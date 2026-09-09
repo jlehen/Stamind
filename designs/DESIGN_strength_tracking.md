@@ -1,5 +1,16 @@
 # Strength tracking: reading the sets, naming the blocks, prescribing in kilograms
 
+**Status:** Draft · **Date:** 2026-09-09 (rev. 2) · **Branch:** worktree-strength-tracking-design
+
+Revision 2 re-reads the code after the plan-change-continuity merge and fixes what rev. 1
+assumed: the re-fetch rides on the mutable-days zone that already exists, not on a
+`data pull --force` that does not (§6); the e1RM logbook has no test-beats-modeled rule to
+inherit, so the design states its own (§8); the strength call must run before the preview
+because `workouts` is append-only, and inside the commitment window a kept session keeps
+its kilograms (§9); a naming question can only ride on the morning push or on a command the
+athlete runs (§7). Where the prescription's structured form lives is a new open question
+(§13). Revision 1 is in the branch history.
+
 ## 1. Motivation
 
 TrainMate plans strength sessions but has no idea what happens in them. A completed
@@ -145,21 +156,30 @@ name came from Garmin or from a person. Nothing else ever sets it.
 
 Manual and imported sessions need a `completed_activities` row to hang off; they get one
 with `activity_type = strength_training`, a synthetic `activity_id`, and whatever
-duration/RPE the athlete gave. Nothing downstream distinguishes them from Garmin rows,
-which is the point.
+duration/RPE the athlete gave. Today `garmin/sync.py` is the only writer of that table and
+RPE is never synthesised; the quick-log becomes the second writer, and its RPE is the
+athlete's own number, not a synthesis. Nothing downstream distinguishes these rows from
+Garmin's, which is the point.
 
 ## 6. The pull path
 
-`data pull` already iterates activities in the window. For each strength activity it
-additionally fetches exercise sets and replaces that activity's rows wholesale (delete by
-`activity_id`, insert the fresh list). Replace-not-merge because the athlete edits in
-Connect and the corrected version must win.
+`garmin/sync.py::_ingest_activities` already iterates the activities in a window and
+upserts one summary row each. For each strength activity it additionally fetches exercise
+sets and replaces that activity's rows wholesale (delete by `activity_id`, insert the
+fresh list). Replace-not-merge because the athlete edits in Connect and the corrected
+version must win. Because the fetch lives in ingest, anything that re-ingests an activity
+refreshes its sets: `data pull -d 30d` re-fetches every set in that range, and no
+`--force` is needed.
 
-That edit happens *after* the session, often after TrainMate's first pull of it. So on
-every pull, sets for strength activities from the last **7 days** are re-fetched and
-replaced, regardless of the window asked for. It is one API call per activity, two or
-three per pull, and it removes any need to detect "was this activity edited". Older than
-7 days is considered settled; `data pull --force` re-fetches the whole window.
+That edit happens *after* the session, often after TrainMate's first pull of it. The code
+already has the shape for this: `garmin_mutable_days` (default 3) is the trailing zone
+that read commands re-fetch through `ensure_data` because Garmin finalises late. Sets get
+the same treatment with a longer reach: on every pull, and on every `ensure_data`
+refresh, strength activities dated in the last **7 days** have their sets re-fetched and
+replaced, whatever window was asked for. Seven rather than three because a Connect edit is
+a human remembering, not a server settling. It is one API call per activity, two or three
+per pull, and it removes any need to detect "was this activity edited". Older than 7 days
+is considered settled unless a selector reaches back to it.
 
 Athlete-confirmed names (§7) live in the same rows, so a re-fetch must not erase them: the
 replace step carries `exercise`/`named_by = athlete` forward by `seq` when the new fetch
@@ -186,6 +206,16 @@ Three sources of names, in order of preference, and nothing else:
 
    The answer is written with `named_by = athlete`. Unanswered questions expire quietly;
    the sets stay unnamed and count as volume only.
+
+   Two facts about the bot shape this. The bot has no path for an unprompted message: it
+   replies, or it runs `bot morning` inside the push window
+   (DESIGN_plan_change_continuity.md §6.4 kept it that way on purpose). So the question is
+   asked by `bot morning` after its pull, and by `workout compare` when "Done lately" runs
+   it, never on its own. And the button mechanism that fits is the row picker
+   (`cli/bot.py::_offer_row_picker`): one `TM-BUTTONS` row per chat, each button a
+   deterministic re-invocation (`strength name <activity> <block> <exercise>`), the row
+   replaced when the next one arrives. One row per chat means one block per message;
+   naming a block re-runs the command that offers the next.
 3. **Nothing.** An unnamed block is a legitimate state. It contributes to session volume
    and fatigue (§9) and to nothing else.
 
@@ -225,12 +255,25 @@ Top set only, because a session's rows mix warm-ups, back-off sets and light var
 athlete's named deadlifts range from 12×16 kg to 4×80 kg in one fortnight, and averaging
 that says nothing. The e1RM is stored per exercise, never per pattern (§4).
 
-The existing `benchmark_results` table already has an `e1rm` anchor kind (kg) that was
-never populated because the CLI had "no per-exercise field". It gains an `exercise`
-column, and the strength state writes a `source = modeled` row per tracked exercise when
-its e1RM changes by more than 2.5%. A formal 1RM test, if the athlete ever does one, is a
-`source = test` row on the same exercise and takes precedence exactly as FTP tests do over
-modeled FTP.
+The existing `benchmark_results` table already has an `e1rm` anchor kind (kg) that
+`benchmark record --e1rm` warns is single-lift because the logbook has "no per-exercise
+field". It gains an `exercise` column, `benchmark record` gains `--exercise` (required
+with `--e1rm`), and the effective-value read (`db/benchmarks.py::latest_thresholds`) keys
+e1RM on `(anchor_kind, exercise)` instead of on the kind alone. The strength state writes
+a `source = modeled` row per tracked exercise when its e1RM changes by more than 2.5%,
+which makes it the first code path to write a modeled row: today the enum value exists
+and nothing produces one.
+
+There is no test-beats-modeled rule to inherit. For FTP the effective value is simply the
+newest row per kind, and `source` only changes what the prompt is told about it ("a
+'manual' or 'modeled' value is an assumption, not a measurement"). e1RM keeps that rule:
+a formal 1RM test is a `source = test` row on the exercise, it is the newest row until the
+next modeled update, and the strength state block names the source beside the number.
+
+One exclusion stays. `prompt.py::_threshold_reasons` skips `e1rm` so a lift PR never
+invalidates a periodization (`test_e1rm_never_invalidates_a_periodization`). The
+exercise column does not change that: strength numbers feed the prescription, never a
+replan.
 
 ## 9. Coach consumption
 
@@ -254,8 +297,14 @@ keep 3 in reserve)" instead of "at 8RM load", and can defend the number.
 `workout adapt`) decides that Tuesday is a 65-minute non-failure strength session, which
 patterns it covers, and what fatigue it may cost the Thursday intervals — the slot and its
 purpose. A second, small call receives only the strength science, the strength state,
-the equipment constraints in force, and that slot's purpose, and returns the exercise
-list with sets, reps and loads. The reasons for splitting here and only here:
+the equipment for that day, and that slot's purpose, and returns the exercise list with
+sets, reps and loads. Equipment is not a constraint type — the constraints table is dates,
+prose and a `rest` flag — so the call reads the two places it lives: the profile's general
+and per-weekday equipment lists (`engine/prompt.py::_format_athlete_profile`) and the
+prose of the constraints active on that date, where "hotel gym, dumbbells only" would be
+written. The precedent for the call is `planning.py::_plan_reshape_verdict`, "a small call
+on purpose": this is the first second call that carries science. The reasons for splitting
+here and only here:
 
 - the strength call's inputs (set history, equipment) are of no use to the endurance
   decisions, and the strength science leaves the endurance prompt entirely;
@@ -266,15 +315,31 @@ list with sets, reps and loads. The reasons for splitting here and only here:
 
 The contract between the two is the planned workout row: the planner writes the slot
 (title, duration, patterns, purpose, RPE budget) and the strength call fills the
-`description` with the prescription. If the strength call fails, the row keeps the
-planner's pattern-level text, which is exactly today's output.
+`description` with the prescription. Three facts about that row fix where the call runs:
+
+- `workouts` is append-only, enforced by triggers (DESIGN_workout_revisions.md). A
+  description cannot be patched after the fact, so the strength call runs on the propose
+  side, inside `workout_generate` / `workout_adapt` before the preview, and the operator
+  sees the kilograms before accepting. `description` is one of the two fields `append`
+  always takes as given, so a new prescription is a real revision with the old one in
+  History.
+- Inside the commitment window (DESIGN_plan_change_continuity.md §4) the planner answers
+  keep / revise / replace / drop for every standing session and is shown the full
+  description of each committed one. A kept strength session appends nothing, so its
+  kilograms stand; only a revised or replaced strength session gets a fresh strength call.
+  The planner can read last week's prescription when it decides, and wording alone is
+  never a reason to touch it.
+- If the strength call fails, the row keeps the planner's pattern-level text, which is
+  exactly today's output.
 
 Untracked volume matters to the planner for one thing: fatigue. An athlete who habitually
 adds 20 minutes of upper-body accessories to a leg day makes every strength session
 heavier than planned; that is the shape of a coach learning ("adds ~20 min accessories
 to strength sessions") and the existing learnings machinery is the right home for it —
 the planner then budgets 85 minutes for a 65-minute prescription, or trims the
-prescription, and stops being surprised.
+prescription, and stops being surprised. Learnings are authored only by the analysis path
+(`data reflect`, bootstrap), so this one appears when reflect is shown the set history,
+not from `workout generate`, which stays read-only toward learnings.
 
 ## 10. Adherence
 
@@ -294,8 +359,10 @@ adherence, with the note that the numbers landed on a different exercise.
 
 **Phase 1 — data, no prompt changes.** The vocabulary table, `exercise_sets`, the pull
 with 7-day re-fetch, the Telegram naming question, the CLI quick-log, the Doc import
-(§12), and sets shown in `workout compare` / "Done lately". At the end of it TrainMate
-knows what the athlete lifts and the coach does not use it yet. Deliberately boring, so it
+(§12), and sets shown in `workout compare` / "Done lately" — both of which today render a
+strength session as duration, load and RPE only (`cli/common.py::format_actual`,
+`cli/render.py::simple_compare_lines`). At the end of it TrainMate knows what the athlete
+lifts and the coach does not use it yet. Deliberately boring, so it
 can be checked against reality — do Connect edits come through, is 7 days enough — before
 anything depends on it.
 
@@ -306,10 +373,14 @@ detour through the direction the prompt is trying to leave.
 
 **Between them, the science trim** (TODO §PROMPT). The adapt prompt is ~50k tokens; ~15k
 is science, split evenly between shipped and athlete files and sent whole to every
-command. Tagging files by command and sport and including only matches is independent of
-strength and should land before phase 2, so that when the strength call appears the
-endurance prompt has already shed the strength science and the two-call shape is visible
-rather than buried.
+command (`coach/formatting.py::_load_science_guidelines` reads every `*.md` in both
+directories, in name order, with no tagging). Tagging files by command and sport and
+including only matches is independent of strength and should land before phase 2, so that
+when the strength call appears the endurance prompt has already shed the strength science
+and the two-call shape is visible rather than buried. The shipped set has no strength file;
+the athlete's strength science is the kind of file `science.samples/cycling_and_strength/
+strength_integration.md` is, and the samples now come as two sets there, so the tags have
+a worked example in each.
 
 ## 12. The one-time import
 
@@ -334,8 +405,16 @@ Open:
 - The habitual threshold (3 of the last 8 sessions) is a first guess; revisit once the
   table has two months of rows.
 - Whether the naming question should batch a whole session ("3 unnamed blocks on Sep 1")
-  or send one message per block. Start with one message listing all blocks, one reply
-  per block.
+  or send one message per block. The bot holds one button row per chat (§7), which
+  decides it for now: one block per message, the next offered when the last is answered.
+  Batching would need a second mechanism and is not worth one until the single-row form
+  has been used.
+- Where the prescription's structured form lives. §10 compares prescribed exercises,
+  sets, reps and loads against `exercise_sets`, and parsing them back out of
+  `description` is fragile. `workouts` has no JSON column and the precedent is typed
+  columns (`planned_zone_currency` + `planned_zone{n}_sec`); a `prescribed_sets` table
+  keyed by the workout revision is the other shape. Phase 2 decides, after phase 1 has
+  shown what the set rows look like.
 - Pushing the prescription to the watch (`upload_workout` + `schedule_workout`) would
   make the watch name the exercises itself, which removes §7 for an athlete who follows
   the plan exactly and adds friction for one who improvises. Garmin's strength-workout
