@@ -1,8 +1,16 @@
 # Strength tracking: reading the sets, naming the blocks, prescribing in kilograms
 
-**Status:** Draft · **Date:** 2026-09-09 (rev. 2) · **Branch:** worktree-strength-tracking-design
+**Status:** Draft · **Date:** 2026-09-10 (rev. 3) · **Branch:** worktree-strength-tracking-design
 
-Revision 2 re-reads the code after the plan-change-continuity merge and fixes what rev. 1
+Revision 3 answers "how do strength benchmarks work" for athletes in general. The number
+read from ordinary sessions is a **training max**, a floor, and it never competes with a
+tested value (§8). A block's test measures the goal's sport: a cyclist's boundary week
+holds the FTP test and no strength test, a strength-goal athlete's holds a rep-max
+session that reads its own result from the sets (§8, §9). Rev. 2's "newest row wins"
+rule for e1RM is withdrawn because it produced a sawtooth between tested and modeled
+values (§13).
+
+Revision 2 re-read the code after the plan-change-continuity merge and fixes what rev. 1
 assumed: the re-fetch rides on the mutable-days zone that already exists, not on a
 `data pull --force` that does not (§6); the e1RM logbook has no test-beats-modeled rule to
 inherit, so the design states its own (§8); the strength call must run before the preview
@@ -228,7 +236,7 @@ evidence, and a wrong name silently corrupts a lift's history. Template proposal
 possible later convenience because they still end in a human decision; they are out of
 the first version (§11).
 
-## 8. Tracked lifts and the estimated 1RM
+## 8. Tracked lifts, the training max, and the strength test
 
 Nobody configures a list of lifts. The set of **tracked** exercises is derived from two
 sources, unioned:
@@ -245,35 +253,91 @@ join automatically and lateral raises never do. A lift that stops being done age
 For each tracked exercise TrainMate keeps a rolling **strength state**:
 
 - the last three sessions' working sets (`sets × reps @ kg`, plus session RPE);
-- an estimated one-rep max (e1RM) from the session's **top set** — the set with the
-  highest `load × reps` product — using Epley (`load × (1 + reps/30)`), computed only
-  when reps ≤ 12 because the formula drifts past that;
+- a **training max** from the session's **top set** — the set with the highest
+  `load × reps` product — using Epley (`load × (1 + reps/30)`), computed only when
+  reps ≤ 12 because the formula drifts past that;
 - for bodyweight exercises, the best set's reps at bodyweight (or reps at added load)
-  instead of an e1RM.
+  instead of a training max.
 
 Top set only, because a session's rows mix warm-ups, back-off sets and light variants: the
 athlete's named deadlifts range from 12×16 kg to 4×80 kg in one fortnight, and averaging
-that says nothing. The e1RM is stored per exercise, never per pattern (§4).
+that says nothing. The training max is stored per exercise, never per pattern (§4).
+
+**Why "training max" and not "e1RM".** Working sets are stopped with reps in reserve, and
+reps in reserve are not recorded (§2). Epley on 4×4 @ 80 kg with three left in the tank
+says 91 kg when the true max is nearer 100. So every number derived from ordinary sessions
+is a floor, and a consistent floor as long as the athlete keeps a similar reserve: the
+trend is real, the level is not. The coach is told exactly that, and prescribes from the
+sets, not from the number: "4×10 @ 107.5, +2.5 from last Tuesday's 4×10 @ 105 with two in
+reserve". The training max is a progress summary — the timeline, the block report, the
+anchors line — never the input to a load.
+
+### 8.1 The logbook
 
 The existing `benchmark_results` table already has an `e1rm` anchor kind (kg) that
 `benchmark record --e1rm` warns is single-lift because the logbook has "no per-exercise
-field". It gains an `exercise` column, `benchmark record` gains `--exercise` (required
-with `--e1rm`), and the effective-value read (`db/benchmarks.py::latest_thresholds`) keys
-e1RM on `(anchor_kind, exercise)` instead of on the kind alone. The strength state writes
-a `source = modeled` row per tracked exercise when its e1RM changes by more than 2.5%,
-which makes it the first code path to write a modeled row: today the enum value exists
-and nothing produces one.
+field". It gains an `exercise` column and `benchmark record` gains `--exercise`
+(required with `--e1rm`). The strength state writes a `source = modeled` row per tracked
+exercise when its training max changes by more than 2.5%, which makes it the first code
+path to write a modeled row: today the enum value exists and nothing produces one.
 
-There is no test-beats-modeled rule to inherit. For FTP the effective value is simply the
-newest row per kind, and `source` only changes what the prompt is told about it ("a
-'manual' or 'modeled' value is an assumption, not a measurement"). e1RM keeps that rule:
-a formal 1RM test is a `source = test` row on the exercise, it is the newest row until the
-next modeled update, and the strength state block names the source beside the number.
-
-One exclusion stays. `prompt.py::_threshold_reasons` skips `e1rm` so a lift PR never
-invalidates a periodization (`test_e1rm_never_invalidates_a_periodization`). The
-exercise column does not change that: strength numbers feed the prescription, never a
+**A tested max and a training max never compete.** They measure different things — a
+set taken to one rep short of failure, and a floor guessed from sets that were not — and
+a rule that picks the newest of the two produces a sawtooth: tested 155 in August,
+modeled 140 in September, 145 in October, and a reader concludes the athlete got weaker
+in August. So for `e1rm` nothing ever asks for "the current value". The effective-value
+read (`db/benchmarks.py::latest_thresholds`) serves two readers: the drift check that
+triggers a replan, which already skips `e1rm`
+(`prompt.py::_threshold_reasons`, `test_e1rm_never_invalidates_a_periodization`), and the
+ANCHORS ON RECORD line. For strength that line gives way to the strength state block,
+which shows both numbers side by side with the test's date (§9). The exercise column
+changes nothing about the exclusion: strength numbers feed the prescription, never a
 replan.
+
+### 8.2 The strength test
+
+The benchmark machinery (DESIGN_benchmark_workouts.md §4.1) asks for one test in each
+block's final week, preceded by an opener day so the athlete is fresh, and its post-check
+counts a benchmark of any sport. Two tests in one week therefore collide twice: two
+openers in a seven-day week that also holds the block's last hard sessions, and — since
+the same-day collision rule is per sport — nothing stops a near-failure leg session
+landing two days before the FTP test and lowering the number that scales the whole next
+block.
+
+The rule that resolves it is general, and one sentence long:
+
+> **A block's test measures what the block is for.** One test per boundary week, of the
+> kind that belongs to the macrocycle's goal sport (`objectives.sport_type`). Supporting
+> sports get no boundary test; their anchors are read wherever they can be read without
+> a session.
+
+For a cyclist who lifts, the seam holds the FTP test and no strength test is ever placed:
+strength is a training max from working sets, and the collision cannot happen because
+only one test exists. For a runner who lifts, the same with threshold pace. For an athlete
+whose goal is strength — "squat 140 by December", a meet — the boundary week holds the
+strength test and there is no endurance test to collide with. The placement text in
+`engine/workouts.py` says "the goal sport's test" instead of "a fitness test of the
+appropriate kind", and the strength entry in `science/benchmarks.md` changes from "1RM
+test, or e1RM from a set near failure" to the protocol below. The planner already reads
+the goals, so it knows the sport.
+
+**The protocol.** After the warm-up, on each tracked lift, one set at a load good for
+five to eight reps, stopped one short of failure; then the usual back-off work. Not a 1RM
+attempt: a true single is dangerous without a spotter, costs a week of recovery, and buys
+nothing a five-rep max does not, while Epley is accurate in the 3–8 rep range and safe to
+repeat on the block cadence. The planner places the slot with `benchmark_type = e1rm`
+exactly as it places every other benchmark — boundary week, opener before it — and the
+strength call (§9) fills it with that protocol on the tracked lifts.
+
+**The test reads itself.** The watch records the reps and load of the near-failure set, so
+unlike an FTP test, which needs `benchmark record` because Zwift shows a number the app
+cannot recompute, this one captures its own result. On the pull, a completed strength
+activity on the date of a planned session flagged `e1rm` — the same date-and-sport link
+the adherence matcher already makes — has its top set per tracked lift run through Epley
+and written as a `source = test` row with the exercise name. A lift whose top set that
+day is unnamed gets no row until the naming question (§7) is answered; no guessing, same
+rule as everywhere else. `benchmark record --e1rm --exercise` remains the third way to
+write a test row, for an athlete without a watch or a test done elsewhere.
 
 ## 9. Coach consumption
 
@@ -281,17 +345,20 @@ The coach gets a compact **strength state** block, one line per tracked exercise
 one-line summary of untracked volume:
 
 ```
-STRENGTH STATE (tracked lifts; loads are per exercise and not comparable across them)
-  deadlift (barbell, hinge)        e1RM 91 kg   last: 4x4@80 RPE6 | 5x5@55 | 3x10@60
-  belt squat (machine, squat)      e1RM 137 kg  last: 4x10@105 | 4x10@100 | 4x10@100
-  bench press (barbell, push_h)    e1RM 61 kg   last: 3x5@52 | 5x5@50 | 5x5@48
-  lat pulldown (cable, pull_v)     e1RM 143 kg  last: 5x10@110 | 5x10@95
-  pull-up (bodyweight, pull_v)     best 8 reps  last: 4x6 | 3x8 | 4x5
+STRENGTH STATE (tracked lifts; loads are per exercise and not comparable across them;
+                training max is a floor estimated from working sets not taken to failure)
+  deadlift (barbell, hinge)        tmax 91 kg                 last: 4x4@80 RPE6 | 5x5@55 | 3x10@60
+  belt squat (machine, squat)     tmax 140 kg  tested 155 Aug 12   last: 4x10@105 | 4x10@100 | 4x10@100
+  bench press (barbell, push_h)    tmax 61 kg                 last: 3x5@52 | 5x5@50 | 5x5@48
+  lat pulldown (cable, pull_v)    tmax 143 kg                 last: 5x10@110 | 5x10@95
+  pull-up (bodyweight, pull_v)    best 8 reps                 last: 4x6 | 3x8 | 4x5
   untracked: ~12 sets/session of core, flyes, triceps; adds ~20 min
 ```
 
 With that in front of it the coach writes "belt squat 4×10 @ 110 (+5 from last week,
-keep 3 in reserve)" instead of "at 8RM load", and can defend the number.
+keep 3 in reserve)" instead of "at 8RM load", and can defend the number. The `tested`
+column appears only when a test row exists for the lift; for a strength-goal athlete it is
+the anchor and leads the line, for a cyclist it is usually absent.
 
 **The prescription is a separate LLM call.** The main planner (`workout generate` /
 `workout adapt`) decides that Tuesday is a 65-minute non-failure strength session, which
@@ -331,6 +398,10 @@ The contract between the two is the planned workout row: the planner writes the 
   never a reason to touch it.
 - If the strength call fails, the row keeps the planner's pattern-level text, which is
   exactly today's output.
+- A slot flagged `benchmark_type = e1rm` (§8.2) is filled by the same call with the
+  rep-max protocol on the tracked lifts, plus back-off work sized to the slot. The planner
+  only ever places that slot for a strength goal, so the strength call never has to know
+  the athlete's goal sport itself.
 
 Untracked volume matters to the planner for one thing: fatigue. An athlete who habitually
 adds 20 minutes of upper-body accessories to a leg day makes every strength session
@@ -355,6 +426,12 @@ information for §9, never a deviation. Two things are deviations worth flagging
 Substitution within a pattern (goblet squat for back squat, pulldown for pull-up) is
 adherence, with the note that the numbers landed on a different exercise.
 
+A strength test session (§8.2) is done when every tracked lift has a named top set in the
+5–8 rep range; a lift whose top set is unnamed is "test pending your answer", not a
+deviation, and becomes a test row when the block is named. Here substitution is not
+adherence: a goblet squat top set says nothing about the back squat's max, so the lift
+counts as skipped and its previous test row stands.
+
 ## 11. Phasing, and the science trim
 
 **Phase 1 — data, no prompt changes.** The vocabulary table, `exercise_sets`, the pull
@@ -367,9 +444,17 @@ can be checked against reality — do Connect edits come through, is 7 days enou
 anything depends on it.
 
 **Phase 2 — the coach.** Tracked-lift derivation, strength state, the `benchmark_results`
-extension, the separate prescription call, strength adherence. Built as a second call from
-the start: bolting a lift-history block onto the existing prompt and splitting later is a
-detour through the direction the prompt is trying to leave.
+extension, the separate prescription call, strength adherence, and the two one-line
+changes that carry the goal-sport rule (§8.2): the placement text and the strength entry
+in `science/benchmarks.md`. Built as a second call from the start: bolting a lift-history
+block onto the existing prompt and splitting later is a detour through the direction the
+prompt is trying to leave.
+
+**Deferred until an athlete with a strength goal exists:** the self-capturing test (§8.2)
+and the test-session adherence rule (§10). Neither runs on an instance whose goals are
+endurance, because the planner never places the slot there. The rule and the shape are
+decided now so the schema and the prompt do not close the door; the code is written for
+the first instance that opens it.
 
 **Between them, the science trim** (TODO §PROMPT). The adapt prompt is ~50k tokens; ~15k
 is science, split evenly between shipped and athlete files and sent whole to every
@@ -397,7 +482,14 @@ Decided:
 - Read-only toward Garmin; Connect is the editing surface.
 - No inferred names, ever. Templates, if they come, are proposals with a human tap.
 - Tracked lifts by frequency and prescription, never by load, never by config.
-- e1RM per exercise from the top set; patterns for adherence only.
+- A training max per exercise from the top set, named as the floor it is; patterns for
+  adherence only.
+- A tested max and a training max never compete for a current value; the strength state
+  shows both. Rev. 2's "newest row wins" was withdrawn for the sawtooth it produced.
+- A block's test measures the goal's sport. A strength test is placed only for a strength
+  goal, as a rep-max session that reads its own result from the sets; a cyclist's boundary
+  week holds the FTP test and nothing else, because a second test would cost an opener day
+  and could land a near-failure leg session before the ride that calibrates the next block.
 - Strength prescription is its own LLM call; the endurance planner stays one call.
 
 Open:
@@ -415,6 +507,11 @@ Open:
   columns (`planned_zone_currency` + `planned_zone{n}_sec`); a `prescribed_sets` table
   keyed by the workout revision is the other shape. Phase 2 decides, after phase 1 has
   shown what the set rows look like.
+- Whether a supporting-sport athlete ever misses a tested max. Once the prescription has
+  a structured form, the strength call could write "top set: 5+ reps at 105, one short of
+  failure" into an ordinary mid-block session and the pull could read that set as a test
+  because the prescription said it was one — inside the strength call, touching no planner
+  rule. Wait for phase 2 to show whether the floor is missed before building it.
 - Pushing the prescription to the watch (`upload_workout` + `schedule_workout`) would
   make the watch name the exercises itself, which removes §7 for an athlete who follows
   the plan exactly and adds friction for one who improvises. Garmin's strength-workout
