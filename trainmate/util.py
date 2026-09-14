@@ -363,8 +363,8 @@ def truncate_visible(s: str, width: int) -> str:
 
 
 class Progress:
-    """A single self-erasing '[####....] 7/28' line for a loop whose only other option is
-    one printed line per item (the Calendar round-trips of generate/rollback).
+    """A single self-erasing '[####....] 7/28' line for a loop of slow network round-trips:
+    the Calendar writes of generate/rollback, the days and activities of a Garmin pull.
 
     Silent unless stdout is a terminal, so piped output, the bot and the tests keep just
     the summary line that introduced it. Usable as a context manager, which erases the

@@ -1,3 +1,4 @@
+import io
 import os
 import unittest
 from datetime import date, datetime, timedelta, timezone
@@ -280,7 +281,7 @@ class TestBackfillTss(unittest.TestCase):
 
 
 class _FakeClient:
-    """Minimal GarminClient stand-in for _ingest_activities. `summaries` is the
+    """Minimal GarminClient stand-in for the ingest loops. `summaries` is the
     activity list get_activities returns; set `raise_on_fetch` to simulate an API
     failure. No HR/power so the zone/RPE lookups stay trivial."""
 
@@ -301,6 +302,9 @@ class _FakeClient:
 
     def get_activity_rpe(self, activity_id):
         return None
+
+    def get_daily_metrics(self, date_str):
+        return {"rhr": None, "hrv": None, "sleep_score": None, "stress": None}
 
 
 def _summary(activity_id, day, type_key="indoor_cycling"):
@@ -363,6 +367,33 @@ class TestIngestReconcilesDeletions(unittest.TestCase):
             garmin._ingest_activities(client, _d(0), _d(0), throttle=0)
 
         self.assertEqual(self._ids(), {"today", "last_week"})
+
+
+class _Tty(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
+class TestIngestProgress(unittest.TestCase):
+    """A pull draws the Calendar's self-erasing bar: one tick per activity, one per day."""
+
+    def setUp(self):
+        _bind_test_db(self)
+        clear_all_tables(test_db)
+
+    def test_activities_tick_once_each_including_a_skipped_one(self):
+        undated = {**_summary("undated", _d(0)), "startTimeLocal": ""}
+        client = _FakeClient([_summary("a1", _d(0)), undated])
+        out = _Tty()
+        with patch("sys.stdout", out):
+            garmin._ingest_activities(client, _d(0), _d(0), throttle=0)
+        self.assertIn("2/2", out.getvalue())
+
+    def test_metrics_tick_once_per_day(self):
+        out = _Tty()
+        with patch("sys.stdout", out):
+            garmin._ingest_metrics(_FakeClient([]), _d(-2), _d(0), throttle=0)
+        self.assertIn("3/3", out.getvalue())
 
 
 class TestEnsureData(unittest.TestCase):

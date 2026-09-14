@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Tuple
 
 from trainmate import runtime
 from trainmate.config import config
-from trainmate.util import today_str, cmd, fail, step, warn, keep_whole
+from trainmate.util import Progress, today_str, cmd, fail, step, warn, keep_whole
 import trainmate.garmin as _g
 from trainmate.garmin.client import (GarminAuthRequired, GarminClient, _date_range,
     _derivation_pad_days, _shift, _to_date)
@@ -27,61 +27,68 @@ def _ingest_activities(client: GarminClient, start: str, end: str, throttle: flo
     step(f"Found {len(activities)} activities in {start}..{end}.")
     underestimated_activities = []  # activities whose load is a weak estimate for lack of RPE
     fetched_ids = []  # everything Garmin still has in this range, for deletion reconcile
-    for idx, act in enumerate(activities):
-        activity_id = str(act.get("activityId"))
-        fetched_ids.append(activity_id)
-        start_time = act.get("startTimeLocal", "") or ""
-        date_str = start_time.split(" ")[0] if start_time else ""
-        if not date_str:
-            continue
-        type_key = (act.get("activityType") or {}).get("typeKey", "unknown")
-        duration_sec = act.get("duration") or 0.0
-        avg_hr = act.get("averageHR")
+    with Progress(len(activities)) as bar:
+        for idx, act in enumerate(activities):
+            activity_id = str(act.get("activityId"))
+            fetched_ids.append(activity_id)
+            start_time = act.get("startTimeLocal", "") or ""
+            date_str = start_time.split(" ")[0] if start_time else ""
+            if not date_str:
+                bar.step()
+                continue
+            type_key = (act.get("activityType") or {}).get("typeKey", "unknown")
+            duration_sec = act.get("duration") or 0.0
+            avg_hr = act.get("averageHR")
 
-        # A classifier, not a pre-filter: Garmin reports avgPower for running too
-        # (watch-/Stryd-derived), and running watts scored against a cycling FTP are
-        # meaningless (DESIGN_intensity_distribution.md §6.1).
-        bike_avg_watts = None
-        if canonical_sport(type_key or "") == "cycling":
-            power = act.get("avgPower") or act.get("averagePower")
-            if power is not None:
-                try:
-                    bike_avg_watts = int(round(float(power)))
-                except (ValueError, TypeError):
-                    pass
+            # A classifier, not a pre-filter: Garmin reports avgPower for running too
+            # (watch-/Stryd-derived), and running watts scored against a cycling FTP are
+            # meaningless (DESIGN_intensity_distribution.md §6.1).
+            bike_avg_watts = None
+            if canonical_sport(type_key or "") == "cycling":
+                power = act.get("avgPower") or act.get("averagePower")
+                if power is not None:
+                    try:
+                        bike_avg_watts = int(round(float(power)))
+                    except (ValueError, TypeError):
+                        pass
 
-        zones = client.get_activity_hr_zones(activity_id) if avg_hr is not None else {f"zone{i}_sec": 0 for i in range(1, 6)}
-        # Power zones only exist when a power meter was recording (cycling); skip
-        # the extra API call otherwise and leave the columns NULL.
-        power_zones = (
-            client.get_activity_power_zones(activity_id)
-            if bike_avg_watts is not None
-            else {f"power_zone{i}_sec": None for i in range(1, 8)}
-        )
+            zones = (
+                client.get_activity_hr_zones(activity_id)
+                if avg_hr is not None
+                else {f"zone{i}_sec": 0 for i in range(1, 6)}
+            )
+            # Power zones only exist when a power meter was recording (cycling); skip
+            # the extra API call otherwise and leave the columns NULL.
+            power_zones = (
+                client.get_activity_power_zones(activity_id)
+                if bike_avg_watts is not None
+                else {f"power_zone{i}_sec": None for i in range(1, 8)}
+            )
 
-        # RPE is user-entered only; we never synthesise it from power or HR.
-        rpe_raw = client.get_activity_rpe(activity_id)
-        rpe = int(round(rpe_raw)) if rpe_raw else None
+            # RPE is user-entered only; we never synthesise it from power or HR.
+            rpe_raw = client.get_activity_rpe(activity_id)
+            rpe = int(round(rpe_raw)) if rpe_raw else None
 
-        # Store the objective measurement (power TSS or hrTSS; NULL if neither).
-        # The training-load fallback — which may use RPE — is derived on the fly.
-        tss = measured_tss(power_zones, zones)
-        _load, _method, warning = compute_load(power_zones, zones, rpe, duration_sec)
-        if warning:
-            act_name = act.get("activityName", "Unknown Activity")
-            underestimated_activities.append(f"{date_str} {act_name}")
+            # Store the objective measurement (power TSS or hrTSS; NULL if neither).
+            # The training-load fallback — which may use RPE — is derived on the fly.
+            tss = measured_tss(power_zones, zones)
+            _load, _method, warning = compute_load(power_zones, zones, rpe, duration_sec)
+            if warning:
+                act_name = act.get("activityName", "Unknown Activity")
+                underestimated_activities.append(f"{date_str} {act_name}")
 
-        runtime.db.save_completed_activity(
-            activity_id=activity_id, date=date_str, start_time=start_time,
-            activity_name=act.get("activityName", "Unknown Activity"),
-            activity_type=type_key, duration_sec=float(duration_sec),
-            distance_km=_safe_round((act.get("distance") or 0) / 1000.0, 2),
-            elevation_gain_m=_safe_round(act.get("elevationGain")),
-            avg_hr=avg_hr, max_hr=act.get("maxHR"), rpe=rpe, tss=tss,
-            bike_avg_watts=bike_avg_watts, **zones, **power_zones,
-        )
-        if throttle:
-            time.sleep(throttle)
+            runtime.db.save_completed_activity(
+                activity_id=activity_id, date=date_str, start_time=start_time,
+                activity_name=act.get("activityName", "Unknown Activity"),
+                activity_type=type_key, duration_sec=float(duration_sec),
+                distance_km=_safe_round((act.get("distance") or 0) / 1000.0, 2),
+                elevation_gain_m=_safe_round(act.get("elevationGain")),
+                avg_hr=avg_hr, max_hr=act.get("maxHR"), rpe=rpe, tss=tss,
+                bike_avg_watts=bike_avg_watts, **zones, **power_zones,
+            )
+            bar.step()
+            if throttle:
+                time.sleep(throttle)
 
     if underestimated_activities:
         count = len(underestimated_activities)
@@ -104,18 +111,20 @@ def _ingest_metrics(client: GarminClient, start: str, end: str, throttle: float)
     """Ingests one row per day in the range, returning how many days that was."""
     dates = _date_range(start, end)
     step(f"Fetching daily metrics for {len(dates)} day(s) {start}..{end}...")
-    for date_str in dates:
-        m = client.get_daily_metrics(date_str)
-        # Write a row for EVERY day in range, even all-null, so the metrics-cache
-        # date coverage records what has been pulled (gap detection). Derived
-        # fields are left None here; recompute fills them via COALESCE.
-        runtime.db.save_metric_cache(
-            date=date_str,
-            rhr=_int_or_none(m["rhr"]), hrv=_int_or_none(m["hrv"]),
-            sleep_score=_int_or_none(m["sleep_score"]), stress=_int_or_none(m["stress"]),
-        )
-        if throttle:
-            time.sleep(throttle)
+    with Progress(len(dates)) as bar:
+        for date_str in dates:
+            m = client.get_daily_metrics(date_str)
+            # Write a row for EVERY day in range, even all-null, so the metrics-cache
+            # date coverage records what has been pulled (gap detection). Derived
+            # fields are left None here; recompute fills them via COALESCE.
+            runtime.db.save_metric_cache(
+                date=date_str,
+                rhr=_int_or_none(m["rhr"]), hrv=_int_or_none(m["hrv"]),
+                sleep_score=_int_or_none(m["sleep_score"]), stress=_int_or_none(m["stress"]),
+            )
+            bar.step()
+            if throttle:
+                time.sleep(throttle)
     return len(dates)
 def _int_or_none(v: Any) -> Optional[int]:
     if v is None:
