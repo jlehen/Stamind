@@ -339,8 +339,9 @@ def run_bot_morning(args: argparse.Namespace) -> None:
 
     Idempotent per day via the settings marker; the bot's scheduler may fire it
     repeatedly (catch-up after sleep, restarts) without double-sending. A day with no
-    session gets the one-line rest message and a day already trained the congratulation,
-    both without buttons — neither has anything left to offer.
+    session gets the one-line rest message, a planned rest day its own line, and a day
+    already trained the congratulation, all without buttons — none has a session left to
+    change.
 
     Once the schedule has run out the push says so and offers to extend it, and once even
     that has nothing left to say it sends nothing at all (DESIGN_runway_nudge.md §6)."""
@@ -387,8 +388,10 @@ def run_bot_morning(args: argparse.Namespace) -> None:
         for line in simple_runway_lines(runway, today):
             print(wrap_text(line))
     # Two independent gates, each answering its own question, so relaxing one cannot
-    # resurrect the other's buttons (§6).
-    buttons = (MORNING_BUTTONS if ahead else []) + runway_buttons(runway)
+    # resurrect the other's buttons (§6). A rest session is graded apart from done, but
+    # there is nothing on it to ease or move.
+    to_change = [w for w in ahead if canonical_sport(w["sport_type"]) != "rest"]
+    buttons = (MORNING_BUTTONS if to_change else []) + runway_buttons(runway)
     if buttons:
         emit_buttons(buttons)
     runtime.db.set_setting(MORNING_MARKER, today)

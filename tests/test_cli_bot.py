@@ -153,6 +153,15 @@ class MorningPushTest(unittest.TestCase):
         self.assertNotIn(BUTTONS_SENTINEL, out)
         self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
 
+    def test_a_planned_rest_day_gets_no_buttons(self):
+        """The coach writes rest as a session row, graded rest_ok rather than done; "Can't
+        today" would offer to move it."""
+        save_workout(test_db, today_str(), "rest", "Rest day")
+        code, out, _ = run_cli(["bot", "morning"])
+        self.assertEqual(code, 0)
+        self.assertIn("Rest day", out)
+        self.assertNotIn(BUTTONS_SENTINEL, out)
+
     def test_session_day_renders_line_description_and_buttons(self):
         save_workout(
             test_db, today_str(), "running", "Easy run",
