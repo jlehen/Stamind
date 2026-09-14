@@ -30,19 +30,20 @@ import datetime
 import html
 import json
 import os
+import re
 import secrets
 import shlex
 import signal
 import sys
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
-from trainmate import journal, settings
+from trainmate import athlete_queue, journal, settings
 from trainmate.clock import now as athlete_now, reset_cache as forget_timezone
 from trainmate.config import config
 from trainmate.prompt import (
     PROMPT_SENTINEL, PROMPT_PROTOCOL_VERSION, PHOTO_SENTINEL, BUTTONS_SENTINEL,
-    FLUSH_SENTINEL,
+    FLUSH_SENTINEL, QUEUE_LATER_CHOICES, QUEUE_NOT_NOW, QUEUE_SENTINEL, queue_later_label,
 )
 from trainmate.util import cmd, strip_ansi, warn
 
@@ -91,6 +92,7 @@ MENU_COMMANDS = [
     ("learnings", "Inspect coach learnings"),
     ("constraint", "Manage directives the coach works around"),
     ("settings", "Show/change preferences (model, timezone, morning push)"),
+    ("queue", "Questions and messages waiting for the athlete"),
     ("ui", "Switch simple/expert chat UI (until restart)"),
     ("cancel", "Abort the command awaiting your answer"),
     ("restart", "Restart the bot process (picks up new code)"),
@@ -209,6 +211,9 @@ CAPTURE_RESCUE_ECHO = "noting that for your coach"
 # What a tap on a row a newer one replaced gets back (§12.3).
 UI_STALE_TAP = "That offer expired — just send it again."
 
+# What a tap gets while another command runs in the chat; its buttons stay alive for a retry.
+BUSY_TAP = "One moment — still finishing the last thing. Tap again shortly."
+
 # --- The Stop button raised over an LLM wait (DESIGN_bot_stop_button.md §3) ---
 # One button, one meaning, the same in both personas: end the command the athlete is
 # watching wait. "Stopped." is all the reply claims, because a command that already
@@ -304,6 +309,37 @@ def next_push_delay(
     return (start + datetime.timedelta(days=1) - now).total_seconds()
 
 
+async def scheduler_wake(
+    fired: Optional[str], simple: bool, busy: Callable[[], bool],
+    run: Callable[[List[str], bool], Awaitable[None]],
+) -> Tuple[Optional[str], float]:
+    """One wake of the bot's scheduler. Returns the day the push last fired and how long to
+    sleep before the next wake: at most 5 minutes, so a laptop suspend (which stalls the
+    monotonic clock asyncio sleeps on) can't oversleep the window.
+
+    Reminders that are due go first, and `run` waits for them: a push due on the same wake
+    would otherwise find the chat busy. They go out whatever the persona and whether or not
+    the push is on (DESIGN_athlete_queue.md §6.5). The push fires inside the
+    [morning_time, deadline] window once per bot-day (DESIGN_bot_simple_frontend.md §4.3)."""
+    # The athlete's wall clock, not the machine's: morning-time/morning-deadline are the
+    # hours they wake up in (DESIGN_user_timezone.md §2). Every knob here is re-read each
+    # wake — `settings set` runs in a CLI subprocess, so this long-lived process would
+    # otherwise hold its first answer until a restart (DESIGN_settings.md §5).
+    forget_timezone()
+    if not busy() and athlete_queue.reminders_due():
+        await run(["bot", "queue", "--remind"], True)
+    now = athlete_now()
+    today = now.date().isoformat()
+    delay = next_push_delay(now, settings.morning_time(), settings.morning_deadline())
+    if delay > 0 or not simple or not settings.push_enabled() or fired == today:
+        return fired, min(max(delay, 60), 300)
+    if busy():
+        # §4.3: never collide with an in-flight command — retry shortly.
+        return fired, 180
+    await run(["bot", "morning"], False)
+    return today, 0
+
+
 def parse_message_to_argv(text: str, bot_username: Optional[str] = None) -> Optional[List[str]]:
     """Turns a raw chat message into a CLI argv list, or None if there's nothing to run.
 
@@ -390,6 +426,20 @@ def is_flush_request(line: str) -> bool:
     return line.startswith(FLUSH_SENTINEL)
 
 
+def parse_queue_request(line: str) -> Optional[dict]:
+    """Decodes a sentinel-framed queued item, or None if it isn't one.
+
+    `trainmate.prompt.emit_queue_item` writes ``\\x1eTM-QUEUE {json}`` (fields ``id``,
+    ``text``, ``buttons``, ``since``). The item goes out as a message of its own and its
+    buttons carry all a tap needs, so the bot stores nothing (DESIGN_athlete_queue.md §6.2)."""
+    if not line.startswith(QUEUE_SENTINEL):
+        return None
+    try:
+        return json.loads(line[len(QUEUE_SENTINEL):])
+    except json.JSONDecodeError:
+        return None
+
+
 # Any other \x1e-prefixed sentinel a future CLI version might emit: recognised
 # framing but not (yet) understood by this bot build. Dropped rather than
 # forwarded as chat text, so a stale bot degrades to a silently-missing
@@ -429,6 +479,26 @@ def decode_stop_callback(data: str) -> Optional[str]:
     return parts[1]
 
 
+def queue_callback_data(item_id: Any, action: str, since: str) -> str:
+    """callback_data for a queued item's button: ``"q:{item id}:{action}:{walk start}"``.
+    The action names a position among the answers stored with the item, never the answer
+    itself, so it stays inside Telegram's 64 bytes (DESIGN_athlete_queue.md §6.2)."""
+    return f"q:{item_id}:{action}:{since}"
+
+
+def decode_queue_callback(data: str) -> Optional[Tuple[str, str, str]]:
+    """Splits ``"q:{item id}:{action}:{walk start}"`` back into its parts, or None when it
+    is not one. Each part becomes a word of `bot queue`'s argv, so each is held to its
+    shape."""
+    parts = (data or "").split(":")
+    if len(parts) != 4 or parts[0] != "q":
+        return None
+    _, item_id, action, since = parts
+    if not (item_id.isdigit() and action.isalnum() and re.fullmatch(r"r?\d+", since)):
+        return None
+    return item_id, action, since
+
+
 def resolve_ui_action(buttons: List[Any], path: str) -> Optional[dict]:
     """The button dict a callback path names: "2" is buttons[2], "2.1" entry 1 of its
     menu. None when the path doesn't resolve (malformed, stale, or hostile data)."""
@@ -464,6 +534,32 @@ def ui_menu_rows(menu: List[dict], token: str, parent: str) -> List[List[Tuple[s
     """A tapped `menu` button's sub-choices: one per row, like a choose prompt."""
     return [[(b.get("label", ""), ui_callback_data(token, f"{parent}.{i}"))]
             for i, b in enumerate(menu)]
+
+
+def queue_button_rows(req: dict) -> List[List[Tuple[str, str]]]:
+    """A queued item's buttons, laid out like the morning row they arrive under (§6.1)."""
+    cells = [
+        (b.get("label", ""),
+         queue_callback_data(req.get("id"), b.get("action", ""), req.get("since", "")))
+        for b in req.get("buttons") or [] if isinstance(b, dict)
+    ]
+    return [cells[i:i + UI_BUTTONS_PER_ROW] for i in range(0, len(cells), UI_BUTTONS_PER_ROW)]
+
+
+def queue_later_rows(item_id: str, since: str) -> List[List[Tuple[str, str]]]:
+    """What "Not now" swaps in: the three later choices, built from the tap itself, so the
+    bot still remembers nothing (DESIGN_athlete_queue.md §6.4)."""
+    return [[(queue_later_label(words, emoji), queue_callback_data(item_id, code, since))
+             for code, words, emoji in QUEUE_LATER_CHOICES]]
+
+
+def tapped_label(rows: List[List[Tuple[str, str]]], data: str) -> Optional[str]:
+    """The label of the button a tap came from, for the "→ …" line left under the item."""
+    for row in rows:
+        for label, callback in row:
+            if callback == data:
+                return label
+    return None
 
 
 def prompt_buttons(req: dict, nonce: str) -> List[List[Tuple[str, str]]]:
@@ -540,7 +636,7 @@ def _cli_env(
 
     `source` is a parameter rather than a constant beside TRAINMATE_FRONTEND because
     this one function serves three callers with three different answers: a chat message
-    is `bot`, the same call firing the morning push is `push`, and the intent router is
+    is `bot`, the scheduler firing the push or a reminder is `push`, and the intent router is
     `route` (DESIGN_logging.md §3). The child also gets this process's run id as its
     parent, so the push and the subprocess it launched read as one story."""
     env = dict(os.environ)
@@ -779,6 +875,20 @@ def main() -> None:
         )
         _log(session.chat_id, "<<", f"{len(buttons)} ui button(s)")
 
+    async def _send_queue_item(session: "_Session", req: dict) -> None:
+        """Sends a queued item as a message of its own (DESIGN_athlete_queue.md §6.2). Its
+        buttons carry the item, so it neither replaces the chat's TM-BUTTONS row nor
+        anchors to the output above it."""
+        keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton(label, callback_data=data) for label, data in row]
+             for row in queue_button_rows(req)]
+        )
+        session.sent = True
+        await bot.send_message(
+            chat_id=session.chat_id, text=req.get("text") or "", reply_markup=keyboard,
+        )
+        _log(session.chat_id, "<<", f"queue item #{req.get('id')}")
+
     async def _send_photo(session: "_Session", req: dict) -> None:
         """Sends the chart PNG a `--chart` run pointed at, then unlinks the temp
         file regardless of send outcome (§7.2) — the CLI wrote it with
@@ -869,6 +979,12 @@ def main() -> None:
                     buf = []
                     await _send_ui_buttons(session, buttons_req)
                     continue
+                queue_req = parse_queue_request(raw)
+                if queue_req is not None:
+                    await _flush_output(session, buf)
+                    buf = []
+                    await _send_queue_item(session, queue_req)
+                    continue
                 if is_flush_request(raw):
                     # Nothing to render: the marker's whole job is to end the message
                     # here, before the CLI goes quiet for an LLM call (§7). That message
@@ -916,7 +1032,7 @@ def main() -> None:
 
     async def _start_command(
         chat_id: int, argv: List[str], quiet: bool = False, source: str = "bot"
-    ) -> None:
+    ) -> "_Session":
         proc = await asyncio.create_subprocess_exec(
             sys.executable, "-u", CLI_PATH, *argv,
             stdin=asyncio.subprocess.PIPE,
@@ -928,6 +1044,7 @@ def main() -> None:
         session = _Session(chat_id, proc, secrets.token_hex(4), quiet=quiet)
         sessions[chat_id] = session
         session.task = asyncio.create_task(_drive(session))
+        return session
 
     async def _route_intent(text: str) -> str:
         """Runs `tm bot route` silently — output captured here, never streamed to the
@@ -1199,10 +1316,7 @@ def main() -> None:
         utterance = action.get("send")
         if utterance and sessions.get(chat_id) is not None:
             # Busy chat: leave the buttons alive so the tap can be retried.
-            await bot.send_message(
-                chat_id=chat_id,
-                text="One moment — still finishing the last thing. Tap again shortly.",
-            )
+            await bot.send_message(chat_id=chat_id, text=BUSY_TAP)
             return
         _log(chat_id, "  ", f"ui tap: {action.get('label')}")
         try:  # a decided row is spent: drop the buttons
@@ -1224,6 +1338,44 @@ def main() -> None:
         _log(chat_id, "  ", f"run: {shlex.join(argv)}")
         await bot.send_chat_action(chat_id=chat_id, action="typing")
         await _start_command(chat_id, argv)
+
+    async def _handle_queue_callback(query, chat_id: int, data: str) -> None:
+        """A tap on a queued item's button (DESIGN_athlete_queue.md §6.2). "Not now" swaps
+        in the three later choices; any other tap leaves the choice under the item's text
+        and runs `bot queue`, which checks the item and sends the next one. The chat's live
+        TM-BUTTONS row is not touched."""
+        decoded = decode_queue_callback(data)
+        if decoded is None:
+            return
+        item_id, action, since = decoded
+        if action == QUEUE_NOT_NOW:
+            keyboard = InlineKeyboardMarkup(
+                [[InlineKeyboardButton(label, callback_data=cb) for label, cb in row]
+                 for row in queue_later_rows(item_id, since)]
+            )
+            try:
+                await query.edit_message_reply_markup(reply_markup=keyboard)
+            except Exception as exc:
+                journal.debug("bot.event", f"later choices not swapped in: {exc}")
+            return
+        if sessions.get(chat_id) is not None:
+            await bot.send_message(chat_id=chat_id, text=BUSY_TAP)
+            return
+        message = query.message
+        markup = getattr(message, "reply_markup", None)
+        rows = [[(b.text, b.callback_data) for b in row]
+                for row in (markup.inline_keyboard if markup else [])]
+        label = tapped_label(rows, data)
+        try:  # the message keeps its text, gains the choice and loses its buttons (§6.1)
+            if label and getattr(message, "text", None):
+                await query.edit_message_text(text=f"{message.text}\n\n→ {label}")
+            else:
+                await query.edit_message_reply_markup(reply_markup=None)
+        except Exception as exc:
+            journal.debug("bot.event", f"queue choice not echoed: {exc}")
+        argv = ["bot", "queue", item_id, action, "--since", since]
+        _log(chat_id, "  ", f"run: {shlex.join(argv)}")
+        await _start_command(chat_id, argv, quiet=True)
 
     async def _handle_stop_callback(query, chat_id: int, data: str) -> None:
         """A tap on the §3 Stop button: ends the command it was raised for, the same
@@ -1252,6 +1404,9 @@ def main() -> None:
         if not is_authorized(chat.id, allowed_ids):
             return
         data = query.data or ""
+        if data.startswith("q:"):
+            await _handle_queue_callback(query, chat.id, data)
+            return
         if data.startswith("ui:"):
             await _handle_ui_callback(query, chat.id, data)
             return
@@ -1291,37 +1446,26 @@ def main() -> None:
     # instance model makes that the athlete (§4.3).
     push_chat_id = allowed_ids[0] if allowed_ids else None
 
+    async def _run_scheduled(argv: List[str], wait: bool) -> None:
+        """Starts a scheduler-run command in the push chat; `wait` holds the wake until it
+        has finished (DESIGN_athlete_queue.md §6.5)."""
+        _log(push_chat_id, "**", shlex.join(argv))
+        session = await _start_command(push_chat_id, argv, quiet=True, source="push")
+        if wait:
+            await session.task
+
     async def _push_loop() -> None:
-        """Fires `bot morning` inside the [morning_time, deadline] window, once per
-        bot-day (§4.3). Sleeps at most 5 minutes at a time so a laptop suspend (which
-        stalls the monotonic clock asyncio sleeps on) can't oversleep the window. Real
-        idempotency lives in the database marker `bot morning` checks; `fired` only
-        avoids re-spawning the subprocess every tick within one bot lifetime."""
+        """One `scheduler_wake` after another (§4.3). Real idempotency lives in the
+        database marker `bot morning` checks; `fired` only avoids re-spawning the
+        subprocess every tick within one bot lifetime."""
         fired: Optional[str] = None
         while True:
-            # The athlete's wall clock, not the machine's: morning-time/morning-deadline
-            # are the hours they wake up in (DESIGN_user_timezone.md §2). Every knob here
-            # is re-read each tick — `settings set` runs in a CLI subprocess, so this
-            # long-lived process would otherwise hold its first answer until a restart
-            # (DESIGN_settings.md §5).
-            forget_timezone()
-            now = athlete_now()
-            delay = next_push_delay(
-                now, settings.morning_time(), settings.morning_deadline(),
+            fired, pause = await scheduler_wake(
+                fired, simple_ui, lambda: sessions.get(push_chat_id) is not None,
+                _run_scheduled,
             )
-            if (delay <= 0 and simple_ui and settings.push_enabled()
-                    and fired != now.date().isoformat()):
-                if sessions.get(push_chat_id) is not None:
-                    # §4.3: never collide with an in-flight command — retry shortly.
-                    await asyncio.sleep(180)
-                    continue
-                fired = now.date().isoformat()
-                _log(push_chat_id, "**", "morning push")
-                await _start_command(
-                    push_chat_id, ["bot", "morning"], quiet=True, source="push"
-                )
-                continue
-            await asyncio.sleep(min(max(delay, 60), 300))
+            if pause:
+                await asyncio.sleep(pause)
 
     async def _serve() -> None:
         """Runs the bot until SIGINT/SIGTERM. Equivalent to Application.run_polling(),

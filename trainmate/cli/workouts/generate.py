@@ -2,7 +2,7 @@
 import argparse
 from datetime import datetime, timedelta
 from typing import Optional
-from trainmate import runtime
+from trainmate import athlete_queue, runtime
 from trainmate.config import config
 from trainmate.adherence import analyze_adherence, date_covered, format_discrepancies
 from trainmate.google_calendar import event_url
@@ -95,8 +95,11 @@ def run_workout_adapt(args: argparse.Namespace) -> None:
         # to do instead of an all-clear over an empty calendar (DESIGN_runway_nudge.md §4,
         # extending DESIGN_block_boundary.md §6's "adapt requires a block").
         runtime.render.adapt_plan_behind(state, date_str)
+        runtime.render.queue_hint(*athlete_queue.waiting_counts())
         return
     runtime.render.runway_hint(state, date_str)
+    # What waits in the athlete queue shares that place (DESIGN_athlete_queue.md §5.2).
+    runtime.render.queue_hint(*athlete_queue.waiting_counts())
 
     # Before the coach is told anything: settle any pairing the matcher had to guess at.
     _resolve_ambiguous_matches(date_str, auto=args.auto)

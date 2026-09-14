@@ -5,7 +5,9 @@ Hidden maintenance commands the Telegram bot spawns, never typed by the athlete
 `bot route` classifies one free-text chat message into a fixed intent; `bot constraints`
 and `bot goals` render a companion list with its picker (§5.5, §12.6); `bot capture
 <intent>` is the write path — a second, domain-focused LLM call that extracts a typed
-proposal, previews it from real rows, and asks before anything is stored (§12.2).
+proposal, previews it from real rows, and asks before anything is stored (§12.2). `bot
+queue` acts on a tap on a queued item; its handler lives in `cli/queue.py` with the rest of
+the queue (DESIGN_athlete_queue.md §6.2).
 
 Three shapes and no fourth (§12.1): a **view** runs fixed argv, a **picker** lets the
 athlete's tap choose the row, a **capture** reads values out of the message. An operation
@@ -18,7 +20,7 @@ import shlex
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from trainmate import settings
+from trainmate import clock, settings
 from trainmate.cli.candidates import confirm_new_constraints, confirm_new_signals
 from trainmate.cli.common import adherence_verdicts, ensure_recent_data
 # The companion surfaces are companion-only by definition, so they call the line
@@ -29,6 +31,7 @@ from trainmate.cli.render import (
     simple_day_word, simple_goal_edit_lines, simple_goal_line, simple_goal_lines,
     simple_runway_lines, simple_session_line,
 )
+from trainmate.cli.queue import run_bot_queue, send_walk_step
 from trainmate.cli.runway import current_runway, runway_buttons, schedule_exhausted
 from trainmate.cli.settings import ROUTABLE_SETTINGS, routable_setting
 from trainmate.config import config
@@ -392,6 +395,9 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     # Consumed only now, when the line has actually been sent.
     if week_note:
         runtime.db.set_setting(NOTE_MARKER, str(week_note[1]))
+    # After the briefing, the first item of the athlete queue, as a message of its own
+    # (DESIGN_athlete_queue.md §6.1).
+    send_walk_step(clock.command_start())
 
 
 def _use_router_model(args: argparse.Namespace) -> None:
@@ -1231,4 +1237,28 @@ def add_bot_parser(subparsers):
     )
     b_block.add_argument("mesocycle_id", type=int, help="The mesocycle to show")
     b_block.set_defaults(func=run_bot_block)
+
+    # bot queue — the handler lives with the rest of the queue (DESIGN_athlete_queue.md §6.2)
+    b_queue = bot_subparsers.add_parser(
+        "queue",
+        help="Act on one tapped queue item, or send the reminders that are due",
+        description=(
+            "Run by a tap on a queued item's button: check the item is still waiting and "
+            "still worth asking, apply the action, then send the next item of the walk "
+            "that started at --since. With --remind, send each item whose reminder time "
+            "has passed."
+        ),
+    )
+    b_queue.add_argument("item_id", metavar="ID", type=int, nargs="?", help="The tapped item")
+    b_queue.add_argument(
+        "action", metavar="ACTION", nargs="?",
+        help="The tapped button: a<n> for an answer, d, s, h, t or b",
+    )
+    b_queue.add_argument(
+        "--since", help="When the walk started, in epoch seconds; r-prefixed for a walk of one",
+    )
+    b_queue.add_argument(
+        "--remind", action="store_true", help="Send the reminders that are due",
+    )
+    b_queue.set_defaults(func=run_bot_queue)
     return bot_parser

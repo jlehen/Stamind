@@ -17,7 +17,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from trainmate import progression, runtime
+from trainmate import athlete_queue, progression, runtime
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.config import config
 from trainmate.progression import RUNWAY_BLOCK, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
@@ -30,6 +30,9 @@ from trainmate.util import (
 from trainmate.cli.goals import print_goal_row, print_goal_table, report_archived_sessions
 from trainmate.cli.plans import print_plan
 from trainmate.cli.progress import emit_chart, print_progress_report
+from trainmate.cli.queue import (
+    print_queue_acted, print_queue_list, queue_buttons, queue_chat_message, queue_hint_lines,
+)
 from trainmate.cli.runway import (
     crossing_the_end, current_runway, runway_buttons, runway_hint_lines,
 )
@@ -677,6 +680,21 @@ def _iso_span(start: str, end: str) -> str:
 # --- The two voices (DESIGN_render_persona.md §4) ---
 
 
+def simple_queue_message(
+    item: Dict[str, Any], left: Optional[int]
+) -> Tuple[str, List[dict]]:
+    """One queued item in the companion's words, without skip: its difference from "after
+    the others" does not fit in a sentence she can see (DESIGN_athlete_queue.md §6.4).
+    `left` counts the walk from this item on, and None marks a reminder (§6.5)."""
+    text = athlete_queue.wording(item, companion=True)
+    buttons = queue_buttons(item, skip=False)
+    if left is None:
+        return f"⏰ You asked me to come back to this:\n{text}", buttons
+    if athlete_queue.kind_of(item).shape == athlete_queue.MESSAGE:
+        return f"📬 {text}", buttons
+    return f"🙋 Quick question ({left} left)\n{text}", buttons
+
+
 class ExpertRenderer:
     """The default voice: reports, tables, IDs, operator nudges.
 
@@ -894,6 +912,30 @@ class ExpertRenderer:
             "what's next with " + cmd("goal add") + ", then " + cmd("plan generate")
             + "."
         )
+
+    def queue_hint(self, questions: int, messages: int) -> None:
+        """What waits in the athlete queue, in the runway hint's place and yellow
+        (DESIGN_athlete_queue.md §5.2)."""
+        lines = queue_hint_lines(questions, messages)
+        if not lines:
+            return
+        print()
+        for line in lines:
+            notice(line)
+        print()
+
+    def queue_list(self, items: List[Dict[str, Any]], now: datetime) -> None:
+        print_queue_list(items, now)
+
+    def queue_message(
+        self, item: Dict[str, Any], left: Optional[int]
+    ) -> Tuple[str, List[dict]]:
+        """One queued item as a chat message: its text and its buttons
+        (DESIGN_athlete_queue.md §6.1)."""
+        return queue_chat_message(item, left)
+
+    def queue_acted(self, item: Dict[str, Any], action: str, line: Optional[str]) -> None:
+        print_queue_acted(item, action, line)
 
 
 class CompanionRenderer(ExpertRenderer):
@@ -1141,6 +1183,21 @@ class CompanionRenderer(ExpertRenderer):
             simple_plan_wrapped_line()
         ]
         for line in lines:
+            print(wrap_text(line))
+
+    def queue_hint(self, questions: int, messages: int) -> None:
+        """Draws nothing: the morning message brings the questions, and a hint about a
+        command she cannot type is noise (DESIGN_athlete_queue.md §5.2)."""
+
+    def queue_message(
+        self, item: Dict[str, Any], left: Optional[int]
+    ) -> Tuple[str, List[dict]]:
+        return simple_queue_message(item, left)
+
+    def queue_acted(self, item: Dict[str, Any], action: str, line: Optional[str]) -> None:
+        """Only the kind's own line: the tapped message already shows her choice
+        (DESIGN_athlete_queue.md §6.1)."""
+        if line:
             print(wrap_text(line))
 
 

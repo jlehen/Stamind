@@ -74,6 +74,7 @@ _ALL_TABLES = [
     "benchmark_results",
     "objectives",
     "settings",
+    "athlete_queue",
 ]
 
 

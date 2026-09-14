@@ -1,6 +1,6 @@
 # Design: The queue of things TrainMate wants to tell or ask the athlete
 
-**Status:** Proposed · **Date:** 2026-09-14 (rev. 3)
+**Status:** Implemented · **Date:** 2026-09-14 (rev. 3)
 
 Revision 3 settles the terminal command: a bare `tm queue` lists, `tm queue answer` goes
 through the items, and `tm queue tell` leaves a message, which is also the first thing that
@@ -99,7 +99,10 @@ Four rules come with it.
 
 **The order is the order things were queued.** The head of the queue is the waiting item
 with the oldest `queued_at`. There are no priorities. When a feature queues six items in the
-same second, they keep the order of their ids, which is the order it queued them in.
+same second, they keep the order of their ids, which is the order it queued them in. An
+item is dated by the start of the command that queued it, not by the moment of the write,
+so the questions the morning push queues while it runs are waiting when the walk it opens
+at its end starts (§4).
 
 **A subject is queued once, ever.** Queuing an item whose kind and subject already exist
 does nothing, whether the existing item is still waiting or was closed long ago. That is

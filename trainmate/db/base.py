@@ -9,7 +9,7 @@ from trainmate.config import config
 # migrations are idempotent, so this is a "skip the work" marker rather than a ledger of
 # steps to replay — TrainMate has one user and one database, and the alternative (a
 # numbered migration framework) would be more machinery than that warrants.
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 
 # How long a connection waits for a writer to finish before raising "database is
@@ -793,6 +793,22 @@ class BaseDB:
                     key        TEXT PRIMARY KEY,
                     value      TEXT NOT NULL,
                     updated_at TEXT NOT NULL
+                )
+            """)
+
+            # Questions and messages held for the athlete until she is there to answer.
+            # A kind and subject are queued once, ever (DESIGN_athlete_queue.md §3).
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS athlete_queue (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    kind       TEXT NOT NULL,
+                    subject    TEXT NOT NULL,
+                    payload    TEXT NOT NULL,
+                    queued_at  TEXT NOT NULL,
+                    remind_at  TEXT,
+                    closed_at  TEXT,
+                    outcome    TEXT,
+                    UNIQUE (kind, subject)
                 )
             """)
 

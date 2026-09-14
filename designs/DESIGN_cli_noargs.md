@@ -117,9 +117,10 @@ printing help (the parser binds the handler at both levels). The rule it follows
 top-of-page one applied to the group: a group may act bare when it has a single
 read-only view that is its whole state, and the other sub-commands are addressed
 *through* that view — `settings set` takes a name from `settings list`, so printing
-help instead would answer the question with a second command to run. No other
-group qualifies: `goal`, `workout` and the rest each hold several views, and
-picking one for them would be arbitrary.
+help instead would answer the question with a second command to run. One other group
+qualifies (amended 2026-09-14, DESIGN_athlete_queue.md §5.1): a bare `queue` runs
+`queue list`, and `queue answer <id>` takes its id from that list. `goal`, `workout` and
+the rest each hold several views, and picking one for them would be arbitrary.
 
 ## §b — Preview-then-confirm commands name the defaulted target
 

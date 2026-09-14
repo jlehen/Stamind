@@ -136,6 +136,12 @@ The push must not collide with an in-flight command's polling pause: it uses the
 one-session-per-chat gate as typed commands (`sessions` dict) and simply retries a few
 minutes later if the chat is busy.
 
+Amended 2026-09-14 (DESIGN_athlete_queue.md §6.5): every wake first asks the database
+whether a queued item's reminder time has passed. If one has, it runs `tm bot queue
+--remind` and waits for it to finish before it considers the push, so a reminder due at
+07:58 arrives just ahead of the 08:00 briefing. Reminders go out whatever the persona and
+whether or not the push is on, and wait for the next wake while the chat is busy.
+
 ### 4.4 Bot-level buttons: a third sentinel
 
 The CLI↔bot channel already carries `\x1eTM-PROMPT` (blocking question) and
@@ -149,6 +155,12 @@ chat, a lifetime §12.3 has to own now that rows multiply).
 
 Prompts ask and block; buttons offer and exit. Keeping WHAT to offer in the CLI keeps
 the parity principle: the bot renders, it does not decide.
+
+Amended 2026-09-14 (DESIGN_athlete_queue.md §6.2): a fifth sentinel, `\x1eTM-QUEUE
+{json}`, carries one item of the athlete queue. Unlike this row it is sent as a message of
+its own, and each of its buttons carries its whole meaning (`q:<item id>:<action>:<walk
+start>`), so it neither replaces the live row nor is replaced by it, and the bot stores
+nothing about it.
 
 ## 5. Simple-mode interaction
 
@@ -417,6 +429,10 @@ earns it is expert detail, and the chat surface does not audit.
   auto-answered by the simple layer.
 - The push scheduler owns no state: a double-send is prevented by the `settings` marker
   (§4.2), not by the bot remembering it fired.
+- Amended 2026-09-14 (DESIGN_athlete_queue.md §9): a queued item's buttons run the hidden
+  `bot queue <id> <action>`, which is not in the intent table. A tap can only run one of
+  the answers the item was queued with, on that item, after the item passes its check,
+  and what an answer writes is reversible.
 
 ## 8. Touch points
 

@@ -159,6 +159,11 @@ nags — with one placement rule the earlier draft missed: those nags all live i
 one wording that exists *because* nothing is on record — never reaches that branch. The
 runway hint therefore prints **outside** it, unconditionally on detector output.
 
+Amended 2026-09-14 (DESIGN_athlete_queue.md §5.2): the athlete queue's two-line hint
+shares these touchpoints. `status` and `workout adapt` print it right after the runway
+hint, in the same yellow, whenever a question or message is waiting. The companion prints
+neither.
+
 **Adapt stops contradicting the fact.** When every block of the active macrocycle is
 behind today, `workout adapt` currently adapts against `get_active_mesocycle`'s
 absolute-first-block fallback and closes with "All metrics are green and workout plan is

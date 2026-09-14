@@ -91,7 +91,7 @@ classes themselves.
   handler anywhere (DESIGN_logging.md §3/§5.4).
 - **`trainmate/cli/`** — per-command-family handler modules (`run_*()`): `status`,
   `progress`, `goals`, `constraints`, `benchmarks`, `signals`, `learnings`,
-  `plans`, `data`, `settings`, `journal`, `bot`, the `workouts/` package
+  `plans`, `data`, `settings`, `journal`, `queue`, `bot`, the `workouts/` package
   (`parser`/`generate`/`edit`/`revisions`/`_helpers`), plus the shared modules:
   `common` (renderers and the adherence pairing), `selectors` (the range grammar),
   `argparse_ext` (parser/help extensions), `render` (the two voices, [§6](#6-singletons)),
@@ -204,7 +204,8 @@ classes themselves.
     `progress`, the five adapt outcome lines, `goal list`, `plan show`, `workout
     generate`'s preview, the revision preview, `constraint rm`, the runway hint's
     silence, the adapt plan-behind refusal, the note-candidate confirms, `goal
-    add`/`edit`/`rm`, `settings set`, the plan-shaping and replan notices) and anything
+    add`/`edit`/`rm`, `settings set`, the plan-shaping and replan notices, the queue hint's silence and the queued item's
+    wording) and anything
     else falls back to the expert form (DESIGN_render_persona.md). Every command a tap
     can reach goes through it, which is what keeps expert command text — `plan
     generate`, `constraint edit --replan`, `goal edit --status active` — out of a chat
@@ -259,6 +260,19 @@ classes themselves.
     calls exist. A terminal gets the same number folded into the aside it already prints.
     `complete(..., wait_notice=False)` suppresses it for `tm bot route`, whose output
     nobody reads (DESIGN_output_verbosity.md §8).
+  - **The athlete queue:** a fifth one-way sentinel, `QUEUE_SENTINEL`/`emit_queue_item`
+    (`\x1eTM-QUEUE {json}`), carries one queued question or message
+    (`trainmate/athlete_queue.py`, DESIGN_athlete_queue.md). The bot sends it as a message
+    of its own whose buttons carry all a tap needs — `q:<item id>:<action>:<walk start>` —
+    so it stores nothing, replaces no `TM-BUTTONS` row and loses nothing on a restart. A
+    tap runs the hidden `tm bot queue <id> <action> --since <walk start>`, which checks the
+    item is still waiting and still worth asking, applies the action and sends the next
+    item of the walk; "🕐 Not now" swaps in the three later choices from the tap itself.
+    `bot morning` ends by starting a walk. Each scheduler wake (`scheduler_wake`) first asks
+    the database whether a reminder time has passed and, if one has, runs `bot queue
+    --remind` and waits for it before it considers the push, whatever the persona and the
+    `push` switch. On a terminal the item's line becomes the two-line hint that `status`
+    and `workout adapt` print.
 
 ### Package `trainmate/`
 
@@ -267,6 +281,7 @@ classes themselves.
 | `types.py`           | —                    | TypedDicts: `Objective`, `Constraint`, `DailySignal`, `Workout` (the hydrated session, not a table row — §5), `CompletedActivity` (incl. `bike_avg_watts`, `zone1_sec`–`zone5_sec`, `power_zone1_sec`–`power_zone7_sec`), `AthleteMetric`, `AthleteBaseline`, `Macrocycle`, `Mesocycle`, `PlanFeedback`, `PlanProposal` |
 | `config.py`          | `config`             | Reads `config.yaml`; exposes typed properties.   |
 | `prompt.py`          | (`cli.prompt`)       | Front-end-agnostic prompt broker: `confirm`/`choose`/`ask_text` over `TtyPrompt` (`input()`) or `JsonPrompt` (chat/web). Journals every answer on the asking run (DESIGN_logging.md §5.6). See [§6](#6-singletons). |
+| `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, is the first), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
 | `db/`                | `db`                 | SQLite wrapper; `Database` composed from         |
 |                      |                      | per-domain mixins. Full CRUD for all tables.     |
 | `coach/honoring.py`  | —                    | Which coach pass owns a constraint, and whether  |
@@ -487,6 +502,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | What became of a planned session (the adherence verdict) | `adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `cli/common.py` (`adherence_results` — the one DB-backed pairing — `adherence_verdicts` keyed by workout id, and `format_actual` for the effort it graded against), `cli/workouts/_helpers.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/generate.py::_list_verdicts` (which span the listing grades, and the pull it needs), `google_calendar.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/app.js` (the badge) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
 | Which timezone dates are read in | `trainmate/clock.py` (the zone, the cache, the fallback), `util.today_date`/`fmt_timestamp` (the only callers), the push loop in `trainmate_bot.py`, DESIGN_user_timezone.md. Changing it is one row of `settings` |
 | A preference the athlete can change at runtime | `trainmate/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
+| A question or message for the athlete that no command waits on | A `Kind` in `KINDS` of `trainmate/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does, its drop label — and `athlete_queue.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8 |
 | A CLI command                    | `trainmate/cli/<family>.py` (`run_*`), dispatcher in `trainmate_cli.py` ([§7](#7-cli-commands-reference)) |
 | A message telling the athlete to run something | wrap the command in `util.cmd()`, nested *inside* the line's colour call, so it renders as the bright shade of that colour — and emit it with `util.aside`, not `print`: a "you could now run X" hint is side information |
 | Whether a line reaches the chat front-end | `util.aside` (side information, terminal only) vs `print` (the answer, warnings, errors). Building a list of lines rather than printing? gate on `util.asides_enabled()`. DESIGN_output_verbosity.md §3 |
@@ -954,7 +970,7 @@ from trainmate.coach import coach_service
 `Database` is composed from per-domain mixins — `base.py` (`BaseDB`:
 connection + schema setup), `objectives.py`, `constraints.py`,
 `signals.py`, `benchmarks.py`, `workouts.py`, `activities.py`, `learnings.py`,
-`analysis.py`, `periodization.py`, `settings.py`, `wipes.py` — all re-exported from
+`analysis.py`, `periodization.py`, `settings.py`, `queue.py`, `wipes.py` — all re-exported from
 `__init__.py` so
 `from trainmate.db import ...` is unchanged.
 
@@ -1472,6 +1488,24 @@ the id of the last change whose line to the athlete the push delivered
 | `value`      | TEXT    | Stored value (a model identifier, a zone name, …) |
 | `updated_at` | TEXT    | UTC ISO instant of the last write                  |
 
+### athlete_queue
+Questions and messages held for the athlete until she is there to answer
+(DESIGN_athlete_queue.md §3). A `(kind, subject)` is queued once, ever, so a dropped
+question is never asked again. The queue's order is `queued_at, id`. Every instant is a UTC
+ISO string to the microsecond, in one form, so the columns compare as strings. Untouched by
+every `wipe`, and closed rows are kept.
+
+| Column      | Type    | Notes                                                              |
+|-------------|---------|--------------------------------------------------------------------|
+| `id`        | INTEGER | Primary key: what `queue answer <id>` and a button name            |
+| `kind`      | TEXT    | The feature that asks (`message`), a key of `athlete_queue.KINDS`   |
+| `subject`   | TEXT    | What it asks about, in that feature's own terms                    |
+| `payload`   | TEXT    | JSON written at queue time: what to show and the fixed answers     |
+| `queued_at` | TEXT    | The start of the command that queued it; "after the others" sets now |
+| `remind_at` | TEXT    | Hidden until this instant and reminded at it; NULL otherwise       |
+| `closed_at` | TEXT    | NULL while the item waits                                          |
+| `outcome`   | TEXT    | `answered`, `dropped` or `stale`                                   |
+
 ### daily_signals
 External daily signals (alcohol, sleep, stress, …) ingested from tagged
 Google Calendar events. TrainMate is domain-agnostic: `metric` is an opaque
@@ -1795,8 +1829,8 @@ Invoked as `python trainmate_cli.py [--llm-model MODEL] <command> [subcommand] [
 patchable singletons; the handler functions, named
 `run_<command>_<subcommand>()`, live in the `trainmate/cli/` package
 (one module per command family: `status`, `progress`, `goals`, `constraints`,
-`benchmarks`, `signals`, `learnings`, `plans`, `data`, `settings`, `journal`, `bot`
-(hidden: `bot morning`/`route`/`constraints`/`goals`/`block`/`capture`, spawned by the
+`benchmarks`, `signals`, `learnings`, `plans`, `data`, `settings`, `journal`, `queue`, `bot`
+(hidden: `bot morning`/`route`/`constraints`/`goals`/`block`/`capture`/`queue`, spawned by the
 Telegram bot —
 DESIGN_bot_simple_frontend.md; `candidates.py` holds the confirm loops that turn a
 note's extracted constraints and signals into rows, shared by `workout adapt -m` and
@@ -1849,7 +1883,7 @@ tree. This
 is *not* argparse's missing-argument path, so it gets neither the "the following
 arguments are required" line nor the chat short form — under `TRAINMATE_FRONTEND=json`
 the whole help block is sent to Telegram. The documented exception is a group with a
-single read-only view that is its whole state (`settings`), which acts bare instead
+single read-only view that is its whole state (`settings`, `queue`), which acts bare instead
 (DESIGN_cli_noargs.md §a3).
 
 | Command      | Subcommand   | Short form | Description                                                            |
@@ -1918,6 +1952,9 @@ single read-only view that is its whole state (`settings`), which acts bare inst
 | `settings`   | `list`       | `se l`   | Every preference with its value and where that value came from — the stored row, `config.yaml`, or the built-in default. With a NAME, that one setting in detail: the numbered model menu for `coach-model`, the local clock for `timezone`. A bare `settings` lists — the read-only-family exception (DESIGN_cli_noargs.md §a3, applied by DESIGN_settings.md §4) |
 | `settings`   | `set`        | `se s`, `se use` | Change one preference: `settings set coach-model 3`, `settings set timezone Europe/Paris`, `settings set morning-time 07:00`. The name takes any unambiguous prefix. Validated by the setting's own parser — a value it cannot read is refused and nothing is written. Stored in `settings`; survives restarts |
 | `settings`   | `reset`      | `se r`   | Forget one stored preference so `config.yaml`, or the built-in default, rules again |
+| `queue`      | `list`       | `q l`    | Every waiting question and message in queue order, then the ones put off until later with when they come back. A bare `queue` lists — the second read-only family (DESIGN_cli_noargs.md §a3, DESIGN_athlete_queue.md §5.1) |
+| `queue`      | `answer`     | `q a`    | Go through the waiting items with the blocking chooser: each item's answers, then drop, skip (Enter), and later — in 1 hour, in 1 day, after the others. `queue answer <id>` shows that item alone. In chat it sends the first item with its buttons instead |
+| `queue`      | `tell`       | `q t`    | Queue a message for the athlete: `queue tell "Charge your watch tonight."` It goes out with the next morning push, or with `queue answer` |
 | `journal`    | —            | `j`      | The operational record: one row per command run, newest first — id, when (athlete's zone), source, command, wall time, model calls · tokens, and how it ended (`ok`, `warn`, `cancelled`, `FAILED`, `?` for a run with no `run.end`), with a gray legend under the table glossing the outcomes on screen. Every run that did not simply finish also gets a line under the table saying why — the exception for a `FAILED` one, the first warning it logged otherwise — so `warn` is never a status you have to open a second command to decode. Runs that only looked — `list`, `show`, `status`, `journal`, any `-h` — are left out unless `-a` asks for them, unless they went wrong or called a model; command lines and those reasons are clipped to the width of the screen unless `-v` asks for them in full (DESIGN_logging.md §7.1–§7.3). Filters: `-n N`, the shared `-d RANGE`, `--source`, `--command`, `--failed`, plus `--cost` for the by-model/by-command token rollup and `--follow` to tail the file live (DESIGN_logging.md §7) |
 | `journal`    | `show`       | `j 5a0e` | Everything one run wrote, by id prefix: where it ran, each event as an offset from its start, the LLM exchange files it produced, the traceback if it failed, and the runs it spawned. The bare `journal <id>` form is the same command; an ambiguous prefix lists what it matched |
 | `journal`    | `prune`      | `j p`    | Force the retention sweep now — journal days past `logging.retain_days`, exchange files past `logging.retain_exchange_days`. Otherwise it runs at most once a UTC day, off the first command to finish (DESIGN_logging.md §10) |
@@ -2679,6 +2716,10 @@ venv/bin/python -m unittest discover -s tests -p "test_*.py"
 |                                | aggregation, cache reuse/force/inspect_only, learnings           |
 |                                | injection, reflect watermark advance/skip, bootstrap re-run      |
 |                                | guard, per-week constraints + body-response z-scores             |
+| `tests/test_athlete_queue.py`  | the athlete queue (DESIGN_athlete_queue.md): a subject queued once, |
+|                                | the order and "after the others", a walk showing each item once, |
+|                                | stale items, "in 1 day" from the walk start, reminders sent once, |
+|                                | the chat and terminal surfaces, the hint in `status` and `adapt`  |
 | `tests/test_constraints.py`    | constraint DB windowing, hard-rest pre-pass, §7 magnitude, §8 message capture |
 | `tests/test_cli_*.py`          | One file per command family: output and argument handling, with |
 |                                | the service mocked. `test_dispatch.py` walks the parser tree     |

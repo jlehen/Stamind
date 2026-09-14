@@ -731,5 +731,102 @@ class PushScheduleTest(unittest.TestCase):
         self.assertGreater(delay, 0)  # window already closed for the day
 
 
+class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
+    """One wake of the scheduler: due reminders, then the push (DESIGN_athlete_queue.md
+    §6.5)."""
+
+    def setUp(self):
+        import datetime as dt
+        at_eight = dt.datetime(2026, 9, 16, 8, 0).astimezone()
+        patches = [
+            mock.patch.object(bot, "athlete_now", return_value=at_eight),
+            mock.patch.object(bot, "forget_timezone"),
+            mock.patch.object(bot.settings, "morning_time", return_value="08:00"),
+            mock.patch.object(bot.settings, "morning_deadline", return_value="15:00"),
+            mock.patch.object(bot.settings, "push_enabled", return_value=True),
+            mock.patch.object(bot.athlete_queue, "reminders_due", return_value=True),
+        ]
+        for patcher in patches:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.ran = []
+
+    async def run_command(self, argv, wait):
+        self.ran.append((argv, wait))
+
+    async def test_a_due_reminder_goes_out_before_the_push_on_the_same_wake(self):
+        fired, _ = await bot.scheduler_wake(None, True, lambda: False, self.run_command)
+        self.assertEqual(self.ran, [
+            (["bot", "queue", "--remind"], True), (["bot", "morning"], False),
+        ])
+        self.assertEqual(fired, "2026-09-16")
+
+    async def test_reminders_go_out_whatever_the_persona_and_the_push_switch(self):
+        with mock.patch.object(bot.settings, "push_enabled", return_value=False):
+            await bot.scheduler_wake(None, True, lambda: False, self.run_command)
+        await bot.scheduler_wake(None, False, lambda: False, self.run_command)
+        self.assertEqual(self.ran, [(["bot", "queue", "--remind"], True)] * 2)
+
+    async def test_a_busy_chat_leaves_the_reminder_to_the_next_wake(self):
+        fired, pause = await bot.scheduler_wake(None, True, lambda: True, self.run_command)
+        self.assertEqual(self.ran, [])
+        self.assertEqual((fired, pause), (None, 180))
+
+
+class QueueProtocolTest(unittest.TestCase):
+    """The TM-QUEUE sentinel and the `q:` buttons (DESIGN_athlete_queue.md §6.2)."""
+
+    def test_roundtrips_through_emit_queue_item(self):
+        import io
+        from trainmate.prompt import emit_queue_item
+        buf = io.StringIO()
+        emit_queue_item(
+            12, "🙋 Quick question (1 left)\nWhat was it?",
+            [{"label": "Leg press", "action": "a2"}, {"label": "🕐 Not now", "action": "n"}],
+            "1789538400", out=buf,
+        )
+        req = bot.parse_queue_request(buf.getvalue().rstrip("\n"))
+        self.assertEqual(req["text"], "🙋 Quick question (1 left)\nWhat was it?")
+        self.assertEqual(bot.queue_button_rows(req), [[
+            ("Leg press", "q:12:a2:1789538400"), ("🕐 Not now", "q:12:n:1789538400"),
+        ]])
+
+    def test_no_other_sentinel_parser_claims_a_queued_item(self):
+        line = bot.QUEUE_SENTINEL + '{"id": 1}'
+        self.assertIsNone(bot.parse_prompt_request(line))
+        self.assertIsNone(bot.parse_buttons_request(line))
+        self.assertFalse(bot.is_flush_request(line))
+        self.assertEqual(bot.parse_queue_request(line), {"id": 1})
+
+    def test_callback_roundtrips_inside_telegrams_64_bytes(self):
+        data = bot.queue_callback_data(123456, "a12", "r1789538400")
+        self.assertEqual(bot.decode_queue_callback(data), ("123456", "a12", "r1789538400"))
+        self.assertLessEqual(len(data.encode()), 64)
+
+    def test_decode_rejects_anything_but_a_queue_tap(self):
+        for data in ("ui:ab12:0", "stop:ab12", "q:12:a2", "q:x:a2:1", "q:12:a-2:1",
+                     "q:12:a2:1789 --remind", "q:12:a2:x1", "q:12::1"):
+            self.assertIsNone(bot.decode_queue_callback(data), data)
+
+    def test_a_queue_tap_leaves_the_live_button_row_alone(self):
+        """The item's buttons are their own namespace: no TM-BUTTONS token or Stop nonce
+        reads them, so a tap neither retires nor answers the morning row (§6.2)."""
+        data = bot.queue_callback_data(12, "a1", "1789538400")
+        self.assertIsNone(bot.decode_ui_callback(data))
+        self.assertIsNone(bot.decode_stop_callback(data))
+
+    def test_not_now_swaps_in_the_three_later_choices_from_the_tap(self):
+        self.assertEqual(bot.queue_later_rows("12", "1789538400"), [[
+            ("⏰ In 1 hour", "q:12:h:1789538400"),
+            ("⏰ In 1 day", "q:12:t:1789538400"),
+            ("↩️ After the others", "q:12:b:1789538400"),
+        ]])
+
+    def test_the_echo_names_the_button_that_was_tapped(self):
+        rows = [[("Belt squat", "q:1:a1:5"), ("Leg press", "q:1:a2:5")]]
+        self.assertEqual(bot.tapped_label(rows, "q:1:a2:5"), "Leg press")
+        self.assertIsNone(bot.tapped_label(rows, "q:1:a3:5"))
+
+
 if __name__ == "__main__":
     unittest.main()

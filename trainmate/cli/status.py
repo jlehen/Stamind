@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from trainmate import runtime
+from trainmate import athlete_queue, runtime
 from trainmate import intensity
 from trainmate.baselines import classify_metric, is_anomalous, UNKNOWN
 from trainmate.config import config
@@ -168,6 +168,8 @@ def run_status(args) -> None:
     # wording exists precisely because nothing is on record, so it would never be reached
     # from inside it (DESIGN_runway_nudge.md §4).
     runtime.render.runway_hint(current_runway(), _today_str())
+    # What waits in the athlete queue shares that place (DESIGN_athlete_queue.md §5.2).
+    runtime.render.queue_hint(*athlete_queue.waiting_counts())
 
     # Fitness thresholds (the effective anchors the coach prescribes from). Each is the
     # latest logbook row for its kind, with when it was tested (DESIGN_benchmark_workouts

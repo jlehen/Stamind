@@ -99,6 +99,44 @@ def emit_flush(out=None) -> None:
     out.flush()
 
 
+# Fifth sentinel: one item of the athlete queue, sent as a message of its own whose buttons
+# carry the item id. It replaces no TM-BUTTONS row and no row replaces it, so the bot
+# remembers nothing about it (DESIGN_athlete_queue.md §6.2).
+QUEUE_SENTINEL = "\x1eTM-QUEUE "
+
+
+def emit_queue_item(
+    item_id: int, text: str, buttons: Sequence[dict], since: str, out=None
+) -> None:
+    """Writes one sentinel-framed queued item: ``\\x1eTM-QUEUE {json}``, fields ``id``,
+    ``text``, ``buttons`` (each ``{"label", "action"}``) and ``since``, the walk's start in
+    epoch seconds, ``r``-prefixed for a walk of one (DESIGN_athlete_queue.md §6.2)."""
+    if out is None:
+        out = sys.stdout
+    payload = {"id": item_id, "text": text, "buttons": list(buttons), "since": since}
+    out.write(QUEUE_SENTINEL + json.dumps(payload) + "\n")
+    out.flush()
+
+
+# The "later" choices of a queued item: action code, words, and the emoji a chat button
+# adds. One definition for the terminal's chooser and the bot's "Not now" row, which the bot
+# swaps in from the tap itself (DESIGN_athlete_queue.md §6.4).
+QUEUE_LATER_HOUR = "h"
+QUEUE_LATER_DAY = "t"
+QUEUE_LATER_BACK = "b"
+QUEUE_NOT_NOW = "n"
+QUEUE_LATER_CHOICES = (
+    (QUEUE_LATER_HOUR, "in 1 hour", "⏰"),
+    (QUEUE_LATER_DAY, "in 1 day", "⏰"),
+    (QUEUE_LATER_BACK, "after the others", "↩️"),
+)
+
+
+def queue_later_label(words: str, emoji: str) -> str:
+    """A "later" choice as a chat button: '⏰ In 1 hour'."""
+    return f"{emoji} {words[:1].upper()}{words[1:]}"
+
+
 class PromptCancelled(Exception):
     """Raised when the front-end cancels an in-flight prompt (``/cancel`` or idle
     timeout), or when the answer channel closes.

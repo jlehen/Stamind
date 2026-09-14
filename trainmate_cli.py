@@ -10,7 +10,7 @@ import sys
 import traceback
 from typing import Optional
 
-from trainmate import journal, runtime
+from trainmate import clock, journal, runtime
 from trainmate.prompt import PromptCancelled
 from trainmate.util import (
     bold, dim, green, red, cyan, blue, magenta, gray, aside, visible_len, pad_visible,
@@ -37,9 +37,10 @@ TREE_COMMANDS = ("help", "shell")
 
 COMMAND_ORDER = {
     "": ["status", "workout", "progress", "plan", "goal",
-         "constraint", "benchmark", "signal", "learnings", "data", "settings",
+         "constraint", "benchmark", "signal", "queue", "learnings", "data", "settings",
          "journal", "shell", "help"],
     "settings": ["list", "set", "reset"],
+    "queue": ["list", "answer", "tell"],
     "journal": ["show", "prune"],
     "goal": ["list", "add", "edit", "rm"],
     "constraint": ["list", "show", "add", "edit", "rm"],
@@ -98,6 +99,7 @@ from trainmate.cli.workouts import add_workout_parser
 from trainmate.cli.data import add_data_parser
 from trainmate.cli.settings import add_settings_parser
 from trainmate.cli.journal import add_journal_parser
+from trainmate.cli.queue import add_queue_parser
 from trainmate.cli.bot import (
     add_bot_parser, run_bot_constraints, run_bot_morning, run_bot_route,
 )
@@ -186,6 +188,7 @@ def build_parser():
     add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser)
     add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser)
     add_settings_parser(subparsers)
+    add_queue_parser(subparsers)
     add_journal_parser(subparsers)
     add_bot_parser(subparsers)
 
@@ -211,6 +214,7 @@ def run_once(argv, parser, named_subparsers, source=None) -> None:
     gets no outcome at all: it is dropped, which is why the bracket is deferred (§3).
     """
     journal.start_run(argv, source=source, defer=True)
+    clock.start_command()
     try:
         _dispatch(argv, parser, named_subparsers)
     except UsageExit:
@@ -230,6 +234,8 @@ def run_once(argv, parser, named_subparsers, source=None) -> None:
             traceback_text=traceback.format_exc(),
         )
         raise
+    finally:
+        clock.end_command()
     journal.end_run("ok")
 
 
