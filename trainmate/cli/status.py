@@ -375,7 +375,7 @@ def add_status_parser(subparsers, pull_bypass_parser):
     # status command
     status_parser = subparsers.add_parser(
         "status",
-        aliases=["s"],
+        aliases=["s", "st"],
         parents=[pull_bypass_parser],
         help="Show current athlete status, active goals, recent metrics, and memories",
         description=(

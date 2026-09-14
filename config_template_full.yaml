@@ -279,6 +279,14 @@ garmin:
   #pmc_ctl_days: 42
   #pmc_atl_days: 7
 
+# Strength tracking (DESIGN_strength_tracking.md). This key only seeds a setting; change it
+# live with `settings set strength-sets-since 2026-09-03`.
+#strength:
+#  # First day whose strength sets are read from Garmin. Before it you did not correct the
+#  # watch's exercise names in Garmin Connect, so they were not checked. Unset, no sets are
+#  # read. Quote the date.
+#  #sets_since: "2026-09-03"
+
 coach:
   # Days of recent metrics history fed to the coach as context.
   #metrics_lookback_days: 15

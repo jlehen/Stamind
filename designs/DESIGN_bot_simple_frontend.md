@@ -136,6 +136,12 @@ The push must not collide with an in-flight command's polling pause: it uses the
 one-session-per-chat gate as typed commands (`sessions` dict) and simply retries a few
 minutes later if the chat is busy.
 
+Amended 2026-09-14 (DESIGN_strength_tracking.md §11): after deciding it is not a silent
+morning, `tm bot morning` runs the recent-data refresh a read command runs, whatever
+`adapt-first` says and whether or not a session is planned today, then reads the new strength
+sets. A question about yesterday's sets is queued before the walk the push opens at its end.
+A failure briefs what is stored.
+
 Amended 2026-09-14 (DESIGN_athlete_queue.md §6.5): every wake first asks the database
 whether a queued item's reminder time has passed. If one has, it runs `tm bot queue
 --remind` and waits for it to finish before it considers the push, so a reminder due at

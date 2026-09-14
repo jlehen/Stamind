@@ -134,7 +134,9 @@ refreshed the data.
 For a **question**:
 
 - **Answer.** The kind applies the answer, the item closes as `answered`, and the next item
-  is shown.
+  is shown. Amended 2026-09-14 (DESIGN_strength_tracking.md §7): when the kind could not
+  apply the answer, because Garmin was out of reach or she chose none of the proposed names,
+  the item stays waiting and the kind's line says why, as an empty typed text already did.
 - **Drop.** Nothing is applied. The item closes as `dropped` and is never asked again, unless
   its feature later queues a new subject. The next item is shown.
 - **Skip.** Nothing is written. The item keeps its place, so it is the first thing shown
@@ -469,6 +471,11 @@ That is all. A feature does not schedule anything, does not remember what it ask
 not touch the bot. The queue module holds the list of kinds and nothing about sets, learnings
 or any other feature. The `message` kind of §5.1 is the first entry in that list and the
 smallest example of one.
+
+Amended 2026-09-14 (DESIGN_strength_tracking.md §7): `sets_final` and `set_names` are the next
+two entries. A feature takes what it needs from `trainmate/queue_kind.py` (the `Kind` shape,
+`queue` and `NotApplied`), so the list of kinds can import the feature without the feature
+importing the list.
 
 ## 9. Guardrails
 

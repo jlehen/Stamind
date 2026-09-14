@@ -37,10 +37,11 @@ TREE_COMMANDS = ("help", "shell")
 
 COMMAND_ORDER = {
     "": ["status", "workout", "progress", "plan", "goal",
-         "constraint", "benchmark", "signal", "queue", "learnings", "data", "settings",
+         "constraint", "benchmark", "strength", "signal", "queue", "learnings", "data", "settings",
          "journal", "shell", "help"],
     "settings": ["list", "set", "reset"],
     "queue": ["list", "answer", "tell"],
+    "strength": ["name", "reset", "discard"],
     "journal": ["show", "prune"],
     "goal": ["list", "add", "edit", "rm"],
     "constraint": ["list", "show", "add", "edit", "rm"],
@@ -100,6 +101,7 @@ from trainmate.cli.data import add_data_parser
 from trainmate.cli.settings import add_settings_parser
 from trainmate.cli.journal import add_journal_parser
 from trainmate.cli.queue import add_queue_parser
+from trainmate.cli.strength import add_strength_parser
 from trainmate.cli.bot import (
     add_bot_parser, run_bot_constraints, run_bot_morning, run_bot_route,
 )
@@ -189,6 +191,7 @@ def build_parser():
     add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser)
     add_settings_parser(subparsers)
     add_queue_parser(subparsers)
+    add_strength_parser(subparsers)
     add_journal_parser(subparsers)
     add_bot_parser(subparsers)
 

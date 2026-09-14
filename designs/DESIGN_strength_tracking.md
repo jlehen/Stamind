@@ -1,6 +1,6 @@
 # Strength tracking: reading the sets, naming the blocks, prescribing in kilograms
 
-**Status:** Draft · **Date:** 2026-09-14 (rev. 7) · **Branch:** worktree-strength-tracking-design
+**Status:** Phase 1 implemented (§11.1) · **Date:** 2026-09-14 (rev. 7) · **Branch:** worktree-strength-tracking-design
 
 Revision 7 reads a session's sets once. The pull reads them the morning after the session,
 and from the moment they are final nothing under the athlete's answers moves again: a
@@ -748,6 +748,61 @@ and the two-call shape is visible rather than buried. The shipped strength file 
 the first file the tags exist for; the athlete's strength science is the kind of file
 `science.samples/cycling_and_strength/strength_integration.md` is, and the samples come as
 two sets there, so the tags have a worked example in each.
+
+### 11.1 Phase 1 as built
+
+The two facts were checked on 2026-09-14 against nine of the athlete's sessions from
+August 20 to September 10, read from the sets endpoint. Both came back usable, and the same
+reading turned up three things the design did not expect.
+
+**What the weight field carries on a bodyweight exercise.** The added load, never body
+weight. Pull-ups come back at 0, a dead bug at -1, an ab twist with no weight at all. So the
+50 kg check ships, and -1 or no weight is stored as "no load".
+
+**Whether Garmin says who named a set.** It does. A name a person picked, on the watch or
+in Connect, comes back as one candidate at 100%. A name the watch guessed comes back as up to
+three candidates with their probabilities: barbell deadlift 69%, unknown 30%. So `named_by`
+has three values: `watch`, `garmin` for a person's pick in Garmin, and `athlete` for an
+answer given in TrainMate. The lines under the activity mark the watch's guesses with
+`(watch)`, and nothing else is marked: a name a person picked is as good as an answer.
+
+**The 50 kg check applies to the watch's guesses only.** The athlete picks the nearest name
+Connect offers, even from the wrong category. On September 7 the pec deck at 60 kg is filed
+as the suspension trainer's chest fly, and a hip-thrust machine at 130 kg as the banded glute
+bridge. Checked against her pick, the rule would erase names a person chose. Checked against
+the watch, it still catches the case it was written for: on September 1 the watch guessed
+"sit-up" at 100 kg, and that set is stored unnamed with Garmin's guess kept.
+
+**A set can name a category and no exercise.** On September 7 she tagged three sets at
+120 kg as "Row" and chose no row. Such a set takes the category's own generic exercise,
+"row", which Garmin's catalog also lists.
+
+**The vocabulary is Garmin Connect's catalog, not the FIT file format's lists.** Connect
+uses names the FIT SDK lacks (`BELT_SQUAT`, which she logs weekly), and it publishes its
+exercise catalog with a bodyweight flag per exercise
+(`connect.garmin.com/web-data/exercises/Exercises.json`, 1,531 names). The shipped table is
+that catalog, the FIT SDK names it lacks (mostly yoga, Pilates and wheelchair variants), and
+seven gym machines neither has, such as the pec deck and the machine chest press: 1,493
+exercises and 1,934 Garmin names in `trainmate/strength/exercises.tsv`. A weighted variant
+of a bodyweight exercise is the same exercise, so a weighted pull-up adds to the pull-up's
+history, its load read as the added load.
+
+**The lines under the activity group by exercise, not by consecutive sets.** She alternates
+two exercises: belt squat, push press, belt squat, push press. Collapsing consecutive equal
+sets turned September 7 into 42 one-set lines. Grouped by exercise, in the order the
+exercises first came, it is 12 lines, one per exercise; unnamed sets, when a session has
+any, share one line listing their positions.
+
+**`strength name` on a session still waiting for "are the sets final?" freezes it first.**
+Otherwise a later "yes, final" would read the sets again and drop the names she had just
+given.
+
+**`tm st` is still `status`.** `strength` shares the prefix, so `st` became an alias, the
+way `s` already was.
+
+Not verified: whether a session's first read the morning after already has her Connect
+corrections. The four sessions since she started correcting all came back fully named, but
+they were read days later.
 
 ## 12. Decisions and open questions
 

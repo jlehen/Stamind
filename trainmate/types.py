@@ -130,6 +130,11 @@ class CompletedActivity(TypedDict):
     power_zone5_sec: Optional[int]
     power_zone6_sec: Optional[int]
     power_zone7_sec: Optional[int]
+    # Strength sessions only (DESIGN_strength_tracking.md §5): when the sets were read and
+    # frozen, and whether a person discarded the session.
+    sets_read_at: Optional[str]
+    sets_final_at: Optional[str]
+    discarded: int
 
 class AthleteMetric(TypedDict):
     """Represents Garmin health/performance metrics cached for a specific day."""

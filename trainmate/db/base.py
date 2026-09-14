@@ -9,7 +9,7 @@ from trainmate.config import config
 # migrations are idempotent, so this is a "skip the work" marker rather than a ledger of
 # steps to replay — TrainMate has one user and one database, and the alternative (a
 # numbered migration framework) would be more machinery than that warrants.
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 # How long a connection waits for a writer to finish before raising "database is
@@ -445,6 +445,18 @@ class BaseDB:
                     cursor, "completed_activities", col.split()[0],
                     f"ALTER TABLE completed_activities ADD COLUMN {col}"
                 )
+            # Whether a strength session's sets were read, frozen or discarded
+            # (DESIGN_strength_tracking.md §5). The summary upsert names its columns, so a
+            # pull never touches these three.
+            for col in [
+                "sets_read_at TEXT DEFAULT NULL",
+                "sets_final_at TEXT DEFAULT NULL",
+                "discarded INTEGER NOT NULL DEFAULT 0",
+            ]:
+                self._add_column(
+                    cursor, "completed_activities", col.split()[0],
+                    f"ALTER TABLE completed_activities ADD COLUMN {col}"
+                )
 
             # The athlete's answers to "is this activity that session?" — the pairing
             # questions `adherence.is_ambiguous_match` raises (ARCHITECTURE.md §15).
@@ -809,6 +821,27 @@ class BaseDB:
                     closed_at  TEXT,
                     outcome    TEXT,
                     UNIQUE (kind, subject)
+                )
+            """)
+
+            # Every set of a strength session as Garmin recorded it, rest entries included.
+            # Rows go with their activity, so the pull's deletion reconcile and the Garmin
+            # data wipe take them along (DESIGN_strength_tracking.md §5).
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS exercise_sets (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    activity_id   TEXT NOT NULL,
+                    seq           INTEGER NOT NULL,
+                    set_type      TEXT NOT NULL,
+                    exercise      TEXT,
+                    garmin_name   TEXT,
+                    reps          INTEGER,
+                    load_kg       REAL,
+                    duration_sec  REAL,
+                    named_by      TEXT,
+                    UNIQUE (activity_id, seq),
+                    FOREIGN KEY (activity_id) REFERENCES completed_activities(activity_id)
+                        ON DELETE CASCADE
                 )
             """)
 

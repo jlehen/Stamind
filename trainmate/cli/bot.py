@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from trainmate import clock, settings
+from trainmate.strength.sets import read_new_sessions
 from trainmate.cli.candidates import confirm_new_constraints, confirm_new_signals
 from trainmate.cli.common import adherence_verdicts, ensure_recent_data
 # The companion surfaces are companion-only by definition, so they call the line
@@ -285,6 +286,18 @@ def _auto_adapt_note(date_str: str) -> Optional[str]:
         return None
 
 
+def _refresh_garmin(date_str: str) -> None:
+    """The recent-data refresh a read command runs, then the strength sets: the push is the
+    companion's whole delivery path, so their questions have to join its walk
+    (DESIGN_strength_tracking.md §11). A failure briefs what is stored."""
+    from trainmate import runtime
+    try:
+        runtime.garmin.ensure_data(date_str, date_str)
+        read_new_sessions()
+    except Exception as e:
+        step(f"Could not refresh Garmin data, briefing what is stored: {e}")
+
+
 def _trained_today(date_str: str) -> Dict[int, Dict[str, Any]]:
     """Today's adherence verdicts over freshly pulled activity data — what the push needs
     to tell a session still ahead from one already behind (§4.1). Like the adaptation, a
@@ -359,6 +372,7 @@ def run_bot_morning(args: argparse.Namespace) -> None:
             and not runtime.db.get_workouts(start_date=today, end_date=today)):
         runtime.db.set_setting(MORNING_MARKER, today)
         return
+    _refresh_garmin(today)
 
     # Read before the adaptation, so the line is about the change the athlete's week
     # actually carries rather than one this run is about to make (§6.4).

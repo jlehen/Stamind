@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import athlete_queue, progression, runtime
+from trainmate.strength.sets import session_lines
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.config import config
 from trainmate.progression import RUNWAY_BLOCK, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
@@ -174,6 +175,11 @@ def simple_activity_line(act: Dict[str, Any]) -> str:
     return f"{emoji} {name} — {simple_activity_minutes(act)} min"
 
 
+def simple_set_lines(act: Dict[str, Any]) -> List[str]:
+    """What was lifted, under a strength session's line (DESIGN_strength_tracking.md §7)."""
+    return [f"      {line}" for line in session_lines(act)]
+
+
 def simple_activity_minutes(act: Dict[str, Any]) -> int:
     return round((act.get("duration_sec") or 0) / 60)
 
@@ -202,6 +208,7 @@ def simple_compare_lines(
                     lines.append(
                         f"{day} · ❌ 🛌 Rest day, but you trained: {simple_activity_line(act)}"
                     )
+                    lines.extend(simple_set_lines(act))
                 elif r.get("pending"):
                     lines.append(f"{day} · 🛌 Rest day")
                 else:
@@ -217,10 +224,12 @@ def simple_compare_lines(
                     f"{day} · ✅ {simple_session_line(w)} "
                     f"(you did {simple_activity_minutes(act)} min)"
                 )
+                lines.extend(simple_set_lines(act))
             else:
                 lines.append(f"{day} · ❌ {simple_session_line(w)}")
         for act in unplanned:
             lines.append(f"{day} · ➕ {simple_activity_line(act)}, not on the plan")
+            lines.extend(simple_set_lines(act))
     if len(lines) == 1:
         return ["Nothing to look back on yet — your sessions are ahead of you 💪"]
     session_word = "session" if total == 1 else "sessions"

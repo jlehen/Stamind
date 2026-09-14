@@ -29,6 +29,7 @@ from trainmate.db.analysis import AnalysisCacheMixin
 from trainmate.db.periodization import PeriodizationMixin
 from trainmate.db.settings import SettingsMixin
 from trainmate.db.queue import QueueMixin
+from trainmate.db.strength import StrengthMixin
 from trainmate.db.wipes import WipesMixin
 
 
@@ -44,6 +45,7 @@ class Database(
     PeriodizationMixin,
     SettingsMixin,
     QueueMixin,
+    StrengthMixin,
     WipesMixin,
     BaseDB,
 ):
