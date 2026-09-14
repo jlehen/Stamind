@@ -1,18 +1,17 @@
 # Strength tracking: reading the sets, naming the blocks, prescribing in kilograms
 
-**Status:** Draft · **Date:** 2026-09-14 (rev. 5) · **Branch:** worktree-strength-tracking-design
+**Status:** Draft · **Date:** 2026-09-14 (rev. 6) · **Branch:** worktree-strength-tracking-design
 
-Revision 5 folds in the review of 2026-09-11 to 14. A session is any activity Garmin itself
-typed as strength training that returned at least one set, and sessions are counted by day
-(§3). A real Garmin name wins over an earlier answer to the naming question (§6). The naming
-question is asked only by commands the athlete typed or tapped, never by the morning push;
-it offers "ask me later", its next question opens on the last answer, and free text goes
-through a model proposal the athlete confirms (§7). The training max is one rule, the top
-set by Epley over sets of 12 reps or fewer, shown in the state block and written to the
-logbook every session; the rep window and the guard of rev. 4 are gone, and a wrong session
-is removed by hand with `strength discard` (§8). The strength test reads its lifts from the
-prescribed sets, not from the goal (§8.2). Two commands, `strength name` and `strength
-discard`, are specified (§7). Revisions 1–4 are in the branch history.
+Revision 6 adopts the athlete queue (DESIGN_athlete_queue.md, implemented 2026-09-14). The
+naming question is no longer asked on the spot by anything: every pull that stores unnamed
+sets queues one question per block, and the morning push, `tm queue` and the reminders
+bring it to the athlete (§7). The question is a queue kind with a subject, answers fixed
+when it is queued, a "Leave it unnamed" drop and a staleness check, which retires the
+`sets_declined` flag (§5, §6), the "previous answer first" rule and the "how many sets?"
+follow-up of rev. 5. `strength name` is the only command that asks on the spot and the
+only place a block is split (§7). Rev. 5's "ask me later" is the queue's own "Not now".
+
+Revisions 1–5 are in the branch history.
 
 ## 1. Motivation
 
@@ -223,10 +222,10 @@ rewritten when an unnamed set gets its name.
 `named_by` is the no-guessing rule made auditable: every named row can say whether the
 name came from Garmin or from a person. Nothing else ever sets it.
 
-Two flags live on `completed_activities`, both set by a person and never by the pull:
-`sets_declined`, the athlete answered "leave it unnamed" for this session (§7), and
+One flag lives on `completed_activities`, set by a person and never by the pull:
 `discarded`, the athlete ran `strength discard` on it (§7). The summary row is upserted
-on every pull; the upsert leaves both columns alone.
+on every pull; the upsert leaves the column alone. "Leave it unnamed" writes no flag: the
+queue's closed row remembers it (§7).
 
 ## 6. The pull path
 
@@ -257,9 +256,10 @@ on Thursday, correcting loads in Connect, saw it was the hack squat and renamed 
 Friday's re-fetch takes the hack squat. The carry-forward goes by `seq` and only when the
 re-fetched session has the same number of sets as before. When the count changed — the
 athlete deleted a phantom set in Connect, or added one — positions have shifted and the
-names would land one set off, so nothing is carried forward, `sets_declined` is cleared
-because the athlete has just edited the session and a new look is due, and the question
-is asked again. Correcting a load or a rep count leaves the count unchanged, so names
+names would land one set off, so nothing is carried forward, and the pull queues the
+session's blocks afresh: the athlete has just edited the session, a new look is due, and
+a block in a session whose count changed is a new subject (§7), so an earlier drop does
+not hold it back. Correcting a load or a rep count leaves the count unchanged, so names
 survive the common edit.
 
 A Garmin name is accepted as given, with one check: **a name whose equipment class is
@@ -282,53 +282,93 @@ Three sources of names, in order of preference, and nothing else:
 1. **Garmin.** Whatever the watch detected or the athlete corrected in Connect. Since the
    athlete already opens Connect to fix reps and loads, fixing a name is the same gesture in
    the same screen; this is the primary path.
-2. **The athlete, via Telegram or CLI.** After a pull leaves unnamed sets in the last 7
-   days, the command asks. **Blocks are consecutive unnamed sets at the same load**, reps
-   ignored: within one exercise the reps drift (10, 10, 10, 9) while the load holds, and
-   when the machine changes the load almost always changes with it. The question shows the
-   whole block, one line per set, and offers the athlete's recent exercises:
+2. **The athlete, through the queue.** An unnamed block changes what TrainMate knows and
+   holds nothing up: the sets already count as volume. That is the case
+   DESIGN_athlete_queue.md §2 sends to the queue even when the athlete is watching, so the
+   naming question is never asked on the spot. Every pull that stores unnamed sets in the
+   last 7 days — `data pull`, the refresh a read command runs through `ensure_data`, the
+   morning push — queues one question per block and goes on with its work. **Blocks are
+   consecutive unnamed sets at the same load**, reps ignored: within one exercise the reps
+   drift (10, 10, 10, 9) while the load holds, and when the machine changes the load
+   almost always changes with it. The question shows the whole block and offers the
+   athlete's recent exercises:
 
-   > Sep 1, sets 1–4: 10, 10, 10, 9 reps @ 100 kg. What was it?
-   > [1] lat pulldown [2] leg press [3] cable row [4] other… [5] leave it unnamed
-   > [6] ask me later
+   > Tue Sep 15 gym session, sets 5–8: 10, 10, 8, 8 reps @ 60 kg. What was it?
+   > [1] leg press [2] belt squat [3] cable row [4] something else…
+   > [5] leave it unnamed — drop, never asked again [6] skip … [9] later — after the others
 
-   The answer is written with `named_by = athlete`. A warm-up ramp is several blocks for
-   one exercise (leg press 100, 140, 180 × 3 is three), and a superset is a block per set,
-   so **the previous answer is the first button of the next question**: the ramp costs one
-   tap per extra block. "Leave it unnamed" sets `sets_declined` on the activity and the
-   question is never asked about that session again; the sets stay unnamed and count as
-   volume only, and `strength name` still works on them later. "Ask me later", Enter in
-   the terminal, and the bot's timeout all mean the same thing: the question returns with
-   the next pull.
+   Choices 5 onward are the queue's own. The kind is `set_names`, and it brings the five
+   things §8 of the queue design asks a feature for:
 
-   **"Other…" takes free text, and the text goes through a model** — the one model call in
-   the naming path. The athlete types "pec deck" or "seated row machine"; the call is
-   shown the vocabulary and returns up to three candidate names; they come back as a
-   chooser with "none of these". Alias matching would not do: what people type does not
-   line up with Garmin's few hundred names, and no hand-kept alias list covers it. This
-   is not the guess §4 forbids, because the athlete sees it and confirms it, the same
-   exception §12 makes for template proposals. The path is rare: after a few weeks the
-   recent-exercises list covers nearly everything the athlete does, and "Other…" is for a
-   genuinely new exercise. A block that is two exercises at one load (cable row 50, then
-   pulldown 50) is split by a second chooser after the name is picked — "all 6 sets, or
-   how many?" — and the rest are asked again.
+   - **The subject** is the activity, the block's set positions and the session's set
+     count: `12345678901:5-8/12`. The same block is the same subject, so a re-fetch that
+     changes nothing queues nothing, and a block the athlete dropped is never asked about
+     again. A load corrected in Connect re-forms the blocks around it, and a set added or
+     deleted changes the count; each of those makes a new subject and a new question,
+     because the athlete has just edited the session and a new look is due. The count is
+     in the subject because a re-fetch that changed it carries no name forward (§6), and
+     a block at the same positions is then a fresh question, not a dropped one.
+   - **The wording**, written from the payload so it reads the same tomorrow: the date,
+     the positions, the reps and the load. The expert form is the line above; the
+     companion reads "Tuesday's gym session, sets 5–8: 10, 10, 8, 8 reps at 60 kg. What
+     was it?". A block at 0 kg says so, which is how a warm-up recorded under the
+     strength profile (§3) looks.
+   - **The answers**, fixed when the item is queued: the exercises named in the athlete's
+     last eight sessions (by day, discarded ones skipped), the ones done in the most
+     sessions first, at most nine, then "Something else…", which takes typed text. Fixed
+     because the queue says so (§3 there): a button tapped tomorrow must mean what it
+     meant when it was shown. Rev. 5 opened each question on the previous answer, which
+     recomputed the answers at tap time, and that rule is gone. A warm-up ramp of three
+     blocks still costs one tap per block, because its exercise is in the list; an
+     exercise the athlete has never done before costs a typed answer per block of its
+     first session and is in the list from the next one on.
+   - **The drop button** is "Leave it unnamed". It writes nothing: the sets stay unnamed
+     and count as volume only, the block is never asked about again, and `strength name`
+     can still name it later.
+   - **The check** calls the item stale when the block it describes no longer stands in
+     the table: any of its sets has a name, the rows at its positions no longer hold
+     those reps and loads, the session is discarded, or the activity is gone. A name
+     fixed in Connect, an answer given through `strength name` and a `strength discard`
+     all close a waiting question this way, and none of them touches the queue.
 
-   The mechanism is the blocking chooser (`runtime.prompt.choose`), the one that asks
-   "which one did you mean?" today. In a terminal it prints a numbered list and waits; in
-   the bot it sends inline buttons and waits up to `telegram.prompt_timeout`. **Only a
-   command the athlete typed or tapped asks** — `data pull`, `workout compare` and its
-   companion label "Done lately", `strength name` — and the morning push never does,
-   because it runs at 08:00 with nobody in the chat, and a question asked then is a
-   question that times out every morning. The one sentence: "TrainMate asks when you are
-   talking to it." Because the chooser blocks, the naming step runs **last** in the
-   commands that carry it, after everything else has printed. One block per question,
-   the next asked when the last is answered; in the bot a timeout ends the command, so
-   the remaining blocks wait for the next pull, and the timeout text for this question is
-   "Timed out, I'll ask again later" rather than the generic "command cancelled" — the CLI
-   marks the request as one that can wait, and the bot picks the wording from that. The
-   non-blocking button row (`TM-BUTTONS`) is the wrong tool here: it prints as a raw
-   sentinel in a terminal, and the bot keeps one row per chat, which the morning push
-   already uses.
+   An answer names every set of the block with `named_by = athlete` and confirms it:
+   "Named sets 5–8: leg press." Undoing it is `strength name` on the same day, the
+   reversibility the queue design (§9) asks of anything a tap can write.
+
+   **"Something else…" takes free text, and the text goes through a model** — the one
+   model call in the naming path. The tap starts the queue's text prompt (queue design
+   §6.3), the athlete types "pec deck" or "seated row machine", and the call, shown the
+   vocabulary, returns up to three candidate names. They come back as a blocking chooser
+   with "none of these". She has just typed, so she is there, and the answer cannot be
+   applied without her choice: the one case §2 of the queue design keeps on the spot. A
+   candidate chosen names the block. "None of these", Enter, and a timeout in chat write
+   nothing and leave the question waiting, exactly as an empty text does; that needs one
+   line added to the queue design when this lands (§11). Alias matching would not do:
+   what people type does not line up with Garmin's few hundred names, and no hand-kept
+   alias list covers it. This is not the guess §4 forbids, because the athlete sees it
+   and confirms it, the same exception §12 makes for template proposals. The path is
+   rare: after a few weeks the recent-exercises list covers nearly everything the athlete
+   does, and "Something else…" is for a genuinely new exercise.
+
+   A block that is two exercises at one load (cable row 50, then pulldown 50) gets one
+   name from the queue. Rev. 5 followed every answer with "all 6 sets, or how many?", a
+   second question on every tap to catch a rare case, and that is gone. The tail of such
+   a block is fixed the way any wrong name is: in Connect within 7 days, where Garmin's
+   name wins (§6), or with `strength name`, which splits.
+
+   Where she meets the question is the queue design's business, not this one's. In
+   Telegram the questions arrive after the morning briefing, one at a time with their
+   buttons, and nothing waits: she can answer at breakfast or in the evening, and "Not
+   now" puts one off. In the terminal `tm queue` lists them, `tm queue answer` goes
+   through them, and `status` and `workout adapt` say how many are waiting. This feature
+   adds no surface of its own. The week of §1 of that design, seen from this side:
+   Tuesday's machine session leaves six unnamed blocks. Wednesday's 08:00 push pulls
+   Garmin, stores the sets and queues six questions, dated 08:00 by the command that
+   queued them, so the walk the push opens at its end shows them. She names four at
+   breakfast, drops the chest-press warm-up, and puts one off until Thursday. On
+   Wednesday evening she names the last one in Connect. Thursday's push re-fetches the
+   session, which is within 7 days, the sets come back named, and the waiting question
+   is found stale and closed without a word.
 3. **Nothing.** An unnamed block is a legitimate state. It contributes to session volume
    and fatigue (§9) and to nothing else.
 
@@ -350,18 +390,23 @@ exercise carries a mark for where the name came from — `(g)` for Garmin, nothi
 athlete — so a wrong Garmin name is seen the morning after: "barbell row 4×4 @ 80 (g)"
 on a day the athlete deadlifted.
 
-**Two commands do the surgery.** `strength name <date>` asks the naming question over any
-block of that day's session, named or not (a named block is consecutive sets with the
-same name), and is the only way to fix a name once the 7-day re-fetch has passed, and
-the way to name the backlog: the first pull with `sets_since` months back stores
-hundreds of unnamed blocks and asks about the last 7 days only, and until the older
-sessions are named through this command nothing on a machine day is habitual (§8).
-`strength discard <date>` marks that day's session as one that should not count — the
-hotel gym's leg press, a warm-up recorded under the strength profile, a session logged
-so badly it is not worth fixing — and `--undo` reverses it. The sets stay stored. A
-discarded session is skipped by the tracked-lift rule, by the state block and by the
-logbook; since those are computed on every read, the flag is enough, and the command's
-one write is to delete the session's modeled rows (§8.1), which undo writes back.
+**Two commands do the surgery.** `strength name <date>` is the only command that asks on
+the spot, and the queue's rule allows it that: the operator typed it, and the answer is
+the whole of its work. It asks the naming question over any block of that day's session,
+named or not (a named block is consecutive sets with the same name), with the same answers
+as the queued question and one more step after the name is picked: "all 6 sets, or how
+many?", and the rest are asked again. It is the only way to fix a name once the 7-day
+re-fetch has passed, the only place a block is split, and the way to name the backlog: the
+first pull with `sets_since` months back stores hundreds of unnamed blocks and queues the
+last 7 days only, and until the older sessions are named through this command nothing on a
+machine day is habitual (§8). A waiting question about sets it names is stale from then
+on. `strength discard <date>` marks that day's session as one that should not count — the
+hotel gym's leg press, a warm-up recorded under the strength profile, a session logged so
+badly it is not worth fixing — and `--undo` reverses it. The sets stay stored. A discarded
+session is skipped by the tracked-lift rule, by the state block and by the logbook, and
+its waiting questions are stale; since all of those are computed on every read, the flag
+is enough, and the command's one write is to delete the session's modeled rows (§8.1),
+which undo writes back.
 
 ## 8. Tracked lifts, the training max, and the strength test
 
@@ -651,15 +696,18 @@ stands.
 ## 11. Phasing, and the science trim
 
 **Phase 1 — data, no prompt changes.** The vocabulary table with the full Garmin mapping,
-`exercise_sets`, `strength.sets_since`, the pull with the 7-day set re-fetch, the naming
-question through the chooser with its model-backed "Other…", `strength name` and
+`exercise_sets`, `strength.sets_since`, the pull with the 7-day set re-fetch, the
+`set_names` queue kind with its model-backed "Something else…", `strength name` and
 `strength discard`, and sets shown in `workout compare` / "Done lately" with their name
 source — both of which today render a strength session as duration, load and RPE only
 (`cli/common.py::format_actual`, `cli/render.py::simple_compare_lines`). At the end of it
 TrainMate knows what the athlete lifts and the coach does not use it yet. Deliberately
 boring, so it can be checked against reality — do Connect edits come through, is 7 days
 enough, does the load-only block split ask sensible questions — before anything depends
-on it. Two facts to verify against the account in this phase, because a rule depends on
+on it. DESIGN_athlete_queue.md, implemented, is amended when this lands: its list of
+kinds (§8) gains `set_names`, and its §4 says that an answer whose apply wrote nothing
+leaves the item waiting, which the empty typed answer already does. Two facts to verify
+against the account in this phase, because a rule depends on
 each: what the weight field carries on a bodyweight exercise (§6), and whether the sets
 endpoint says if a name was watch-detected or user-edited — if it does, `named_by`
 records the difference and `workout compare` can mark a watch guess apart from an
@@ -706,9 +754,13 @@ Decided:
   free-text path is a model proposal with a human tap. A real Garmin name wins over an
   earlier answer to the question; a Garmin name on a bodyweight exercise at a heavy load
   is not a name.
-- The naming question is the blocking chooser, asked last, only by commands the athlete
-  typed or tapped, never by the morning push; one block per question, blocks split by
-  load, the previous answer first, with "leave it unnamed" and "ask me later" as answers.
+- The naming question is a queue kind, never asked on the spot: every pull that stores
+  unnamed sets queues one item per block, blocks split by load, the subject being the
+  activity, the positions and the session's set count. Its answers are the recent
+  exercises, fixed when queued, plus a typed "Something else…" confirmed through a model
+  proposal; "Leave it unnamed" is the drop; a block whose sets are named, re-formed or
+  discarded is stale. No `sets_declined` flag. `strength name` is the only command that asks
+  on the spot and the only place a block is split.
 - Two commands: `strength name <date>` and `strength discard <date> [--undo]`.
 - Tracked lifts by frequency and prescription, never by load, never by config.
 - One training max rule: the set with the highest Epley estimate over sets of 12 reps or
