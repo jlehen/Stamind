@@ -195,7 +195,8 @@ the shorthand is a second vocabulary to memorize, and it is arbitrary — `res` 
 ### The rule
 
 **A token that is a prefix of exactly one command at its level *is* that command.**
-`st` is `status`, `wo li` is `workout list`, `constr ed` is `constraint edit`. No
+`st` is `status` (an alias since `strength` arrived, the way `s` already was), `wo li` is
+`workout list`, `constr ed` is `constraint edit`. No
 registration, no list to maintain: the command names themselves are the vocabulary.
 An ambiguous prefix is refused by name — `p` prints `Ambiguous command 'p' —
 matches: plan, progress` and exits 2, the same shape as argparse's own errors.

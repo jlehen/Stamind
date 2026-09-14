@@ -3,6 +3,7 @@ import argparse
 from datetime import datetime, timedelta
 from typing import Optional
 from trainmate import athlete_queue, runtime
+from trainmate.strength.sets import session_lines
 from trainmate.config import config
 from trainmate.adherence import analyze_adherence, date_covered, format_discrepancies
 from trainmate.google_calendar import event_url
@@ -881,6 +882,7 @@ def print_workout_compare(
                     print(f"  ACTUAL:     {red(act_str)} {bold(red('[REST VIOLATION]'))}")
                 else:
                     print(f"  ACTUAL:     {green(act_str)}")
+                print_set_lines(act)
             elif r.get('pending'):
                 print(f"  ACTUAL:     {gray('(not yet — still ahead today)')}")
             elif not is_rest:
@@ -895,6 +897,7 @@ def print_workout_compare(
                 print(f"  UNPLANNED:  {yellow(act_str)}")
             else:
                 print(gray(f"  (off-plan): {act_str}"))
+            print_set_lines(act)
 
         print(gray("-" * 40))
 
@@ -916,6 +919,13 @@ def print_workout_compare(
             print(gray(
                 f"- {fmt_date(act['date'])}: {format_actual(act, divergence=True)}"
             ))
+
+
+def print_set_lines(act: dict) -> None:
+    """What was lifted, under a strength session's activity line (DESIGN_strength_tracking.md
+    §7)."""
+    for line in session_lines(act):
+        print(gray(f"              {line}"))
 
 
 def print_calendar_marked(marked: int) -> None:

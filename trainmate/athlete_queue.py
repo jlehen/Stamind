@@ -4,16 +4,16 @@ The list of kinds, the walk and the actions. The queue knows nothing about what 
 asks: each kind brings its wording, its check and what its answers do (§8). `message`, the
 operator's note from `tm queue tell`, is the first kind and the smallest one.
 """
-from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import clock, runtime
 from trainmate.db.queue import queue_stamp
 from trainmate.prompt import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
-
-QUESTION = "question"
-MESSAGE = "message"
+# Re-exported: what a feature needs lives in queue_kind, so a feature can queue items
+# without importing the list of kinds that imports it.
+from trainmate.queue_kind import MESSAGE, QUESTION, Kind, NotApplied, queue  # noqa: F401
+from trainmate.strength.questions import SET_NAMES_KIND, SETS_FINAL_KIND
 
 ANSWERED = "answered"
 DROPPED = "dropped"
@@ -29,21 +29,6 @@ SKIP = "s"
 MESSAGE_ANSWERS = ({"label": "got it"},)
 
 
-@dataclass(frozen=True)
-class Kind:
-    """What a feature brings to the queue (§8).
-
-    `apply` gets the item, the position of the chosen answer and the typed text when that
-    answer asks for one (an answer with an `ask` key), and returns the line confirming it."""
-    name: str
-    shape: str
-    wording: Callable[[Dict[str, Any]], str]
-    companion_wording: Callable[[Dict[str, Any]], str]
-    is_stale: Callable[[Dict[str, Any]], bool]
-    apply: Callable[[Dict[str, Any], int, Optional[str]], Optional[str]]
-    drop_label: Optional[str] = None
-
-
 def _message_text(item: Dict[str, Any]) -> str:
     return item["payload"]["text"]
 
@@ -55,7 +40,10 @@ MESSAGE_KIND = Kind(
     is_stale=lambda item: False, apply=lambda item, index, text: None,
 )
 
-KINDS: Dict[str, Kind] = {MESSAGE_KIND.name: MESSAGE_KIND}
+# The strength kinds ask for a session's sets (DESIGN_strength_tracking.md §7).
+KINDS: Dict[str, Kind] = {
+    kind.name: kind for kind in (MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND)
+}
 
 
 def kind_of(item: Dict[str, Any]) -> Kind:
@@ -81,14 +69,6 @@ def answer_index(item: Dict[str, Any], action: str) -> Optional[int]:
         return None
     index = int(action[1:]) - 1
     return index if 0 <= index < len(answers(item)) else None
-
-
-def queue(kind: str, subject: str, payload: Dict[str, Any]) -> Optional[int]:
-    """Queues an item once per kind and subject, and returns its id (§3).
-
-    Dated by the command that queues it, so an item the morning push queues while it runs
-    belongs to the walk the push opens at its end (§4)."""
-    return runtime.db.queue_item(kind, subject, payload, clock.command_start())
 
 
 def tell(text: str) -> Optional[int]:
@@ -140,7 +120,8 @@ def act(
     item: Dict[str, Any], action: str, since: datetime, text: Optional[str] = None
 ) -> Optional[str]:
     """Applies one action to a waiting item and returns the kind's line for an answer (§4).
-    An action the item was not queued with writes nothing (§9)."""
+    An action the item was not queued with writes nothing (§9), and an answer its kind could
+    not apply leaves the item waiting, with the kind's line saying why."""
     now = clock.now()
     kind = kind_of(item)
     if action == DROP and kind.shape == QUESTION:
@@ -156,7 +137,10 @@ def act(
     index = answer_index(item, action)
     if index is None:
         return None
-    line = kind.apply(item, index, text)
+    try:
+        line = kind.apply(item, index, text)
+    except NotApplied as not_applied:
+        return str(not_applied)
     runtime.db.close_queue_item(item["id"], ANSWERED, now)
     return line
 

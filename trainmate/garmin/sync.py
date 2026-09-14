@@ -12,6 +12,7 @@ from trainmate.garmin.client import (GarminAuthRequired, GarminClient, _date_ran
 from trainmate.garmin.load import _safe_round, compute_load, measured_tss
 from trainmate.sports import canonical_sport
 from trainmate.garmin.pmc import recompute_derived
+from trainmate.strength import sets as strength_sets
 
 def _ingest_activities(client: GarminClient, start: str, end: str, throttle: float) -> int:
     """Ingests the range's activities, returning how many Garmin returned — -1 on a
@@ -133,6 +134,13 @@ def _int_or_none(v: Any) -> Optional[int]:
         return int(round(float(v)))
     except (ValueError, TypeError):
         return None
+def connect() -> GarminClient:
+    """A client logged into the configured Garmin Connect account. Raises GarminAuthRequired
+    when a non-interactive run would need MFA."""
+    client = GarminClient(config.garmin_email, config.garmin_password, config.garmin_token_dir)
+    step(f"Logging into Garmin Connect (tokens: {config.garmin_token_dir})...")
+    client.login()
+    return client
 def pull(
     start_date: str, end_date: str, *,
     metrics: bool = True, activities: bool = True,
@@ -147,9 +155,7 @@ def pull(
     if throttle is None:
         throttle = config.garmin_throttle_seconds
 
-    client = GarminClient(config.garmin_email, config.garmin_password, config.garmin_token_dir)
-    step(f"Logging into Garmin Connect (tokens: {config.garmin_token_dir})...")
-    client.login()
+    client = connect()
 
     landed = []
     if activities:
@@ -158,6 +164,8 @@ def pull(
             "activities unavailable" if count < 0
             else f"{count} activit{'y' if count == 1 else 'ies'}"
         )
+        # The sets of strength sessions are a step of their own (DESIGN_strength_tracking.md §6).
+        strength_sets.report(strength_sets.read_new_sessions(client))
     if metrics:
         days = _ingest_metrics(client, start_date, end_date, throttle)
         landed.append(f"{days} day{'' if days == 1 else 's'} of metrics")

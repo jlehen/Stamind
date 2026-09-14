@@ -184,3 +184,8 @@ class GarminClient:
         except Exception as e:
             journal.debug("garmin.pull", f"activity {activity_id} RPE: {e}")
         return None
+
+    def get_activity_exercise_sets(self, activity_id: Any) -> Dict[str, Any]:
+        """The sets of a strength activity (DESIGN_strength_tracking.md §3). Raises on API
+        failure: an empty answer would read as "no sets" and freeze the session."""
+        return self.api.get_activity_exercise_sets(activity_id) or {}

@@ -11,6 +11,7 @@ lazily inside each function, so importing this module never opens the database.
 
 import re
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Callable, List, Optional, Tuple
 
 from trainmate import clock, llm_models
@@ -26,6 +27,7 @@ MORNING_TIME = "morning-time"
 MORNING_DEADLINE = "morning-deadline"
 ADAPT_FIRST = "adapt-first"
 COMMITMENT_DAYS = "commitment-days"
+STRENGTH_SETS_SINCE = "strength-sets-since"
 
 
 def parse_hhmm(token: Any) -> str:
@@ -48,6 +50,15 @@ def parse_days(token: Any) -> str:
             f"'{raw}' is not a number of days — write a whole number, 0 or more, e.g. 7."
         )
     return str(int(raw))
+
+
+def parse_date(token: Any) -> str:
+    """A calendar day as 'YYYY-MM-DD'. An unquoted date in config.yaml arrives as a date."""
+    raw = str(token if token is not None else "").strip()
+    try:
+        return date.fromisoformat(raw).isoformat()
+    except ValueError:
+        raise ValueError(f"'{raw}' is not a date — write it as YYYY-MM-DD, e.g. 2026-09-03.")
 
 
 def parse_switch(token: Any) -> str:
@@ -213,6 +224,17 @@ SETTINGS: List[Setting] = [
         fallback="off",
         coerce=_is_on,
     ),
+    Setting(
+        name=STRENGTH_SETS_SINCE,
+        key="strength_sets_since",
+        group="Strength",
+        summary="First day whose strength sets are read from Garmin",
+        value_hint="YYYY-MM-DD",
+        parse=parse_date,
+        # Before it the athlete did not correct the watch (DESIGN_strength_tracking.md §3).
+        config_path=("strength", "sets_since"),
+        unset_label="(sets are not read)",
+    ),
 ]
 
 
@@ -339,3 +361,7 @@ def router_model() -> Optional[str]:
     """The model `bot route` classifies with, or None to follow the coaching model
     (DESIGN_bot_simple_frontend.md §5.4)."""
     return value(ROUTER_MODEL)
+
+
+def strength_sets_since() -> Optional[str]:
+    return value(STRENGTH_SETS_SINCE)
