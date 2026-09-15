@@ -1,43 +1,35 @@
 # Strength tracking: reading the sets, naming the blocks, prescribing in kilograms
 
-**Status:** Phase 1 implemented (§11.1) · Phase 2 draft (§8–§10) · **Date:** 2026-09-14 (rev. 8) · **Branch:** worktree-strength-tracking-design
+**Status:** Phase 1 implemented (§11.1) · Phase 2 draft (§8–§10) · **Date:** 2026-09-15 (rev. 9) · **Branch:** worktree-strength-tracking-design
 
-Revision 8 designs phase 2, the coach. It starts from what phase 1 found in the athlete's
-first five sessions read from Garmin (September 3 to 10), and from the code phase 2 has to
-touch. Four findings reshape it.
+Revision 9 settles a day with two strength workouts. On Thursday September 3 the athlete
+lifted at the gym at 09:43 and did 16 kg kettlebell work at 20:45 (§6). Phase 1 already kept
+the two apart in the queue, since every question's subject carries the activity, but four
+things about such a day were wrong.
 
-The athlete does not repeat sessions. A Monday at the gym with a belt squat, a push press and
-a lat pulldown; a Thursday with kettlebells; short dumbbell circuits in the evening. Over four
-session days the athlete did 23 different exercises, and only one of them, the goblet squat,
-came back on three days. Revision 7 chose which exercises to show the coach by that count,
-three of the last eight sessions, so the coach would have seen one exercise. Revision 8 shows
-the coach every exercise done recently (§8).
+The questions gave the start time only on a day with two strength activities, and decided
+that when the question was queued. Had the evening session reached Garmin after the
+morning's sets were read, the morning's question would have said "Thu Sep 3 gym session"
+for good. Every question now gives the start time (§7).
 
-Garmin says which names the watch only guessed (§11.1). Revision 7 trusted every Garmin name,
-but a guess is exactly the inference this design refuses. The evening of September 3 shows
-why: the watch called a set of 12 reps at 16 kg a "barbell deadlift", in a session where
-nothing weighed more than 16 kg, and revision 7 would have filed it as the athlete's latest
-deadlift. Revision 8 counts a guess once the athlete has said the session's sets are final
-(§6, §7).
+`strength reset` and `strength discard` acted on every activity of the date. Reading the
+morning again after a fix in Connect dropped the names given to the evening, and discarding
+a warm-up recorded under the strength profile discarded the session beside it. Both now ask
+which one when a day has more than one (§7).
 
-People file machines under the nearest name Connect offers: the pec deck at 60 kg as a
-suspension-trainer chest fly, a hip-thrust machine at 130 kg as a banded glute bridge. So the
-equipment class of a name says what that exercise usually needs, not what the athlete used.
-Revision 7 decided by that class whether an exercise was measured in reps or in kilograms.
+Discarding never took a workout out of training load: nothing outside strength tracking
+reads the flag, so its duration, RPE and load reach the planner as before, and only its sets
+leave the strength history and the naming answers. But the command said the session "no
+longer counts", which reads as the work thrown away. It now says what it does (§5, §7).
 
-And the benchmark logbook, where revision 7 wrote a training max for every exercise of every
-session, assumes one number per kind of test in about ten places: the block report,
-`status`, `benchmark list`, the web API, the profile every prompt sees, and more. The
-progress timeline, which was to show that number, does not read the logbook at all.
+In phase 2, the history put the sets of an exercise done in two workouts of a day on one
+line, with room for one RPE. Goblet squats at 44 kg in the morning and at 16 kg in the
+evening would have read as one session that faded, which the prescription answers by holding
+the load. Each workout now gets its own line (§8). Asking, after a session that departs from
+its prescription, whether it should count is recorded as an open question rather than built
+(§12).
 
-So revision 8 removes more than it adds. There is no tracked-lift rule, no training max, no
-logbook rows, no adherence thresholds and no new field in the planner's reply. What stays is
-the part that retires the hand-kept log and the outside chat: a history of recent sets per
-exercise (§8), one more model call that writes kilograms into the strength sessions, and a
-table that keeps those kilograms as data (§9). Revision 7's training max is in the branch
-history for the day someone designs a progress view (§12).
-
-Revisions 1–7 are in the branch history.
+Revisions 1–8 are in the branch history.
 
 ## 1. Motivation
 
@@ -262,7 +254,8 @@ columns, leaves all three alone on every pull:
   question waits (§7). From then on no pull touches the rows, and the naming question's
   subject carries this time (§7).
 - `discarded` — the athlete ran `strength discard` on it (§7). Set by a person, never by
-  the pull.
+  the pull. It keeps the sets out of the strength history and the naming answers; the
+  activity still counts toward training load, which never reads it.
 
 Neither drop answer of §7 writes a flag: the queue's closed row remembers it.
 
@@ -381,7 +374,7 @@ Three sources of names, in order of preference, and nothing else:
    when the machine changes the load almost always changes with it. The question shows
    the whole block and offers the athlete's recent exercises:
 
-   > Tue Sep 15 gym session, sets 5–8: 10, 10, 8, 8 reps @ 60 kg. What was it?
+   > Tue Sep 15 18:10 gym session, sets 5–8: 10, 10, 8, 8 reps @ 60 kg. What was it?
    > [1] leg press [2] belt squat [3] cable row [4] something else…
    > [5] leave it unnamed — drop, never asked again [6] skip … [9] later — after the others
 
@@ -394,12 +387,13 @@ Three sources of names, in order of preference, and nothing else:
      freeze stands, a block the athlete dropped is never asked about again, and
      `strength reset`, which freezes anew, makes every block of the session a new subject
      and a new question: the athlete has just edited the session and a new look is due.
-   - **The wording**, written from the payload so it reads the same tomorrow: the date,
-     the positions, the reps and the load. The expert form is the line above; the
-     companion reads "Tuesday's gym session, sets 5–8: 10, 10, 8, 8 reps at 60 kg. What
-     was it?". A block at 0 kg says so, which is how a warm-up recorded under the
-     strength profile (§3) looks. A day with two lifting activities (§3) carries the
-     start time in both questions, "Tue Sep 15 18:10 gym session", so they are told apart.
+   - **The wording**, written from the payload so it reads the same tomorrow: the date
+     and start time, the positions, the reps and the load. The expert form is the line
+     above; the companion reads "Tuesday's 18:10 gym session, sets 5–8: 10, 10, 8, 8 reps
+     at 60 kg. What was it?". A block at 0 kg says so, which is how a warm-up recorded
+     under the strength profile (§3) looks. The start time is always there, so a day with
+     two lifting activities (§3) tells them apart even when the second reached Garmin
+     after the first was read.
    - **The answers**, fixed when the item is queued: the exercises a person named in the
      athlete's last eight sessions (by day, discarded ones skipped), the ones done in the
      most sessions first, at most nine, then "Something else…", which takes typed text.
@@ -512,11 +506,23 @@ sessions' sets again from Garmin, replaces the rows, drops the answers on them, 
 them anew, makes the guesses still standing the athlete's and queues the naming questions
 for what is still unnamed, seven days old or not: it is how a name fixed in Connect after
 the freeze comes in, and how a session read wrong gets read right. `strength discard
-<date>` marks that day's session as one that should not count — the hotel gym's leg press,
-a warm-up recorded under the strength profile, a session logged so badly it is not worth
+<date>` keeps a session's sets out of weight planning — the hotel gym's leg press, a
+warm-up recorded under the strength profile, a session logged so badly it is not worth
 fixing — and `--undo` reverses it. The sets stay stored. A discarded session is skipped by
 the strength history (§8) and by the naming answers, and its waiting questions are stale;
-all of those are computed on every read, so the flag is the command's one write.
+all of those are computed on every read, so the flag is the command's one write. The
+workout still counts as training: its duration, RPE and load reach the planner as before,
+because nothing outside strength tracking reads the flag.
+
+**On a day with two strength activities, `strength reset` and `strength discard` ask which
+one**, offering each by its start time, then "all of them" and "none", the default. Take
+September 3 (§6): the athlete fixes a name in Connect on the 09:43 session and resets the
+day. Acting on every activity of the date would also read the 20:45 session again and drop
+the names given to it, and discarding a warm-up recorded under the strength profile would
+discard the session beside it. The date stays the argument, because it is what the athlete
+remembers: Garmin's activity number is eleven digits that no TrainMate screen shows.
+`strength name` does not ask: it goes through every session of the day, each under its
+start time, and "keep it as it is" leaves a block alone.
 
 ## 8. The strength history
 
@@ -576,6 +582,24 @@ recorded, per exercise, not comparable across exercises)
 The row shows three sets where the athlete did four: the fourth is a watch guess nobody has
 confirmed (§6). The morning of September 3 is missing altogether, deadlifts at 80 kg
 included, because every name in it is a guess.
+
+**A day with two workouts shows each on its own line.** Days still decide what is counted,
+the eight days and each exercise's last three, but the sets of an exercise done in two
+workouts of one day are not merged. Say that on Tuesday September 22 the athlete does the
+prescribed goblet squats at the gym at 09:00, and goblet squats again at 16 kg in an evening
+workout at 20:10:
+
+```
+  goblet squat (squat, dumbbell)
+    Tue Sep 22, prescribed 3×10 @ 44:
+      09:00: 3×10 @ 44 | RPE 6
+      20:10: 3×12 @ 16 | RPE 2
+```
+
+Merged into "Tue Sep 22: 3×10 @ 44, 3×12 @ 16", the evening reads as the morning's session
+fading, which the prescription call answers by holding the load (§9), and the line has room
+for one of the two RPEs. A session the watch recorded as two activities (§3) shows as two
+lines too, which is what happened. A day with one workout keeps its one line.
 
 The loads are the weight field as recorded. On a pull-up that is the added load. Body
 weight is not stored, and Garmin's weigh-ins are not read (§3). "pull up: 4×8, 2×6 @ 10" is
@@ -900,8 +924,8 @@ Decided:
   runs `strength reset`, or keeps it in `strength name`; until then it is volume. A watch
   guess of a bodyweight exercise at more than 50 kg is not a name. Templates, if they come,
   are proposals with a human tap; the free-text path is a model proposal with a human tap.
-- Two queue kinds, neither asked on the spot. `sets_final`, one per session with unnamed
-  sets or guesses, subject the activity, "leave it as it is" freezing as read, "Not now"
+- Two queue kinds, neither asked on the spot, both naming the session by its day and start
+  time. `sets_final`, one per session with unnamed sets or guesses, subject the activity, "leave it as it is" freezing as read, "Not now"
   meaning "I'll fix them in Connect". `set_names`, one per block at the freeze, blocks
   being consecutive unnamed sets at one load, subject the activity, the freeze time and the
   positions; answers the exercises a person named recently, fixed when queued, plus a typed
@@ -909,11 +933,14 @@ Decided:
   block whose sets are named, discarded or frozen again is stale. `strength name` is the
   only command that asks on the spot and the only place a block is split.
 - Three commands: `strength name <date>`, `strength reset <date>` and
-  `strength discard <date> [--undo]`.
+  `strength discard <date> [--undo]`. On a day with two strength activities, reset and
+  discard ask which one, "none" by default. A discarded session's sets leave the history
+  and the naming answers; the workout still counts as training.
 - Body weight is not stored; loads are shown as recorded.
 - The strength history shows every exercise a person named in the last eight strength
-  days, each with its last three sessions, built on read. No tracked-lift rule, and no
-  stored or computed number per exercise.
+  days, each with its last three sessions, built on read; a day with two workouts shows
+  each on its own line with its start time and RPE. No tracked-lift rule, and no stored or
+  computed number per exercise.
 - The benchmark logbook is untouched: no modeled rows, no exercise column, and `e1rm`
   stays one lift, as `benchmark record` says.
 - The planner's reply does not change. One prescription call per proposal writes the new
@@ -938,6 +965,14 @@ Open:
   were written and kettlebell swings where "no swings" was. The call is shown what was
   prescribed beside what was done, so the next prescription starts from what the athlete
   actually does. Whether kilograms change what the athlete does is what phase 2 finds out.
+- A question instead of `strength discard`. An athlete who only uses the chat bot has no
+  way to keep a session out of weight planning. Asking after every session that departs
+  from its prescription is not the answer: most departures are what the next prescription
+  has to learn from, a push press that stopped at 3 of 5 reps or a belt squat done where a
+  back squat was written, so the answer would nearly always be yes and soon be tapped
+  through, and deciding what departs would bring back the thresholds revision 8 removed.
+  Whether a question is needed, and what triggers it, waits until phase 2 shows how often
+  sessions depart from what was prescribed.
 - An unnamed circuit asks one question per set (§7). If an athlete who does not fix names
   in Connect lifts in circuits, asking once per load across the session is the change, at
   the cost of a wrong name whenever two machines share a weight.
