@@ -216,15 +216,14 @@ def session_lines(activity: Dict[str, Any]) -> List[str]:
     if unnamed:
         lines.append(f"{position_list(unnamed)} unnamed")
     if lines and activity.get("discarded"):
-        lines.append("discarded: this session does not count")
+        lines.append("discarded: counts as training, not for planning weights")
     return lines
 
 
 def session(activity: Dict[str, Any]) -> Dict[str, Any]:
-    """The part of a question's payload that names the session: its day, and its start time
-    when that day has two strength activities (§7)."""
-    same_day = runtime.db.strength_activities(activity["date"], date=activity["date"])
-    start = (activity.get("start_time") or "")[11:16] if len(same_day) > 1 else None
+    """The part of a question's payload that names the session: its day and start time, so a
+    day with two strength activities tells them apart however late the second came in (§7)."""
+    start = (activity.get("start_time") or "")[11:16] or None
     return {"activity_id": activity["activity_id"], "date": activity["date"], "time": start}
 
 

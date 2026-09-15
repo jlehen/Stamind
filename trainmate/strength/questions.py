@@ -36,7 +36,8 @@ def _capitalized(text: str) -> str:
 
 
 def session_words(payload: Dict[str, Any]) -> str:
-    """'Tue Sep 15 gym session', with the start time when that day had two (§7)."""
+    """'Tue Sep 15 18:10 gym session'; an item queued before the time was always given has
+    none (§7)."""
     day = date.fromisoformat(payload["date"])
     when = f"{day:%a %b} {day.day}"
     if payload.get("time"):
@@ -45,8 +46,8 @@ def session_words(payload: Dict[str, Any]) -> str:
 
 
 def companion_session_words(item: Dict[str, Any]) -> str:
-    """"Tuesday's gym session" within the week the question was queued in, "the Sep 1 gym
-    session" after it."""
+    """"Tuesday's 18:10 gym session" within the week the question was queued in, "the Sep 1
+    18:10 gym session" after it."""
     payload = item["payload"]
     day = date.fromisoformat(payload["date"])
     queued = clock.to_local(datetime.fromisoformat(item["queued_at"])).date()

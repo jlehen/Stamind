@@ -1,7 +1,8 @@
 """`strength`: the surgery on a strength session's sets (DESIGN_strength_tracking.md §7).
 
 `strength name` names a day's blocks on the spot, `strength reset` reads a day's sets again
-from Garmin, and `strength discard` marks a day's session as one that does not count.
+from Garmin, and `strength discard` keeps a day's session out of weight planning. On a day
+with two strength sessions, reset and discard ask which one.
 """
 import argparse
 from typing import Any, Dict, List, Optional
@@ -18,10 +19,27 @@ KEEP = "keep"
 CLEAR = "clear"
 OTHER = "other"
 ALL = "all"
+NONE = "none"
 
 
 def _title(activity: Dict[str, Any]) -> str:
     return questions.session_words(sets.session(activity))
+
+
+def _which(day: str, activities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The day's one strength session, or the ones picked when it has more: a second workout
+    or a warm-up is not reset or discarded along with the session (§7)."""
+    if len(activities) < 2:
+        return activities
+    choices = [Choice(activity["activity_id"], _title(activity)) for activity in activities]
+    choices += [Choice(ALL, "all of them"), Choice(NONE, "none")]
+    picked = runtime.prompt.choose(
+        f"{fmt_date(day)} has {len(activities)} strength sessions. Which one?", choices,
+        default=NONE,
+    )
+    if picked == ALL:
+        return activities
+    return [activity for activity in activities if activity["activity_id"] == picked]
 
 
 def _block_at(rows: List[Dict[str, Any]], position: int) -> Optional[sets.Block]:
@@ -142,6 +160,10 @@ def run_strength_reset(args: argparse.Namespace) -> None:
         notice(f"No strength activity on {fmt_date(day)}. Fetch it first with "
                + cmd(f"data pull -d {day}") + ".")
         return
+    activities = _which(day, activities)
+    if not activities:
+        print("Nothing changed.")
+        return
     try:
         client = runtime.garmin.connect()
     except Exception as e:
@@ -169,21 +191,28 @@ def run_strength_reset(args: argparse.Namespace) -> None:
 
 
 def run_strength_discard(args: argparse.Namespace) -> None:
-    """Marks a day's session as one that does not count, or counts it again with --undo."""
+    """Keeps a day's session out of weight planning, or brings it back with --undo (§7)."""
     day = args.date
     activities = runtime.db.strength_activities(day, date=day)
     if not activities:
         notice(f"No strength activity on {fmt_date(day)}.")
         return
+    activities = _which(day, activities)
+    if not activities:
+        print("Nothing changed.")
+        return
     for activity in activities:
         runtime.db.set_activity_discarded(activity["activity_id"], not args.undo)
+        if args.undo:
+            print(f"The {_title(activity)} is back in weight planning.")
+        else:
+            print(f"Discarded the {_title(activity)}.")
     if args.undo:
-        print(f"The {fmt_date(day)} strength session counts again.")
         return
     print(wrap_text(
-        f"Discarded the {fmt_date(day)} strength session: its sets stay on record but no "
-        "longer count, and its waiting questions are settled. "
-        + cmd(f"strength discard {day} --undo") + " counts it again."
+        "A discarded session still counts as training: its sets stay on record but are "
+        "left out of weight planning, and its waiting questions are settled. "
+        + cmd(f"strength discard {day} --undo") + " brings it back."
     ))
 
 
@@ -222,7 +251,8 @@ def add_strength_parser(subparsers):
         description=(
             "Read the day's sets again from Garmin, so a name fixed in Garmin Connect comes "
             "in. The names given in TrainMate for that day are dropped, and a question is "
-            "queued for every block still unnamed."
+            "queued for every block still unnamed. On a day with two strength sessions, it "
+            "asks which one."
         ),
     )
     s_reset.add_argument("date", metavar="DATE", type=parse_single_date, help=date_help)
@@ -230,13 +260,16 @@ def add_strength_parser(subparsers):
 
     s_discard = strength_subparsers.add_parser(
         "discard",
-        help="Mark a day's session as one that does not count",
+        help="Keep a day's session out of weight planning",
         description=(
-            "Mark the day's session as one that should not count: a hotel gym, a warm-up "
-            "recorded as strength, a session logged too badly to fix. The sets stay stored."
+            "Keep the day's session out of weight planning: a hotel gym, a warm-up "
+            "recorded as strength, a session logged too badly to fix. It still counts as "
+            "training and the sets stay stored. On a day with two strength sessions, it "
+            "asks which one."
         ),
     )
     s_discard.add_argument("date", metavar="DATE", type=parse_single_date, help=date_help)
-    s_discard.add_argument("--undo", action="store_true", help="Count the session again")
+    s_discard.add_argument("--undo", action="store_true",
+                           help="Bring the session back into weight planning")
     s_discard.set_defaults(func=run_strength_discard)
     return strength_parser

@@ -272,21 +272,14 @@ class ReadingTest(_StrengthCase):
         self.assertEqual((item["kind"], item["subject"]), (sets.SETS_FINAL, "tue"))
         self.assertEqual(
             athlete_queue.wording(item),
-            "Tue Sep 15 gym session: 2 blocks the watch couldn't name (sets 2–3, 4). "
+            "Tue Sep 15 18:10 gym session: 2 blocks the watch couldn't name (sets 2–3, 4). "
             "Are the sets in Garmin final?",
         )
         self.assertEqual(
             athlete_queue.wording(item, companion=True),
-            "Tuesday's gym session has 2 groups of sets the watch couldn't name. "
+            "Tuesday's 18:10 gym session has 2 groups of sets the watch couldn't name. "
             "Are the sets in Garmin final?",
         )
-
-    def test_a_day_with_two_sessions_says_which_one(self):
-        self.activity("morning", start="09:06:00", payload=garmin_sets(unnamed()))
-        self.activity("evening", start="18:10:00", payload=garmin_sets(lift("ROW", None)))
-        self.read()
-        [item] = test_db.waiting_queue_items()
-        self.assertTrue(athlete_queue.wording(item).startswith("Tue Sep 15 09:06 gym session"))
 
     def test_an_old_session_is_frozen_as_read_and_asks_nothing(self):
         self.activity("old", day="2026-09-02", payload=garmin_sets(unnamed()))
@@ -372,7 +365,8 @@ class SetsFinalTest(_StrengthCase):
         [names] = self.names_asked()
         self.assertEqual(names["subject"], f"tue:{final_at}:2-3")
         self.assertEqual(athlete_queue.wording(names),
-                         "Tue Sep 15 gym session, sets 2–3: 10, 10 reps @ 60 kg. What was it?")
+                         "Tue Sep 15 18:10 gym session, sets 2–3: 10, 10 reps @ 60 kg. "
+                         "What was it?")
 
     def test_garmin_out_of_reach_leaves_the_question_waiting(self):
         self.garmin.down = True
@@ -414,9 +408,11 @@ class SetNamesTest(_StrengthCase):
 
     def test_the_question_shows_the_whole_block(self):
         self.assertEqual(athlete_queue.wording(self.block),
-                         "Tue Sep 15 gym session, sets 1–2: 10, 8 reps @ 60 kg. What was it?")
+                         "Tue Sep 15 18:10 gym session, sets 1–2: 10, 8 reps @ 60 kg. "
+                         "What was it?")
         self.assertEqual(athlete_queue.wording(self.block, companion=True),
-                         "Tuesday's gym session, sets 1–2: 10, 8 reps at 60 kg. What was it?")
+                         "Tuesday's 18:10 gym session, sets 1–2: 10, 8 reps at 60 kg. "
+                         "What was it?")
         self.assertIn("set 4: 12 reps @ 0 kg", athlete_queue.wording(self.warm_up))
         self.assertIn("set 5: 15 reps, no weight entered", athlete_queue.wording(self.no_weight))
 
@@ -489,7 +485,7 @@ class CommandsTest(_StrengthCase):
         self.now = WEDNESDAY_8AM.replace(hour=9)
         code, out, _ = run_cli(["strength", "reset", TUESDAY])
         self.assertEqual(code, 0)
-        self.assertIn("2 blocks without a name", out)
+        self.assertIn("2 blocks without a name", " ".join(out.split()))
         self.assertEqual([row["exercise"] for row in test_db.get_exercise_sets("tue")
                           if row["set_type"] == "active"], [None, None])
         subjects = [item["subject"] for item in athlete_queue.walk(self.now)]
@@ -508,8 +504,38 @@ class CommandsTest(_StrengthCase):
         self.assertEqual(self.row("mon")["discarded"], 1)
         self.assertEqual(sets.recent_exercises(), [])
         code, out, _ = run_cli(["strength", "discard", "2026-09-14", "--undo"])
-        self.assertIn("counts again", out)
+        self.assertIn("back in weight planning", out)
         self.assertEqual(sets.recent_exercises(), ["leg press"])
+
+    def test_reset_on_a_day_with_two_sessions_reads_the_one_picked(self):
+        self.activity("am", start="09:00:00", payload=garmin_sets(lift("SQUAT", "LEG_PRESS")))
+        self.activity("pm", start="20:10:00", payload=garmin_sets(lift("ROW", "SEATED_CABLE_ROW")))
+        self.read()
+        self.garmin.calls = []
+        runtime.prompt = _Prompt(picks=["pm"])
+        code, _, _ = run_cli(["strength", "reset", TUESDAY])
+        self.assertEqual(code, 0)
+        self.assertEqual(runtime.prompt.shown, [(
+            "2026-09-15 Tue has 2 strength sessions. Which one?",
+            ["Tue Sep 15 09:00 gym session", "Tue Sep 15 20:10 gym session", "all of them",
+             "none"],
+        )])
+        self.assertEqual(self.garmin.calls, ["pm"])
+
+    def test_discard_on_a_day_with_two_sessions_leaves_the_other_alone(self):
+        self.activity("am", start="09:00:00", payload=garmin_sets(lift("SQUAT", "LEG_PRESS")))
+        self.activity("pm", start="20:10:00", payload=garmin_sets(lift("ROW", "SEATED_CABLE_ROW")))
+        self.read()
+        runtime.prompt = _Prompt(picks=["pm"])
+        _, out, _ = run_cli(["strength", "discard", TUESDAY])
+        self.assertIn("Discarded the Tue Sep 15 20:10 gym session.", out)
+        self.assertIn("still counts as training", out)
+        self.assertEqual((self.row("am")["discarded"], self.row("pm")["discarded"]), (0, 1))
+        # Enter picks "none": nothing is brought back.
+        runtime.prompt = _Prompt()
+        _, out, _ = run_cli(["strength", "discard", TUESDAY, "--undo"])
+        self.assertIn("Nothing changed.", out)
+        self.assertEqual(self.row("pm")["discarded"], 1)
 
 
 class ShownTest(_StrengthCase):
@@ -539,7 +565,7 @@ class ShownTest(_StrengthCase):
         self.read()
         test_db.set_activity_discarded("sun", True)
         self.assertEqual(sets.session_lines(self.row("sun"))[-1],
-                         "discarded: this session does not count")
+                         "discarded: counts as training, not for planning weights")
 
     def test_workout_compare_and_done_lately_show_the_sets(self):
         activity = self.activity("tue", payload=garmin_sets(lift("SQUAT", "LEG_PRESS", 10, 140)))
@@ -574,8 +600,8 @@ class MorningPushTest(_StrengthCase):
         code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         [item] = queue_lines(out)
-        self.assertIn("Tuesday's gym session has 1 group of sets the watch couldn't name.",
-                      item["text"])
+        self.assertIn("Tuesday's 18:10 gym session has 1 group of sets the watch couldn't "
+                      "name.", item["text"])
         self.assertEqual([b["label"] for b in item["buttons"]],
                          ["Yes, final", "Leave it unnamed", "🕐 Not now"])
 

@@ -201,9 +201,9 @@ list, as `settings set` takes a name from `settings list`.
 $ tm queue
 === QUEUE ===
 
-  #13  question  Wed Sep 16 08:00  Tue Sep 15 gym session, sets 1–4: 10, 10, 10, 9 reps @ 100 kg
-  #14  question  Wed Sep 16 08:00  Tue Sep 15 gym session, sets 5–8: 10, 10, 8, 8 reps @ 60 kg
-  #15  question  Wed Sep 16 08:00  Tue Sep 15 gym session, sets 9–12: 12, 12, 12, 10 reps @ 30 kg
+  #13  question  Wed Sep 16 08:00  Tue Sep 15 18:10 gym session, sets 1–4: 10, 10, 10, 9 reps @ 100 kg
+  #14  question  Wed Sep 16 08:00  Tue Sep 15 18:10 gym session, sets 5–8: 10, 10, 8, 8 reps @ 60 kg
+  #15  question  Wed Sep 16 08:00  Tue Sep 15 18:10 gym session, sets 9–12: 12, 12, 12, 10 reps @ 30 kg
   #12  question  Wed Sep 16 05:00  Your coach doubts a learning  · hidden until Thu 07:58
   #19  message   Wed Sep 16 21:10  Charge your watch tonight — long ride tomorrow.
 
@@ -219,7 +219,7 @@ shape. Hidden items are listed after the waiting ones, with the time they come b
 $ tm queue answer
 
 Question 1 of 4 · #13 · queued Wed Sep 16 08:00
-Tue Sep 15 gym session, sets 1–4: 10, 10, 10, 9 reps @ 100 kg. What was it?
+Tue Sep 15 18:10 gym session, sets 1–4: 10, 10, 10, 9 reps @ 100 kg. What was it?
   [1] belt squat
   [2] leg press
   [3] cable row
@@ -233,7 +233,7 @@ Choice: 2
 Named sets 1–4: leg press.
 
 Question 2 of 4 · #14 · queued Wed Sep 16 08:00
-Tue Sep 15 gym session, sets 5–8: 10, 10, 8, 8 reps @ 60 kg. What was it?
+Tue Sep 15 18:10 gym session, sets 5–8: 10, 10, 8, 8 reps @ 60 kg. What was it?
   ...
 Choice: 9
 #14 moved behind the others.
@@ -314,7 +314,7 @@ At the end of `bot morning`, after the briefing and its row of buttons, the firs
 the queue arrives as a separate message with its own buttons:
 
 > 🙋 Quick question (7 left)
-> Tuesday's gym session, sets 1–4: 10, 10, 10, 9 reps at 100 kg. What was it?
+> Tuesday's 18:10 gym session, sets 1–4: 10, 10, 10, 9 reps at 100 kg. What was it?
 >
 > `[Belt squat]` `[Leg press]` `[Cable row]`
 > `[Something else…]` `[Leave it unnamed]` `[🕐 Not now]`
@@ -419,7 +419,7 @@ the others as its own message, and clears their reminder time, so each reminder 
 once:
 
 > ⏰ You asked me to come back to this:
-> Tuesday's gym session, sets 13–16: 12, 12, 12, 12 reps at 45 kg. What was it?
+> Tuesday's 18:10 gym session, sets 13–16: 12, 12, 12, 12 reps at 45 kg. What was it?
 >
 > `[Chest press]` `[Shoulder press]` `[Pulldown]`
 > `[Something else…]` `[Leave it unnamed]` `[🕐 Not now]`
