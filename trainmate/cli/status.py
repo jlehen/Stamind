@@ -292,7 +292,7 @@ def run_status(args) -> None:
                + cmd("data pull") + " first.")
 
     # Coach Learnings — one-line summary; the full list lives under 'learnings list'.
-    learnings = runtime.db.get_learnings()
+    learnings = [l for l in runtime.db.get_learnings() if not l.get("archived")]
     print(bold("\nCoach Learnings:"))
     if learnings:
         active = [l for l in learnings if not l.get("dormant")]

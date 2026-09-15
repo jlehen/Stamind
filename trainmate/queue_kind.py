@@ -13,6 +13,11 @@ from trainmate import clock, runtime
 QUESTION = "question"
 MESSAGE = "message"
 
+# How an item closed (§4).
+ANSWERED = "answered"
+DROPPED = "dropped"
+STALE = "stale"
+
 
 @dataclass(frozen=True)
 class Kind:
@@ -20,7 +25,8 @@ class Kind:
 
     `apply` gets the item, the position of the chosen answer and the typed text when that
     answer asks for one (an answer with an `ask` key), and returns the line confirming it.
-    It raises `NotApplied` when the answer could not be applied, and the item waits (§4)."""
+    It raises `NotApplied` when the answer could not be applied, and the item waits (§4). A
+    question without a `drop_label` offers no drop: every one of its answers settles it."""
     name: str
     shape: str
     wording: Callable[[Dict[str, Any]], str]

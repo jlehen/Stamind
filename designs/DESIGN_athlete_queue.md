@@ -154,6 +154,10 @@ For a **question**:
   - **After the others.** The item's `queued_at` becomes now, which puts it behind
     everything waiting. No reminder is sent; it comes up in a later walk.
 
+Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §4): a question kind may have no drop,
+when every one of its answers settles it. It then shows no drop button and no drop choice,
+and a drop sent anyway writes nothing.
+
 For a **message**:
 
 - **Acknowledge.** The item closes as `answered`. For a message, acknowledging and dropping
@@ -295,6 +299,9 @@ Hidden items are not counted until their time has passed. The hint is two lines 
 walk because `workout adapt` already asks its own questions, and ending it with four more
 would turn the morning's command into a form.
 
+Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §8): `data reflect` and `data bootstrap`
+print the same hint at their end, where their demotion prompt used to be.
+
 In the companion, the hint prints nothing: the morning message already brings the questions,
 and "Feeling tired" runs `workout adapt`, where a hint about a command she cannot type would
 be noise.
@@ -370,7 +377,8 @@ answer. If she does not answer within the prompt timeout, the item stays waiting
 
 The companion shows the item's answers, its drop button under the kind's own name (for
 example "Leave it unnamed"), and **🕐 Not now**. A message shows "👍 Got it" and "🕐 Not
-now".
+now". A question kind without a drop shows its answers and "🕐 Not now" (amended
+2026-09-14, DESIGN_learning_doubt_nudge.md §4).
 
 "Not now" replaces the buttons on the same message with three:
 
@@ -462,7 +470,8 @@ code:
 - **The wording**, in an expert version and a companion version, like the other renderers.
 - **The check** that says whether an item is still worth asking.
 - **What each answer does.**
-- **The drop button's name**, or none for a message.
+- **The drop button's name**, or none for a message. Amended 2026-09-14
+  (DESIGN_learning_doubt_nudge.md §4): or none for a question whose every answer settles it.
 
 It then queues items. For each one it chooses the subject, which decides whether and when
 the same thing can be asked again (§3), and it writes the payload, answers included.
@@ -476,6 +485,9 @@ Amended 2026-09-14 (DESIGN_strength_tracking.md §7): `sets_final` and `set_name
 two entries. A feature takes what it needs from `trainmate/queue_kind.py` (the `Kind` shape,
 `queue` and `NotApplied`), so the list of kinds can import the feature without the feature
 importing the list.
+
+Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §5): `learning`, from
+`trainmate/learning_doubts.py`, is the next entry.
 
 ## 9. Guardrails
 

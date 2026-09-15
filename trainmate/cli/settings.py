@@ -19,7 +19,10 @@ from trainmate.util import (
 # than in the bot, beside the registry it guards, so a knob added to SETTINGS is not
 # routable until someone deliberately puts it on this list. Anything operator- or
 # cost-shaped — a model role, adapt-first — is off it by construction.
-ROUTABLE_SETTINGS = (settings.MORNING_TIME, settings.MORNING_DEADLINE, settings.PUSH)
+ROUTABLE_SETTINGS = (
+    settings.MORNING_TIME, settings.MORNING_DEADLINE, settings.PUSH,
+    settings.LEARNING_QUESTIONS,
+)
 
 
 def routable_setting(name: str) -> "settings.Setting | None":

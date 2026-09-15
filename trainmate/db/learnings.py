@@ -8,15 +8,21 @@ from trainmate.config import config
 CONFIDENCE_LEVELS = ("tentative", "moderate", "established")
 
 # Sentinel stored in `proposed_confidence` when the pending downgrade is a *retirement*
-# (net support fell to ≤0 under contradiction, or a tentative learning aged out). Not a
-# real confidence level, so it never validates as one.
+# (net support fell to ≤0 under contradiction). Not a real confidence level, so it never
+# validates as one.
 RETIRE_PROPOSAL = "retire"
+
+# `coach_learnings.status`. Retiring a learning archives it, so a slip is restored with its
+# evidence (DESIGN_learning_doubt_nudge.md §6).
+ACTIVE = "active"
+ARCHIVED = "archived"
 
 # A learning is "dormant" — kept in the DB but excluded from LLM prompts — once it has gone
 # unreinforced for longer than the budget for its confidence level. Decay is soft: a dormant
-# learning revives the moment new supporting evidence lands (or a staleness demotion re-arms
-# its clock). Crossing the budget also proposes a one-level staleness demotion (§7/§8). The
-# per-level budgets (days) are tunable via `config.learning_staleness_days`.
+# learning revives the moment new supporting evidence lands (or a staleness step re-arms its
+# clock). Every reflect and bootstrap run also lowers a dormant learning one level
+# (DESIGN_learning_doubt_nudge.md §3.2). The per-level budgets (days) are tunable via
+# `config.learning_staleness_days`.
 
 
 def normalize_sports(value: Any) -> str:
@@ -101,6 +107,13 @@ def _monday_str(date_str: str) -> Optional[str]:
     return (d - timedelta(days=d.weekday())).strftime("%Y-%m-%d")
 
 
+def _one_line(value: Any) -> Optional[str]:
+    """A delta's free-text field, stripped, or None when it carries none."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return value.strip()
+
+
 class LearningsMixin:
     """Coach learnings: discrete, addressable athlete-observation records whose confidence
     is computed by the app from a per-learning evidence basis (the distinct training weeks
@@ -109,26 +122,34 @@ class LearningsMixin:
     # ------------------------------------------------------------------ reads
 
     def get_learnings(self) -> List[Dict[str, Any]]:
-        """Returns all observation records ordered by id. Each carries a computed `dormant`
-        flag (decayed past its budget) and its (nullable) `proposed_confidence` downgrade."""
+        """Returns every observation record ordered by id, archived ones included. Each
+        carries a computed `dormant` flag (decayed past its budget), an `archived` flag and
+        its (nullable) `proposed_confidence` downgrade. Whatever leaves dormant learnings
+        out leaves archived ones out too (DESIGN_learning_doubt_nudge.md §6)."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, text, sports, confidence, proposed_confidence, created_at, "
+                "SELECT id, text, sports, confidence, proposed_confidence, status, created_at, "
                 "updated_at, last_reinforced_at FROM coach_learnings ORDER BY id"
             )
             learnings = [dict(row) for row in cursor.fetchall()]
         now = datetime.now(timezone.utc)
         for learning in learnings:
             learning["dormant"] = learning_is_dormant(learning, now)
+            learning["archived"] = learning["status"] == ARCHIVED
         return learnings
+
+    def get_learning(self, learning_id: int) -> Optional[Dict[str, Any]]:
+        """One record as `get_learnings` returns it, archived or not; None when there is
+        none with that id."""
+        return next((l for l in self.get_learnings() if l["id"] == learning_id), None)
 
     def get_learning_evidence(self, learning_id: int) -> List[Dict[str, Any]]:
         """Returns the evidence basis rows for a learning, ordered by week then polarity."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, learning_id, week_commencing, polarity, source, created_at "
+                "SELECT id, learning_id, week_commencing, polarity, source, reason, created_at "
                 "FROM learning_evidence WHERE learning_id=? "
                 "ORDER BY week_commencing, polarity",
                 (learning_id,)
@@ -169,9 +190,30 @@ class LearningsMixin:
             )
 
     def delete_learning(self, learning_id: int) -> None:
-        """Removes an observation record (its evidence basis cascades)."""
+        """Deletes an observation record for good, its evidence basis cascading
+        (`learnings rm --purge`)."""
         with self._get_connection() as conn:
             conn.execute("DELETE FROM coach_learnings WHERE id=?", (learning_id,))
+
+    def archive_learning(self, learning_id: int) -> bool:
+        """Retires a learning by archiving it (DESIGN_learning_doubt_nudge.md §6). False
+        when it was not active."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            return self._archive(conn.cursor(), learning_id, now)
+
+    def restore_learning(self, learning_id: int) -> bool:
+        """Puts an archived learning back at tentative, with its evidence and a fresh
+        dormancy clock (§6). False when it was not archived."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE coach_learnings SET status=?, confidence='tentative', "
+                "proposed_confidence=NULL, last_reinforced_at=?, updated_at=? "
+                "WHERE id=? AND status=?",
+                (ACTIVE, now, now, learning_id, ARCHIVED)
+            )
+            return cursor.rowcount > 0
 
     # ----------------------------------------------------- evidence internals
 
@@ -190,12 +232,23 @@ class LearningsMixin:
                 con = count
         return sup, con
 
+    def _archive(self, cursor, learning_id: int, now: str) -> bool:
+        """Archives an active learning and drops its pending proposal (§6)."""
+        cursor.execute(
+            "UPDATE coach_learnings SET status=?, proposed_confidence=NULL, updated_at=? "
+            "WHERE id=? AND status=?",
+            (ARCHIVED, now, learning_id, ACTIVE)
+        )
+        return cursor.rowcount > 0
+
     def _add_evidence_weeks(
         self, cursor, learning_id: int, weeks: Iterable[str], polarity: int,
-        source: str, now: str
+        source: str, now: str, reason: Optional[str] = None
     ) -> int:
         """Inserts (week, polarity) evidence rows, deduped via INSERT-OR-IGNORE. Returns the
-        number of *new* rows actually inserted (0 means every cited week was already counted)."""
+        number of *new* rows actually inserted (0 means every cited week was already counted).
+        `reason` is what a contradiction says went against the learning
+        (DESIGN_learning_doubt_nudge.md §4)."""
         inserted = 0
         for raw in weeks:
             monday = _monday_str(raw) if isinstance(raw, str) else None
@@ -203,9 +256,9 @@ class LearningsMixin:
                 continue
             cursor.execute(
                 "INSERT OR IGNORE INTO learning_evidence "
-                "(learning_id, week_commencing, polarity, source, created_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (learning_id, monday, polarity, source, now)
+                "(learning_id, week_commencing, polarity, source, reason, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (learning_id, monday, polarity, source, reason, now)
             )
             inserted += cursor.rowcount
         return inserted
@@ -288,15 +341,16 @@ class LearningsMixin:
           {"op": "add", "text": "...", "sports"?: "...", "evidence"?: [weeks]}
           {"op": "revise", "id": <int>, "text"?: "...", "sports"?: "...", "evidence"?: [weeks]}
           {"op": "reinforce", "id": <int>, "evidence": [weeks]}   # no evidence ⇒ no-op
-          {"op": "contradict", "id": <int>, "evidence": [weeks]}  # no evidence ⇒ no-op
-          {"op": "retire", "id": <int>}
+          {"op": "contradict", "id": <int>, "evidence": [weeks], "reason"?: "..."}
+          {"op": "retire", "id": <int>}                            # archives it
 
         The LLM no longer sets confidence — it only attributes observations to the
         `week_commencing` weeks it was shown. Cited weeks are normalized to their Monday and,
         when `available_weeks` is provided, validated against it (weeks outside the analysed
         window are dropped, mirroring the skip-malformed philosophy). `last_reinforced_at` is
         refreshed only when a *new* supporting week actually lands — so re-citing counted
-        weeks neither inflates confidence nor resets decay. Malformed deltas are skipped.
+        weeks neither inflates confidence nor resets decay. Malformed deltas, and deltas
+        addressed to a missing or archived learning, are skipped.
 
         Returns `{"applied": n, "skipped": n}`. Skipping stays silent here, but the count
         does not: a response whose deltas ALL skip is indistinguishable from one that
@@ -325,7 +379,9 @@ class LearningsMixin:
             return out
 
         def _exists(cursor, lid) -> bool:
-            cursor.execute("SELECT 1 FROM coach_learnings WHERE id=?", (lid,))
+            cursor.execute(
+                "SELECT 1 FROM coach_learnings WHERE id=? AND status=?", (lid, ACTIVE)
+            )
             return cursor.fetchone() is not None
 
         touched: Set[int] = set()
@@ -406,18 +462,19 @@ class LearningsMixin:
                         tally["skipped"] += 1
                         continue
                     new_weeks = self._add_evidence_weeks(
-                        cursor, lid, filtered(delta.get("evidence")), -1, source, now
+                        cursor, lid, filtered(delta.get("evidence")), -1, source, now,
+                        reason=_one_line(delta.get("reason")),
                     )
                     if new_weeks:
                         touched.add(lid)
                     tally["applied"] += 1
                 elif op == "retire":
                     lid = delta.get("id")
-                    if lid is None:
+                    if lid is None or not _exists(cursor, lid):
                         tally["skipped"] += 1
-                    else:
-                        cursor.execute("DELETE FROM coach_learnings WHERE id=?", (lid,))
-                        tally["applied"] += 1
+                        continue
+                    self._archive(cursor, lid, now)
+                    tally["applied"] += 1
                 else:
                     # No recognized op — the delta named something the app cannot act on
                     # (or the key itself came back mangled, as with a model that prefixes
@@ -444,54 +501,40 @@ class LearningsMixin:
 
     # ---------------------------------------------------- staleness & proposals
 
-    def derive_staleness_proposals(self, auto: bool = False) -> None:
-        """Proposes a one-level staleness demotion for each learning that has crossed into
-        dormancy without one already pending (§7/§8).
-
-        Interactive (`auto=False`): writes `proposed_confidence` (one level down, or
-        RETIRE_PROPOSAL below tentative) for the human to confirm. Unattended (`auto=True`):
-        applies the step directly and re-arms the dormancy clock at the new (shorter) budget,
-        so an untouched learning walks down to retirement over real time rather than in one
-        jump. A learning with a contradiction proposal already pending is left untouched.
-        """
+    def apply_staleness_steps(self) -> None:
+        """Lowers each active learning that has gone dormant by one level and re-arms its
+        clock at the lower level's shorter budget, so an untouched learning walks down over
+        real time; below tentative it is archived. Every reflect and bootstrap run applies
+        these, and a learning with a proposal pending is left to that proposal
+        (DESIGN_learning_doubt_nudge.md §3.2)."""
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT id, confidence, proposed_confidence, created_at, last_reinforced_at "
-                "FROM coach_learnings"
+                "FROM coach_learnings WHERE status=?",
+                (ACTIVE,)
             )
             rows = [dict(r) for r in cursor.fetchall()]
             for row in rows:
-                if row.get("proposed_confidence"):
-                    continue  # a downgrade is already pending; don't escalate.
-                if not learning_is_dormant(row, now_dt):
+                if row.get("proposed_confidence") or not learning_is_dormant(row, now_dt):
                     continue
                 target = step_down(row["confidence"] or "tentative")
-                if auto:
-                    if target == RETIRE_PROPOSAL:
-                        cursor.execute(
-                            "DELETE FROM coach_learnings WHERE id=?", (row["id"],)
-                        )
-                    else:
-                        # Apply + re-arm the clock at the lower level's budget.
-                        cursor.execute(
-                            "UPDATE coach_learnings SET confidence=?, last_reinforced_at=?, "
-                            "updated_at=? WHERE id=?",
-                            (target, now, now, row["id"])
-                        )
-                else:
-                    cursor.execute(
-                        "UPDATE coach_learnings SET proposed_confidence=?, updated_at=? "
-                        "WHERE id=?",
-                        (target, now, row["id"])
-                    )
+                if target == RETIRE_PROPOSAL:
+                    self._archive(cursor, row["id"], now)
+                    continue
+                cursor.execute(
+                    "UPDATE coach_learnings SET confidence=?, last_reinforced_at=?, "
+                    "updated_at=? WHERE id=?",
+                    (target, now, now, row["id"])
+                )
 
     def demote_learning(self, learning_id: int) -> Optional[str]:
-        """Accepts a pending downgrade: writes confidence = proposed_confidence (or retires the
-        learning on the retirement sentinel), clears the proposal, and re-arms the dormancy
-        clock at the new level. Returns the new level, 'retired', or None if nothing pending."""
+        """Accepts a pending downgrade: writes confidence = proposed_confidence, clears the
+        proposal and re-arms the dormancy clock at the new level, or archives the learning
+        on the retirement sentinel (DESIGN_learning_doubt_nudge.md §6). Returns the new
+        level, 'retired', or None if nothing was pending."""
         now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -503,7 +546,7 @@ class LearningsMixin:
                 return None
             target = row["proposed_confidence"]
             if target == RETIRE_PROPOSAL:
-                cursor.execute("DELETE FROM coach_learnings WHERE id=?", (learning_id,))
+                self._archive(cursor, learning_id, now)
                 return "retired"
             cursor.execute(
                 "UPDATE coach_learnings SET confidence=?, proposed_confidence=NULL, "
@@ -513,35 +556,22 @@ class LearningsMixin:
             return target
 
     def keep_learning(self, learning_id: int) -> None:
-        """Dismisses + affirms a pending downgrade (§7). For a contradiction-driven proposal,
-        neutralizes the −1 evidence rows (the human overrules the disconfirming weeks); for a
-        staleness-driven one, refreshes `last_reinforced_at` (the affirmation counts as
-        reinforcement). Either way clears the proposal and re-derives confidence."""
+        """Overrules a pending downgrade (§7): deletes the contradicting weeks behind it,
+        clears the proposal and re-derives confidence. Staleness steps apply directly, so
+        every proposal is a contradiction (DESIGN_learning_doubt_nudge.md §3.2)."""
         now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT confidence, proposed_confidence FROM coach_learnings WHERE id=?",
-                (learning_id,)
+                "SELECT proposed_confidence FROM coach_learnings WHERE id=?", (learning_id,)
             )
             row = cursor.fetchone()
             if not row or not row["proposed_confidence"]:
                 return
-            current = row["confidence"] or "tentative"
-            sup, con = self._evidence_counts(cursor, learning_id)
-            contradiction_driven = (
-                con > 0 and confidence_rank(derive_confidence(sup, con)) < confidence_rank(current)
+            cursor.execute(
+                "DELETE FROM learning_evidence WHERE learning_id=? AND polarity < 0",
+                (learning_id,)
             )
-            if contradiction_driven:
-                cursor.execute(
-                    "DELETE FROM learning_evidence WHERE learning_id=? AND polarity < 0",
-                    (learning_id,)
-                )
-            else:
-                cursor.execute(
-                    "UPDATE coach_learnings SET last_reinforced_at=? WHERE id=?",
-                    (now, learning_id)
-                )
             cursor.execute(
                 "UPDATE coach_learnings SET proposed_confidence=NULL, updated_at=? WHERE id=?",
                 (now, learning_id)

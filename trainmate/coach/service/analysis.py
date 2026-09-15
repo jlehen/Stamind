@@ -191,11 +191,15 @@ class DataAnalysisMixin:
         if not inspect_only:
             self._set_reflect_watermark(until_date.strftime("%Y-%m-%d"))
             self._record_bootstrap_run(until_date.strftime("%Y-%m-%d"))
-            self._review_learning_proposals(auto=auto)
+            self._review_learning_proposals()
             # Bootstrap is the command that seeds observations, so ending with none on
             # record is news — otherwise the next command's cold-start nudge points the
             # user right back here with no hint that the run already happened (§13).
-            if not any(not l.get("dormant") for l in self._db.get_learnings()):
+            active = [
+                l for l in self._db.get_learnings()
+                if not l.get("dormant") and not l.get("archived")
+            ]
+            if not active:
                 notice(
                     "Bootstrap finished with no active coach observations on record. The "
                     "reconstruction above is saved; re-run with "
@@ -207,7 +211,7 @@ class DataAnalysisMixin:
         self, from_date_str: Optional[str] = None, until_date_str: Optional[str] = None,
         days: Optional[int] = None, weeks: Optional[int] = None,
         context: Optional[str] = None, force: bool = False, inspect_only: bool = False,
-        no_pull: bool = False, force_pull: bool = False, auto: bool = False
+        no_pull: bool = False, force_pull: bool = False
     ) -> Dict[str, Any]:
         """Incremental reflection over evidence accrued since the last reflect.
 
@@ -257,9 +261,10 @@ class DataAnalysisMixin:
             since = watermark["through_date"] if watermark else (from_date_str or "?")
             tail = "" if until_date_str else " (no completed week since)"
             print(cyan(f"Nothing new to reflect on since {since}{tail}."))
-            # Even with no new evidence, surface any staleness demotions that have come due.
+            # Even with no new evidence, the staleness steps and the pending doubts are
+            # settled (DESIGN_learning_doubt_nudge.md §3.2).
             if not inspect_only:
-                self._review_learning_proposals(auto=auto)
+                self._review_learning_proposals()
             return {}
 
         decision = self._run_workout_analysis(
@@ -269,7 +274,7 @@ class DataAnalysisMixin:
         )
         if not inspect_only:
             self._advance_reflect_watermark(until_date.strftime("%Y-%m-%d"))
-            self._review_learning_proposals(auto=auto)
+            self._review_learning_proposals()
         return decision
 
     @staticmethod

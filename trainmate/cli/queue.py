@@ -102,8 +102,8 @@ def _button_label(text: str) -> str:
 
 
 def queue_buttons(item: Dict[str, Any], skip: bool) -> List[dict]:
-    """An item's chat buttons: its answers, its drop, skip when `skip`, and "Not now",
-    which the bot turns into the three later choices (§6.2, §6.4)."""
+    """An item's chat buttons: its answers, its drop when its kind has one, skip when
+    `skip`, and "Not now", which the bot turns into the three later choices (§6.2, §6.4)."""
     kind = athlete_queue.kind_of(item)
     buttons = [
         {"label": _button_label(answer["label"]), "action": f"a{number}"}
@@ -111,7 +111,7 @@ def queue_buttons(item: Dict[str, Any], skip: bool) -> List[dict]:
     ]
     if kind.shape == MESSAGE:
         buttons[0]["label"] = "👍 " + buttons[0]["label"]
-    else:
+    elif kind.drop_label:
         buttons.append({"label": _button_label(kind.drop_label), "action": DROP})
     if skip:
         buttons.append({"label": "⏭ Skip", "action": SKIP})
@@ -182,7 +182,8 @@ def terminal_choices(item: Dict[str, Any], since: datetime) -> List[Choice]:
         choices.append(Choice(SKIP, "tell me again next time"))
         lead = "remind me"
     else:
-        choices.append(Choice(DROP, f"{kind.drop_label} — drop, never asked again"))
+        if kind.drop_label:
+            choices.append(Choice(DROP, f"{kind.drop_label} — drop, never asked again"))
         choices.append(Choice(SKIP, "skip — first in line next time"))
         lead = "later —"
     for code, words, _emoji in QUEUE_LATER_CHOICES:

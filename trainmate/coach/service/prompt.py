@@ -2,13 +2,10 @@ import difflib
 import json
 from datetime import datetime
 from typing import Any, List, Optional, Tuple, Dict
-from trainmate import runtime
+from trainmate import learning_doubts, runtime
 from trainmate.config import config, changed_plan_profile_fields, plan_profile
-from trainmate.prompt import Choice
 from trainmate.types import Objective, Constraint
-from trainmate.util import (
-    cyan, green, bold, red, gray, cmd, format_labeled_block, notice,
-)
+from trainmate.util import cmd, notice
 from trainmate.coach.formatting import _load_science_guidelines
 from trainmate.coach.proposals import CoachContext
 import trainmate.coach.service as _svc
@@ -387,9 +384,12 @@ class PromptConfigMixin:
 
     def _get_learnings_text(self) -> str:
         """Renders active athlete observations as a tagged block for prompts. Each line is
-        `[id|sports|confidence] text`. Dormant (decayed) observations are omitted so stale
-        notes stop influencing planning until reaffirmed."""
-        learnings = [l for l in self._db.get_learnings() if not l.get("dormant")]
+        `[id|sports|confidence] text`. Dormant (decayed) and archived observations are
+        omitted, so stale notes stop influencing planning until reaffirmed or restored."""
+        learnings = [
+            l for l in self._db.get_learnings()
+            if not l.get("dormant") and not l.get("archived")
+        ]
         if not learnings:
             return (
                 "No observations yet. Over time, observe the athlete's responses to "
@@ -430,48 +430,32 @@ class PromptConfigMixin:
             )
         return tally
 
-    def _review_learning_proposals(self, auto: bool = False) -> None:
-        """Resolves pending learning-confidence downgrades (§7).
+    def _review_learning_proposals(self) -> None:
+        """The end of every reflect and bootstrap run (DESIGN_learning_doubt_nudge.md §3.2):
+        the staleness steps apply, then each pending proposal goes to the athlete queue as a
+        question, or is applied when the questions are switched off. Nothing is asked on
+        the spot."""
+        self._db.apply_staleness_steps()
+        learning_doubts.settle_doubts(self.learning_question)
 
-        First sweeps for staleness demotions (dormant learnings): under `auto` these apply
-        directly, otherwise they are queued as proposals. Then, when interactive, prompts the
-        human about each pending proposal (contradiction- or staleness-driven) — accept
-        (demote), keep (dismiss + affirm), or skip (leave pending). Under `auto` contradiction
-        proposals stay queued for the next interactive review; no prompts are shown."""
-        self._db.derive_staleness_proposals(auto=auto)
-        if auto:
-            return
-        pending = [l for l in self._db.get_learnings() if l.get("proposed_confidence")]
-        if not pending:
-            return
-        notice(bold("\nPending coach-learning demotion proposals:"))
-        for l in pending:
-            target = l["proposed_confidence"]
-            target_disp = "retire" if target == "retire" else target
-            print(format_labeled_block(
-                f"  [{l['id']}|{l.get('sports') or 'general'}|{l['confidence']}]", l['text']
-            ))
-            notice(f"    proposed demotion → {target_disp}")
-            ans = self._prompt.choose(
-                f"Apply proposed demotion of learning [{l['id']}] → {target_disp}?",
-                [
-                    Choice("demote", f"Demote → {target_disp}"),
-                    Choice("keep", "Keep (dismiss + affirm)"),
-                    Choice("skip", "Skip (leave pending)"),
-                ],
-                default="skip",
-            )
-            if ans == "demote":
-                result = self._db.demote_learning(l["id"])
-                if result == "retired":
-                    notice(f"    Retired learning [{l['id']}].", red)
-                else:
-                    print(green(f"    Demoted [{l['id']}] → {result}."))
-            elif ans == "skip":
-                print(gray(f"    Left [{l['id']}] pending."))
-            else:
-                self._db.keep_learning(l["id"])
-                print(cyan(f"    Kept [{l['id']}] at {l['confidence']}."))
+    def learning_question(
+        self, learning: Dict[str, Any], reasons: List[Dict[str, Any]]
+    ) -> Tuple[str, Optional[str]]:
+        """The coach's two sentences for a doubted learning's question: what the learning
+        claims about the athlete's experience, and what the coach saw against it, None when
+        reflect gave no reason (DESIGN_learning_doubt_nudge.md §4). Raises ValueError when
+        the answer carries no statement."""
+        result = self.engine._learning_question_logic(
+            learning["text"], learning.get("sports") or "general",
+            [row["reason"] for row in reasons],
+        )
+        statement = result.get("statement")
+        if not isinstance(statement, str) or not statement.strip():
+            raise ValueError("the coach wrote no statement")
+        saw = result.get("saw")
+        if not reasons or not isinstance(saw, str) or not saw.strip():
+            return statement.strip(), None
+        return statement.strip(), saw.strip()
 
     def _maybe_nudge_no_threshold(self) -> None:
         """Cold-start hint when no trainable threshold is on record (§3.4).
@@ -497,7 +481,7 @@ class PromptConfigMixin:
         A bootstrap that already ran and seeded nothing gets the other half of the message:
         pointing at a command the user just ran reads as the app not having noticed
         (DESIGN_backward_evaluation.md §13)."""
-        if any(not l.get("dormant") for l in self._db.get_learnings()):
+        if any(not l.get("dormant") and not l.get("archived") for l in self._db.get_learnings()):
             return
         # Only when the table is genuinely empty: learnings that exist but have all gone
         # dormant are a staleness story, not a bootstrap that came back with nothing.

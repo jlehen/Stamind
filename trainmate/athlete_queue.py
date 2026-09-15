@@ -12,12 +12,11 @@ from trainmate.db.queue import queue_stamp
 from trainmate.prompt import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
 # Re-exported: what a feature needs lives in queue_kind, so a feature can queue items
 # without importing the list of kinds that imports it.
-from trainmate.queue_kind import MESSAGE, QUESTION, Kind, NotApplied, queue  # noqa: F401
+from trainmate.queue_kind import (  # noqa: F401
+    ANSWERED, DROPPED, MESSAGE, QUESTION, STALE, Kind, NotApplied, queue,
+)
+from trainmate.learning_doubts import LEARNING_KIND
 from trainmate.strength.questions import SET_NAMES_KIND, SETS_FINAL_KIND
-
-ANSWERED = "answered"
-DROPPED = "dropped"
-STALE = "stale"
 
 # The action codes a chooser returns and a button carries (§6.2). An answer is `a<n>`, the
 # n-th answer stored with the item. The three "later" codes live in trainmate.prompt, where
@@ -40,9 +39,11 @@ MESSAGE_KIND = Kind(
     is_stale=lambda item: False, apply=lambda item, index, text: None,
 )
 
-# The strength kinds ask for a session's sets (DESIGN_strength_tracking.md §7).
+# The strength kinds ask for a session's sets (DESIGN_strength_tracking.md §7), and the
+# learning kind whether a doubted learning still fits (DESIGN_learning_doubt_nudge.md §5).
 KINDS: Dict[str, Kind] = {
-    kind.name: kind for kind in (MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND)
+    kind.name: kind
+    for kind in (MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND, LEARNING_KIND)
 }
 
 
@@ -124,7 +125,8 @@ def act(
     not apply leaves the item waiting, with the kind's line saying why."""
     now = clock.now()
     kind = kind_of(item)
-    if action == DROP and kind.shape == QUESTION:
+    # A question kind without a drop label refuses one (§4).
+    if action == DROP and kind.shape == QUESTION and kind.drop_label:
         runtime.db.close_queue_item(item["id"], DROPPED, now)
         return None
     if action == QUEUE_LATER_BACK:

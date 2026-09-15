@@ -931,6 +931,18 @@ class CaptureSettingTest(_CaptureCase):
         self.assertEqual(code, 0)
         self.assertIsNone(settings.stored(settings.PUSH))
 
+    def test_the_learning_questions_switch_reads_back_as_its_effect(self):
+        """"Stop asking me about that stuff" (DESIGN_learning_doubt_nudge.md §3.4)."""
+        from trainmate import settings
+        code, _, prompt = self._run({"key": "learning-questions", "value": "off"},
+                                    text="stop asking me about that stuff")
+        self.assertEqual(code, 0)
+        self.assertFalse(settings.learning_questions())
+        self.assertIn("I'll stop asking about what I've learned about you, and go by what I "
+                      "see instead.", prompt.text)
+        self._run({"key": "learning-questions", "value": "on"}, text="you can ask me again")
+        self.assertTrue(settings.learning_questions())
+
 
 class SimpleListRenderTest(unittest.TestCase):
     """`workout list` under TRAINMATE_RENDER=simple: companion prose, expert form

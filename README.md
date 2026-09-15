@@ -296,9 +296,11 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
 - **A coach that learns, with evidence.** TrainMate keeps durable learnings
   about you, such as how you respond to back-to-back hard days. Each learning's
   confidence is computed from the training weeks that support or contradict it,
-  not asserted by the model. Learnings decay if unreinforced, downgrades are
-  proposed rather than applied, and `learnings show`, `edit`, `demote` and
-  `keep` let you curate every record. `data reflect` updates them from what
+  not asserted by the model. Learnings decay if unreinforced. When recent
+  weeks contradict one, the coach asks the athlete whether it still fits before
+  leaning on it less, through the queue of questions, and `learnings show`,
+  `edit`, `rm`, `restore`, `demote` and `keep` let you curate every record. A
+  retired learning is archived, not deleted. `data reflect` updates them from what
   happened since the last time.
 
 **Measurement**

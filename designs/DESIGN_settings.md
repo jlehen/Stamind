@@ -33,6 +33,10 @@ whole test, and it is what keeps the listing at seven rows rather than fifty.
 In: which model the coach reasons with, which model routes free text, the timezone, and
 the four morning-push knobs (on/off, time, deadline, adapt-first).
 
+Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §3.4): `learning-questions`, in the Coach
+group, says whether the coach asks the athlete before it leans less on something it
+learned. It is on by default, and the athlete can change it from chat.
+
 Out, and staying in `config.yaml`: credentials (`llm.api_key`, `garmin.password`), file
 paths (`database`, `science_dir`, `service_account_file`), the web bind address, the
 Telegram plumbing (`bot_token`, `allowed_chat_ids`, timeouts, `wrap_width`), and every

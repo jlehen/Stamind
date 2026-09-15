@@ -1,10 +1,12 @@
 import argparse
 import sys
+from typing import Optional
 
 from trainmate import runtime
+from trainmate.learning_doubts import contradiction_reasons
 from trainmate.util import (
     bold, green, red, yellow, cyan, magenta, gray, cmd, fmt_timestamp, format_labeled_block,
-    notice,
+    format_labeled_text, notice,
 )
 
 
@@ -25,17 +27,18 @@ def _print_learning(l: dict) -> None:
     sports_str = l.get('sports') or 'general'
     conf_str = l.get('confidence') or 'tentative'
 
-    if l.get("dormant"):
-        # Decayed: kept on record but no longer fed to the coach until reaffirmed.
+    if l.get("archived") or l.get("dormant"):
+        # Kept on record but no longer fed to the coach until restored or reaffirmed.
+        state = "archived" if l.get("archived") else "dormant"
         tag = f"  [{l['id']}|{sports_str}|{conf_str}]"
-        print(format_labeled_block(gray(tag), gray(f"{l['text']} (dormant)")))
+        print(format_labeled_block(gray(tag), gray(f"{l['text']} ({state})")))
     else:
         conf_disp = _confidence_color(conf_str)(conf_str)
         tag = f"  [{cyan(str(l['id']))}|{magenta(sports_str)}|{conf_disp}]"
         print(format_labeled_block(tag, l['text']))
 
     # Pending, human-confirmable confidence downgrade (resolve with 'learnings demote'/'keep'
-    # here, or interactively on the next 'data reflect'/'data bootstrap' run).
+    # here, or through the question the reflect run queued for the athlete).
     proposed = l.get("proposed_confidence")
     if proposed:
         target = "retire" if proposed == "retire" else proposed
@@ -45,9 +48,34 @@ def _print_learning(l: dict) -> None:
 
 def _echo_learning(learning_id: int) -> None:
     """Re-reads a just-mutated learning and echoes it in the `learnings list` format."""
-    learning = next((l for l in runtime.db.get_learnings() if l['id'] == learning_id), None)
+    learning = runtime.db.get_learning(learning_id)
     if learning:
         _print_learning(learning)
+
+
+def _not_found(learning_id: int) -> None:
+    notice(f"Learning with ID {learning_id} not found.", red)
+    sys.exit(1)
+
+
+def print_learning_kept(learning: dict) -> None:
+    """What keeping a doubted learning prints in the expert's words
+    (DESIGN_learning_doubt_nudge.md §4)."""
+    _print_learning(learning)
+    print(green("Learning kept; pending demotion dismissed."))
+
+
+def print_learning_demoted(learning_id: int, result: Optional[str]) -> None:
+    """What accepting a pending demotion prints: the new level, or the archive (§4, §6)."""
+    if result is None:
+        notice(f"Learning with ID {learning_id} has no pending demotion.")
+        return
+    if result == "retired":
+        print(green(f"Learning with ID {learning_id} retired and archived — "
+                    + cmd(f"learnings restore {learning_id}") + " brings it back."))
+        return
+    _echo_learning(learning_id)
+    print(green(f"Learning demoted to '{result}'."))
 
 
 def _print_learning_dates(l: dict) -> None:
@@ -61,9 +89,12 @@ def _print_learning_dates(l: dict) -> None:
 
 
 def run_learning_list(args: argparse.Namespace) -> None:
-    """Lists coach learnings, optionally filtered by sport, confidence, or dormancy."""
+    """Lists coach learnings, optionally filtered by sport, confidence, or dormancy.
+    Archived learnings are hidden unless -a/--all (DESIGN_learning_doubt_nudge.md §6)."""
     learnings = runtime.db.get_learnings()
 
+    if not getattr(args, "all", False):
+        learnings = [l for l in learnings if not l.get("archived")]
     if getattr(args, "dormant", False):
         learnings = [l for l in learnings if l.get("dormant")]
     if getattr(args, "sport", None):
@@ -91,11 +122,11 @@ def run_learning_list(args: argparse.Namespace) -> None:
 
 
 def run_learning_show(args: argparse.Namespace) -> None:
-    """Displays one learning with its full evidence basis (the 'why' behind its confidence)."""
-    learning = next((l for l in runtime.db.get_learnings() if l['id'] == args.id), None)
+    """Displays one learning, archived or not, with its full evidence basis (the 'why' behind
+    its confidence) and what reflect said went against it."""
+    learning = runtime.db.get_learning(args.id)
     if not learning:
-        notice(f"Learning with ID {args.id} not found.", red)
-        sys.exit(1)
+        _not_found(args.id)
 
     _print_learning(learning)
     _print_learning_dates(learning)
@@ -112,16 +143,17 @@ def run_learning_show(args: argparse.Namespace) -> None:
         return ", ".join(f"{r['week_commencing']}({r['source']})" for r in rows)
 
     print(green(f"    supporting ({len(sup)} wk): ") + (_weeks(sup) or "-"))
-    if con:
-        print(red(f"    contradicting ({len(con)} wk): ") + _weeks(con))
+    if not con:
+        return
+    print(red(f"    contradicting ({len(con)} wk): ") + _weeks(con))
+    for row in contradiction_reasons(args.id):
+        print(format_labeled_text(f"      {', '.join(row['weeks'])}: ", row["reason"]))
 
 
 def run_learning_edit(args: argparse.Namespace) -> None:
     """Revises the text of an existing learning."""
-    learning = next((l for l in runtime.db.get_learnings() if l['id'] == args.id), None)
-    if not learning:
-        notice(f"Learning with ID {args.id} not found.", red)
-        sys.exit(1)
+    if not runtime.db.get_learning(args.id):
+        _not_found(args.id)
 
     runtime.db.update_learning(args.id, args.text)
     _echo_learning(args.id)
@@ -129,43 +161,50 @@ def run_learning_edit(args: argparse.Namespace) -> None:
 
 
 def run_learning_rm(args: argparse.Namespace) -> None:
-    """Deletes a learning by ID (its evidence basis cascades)."""
-    learning = next((l for l in runtime.db.get_learnings() if l['id'] == args.id), None)
-    if not learning:
-        notice(f"Learning with ID {args.id} not found.", red)
-        sys.exit(1)
+    """Archives a learning by ID, or with --purge deletes it and its evidence for good
+    (DESIGN_learning_doubt_nudge.md §6)."""
+    if not runtime.db.get_learning(args.id):
+        _not_found(args.id)
 
-    runtime.db.delete_learning(args.id)
-    print(green(f"Learning with ID {args.id} removed successfully."))
+    if args.purge:
+        runtime.db.delete_learning(args.id)
+        print(green(f"Learning with ID {args.id} and its evidence deleted."))
+        return
+    if not runtime.db.archive_learning(args.id):
+        notice(f"Learning with ID {args.id} is already archived. Add --purge to delete it.")
+        return
+    print(green(f"Learning with ID {args.id} archived — "
+                + cmd(f"learnings restore {args.id}") + " brings it back."))
+
+
+def run_learning_restore(args: argparse.Namespace) -> None:
+    """Puts an archived learning back at tentative, with its evidence (§6)."""
+    if not runtime.db.get_learning(args.id):
+        _not_found(args.id)
+
+    if not runtime.db.restore_learning(args.id):
+        notice(f"Learning with ID {args.id} is not archived.")
+        return
+    _echo_learning(args.id)
+    print(green("Learning restored at tentative."))
 
 
 def run_learning_demote(args: argparse.Namespace) -> None:
     """Accepts a pending confidence downgrade for a learning."""
-    result = runtime.db.demote_learning(args.id)
-    if result is None:
-        notice(f"Learning with ID {args.id} has no pending demotion.")
-        return
-    if result == "retired":
-        # A retirement deletes the row, so there is nothing left to echo.
-        print(green(f"Learning with ID {args.id} retired."))
-        return
-    _echo_learning(args.id)
-    print(green(f"Learning demoted to '{result}'."))
+    runtime.render.learning_demoted(args.id, runtime.db.demote_learning(args.id))
 
 
 def run_learning_keep(args: argparse.Namespace) -> None:
-    """Dismisses + affirms a pending downgrade (the affirmation counts as reinforcement)."""
-    learning = next((l for l in runtime.db.get_learnings() if l['id'] == args.id), None)
+    """Dismisses a pending downgrade: the contradicting weeks behind it are overruled."""
+    learning = runtime.db.get_learning(args.id)
     if not learning:
-        notice(f"Learning with ID {args.id} not found.", red)
-        sys.exit(1)
+        _not_found(args.id)
     if not learning.get("proposed_confidence"):
         notice(f"Learning with ID {args.id} has no pending demotion to dismiss.")
         return
 
     runtime.db.keep_learning(args.id)
-    _echo_learning(args.id)
-    print(green("Learning kept; pending demotion dismissed."))
+    runtime.render.learning_kept(runtime.db.get_learning(args.id))
 
 
 def run_learning_wipe(args: argparse.Namespace) -> None:
@@ -208,6 +247,9 @@ def add_learnings_parser(subparsers):
         help="Filter by confidence level: %(choices)s"
     )
     ln_list.add_argument(
+        "-a", "--all", action="store_true", help="Also show archived learnings"
+    )
+    ln_list.add_argument(
         "-v", "--verbose", action="store_true",
         help="Also show created/updated/reinforced timestamps"
     )
@@ -228,9 +270,22 @@ def add_learnings_parser(subparsers):
     ln_edit.add_argument("text", help="New learning text")
 
     # learnings rm
-    ln_rm = learnings_subparsers.add_parser("rm", help="Remove a learning by ID")
+    ln_rm = learnings_subparsers.add_parser(
+        "rm", help="Archive a learning by ID (--purge deletes it)"
+    )
     ln_rm.set_defaults(func=run_learning_rm)
-    ln_rm.add_argument("id", type=int, help="Learning ID to remove")
+    ln_rm.add_argument("id", type=int, help="Learning ID to archive")
+    ln_rm.add_argument(
+        "--purge", action="store_true",
+        help="Delete the learning and its evidence for good instead of archiving it"
+    )
+
+    # learnings restore
+    ln_restore = learnings_subparsers.add_parser(
+        "restore", help="Put an archived learning back, at tentative"
+    )
+    ln_restore.set_defaults(func=run_learning_restore)
+    ln_restore.add_argument("id", type=int, help="Learning ID to restore")
 
     # learnings demote
     ln_demote = learnings_subparsers.add_parser(

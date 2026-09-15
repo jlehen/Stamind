@@ -309,18 +309,33 @@ def next_push_delay(
     return (start + datetime.timedelta(days=1) - now).total_seconds()
 
 
+# The nightly reflect reads the week that ended on Sunday from the night into Wednesday on,
+# once late syncs and weekend edits have landed (DESIGN_learning_doubt_nudge.md §3.1).
+REFLECT_FROM_WEEKDAY = 2  # Wednesday
+REFLECT_FROM_HOUR = 3
+
+
+def reflect_due(now: "datetime.datetime") -> bool:
+    """Whether the nightly `data reflect` may start: Wednesday to Sunday, from 03:00 on the
+    athlete's clock (DESIGN_learning_doubt_nudge.md §3.1)."""
+    return now.weekday() >= REFLECT_FROM_WEEKDAY and now.hour >= REFLECT_FROM_HOUR
+
+
 async def scheduler_wake(
-    fired: Optional[str], simple: bool, busy: Callable[[], bool],
-    run: Callable[[List[str], bool], Awaitable[None]],
-) -> Tuple[Optional[str], float]:
-    """One wake of the bot's scheduler. Returns the day the push last fired and how long to
-    sleep before the next wake: at most 5 minutes, so a laptop suspend (which stalls the
-    monotonic clock asyncio sleeps on) can't oversleep the window.
+    last_run: Dict[str, str], simple: bool, busy: Callable[[], bool],
+    run: Callable[[List[str], bool], Awaitable[None]], reflect: Callable[[], None],
+) -> float:
+    """One wake of the bot's scheduler. `last_run` holds the day the push and the nightly
+    reflect last started, and the return is how long to sleep before the next wake: at most
+    5 minutes, so a laptop suspend (which stalls the monotonic clock asyncio sleeps on) can't
+    oversleep the window.
 
     Reminders that are due go first, and `run` waits for them: a push due on the same wake
     would otherwise find the chat busy. They go out whatever the persona and whether or not
-    the push is on (DESIGN_athlete_queue.md §6.5). The push fires inside the
-    [morning_time, deadline] window once per bot-day (DESIGN_bot_simple_frontend.md §4.3)."""
+    the push is on (DESIGN_athlete_queue.md §6.5). In companion mode `reflect` starts `data
+    reflect --auto` outside the chat once a day, and nothing waits for it
+    (DESIGN_learning_doubt_nudge.md §3.1). The push fires inside the [morning_time,
+    deadline] window once per bot-day (DESIGN_bot_simple_frontend.md §4.3)."""
     # The athlete's wall clock, not the machine's: morning-time/morning-deadline are the
     # hours they wake up in (DESIGN_user_timezone.md §2). Every knob here is re-read each
     # wake — `settings set` runs in a CLI subprocess, so this long-lived process would
@@ -330,14 +345,19 @@ async def scheduler_wake(
         await run(["bot", "queue", "--remind"], True)
     now = athlete_now()
     today = now.date().isoformat()
+    if simple and reflect_due(now) and last_run.get("reflect") != today:
+        last_run["reflect"] = today
+        reflect()
     delay = next_push_delay(now, settings.morning_time(), settings.morning_deadline())
-    if delay > 0 or not simple or not settings.push_enabled() or fired == today:
-        return fired, min(max(delay, 60), 300)
+    pushed = last_run.get("push") == today
+    if delay > 0 or not simple or not settings.push_enabled() or pushed:
+        return min(max(delay, 60), 300)
     if busy():
         # §4.3: never collide with an in-flight command — retry shortly.
-        return fired, 180
+        return 180
     await run(["bot", "morning"], False)
-    return today, 0
+    last_run["push"] = today
+    return 0
 
 
 def parse_message_to_argv(text: str, bot_username: Optional[str] = None) -> Optional[List[str]]:
@@ -1454,15 +1474,49 @@ def main() -> None:
         if wait:
             await session.task
 
+    # Held until each ends: asyncio keeps only a weak reference to a running task.
+    reflect_tasks: set = set()
+
+    async def _reflect_outside_chat() -> None:
+        """`data reflect --auto` as a process of its own, like the router: nothing is posted,
+        the chat is not busy, and its output goes to the journal
+        (DESIGN_learning_doubt_nudge.md §3.1)."""
+        argv = ["data", "reflect", "--auto"]
+        _log(push_chat_id, "**", shlex.join(argv))
+        env = _cli_env(None, source="push")
+        env.pop("TRAINMATE_FRONTEND")  # a terminal report for the journal, no chat sentinels
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-u", CLI_PATH, *argv,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                cwd=os.path.dirname(CLI_PATH),
+            )
+            out, _ = await proc.communicate()
+        except Exception as exc:
+            journal.record("bot.reflect", f"did not run: {exc}", lvl="warn")
+            return
+        journal.record(
+            "bot.reflect", strip_ansi(out.decode(errors="replace")).strip(),
+            exit_code=proc.returncode,
+        )
+
+    def _start_reflect() -> None:
+        task = asyncio.create_task(_reflect_outside_chat())
+        reflect_tasks.add(task)
+        task.add_done_callback(reflect_tasks.discard)
+
     async def _push_loop() -> None:
         """One `scheduler_wake` after another (§4.3). Real idempotency lives in the
-        database marker `bot morning` checks; `fired` only avoids re-spawning the
+        database marker `bot morning` checks; `last_run` only avoids re-spawning the
         subprocess every tick within one bot lifetime."""
-        fired: Optional[str] = None
+        last_run: Dict[str, str] = {}
         while True:
-            fired, pause = await scheduler_wake(
-                fired, simple_ui, lambda: sessions.get(push_chat_id) is not None,
-                _run_scheduled,
+            pause = await scheduler_wake(
+                last_run, simple_ui, lambda: sessions.get(push_chat_id) is not None,
+                _run_scheduled, _start_reflect,
             )
             if pause:
                 await asyncio.sleep(pause)

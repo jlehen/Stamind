@@ -246,9 +246,17 @@ class TestDatabase(unittest.TestCase):
         ])
         self.assertEqual(test_db.get_learnings()[0]["confidence"], "established")
 
-        # Retire deletes the record (basis cascades).
+        # Retire archives the record with its basis; a delta then skips it, and restore
+        # brings it back at tentative (DESIGN_learning_doubt_nudge.md §6).
         test_db.apply_learning_deltas([{"op": "retire", "id": lid}])
-        self.assertEqual(len(test_db.get_learnings()), 0)
+        self.assertTrue(test_db.get_learning(lid)["archived"])
+        self.assertEqual(len(test_db.get_learning_evidence(lid)), 5)
+        tally = test_db.apply_learning_deltas([
+            {"op": "reinforce", "id": lid, "evidence": ["2026-06-15"]},
+        ])
+        self.assertEqual(tally, {"applied": 0, "skipped": 1})
+        self.assertTrue(test_db.restore_learning(lid))
+        self.assertEqual(test_db.get_learning(lid)["confidence"], "tentative")
 
     def test_the_merge_counts_what_it_could_not_act_on(self):
         """Skipping a malformed delta is right; hiding the skip is not — a caller has to be
@@ -375,29 +383,31 @@ class TestDatabase(unittest.TestCase):
         ])
         self.assertFalse(test_db.get_learnings()[0]["dormant"])
 
-    def test_staleness_proposes_and_auto_applies(self):
+    def test_staleness_steps_apply_and_the_bottom_rung_archives(self):
+        """Every run lowers a dormant learning one level and re-arms its clock; below
+        tentative it is archived, and restored with its basis
+        (DESIGN_learning_doubt_nudge.md §3.2, §6)."""
         lid = test_db.add_learning("Aging note", confidence="moderate")  # 60-day budget
         old = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
         with test_db._get_connection() as conn:
             conn.execute(
                 "UPDATE coach_learnings SET last_reinforced_at=? WHERE id=?", (old, lid)
             )
-        # Interactive sweep: proposes one level down, leaves live level intact.
-        test_db.derive_staleness_proposals(auto=False)
-        learning = test_db.get_learnings()[0]
-        self.assertEqual(learning["confidence"], "moderate")
-        self.assertEqual(learning["proposed_confidence"], "tentative")
+        test_db.apply_staleness_steps()
+        learning = test_db.get_learning(lid)
+        self.assertEqual(learning["confidence"], "tentative")
+        self.assertIsNone(learning["proposed_confidence"])
+        self.assertFalse(learning["dormant"])
 
-        # Auto sweep would have applied it directly; verify on a fresh aged learning.
-        lid2 = test_db.add_learning("Another aging note", confidence="moderate")
         with test_db._get_connection() as conn:
             conn.execute(
-                "UPDATE coach_learnings SET last_reinforced_at=? WHERE id=?", (old, lid2)
+                "UPDATE coach_learnings SET last_reinforced_at=? WHERE id=?", (old, lid)
             )
-        test_db.derive_staleness_proposals(auto=True)
-        l2 = next(l for l in test_db.get_learnings() if l["id"] == lid2)
-        self.assertEqual(l2["confidence"], "tentative")
-        self.assertIsNone(l2["proposed_confidence"])
+        test_db.apply_staleness_steps()
+        self.assertTrue(test_db.get_learning(lid)["archived"])
+        self.assertTrue(test_db.restore_learning(lid))
+        self.assertFalse(test_db.get_learning(lid)["archived"])
+        self.assertEqual(len(test_db.get_learning_evidence(lid)), 3)
 
     def test_grandfather_seeds_basis_to_sustain_level(self):
         """A learning predating the evidence model keeps its level after recompute, because

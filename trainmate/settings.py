@@ -28,6 +28,7 @@ MORNING_DEADLINE = "morning-deadline"
 ADAPT_FIRST = "adapt-first"
 COMMITMENT_DAYS = "commitment-days"
 STRENGTH_SETS_SINCE = "strength-sets-since"
+LEARNING_QUESTIONS = "learning-questions"
 
 
 def parse_hhmm(token: Any) -> str:
@@ -158,6 +159,17 @@ SETTINGS: List[Setting] = [
         parse=llm_models.resolve_token,
         config_path=("llm", "router_model"),
         unset_label=f"(follows {COACH_MODEL})",
+    ),
+    Setting(
+        name=LEARNING_QUESTIONS,
+        key="learning_questions",
+        group="Coach",
+        summary="Ask the athlete before the coach leans less on something it learned",
+        value_hint="on|off",
+        parse=parse_switch,
+        # Off, the coach settles its doubts by itself (DESIGN_learning_doubt_nudge.md §3.4).
+        fallback="on",
+        coerce=_is_on,
     ),
     Setting(
         name=TIMEZONE,
@@ -365,3 +377,8 @@ def router_model() -> Optional[str]:
 
 def strength_sets_since() -> Optional[str]:
     return value(STRENGTH_SETS_SINCE)
+
+
+def learning_questions() -> bool:
+    """Whether a doubt about a learning is asked (DESIGN_learning_doubt_nudge.md §3.4)."""
+    return value(LEARNING_QUESTIONS)

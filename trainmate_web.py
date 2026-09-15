@@ -95,6 +95,12 @@ def _annotate_workout(
     }
 
 
+def _unarchived_learnings() -> List[Dict[str, Any]]:
+    """Every learning but the archived ones, which the dashboard leaves out as `status` does
+    (DESIGN_learning_doubt_nudge.md §6)."""
+    return [l for l in runtime.db.get_learnings() if not l.get("archived")]
+
+
 def _learnings_summary(learnings: List[Dict[str, Any]]) -> Dict[str, int]:
     """Computes the active/dormant/pending counts shown by `status` (status.py)."""
     active = [l for l in learnings if not l.get("dormant")]
@@ -154,7 +160,7 @@ def get_status() -> Any:
     # Get last baseline
     last_baseline = runtime.db.get_baseline(last_metrics['date']) if last_metrics else None
 
-    learnings = runtime.db.get_learnings()
+    learnings = _unarchived_learnings()
 
     macrocycle = None
     mesocycles = []
@@ -578,7 +584,7 @@ def get_learnings() -> Any:
     """Lists coach learnings (mirrors `learnings list`). Each carries its computed
     `dormant` flag, `sports`/`confidence`, and any `proposed_confidence` downgrade.
     Optional filters: ?sport=&confidence=&dormant=1."""
-    learnings = runtime.db.get_learnings()
+    learnings = _unarchived_learnings()
 
     if request.args.get("dormant", "").lower() in ("1", "true", "yes"):
         learnings = [l for l in learnings if l.get("dormant")]
@@ -592,7 +598,7 @@ def get_learnings() -> Any:
 
     return jsonify({
         "learnings": learnings,
-        "summary": _learnings_summary(runtime.db.get_learnings()),
+        "summary": _learnings_summary(_unarchived_learnings()),
     })
 
 

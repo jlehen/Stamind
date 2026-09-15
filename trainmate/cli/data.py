@@ -2,7 +2,7 @@ import csv as csv_mod
 import argparse
 import sys
 from typing import Optional
-from trainmate import runtime
+from trainmate import athlete_queue, runtime
 from trainmate import intensity
 from trainmate.garmin.load import activity_load, load_method
 from trainmate.sports import sport_aliases
@@ -488,6 +488,9 @@ def run_data_bootstrap(args: argparse.Namespace) -> None:
         auto=getattr(args, "auto", False),
     )
     _render_analysis_report(result, args.inspect_only)
+    _doubts_hint(args)
+
+
 def run_data_reflect(args: argparse.Namespace) -> None:
     """Incremental reflection over evidence accrued since the last reflect watermark."""
     window = resolve_window(args)
@@ -499,11 +502,20 @@ def run_data_reflect(args: argparse.Namespace) -> None:
         inspect_only=args.inspect_only,
         no_pull=args.no_pull,
         force_pull=args.force_pull,
-        auto=getattr(args, "auto", False),
     )
-    if not result:
-        return  # Nothing new to reflect on; service already printed why.
-    _render_analysis_report(result, args.inspect_only)
+    # An empty result read nothing new, and the service already printed why.
+    if result:
+        _render_analysis_report(result, args.inspect_only)
+    _doubts_hint(args)
+
+
+def _doubts_hint(args: argparse.Namespace) -> None:
+    """The queue hint where the end-of-run demotion prompt used to be: a run queues its
+    doubts for the athlete instead of asking (DESIGN_learning_doubt_nudge.md §8)."""
+    if not args.inspect_only:
+        runtime.render.queue_hint(*athlete_queue.waiting_counts())
+
+
 def run_data_show_analysis(args: argparse.Namespace) -> None:
     """Renders the stored reconstruction for one horizon slot; never recomputes it
     (DESIGN_backward_evaluation.md §5.1, forward consumer 3)."""
@@ -643,6 +655,8 @@ def _render_analysis_report(result: dict, inspect_only: bool) -> None:
                 tag = f"  ↓ contradicted [{u.get('id')}]{suffix}"
                 text = _existing_text(u.get("id"))
                 print(format_labeled_block(tag, text) if text else tag)
+                if isinstance(u.get("reason"), str) and u["reason"].strip():
+                    print(format_labeled_text("      because: ", u["reason"].strip()))
             elif op == "retire":
                 print(f"  - retired [{u.get('id')}]")
             else:
@@ -755,8 +769,8 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         )
         d_an.add_argument(
             "--auto", action="store_true",
-            help="Unattended: skip interactive demotion prompts. Staleness demotions apply "
-                 "directly; contradiction demotions stay queued for the next interactive review."
+            help="Unattended: ask nothing on the spot, so a repeat bootstrap is skipped. Doubts "
+                 "about learnings go to the athlete queue either way."
         )
 
     # data backfill-tss

@@ -732,14 +732,14 @@ class PushScheduleTest(unittest.TestCase):
 
 
 class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
-    """One wake of the scheduler: due reminders, then the push (DESIGN_athlete_queue.md
-    §6.5)."""
+    """One wake of the scheduler: due reminders, the nightly reflect, then the push
+    (DESIGN_athlete_queue.md §6.5, DESIGN_learning_doubt_nudge.md §3.1)."""
 
     def setUp(self):
         import datetime as dt
-        at_eight = dt.datetime(2026, 9, 16, 8, 0).astimezone()
+        self.now = dt.datetime(2026, 9, 16, 8, 0).astimezone()  # a Wednesday
         patches = [
-            mock.patch.object(bot, "athlete_now", return_value=at_eight),
+            mock.patch.object(bot, "athlete_now", side_effect=lambda: self.now),
             mock.patch.object(bot, "forget_timezone"),
             mock.patch.object(bot.settings, "morning_time", return_value="08:00"),
             mock.patch.object(bot.settings, "morning_deadline", return_value="15:00"),
@@ -750,27 +750,63 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.ran = []
+        self.reflects = []
+        self.last_run = {}
 
     async def run_command(self, argv, wait):
         self.ran.append((argv, wait))
 
+    def reflect(self):
+        self.reflects.append(self.now.strftime("%a %H:%M"))
+
+    async def wake(self, simple=True, busy=False):
+        return await bot.scheduler_wake(
+            self.last_run, simple, lambda: busy, self.run_command, self.reflect
+        )
+
     async def test_a_due_reminder_goes_out_before_the_push_on_the_same_wake(self):
-        fired, _ = await bot.scheduler_wake(None, True, lambda: False, self.run_command)
+        await self.wake()
         self.assertEqual(self.ran, [
             (["bot", "queue", "--remind"], True), (["bot", "morning"], False),
         ])
-        self.assertEqual(fired, "2026-09-16")
+        self.assertEqual(self.last_run["push"], "2026-09-16")
 
     async def test_reminders_go_out_whatever_the_persona_and_the_push_switch(self):
         with mock.patch.object(bot.settings, "push_enabled", return_value=False):
-            await bot.scheduler_wake(None, True, lambda: False, self.run_command)
-        await bot.scheduler_wake(None, False, lambda: False, self.run_command)
+            await self.wake()
+        await self.wake(simple=False)
         self.assertEqual(self.ran, [(["bot", "queue", "--remind"], True)] * 2)
 
     async def test_a_busy_chat_leaves_the_reminder_to_the_next_wake(self):
-        fired, pause = await bot.scheduler_wake(None, True, lambda: True, self.run_command)
+        pause = await self.wake(busy=True)
         self.assertEqual(self.ran, [])
-        self.assertEqual((fired, pause), (None, 180))
+        self.assertEqual((self.last_run.get("push"), pause), (None, 180))
+
+    async def test_reflect_starts_once_a_night_from_wednesday_to_sunday(self):
+        import datetime as dt
+        for day in range(14, 21):  # Monday 14 to Sunday 20 September
+            for hour, minute in ((2, 55), (3, 0), (3, 5), (8, 0)):
+                self.now = dt.datetime(2026, 9, day, hour, minute).astimezone()
+                await self.wake()
+        self.assertEqual(self.reflects, [
+            "Wed 03:00", "Thu 03:00", "Fri 03:00", "Sat 03:00", "Sun 03:00",
+        ])
+        self.assertNotIn("data", [argv[0] for argv, _ in self.ran])
+
+    async def test_reflect_leaves_the_chat_to_the_push(self):
+        """Started outside the chat, reflect neither waits for a busy chat nor holds up a
+        push due on the same wake, as after the bot was down overnight."""
+        await self.wake(busy=True)
+        self.assertEqual(self.reflects, ["Wed 08:00"])
+        await self.wake()
+        self.assertEqual(self.reflects, ["Wed 08:00"])
+        self.assertIn((["bot", "morning"], False), self.ran)
+
+    async def test_the_expert_persona_has_no_nightly_reflect(self):
+        import datetime as dt
+        self.now = dt.datetime(2026, 9, 16, 3, 0).astimezone()
+        await self.wake(simple=False)
+        self.assertEqual(self.reflects, [])
 
 
 class QueueProtocolTest(unittest.TestCase):

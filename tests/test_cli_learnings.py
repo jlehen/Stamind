@@ -83,8 +83,8 @@ class TestCliLearnings(unittest.TestCase):
         self.assertNotIn("proposed demotion", stdout)
         self.assertIn("Learning kept; pending demotion dismissed", stdout)
 
-    def test_learning_retire_has_nothing_to_echo(self):
-        """A retirement deletes the row, so only the confirmation prints."""
+    def test_a_retirement_archives_and_restore_brings_it_back(self):
+        """Retiring archives the learning (DESIGN_learning_doubt_nudge.md §6)."""
         lid = test_db.add_learning(
             "Runs better on 8h sleep", sports="running", confidence="tentative"
         )
@@ -92,8 +92,41 @@ class TestCliLearnings(unittest.TestCase):
 
         exit_code, stdout, _ = self.run_cli(["learnings", "demote", str(lid)])
         self.assertEqual(exit_code, 0)
-        self.assertIn(f"Learning with ID {lid} retired.", stdout)
-        self.assertNotIn("Runs better on 8h sleep", stdout)
+        self.assertIn(f"Learning with ID {lid} retired and archived", stdout)
+
+        _, listed, _ = self.run_cli(["learnings", "list"])
+        self.assertNotIn("Runs better on 8h sleep", listed)
+        _, listed, _ = self.run_cli(["learnings", "list", "--all"])
+        self.assertIn("Runs better on 8h sleep (archived)", listed)
+        _, shown, _ = self.run_cli(["learnings", "show", str(lid)])
+        self.assertIn("(archived)", shown)
+
+        exit_code, stdout, _ = self.run_cli(["learnings", "restore", str(lid)])
+        self.assertEqual(exit_code, 0)
+        self.assertIn(f"[{lid}|running|tentative]", stdout)
+        self.assertFalse(test_db.get_learning(lid)["archived"])
+
+    def test_rm_archives_and_purge_deletes_for_good(self):
+        lid = test_db.add_learning("Runs better on 8h sleep")
+        exit_code, stdout, _ = self.run_cli(["learnings", "rm", str(lid)])
+        self.assertEqual(exit_code, 0)
+        self.assertIn(f"Learning with ID {lid} archived", stdout)
+        self.assertTrue(test_db.get_learning(lid)["archived"])
+
+        exit_code, _, _ = self.run_cli(["learnings", "rm", str(lid), "--purge"])
+        self.assertEqual(exit_code, 0)
+        self.assertIsNone(test_db.get_learning(lid))
+        self.assertEqual(test_db.get_learning_evidence(lid), [])
+
+    def test_show_prints_what_went_against_it(self):
+        lid = test_db.add_learning("Absorbs doubles", sports="cycling", confidence="moderate")
+        test_db.apply_learning_deltas([{
+            "op": "contradict", "id": lid, "evidence": ["2026-09-07"],
+            "reason": "The second session was cut short.",
+        }])
+        _, stdout, _ = self.run_cli(["learnings", "show", str(lid)])
+        self.assertIn("contradicting (1 wk)", stdout)
+        self.assertIn("2026-09-07: The second session was cut short.", stdout)
 
 
 class TestLearningTuningKnobsAreDocumented(unittest.TestCase):

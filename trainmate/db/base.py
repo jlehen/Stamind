@@ -9,7 +9,7 @@ from trainmate.config import config
 # migrations are idempotent, so this is a "skip the work" marker rather than a ledger of
 # steps to replay — TrainMate has one user and one database, and the alternative (a
 # numbered migration framework) would be more machinery than that warrants.
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 
 # How long a connection waits for a writer to finish before raising "database is
@@ -522,7 +522,8 @@ class BaseDB:
             # incrementally via deltas (see apply_learning_deltas). `confidence` is
             # APP-COMPUTED from the evidence basis in learning_evidence below, never
             # LLM-asserted (DESIGN_evidence_based_confidence.md); `proposed_confidence`
-            # holds a pending human-confirmable DOWNGRADE.
+            # holds a pending human-confirmable DOWNGRADE; `status` is 'active' | 'archived',
+            # and retiring a learning archives it (DESIGN_learning_doubt_nudge.md §6).
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS coach_learnings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -532,18 +533,20 @@ class BaseDB:
                     proposed_confidence TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    last_reinforced_at TEXT
+                    last_reinforced_at TEXT,
+                    status TEXT DEFAULT 'active'
                 )
             """)
 
             # Phase 2 enrichment: add sport-scope, confidence, and recency columns to
             # coach_learnings created before they existed; plus the evidence-confidence
-            # proposed_confidence column.
+            # proposed_confidence column and the archive status.
             for col in [
                 "sports TEXT NOT NULL DEFAULT 'general'",
                 "confidence TEXT NOT NULL DEFAULT 'tentative'",
                 "proposed_confidence TEXT",
                 "last_reinforced_at TEXT",
+                "status TEXT DEFAULT 'active'",
             ]:
                 self._add_column(
                     cursor, "coach_learnings", col.split()[0],
@@ -568,10 +571,16 @@ class BaseDB:
                     polarity INTEGER NOT NULL,     -- +1 supporting | -1 contradicting
                     source TEXT,                   -- 'reflect'|'bootstrap'|'plan'|'manual'|'migration'
                     created_at TEXT NOT NULL,
+                    reason TEXT,                   -- contradicting: what went against it
                     UNIQUE(learning_id, week_commencing, polarity),
                     FOREIGN KEY (learning_id) REFERENCES coach_learnings(id) ON DELETE CASCADE
                 )
             """)
+            # What reflect said went against a learning (DESIGN_learning_doubt_nudge.md §4).
+            self._add_column(
+                cursor, "learning_evidence", "reason",
+                "ALTER TABLE learning_evidence ADD COLUMN reason TEXT"
+            )
 
 
             # Macrocycles table

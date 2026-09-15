@@ -5,6 +5,36 @@ from trainmate.util import cyan, step
 import trainmate.coach.engine as _eng
 from trainmate.coach.engine import LEARNING_UPDATES_FIELD
 
+# The two sentences a doubted learning's question carries (DESIGN_learning_doubt_nudge.md §4).
+LEARNING_QUESTION_SYSTEM_PROMPT = """You are TrainMate Coach. You keep notes about an athlete, and
+recent training went against one of them. The athlete is about to be asked whether it still fits.
+
+## TASK
+Write two sentences addressed to the athlete.
+
+### THE STATEMENT
+One sentence saying what the note claims about the athlete's own experience: how training feels,
+how they recover, what they tend to do. Write it as a statement, not a question: the app shows it
+inside a question that asks whether it still fits.
+
+### WHAT YOU SAW
+One sentence about the athlete's own recent sessions, saying what went against the note, taken
+only from WHAT WENT AGAINST THE NOTE. Start it with "But", since it follows the statement. When
+WHAT WENT AGAINST THE NOTE is empty, return null.
+
+### RULES FOR BOTH SENTENCES
+- Second person, plain words, in the language of this prompt.
+- Short enough to read at a glance on a phone: one idea, about fifteen words.
+- No numbers, metrics, heart-rate or power zones, training jargon, or names.
+- Describe effects. Never name substances, health conditions or private life: a note about
+  drinking becomes "Some evenings out cost you the next morning". The sentences can show on a
+  phone's lock screen.
+
+## RESPONSE FORMAT
+Return a JSON object with exactly these keys:
+{"statement": "one sentence", "saw": "one sentence, or null"}
+"""
+
 
 class AnalysisLogicMixin:
     """Part of :class:`CoachEngine` — see coach/engine/__init__.py."""
@@ -168,3 +198,19 @@ class AnalysisLogicMixin:
             system_prompt, user_content, label=label
         )
         return result
+
+    def _learning_question_logic(
+        self, text: str, sports: str, reasons: List[str]
+    ) -> Dict[str, Any]:
+        """Asks for the statement and what the coach saw, for a learning reflect doubts
+        (DESIGN_learning_doubt_nudge.md §4). One short call, made when the question is
+        queued; nobody watches it."""
+        against = "\n".join(f"- {reason}" for reason in reasons)
+        user_content = (
+            f"## THE NOTE\n{text}\nSports: {sports}\n\n"
+            f"## WHAT WENT AGAINST THE NOTE\n{against}\n"
+        )
+        return _eng.openrouter_client.complete(
+            LEARNING_QUESTION_SYSTEM_PROMPT, user_content, label="learning_question",
+            wait_notice=False,
+        )

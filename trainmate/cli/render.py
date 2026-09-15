@@ -29,6 +29,7 @@ from trainmate.util import (
     today_date as _today_date, today_str as _today_str,
 )
 from trainmate.cli.goals import print_goal_row, print_goal_table, report_archived_sessions
+from trainmate.cli.learnings import print_learning_demoted, print_learning_kept
 from trainmate.cli.plans import print_plan
 from trainmate.cli.progress import emit_chart, print_progress_report
 from trainmate.cli.queue import (
@@ -886,6 +887,14 @@ class ExpertRenderer:
             return
         print(green(f"{name} set to {stored}") + dim(f" — was {before}."))
 
+    # -- a doubted learning's answer (DESIGN_learning_doubt_nudge.md §4) --
+
+    def learning_kept(self, learning: Dict[str, Any]) -> None:
+        print_learning_kept(learning)
+
+    def learning_demoted(self, learning_id: int, result: Optional[str]) -> None:
+        print_learning_demoted(learning_id, result)
+
     # -- one-liners --
 
     def constraint_removed(self, constraint_id: int) -> None:
@@ -1167,6 +1176,17 @@ class CompanionRenderer(ExpertRenderer):
         # (DESIGN_bot_simple_frontend.md §12.7).
         print(green("Done — that's set 👍" if stored != before
                     else "That's already how it is 👍"))
+
+    # -- a doubted learning's answer --
+
+    def learning_kept(self, learning: Dict[str, Any]) -> None:
+        print(green("Thanks — good to know, I'll keep that in mind."))
+
+    def learning_demoted(self, learning_id: int, result: Optional[str]) -> None:
+        if result == "retired":
+            print(green("Got it — I've set that idea aside."))
+            return
+        print(green("Got it — I'll lean on that less."))
 
     # -- one-liners --
 

@@ -1,6 +1,6 @@
 # Design: The coach asks before it stops trusting what it learned
 
-**Status:** Proposed · **Date:** 2026-09-14 (rev. 3)
+**Status:** Implemented (2026-09-14) · **Date:** 2026-09-14 (rev. 3)
 
 Revision 3 answers a review of revision 2. On a companion instance, the bot's scheduler runs
 reflect at night from Tuesday night on, outside the athlete's chat (§3.1). Every run applies
@@ -405,7 +405,8 @@ question then closes as stale.
   goes to the journal.
 - `trainmate/settings.py`: the `learning-questions` switch, on by default.
   `trainmate/cli/settings.py`: it joins `ROUTABLE_SETTINGS`. `trainmate/cli/bot.py`: its line
-  in `SETTING_DESCRIPTIONS` and its two sentences in `_setting_effect`.
+  in `SETTING_DESCRIPTIONS`, its two sentences in `_setting_effect`, and the router's
+  description of `change_setting`, so "stop asking me about that stuff" reaches it.
 - `trainmate/learning_doubts.py` (new): the `learning` kind (expert and companion wording,
   the check of §5, the two answers, no drop), registered in `athlete_queue.KINDS`; and the
   queuing of §5, which skips a learning with a question still waiting or a dormant learning,
@@ -414,10 +415,10 @@ question then closes as stale.
   label offers no drop, in `queue_buttons` and `terminal_choices`, and `act` refuses a drop
   on it.
 - `trainmate/coach/service/`: `learning_question(learning, reasons)` and its prompt (the
-  statement and what the coach saw, plain and discreet). In `prompt.py`,
-  `_review_learning_proposals` runs the staleness sweep in its applying form on every run,
-  loses its prompt, queues the questions (or, with the switch off, applies the proposals)
-  and ends with the queue hint.
+  statement and what the coach saw, plain and discreet; the call is
+  `CoachEngine._learning_question_logic`). In `prompt.py`, `_review_learning_proposals` runs
+  the staleness sweep in its applying form on every run, loses its prompt, and queues the
+  questions (or, with the switch off, applies the proposals).
 - `trainmate/coach/engine/__init__.py`: `reason` on the `contradict` op in
   `LEARNING_UPDATES_FIELD`.
 - `trainmate/db/learnings.py` and `db/base.py`: the `status` column on `coach_learnings` and
@@ -428,11 +429,12 @@ question then closes as stale.
   `_exists`.
 - `trainmate/cli/learnings.py`: `rm --purge`, `restore`, `list -a/--all`, `show` finding an
   archived learning and printing the reasons, keep/demote printing through the renderer.
-- `trainmate/cli/data.py`: the reason under a contradiction in the reflect report.
+- `trainmate/cli/data.py`: the reason under a contradiction in the reflect report, and the
+  queue hint at the end of `data reflect` and `data bootstrap`.
 - `trainmate/cli/status.py` and `trainmate_web.py`: archived learnings left out.
-- `trainmate/cli/render.py`: the companion wording beside `simple_queue_message`; renderer
-  methods for the two answers' replies, one rung down or on the retirement rung, with
-  expert and companion bodies.
+- `trainmate/cli/render.py`: renderer methods for the two answers' replies, one rung down or
+  on the retirement rung, with expert and companion bodies. The question's own companion
+  wording lives with the kind in `learning_doubts.py`, as the strength kinds' does.
 - Tests (`tests/test_bot.py`, `tests/test_athlete_queue.py`, `tests/test_learnings*.py`, a
   new `tests/test_learning_doubts.py`): the scheduler starting reflect once a day after 03:00
   from Wednesday to Sunday in companion mode only, without making the chat busy, and not on

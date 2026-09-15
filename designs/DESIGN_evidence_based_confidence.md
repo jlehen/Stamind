@@ -236,6 +236,13 @@ asserting confidence:
 Removed: the `confidence` field on every op, and the prose telling the model to
 "raise it as evidence accumulates." Confidence is no longer the model's to set.
 
+> **AS BUILT (rev 3, DESIGN_learning_doubt_nudge.md §4, §6).** `contradict` also carries
+> `reason`: one line, written for the coach, saying what in the cited weeks went against
+> the observation. It is stored on each contradicting week the op files
+> (`learning_evidence.reason`), printed under the contradiction in the reflect report and
+> in `learnings show`, and read by the question the athlete is asked. `retire` archives
+> the learning instead of deleting it.
+
 **Validation (consistent with the existing "skip malformed" philosophy in
 `apply_learning_deltas`).** The app validates each cited week against the actual
 set of `week_commencing` values in the analysis window; weeks outside it (LLM
@@ -334,6 +341,18 @@ The three human actions and their effects are:
 > The web front-end exposes the **read** half only — `GET /api/learnings` and
 > `GET /api/learnings/<id>/evidence`. The dashboard is read-only by design, so there are
 > no `demote`/`keep` HTTP endpoints; resolving a proposal is a CLI (or run-end) action.
+
+> **AS BUILT (rev 3) — the athlete decides, through the queue
+> (DESIGN_learning_doubt_nudge.md).** The end-of-run prompt is gone. Every `data reflect`
+> and `data bootstrap` run, with or without `--auto`, applies staleness steps directly, so
+> the staleness proposal is gone and every pending proposal is a contradiction. The run then
+> queues one question per pending proposal in the athlete queue: "Still fits" runs `keep`,
+> "Not really" runs `demote`. With the `learning-questions` setting off, the run applies
+> each pending proposal itself. Retirement archives the learning
+> (`coach_learnings.status`) on every path: `demote` on the retirement sentinel, the
+> `retire` delta op, the staleness sweep's bottom rung and `learnings rm`. `learnings
+> restore` brings it back at tentative, and `learnings rm --purge` is the hard delete. The
+> `--auto` paragraphs below describe revs 1 and 2.
 
 **`--auto` (unattended runs).** `plan generate` already carries an `--auto` flag
 for non-interactive use (plans.py — skips prompts, see [reflect/bootstrap split]

@@ -275,6 +275,12 @@ classes themselves.
     --remind` and waits for it before it considers the push, whatever the persona and the
     `push` switch. On a terminal the item's line becomes the two-line hint that `status`
     and `workout adapt` print.
+  - **The nightly reflect:** in companion mode, from Wednesday to Sunday, the scheduler's
+    first wake after 03:00 on the athlete's clock also starts `data reflect --auto`, once a
+    day (`reflect_due`). It runs as a process of its own outside the chat, the way the
+    router does: nothing is posted, the chat is not busy, the wake does not wait for it,
+    and its output is journalled as `bot.reflect`. The doubts it leaves are queued for the
+    athlete (DESIGN_learning_doubt_nudge.md §3.1).
 
 ### Package `trainmate/`
 
@@ -283,8 +289,9 @@ classes themselves.
 | `types.py`           | —                    | TypedDicts: `Objective`, `Constraint`, `DailySignal`, `Workout` (the hydrated session, not a table row — §5), `CompletedActivity` (incl. `bike_avg_watts`, `zone1_sec`–`zone5_sec`, `power_zone1_sec`–`power_zone7_sec`, and the strength columns `sets_read_at`/`sets_final_at`/`discarded`), `AthleteMetric`, `AthleteBaseline`, `Macrocycle`, `Mesocycle`, `PlanFeedback`, `PlanProposal` |
 | `config.py`          | `config`             | Reads `config.yaml`; exposes typed properties.   |
 | `prompt.py`          | (`cli.prompt`)       | Front-end-agnostic prompt broker: `confirm`/`choose`/`ask_text` over `TtyPrompt` (`input()`) or `JsonPrompt` (chat/web). Journals every answer on the asking run (DESIGN_logging.md §5.6). See [§6](#6-singletons). |
-| `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
+| `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, and `learning` from `learning_doubts.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
+| `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
 | `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class and listing the Garmin names that mean it (Connect's catalog and the FIT SDK names). `sets.py` parses Garmin's `exerciseSets`, reads each strength session once the morning after (`read_new_sessions`, run by `garmin.pull` and the morning push), freezes it or queues "are the sets final?", groups sets into blocks, and renders the lines under the activity (`session_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. Rows in `db/strength.py`; surgery in `cli/strength.py`. |
 | `db/`                | `db`                 | SQLite wrapper; `Database` composed from         |
 |                      |                      | per-domain mixins. Full CRUD for all tables.     |
@@ -495,7 +502,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Telling the athlete the schedule is running out | `progression.py` (`coverage_end`, `runway` — the pure detector and its four kinds), `cli/runway.py` (the row fetch, every wording, the morning-push button), and the four surfaces that draw it: `cli/workouts/generate.py` (`workout adapt`'s hint and refusal, `workout list`'s marker), `cli/status.py`, `cli/bot.py:run_bot_morning`, `config.runway_warning_days`, DESIGN_runway_nudge.md. The wording is built in **one** place on purpose — the hint used to live on `workout adapt` alone, which is how `status` came to answer differently on the same morning (§3 of that doc) |
 | Generation covering every date of its span | `coach/engine/workouts.py` (the TASK sentence), `coach/service/workouts.py:_fill_coverage_gaps` (the deterministic backstop, over the same `_rest_workout` factory the rest-window pre-pass uses), DESIGN_runway_nudge.md §2.1. The invariant is what lets the end of the schedule be read straight off the rows, with no margin |
 | Knowing whether the plan reflects a constraint | `coach/honoring.py` (**canonical** for `honored_at`: what it means, who may stamp it, the write, and `needs_a_pass` — whether the plan is missing a directive at all), `coach/proposals.py` (`covered_constraint_ids`, decided at proposal time on both proposal types so apply never re-derives it), `coach/service/adaptation.py` + `coach/service/workouts.py` (the two stamping commands), `cli/constraints.py:_maybe_point_at_honor` (the add-time message naming the block and the run that would build it in), `cli/status.py`, `cli/common.py:constraint_line`/`report_unhonored`, `db/constraints.py` (`mark_honored`, `clear_honored`, `clear_honored_after`), DESIGN_constraint_honoring.md. There is deliberately **no dedicated command** and no SQL half-copy of the predicate in `db/` — §5 of that doc records why |
-| Coach-learnings / confidence     | `db/learnings.py`, `coach/service/prompt.py` (`_apply_learning_updates`), model is **canonical** in [§3](#3-coach-package-architecture) |
+| Coach-learnings / confidence     | `db/learnings.py`, `coach/service/prompt.py` (`_apply_learning_updates`, `_review_learning_proposals`), `learning_doubts.py` (the athlete's question about a doubt), model is **canonical** in [§3](#3-coach-package-architecture) |
 | Backward analysis (bootstrap/reflect) | `coach/service/analysis.py:_run_workout_analysis`, `coach/engine/analysis.py:_data_analyze_logic` ([§10](#data-analysis-data-bootstrap--data-reflect)) |
 | Garmin pull / metrics / load model | `trainmate/garmin/sync.py` (`pull`, `ensure_data`), `garmin/load.py` (`activity_load`), `garmin/pmc.py` (PMC + `recompute_derived`), see [§12](#12-sports-science--coaching-mathematics) |
 | Progress timeline / PMC projection | `trainmate/progression.py` (pure math), `trainmate/timeline.py` (shared row-fetch), `trainmate/chart.py` (PNG), `cli/progress.py` (text), `/api/timeline.png` in `trainmate_web.py`, see [§12](#fitnessfatigueform-pmc-model), DESIGN_progress_timeline.md |
@@ -696,9 +703,9 @@ training **week(s)** it was shown (`week_commencing` Mondays). The five ops:
   `evidence` given, also adds supporting weeks.
 - `{"op": "reinforce", id, evidence:[weeks]}` — add supporting weeks (no
   reword). **No `evidence` ⇒ no-op.**
-- `{"op": "contradict", id, evidence:[weeks]}` — add contradicting weeks; may
-  trigger a *proposed* demotion.
-- `{"op": "retire", id}` — hard delete (basis cascades).
+- `{"op": "contradict", id, evidence:[weeks], reason?}` — add contradicting weeks, each
+  carrying the one-line `reason`; may trigger a *proposed* demotion.
+- `{"op": "retire", id}` — archives the learning, basis kept.
 
 Cited weeks are validated against `available_weeks` (the analysed window's
 Mondays); weeks outside it are dropped (skip-malformed philosophy).
@@ -719,30 +726,37 @@ refreshes only when a *new* supporting week lands (or on a staleness demotion).
 **Decay (soft) + staleness demotion:** a learning is *dormant* once unreinforced
 past its confidence budget (`config.learning_staleness_days`: tentative 21d / moderate
 60d / established 180d, via `db.learning_is_dormant()`). Dormant records stay in
-the DB, are listed by `learnings list` (marked), and are **excluded from prompts**. Crossing the
-budget also **proposes a one-level staleness demotion** (`derive_staleness_proposals`);
-accepting it re-arms the clock at the lower (shorter) budget, so an untouched
-learning walks established → moderate → tentative → retire over real time.
+the DB, are listed by `learnings list` (marked), and are **excluded from prompts**. Every
+reflect and bootstrap run also **lowers a dormant learning one level** directly
+(`apply_staleness_steps`) and re-arms the clock at the lower (shorter) budget, so an
+untouched learning walks established → moderate → tentative → archived over real time.
 
-**Propose / confirm flow:** pending downgrades (contradiction- or
-staleness-driven) are resolved **interactively** at the end of `data
-bootstrap`/`data reflect` — accept (`db.demote_learning`), keep
-(`db.keep_learning` — dismiss + affirm: drop the −1 rows for a contradiction, or
-refresh recency for staleness), or skip — or out of band via `learnings demote
-<id>` / `learnings keep <id>`. `--auto` skips the prompts: staleness demotions
-apply directly; contradiction demotions stay queued for the next interactive
-review. The bottom rung differs by mode: under `--auto` there is no queue to park the
-last step in, so a dormant *tentative* learning is **hard-DELETEd** from
-`coach_learnings` (basis cascading); interactively the same learning stops one rung
-earlier, as a pending `retire` proposal.
-`CoachService._get_learnings_text()` renders only active learnings as
-`[id|sports|confidence] text` into every using flow's prompt.
+**Propose / confirm flow — the athlete decides:** a contradiction-driven downgrade is
+only proposed, and the athlete rules on it (DESIGN_learning_doubt_nudge.md). At the end of
+every `data bootstrap`/`data reflect`, `CoachService._review_learning_proposals()` applies
+the staleness steps, then `learning_doubts.settle_doubts()` queues one question in the
+athlete queue per pending proposal whose learning is not dormant and has no question
+waiting. The question carries two sentences from `CoachService.learning_question()`: what
+the learning claims about the athlete, and what the coach saw against it, taken from the
+contradicting weeks' `reason`. "Still fits" runs `db.keep_learning` (the −1 rows are
+deleted and confidence re-derived); "Not really" runs `db.demote_learning`. Nothing is
+asked on the spot, with or without `--auto`; the operator can still settle a doubt by hand
+with `learnings demote <id>` / `learnings keep <id>`, and the waiting question then closes
+as stale. With the `learning-questions` setting off, the run applies each pending proposal
+itself. **Retirement archives** (`coach_learnings.status`): the retirement rung of
+`demote_learning`, the `retire` delta op, the staleness bottom rung and `learnings rm` all
+archive; `learnings restore` brings a learning back at tentative with its evidence, and
+`learnings rm --purge` is the hard delete.
+`CoachService._get_learnings_text()` renders only active (not dormant, not archived)
+learnings as `[id|sports|confidence] text` into every using flow's prompt.
 
 **Inspection / curation:** the `learnings` command family is the home for viewing
-and hand-curating records — `list` (filters: `--sport`/`--confidence`/`--dormant`),
-`show <id>` (full text + per-week evidence basis), `edit`, `rm`, `demote`, `keep`,
-`wipe`. `status` carries only a one-line summary (`N active, M dormant, K pending
-demotion`) pointing at `learnings list`.
+and hand-curating records — `list` (filters: `--sport`/`--confidence`/`--dormant`;
+archived learnings only with `-a/--all`), `show <id>` (full text + per-week evidence basis
+with each contradicting week's reason; finds archived learnings too), `edit`, `rm`
+(archives; `--purge` deletes), `restore`, `demote`, `keep`, `wipe`. `status` carries only a
+one-line summary (`N active, M dormant, K pending demotion`, archived left out) pointing at
+`learnings list`.
 
 **Cold-start nudge:** when there are no active learnings, `plan generate` and
 `status` suggest running `data bootstrap` (the only flow that authors learnings).
@@ -1094,11 +1108,13 @@ methods whose behavior is *not* obvious from that convention are called out belo
   other caller silently corrupted the derived metrics; the lazy `runtime` singletons
   removed the cycle, so the invariant now belongs to the operation.
 - **Coach Learnings** (`learnings.py`) — `get_learnings()` annotates each record with
-  a computed `dormant` flag and its `proposed_confidence`; `add_learning` seeds a
-  synthetic basis sustaining the level; plus the evidence/decay mutators
-  (`apply_learning_deltas`, `recompute_all_confidence`, `derive_staleness_proposals`,
-  `demote_learning`, `keep_learning`) and module-level helpers/constants
-  (`CONFIDENCE_LEVELS`, `RETIRE_PROPOSAL`, `derive_confidence`, `step_down`,
+  computed `dormant` and `archived` flags and its `proposed_confidence`; `get_learning(id)`
+  reads one; `add_learning` seeds a synthetic basis sustaining the level;
+  `archive_learning`/`restore_learning`, and `delete_learning` for `learnings rm --purge`;
+  plus the evidence/decay mutators (`apply_learning_deltas`, `recompute_all_confidence`,
+  `apply_staleness_steps`, `demote_learning`, `keep_learning`) and module-level
+  helpers/constants (`CONFIDENCE_LEVELS`, `RETIRE_PROPOSAL`, `ACTIVE`/`ARCHIVED`,
+  `derive_confidence`, `step_down`,
   `learning_is_dormant`; the staleness budgets are config, not a constant —
   `config.learning_staleness_days`). The
   evidence/confidence/decay model these implement is **canonical** in
@@ -1611,7 +1627,8 @@ from the `learning_evidence` basis (below), not asserted by the LLM. Full model:
 | `proposed_confidence` | TEXT       | Pending, human-confirmable **downgrade** (`retire` = propose retirement); NULL when none |
 | `created_at`          | TEXT       | ISO timestamp                                          |
 | `updated_at`          | TEXT       | ISO timestamp; last content/metadata change            |
-| `last_reinforced_at`  | TEXT       | ISO timestamp; drives decay → `dormant` (see §3); refreshed only by a *new* supporting week or a staleness demotion |
+| `last_reinforced_at`  | TEXT       | ISO timestamp; drives decay → `dormant` (see §3); refreshed only by a *new* supporting week or a staleness step |
+| `status`              | TEXT       | `active` / `archived`; retiring a learning archives it (DESIGN_learning_doubt_nudge.md §6) |
 
 ### learning_evidence
 The per-learning **evidence basis**: the distinct training **weeks** backing each
@@ -1627,6 +1644,7 @@ guarantee (re-citing a counted week is an `INSERT OR IGNORE` no-op). Full model:
 | `week_commencing` | TEXT       | YYYY-MM-DD (Monday) — the evidence anchor          |
 | `polarity`        | INTEGER    | +1 supporting · −1 contradicting                   |
 | `source`          | TEXT       | `reflect` \| `bootstrap` \| `manual` \| `migration` (`plan` is a reserved value in the schema comment; `plan generate` is a non-writer, so nothing emits it) |
+| `reason`          | TEXT       | On a contradicting week: what went against the learning, one line from reflect (DESIGN_learning_doubt_nudge.md §4) |
 | `created_at`      | TEXT       | ISO timestamp                                      |
 
 `UNIQUE(learning_id, week_commencing, polarity)`

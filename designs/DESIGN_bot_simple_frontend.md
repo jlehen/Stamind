@@ -148,6 +148,12 @@ whether a queued item's reminder time has passed. If one has, it runs `tm bot qu
 07:58 arrives just ahead of the 08:00 briefing. Reminders go out whatever the persona and
 whether or not the push is on, and wait for the next wake while the chat is busy.
 
+Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §3.1): in companion mode, from Wednesday
+to Sunday, the first wake after 03:00 on the athlete's clock also starts `tm data reflect
+--auto`, once a day. It runs as a process of its own outside the chat, like the router:
+nothing is posted, the chat is not busy, the scheduler does not wait for it, and its output
+goes to the journal. The expert persona has no nightly reflect.
+
 ### 4.4 Bot-level buttons: a third sentinel
 
 The CLI↔bot channel already carries `\x1eTM-PROMPT` (blocking question) and
@@ -916,6 +922,10 @@ pass through the settings layer's own validation, and the preview reads back the
 at 07:00 from tomorrow. OK?" claims tomorrow only when today's is already past.
 There is no `show_settings` view: the confirm echoes the value, and the full listing
 is expert detail.
+
+Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §3.4): `learning-questions` joins the
+allowlist. "Stop asking me about that stuff" reads back as "I'll stop asking about what
+I've learned about you, and go by what I see instead. OK?"
 
 ### 12.8 The intent table after this pass
 
