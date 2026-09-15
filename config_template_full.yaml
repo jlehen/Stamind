@@ -409,6 +409,8 @@ user_profile:
     - "ski_touring"
   chronic_injuries: |
     Sensitive lower back. Avoid high-impact running on pavement when flared up.
+  # Session-level only: how sessions are written up, where they happen, what kit, how to
+  # talk to you. Sessions per week, block order and taper depth go in a science/ file.
   preferences: |
     Enjoys morning workouts. Prefers outdoor trail runs and road cycling.
   equipment:

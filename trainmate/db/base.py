@@ -9,7 +9,7 @@ from trainmate.config import config
 # migrations are idempotent, so this is a "skip the work" marker rather than a ledger of
 # steps to replay — TrainMate has one user and one database, and the alternative (a
 # numbered migration framework) would be more machinery than that warrants.
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 
 # How long a connection waits for a writer to finish before raising "database is
@@ -597,6 +597,7 @@ class BaseDB:
                     goals_snapshot TEXT,
                     constraints_snapshot TEXT,
                     all_constraints_snapshot TEXT,
+                    science_snapshot TEXT,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (objective_id) REFERENCES objectives(id) ON DELETE CASCADE
                 )
@@ -670,6 +671,15 @@ class BaseDB:
             if 'profile_snapshot' not in columns:
                 cursor.execute(
                     "ALTER TABLE macrocycles ADD COLUMN profile_snapshot TEXT"
+                )
+            # The athlete's science documents the plan was generated with, as JSON
+            # {filename: text}: the prescriptive input, fingerprinted like the profile so
+            # an edited guideline flags the plan and shows the edit
+            # (DESIGN_plan_staleness.md §11). NULL is a plan that predates the column,
+            # and is never flagged on this axis.
+            if 'science_snapshot' not in columns:
+                cursor.execute(
+                    "ALTER TABLE macrocycles ADD COLUMN science_snapshot TEXT"
                 )
             # Plan-version axis (see DESIGN_plan_rollback.md). Regenerating a plan keeps the
             # prior macrocycle, marked 'superseded' at `superseded_at`, so `plan rollback` can

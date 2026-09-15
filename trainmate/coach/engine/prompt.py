@@ -43,12 +43,19 @@ class PromptBuildMixin:
             else:
                 lines.append(f"- Chronic Injuries: {chronic_injuries}")
 
+        # Session-level by contract: the science documents set the structure, the
+        # preferences say how a session is written up (DESIGN_plan_staleness.md §11).
         preferences = profile.get("preferences")
         if preferences:
             if isinstance(preferences, list):
-                lines.append(f"- Preferences / Static Constraints: {', '.join(preferences)}")
-            else:
-                lines.append(f"- Preferences / Static Constraints: {preferences}")
+                preferences = ', '.join(preferences)
+            lines.append(f"- Preferences / Static Constraints: {preferences}")
+            lines.append(
+                "  (Preferences describe how sessions are written up, where they happen, "
+                "with what kit, and how to speak to the athlete. Session counts, block "
+                "order and taper depth come from the athlete-provided science guidelines, "
+                "never from here.)"
+            )
 
         general_equipment = profile.get("equipment")
         if general_equipment:

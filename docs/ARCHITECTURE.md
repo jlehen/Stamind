@@ -498,7 +498,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Plan feedback (the athlete's notes on the plan) | `db/periodization.py` (`add_/list_/get_/rm_plan_feedback` over the `plan_feedback` table), `cli/plans.py:run_plan_feedback` + `cli/selectors.py:resolve_meso_atom` (the `-m` atom), `coach/service/planning.py` (the regen gate disjunct + prompt assembly), `coach/engine/planning.py` (the prompt section), DESIGN_plan_feedback.md |
 | Workout generation span          | `coach/service/workouts.py:workout_generate`, `cli/workouts/generate.py:_resolve_span`, `cli/workouts/parser.py` (flag parsing), `config.workout_generation_span_days` |
 | Commitment window                | `settings.commitment_days`, `coach/service/workouts.py:_commitment_window`/`_standing_block`/`_resolve_standing`, `coach/formatting.py:format_standing_workouts`, `calendar_reconcile.py:leaves_trace`, `workout_changes.commitment_end` |
-| Telling the athlete a plan-shaping input changed since the plan was built | `config.py` (`plan_profile`/`changed_plan_profile_fields`/`plan_config_hash` — the partition and the fields that moved), `coach/service/prompt.py:config_changed` (the judgment, both axes), **`cli/staleness.py`** (canonical for everything the athlete sees: the reason, the §2 test said out loud, the re-stamp, and the four surfaces' shared wording), and the surfaces that draw it: `cli/plans.py` (`plan show` reports, `plan keep` dismisses, `plan generate` offers), `cli/workouts/generate.py`, `cli/status.py` (a pointer to `plan show`, nothing more), `trainmate_web.py` (a read-only banner off `plan_config_hash()`, deliberately not through the engine — §8). Built in **one** place for the same reason the runway nudge is: three call sites each phrasing a two-sentence explanation is how they drift (DESIGN_plan_staleness.md §9) |
+| Telling the athlete a plan-shaping input changed since the plan was built | `config.py` (`plan_profile`/`changed_plan_profile_fields`/`plan_config_hash` — the partition and the fields that moved; `athlete_science_documents`/`changed_science_documents` — the science files that moved), `coach/service/prompt.py:config_changed` (the judgment, every axis), **`cli/staleness.py`** (canonical for everything the athlete sees: the reason, the §2 test said out loud, the re-stamp, and the four surfaces' shared wording), and the surfaces that draw it: `cli/plans.py` (`plan show` reports, `plan keep` dismisses, `plan generate` offers), `cli/workouts/generate.py`, `cli/status.py` (a pointer to `plan show`, nothing more), `trainmate_web.py` (a read-only banner off `plan_config_hash()`, deliberately not through the engine — §8). Built in **one** place for the same reason the runway nudge is: three call sites each phrasing a two-sentence explanation is how they drift (DESIGN_plan_staleness.md §9) |
 | Telling the athlete the schedule is running out | `progression.py` (`coverage_end`, `runway` — the pure detector and its four kinds), `cli/runway.py` (the row fetch, every wording, the morning-push button), and the four surfaces that draw it: `cli/workouts/generate.py` (`workout adapt`'s hint and refusal, `workout list`'s marker), `cli/status.py`, `cli/bot.py:run_bot_morning`, `config.runway_warning_days`, DESIGN_runway_nudge.md. The wording is built in **one** place on purpose — the hint used to live on `workout adapt` alone, which is how `status` came to answer differently on the same morning (§3 of that doc) |
 | Generation covering every date of its span | `coach/engine/workouts.py` (the TASK sentence), `coach/service/workouts.py:_fill_coverage_gaps` (the deterministic backstop, over the same `_rest_workout` factory the rest-window pre-pass uses), DESIGN_runway_nudge.md §2.1. The invariant is what lets the end of the schedule be read straight off the rows, with no margin |
 | Knowing whether the plan reflects a constraint | `coach/honoring.py` (**canonical** for `honored_at`: what it means, who may stamp it, the write, and `needs_a_pass` — whether the plan is missing a directive at all), `coach/proposals.py` (`covered_constraint_ids`, decided at proposal time on both proposal types so apply never re-derives it), `coach/service/adaptation.py` + `coach/service/workouts.py` (the two stamping commands), `cli/constraints.py:_maybe_point_at_honor` (the add-time message naming the block and the run that would build it in), `cli/status.py`, `cli/common.py:constraint_line`/`report_unhonored`, `db/constraints.py` (`mark_honored`, `clear_honored`, `clear_honored_after`), DESIGN_constraint_honoring.md. There is deliberately **no dedicated command** and no SQL half-copy of the predicate in `db/` — §5 of that doc records why |
@@ -612,11 +612,12 @@ default the user layer overrides.
 - **`_get_constraints_hash(constraints)`** — SHA-256 of the `_clean_constraints` list.
 - **`_get_config_hash()`** — SHA-256 of `_clean_profile()`: the `user_profile` block minus
   the threshold anchors (`max_hr`/`lthr`/`ftp`) and minus the fields that reach the prompt
-  but cannot shape a periodization — `name`, top-level `equipment`, and each day's
-  `equipment` within `weekly_schedule` (that day's hours, `max_sessions` and
-  `certainty_percent` stay in). The partition and its rationale are
-  `DESIGN_plan_staleness.md` §3–§4; the exclusions are a denylist so a profile field added
-  later counts as plan-shaping until someone decides otherwise (§6). Thresholds are instead
+  but cannot shape a periodization — `name`, top-level `equipment`, the free-text
+  `preferences` (session-level by contract, §11), and each day's `equipment` within
+  `weekly_schedule` (that day's hours, `max_sessions` and `certainty_percent` stay in).
+  The partition and its rationale are `DESIGN_plan_staleness.md` §3–§4 and §11; the
+  exclusions are a denylist so a profile field added later counts as plan-shaping until
+  someone decides otherwise (§6). Thresholds are instead
   snapshotted raw on the macrocycle (via `CoachService.effective_thresholds()`) and only
   flag the plan stale past `coach.threshold_replan_pct` relative drift (default 5%) — see
   `CoachService.config_changed()`. Trainable thresholds now live in the `benchmark_results`
@@ -625,7 +626,10 @@ default the user layer overrides.
   (`metrics_lookback_days`) are not fingerprinted at all.
   The macrocycle also stores `profile_snapshot` — the plan-shaping fields as JSON — so the
   staleness reason can name what moved (`"athlete profile changed: sport_preferences"`)
-  rather than only that something did (`DESIGN_plan_staleness.md` §5).
+  rather than only that something did (`DESIGN_plan_staleness.md` §5), and
+  `science_snapshot` — the athlete's `science_dir` documents as `{filename: text}`
+  (`config.athlete_science_documents()`) — so an edited guideline flags the plan, names
+  the file and shows the edit (§11).
 - **`_plan_generate_strategy(...)`** — LLM call → `{strategy, mesocycles}` covering the
   plan start through the goal date, whatever the horizon. Label `plan_generate`.
   Branches on the goal's `date_type`: a `horizon` goal's task forbids pinning a
@@ -950,7 +954,9 @@ called by the UIs.
 - **`_get_config_hash()`** — delegates to `CoachEngine._get_config_hash()`.
   **`_get_config_snapshot()`** — `effective_thresholds()` as JSON, snapshotted on the
   macrocycle. **`_get_profile_snapshot()`** — `config.plan_profile()` as JSON, snapshotted
-  alongside it so staleness can name the field that moved.
+  alongside it so staleness can name the field that moved. **`_get_science_snapshot()`** —
+  `config.athlete_science_documents()` as JSON, the text itself rather than a hash, so the
+  diff and the coach's verdict can read the edit (`DESIGN_plan_staleness.md` §11).
 - **`config_changed(macro)`** — the single staleness judgment, reached from the CLI only
   through `cli/staleness.py` (which owns the wording, the four surfaces and the re-stamp)
   and directly by the `plan_generate` reuse
@@ -964,7 +970,10 @@ called by the UIs.
   replan (DESIGN_benchmark_workouts.md §3.3). Macrocycles without a snapshot (legacy)
   judge on the fingerprint alone. The profile half of the reason names the fields that
   moved when the macrocycle carries a `profile_snapshot`, and degrades to a bare
-  "athlete profile changed" when it does not (`DESIGN_plan_staleness.md` §5).
+  "athlete profile changed" when it does not (`DESIGN_plan_staleness.md` §5). The fifth
+  axis is the athlete's science documents: `"training guidelines changed: <file>, …"`
+  when the `science_snapshot` no longer matches `science_dir`, and silence for a plan
+  that carries no snapshot (§11).
 - **`plan_reshape_verdict(macro, change_reason)`** — the coach's read on whether the
   change `config_changed` reported would have reshaped `macro`: `{reshaping, why}`, or
   `None`. Reached from `cli/staleness.py` when the changed-input question is put to the
@@ -2672,8 +2681,9 @@ all three; only the delivery differs.
 - `trainmate/science/` — built-in: `benchmarks.md`, `periodization.md`,
   `recovery_metrics.md`, `training_load.md`, `zones.md`
 - `science/` (`science_dir`, gitignored) — user-provided; empty by default; any `.md`
-  files added here are injected into every LLM prompt. `science.samples/` holds
-  ready-made sets to copy from, one directory per training philosophy (see README).
+  files added here are injected into every LLM prompt, and snapshotted on the macrocycle
+  so an edit flags the plan stale (`DESIGN_plan_staleness.md` §11). `science.samples/`
+  holds ready-made sets to copy from, one directory per training philosophy (see README).
 - The two are layered — built-in owns measurement and vocabulary, user owns
   prescription, and the citation only runs one way. Contract in
   [§3](#_load_science_guidelinesapp_science_dir-science_dir--str).

@@ -1171,19 +1171,24 @@ class TestPeriodization(unittest.TestCase):
             trainmate.coach.config.data["coach"] = original_coach
 
     def test_non_plan_shaping_profile_fields_do_not_flag_the_plan_stale(self):
-        """`name` and `equipment` reach every prompt but cannot shape the periodization,
-        so editing one must not propose a replan (DESIGN_plan_staleness.md §3)."""
+        """`name`, `equipment` and `preferences` reach every prompt but cannot shape the
+        periodization, so editing one must not propose a replan (DESIGN_plan_staleness.md
+        §3, §11: structure lives in the science documents, which flag on their own)."""
         original_profile = dict(trainmate.coach.config.data["user_profile"])
         try:
             profile = trainmate.coach.config.data["user_profile"]
             profile["name"] = "Sam"
             profile["equipment"] = ["carbon road bike"]
+            profile["preferences"] = "Zwift on weekdays"
             baseline = coach_service._get_config_hash()
 
             profile["name"] = "Alex"
             self.assertEqual(baseline, coach_service._get_config_hash())
 
             profile["equipment"] = ["carbon road bike", "rowing machine"]
+            self.assertEqual(baseline, coach_service._get_config_hash())
+
+            profile["preferences"] = "Zwift on weekdays, gravel bike in winter"
             self.assertEqual(baseline, coach_service._get_config_hash())
         finally:
             trainmate.coach.config.data["user_profile"] = original_profile
@@ -1226,15 +1231,13 @@ class TestPeriodization(unittest.TestCase):
             profile.update({
                 "birth_year": 1986, "weekly_target_hours": 8.0,
                 "sport_preferences": ["cycling"], "chronic_injuries": "none",
-                "preferences": "keep strength year-round",
             })
             baseline = coach_service._get_config_hash()
 
             for key, value in (("birth_year", 1956),
                                ("weekly_target_hours", 20.0),
                                ("sport_preferences", ["cycling", "swimming"]),
-                               ("chronic_injuries", "left ACL reconstructed"),
-                               ("preferences", "endurance only")):
+                               ("chronic_injuries", "left ACL reconstructed")):
                 with self.subTest(field=key):
                     restore = profile[key]
                     profile[key] = value
@@ -1251,7 +1254,7 @@ class TestPeriodization(unittest.TestCase):
             profile = trainmate.coach.config.data["user_profile"]
             profile["sport_preferences"] = ["cycling"]
             profile["chronic_injuries"] = "none"
-            profile["preferences"] = "keep strength year-round"
+            profile["weekly_target_hours"] = 8.0
             macro = {
                 "config_hash": coach_service._get_config_hash(),
                 "config_snapshot": coach_service._get_config_snapshot(),
@@ -1266,16 +1269,16 @@ class TestPeriodization(unittest.TestCase):
             )
 
             # Several at once are all named, in a stable order.
-            profile["preferences"] = "endurance only"
+            profile["weekly_target_hours"] = 12.0
             self.assertEqual(
                 coach_service.config_changed(macro),
-                "athlete profile changed: preferences, sport_preferences",
+                "athlete profile changed: sport_preferences, weekly_target_hours",
             )
 
             # A field that disappears is named the same way as one that was edited —
             # the other two are put back so only the removal is left to report.
             profile["sport_preferences"] = ["cycling"]
-            profile["preferences"] = "keep strength year-round"
+            profile["weekly_target_hours"] = 8.0
             del profile["chronic_injuries"]
             self.assertEqual(
                 coach_service.config_changed(macro),

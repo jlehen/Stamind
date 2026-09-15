@@ -22,7 +22,8 @@ def reason(macro: dict) -> Optional[str]:
 
 
 def guidance() -> str:
-    """The §2 test said out loud, because `preferences` over-triggers by design (§4).
+    """The §2 test said out loud (§9), so the athlete can judge a flag without the design
+    doc open.
 
     It names the command that actually reaches the days already scheduled: a bare
     `workout generate` opens after them (DESIGN_plan_change_continuity.md §6.5)."""
@@ -53,6 +54,7 @@ def stamp(macro: dict) -> None:
         goals_snapshot=json.dumps(service.engine._clean_goals(objectives)),
         constraints_hash=service._get_constraints_hash(replan),
         constraints_snapshot=json.dumps(service.engine._clean_constraints(replan)),
+        science_snapshot=service._get_science_snapshot(),
     )
 
 
@@ -60,7 +62,7 @@ def kept_line() -> str:
     """What every "keep it" route says back, so the three cannot drift apart (§9)."""
     return (
         "Keeping the current periodization strategy. It is now recorded against your "
-        "current profile and thresholds, so this change won't be flagged again."
+        "current inputs, so this change won't be flagged again."
     )
 
 

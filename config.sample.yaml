@@ -52,14 +52,16 @@ user_profile:
     Left ACL reconstructed years ago; the knee dislikes hard pivoting, so no
     court or stop-and-go sports. Running is fine on trails, unpleasant on
     pavement beyond ~45 minutes.
+  # Session-level only: how sessions are written up, where they happen, what kit, how to
+  # talk to you. Anything countable — sessions per week, block order, taper depth — goes
+  # in a science/ file instead (see science.samples/*/athlete_weekly_structure.md). An
+  # edit here never proposes a replan; an edit to science/ does.
   preferences: |
     Prioritize long-term health span and longevity: structural strength, joint
     resilience, mixed-intensity cardiovascular capacity, proactive recovery.
     Endurance is the competitive outlet — I ride with a fast weekend group and
     want to hold my own — but strength is a year-round priority in its own
-    right, not just support for the current goal: keep 2 sessions/week through
-    every phase, including taper and off-season. Trim their volume when the
-    endurance block demands it, but never drop them entirely.
+    right, not just support for the current goal.
 
     I consistently over-do sessions that are prescribed easy — call this out.
 

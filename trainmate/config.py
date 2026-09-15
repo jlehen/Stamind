@@ -586,8 +586,10 @@ config = Config()
 PROFILE_THRESHOLD_FIELDS = ('max_hr', 'lthr', 'ftp')
 
 # Profile fields that reach every prompt but cannot shape the *periodization*, so editing
-# one must not flag the plan stale (DESIGN_plan_staleness.md §3).
-PROFILE_NON_PLAN_FIELDS = ('name', 'equipment')
+# one must not flag the plan stale (DESIGN_plan_staleness.md §3). `preferences` is
+# session-level by contract: structure lives in the athlete's science documents, which
+# are fingerprinted on their own (§11).
+PROFILE_NON_PLAN_FIELDS = ('name', 'equipment', 'preferences')
 
 # Per-day `weekly_schedule` sub-keys that shape individual sessions but not the block
 # structure — swapping a day's kit changes what that day is, not the periodization
@@ -634,6 +636,42 @@ def changed_plan_profile_fields(old_profile: Dict[str, Any]) -> List[str]:
     return sorted(
         k for k in set(old_profile) | set(current)
         if old_profile.get(k) != current.get(k)
+    )
+
+
+def science_documents(s_dir: str) -> Dict[str, str]:
+    """Every `*.md` under `s_dir` as {filename: text}, in name order; {} when the
+    directory is missing or holds none. One reader for the prompt and the fingerprint, so
+    the coach and the staleness check agree on what the athlete's guidelines are."""
+    if not os.path.isdir(s_dir):
+        return {}
+    docs: Dict[str, str] = {}
+    for filename in sorted(os.listdir(s_dir)):
+        if not filename.endswith(".md"):
+            continue
+        filepath = os.path.join(s_dir, filename)
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                docs[filename] = f.read()
+        except Exception as e:
+            print(f"Error reading science guideline {filename}: {e}")
+    return docs
+
+
+def athlete_science_documents() -> Dict[str, str]:
+    """The athlete's own guidelines (`science_dir`), the prescriptive input the plan is
+    generated from and the fifth staleness axis (DESIGN_plan_staleness.md §11)."""
+    return science_documents(config.science_dir)
+
+
+def changed_science_documents(old_docs: Dict[str, str]) -> List[str]:
+    """The athlete's science files that differ between `old_docs` (a snapshot taken at
+    plan generation) and the directory now — added, removed or edited, like
+    `changed_plan_profile_fields` (§11)."""
+    current = athlete_science_documents()
+    return sorted(
+        name for name in set(old_docs) | set(current)
+        if old_docs.get(name) != current.get(name)
     )
 
 

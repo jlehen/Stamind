@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 from trainmate.types import Workout, CompletedActivity
@@ -7,6 +6,7 @@ from trainmate.util import PMC_TSB_LAG_NOTE
 from trainmate.sports import canonical_sport
 from trainmate.adherence import Performed
 from trainmate import intensity
+from trainmate.config import science_documents
 
 
 def _first_form(workout: Workout) -> str:
@@ -363,18 +363,10 @@ def _science_block(s_dir: str, title: str, provenance: str) -> str:
     inside it is verbatim source, so its own `#` headings are the document's and not the
     prompt's — which is why the frame never uses one.
     """
-    if not os.path.exists(s_dir):
-        return ""
-    docs = []
-    for filename in sorted(os.listdir(s_dir)):
-        if not filename.endswith(".md"):
-            continue
-        filepath = os.path.join(s_dir, filename)
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                docs.append(f"--- {filename} ---\n" + f.read())
-        except Exception as e:
-            print(f"Error reading science guideline {filename}: {e}")
+    docs = [
+        f"--- {filename} ---\n{text}"
+        for filename, text in science_documents(s_dir).items()
+    ]
     if not docs:
         return ""
     return "\n".join([

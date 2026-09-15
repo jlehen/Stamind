@@ -426,6 +426,7 @@ class PlanningMixin:
             all_constraints_snapshot=json.dumps(
                 self.engine._clean_constraints_all(constraints)
             ),
+            science_snapshot=self._get_science_snapshot(),
         )
 
         # Try to retrieve existing macrocycle
@@ -611,6 +612,7 @@ class PlanningMixin:
                 constraints_hash=self.engine._get_constraints_hash(replan_constraints),
                 config_hash=self.engine._get_config_hash(),
                 config_snapshot=self._get_config_snapshot(),
+                profile_snapshot=self._get_profile_snapshot(),
                 goals_snapshot=json.dumps(self.engine._clean_goals(objectives)),
                 constraints_snapshot=json.dumps(
                     self.engine._clean_constraints(replan_constraints)
@@ -618,6 +620,7 @@ class PlanningMixin:
                 all_constraints_snapshot=json.dumps(
                     self.engine._clean_constraints_all(constraints)
                 ),
+                science_snapshot=self._get_science_snapshot(),
             )
 
         self._db.save_macrocycle(
@@ -631,6 +634,7 @@ class PlanningMixin:
             goals_snapshot=fingerprints.goals_snapshot,
             constraints_snapshot=fingerprints.constraints_snapshot,
             all_constraints_snapshot=fingerprints.all_constraints_snapshot,
+            science_snapshot=fingerprints.science_snapshot,
             mesocycles=mesocycles
         )
         return objective_id

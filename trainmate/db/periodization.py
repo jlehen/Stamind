@@ -481,11 +481,11 @@ class PeriodizationMixin:
         constraints_hash: str, mesocycles: List[Dict[str, Any]],
         config_hash: str = "", config_snapshot: str = "", goals_snapshot: str = "",
         constraints_snapshot: str = "", all_constraints_snapshot: str = "",
-        profile_snapshot: str = ""
+        profile_snapshot: str = "", science_snapshot: str = ""
     ) -> int:
         """Saves a macrocycle and its nested mesocycles for the objective.
 
-        The four `*_snapshot` arguments are JSON of the inputs the plan was generated from,
+        The `*_snapshot` arguments are JSON of the inputs the plan was generated from,
         preserved so they can be shown and judged for drift after the live records change;
         `db/base.py` documents each at its column.
 
@@ -511,12 +511,14 @@ class PeriodizationMixin:
                 INSERT INTO macrocycles (
                     objective_id, strategy, goals_hash, constraints_hash, config_hash,
                     config_snapshot, profile_snapshot, goals_snapshot,
-                    constraints_snapshot, all_constraints_snapshot, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    constraints_snapshot, all_constraints_snapshot, science_snapshot,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (objective_id, strategy, goals_hash, constraints_hash, config_hash,
                   config_snapshot or None, profile_snapshot or None,
                   goals_snapshot or None, constraints_snapshot or None,
-                  all_constraints_snapshot or None, created_at))
+                  all_constraints_snapshot or None, science_snapshot or None,
+                  created_at))
             macrocycle_id = cursor.lastrowid
 
             for meso in mesocycles:
@@ -537,10 +539,11 @@ class PeriodizationMixin:
         goals_snapshot: Optional[str] = None,
         constraints_hash: Optional[str] = None,
         constraints_snapshot: Optional[str] = None,
+        science_snapshot: Optional[str] = None,
     ) -> None:
         """Updates the config hash (and, when provided, the threshold and profile
-        snapshots, the goals and the plan-shaping constraints) for a specific macrocycle —
-        the "keep current plan, accept new inputs" path.
+        snapshots, the goals, the plan-shaping constraints and the science documents) for
+        a specific macrocycle — the "keep current plan, accept new inputs" path.
 
         The stamp has to clear everything the staleness check flags, or a kept plan flags
         again tomorrow (DESIGN_plan_change_continuity.md §6.5). A value left as None is
@@ -552,7 +555,8 @@ class PeriodizationMixin:
                               ('goals_hash', goals_hash),
                               ('goals_snapshot', goals_snapshot),
                               ('constraints_hash', constraints_hash),
-                              ('constraints_snapshot', constraints_snapshot)):
+                              ('constraints_snapshot', constraints_snapshot),
+                              ('science_snapshot', science_snapshot)):
             if value is not None:
                 sets.append(f"{column} = ?")
                 params.append(value)

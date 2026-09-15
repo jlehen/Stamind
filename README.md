@@ -428,7 +428,10 @@ The blocks you must fill:
   count, how certain you are to train that day, and what equipment is at hand.
   The plan is built around this block, so fill it honestly rather than
   optimistically. Omit `weekly_schedule` and the coach places sessions on any
-  day, sized by `weekly_target_hours`.
+  day, sized by `weekly_target_hours`. The free-text `preferences` are
+  session-level: how a session is written up, where it happens, what kit, how
+  you like to be spoken to. Anything countable, such as how many strength
+  sessions a week, belongs in `science/` (next section).
 
 Trainable thresholds do not go in the config. FTP, LTHR and threshold pace live
 in the dated benchmark logbook, recorded with `./tm benchmark record`, and that
@@ -522,6 +525,16 @@ mode bot for someone else: two configs, two bots, no routing code.
 `user_profile:` says who you are. The `science/` directory says how you want to
 be coached, and it is the deepest lever you have on the plans the coach writes.
 
+The line between the two is whether the sentence changes a number in the
+periodization. "I want two strength sessions a week, every phase" changes
+the block structure, so it is a guideline and lives in `science/`. "Zwift on
+weekdays, outdoors at the weekend" changes what a session looks like, not how
+many there are, so it is a preference and lives in `user_profile:`. The app
+holds you to the split: editing a file in `science/` flags the current plan as
+built on old inputs and offers to run `plan generate`, naming the file and
+showing the edit; editing `preferences` never does, and the next
+`workout generate` simply picks it up.
+
 The quickest start is `science.samples/`: two ready-made sets, one for an
 endurance athlete who also lifts and one for a woman in menopause training for
 health, described at the end of this section. Copy the files you like into
@@ -571,6 +584,9 @@ lifts, and wants a plan built on one named methodology:
 - `plan_customization.md` is **reference only**: adjusting a plan around real
   life, from TrainingPeaks'
   [Easy Ways to Customize Your Readymade Endurance Training Plan](https://www.trainingpeaks.com/blog/customize-your-training-plan/).
+- `athlete_weekly_structure.md` is the athlete's own **prescriptive** override:
+  two strength sessions a week in every phase, where the methodology says one.
+  It is the shape to copy for any countable rule of your own.
 
 `menopause_woman_health/` is for a woman in menopause training for health
 rather than a race. Its one file,

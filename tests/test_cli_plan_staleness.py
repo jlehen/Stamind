@@ -55,7 +55,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         )
         if stale:
             snapshot = dict(plan_profile())
-            snapshot["preferences"] = "a sentence that has since been reworded"
+            snapshot["chronic_injuries"] = "a sentence that has since been reworded"
             config_hash = "not-the-current-hash"
         else:
             snapshot = plan_profile()
@@ -94,7 +94,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("An input has changed since this plan was generated", flowed)
         # Names the field, so the athlete knows which input to go and look at (§5).
-        self.assertIn("preferences", stdout)
+        self.assertIn("chronic_injuries", stdout)
         # The test being applied, not just the fact that something moved (§9).
         self.assertIn("block structure, phase order or volume ramp", flowed)
         # The command that actually reaches the days already scheduled (§6.5).
@@ -139,7 +139,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         exit_code, stdout, _ = run_cli(["plan", "keep"])
         self.assertEqual(exit_code, 0)
         self.assertIn("Changed since this plan was generated", stdout)
-        self.assertIn("preferences", stdout)
+        self.assertIn("chronic_injuries", stdout)
         self.assertIn("won't be flagged again", stdout)
         # Keeping the plan is not losing the edit: it still reaches the sessions.
         self.assertIn("workout generate", stdout)
@@ -157,8 +157,8 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
 
     @patch("trainmate.runtime.garmin")
     def test_plan_show_prints_the_edit_itself(self, _mock_garmin):
-        """Naming the field is not enough to judge a blob like `preferences`: the old
-        and new text are shown, old struck, new added (§10)."""
+        """Naming the field is not enough to judge a prose field like `chronic_injuries`:
+        the old and new text are shown, old struck, new added (§10)."""
         self._seed(stale=True)
 
         with patch("trainmate.coach.engine.openrouter_client") as client:
@@ -166,8 +166,8 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             exit_code, stdout, _ = run_cli(["plan", "show"])
 
         self.assertEqual(exit_code, 0)
-        self.assertIn("preferences (when the plan was generated)", stdout)
-        self.assertIn("preferences (now)", stdout)
+        self.assertIn("chronic_injuries (when the plan was generated)", stdout)
+        self.assertIn("chronic_injuries (now)", stdout)
         self.assertIn("-a sentence that has since been reworded", stdout)
 
     @patch("trainmate.runtime.garmin")
@@ -207,7 +207,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         _code, stdout, _ = run_cli(["plan", "keep"])
 
         self.assertIn("-a sentence that has since been reworded", stdout)
-        self.assertIn("preferences (now)", stdout)
+        self.assertIn("chronic_injuries (now)", stdout)
 
     def _macro(self):
         from trainmate import runtime
@@ -231,7 +231,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             else:
                 client.complete.return_value = verdict
             prompt.confirm.return_value = False
-            staleness.confirm_regenerate("athlete profile changed: preferences", macro)
+            staleness.confirm_regenerate("athlete profile changed: chronic_injuries", macro)
         _args, kwargs = prompt.confirm.call_args
         return kwargs.get("default"), out.getvalue(), client.complete
 
@@ -329,8 +329,97 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         )
         macro = self._macro()
         reason = coach_service.config_changed(macro)
-        self.assertIn("athlete profile changed: preferences", reason)
+        self.assertIn("athlete profile changed: chronic_injuries", reason)
         self.assertIn("ftp changed", reason)
+
+    # --- §11: the athlete's science documents ---
+
+    def _with_science_dir(self, docs: dict):
+        """A temporary science directory holding `docs` ({filename: text}), and the
+        config pointed at it for the duration of the returned context."""
+        import contextlib
+        import tempfile
+        from trainmate.config import config
+
+        @contextlib.contextmanager
+        def ctx():
+            with tempfile.TemporaryDirectory() as d:
+                for name, text in docs.items():
+                    with open(os.path.join(d, name), "w", encoding="utf-8") as f:
+                        f.write(text)
+                original = config.data.get("science_dir")
+                config.data["science_dir"] = d
+                try:
+                    yield d
+                finally:
+                    if original is None:
+                        config.data.pop("science_dir", None)
+                    else:
+                        config.data["science_dir"] = original
+        return ctx()
+
+    def test_an_edited_science_file_flags_the_plan_and_names_the_file(self):
+        """The athlete's science documents set the structure, so an edit to one is the
+        most plan-shaping input there is; the reason names the file and the diff shows
+        the line (DESIGN_plan_staleness.md §11)."""
+        from trainmate.coach import coach_service
+
+        template = "# Template\n\n- 1/week Resistance Training\n- 0-2/week HIIT\n"
+        with self._with_science_dir({"template.md": template, "notes.md": "# Notes\n"}) as d:
+            self._seed(stale=False)
+            macro = self._macro()
+            test_db.update_macrocycle_config_hash(
+                macro["id"], macro["config_hash"],
+                science_snapshot=coach_service._get_science_snapshot(),
+            )
+            macro = self._macro()
+            self.assertIsNone(coach_service.config_changed(macro))
+
+            with open(os.path.join(d, "template.md"), "w", encoding="utf-8") as f:
+                f.write(template.replace("1/week Resistance", "2/week Resistance"))
+            self.assertEqual(
+                coach_service.config_changed(macro),
+                "training guidelines changed: template.md",
+            )
+            diff = coach_service.staleness_diff(macro)
+            self.assertIn("template.md (when the plan was generated)", diff)
+            self.assertIn("-- 1/week Resistance Training", diff)
+            self.assertIn("+- 2/week Resistance Training", diff)
+            self.assertNotIn("notes.md", diff)
+
+            # Added and removed files are named the same way as edited ones.
+            os.remove(os.path.join(d, "notes.md"))
+            with open(os.path.join(d, "weekly.md"), "w", encoding="utf-8") as f:
+                f.write("# Weekly\n")
+            self.assertEqual(
+                coach_service.config_changed(macro),
+                "training guidelines changed: notes.md, template.md, weekly.md",
+            )
+
+    def test_a_plan_without_a_science_snapshot_is_not_held_to_one(self):
+        """A plan generated before the column existed cannot say what it was built
+        against, so it is not flagged on this axis until its next stamp (§11)."""
+        from trainmate.coach import coach_service
+
+        with self._with_science_dir({"template.md": "# Template\n"}):
+            self._seed(stale=False)
+            macro = self._macro()
+            self.assertIsNone(macro.get("science_snapshot"))
+            self.assertIsNone(coach_service.config_changed(macro))
+
+    @patch("trainmate.runtime.garmin")
+    def test_plan_keep_stamps_the_science_documents_too(self, _mock_garmin):
+        """The stamp has to clear every axis, or a kept plan flags again tomorrow."""
+        from trainmate.coach import coach_service
+
+        with self._with_science_dir({"template.md": "# Template\n"}) as d:
+            self._seed(stale=True)
+            with open(os.path.join(d, "template.md"), "a", encoding="utf-8") as f:
+                f.write("- 2/week Resistance Training\n")
+            exit_code, stdout, _ = run_cli(["plan", "keep"])
+            self.assertEqual(exit_code, 0)
+            self.assertIn("chronic_injuries", stdout)
+            self.assertIsNone(coach_service.config_changed(self._macro()))
 
     def test_two_threshold_moves_are_reported_together(self):
         from trainmate.coach import coach_service

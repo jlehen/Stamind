@@ -229,3 +229,50 @@ verdict steps aside under it rather than printing its prompt and exiting first.
 **Deliberately not done.** No caching of the verdict on the macrocycle: both questions
 stamp on "keep", so the same change is asked about once. The web banner still names
 fields only. The bot has no path to this question (§9's companion exemption stands).
+
+## 11. The preferences are session-level, the science files are the structure
+
+**Date:** 2026-09-15 · **Branch:** worktree-science-staleness
+
+§4 accepted that `preferences` over-triggers because the blob mixes a periodization
+directive ("keep 2 sessions/week through every phase") with tone and session flavour.
+The directive was the problem, not the blob: it was a second prescription living beside
+the athlete's science documents, whose banner already tells the coach they "govern what
+is prescribed: volumes, durations, session counts, block order, taper depth". Nothing said
+which of the two won, and the coach resolved it by judgement on every call. Meanwhile an
+edit to the science files — the prescriptive input — flagged nothing, because
+`science_dir` was not fingerprinted at all.
+
+**The split.** A sentence is a *guideline* if the periodization or the weekly session
+count would come out different without it; it lives in `science/`. It is a *preference* if
+it changes how a session is written up, where it happens, with what kit, or how the
+athlete likes to be spoken to; it lives in `user_profile.preferences`. The §2 test, applied
+one level up.
+
+**What follows from it.**
+
+- `preferences` joins `name` and `equipment` in `PROFILE_NON_PLAN_FIELDS`: an edit there
+  never flags the plan. §6's argument that the noisy failure direction is the safe one
+  still holds, but the noise now comes from where structure actually lives.
+- The athlete's science documents become the fifth axis of `config_changed`. The
+  macrocycle carries `science_snapshot`, the documents as `{filename: text}` JSON, written
+  at `plan generate` and by every keep-stamp. The reason reads
+  `training guidelines changed: sustainable_training.md`, names added and removed files
+  the same way, and the diff and the coach's verdict get the edit like any profile field.
+  The text is stored rather than a hash because the verdict needs the old lines, and the
+  prompt already carries these files on every call. The app's own `trainmate/science/` is
+  not fingerprinted: it changes with the code and yields to the athlete's files.
+- A plan without a snapshot is not held to one — the rule the goals hash already follows
+  — so nothing flags on upgrade; the first stamp or `plan generate` records it.
+- The profile block tells the coach, in one sentence beside the preferences, what they are
+  for and where structure comes from. No conflict-resolution rule: after the move there
+  is no conflict in a config that follows the split, and a rule for the residue would be
+  the kind of mechanism that exists for a case no athlete hits in a real week.
+- The shipped `config.sample.yaml` moved its "keep 2 sessions/week" sentence into
+  `science.samples/cycling_and_strength/athlete_weekly_structure.md`, a prescriptive
+  override file that shows the shape; the templates say on the `preferences` key what
+  belongs there.
+
+**Deliberately not done.** The web banner still reads `plan_config_hash()` alone and
+does not see the science axis (§8). No size cap on the snapshot: a science directory
+that is too big to snapshot is already too big to send with every prompt.

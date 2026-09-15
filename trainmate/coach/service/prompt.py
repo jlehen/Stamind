@@ -3,7 +3,10 @@ import json
 from datetime import datetime
 from typing import Any, List, Optional, Tuple, Dict
 from trainmate import learning_doubts, runtime
-from trainmate.config import config, changed_plan_profile_fields, plan_profile
+from trainmate.config import (
+    athlete_science_documents, changed_plan_profile_fields, changed_science_documents,
+    config, plan_profile,
+)
 from trainmate.types import Objective, Constraint
 from trainmate.util import cmd, notice
 from trainmate.coach.formatting import _load_science_guidelines
@@ -12,6 +15,7 @@ import trainmate.coach.service as _svc
 
 
 _PROFILE_CHANGED = "athlete profile changed"
+_SCIENCE_CHANGED = "training guidelines changed"
 
 
 def _profile_change_reason(snapshot_raw: Optional[str]) -> str:
@@ -38,6 +42,20 @@ def _snapshot_profile(snapshot_raw: Optional[str]) -> Optional[Dict[str, Any]]:
     except (ValueError, TypeError):
         return None
     return old_profile if isinstance(old_profile, dict) else None
+
+
+def _snapshot_science(snapshot_raw: Optional[str]) -> Optional[Dict[str, str]]:
+    """The athlete's science documents as the plan saw them, {filename: text}, or None
+    when the plan carries none it can be held to (DESIGN_plan_staleness.md §11)."""
+    if not snapshot_raw:
+        return None
+    try:
+        docs = json.loads(snapshot_raw)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(docs, dict):
+        return None
+    return docs if all(isinstance(v, str) for v in docs.values()) else None
 
 
 def _profile_field_lines(value: Any) -> List[str]:
@@ -94,6 +112,22 @@ def profile_diff_text(old_profile: Dict[str, Any]) -> str:
     return "\n\n".join(chunks)
 
 
+def science_diff_text(old_docs: Dict[str, str]) -> str:
+    """A unified diff per athlete science file that differs between `old_docs` and the
+    directory now (§11). Empty when nothing differs."""
+    current = athlete_science_documents()
+    chunks = []
+    for name in changed_science_documents(old_docs):
+        lines = difflib.unified_diff(
+            _profile_field_lines(old_docs.get(name)),
+            _profile_field_lines(current.get(name)),
+            fromfile=f"{name} (when the plan was generated)",
+            tofile=f"{name} (now)", lineterm="", n=1,
+        )
+        chunks.append("\n".join(lines))
+    return "\n\n".join(chunks)
+
+
 class PromptConfigMixin:
     """Part of :class:`CoachService` — see coach/service/__init__.py."""
 
@@ -137,6 +171,24 @@ class PromptConfigMixin:
         config_changed() can name which field moved (DESIGN_plan_staleness.md §5)."""
         return json.dumps(plan_profile(), sort_keys=True)
 
+    def _get_science_snapshot(self) -> str:
+        """JSON of the athlete's science documents, {filename: text}, persisted on the
+        macrocycle so config_changed() can name the file that moved and show the edit
+        (DESIGN_plan_staleness.md §11). The text itself, not a hash: the coach's verdict
+        reads the diff, and the prompt already carries these files on every call."""
+        return json.dumps(athlete_science_documents(), sort_keys=True)
+
+    def _science_reasons(self, macro: Dict[str, Any]) -> List[str]:
+        """Whether the athlete's science documents have moved since `macro` was
+        generated (§11). A plan carrying no snapshot cannot be held to one."""
+        old_docs = _snapshot_science(macro.get('science_snapshot'))
+        if old_docs is None:
+            return []
+        changed = changed_science_documents(old_docs)
+        if not changed:
+            return []
+        return [f"{_SCIENCE_CHANGED}: {', '.join(changed)}"]
+
     def _threshold_reasons(self, macro: Dict[str, Any]) -> List[str]:
         """Every threshold anchor that has drifted past `coach.threshold_replan_pct`
         since `macro` was generated — a small FTP/LTHR retest correction feeds the next
@@ -176,9 +228,10 @@ class PromptConfigMixin:
     def config_changed(self, macro: Dict[str, Any]) -> Optional[str]:
         """Whether a plan-shaping input has drifted since `macro` was generated.
 
-        Returns a human-readable reason, or None when the plan is still current. Four
+        Returns a human-readable reason, or None when the plan is still current. Five
         axes: the fingerprint over plan-shaping profile fields (see engine._clean_profile),
-        the effective threshold anchors, the goals, and the `replan = 1` constraints. A
+        the effective threshold anchors, the goals, the `replan = 1` constraints, and the
+        athlete's science documents (DESIGN_plan_staleness.md §11). A
         moved race date is the largest reshaper there is, and both it and the constraints
         were fingerprinted for `plan generate`'s strategy-reuse check alone
         (DESIGN_plan_change_continuity.md §6.5).
@@ -192,6 +245,7 @@ class PromptConfigMixin:
             reasons.append(_profile_change_reason(macro.get('profile_snapshot')))
         reasons.extend(self._threshold_reasons(macro))
         reasons.extend(self._plan_input_reasons(macro))
+        reasons.extend(self._science_reasons(macro))
         return "; ".join(reasons) if reasons else None
 
     def _plan_input_reasons(self, macro: Dict[str, Any]) -> List[str]:
@@ -230,8 +284,9 @@ class PromptConfigMixin:
 
     def staleness_diff(self, macro: Dict[str, Any]) -> str:
         """Every edit the staleness reason names, as diffs the athlete can judge: the
-        profile fields, the goals, and the plan-shaping constraints
-        (DESIGN_plan_change_continuity.md §6.5).
+        profile fields, the goals, the plan-shaping constraints
+        (DESIGN_plan_change_continuity.md §6.5) and the athlete's science documents
+        (DESIGN_plan_staleness.md §11).
 
         A snapshot the plan does not carry contributes nothing — it cannot be attributed
         honestly — and the threshold reasons already carry their own numbers."""
@@ -254,6 +309,10 @@ class PromptConfigMixin:
                 old_constraints, self.engine._clean_constraints(replan),
                 "plan-shaping constraints",
             ))
+
+        old_docs = _snapshot_science(macro.get('science_snapshot'))
+        if old_docs is not None:
+            chunks.append(science_diff_text(old_docs))
         return "\n\n".join(chunk for chunk in chunks if chunk)
 
     def _get_goals_hash(self, objectives: List[Objective]) -> str:

@@ -181,6 +181,8 @@ class Macrocycle(TypedDict):
     goals_snapshot: Optional[str]
     constraints_snapshot: Optional[str]
     all_constraints_snapshot: Optional[str]
+    # The athlete's science files as {name: text} (DESIGN_plan_staleness.md §11)
+    science_snapshot: Optional[str]
     created_at: str
     reshape_verdict: Optional[str]  # the coach's cached read on the pending edit (DESIGN_plan_change_continuity.md §7)
     reshape_verdict_key: Optional[str]  # the snapshot that verdict was asked about
