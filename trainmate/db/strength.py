@@ -1,4 +1,4 @@
-"""The sets of strength sessions, read from Garmin (DESIGN_strength_tracking.md §5).
+"""The sets of strength activities, read from Garmin (DESIGN_strength_tracking.md §5).
 
 Every instant is stored as the athlete queue stores its own (`db/queue.py::queue_stamp`),
 UTC to the microsecond, because the freeze time is part of a queued subject (§7).
@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from trainmate.db.queue import queue_stamp
 
-# The raw Garmin type a strength session is recorded under (§3). The sport table folds
+# The raw Garmin type a strength activity is recorded under (§3). The sport table folds
 # `fitness` and `indoor_cardio` into strength too; the sets are read for this type only.
 STRENGTH_TYPE = "strength_training"
 
@@ -111,8 +111,8 @@ class StrengthMixin:
             )
             conn.commit()
 
-    def session_exercises_by_day(self) -> List[Dict[str, Any]]:
-        """Every active set of every session that was not discarded, newest day first:
+    def activity_exercises_by_day(self) -> List[Dict[str, Any]]:
+        """Every active set of every activity that was not discarded, newest day first:
         `{date, exercise}` rows, what the recent-exercises answers count (§7)."""
         with self._get_connection() as conn:
             rows = conn.execute(

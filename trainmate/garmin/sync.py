@@ -165,7 +165,7 @@ def pull(
             else f"{count} activit{'y' if count == 1 else 'ies'}"
         )
         # The sets of strength sessions are a step of their own (DESIGN_strength_tracking.md §6).
-        strength_sets.report(strength_sets.read_new_sessions(client))
+        strength_sets.report(strength_sets.read_new_activities(client))
     if metrics:
         days = _ingest_metrics(client, start_date, end_date, throttle)
         landed.append(f"{days} day{'' if days == 1 else 's'} of metrics")

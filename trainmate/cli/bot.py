@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from trainmate import clock, settings
-from trainmate.strength.sets import read_new_sessions
+from trainmate.strength.sets import read_new_activities
 from trainmate.cli.candidates import confirm_new_constraints, confirm_new_signals
 from trainmate.cli.common import adherence_verdicts, ensure_recent_data
 # The companion surfaces are companion-only by definition, so they call the line
@@ -294,7 +294,7 @@ def _refresh_garmin(date_str: str) -> None:
     from trainmate import runtime
     try:
         runtime.garmin.ensure_data(date_str, date_str)
-        read_new_sessions()
+        read_new_activities()
     except Exception as e:
         step(f"Could not refresh Garmin data, briefing what is stored: {e}")
 

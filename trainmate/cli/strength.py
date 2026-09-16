@@ -1,8 +1,8 @@
-"""`strength`: the surgery on a strength session's sets (DESIGN_strength_tracking.md §7).
+"""`strength`: the surgery on a strength activity's sets (DESIGN_strength_tracking.md §7).
 
-`strength name` names a day's blocks on the spot, `strength reset` reads a day's sets again
-from Garmin, and `strength discard` keeps a day's session out of weight planning. On a day
-with two strength sessions, reset and discard ask which one.
+`strength name` names a day's groups on the spot, `strength reset` reads a day's sets again
+from Garmin, and `strength discard` keeps a day's activity out of the strength history. On a
+day with two strength activities, reset and discard ask which one.
 """
 import argparse
 from typing import Any, Dict, List, Optional
@@ -23,18 +23,18 @@ NONE = "none"
 
 
 def _title(activity: Dict[str, Any]) -> str:
-    return questions.session_words(sets.session(activity))
+    return questions.activity_words(sets.activity_ref(activity))
 
 
 def _which(day: str, activities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """The day's one strength session, or the ones picked when it has more: a second workout
-    or a warm-up is not reset or discarded along with the session (§7)."""
+    """The day's one strength activity, or the ones picked when it has more: a second one
+    or a warm-up is not reset or discarded along with the activity (§7)."""
     if len(activities) < 2:
         return activities
     choices = [Choice(activity["activity_id"], _title(activity)) for activity in activities]
     choices += [Choice(ALL, "all of them"), Choice(NONE, "none")]
     picked = runtime.prompt.choose(
-        f"{fmt_date(day)} has {len(activities)} strength sessions. Which one?", choices,
+        f"{fmt_date(day)} has {len(activities)} strength activities. Which one?", choices,
         default=NONE,
     )
     if picked == ALL:
@@ -42,26 +42,26 @@ def _which(day: str, activities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [activity for activity in activities if activity["activity_id"] == picked]
 
 
-def _block_at(rows: List[Dict[str, Any]], position: int) -> Optional[sets.Block]:
-    """The block holding the active set at `position`, from that set on."""
-    for block in sets.blocks(rows):
-        if block.last < position:
+def _group_at(rows: List[Dict[str, Any]], position: int) -> Optional[sets.Group]:
+    """The group holding the active set at `position`, from that set on."""
+    for group in sets.groups(rows):
+        if group.last < position:
             continue
-        start = max(position, block.first)
-        return sets.Block(block.exercise, block.sets[start - block.first:], start)
+        start = max(position, group.first)
+        return sets.Group(group.exercise, group.sets[start - group.first:], start)
     return None
 
 
-def _block_prompt(block: sets.Block) -> str:
-    span = sets.set_span(block.first, block.last)
-    if block.exercise is None:
-        return f"{span}: {sets.reps_and_load(block.reps, block.load_kg)}, unnamed. What was it?"
-    return f"{span}: {sets.named_line(block)}. What was it?"
+def _group_prompt(group: sets.Group) -> str:
+    span = sets.set_span(group.first, group.last)
+    if group.exercise is None:
+        return f"{span}: {sets.reps_and_load(group.reps, group.load_kg)}, unnamed. What was it?"
+    return f"{span}: {sets.named_line(group)}. What was it?"
 
 
-def _how_many(block: sets.Block, exercise: str) -> int:
-    """"All 6 sets, or how many?": a block that was two exercises is split here (§7)."""
-    count = len(block.sets)
+def _how_many(group: sets.Group, exercise: str) -> int:
+    """"All 6 sets, or how many?": a group that was two exercises is split here (§7)."""
+    count = len(group.sets)
     if count == 1:
         return 1
     choices = [Choice(ALL, f"all {count} sets")]
@@ -71,41 +71,41 @@ def _how_many(block: sets.Block, exercise: str) -> int:
     return count if picked == ALL else int(picked)
 
 
-def _ask_block(activity_id: str, block: sets.Block, recent: List[str]) -> int:
-    """Asks what one block was and applies the answer; returns the next position to ask."""
+def _ask_group(activity_id: str, group: sets.Group, recent: List[str]) -> int:
+    """Asks what one group was and applies the answer; returns the next position to ask."""
     choices = [Choice(f"a{n}", name) for n, name in enumerate(recent, 1)]
     choices.append(Choice(OTHER, "something else…"))
-    clear = "leave it unnamed" + (", clearing its name" if block.exercise else "")
+    clear = "leave it unnamed" + (", clearing its name" if group.exercise else "")
     choices.append(Choice(CLEAR, clear))
     choices.append(Choice(KEEP, "keep it as it is"))
-    picked = runtime.prompt.choose(wrap_text(_block_prompt(block)), choices, default=KEEP)
+    picked = runtime.prompt.choose(wrap_text(_group_prompt(group)), choices, default=KEEP)
     if picked == KEEP:
-        return block.last + 1
+        return group.last + 1
     if picked == CLEAR:
-        runtime.db.name_exercise_sets(activity_id, block.seqs, None)
-        print(f"{_capitalize(sets.set_span(block.first, block.last))} left unnamed.")
-        return block.last + 1
+        runtime.db.name_exercise_sets(activity_id, group.seqs, None)
+        print(f"{_capitalize(sets.set_span(group.first, group.last))} left unnamed.")
+        return group.last + 1
     if picked == OTHER:
         text = runtime.prompt.ask_text(sets.SOMETHING_ELSE["ask"]).strip()
         try:
             exercise = questions.choose_proposed(text)
         except NotApplied as not_applied:
             print(wrap_text(str(not_applied)))
-            return block.first
+            return group.first
     else:
         exercise = recent[int(picked[1:]) - 1]
-    count = _how_many(block, exercise)
-    runtime.db.name_exercise_sets(activity_id, block.seqs[:count], exercise)
-    print(f"Named {sets.set_span(block.first, block.first + count - 1)}: {exercise}.")
-    return block.first + count
+    count = _how_many(group, exercise)
+    runtime.db.name_exercise_sets(activity_id, group.seqs[:count], exercise)
+    print(f"Named {sets.set_span(group.first, group.first + count - 1)}: {exercise}.")
+    return group.first + count
 
 
 def _capitalize(text: str) -> str:
     return text[:1].upper() + text[1:]
 
 
-def _name_session(activity: Dict[str, Any], recent: List[str]) -> None:
-    """Goes through a session's blocks, named or not, in order. Naming by hand declares the
+def _name_activity(activity: Dict[str, Any], recent: List[str]) -> None:
+    """Goes through an activity's groups, named or not, in order. Naming by hand declares the
     sets final, so a waiting "are the sets final?" question is settled first (§7)."""
     activity_id = activity["activity_id"]
     if not activity["sets_final_at"]:
@@ -114,14 +114,14 @@ def _name_session(activity: Dict[str, Any], recent: List[str]) -> None:
     print(bold(_title(activity)))
     position = 1
     while True:
-        block = _block_at(runtime.db.get_exercise_sets(activity_id), position)
-        if block is None:
+        group = _group_at(runtime.db.get_exercise_sets(activity_id), position)
+        if group is None:
             return
-        position = _ask_block(activity_id, block, recent)
+        position = _ask_group(activity_id, group, recent)
 
 
 def run_strength_name(args: argparse.Namespace) -> None:
-    """Names the blocks of a day's strength session on the spot (§7)."""
+    """Names the groups of a day's strength activities on the spot (§7)."""
     day = args.date
     activities = runtime.db.strength_activities(day, date=day)
     with_sets = [
@@ -133,13 +133,13 @@ def run_strength_name(args: argparse.Namespace) -> None:
         unread = [activity for activity in activities if not activity["sets_read_at"]]
         if unread:
             notice(f"The sets of {fmt_date(day)} are not read yet: they are read the morning "
-                   "after the session, or now with " + cmd(f"strength reset {day}") + ".")
+                   "after training, or now with " + cmd(f"strength reset {day}") + ".")
             return
-        notice(f"No strength session with sets on {fmt_date(day)}.")
+        notice(f"No strength activity with sets on {fmt_date(day)}.")
         return
     recent = sets.recent_exercises()
     for activity in with_sets:
-        _name_session(activity, recent)
+        _name_activity(activity, recent)
 
 
 def run_strength_reset(args: argparse.Namespace) -> None:
@@ -179,19 +179,20 @@ def run_strength_reset(args: argparse.Namespace) -> None:
         if not found:
             print(f"{title}: Garmin has no sets for it.")
             continue
-        count = len([block for block in found if block.exercise is None])
+        count = len([group for group in found if group.exercise is None])
         if not count:
             print(f"{title}: sets read again and frozen. Every set has a name.")
             continue
         print(wrap_text(
-            f"{title}: sets read again and frozen. {count} block{'s' if count != 1 else ''} "
+            f"{title}: sets read again and frozen. {count} group{'s' if count != 1 else ''} "
             "without a name: the questions are in the queue, " + cmd("queue answer")
             + " goes through them."
         ))
 
 
 def run_strength_discard(args: argparse.Namespace) -> None:
-    """Keeps a day's session out of weight planning, or brings it back with --undo (§7)."""
+    """Keeps a day's activity out of the strength history, or brings it back with --undo
+    (§7)."""
     day = args.date
     activities = runtime.db.strength_activities(day, date=day)
     if not activities:
@@ -204,26 +205,26 @@ def run_strength_discard(args: argparse.Namespace) -> None:
     for activity in activities:
         runtime.db.set_activity_discarded(activity["activity_id"], not args.undo)
         if args.undo:
-            print(f"The {_title(activity)} is back in weight planning.")
+            print(f"The {_title(activity)} is back in the strength history.")
         else:
             print(f"Discarded the {_title(activity)}.")
     if args.undo:
         return
     print(wrap_text(
-        "A discarded session still counts as training: its sets stay on record but are "
-        "left out of weight planning, and its waiting questions are settled. "
+        "A discarded activity still counts as training: its sets stay on record but are "
+        "left out of the strength history, and its waiting questions are settled. "
         + cmd(f"strength discard {day} --undo") + " brings it back."
     ))
 
 
 def add_strength_parser(subparsers):
-    # strength command & subparsers — the sets of strength sessions
+    # strength command & subparsers — the sets of strength activities
     # (DESIGN_strength_tracking.md §7).
     strength_parser = subparsers.add_parser(
         "strength",
-        help="Name, read again or discard the sets of a strength session",
+        help="Name, read again or discard the sets of a strength activity",
         description=(
-            "TrainMate reads your sets from Garmin the morning after a session. Anything it "
+            "TrainMate reads your sets from Garmin the morning after you lift. Anything it "
             "can't name, it asks you about through the queue. These commands fix a day by "
             "hand."
         ),
@@ -231,14 +232,14 @@ def add_strength_parser(subparsers):
     strength_subparsers = strength_parser.add_subparsers(
         dest="subcommand", help="Strength sub-commands"
     )
-    date_help = "The session's day: YYYY-MM-DD, 'today', or an offset like -1d"
+    date_help = "The activity's day: YYYY-MM-DD, 'today', or an offset like -1d"
 
     s_name = strength_subparsers.add_parser(
         "name",
-        help="Name the sets of a day's session, block by block",
+        help="Name the sets of a day's activity, group by group",
         description=(
-            "Go through every block of the day's session, named or not, and name it. After "
-            "a name, say whether it covers the whole block or only its first sets, and the "
+            "Go through every group of the day's activities, named or not, and name it. After "
+            "a name, say whether it covers the whole group or only its first sets, and the "
             "rest are asked again."
         ),
     )
@@ -251,7 +252,7 @@ def add_strength_parser(subparsers):
         description=(
             "Read the day's sets again from Garmin, so a name fixed in Garmin Connect comes "
             "in. The names given in TrainMate for that day are dropped, and a question is "
-            "queued for every block still unnamed. On a day with two strength sessions, it "
+            "queued for every group still unnamed. On a day with two strength activities, it "
             "asks which one."
         ),
     )
@@ -260,16 +261,16 @@ def add_strength_parser(subparsers):
 
     s_discard = strength_subparsers.add_parser(
         "discard",
-        help="Keep a day's session out of weight planning",
+        help="Keep a day's activity out of the strength history",
         description=(
-            "Keep the day's session out of weight planning: a hotel gym, a warm-up "
-            "recorded as strength, a session logged too badly to fix. It still counts as "
-            "training and the sets stay stored. On a day with two strength sessions, it "
+            "Keep the day's activity out of the strength history: a hotel gym, a warm-up "
+            "recorded as strength, an activity logged too badly to fix. It still counts as "
+            "training and the sets stay stored. On a day with two strength activities, it "
             "asks which one."
         ),
     )
     s_discard.add_argument("date", metavar="DATE", type=parse_single_date, help=date_help)
     s_discard.add_argument("--undo", action="store_true",
-                           help="Bring the session back into weight planning")
+                           help="Bring the activity back into the strength history")
     s_discard.set_defaults(func=run_strength_discard)
     return strength_parser

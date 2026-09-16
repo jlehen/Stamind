@@ -1,5 +1,5 @@
-"""A strength session's sets (DESIGN_strength_tracking.md §6, §7): read from Garmin once, the
-morning after the session, then frozen, with questions queued for what the watch could not
+"""A strength activity's sets (DESIGN_strength_tracking.md §6, §7): read from Garmin once, the
+morning after the activity, then frozen, with questions queued for what the watch could not
 name. Also the lines that show the sets under the activity.
 """
 import time
@@ -25,10 +25,10 @@ WATCH = "watch"
 GARMIN = "garmin"
 ATHLETE = "athlete"
 
-# A session older than this when its sets are first read is frozen as read (§6).
+# An activity older than this when its sets are first read is frozen as read (§6).
 ASK_WITHIN_DAYS = 7
-# The naming question offers the exercises of the last sessions, counted by day (§7).
-RECENT_SESSIONS = 8
+# The naming question offers the exercises of the last strength days (§7).
+RECENT_DAYS = 8
 MAX_ANSWERS = 9
 
 YES_FINAL = {"label": "yes, final"}
@@ -44,9 +44,9 @@ class SetsRead(NamedTuple):
 
 
 @dataclass
-class Block:
+class Group:
     """Consecutive active sets that are one thing: the same exercise, or unnamed at one load
-    (§7). `first` is the position of its first set among the session's active sets."""
+    (§7). `first` is the position of its first set among the activity's active sets."""
     exercise: Optional[str]
     sets: List[Dict[str, Any]]
     first: int
@@ -110,10 +110,10 @@ def parse_sets(payload: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[str]
     return rows, unknown
 
 
-def blocks(sets: Sequence[Dict[str, Any]]) -> List[Block]:
-    """A session's active sets as blocks: consecutive sets with the same name, or unnamed
+def groups(sets: Sequence[Dict[str, Any]]) -> List[Group]:
+    """An activity's active sets as groups: consecutive sets with the same name, or unnamed
     at the same load, reps ignored (§7)."""
-    found: List[Block] = []
+    found: List[Group] = []
     position = 0
     for s in sets:
         if s["set_type"] != ACTIVE:
@@ -125,12 +125,12 @@ def blocks(sets: Sequence[Dict[str, Any]]) -> List[Block]:
         ):
             last.sets.append(s)
             continue
-        found.append(Block(s["exercise"], [s], position))
+        found.append(Group(s["exercise"], [s], position))
     return found
 
 
-def unnamed_blocks(sets: Sequence[Dict[str, Any]]) -> List[Block]:
-    return [block for block in blocks(sets) if block.exercise is None]
+def unnamed_groups(sets: Sequence[Dict[str, Any]]) -> List[Group]:
+    return [group for group in groups(sets) if group.exercise is None]
 
 
 def fmt_kg(load_kg: float) -> str:
@@ -143,15 +143,15 @@ def positions(first: int, last: int) -> str:
 
 
 def set_span(first: int, last: int) -> str:
-    """'set 5' or 'sets 5–8': positions among the session's active sets."""
+    """'set 5' or 'sets 5–8': positions among the activity's active sets."""
     return f"set {first}" if first == last else f"sets {first}–{last}"
 
 
 def reps_and_load(
     reps: Sequence[Optional[int]], load_kg: Optional[float], companion: bool = False
 ) -> str:
-    """'10, 10, 8, 8 reps @ 60 kg', or 'at 60 kg' in the companion's words. A block at 0 kg
-    says so, and a block with no weight entered says that (§7)."""
+    """'10, 10, 8, 8 reps @ 60 kg', or 'at 60 kg' in the companion's words. A group at 0 kg
+    says so, and a group with no weight entered says that (§7)."""
     counts = ", ".join("?" if r is None else str(r) for r in reps)
     unit = "rep" if list(reps) == [1] else "reps"
     if load_kg is None:
@@ -159,11 +159,11 @@ def reps_and_load(
     return f"{counts} {unit} {'at' if companion else '@'} {fmt_kg(load_kg)} kg"
 
 
-def named_line(block: Block) -> str:
+def named_line(group: Group) -> str:
     """'deadlift 1×5 @ 40, 4×4 @ 80 (watch)': consecutive equal sets collapsed, and a mark
     on a name only the watch guessed (§7)."""
     chunks: List[List[Any]] = []
-    for s in block.sets:
+    for s in group.sets:
         key = (s["reps"], s["load_kg"], None if s["reps"] is not None else s["duration_sec"])
         if chunks and chunks[-1][0] == key:
             chunks[-1][1] += 1
@@ -174,12 +174,12 @@ def named_line(block: Block) -> str:
         amount = str(reps) if reps is not None else f"{round(duration or 0)}s"
         weight = f" @ {fmt_kg(load_kg)}" if load_kg else ""
         parts.append(f"{count}×{amount}{weight}")
-    mark = " (watch)" if any(s["named_by"] == WATCH for s in block.sets) else ""
-    return f"{block.exercise} {', '.join(parts)}{mark}"
+    mark = " (watch)" if any(s["named_by"] == WATCH for s in group.sets) else ""
+    return f"{group.exercise} {', '.join(parts)}{mark}"
 
 
 def position_list(numbers: Sequence[int]) -> str:
-    """'set 5', 'sets 1, 3, 7–9': positions among the session's active sets, runs joined."""
+    """'set 5', 'sets 1, 3, 7–9': positions among the activity's active sets, runs joined."""
     runs: List[List[int]] = []
     for number in numbers:
         if runs and runs[-1][1] == number - 1:
@@ -190,10 +190,10 @@ def position_list(numbers: Sequence[int]) -> str:
     return f"{word} " + ", ".join(positions(first, last) for first, last in runs)
 
 
-def session_lines(activity: Dict[str, Any]) -> List[str]:
+def activity_lines(activity: Dict[str, Any]) -> List[str]:
     """What was lifted, for under the activity line (§7): one line per exercise, in the order
     the exercises first came, so alternating two exercises still reads as two lines; then
-    the unnamed sets. A session whose sets are still to be read says so; an activity whose
+    the unnamed sets. An activity whose sets are still to be read says so; an activity whose
     sets are never read, or that returned none, gets no line."""
     if activity.get("activity_type") != STRENGTH_TYPE:
         return []
@@ -202,17 +202,17 @@ def session_lines(activity: Dict[str, Any]) -> List[str]:
         return []
     if not activity.get("sets_read_at"):
         return [SETS_NOT_READ]
-    by_exercise: Dict[str, Block] = {}
+    by_exercise: Dict[str, Group] = {}
     unnamed: List[int] = []
-    for block in blocks(runtime.db.get_exercise_sets(activity["activity_id"])):
-        if block.exercise is None:
-            unnamed.extend(range(block.first, block.last + 1))
+    for group in groups(runtime.db.get_exercise_sets(activity["activity_id"])):
+        if group.exercise is None:
+            unnamed.extend(range(group.first, group.last + 1))
             continue
-        if block.exercise in by_exercise:
-            by_exercise[block.exercise].sets.extend(block.sets)
+        if group.exercise in by_exercise:
+            by_exercise[group.exercise].sets.extend(group.sets)
             continue
-        by_exercise[block.exercise] = Block(block.exercise, list(block.sets), block.first)
-    lines = [named_line(block) for block in by_exercise.values()]
+        by_exercise[group.exercise] = Group(group.exercise, list(group.sets), group.first)
+    lines = [named_line(group) for group in by_exercise.values()]
     if unnamed:
         lines.append(f"{position_list(unnamed)} unnamed")
     if lines and activity.get("discarded"):
@@ -220,22 +220,22 @@ def session_lines(activity: Dict[str, Any]) -> List[str]:
     return lines
 
 
-def session(activity: Dict[str, Any]) -> Dict[str, Any]:
-    """The part of a question's payload that names the session: its day and start time, so a
+def activity_ref(activity: Dict[str, Any]) -> Dict[str, Any]:
+    """The part of a question's payload that names the activity: its day and start time, so a
     day with two strength activities tells them apart however late the second came in (§7)."""
     start = (activity.get("start_time") or "")[11:16] or None
     return {"activity_id": activity["activity_id"], "date": activity["date"], "time": start}
 
 
 def recent_exercises() -> List[str]:
-    """The exercises named in the last eight sessions, counted by day with discarded sessions
-    skipped, the ones done on the most days first (§7)."""
+    """The exercises named in the last eight strength days, discarded activities skipped,
+    the ones done on the most days first (§7)."""
     days: List[str] = []
     done_on: Dict[str, set] = {}
     last_seen: Dict[str, int] = {}
-    for row in runtime.db.session_exercises_by_day():
+    for row in runtime.db.activity_exercises_by_day():
         if row["date"] not in days:
-            if len(days) == RECENT_SESSIONS:
+            if len(days) == RECENT_DAYS:
                 break
             days.append(row["date"])
         if not row["exercise"]:
@@ -246,7 +246,7 @@ def recent_exercises() -> List[str]:
     return ranked[:MAX_ANSWERS]
 
 
-def read_new_sessions(client: Any = None) -> SetsRead:
+def read_new_activities(client: Any = None) -> SetsRead:
     """Reads the sets of every strength activity from `strength-sets-since` on, dated before
     today and never read, and freezes each or asks whether it is final (§6). Logs into
     Garmin only when there is something to read."""
@@ -295,42 +295,42 @@ def _first_read(activity: Dict[str, Any], rows: List[Dict[str, Any]], today: str
     if not any(row["set_type"] == ACTIVE for row in rows):
         runtime.db.store_exercise_sets(activity_id, [], now, now)
         return
-    unnamed = unnamed_blocks(rows)
+    unnamed = unnamed_groups(rows)
     asked_from = (date.fromisoformat(today) - timedelta(days=ASK_WITHIN_DAYS)).isoformat()
     if not unnamed or activity["date"] < asked_from:
         runtime.db.store_exercise_sets(activity_id, rows, now, now)
         return
     runtime.db.store_exercise_sets(activity_id, rows, now, None)
     queue(SETS_FINAL, activity_id, {
-        **session(activity),
-        "blocks": [[block.first, block.last] for block in unnamed],
+        **activity_ref(activity),
+        "groups": [[group.first, group.last] for group in unnamed],
         "answers": [YES_FINAL],
     })
 
 
-def read_again(activity: Dict[str, Any], client: Any) -> List[Block]:
-    """Reads a session's sets again, replacing the rows and the answers on them, freezes them
-    and queues a naming question per block still unnamed; returns every block (§6, §7).
+def read_again(activity: Dict[str, Any], client: Any) -> List[Group]:
+    """Reads an activity's sets again, replacing the rows and the answers on them, freezes them
+    and queues a naming question per group still unnamed; returns every group (§6, §7).
     Garmin's errors propagate, and then nothing has changed."""
     payload = client.get_activity_exercise_sets(activity["activity_id"])
     rows, _ = parse_sets(payload)
     now = clock.now()
     runtime.db.store_exercise_sets(activity["activity_id"], rows, now, now)
-    found = blocks(rows)
-    ask_names(activity, queue_stamp(now), [block for block in found if block.exercise is None])
+    found = groups(rows)
+    ask_names(activity, queue_stamp(now), [group for group in found if group.exercise is None])
     return found
 
 
-def ask_names(activity: Dict[str, Any], final_at: str, unnamed: Sequence[Block]) -> None:
-    """Queues one naming question per block, all offering the same answers (§7)."""
+def ask_names(activity: Dict[str, Any], final_at: str, unnamed: Sequence[Group]) -> None:
+    """Queues one naming question per group, all offering the same answers (§7)."""
     if not unnamed:
         return
     answers = [{"label": name} for name in recent_exercises()] + [SOMETHING_ELSE]
-    named = session(activity)
-    for block in unnamed:
-        subject = f"{activity['activity_id']}:{final_at}:{block.first}-{block.last}"
+    named = activity_ref(activity)
+    for group in unnamed:
+        subject = f"{activity['activity_id']}:{final_at}:{group.first}-{group.last}"
         queue(SET_NAMES, subject, {
-            **named, "final_at": final_at, "first": block.first, "last": block.last,
-            "seqs": block.seqs, "reps": block.reps, "load_kg": block.load_kg,
+            **named, "final_at": final_at, "first": group.first, "last": group.last,
+            "seqs": group.seqs, "reps": group.reps, "load_kg": group.load_kg,
             "answers": answers,
         })

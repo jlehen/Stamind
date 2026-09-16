@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import athlete_queue, progression, runtime
-from trainmate.strength.sets import session_lines
+from trainmate.strength.sets import activity_lines
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.config import config
 from trainmate.progression import RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
@@ -178,7 +178,7 @@ def simple_activity_line(act: Dict[str, Any]) -> str:
 
 def simple_set_lines(act: Dict[str, Any]) -> List[str]:
     """What was lifted, under a strength session's line (DESIGN_strength_tracking.md §7)."""
-    return [f"      {line}" for line in session_lines(act)]
+    return [f"      {line}" for line in activity_lines(act)]
 
 
 def simple_activity_minutes(act: Dict[str, Any]) -> int:

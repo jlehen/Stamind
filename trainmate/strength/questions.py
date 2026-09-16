@@ -1,5 +1,5 @@
 """The two questions strength tracking queues for the athlete (DESIGN_strength_tracking.md §7):
-are a session's sets final in Garmin, and what was a block of sets the watch could not name.
+are an activity's sets final in Garmin, and what was a group of sets the watch could not name.
 """
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
@@ -35,7 +35,7 @@ def _capitalized(text: str) -> str:
     return text[:1].upper() + text[1:]
 
 
-def session_words(payload: Dict[str, Any]) -> str:
+def activity_words(payload: Dict[str, Any]) -> str:
     """'Tue Sep 15 18:10 gym session'; an item queued before the time was always given has
     none (§7)."""
     day = date.fromisoformat(payload["date"])
@@ -45,7 +45,7 @@ def session_words(payload: Dict[str, Any]) -> str:
     return f"{when} gym session"
 
 
-def companion_session_words(item: Dict[str, Any]) -> str:
+def companion_activity_words(item: Dict[str, Any]) -> str:
     """"Tuesday's 18:10 gym session" within the week the question was queued in, "the Sep 1
     18:10 gym session" after it."""
     payload = item["payload"]
@@ -65,27 +65,27 @@ def _activity(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def _sets_final_wording(item: Dict[str, Any]) -> str:
     payload = item["payload"]
-    spans = payload["blocks"]
+    spans = payload["groups"]
     count = len(spans)
     listed = ", ".join(sets.positions(first, last) for first, last in spans)
     word = "set" if count == 1 and spans[0][0] == spans[0][1] else "sets"
     return (
-        f"{session_words(payload)}: {count} block{'s' if count != 1 else ''} the watch "
+        f"{activity_words(payload)}: {count} group{'s' if count != 1 else ''} the watch "
         f"couldn't name ({word} {listed}). Are the sets in Garmin final?"
     )
 
 
 def _sets_final_companion(item: Dict[str, Any]) -> str:
-    count = len(item["payload"]["blocks"])
+    count = len(item["payload"]["groups"])
     return (
-        f"{_capitalized(companion_session_words(item))} has {count} "
+        f"{_capitalized(companion_activity_words(item))} has {count} "
         f"group{'s' if count != 1 else ''} of sets the watch couldn't name. "
         "Are the sets in Garmin final?"
     )
 
 
 def _sets_final_stale(item: Dict[str, Any]) -> bool:
-    """Settled once the session is frozen by other means, discarded, or gone."""
+    """Settled once the activity is frozen by other means, discarded, or gone."""
     activity = _activity(item)
     return activity is None or bool(activity["discarded"]) or bool(activity["sets_final_at"])
 
@@ -97,27 +97,27 @@ def _apply_sets_final(item: Dict[str, Any], index: int, text: Optional[str]) -> 
     except Exception as e:
         raise NotApplied(f"Couldn't read the sets from Garmin ({e}), so nothing changed. "
                          "The question will come back.")
-    unnamed = [block for block in found if block.exercise is None]
+    unnamed = [group for group in found if group.exercise is None]
     if not unnamed:
         return "Sets read again and frozen: every set has a name."
     count = len(unnamed)
-    return (f"Sets read again and frozen. {count} block{'s' if count != 1 else ''} still "
+    return (f"Sets read again and frozen. {count} group{'s' if count != 1 else ''} still "
             f"without a name: I'll ask about {'it' if count == 1 else 'them'} next time.")
 
 
-# --- set_names: what was this block? ---
+# --- set_names: what was this group? ---
 
 def _set_names_words(item: Dict[str, Any], companion: bool) -> str:
     payload = item["payload"]
-    block = (f"{sets.set_span(payload['first'], payload['last'])}: "
+    group = (f"{sets.set_span(payload['first'], payload['last'])}: "
              f"{sets.reps_and_load(payload['reps'], payload['load_kg'], companion)}")
     if companion:
-        return f"{_capitalized(companion_session_words(item))}, {block}. What was it?"
-    return f"{session_words(payload)}, {block}. What was it?"
+        return f"{_capitalized(companion_activity_words(item))}, {group}. What was it?"
+    return f"{activity_words(payload)}, {group}. What was it?"
 
 
 def _set_names_stale(item: Dict[str, Any]) -> bool:
-    """Settled once the block no longer stands: a set of it has a name, the session is
+    """Settled once the group no longer stands: a set of it has a name, the activity is
     discarded or gone, or `strength reset` froze it again (§7)."""
     payload = item["payload"]
     activity = _activity(item)

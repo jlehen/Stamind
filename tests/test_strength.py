@@ -142,7 +142,7 @@ class _StrengthCase(unittest.TestCase):
         return test_db.get_completed_activity(activity_id)
 
     def read(self):
-        return sets.read_new_sessions(self.garmin)
+        return sets.read_new_activities(self.garmin)
 
     def answer_final(self, activity_id="tue"):
         """Reads the sessions and answers "yes, final" to the question about one of them."""
@@ -231,7 +231,7 @@ class ParseSetsTest(unittest.TestCase):
             lift("SQUAT", "LEG_PRESS", kg=140), unnamed(10, 60), unnamed(10, 60), unnamed(8, 60),
             unnamed(12, 30), lift("SQUAT", "LEG_PRESS", kg=140), unnamed(12, 30),
         ))
-        found = sets.unnamed_blocks(rows)
+        found = sets.unnamed_groups(rows)
         self.assertEqual([(b.first, b.last, b.load_kg) for b in found],
                          [(2, 4, 60.0), (5, 5, 30.0), (7, 7, 30.0)])
         self.assertEqual(found[0].reps, [10, 10, 8])
@@ -272,7 +272,7 @@ class ReadingTest(_StrengthCase):
         self.assertEqual((item["kind"], item["subject"]), (sets.SETS_FINAL, "tue"))
         self.assertEqual(
             athlete_queue.wording(item),
-            "Tue Sep 15 18:10 gym session: 2 blocks the watch couldn't name (sets 2–3, 4). "
+            "Tue Sep 15 18:10 gym session: 2 groups the watch couldn't name (sets 2–3, 4). "
             "Are the sets in Garmin final?",
         )
         self.assertEqual(
@@ -292,7 +292,7 @@ class ReadingTest(_StrengthCase):
         self.read()
         self.assertEqual(test_db.get_exercise_sets("tue"), [])
         self.assertTrue(self.row("tue")["sets_final_at"])
-        self.assertEqual(sets.session_lines(self.row("tue")), [])
+        self.assertEqual(sets.activity_lines(self.row("tue")), [])
 
     def test_sets_are_read_once(self):
         self.activity("tue", payload=garmin_sets(unnamed()))
@@ -350,13 +350,13 @@ class SetsFinalTest(_StrengthCase):
         [self.item] = test_db.waiting_queue_items()
 
     def test_yes_final_reads_again_freezes_and_asks_the_names_still_missing(self):
-        """She named the 30 kg block in Connect after the first read: the answer brings it in."""
+        """She named the 30 kg group in Connect after the first read: the answer brings it in."""
         self.garmin.payloads["tue"] = garmin_sets(
             lift("SQUAT", "BELT_SQUAT"), unnamed(10, 60), unnamed(10, 60),
             lift("ROW", "SEATED_CABLE_ROW", 12, 30),
         )
         line = athlete_queue.act(self.item, "a1", self.now)
-        self.assertEqual(line, "Sets read again and frozen. 1 block still without a name: "
+        self.assertEqual(line, "Sets read again and frozen. 1 group still without a name: "
                                "I'll ask about it next time.")
         self.assertEqual(test_db.get_queue_item(self.item["id"])["outcome"],
                          athlete_queue.ANSWERED)
@@ -404,44 +404,44 @@ class SetNamesTest(_StrengthCase):
             unnamed(15, None),
         ))
         self.answer_final()
-        self.block, self.warm_up, self.no_weight = self.names_asked()
+        self.group, self.warm_up, self.no_weight = self.names_asked()
 
     def test_the_question_shows_the_whole_block(self):
-        self.assertEqual(athlete_queue.wording(self.block),
+        self.assertEqual(athlete_queue.wording(self.group),
                          "Tue Sep 15 18:10 gym session, sets 1–2: 10, 8 reps @ 60 kg. "
                          "What was it?")
-        self.assertEqual(athlete_queue.wording(self.block, companion=True),
+        self.assertEqual(athlete_queue.wording(self.group, companion=True),
                          "Tuesday's 18:10 gym session, sets 1–2: 10, 8 reps at 60 kg. "
                          "What was it?")
         self.assertIn("set 4: 12 reps @ 0 kg", athlete_queue.wording(self.warm_up))
         self.assertIn("set 5: 15 reps, no weight entered", athlete_queue.wording(self.no_weight))
 
     def test_the_answers_are_the_recent_exercises_done_most_often_first(self):
-        self.assertEqual([a["label"] for a in athlete_queue.answers(self.block)],
+        self.assertEqual([a["label"] for a in athlete_queue.answers(self.group)],
                          ["seated cable row", "leg press", "something else…"])
 
     def test_an_answer_names_every_set_of_the_block(self):
-        line = athlete_queue.act(self.block, "a2", self.now)
+        line = athlete_queue.act(self.group, "a2", self.now)
         self.assertEqual(line, "Named sets 1–2: leg press.")
         named = [(row["exercise"], row["named_by"]) for row in test_db.get_exercise_sets("tue")
-                 if row["seq"] in self.block["payload"]["seqs"]]
+                 if row["seq"] in self.group["payload"]["seqs"]]
         self.assertEqual(named, [("leg press", "athlete")] * 2)
 
     def test_something_else_names_the_block_with_the_proposal_she_picks(self):
         runtime.prompt = _Prompt(picks=["pec deck"])
         with patch.object(questions, "propose", return_value=["pec deck", "chest fly"]):
-            line = athlete_queue.act(self.block, "a3", self.now, text="butterfly machine")
+            line = athlete_queue.act(self.group, "a3", self.now, text="butterfly machine")
         self.assertEqual(line, "Named sets 1–2: pec deck.")
         self.assertEqual(runtime.prompt.shown[0][1], ["pec deck", "chest fly", "none of these"])
 
     def test_none_of_the_proposals_leaves_the_question_waiting(self):
         runtime.prompt = _Prompt(picks=[questions.NONE_OF_THESE])
         with patch.object(questions, "propose", return_value=["pec deck"]):
-            athlete_queue.act(self.block, "a3", self.now, text="butterfly machine")
+            athlete_queue.act(self.group, "a3", self.now, text="butterfly machine")
         with patch.object(questions, "propose", return_value=[]):
-            line = athlete_queue.act(self.block, "a3", self.now, text="zzz")
+            line = athlete_queue.act(self.group, "a3", self.now, text="zzz")
         self.assertIn("Nothing named", line)
-        self.assertIsNone(test_db.get_queue_item(self.block["id"])["closed_at"])
+        self.assertIsNone(test_db.get_queue_item(self.group["id"])["closed_at"])
         self.assertIsNone(test_db.get_exercise_sets("tue")[0]["exercise"])
 
     def test_a_proposal_is_only_ever_a_name_the_vocabulary_has(self):
@@ -452,8 +452,8 @@ class SetNamesTest(_StrengthCase):
                              ["pec deck", "chest fly", "leg press"])
 
     def test_a_name_given_another_way_settles_the_question(self):
-        test_db.name_exercise_sets("tue", self.block["payload"]["seqs"][:1], "leg press")
-        self.assertNotIn(self.block["id"], [i["id"] for i in athlete_queue.walk(self.now)])
+        test_db.name_exercise_sets("tue", self.group["payload"]["seqs"][:1], "leg press")
+        self.assertNotIn(self.group["id"], [i["id"] for i in athlete_queue.walk(self.now)])
 
 
 class CommandsTest(_StrengthCase):
@@ -485,7 +485,7 @@ class CommandsTest(_StrengthCase):
         self.now = WEDNESDAY_8AM.replace(hour=9)
         code, out, _ = run_cli(["strength", "reset", TUESDAY])
         self.assertEqual(code, 0)
-        self.assertIn("2 blocks without a name", " ".join(out.split()))
+        self.assertIn("2 groups without a name", " ".join(out.split()))
         self.assertEqual([row["exercise"] for row in test_db.get_exercise_sets("tue")
                           if row["set_type"] == "active"], [None, None])
         subjects = [item["subject"] for item in athlete_queue.walk(self.now)]
@@ -504,7 +504,7 @@ class CommandsTest(_StrengthCase):
         self.assertEqual(self.row("mon")["discarded"], 1)
         self.assertEqual(sets.recent_exercises(), [])
         code, out, _ = run_cli(["strength", "discard", "2026-09-14", "--undo"])
-        self.assertIn("back in weight planning", out)
+        self.assertIn("back in the strength history", out)
         self.assertEqual(sets.recent_exercises(), ["leg press"])
 
     def test_reset_on_a_day_with_two_sessions_reads_the_one_picked(self):
@@ -516,7 +516,7 @@ class CommandsTest(_StrengthCase):
         code, _, _ = run_cli(["strength", "reset", TUESDAY])
         self.assertEqual(code, 0)
         self.assertEqual(runtime.prompt.shown, [(
-            "2026-09-15 Tue has 2 strength sessions. Which one?",
+            "2026-09-15 Tue has 2 strength activities. Which one?",
             ["Tue Sep 15 09:00 gym session", "Tue Sep 15 20:10 gym session", "all of them",
              "none"],
         )])
@@ -549,7 +549,7 @@ class ShownTest(_StrengthCase):
             guess("DEADLIFT", "BARBELL_DEADLIFT", 4, 80),
         ))
         self.read()
-        self.assertEqual(sets.session_lines(self.row("sun")), [
+        self.assertEqual(sets.activity_lines(self.row("sun")), [
             "belt squat 1×5 @ 120, 1×5 @ 140",
             "barbell push press 1×5 @ 60, 1×4 @ 70",
             "barbell deadlift 2×4 @ 80 (watch)",
@@ -557,14 +557,14 @@ class ShownTest(_StrengthCase):
         ])
 
     def test_a_session_not_read_yet_says_so_and_one_before_the_first_day_says_nothing(self):
-        self.assertEqual(sets.session_lines(self.activity("tue")), [sets.SETS_NOT_READ])
-        self.assertEqual(sets.session_lines(self.activity("aug", day="2026-08-20")), [])
+        self.assertEqual(sets.activity_lines(self.activity("tue")), [sets.SETS_NOT_READ])
+        self.assertEqual(sets.activity_lines(self.activity("aug", day="2026-08-20")), [])
 
     def test_a_discarded_session_says_so(self):
         self.activity("sun", day="2026-09-13", payload=garmin_sets(lift("SQUAT", "LEG_PRESS")))
         self.read()
         test_db.set_activity_discarded("sun", True)
-        self.assertEqual(sets.session_lines(self.row("sun"))[-1],
+        self.assertEqual(sets.activity_lines(self.row("sun"))[-1],
                          "discarded: counts as training, not for planning weights")
 
     def test_workout_compare_and_done_lately_show_the_sets(self):
