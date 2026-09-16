@@ -1285,6 +1285,24 @@ class TestPeriodization(unittest.TestCase):
                 "athlete profile changed: chronic_injuries",
             )
 
+            # A snapshot taken before a field left the partition still carries it; it
+            # is read through the current partition, so the field is not reported as
+            # deleted — only what really moved is named (§7).
+            profile["chronic_injuries"] = "none"
+            import json
+            stale_partition = dict(json.loads(macro["profile_snapshot"]))
+            stale_partition["preferences"] = "long prose that no longer shapes the plan"
+            older = dict(macro, profile_snapshot=json.dumps(stale_partition))
+            self.assertIsNone(coach_service.config_changed(older))
+            profile["weekly_target_hours"] = 12.0
+            self.assertEqual(
+                coach_service.config_changed(older),
+                "athlete profile changed: weekly_target_hours",
+            )
+            self.assertNotIn("preferences", coach_service.profile_diff(older))
+            profile["weekly_target_hours"] = 8.0
+            del profile["chronic_injuries"]
+
             # A plan predating the snapshot column — or carrying an unreadable one —
             # cannot attribute the change, so it says only that there was one (§5).
             for snapshot in (None, "", "{not json"):

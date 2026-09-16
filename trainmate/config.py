@@ -611,8 +611,14 @@ def plan_profile() -> Dict[str, Any]:
     `coach.metrics_lookback_days`, which change what the coach *sees*, not what the plan
     should be.
     """
+    return plan_shaping(config.user_profile)
+
+
+def plan_shaping(user_profile: Dict[str, Any]) -> Dict[str, Any]:
+    """`plan_profile()`'s partition applied to any profile dict — the live one, or a
+    snapshot stored under an earlier partition (DESIGN_plan_staleness.md §7)."""
     excluded = set(PROFILE_THRESHOLD_FIELDS) | set(PROFILE_NON_PLAN_FIELDS)
-    profile = {k: v for k, v in config.user_profile.items() if k not in excluded}
+    profile = {k: v for k, v in user_profile.items() if k not in excluded}
     schedule = profile.get('weekly_schedule')
     if isinstance(schedule, dict):
         profile['weekly_schedule'] = {
@@ -632,6 +638,9 @@ def changed_plan_profile_fields(old_profile: Dict[str, Any]) -> List[str]:
     Names a field whether it was added, removed, or edited — the athlete needs to know
     which input to look at, not which of the three happened to it (DESIGN_plan_staleness.md
     §5)."""
+    # Read through the current partition: a field that stopped being plan-shaping after
+    # the snapshot was taken is not a deletion (§7).
+    old_profile = plan_shaping(old_profile)
     current = plan_profile()
     return sorted(
         k for k in set(old_profile) | set(current)

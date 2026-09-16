@@ -103,6 +103,11 @@ computed over the *old* partition (which included `name` and `equipment`), so it
 match a hash over the new one even when nothing was edited, and it has no
 `profile_snapshot` to attribute the difference to.
 
+A macrocycle that *does* carry a snapshot, taken under an earlier partition, is read
+through the current one (`plan_shaping()`): a field that has since stopped being
+plan-shaping is dropped from both sides, not named as deleted. The hash still mismatches
+once, so the reason is bare unless something plan-shaping really moved.
+
 Declining the proposal re-stamps the hash and both snapshots (`plan generate` /
 `workout generate`), so it is self-healing after one prompt. Backfilling the snapshot at
 migration time was rejected: the honest value is what the plan was generated with, which is
