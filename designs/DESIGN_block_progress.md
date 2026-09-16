@@ -126,6 +126,16 @@ knob) to decide how far below its neighbours a week must dip. The precedent is �
 the figures and what divided them, and let the model read the dip. The TASK below says
 explicitly that a clear dip in an elapsed week *was* the deload.
 
+**Amendment, 2026-09-16.** An athlete whose guidelines alternate a heavier and a lighter
+week — two hard rides one week, one hard ride and a kettlebell HIIT the next — produces a
+dip every other week by design. Read literally, the rule above would take the first light
+week as the block's deload and suppress the real one. So the rule now adds: a dip that
+recurs on a fixed rhythm is the microcycle, not the deload; the deload is the one-off dip
+below that rhythm. Still no label, no threshold and no field — the model reads the rhythm
+the same way it reads the dip. The alternation itself lives in the athlete's science
+documents, anchored to the block start so that a `workout generate` opening mid-block can
+tell which week it is resuming into; the app stores no cycle phase.
+
 ### 3.3 Per-sport gap annotation
 
 The week line's total is one blended figure across every sport (training_load.md's CTL/ATL/TSB

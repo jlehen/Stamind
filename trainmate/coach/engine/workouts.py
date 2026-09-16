@@ -157,7 +157,9 @@ where the last completed week left it instead of restarting at week-one volume, 
 the block's remaining weeks pointed at the focus it was given. If one elapsed week's
 planned load dips clearly below the weeks around it, that week WAS this block's deload —
 do not schedule a second one; if no such dip has happened yet and the block's design calls
-for one, it still belongs in the weeks you are writing.
+for one, it still belongs in the weeks you are writing. A dip that recurs on a fixed rhythm
+— every other week, where the athlete's guidelines alternate a heavier and a lighter week —
+is the microcycle, not the deload: the deload is the one-off dip below that rhythm.
 
 Where a week's actual load fell well short of what was planned, build from the volume the
 athlete actually produced rather than from the plan they did not complete — ramping from an
@@ -556,8 +558,9 @@ class WorkoutLogicMixin:
             "## TASK\n"
             f"Generate a training schedule for the next {duration_desc} starting from "
             f"{starting_phrase}.\n"
-            "Ensure the weekly schedules/microcycles are designed specifically to match the focus, target\n"
-            "volume, and intensity of the active mesocycle block(s) the athlete is in during this period, and\n"
+            "Ensure the microcycles — one week, or longer where the athlete's guidelines\n"
+            "alternate weeks — are designed specifically to match the focus, target volume, and\n"
+            "intensity of the active mesocycle block(s) the athlete is in during this period, and\n"
             "incorporate any deload weeks or exceptions for the athlete's active constraints in accordance\n"
             "with the science guidelines.\n"
             "Cover EVERY date of the span: a training day carries its session, a rest\n"
@@ -587,7 +590,7 @@ class WorkoutLogicMixin:
             "{\n"
             '  "reasoning": "How this microcycle design serves the active mesocycle focus, in AT\n'
             '    MOST 4 SENTENCES. The sessions themselves are listed below your prose — describe\n'
-            '    the shape of the week and why, not each workout in turn.",\n'
+            '    the shape of the microcycle and why, not each workout in turn.",\n'
             + _athlete_note_field(standing_workouts)
             # Workout generation is read-only w.r.t. coach learnings (see
             # DESIGN_backward_evaluation.md §11): it consumes the rendered learnings in the

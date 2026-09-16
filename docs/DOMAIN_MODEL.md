@@ -614,11 +614,14 @@ are rest. A `microcycles` row would either duplicate that or contradict it.
 
 So the concept lives in exactly three places:
 
-1. **The workout-generation prompt**, which asks for it by name: *"Ensure the weekly
-   schedules/microcycles are designed specifically to match the focus, target volume, and
-   intensity of the active mesocycle block(s)."* The model's `reasoning` field is asked to
-   describe *"the shape of the week and why"* — that is the microcycle design, returned as
-   prose rather than as data.
+1. **The workout-generation prompt**, which asks for it by name: *"Ensure the microcycles
+   — one week, or longer where the athlete's guidelines alternate weeks — are designed
+   specifically to match the focus, target volume, and intensity of the active mesocycle
+   block(s)."* The model's `reasoning` field is asked to describe *"the shape of the
+   microcycle and why"* — that is the microcycle design, returned as prose rather than as
+   data. A two-week alternation is a microcycle the prompt allows and the block-progress
+   deload rule knows about (`DESIGN_block_progress.md` §3.2); the app still aggregates by
+   Monday week (point 3), so the alternation shows there as a sawtooth, not as a unit.
 2. **The science guidelines**, as the defaults above.
 3. **`progression.weekly_aggregates`**, the one place the app makes weeks concrete. It
    aggregates planned-vs-actual load into **Monday-commencing** weeks and labels each week
