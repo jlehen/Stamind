@@ -71,6 +71,26 @@ class TestCliWorkouts(unittest.TestCase):
 
     @patch("trainmate.runtime.garmin")
     @patch("trainmate.runtime.coach_service")
+    def test_adapt_message_open_ended_rule_is_named_not_stored(self, mock_coach, _garmin):
+        """A note with no time bound is not a dated constraint: the terminal says where it
+        belongs and asks nothing (DESIGN_bot_simple_frontend.md §12.3, 2026-09-16)."""
+        mock_coach.workout_adapt.return_value = RevisionProposal(
+            reason="Metrics are green", workouts=[],
+            new_constraints=[{"title": "never two workouts in a day",
+                              "start_date": None, "end_date": None, "open_ended": True}],
+            range_start="2026-06-03", range_end="2026-06-30", pairs=(),
+        )
+        exit_code, stdout, _ = self.run_cli(
+            ["workout", "adapt", "--auto", "-m", "I have no time for two workouts a day"]
+        )
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Not saved", stdout)
+        self.assertIn("never two workouts in a day", stdout)
+        self.assertIn("user_profile.preferences", stdout)
+        mock_coach.capture_message_constraint.assert_not_called()
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
     def test_workout_commands(self, mock_coach, mock_garmin):
         adapted = {
             "date": "2026-06-03",

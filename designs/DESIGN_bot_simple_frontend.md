@@ -798,6 +798,30 @@ carry the same lesson per message ("noting that rule for your coach" vs "passing
 that on to your coach"). No line of copy promises verbatim delivery on a tap,
 because no tap delivers it.
 
+**A rule for good is not a constraint** (2026-09-16). "I have no time to do two
+workouts in a day" reached this inbox and came out as a constraint dated today, because
+the extraction was told never to omit the dates and to default them to today. Honored
+for one day, expired by morning, and the double is back next week. The rule has a home
+already — the profile: a session cap in `weekly_schedule`, or a sentence in
+`preferences` — and the profile is what the staleness check watches, so recording it
+there flags the plan when it should. Neither is writable from chat, and this pass does
+not make them so: an open-ended constraint would need every consumer that does date
+arithmetic (the §7 replan heuristic, the honoring stamp, the analysis feed, the list) to
+learn that some windows never close, which is a second kind of object hidden in a column;
+a chat-writable profile is a second kind of object from her chair, one she could neither
+see nor take back. Both are more than a rule she states a few times a year has earned.
+So the extraction gains one answer: a note with no time bound at all comes back with
+`open_ended: true` and no dates. The app stores nothing for it and says so in one
+forwardable message — the rule is for good, not for the next few days; ask ⟨operator⟩
+to record it in your preferences; and her words, quoted, so a Telegram forward carries
+them to the operator without retyping. The "📨 Send it to your coach as written" button
+follows when nothing else was stored, because today's half of the rule is still the week
+planner's. On the terminal the same candidate prints a one-line "not saved" naming the
+config keys. `workout adapt -m` shares the extraction text, so it gets the same answer
+and the same skip. If the rules she states turn out to be structure more often than
+flavour, a settable session cap is the next step; if flavour, open-ended constraints
+are; this pass records the question rather than guessing at it.
+
 **One live button row per chat** is a §4.4 mechanic this pass turns into a constraint:
 any new row — the morning push included — retires the pending one. An offer left
 overnight is gone by breakfast, and a tap that finds its row stale must say so ("That

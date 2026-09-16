@@ -597,7 +597,9 @@ what `constraint add` itself accepts:
   **always advisory, `rest = 0`** — see trust boundary below), reversible and
   inspectable. Only `title` and dates are required of the classifier;
   `description` may be left NULL. (Rev 6 dropped the `sport`/`type` fields from this
-  schema along with their columns — which sport is prose in the title now, §5.) It is
+  schema along with their columns — which sport is prose in the title now, §5. Since
+  2026-09-16 an entry may instead carry `open_ended: true` with no dates — a rule with
+  no time bound, which is never stored; DESIGN_bot_simple_frontend.md §12.3.) It is
   honored this run through the existing athlete-message advisory text (unchanged),
   *and* persists for every future run via the durable row — so the `change_reason`
   smuggling hack is no longer needed for these.

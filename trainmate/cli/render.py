@@ -754,6 +754,15 @@ class ExpertRenderer:
     def constraint_candidate_discarded(self) -> None:
         print("Discarded — not saved as a constraint.")
 
+    def constraints_open_ended(self, titles: List[str], text: str) -> None:
+        """A rule with no time bound has no home in the constraints table; the profile is
+        where it belongs (DESIGN_bot_simple_frontend.md §12.3, 2026-09-16)."""
+        quoted = ", ".join(f"“{t}”" for t in titles)
+        notice(
+            f"Not saved: {quoted} — a rule for good, not a dated constraint. Record it "
+            "in config.yaml under user_profile.preferences, or the weekly schedule."
+        )
+
     def constraint_plan_shaping(self, constraint_id: int, impact: Dict[str, Any]) -> None:
         """What a capture says when the directive it just stored is big enough to
         reshape the plan (DESIGN_constraints.md §7). Names the escalation commands,
@@ -999,6 +1008,17 @@ class CompanionRenderer(ExpertRenderer):
 
     def constraint_candidate_discarded(self) -> None:
         print("Okay — I won't note that one.")
+
+    def constraints_open_ended(self, titles: List[str], text: str) -> None:
+        """One forwardable message: her words are quoted so a Telegram forward carries
+        the rule to the operator without retyping (§12.3, 2026-09-16)."""
+        print(wrap_text(
+            "That sounds like a rule, not something for the next few days. Ask "
+            f"{config.telegram_operator_name} to record this in your preferences for "
+            "good. You can just forward this message:"
+        ))
+        print()
+        print(f"“{text.strip()}”")
 
     def constraint_plan_shaping(self, constraint_id: int, impact: Dict[str, Any]) -> None:
         """The same fact, without the commands: reshaping the plan around it is one tap

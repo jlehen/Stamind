@@ -22,7 +22,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from trainmate import clock, settings
 from trainmate.strength.sets import read_new_sessions
-from trainmate.cli.candidates import confirm_new_constraints, confirm_new_signals
+from trainmate.cli.candidates import (
+    confirm_new_constraints, confirm_new_signals, open_ended,
+)
 from trainmate.cli.common import adherence_verdicts, ensure_recent_data
 # The companion surfaces are companion-only by definition, so they call the line
 # builders directly rather than through `runtime.render` (DESIGN_render_persona.md §3).
@@ -607,11 +609,15 @@ def run_bot_capture_note(text: str) -> None:
         _no_find(text)
         return
 
-    captured = confirm_new_constraints(constraints, today)
+    captured = confirm_new_constraints(constraints, today, text)
     logged = confirm_new_signals(signal_rows, today)
     if not captured and not logged:
-        # She said no to everything the note offered. Nothing was stored and nothing is
-        # owed: a second offer here would read as pressing her on an answer she gave.
+        # A rule for good was handed to the operator and nothing else was stored: today's
+        # half of it is still the coach's, one tap away (§12.3, 2026-09-16).
+        if any(open_ended(c) for c in constraints):
+            emit_buttons([send_to_coach_button(text)])
+        # Otherwise she said no to everything the note offered. Nothing was stored and
+        # nothing is owed: a second offer would read as pressing her on an answer she gave.
         return
     # Signals get the offer too (amended 2026-09-02): the record points backward and
     # adapts nothing, but the athlete REPORTING one expects forward notice, and a row

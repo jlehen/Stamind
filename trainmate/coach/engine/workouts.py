@@ -233,9 +233,13 @@ stated preference with a date or date range (e.g. "no run Thursday", "only 45 mi
 distinct directive, exactly as if the athlete had run `constraint add`. A note only about
 how they feel right now ("felt flat, ease today") is NOT a constraint — leave
 "new_constraints" empty for it (it may still be a signal, below). When unsure, leave it
-out: a durable-looking note mis-filed as a constraint is worse than a missed one. This is
-extraction only — never invent a plan-shaping escalation, and never omit "start_date"/
-"end_date" (default both to today when the note doesn't say). Extracted constraints are
+out: a durable-looking note mis-filed as a constraint is worse than a missed one. A rule
+with no time bound at all — "I never have time for two workouts in a day", "no gym on
+Fridays, ever" — is OPEN-ENDED: return it with "open_ended": true and both dates null.
+The app does not store those as constraints; it tells the athlete where such a rule
+belongs. Everything else is dated: never omit "start_date"/"end_date" for it (default
+both to today when the note is about the days at hand but names none). This is
+extraction only — never invent a plan-shaping escalation. Extracted constraints are
 always advisory; the deterministic-rest and plan-shaping escalations are deliberate human
 actions and the app, not you, decides those.
 """
@@ -292,6 +296,7 @@ NEW_CONSTRAINTS_SCHEMA = (
     '      "title": "the directive, stated short (required)",\n'
     '      "start_date": "YYYY-MM-DD (required; default today)",\n'
     '      "end_date": "YYYY-MM-DD (required; == start for a single day)",\n'
+    '      "open_ended": "true ONLY for a rule with no time bound at all (dates null)",\n'
     '      "description": "optional richer context or null/omit"\n'
     "    }\n"
     "  ]"

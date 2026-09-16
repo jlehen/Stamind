@@ -684,6 +684,38 @@ class CaptureNoteTest(_CaptureCase):
         self.assertEqual(code, 0)
         self.assertIn("Send it to your coach as written", out)
 
+    def test_a_rule_for_good_is_handed_to_the_operator_not_stored(self):
+        """2026-09-16: "never two workouts in a day" has no dates, so it is not a
+        constraint. She is told whose it is, her words are quoted so she can forward the
+        message, and today's half stays one tap away (§12.3)."""
+        code, out, prompt = self._run({"new_constraints": [
+            {"title": "never two workouts in a day", "start_date": None,
+             "end_date": None, "open_ended": True},
+        ]})
+        self.assertEqual(code, 0)
+        self.assertEqual(test_db.get_constraints(today_str(), None), [])
+        self.assertNotIn("Shall I remember that?", prompt.text)
+        # The reply is wrapped for the chat; compare on one logical line.
+        said = " ".join(out.split())
+        self.assertIn("not something for the next few days", said)
+        self.assertIn(f"Ask {config.telegram_operator_name} to record this", said)
+        self.assertIn("forward this message", said)
+        self.assertIn(f"“{self.NOTE}”", said)
+        self.assertIn("Send it to your coach as written", out)
+
+    def test_a_dated_rule_beside_an_open_ended_one_is_still_stored(self):
+        code, out, _ = self._run({"new_constraints": [
+            {"title": "never two workouts in a day", "open_ended": True},
+        ] + self._constraint()["new_constraints"]})
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            [c["title"] for c in test_db.get_constraints(today_str(), None)],
+            ["no running"],
+        )
+        self.assertIn("forward this message", out)
+        self.assertIn("Adjust my week around it", out)
+        self.assertNotIn("Send it to your coach as written", out)
+
     def test_declining_stores_nothing_and_presses_no_further(self):
         code, out, _ = self._run(self._constraint(), answers=False)
         self.assertEqual(code, 0)
