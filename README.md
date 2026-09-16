@@ -24,7 +24,7 @@ Target Date: 2027-06-13 Sun (34 days remaining)
 
 Active Mesocycle: Hill Power (2027-05-10 Mon to 2027-05-23 Sun)
 Cycle Focus:
-  Two loading weeks turning the base block's aerobic work into sustained
+  Two loading weeks turning the base mesocycle's aerobic work into sustained
   climbing power. Two quality sessions a week, never on consecutive days, each
   preceded by an easy or rest day; the longest ride stays easy ...
 
@@ -41,6 +41,7 @@ a coach so an athlete who never wants to learn a command can still use it.
 
 - [Who it is for](#who-it-is-for)
 - [Quick start](#quick-start)
+- [The words TrainMate uses](#the-words-trainmate-uses)
 - [A week with TrainMate](#a-week-with-trainmate)
 - [Features](#features)
 - [The three interfaces](#the-three-interfaces)
@@ -69,11 +70,11 @@ You need:
 - A Google service account with access to one Google Calendar. The
   [setup section](#google-calendar-and-the-service-account) walks through it.
 
-What it costs to run: the coach is called when you generate a plan, when you
-generate workouts, and once a day when you adapt. Each of those is one large
+What it costs to run: the coach model is called when you generate a plan, when
+you generate workouts, and once a day when you adapt. Each of those is one large
 call with tens of thousands of tokens of context. Nothing else spends money.
-`./tm journal --cost` rolls up your own spend by model and by command, so
-after a week you will know your number.
+`./tm journal --cost` rolls up your own spend by model and by command, so after
+a week you will know your number.
 
 ## Quick start
 
@@ -84,7 +85,7 @@ after a week you will know your number.
    venv/bin/pip install -r requirements.txt
    ```
 2. **Configure.** Copy `config_template.yaml` to `config.yaml` and fill in the
-   four credential blocks: OpenRouter, Google Calendar, Garmin, and your
+   four credential sections: OpenRouter, Google Calendar, Garmin, and your
    athlete profile. Details in [Configuration](#configuration).
 3. **Pin Garmin's settings.** Turn off automatic threshold detection and keep
    the default zones on the right basis, once, in Garmin Connect. Why this
@@ -119,6 +120,31 @@ Any unambiguous prefix works as a command: `./tm wo li` is `workout list`.
 `./tm help` prints every command and sub-command on one page, and `./tm shell`
 opens an interactive prompt if you prefer not to retype `./tm`.
 
+## The words TrainMate uses
+
+A handful of words come back in every command, message and document. Each one
+means one thing.
+
+- **Plan.** The periodization for a goal: the macrocycle, which is the whole arc
+  to the goal, cut into mesocycles. `plan generate` writes it and `plan show`
+  prints it. The plan says what each stretch of weeks is for. It does not hold
+  the day-by-day workouts.
+- **Mesocycle.** A few weeks of the plan with one focus, such as "Base" or "Hill
+  Power". `workout generate -m 5` writes the sessions of mesocycle 5.
+- **Session.** One planned workout on one day, the thing that lands in your
+  calendar. The commands call them workouts: `workout list` lists your sessions.
+- **Activity.** What your Garmin recorded when you trained. Each session is
+  graded against the activity that matches it, which is where `[DONE]`,
+  `[PARTIAL]` and `[MISSED]` come from.
+- **Week planner.** The model call inside `workout generate` and `workout adapt`
+  that writes the sessions: a sport, a duration, an RPE, a load, a title and a
+  description for each day. `workout generate` asks it to write the coming
+  weeks; `workout adapt` asks it each morning which of them to ease, move or
+  keep.
+- **The coach.** TrainMate talking to you, whichever model call wrote the words.
+  Every one of those calls runs on the coach model, see
+  [Choosing a model](#choosing-a-model).
+
 ## A week with TrainMate
 
 Here is what the daily rhythm looks like once a plan is in place. The athlete
@@ -136,11 +162,11 @@ Decision Summary:
 HRV and resting HR sit on baseline and yesterday's ride stayed easy as
 prescribed. Today's strength session stands.
 
-All metrics are green and workout plan is on track. No changes recommended.
+All metrics are green and the schedule is on track. No changes recommended.
 ```
 
 **Wednesday.** You slept badly and had two glasses of wine. You say so, in
-your own words, and the coach eases the day without rewriting the block:
+your own words, and the coach eases the day without rewriting the mesocycle:
 
 ```
 $ ./tm workout adapt -m "late night, a couple of drinks, feel flat"
@@ -148,25 +174,26 @@ Querying OpenRouter… this usually takes about 25s.
 
 Decision Summary:
 This morning's low HRV is explained by the late night and the alcohol, so it
-reads as lifestyle noise rather than block fatigue. The intervals move to
-Thursday and today becomes an easy spin. The block's load is untouched.
+reads as lifestyle noise rather than mesocycle fatigue. The intervals move to
+Thursday and today becomes an easy spin. The mesocycle's load is untouched.
 
 PROPOSED WORKOUT ADAPTATIONS:
 Date        Sport          Original Workout      Proposed Workout
 2027-05-12  CYCLING        Hill Repeats 5x4 min  Easy Spin
 2027-05-13  REST->CYCLING  Rest Day              Hill Repeats 5x4 min
-Apply these adaptations to your training plan and sync to Calendar? [y/N] y
+Apply these adaptations to your schedule and sync to Calendar? [y/N] y
 ```
 
 The distinction matters. A rough morning that has an explanation does not get
-read as "the block is too hard", so your volume is not cut on a false signal.
+read as "the mesocycle is too hard", so your volume is not cut on a false
+signal.
 
 **Thursday.** Work drops a trip on you. That is a directive, not a report, so
 it becomes a constraint the coach has to work around:
 
 ```
 $ ./tm constraint add "away, no bike" --start 2027-05-16 --end 2027-05-18
-ID: 7 | away, no bike: 2027-05-16 Sun to 2027-05-18 Tue | advisory · not yet in the plan
+ID: 7 | away, no bike: 2027-05-16 Sun to 2027-05-18 Tue | advisory · not yet in the schedule
 Constraint added successfully.
 ```
 
@@ -218,9 +245,9 @@ w/c 05-24    290  ▒▒▒▒▒▒▒▒░░░░
 ```
 
 The top line is the classic fitness, fatigue and form model (CTL, ATL and TSB,
-explained under [Features](#features)). Below it, each training block is a band,
-each week a bar: planned load against what you actually did, and how close the
-two came. A time-in-zone table per sport follows, so a week where your easy
+explained under [Features](#features)). Below it, each training mesocycle is a
+band, each week a bar: planned load against what you actually did, and how close
+the two came. A time-in-zone table per sport follows, so a week where your easy
 days quietly drifted into tempo is visible even when the load number says
 everything went to plan.
 
@@ -258,14 +285,14 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
   worked sets to copy. See
   [The science directory](#the-science-directory-your-coaching-philosophy).
 - **Periodized plans.** From your goals, constraints and profile, TrainMate
-  builds a macrocycle (the whole arc to your goal), its mesocycles (blocks of a
-  few weeks with one focus each) and the microcycles (your actual weeks). How a
+  builds a macrocycle (the whole arc to your goal), its mesocycles (a few
+  weeks with one focus each) and the microcycles (your actual weeks). How a
   short run-in or a multi-season build should be structured comes from the
   science guidelines you supply, not from thresholds baked into the app.
 - **Event dates and horizon dates.** A race is an event: the plan peaks and
   tapers for it. "Get my FTP to 280 by next summer" is a horizon: the plan ends
-  around the date with an ordinary block, and no taper pinned to a day nothing
-  happens on. `goal add --date-type horizon` says which.
+  around the date with an ordinary mesocycle, and no taper pinned to a day
+  nothing happens on. `goal add --date-type horizon` says which.
 - **Plan feedback.** `plan feedback "drop the second FTP test"` files a note
   against the plan. Notes pile up, cost nothing to capture, and the next
   `plan generate` has to address every one.
@@ -285,7 +312,7 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
   not compound.
 - **Lifestyle noise versus training fatigue.** A poor morning explained by
   alcohol, a late night or stress is treated as noise, not as evidence the
-  block is too hard. Signals come from tagged Google Calendar events or
+  mesocycle is too hard. Signals come from tagged Google Calendar events or
   `signal add`.
 - **A fast-capture inbox.** `workout adapt -m "away with no gym Thursday"` is
   classified and saved as a real constraint you can list and remove. "Felt
@@ -310,14 +337,14 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
   or session-RPE (Foster). Loads roll up into the Performance Management Chart:
   CTL (fitness, a 42-day average), ATL (fatigue, a 7-day average) and TSB
   (form, their difference), plus an ATL:CTL ratio for overload risk. An RPE
-  divergence flag marks sessions that felt far harder than they measured.
+  divergence flag marks activities that felt far harder than they measured.
 - **Time in zone, per sport.** Because a single load number blends volume and
   intensity, `progress` also prints the minutes you spent in each zone, per
   sport, next to what the plan prescribed.
 - **Adherence tracking.** Planned versus completed, with misses, load and
   duration mismatches, and rest-day violations, graded once and shown in the
   CLI, the dashboard and the Calendar event alike.
-- **Backward evaluation.** `data bootstrap` reverse-engineers the blocks you
+- **Backward evaluation.** `data bootstrap` reverse-engineers the mesocycles you
   actually trained from your Garmin history and seeds coach learnings, so a new
   install starts warm. `data show-analysis` prints that reconstruction back.
 - **A benchmark logbook.** Thresholds (FTP, LTHR, threshold pace, and so on) are
@@ -376,7 +403,7 @@ Setup for either mode:
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
 2. Message your bot once, then find your numeric chat id, for example via
    [@userinfobot](https://t.me/userinfobot).
-3. Add a `telegram:` block to `config.yaml`:
+3. Add a `telegram:` section to `config.yaml`:
    ```yaml
    telegram:
      bot_token: "123456789:ABCdef..."   # or set TELEGRAM_BOT_TOKEN
@@ -394,9 +421,10 @@ Setup for either mode:
 
 Only allow-listed chat ids are served. Because the bot cannot ask for
 confirmation, destructive commands such as `wipe` and `rm` are declined unless
-you pass their `-y` flag. A command that calls the coach first sends you what it
-is working from, then tells you how long the wait usually is, then the answer.
-The estimate is the median of that command's recent runs on your own machine.
+you pass their `-y` flag. A command that calls the coach model first sends you
+what it is working from, then tells you how long the wait usually is, then the
+answer. The estimate is the median of that command's recent runs on your own
+machine.
 
 ## Setup in detail
 
@@ -409,10 +437,10 @@ schema at three lengths:
 | File | What it is |
 | --- | --- |
 | `config_template.yaml` | The short template: only what you must fill in. Start here. |
-| `config_template_full.yaml` | Every knob the app reads, commented out at its default, with the reasoning. Copy a block over when you want to change one. |
+| `config_template_full.yaml` | Every knob the app reads, commented out at its default, with the reasoning. Copy a section over when you want to change one. |
 | `config.sample.yaml` | A realistic filled-in config to imitate. All values fictional. |
 
-The blocks you must fill:
+The sections you must fill:
 
 - **`llm:`** has `api_key` (an `OPENROUTER_API_KEY` environment variable
   overrides it) and `models`, the list of OpenRouter models this install may
@@ -426,7 +454,7 @@ The blocks you must fill:
   `weekly_target_hours`, sport preferences, chronic injuries, free-text
   preferences, and an optional per-day `weekly_schedule` with hours, session
   count, how certain you are to train that day, and what equipment is at hand.
-  The plan is built around this block, so fill it honestly rather than
+  The plan is built around this section, so fill it honestly rather than
   optimistically. Omit `weekly_schedule` and the coach places sessions on any
   day, sized by `weekly_target_hours`. The free-text `preferences` are
   session-level: how a session is written up, where it happens, what kit, how
@@ -498,7 +526,7 @@ apart mean different efforts with nothing in the data to show it.
 The first `data pull` looks at how far back your Garmin history reaches and,
 when the gap is large, hands you the backfill command rather than fetching
 months of data unannounced. If you arrive with a real training past, run
-`data bootstrap` once after backfilling. It reverse-engineers the blocks you
+`data bootstrap` once after backfilling. It reverse-engineers the mesocycles you
 actually trained and seeds coach learnings from them, so the first plan is
 written against your history rather than a blank page.
 
@@ -527,7 +555,7 @@ be coached, and it is the deepest lever you have on the plans the coach writes.
 
 The line between the two is whether the sentence changes a number in the
 periodization. "I want two strength sessions a week, every phase" changes
-the block structure, so it is a guideline and lives in `science/`. "Zwift on
+the mesocycle structure, so it is a guideline and lives in `science/`. "Zwift on
 weekdays, outdoors at the weekend" changes what a session looks like, not how
 many there are, so it is a preference and lives in `user_profile:`. The app
 holds you to the split: editing a file in `science/` flags the current plan as
@@ -545,9 +573,9 @@ the coaching prompts alongside the built-in guidelines in `trainmate/science/`.
 The built-ins teach mainstream sports science: zones, load math, periodization
 theory, benchmarking, recovery metrics. They deliberately do not pick a
 methodology. A file in `science/` is where you say which approach the coach
-should plan with: how blocks are structured, what a hard week looks like, how
-you taper. It is also the place for domain knowledge the built-ins lack, such
-as how strength work should coexist with endurance blocks.
+should plan with: how mesocycles are structured, what a hard week looks like,
+how you taper. It is also the place for domain knowledge the built-ins lack,
+such as how strength work should coexist with endurance mesocycles.
 
 **How to build a file.** Pick the articles, videos or podcasts that reflect the
 approach you want, pull their text with
@@ -609,7 +637,7 @@ around.
 | `constraint add` | You want the coach to *work around* something: "no run Thursday", "only 45 min today", a trip, an injury layoff. `--rest` makes it a hard no-training window that rests those dates deterministically; without it the constraint is advisory and the coach honors it by judgement. Whether it is big enough to reshape the plan is derived from its size and confirmed by you, or forced with `--replan`. |
 | `signal add`, or a tagged Calendar event | You are *reporting* something: alcohol, poor sleep, stress, heat. Signals help the morning adaptation read a rough day correctly. They never reshape the plan. |
 | `workout adapt -m "…"` | Quick capture in the moment. A durable note ("away, no gym Thursday") is saved as a real constraint; a one-off nudge ("felt flat, ease today") is folded into today's adaptation. |
-| `plan feedback "…"` | You have an opinion about the plan itself: "drop the second FTP test", "Friday sessions should progress duration, not surges". The next `plan generate` must address each note. `-m` files a note to one block, `--replan` regenerates on the spot. |
+| `plan feedback "…"` | You have an opinion about the plan itself: "drop the second FTP test", "Friday sessions should progress duration, not surges". The next `plan generate` must address each note. `-m` files a note to one mesocycle, `--replan` regenerates on the spot. |
 
 Alongside these, `workout add`, `swap`, `rm` and `restore` edit single sessions
 by hand. Adaptation treats a hand-added session as deliberate intent and
@@ -619,26 +647,27 @@ Only completed sessions are locked history.
 Three things to know when you regenerate:
 
 - **A regen is not a cold start.** The new plan is fed your previous strategy, a
-  planned-versus-actual review of the blocks you already trained, and your coach
-  learnings, so it refines the arc rather than redrawing it. When the arc is the
-  thing you want gone, `plan generate --fresh` withholds only the plan in place.
-  `--show-llm-context` shows exactly what the coach was shown.
+  planned-versus-actual review of the mesocycles you already trained, and your
+  coach learnings, so it refines the arc rather than redrawing it. When the arc
+  is the thing you want gone, `plan generate --fresh` withholds only the plan in
+  place. `--show-llm-context` shows exactly what the model was shown.
 - **`workout generate` replaces the span you name.** Manual edits included,
   though they are recoverable with `workout rollback`. With no flag the span is
-  today onward for 28 days; `-m 5` is block 5's own days; `-g` is a goal's whole
-  plan. Because it replaces rather than fills in, it asks twice: once before
-  spending the LLM call, naming how many sessions are at stake, and again with
-  the coach's proposal in front of you. `-f` skips both for unattended runs. So
-  make strategic changes first (constraint, `plan generate`, `workout
-  generate`), then layer manual tweaks on top, not the other way around.
+  today onward for 28 days; `-m 5` is mesocycle 5's own days; `-g` is a goal's
+  whole plan. Because it replaces rather than fills in, it asks twice: once
+  before spending the LLM call, naming how many sessions are at stake, and again
+  with the week planner's proposal in front of you. `-f` skips both for
+  unattended runs. So make strategic changes first (constraint, `plan generate`,
+  `workout generate`), then layer manual tweaks on top, not the other way
+  around.
 - **The next week does not move under the athlete's feet.** The days they have
   already read — the next 7 by default, `settings set commitment-days N` — are
-  not rewritten blind. The coach is shown every session standing there, plus
-  every hand-added session anywhere in the span, and has to account for each
-  one: keep it, revise it, move it or drop it, each with a sentence written for
-  the athlete. A session it does not mention is kept. `workout generate` prints
-  what it will do to each of them before you accept, and prints that report
-  under `-f` too. A session it removes in there keeps its Calendar event,
+  not rewritten blind. The week planner is shown every session standing there,
+  plus every hand-added session anywhere in the span, and has to account for
+  each one: keep it, revise it, move it or drop it, each with a sentence written
+  for the athlete. A session it does not mention is kept. `workout generate`
+  prints what it will do to each of them before you accept, and prints that
+  report under `-f` too. A session it removes in there keeps its Calendar event,
   marked with the reason, rather than vanishing overnight. Past the window, a
   rebuild is a rebuild.
 
@@ -647,12 +676,13 @@ Three things to know when you regenerate:
 TrainMate uses two model roles, both picked from the `llm.models` list in your
 config.
 
-- **The coach** writes plans, generates workouts and runs the daily adaptation.
-  This is where quality matters. **The recommendation is the most recent Claude
-  Opus** (`anthropic/claude-opus-5` at the time of writing). In the author's
-  2026-08-18 benchmark of fifteen OpenRouter models on the same two-goal
-  season, it wrote the best 14-week plan, and the only one derived from the
-  athlete's per-day equipment calendar. Be aware of the benchmark's other
+- **The coach model** answers every call that coaches: it writes the plan, it is
+  the week planner that writes and adapts the sessions, and it reads your
+  history. This is where quality matters. **The recommendation is the most
+  recent Claude Opus** (`anthropic/claude-opus-5` at the time of writing). In
+  the author's 2026-08-18 benchmark of fifteen OpenRouter models on the same
+  two-goal season, it wrote the best 14-week plan, and the only one derived from
+  the athlete's per-day equipment calendar. Be aware of the benchmark's other
   finding: `google/gemini-3.1-pro-preview` ranked first overall because it was
   the only model that reworked the schedule around both constraints dropped on
   it after planning, while Opus, like five others, adapted nothing in that
@@ -667,21 +697,21 @@ config.
 ```yaml
 llm:
   models:
-    - model: "anthropic/claude-opus-5"      # first entry is the default coach
+    - model: "anthropic/claude-opus-5"      # first entry: default coach model
     - model: "google/gemini-3.5-flash"
   router_model: "google/gemini-3.5-flash"
 ```
 
 `./tm settings list coach-model` prints the numbered menu and marks which entry
-holds which role. `--llm-model <id>` overrides the coach for a single command
-without storing anything.
+holds which role. `--llm-model <id>` overrides the coach model for a single
+command without storing anything.
 
 ## Going deeper
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how the coaching logic
   and the application fit together. Read it before changing code.
 - [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md) defines every record the app
-  keeps: goals, plans, blocks, workouts, constraints, signals, learnings.
+  keeps: goals, plans, mesocycles, workouts, constraints, signals, learnings.
 - [docs/model_comparison_2026-08.md](docs/model_comparison_2026-08.md) is the
   full fifteen-model benchmark.
 - `designs/` holds one design document per feature, with the reasoning behind

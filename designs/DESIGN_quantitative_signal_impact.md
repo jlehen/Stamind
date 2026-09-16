@@ -77,7 +77,7 @@ them per signal-day and shows the result to the LLM.
   visibly different, not one "drink day."
 - **Category-agnostic:** the same alignment runs identically for `alcohol`, a big
   meal, … TrainMate never encodes what any of them mean.
-- Feed the result into the coach's **existing** analysis prompt so a durable
+- Feed the result into the **existing** analysis prompt so a durable
   conclusion accrues confidence through the week-keyed evidence basis
   (`DESIGN_evidence_based_confidence.md`) — no second confidence path.
 
@@ -213,7 +213,7 @@ Two scope rules keep the facts honest:
 
 ## 4. What the app hands the LLM
 
-A compact block beside `weekly_summaries`: per signal category, the aligned
+A compact section beside `weekly_summaries`: per signal category, the aligned
 **episode rows** (§3) — each a dose sequence plus its before/during/after morning
 strip. Nothing is fitted or summarized.
 
@@ -258,7 +258,7 @@ new training.
 
 **The before-mornings are the reference — no separate no-signal rows.** The leading
 `k` mornings of every episode are a temporally-matched local "normal at this point in
-the block," and `vs_normal` is already baseline-relative (z = 0 is a typical day). So
+the mesocycle," and `vs_normal` is already baseline-relative (z = 0 is a typical day). So
 the contrast the first draft sought from sampled `value: 0` rows is built into each
 episode instead — the model always has a clean "what mornings looked like just before"
 to subtract, without a separate sampling policy (this **resolves** the old
@@ -274,7 +274,7 @@ each morning's preceding-day **dose** (via `days`) and `prev_day_load_tss`
 after arc to judge how long the effect lasts and whether consecutive days stack; treat
 a missing channel/morning as "no data," never as zero.
 
-**Both the block and its prompt guide are gated on a non-empty `signal_days`.** When
+**Both the section and its prompt guide are gated on a non-empty `signal_days`.** When
 nothing is logged (or every category sits below the floor, §5) neither is rendered, so
 the absence reads as "nothing logged" rather than "logged and unremarkable," and the
 model is never given instructions for a section it wasn't handed.
@@ -301,7 +301,7 @@ Honesty now rests on **what we show** plus the LLM's instructed caution:
   bit-for-bit reproducible, and it could mis-read if handed *hundreds* of rows.
   Both are softened by existing machinery — the evidence model accumulates agreement
   across runs, and the analysis is cached unless inputs change (§8) — and by keeping
-  the block **digestible** (§6 volume note).
+  the section **digestible** (§6 volume note).
 
 ---
 
@@ -327,12 +327,12 @@ how global baselines already feed a windowed analysis.
 runs, so full history is typically a few-tens of episodes, each a short dose sequence
 plus a `streak_length − 1 + 2k` morning strip — still small. A chronic
 every-other-day pattern can merge into one long episode (§3.0); that is one genuine
-confounded period, so we keep it whole. If a long history ever makes the block bulky,
+confounded period, so we keep it whole. If a long history ever makes the section bulky,
 cap to the most recent N **episodes** before trimming k; noted, not built (§10).
 
 ### 6.1 Which flows compute it, and when — no separate trigger
 
-The block rides inside the **one analysis path** (`_run_workout_analysis`), which
+The section rides inside the **one analysis path** (`_run_workout_analysis`), which
 has exactly two entry points; those are the only flows this change touches:
 
 | Command | Behaviour change |
@@ -346,20 +346,20 @@ facts, so they inherit the conclusions for free.
 **`workout adapt` is the one place the conclusion alone is not enough.** The durable
 learning ("alcohol suppresses next-day HRV") is general; to act on it at the daily
 load decision the adaptation must also see the *per-day* fact that a signal was logged
-yesterday — which the episode-aligned `signal_days` block (an analysis-pass input)
+yesterday — which the episode-aligned `signal_days` section (an analysis-pass input)
 does not give it. So `workout adapt` reads the raw windowed `daily_signals` rows
 directly (alongside metrics) and is instructed to attribute a depressed morning to
 lifestyle noise vs training fatigue, separating *why* recovery is low from *what* to do
 today. A signal the day before a bad morning is transient suppression, **not**
 accumulated training fatigue: the LLM may still ease or **reschedule** today's hard
-session for acute readiness, but must not read it as evidence the *block* is too hard
+session for acute readiness, but must not read it as evidence the *mesocycle* is too hard
 (no permanent cut to planned volume/intensity, not counted as training fatigue).
 Without this, the whole quantitative path produces a true-but-inert learning — the
 attribution never reaches the decision that moves load. (Plumbing only: no learning is
 authored here; daily adaptation stays read-only w.r.t. learnings.)
 
 There is **no dedicated "analyse my drinking" command**, and the athlete triggers
-nothing manually. Because the block is rebuilt full-history every run, the picture
+nothing manually. Because the section is rebuilt full-history every run, the picture
 **sharpens automatically** as signal-days accumulate — each routine `data reflect`
 shows the LLM the whole history, even though it only analyses the newest weeks.
 
@@ -388,24 +388,24 @@ that learning earns confidence over time.**
 
 `CoachEngine._get_evidence_fingerprint` (`coach/engine/prompt.py`) hashes the
 `completed_activities`, `metrics`, `constraints` and `daily_signals` of the analysis
-**window**. That is not enough for this block: `signal_days` is built over **full
+**window**. That is not enough for this mesocycle: `signal_days` is built over **full
 history** (§6), so a signal, activity or metric added, edited or deleted *outside*
 `[from, until]` changes the prompt the LLM sees. Under a window-scoped hash alone the
 fingerprint would not move and `data reflect` would silently reuse a reconstruction
-built from a now-stale block — precisely the case §6 says matters, since an incremental
+built from a now-stale section — precisely the case §6 says matters, since an incremental
 window contains almost none of the signal history.
 
-So **the computed `signal_days` block is itself folded into the fingerprint**. It is
+So **the computed `signal_days` section is itself folded into the fingerprint**. It is
 built *before* the reuse check and hashed as-is, which keeps the project invariant
 exact — everything rendered into the analysis prompt is hashed — with no field-by-field
-mirror of `_signal_days`' inputs to drift out of date: if the block the LLM would see
+mirror of `_signal_days`' inputs to drift out of date: if the section the LLM would see
 differs, the fingerprint differs, whatever moved (a drink logged last spring, a
 re-pulled load on a bracketing morning, a changed `k`). Conversely a change that leaves
-the block identical costs nothing. The extra work is three unbounded reads plus the
+the section identical costs nothing. The extra work is three unbounded reads plus the
 alignment on the reuse path — local SQLite, negligible against the LLM call it guards.
 
 **Accepted consequence: the two knobs of §5 are now fingerprinted, transitively.**
-`signal_days_lookahead` and `signal_days_min_days` shape the block, so editing
+`signal_days_lookahead` and `signal_days_min_days` shape the section, so editing
 either changes the hash and forces a recompute on the next `data bootstrap` /
 `data reflect`. That is a deliberate exception to the project's general stance that
 config values are not hashed into this cache (`_get_config_hash` / `plan_config_hash`
@@ -414,7 +414,7 @@ the stance exists so that fiddling with a setting does not cost an
 LLM call, but here a different knob genuinely produces a different prompt, and reusing an
 answer computed under the old one would be reporting a stale result as current. It is
 narrow — only these two keys, only on the analysis cache — and it is why the knobs are not
-merely display settings. Adding the block to the hash also invalidated whatever was cached
+merely display settings. Adding the section to the hash also invalidated whatever was cached
 at the time of the change, once.
 
 The **deliberate baseline-recompute omission** noted in
@@ -448,7 +448,7 @@ z values are hashed as computed.
 - `coach/engine/prompt.py::_get_evidence_fingerprint` — take `signal_days` and hash it
   alongside the windowed evidence (§8).
 - `coach/engine/analysis.py::_data_analyze_logic` — accept a `signal_days` argument,
-  render it into the user content beside `weekly_summaries` (both the block and the
+  render it into the user content beside `weekly_summaries` (both the section and the
   guide gated on it being non-empty; §4), and add one TASK paragraph (§4):
   read each morning's preceding-day dose (via `days`) and `prev_day_load_tss`
   together; read the before→during→after arc for persistence and the cumulative cost
@@ -496,7 +496,7 @@ need; it's a join plus the z arithmetic already in the codebase.
 - **Volume cap (§6).** If full history grows large, cap to most-recent-N **episodes**?
   What N, and does it bias toward recent behaviour?
 - **Default `k` (§3).** 3 is the starting default; it now also sets the *before*
-  window and the episode-merge gap, so it is worth revisiting once real blocks are
+  window and the episode-merge gap, so it is worth revisiting once real sections are
   inspected — long enough to watch a heavy session clear and to bracket a run,
   short enough that the edges aren't all intervening-training noise.
 

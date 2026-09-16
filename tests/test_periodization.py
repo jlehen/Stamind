@@ -26,7 +26,7 @@ from trainmate.cli.workouts import generate as generate_cli
 from trainmate.config import config
 from trainmate.cli.selectors import IdRange
 from trainmate.db import Database
-from trainmate.db.periodization import repair_block_contiguity
+from trainmate.db.periodization import repair_mesocycle_contiguity
 import trainmate.db
 import trainmate.coach
 
@@ -241,8 +241,8 @@ class TestPeriodization(unittest.TestCase):
             system_prompt,
         )
 
-    def _plan_with_block_under_way(self, target_date: str = "2026-11-01") -> int:
-        """A goal whose active plan holds one block straddling the pinned today."""
+    def _plan_with_mesocycle_under_way(self, target_date: str = "2026-11-01") -> int:
+        """A goal whose active plan holds one mesocycle straddling the pinned today."""
         obj_id = test_db.add_objective(
             title="Zurich Marathon", target_date=target_date,
             sport_type="running",
@@ -260,14 +260,14 @@ class TestPeriodization(unittest.TestCase):
         return obj_id
 
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_replan_offers_to_keep_the_block_under_way(self, mock_client):
-        """Mid-block, the replan may let that block finish — which means repeating its
-        ORIGINAL start date, since blocks own their sessions by date containment
-        (DESIGN_block_progress.md §7)."""
+    def test_replan_offers_to_keep_the_mesocycle_under_way(self, mock_client):
+        """Mid-mesocycle, the replan may let that mesocycle finish — which means repeating its
+        ORIGINAL start date, since mesocycles own their sessions by date containment
+        (DESIGN_mesocycle_progress.md §7)."""
         pin_clock(self, "2026-08-23")
-        self._plan_with_block_under_way()
+        self._plan_with_mesocycle_under_way()
         mock_client.complete.return_value = {
-            "strategy": "Kept the Build block; it still fits.",
+            "strategy": "Kept the Build mesocycle; it still fits.",
             "mesocycles": [{
                 "name": "Build", "start_date": "2026-08-03",
                 "end_date": "2026-08-30", "focus": "Threshold work",
@@ -277,7 +277,7 @@ class TestPeriodization(unittest.TestCase):
         coach_service.plan_generate(force=True)
 
         prompt = mock_client.complete.call_args_list[0][0][0]
-        self.assertIn("### THE BLOCK ALREADY UNDER WAY", prompt)
+        self.assertIn("### THE MESOCYCLE ALREADY UNDER WAY", prompt)
         self.assertIn('"Build" (2026-08-03 to 2026-08-30)', prompt)
         self.assertIn("Already trained: 20 days of it, starting 2026-08-03.", prompt)
         # The whole point of the change: keeping it means the original start date.
@@ -288,37 +288,37 @@ class TestPeriodization(unittest.TestCase):
         self.assertNotIn("The first mesocycle must start on the start date", prompt)
 
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_block_starting_today_is_not_offered(self, mock_client):
+    def test_mesocycle_starting_today_is_not_offered(self, mock_client):
         """Nothing is under way yet, so there is nothing to let finish."""
         pin_clock(self, "2026-08-03")
-        self._plan_with_block_under_way()
+        self._plan_with_mesocycle_under_way()
         mock_client.complete.return_value = {"strategy": "s", "mesocycles": []}
 
         coach_service.plan_generate(force=True)
 
         prompt = mock_client.complete.call_args_list[0][0][0]
-        self.assertNotIn("### THE BLOCK ALREADY UNDER WAY", prompt)
+        self.assertNotIn("### THE MESOCYCLE ALREADY UNDER WAY", prompt)
         self.assertIn(
             "The first mesocycle must start on the start date (2026-08-03).", prompt
         )
 
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_fresh_withholds_the_block_under_way(self, mock_client):
-        """A clean slate is not asked to finish the block it is departing from."""
+    def test_fresh_withholds_the_mesocycle_under_way(self, mock_client):
+        """A clean slate is not asked to finish the mesocycle it is departing from."""
         pin_clock(self, "2026-08-23")
-        self._plan_with_block_under_way()
+        self._plan_with_mesocycle_under_way()
         mock_client.complete.return_value = {"strategy": "s", "mesocycles": []}
 
         coach_service.plan_generate(fresh=True)
 
         prompt = mock_client.complete.call_args_list[0][0][0]
-        self.assertNotIn("### THE BLOCK ALREADY UNDER WAY", prompt)
+        self.assertNotIn("### THE MESOCYCLE ALREADY UNDER WAY", prompt)
         self.assertIn(
             "The first mesocycle must start on the start date (2026-08-23).", prompt
         )
 
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_block_not_offered_when_plan_start_is_pinned_past_today(self, mock_client):
+    def test_mesocycle_not_offered_when_plan_start_is_pinned_past_today(self, mock_client):
         """A preceding goal's plan pins the start after today; reaching back past that
         would overlap that goal's season, so the keep option is withheld."""
         pin_clock(self, "2026-08-23")
@@ -334,14 +334,14 @@ class TestPeriodization(unittest.TestCase):
                 "end_date": "2026-09-15", "focus": "Speed",
             }],
         )
-        obj_id = self._plan_with_block_under_way()
+        obj_id = self._plan_with_mesocycle_under_way()
         mock_client.complete.return_value = {"strategy": "s", "mesocycles": []}
 
         # Named explicitly: the bare call would plan for the sooner tune-up goal.
         coach_service.plan_generate(force=True, objective_id=obj_id)
 
         prompt = mock_client.complete.call_args_list[0][0][0]
-        self.assertNotIn("### THE BLOCK ALREADY UNDER WAY", prompt)
+        self.assertNotIn("### THE MESOCYCLE ALREADY UNDER WAY", prompt)
         self.assertIn(
             "The first mesocycle must start on the start date (2026-09-16).", prompt
         )
@@ -484,7 +484,7 @@ class TestPeriodization(unittest.TestCase):
         self.assertEqual(proposal['strategy'], "New strategy")
 
     def _prior_training_fixture(self, mock_client) -> int:
-        """A goal whose plan has one elapsed block with a session trained inside it —
+        """A goal whose plan has one elapsed mesocycle with a session trained inside it —
         the least that gives `_build_prior_training_context` something to say. Returns
         the goal's ID."""
         obj_id = test_db.add_objective(
@@ -499,7 +499,7 @@ class TestPeriodization(unittest.TestCase):
                 "end_date": "2026-06-28", "focus": "Aerobic conditioning",
             }],
         )
-        # A completed session inside that elapsed block.
+        # A completed session inside that elapsed mesocycle.
         test_db.save_completed_activity(
             activity_id="a1", date="2026-06-01", start_time="08:00:00",
             activity_name="Base Run", activity_type="running",
@@ -517,7 +517,7 @@ class TestPeriodization(unittest.TestCase):
 
     @patch("trainmate.coach.engine.openrouter_client")
     def test_plan_generate_injects_planned_vs_actual(self, mock_client):
-        # Option A (DESIGN_backward_evaluation.md §6): the prior plan's elapsed blocks are
+        # Option A (DESIGN_backward_evaluation.md §6): the prior plan's elapsed mesocycles are
         # compared against what was actually completed, and fed into the strategy prompt.
         obj_id = self._prior_training_fixture(mock_client)
         coach_service.plan_generate(force=True, objective_id=obj_id)
@@ -525,7 +525,7 @@ class TestPeriodization(unittest.TestCase):
         self.assertIn("## PRIOR TRAINING REVIEW", system_prompt)
         self.assertIn("PLANNED vs ACTUAL", system_prompt)
         self.assertIn("Aerobic conditioning", system_prompt)
-        self.assertIn("1 session", system_prompt)
+        self.assertIn("1 activity", system_prompt)
         # The review now carries the per-sport, per-zone distribution as a per-week rate
         # over completed weeks, not a Z1-2/Z3/Z4-5 rollup
         # (DESIGN_intensity_distribution.md §5/§9).
@@ -728,7 +728,7 @@ class TestPeriodization(unittest.TestCase):
         self, mock_client, mock_calendar
     ):
         """When today's planned session has a matching completed activity, regeneration
-        must keep today's workout and start the new plan tomorrow."""
+        must keep today's workout and start the new sessions tomorrow."""
         test_db.add_objective(
             title="Zurich Marathon", target_date=GOAL_DATE,
             sport_type="running",
@@ -766,7 +766,7 @@ class TestPeriodization(unittest.TestCase):
         }
         _generate_workouts()
 
-        # Today's completed workout survives; the new plan begins tomorrow.
+        # Today's completed workout survives; the new sessions begin tomorrow.
         titles = _session_titles(test_db.get_workouts(start_date=today))
         self.assertEqual(titles, ["Today Done", "Tomorrow Run"])
         # Today's Calendar event was left untouched (only future days are torn down).
@@ -796,7 +796,7 @@ class TestPeriodization(unittest.TestCase):
         }
         coach_service.plan_generate(force=False)
 
-        # Simulate a stale workout from the old plan that was synced to Calendar.
+        # Simulate a stale session from an earlier generation that was synced to Calendar.
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         future = (datetime.now(timezone.utc) + timedelta(days=10)).strftime("%Y-%m-%d")
         save_workout(test_db,
@@ -968,7 +968,7 @@ class TestPeriodization(unittest.TestCase):
 
     def _plan_v1(self, mock_client, strategy: str = "v1", force: bool = False) -> int:
         """Generates a periodization plan and returns the active macrocycle id."""
-        # The block has to still be live for `workout generate` to have anything to
+        # The mesocycle has to still be live for `workout generate` to have anything to
         # place into, so it rides on today like the goal does.
         mock_client.complete.return_value = {"strategy": strategy, "mesocycles": [{
             "name": "Base", "start_date": _days_out(-1),
@@ -1618,8 +1618,8 @@ class TestPeriodization(unittest.TestCase):
 
         system_prompt = mock_client.complete.call_args[0][0]
         self.assertIn("## ATHLETE RECENT TRAINING SUMMARY (PAST 15 DAYS)", system_prompt)
-        self.assertIn("Completed Workouts (Past 15 days):", system_prompt)
-        self.assertIn("running: 1 sessions", system_prompt)
+        self.assertIn("Completed Activities (Past 15 days):", system_prompt)
+        self.assertIn("running: 1 activity", system_prompt)
         self.assertIn("Resting Heart Rate: 55.0 bpm", system_prompt)
 
     @patch("trainmate.coach.service._today_str")
@@ -1715,7 +1715,7 @@ class TestCompletedSeasonsReachTheReview(unittest.TestCase):
 
     @patch("trainmate.runtime.calendar_syncer")
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_last_seasons_blocks_are_in_the_next_plans_prompt(
+    def test_last_seasons_mesocycles_are_in_the_next_plans_prompt(
         self, mock_client, mock_calendar
     ):
         self._last_season()
@@ -1904,9 +1904,9 @@ class TestStaleAnalysisWarning(unittest.TestCase):
 
 
 class TestPlanLineage(unittest.TestCase):
-    """The retrospective block walk takes the previous *goal's* plan and never an earlier
-    *version* of this goal's own (DESIGN_plan_rollback.md §6.1). `_blocks_in_window` used
-    to call the version accessor, so `tm progress --blocks` reported every block twice
+    """The retrospective mesocycle walk takes the previous *goal's* plan and never an earlier
+    *version* of this goal's own (DESIGN_plan_rollback.md §6.1). `_mesocycles_in_window` used
+    to call the version accessor, so `tm progress --mesocycles` reported every mesocycle twice
     after any regeneration — the two plans cover the same dates."""
 
     TODAY = "2026-08-05"
@@ -1937,17 +1937,17 @@ class TestPlanLineage(unittest.TestCase):
             title=title, target_date=target_date, sport_type="running",
         )
 
-    def _plan(self, obj_id, strategy, blocks):
+    def _plan(self, obj_id, strategy, mesocycles):
         return test_db.save_macrocycle(
             objective_id=obj_id, strategy=strategy, goals_hash="g", constraints_hash="c",
             mesocycles=[{"name": name, "start_date": start, "end_date": end,
-                         "focus": "aerobic"} for name, start, end in blocks],
+                         "focus": "aerobic"} for name, start, end in mesocycles],
         )
 
-    def test_regenerating_does_not_duplicate_the_blocks(self):
+    def test_regenerating_does_not_duplicate_the_mesocycles(self):
         """The regression: v1 and v2 span the same dates, so walking both reports every
-        calendar period twice and counts each activity into two blocks."""
-        from trainmate.cli.progress import _blocks_in_window
+        calendar period twice and counts each activity into two mesocycles."""
+        from trainmate.cli.progress import _mesocycles_in_window
 
         obj = self._goal("Autumn Marathon", "2026-09-20")
         self._plan(obj, "v1", [("V1 Base", "2026-06-01", "2026-06-28"),
@@ -1955,22 +1955,22 @@ class TestPlanLineage(unittest.TestCase):
         v2 = self._plan(obj, "v2", [("V2 Base", "2026-06-01", "2026-06-28"),
                                     ("V2 Build", "2026-06-29", "2026-07-26")])
 
-        blocks = _blocks_in_window(test_db, "2026-06-01", self.TODAY)
-        self.assertEqual([b["name"] for b in blocks], ["V2 Base", "V2 Build"])
-        self.assertEqual({b["macrocycle_id"] for b in blocks}, {v2})
+        mesocycles = _mesocycles_in_window(test_db, "2026-06-01", self.TODAY)
+        self.assertEqual([b["name"] for b in mesocycles], ["V2 Base", "V2 Build"])
+        self.assertEqual({b["macrocycle_id"] for b in mesocycles}, {v2})
 
     def test_the_previous_goals_plan_is_walked(self):
-        """The other half: a window reaching back past the current plan's first block
+        """The other half: a window reaching back past the current plan's first mesocycle
         lands in the previous goal's plan, which nothing else supplies."""
-        from trainmate.cli.progress import _blocks_in_window
+        from trainmate.cli.progress import _mesocycles_in_window
 
         spring = self._goal("Spring 10k", "2026-05-31")
         self._plan(spring, "spring", [("Spring Base", "2026-04-06", "2026-05-31")])
         autumn = self._goal("Autumn Marathon", "2026-09-20")
         self._plan(autumn, "autumn", [("Autumn Base", "2026-06-01", "2026-06-28")])
 
-        blocks = _blocks_in_window(test_db, "2026-04-06", self.TODAY)
-        self.assertEqual([b["name"] for b in blocks], ["Spring Base", "Autumn Base"])
+        mesocycles = _mesocycles_in_window(test_db, "2026-04-06", self.TODAY)
+        self.assertEqual([b["name"] for b in mesocycles], ["Spring Base", "Autumn Base"])
 
     def test_preceding_macrocycle_skips_superseded_versions(self):
         """`get_preceding_macrocycle` reaches the previous goal's *active* plan, not
@@ -2033,11 +2033,11 @@ class TestDateKeyedGeneration(unittest.TestCase):
             title=title, target_date=target_date, sport_type="running",
         )
 
-    def _plan(self, obj_id, strategy, blocks):
+    def _plan(self, obj_id, strategy, mesocycles):
         return test_db.save_macrocycle(
             objective_id=obj_id, strategy=strategy, goals_hash="g", constraints_hash="c",
             mesocycles=[{"name": name, "start_date": start, "end_date": end,
-                         "focus": f"focus of {name}"} for name, start, end in blocks],
+                         "focus": f"focus of {name}"} for name, start, end in mesocycles],
         )
 
     @staticmethod
@@ -2053,15 +2053,15 @@ class TestDateKeyedGeneration(unittest.TestCase):
     # --- the DB rule on its own ---------------------------------------------------
 
     def test_sequential_plans_both_govern_a_long_window(self):
-        """A horizon can legitimately run out of one goal's last block into the next
+        """A horizon can legitimately run out of one goal's last mesocycle into the next
         goal's first, so neither plan is dropped."""
         first = self._goal("Spring 10k", _days_out(30))
         self._plan(first, "spring", [("Base", _days_out(0), _days_out(30))])
         second = self._goal("Autumn Marathon", _days_out(90))
         self._plan(second, "autumn", [("Build", _days_out(31), _days_out(90))])
 
-        blocks, dropped = test_db.get_governing_mesocycles(_days_out(0), _days_out(60))
-        self.assertEqual([b["name"] for b in blocks], ["Base", "Build"])
+        mesocycles, dropped = test_db.get_governing_mesocycles(_days_out(0), _days_out(60))
+        self.assertEqual([b["name"] for b in mesocycles], ["Base", "Build"])
         self.assertEqual(dropped, [])
 
     def test_plans_covering_the_same_days_are_settled_by_recency(self):
@@ -2072,25 +2072,25 @@ class TestDateKeyedGeneration(unittest.TestCase):
         second = self._goal("Autumn Marathon", _days_out(90))
         new = self._plan(second, "autumn", [("Build", _days_out(0), _days_out(90))])
 
-        blocks, dropped = test_db.get_governing_mesocycles(_days_out(0), _days_out(30))
-        self.assertEqual([b["macrocycle_id"] for b in blocks], [new])
+        mesocycles, dropped = test_db.get_governing_mesocycles(_days_out(0), _days_out(30))
+        self.assertEqual([b["macrocycle_id"] for b in mesocycles], [new])
         self.assertEqual(dropped, [old])
 
         # Naming a plan settles it the other way instead.
-        blocks, dropped = test_db.get_governing_mesocycles(
+        mesocycles, dropped = test_db.get_governing_mesocycles(
             _days_out(0), _days_out(30), prefer_macro_id=old
         )
-        self.assertEqual([b["macrocycle_id"] for b in blocks], [old])
+        self.assertEqual([b["macrocycle_id"] for b in mesocycles], [old])
         self.assertEqual(dropped, [new])
 
-    def test_a_window_no_block_covers_falls_back_rather_than_answering_empty(self):
+    def test_a_window_no_mesocycle_covers_falls_back_rather_than_answering_empty(self):
         """A plan that has run out still answers, so generation reports "no strategy"
         only when there is genuinely none."""
         goal = self._goal("Spring 10k", _days_out(-5))
         self._plan(goal, "spring", [("Base", _days_out(-40), _days_out(-10))])
 
-        blocks, dropped = test_db.get_governing_mesocycles(_days_out(0), _days_out(27))
-        self.assertEqual([b["name"] for b in blocks], ["Base"])
+        mesocycles, dropped = test_db.get_governing_mesocycles(_days_out(0), _days_out(27))
+        self.assertEqual([b["name"] for b in mesocycles], ["Base"])
         self.assertEqual(dropped, [])
 
         clear_all_tables(test_db)
@@ -2098,9 +2098,9 @@ class TestDateKeyedGeneration(unittest.TestCase):
             test_db.get_governing_mesocycles(_days_out(0), _days_out(27)), ([], [])
         )
 
-    def test_the_strict_readers_answer_only_with_blocks_that_cover_their_target(self):
+    def test_the_strict_readers_answer_only_with_mesocycles_that_cover_their_target(self):
         """The strict question, for every caller that goes on to treat the answer as
-        covering what it asked about — a block that does not contain the target is not
+        covering what it asked about — a mesocycle that does not contain the target is not
         something to name (DESIGN_constraint_honoring.md §4.1). The window form is
         internal to get_governing_mesocycles; the single-date form is the public reader
         the constraint messages use.
@@ -2115,7 +2115,7 @@ class TestDateKeyedGeneration(unittest.TestCase):
         self.assertIsNone(test_db.get_covering_mesocycle(_days_out(0)))
         # The governing readers still fall back, because `generate` depends on it.
         self.assertIsNotNone(test_db.get_active_mesocycle(_days_out(0)))
-        # And a window a block really does cover answers with it through either reader.
+        # And a window a mesocycle really does cover answers with it through either reader.
         covered = _days_out(-20)
         self.assertEqual(
             [b["name"] for b in test_db.get_governing_mesocycles(covered, covered)[0]],
@@ -2123,8 +2123,8 @@ class TestDateKeyedGeneration(unittest.TestCase):
         )
 
     def test_single_date_readers_prefer_the_newest_plan_on_overlapping_days(self):
-        """Overlapping plans are settled by recency in every reader, so the block a
-        message names and the block a workout is stamped with are the same one."""
+        """Overlapping plans are settled by recency in every reader, so the mesocycle a
+        message names and the mesocycle a workout is stamped with are the same one."""
         first = self._goal("Spring 10k", _days_out(40))
         self._plan(first, "spring", [("Base", _days_out(0), _days_out(40))])
         second = self._goal("Autumn Marathon", _days_out(90))
@@ -2145,7 +2145,7 @@ class TestDateKeyedGeneration(unittest.TestCase):
         self, mock_client, _mock_calendar
     ):
         """The regression the goal indirection caused: the nearest goal's plan was used
-        even when its blocks were long finished and another plan covered today."""
+        even when its mesocycles were long finished and another plan covered today."""
         stale = self._goal("Club 10k", _days_out(20))
         self._plan(stale, "STALE STRATEGY", [("Old", _days_out(-60), _days_out(-30))])
         live = self._goal("Autumn Marathon", _days_out(90))
@@ -2157,7 +2157,7 @@ class TestDateKeyedGeneration(unittest.TestCase):
         system_prompt = mock_client.complete.call_args.args[0]
         self.assertIn("LIVE STRATEGY", system_prompt)
         self.assertNotIn("STALE STRATEGY", system_prompt)
-        # The covered block is marked, so the model no longer has to infer which blocks
+        # The covered mesocycle is marked, so the model no longer has to infer which mesocycles
         # the span falls in from the dates alone.
         self.assertIn("> Build", system_prompt)
 
@@ -2194,8 +2194,8 @@ class TestDateKeyedGeneration(unittest.TestCase):
 
     @patch("trainmate.runtime.calendar_syncer")
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_a_horizon_past_the_last_block_says_so(self, mock_client, _mock_calendar):
-        """Days past the plan's end have no block to follow — a date-keyed view can see
+    def test_a_horizon_past_the_last_mesocycle_says_so(self, mock_client, _mock_calendar):
+        """Days past the plan's end have no mesocycle to follow — a date-keyed view can see
         that and say it, where the goal-keyed one could not."""
         goal = self._goal("Autumn Marathon", _days_out(90))
         self._plan(goal, "autumn", [("Base", _days_out(0), _days_out(20))])
@@ -2269,7 +2269,7 @@ class TestGenerationSpanIsBounded(unittest.TestCase):
     @patch("trainmate.runtime.calendar_syncer")
     @patch("trainmate.coach.engine.openrouter_client")
     def test_the_span_opens_where_the_caller_put_it(self, mock_client, _mock_calendar):
-        """A block that starts next month is generated from its own first day: `-m` names
+        """A mesocycle that starts next month is generated from its own first day: `-m` names
         a span, not a horizon reaching back to today."""
         mock_client.complete.return_value = self._response(_days_out(31))
         proposal = coach_service.workout_generate(
@@ -2285,7 +2285,7 @@ class TestGenerationSpanIsBounded(unittest.TestCase):
     @patch("trainmate.runtime.calendar_syncer")
     @patch("trainmate.coach.engine.openrouter_client")
     def test_the_span_never_opens_in_the_past(self, mock_client, _mock_calendar):
-        """A block already under way is regenerated from today: yesterday is history."""
+        """A mesocycle already under way is regenerated from today: yesterday is history."""
         mock_client.complete.return_value = self._response(_days_out(1))
         proposal = coach_service.workout_generate(
             start_date=_days_out(-10), end_date=_days_out(10)
@@ -2365,14 +2365,14 @@ class TestGenerationSpanIsBounded(unittest.TestCase):
         )
 
     def test_a_plan_covered_to_its_last_day_has_nothing_left_to_generate(self):
-        """Carrying on past the plan would write days no block governs — the plan-cliff
+        """Carrying on past the plan would write days no mesocycle governs — the plan-cliff
         state, whose fix is a new goal rather than another span."""
         self._existing(_days_out(90), "Final")
         self.assertIsNone(generate_cli._resolve_span(argparse.Namespace()))
 
     def test_a_selector_still_opens_today(self):
         """Only the unselected case carries on. A forward-direction selector fills its own
-        start in `resolve_window`, so `-m ..<id>` keeps meaning today through that block."""
+        start in `resolve_window`, so `-m ..<id>` keeps meaning today through that mesocycle."""
         self._existing(_days_out(3), "Planned")
         meso_id = test_db.get_mesocycles_for_macrocycle(
             test_db.get_governing_macrocycle()["id"]
@@ -2399,9 +2399,9 @@ class TestGenerationSpanIsBounded(unittest.TestCase):
             proposal.gen_end, _days_out(config.workout_generation_span_days - 1)
         )
 
-class TestTheStandingBlockReachesGeneration(unittest.TestCase):
+class TestTheStandingSessionsReachGeneration(unittest.TestCase):
     """`workout generate` rewrites the horizon, so the sessions the athlete has already
-    been told about reach the prompt and the coach must answer for each one
+    been told about reach the prompt and the week planner must answer for each one
     (DESIGN_plan_change_continuity.md §4). Past the window they do not: out there the
     plan is the plan, and the run rebuilds freely."""
 
@@ -2511,8 +2511,8 @@ class TestTheStandingBlockReachesGeneration(unittest.TestCase):
         _proposal, user = self._run()
         self.assertIn("ERG-locked, no surges.", user)
 
-    def test_a_session_past_the_window_is_not_in_the_block(self):
-        """Out there the plan is the plan and the run rebuilds freely, so the coach is
+    def test_a_session_past_the_window_is_not_a_standing_session(self):
+        """Out there the plan is the plan and the run rebuilds freely, so the week planner is
         not asked to account for the day (§4.2)."""
         self._window(3)
         self._eased(_days_out(1))
@@ -2521,7 +2521,7 @@ class TestTheStandingBlockReachesGeneration(unittest.TestCase):
         self.assertIn("Easy Z2 Spin", user)
         self.assertNotIn("Steady Run", user)
 
-    def test_a_manual_session_past_the_window_is_in_the_block(self):
+    def test_a_manual_session_past_the_window_is_a_standing_session(self):
         """The window's argument is that past it the athlete has not seen the day. That
         is false for a session they typed in themselves (§4.2)."""
         self._window(3)
@@ -2537,7 +2537,7 @@ class TestTheStandingBlockReachesGeneration(unittest.TestCase):
         _proposal, user = self._run()
         self.assertNotIn("SESSIONS ALREADY STANDING", user)
 
-    def test_a_cancelled_session_is_not_in_the_block(self):
+    def test_a_cancelled_session_is_not_a_standing_session(self):
         """`workout rm` ended the session; there is nothing standing to answer for."""
         self._eased(_days_out(3), removed=True, removed_reason="travelling")
         _proposal, user = self._run()
@@ -2605,7 +2605,7 @@ class TestTheStandingBlockReachesGeneration(unittest.TestCase):
 
     def test_a_keep_naming_a_slot_nothing_stands_in_is_dropped(self):
         """It claims a slot nothing would then write. Dropping it archives the day like
-        any other the plan does not fill — a silently blank day is the worse failure."""
+        any other the new sessions do not fill — a silently blank day is the worse failure."""
         self._eased(_days_out(3))
         self._run(self._keep(_days_out(4), sport="running"))
         self.assertIsNone(test_db.get_workout(_days_out(4), "running"))
@@ -2652,7 +2652,7 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
         clear_all_tables(test_db)
 
     def _goal_with_plan(self, title: str, target: str, start: str, end: str):
-        """A goal plus a one-block plan, returned as (objective_id, macrocycle_id)."""
+        """A goal plus a one-mesocycle plan, returned as (objective_id, macrocycle_id)."""
         oid = test_db.add_objective(title, target, "running", "", 1)
         mid = test_db.save_macrocycle(
             oid, f"{title} strategy", "gh", "ch",
@@ -2690,7 +2690,7 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
             "Race A", _days_out(60), _days_out(0), _days_out(30)
         )
         save_workout(test_db, _days_out(3), "running", "Tagged", "x", macrocycle_id=mid)
-        # Beyond every block, so save_workout finds no plan to tag it with.
+        # Beyond every mesocycle, so save_workout finds no plan to tag it with.
         save_workout(test_db, _days_out(45), "running", "Untagged", "x")
 
         result = coach_service.goal_archive(oid)
@@ -2777,10 +2777,10 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
         )
 
 
-class TestBlockContiguityRepair(unittest.TestCase):
-    """Within one plan, blocks are contiguous by construction: save_macrocycle repairs
+class TestMesocycleContiguityRepair(unittest.TestCase):
+    """Within one plan, mesocycles are contiguous by construction: save_macrocycle repairs
     model-authored dates instead of trusting them (DOMAIN_MODEL.md §4). End dates stay
-    authoritative; starts are re-derived, and a swallowed block is dropped."""
+    authoritative; starts are re-derived, and a swallowed mesocycle is dropped."""
 
     @classmethod
     def setUpClass(cls):
@@ -2801,56 +2801,56 @@ class TestBlockContiguityRepair(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
 
-    def _save(self, blocks):
+    def _save(self, mesocycles):
         obj = test_db.add_objective(
             title="Goal", target_date=_days_out(90), sport_type="running",
         )
         macro = test_db.save_macrocycle(
             objective_id=obj, strategy="s", goals_hash="g", constraints_hash="c",
             mesocycles=[{"name": name, "start_date": start, "end_date": end,
-                         "focus": "f"} for name, start, end in blocks],
+                         "focus": "f"} for name, start, end in mesocycles],
         )
         return test_db.get_mesocycles_for_macrocycle(macro)
 
-    def test_contiguous_blocks_are_stored_untouched(self):
+    def test_contiguous_mesocycles_are_stored_untouched(self):
         stored = self._save([("Base", _days_out(0), _days_out(27)),
                              ("Build", _days_out(28), _days_out(55))])
         self.assertEqual([(b["start_date"], b["end_date"]) for b in stored],
                          [(_days_out(0), _days_out(27)), (_days_out(28), _days_out(55))])
 
-    def test_a_gap_between_blocks_is_closed_at_save(self):
+    def test_a_gap_between_mesocycles_is_closed_at_save(self):
         stored = self._save([("Base", _days_out(0), _days_out(27)),
                              ("Build", _days_out(33), _days_out(55))])
         self.assertEqual(stored[1]["start_date"], _days_out(28))
         self.assertEqual(stored[1]["end_date"], _days_out(55))
 
-    def test_overlapping_blocks_are_redated_at_save(self):
+    def test_overlapping_mesocycles_are_redated_at_save(self):
         stored = self._save([("Base", _days_out(0), _days_out(27)),
                              ("Build", _days_out(20), _days_out(55))])
         self.assertEqual(stored[1]["start_date"], _days_out(28))
 
-    def test_a_block_its_predecessor_swallows_is_dropped(self):
+    def test_a_mesocycle_its_predecessor_swallows_is_dropped(self):
         stored = self._save([("Base", _days_out(0), _days_out(27)),
                              ("Blip", _days_out(10), _days_out(20)),
                              ("Build", _days_out(28), _days_out(55))])
         self.assertEqual([b["name"] for b in stored], ["Base", "Build"])
 
     def test_repair_names_what_it_changed_and_is_idempotent(self):
-        blocks = [
+        mesocycles = [
             {"name": "Base", "start_date": _days_out(0), "end_date": _days_out(27),
              "focus": "f"},
             {"name": "Build", "start_date": _days_out(33), "end_date": _days_out(55),
              "focus": "f"},
         ]
-        repaired, notes = repair_block_contiguity(blocks)
+        repaired, notes = repair_mesocycle_contiguity(mesocycles)
         self.assertEqual(len(notes), 1)
         self.assertIn("Build", notes[0])
         self.assertIn("gap", notes[0])
-        again, no_notes = repair_block_contiguity(repaired)
+        again, no_notes = repair_mesocycle_contiguity(repaired)
         self.assertEqual(no_notes, [])
         self.assertEqual(again, repaired)
         # The input list is not mutated: the caller may still display what the model said.
-        self.assertEqual(blocks[1]["start_date"], _days_out(33))
+        self.assertEqual(mesocycles[1]["start_date"], _days_out(33))
 
 
 if __name__ == "__main__":

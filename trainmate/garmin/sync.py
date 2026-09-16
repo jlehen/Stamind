@@ -213,7 +213,7 @@ def ensure_data(start_date: str, end_date: str, force: bool = False) -> None:
     """Ensures Garmin data covering [start_date, end_date] is present and fresh,
     pulling automatically where the gap is small and surfacing a copy-pastable
     command where it is large. Always continue-with-warning: never aborts, never
-    blocks. Call once at command entry with the window the command will read.
+    stops the command. Call once at command entry with the window the command will read.
 
     `force` (from --force-pull) bypasses the refresh-minutes throttle: the recent
     mutable zone is re-fetched and Calendar signals re-synced even if a refresh ran

@@ -1,4 +1,4 @@
-"""Whether the plan reflects a constraint yet, and who may say that it does.
+"""Whether the schedule reflects a constraint yet, and who may say that it does.
 
 `constraints.honored_at` means: *a coach pass had this directive in scope, with authority
 over every day of it still ahead* (DESIGN_constraint_honoring.md §2). Two rules follow
@@ -6,7 +6,7 @@ from it and both live here rather than being restated at each site:
 
 * **who may stamp** — `workout adapt` and `workout generate` claim the column over two
   different ranges (`covers`/`covered_ids`/`stamp`).
-* **whether the plan is missing it** — `needs_a_pass`, asked by the `status` line,
+* **whether the schedule is missing it** — `needs_a_pass`, asked by the `status` line,
   `constraint list`/`show` and the add-time nudge. Hand-written copies of that rule are
   how `constraint show` came to flag exactly the plan-shaping directives the `status`
   line deliberately skips.
@@ -41,7 +41,7 @@ def constraint_window(
 
 
 def needs_a_pass(db: Any, constraint: Constraint, today: str) -> bool:
-    """Whether the plan is missing this directive and something could still be done about
+    """Whether the schedule is missing this directive and something could still be done about
     it (DESIGN_constraint_honoring.md §2).
 
     Four terms, cheapest first. Already stamped and there is nothing to report. A
@@ -61,7 +61,7 @@ def needs_a_pass(db: Any, constraint: Constraint, today: str) -> bool:
 
 
 def constraints_needing_a_pass(db: Any, today: str) -> List[Constraint]:
-    """Every directive the plan does not reflect yet, oldest first.
+    """Every directive the schedule does not reflect yet, oldest first.
 
     The `status` count comes from this one call, so every screen that reports the gap
     reports the same set.

@@ -54,7 +54,7 @@ class TestParseJsonContent(unittest.TestCase):
 
     def test_self_correction_keeps_the_last_object(self):
         # A model that answers, notices the answer was partial and answers again: the
-        # second block is the answer, the first is the one it abandoned.
+        # second object is the answer, the first is the one it abandoned.
         text = (
             '```json\n'
             '{"change_needed": true, "reason": "nothing needs easing"}\n'
@@ -74,9 +74,9 @@ class TestParseJsonContent(unittest.TestCase):
             },
         )
 
-    def test_a_brace_in_the_prose_between_blocks_is_skipped(self):
+    def test_a_brace_in_the_prose_between_objects_is_skipped(self):
         # The scan must step over a brace that starts no value, or it stops before the
-        # correction and keeps the abandoned block after all.
+        # correction and keeps the abandoned object after all.
         text = (
             '{"a": 1}\n'
             'Hold on, that is wrong {not json here}. Again:\n'
@@ -84,7 +84,7 @@ class TestParseJsonContent(unittest.TestCase):
         )
         self.assertEqual(OpenRouterClient._parse_json_content(text), {"a": 2})
 
-    def test_dropping_a_block_is_recorded(self):
+    def test_dropping_an_object_is_recorded(self):
         # Silence was half the bug: nothing said the discarded characters existed.
         with patch("trainmate.openrouter.journal.note") as note:
             OpenRouterClient._parse_json_content('{"a": 1}\n{"a": 2}')

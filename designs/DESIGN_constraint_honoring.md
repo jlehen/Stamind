@@ -1,11 +1,11 @@
-# Design: knowing whether the plan reflects a constraint
+# Design: knowing whether the schedule reflects a constraint
 
 ## 1. The problem
 
 A constraint dated outside the current mesocycle is stored, is never lost, and is eventually
 honored — but nothing acts on it now, and **nothing says so**.
 
-`coach/service/adaptation.py::workout_adapt` pins its forward range to the block containing
+`coach/service/adaptation.py::workout_adapt` pins its forward range to the mesocycle containing
 the evaluation date:
 
 ```python
@@ -14,7 +14,7 @@ meso_end_date_str = active_meso['end_date']
 constraints = self._db.get_constraints(target_date_str, meso_end_date_str)
 ```
 
-Two bounds follow, enforced separately (DESIGN_block_boundary.md §1): the read bound keeps
+Two bounds follow, enforced separately (DESIGN_mesocycle_boundary.md §1): the read bound keeps
 post-boundary sessions out of the prompt, and a write-side filter drops any proposal dated past
 `meso_end`. So even when the sessions already exist — `workout generate -g` lays down a whole
 macrocycle, and since DESIGN_cli_selectors.md §8 that is the natural thing to ask for — a
@@ -24,7 +24,7 @@ The existing tiers cover it eventually:
 
 | the constraint | what honors it |
 | --- | --- |
-| falls inside the current block | daily `adapt` |
+| falls inside the current mesocycle | daily `adapt` |
 | trips the §7 magnitude heuristic (DESIGN_constraints.md) | the replan proposal, then `plan generate` |
 | anything else past `meso_end` | the next `workout generate` whose horizon reaches it |
 
@@ -33,8 +33,8 @@ The third row is the gap, and the cost is not that it is honored late. It is tha
 calendar shows sessions the athlete already knows they will not do, for weeks, with no
 indication that the coach has registered the fact.
 
-A constraint straddling the block boundary is worse: `get_constraints` returns it — the query
-is an overlap, not a containment — so a ten-day trip starting three days before the block ends
+A constraint straddling the mesocycle boundary is worse: `get_constraints` returns it — the query
+is an overlap, not a containment — so a ten-day trip starting three days before the mesocycle ends
 has its first three days rested and its remaining seven ignored, and nothing marks the seam.
 
 **This design closes the silence, not the gap.** §5 records why.
@@ -47,7 +47,7 @@ cannot be inferred from timestamps, and inferring it from content only works for
 honoring an advisory constraint is a judgement, not a state.
 
 What the column means, stated plainly so nobody reads more into it: *a coach pass had this
-constraint in scope, with authority over every day of it still ahead.* **Not** *the plan
+constraint in scope, with authority over every day of it still ahead.* **Not** *the schedule
 definitely changed*. That is the same warrant `workout generate` gives for every other
 constraint it built around, and it is a nudge's worth of precision, which is all this needs.
 
@@ -70,7 +70,7 @@ no-change branch stamps too, through `workout_revision_record_no_change`.
 **That stamp is a write, so it is on the write side.** An earlier draft put it inside
 `workout_adapt`, which builds a proposal and is supposed to write nothing. The cost was
 immediate: a second producer of the same proposal shape appeared, nobody noticed it needed the
-same call, and a pass that answered "the plan already works around this" left the constraint
+same call, and a pass that answered "the schedule already works around this" left the constraint
 unstamped — so the nudge re-offered it forever. `tests/test_service_invariants.py` now fails any
 method returning a `*Proposal` that touches the database, so the shape cannot come back.
 
@@ -79,8 +79,8 @@ method returning a `*Proposal` that touches the database, so the shape cannot co
 constraint the prose *is* the enforcement mechanism (DESIGN_constraints.md §5), so new words are
 a new directive a previous honoring says nothing about.
 
-**Cleared, too, by a rollback that resurrects a plan older than the honoring.** Both rollbacks
-restore a batch keyed by its stamp, and a constraint honored into a plan *newer* than the one
+**Cleared, too, by a rollback that resurrects sessions older than the honoring.** Both rollbacks
+restore a batch keyed by its stamp, and a constraint honored into sessions *newer* than the ones
 coming back cannot be reflected by the restored rows. One timestamp comparison, in
 `db.clear_honored_after` — called from inside `restore_workout_batch`'s transaction so the two
 halves of a restore cannot diverge, and returning what it cleared so the caller can name it.
@@ -93,7 +93,7 @@ renders that line for both rollbacks.
 Rollback is its own inverse, but the clear survives rolling forward again — deliberately
 unrestored, because a false "unhonored" costs a nudge and a cheap re-pass that re-stamps, while
 a false "honored" hides a real gap. The converse case needs nothing: an honoring older than the
-batch was already part of the plan being restored.
+batch was already part of the sessions being restored.
 
 ## 3. Coverage is decided at proposal time
 
@@ -112,7 +112,7 @@ stop.
 
 ## 4. One predicate, four surfaces
 
-*Does the plan reflect this directive yet, and is there anything to be done about it?* —
+*Does the schedule reflect this directive yet, and is there anything to be done about it?* —
 `honoring.needs_a_pass`, read by the `status` line, `constraint list`, `constraint show` and
 the add-time nudge. Four terms, cheapest first:
 
@@ -145,19 +145,19 @@ asserts they agree — a rule that spans files, tested across them.
 
 `cli/constraints.py` prints today only when the magnitude heuristic fires; below that threshold
 it says nothing about *when* the constraint takes effect. When the constraint's window *ends*
-after the active block's end — landing wholly beyond it, or straddling the boundary:
+after the active mesocycle's end — landing wholly beyond it, or straddling the boundary:
 
 ```
 Lands in Build 2 (2026-09-14 — 2026-10-04), outside daily adapt's reach.
 Leave it — adapt reaches it on 2026-09-14 — or build it in now with `workout generate -m 8`,
-which rebuilds the plan from today through that block's end.
+which rebuilds the sessions from today through that mesocycle's end.
 ```
 
-**The block named is the one holding the constraint's LAST day, and the three cases are not one
-message.** Which days are out of reach is decided by where the window *ends* — that is the test
-this branch fires on — so asking which block the window *starts* in answers a different question,
-and answers it wrongly for the straddling case: such a constraint starts in the current block, so
-it would name the block adapt reaches *today* and then offer that block's first day — already
+**The mesocycle named is the one holding the constraint's LAST day, and the three cases are not one
+message.** Which days are out of reach is decided by where the window *ends* — that is the test this
+branch fires on — so asking which mesocycle the window *starts* in answers a different question, and
+answers it wrongly for the straddling case: such a constraint starts in the current mesocycle, so it
+would name the mesocycle adapt reaches *today* and then offer that mesocycle's first day — already
 past — as the day adapt will get to it. Both lines contradict themselves.
 
 So the straddle gets its own wording, and it is a better pitch than the corrected date would have
@@ -167,13 +167,13 @@ as one:
 ```
 Straddles the end of Build 1 (2026-09-14): daily adapt honors the days up to there,
 Build 2 holds the rest, and no one run sees both.
-Build the whole of it in with `workout generate -m 8` — that rebuilds the plan from today
+Build the whole of it in with `workout generate -m 8` — that rebuilds the sessions from today
 through 2026-10-04.
 ```
 
-Naming the block that holds the **last** day is also what makes one run enough: generation always
-starts today (DESIGN_cli_selectors.md §8), so `-m` on the later block covers every block before
-it too.
+Naming the mesocycle that holds the **last** day is also what makes one run enough: generation
+always starts today (DESIGN_cli_selectors.md §8), so `-m` on the later mesocycle covers every
+mesocycle before it too.
 
 **It is not a branch appended to `_maybe_replan`, and that is not a detail.** That function
 returns early four times before it reaches its own heuristic — on `--no-replan`, on `--replan`,
@@ -198,18 +198,18 @@ through the shared ACTIVE CONSTRAINTS prompt section; and `get_constraints(gen_s
 open-ended, so every stored directive from today onward is in scope. That is not a weaker
 honoring than a dedicated tier's — it is the same one.
 
-**On plan quality it is the stronger tool.** A window pass was metric-blind on purpose and could
-only rebalance ±3 days, so displaced load had to fit in the margin or be dropped. Generate reads
-metrics, PMC, baseline, intensity distribution and the block's focus, and re-lays whole
-microcycles around the constraint.
+**On the quality of the sessions it is the stronger tool.** A window pass was metric-blind on
+purpose and could only rebalance ±3 days, so displaced load had to fit in the margin or be dropped.
+Generate reads metrics, PMC, baseline, intensity distribution and the mesocycle's focus, and re-lays
+whole microcycles around the constraint.
 
 **The tier's exclusive domain was narrow.** To be its case a constraint had to be past adapt's
 reach, *and* below the replan bar (`replan_rest_span_days`, `replan_displaced_load_pct`), *and*
 have sessions in its window: a one-to-two-day rest window or a light advisory cap, more than a
-block out. Anything more disruptive escalates at add time; anything nearer is adapt's.
+mesocycle out. Anything more disruptive escalates at add time; anything nearer is adapt's.
 
 **What it bought was not rewriting the intervening weeks.** Generation always starts today, so
-building a constraint in three weeks out rebuilds the plan from here to there, discarding
+building a constraint in three weeks out rebuilds the sessions from here to there, discarding
 accumulated adaptations and replacing any hand-added sessions (`workout_generate_apply` names
 them, and `workout rollback` restores them). That cost is real. It is an argument for letting
 `workout generate` take a start bound — a general capability, cheap now that

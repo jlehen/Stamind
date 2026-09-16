@@ -258,7 +258,7 @@ class RestartTeardownTest(unittest.IsolatedAsyncioTestCase):
         async def _hangs():
             await asyncio.sleep(3600)
 
-        await bot.restart_teardown(None, _hangs)  # must not block the hard exit
+        await bot.restart_teardown(None, _hangs)  # must not hold up the hard exit
 
     async def test_a_failing_stop_still_returns(self):
         async def _raises():
@@ -444,8 +444,8 @@ class GuardrailTest(unittest.TestCase):
     def test_the_captures_own_offers_stay_inside_the_guardrail(self):
         """The two buttons a capture emits, and the picker leaf that re-enters it: none
         may reach a command the router itself could not (§12.9)."""
-        from trainmate.cli.bot import adjust_plan_button, send_to_coach_button
-        adjust = bot.parse_message_to_argv(adjust_plan_button()["send"])
+        from trainmate.cli.bot import adjust_week_button, send_to_coach_button
+        adjust = bot.parse_message_to_argv(adjust_week_button()["send"])
         self.assertEqual(adjust, ["workout", "adapt"])
         # The coach lane carries her words verbatim through one -m, quoting and all.
         message = "knee's sore; \"no running\" for 2 weeks"

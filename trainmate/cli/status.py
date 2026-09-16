@@ -5,7 +5,7 @@ from trainmate.baselines import classify_metric, is_anomalous, UNKNOWN
 from trainmate.config import config
 from trainmate.util import (
     aside, asides_enabled, bold, dim, green, red, yellow, cyan, magenta, gray, cmd,
-    color_load_ratio, color_ramp, pmc_cells, pmc_warming_note, format_labeled_block,
+    color_load_ratio, color_ramp, pmc_cells, pmc_warming_note, format_labeled_paragraph,
     default_wrap_width, PMC_TSB_LAG_NOTE, fmt_date, today_str as _today_str,
     today_date as _today_date, notice,
 )
@@ -81,7 +81,7 @@ def run_status(args) -> None:
         print(f"{bold('Target Date')}: {cyan(fmt_date(next_goal['target_date']))}"
               f"{gray(days_rem_str)}")
         
-        print(format_labeled_block(f"{bold('Description')}:", next_goal.get('description', '')))
+        print(format_labeled_paragraph(f"{bold('Description')}:", next_goal.get('description', '')))
         
         # Query active mesocycle
         macro = runtime.db.get_macrocycle_for_objective(next_goal['id'])
@@ -97,7 +97,7 @@ def run_status(args) -> None:
                     + cmd("plan show") + " to see what changed and what to do about it.",
                 )
 
-            # Constraints the plan does not reflect yet are the same kind of fact — a
+            # Constraints the schedule does not reflect yet are the same kind of fact — a
             # directive on record that nothing has acted on
             # (DESIGN_constraint_honoring.md §4), so it belongs beside the staleness
             # warning too. Counted through `honoring`, so this nag and the surfaces that
@@ -106,7 +106,7 @@ def run_status(args) -> None:
             if unhonored:
                 noun = "constraint" if len(unhonored) == 1 else "constraints"
                 notice(
-                    f"Constraints: {len(unhonored)} {noun} your plan does not reflect — "
+                    f"Constraints: {len(unhonored)} {noun} your schedule does not reflect — "
                     + cmd("workout generate") + " builds them in.",
                 )
 
@@ -134,11 +134,11 @@ def run_status(args) -> None:
                     f"({cyan(fmt_date(active_meso['start_date']))} to "
                     f"{cyan(fmt_date(active_meso['end_date']))})"
                 )
-                print(format_labeled_block(f"{bold('Cycle Focus')}:", active_meso['focus']))
-                # What the block ACTUALLY measured, beside what it was for
+                print(format_labeled_paragraph(f"{bold('Cycle Focus')}:", active_meso['focus']))
+                # What the mesocycle ACTUALLY measured, beside what it was for
                 # (DESIGN_intensity_distribution.md §9). Already wrapped to the target
                 # width — never re-wrap it, the zone table is column-aligned.
-                report = intensity.block_report(
+                report = intensity.mesocycle_report(
                     active_meso, _today_str(), runtime.db.get_completed_activities,
                     current_week=True, benchmarks=runtime.db.get_benchmark_results(),
                     with_focus=False, indent="", width=default_wrap_width(),
@@ -356,7 +356,7 @@ def run_status(args) -> None:
                 f"({sport_str}) on {cyan(fmt_date(g['target_date']))}"
             )
             if g.get('description'):
-                print(format_labeled_block("  Description:", g['description']))
+                print(format_labeled_paragraph("  Description:", g['description']))
 
         today = _today_str()
         constraints = runtime.db.get_constraints(today)
@@ -366,7 +366,7 @@ def run_status(args) -> None:
         for c in constraints:
             print(f"- {constraint_line(c, honoring.needs_a_pass(runtime.db, c, today))}")
             if c.get('description'):
-                print(format_labeled_block("  Details:", c['description']))
+                print(format_labeled_paragraph("  Details:", c['description']))
 
     print(bold(cyan("\n================================")))
 

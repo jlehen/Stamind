@@ -126,7 +126,7 @@ message) are an **orthogonal I/O concern**, never a property of meaning.
 **We keep the observation/directive split.** It is not cosmetic: observations
 feed the evidence/confidence machinery, directives feed the solver, and a
 directive must *never* become physiological evidence ("I couldn't train Thursday"
-is not data that the block is too hard). The one sanctioned crossing runs the
+is not data that the mesocycle is too hard). The one sanctioned crossing runs the
 *other* way: the weekly analysis may read a directive to **explain an anomaly
 away** (a travel week is not a fitness-loss signal), never to *support* a
 learning — this is what life events already do for the backward evaluation
@@ -219,15 +219,15 @@ constraint add TITLE [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--desc TEXT]
   let the magnitude heuristic decide whether to *ask*. Independent of `--rest`
   (§5, §7).
 - `constraint list` defaults to directives **from the start of the current
-  mesocycle** (`get_active_mesocycle(today)['start_date']` — the training block
+  mesocycle** (`get_active_mesocycle(today)['start_date']` — the training mesocycle
   being planned) plus everything upcoming (open-ended into the future). This
-  anchors the list on the block the coach is actively reasoning over rather than
+  anchors the list on the mesocycle the coach is actively reasoning over rather than
   a rolling calendar window. `--all`/`-a` drops the lower bound (past directives
   included); a selector (`-d`/`-m`/`-M`/`-g`, DESIGN_cli_selectors.md) overrides the
   bounds explicitly. When no active
   mesocycle exists to anchor on (no plan yet), the lower bound is dropped and
   **every** constraint is shown — a fresh user has only a handful, and there is
-  no block to scope to.
+  no mesocycle to scope to.
 
 ### Disambiguation: the observation command's short alias
 
@@ -294,7 +294,7 @@ is set by the §7 flow, surfaced in `constraint show`, and read by `plan generat
 **`rest` and `replan` are independent axes.** `rest` answers *how the directive is
 enforced when a plan is built* (code-enforced rest vs advisory prose); `replan`
 answers *whether we rebuild the macrocycle around it now*. Neither implies the
-other, and no flag couples them: "prefer easy this whole build block" is advisory
+other, and no flag couples them: "prefer easy this whole build mesocycle" is advisory
 **and** `replan = 1` (reshape the plan, no rest rows); "no run Thursday" is advisory
 and `replan = 0`; "broke my ankle, out 6 weeks" is `rest = 1` **and** `replan = 1`.
 `--replan` therefore never sets `rest`, and `--rest` never sets `replan` (§7).
@@ -332,7 +332,7 @@ For each directive in the fetched set:
   model still returns whatever it likes for that date, and the app rewrites it:
   - `generate` calls the LLM for the whole plan and then saves the returned list
     (`coach/service/workouts.py`'s `workout_generate`, the `workouts =
-    plan_data.get("workouts", [])` → `save_workout` loop). The pre-pass
+    planner_reply.get("workouts", [])` → `save_workout` loop). The pre-pass
     (`_enforce_rest_windows_generate`) runs **between** those two steps: drop any
     session the model placed on a rest date and splice in a forced
     `{sport_type: 'rest', duration_minutes: 0, rpe: 0, tss: 0}` row for that date.
@@ -366,7 +366,7 @@ For each directive in the fetched set:
   before. Advisory, not code-enforced (§5): the LLM decides what, if anything, to
   substitute, and other sports flow normally.
 
-The rendered block replaces the old life-events section of both prompts:
+The rendered section replaces the old life-events section of both prompts:
 `title | dates | enforcement | description`, where enforcement reads either
 "no training (rest enforced)" or "advisory" (`coach/engine/prompt.py`'s
 `_render_constraints`). No new prompt *structure* is required, only a relabel and
@@ -395,7 +395,7 @@ demotion (ARCHITECTURE.md §"Web dashboard"), leaving a single
 `GET /api/constraints` (`list_constraints`) that reads through `get_constraints`.
 Authoring is CLI-only, so §4 is the whole mutating surface. That endpoint's window
 is deliberately *not* `constraint list`'s: a rolling `metrics_lookback_days` plus
-everything upcoming, because the dashboard has no block context in which the
+everything upcoming, because the dashboard has no mesocycle context in which the
 mesocycle anchor would read. The
 `trainmate_bot.py` touch is only a one-line command label
 (`("lifeevent", "Manage life events")`) and is handled by the §9 forwarder — no
@@ -410,7 +410,7 @@ Plan-invalidation is **not** a property of a constraint the user declares. Flow:
 1. On `constraint add`/`edit`, compute the directive's **magnitude against the
    active plan** (the heuristic below).
 2. If magnitude crosses the threshold and neither `--replan` nor `--no-replan`
-   was given, **propose**: *"This overlaps your build block and displaces a big
+   was given, **propose**: *"This overlaps your build mesocycle and displaces a big
    chunk of planned load — replan around it? [y/N]"*. On `y`, set `replan = 1`
    and run the existing `plan generate` → `workout generate` confirm flow. On
    `n`, `replan = 0`; the directive is still honored by daily `adapt` (§6), just
@@ -459,11 +459,11 @@ This follows from the magnitude being measured over the constraint's **own** win
 was read from, or the proposal and its action describe two different plans.
 
 **Between the two fates above there is a gap, and it is named rather than filled.**
-Honoring by daily `adapt` reaches only the current block, and a replan rewrites a whole
+Honoring by daily `adapt` reaches only the current mesocycle, and a replan rewrites a whole
 plan; a directive that is too far off for the first and too small for the second waits for
 the next `workout generate` whose horizon reaches it. `constraints.honored_at` records
 whether any pass has had it in scope yet, so `status`, `constraint list`/`show` and the
-add-time message can say the plan does not reflect it and name the run that would
+add-time message can say the schedule does not reflect it and name the run that would
 (DESIGN_constraint_honoring.md). The magnitude heuristic below is unchanged.
 
 **Magnitude heuristic (concrete).** Two independent triggers; **either** one
@@ -616,7 +616,7 @@ what `constraint add` itself accepts:
    the advisory text, but nothing durable is written.
 2. **Then confirm the adaptation.** The existing adapt preview + `[y/N]` apply
    prompt (`cli/workouts/generate.py`) runs as it does today. Declining the constraint in
-   step 1 does not block step 2, and vice versa — they are independent
+   step 1 does not stop step 2, and vice versa — they are independent
    commits.
 
 This makes §11's "echo what was created" fall out for free (the confirmation

@@ -3,7 +3,7 @@
 `plan show` reports it, `plan keep` dismisses it, `plan generate` and `workout generate`
 each offer to act on it. Wording and re-stamp live here once, closing design smell B-8
 (DESIGN_plan_staleness.md §9). What changed is shown as a diff, and the two questions
-carry the coach's read on whether it reshapes the plan (§10).
+carry the verdict call's read on whether it reshapes the plan (§10).
 """
 
 import hashlib
@@ -28,7 +28,7 @@ def guidance() -> str:
     It names the command that actually reaches the days already scheduled: a bare
     `workout generate` opens after them (DESIGN_plan_change_continuity.md §6.5)."""
     return (
-        "Regenerate only if the change would have altered the block structure, phase "
+        "Regenerate only if the change would have altered the mesocycle structure, phase "
         "order or volume ramp. Wording, tone or how sessions are described: keep the "
         f"plan — {cmd('workout generate -d today..')} applies it to the days already "
         f"scheduled, and a bare {cmd('workout generate')} to the days after them."
@@ -86,7 +86,7 @@ def print_diff(macro: dict, indent: str = "") -> None:
 
 
 def verdict_line(verdict: Optional[Dict[str, Any]]) -> Optional[str]:
-    """The coach's read as one line, or None when there was none to report."""
+    """The verdict call's read as one line, or None when there was none to report."""
     if verdict is None:
         return None
     label = "re-shaping" if verdict['reshaping'] else "keep the plan"
@@ -102,7 +102,7 @@ def _verdict_key(macro: dict, change_reason: str) -> str:
 
 
 def cached_verdict(macro: dict, change_reason: str) -> Optional[Dict[str, Any]]:
-    """The coach's read on this edit, asked once and cached against it (§7).
+    """The verdict call's read on this edit, asked once and cached against it (§7).
 
     Fails open exactly as the uncached call does: a network error leaves the caller with
     the question and no verdict, and nothing is cached, so the next run asks again."""
@@ -125,7 +125,7 @@ def cached_verdict(macro: dict, change_reason: str) -> Optional[Dict[str, Any]]:
 
 def explain(change_reason: str, macro: dict) -> Optional[bool]:
     """Everything the athlete gets before either question (§10): the fact, the diff, the
-    §2 test, then the coach's read on it. Returns True when the coach calls it
+    §2 test, then the verdict call's read on it. Returns True when that call says
     re-shaping, False for keep, None when no verdict could be had."""
     print(wrap_text(
         f"A plan-shaping input has changed since the last plan generation "
@@ -143,7 +143,7 @@ def explain(change_reason: str, macro: dict) -> Optional[bool]:
 
 
 def confirm_regenerate(change_reason: str, macro: dict) -> bool:
-    """The generate-path question. The default follows the coach's read: a coach that
+    """The generate-path question. The default follows the verdict call's read: a verdict that
     says "re-shaping" and an app that defaults to No would be two answers (§10)."""
     reshaping = explain(change_reason, macro)
     return runtime.prompt.confirm(
@@ -153,9 +153,9 @@ def confirm_regenerate(change_reason: str, macro: dict) -> bool:
 
 
 def report(change_reason: str, macro: dict) -> None:
-    """The block `plan show` prints under the inputs it contradicts (§9).
+    """The section `plan show` prints under the inputs it contradicts (§9).
 
-    It asks the coach for its read, and caches it against the edit: `plan show` is the
+    It asks the verdict call for its read, and caches it against the edit: `plan show` is the
     command whose whole job is to help the operator decide, which is what the verdict is
     for, and it stamps nothing — so the same edit is asked about once however often the
     plan is read (DESIGN_plan_change_continuity.md §7)."""

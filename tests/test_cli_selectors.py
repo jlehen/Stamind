@@ -176,10 +176,10 @@ class TestSelectorVocabularyInvariants(unittest.TestCase):
     Every violation fails silently — the wrong flag simply resolves — so the real parser
     tree is walked here the same way TestCommandTreeInvariants walks it for commands."""
 
-    # The two commands that act on a single day rather than a range, so a block or a plan
+    # The two commands that act on a single day rather than a range, so a mesocycle or a plan
     # is not a thing they could mean (the athlete's call, DESIGN_cli_selectors.md §5).
     SINGLE_DAY = {"workout adapt", "benchmark record"}
-    # `-m` there is --message / --metric, kept because neither command takes a block.
+    # `-m` there is --message / --metric, kept because neither command takes a mesocycle.
     LETTER_EXEMPT = {("workout adapt", "-m")}
 
     EXPECTED = {

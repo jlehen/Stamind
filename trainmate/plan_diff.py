@@ -18,7 +18,7 @@ _SENTENCE_SPLIT = re.compile(
     r"(?<=[.!?])\s+"
 )
 
-# Below this sentence-level similarity a prose block was rewritten rather than edited, so
+# Below this sentence-level similarity a prose passage was rewritten rather than edited, so
 # a sentence diff conveys nothing a reader could not get from the two texts side by side.
 REWRITE_RATIO = 0.5
 
@@ -106,22 +106,22 @@ def split_sentences(text: Optional[str]) -> List[str]:
 def diff_prose(old: Optional[str], new: Optional[str]) -> Dict[str, Any]:
     """Compares two prose blobs sentence by sentence.
 
-    `blocks` keeps the edits in reading order, each pairing the sentences dropped with
-    those that replaced them. `rewritten` marks a block the coach re-authored wholesale
+    `groups` keeps the edits in reading order, each pairing the sentences dropped with
+    those that replaced them. `rewritten` marks prose `plan generate` re-authored wholesale
     rather than edited — the sentence lists are still returned, but a caller rendering
     for a human is better off collapsing them to a note."""
     a, b = split_sentences(old), split_sentences(new)
     matcher = difflib.SequenceMatcher(None, a, b)
-    blocks = [
+    groups = [
         {"removed": a[i1:i2], "added": b[j1:j2]}
         for tag, i1, i2, j1, j2 in matcher.get_opcodes() if tag != 'equal'
     ]
     return {
-        "changed": bool(blocks),
-        "rewritten": bool(a and b and blocks and matcher.ratio() < REWRITE_RATIO),
+        "changed": bool(groups),
+        "rewritten": bool(a and b and groups and matcher.ratio() < REWRITE_RATIO),
         "old_count": len(a),
         "new_count": len(b),
-        "blocks": blocks,
+        "groups": groups,
     }
 
 
@@ -167,8 +167,8 @@ def _added_or_removed(m: Dict[str, Any], change: str) -> Dict[str, Any]:
 def diff_mesocycles(
     old: List[Dict[str, Any]], new: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
-    """Aligns two versions' mesocycle lists by name and reports each block's fate, in
-    reading order. Unchanged blocks are included (`change: "unchanged"`) so a caller can
+    """Aligns two versions' mesocycle lists by name and reports each mesocycle's fate, in
+    reading order. Unchanged mesocycles are included (`change: "unchanged"`) so a caller can
     show the whole timeline; the CLI filters them out.
 
     Within a replaced run the phases pair up positionally when their names still look
@@ -278,7 +278,7 @@ def diff_plans(
     old_notes: Optional[list] = None, new_notes: Optional[list] = None,
 ) -> Dict[str, Any]:
     """Everything that differs between two plan versions: the macrocycle's strategy, the
-    feedback each carries, its mesocycle blocks, and the inputs each was generated from."""
+    feedback each carries, its mesocycles, and the inputs each was generated from."""
     old_goals, old_events, _old_all_events, old_thresholds = input_snapshots(old_macro)
     new_goals, new_events, _new_all_events, new_thresholds = input_snapshots(new_macro)
     return {

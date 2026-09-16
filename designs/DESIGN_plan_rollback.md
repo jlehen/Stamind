@@ -140,46 +140,46 @@ These were updated to ignore superseded versions:
   *status* is still intentionally unfiltered — a since-completed objective still
   planned its dates.)
 
-### 6.1 Walking blocks: by macrocycle id, never by date
+### 6.1 Walking mesocycles: by macrocycle id, never by date
 
 The filtering above covers every accessor that answers *"what is the plan?"*. It does not
-cover the retrospective views, which ask a different question — *"which blocks did the
+cover the retrospective views, which ask a different question — *"which mesocycles did the
 athlete train through, in order?"* — and those have two traps, one on each side of the
 same filter:
 
 - **Keep the `mac.status = 'active'` filter and query mesocycles by date**, and the
-  cross-plan case disappears: a window reaching back before the current plan's first block
+  cross-plan case disappears: a window reaching back before the current plan's first mesocycle
   finds nothing there, because the earlier goal's plan is a different macrocycle and a
   date query has no reason to prefer it.
 - **Drop the filter**, and superseded versions come flooding back. They are not history:
   they sit on *the same calendar dates* as the active version and describe training that
   was planned and then replaced. Reporting them double-counts every activity in the
-  overlap and corrupts the block-over-block delta chain, whose baseline is simply the
+  overlap and corrupts the mesocycle-over-mesocycle delta chain, whose baseline is simply the
   previous entry in the list.
 
 So the rule for any view that walks the plan retrospectively: **fix the lineage by
 macrocycle id first, then compare dates.** `trainmate/plan_lineage.py`'s `plan_lineage()`
-is that walk, shared by `tm progress --blocks` (`cli/progress.py`) and the strategy
+is that walk, shared by `tm progress --mesocycles` (`cli/progress.py`) and the strategy
 prompt's planned-vs-actual review (`coach/service/context.py`).
 
-**`tm progress --blocks` stops the delta at the plan boundary; the strategy prompt does
-not.** Each block reports its change against the block before it, which within one plan is
+**`tm progress --mesocycles` stops the delta at the plan boundary; the strategy prompt does
+not.** Each mesocycle reports its change against the mesocycle before it, which within one plan is
 the periodization signal proper (DESIGN_intensity_distribution.md §4.1). Across a boundary
-the block before is the *previous goal's* last one, so the comparison spans a taper, a race
+the mesocycle before is the *previous goal's* last one, so the comparison spans a taper, a race
 and whatever off-season followed.
 
 The two consumers want opposite things there, and the split is deliberate:
 
-- **`--blocks` suppresses it** (`plan_lineage.delta_baseline()`). The athlete is asking
+- **`--mesocycles` suppresses it** (`plan_lineage.delta_baseline()`). The athlete is asking
   how the current training is going; a "change" that is really a season transition reads
-  as a collapse in load and says nothing about intensity creep. The block is still
+  as a collapse in load and says nothing about intensity creep. The mesocycle is still
   *reported* — the coverage is what a long window asked for — it just reports no change.
 - **The strategy prompt keeps it.** Reviewing one season against the last is the whole
   point of the planned-vs-actual review (DESIGN_backward_evaluation.md §6.1), which is why
-  its blocks are ordered by when they were trained rather than by argument position. Pinned
-  by `test_blocks_are_ordered_by_when_they_were_trained`.
+  its mesocycles are ordered by when they were trained rather than by argument position. Pinned
+  by `test_mesocycles_are_ordered_by_when_they_were_trained`.
 
-So this is one case where the athlete's view and the coach's prompt legitimately differ,
+So this is one case where the athlete's view and the `plan generate` prompt legitimately differ,
 against the usual rule that they must not (§3.1): they are answering different questions.
 
 Which makes the name of the "previous plan" accessor load-bearing, because there are two
@@ -190,8 +190,8 @@ of them and they mean opposite things:
 | `get_previous_macrocycle_version(objective_id)` | an earlier **version** of *this* goal's plan — superseded, never trained, overlapping dates | `plan rollback`, `plan diff` |
 | `get_preceding_macrocycle(objective_id)` | the **active** plan of the *previous goal* — what actually governed the earlier dates | retrospective views |
 
-`_blocks_in_window` originally called the first while its own docstring warned against
-exactly what the first returns, so `tm progress --blocks` reported every block twice after
+`_mesocycles_in_window` originally called the first while its own docstring warned against
+exactly what the first returns, so `tm progress --mesocycles` reported every mesocycle twice after
 any plan regeneration. The rename is the fix that keeps it fixed.
 
 ## 7. CLI & Web

@@ -5,14 +5,15 @@
 Revision 4 follows a third review against the code and a discussion of its findings. The
 largest change is a removal: rev. 3 had `workout generate` reconstruct *what changed since
 these sessions were written* from profile snapshots saved on every change row, and that
-machinery is gone. The coach is shown the present — today's profile, the plan, the
-constraints, the sessions standing — and keeps a session unless it can name the line
-that session now contradicts (§6.1). Alongside it: a dropped session becomes a rest day
+machinery is gone. The week planner, the model call inside `workout generate` that writes
+the sessions, is shown the present — today's profile, the plan, the constraints, the
+sessions standing — and keeps a session unless it can name the line that session now
+contradicts (§6.1). Alongside it: a dropped session becomes a rest day
 on its own lineage the way `workout adapt` already does, so a decision leaves one event
 and not two (§4.5); the Calendar reads a void from its own lineage, so a marker written
-and then covered in the same slot is not torn down (§5.2); a session the coach does not
+and then covered in the same slot is not torn down (§5.2); a session the week planner does not
 mention is kept, not dropped (§4.5); manual sessions are held across the whole span
-(§4.2); past constraints of the current block reach the prompt (§6.1). Revisions 1 to 3
+(§4.2); past constraints of the current mesocycle reach the prompt (§6.1). Revisions 1 to 3
 are in the branch history.
 
 Throughout, "regeneration" is never used bare: `plan generate` rebuilds the periodization,
@@ -35,7 +36,7 @@ a chain. The chain is right. What comes out the other end of it is not.
    `plan generate`. On "keep" they run `plan keep`. **Either way the athlete's sessions
    are untouched at this point.**
 3. To make the change reach the sessions that already exist, the operator passes a
-   selector to `workout generate` — `-d today..`, or `-m` for the current block. A bare
+   selector to `workout generate` — `-d today..`, or `-m` for the current mesocycle. A bare
    `workout generate` opens the day after the schedule's coverage ends
    (`cli/workouts/generate.py::_resolve_span`), so without a selector the change does not
    reach the athlete for up to `workout_generation_span_days`.
@@ -72,7 +73,7 @@ session was planned, and a decision removed it.
 **A sport change is a new session with no history.** Had the correction been "no
 running", Thursday's run would become a ride. Same reasoning: different sport, different
 slot, new lineage. The run's event is deleted and a ride event appears with an empty
-History block. Compare `workout adapt`, which hands the displaced session's lineage to
+History section. Compare `workout adapt`, which hands the displaced session's lineage to
 its new-sport replacement (`coach/service/adaptation.py::workout_adapt_apply`,
 `lineage_id=displaced['id']`), so the event updates in place, retitled, with the run
 underneath it in History.
@@ -94,7 +95,7 @@ Thursday.
 
 **A rewritten day in the same slot explains itself.** A day `workout generate`
 re-prescribes in the same `(date, sport)` keeps its `lineage_id`, so its event is updated
-in place and the History block shows the earlier form, its load, its target and its
+in place and the History section shows the earlier form, its load, its target and its
 reason (DESIGN_calendar_lineage.md §3). That reads as a change to something the athlete
 recognises.
 
@@ -138,13 +139,13 @@ rebuild (§7). §5 makes every removal inside the window visible, and §6 answer
   own lineage, exactly as adapt does, so the day keeps one event. A session the model
   does not mention is kept. The preview lists what was written to each of them, before
   the operator accepts.
-- **§5 — A removal leaves a trace.** A session the coach removes inside the window keeps
+- **§5 — A removal leaves a trace.** A session the week planner removes inside the window keeps
   its Calendar event, retitled `[Cancelled]` with the reason. A session the athlete added
-  by hand keeps its event whenever the coach removes it, inside the window or not.
+  by hand keeps its event whenever the week planner removes it, inside the window or not.
   `[Deleted]` stays the word for a removal the athlete asked for.
-- **§6 — The coach reads the present and writes what it did.** `workout generate` is
+- **§6 — The week planner reads the present and writes what it did.** `workout generate` is
   shown today's profile, the plan, the constraints including the ones that ended earlier
-  in this block, and the sessions standing. It keeps a session unless it can name what
+  in this mesocycle, and the sessions standing. It keeps a session unless it can name what
   that session now contradicts, and when it changes one it writes one sentence for the
   athlete about that day, and one for the week. No history is reconstructed.
 - **§8 — Tests**, named up front.
@@ -179,15 +180,15 @@ intersection already ignores every window day the run does not rewrite.
 
 ### 4.2 Where it bites: the window *and* the span
 
-**Only where the generated span overlaps sessions that already exist.** The operative set
-is the standing sessions that are in the window **and** in the range being rewritten:
+**Only where the generated span overlaps sessions that already exist.** The span's sessions
+are the live sessions already in the range being rewritten. The standing sessions are the ones
+among them that sit in the window, plus the ones the athlete added by hand:
 
 ```
-committed = standing sessions where today <= date <= window_end
-                                 and gen_start <= date <= gen_end
-manual    = standing sessions where source == "manual"
-                                 and gen_start <= date <= gen_end
-standing block = committed ∪ manual
+span sessions     = live sessions where gen_start <= date <= gen_end
+committed         = span sessions where today <= date <= window_end
+manual            = span sessions where source == "manual"
+standing sessions = committed ∪ manual
 ```
 
 Both bounds of `committed` are load-bearing:
@@ -209,17 +210,17 @@ Both bounds of `committed` are load-bearing:
 
 **Manual sessions are held across the whole span.** The argument for the window is that
 past it the athlete has not seen the days. That is false for a session they typed in
-themselves. So every manual session in the span is in the standing block whatever the
+themselves. So every manual session in the span is a standing session whatever the
 window, tagged as the athlete's (§4.6), and the model answers for it like any other.
 
 **Benchmarks are not.** A scheduled fitness test inside the window is in the committed
-set and carries its tag. Past the window the coach re-places tests itself, from the
+set and carries its tag. Past the window the week planner re-places tests itself, from the
 record it is already given: every anchor's latest value and last test date, every test on
 the calendar in the ninety days before the span, and the tests planned in the elapsed
-part of the block (`coach/service/context.py::_anchor_history_text`,
-`_block_benchmark_lines`). The plan is the plan out there, and that includes its tests.
+part of the mesocycle (`coach/service/context.py::_anchor_history_text`,
+`_mesocycle_benchmark_lines`). The plan is the plan out there, and that includes its tests.
 
-One set, computed once, used by the prompt block (§4.6), the preview (§4.5) and the trace
+One set, computed once, used by the prompt section (§4.6), the preview (§4.5) and the trace
 rule (§5.2).
 
 ### 4.3 Shape, load and wording
@@ -232,7 +233,7 @@ The distinction the window turns on has three levels, not two:
 | **Load** | duration, intensity target, the interval structure | visible by opening it, and felt on the day |
 | **Wording** | the prose, the title | visible by opening it |
 
-Inside the standing block the rule is:
+For the standing sessions the rule is:
 
 - **Wording alone is never a reason to touch a session.** The default for every standing
   session is `keep`. A rewritten description with the same load is churn, and the point of
@@ -267,8 +268,8 @@ but still prints §4.5's report, so a forced run says what it did.
 
 Today the model is shown the eased sessions and may answer `keep` for each
 (DESIGN_workout_revisions.md §7.1). The window widens that to every session in §4.2's
-standing block and adds three more answers. For each session listed in the prompt's
-"SESSIONS ALREADY STANDING" block, the response holds at most one of:
+standing sessions and adds three more answers. For each session listed in the prompt's
+"SESSIONS ALREADY STANDING" section, the response holds at most one of:
 
 | answer | response entry | what apply does |
 |---|---|---|
@@ -288,13 +289,13 @@ a day that alternated ride, rest, ride across three runs collected a marker per 
 **A session the model does not mention is kept**, and the preview says so in a notice.
 Silence is the ordinary way a JSON-mode model fails — the response format is prose in the
 system prompt, not a schema the provider enforces — and a cancellation has to be said. The
-coverage backstop and the void loop both stand aside for the standing block (§7): a
+coverage backstop and the void loop both stand aside for the standing sessions (§7): a
 kept session is a row, so its date is covered, and its slot is spoken for.
 
 **`change_reason` is one sentence, written for the athlete.** Not coach shorthand. "Your
 long run stays 90 minutes but goes easy — Friday is now a hard day", not "deload,
 polarised week". It is required on revise, replace and drop, and only for sessions in the
-standing block: outside it the athlete has never seen the day, so there is nothing for a
+standing sessions: for any other the athlete has never seen the day, so there is nothing for a
 change to be *from*, and the model writes those sessions as it always has. A 28-day
 `workout generate` therefore produces a handful of sentences, not twenty-five. The
 sentence is written in the language the athlete's profile is written in; the bracketed
@@ -322,10 +323,10 @@ a KEEP of it. `_resolve_standing` needs the rest of them, and they are as flat:
 - A `replaces` whose destination slot is occupied by a standing session that is kept —
   explicitly, or by silence — is refused, both sessions stay where they were, and the
   preview says so. The occupant's own answer is resolved first; only when it was itself
-  revised away, moved or dropped is the destination free. A second call to the coach was
+  revised away, moved or dropped is the destination free. A second week planner call was
   considered and rejected: it costs a call, answers differently each time, and would run
   inside apply, where nothing else is nondeterministic. Refusing loses nothing.
-- A `replaces` naming a source outside the standing block is refused: the run is only
+- A `replaces` naming a source that is not a standing session is refused: the run is only
   answering for the days it was shown.
 - A full entry on a date whose only standing session is a rest day is treated as replacing
   that rest day, on its lineage, whether or not the model said `replaces`. A rest day and
@@ -360,9 +361,9 @@ and, for the "no running" correction:
 A dropped session prints as `→ Rest Day` with its reason; a moved one as `→ Sun 14 Sep`;
 a session the model did not mention as `kept (not mentioned by the coach)`.
 
-### 4.6 The prompt block
+### 4.6 The prompt section
 
-One block, "SESSIONS ALREADY STANDING". Each session carries tags rather than sitting in a
+One mesocycle, "SESSIONS ALREADY STANDING". Each session carries tags rather than sitting in a
 separate section, so the model sees it once:
 
 - `[COMMITTED]` — in §4.2's committed set, so the §4.3 rule applies. A manual session
@@ -374,14 +375,14 @@ separate section, so the model sees it once:
 - `[REST DAY]` — a planned rest day, so the model knows it is committing to a shape
   change when it fills it.
 
-**The block holds the standing block only, and the easing rule now lives inside it.**
+**The section holds the standing sessions only, and the easing rule now lives inside it.**
 Rev. 2 kept `workout generate`'s carry-over rule span-wide, which is where the eased
 sessions are read from today (`adaptation_count > 0` over the whole span). Past the
 window the plan is the plan, and that now includes a session `workout adapt` eased there:
 `workout generate` rewrites it, and because a `generate` revision is where
 `db/workouts.py::_adaptation_tally` stops its walk, the easing count resets with it. What
-the coach loses in the flag it gets back in the record: the block's past constraints
-(§6.1) say *why* a week went quiet, and the block-progress section already says how much
+the week planner loses in the flag it gets back in the record: the mesocycle's past constraints
+(§6.1) say *why* a week went quiet, and the mesocycle-progress section already says how much
 was missed. Inside the window the eased session is listed with its tag and its earlier
 form, and the model is told to keep it unless the moment the easing answered has passed.
 
@@ -415,7 +416,7 @@ at all*. The second wins, or the calendar keeps a run under a no-running instruc
 
 **Each session is shown** with its date, sport, title, duration, target, first form and —
 for committed sessions — its description, so a revision can be minimal rather than
-re-invented. The block replaces the current one, whose closing line — "every other day in
+re-invented. The section replaces the current one, whose closing line — "every other day in
 this window is yours to write from scratch, and a date this list does not name is not
 spoken for" — now means the opposite of what it says and is rewritten with it.
 
@@ -442,18 +443,18 @@ carries the kind of the change that made it:
 | `rm` | the athlete cancelled it | `[Deleted]` |
 | `stand-down` | the athlete called the goal off | `[Deleted]` |
 | `add` | the athlete typed over it | `[Deleted]` |
-| `generate` | the coach did not keep it | `[Cancelled]` |
-| `adapt` | the coach dropped it | `[Cancelled]` |
+| `generate` | the week planner did not keep it | `[Cancelled]` |
+| `adapt` | the week planner dropped it | `[Cancelled]` |
 | `swap` | it moved (void where it left, copy where it landed) | none: the event moves |
 
 `[Deleted]` is what `google_calendar.py::sync_workout` draws today for the `rm` case, and
 it keeps meaning "you did this". `[Cancelled]` is new and means "your coach did this".
-Both carry the void's `reason` as a `Reason:` block, which §4.5 now fills with the coach's
+Both carry the void's `reason` as a `Reason:` line, which §4.5 now fills with the coach's
 own words instead of "Not in the regenerated plan".
 
 With §4.5's `drop` landing a rest day on the session's own lineage, a coach void with no
 replacement is the exception, not the rule. It happens in three places: a manual session
-the coach writes over in its own slot (§5.3), a standing session displaced from a slot a
+the week planner writes over in its own slot (§5.3), a standing session displaced from a slot a
 moved session lands in (§4.5), and the second and later sessions on a date a `rest`
 constraint clears (§5.5). Each is one event beside another, and each is explicable in a
 sentence: "the session you were told about is marked cancelled; the one that replaced the
@@ -478,7 +479,7 @@ above already are:
 
 `ATHLETE_VOID_KINDS = ("rm", "stand-down")` has three consumers asking different
 questions. `coach/service/adaptation.py::workout_adapt` asks **who asked for this?** — so
-the coach is not told the athlete cancelled a day the plan merely stopped scheduling. That
+the week planner is not told the athlete cancelled a day the plan merely stopped scheduling. That
 is about authorship, and the constant stays as it is for that job.
 `google_calendar.py::_void_label` asks **whose decision does the word report?**, which is
 the athlete's for `add` as well, so it adds that kind and no other caller does.
@@ -554,9 +555,9 @@ rule; the manual lineage's newest row is a void, `source` hydrates as `manual` b
 and §5.2's lineage read finds it. DESIGN_workout_revisions.md §12's "Replaced the session
 you added" notice stays.
 
-Manual sessions are in the standing block across the whole span (§4.2), so the coach
+Manual sessions are standing sessions across the whole span (§4.2), so the week planner
 answers for each one and the same-slot case arises only when it revises one — which, by
-the append rule above, is a replacement rather than a revision. The coach's session does
+the append rule above, is a replacement rather than a revision. The week planner's session does
 not continue the athlete's lineage, or it would render `[Manual]`.
 
 ### 5.4 A dropped session is a rest day on its own lineage
@@ -572,13 +573,13 @@ row, and the date is covered.
 
 ### 5.5 Removals no model answer explains get a real reason too
 
-Several paths remove a standing session without passing through the model's answers, and
-apply's void loop stamps all of them "Not in the regenerated plan" — the string §5.1
-exists to replace, now promoted from a database column to the athlete's phone:
+Several paths remove a session already on the calendar without passing through the model's answers,
+and apply's void loop stamps all of them "Not in the regenerated plan" — the string §5.1 exists to
+replace, now promoted from a database column to the athlete's phone:
 
 | pass | what it writes |
 |---|---|
-| `_enforce_rest_windows_generate` | the rest row takes the lineage of the first standing session on that date, reason the constraint's own title; any further session on the date gets a void with the same reason and a `[Cancelled]` marker |
+| `_enforce_rest_windows_generate` | the rest row takes the lineage of the first session already on that date, reason the constraint's own title; any further session on the date gets a void with the same reason and a `[Cancelled]` marker |
 | `_drop_benchmark_collisions` | nothing: it drops a *proposed* row, and the standing session it protects is the test |
 | a `replaces` displacing an occupant the model dropped | the occupant's void carries the occupant's own `change_reason` |
 
@@ -607,9 +608,9 @@ Repeated `workout generate` runs on the same day do not stack markers: every ans
 `keep` lands on the session's own lineage (§4.5), so a day re-decided in a later run is
 the same event, retitled again.
 
-## 6. The coach reads the present and writes what it did
+## 6. The week planner reads the present and writes what it did
 
-### 6.1 What the coach reads
+### 6.1 What the week planner reads
 
 Rev. 2 and rev. 3 both had `workout generate` told *what changed since these sessions
 were written*: rev. 2 by copying `plan show`'s diff onto the macrocycle as a pending
@@ -619,12 +620,12 @@ changes if possible" cannot be decided without knowing what changed. Rev. 3's ow
 example shows the worry is misplaced.
 
 The two cases it used were "describe her sessions with more detail on form cues" and
-"she's had knee pain — no running for now". Look at what the coach sees in each without
+"she's had knee pain — no running for now". Look at what the week planner sees in each without
 any history. In the knee case the profile says no running and Thursday holds a run: the
-session contradicts the profile *as it stands today*, and the coach can see that
+session contradicts the profile *as it stands today*, and the week planner can see that
 directly. In the form-cues case Thursday's ride matches the profile in sport, duration,
-intensity and day: nothing contradicts anything, so the coach keeps it, and a rewrite of
-the wording is thrown away by the no-op rule anyway. The question the coach has to answer
+intensity and day: nothing contradicts anything, so the week planner keeps it, and a rewrite of
+the wording is thrown away by the no-op rule anyway. The question the week planner has to answer
 is not "what changed" but "does this standing session contradict the profile, the plan or
 a constraint as they are today". That question needs no history, and asking it of the
 present is more truthful than asking it of an edit: it holds whether the profile was
@@ -644,27 +645,27 @@ which diff. That is most of what rev. 3's §6 was.
 So `workout generate` reads what it reads today, with two additions and a rule:
 
 - **Today's profile, the plan and the current constraints**, as now. The plan's strategy
-  text and block list already reach the prompt (`coach/engine/workouts.py`,
+  text and mesocycle list already reach the prompt (`coach/engine/workouts.py`,
   `strategy`, `meso_text`).
-- **The standing block** (§4.6).
-- **The current block's past constraints.** Today the prompt is given only the
+- **The standing sessions** (§4.6).
+- **The current mesocycle's past constraints.** Today the prompt is given only the
   constraints still active on or after the span's start
   (`coach/service/workouts.py`, `get_constraints(gen_start)`). A constraint that ended
-  last week — "ill 1 to 5 September" — is not shown, so the coach sees three missed
-  sessions in the block-progress section and not why. The lower bound becomes the
+  last week — "ill 1 to 5 September" — is not shown, so the week planner sees three missed
+  sessions in the mesocycle-progress section and not why. The lower bound becomes the
   current mesocycle's start date, and constraints that ended before the span are rendered
   under their own heading, marked past. There is no "debilitating" flag to filter on —
   a constraint row has a hard-rest switch and free text — and a travel week explains a
-  quiet week as well as an illness does, so all of them are listed; a block holds a
-  handful. This is what makes §4.6's reset safe: the coach that rewrites the week after
+  quiet week as well as an illness does, so all of them are listed; a mesocycle holds a
+  handful. This is what makes §4.6's reset safe: the week planner that rewrites the week after
   an easing knows what the easing answered.
-- **The rule** in §4.6: keep unless it contradicts a line the coach can name.
+- **The rule** in §4.6: keep unless it contradicts a line the week planner can name.
 
-What the coach is *not* given more of is health data. The prompt already carries fifteen
+What the week planner is *not* given more of is health data. The prompt already carries fifteen
 days of daily metrics (`coach.metrics_lookback_days`), the completed activities in the
-same window, the baseline they are judged against, and the block's planned-versus-actual
-progress week by week. For a week more than fifteen days old the coach needs why it went
-quiet, which the past constraint gives, and how much was missed, which block progress
+same window, the baseline they are judged against, and the mesocycle's planned-versus-actual
+progress week by week. For a week more than fifteen days old the week planner needs why it went
+quiet, which the past constraint gives, and how much was missed, which mesocycle progress
 gives; the day-by-day HRV from four weeks ago adds size and no decision. The setting is
 there if fifteen proves short.
 
@@ -681,14 +682,14 @@ new column, no new plumbing.
 Two limits, stated so they are not rediscovered. The paragraph exists only on the
 `plan generate` route: on `plan keep` no plan is written, and the operator has just said
 the plan did not need re-shaping, so there is nothing to summarise at plan level. And
-nothing in §4 depends on it. The coach's rule is about the present; the paragraph is
+nothing in §4 depends on it. The week planner's rule is about the present; the paragraph is
 background for its judgement and for the athlete's sentence, not a mechanism.
 
-### 6.3 What the coach writes: one sentence per session, one for the week
+### 6.3 What the week planner writes: one sentence per session, one for the week
 
 Rev. 2 asked the re-shaping verdict for one sentence covering the whole edit. That was
 wrong twice over. The verdict is handed the reason, the diff, the strategy prose and the
-block list and nothing else (`coach/engine/planning.py::_plan_reshape_verdict`) — it has
+mesocycle list and nothing else (`coach/engine/planning.py::_plan_reshape_verdict`) — it has
 never seen the calendar, so "starting this Friday" was a guess about a day it does not
 know exists. And the sentence was written before anything was decided, then stamped onto
 every session the run wrote, so it could contradict the outcome.
@@ -720,7 +721,7 @@ revision's own `reason` as `Reason:` and the change's `summary` as `Change:` whe
 differ. For an adaptation the summary is the batch's overall rationale — "HRV suppressed
 three mornings running" — which is a second *why*, not a *what*, so the label misleads
 (DESIGN_calendar_lineage.md §3's example shows exactly this). For a `workout generate`
-the summary is the coach's four-sentence microcycle reasoning, which would then appear in
+the summary is the week planner's four-sentence microcycle reasoning, which would then appear in
 the History of every session it wrote.
 
 So: **one label, one meaning.** `_entry` prints `Reason:` from the revision's own reason,
@@ -769,7 +770,7 @@ threshold loop itself returns on the first key in alphabetical order rather than
 largest move. So: the athlete retests, FTP 250 → 265, the plan flags it correctly. Before
 anyone looks, the operator also corrects `preferences`. Now `plan show` says "athlete
 profile changed: preferences" and shows that diff alone — the FTP line is gone from the
-reason, the coach's verdict never learns the threshold moved 6%, and `plan keep` stamps
+reason, the verdict call never learns the threshold moved 6%, and `plan keep` stamps
 **both** snapshots, dismissing it for good. The fix is control flow: collect every reason
 instead of returning on the first, in both loops, and report "athlete profile changed:
 preferences; ftp changed 250 → 265 (+6.0%)".
@@ -783,7 +784,7 @@ plan save: `goals_snapshot`, and `constraints_snapshot`, which holds the `replan
 subset the hash fingerprints. Both join the staleness reason and the diff.
 
 `all_constraints_snapshot` does not. It holds every active constraint, tactical ones
-included, and exists so `plan show` can list what the coach saw rather than print
+included, and exists so `plan show` can list what `plan generate` saw rather than print
 "constraints considered: none" while a small constraint plainly shaped the strategy. It is
 a display aid. Joining it to staleness would flag the operator's plan every time the
 companion athlete says "not Wednesday next week", and this design does not touch it.
@@ -802,12 +803,12 @@ not reach the days already scheduled (§1.1) — and becomes *"…keep the plan 
 
 ## 7. Implementation notes
 
-**One block, one resolver.** `_resolve_kept` becomes `_resolve_standing`: it maps
-`keep`, `revise`, `replaces` and `drop` entries onto the standing block under §4.5's
+**One set, one resolver.** `_resolve_kept` becomes `_resolve_standing`: it maps
+`keep`, `revise`, `replaces` and `drop` entries onto the standing sessions under §4.5's
 conflict rules, turns each `drop` into a rest entry that replaces its session, treats a
 full entry on a rest-only date as replacing the rest day, adds a `keep` for every
 standing session left unmentioned, and hands every pass after it a uniform list of full
-sessions. The void loop then has nothing to void in the standing block — every slot is
+sessions. The void loop then has nothing to void among the standing sessions — every slot is
 either kept or explicitly replaced — and `_fill_coverage_gaps` finds every standing date
 covered.
 
@@ -815,10 +816,10 @@ covered.
 hands `workout generate` something `workout adapt` already had: a view of the standing
 sessions, `keep`, lineage carried across a sport change or onto a rest day, a required
 `change_reason`. That is the same machinery and it should be built once: the standing
-block, `_resolve_standing`, the §4.5 report, and the lineage-carrying apply. What stays
+set, `_resolve_standing`, the §4.5 report, and the lineage-carrying apply. What stays
 separate is the policy each command runs it under: **adapt answers "how is the athlete",
 generate answers "what does the plan say".** Adapt's cause is the athlete's state, it may
-not reshape the block (DESIGN_block_boundary.md §2), and it holds its easing tag over its
+not reshape the mesocycle (DESIGN_mesocycle_boundary.md §2), and it holds its easing tag over its
 whole reach. Generate's cause is the plan and the profile as they stand, it may reshape
 freely outside the window, and it reads the easing tag only inside it (§4.6).
 `replaces` across dates is new to both; adapt may adopt it later so that a move keeps its
@@ -853,11 +854,11 @@ the past-constraints section and the `[Cancelled]` word.
 
 ## 8. Tests
 
-`tests/test_prompt_gates.py` — the "SESSIONS ALREADY STANDING" block, the `replaces` and
+`tests/test_prompt_gates.py` — the "SESSIONS ALREADY STANDING" section, the `replaces` and
 `drop` schema members, the per-session `change_reason` and the keep-unless-contradicted
-instruction are one gated region: present together when the standing block is non-empty,
+instruction are one gated region: present together when there are standing sessions,
 absent together when it is not. The past-constraints heading appears when the current
-block has a constraint that ended before the span, and not otherwise.
+mesocycle has a constraint that ended before the span, and not otherwise.
 
 `tests/test_workout_generate_window.py` (new) —
 - `keep`, `revise`, `replaces` and `drop` each produce the expected rows, all on the
@@ -869,20 +870,20 @@ block has a constraint that ended before the span, and not otherwise.
 - Window counting: `N=0` protects nothing, `N=1` today only, `N=7` today through day six.
 - The committed set is the intersection: a forward-selected span leaves it empty even
   when the window holds sessions; a completed session today is excluded and preserved.
-- A manual session past the window is in the standing block; a benchmark past the window
+- A manual session past the window is a standing session; a benchmark past the window
   is not.
 - A wording-only revision (same load, new prose) is reported as `kept` and appends nothing
   (DESIGN_workout_revisions.md §9) — the preview reads the comparison, not the response.
 - The `replaces` conflict rules: duplicate targets, a destination outside the span, a
-  source outside the standing block, a destination whose occupant is kept (refused, both
+  source that is not a standing session, a destination whose occupant is kept (refused, both
   stand), a destination whose occupant was dropped (allowed, occupant's void carries its
   reason).
 - The easing tag applies inside the window and not outside it; outside, a rewrite resets
   the tally.
 - A constraint-shaped profile line outranks a two-day-old easing.
-- A rest constraint over a date with two standing sessions: the rest row carries the first
+- A rest constraint over a date with two sessions on it: the rest row carries the first
   lineage and the constraint's title; the second gets a void with the same reason.
-- The block's past constraints are fetched from the mesocycle start; one that ended
+- The mesocycle's past constraints are fetched from the mesocycle start; one that ended
   before the span renders under the past heading; one still active does not.
 
 `tests/test_calendar.py` — `leaves_trace` for each clause: athlete kind outside the
@@ -928,7 +929,7 @@ never two hard days in a row".
 **Today.** `plan show` shows the diff and the coach says "keep". The operator runs
 `plan keep`, then `workout generate -m`. Thursday's ride event is deleted and a "Rest
 Day" appears in its place with "no session planned for this day"; Saturday becomes
-something the athlete has never seen; the whole block is re-rolled including the parts
+something the athlete has never seen; the whole mesocycle is re-rolled including the parts
 the correction never touched. The athlete finds out by opening their phone.
 
 **With this design.** `plan keep` stamps as before — it does not matter. `workout
@@ -958,7 +959,7 @@ morning the push opens with the week line, once.
 Had the correction instead been "no running", the preview would have said
 `Thu 11 Sep  Run 60m → Ride 60m   no running while the knee settles`, and Thursday's event
 would have been retitled in place with the run in its History — the same thing adapt does
-today. Had the coach dropped Thursday outright, Thursday's event would read "Rest Day"
+today. Had the week planner dropped Thursday outright, Thursday's event would read "Rest Day"
 with the ride in its History and the coach's sentence as its reason, and nothing else on
 the day. Had a rest constraint covered Friday, the tempo run would have been replaced
 deterministically, on the rest day's lineage, and the reason would read the constraint's
@@ -966,7 +967,7 @@ title.
 
 ## 10. Deliberately not done
 
-**No profile diff for `workout generate`.** See §6.1. The coach is asked about the
+**No profile diff for `workout generate`.** See §6.1. The week planner is asked about the
 present, and the reconstruction rev. 3 built to ask about the past was both unnecessary
 and wrong on the common route.
 
@@ -979,11 +980,11 @@ change and should be done on its own merits.
 **The whole horizon is not carried forward.** Showing the model every standing session
 across the full span would partly reverse DESIGN_workout_revisions.md §7.1's choice —
 "every other day stays the model's to write, which is what keeps `generate` a
-regeneration rather than a second `adapt`". The standing block is the window plus the
+regeneration rather than a second `adapt`". The standing sessions are the window plus the
 athlete's own sessions, and nothing more. Requirement 2 of §2 is therefore met inside
 the window only, and that is the intended trade.
 
-**Benchmarks past the window are not held.** See §4.2: the coach re-places them from the
+**Benchmarks past the window are not held.** See §4.2: the week planner re-places them from the
 record it already has.
 
 **The metrics window is not widened.** See §6.1.

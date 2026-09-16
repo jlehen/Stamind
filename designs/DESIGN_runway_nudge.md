@@ -1,7 +1,7 @@
 # Design: End-of-runway nudges — suggesting the right action when the schedule runs out
 
 **Status:** Implemented (2026-08-31) · **Date:** 2026-08-30 · **Revised:** 2026-08-31
-(review pass: coverage invariant replaces the rest-tail margin, block hint folded in,
+(review pass: coverage invariant replaces the rest-tail margin, mesocycle hint folded in,
 passed-state window, honest `new_goal` reply)
 
 Two readings the implementation settled, both narrower than they look:
@@ -9,7 +9,7 @@ Two readings the implementation settled, both narrower than they look:
 - **A periodization wholly behind today is a plan cliff**, whatever the sessions did.
   §2's classification compares `last_covered_date` to the plan end, which on its own would
   call "schedule stopped a week before the plan, and the plan has now ended too" a *span*
-  cliff — pointing at `workout generate` with no blocks left to generate against, and
+  cliff — pointing at `workout generate` with no mesocycles left to generate against, and
   disagreeing with §4's adapt refusal, which fires on exactly that state. The comparison
   therefore runs only while the plan still reaches today.
 - **Dates are rendered by `fmt_date`** ("2026-09-03 Thu"), the CLI's one date renderer,
@@ -25,12 +25,12 @@ different causes with three different right actions:
 | Cliff | Situation | Right action |
 |---|---|---|
 | **Span cliff** | Sessions were generated for a bounded span (`workout generate` defaults to `config.workout_generation_span_days` = 28 days from today) and the periodization runs on past the last one | `workout generate` — extend the sessions; nothing to rethink |
-| **Block cliff** | The current mesocycle's sessions run out at its boundary; the next block exists but holds no fresh sessions | `workout generate -m ..<id>` — re-plan the next block against current metrics |
-| **Plan cliff** | The periodization itself ends — the macrocycle's last block closes, usually on the goal | If a later goal has a plan: `workout generate -g`. If not: `goal add`, then `plan generate` — a conversation, not a button |
+| **Mesocycle cliff** | The current mesocycle's sessions run out at its boundary; the next mesocycle exists but holds no fresh sessions | `workout generate -m ..<id>` — re-plan the next mesocycle against current metrics |
+| **Plan cliff** | The periodization itself ends — the macrocycle's last mesocycle closes, usually on the goal | If a later goal has a plan: `workout generate -g`. If not: `goal add`, then `plan generate` — a conversation, not a button |
 
 Parts of this already exist, scattered by surface rather than by fact:
 
-- The **block cliff** has a hint — but only on one surface: `workout adapt` prints two
+- The **mesocycle cliff** has a hint — but only on one surface: `workout adapt` prints two
   lines inside `config.adapt_terminal_window_days`
   (`trainmate/cli/workouts/generate.py::_print_block_boundary_hint`). `status` and the
   bot never see it, so the same morning can already answer differently depending on
@@ -43,7 +43,7 @@ Parts of this already exist, scattered by surface rather than by fact:
   Worse, two of them actively mislead once the schedule is exhausted: the morning push
   reads "Rest day — enjoy it 🎉" (the schedule being empty, not the athlete being given
   rest), and `workout adapt` — adapting against `get_active_mesocycle`'s wholly-past
-  fallback block — closes with "All metrics are green and workout plan is on track."
+  fallback mesocycle — closes with "All metrics are green and the schedule is on track."
   over an empty calendar (§4).
 
 The failure mode is the same one DESIGN_constraint_honoring.md §1 names for constraints:
@@ -73,8 +73,8 @@ Output: `None` when nothing fires, else:
 
 - `last_covered_date` — the last date a generated row (rest included) covers, and
   `days_left` from today (negative once the cliff is behind the athlete);
-- `kind` — `block` | `span` | `plan_end_next_goal` | `plan_end_no_goal`;
-- for `block`: the next mesocycle's id, so every surface can name `-m ..<id>`;
+- `kind` — `mesocycle` | `span` | `plan_end_next_goal` | `plan_end_no_goal`;
+- for `mesocycle`: the next mesocycle's id, so every surface can name `-m ..<id>`;
 - for `span`: the periodization end date, so the wording can say how much plan is left;
 - for `plan_end_next_goal`: the objective — via `plan_gap`, **fed the mesocycle-derived
   plan end**, not `progression.plan_end`. The two differ exactly when the detector
@@ -109,8 +109,8 @@ documented as gating prompt behavior.
 
 **Classification.** Compare `last_covered_date` to the last mesocycle's end date:
 
-- covered short of plan end, ending exactly on a non-final block's boundary with a next
-  block on record → **block** cliff;
+- covered short of plan end, ending exactly on a non-final mesocycle's boundary with a next
+  mesocycle on record → **mesocycle** cliff;
 - covered short of plan end otherwise → **span** cliff;
 - covered through plan end → **plan** cliff, split on whether `plan_gap` (fed the plan
   end, per above) finds a live objective beyond it.
@@ -123,33 +123,33 @@ filter drops a goal the day after its target date, which is exactly the morning 
 wrap-up message matters most. Past the passed-state window the detector returns `None`
 and the surfaces go quiet (§6 — an honest nothing beats a daily 🎉 forever).
 
-Like the old block hint it fires on **every** run in the window, not only when something
+Like the old mesocycle hint it fires on **every** run in the window, not only when something
 else is wrong: the cliff is equally real on a green day, and acting on the nudge is what
-makes it stop, because the fact changes (DESIGN_block_boundary.md §4).
+makes it stop, because the fact changes (DESIGN_mesocycle_boundary.md §4).
 
 ## 3. One hint, not two
 
 The earlier draft kept `_print_block_boundary_hint` and gave the runway hint a
 precedence rule. That rule could only exist on `workout adapt` — the only surface the
-block hint ever fired on — so `status` would have named a different command than `adapt`
+mesocycle hint ever fired on — so `status` would have named a different command than `adapt`
 on the same morning, and even on `adapt` alone the advice would have flipped from
 `workout generate` (days 7–4, runway window) to `workout generate -m ..<id>` (days 3–0,
-block window) mid-week.
+mesocycle window) mid-week.
 
-Instead the detector owns the distinction: the `block` kind carries the next mesocycle's
+Instead the detector owns the distinction: the `mesocycle` kind carries the next mesocycle's
 id, and **every** surface prints the same `-m ..<id>` command from the first day of the
 runway window. `_print_block_boundary_hint` retires into `_print_runway_hint` — one
-printer, one fact, one command. DESIGN_block_boundary.md §4's CLI hint is subsumed by
-this; its §3 prompt-side terminal window (`THIS BLOCK IS ENDING`) is untouched and stays
+printer, one fact, one command. DESIGN_mesocycle_boundary.md §4's CLI hint is subsumed by
+this; its §3 prompt-side terminal window (`THIS MESOCYCLE IS ENDING`) is untouched and stays
 on `adapt_terminal_window_days` — that gate is about what the *coach model* is told, and
 must stay tight for the reasons that design gives.
 
-A plan cliff cannot coincide with a block cliff — the block kind requires a next
+A plan cliff cannot coincide with a mesocycle cliff — the mesocycle kind requires a next
 mesocycle, the plan cliff requires there to be none.
 
 ## 4. CLI
 
-The idiom is the old block hint's, verbatim: two yellow lines, the fact plus the exact
+The idiom is the old mesocycle hint's, verbatim: two yellow lines, the fact plus the exact
 command, printed from the daily touchpoints.
 
 `workout adapt` calls `_print_runway_hint` where `_print_block_boundary_hint` used to
@@ -164,20 +164,20 @@ shares these touchpoints. `status` and `workout adapt` print it right after the 
 hint, in the same yellow, whenever a question or message is waiting. The companion prints
 neither.
 
-**Adapt stops contradicting the fact.** When every block of the active macrocycle is
+**Adapt stops contradicting the fact.** When every mesocycle of the active macrocycle is
 behind today, `workout adapt` currently adapts against `get_active_mesocycle`'s
-absolute-first-block fallback and closes with "All metrics are green and workout plan is
-on track." — over an empty calendar. This design extends DESIGN_block_boundary.md §6's
-"adapt requires a block" one step: with the plan wholly in the past, adapt **refuses**,
+absolute-first-mesocycle fallback and closes with "All metrics are green and the schedule is
+on track." — over an empty calendar. This design extends DESIGN_mesocycle_boundary.md §6's
+"adapt requires a mesocycle" one step: with the plan wholly in the past, adapt **refuses**,
 printing the plan-cliff wording (the same two lines) instead of a green all-clear. There
-is nothing to adapt *towards*; the block-boundary design already accepted that
+is nothing to adapt *towards*; the mesocycle-boundary design already accepted that
 consequence for the no-plan case, and a finished plan is the same situation one day
 later. (`bot morning` with `adapt-first` on already swallows a refusing adapt into a
 terminal-side aside, so the push degrades exactly as it does today.)
 
-Block cliff (same wording every surface, every day in the window):
+Mesocycle cliff (same wording every surface, every day in the window):
 
-    This block ends in 4 day(s), on Thu Sep 3, and the next one has no fresh sessions.
+    This mesocycle ends in 4 day(s), on Thu Sep 3, and the next one has no fresh sessions.
     Run `workout generate -m ..7` to plan it against current metrics.
 
 Span cliff:
@@ -211,7 +211,7 @@ does not replace them.
 
 ## 5. Telegram, expert mode
 
-Free. The expert bot executes the real CLI and returns its output in `<pre>` blocks, so
+Free. The expert bot executes the real CLI and returns its output in `<pre>` messages, so
 the §4 hints arrive the moment the CLI prints them. Byte-parity preserved, nothing built.
 
 ## 6. Telegram, simple mode
@@ -222,12 +222,12 @@ per the standing split, the CLI owns *what* to offer, the bot only renders
 them and maps the taps — the offer spans both files). `bot morning` grows one conditional
 line, inside its existing per-day idempotent push.
 
-**Span and block cliffs — a line and a one-tap fix.** This **amends
+**Span and mesocycle cliffs — a line and a one-tap fix.** This **amends
 DESIGN_bot_simple_frontend.md §7's guardrail**, which listed `workout generate` among
 the commands requiring typed expert vocabulary (that document is edited in the same
 change). The amendment is deliberately narrow: `workout generate` becomes tappable in
 exactly one place — the morning push's runway button, whose argv comes from the detector
-(`workout generate`, or `workout generate -m ..<id>` for a block cliff) — and never from
+(`workout generate`, or `workout generate -m ..<id>` for a mesocycle cliff) — and never from
 the free-text router. It is safe to offer because the button feeds the normal command
 pipeline like every `send` entry, and the structured-prompt protocol
 (`TRAINMATE_FRONTEND=json`) renders its preview/confirm as tappable buttons — she sees
@@ -238,8 +238,8 @@ Two mechanics the earlier draft hand-waved:
 - **One gate per button row.** `emit_buttons` today fires only `if ahead:` — deliberately,
   so an all-done day earns no "Can't today" row. That gate stays exactly as it is for the
   session rows. The runway row has its own, equally simple gate: *the detector fired with
-  a `block` or `span` kind*. `bot morning` emits `session_rows(if ahead) +
-  runway_row(if runway and runway.kind in (block, span))` — two independent conditions,
+  a `mesocycle` or `span` kind*. `bot morning` emits `session_rows(if ahead) +
+  runway_row(if runway and runway.kind in (mesocycle, span))` — two independent conditions,
   each answering its own question, so relaxing one cannot resurrect the other's buttons.
 - **The preview must not be a `<pre>` dump.** `workout generate` joins the simple-rendering
   opt-in set for its preview: the proposed sessions render through `simple_week_lines`
@@ -267,7 +267,7 @@ day as "Rest day — enjoy it 🎉", whatever the reason it is empty
 none ahead, plan still active per §2's definition — that is wrong: it describes an
 exhausted schedule as a coaching decision. The passed state takes precedence over the
 rest line in the morning push: "You've finished everything on the schedule 🎉", followed
-by the span/block-cliff button or the plan-cliff prose as appropriate. Inside the window
+by the span/mesocycle-cliff button or the plan-cliff prose as appropriate. Inside the window
 but before the cliff, the rest line stays and the runway line is appended after it.
 `simple_week_lines` gets the matching one-liner when its window crosses the cliff
 ("that's the end of the current schedule"), mirroring §4's list marker — **and, revised
@@ -327,9 +327,9 @@ then quiet.
 - **A separate nag channel or scheduler.** The nudge rides the daily touchpoints and the
   existing morning push with its settings-marker idempotence. No new push, no new state.
 - **Gating on fatigue or proposals.** Fires every run in the window, per the
-  block-boundary precedent — the schedule is equally finite on a green day.
+  mesocycle-boundary precedent — the schedule is equally finite on a green day.
 - **Simple-mode plan generation.** A `plan generate` preview is long, and the choice of
-  what to periodize toward is the operator's in companion mode. Span/block extension is
+  what to periodize toward is the operator's in companion mode. Span/mesocycle extension is
   the only one-tap offer.
 - **Goal capture in chat.** The `new_goal` intent stays reply-only until a real
   goal-authoring conversation (date, event-vs-horizon, priority) is designed; a half-goal

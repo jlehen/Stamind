@@ -369,7 +369,7 @@ class OpenRouterClient:
             self._announce_wait(label, wait_notice)
             # Everything printed so far belongs to the setup, not the answer. A chat
             # front-end buffers to a prompt or to exit, so without this the two arrive
-            # as one block after a wait of tens of seconds (DESIGN_output_verbosity.md
+            # as one mesocycle after a wait of tens of seconds (DESIGN_output_verbosity.md
             # §7). Every LLM command passes through here, so this is the one call site.
             emit_flush()
             response = requests.post(

@@ -3,7 +3,7 @@ already been told about (DESIGN_plan_change_continuity.md §4, §5.5, §8).
 
 Everything here goes through the real propose/apply pair against a canned model reply,
 because the point of the design is what lands in the log and on the Calendar — not what
-the coach said. The preview is asserted from the proposal for the same reason: it is
+the week planner said. The preview is asserted from the proposal for the same reason: it is
 built from what apply will write.
 """
 import os
@@ -221,7 +221,7 @@ class TestTheAnswers(WindowTestCase):
         self.assertFalse(line.mentioned)
 
     def test_a_full_entry_on_a_rest_only_date_replaces_the_rest_day(self):
-        """A rest day and a session on the same date cannot both be true, so the coach is
+        """A rest day and a session on the same date cannot both be true, so the week planner is
         not offered the choice (§4.5)."""
         lineage = self.rest(_days_out(3))
         self.generate(self.session(
@@ -308,7 +308,7 @@ class TestTheWindow(WindowTestCase):
         self.assertIn("[ADDED BY THE ATHLETE]", self.prompt_user_content)
 
     def test_a_benchmark_past_the_window_is_not(self):
-        """The coach re-places tests itself out there, from the record it already has
+        """The week planner re-places tests itself out there, from the record it already has
         (§4.2)."""
         self.window(2)
         self.ride(_days_out(15), title="FTP test", benchmark_type="ftp_20min")
@@ -349,7 +349,7 @@ class TestTheConflictRules(WindowTestCase):
         after = test_db.get_workout(_days_out(2), "cycling")
         self.assertEqual(after["revision_id"], before["revision_id"])
 
-    def test_a_source_outside_the_standing_block_is_refused(self):
+    def test_a_source_outside_the_standing_sessions_is_refused(self):
         """The run answers only for the days it was shown; the entry is still written
         where it stands."""
         self.window(2)
@@ -443,7 +443,7 @@ class TestTheDeterministicPasses(WindowTestCase):
         self.assertIn("Travel", run_line.reason)
 
     def test_a_removal_nothing_explains_still_names_who_did_it(self):
-        """Past the window, where the coach writes freely and answers for nothing."""
+        """Past the window, where the week planner writes freely and answers for nothing."""
         self.window(0)
         self.ride(_days_out(2))
         proposal = self.generate(self.session(_days_out(5)))
@@ -452,7 +452,7 @@ class TestTheDeterministicPasses(WindowTestCase):
 
 
 class TestTheEasingTag(WindowTestCase):
-    """What the coach is told about a session a prior adaptation eased (§4.6)."""
+    """What the week planner is told about a session a prior adaptation eased (§4.6)."""
 
     def _eased(self, date_str):
         save_workout(
@@ -492,14 +492,14 @@ class TestTheEasingTag(WindowTestCase):
 
 
 class TestPastConstraintsReachThePrompt(WindowTestCase):
-    """A constraint that ended earlier in the block is why a week went quiet (§6.1)."""
+    """A constraint that ended earlier in the mesocycle is why a week went quiet (§6.1)."""
 
     def test_one_that_ended_before_the_span_renders_under_the_past_heading(self):
         test_db.add_constraint(
             title="Ill", start_date=_days_out(-10), end_date=_days_out(-5), rest=0,
         )
         self.generate()
-        self.assertIn("## CONSTRAINTS EARLIER IN THIS BLOCK", self.prompt_user_content)
+        self.assertIn("## CONSTRAINTS EARLIER IN THIS MESOCYCLE", self.prompt_user_content)
         self.assertIn("Ill", self.prompt_user_content)
 
     def test_one_still_active_does_not(self):
@@ -508,12 +508,12 @@ class TestPastConstraintsReachThePrompt(WindowTestCase):
         )
         self.generate()
         self.assertNotIn(
-            "## CONSTRAINTS EARLIER IN THIS BLOCK", self.prompt_user_content
+            "## CONSTRAINTS EARLIER IN THIS MESOCYCLE", self.prompt_user_content
         )
         # It is still live, so it stays where a live constraint belongs.
         self.assertIn("Travel", self.prompt_system)
 
-    def test_one_before_the_block_started_does_not(self):
+    def test_one_before_the_mesocycle_started_does_not(self):
         test_db.add_constraint(
             title="Old news", start_date=_days_out(-40), end_date=_days_out(-30), rest=0,
         )

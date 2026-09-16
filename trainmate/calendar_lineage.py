@@ -2,7 +2,7 @@
 
 `workouts` is an append-only log, so every form a session ever had is still a row and the
 lineage links them (DESIGN_workout_revisions.md §4). This renders those rows as the
-`History` block at the bottom of the event: every revision except the one the event is
+`History` section at the bottom of the event: every revision except the one the event is
 showing, newest first.
 
 The renderer is pure text over raw revision dicts — what `db.get_lineage_revisions`
@@ -74,7 +74,7 @@ def _load(revision: Dict[str, Any]) -> Optional[str]:
 
 
 def _entry(revision: Dict[str, Any], position: int, total: int) -> str:
-    """One revision as a labelled block (§3), with one `Reason:` line and no `Change:`
+    """One revision as a labelled entry (§3), with one `Reason:` line and no `Change:`
     (DESIGN_plan_change_continuity.md §6.4).
 
     A void is rendered lean — it carries the departing session's columns forward, and
@@ -117,7 +117,7 @@ def _earlier(
     return list(reversed(numbered))
 
 
-def history_block(
+def history_section(
     revisions: Sequence[Dict[str, Any]], head_revision_id: int,
     budget: Optional[int] = None,
 ) -> Optional[str]:
@@ -160,7 +160,7 @@ def history_block(
 def for_workout(
     workout: Dict[str, Any], budget: Optional[int] = None
 ) -> Optional[str]:
-    """The history block for a hydrated session, read from its lineage.
+    """The `History` section for a hydrated session, read from its lineage.
 
     `id` is the lineage and `revision_id` the live row it speaks through
     (DESIGN_workout_revisions.md §5); a dict carrying neither — a synthetic one in a test,
@@ -169,6 +169,6 @@ def for_workout(
     revision_id = workout.get("revision_id")
     if lineage_id is None or revision_id is None:
         return None
-    return history_block(
+    return history_section(
         runtime.db.get_lineage_revisions(lineage_id), revision_id, budget
     )

@@ -18,7 +18,7 @@ from trainmate.cli.workouts.generate import (
 
 def _add_listing_args(parser):
     """The targets, selectors and filters `workout list` and `workout show` share: one
-    listing, and only the per-workout detail block differs (`show` always prints it)."""
+    listing, and only the per-workout detail lines differ (`show` always prints it)."""
     parser.add_argument(
         "targets", nargs="*", metavar="TARGET", type=parse_target,
         help="Workout IDs and/or date selectors to show (e.g. '12 15', '2026-06-01..')"
@@ -77,7 +77,7 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         parents=[pull_bypass_parser],
         help="Show named workouts in full detail",
         description=(
-            "Show workouts with the full detail block: the description, when the session "
+            "Show workouts with their full details: the description, when the session "
             "was planned and last adapted, the effort a past session was graded against, "
             f"and any adapt notes. Same output as '{green('workout list')} -v', under a "
             "name that says what it does. Name workout IDs or dates as arguments "
@@ -124,10 +124,10 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         parents=[pull_bypass_parser, llm_debug_parser],
         help="Generate workouts (microcycles) based on the active strategy",
         description=(
-            "Generate workouts (microcycles), driven by the periodization blocks covering "
+            "Generate workouts (microcycles), driven by the periodization mesocycles covering "
             "the days being generated — which plan applies is read off the dates, so no "
             "goal has to be named. -d/-m/-M/-g pick the whole span to write, both ends of "
-            "it: '-m 5' is block 5 from its first day to its last, '-g' is a goal's whole "
+            "it: '-m 5' is mesocycle 5 from its first day to its last, '-g' is a goal's whole "
             "plan, '-d 4w' is the next four weeks. A span never opens before today. With "
             "no selector, generates config.workout_generation_span_days days from today "
             f"(28 by default). The proposed sessions are listed as '{green('workout list')}' "
@@ -296,7 +296,7 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             "won't override clear fatigue signals. The note itself isn't stored, but if "
             "it drives a session change its cause is recorded in that session's reason so "
             "a later run understands the tactical change; it stays a one-off and never "
-            "becomes durable block evidence. For persistent signals (alcohol, sleep, "
+            "becomes durable mesocycle evidence. For persistent signals (alcohol, sleep, "
             "stress) use 'signal add' instead."
         )
     )

@@ -2,7 +2,7 @@ import argparse
 import sys
 from trainmate import runtime
 from trainmate.util import (
-    bold, green, red, cyan, gray, cmd, format_labeled_block, fmt_date,
+    bold, green, red, cyan, gray, cmd, format_labeled_paragraph, fmt_date,
     today_str as _today_str, notice,
 )
 from trainmate.cli.common import print_plan_cascade, report_unhonored
@@ -36,7 +36,7 @@ def print_goal_row(g: dict) -> None:
         f"({sport_str}) {date_disp}"
     )
     if g.get('description'):
-        print(format_labeled_block("  Description:", g['description']))
+        print(format_labeled_paragraph("  Description:", g['description']))
 
 
 def run_goal_add(args: argparse.Namespace) -> None:
@@ -309,7 +309,7 @@ def add_goal_parser(subparsers):
     g_rm.add_argument(
         "--purge", action="store_true",
         help="Delete the goal outright instead of calling it off, with every plan "
-             "version, block and feedback note it owns. For a goal entered by mistake; "
+             "version, mesocycle and feedback note it owns. For a goal entered by mistake; "
              "cannot be undone."
     )
     g_rm.add_argument(

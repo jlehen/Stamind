@@ -72,16 +72,16 @@ def _easing_recency_tag(workout: Workout, eval_date: Optional[str]) -> str:
 def format_metrics_history(
     metrics: List[Dict[str, Any]], warmup_cutoff: Optional[str] = None
 ) -> str:
-    """Formats metrics cache history to a readable block for LLM prompts.
+    """Formats metrics cache history to readable text for LLM prompts.
 
     One None-omission convention for the whole line: every field (RHR, HRV, Sleep,
     Stress, and the PMC triple CTL/ATL/TSB plus the ATL:CTL ratio) is emitted only when
     present, so a NULL value is silently dropped rather than crashing a `:.2f`/rendering
-    `Nonebpm` (DESIGN_pmc_fitness_fatigue.md §5.1). The PMC block is additionally
+    `Nonebpm` (DESIGN_pmc_fitness_fatigue.md §5.1). The PMC lines are additionally
     suppressed for rows dated before `warmup_cutoff` (garmin.pmc_warmup_cutoff_for),
     where the EWMAs are still leading-edge warm-up artifacts (§3.3a) — the ratio rides
     inside that gate since it divides two of them. The TSB-lag footnote is appended once
-    when any row showed TSB (it explains the TSB lag; a CTL/ATL-only block has no lag
+    when any row showed TSB (it explains the TSB lag; a CTL/ATL-only history has no lag
     to explain)."""
     metrics_lines = []
     shown_tsb = False
@@ -122,7 +122,7 @@ def format_metrics_history(
 
 def format_daily_signals(daily_signals: List[Dict[str, Any]]) -> str:
     """Formats externally-logged daily signals (alcohol, poor sleep, etc.)
-    to a readable block for LLM prompts. One line per logged signal-day."""
+    to readable text for LLM prompts. One line per logged signal-day."""
     lines = []
     for c in daily_signals:
         line = f"- {c['date']}: {c['metric']}"
@@ -135,7 +135,7 @@ def format_daily_signals(daily_signals: List[Dict[str, Any]]) -> str:
 
 
 def format_completed_activities(completed_activities: List[CompletedActivity]) -> str:
-    """Formats Garmin completed activities to a readable block for LLM prompts."""
+    """Formats Garmin completed activities to readable text for LLM prompts."""
     completed_list = []
     for act in completed_activities:
         line = (
@@ -196,7 +196,7 @@ def _planned_summary(
         line += f" — {mod_reason}"
     # The stated intensity target (DESIGN_intensity_distribution.md §9.8) — duration and
     # TSS fold intensity away, and both prompts are asked to weigh a session against the
-    # block's hard/easy split (DESIGN_workout_revisions.md §7.1).
+    # mesocycle's hard/easy split (DESIGN_workout_revisions.md §7.1).
     target = intensity.format_planned_zones(w)
     if target:
         line += f"\n  {target}"
@@ -206,7 +206,7 @@ def _planned_summary(
 def format_planned_workouts(
     planned_workouts: List[Workout], eval_date: Optional[str] = None,
 ) -> str:
-    """Formats planned workouts to a readable block for LLM prompts.
+    """Formats planned workouts to readable text for LLM prompts.
 
     `eval_date` dates the easing tag. Used where the model is asked to weigh a session
     rather than rewrite it, so it carries the intensity target but not the description
@@ -235,23 +235,23 @@ def format_standing_workouts(
     standing: List[Workout], eval_date: Optional[str] = None,
     window_end: Optional[str] = None,
 ) -> str:
-    """The SESSIONS ALREADY STANDING block of the generate prompt
+    """The SESSIONS ALREADY STANDING section of the generate prompt
     (DESIGN_plan_change_continuity.md §4.6).
 
     A committed session also carries its full description, so a revision can be minimal
     rather than re-invented; one past the window is listed to be answered for, not
     rewritten in detail, so its one-line form is enough."""
-    blocks = []
+    sections = []
     for w in standing:
         committed = bool(window_end and w['date'] <= window_end)
         header = _planned_summary(w, eval_date, _standing_markers(w, window_end))
         desc = (w.get('description') or '').strip() if committed else ''
         if not desc:
-            blocks.append(header)
+            sections.append(header)
             continue
         indented = "\n".join("    " + ln for ln in desc.splitlines())
-        blocks.append(f"{header}\n  Full description:\n{indented}")
-    return "\n\n".join(blocks)
+        sections.append(f"{header}\n  Full description:\n{indented}")
+    return "\n\n".join(sections)
 
 
 def _performed_marker(p: Performed) -> str:
@@ -301,7 +301,7 @@ def format_planned_workouts_detailed(
     form is already the reduced plan.
     """
     performed = performed or {}
-    blocks = []
+    sections = []
     for w in planned_workouts:
         markers = ""
         p = performed.get((w['date'], canonical_sport(w['sport_type'])))
@@ -317,10 +317,10 @@ def format_planned_workouts_detailed(
         desc = (w.get('description') or '').strip()
         if desc:
             indented = "\n".join("    " + ln for ln in desc.splitlines())
-            blocks.append(f"{header}\n  Full description:\n{indented}")
+            sections.append(f"{header}\n  Full description:\n{indented}")
         else:
-            blocks.append(header)
-    return "\n\n".join(blocks)
+            sections.append(header)
+    return "\n\n".join(sections)
 
 
 def format_removed_workouts(removed_workouts: List[Workout]) -> str:
@@ -340,7 +340,7 @@ def format_removed_workouts(removed_workouts: List[Workout]) -> str:
 
 
 def format_baseline(baseline: Optional[Dict[str, Any]]) -> str:
-    """Formats 28-day baseline reference to a readable block for LLM prompts."""
+    """Formats 28-day baseline reference to readable text for LLM prompts."""
     if not baseline:
         return "No baseline data available."
     return (
@@ -356,8 +356,8 @@ def format_baseline(baseline: Optional[Dict[str, Any]]) -> str:
 _RULE = "=" * 80
 
 
-def _science_block(s_dir: str, title: str, provenance: str) -> str:
-    """One bannered block of quoted science documents, or "" when the directory holds none.
+def _science_section(s_dir: str, title: str, provenance: str) -> str:
+    """One bannered section of quoted science documents, or "" when the directory holds none.
 
     The banner is the prompt's third marker (DESIGN_prompt_structure.md §3): everything
     inside it is verbatim source, so its own `#` headings are the document's and not the
@@ -386,8 +386,8 @@ def _load_science_guidelines(app_science_dir: str, science_dir: str) -> str:
     banner hid that. Returns "" when neither directory has documents, so no caller emits an
     empty banner.
     """
-    blocks = [
-        _science_block(
+    sections = [
+        _science_section(
             app_science_dir,
             "TRAINMATE SPORTS SCIENCE GUIDELINES",
             "TrainMate's own reference material, shipped with the app. It defines how to\n"
@@ -395,12 +395,12 @@ def _load_science_guidelines(app_science_dir: str, science_dir: str) -> str:
             "what to prescribe. Where the two disagree, these yield — except for the rules\n"
             "each document marks as a floor, which never yield.",
         ),
-        _science_block(
+        _science_section(
             science_dir,
             "ATHLETE-PROVIDED SPORTS SCIENCE GUIDELINES",
             "Reference material the athlete supplied themselves — the training philosophy\n"
             "and sources they want their coaching drawn from. These govern what is\n"
-            "prescribed: volumes, durations, session counts, block order, taper depth.",
+            "prescribed: volumes, durations, session counts, mesocycle order, taper depth.",
         ),
     ]
-    return "\n\n".join(b for b in blocks if b)
+    return "\n\n".join(b for b in sections if b)

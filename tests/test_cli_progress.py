@@ -17,7 +17,7 @@ from trainmate.cli.progress import (
     render_progress, format_weekly_table, table_rows, _week_row,
     fmt_zone_cell, window_sport_stats, zone_currency,
     zone_week_cells, zone_table, zone_section, unknown_sport_preferences,
-    _orphan_week_note, render_block_section, _warning_line,
+    _orphan_week_note, render_mesocycle_section, _warning_line,
     BAND_LABEL_WIDTH, BAR_WIDTH, TABLE_WIDTH, WEEK_COL_WIDTH,
 )
 
@@ -756,19 +756,19 @@ class TestUnknownSportPreferences(unittest.TestCase):
 
 
 class TestOrphanWeekNote(unittest.TestCase):
-    BLOCKS = [{"start_date": "2026-05-25", "end_date": "2026-06-14"},
+    MESOCYCLES = [{"start_date": "2026-05-25", "end_date": "2026-06-14"},
               {"start_date": "2026-06-29", "end_date": "2026-07-26"}]
 
-    def test_weeks_belonging_to_no_block_are_named(self):
+    def test_weeks_belonging_to_no_mesocycle_are_named(self):
         weeks = [_zweek(d) for d in
                  ("2026-06-01", "2026-06-15", "2026-06-22", "2026-06-29")]
-        lines = _orphan_week_note(weeks, self.BLOCKS)
+        lines = _orphan_week_note(weeks, self.MESOCYCLES)
         note = " ".join(l.strip() for l in lines)
         self.assertIn("2 weeks", note)
         self.assertIn("06-15", note)
         self.assertIn("06-22", note)
         self.assertIn("partial week is excluded", note)
-        self.assertIn("without --blocks", note)
+        self.assertIn("without --mesocycles", note)
         for line in lines:
             self.assertLessEqual(visible_len(line), TABLE_WIDTH, msg=repr(line))
 
@@ -776,18 +776,18 @@ class TestOrphanWeekNote(unittest.TestCase):
         weeks = [_zweek(f"2026-06-{d:02d}") for d in (15, 22)] + [
             _zweek("2026-08-03"), _zweek("2026-08-10")
         ]
-        note = "\n".join(_orphan_week_note(weeks, self.BLOCKS))
+        note = "\n".join(_orphan_week_note(weeks, self.MESOCYCLES))
         self.assertIn("+2 more", note)
 
     def test_full_coverage_says_nothing(self):
-        self.assertEqual(_orphan_week_note([_zweek("2026-06-29")], self.BLOCKS), [])
+        self.assertEqual(_orphan_week_note([_zweek("2026-06-29")], self.MESOCYCLES), [])
 
 
 class _StubDb:
-    """The five accessors `render_block_section` reads, and nothing else — it takes a
-    `dbh` precisely so the block walk stays testable without a database.
+    """The five accessors `render_mesocycle_section` reads, and nothing else — it takes a
+    `dbh` precisely so the mesocycle walk stays testable without a database.
 
-    `preceding` is `(macro, blocks)` for the previous *goal's* plan, the only other
+    `preceding` is `(macro, mesocycles)` for the previous *goal's* plan, the only other
     lineage the walk pulls in; there is deliberately no way to hand it a superseded
     version of the governing plan (DESIGN_plan_rollback.md §6.1)."""
 
@@ -824,8 +824,8 @@ def _run_act(date, minutes, z2_minutes):
     return row
 
 
-class TestBlockSection(unittest.TestCase):
-    """`--blocks` reproduces the very loss §9.6 exists to prevent, by more than one
+class TestMesocycleSection(unittest.TestCase):
+    """`--mesocycles` reproduces the very loss §9.6 exists to prevent, by more than one
     route, so it must name both."""
 
     TODAY = "2026-07-09"
@@ -847,21 +847,21 @@ class TestBlockSection(unittest.TestCase):
         acts = [_run_act(d, 300, 250) for d in
                 ("2026-06-02", "2026-06-09", "2026-06-16", "2026-06-23",
                  "2026-06-30", "2026-07-07")]
-        return render_block_section(
+        return render_mesocycle_section(
             _StubDb(self.MESOS, acts), {"weeks": self._payload_weeks()},
             8, self.TODAY, [], ["running"],
         )
 
-    def test_reports_each_block_overlapping_the_window(self):
+    def test_reports_each_mesocycle_overlapping_the_window(self):
         text = "\n".join(self._section())
-        self.assertIn("ZONES BY BLOCK — running", text)
+        self.assertIn("ZONES BY MESOCYCLE — running", text)
         self.assertIn("Base 1", text)
         self.assertIn("Base 2", text)
         self.assertIn("aerobic volume", text)  # the stated focus, to be graded against
 
-    def test_names_the_weeks_that_belong_to_no_block(self):
+    def test_names_the_weeks_that_belong_to_no_mesocycle(self):
         text = " ".join(l.strip() for l in self._section())
-        self.assertIn("belong to no block", text)
+        self.assertIn("belong to no mesocycle", text)
         self.assertIn("06-15", text)
         self.assertIn("06-22", text)
 
@@ -869,7 +869,7 @@ class TestBlockSection(unittest.TestCase):
         text = " ".join(l.strip() for l in self._section())
         self.assertIn("final partial week is excluded", text)
 
-    def test_the_caveats_are_emitted_once_not_once_per_block(self):
+    def test_the_caveats_are_emitted_once_not_once_per_mesocycle(self):
         text = "\n".join(self._section())
         self.assertEqual(text.count("interval work with rest"), 1)
 
@@ -879,7 +879,7 @@ class TestBlockSection(unittest.TestCase):
 
 
 class TestDeltaStopsAtThePlanBoundary(unittest.TestCase):
-    """A long window reaches back into the previous goal's plan. Those blocks are worth
+    """A long window reaches back into the previous goal's plan. Those mesocycles are worth
     reporting; the change *against* them is not — it spans a taper, a race and an
     off-season (DESIGN_plan_rollback.md §6.1)."""
 
@@ -906,11 +906,11 @@ class TestDeltaStopsAtThePlanBoundary(unittest.TestCase):
         acts = [_run_act(f"{m[:8]}{int(m[8:]) + 1:02d}", 300, 250) for m in mondays]
         db = _StubDb(self.THIS_SEASON, acts, governing_id=2,
                      preceding=({"id": 1, "objective_id": 1}, self.LAST_SEASON))
-        return "\n".join(render_block_section(
+        return "\n".join(render_mesocycle_section(
             db, {"weeks": weeks}, "all", self.TODAY, [], ["running"],
         ))
 
-    def test_last_seasons_block_is_still_reported(self):
+    def test_last_seasons_mesocycle_is_still_reported(self):
         self.assertIn("Spring Peak", self._section())
 
     def test_no_delta_is_drawn_across_the_boundary(self):
@@ -924,22 +924,22 @@ class TestDeltaBaseline(unittest.TestCase):
     """`delta_baseline` on its own — the rule both the CLI section and the strategy
     prompt read it from."""
 
-    BLOCKS = [
+    MESOCYCLES = [
         {"name": "Spring Peak", "macrocycle_id": 1},
         {"name": "Base 1", "macrocycle_id": 2},
         {"name": "Base 2", "macrocycle_id": 2},
     ]
 
-    def test_the_first_block_has_no_baseline(self):
-        self.assertIsNone(delta_baseline(self.BLOCKS, 0))
+    def test_the_first_mesocycle_has_no_baseline(self):
+        self.assertIsNone(delta_baseline(self.MESOCYCLES, 0))
 
     def test_a_plan_boundary_has_no_baseline(self):
-        self.assertIsNone(delta_baseline(self.BLOCKS, 1))
+        self.assertIsNone(delta_baseline(self.MESOCYCLES, 1))
 
-    def test_within_a_plan_the_baseline_is_the_block_before(self):
-        self.assertEqual(delta_baseline(self.BLOCKS, 2)["name"], "Base 1")
+    def test_within_a_plan_the_baseline_is_the_mesocycle_before(self):
+        self.assertEqual(delta_baseline(self.MESOCYCLES, 2)["name"], "Base 1")
 
-    def test_blocks_predating_the_column_still_compare(self):
+    def test_mesocycles_predating_the_column_still_compare(self):
         """Legacy rows carry no `macrocycle_id`; None == None, so they keep their delta
         rather than silently losing it."""
         legacy = [{"name": "A"}, {"name": "B"}]
@@ -948,7 +948,7 @@ class TestDeltaBaseline(unittest.TestCase):
 
 class TestLoadSparseWeek(unittest.TestCase):
     """§11: the strap died, no RPE was entered, and the week reads as an adherence
-    miss the coach will then adapt the plan around."""
+    miss the week planner will then adapt the sessions around."""
 
     def _week(self, sparse):
         return {"week_commencing": "2026-06-29", "planned_load": 320.0,

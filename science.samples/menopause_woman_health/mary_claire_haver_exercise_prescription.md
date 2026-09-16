@@ -37,7 +37,7 @@ ppears well below 150 minutes.
 
 ## Sample Weekly Structure
 
-**Option A — Daily 35-minute block (7 days)**
+**Option A — Daily 35-minute session (7 days)**
 - 20 min moderate cardio + 15 min strength, every day.
 
 **Option B — Split schedule (more practical for most)**

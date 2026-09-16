@@ -54,7 +54,7 @@ The scenario, on a simulated "today" of 2026-08-18:
 | 0 | Goals in the database (`goal list`) |
 | 1 | `data bootstrap` — history reconstruction, mesocycle inference, coach learnings |
 | 2 | The travel constraint added before any planning |
-| 3 | `plan generate -g 2` as printed while generating (the coach's reasoning) |
+| 3 | `plan generate -g 2` as printed while generating (the model's reasoning) |
 | 4 | The resulting plan (`plan show -g 2 -w`) |
 | 5 | `workout generate -g 2` as printed while generating |
 | 6 | The resulting 14-week schedule (`workout list -g 2 -v`) — the pre-adapt baseline |
@@ -100,7 +100,7 @@ The headline row per model; each column is unpacked into its own table further d
 | glm-5.2 | 0 — gen failed ×2 | 5 | — | — | — | — | — | — | 750 |
 
 Column notes. *B-boundary*: a mesocycle boundary within ±2 days of the B-event —
-"no" means the block structure rolls past the race. *travel viol.*: outdoor-bike
+"no" means the mesocycle structure rolls past the race. *travel viol.*: outdoor-bike
 sessions scheduled inside Oct 12–18. *bike on gym days*: cycling sessions on the four
 weekdays the athlete's `weekly_schedule` marks gym-only (no bike available). *over-dur*:
 sessions longer than the day's `total_available_hours`. *wedding TSS*: load left on
@@ -116,11 +116,11 @@ the end), so it is absent from the per-dimension tables below.
 All fourteen completed models spanned the full 14 weeks and treated the B-event as a
 **train-through tune-up** rather than a second peak — the phrasing is strikingly
 convergent ("B-event ... not a full taper" appears in nearly every strategy). Every
-model also names the travel week explicitly in its block structure — most as its own
-mesocycle, five folded into a longer block (·travel below). The block structures
+model also names the travel week explicitly in its mesocycle structure — most as its own
+mesocycle, five folded into a longer mesocycle (·travel below). The mesocycle structures
 themselves:
 
-| model | blocks | in order (weeks) | B-event boundary |
+| model | mesocycles | in order (weeks) | B-event boundary |
 |---|---|---|---|
 | claude-opus-4.8 | 6 | Base 2.9w → HIIT·B 3.1w → Threshold·travel 3.4w → Threshold 1.9w → Peak/taper 0.9w → Race 0.9w | **no** |
 | claude-opus-5 | 6 | Base 2.7w → HIIT·B 2.9w → Threshold·travel 3.9w → HIIT 1.9w → Peak/taper 0.9w → Race 0.9w | yes |
@@ -137,23 +137,23 @@ themselves:
 | qwen3.8-max | 7 | SIT 1.7w → HIIT·B 3.9w → Consolidation 1.9w → Travel 0.9w → Threshold 2.9w → Peak/taper 1.7w → Race 0.0w | yes |
 | grok-4.5 | 7 | Base 1.9w → SIT 1.9w → HIIT·B 2.7w → Travel 1.9w → Threshold 2.9w → Peak/taper 0.9w → Race 0.9w | **no** |
 
-Each block name is compressed to a type label (keyword-matched; "Specific" =
-event-specific build, "B-tune" = a dedicated B-race tune-up block). **·B** marks a
-block whose name references the Hillcrest climb, **·travel** a block that absorbs the
-travel week rather than isolating it. The full block names are in each report's
+Each mesocycle name is compressed to a type label (keyword-matched; "Specific" =
+event-specific build, "B-tune" = a dedicated B-race tune-up mesocycle). **·B** marks a
+mesocycle whose name references the Hillcrest climb, **·travel** a mesocycle that absorbs the
+travel week rather than isolating it. The full mesocycle names are in each report's
 section 4.
 
-Three models let their block structure roll straight past the B-race: opus-4.8's HIIT
-block ends 09-30 (three days after the event), kimi-k3's threshold block runs to
-10-11, grok-4.5's to 10-04 — the race sits mid-block with no structural
+Three models let their mesocycle structure roll straight past the B-race: opus-4.8's HIIT
+mesocycle ends 09-30 (three days after the event), kimi-k3's threshold mesocycle runs to
+10-11, grok-4.5's to 10-04 — the race sits mid-mesocycle with no structural
 acknowledgement. Details worth calling out beyond the table:
 
 - **qwen3.8-max says "no full taper" and then plans one**: Sep 15–27 is two weeks of
   reduced volume, rest days and openers — a full taper for a B-event, contradicting its
-  own strategy text. It also opens the 14-week autumn plan with a sprint (SIT) block on
+  own strategy text. It also opens the 14-week autumn plan with a sprint (SIT) mesocycle on
   the argument that anaerobic residuals "decay quickly" — which is precisely the reason
   to put SIT *late*, not first.
-- **gemini-3.1-pro-preview starts HIIT on day 1** with no base block, against its own
+- **gemini-3.1-pro-preview starts HIIT on day 1** with no base mesocycle, against its own
   bootstrap data showing CTL falling — and its history reconstruction invents a "summer
   overload maintaining a heightened CTL base" that never happened.
 - **claude-opus-5** was the only model to derive its weekly shape from the athlete's
@@ -192,10 +192,10 @@ nearly everyone dips into the B-race week (09-21), bottoms out in the travel wee
 drops again for the peak week (11-09). Within that shared shape, the spread is at the
 edges. **kimi-k3 (9.1 h) and gpt-5.6-terra (8.9 h) plan well over the 8 h budget** —
 terra has six weeks at 460 TSS or more, and kimi stacks its two heaviest weeks of the
-whole plan (519, 537) into the final build block. At the other end **deepseek-v4-pro
+whole plan (519, 537) into the final build mesocycle. At the other end **deepseek-v4-pro
 plans just 6.0 h** and starts shedding load from 11-02, a three-week glide into the
 race. grok-4.5 is the only model whose load *rises* into the B-race week (295 → 307
-TSS) — consistent with its block rolling past the event.
+TSS) — consistent with its mesocycle rolling past the event.
 
 The tiny race weeks (77–110 TSS) in the 11-16 column belong to the eight models whose
 schedule ends on Nov 21 — the app's end-exclusive horizon bug (see *App findings*), not
@@ -291,10 +291,10 @@ across the 14 weeks — the athlete's 250 W FTP anchor enters the run unverified
 
 Testing discipline is uniform: **no model schedules more than one test in 14 weeks**,
 so illegally short retest gaps never arise. The field splits by *when* — six models anchor
-the number inside the first two weeks, before the blocks that scale off it; opus-5
-tests at the end of its base block with a stated trigger and an explicit no-retest
+the number inside the first two weeks, before the mesocycles that scale off it; opus-5
+tests at the end of its base mesocycle with a stated trigger and an explicit no-retest
 window before the race; sonnet-5 re-anchors three days after the B-race for its
-threshold block; gemini-3.1-pro waits until week 10. And **four models — opus-4.8,
+threshold mesocycle; gemini-3.1-pro waits until week 10. And **four models — opus-4.8,
 gemini-3.7-flash, gpt-5.6-terra and qwen3.8-max — ride the whole 14 weeks without
 ever verifying the anchor**, while still prescribing watt-target sessions off it.
 
@@ -367,7 +367,7 @@ gpt-family adaptation in the set.
 
 The two late constraints — group ride Aug 30, wedding Sep 11–13 — separated the field
 more than anything else. `workout adapt` only reaches to the end of
-the **active mesocycle**, so each model's window is set by its own first-block length;
+the **active mesocycle**, so each model's window is set by its own first-mesocycle length;
 "mentions" counts how often the decision summary (section 8) names each constraint:
 
 | model | adapt window | saw ride / mentions | saw wedding / mentions | changed | Aug 30 after adapt | wedding TSS |
@@ -412,7 +412,7 @@ session after adaptation — an unchanged easy spin means the model left a frien
   relocated its FTP test off the morning after an unplanned hard ride, qwen trimmed
   one ride to Z2 on recovery grounds; neither mentions the group ride or the wedding.
 - The wedding exposed an emergent property of the app's design: whether Sep 11–13 was
-  even visible depended on block-length choices each model made weeks earlier. Only
+  even visible depended on mesocycle-length choices each model made weeks earlier. Only
   **gemini-3.7-flash** (window to Sep 27) and **kimi-k3** (to Sep 13) had the wedding
   in reach besides gemini-3.1-pro — and both ignored it. For everyone else the correct
   app-level answer would have been a plan-level replan, which the CLI offered ("Replan
@@ -440,7 +440,7 @@ as measured on 2026-08-18.
    snapshotted into the plan fingerprint, so advisory ones vanish from the rendering
    even though the LLM saw them. Cosmetic, but it misleads exactly when auditing runs
    like these.
-4. **kimi-k3's bootstrap rendered empty blocks** ("Macrocycle Focus ( to ): N/A",
+4. **kimi-k3's bootstrap rendered empty mesocycles** ("Macrocycle Focus ( to ): N/A",
    empty coach observations) and the CLI printed "No coach learnings yet. Run 'data
    bootstrap'..." immediately *after* bootstrap ran — worth a look at what a
    partially-parseable bootstrap response leaves behind (gpt-5.6-terra hit the same
@@ -452,14 +452,14 @@ glm-5.2's first attempt failed at `workout generate`: after 388 s and 58k comple
 tokens it returned *complete, well-formed JSON of the wrong shape* — a top-level list
 of week-objects each holding a `workouts` array, instead of the required single
 `{"workouts": [...]}` object — and the app died on `'list' object has no attribute
-'get'`. Its plan (4 blocks to Nov 22) had been fine. The full failed report is
+'get'`. Its plan (4 mesocycles to Nov 22) had been fine. The full failed report is
 preserved as `out/z-ai-glm-5-2.txt.attempt1`.
 
 The retry (now the main `out/z-ai-glm-5-2.txt`) failed the same step a **different
 way**: 750 s and 50k completion tokens ending in a missing-comma JSON error at
 character 58,495, with the raw response tail degenerating into a long run of
 whitespace — a classic long-output breakdown. Everything before and after the
-generation step worked both times (its 5-block plan is reasonable, with a bookended
+generation step worked both times (its 5-mesocycle plan is reasonable, with a bookended
 travel mesocycle). Two attempts, two distinct failure modes: glm-5.2 cannot reliably
 sustain a ~100-session single-call generation — the clearest capability failure in
 the benchmark.
@@ -519,10 +519,10 @@ sessions *plus* 11 rest days in 14 weeks.
 2. **gpt-5.6-sol-pro** — the no-weak-dimension model. Second-best adaptation
    (7 changed sessions, re-sequencing its FTP test
    off the group-ride day with recovery placed around it), near-perfect availability
-   (1 weekday bike, 0 over-duration), sane load (6.8 h), clean 6-block structure,
+   (1 weekday bike, 0 over-duration), sane load (6.8 h), clean 6-mesocycle structure,
    sensibly early test. Its only misses are the app-assisted A-race gap and a wedding
-   that its own short first block put out of reach. It out-ranks the two Claude
-   planners because it did both halves of the job well rather than one half
+   that its own short first mesocycle put out of reach. It out-ranks the two Claude
+   models because it did both halves of the job well rather than one half
    perfectly.
 
 3. **claude-opus-5** — the best 14-week plan in the field, full stop: the only model
@@ -536,7 +536,7 @@ sessions *plus* 11 rest days in 14 weeks.
 
 4. **claude-sonnet-5** — the cleanest execution sheet in the field: zero bikes on
    gym-only days, one over-duration session, both race days, a dedicated B-race
-   mini-taper block, and a defensible post-B-race re-anchor test (day 44). It sits
+   mini-taper mesocycle, and a defensible post-B-race re-anchor test (day 44). It sits
    below opus-5 on plan richness (6.7 h undershoots the budget, 59-word vs 22-word
    protocols cuts both ways) and shares the same F: an inert adapt that never
    mentioned either constraint.
@@ -544,23 +544,23 @@ sessions *plus* 11 rest days in 14 weeks.
 5. **grok-4.5** — the third real adaptation (5 changes, and the most realistic
    athlete guidance in the set: "Expect surges you won't fully control—don't chase
    every attack"). The plan underneath is mid-pack at best: one of three models whose
-   blocks roll straight past the B-race, the only model whose load *rises* into the
+   mesocycles roll straight past the B-race, the only model whose load *rises* into the
    B-race week, 14 weekday bikes and 6 over-duration sessions. Adaptation quality
-   pulls it above better planners; plan flaws keep it out of the top three.
+   pulls it above models that plan better; plan flaws keep it out of the top three.
 
-6. **gpt-5.6** — solid everywhere, spectacular nowhere: 8 blocks with a dedicated
+6. **gpt-5.6** — solid everywhere, spectacular nowhere: 8 mesocycles with a dedicated
    B-tune week, day-12 test, compliant travel week, and a modest but sensible
    2-change adaptation (it converted the day into a social recovery ride — thereby
    exposing app bug #2, which is the app's fault, not the model's). The 14 weekday
    bikes and missing A-day are the gap to the top five.
 
-7. **gpt-5.6-terra-pro** — the best pure plan of the gpt family: 9 blocks including
+7. **gpt-5.6-terra-pro** — the best pure plan of the gpt family: 9 mesocycles including
    a B-tune week *and* a post-B recovery week, availability 2/0, day-5 test, 7.3 h.
    All of it wasted at the second hurdle: ~108k prompt tokens to conclude "no changes"
    with the group ride in its window. The plan alone would rank top-four; the F adapt
    costs it three places.
 
-8. **gpt-5.6-sol** — a competent plan (8 blocks, B-tune, day-9 test, 7.5 h) and a
+8. **gpt-5.6-sol** — a competent plan (8 mesocycles, B-tune, day-9 test, 7.5 h) and a
    minimal-but-correct adaptation (1 change: raised the group-ride day's expected
    intensity instead of pretending it's recovery). The 24 weekday bikes — third worst
    in the field — are what hold it here.
@@ -592,7 +592,7 @@ sessions *plus* 11 rest days in 14 weeks.
 
 12. **claude-opus-4.8** — both race days and tidy load management (7.0 h, sane
     rhythm), but the plan is un-executable twice a week — 25 bike sessions on
-    gym-only days, second worst in the field — its block structure rolls past the
+    gym-only days, second worst in the field — its mesocycle structure rolls past the
     B-race with no acknowledgement, it prescribes watts for 14 weeks without ever
     testing the anchor, and its 6-second adapt changed nothing. Flash edges it on the
     grounds that flash's plan can at least be ridden as written on 13 of 14 weeks'
@@ -600,8 +600,8 @@ sessions *plus* 11 rest days in 14 weeks.
 
 13. **qwen3.8-max** — the self-contradiction case: writes "no full taper" for the
     B-event and then plans a textbook two-week one, opens a 14-week autumn plan with
-    a SIT block on reasoning ("anaerobic residuals decay quickly") that argues for
-    the opposite placement, and ends with a zero-width race block. Add 17 weekday
+    a SIT mesocycle on reasoning ("anaerobic residuals decay quickly") that argues for
+    the opposite placement, and ends with a zero-width race mesocycle. Add 17 weekday
     bikes with 7 over-duration sessions, no FTP test, the worst post-adapt wedding
     load (255 TSS), a near-blind 1-change adapt, and the slowest run (~39 min). Both
     race days present and a compliant (if aerobic-free) travel week keep it off the
@@ -611,7 +611,7 @@ sessions *plus* 11 rest days in 14 weeks.
     for missing on every dimension that matters at once: 26 weekday bikes, 8.9 h
     against the 8 h budget with six weeks at 460+ TSS, no FTP test behind its watt
     targets, no coach learnings saved at bootstrap, an inert adapt, and the
-    heaviest-but-one wedding load (240 TSS). Its B-taper block and speed (205 s) are
+    heaviest-but-one wedding load (240 TSS). Its B-taper mesocycle and speed (205 s) are
     the only entries on the credit side.
 
 15. **glm-5.2** — two attempts, two different structural failures at the same

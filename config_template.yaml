@@ -2,11 +2,11 @@
 #
 # Copy this to config.yaml (gitignored) and replace the placeholders. Everything not
 # listed here has a working default, so this file is a complete, runnable config once
-# the four credential blocks below are real.
+# the four credential sections below are real.
 #
 # Every remaining knob — Garmin pull behaviour, load and zone thresholds, coaching
 # lookbacks, replan triggers, logging, the web UI — is documented at length in
-# config_template_full.yaml. Copy a block over from there when you want to change it.
+# config_template_full.yaml. Copy a section over from there when you want to change it.
 # config.sample.yaml shows a realistic filled-in config to imitate.
 
 llm:
@@ -33,7 +33,7 @@ garmin:
   email: "you@example.com"
   password: "your-garmin-password"
 
-# The athlete the coach plans for. This block is the single biggest influence on the
+# The athlete the coach plans for. This mesocycle is the single biggest influence on the
 # quality of the plan, so fill it in honestly rather than optimistically — the free-text
 # fields are read verbatim by the coach, so write them the way you'd brief a human one.
 user_profile:
@@ -57,14 +57,14 @@ user_profile:
   chronic_injuries: |
     Sensitive lower back. Avoid high-impact running on pavement when flared up.
   # Session-level only: how sessions are written up, where they happen, what kit, how to
-  # talk to you. Sessions per week, block order and taper depth go in a science/ file.
+  # talk to you. Sessions per week, mesocycle order and taper depth go in a science/ file.
   preferences: |
     Enjoys morning workouts. Prefers outdoor trail runs and road cycling.
   equipment:
     - "Garmin watch"
     - "running shoes"
     - "road bike"
-  # Per-day availability. Optional: omit the whole block and the coach places sessions
+  # Per-day availability. Optional: omit the whole mesocycle and the coach places sessions
   # on any day, sized by weekly_target_hours. certainty_percent is how likely you are to
   # actually train that day — the coach weights planning toward higher-certainty days.
   weekly_schedule:
@@ -124,7 +124,7 @@ coach:
     altitude: "sleeping or training above ~1500 m; value = altitude in metres"
     medication: "a drug that moves recovery — antihistamine, steroid, decongestant"
 
-# Optional: drive TrainMate from your phone (./tm-bot). Omit the whole block to disable
+# Optional: drive TrainMate from your phone (./tm-bot). Omit the whole mesocycle to disable
 # it. Create a bot with @BotFather for the token; message it once and use @userinfobot
 # to find your numeric chat id. See config_template_full.yaml for the timeouts, the
 # 'simple' companion persona and the morning push.

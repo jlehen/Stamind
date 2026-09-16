@@ -11,7 +11,7 @@ Two transports ship here:
 * ``TtyPrompt`` — ``input()`` with ``[y/N]`` rendering, EOF falling back to the supplied
   default (this is what keeps piped/cron runs aborting cleanly).
 * ``JsonPrompt`` — non-blocking *for the front-end*: it writes one sentinel-framed JSON
-  request line to ``out`` (see ``PROMPT_SENTINEL``) and blocks reading a single response
+  request line to ``out`` (see ``PROMPT_SENTINEL``) and waits to read a single response
   line from ``inp``, so the process stays parked on its stdin read while the front-end
   waits for the human. ``{"cancelled": true}`` raises ``PromptCancelled``, which the CLI
   dispatcher turns into a clean abort.
@@ -59,7 +59,7 @@ def emit_photo(path: str, caption: Optional[str] = None, out=None) -> None:
 
 
 # Third sentinel: a NON-blocking inline-button row attached to the output just
-# flushed. Prompts ask and block; buttons offer and exit — the CLI keeps deciding
+# flushed. Prompts ask and wait; buttons offer and exit — the CLI keeps deciding
 # WHAT to offer, the front-end only renders (DESIGN_bot_simple_frontend.md §4.4).
 BUTTONS_SENTINEL = "\x1eTM-BUTTONS "
 
@@ -144,7 +144,7 @@ class PromptCancelled(Exception):
     An ordinary exception. It inherited ``BaseException`` only so the handlers' broad
     ``except Exception`` nets could not mistake a deliberate abort for a command error;
     those nets are gone, and `trainmate_cli.main` catches this before its own boundary
-    and reports a clean cancellation. A test asserts no `except Exception` block
+    and reports a clean cancellation. A test asserts no `except Exception` clause
     encloses a prompt call, which is the condition that made this safe."""
 
 
@@ -247,7 +247,7 @@ class TtyPrompt:
 class JsonPrompt:
     """Structured transport for chat/web front-ends.
 
-    Each call emits one sentinel-framed JSON request on ``out`` then blocks until a
+    Each call emits one sentinel-framed JSON request on ``out`` then waits until a
     matching JSON answer line arrives on ``inp``. The front-end is responsible for
     rendering the question and writing back ``{"v": 1, "id": ..., "answer": ...}``
     or ``{"v": 1, "id": ..., "cancelled": true}``."""

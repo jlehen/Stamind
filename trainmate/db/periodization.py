@@ -5,45 +5,45 @@ from trainmate.util import today_date
 from trainmate.db.objectives import ARCHIVED
 
 
-def repair_block_contiguity(
+def repair_mesocycle_contiguity(
     mesocycles: List[Dict[str, Any]]
 ) -> Tuple[List[Dict[str, Any]], List[str]]:
-    """Sorts a plan's blocks and re-dates them so consecutive blocks are contiguous.
+    """Sorts a plan's mesocycles and re-dates them so consecutive mesocycles are contiguous.
 
     Contiguity is asked of the model; this repairs what came back so the stored plan
-    always holds it (DOMAIN_MODEL.md §4). End dates are authoritative: a block whose
+    always holds it (DOMAIN_MODEL.md §4). End dates are authoritative: a mesocycle whose
     start is not the day after its predecessor's end is re-dated to start there, and a
-    block ending inside its predecessor is dropped. Returns (blocks, notes), the notes
+    mesocycle ending inside its predecessor is dropped. Returns (mesocycles, notes), the notes
     naming each repair — empty when nothing needed one. Idempotent, so the write
     boundary re-applies it as a no-op after `plan_apply` has surfaced the notes."""
     ordered = sorted(mesocycles, key=lambda b: (b['start_date'], b['end_date']))
     repaired: List[Dict[str, Any]] = []
     notes: List[str] = []
-    for block in ordered:
+    for mesocycle in ordered:
         if not repaired:
-            repaired.append(dict(block))
+            repaired.append(dict(mesocycle))
             continue
         prev = repaired[-1]
         expected = (
             datetime.strptime(prev['end_date'], "%Y-%m-%d") + timedelta(days=1)
         ).strftime("%Y-%m-%d")
-        if block['end_date'] < expected:
+        if mesocycle['end_date'] < expected:
             notes.append(
-                f"dropped '{block['name']}' ({block['start_date']} to "
-                f"{block['end_date']}): it ends inside '{prev['name']}'"
+                f"dropped '{mesocycle['name']}' ({mesocycle['start_date']} to "
+                f"{mesocycle['end_date']}): it ends inside '{prev['name']}'"
             )
             continue
-        if block['start_date'] != expected:
-            if block['start_date'] < expected:
+        if mesocycle['start_date'] != expected:
+            if mesocycle['start_date'] < expected:
                 how = f"overlapped '{prev['name']}'"
             else:
                 how = f"left a gap after '{prev['name']}'"
             notes.append(
-                f"moved the start of '{block['name']}' from {block['start_date']} to "
+                f"moved the start of '{mesocycle['name']}' from {mesocycle['start_date']} to "
                 f"{expected}: it {how}, which ends {prev['end_date']}"
             )
-            block = dict(block, start_date=expected)
-        repaired.append(dict(block))
+            mesocycle = dict(mesocycle, start_date=expected)
+        repaired.append(dict(mesocycle))
     return repaired, notes
 
 
@@ -90,7 +90,7 @@ class PeriodizationMixin:
         time (see DESIGN_plan_rollback.md). Returns None when there is no earlier version.
 
         Named for the *version* axis on purpose: what comes back is superseded, and its
-        blocks sit on the same calendar dates as the active version's while describing
+        mesocycles sit on the same calendar dates as the active version's while describing
         training that never happened. A retrospective view wants `get_preceding_macrocycle`
         (DESIGN_plan_rollback.md §6.1)."""
         if before_id is None:
@@ -149,8 +149,8 @@ class PeriodizationMixin:
 
         The other sense of "the previous plan", and the one a retrospective view wants:
         which plan governed the calendar dates *before* this goal's plan did. A window
-        reaching further back than the current plan's first block runs into it, and
-        nothing else supplies those blocks.
+        reaching further back than the current plan's first mesocycle runs into it, and
+        nothing else supplies those mesocycles.
 
         Deliberately distinct from `get_previous_macrocycle_version`, which returns an
         earlier *version* of this same goal's plan — superseded, never trained, and
@@ -211,18 +211,18 @@ class PeriodizationMixin:
         self, start_date: str, end_date: Optional[str] = None,
         prefer_macro_id: Optional[int] = None
     ) -> Tuple[List[Mesocycle], List[int]]:
-        """The blocks that ACTUALLY overlap a window — or none — plus the macrocycle IDs
+        """The mesocycles that ACTUALLY overlap a window — or none — plus the macrocycle IDs
         dropped as conflicts. The strict half of `get_governing_mesocycles`, its one
-        caller: an empty answer means no block covers any of these days, which is what
+        caller: an empty answer means no mesocycle covers any of these days, which is what
         lets the governing reader fall back only when it should.
 
         Sequential plans both survive — a long span legitimately crosses from one goal's
-        last block into the next goal's first — but two plans covering the *same* dates
+        last mesocycle into the next goal's first — but two plans covering the *same* dates
         cannot both be followed, so the most recently created wins, the same tiebreak
         get_periodization_ids_for_date makes per day. `prefer_macro_id` settles that
         contest by hand instead.
 
-        `end_date=None` means no upper bound — "every block from here to the plan's end",
+        `end_date=None` means no upper bound — "every mesocycle from here to the plan's end",
         the form `get_constraints` already takes, so no caller has to invent a far-future
         date to stand in for one.
         """
@@ -267,12 +267,12 @@ class PeriodizationMixin:
         self, start_date: str, end_date: Optional[str] = None,
         prefer_macro_id: Optional[int] = None
     ) -> Tuple[List[Mesocycle], List[int]]:
-        """The blocks that govern a window, plus the macrocycle IDs dropped as
+        """The mesocycles that govern a window, plus the macrocycle IDs dropped as
         conflicts — the one window reader (DESIGN_cli_selectors.md §8).
 
         Overlap and arbitration are `_get_covering_mesocycles`'s: whole plans survive or
         drop, the most recently created wins, `prefer_macro_id` overrides. When nothing
-        overlaps at all, answers with get_active_mesocycle's nearest block instead — so
+        overlaps at all, answers with get_active_mesocycle's nearest mesocycle instead — so
         a plan that starts after the window still answers, and an empty result means
         there is genuinely no plan. A caller that treats the answer as covering a *date*
         wants the strict single-date reader, `get_covering_mesocycle`."""
@@ -288,7 +288,7 @@ class PeriodizationMixin:
         """Returns the (start_date, end_date) spans of all mesocycles overlapping the
         given window, across every objective regardless of status.
 
-        Used to decide whether a date fell inside *any* planned block: an activity on a
+        Used to decide whether a date fell inside *any* planned mesocycle: an activity on a
         covered date with no matching workout is a genuine deviation, whereas one outside
         all coverage is just history the plan never governed (e.g. before tool adoption,
         or an unplanned off-season stretch). Objective status is intentionally not
@@ -312,7 +312,7 @@ class PeriodizationMixin:
         """Resolves the (objective_id, macrocycle_id, mesocycle_id) covering a date.
 
         Returns the mesocycle whose span contains the given date, along with its
-        parent macrocycle and objective ids. When overlapping blocks exist across
+        parent macrocycle and objective ids. When overlapping mesocycles exist across
         objectives, the most recently created macrocycle wins. Returns None if no
         mesocycle covers the date. Used to stamp calendar events with traceability
         back to the plan that produced them.
@@ -352,7 +352,7 @@ class PeriodizationMixin:
         reader: what every caller wants that goes on to read the answer's dates as
         covering the target. Only considers active objectives. When overlapping plans
         both contain the date, the most recently created wins — the same tiebreak
-        get_periodization_ids_for_date makes, so no two readers name different blocks
+        get_periodization_ids_for_date makes, so no two readers name different mesocycles
         for one day."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -369,7 +369,7 @@ class PeriodizationMixin:
 
     def get_active_mesocycle(self, target_date: str) -> Optional[Mesocycle]:
         """`get_covering_mesocycle`, falling back to the next future mesocycle, or the
-        absolute first one, when none contains the date — the block a command should act
+        absolute first one, when none contains the date — the mesocycle a command should act
         RELATIVE to, not necessarily one containing the date. A caller that reads the
         answer's dates as covering the target wants the strict reader instead."""
         covering = self.get_covering_mesocycle(target_date)
@@ -404,7 +404,7 @@ class PeriodizationMixin:
     def get_next_mesocycle(self, after_date: str) -> Optional[Mesocycle]:
         """Finds the earliest active mesocycle starting strictly after `after_date`.
 
-        Unlike get_active_mesocycle this never falls back: no block ahead means None.
+        Unlike get_active_mesocycle this never falls back: no mesocycle ahead means None.
         """
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -439,7 +439,7 @@ class PeriodizationMixin:
 
     def list_plan_feedback(self, macrocycle_id: int) -> List[PlanFeedback]:
         """The notes attached to one plan version, **oldest first**, each carrying the
-        name of the block it was filed against (None = plan-level).
+        name of the mesocycle it was filed against (None = plan-level).
 
         One ordering everywhere — this listing, `plan show`, the regeneration prompt — so
         the log reads as a conversation in the order it happened, and a later note reads
@@ -456,7 +456,7 @@ class PeriodizationMixin:
             return [dict(row) for row in cursor.fetchall()]  # type: ignore
 
     def get_plan_feedback(self, feedback_id: int) -> Optional[PlanFeedback]:
-        """One note by id, with the name of the block it was filed against."""
+        """One note by id, with the name of the mesocycle it was filed against."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -493,10 +493,10 @@ class PeriodizationMixin:
         deleted (see DESIGN_plan_rollback.md): it and its mesocycles are kept so that
         `plan rollback` can restore them, while the freshly-saved version becomes active.
 
-        Blocks pass through `repair_block_contiguity` before insertion, so within-plan
+        Mesocycles pass through `repair_mesocycle_contiguity` before insertion, so within-plan
         gaps and overlaps never reach the table (DOMAIN_MODEL.md §4).
         """
-        mesocycles, _ = repair_block_contiguity(mesocycles)
+        mesocycles, _ = repair_mesocycle_contiguity(mesocycles)
         created_at = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -571,7 +571,7 @@ class PeriodizationMixin:
     def save_reshape_verdict(
         self, macrocycle_id: int, key: str, verdict: Optional[str]
     ) -> None:
-        """Caches the coach's re-shaping read against the edit it was asked about, so
+        """Caches the verdict call's re-shaping read against the edit it was asked about, so
         `plan show` asks once per edit rather than on every read
         (DESIGN_plan_change_continuity.md §7)."""
         with self._get_connection() as conn:

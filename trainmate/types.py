@@ -33,7 +33,7 @@ class Constraint(TypedDict):
     source: Optional[str]
     created: Optional[str]
     # When a coach pass last had this constraint in scope with authority over every day
-    # of it still ahead — NULL = the plan does not reflect it yet
+    # of it still ahead — NULL = the schedule does not reflect it yet
     # (DESIGN_constraint_honoring.md §2). Declared last: the column is appended by an
     # ALTER, and test_types.py pins declaration order against PRAGMA table_info.
     honored_at: Optional[str]
@@ -184,13 +184,13 @@ class Macrocycle(TypedDict):
     # The athlete's science files as {name: text} (DESIGN_plan_staleness.md §11)
     science_snapshot: Optional[str]
     created_at: str
-    reshape_verdict: Optional[str]  # the coach's cached read on the pending edit (DESIGN_plan_change_continuity.md §7)
+    reshape_verdict: Optional[str]  # the verdict call's cached read on the pending edit (DESIGN_plan_change_continuity.md §7)
     reshape_verdict_key: Optional[str]  # the snapshot that verdict was asked about
     status: Optional[str]  # 'active' | 'superseded'
     superseded_at: Optional[str]
 
 class Mesocycle(TypedDict):
-    """Represents a specific block/phase of training within a macrocycle."""
+    """Represents a specific mesocycle/phase of training within a macrocycle."""
     id: Optional[int]
     macrocycle_id: int
     name: str

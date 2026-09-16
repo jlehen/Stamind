@@ -163,9 +163,9 @@ class TestPlanFeedbackMatchesTheHydratedDict(unittest.TestCase):
             mesocycles=[{"name": "Base", "start_date": "2026-07-01",
                          "end_date": "2026-07-28", "focus": "Z2"}],
         )
-        block = cls.db.get_mesocycles_for_macrocycle(cls.macro_id)[0]
+        mesocycle = cls.db.get_mesocycles_for_macrocycle(cls.macro_id)[0]
         cls.db.add_plan_feedback(cls.macro_id, "plan-level note")
-        cls.db.add_plan_feedback(cls.macro_id, "block note", mesocycle_id=block["id"])
+        cls.db.add_plan_feedback(cls.macro_id, "mesocycle note", mesocycle_id=mesocycle["id"])
         cls.notes = cls.db.list_plan_feedback(cls.macro_id)
 
     def test_the_hydrated_dict_has_exactly_the_declared_keys(self):
@@ -173,10 +173,10 @@ class TestPlanFeedbackMatchesTheHydratedDict(unittest.TestCase):
             with self.subTest(text=note["text"]):
                 self.assertEqual(list(note), list(types.PlanFeedback.__annotations__))
 
-    def test_the_joined_block_name_is_present_and_none_for_a_plan_level_note(self):
+    def test_the_joined_mesocycle_name_is_present_and_none_for_a_plan_level_note(self):
         by_text = {note["text"]: note for note in self.notes}
         self.assertIsNone(by_text["plan-level note"]["mesocycle_name"])
-        self.assertEqual(by_text["block note"]["mesocycle_name"], "Base")
+        self.assertEqual(by_text["mesocycle note"]["mesocycle_name"], "Base")
 
 
 if __name__ == "__main__":

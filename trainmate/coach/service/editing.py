@@ -127,7 +127,7 @@ class WorkoutEditMixin:
             if old_id != new_id:
                 warnings.append(
                     f"Moving '{w['title']}' from {w['date']} to {new_date} crosses a "
-                    f"mesocycle boundary; it may no longer match the block's focus."
+                    f"mesocycle boundary; it may no longer match the mesocycle's focus."
                 )
 
         return warnings

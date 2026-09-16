@@ -47,7 +47,7 @@ class TestAdaptationAdapt(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
         # `adapt` refuses without a plan (§6), so every case needs one. A single wide
-        # block keeps it out of the way: tests that care about block edges save their
+        # mesocycle keeps it out of the way: tests that care about mesocycle edges save their
         # own plan over this one.
         self._save_background_plan()
 
@@ -245,8 +245,8 @@ class TestAdaptationAdapt(unittest.TestCase):
                 mock_client.complete.call_args[0][1],
             )
 
-    def _save_two_block_plan(self):
-        """Saves a plan whose first block ends 2026-06-30 and whose second opens 2026-07-01."""
+    def _save_two_mesocycle_plan(self):
+        """Saves a plan whose first mesocycle ends 2026-06-30 and whose second opens 2026-07-01."""
         self._clear_plans()
         obj_id = test_db.add_objective(
             title="Zurich Marathon", target_date="2026-10-15",
@@ -267,10 +267,10 @@ class TestAdaptationAdapt(unittest.TestCase):
 
     @patch("trainmate.coach.engine.openrouter_client")
     def test_adapt_terminal_window_section_in_prompt(self, mock_client):
-        """Near the block's end the prompt warns the model that an easing cannot rebound and
-        the next block is out of reach; mid-block that section is absent entirely
-        (DESIGN_block_boundary.md §3)."""
-        self._save_two_block_plan()
+        """Near the mesocycle's end the prompt warns the model that an easing cannot rebound and
+        the next mesocycle is out of reach; mid-mesocycle that section is absent entirely
+        (DESIGN_mesocycle_boundary.md §3)."""
+        self._save_two_mesocycle_plan()
         with patch.dict(trainmate.coach.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
@@ -286,13 +286,13 @@ class TestAdaptationAdapt(unittest.TestCase):
             test_db.save_metric_cache("2026-06-28", 56, 42, 60, 35, 14.0, 8.0, 1.75)
             test_db.save_baseline("2026-06-28", 50.0, 2.0, 60.0, 5.0, 80.0, 5.0)
 
-            # Two days before the block ends -> inside the default 3-day terminal window.
+            # Two days before the mesocycle ends -> inside the default 3-day terminal window.
             coach_service.workout_adapt("2026-06-28")
             system_prompt = mock_client.complete.call_args[0][0]
-            self.assertIn("THIS BLOCK IS ENDING", system_prompt)
+            self.assertIn("THIS MESOCYCLE IS ENDING", system_prompt)
             self.assertIn("ends in 2 day(s), on 2026-06-30", system_prompt)
 
-            # Mid-block -> the section is omitted (prompt unchanged for the common case).
+            # Mid-mesocycle -> the section is omitted (prompt unchanged for the common case).
             mock_client.complete.reset_mock()
             mock_client.complete.return_value = {
                 "change_needed": False,
@@ -300,7 +300,7 @@ class TestAdaptationAdapt(unittest.TestCase):
                 "adapted_workouts": [],
             }
             coach_service.workout_adapt("2026-06-10")
-            self.assertNotIn("THIS BLOCK IS ENDING", mock_client.complete.call_args[0][0])
+            self.assertNotIn("THIS MESOCYCLE IS ENDING", mock_client.complete.call_args[0][0])
 
     @patch("trainmate.coach.engine.openrouter_client")
     def test_the_shared_revision_sections_render_adapts_scope(self, mock_client):
@@ -325,18 +325,18 @@ class TestAdaptationAdapt(unittest.TestCase):
         # Rule 2 keeps adapt's own three signals, not the window pass's constraint wording.
         self.assertIn("a depressed morning, a note, a drift reading", system_prompt)
         self.assertNotIn("No constraint, however disruptive,", system_prompt)
-        # The benchmark section keeps the block scope its postponement escape rests on.
-        self.assertIn("to a later day within THIS block", system_prompt)
+        # The benchmark section keeps the mesocycle scope its postponement escape rests on.
+        self.assertIn("to a later day within THIS mesocycle", system_prompt)
         self.assertIn(
-            "The next generated block re-places the test when it is due.", system_prompt
+            "The next generated mesocycle re-places the test when it is due.", system_prompt
         )
 
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_adapt_drops_proposal_past_block_end(self, mock_client):
-        """The next block is out of adapt's reach on the write side too: a proposal dated past
-        the block's end is dropped, so the applied range can never stretch into the next block
-        (DESIGN_block_boundary.md §1)."""
-        self._save_two_block_plan()
+    def test_adapt_drops_proposal_past_mesocycle_end(self, mock_client):
+        """The next mesocycle is out of adapt's reach on the write side too: a proposal dated
+        past the mesocycle's end is dropped, so the applied range can never stretch into the next
+        mesocycle (DESIGN_mesocycle_boundary.md §1)."""
+        self._save_two_mesocycle_plan()
         with patch.dict(trainmate.coach.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
@@ -344,11 +344,11 @@ class TestAdaptationAdapt(unittest.TestCase):
                 "minor_activity_load_threshold": 10.0,
             }
         }):
-            # The model invents a session in the NEXT block (starts 2026-07-01) alongside a
-            # legitimate in-block one.
+            # The model invents a session in the NEXT mesocycle (starts 2026-07-01) alongside a
+            # legitimate in-mesocycle one.
             mock_client.complete.return_value = {
                 "change_needed": True,
-                "reason": "Ease into the block's last days.",
+                "reason": "Ease into the mesocycle's last days.",
                 "adapted_workouts": [
                     {
                         "date": "2026-06-29", "sport_type": "running",
@@ -357,7 +357,7 @@ class TestAdaptationAdapt(unittest.TestCase):
                     },
                     {
                         "date": "2026-07-02", "sport_type": "running",
-                        "title": "Next-block Session (should be dropped)",
+                        "title": "Next-mesocycle Session (should be dropped)",
                         "description": "Past the boundary.",
                         "duration_minutes": 60, "rpe": 7, "tss": 55.0,
                     },
@@ -453,9 +453,9 @@ class TestAdaptationAdapt(unittest.TestCase):
         """Dropping the day's OTHER session must not take the finished one with it.
 
         Observed 2026-08-30: the athlete rode a 150-minute Z2 session and then said they
-        were skipping the afternoon kettlebell workout. The coach encoded that as a single
+        were skipping the afternoon kettlebell workout. The week planner encoded that as a single
         `rest` entry for the day, and the displacement rule read the finished ride — whose
-        sport the entry never names — as a session the coach wanted gone
+        sport the entry never names — as a session the week planner wanted gone
         (DESIGN_workout_revisions.md §9.2).
         """
         test_profile = {"lthr": 165, "max_hr": 185}
@@ -593,7 +593,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         `indoor_cardio` is an alias of `strength_training`, so a 10-minute warm-up pairs
         with the 65-minute lift it preceded. The prompt used to call that pairing
         "[COMPLETED — locked history, not adaptable]" and the guard dropped any proposal
-        touching it, so the coach was told a session the athlete never did was in the bank
+        touching it, so the week planner was told a session the athlete never did was in the bank
         and forbidden from salvaging the rest of the day (ARCHITECTURE.md §15)."""
         test_profile = {"lthr": 165, "max_hr": 185}
         with patch.dict(trainmate.coach.config.data, {
@@ -660,7 +660,7 @@ class TestAdaptationAdapt(unittest.TestCase):
 
         `indoor_cardio` is an alias of `strength_training`, so a 10-minute warm-up pairs
         with a 65-minute lift on load-sorted first-come matching. That is a guess, not a
-        fact, and it used to reach the coach as "this session was performed"
+        fact, and it used to reach the week planner as "this session was performed"
         (ARCHITECTURE.md §15)."""
         test_profile = {"lthr": 165, "max_hr": 185}
         with patch.dict(trainmate.coach.config.data, {
@@ -831,7 +831,7 @@ class TestAdaptationAdapt(unittest.TestCase):
                 duration_minutes=60, rpe=5, tss=40,
             )
             save_workout(test_db,
-                "2026-06-06", "running", "Friday Tempo", "45 mins w/ tempo blocks",
+                "2026-06-06", "running", "Friday Tempo", "45 mins w/ tempo intervals",
                 duration_minutes=45, rpe=7, tss=55,
             )
 
@@ -976,7 +976,7 @@ class TestAdaptationAdapt(unittest.TestCase):
 
     @patch("trainmate.coach.engine.openrouter_client")
     def test_adapt_applies_a_text_only_revision_and_it_costs_no_easing(self, mock_client):
-        """Rewriting only the description is a real change the coach makes deliberately —
+        """Rewriting only the description is a real change the week planner makes deliberately —
         the athlete reads it — so it is applied, not suppressed. And it is cheap: `_eased`
         counts a revision only when duration or TSS FELL, so a reworded session never
         renders the `ALREADY EASED` tag that raises the bar for the next adapt (§9.1)."""
@@ -989,7 +989,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         }):
             mock_client.complete.return_value = {
                 "change_needed": True,
-                "reason": "Holding the block; the pacing cue now references Wednesday.",
+                "reason": "Holding the mesocycle; the pacing cue now references Wednesday.",
                 "adapted_workouts": [
                     {
                         "date": "2026-06-05", "sport_type": "cycling",
@@ -1031,7 +1031,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         `adaptation_count`; a second load-moving adapt of the same session bumps it
         again. Non-adapt saves leave both untouched."""
         save_workout(test_db,
-            "2026-06-20", "running", "Friday Tempo", "45 mins w/ tempo blocks",
+            "2026-06-20", "running", "Friday Tempo", "45 mins w/ tempo intervals",
             duration_minutes=45, rpe=7, tss=55,
         )
         # A plain save (no adapted_at) must not start the counter.
@@ -1046,7 +1046,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             "duration_minutes": 35, "rpe": 5, "tss": 30,
         }]
         service.workout_revision_apply(RevisionProposal(
-            reason="Block too hard", workouts=proposed, new_constraints=[],
+            reason="Mesocycle too hard", workouts=proposed, new_constraints=[],
             range_start="2026-06-20", range_end="2026-06-20",
         ))
         row = test_db.get_workout("2026-06-20", "running")
@@ -1063,8 +1063,8 @@ class TestAdaptationAdapt(unittest.TestCase):
         row = test_db.get_workout("2026-06-20", "running")
         self.assertEqual(row["adaptation_count"], 2)
 
-    def _seed_block_with_drift(self):
-        """A 3-week-elapsed block whose 'easy' running has drifted into Z3."""
+    def _seed_mesocycle_with_drift(self):
+        """A 3-week-elapsed mesocycle whose 'easy' running has drifted into Z3."""
         self._clear_plans()
         obj_id = test_db.add_objective(
             title="Autumn Half", target_date="2026-09-01",
@@ -1089,33 +1089,33 @@ class TestAdaptationAdapt(unittest.TestCase):
     def test_adapt_prompt_carries_the_measured_distribution_and_drift_branch(
         self, mock_client
     ):
-        """§9.3/§9.4: the block's measured distribution reaches the adapt prompt as its
+        """§9.3/§9.4: the mesocycle's measured distribution reaches the adapt prompt as its
         own section, and it gates both the fourth TASK branch and CORRECTING EXECUTION
         DRIFT — the case no other branch covers, since the athlete showed up for
         everything and feels fine."""
-        self._seed_block_with_drift()
+        self._seed_mesocycle_with_drift()
         mock_client.complete.return_value = {"change_needed": False, "reason": "ok"}
         coach_service.workout_adapt("2026-06-24")
 
         system_prompt, user_content = mock_client.complete.call_args[0][:2]
         flat = " ".join(user_content.split())
-        self.assertIn("MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE BLOCK", flat)
+        self.assertIn("MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE MESOCYCLE", flat)
         self.assertIn('Base 2 — focus "aerobic volume"', flat)
         self.assertIn("Z3 tempo", flat)
         self.assertIn("Current week so far", flat)
         self.assertIn("NOT extrapolated", flat)
         self.assertIn("### CORRECTING EXECUTION DRIFT", system_prompt)
         self.assertIn("even when\n  recovery metrics are fine", system_prompt)
-        # §9.2: adapt may move a session's intensity, never the block's composition.
+        # §9.2: adapt may move a session's intensity, never the mesocycle's composition.
         self.assertIn("belongs to the next `workout generate`", system_prompt)
-        # §4.1: the block-over-block delta is a generate view; adapt must not see it.
+        # §4.1: the mesocycle-over-mesocycle delta is a generate view; adapt must not see it.
         self.assertNotIn("Change vs", user_content)
 
     @patch("trainmate.coach.engine.openrouter_client")
     def test_adapt_refuses_without_a_plan(self, mock_client):
-        """Every judgement adapt makes is relative to the block, so with no plan there is
+        """Every judgement adapt makes is relative to the mesocycle, so with no plan there is
         nothing to adapt towards: refuse rather than invent a bare 7-day range
-        (DESIGN_block_boundary.md §6). No LLM call is made."""
+        (DESIGN_mesocycle_boundary.md §6). No LLM call is made."""
         self._clear_plans()
         with self.assertRaises(ValueError) as ctx:
             coach_service.workout_adapt("2026-06-24")
@@ -1137,7 +1137,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         proposed = [{
             "date": "2026-06-21", "sport_type": "running", "title": "Easy Hour",
             "description": "60 min conversational. HR ceiling 145 — hard cap.",
-            "modification_reason": "Third block week where 'easy' runs averaged Z3.",
+            "modification_reason": "Third mesocycle week where 'easy' runs averaged Z3.",
             "duration_minutes": 60, "rpe": 4, "tss": 40.0,
         }]
         service.workout_revision_apply(RevisionProposal(
@@ -1163,7 +1163,7 @@ class TestAdaptationAdapt(unittest.TestCase):
     def test_adapt_replacing_a_benchmark_strips_its_flag(self):
         """The flag belongs to the test, not to its date: a session that takes over a
         test's date and does not re-emit benchmark_type must not inherit it, or a social
-        ride is filed as an FTP result and the block believes it already tested
+        ride is filed as an FTP result and the mesocycle believes it already tested
         (DESIGN_benchmark_workouts.md §4.2)."""
         save_workout(test_db,
             "2026-06-24", "cycling", "FTP Test", "[FTP Test]\n20-min test or ramp.",
@@ -1264,7 +1264,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         eased = {
             "date": "2026-06-18", "sport_type": "running", "title": "Easy Tempo",
             "description": "Z2", "duration_minutes": 35, "rpe": 5, "tss": 30,
-            "modification_reason": "Eased", "adaptation_summary": "Block too hard",
+            "modification_reason": "Eased", "adaptation_summary": "Mesocycle too hard",
             "adapted_at": "2026-06-17T08:00:00+00:00", "adaptation_count": 2,
         }
         untouched = {

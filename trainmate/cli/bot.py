@@ -27,7 +27,7 @@ from trainmate.cli.common import adherence_verdicts, ensure_recent_data
 # The companion surfaces are companion-only by definition, so they call the line
 # builders directly rather than through `runtime.render` (DESIGN_render_persona.md §3).
 from trainmate.cli.render import (
-    SIMPLE_DONE_STATUSES, SIMPLE_PASSED_LINE, picker_label, simple_block_lines,
+    SIMPLE_DONE_STATUSES, SIMPLE_PASSED_LINE, picker_label, simple_mesocycle_lines,
     simple_constraint_edit_lines, simple_constraint_lines, simple_day_lines,
     simple_day_word, simple_goal_edit_lines, simple_goal_line, simple_goal_lines,
     simple_runway_lines, simple_session_line,
@@ -99,7 +99,7 @@ ROUTER_INTENTS = {
     ),
     "show_plan": (
         "the athlete wants the big picture of their training plan — the phases or "
-        "blocks on the way to the goal, what comes after this week"
+        "mesocycles on the way to the goal, what comes after this week"
     ),
     "show_progress": "the athlete wants to see progress, fitness, stats or a chart",
     "coach_message": (
@@ -247,20 +247,20 @@ def run_bot_goals(args: argparse.Namespace) -> None:
         emit_buttons(goal_rm_buttons(upcoming))
 
 
-def run_bot_block(args: argparse.Namespace) -> None:
-    """One training block in full: the stanza the plan view draws for it, then the
+def run_bot_mesocycle(args: argparse.Namespace) -> None:
+    """One training mesocycle in full: the stanza the plan view draws for it, then the
     whole focus rather than its first sentence (§11.2). Read-only; reached from the
     plan view's "Tell me more" leaves, so a stale tap after a replan has to land
     softly rather than as an error."""
     from trainmate import runtime
     m = runtime.db.get_mesocycle(args.mesocycle_id)
     if not m:
-        print("That block isn't on your plan any more — tap 🧭 My plan for the current road.")
+        print("That mesocycle isn't on your plan any more — tap 🧭 My plan for the current road.")
         return
     macrocycle = runtime.db.get_macrocycle(m["macrocycle_id"])
     if macrocycle and macrocycle.get("status") == "superseded":
-        print("(a block from an older version of the plan — a newer one has replaced it)")
-    for line in simple_block_lines(m, _today_str()):
+        print("(a mesocycle from an older version of the plan — a newer one has replaced it)")
+    for line in simple_mesocycle_lines(m, _today_str()):
         print(line)
     focus = (m.get("focus") or "").strip()
     if focus:
@@ -480,7 +480,7 @@ CAPTURE_NO_FIND_LINE = (
     "I'm not sure what to do with that one 🤔 — but I don't want to lose it."
 )
 SEND_TO_COACH_LABEL = "📨 Send it to your coach as written"
-ADJUST_PLAN_LABEL = "🔄 Adjust the plan around it"
+ADJUST_WEEK_LABEL = "🔄 Adjust my week around it"
 
 
 def send_to_coach_button(text: str) -> dict:
@@ -490,11 +490,11 @@ def send_to_coach_button(text: str) -> dict:
             "send": "workout adapt -m " + shlex.quote(text)}
 
 
-def adjust_plan_button() -> dict:
-    """The offer every persisted capture ends on (§12.3). Bare `workout adapt`: the coach
+def adjust_week_button() -> dict:
+    """The offer every persisted capture ends on (§12.3). Bare `workout adapt`: the week planner
     reads the stored row, not the original words — transcription is the price of the
     instant lane, and the help card teaches which lane is which."""
-    return {"label": ADJUST_PLAN_LABEL, "send": "workout adapt"}
+    return {"label": ADJUST_WEEK_LABEL, "send": "workout adapt"}
 
 
 def _dated_context(today: str) -> str:
@@ -617,7 +617,7 @@ def run_bot_capture_note(text: str) -> None:
     # adapts nothing, but the athlete REPORTING one expects forward notice, and a row
     # filed behind a cheerful confirm otherwise reads as heard-and-acted-on while
     # nothing about today changes. The offer makes that gap one visible tap wide.
-    emit_buttons([adjust_plan_button()])
+    emit_buttons([adjust_week_button()])
 
 
 # --- capture: add_goal (§12.5) ---
@@ -1253,17 +1253,17 @@ def add_bot_parser(subparsers):
     )
     b_goals.set_defaults(func=run_bot_goals)
 
-    # bot block
-    b_block = bot_subparsers.add_parser(
-        "block",
-        help="Render one training block in full, in companion prose",
+    # bot mesocycle
+    b_mesocycle = bot_subparsers.add_parser(
+        "mesocycle",
+        help="Render one training mesocycle in full, in companion prose",
         description=(
             "Render one mesocycle the way the simple plan view draws it, followed by "
             "its whole focus. Read-only; the plan view's \"Tell me more\" leaves run it."
         ),
     )
-    b_block.add_argument("mesocycle_id", type=int, help="The mesocycle to show")
-    b_block.set_defaults(func=run_bot_block)
+    b_mesocycle.add_argument("mesocycle_id", type=int, help="The mesocycle to show")
+    b_mesocycle.set_defaults(func=run_bot_mesocycle)
 
     # bot queue — the handler lives with the rest of the queue (DESIGN_athlete_queue.md §6.2)
     b_queue = bot_subparsers.add_parser(

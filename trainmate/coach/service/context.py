@@ -36,13 +36,13 @@ class PmcContextMixin:
                 sport_durations[sport] = sport_durations.get(sport, 0.0) + dur_min
                 sport_counts[sport] = sport_counts.get(sport, 0) + 1
 
-            lines.append("Completed Workouts (Past 15 days):")
+            lines.append("Completed Activities (Past 15 days):")
             total_duration_hours = 0.0
             for sport, count in sport_counts.items():
                 dur_hours = sport_durations[sport] / 60.0
                 total_duration_hours += dur_hours
                 lines.append(
-                    f"  - {sport}: {count} sessions, "
+                    f"  - {sport}: {count} activit{'ies' if count != 1 else 'y'}, "
                     f"total duration {dur_hours:.1f} hours"
                 )
 
@@ -52,7 +52,7 @@ class PmcContextMixin:
                 f"(~{weekly_avg_hours:.1f} hours/week)"
             )
         else:
-            lines.append("Completed Workouts (Past 15 days):\n  - No completed workouts found.")
+            lines.append("Completed Activities (Past 15 days):\n  - No completed activities found.")
 
         # 2. Metrics summary
         if metrics:
@@ -81,7 +81,7 @@ class PmcContextMixin:
     def _pmc_summary_lines(
         self, metrics: List[Dict[str, Any]], as_of: str
     ) -> List[str]:
-        """The PMC block for the data summary (strategy/plan prompt): the latest
+        """The PMC lines for the data summary (strategy/plan prompt): the latest
         Fitness/Fatigue line, the single CTL ramp line, the §3.3(b) still-warming-up flag,
         and the TSB-lag footnote — each omitted when it has nothing to say. Order: values,
         then trust/caveat."""
@@ -177,9 +177,9 @@ class PmcContextMixin:
     def _pmc_prompt_context(
         self, as_of: Optional[str] = None
     ) -> Tuple[Optional[str], Optional[str]]:
-        """(warmup_cutoff, extra_lines) for the generate/adapt metrics block: the single
+        """(warmup_cutoff, extra_lines) for the generate/adapt metrics section: the single
         ramp line and the still-warming-up flag — a single line each beside the per-day
-        block, never repeated per day (§5.2). History start is read ONCE and passed down."""
+        mesocycle, never repeated per day (§5.2). History start is read ONCE and passed down."""
         start = garmin.pmc_history_start(dbh=self._db)
         cutoff = garmin.pmc_warmup_cutoff_for(start, config.pmc_ctl_days)
         lines: List[str] = []
@@ -222,41 +222,41 @@ class PmcContextMixin:
         return end_ctl, week_ramp, min_tsb
 
     # ------------------------------------------------------ intensity distribution
-    def _intensity_block_context(self, as_of: str) -> Optional[str]:
-        """The active block's measured intensity distribution for `adapt`
-        (DESIGN_intensity_distribution.md §9.3): the block to date as a per-week rate
+    def _intensity_mesocycle_context(self, as_of: str) -> Optional[str]:
+        """The active mesocycle's measured intensity distribution for `adapt`
+        (DESIGN_intensity_distribution.md §9.3): the mesocycle to date as a per-week rate
         beside its stated focus, plus the current week's raw minutes.
 
-        No preceding block and no delta — block-over-block creep is a periodization
+        No preceding mesocycle and no delta — mesocycle-over-mesocycle creep is a periodization
         question, and §9.2 gives those to `generate`. Returns None when today falls
-        outside every block — the next FUTURE block would render an empty table for
+        outside every mesocycle — the next FUTURE mesocycle would render an empty table for
         training that has not happened (§8).
         """
         meso = self._db.get_covering_mesocycle(as_of)
         if not meso:
             return None
-        return intensity.block_report(
+        return intensity.mesocycle_report(
             meso, as_of, self._db.get_completed_activities,
             current_week=True, benchmarks=self._db.get_benchmark_results(),
         )
 
-    # ----------------------------------------------------------- block progress
-    def _block_progress_context(
+    # ----------------------------------------------------------- mesocycle progress
+    def _mesocycle_progress_context(
         self, as_of: str, gen_start: str
     ) -> Tuple[Optional[str], bool]:
-        """The elapsed part of the block `generate` is about to re-plan the remainder of
-        (DESIGN_block_progress.md §3): its measured intensity distribution beside what the
-        plan prescribed and beside the preceding block, each already-trained week's
-        planned-vs-actual load, and the fitness tests the block has already run.
+        """The elapsed part of the mesocycle `generate` is about to re-plan the remainder of
+        (DESIGN_mesocycle_progress.md §3): its measured intensity distribution beside what the
+        plan prescribed and beside the preceding mesocycle, each already-trained week's
+        planned-vs-actual load, and the fitness tests the mesocycle has already run.
 
         Returns `(text, has_intensity)`, a pair like `_pmc_prompt_context`'s: the
         composition TASK section quotes the zone tables, so it must be gated on those
         tables actually having rows rather than on the section merely existing (§5.1).
 
         `text` is None when there is no fulfilled part to report — `as_of` outside every
-        block (a future or first block would describe training that has not happened),
-        or `gen_start` on/before the block's first day, where generate IS writing the
-        whole block and has nothing to continue.
+        mesocycle (a future or first mesocycle would describe training that has not happened),
+        or `gen_start` on/before the mesocycle's first day, where generate IS writing the
+        whole mesocycle and has nothing to continue.
         """
         meso = self._db.get_covering_mesocycle(as_of)
         if not meso:
@@ -268,41 +268,41 @@ class PmcContextMixin:
             return None, False
 
         # Fetched once and handed to both renderers: they read the same rows, and the week
-        # lines and the test lines must never disagree about what the block contains.
+        # lines and the test lines must never disagree about what the mesocycle contains.
         workouts = self._db.get_workouts(start_date=meso['start_date'], end_date=elapsed_end)
-        weeks = self._block_week_lines(meso, as_of, elapsed_end, workouts)
-        benchmarks = self._block_benchmark_lines(meso, elapsed_end, workouts)
+        weeks = self._mesocycle_week_lines(meso, as_of, elapsed_end, workouts)
+        benchmarks = self._mesocycle_benchmark_lines(meso, elapsed_end, workouts)
         # Everything is anchored on gen_start, not as_of: history ends the day before the
         # first day being written, so the header's "N completed weeks", the week lines and
         # the zone windows all count the same days. The two differ by one on the run that
         # preserves an already-completed session and starts tomorrow.
-        report = intensity.block_report(
+        report = intensity.mesocycle_report(
             meso, gen_start, self._db.get_completed_activities,
             current_week=True, previous=self._preceding_mesocycle(meso),
             benchmarks=self._db.get_benchmark_results(),
             fetch_workouts=self._db.get_workouts, indent="",
         )
-        # Gated on banked evidence, NOT on `report`: a started block with nothing recorded
+        # Gated on banked evidence, NOT on `report`: a started mesocycle with nothing recorded
         # still yields a report ("no completed activities in ..."), and pairing that with a
         # task section about carrying a ramp on from the last completed week describes a
         # week that does not exist. Generate already sees the empty activity list.
         if not weeks and not benchmarks:
             return None, False
 
-        # `block_report` opens with the same `format_header` line, so it stands in for the
+        # `mesocycle_report` opens with the same `format_header` line, so it stands in for the
         # header when present rather than being stacked under a second copy of it.
         lines = [report] if report else [intensity.format_header(meso, gen_start)]
         if weeks:
             lines.append("  Weeks already trained (load the plan asked -> load produced):")
             lines.extend(weeks)
         if benchmarks:
-            lines.append("  Fitness tests this block has already run:")
+            lines.append("  Fitness tests this mesocycle has already run:")
             lines.extend(benchmarks)
-        return "\n".join(lines), bool(report) and self._block_has_zone_rows(meso, gen_start)
+        return "\n".join(lines), bool(report) and self._mesocycle_has_zone_rows(meso, gen_start)
 
-    def _block_has_zone_rows(self, meso: Dict[str, Any], as_of: str) -> bool:
-        """Whether the block's zone table will have rows — asked of the same window
-        `block_report` builds that table from, via `intensity.measured_window`, so the
+    def _mesocycle_has_zone_rows(self, meso: Dict[str, Any], as_of: str) -> bool:
+        """Whether the mesocycle's zone table will have rows — asked of the same window
+        `mesocycle_report` builds that table from, via `intensity.measured_window`, so the
         prompt's gate and the table can never disagree (§5.1)."""
         win_start, win_end, _ = intensity.measured_window(
             meso['start_date'], meso['end_date'], as_of
@@ -314,29 +314,29 @@ class PmcContextMixin:
     def _preceding_mesocycle(
         self, meso: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
-        """The block immediately before `meso` in its own macrocycle, for the
-        block-over-block delta — the periodization signal proper (§5).
+        """The mesocycle immediately before `meso` in its own macrocycle, for the
+        mesocycle-over-mesocycle delta — the periodization signal proper (§5).
 
         Navigated by macrocycle id rather than by a date-ordered mesocycle query
         (DESIGN_plan_rollback.md §6.1).
         """
-        blocks = self._db.get_mesocycles_for_macrocycle(meso['macrocycle_id'])
-        earlier = [b for b in blocks if b['start_date'] < meso['start_date']]
+        mesocycles = self._db.get_mesocycles_for_macrocycle(meso['macrocycle_id'])
+        earlier = [b for b in mesocycles if b['start_date'] < meso['start_date']]
         return max(earlier, key=lambda b: b['start_date']) if earlier else None
 
-    def _block_week_lines(
+    def _mesocycle_week_lines(
         self, meso: Dict[str, Any], as_of: str, elapsed_end: str,
         workouts: List[Workout], indent: str = "    ",
     ) -> List[str]:
-        """One planned-vs-actual line per Monday-week of the block's elapsed part.
+        """One planned-vs-actual line per Monday-week of the mesocycle's elapsed part.
 
         Reuses `progression.weekly_aggregates`, the same planned-vs-actual weekly maths
-        `tm progress` renders, so the coach and the athlete never read different numbers
+        `tm progress` renders, so the week planner and the athlete never read different numbers
         for the same week (§3.1). The in-progress week states raw load beside the elapsed
         day count and is never extrapolated, following
         DESIGN_intensity_distribution.md §9.3.
 
-        `indent` only differs because the two prompts nest their blocks differently: the
+        `indent` only differs because the two prompts nest their reports differently: the
         strategy prompt sits each report one level in, since it sends several.
         """
         activities = self._db.get_completed_activities(
@@ -360,13 +360,13 @@ class PmcContextMixin:
                 continue
             pct = f" ({actual / denom * 100:.0f}%)" if denom else ""
             asked = f"planned {denom:.0f}" + (" so far" if w['in_progress'] else "")
-            # Partiality is judged against the BLOCK, not against `partial_plan`: that flag
+            # Partiality is judged against the MESOCYCLE, not against `partial_plan`: that flag
             # compares the week to the workout rows handed in, so a Monday the athlete had
             # no session on would read as "the plan starts mid-week" when it does not. Only
-            # a week the block itself straddles is genuinely incomparable. The in-progress
+            # a week the mesocycle itself straddles is genuinely incomparable. The in-progress
             # week is always cut short by design, and its day count already says so.
             note = (
-                " [block covers only part of this week]"
+                " [mesocycle covers only part of this week]"
                 if when < meso['start_date'] and not w['in_progress'] else ""
             )
             out.append(f"{head}: {asked}, actual {actual:.0f}{pct}{note}")
@@ -384,7 +384,7 @@ class PmcContextMixin:
         sport actually drove it — a shortfall concentrated in one sport (e.g. missed
         strength) reads as generalized under-training when only the blended total is
         shown, even though the sport the athlete's goal depends on may be fully on
-        plan (DESIGN_block_progress.md §3.3: CTL/ATL/TSB is one blended stream across
+        plan (DESIGN_mesocycle_progress.md §3.3: CTL/ATL/TSB is one blended stream across
         all sports by design, DESIGN_pmc_fitness_fatigue.md's out-of-scope list; this
         note is the cheap per-sport cross-check the blended total can't give alone).
 
@@ -419,23 +419,23 @@ class PmcContextMixin:
             parts.append(f"{sport}: {sport_actual:.0f}/{sport_planned:.0f}{sport_pct}")
         return "of which " + ", ".join(parts) if parts else None
 
-    def _block_benchmark_lines(
+    def _mesocycle_benchmark_lines(
         self, meso: Dict[str, Any], elapsed_end: str, workouts: List[Workout],
     ) -> List[str]:
-        """The fitness tests the block's elapsed part already ran — what makes the
+        """The fitness tests the mesocycle's elapsed part already ran — what makes the
         generate prompt's BENCHMARK PLACEMENT conditional rather than unconditional (§4).
 
         Keyed on the planned benchmark sessions, not the logbook: a test the athlete
         performed but never recorded still must not be scheduled twice. A logbook row is
         matched to its session by `workout_id`, falling back to a same-date reading for a
-        result recorded without the link; unmatched in-block rows are reported as ad-hoc
+        result recorded without the link; unmatched in-mesocycle rows are reported as ad-hoc
         tests.
         """
         start = meso['start_date']
         planned = [w for w in workouts if w.get('benchmark_type')]
         results = self._db.get_benchmark_results()
         by_workout = {r['workout_id']: r for r in results if r.get('workout_id')}
-        in_block = [r for r in results if start <= r['date'] <= elapsed_end]
+        in_mesocycle = [r for r in results if start <= r['date'] <= elapsed_end]
 
         def measured(r: Dict[str, Any]) -> str:
             anchor = ANCHOR_KINDS.get(r['anchor_kind'])
@@ -446,7 +446,7 @@ class PmcContextMixin:
         claimed = set()
         for w in sorted(planned, key=lambda w: w['date']):
             r = by_workout.get(w['id']) or next(
-                (x for x in in_block if x['date'] == w['date']), None
+                (x for x in in_mesocycle if x['date'] == w['date']), None
             )
             if r:
                 claimed.add(r['id'])
@@ -455,7 +455,7 @@ class PmcContextMixin:
                 + (measured(r) if r else "no result recorded")
             )
         for r in sorted(
-            (x for x in in_block if x['id'] not in claimed), key=lambda r: r['date']
+            (x for x in in_mesocycle if x['id'] not in claimed), key=lambda r: r['date']
         ):
             out.append(f"    - {r['date']}: {measured(r)} recorded (no planned test)")
         return out
@@ -495,7 +495,7 @@ class PmcContextMixin:
         return "\n".join(lines)
 
     def _planning_zone_currencies(self, as_of: str) -> Dict[str, str]:
-        """`{sport: 'power'|'hr'}` for the sports the coach may prescribe zone targets in
+        """`{sport: 'power'|'hr'}` for the sports the week planner may prescribe zone targets in
         (DESIGN_intensity_distribution.md §9.8).
 
         §9.6's currency rule needs a window and authoring has none — at generation time
@@ -519,28 +519,28 @@ class PmcContextMixin:
         self, macros: List[Dict[str, Any]], today_str: str,
         width: int = intensity.PROMPT_WIDTH,
     ) -> List[str]:
-        """One intensity report per elapsed block across `macros`, each carrying the
-        delta against the block before it (§4.1) — the strategy prompt's view.
+        """One intensity report per elapsed mesocycle across `macros`, each carrying the
+        delta against the mesocycle before it (§4.1) — the strategy prompt's view.
 
-        Each block's delta baseline is the block before it in the flattened lineage —
-        across plan boundaries too, unlike `tm progress --blocks`: reviewing one season
+        Each mesocycle's delta baseline is the mesocycle before it in the flattened lineage —
+        across plan boundaries too, unlike `tm progress --mesocycles`: reviewing one season
         against the last is what this prompt is for (DESIGN_plan_rollback.md §6.1).
         """
-        blocks = plan_lineage(self._db, macros)
+        mesocycles = plan_lineage(self._db, macros)
         benchmarks = self._db.get_benchmark_results()
         reports = []
-        for i, meso in enumerate(blocks):
-            text = intensity.block_report(
+        for i, meso in enumerate(mesocycles):
+            text = intensity.mesocycle_report(
                 meso, today_str, self._db.get_completed_activities,
-                previous=blocks[i - 1] if i else None, benchmarks=benchmarks,
+                previous=mesocycles[i - 1] if i else None, benchmarks=benchmarks,
                 fetch_workouts=self._db.get_workouts, width=width,
             )
             if not text:
                 continue
-            # Elapsed part only: a finished block ends where it ended, the current one at
+            # Elapsed part only: a finished mesocycle ends where it ended, the current one at
             # today. Both sides of every week line are cut to the same span.
             elapsed_end = min(today_str, meso['end_date'])
-            weeks = self._block_week_lines(
+            weeks = self._mesocycle_week_lines(
                 meso, today_str, elapsed_end,
                 self._db.get_workouts(start_date=meso['start_date'], end_date=elapsed_end),
                 indent="      ",
@@ -559,11 +559,11 @@ class PmcContextMixin:
         (DESIGN_backward_evaluation.md §6, Option A).
 
         Anchored on the *elapsed* mesocycle windows of every plan given AND of the plan the
-        athlete is currently in (§6, §6.1): each planned block's focus is shown beside what the
+        athlete is currently in (§6, §6.1): each planned mesocycle's focus is shown beside what the
         athlete actually did in that window — volume, load, the per-sport per-zone
-        intensity distribution against both its block-over-block delta and what the plan
+        intensity distribution against both its mesocycle-over-mesocycle delta and what the plan
         prescribed (DESIGN_intensity_distribution.md §4.1/§9/§9.2a), and each week's
-        planned load beside the load produced — so the model can judge whether the block's
+        planned load beside the load produced — so the model can judge whether the mesocycle's
         intent materialized and whether it was actually carried out. Every cached
         backward-evaluation reconstruction then follows, reused without another LLM call
         (§10, §10.2). Returns None if there is nothing to report.
@@ -578,7 +578,7 @@ class PmcContextMixin:
         # `width` defaults to the model's prompt width; callers rendering this for a
         # narrower surface (e.g. Telegram) pass their own to keep the tables intact there.
 
-        # The current plan's elapsed blocks join the prior plans': drift diagnosed only
+        # The current plan's elapsed mesocycles join the prior plans': drift diagnosed only
         # one macrocycle late is history (gap 2 of DESIGN_intensity_distribution.md §3).
         reports = self._intensity_history_context(
             [*prior_macros, self._db.get_governing_macrocycle()], today_str, width=width,
@@ -586,21 +586,21 @@ class PmcContextMixin:
         if reports:
             sections.append(
                 wrap_text(
-                    "PLANNED vs ACTUAL (elapsed blocks — judge whether each block's intent "
-                    "materialized). Each block shows its planned focus beside what the "
-                    "athlete's sessions ACTUALLY measured, per sport and per zone, as a "
-                    "per-week rate over the block's completed weeks, plus the change "
-                    "against the block before it. Read the delta as the intensity-creep "
+                    "PLANNED vs ACTUAL (elapsed mesocycles — judge whether each mesocycle's intent "
+                    "materialized). Each mesocycle shows its planned focus beside what the "
+                    "athlete's activities ACTUALLY measured, per sport and per zone, as a "
+                    "per-week rate over the mesocycle's completed weeks, plus the change "
+                    "against the mesocycle before it. Read the delta as the intensity-creep "
                     "check: weekly TSS can hold flat while easy volume quietly gives way "
                     "to tempo.\n"
                     "Two more comparisons decide WHOSE problem a divergence is. Against "
-                    "'What the plan PRESCRIBED', a block that measures off its focus but "
-                    "tracks its prescription was MIS-DESIGNED — reshape the blocks still "
+                    "'What the plan PRESCRIBED', a mesocycle that measures off its focus but "
+                    "tracks its prescription was MIS-DESIGNED — reshape the mesocycles still "
                     "ahead; one that diverges from the prescription was mis-executed, "
                     "which the daily adaptation owns, so do not reward it by planning "
-                    "the easier block it drifted toward. Against the weekly load lines, "
-                    "a block whose weeks came in far under what was asked was not the "
-                    "block that was planned: build the next one from the load the athlete "
+                    "the easier mesocycle it drifted toward. Against the weekly load lines, "
+                    "a mesocycle whose weeks came in far under what was asked was not the "
+                    "mesocycle that was planned: build the next one from the load the athlete "
                     "actually produced, not from the load they were prescribed.", width
                 )
                 + "\n" + "\n".join(reports)
@@ -649,7 +649,7 @@ class PmcContextMixin:
         reverse-engineered periodization structure, and the physiological insights.
 
         The structure is fed so the new plan can build on the real prior arc — where
-        base/build/recovery fell, how consistent each block was — rather than re-deriving
+        base/build/recovery fell, how consistent each mesocycle was — rather than re-deriving
         it (DESIGN_backward_evaluation.md §10).
         """
         lines: List[str] = []

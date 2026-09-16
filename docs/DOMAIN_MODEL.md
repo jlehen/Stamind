@@ -19,7 +19,7 @@ question, and each level is written by a different command.
 |---|---|---|---|
 | **Goal** | What are we training for, and by when? | `objectives` table | The athlete (`goal add/edit`) |
 | **Macrocycle** | What is the overall strategy from now until that goal? | `macrocycles` table | `plan generate` (one LLM call) |
-| **Mesocycle** | What is this block of weeks *for*? | `mesocycles` table | `plan generate`, in the same call |
+| **Mesocycle** | What is this mesocycle of weeks *for*? | `mesocycles` table | `plan generate`, in the same call |
 | **Microcycle** | What does a typical week look like? | **Nothing. It is not stored.** | Implied by the workouts |
 | **Workout** | What do I actually do on Tuesday? | `workouts` table | `workout generate`, then `adapt` / hand edits |
 
@@ -30,7 +30,7 @@ explain most of the design.
 explains why, and what stands in for it.
 
 **"Plan" means the top two rows only.** In TrainMate, *the plan* is the periodization —
-one macrocycle plus its mesocycle blocks. The scheduled sessions are *workouts*, never
+one macrocycle plus its mesocycles. The scheduled sessions are *workouts*, never
 "the plan". The `plan` and `workout` command families are split on exactly that line
 (`ARCHITECTURE.md §11`).
 
@@ -42,7 +42,7 @@ one macrocycle plus its mesocycle blocks. The scheduled sessions are *workouts*,
       ▼
   macrocycles (one row = one PLAN VERSION)
       │  ON DELETE CASCADE
-      ├──────────────► mesocycles (the blocks)      ON DELETE CASCADE
+      ├──────────────► mesocycles                   ON DELETE CASCADE
       └──────────────► plan_feedback (notes)        ON DELETE CASCADE
 
   workouts (one row = one REVISION of one session)
@@ -54,11 +54,11 @@ Read it top to bottom:
 
 - A **goal** owns its plan versions. There can be many, because every regeneration
   makes a new one, but exactly one is active.
-- A **macrocycle** owns its blocks and its feedback notes. They are created with it and
-  deleted with it. Nothing else creates or deletes a block.
+- A **macrocycle** owns its mesocycles and its feedback notes. They are created with it and
+  deleted with it. Nothing else creates or deletes a mesocycle.
 - A **workout** points at the plan version that wrote it, but only as a label. The
   dashed line matters: there is no foreign key and therefore no cascade. Deleting a goal
-  removes its plan versions, blocks and feedback, and leaves its sessions behind. That
+  removes its plan versions, mesocycles and feedback, and leaves its sessions behind. That
   is why deleting is not what `goal rm` does — it calls the goal off instead, which
   stands those sessions down properly. The delete survives as `goal rm --purge`, and it
   counts the sessions it would strand and warns before it runs (§9.7).
@@ -125,7 +125,7 @@ everything else is generated from it.
 **`date_type` is the field that says what the date *means*.** An `event` is a day
 something happens on, so the periodization peaks and tapers into it. A `horizon` is
 just how far out the athlete wants to train: the plan still ends around that date,
-but with an ordinary training block — no peak, no taper pinned to it — and the rule
+but with an ordinary training mesocycle — no peak, no taper pinned to it — and the rule
 that forbids a fitness test in the goal's own week does not apply, because there is no
 event for a test to compete with.
 
@@ -205,7 +205,7 @@ version, so they are reported rather than swept (`DESIGN_backward_evaluation.md 
    legacy `completed` row to `active`.
 3. Completion is derived from the date, never written (above).
 4. A goal may own many macrocycles (plan versions), but at most one is `active`.
-5. Deleting a goal cascades to every plan version, every block, and every feedback note.
+5. Deleting a goal cascades to every plan version, every mesocycle, and every feedback note.
    It does **not** cascade to workouts.
 
 ### Named ways to read goals
@@ -230,7 +230,7 @@ one by accident:
 | `goal edit ID` | Change any field: `--title`, `--target-date`, `--sport`, `--desc`, `--date-type`, `--status`. |
 | `goal list` | The goals that matter — upcoming and completed. `-a/--all` adds the ones called off. |
 | `goal rm ID` | Calls the goal off — the same thing as `--status archived`, under the verb people reach for. Reversible, so it does not ask. |
-| `goal rm ID --purge` | **Destructive.** Deletes the goal and cascades to every plan version, block and feedback note. Prints that inventory plus the number of upcoming sessions it would strand, then asks (`-y` skips). For a goal entered by mistake. |
+| `goal rm ID --purge` | **Destructive.** Deletes the goal and cascades to every plan version, mesocycle and feedback note. Prints that inventory plus the number of upcoming sessions it would strand, then asks (`-y` skips). For a goal entered by mistake. |
 | `goal wipe` | Delete all goals. |
 
 ---
@@ -240,7 +240,7 @@ one by accident:
 ### What it is
 
 The overall periodization strategy for one goal: a prose `strategy` field plus the set
-of mesocycle blocks hanging off it. **Every regeneration creates a new row.** The
+of mesocycles hanging off it. **Every regeneration creates a new row.** The
 previous row is marked `superseded` and kept, never deleted.
 
 So "macrocycle" and "plan version" are the same thing. `plan versions` lists them;
@@ -287,7 +287,7 @@ The hash detects the change; the snapshot names the field that moved.
         is saved          ▼                        │  (set_active_macrocycle)
                     ┌───────────────────────────────────────┐
                     │              SUPERSEDED               │
-                    │  kept, with its blocks and its notes  │
+                    │  kept, with its mesocycles and its notes  │
                     └───────────────────────────────────────┘
                                         │
                                         │ plan rm / goal rm --purge / plan wipe
@@ -308,7 +308,7 @@ so the sessions match the plan again (§6 "Undo"). The version that was active a
 ago is now superseded, and can itself be rolled back to.
 
 **Deletion is rare and total.** `plan rm` deletes *every* version the goal has, active
-and superseded, and their blocks and notes go with them by cascade. Regeneration never
+and superseded, and their mesocycles and notes go with them by cascade. Regeneration never
 deletes anything.
 
 ### The plan window
@@ -349,7 +349,7 @@ and a `plan rollback` makes an earlier version's notes pending again.
 1. **Exactly one active version per goal.** `save_macrocycle` supersedes the current
    active row before inserting; `set_active_macrocycle` supersedes every other active row
    before promoting its target. Readers filter on `COALESCE(status,'active') = 'active'`.
-2. **Regenerating never deletes.** The old version and its blocks survive so
+2. **Regenerating never deletes.** The old version and its mesocycles survive so
    `plan rollback` can restore them (`DESIGN_plan_rollback.md`).
 3. **The plan window must be non-empty** (above).
 4. **TrainMate never invents intermediate goals.** An athlete who wants a tune-up race as
@@ -378,17 +378,17 @@ These are easy to confuse, so they are named apart:
 | Command | What it does |
 |---|---|
 | `plan generate` | Generate or reuse. `-f` forces. `--fresh` withholds the plan in place from the prompt (a clean slate, not a revision — implies `-f`). `-g` targets a goal. `-y` applies without the preview. `--show-llm-context` also prints the planned-vs-actual review it feeds the model. |
-| `plan show` | Strategy, snapshotted inputs, block timeline with each block's session count / duration / load. `-M ID` for a superseded version, `-a` for every goal, `-w` to list each block's sessions. |
+| `plan show` | Strategy, snapshotted inputs, mesocycle timeline with each mesocycle's session count / duration / load. `-M ID` for a superseded version, `-a` for every goal, `-w` to list each mesocycle's sessions. |
 | `plan versions` | Every kept version for a goal, active and superseded, with IDs and dates. |
-| `plan diff [A] [B]` | Compare two versions: strategy prose, attached feedback, blocks added/removed/renamed/re-dated, snapshot deltas. |
+| `plan diff [A] [B]` | Compare two versions: strategy prose, attached feedback, mesocycles added/removed/renamed/re-dated, snapshot deltas. |
 | `plan rollback` | Make a superseded version active again, and put the workouts back the way they were when it last wrote. `-M` names a version other than the previous one. |
-| `plan feedback` | Append a note to the append-only log for the next version. `-m` files it to one block. `--rm ID` deletes one. `--replan` regenerates immediately. Bare `plan feedback` lists what is pending. |
+| `plan feedback` | Append a note to the append-only log for the next version. `-m` files it to one mesocycle. `--rm ID` deletes one. `--replan` regenerates immediately. Bare `plan feedback` lists what is pending. |
 | `plan rm` / `plan wipe` | Delete every version of one goal's plan / every plan. |
 
 What `plan generate` reads before it calls the model: the science guidelines, the athlete
 profile, every upcoming goal, every active constraint, a 15-day training and metrics
-summary (including the current CTL / ATL / TSB block), a planned-vs-actual review of the
-plans the athlete trained through, the active coach learnings, the block the athlete is
+summary (including the current CTL / ATL / TSB lines), a planned-vs-actual review of the
+plans the athlete trained through, the active coach learnings, the mesocycle the athlete is
 mid-way through (offered so the new plan may let it finish rather than cut it at today),
 and the pending feedback log — which it **must** address note by note.
 
@@ -398,7 +398,7 @@ Generating a new strategy leaves the existing sessions exactly where they are un
 
 ---
 
-## 4. Mesocycle (`mesocycles`) — the block
+## 4. Mesocycle (`mesocycles`) — the mesocycle
 
 ### What it is
 
@@ -412,47 +412,47 @@ That is genuinely all it is. The table has four meaningful columns:
 | `macrocycle_id` | FK → `macrocycles`, cascade delete. |
 | `name` | e.g. "Base Building", "Peak & Taper". |
 | `start_date`, `end_date` | Inclusive `YYYY-MM-DD` bounds. |
-| `focus` | Prose: what this block is for. |
+| `focus` | Prose: what this mesocycle is for. |
 
 There is **no** stored load target, no weekly hours, no intensity distribution, no deload
-flag. A block states what it is for, and the workout generator derives the rest from that
+flag. A mesocycle states what it is for, and the week planner derives the rest from that
 sentence plus the science guidelines.
 
 ### Lifecycle
 
-A block has no lifecycle of its own. It is born when its macrocycle is saved, it is
+A mesocycle has no lifecycle of its own. It is born when its macrocycle is saved, it is
 reachable while its macrocycle is active (and its goal is not archived), it becomes
 unreachable when its macrocycle is superseded, reachable again on rollback, and it is
 deleted only by cascade. **There is no mesocycle CRUD.** You cannot add, rename, re-date
-or delete one directly; the only way to reshape a block is to change what the plan is
+or delete one directly; the only way to reshape a mesocycle is to change what the plan is
 generated from — the goal, the constraints, the feedback — and run `plan generate`.
 
-What *does* change over time is which block is **current**, and that is a function of
+What *does* change over time is which mesocycle is **current**, and that is a function of
 today's date, not of anything stored. A bare `-m` on any selector-taking command means
-"the block covering today".
+"the mesocycle covering today".
 
 ### Invariants
 
 **Enforced by the code:**
 
 1. A mesocycle belongs to exactly one macrocycle, and dies with it.
-2. Blocks are always read in `start_date` order.
-3. Blocks are only reachable through an **active** macrocycle. Most readers additionally
+2. Mesocycles are always read in `start_date` order.
+3. Mesocycles are only reachable through an **active** macrocycle. Most readers additionally
    require the owning goal to be non-archived. The one deliberate exception is
    `get_mesocycle_ranges`, which ignores goal status — a since-completed goal still
    planned its dates — while still excluding superseded *versions*, so an old version's
    dates cannot double-count the active one's.
-4. Within one plan, blocks are contiguous: no gap and no overlap between one block's
+4. Within one plan, mesocycles are contiguous: no gap and no overlap between one mesocycle's
    `end_date` and the next's `start_date`. The model is asked for this, and
    `save_macrocycle` repairs what comes back rather than trusting it
-   (`repair_block_contiguity`): end dates are authoritative, a start that disagrees with
-   its predecessor's end is re-dated to the day after it, and a block that ends inside
+   (`repair_mesocycle_contiguity`): end dates are authoritative, a start that disagrees with
+   its predecessor's end is re-dated to the day after it, and a mesocycle that ends inside
    its predecessor is dropped. `plan apply` runs the same repair first and prints a note
    per fix, so a repaired plan is never silently different from the one shown.
 
 **Asked of the model, but not enforced anywhere:**
 
-5. The first block should start on the plan start date, and the last should end on or
+5. The first mesocycle should start on the plan start date, and the last should end on or
    around the goal date.
 6. Plans of *different* goals should not overlap. `plan generate` pins a new plan's
    start to the day after the latest preceding goal that has a plan — but this is
@@ -465,12 +465,12 @@ today's date, not of anything stored. A bare `-m` on any selector-taking command
 Point 5 lives in the planning prompt only; the readers absorb a plan that starts late or
 ends early by falling back (below).
 
-### Reading blocks for a window: one reader
+### Reading mesocycles for a window: one reader
 
 `get_governing_mesocycles(start, end, prefer_macro_id=None)` is the only window reader:
-"which blocks govern these days". `end=None` means "to the plan's end", so no caller has
+"which mesocycles govern these days". `end=None` means "to the plan's end", so no caller has
 to invent a far-future date. It returns a **tuple**, not a list:
-`(blocks, dropped_macrocycle_ids)` — the second half is a receipt, so the caller can say
+`(mesocycles, dropped_macrocycle_ids)` — the second half is a receipt, so the caller can say
 which plan it ignored and offer the override:
 
 ```
@@ -481,19 +481,19 @@ instead. Pass -M 4 to follow that one.
 Internally it does three things, in order (the first two are
 `_get_covering_mesocycles`, its private strict half):
 
-1. **Overlap query.** Every block whose span touches the window, belonging to an active
+1. **Overlap query.** Every mesocycle whose span touches the window, belonging to an active
    plan version of a non-archived goal, in start-date order.
-2. **Plan arbitration.** The query can hand back blocks from two different plans, and
+2. **Plan arbitration.** The query can hand back mesocycles from two different plans, and
    two plans cannot both be followed on the same day. Each plan gets a **footprint** —
-   the earliest start and latest end among *its blocks that came back*, not its full
+   the earliest start and latest end among *its mesocycles that came back*, not its full
    span — and plans are walked in priority order (`prefer_macro_id` first, then most
    recently created first), dropping any plan whose footprint overlaps one already kept.
-   Whole plans are dropped, never individual blocks, so a surviving plan is never
+   Whole plans are dropped, never individual mesocycles, so a surviving plan is never
    half-followed. Sequential plans both survive — their footprints do not overlap —
-   which is what a long horizon needs when it runs out of one goal's last block into the
+   which is what a long horizon needs when it runs out of one goal's last mesocycle into the
    next goal's first.
 3. **Fallback.** Only when nothing overlaps at all does it answer with
-   `get_active_mesocycle`'s nearest block instead. `workout generate` depends on this:
+   `get_active_mesocycle`'s nearest mesocycle instead. `workout generate` depends on this:
    it lays sessions near a plan's edges and reads an empty answer as "there is no plan
    at all — run `plan generate`", which must not happen for a plan that merely starts
    next week.
@@ -502,83 +502,83 @@ The behaviour on one window:
 
 | The window has… | It returns |
 |---|---|
-| one plan covering it | that plan's blocks, `dropped = []` |
-| two plans, **sequential** | every block of both, `dropped = []` |
-| two plans, **same days** | the newer plan's blocks, `dropped = [older]` |
-| no block touching it, but a plan elsewhere in time | the nearest block, `dropped = []` |
+| one plan covering it | that plan's mesocycles, `dropped = []` |
+| two plans, **sequential** | every mesocycle of both, `dropped = []` |
+| two plans, **same days** | the newer plan's mesocycles, `dropped = [older]` |
+| no mesocycle touching it, but a plan elsewhere in time | the nearest mesocycle, `dropped = []` |
 | no plan at all | `([], [])` |
 
 ### The single-date readers
 
 This is where the strict-vs-lenient fork lives: a strict reader answers only with a
-block that CONTAINS the date, a lenient one falls back to the nearest. The add-time
-constraint message is the strict caller (`cli/constraints.py`): it asks which block
-holds a constraint's last day, and a block that does not cover that date would name the
-wrong block and offer a date already behind the athlete — being handed `None` is what
+mesocycle that CONTAINS the date, a lenient one falls back to the nearest. The add-time
+constraint message is the strict caller (`cli/constraints.py`): it asks which mesocycle
+holds a constraint's last day, and a mesocycle that does not cover that date would name the
+wrong mesocycle and offer a date already behind the athlete — being handed `None` is what
 lets it say "past the end of your plan" instead. Strict and lenient are two named
 readers rather than one boolean flag, because a flag's meaning has to be re-derived at
 every call site and a name does not. Pinned by
-`test_the_strict_readers_answer_only_with_blocks_that_cover_their_target`.
+`test_the_strict_readers_answer_only_with_mesocycles_that_cover_their_target`.
 
 All of them settle overlapping plans the same way the window reader does — the most
-recently created plan wins — so no two commands name different blocks for one day.
+recently created plan wins — so no two commands name different mesocycles for one day.
 
 | Reader | Answers |
 |---|---|
-| `get_covering_mesocycle(date)` | **Strict.** The active block containing that date, or `None`. |
-| `get_active_mesocycle(date)` | **Lenient.** Covering block → first block ending in the future → the absolute first block. |
-| `get_next_mesocycle(after)` | The earliest block starting strictly after a date. **Never falls back**: no block ahead means `None`. |
+| `get_covering_mesocycle(date)` | **Strict.** The active mesocycle containing that date, or `None`. |
+| `get_active_mesocycle(date)` | **Lenient.** Covering mesocycle → first mesocycle ending in the future → the absolute first mesocycle. |
+| `get_next_mesocycle(after)` | The earliest mesocycle starting strictly after a date. **Never falls back**: no mesocycle ahead means `None`. |
 | `get_periodization_ids_for_date(date)` | `(objective_id, macrocycle_id, mesocycle_id)`, for stamping a session with its provenance. |
 
-### The block boundary is a firewall
+### The mesocycle boundary is a firewall
 
-`workout adapt` may only rewrite sessions **up to the end of the block containing the
-evaluation date**. It may not reach into the next block. Its runway therefore shrinks to
-nothing as a block ends.
+`workout adapt` may only rewrite sessions **up to the end of the mesocycle containing the
+evaluation date**. It may not reach into the next mesocycle. Its runway therefore shrinks to
+nothing as a mesocycle ends.
 
 That is on purpose, and it is enforced on both sides:
 
-- **Read side:** workouts are fetched with the block end as the upper bound, so
+- **Read side:** workouts are fetched with the mesocycle end as the upper bound, so
   post-boundary sessions never enter the prompt.
 - **Write side:** any proposal dated past the range end is dropped, so a hallucinated date
   cannot be written. The apply range is derived from the *surviving* proposals, so it
-  cannot stretch past the block either.
+  cannot stretch past the mesocycle either.
 
 The reason is not the range, it is what would ride along with it. Adapt's whole input is a
 backward window of recovery metrics. A longer reach would give this morning's HRV authority
 over a session four weeks out, where it has no predictive claim. Periodization is authored
 by `plan generate` and `workout generate`; a daily readiness check must not rewrite it
-(`DESIGN_block_boundary.md §2`).
+(`DESIGN_mesocycle_boundary.md §2`).
 
 Rather than widening the firewall, both sides are made aware of it. Inside
-`config.adapt_terminal_window_days` of a block's end, the adapt prompt gains a
-`THIS BLOCK IS ENDING` section. On the CLI side, the runway detector watches for the
+`config.adapt_terminal_window_days` of a mesocycle's end, the adapt prompt gains a
+`THIS MESOCYCLE IS ENDING` section. On the CLI side, the runway detector watches for the
 schedule running out: inside `config.runway_warning_days` of the last scheduled session,
 **every** daily surface prints the exact `workout generate` invocation that carries the
-schedule on — `-m ..<id>` at a block boundary, a bare `workout generate` otherwise
-(`DESIGN_runway_nudge.md §3`). When every block of the plan has already ended,
+schedule on — `-m ..<id>` at a mesocycle boundary, a bare `workout generate` otherwise
+(`DESIGN_runway_nudge.md §3`). When every mesocycle of the plan has already ended,
 `workout adapt` refuses outright: there is nothing to adapt towards.
 
 Nothing crosses that boundary. A constraint dated past it is built in by the next
-`workout generate` whose span reaches it — which re-plans those days against the blocks
+`workout generate` whose span reaches it — which re-plans those days against the mesocycles
 that govern them, rather than carrying today's readings across to them. What the athlete
 gets in the meantime is *notice*: `constraints.honored_at` records whether any pass has had
 the directive in scope, so `status`, `constraint list`/`show` and the message printed at add
-time can say the plan does not reflect it yet and name the run that would
+time can say the schedule does not reflect it yet and name the run that would
 (`DESIGN_constraint_honoring.md`).
 
 ### Operations
 
-There is no mesocycle CRUD (above). What you *can* do with a block:
+There is no mesocycle CRUD (above). What you *can* do with a mesocycle:
 
 | Operation | How |
 |---|---|
-| Select a window by block | `-m <id>` on any command taking range selectors: `workout list -m 5`, `workout generate -m 7`, `constraint list -m 5`. Bare `-m` is the block covering today. |
-| File feedback against a block | `plan feedback -m [ATOM] "text"` — the atom is a block ID, a date it covers, or an infix of its name. |
-| Reshape a block | Change the goal, the constraints or the feedback, then `plan generate`. That is the only path. |
-| Re-plan a block's sessions | `workout generate -m <id>` — the selector names the whole span to rebuild, so only that block's days are rewritten. `-m ..<id>` runs from today to that block's end. A span never opens before today. |
+| Select a window by mesocycle | `-m <id>` on any command taking range selectors: `workout list -m 5`, `workout generate -m 7`, `constraint list -m 5`. Bare `-m` is the mesocycle covering today. |
+| File feedback against a mesocycle | `plan feedback -m [ATOM] "text"` — the atom is a mesocycle ID, a date it covers, or an infix of its name. |
+| Reshape a mesocycle | Change the goal, the constraints or the feedback, then `plan generate`. That is the only path. |
+| Re-plan a mesocycle's sessions | `workout generate -m <id>` — the selector names the whole span to rebuild, so only that mesocycle's days are rewritten. `-m ..<id>` runs from today to that mesocycle's end. A span never opens before today. |
 
-A note filed to a block records the block's **name**, not just its ID, when it is later
+A note filed to a mesocycle records the mesocycle's **name**, not just its ID, when it is later
 rendered — names survive version churn, IDs do not.
 
 ---
@@ -617,23 +617,23 @@ So the concept lives in exactly three places:
 1. **The workout-generation prompt**, which asks for it by name: *"Ensure the microcycles
    — one week, or longer where the athlete's guidelines alternate weeks — are designed
    specifically to match the focus, target volume, and intensity of the active mesocycle
-   block(s)."* The model's `reasoning` field is asked to describe *"the shape of the
+   mesocycle(s)."* The model's `reasoning` field is asked to describe *"the shape of the
    microcycle and why"* — that is the microcycle design, returned as prose rather than as
-   data. A two-week alternation is a microcycle the prompt allows and the block-progress
-   deload rule knows about (`DESIGN_block_progress.md` §3.2); the app still aggregates by
+   data. A two-week alternation is a microcycle the prompt allows and the mesocycle-progress
+   deload rule knows about (`DESIGN_mesocycle_progress.md` §3.2); the app still aggregates by
    Monday week (point 3), so the alternation shows there as a sawtooth, not as a unit.
 2. **The science guidelines**, as the defaults above.
 3. **`progression.weekly_aggregates`**, the one place the app makes weeks concrete. It
    aggregates planned-vs-actual load into **Monday-commencing** weeks and labels each week
-   with the mesocycle that has the majority overlap. `tm progress` and the block-progress
-   prompt section both read it, so the coach and the athlete can never read different
+   with the mesocycle that has the majority overlap. `tm progress` and the mesocycle-progress
+   prompt section both read it, so the week planner and the athlete can never read different
    numbers. `workout swap`'s weekly-load-spike check uses the same Monday week.
 
 ### The practical consequence
 
 You cannot query "the current microcycle". You query a date range. Every command that
 looks like it operates on a week — `workout list -d 7d`, `progress -w 8` — is operating on
-dates that happen to be a week long. The `-m` selector reaches a *block*; there is no
+dates that happen to be a week long. The `-m` selector reaches a *mesocycle*; there is no
 selector that reaches a week, because there is no week object to reach.
 
 ---
@@ -739,7 +739,7 @@ A few transitions deserve a sentence each:
 - **Appending over a void is a new session, not a resurrection.** It must not inherit the
   removed session's Calendar event, its originals or its tally.
 - **A swap carries the lineage to the destination.** That is why `lineage_id` exists at
-  all: the adaptation tally has to follow the session across the move, or the coach
+  all: the adaptation tally has to follow the session across the move, or the week planner
   would cut an already-cut session again.
 - **A void is always the last chapter of the lineage it ends**, never a first revision.
 - **A no-op is not written.** A revision prescribing exactly what the live one already
@@ -836,10 +836,10 @@ change after the restored version's newest write.
 | `workout list` | Show planned sessions. Default 7-day forward window. `-v` shows each session's lifecycle. |
 | `workout show` | The same listing with `-v` always on: `workout show 12` details one session. |
 | `workout compare` | Planned vs completed, with misses, rest violations and unplanned high load. Today's untrained sessions read *"not yet"* and are **not** misses. |
-| `workout generate` | Write the sessions for a span, from the blocks governing those days (details in §7). |
-| `workout adapt` | Daily readiness adjustment, within the current block only. `-m "note"` passes a free-text note in the same call. |
+| `workout generate` | Write the sessions for a span, from the mesocycles governing those days (details in §7). |
+| `workout adapt` | Daily readiness adjustment, within the current mesocycle only. `-m "note"` passes a free-text note in the same call. |
 | `workout add` | Manually schedule one session. No LLM. Replaces the same-sport session that day (or, with `--replace-day`, every session that day), recording what it overwrote on the new session's note. Starts a new lineage. Deliberately does **not** re-balance surrounding days — that is `adapt`'s job. |
-| `workout swap` | Exchange two sessions' dates, or move one onto a rest day. Mandatory reason. Validated first: warns about new >2-day hard streaks, weekly load spikes, and block-boundary crossings. |
+| `workout swap` | Exchange two sessions' dates, or move one onto a rest day. Mandatory reason. Validated first: warns about new >2-day hard streaks, weekly load spikes, and mesocycle-boundary crossings. |
 | `workout rm` / `restore` | Append a void with the athlete's reason / append a copy of the revision that void ended. |
 | `workout rollback` / `batches` | Undo (above). |
 | `workout push` | Sync to Google Calendar. Only stale rows unless `-f`. |
@@ -855,18 +855,18 @@ level may never rewrite a higher one.
 
 | Command | Writes | Span | Reads recovery metrics? | LLM calls |
 |---|---|---|---|---|
-| `plan generate` | macrocycle + mesocycles | plan start → goal date (`-g <id>` opens it at the goal's own span) | 15-day summary + PMC block | 1 |
+| `plan generate` | macrocycle + mesocycles | plan start → goal date (`-g <id>` opens it at the goal's own span) | 15-day summary + PMC lines | 1 |
 | `workout generate` | workout revisions | the span `-d`/`-m`/`-M`/`-g` names; by default, the day after the schedule stops, for 28 days | Yes — full `metrics_lookback_days` window | 1 |
-| `workout adapt` | workout revisions | evaluation date → **end of the current block** | Yes — full window, plus daily signals | 1 |
+| `workout adapt` | workout revisions | evaluation date → **end of the current mesocycle** | Yes — full window, plus daily signals | 1 |
 | `workout add` / `swap` / `rm` / `restore` | one or two workout revisions | a single date | No | 0 |
 | `goal rm` / `goal edit --status` | `stand-down` / `reinstate` revisions | today → the goal's last session | No | 0 |
 
 Read that table top to bottom as an authority ladder:
 
 - `plan generate` may reshape everything, and costs the most to run.
-- `workout generate` may rewrite sessions freely, but only within the blocks it was
-  handed. It cannot move a block boundary.
-- `workout adapt` may not cross a block boundary at all.
+- `workout generate` may rewrite sessions freely, but only within the mesocycles it was
+  handed. It cannot move a mesocycle boundary.
+- `workout adapt` may not cross a mesocycle boundary at all.
 - `workout add` / `swap` / `rm` touch exactly what you name and nothing else.
 
 ### What `workout generate` actually does
@@ -875,9 +875,9 @@ Because it is the command that turns a plan into a calendar, its rules are worth
 spelling out:
 
 - **The span has two ends, and the dates pick the plan.** `-d`, `-m`, `-M` and `-g` each
-  name a whole span (a block's own days, a goal's whole plan span, …), and the blocks
+  name a whole span (a mesocycle's own days, a goal's whole plan span, …), and the mesocycles
   governing those days are what shape the sessions. The goal is never an input; it was
-  only ever an indirection to the blocks (`DESIGN_cli_selectors.md §8`).
+  only ever an indirection to the mesocycles (`DESIGN_cli_selectors.md §8`).
 - **With no selector, it carries the schedule on.** The span opens the day after the
   last scheduled session (today, once the schedule has run out) and runs for
   `config.workout_generation_span_days` (default 28). A bare run therefore *adds* days
@@ -886,15 +886,16 @@ spelling out:
   goal, not another span.
 - **A span never opens before today.** If today's session is already completed, the
   span opens tomorrow and today's row is left alone.
-- **Within the span, the proposal is the plan.** Every live session in the span that the
-  proposal does not name is voided ("Not in the regenerated plan"); every proposed
+- **Within the span, the proposal is the schedule.** Every live session in the span that the
+  proposal does not name is voided ("Your coach replaced this day.", unless the week planner
+  wrote its own sentence); every proposed
   session is appended; a session the model marks `keep` is neither. Days outside the span
   are untouched. Sessions a prior `adapt` already eased are shown to the model so it does
   not hand back the load adapt took off.
 - **Every date in the span gets a row**, so a hole means the schedule ended, not that a
   rest day was skipped — which is what lets the runway detector tell the two apart.
 - **Each session is tagged with the plan version governing its date**, so a span that
-  runs from one goal's last block into the next goal's first produces sessions from two
+  runs from one goal's last mesocycle into the next goal's first produces sessions from two
   macrocycles, and rollback accounting keys off that tag.
 - **It warns when the plan runs out before the span does**, naming `plan generate` as the
   fix.
@@ -946,7 +947,7 @@ The plan window runs from today to 2026-11-15. TrainMate assembles the science g
 the athlete profile, every upcoming goal, every active constraint, a 15-day training and
 metrics summary with the current CTL/ATL/TSB, a planned-vs-actual review of any earlier
 plan, and the coach learnings — one LLM call — and shows a `strategy` plus a list of
-blocks:
+mesocycles:
 
 ```
 - Base Building        (2026-08-22 → 2026-09-26)  Zone 2 aerobic base, high volume
@@ -955,7 +956,7 @@ blocks:
 - Peak & Taper         (2026-11-08 → 2026-11-15)  Volume down, intensity held
 ```
 
-On `y`: one `macrocycles` row (`status = 'active'`), four `mesocycles` rows, block dates
+On `y`: one `macrocycles` row (`status = 'active'`), four `mesocycles` rows, mesocycle dates
 repaired for contiguity if the model left a gap. **No workouts yet.**
 
 **3. The sessions.**
@@ -965,8 +966,8 @@ repaired for contiguity if the model left a gap. **No workouts yet.**
 ```
 
 Nothing is scheduled yet, so the span opens today and runs 28 days — that lands entirely
-in Base Building. TrainMate resolves the governing blocks, reads the metrics window,
-builds the block-progress context, and asks the model for a schedule. It prints the
+in Base Building. TrainMate resolves the governing mesocycles, reads the metrics window,
+builds the mesocycle-progress context, and asks the model for a schedule. It prints the
 proposed sessions and asks. On `y`, it opens one `generate` change, appends one revision
 per session (each a first revision, `lineage_id = id`, tagged with the active
 `macrocycle_id`), and the change handle's reconcile pass pushes them to Calendar.
@@ -986,7 +987,7 @@ shows the changes and asks. On `y`, one `adapt` change appends a new revision fo
 session it eases, carrying the session's lineage and a per-session `reason`; the batch
 rationale is the change's `summary`. Reading those sessions back, `adaptation_count` is
 1 and `adapted_at` is set — but only for the ones whose duration or TSS actually fell, so
-a pure rewording does not raise the "already eased" bar for next time. If the coach
+a pure rewording does not raise the "already eased" bar for next time. If the week planner
 decides nothing needs to change, the change row is still written, flagged `held`.
 
 **5. Three weeks later, the schedule runs out.**
@@ -997,10 +998,10 @@ decides nothing needs to change, the change row is still written, flagged `held`
 
 The last scheduled session is 2026-09-18, so this run opens on 2026-09-19 and runs 28
 days — through 2026-10-16, crossing from Base Building into Specific Preparation. The
-sessions already on the calendar are left alone; each new one is tagged with the block
-governing its date. (Had the athlete run this at the block boundary, every daily surface
+sessions already on the calendar are left alone; each new one is tagged with the mesocycle
+governing its date. (Had the athlete run this at the mesocycle boundary, every daily surface
 would already have printed `workout generate -m ..<id>` — the same command, bounded to
-the block.)
+the mesocycle.)
 
 **6. A trip in October.**
 
@@ -1010,17 +1011,17 @@ the block.)
 ```
 
 The constraint is dated inside Specific Preparation — too far off for adapt to reach, too
-small to trip the replan heuristic. So `constraint add` says so, naming the block it lands
+small to trip the replan heuristic. So `constraint add` says so, naming the mesocycle it lands
 in and the run that would cover it; until then `status` and `constraint list` both mark it
-*not yet in the plan*. The generate re-plans that block's remaining days, building around
-the trip like any other stored directive: the sessions already there are voided ("Not in
-the regenerated plan"), the new ones appended, and the constraint's `honored_at` is stamped
+*not yet in the schedule*. The generate re-plans that mesocycle's remaining days, building around
+the trip like any other stored directive: the sessions already there are voided ("Your coach
+replaced this day."), the new ones appended, and the constraint's `honored_at` is stamped
 because its whole remaining window sat inside what was written.
 
 **7. Second thoughts about the plan.**
 
 ```
-./tm plan feedback -m "Base Building" "This block is too long — I plateau after four weeks"
+./tm plan feedback -m "Base Building" "This mesocycle is too long — I plateau after four weeks"
 ./tm plan generate
 ```
 
@@ -1095,7 +1096,7 @@ rest window of at least `replan_rest_span_days` (default 3) days. It only ever p
 escalation is the athlete's call.
 
 `honored_at` records when a coach pass last had the constraint in scope **with authority
-over every day of it still ahead**. `NULL` means the plan does not reflect it yet. It is
+over every day of it still ahead**. `NULL` means the schedule does not reflect it yet. It is
 deliberately *not* a claim that the plan changed. Editing a constraint's window or text
 clears it, and so does any undo that restores sessions older than the honouring —
 `workout rollback`, `plan rollback`, or reinstating a goal.
@@ -1109,7 +1110,7 @@ entirely.
 
 ### 9.5 The plan is regenerated
 
-The old macrocycle is superseded and kept, with its blocks and its feedback. A new active
+The old macrocycle is superseded and kept, with its mesocycles and its feedback. A new active
 macrocycle is inserted. **Workouts are untouched** — they still carry the old version's
 `macrocycle_id` — until `workout generate` runs.
 
@@ -1124,7 +1125,7 @@ sessions back, floored at today, and re-pushes them.
 ### 9.7 A goal is purged
 
 Only `goal rm --purge` gets here; plain `goal rm` calls the goal off (§9.6). The cascade
-takes every plan version, every block and every feedback note. It does **not**
+takes every plan version, every mesocycle and every feedback note. It does **not**
 take the workouts, because `workouts.macrocycle_id` is a plain integer with no foreign key.
 Those sessions are left with no plan to explain them, which is why the purge counts them
 first and says so:
@@ -1132,7 +1133,7 @@ first and says so:
 ```
 Purging goal 'Autumn Marathon' (ID 3) also deletes:
   - 2 periodization plan version(s)
-  - 8 mesocycle block(s)
+  - 8 mesocycle(s)
   - 3 plan feedback note(s)
   and leaves 26 upcoming session(s) with no plan to explain them.
 ```
@@ -1160,7 +1161,7 @@ the progress timeline still labels the weeks just trained.
 | 5 | Plan fingerprints are computed at generate time and carried to apply | `PlanFingerprints` passed through `plan_apply` |
 | 6 | Only `replan = 1` constraints fingerprint the plan | `plan_generate` filters before hashing |
 | 7 | A mesocycle belongs to one macrocycle and dies with it | FK `ON DELETE CASCADE` |
-| 8 | Adapt may not write past the end of the current block | Read bound + write-side filter |
+| 8 | Adapt may not write past the end of the current mesocycle | Read bound + write-side filter |
 | 9 | A pass may stamp `honored_at` only for a constraint whose whole remaining window it wrote | `honoring.covered_ids`, decided at proposal time, stamped at apply |
 | 10 | At most one live workout per (date, canonical sport) | By construction: the live row is the highest `id` in the slot (`live_workouts`) |
 | 11 | `workouts` is append-only — no row is ever updated or deleted | Two SQL triggers, `RAISE(ABORT)` |
@@ -1168,7 +1169,7 @@ the progress timeline still labels the weeks just trained.
 | 13 | A `propose` method never writes; an apply method always records the pass | `tests/test_service_invariants.py` (source-level) |
 | 14 | Workout state is derived from orthogonal axes, never a stored enum | The change `kind`, the lineage tally, `workout_calendar_state` |
 | 15 | Weeks are Monday-commencing everywhere | `progression.weekly_aggregates`, `workout_swap_validate` |
-| 16 | Within one plan, blocks are contiguous — no gaps, no overlaps | `save_macrocycle` via `repair_block_contiguity` |
+| 16 | Within one plan, mesocycles are contiguous — no gaps, no overlaps | `save_macrocycle` via `repair_mesocycle_contiguity` |
 | 17 | Every date of a generated span carries a row | `_fill_coverage_gaps` in `workout_generate` |
 
 ## 11. Deliberately not enforced
@@ -1185,21 +1186,21 @@ Worth knowing, because each of these is a decision rather than an oversight:
   exactly as the model emitted them. A session whose zone seconds do not sum to
   `duration_minutes` is a prescription, not an accounting identity — silently scaling it
   would put the app back in the business of correcting the model rather than aligning for it.
-- **A block having any load target at all.** A block states a name, a span and a focus.
+- **A mesocycle having any load target at all.** A mesocycle states a name, a span and a focus.
   Everything quantitative is derived downstream from the sessions.
 - **Workouts pointing at a real macrocycle.** No foreign key, so no cascade, so a purged
   goal strands its sessions — reported at `goal rm --purge` time rather than prevented.
   Calling a goal off does not have this problem: it sweeps the sessions by plan version
   before archiving anything.
 - **The gap between plans.** `get_active_mesocycle` snaps from "one day left" to "the whole
-  next block" across a calendar gap rather than tapering. Within one plan such a gap no
+  next mesocycle" across a calendar gap rather than tapering. Within one plan such a gap no
   longer exists (invariant 16); one can still open between two goals' plans. Both features
   that read it gate on `0 <= days_left <= N`, so neither misfires. Recorded in
-  `DESIGN_block_boundary.md §6` rather than fixed.
-- **A generated span stopping at a block boundary.** A bare `workout generate` runs 28
-  days from where the schedule stops, whatever block that lands in. A clamp to the block
-  end existed briefly and was removed: it left two-day slivers when a block was slightly
-  longer than the cap, and the block-scoped `-m ..<id>` selector already covers the case
+  `DESIGN_mesocycle_boundary.md §6` rather than fixed.
+- **A generated span stopping at a mesocycle boundary.** A bare `workout generate` runs 28
+  days from where the schedule stops, whatever mesocycle that lands in. A clamp to the mesocycle
+  end existed briefly and was removed: it left two-day slivers when a mesocycle was slightly
+  longer than the cap, and the mesocycle-scoped `-m ..<id>` selector already covers the case
   where stopping at the boundary is what the athlete wants.
 
 ---
@@ -1212,10 +1213,10 @@ Worth knowing, because each of these is a decision rather than an oversight:
 | Full schema and module map | `ARCHITECTURE.md` §5, §2 |
 | Plan vs workout terminology | `ARCHITECTURE.md` §11 |
 | Plan versioning and rollback | `designs/DESIGN_plan_rollback.md` |
-| The block firewall | `designs/DESIGN_block_boundary.md` |
+| The mesocycle firewall | `designs/DESIGN_mesocycle_boundary.md` |
 | How `workout generate` picks its span | `designs/DESIGN_cli_selectors.md` §8, §9 |
 | The schedule running out | `designs/DESIGN_runway_nudge.md` |
-| Whether the plan reflects a constraint | `designs/DESIGN_constraint_honoring.md` |
+| Whether the schedule reflects a constraint | `designs/DESIGN_constraint_honoring.md` |
 | Constraints and the replan escalation | `designs/DESIGN_constraints.md` |
 | Plan feedback log | `designs/DESIGN_plan_feedback.md` |
 | Goal states, calling a goal off | `designs/DESIGN_backward_evaluation.md` §12, §14 |

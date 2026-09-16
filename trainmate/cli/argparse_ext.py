@@ -10,7 +10,7 @@ import textwrap
 from typing import Optional
 
 from trainmate.util import (
-    bold, dim, red, yellow, cmd, default_wrap_width, format_labeled_block, wrap_text, warn,
+    bold, dim, red, yellow, cmd, default_wrap_width, format_labeled_paragraph, wrap_text, warn,
 )
 
 
@@ -89,13 +89,13 @@ class WrapAwareHelpFormatter(argparse.HelpFormatter):
         # Wrap a description/epilog one paragraph at a time, so prose re-flows but a
         # deliberate blank line survives (DESIGN_cli_noargs.md §e). Indented and bulleted
         # paragraphs are left exactly as authored.
-        blocks = []
+        paragraphs = []
         for para in re.split(r"\n[ \t]*\n", text.strip("\n")):
             if any(re.match(r"[ \t]|[-*•]\s", line) for line in para.splitlines()):
-                blocks.append(textwrap.indent(para, indent))
+                paragraphs.append(textwrap.indent(para, indent))
                 continue
-            blocks.append(_fill(para, width, indent, indent))
-        return "\n\n".join(blocks)
+            paragraphs.append(_fill(para, width, indent, indent))
+        return "\n\n".join(paragraphs)
 
 class _DescFromHelpSubParsersAction(argparse._SubParsersAction):
     """Mirror help into description, and hide ``advanced=True`` sub-commands.
@@ -289,7 +289,7 @@ def _print_command_tree(
             continue
         for choice_action in action._choices_actions:
             label = "  " * indent + bold(choice_action.metavar)
-            print(format_labeled_block(label, choice_action.help or ""))
+            print(format_labeled_paragraph(label, choice_action.help or ""))
             _print_command_tree(
                 action.choices[choice_action.dest], indent + 1, include_advanced
             )
@@ -298,7 +298,8 @@ def _print_command_tree(
         if include_advanced:
             for name, help_text in getattr(action, "advanced_choices", []):
                 label = "  " * indent + yellow(name)
-                print(format_labeled_block(label, yellow((help_text or "") + "  [maintenance]")))
+                help_line = yellow((help_text or "") + "  [maintenance]")
+                print(format_labeled_paragraph(label, help_line))
 
 
 def _reorder_subparsers_action(action: argparse._SubParsersAction, order: list) -> None:

@@ -30,7 +30,7 @@ SELECTOR := ATOM | ATOM ".." | ".." ATOM | ATOM ".." ATOM
 | Flag | ATOM | Bare flag |
 | --- | --- | --- |
 | `-d`/`--date` | `2026-06-01`, `today`, a signed offset `-7d` / `+2w` | — |
-| `-m`/`--mesocycle` | a mesocycle ID | the current block |
+| `-m`/`--mesocycle` | a mesocycle ID | the current mesocycle |
 | `-M`/`--macrocycle` | a macrocycle ID (`plan versions` lists them) | the active plan |
 | `-g`/`--goal` | a goal ID | the active goal |
 
@@ -48,7 +48,7 @@ one (§6 is the narrow exception that survives). `..` also makes signed offsets 
 `-1w..+1w` is a fortnight around today, which `-` cannot spell at all.
 
 The `-m` atom has since grown past "a mesocycle ID": `plan feedback -m` also takes a
-date (the block covering that day) and a case-insensitive infix of a block *name*
+date (the mesocycle covering that day) and a case-insensitive infix of a mesocycle *name*
 (DESIGN_plan_feedback.md §5, `resolve_meso_atom` in trainmate/cli/selectors.py). It is
 defined there as a **single-target** resolver, beside this range machinery rather than
 inside it — the day a filtering command wants `workout list -m climb`, the range grammar
@@ -62,12 +62,12 @@ which way it runs.
 ## §2 — Dimensions intersect, and each resolves to a window
 
 `resolve_window` (trainmate/cli/selectors.py) turns every selector given into a
-(start, end) pair and **intersects** them: `-m 3 -d 2026-06-10..` is the part of block 3
+(start, end) pair and **intersects** them: `-m 3 -d 2026-06-10..` is the part of mesocycle 3
 from the 10th onward. Nothing is silently dropped, which the old precedence chain did.
 
 Each ID dimension has one definition of its span, shared by every command:
 
-* **mesocycle** — the block's own start and end;
+* **mesocycle** — the mesocycle's own start and end;
 * **macrocycle** — the first start and last end of its mesocycles;
 * **goal** — the start of its plan through the **goal's target date**, which is past the
   last mesocycle whenever the plan does not yet reach the event. The two old resolvers
@@ -128,9 +128,9 @@ The renames that rule forced:
 Two deliberate exceptions, each because the command cannot mean the reserved thing:
 
 * **`workout adapt -m`** stays `--message`, and **`signal add`** takes no `-m`/`-M`: both
-  act on days, not on blocks, so a mesocycle is not a slice they could take. `-d` there is
+  act on days, not on mesocycles, so a mesocycle is not a slice they could take. `-d` there is
   a single date (`parse_single_date`), as it is on `benchmark record`. Work that *does* need
-  a block selector takes a verb that already reads the reserved vocabulary — `workout
+  a mesocycle selector takes a verb that already reads the reserved vocabulary — `workout
   generate -m 7` — rather than retiring this exception.
 * **`goal edit --target-date`, `constraint add/edit --start/--end`** name a *stored field*,
   not a filter. The line: a command that acts over a span of days takes `-d` (`signal add`
@@ -183,7 +183,7 @@ its `id` tagged every saved workout and drove the boundary-benchmark check, and 
 goal's *target date* was needed later it was fetched back **through** the macrocycle
 (`_goal_date_for_macrocycle`), walking the same 1:1 link in reverse.
 
-Nor did `-g` narrow what the coach saw about the athlete's goals: the prompt is built from
+Nor did `-g` narrow what the week planner saw about the athlete's goals: the prompt is built from
 `upcoming_objectives()` regardless. Its whole effect was swapping which strategy string
 got attached.
 
@@ -196,27 +196,27 @@ versions arrived later with DESIGN_plan_rollback.md. `-g` was the pre-`-M` spell
 
 What shapes a generated week is the **mesocycle covering those dates**. The rest of the
 app already knew this: `get_active_mesocycle(date)`, `get_next_mesocycle(date)` and
-`get_mesocycle_ranges(start, end)` are all date-keyed, and `workout adapt`, the block
-progress context, the block-boundary hint and `workout compare` reach their blocks that
+`get_mesocycle_ranges(start, end)` are all date-keyed, and `workout adapt`, the mesocycle
+progress context, the mesocycle-boundary hint and `workout compare` reach their mesocycles that
 way without naming a goal. Generation was the one command routing through an objective to
-reach blocks a date lookup finds directly.
+reach mesocycles a date lookup finds directly.
 
 The symptom was in the prompt. `_get_active_strategy_and_meso_text` listed **every**
-mesocycle in the macrocycle, including blocks that ended months ago, and the task text
-asked the model to work out "the active mesocycle block(s) the athlete is in during this
+mesocycle in the macrocycle, including mesocycles that ended months ago, and the task text
+asked the model to work out "the active mesocycle(s) the athlete is in during this
 period" for itself.
 
 ### The rule
 
-`db.get_governing_mesocycles(start, end, prefer_macro_id=None)` answers "which blocks
+`db.get_governing_mesocycles(start, end, prefer_macro_id=None)` answers "which mesocycles
 govern these days", and both the CLI's staleness check and `workout_generate` read through
-it. The blocks reach the prompt through the shared assembler: `_coach_context(constraints,
-blocks=…)` takes its strategy text from them instead of from a goal's macrocycle, so the
+it. The mesocycles reach the prompt through the shared assembler: `_coach_context(constraints,
+mesocycles=…)` takes its strategy text from them instead of from a goal's macrocycle, so the
 date-keyed path is a parameter of the one context builder rather than a second way to
 assemble a prompt. The rule itself:
 
 * **Sequential plans both survive.** A long horizon legitimately runs out of one goal's
-  last block into the next goal's first; dropping either would leave those weeks
+  last mesocycle into the next goal's first; dropping either would leave those weeks
   unplanned.
 * **Plans covering the same dates cannot both be followed**, so the most recently
   generated one wins — the same tiebreak `get_periodization_ids_for_date` already made per
@@ -228,10 +228,10 @@ assemble a prompt. The rule itself:
   there genuinely is none.
 
 Two things follow that the goal-keyed version could not express. `macrocycle_id` is
-stamped **per workout** from the block covering its date, so a span crossing a plan
+stamped **per workout** from the mesocycle covering its date, so a span crossing a plan
 boundary tags each session with the plan it belongs to (`plan rollback` accounting keys off
-that column). And a horizon reaching past the last block is *visible*: generation says the
-plan runs out on X, where before it just produced weeks with no block behind them.
+that column). And a horizon reaching past the last mesocycle is *visible*: generation says the
+plan runs out on X, where before it just produced weeks with no mesocycle behind them.
 
 ### What `-g` means now
 
@@ -248,7 +248,7 @@ both.
 ### The span has two ends, not one
 
 Generation used to start today whatever the selectors said, and take only their **end** as
-a horizon. So `workout generate -m 5` meant "today through the end of block 5", not "block
+a horizon. So `workout generate -m 5` meant "today through the end of mesocycle 5", not "mesocycle
 5", and the sessions it wrote from today onward had no far edge at all: the apply pass
 voided every day from the start onward, so a horizon that stopped short cancelled
 everything beyond it.
@@ -256,9 +256,9 @@ everything beyond it.
 Both halves are now read off the same window `resolve_window` already builds:
 
 * **The start is the window's start**, clamped to today — yesterday is history, not a day
-  to re-plan. So `-m 5` on a block three weeks out opens there, and the days between are
+  to re-plan. So `-m 5` on a mesocycle three weeks out opens there, and the days between are
   left exactly as they are. A selection that *ends* before today is refused outright: a
-  block that has already run is history, and quietly regenerating today in its place is
+  mesocycle that has already run is history, and quietly regenerating today in its place is
   not what was asked for.
 * **The end is the window's end**, and it bounds the *write* as well as the prompt.
   `GenerateProposal` carries `gen_end` beside `gen_start`; `displaced` is read between
@@ -282,7 +282,7 @@ nudge reports.
 Two edges. Once the schedule has run out — coverage behind today — the start is today
 again, there being nothing to carry on from. And when coverage already reaches the plan's
 last day the run is refused, rather than opening past the periodization and writing days no
-block governs: that is the plan cliff, whose fix is a new goal rather than another span
+mesocycle governs: that is the plan cliff, whose fix is a new goal rather than another span
 (DESIGN_runway_nudge.md §2).
 
 Only the fully unselected case moves. `resolve_window` fills a forward-direction command's
@@ -298,14 +298,14 @@ is transitional and fires only when the two would actually differ — which incl
 ### The cost this leaves standing
 
 Generating a whole macrocycle in one call is now the easy thing to ask for, and
-DESIGN_block_boundary.md §1 names the price: sessions laid down months ahead are planned
+DESIGN_mesocycle_boundary.md §1 names the price: sessions laid down months ahead are planned
 against today's metrics, never re-read against the athlete's present state, and `adapt` is
-firewalled inside the current block and cannot say so. That was already true of
+firewalled inside the current mesocycle and cannot say so. That was already true of
 `--until-goal`; making it the natural reading of `-g` does not make it safer. The plan-end
 warning above is a nudge in the other direction, not a fix.
 
 `workout adapt` still resolves its strategy text the old way, through
-`_get_active_strategy_and_meso_text`. It is already date-scoped to one block, so the
+`_get_active_strategy_and_meso_text`. It is already date-scoped to one mesocycle, so the
 indirection costs it less; converting it is a separate change.
 
 ## §9 — `plan generate -g`: the same grammar, the same reading

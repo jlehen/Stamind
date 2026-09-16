@@ -10,8 +10,8 @@ Four defects, one command:
 
 1. **Routing in database coordinates.** `--meso 7` requires a `plan show` detour to learn that
    "Climb-Specific Transmutation" is row 7, and "either `--macro` or `--meso` is mandatory" makes
-   the athlete file the note before they can say it. The block has a name; its address should not
-   be an autoincrement integer.
+   the athlete file the note before they can say it. The mesocycle has a name; its address should
+   not be an autoincrement integer.
 2. **A grammar the CLI already outgrew.** `--macro`/`--meso` predates DESIGN_cli_selectors.md and
    was never migrated, so the one command that should read most like talking to a coach is the one
    that reads most like database administration.
@@ -24,9 +24,10 @@ Four defects, one command:
 
 And the fact that unlocks the redesign: at regeneration time,
 `trainmate/coach/service/planning.py` concatenates **all** feedback — macro plus every mesocycle,
-labeled by phase — into a single prompt section the planner reads whole. Routing at capture time
-therefore decides a label and a storage row, never what the model considers. The current interface
-demands careful filing for a reader that reads the whole cabinet anyway.
+labeled by phase — into a single prompt section that `plan generate`'s model call reads whole.
+Routing at capture time therefore decides a label and a storage row, never what the model
+considers. The current interface demands careful filing for a reader that reads the whole cabinet
+anyway.
 
 ## 2. Mental model
 
@@ -59,8 +60,8 @@ Where this sits among the real-world-context channels (the boundary lines do not
 Goals:
 
 - Capture with no selector, no flags, no IDs: `tm plan feedback "…"` and you have your prompt back.
-- Optional explicit filing addressed the way the athlete thinks: block name, date, or bare `-m`
-  for the current block. IDs keep working.
+- Optional explicit filing addressed the way the athlete thinks: mesocycle name, date, or bare `-m`
+  for the current mesocycle. IDs keep working.
 - Append semantics with visible history and per-note removal.
 - Pending feedback counts as a regeneration trigger; `--replan` collapses the two-step entirely.
 - Consumption quality unchanged or better: the regen prompt still sees everything, now dated and
@@ -82,8 +83,8 @@ Non-goals:
 ```
 plan feedback                          List pending notes for the active goal's plan
 plan feedback "text"                   Append a plan-level note
-plan feedback "text" -m               Append a note filed to the current block
-plan feedback "text" -m ATOM          … filed to the block ATOM resolves to (§5)
+plan feedback "text" -m               Append a note filed to the current mesocycle
+plan feedback "text" -m ATOM          … filed to the mesocycle ATOM resolves to (§5)
 plan feedback --rm ID [-y]             Delete one pending note (y/N confirm unless -y)
 plan feedback … -g ID                  Target another goal's plan (default: soonest active goal,
                                        matching today's behavior)
@@ -105,9 +106,9 @@ Noted [id 12, plan-level]: "the Friday sessions should progress duration, not su
 ```
 
 with `[id 13, filed: Climb-Specific Transmutation]` for a filed note. The bare listing prints
-`[id] date · plan-level|<block name> · text`, **oldest first** — one ordering everywhere (listing,
-`plan show`, prompt), so the log always reads as a conversation in the order it happened. Empty
-listing prints one line saying how to add a note.
+`[id] date · plan-level|<mesocycle name> · text`, **oldest first** — one ordering everywhere
+(listing, `plan show`, prompt), so the log always reads as a conversation in the order it happened.
+Empty listing prints one line saying how to add a note.
 
 Fit with DESIGN_cli_noargs.md: the bare run is read-only listing (bucket 1); `--rm` with no ID
 gets the §a missing-argument treatment. Over the bot every form is one-line and editor-free;
@@ -122,20 +123,20 @@ a different goal's plan errors naming the goal it belongs to.
 
 ## 5. The `-m` atom, humanized
 
-`-m [ATOM]` names **one** block; range spellings (`3..5`) are rejected by name — a note files to
-one block. The atom set extends the shared grammar's "a mesocycle ID":
+`-m [ATOM]` names **one** mesocycle; range spellings (`3..5`) are rejected by name — a note files to
+one mesocycle. The atom set extends the shared grammar's "a mesocycle ID":
 
 | ATOM | Resolves to |
 | --- | --- |
 | bare integer | Mesocycle ID (a bare number is never a date — DESIGN_cli_selectors.md §1); must belong to the target plan |
-| date atom: `2026-09-05`, `today`, `-7d`, `+2w` | The block whose start–end range contains that day |
-| anything else | Case-insensitive infix of a block *name*; must match exactly one |
-| *(absent)* | The block containing today — same meaning bare `-m` already has in the shared grammar |
+| date atom: `2026-09-05`, `today`, `-7d`, `+2w` | The mesocycle whose start–end range contains that day |
+| anything else | Case-insensitive infix of a mesocycle *name*; must match exactly one |
+| *(absent)* | The mesocycle containing today — same meaning bare `-m` already has in the shared grammar |
 
 Date atoms reuse the `-d` atom parser. An unsigned span (`7d`) is rejected by name: it describes a
-window, not a day. A name infix matching zero or several blocks errors and lists the plan's blocks
-(name + dates) to retry against — an error listing, not an interactive picker, so the bot behaves
-identically.
+window, not a day. A name infix matching zero or several mesocycles errors and lists the plan's
+mesocycles (name + dates) to retry against — an error listing, not an interactive picker, so the bot
+behaves identically.
 
 All resolution happens against the **active** macrocycle of the target goal. Filing to a
 superseded version is meaningless for steering the next one, so a mesocycle ID outside the active
@@ -194,7 +195,7 @@ Verbatim notes from the athlete about the plan in place, oldest first. A note ma
   duration at 95-100% instead of surges"
 - [2026-08-13] "drop the second FTP test"
 You MUST address every note: revise the macrocycle strategy and/or the duration, boundaries,
-and focuses of individual mesocycles accordingly (e.g. scheduling more rest, changing block
+and focuses of individual mesocycles accordingly (e.g. scheduling more rest, changing mesocycle
 emphasis, extending/shortening specific cycles), while continuing to respect overall sports
 science principles and guidelines.
 ```
@@ -202,7 +203,7 @@ science principles and guidelines.
 Oldest first so later notes read as amendments of earlier ones ("actually, keep the second test").
 Filed notes carry the phase **name** — names survive version churn; IDs do not. The service layer
 (`trainmate/coach/service/planning.py`) assembles the list from pending rows joined with mesocycle
-names, replacing today's slot-reading block.
+names, replacing today's slot-reading code.
 
 **Not consumers.** `workout generate` and `workout adapt` keep reading only the mesocycle focus
 text and constraints. A note reshapes workouts *by reshaping the plan first*; a note that must
@@ -210,8 +211,8 @@ skip the plan is what `workout adapt -m` is for (§12 revisits).
 
 ## 8. Display
 
-- **`plan show`**: the two per-slot renders (macro block + per-meso indented text) become one
-  `ATHLETE FEEDBACK` section after the strategy: `[id] date · plan-level|<block name> · text`,
+- **`plan show`**: the two per-slot renders (macro text + per-meso indented text) become one
+  `ATHLETE FEEDBACK` section after the strategy: `[id] date · plan-level|<mesocycle name> · text`,
   oldest first, qualified "(pending — feeds the next plan generate)" when the shown macrocycle is
   active and "(consumed by the successor version)" when superseded.
 - **`plan diff`**: the feedback panel stops prose-diffing a slot and lists each side's attached
@@ -268,16 +269,17 @@ is not restated in comments.
   call that already happens (the nightly adapt), the same-call pattern again — cosmetic only, so
   it can wait indefinitely.
 - **Keyword/date heuristics at capture.** Free, but a heuristic that guesses wrong files the note
-  silently under the wrong block; labels are not worth brittleness. Explicit atoms only.
+  silently under the wrong mesocycle; labels are not worth brittleness. Explicit atoms only.
 - **Keeping `--edit`.** Editor curation of a multi-entry log is fiddly and bot-hostile;
   `--rm` + re-add covers rewording.
-- **A `next` keyword atom.** Collides with plausible block names; `+2w` says it deterministically.
+- **A `next` keyword atom.** Collides with plausible mesocycle names; `+2w` says it
+  deterministically.
 - **Unified inbox (`tm coach`).** The right end-state; out of scope here (§3). This table is its
   substrate.
 
 ## 12. Open questions
 
-- Should `workout generate` inject pending notes filed to the blocks it is generating for? Lean
+- Should `workout generate` inject pending notes filed to the mesocycles it is generating for? Lean
   no: it blurs the "notes reshape workouts via the plan" line (§7) and adds a second consumer with
   its own lifecycle questions. Revisit if the feedback → `plan generate` → `workout generate`
   two-step proves heavy in practice.

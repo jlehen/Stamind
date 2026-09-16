@@ -311,7 +311,7 @@ class TestDegenerateAnalysisResponse(unittest.TestCase):
 
     Drawn from the 2026-08-18 model comparison: moonshotai/kimi-k3 prefixed every NESTED
     key with '>', so `{">overall_focus": ...}` parsed cleanly and every `.get()` missed —
-    empty report blocks, zero learnings, and a watermark that moved as if history had been
+    empty report mesocycles, zero learnings, and a watermark that moved as if history had been
     read.
     """
 
@@ -388,7 +388,7 @@ class TestDegenerateAnalysisResponse(unittest.TestCase):
     @patch("trainmate.coach.engine.openrouter_client")
     def test_a_partly_readable_response_warns_and_still_saves(self, mock_client):
         """One good part is a result worth keeping — but the unreadable ones are named
-        rather than left to render as blank blocks."""
+        rather than left to render as blank sections."""
         mock_client.complete.return_value = {
             "macrocycle_summary": "A real reconstruction",
             "inferred_macrocycle": {">overall_focus": "Summer aerobic base"},
@@ -402,7 +402,7 @@ class TestDegenerateAnalysisResponse(unittest.TestCase):
         printed = " ".join(str(c.args[0]) for c in mock_print.call_args_list if c.args)
         self.assertIn("unreadable", printed)
         self.assertIn("macrocycle", printed)
-        self.assertIn("mesocycle blocks", printed)
+        self.assertIn("mesocycles", printed)
         self.assertIsNotNone(test_db.get_analysis_cache("long"))
 
     @patch("trainmate.coach.engine.openrouter_client")
@@ -852,7 +852,7 @@ class TestRicherEvidenceIntegration(unittest.TestCase):
     @patch("trainmate.coach.engine.openrouter_client")
     def test_signal_days_reaches_the_prompt(self, mock_client):
         """A logged external signal (alcohol) surfaces as an episode-aligned signal_days
-        block in the analysis user content (DESIGN_quantitative_signal_impact.md §4)."""
+        section in the analysis user content (DESIGN_quantitative_signal_impact.md §4)."""
         self._seed_week()
         test_db.upsert_daily_signal_by_event(
             "evt1", "2026-06-02", "alcohol", value=4.0, text="Alcohol: 4 drinks"
@@ -915,7 +915,7 @@ class TestRicherEvidenceIntegration(unittest.TestCase):
             from_date_str="2026-06-01", until_date_str="2026-06-07", no_pull=True
         )
         # Two months before the analysis window: invisible to the windowed evidence, but
-        # it adds a whole episode to the signal_days block the LLM is shown.
+        # it adds a whole episode to the signal_days section the LLM is shown.
         test_db.upsert_daily_signal_by_event(
             "evt-old", "2026-04-02", "alcohol", value=4.0, text="Alcohol: 4 drinks"
         )
@@ -950,8 +950,8 @@ class TestPriorTrainingContext(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
 
-    def test_inferred_blocks_reach_the_context(self):
-        """The reverse-engineered macro focus and mesocycle blocks from a bootstrap
+    def test_inferred_mesocycles_reach_the_context(self):
+        """The reverse-engineered macro focus and mesocycles from a bootstrap
         reconstruction are rendered into the prior-training context, not just the summary."""
         test_db.save_analysis_cache(
             "long", "fp", "2026-03-01", "2026-05-31",
@@ -1040,13 +1040,13 @@ class TestPriorTrainingContext(unittest.TestCase):
 
     # ------------------------------------------------------- planned vs actual load
 
-    # Two whole Monday-weeks, so the week buckets line up with the block and no edge week
+    # Two whole Monday-weeks, so the week buckets line up with the mesocycle and no edge week
     # is partial by accident.
-    BLOCK_START, BLOCK_END = "2026-06-08", "2026-06-21"
+    MESOCYCLE_START, MESOCYCLE_END = "2026-06-08", "2026-06-21"
     ZONES = [600, 1800, 900, 300, 0]
 
     def _plan(
-        self, name: str = "Base 3", start: str = BLOCK_START, end: str = BLOCK_END,
+        self, name: str = "Base 3", start: str = MESOCYCLE_START, end: str = MESOCYCLE_END,
         goal: str = "Gran Fondo", target: str = "2026-10-15",
     ) -> int:
         obj_id = test_db.add_objective(
@@ -1078,17 +1078,17 @@ class TestPriorTrainingContext(unittest.TestCase):
             zone5_sec=0,
         )
 
-    def _half_missed_block(self) -> None:
+    def _half_missed_mesocycle(self) -> None:
         """Both weeks asked for 100; only the first was trained."""
         macro_id = self._plan()
         self._planned_session(macro_id, "2026-06-09", 100.0)
         self._planned_session(macro_id, "2026-06-16", 100.0)
         self._completed("2026-06-09", 100.0, "w1")
 
-    def test_elapsed_blocks_report_each_week_planned_against_actual(self):
-        """Without this a half-missed block reads exactly like a completed one, and the
+    def test_elapsed_mesocycles_report_each_week_planned_against_actual(self):
+        """Without this a half-missed mesocycle reads exactly like a completed one, and the
         next macrocycle ramps from a load the athlete never reached."""
-        self._half_missed_block()
+        self._half_missed_mesocycle()
 
         text = coach_service._build_prior_training_context([], "2026-07-20")
 
@@ -1096,10 +1096,10 @@ class TestPriorTrainingContext(unittest.TestCase):
         self.assertIn("week of 2026-06-08: planned 100, actual 100 (100%)", text)
         self.assertIn("week of 2026-06-15: planned 100, actual 0 (0%)", text)
 
-    def test_elapsed_blocks_show_what_the_plan_prescribed(self):
-        """Measured beside prescribed is what separates a mis-designed block from a
+    def test_elapsed_mesocycles_show_what_the_plan_prescribed(self):
+        """Measured beside prescribed is what separates a mis-designed mesocycle from a
         mis-executed one (DESIGN_intensity_distribution.md §9.2a)."""
-        self._half_missed_block()
+        self._half_missed_mesocycle()
 
         text = coach_service._build_prior_training_context([], "2026-07-20")
 
@@ -1127,10 +1127,10 @@ class TestPriorTrainingContext(unittest.TestCase):
             test_db.get_macrocycle(early), test_db.get_macrocycle(late)
         )
 
-    def test_blocks_are_ordered_by_when_they_were_trained(self):
+    def test_mesocycles_are_ordered_by_when_they_were_trained(self):
         """The caller's argument order is not chronological — the plan being replaced can
-        be for a later goal than the governing one — and each block's delta baseline is
-        the block before it in the flattened list (§6.1)."""
+        be for a later goal than the governing one — and each mesocycle's delta baseline is
+        the mesocycle before it in the flattened list (§6.1)."""
         early, late = self._two_plans()
 
         text = coach_service._build_prior_training_context([late, early], "2026-07-20")

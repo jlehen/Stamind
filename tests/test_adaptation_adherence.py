@@ -159,7 +159,7 @@ class TestAdaptationAdherence(unittest.TestCase):
 
     def test_analyze_adherence_coverage_gates_unplanned(self):
         """An activity with no planned workout is an 'Unplanned Activity!' deviation only
-        when its date falls inside a planned block; outside all coverage it is softened
+        when its date falls inside a planned mesocycle; outside all coverage it is softened
         to an informational note instead."""
         completed = [{
             "date": "2026-06-04",
@@ -171,7 +171,7 @@ class TestAdaptationAdherence(unittest.TestCase):
             "tss": 27.0,
         }]
 
-        # Covered: 2026-06-04 sits inside the planned block -> deviation.
+        # Covered: 2026-06-04 sits inside the planned mesocycle -> deviation.
         disc, _, info = analyze_adherence(
             planned_workouts=[],
             completed_activities=completed,
@@ -184,7 +184,7 @@ class TestAdaptationAdherence(unittest.TestCase):
                             d.completed["activity_name"] == "Extra Run" for d in disc))
         self.assertEqual(info, [])
 
-        # Uncovered: the block starts after the activity -> informational, not a deviation.
+        # Uncovered: the mesocycle starts after the activity -> informational, not a deviation.
         disc, _, info = analyze_adherence(
             planned_workouts=[],
             completed_activities=completed,
@@ -432,7 +432,7 @@ class TestPendingSessions(unittest.TestCase):
     """A planned session on a day that is not over yet is PENDING, not missed.
 
     `workout adapt` runs in the morning, so the evaluation date's own sessions are
-    still ahead of the athlete. Reporting them as misses told the coach work had been
+    still ahead of the athlete. Reporting them as misses told the week planner work had been
     skipped and invited it to reschedule sessions nobody had skipped — that is how a
     benchmark ended up scheduled twice. Withdrawing a session is `workout remove`;
     saying it won't happen is the adapt note.

@@ -154,7 +154,7 @@ class MorningPushTest(unittest.TestCase):
         self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
 
     def test_a_planned_rest_day_gets_no_buttons(self):
-        """The coach writes rest as a session row, graded rest_ok rather than done; "Can't
+        """The week planner writes rest as a session row, graded rest_ok rather than done; "Can't
         today" would offer to move it."""
         save_workout(test_db, today_str(), "rest", "Rest day")
         code, out, _ = run_cli(["bot", "morning"])
@@ -351,7 +351,7 @@ class RouteCommandTest(unittest.TestCase):
 
     def test_router_model_role_pins_the_client(self):
         from trainmate.openrouter import openrouter_client
-        # The router picks from the same menu the coach does — one allowlist
+        # The router picks from the same menu the coach model does — one allowlist
         # (DESIGN_settings.md §4), so the cheap model is listed under `llm.models` too.
         with patch.dict(
             config.data,
@@ -583,16 +583,16 @@ class GoalsViewTest(unittest.TestCase):
         self.assertNotIn("[ARCHIVED]", out)
 
 
-class BlockViewTest(unittest.TestCase):
-    """`bot block` — §11.2: one block as its stanza plus the whole focus, and a stale
+class MesocycleViewTest(unittest.TestCase):
+    """`bot mesocycle` — §11.2: one mesocycle as its stanza plus the whole focus, and a stale
     tap after a replan lands softly."""
 
     def setUp(self):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
 
-    def _block(self):
-        """A goal 45 days out, one block from last week to the goal; returns its id."""
+    def _mesocycle(self):
+        """A goal 45 days out, one mesocycle from last week to the goal; returns its id."""
         from datetime import date, timedelta
         today = date.fromisoformat(today_str())
         out = lambda days: (today + timedelta(days=days)).isoformat()  # noqa: E731
@@ -610,16 +610,16 @@ class BlockViewTest(unittest.TestCase):
         return test_db.get_mesocycles_for_macrocycle(macro["id"])[0]["id"]
 
     def test_renders_the_stanza_and_the_whole_focus(self):
-        mid = self._block()
-        code, out, _ = run_cli(["bot", "block", str(mid)])
+        mid = self._mesocycle()
+        code, out, _ = run_cli(["bot", "mesocycle", str(mid)])
         self.assertEqual(code, 0)
         self.assertIn("📍 Base", out)
         self.assertIn("you're in week 2 of 8", out)
         self.assertIn("Long runs grow weekly.", out)  # past the first sentence
         self.assertNotIn("Mesocycle ID", out)
 
-    def test_an_unknown_block_lands_softly(self):
-        code, out, _ = run_cli(["bot", "block", "999"])
+    def test_an_unknown_mesocycle_lands_softly(self):
+        code, out, _ = run_cli(["bot", "mesocycle", "999"])
         self.assertEqual(code, 0)
         self.assertIn("isn't on your plan any more", out)
 
@@ -658,7 +658,7 @@ class CaptureNoteTest(_CaptureCase):
         )
         # The coach is an offer, not a toll: nothing here ran an adaptation.
         self.assertIn(BUTTONS_SENTINEL, out)
-        self.assertIn("Adjust the plan around it", out)
+        self.assertIn("Adjust my week around it", out)
         self.assertIn("workout adapt", out)
 
     def test_a_confirmed_signal_gets_the_offer_too(self):
@@ -669,7 +669,7 @@ class CaptureNoteTest(_CaptureCase):
         ]})
         self.assertEqual(code, 0)
         self.assertTrue(test_db.get_daily_signals(today_str(), today_str()))
-        self.assertIn("Adjust the plan around it", out)
+        self.assertIn("Adjust my week around it", out)
 
     def test_nothing_found_offers_the_message_as_written(self):
         code, out, _ = self._run({"new_constraints": [], "new_signals": []})
@@ -996,7 +996,7 @@ class CompanionSurfaceRoutingTest(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def _goal_with_plan(self):
-        """A goal 45 days out, with one block running from last week to the goal."""
+        """A goal 45 days out, with one mesocycle running from last week to the goal."""
         from datetime import date, timedelta
         today = date.fromisoformat(today_str())
         out = lambda days: (today + timedelta(days=days)).isoformat()  # noqa: E731
@@ -1030,13 +1030,13 @@ class CompanionSurfaceRoutingTest(unittest.TestCase):
         self.assertNotIn("MACROCYCLE STRATEGY", out)
         self.assertNotIn("Macrocycle ID", out)
 
-    def test_plan_show_offers_the_door_to_a_block(self):
-        """The road names the blocks; the button is how she reads one in full (§11.2)."""
+    def test_plan_show_offers_the_door_to_a_mesocycle(self):
+        """The road names the mesocycles; the button is how she reads one in full (§11.2)."""
         self._goal_with_plan()
         code, out, _ = run_cli(["plan", "show"])
         self.assertEqual(code, 0)
         self.assertIn(BUTTONS_SENTINEL, out)
-        self.assertIn("bot block ", out)
+        self.assertIn("bot mesocycle ", out)
 
     def test_plan_show_without_a_goal_invites_instead_of_naming_a_command(self):
         """The athlete cannot run `plan generate`, so the empty state must not name it

@@ -89,7 +89,7 @@ class TestNoNetEnclosesAPrompt(unittest.TestCase):
     inherit BaseException.
     """
 
-    def test_no_except_exception_block_wraps_a_prompt_call(self):
+    def test_no_except_exception_clause_wraps_a_prompt_call(self):
         offenders = []
         for root, _, files in os.walk(os.path.join(REPO, "trainmate")):
             for name in sorted(files):

@@ -25,7 +25,7 @@ from typing import Literal
 #
 # `revision_id` stands in for the whole lineage the event now renders as its
 # history: a lineage only changes by gaining a revision, so the live revision's
-# id moves exactly when the history block does (DESIGN_calendar_lineage.md §6).
+# id moves exactly when the `History` section does (DESIGN_calendar_lineage.md §6).
 CALENDAR_FIELDS = (
     "revision_id", "date", "sport_type", "title", "description",
     "original_description", "modification_reason", "duration_minutes", "tss",

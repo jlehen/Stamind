@@ -9,7 +9,7 @@ on the **existing Google Calendar** as tagged all-day events; TrainMate reads
 them, persists them locally, and feeds them to the coach.
 
 Implemented on this branch (schema, `db/signals.py`, calendar `sync_signals`,
-the `garmin` bridge, and the coach analysis wiring). This doc is the spec; see
+the `garmin` bridge, and the analysis call's wiring). This doc is the spec; see
 ARCHITECTURE.md §13 for the as-built summary.
 
 ---
@@ -219,7 +219,7 @@ natively:
      incremental. Unlike Garmin (one API call *per day*, so it needs a horizon),
      Calendar `list` is bulk + paginated + server-side filtered, and tagged
      events are at most one-per-day-per-metric — so pulling everything is a
-     couple of cheap calls. Old events the coach's window doesn't cover just sit
+     couple of cheap calls. Old events the analysis window doesn't cover just sit
      harmlessly in the DB.
 3. For each returned event:
    - `status == "cancelled"` → `delete_daily_signal_by_event(event_id)`; it
@@ -240,7 +240,7 @@ when the last signal sync is younger than `config.data_refresh_minutes` (the
 same "how fresh is fresh enough" window the Garmin metric refresh uses).
 `data pull` and `--force-pull` bypass both gates. The whole thing is best-effort:
 no configured calendar is a silent no-op and every Calendar error is swallowed
-with a warning, so a read never blocks on Google being down.
+with a warning, so a read never waits on Google being down.
 
 ### 6.1 Sync-state storage
 
@@ -291,7 +291,7 @@ so the first morning in range needs the *preceding* day's signal to be explicabl
 prompt is hashed into the **evidence fingerprint**
 (`_get_evidence_fingerprint`, `coach/engine/prompt.py`), so a changed, added or
 deleted signal invalidates the cached reconstruction. That is two things, not one:
-the window-scoped `daily_signals` rows, *and* the `signal_days` block below —
+the window-scoped `daily_signals` rows, *and* the `signal_days` section below —
 which deliberately reads the athlete's full history, not `[from, until]`, and so
 is hashed **as computed** rather than via its inputs. Hashing only the
 window-scoped rows would have left a signal edited outside the window changing the

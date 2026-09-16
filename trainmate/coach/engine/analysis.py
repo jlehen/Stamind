@@ -92,12 +92,12 @@ class AnalysisLogicMixin:
             "\n"
         )
 
-        # Gate this reading guide on the same signal_days that gates the DATA block below,
+        # Gate this reading guide on the same signal_days that gates the DATA section below,
         # so the guide never describes a section the model wasn't given.
         if signal_days:
             custom_task += (
                 "### READING 'signal_days' (quantitative signal impact, full history)\n"
-                "- A separate block, per external signal category (e.g. alcohol), of aligned\n"
+                "- A separate list, per external signal category (e.g. alcohol), of aligned\n"
                 "  EPISODES. An episode is a run of one or more signal-days; each has a 'days'\n"
                 "  dose sequence ({date, value, load_tss} — the signal magnitude and that day's\n"
                 "  training load) and a 'surrounding_mornings' strip bracketing it: k mornings\n"
@@ -135,7 +135,7 @@ class AnalysisLogicMixin:
                '      "name": "Phase Name (e.g. Base Building, Build, Recovery, etc.)",\n'
                '      "start_date": "YYYY-MM-DD",\n'
                '      "end_date": "YYYY-MM-DD",\n'
-               '      "focus_detected": "Key detected focus of this block",\n'
+               '      "focus_detected": "Key detected focus of this mesocycle",\n'
                '      "average_weekly_tss": 380.0,\n'
                '      "estimated_consistency": "High" | "Moderate" | "Low"\n'
                "    }\n"

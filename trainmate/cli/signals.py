@@ -188,7 +188,7 @@ def add_signal_parser(subparsers):
         "--value", type=float, metavar="N",
         help="Optional free numeric magnitude (severity, °C, count — uninterpreted)"
     )
-    # No -m/-M here: a signal is written over days, and a block is not a day the athlete
+    # No -m/-M here: a signal is written over days, and a mesocycle is not a day the athlete
     # can hand to the calendar. -d must stay bounded for the same reason.
     add_selector_args(sig_add, direction="none", default="today")
 

@@ -17,7 +17,7 @@ def default_wrap_width() -> int:
     """The column width text wrapping targets, default 80.
 
     Overridable via the TRAINMATE_WRAP_WIDTH env var so a narrow client (e.g. the
-    Telegram bot rendering into a phone-width monospace block) can ask the CLI to
+    Telegram bot rendering into a phone-width monospace message) can ask the CLI to
     wrap tighter and avoid the client double-wrapping 80-col lines. Floored at 20."""
     raw = os.environ.get("TRAINMATE_WRAP_WIDTH")
     if not raw:
@@ -243,7 +243,7 @@ def color_load_ratio(ratio: float) -> str:
 
     > 1.5 red (excessive relative spike), 1.3-1.5 yellow (caution). Everything at or
     below 1.3 stays uncolored: a *low* ratio is phase-dependent, not a fault — an
-    intensity or realization block drives it to ~0.7 by design, and coloring that as
+    intensity or realization mesocycle drives it to ~0.7 by design, and coloring that as
     "under-training" is what made the old ACWR band fight block periodization. Bands are
     half-open so no value is double-claimed."""
     s = f"{ratio:.2f}"
@@ -257,7 +257,7 @@ def color_load_ratio(ratio: float) -> str:
 # The printed CTL | ATL | TSB triple won't subtract to the shown TSB, because TSB is
 # CTL(yesterday) - ATL(yesterday) (training_load.md §1) while CTL/ATL are today's. This
 # lag is correct (matching TrainingPeaks) but reads as an arithmetic error, so this
-# one-line footnote rides wherever TSB is surfaced (per-day prompt block, coach summary,
+# one-line footnote rides wherever TSB is surfaced (per-day prompt lines, coach summary,
 # tm status). Lives here — not in coach.formatting — because both the CLI and the coach
 # layer render it.
 PMC_TSB_LAG_NOTE = (
@@ -408,7 +408,7 @@ def is_narrow_client() -> bool:
     """True when the CLI is driven by a narrow front-end (e.g. the Telegram bot)
     that asked for a tight wrap width via TRAINMATE_WRAP_WIDTH.
 
-    Wide columnar tables wrap unreadably in a phone-width monospace block, so on a
+    Wide columnar tables wrap unreadably in a phone-width monospace message, so on a
     narrow client we collapse them to a vertical record layout instead. A real
     terminal (default width 80) stays False and keeps the familiar table. The 70
     threshold matches the CLI's argparse help formatter."""
@@ -480,13 +480,13 @@ def render_table(
 
     if narrow:
         label_w = max((visible_len(h) for h in headers[1:]), default=0)
-        blocks = []
+        cards = []
         for row in rows:
             lines = [str(row[0])]
             for header, cell in zip(headers[1:], row[1:]):
                 lines.append(f"  {pad_visible(header, label_w)}  {cell}")
-            blocks.append("\n".join(lines))
-        return "\n\n".join(blocks)
+            cards.append("\n".join(lines))
+        return "\n\n".join(cards)
 
     widths = [_column_width(headers, rows, i) for i in range(len(headers))]
 
@@ -524,7 +524,7 @@ def keep_whole(text: str) -> str:
     above cannot recognise (§3.6).
 
     Only for text that reaches the screen through `wrap_text`, which is what clears the
-    marks: `notice`, `warn`, `fail` and the labelled blocks do, a plain `print` does
+    marks: `notice`, `warn`, `fail` and `format_labeled_paragraph` do, a plain `print` does
     not. `cmd(…, quote=False)` inside one of those is the whole use."""
     return text.replace(' ', _KEEP)
 
@@ -611,7 +611,7 @@ def format_labeled_text(
     return f"{label}{indented_text}"
 
 
-def format_labeled_block(
+def format_labeled_paragraph(
     label: str, text: str, width: Optional[int] = None, color_fn=None
 ) -> str:
     """Wraps text on a new line, indented 2 spaces deeper than the label."""
@@ -621,13 +621,13 @@ def format_labeled_block(
         return f"{label}"
     match = re.match(r'^(\s*)', label)
     leading_spaces = match.group(1) if match else ""
-    block_indent = leading_spaces + "  "
+    paragraph_indent = leading_spaces + "  "
     
-    wrapped_width = max(20, width - len(block_indent))
+    wrapped_width = max(20, width - len(paragraph_indent))
     wrapped_text = wrap_text(text, width=wrapped_width)
     if color_fn:
         wrapped_text = color_fn(wrapped_text)
     
-    indented_text = block_indent + wrapped_text.replace('\n', '\n' + block_indent)
+    indented_text = paragraph_indent + wrapped_text.replace('\n', '\n' + paragraph_indent)
     return f"{label}\n{indented_text}"
 

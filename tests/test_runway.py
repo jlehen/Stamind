@@ -35,7 +35,7 @@ from trainmate.cli.render import SPORT_EMOJI, SIMPLE_PASSED_LINE  # noqa: E402
 from trainmate.cli.runway import RUNWAY_BUTTON_LABEL  # noqa: E402
 from trainmate.prompt import BUTTONS_SENTINEL  # noqa: E402
 from trainmate.progression import (  # noqa: E402
-    RUNWAY_BLOCK, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_PLAN_END_NO_GOAL, RUNWAY_SPAN,
+    RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_PLAN_END_NO_GOAL, RUNWAY_SPAN,
 )
 from trainmate.util import today_str  # noqa: E402
 
@@ -67,7 +67,7 @@ def _w(offset: int, sport_type="running", source="generated", removed=False):
     }
 
 
-def _meso(start: int, end: int, meso_id: int = 1, name="Block"):
+def _meso(start: int, end: int, meso_id: int = 1, name="Mesocycle"):
     return {
         "id": meso_id, "name": name,
         "start_date": _d(start), "end_date": _d(end),
@@ -90,7 +90,7 @@ class RunwayDetectorTest(unittest.TestCase):
         state = self._run([_w(20)], [_meso(-30, 60)])
         self.assertIsNone(state)
 
-    def test_span_cliff_when_the_schedule_stops_mid_block(self):
+    def test_span_cliff_when_the_schedule_stops_mid_mesocycle(self):
         state = self._run([_w(4)], [_meso(-30, 45)])
         self.assertEqual(state["kind"], RUNWAY_SPAN)
         self.assertEqual(state["days_left"], 4)
@@ -98,18 +98,18 @@ class RunwayDetectorTest(unittest.TestCase):
         self.assertEqual(state["plan_end"], _d(45))
         self.assertNotIn("next_mesocycle", state)
 
-    def test_block_cliff_when_the_schedule_stops_on_a_block_boundary(self):
-        blocks = [_meso(-30, 4, meso_id=6, name="Base"),
+    def test_mesocycle_cliff_when_the_schedule_stops_on_a_mesocycle_boundary(self):
+        mesocycles = [_meso(-30, 4, meso_id=6, name="Base"),
                   _meso(5, 45, meso_id=7, name="Build")]
-        state = self._run([_w(4)], blocks)
-        self.assertEqual(state["kind"], RUNWAY_BLOCK)
+        state = self._run([_w(4)], mesocycles)
+        self.assertEqual(state["kind"], RUNWAY_MESOCYCLE)
         self.assertEqual(state["next_mesocycle"]["id"], 7)
 
-    def test_a_block_boundary_with_no_block_after_it_is_a_span_cliff(self):
+    def test_a_mesocycle_boundary_with_no_mesocycle_after_it_is_a_span_cliff(self):
         """A gap inside the plan, not the boundary the athlete should re-plan against:
-        with no block starting after it there is no `-m ..<id>` to name."""
-        blocks = [_meso(-30, 4, meso_id=6), _meso(-60, 45, meso_id=7)]
-        state = self._run([_w(4)], blocks)
+        with no mesocycle starting after it there is no `-m ..<id>` to name."""
+        mesocycles = [_meso(-30, 4, meso_id=6), _meso(-60, 45, meso_id=7)]
+        state = self._run([_w(4)], mesocycles)
         self.assertEqual(state["kind"], RUNWAY_SPAN)
 
     def test_plan_cliff_with_no_goal_beyond_it(self):
@@ -161,9 +161,9 @@ class RunwayDetectorTest(unittest.TestCase):
         self.assertEqual(state["days_left"], -20)
 
     def test_a_finished_plan_speaks_for_one_window_then_goes_quiet(self):
-        blocks = [_meso(-60, -3)]
+        mesocycles = [_meso(-60, -3)]
         self.assertEqual(
-            self._run([_w(-3)], blocks, objectives=[_goal(-3)])["kind"],
+            self._run([_w(-3)], mesocycles, objectives=[_goal(-3)])["kind"],
             RUNWAY_PLAN_END_NO_GOAL,
         )
         self.assertIsNone(self._run([_w(-8)], [_meso(-60, -8)], objectives=[_goal(-8)]))
@@ -200,14 +200,14 @@ class RunwayWordingTest(unittest.TestCase):
             for line in runway_cli.runway_hint_lines(state, today)
         ]
 
-    def test_block_cliff_names_the_next_block_by_id(self):
+    def test_mesocycle_cliff_names_the_next_mesocycle_by_id(self):
         state = progression.runway(
             [_w(4)],
             [_meso(-30, 4, meso_id=6), _meso(5, 45, meso_id=7)],
             [], TODAY, WARN,
         )
         first, second = self._lines(state)
-        self.assertIn("This block ends in 4 day(s), on 2026-09-04 Fri", first)
+        self.assertIn("This mesocycle ends in 4 day(s), on 2026-09-04 Fri", first)
         self.assertIn("the next one has no fresh sessions", first)
         self.assertIn("workout generate -m ..7", second)
 
@@ -260,14 +260,14 @@ class SimpleRunwayWordingTest(unittest.TestCase):
         self.assertIn("that's the goal you've been training toward", line)
         self.assertIn("happens from the computer", line)
 
-    def test_only_span_and_block_cliffs_earn_a_button(self):
+    def test_only_span_and_mesocycle_cliffs_earn_a_button(self):
         span = progression.runway([_w(4)], [_meso(-30, 45)], [], TODAY, WARN)
-        block = progression.runway(
+        mesocycle = progression.runway(
             [_w(4)], [_meso(-30, 4, meso_id=6), _meso(5, 45, meso_id=7)], [], TODAY, WARN
         )
         plan = progression.runway([_w(5)], [_meso(-30, 5)], [], TODAY, WARN)
         self.assertEqual(runway_cli.runway_argv(span), "workout generate")
-        self.assertEqual(runway_cli.runway_argv(block), "workout generate -m ..7")
+        self.assertEqual(runway_cli.runway_argv(mesocycle), "workout generate -m ..7")
         self.assertIsNone(runway_cli.runway_argv(plan))
         self.assertEqual(runway_cli.runway_buttons(plan), [])
         self.assertIsNone(runway_cli.runway_argv(None))
@@ -278,11 +278,11 @@ class RunwayHintIsNotReDerivedTest(unittest.TestCase):
     `workout adapt` alone, which is how `status` came to answer differently on the same
     morning — so nothing outside `cli/runway.py` may build the wording again.
 
-    `-m ..<id>` is the runway hint's own spelling: the block's whole span, not the
+    `-m ..<id>` is the runway hint's own spelling: the mesocycle's whole span, not the
     `-m <id>` a constraint hint names. Keyed on a directory glob rather than a list of
     files, so a CLI module written tomorrow is covered tomorrow."""
 
-    def test_only_the_runway_module_builds_the_next_block_command(self):
+    def test_only_the_runway_module_builds_the_next_mesocycle_command(self):
         cli_dir = Path(runway_cli.__file__).parent
         offenders = [
             path.relative_to(cli_dir.parent).as_posix()
@@ -310,8 +310,8 @@ class RunwaySurfaceTest(unittest.TestCase):
         garmin.start()
         self.addCleanup(garmin.stop)
 
-    def _plan(self, blocks, goal_offset=45, title="Zurich Marathon"):
-        """A goal with a periodization whose blocks are `(start offset, end offset)`."""
+    def _plan(self, mesocycles, goal_offset=45, title="Zurich Marathon"):
+        """A goal with a periodization whose mesocycles are `(start offset, end offset)`."""
         obj_id = test_db.add_objective(
             title=title, target_date=_out(goal_offset), sport_type="running",
         )
@@ -319,9 +319,9 @@ class RunwaySurfaceTest(unittest.TestCase):
             objective_id=obj_id, strategy="Build then sharpen.",
             goals_hash="g", constraints_hash="c",
             mesocycles=[
-                {"name": f"Block {i}", "start_date": _out(s), "end_date": _out(e),
+                {"name": f"Mesocycle {i}", "start_date": _out(s), "end_date": _out(e),
                  "focus": "Endurance"}
-                for i, (s, e) in enumerate(blocks, start=1)
+                for i, (s, e) in enumerate(mesocycles, start=1)
             ],
         )
         return obj_id
@@ -356,7 +356,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         self.assertIn("goal add", flat)
 
     def test_adapt_refuses_over_a_plan_wholly_behind_today(self):
-        """It used to adapt against `get_active_mesocycle`'s absolute-first-block fallback
+        """It used to adapt against `get_active_mesocycle`'s absolute-first-mesocycle fallback
         and close with an all-clear over an empty calendar (§4)."""
         self._plan([(-60, -2)], goal_offset=-2)
         self._sessions(-2)
@@ -440,7 +440,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         the ones already on record (DESIGN_cli_selectors.md §8)."""
         self._plan([(-30, 3), (4, 45)])
         self._sessions(0, 3)
-        self.assertEqual(runway_cli.current_runway()["kind"], RUNWAY_BLOCK)
+        self.assertEqual(runway_cli.current_runway()["kind"], RUNWAY_MESOCYCLE)
         span = generate_cli._resolve_span(argparse.Namespace())
         self.assertEqual(span[0], _out(4))
 
@@ -463,7 +463,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         self.assertIn(RUNWAY_BUTTON_LABEL.split(" ", 1)[1], out)
         self.assertIn("workout generate", out)
 
-    def test_the_week_view_button_carries_the_block_flagged_command(self):
+    def test_the_week_view_button_carries_the_mesocycle_flagged_command(self):
         self._plan([(-30, 2), (3, 45)])
         self._sessions(0, 2)
         with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
@@ -523,16 +523,16 @@ class MorningPushRunwayTest(unittest.TestCase):
         garmin.start()
         self.addCleanup(garmin.stop)
 
-    def _plan(self, blocks, goal_offset=45):
+    def _plan(self, mesocycles, goal_offset=45):
         obj_id = test_db.add_objective(
             title="Zurich Marathon", target_date=_out(goal_offset), sport_type="running",
         )
         test_db.save_macrocycle(
             objective_id=obj_id, strategy="Build.", goals_hash="g", constraints_hash="c",
             mesocycles=[
-                {"name": f"Block {i}", "start_date": _out(s), "end_date": _out(e),
+                {"name": f"Mesocycle {i}", "start_date": _out(s), "end_date": _out(e),
                  "focus": "Endurance"}
-                for i, (s, e) in enumerate(blocks, start=1)
+                for i, (s, e) in enumerate(mesocycles, start=1)
             ],
         )
 
@@ -552,7 +552,7 @@ class MorningPushRunwayTest(unittest.TestCase):
         self.assertIn(RUNWAY_BUTTON_LABEL.split(" ", 1)[1], out)
         self.assertIn("workout generate", out)
 
-    def test_a_block_cliff_sends_the_block_flagged_command(self):
+    def test_a_mesocycle_cliff_sends_the_mesocycle_flagged_command(self):
         self._plan([(-30, 3), (4, 45)])
         self._sessions(0, 3)
         code, out, _ = run_cli(["bot", "morning"])
@@ -605,7 +605,7 @@ class MorningPushRunwayTest(unittest.TestCase):
         coach.workout_adapt.assert_not_called()
 
     def test_a_healthy_schedule_keeps_its_ordinary_rest_day(self):
-        """An empty day inside a schedule that runs on is a rest day the coach chose."""
+        """An empty day inside a schedule that runs on is a rest day the week planner chose."""
         self._plan([(-30, 45)])
         self._sessions(20)
         code, out, _ = run_cli(["bot", "morning"])
@@ -631,8 +631,8 @@ class CoverageInvariantTest(unittest.TestCase):
                 objectives=[], constraints=[], today_str=TODAY, start_str=TODAY,
                 guidelines="", profile="", strategy="", meso_text="", learnings="",
                 num_days=7, metrics=[], completed_activities=[], baseline=None,
-                pmc_warmup_cutoff=None, pmc_context="", block_progress=None,
-                block_has_intensity=False, zone_currencies={}, anchor_history="",
+                pmc_warmup_cutoff=None, pmc_context="", mesocycle_progress=None,
+                mesocycle_has_intensity=False, zone_currencies={}, anchor_history="",
                 standing_workouts=[],
             )
             system_prompt = client.complete.call_args[0][0]
@@ -686,7 +686,7 @@ class SimpleGeneratePreviewTest(unittest.TestCase):
         )
         with patch("trainmate.coach.engine.openrouter_client") as client:
             client.complete.return_value = {
-                "reasoning": "A steady week to open the block.",
+                "reasoning": "A steady week to open the mesocycle.",
                 "workouts": [
                     {"date": _out(0), "sport_type": "running", "title": "Easy run",
                      "description": "Conversational.", "duration_minutes": 40},
@@ -701,7 +701,7 @@ class SimpleGeneratePreviewTest(unittest.TestCase):
             )
         self.assertEqual(code, 0)
         self.assertNotIn("WORKOUTS PROPOSED BY COACH", out)
-        self.assertIn("A steady week to open the block.", out)
+        self.assertIn("A steady week to open the mesocycle.", out)
         self.assertIn("🏃", out)
         # Rest reads as intended rest, not as a generic session (§6).
         self.assertIn(SPORT_EMOJI["rest"], out)

@@ -38,7 +38,7 @@ Generate a training schedule for the next 53 days ...
 
 BENCHMARK PLACEMENT (fitness tests — see the BENCHMARK guidelines above):
 ...
-CONTINUING A BLOCK ALREADY UNDER WAY:
+CONTINUING A MESOCYCLE ALREADY UNDER WAY:
 ...
 ```
 
@@ -55,9 +55,9 @@ Three problems, in increasing order of how much they cost:
 3. **Three conventions for the same job.** The system prompt announced sections in
    `ALL CAPS:`, the user content in `Title Case:` (`Athlete's Metrics History (Past 15
    Days):`, `Baseline Reference:`) — except for three that were caps
-   (`ATHLETE'S NOTE FOR THIS ADAPTATION`, `BLOCK PROGRESS SO FAR`) — and the science
+   (`ATHLETE'S NOTE FOR THIS ADAPTATION`, `MESOCYCLE PROGRESS SO FAR`) — and the science
    documents in whatever markdown their author happened to use. Meanwhile task text refers
-   to sections *by name* ("the section titled `BLOCK PROGRESS SO FAR`", "see `PROTECTING A
+   to sections *by name* ("the section titled `MESOCYCLE PROGRESS SO FAR`", "see `PROTECTING A
    BENCHMARK`"), so those names are load-bearing and their shape should be predictable.
 
 ## 2. The scheme
@@ -78,8 +78,8 @@ Three rules go with them:
   the identity.
 - **No trailing colon.** The marker already announces a heading. `## TASK:` says it twice.
 - **Both messages use the same scheme.** The user content is not a lesser document — it
-  holds the athlete's note, the block progress, the planned workouts. `## BLOCK PROGRESS SO
-  FAR` in the user message and "`the section titled "BLOCK PROGRESS SO FAR"`" in the system
+  holds the athlete's note, the mesocycle progress, the planned workouts. `## MESOCYCLE PROGRESS SO
+  FAR` in the user message and "`the section titled "MESOCYCLE PROGRESS SO FAR"`" in the system
   message now agree on more than the words.
 
 A parenthetical gloss may ride on the heading line where it says what the section *is*
@@ -132,7 +132,7 @@ banner, the `=` rule is taken, and the lighter marker keeps the nesting visible.
 
 `formatting._load_science_guidelines` emits the banners itself rather than returning bare
 text for each caller to wrap. Three call sites used to hand-write the same banner literal
-around it; now the block that must not be misread carries its own frame, and a directory
+around it; now the section that must not be misread carries its own frame, and a directory
 with no documents produces no banner at all instead of an empty one.
 
 **Open question — precedence.** Splitting the banners tells the coach *whose* material each
@@ -149,8 +149,8 @@ is. So the conditional sections are `###`:
 | command | `### sub-sections of TASK` |
 | --- | --- |
 | `plan generate` | `ATHLETE FEEDBACK ON THE PREVIOUS PLAN`, `CONTINUITY WITH THE PREVIOUS PLAN` |
-| `workout generate` | `BENCHMARK PLACEMENT`, `CONTINUING A BLOCK ALREADY UNDER WAY`, `JUDGING THE BLOCK'S COMPOSITION`, `PRESCRIBING INTENSITY` |
-| `workout adapt` | `STANDING RULES`, `WHAT YOU MAY NOT TOUCH`, `ATTRIBUTING A DEPRESSED MORNING`, `DO NOT COMPOUND A PRIOR ADAPTATION`, `PROTECTING A BENCHMARK`, `CORRECTING EXECUTION DRIFT`, `PRESCRIBING INTENSITY`, `THIS BLOCK IS ENDING`, `ATHLETE'S NOTE FOR TODAY`, `EXTRACTING A DURABLE CONSTRAINT FROM THE NOTE`, `DURABLE OBSERVATIONS ARE READ-ONLY HERE` |
+| `workout generate` | `BENCHMARK PLACEMENT`, `CONTINUING A MESOCYCLE ALREADY UNDER WAY`, `JUDGING THE MESOCYCLE'S COMPOSITION`, `PRESCRIBING INTENSITY` |
+| `workout adapt` | `STANDING RULES`, `WHAT YOU MAY NOT TOUCH`, `ATTRIBUTING A DEPRESSED MORNING`, `DO NOT COMPOUND A PRIOR ADAPTATION`, `PROTECTING A BENCHMARK`, `CORRECTING EXECUTION DRIFT`, `PRESCRIBING INTENSITY`, `THIS MESOCYCLE IS ENDING`, `ATHLETE'S NOTE FOR TODAY`, `EXTRACTING A DURABLE CONSTRAINT FROM THE NOTE`, `DURABLE OBSERVATIONS ARE READ-ONLY HERE` |
 | `data analyze` | `READING THE PER-WEEK CONTEXT FIELDS`, `READING 'signal_days'` |
 
 Two sections gained a heading they never had, because a `###` scheme has no place for an

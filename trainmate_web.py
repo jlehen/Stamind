@@ -504,7 +504,7 @@ def get_zones() -> Any:
 @app.route("/api/plan", methods=["GET"])
 def get_plan() -> Any:
     """The active periodization plan for a goal (mirrors `plan show`): the governing
-    macrocycle plus its mesocycle blocks. `?goal_id=` defaults to the next active goal."""
+    macrocycle plus its mesocycles. `?goal_id=` defaults to the next active goal."""
     goal_id = _resolve_goal_id(request.args.get("goal_id"))
     if goal_id is None:
         return jsonify({"goal": None, "macrocycle": None, "mesocycles": []})

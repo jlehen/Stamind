@@ -441,7 +441,7 @@ class TestWeekSummary(unittest.TestCase):
 
     def test_week_inside_warmup_is_all_none(self):
         # A week entirely inside the warm-up window emits all None — otherwise every
-        # bootstrap narrates a phantom overreach block from seeding artifacts.
+        # bootstrap narrates a phantom overreach mesocycle from seeding artifacts.
         self.assertEqual(
             self.summary(self.week, self.ctl_by_date, "2026-04-01"),
             (None, None, None),

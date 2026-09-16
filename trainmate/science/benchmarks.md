@@ -2,7 +2,7 @@ BENCHMARK (FITNESS TEST) GUIDELINES
 ===================================
 
 AUTHORITY: MEASUREMENT. This file defines what a threshold anchor is, when a
-test result can be trusted, and when a measured difference is real. Which blocks
+test result can be trusted, and when a measured difference is real. Which mesocycles
 need which anchors is a plan document's decision — except for the rules marked
 FLOOR, which are properties of the measurement and never yield.
 
@@ -17,24 +17,24 @@ sport-generic:
 1. WHEN TO RE-BENCHMARK
 -----------------------
 The default is NOT to test. Re-anchor on EVIDENCE that the anchor is stale,
-never on the calendar or on a position in the block structure. A test costs a
+never on the calendar or on a position in the mesocycle structure. A test costs a
 quality session and a day of freshness. Run one when:
    - Sessions systematically decouple from their target zones — planned efforts
      consistently too easy or too hard, across several sessions rather than one
      bad day. This is the primary trigger: direct evidence the anchor is wrong.
-   - Returning from a detraining gap (illness, injury layoff, travel block),
+   - Returning from a detraining gap (illness, injury layoff, a long trip),
      where the anchor is stale and probably too high.
-   - Entering a block whose targets DEPEND on that anchor, with nothing recent
-     establishing it. Not every transition qualifies — a block of all-out
+   - Entering a mesocycle whose targets DEPEND on that anchor, with nothing recent
+     establishing it. Not every transition qualifies — a mesocycle of all-out
      unpaced work needs no threshold anchor.
    - The anchor has never been measured. A seeded or self-reported value is a
      guess, not a measurement; the first real test is worth running early.
-Absent a trigger, do not test. A block boundary is not a trigger.
+Absent a trigger, do not test. A mesocycle boundary is not a trigger.
 
 MINIMUM INTERVAL — FLOOR: never test the same anchor twice within 4 weeks.
 Below that the difference is measurement noise, so the test buys no information
 and costs real fatigue. This holds however the plan is structured — short
-blocks do not get a test at every boundary.
+mesocycles do not get a test at every boundary.
 
 TYPICAL CADENCE: 8-12 weeks between tests of the same anchor — a handful per
 year. Testing every 4 weeks clears the floor and is still the classic error:
@@ -101,7 +101,7 @@ When a change is real, the new value becomes the single source of truth and
 every dependent zone and target recomputes from it.
 
 TREND, NOT POINTS. A rising anchor across tests confirms overload is working; a
-stalled or falling one across blocks signals plateau or under-recovery. One
+stalled or falling one across mesocycles signals plateau or under-recovery. One
 test is a point, not a trend — and only same-protocol values form a series.
 
 
@@ -110,4 +110,4 @@ test is a point, not a trend — and only same-protocol values form a series.
    - Prescribe from the anchor you have: old but uncontradicted beats fresh but
      compromised.
    - Never let a test displace the training it serves: if fitting it in means
-     cutting the block's key session, it is not due.
+     cutting the mesocycle's key session, it is not due.

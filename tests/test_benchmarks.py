@@ -467,7 +467,7 @@ class TestBenchmarkPlacementGuards(unittest.TestCase):
         self.assertEqual(out, "")
 
     def test_boundary_week_reaching_the_goal_week_is_not_checked(self):
-        """A goal-directed macrocycle's last block tapers into the event, so its boundary
+        """A goal-directed macrocycle's last mesocycle tapers into the event, so its boundary
         week is the goal's own: no test is asked for there (§4.1)."""
         obj_id = test_db.add_objective(
             title="Hill climb", target_date="2026-09-30",
@@ -483,8 +483,8 @@ class TestBenchmarkPlacementGuards(unittest.TestCase):
                  "end_date": "2026-09-30", "focus": "Peak"},
             ],
         )
-        # Only the Specific block's boundary (2026-09-20) should be asked about; the Taper
-        # block ends on race day itself.
+        # Only the Specific mesocycle's boundary (2026-09-20) should be asked about; the Taper
+        # mesocycle ends on race day itself.
         workouts = [{"date": d, "sport_type": "cycling", "title": "Z2"}
                     for d in ("2026-09-18", "2026-09-25", "2026-09-30")]
         _, out = self._capture(
@@ -496,14 +496,14 @@ class TestBenchmarkPlacementGuards(unittest.TestCase):
 
     def test_boundary_week_with_an_already_completed_benchmark_is_silent(self):
         """Regenerating mid-boundary-week must not advise regenerating to recover a test
-        the athlete has already done (DESIGN_block_progress.md §4.1)."""
+        the athlete has already done (DESIGN_mesocycle_progress.md §4.1)."""
         macro_id = self._macrocycle_with_boundary()
         save_workout(test_db,
             date="2026-08-25", sport_type="cycling", title="FTP Test",
             description="[FTP Test]\n20-min test", benchmark_type="ftp_20min",
             macrocycle_id=macro_id,
         )
-        # Regenerating on the 27th: the freshly generated span reaches the block's end (so
+        # Regenerating on the 27th: the freshly generated span reaches the mesocycle's end (so
         # the boundary week IS checked) but holds no benchmark, the test being two days
         # behind it.
         workouts = [
@@ -518,7 +518,8 @@ class TestBenchmarkPlacementGuards(unittest.TestCase):
 
     def test_a_displaced_future_benchmark_does_not_satisfy_the_boundary_week(self):
         """The stored-workout lookup is bounded below gen_start: the previous plan's future
-        rows are still live when this check runs and must not answer for the new plan."""
+        rows are still live when this check runs and must not answer for the sessions being
+        written."""
         macro_id = self._macrocycle_with_boundary()
         save_workout(test_db,
             date="2026-08-28", sport_type="cycling", title="FTP Test",

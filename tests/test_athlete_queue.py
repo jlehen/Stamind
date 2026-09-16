@@ -398,9 +398,9 @@ class TerminalTest(_QueueCase):
         self.assertIn("=== QUEUE ===", out)
         lines = out.split("\n")
         watch = next(i for i, line in enumerate(lines) if "Charge your watch" in line)
-        block = next(i for i, line in enumerate(lines) if "block 5: what was it?" in line)
-        self.assertLess(watch, block)
-        self.assertIn("hidden until 09:00", lines[block])
+        row = next(i for i, line in enumerate(lines) if "block 5: what was it?" in line)
+        self.assertLess(watch, row)
+        self.assertIn("hidden until 09:00", lines[row])
         self.assertIn("1 waiting, 1 hidden.", out)
 
     def test_a_walk_goes_through_the_items_with_the_chooser(self):

@@ -13,7 +13,7 @@ import sys
 from typing import Optional
 from trainmate import runtime
 from trainmate.util import (
-    aside, bold, dim, green, red, cyan, gray, cmd, format_labeled_block, fmt_date,
+    aside, bold, dim, green, red, cyan, gray, cmd, format_labeled_paragraph, fmt_date,
     fmt_span, today_str as _today_str, notice,
 )
 from trainmate.cli.selectors import (
@@ -39,8 +39,8 @@ def _resolve_dates(args: argparse.Namespace) -> tuple:
 
 
 def point_at_honor(constraint_id: int) -> None:
-    """Names the block a constraint lands in when it is past daily adapt's reach, and
-    says what would build it into the plan now (DESIGN_constraint_honoring.md §4).
+    """Names the mesocycle a constraint lands in when it is past daily adapt's reach, and
+    says what would build it into the schedule now (DESIGN_constraint_honoring.md §4).
 
     Reached through `runtime.render.constraint_honor_hint`, which draws nothing in
     companion chat: every route named below is operator work
@@ -61,21 +61,21 @@ def point_at_honor(constraint_id: int) -> None:
     if not active_meso or constraint['end_date'] <= active_meso['end_date']:
         return
 
-    # The days out of reach are the ones past the current block, so it is the block
+    # The days out of reach are the ones past the current mesocycle, so it is the mesocycle
     # holding the constraint's END that names them. Asked of its START instead, a
-    # constraint straddling the boundary names the current block — the one adapt reaches
-    # today. The strict reader: a block that does not contain the date is not the answer.
+    # constraint straddling the boundary names the current mesocycle — the one adapt reaches
+    # today. The strict reader: a mesocycle that does not contain the date is not the answer.
     landing = runtime.db.get_covering_mesocycle(constraint['end_date'])
     if not landing:
         _report_past_plan_end(constraint)
         return
 
-    # Generation runs from today to the end of the block it is given, so the block
-    # holding the last day is the one to name — it covers every block before it too,
+    # Generation runs from today to the end of the mesocycle it is given, so the mesocycle
+    # holding the last day is the one to name — it covers every mesocycle before it too,
     # which is what makes one run enough for a straddling constraint.
     build = cmd(f"workout generate -m {landing['id']}")
 
-    # Straddling the boundary: adapt honors the near days from this block and the rest
+    # Straddling the boundary: adapt honors the near days from this mesocycle and the rest
     # only once its window rolls on, so no single run ever sees the whole of it.
     if constraint['start_date'] <= active_meso['end_date']:
         notice(
@@ -85,7 +85,7 @@ def point_at_honor(constraint_id: int) -> None:
             "and no one run sees both.",
         )
         notice(
-            f"Build the whole of it in with {build} — that rebuilds the plan from today "
+            f"Build the whole of it in with {build} — that rebuilds the sessions from today "
             f"through {fmt_date(landing['end_date'])}.",
         )
         return
@@ -95,16 +95,17 @@ def point_at_honor(constraint_id: int) -> None:
         f"({fmt_span(landing['start_date'], landing['end_date'], sep=' — ')}), "
         "outside daily adapt's reach.",
     )
-    # Adapt at date D reaches from D to the end of D's block, so it sees this constraint
-    # once its window rolls onto the landing block — i.e. on that block's first day.
+    # Adapt at date D reaches from D to the end of D's mesocycle, so it sees this constraint
+    # once its window rolls onto the landing mesocycle — i.e. on that mesocycle's first day.
     notice(
         f"Leave it — adapt reaches it on {fmt_date(landing['start_date'])} — or build it "
-        f"in now with {build}, which rebuilds the plan from today through that block's end.",
+        f"in now with {build}, which rebuilds the sessions from today through that "
+        "mesocycle's end.",
     )
 
 
 def _report_past_plan_end(constraint: dict) -> None:
-    """No block holds the constraint's last day. Whether anything can be done now turns
+    """No mesocycle holds the constraint's last day. Whether anything can be done now turns
     on its FIRST day: a plan covering part of the window can still be built around it,
     one covering none of it cannot."""
     if runtime.db.get_covering_mesocycle(constraint['start_date']):
@@ -116,7 +117,7 @@ def _report_past_plan_end(constraint: dict) -> None:
         )
         return
     notice(
-        f"Starts {fmt_date(constraint['start_date'])}, past the end of the plan — no block "
+        f"Starts {fmt_date(constraint['start_date'])}, past the end of the plan — no mesocycle "
         "governs it yet, so nothing can schedule around it.",
     )
     notice("Extend the periodization with " + cmd("plan generate") + " first.")
@@ -285,7 +286,7 @@ def run_constraint_edit(args: argparse.Namespace) -> None:
 
 
 def run_constraint_list(args: argparse.Namespace) -> None:
-    """Lists directives from the start of the current mesocycle onward — the training block
+    """Lists directives from the start of the current mesocycle onward — the training mesocycle
     being planned — plus everything upcoming (open-ended). --all drops the lower bound and
     shows every directive, past included; a selector (-d/-m/-M/-g) sets the window
     explicitly (§4). With no active mesocycle to anchor on (no plan yet), every constraint
@@ -295,7 +296,7 @@ def run_constraint_list(args: argparse.Namespace) -> None:
     elif has_selector(args):
         start, end = resolve_window(args)
     else:
-        # Anchor on the current training block; with no plan yet, there is nothing to
+        # Anchor on the current training mesocycle; with no plan yet, there is nothing to
         # anchor on, so show everything (a fresh user has only a handful of constraints).
         active_meso = runtime.db.get_active_mesocycle(_today_str())
         start = active_meso['start_date'] if active_meso else None
@@ -309,7 +310,7 @@ def run_constraint_list(args: argparse.Namespace) -> None:
     for c in constraints:
         print(constraint_line(c, _needs_a_pass(c)))
         if args.verbose and c.get('description'):
-            print(format_labeled_block("  Details:", c['description']))
+            print(format_labeled_paragraph("  Details:", c['description']))
 
 
 def run_constraint_show(args: argparse.Namespace) -> None:
@@ -321,7 +322,7 @@ def run_constraint_show(args: argparse.Namespace) -> None:
     needs_a_pass = _needs_a_pass(constraint)
     print(constraint_line(constraint, needs_a_pass))
     if constraint.get('description'):
-        print(format_labeled_block("  Details:", constraint['description']))
+        print(format_labeled_paragraph("  Details:", constraint['description']))
     src = constraint.get('source')
     if src:
         print(gray(f"  Source: {src}"))
@@ -339,7 +340,7 @@ def run_constraint_show(args: argparse.Namespace) -> None:
                    f"{fmt_date(str(constraint['honored_at'])[:10])}."))
     elif needs_a_pass:
         notice("  Coach pass: none yet — run "
-               + cmd("workout generate") + " to build it into the plan.")
+               + cmd("workout generate") + " to build it into the schedule.")
 
 
 def run_constraint_rm(args: argparse.Namespace) -> None:
@@ -445,7 +446,7 @@ def add_constraint_parser(subparsers):
         help="List directives from the current mesocycle onward",
         description=(
             "List directives the coach works around. By default, shows everything from the "
-            "start of the current mesocycle (the training block being planned) onward, plus "
+            "start of the current mesocycle onward, plus "
             "all upcoming directives. With no active mesocycle to anchor on (no plan yet), "
             "shows every constraint. Use --all to include past directives too, or "
             "-d/-m/-M/-g to set the window explicitly."
@@ -458,7 +459,7 @@ def add_constraint_parser(subparsers):
                            help="Show every directive, past ones included (drop the "
                                 "mesocycle lower bound)")
     # No default window here: with no selector at all the handler anchors on the current
-    # block, which is not a date the parser could name (DESIGN_constraints.md §4).
+    # mesocycle, which is not a date the parser could name (DESIGN_constraints.md §4).
     add_selector_args(cons_list, meso=True, macro=True, goal=True, direction="forward")
 
     # constraint show

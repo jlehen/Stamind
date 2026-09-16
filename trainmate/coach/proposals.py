@@ -23,7 +23,7 @@ class RevisionProposal:
     date onward, which is what separates it from `GenerateProposal` below. Applied by
     `workout_revision_apply`.
 
-    `range_start`/`range_end` are the window the coach actually evaluated, not the span of
+    `range_start`/`range_end` are the window the week planner actually evaluated, not the span of
     the proposals it happened to return. Apply deletes overridden sessions across this
     range, so the two must be the same window or apply removes sessions the preview never
     showed — which is also why every caller renders these rather than its own request.
@@ -44,7 +44,7 @@ class RevisionProposal:
     # exactly the set decided at proposal time (DESIGN_constraint_honoring.md §3). See
     # `coach/honoring.py`.
     covered_constraint_ids: Tuple[int, ...] = ()
-    # `(date, canonical sport)` the coach named only to hold — no revision, but the
+    # `(date, canonical sport)` the week planner named only to hold — no revision, but the
     # displacement rule must still count them as spoken for
     # (DESIGN_workout_revisions.md §9.1).
     held: Tuple[Tuple[str, str], ...] = ()
@@ -55,7 +55,7 @@ class StandingLine:
     """One row of the report `workout generate` prints for a session the athlete has
     already been told about (DESIGN_plan_change_continuity.md §4.5).
 
-    `outcome` is what apply will actually do to the session, not what the coach answered:
+    `outcome` is what apply will actually do to the session, not what the week planner answered:
     a wording-only revision is suppressed by the no-op rule and a rest constraint removes
     days no answer mentions, so reporting the answers would tell the operator the wrong
     thing in both directions.
@@ -71,7 +71,7 @@ class StandingLine:
     becomes: str = ""
     reason: str = ""
     # False when no answer named this session at all, so the preview can say that the
-    # coach's silence is what kept it.
+    # week planner's silence is what kept it.
     mentioned: bool = True
 
 

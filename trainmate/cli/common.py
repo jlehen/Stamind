@@ -232,7 +232,7 @@ def constraint_line(c: Dict[str, Any], needs_a_pass: bool = False) -> str:
     if c.get('honored_at'):
         tags += " · honored"
     elif needs_a_pass:
-        tags += " · not yet in the plan"
+        tags += " · not yet in the schedule"
     return (
         f"ID: {c['id']} | {yellow(c['title'])}: "
         f"{cyan(fmt_date(c['start_date']))} to {cyan(fmt_date(c['end_date']))} | {tags}"
@@ -262,7 +262,7 @@ def print_plan_cascade(objective_id: int) -> None:
     (DESIGN_cli_noargs.md §b1)."""
     from trainmate import runtime
     versions = runtime.db.get_macrocycle_versions(objective_id)
-    blocks = sum(
+    mesocycles = sum(
         len(runtime.db.get_mesocycles_for_macrocycle(m['id'])) for m in versions
     )
     notes = sum(len(runtime.db.list_plan_feedback(m['id'])) for m in versions)
@@ -270,7 +270,7 @@ def print_plan_cascade(objective_id: int) -> None:
         [m['id'] for m in versions], _today_str()
     )
     print(f"  - {len(versions)} periodization plan version(s)")
-    print(f"  - {blocks} mesocycle block(s)")
+    print(f"  - {mesocycles} mesocycle(s)")
     print(f"  - {notes} plan feedback note(s)")
     if orphaned:
         notice(

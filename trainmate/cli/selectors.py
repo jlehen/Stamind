@@ -135,7 +135,7 @@ def parse_id_range(raw: str, label: str = "mesocycle") -> IdRange:
 
 def _maybe_date_atom(raw: str) -> Optional[str]:
     """`_parse_date_atom` for an atom that may not be a date at all: returns the ISO day
-    when the spelling *is* a date one, None when it is something else entirely (a block
+    when the spelling *is* a date one, None when it is something else entirely (a mesocycle
     name). A malformed date still raises — `2026-13-40` is a typo, not a name."""
     atom = raw.strip().lower()
     if atom == "today" or _ISO_RE.match(atom):
@@ -145,76 +145,76 @@ def _maybe_date_atom(raw: str) -> Optional[str]:
         return _parse_date_atom(raw)
     if match:
         raise SelectorError(
-            f"'{raw}' is a span, not a day: a note files to the block covering ONE day. "
+            f"'{raw}' is a span, not a day: a note files to the mesocycle covering ONE day. "
             f"Use '-{atom}' for {atom} ago or '+{atom}' for {atom} ahead."
         )
     return None
 
 
-def _block_listing(mesocycles: list) -> str:
-    """This plan's blocks, name and dates, to retry an unmatched atom against — an error
+def _mesocycle_listing(mesocycles: list) -> str:
+    """This plan's mesocycles, name and dates, to retry an unmatched atom against — an error
     listing rather than an interactive picker, so the bot behaves identically (§5)."""
     lines = "\n".join(
         f"  [{m['id']}] {m['name']} ({fmt_span(m['start_date'], m['end_date'], sep=' -> ')})"
         for m in mesocycles
     )
-    return f"This plan's blocks:\n{lines}"
+    return f"This plan's mesocycles:\n{lines}"
 
 
 def resolve_meso_atom(atom, mesocycles: list) -> dict:
-    """The ONE block an atom names, resolved against a plan's own blocks
+    """The ONE mesocycle an atom names, resolved against a plan's own mesocycles
     (DESIGN_plan_feedback.md §5).
 
-    A bare integer is a mesocycle ID, a date atom is the block covering that day, and
-    anything else is a case-insensitive infix of a block name that must match exactly
-    one. `CURRENT` (a bare `-m`) is the block covering today. Raises `SelectorError`
-    naming the plan's blocks when nothing — or more than one thing — matches.
+    A bare integer is a mesocycle ID, a date atom is the mesocycle covering that day, and
+    anything else is a case-insensitive infix of a mesocycle name that must match exactly
+    one. `CURRENT` (a bare `-m`) is the mesocycle covering today. Raises `SelectorError`
+    naming the plan's mesocycles when nothing — or more than one thing — matches.
 
     Single-target on purpose: range spellings are refused, because a note files to one
-    block. The range grammar can lift this the day a command wants `-m climb` as a
+    mesocycle. The range grammar can lift this the day a command wants `-m climb` as a
     filter (DESIGN_cli_selectors.md §1)."""
     if not mesocycles:
-        raise SelectorError("This plan has no blocks to file a note against.")
-    listing = _block_listing(mesocycles)
+        raise SelectorError("This plan has no mesocycles to file a note against.")
+    listing = _mesocycle_listing(mesocycles)
 
     if atom is None or atom == CURRENT or (isinstance(atom, str) and not atom.strip()):
         today = _today_str()
-        block = next(
+        mesocycle = next(
             (m for m in mesocycles if m['start_date'] <= today <= m['end_date']), None
         )
-        if not block:
-            raise SelectorError(f"No block of this plan covers today ({today}).\n{listing}")
-        return block
+        if not mesocycle:
+            raise SelectorError(f"No mesocycle of this plan covers today ({today}).\n{listing}")
+        return mesocycle
 
     text = str(atom).strip()
     if SEP in text:
         raise SelectorError(
-            f"'{text}' is a range; a note files to one block, so -m takes a single atom."
+            f"'{text}' is a range; a note files to one mesocycle, so -m takes a single atom."
         )
     if text.isdigit():
-        block = next((m for m in mesocycles if m['id'] == int(text)), None)
-        if not block:
+        mesocycle = next((m for m in mesocycles if m['id'] == int(text)), None)
+        if not mesocycle:
             raise SelectorError(
                 f"Mesocycle {text} is not part of this plan.\n{listing}"
             )
-        return block
+        return mesocycle
 
     day = _maybe_date_atom(text)
     if day:
-        block = next(
+        mesocycle = next(
             (m for m in mesocycles if m['start_date'] <= day <= m['end_date']), None
         )
-        if not block:
-            raise SelectorError(f"No block of this plan covers {day}.\n{listing}")
-        return block
+        if not mesocycle:
+            raise SelectorError(f"No mesocycle of this plan covers {day}.\n{listing}")
+        return mesocycle
 
     matches = [m for m in mesocycles if text.lower() in m['name'].lower()]
     if len(matches) == 1:
         return matches[0]
     if not matches:
-        raise SelectorError(f"No block name contains '{text}'.\n{listing}")
+        raise SelectorError(f"No mesocycle name contains '{text}'.\n{listing}")
     names = ", ".join(f"'{m['name']}'" for m in matches)
-    raise SelectorError(f"'{text}' matches several blocks ({names}).\n{listing}")
+    raise SelectorError(f"'{text}' matches several mesocycles ({names}).\n{listing}")
 
 
 def parse_single_date(raw: str) -> str:
@@ -263,7 +263,7 @@ def add_selector_args(
             "-m", "--mesocycle", dest="meso_range", type=parse_id_range, nargs="?",
             const=CURRENT, metavar="RANGE",
             help=f"{lead} a mesocycle range: ID, ID.., ..ID or ID..ID "
-                 "(bare -m is the current block)"
+                 "(bare -m is the current mesocycle)"
         )
     if macro:
         target.add_argument(

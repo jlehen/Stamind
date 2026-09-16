@@ -2,8 +2,8 @@
 
 > **AUTHORITY: REFERENCE ONLY.** This document exists to explain *why* the plan
 > works, in athlete-facing rationale and commentary. It is NOT a source of
-> workout parameters. Do not derive durations, intensities, block lengths,
-> taper percentages, session counts, or block ordering from this document.
+> workout parameters. Do not derive durations, intensities, mesocycle lengths,
+> taper percentages, session counts, or mesocycle ordering from this document.
 
 This guide synthesizes the source below on customizing a training plan around real life (secondary races, travel, schedule shifts).
 
@@ -19,7 +19,7 @@ Ready-Made Plan ---> [ Custom Adjustment Process ]
                      |---> Dynamic Scheduling: Hard/Easy Balance Rules
                      |---> Length Manipulation: Shave early weeks or prepend base
                      |---> "B" Race Integration: Introduce partial recovery weeks
-                     |---> Interrupted Blocks: Bookend missed travel weeks
+                     |---> Interrupted Mesocycles: Bookend missed travel weeks
 ```
 
 ## 1. Adjusting the Training Schedule (The Shift Protocol)
@@ -29,7 +29,7 @@ To shift workouts within your week, follow two key rules:
 
 ## 2. Adjusting Plan Length
 *   **If the Plan is Too Long (Time Gap Prior to Week 1):** Do not start immediately with advanced intensity. Instead, use those extra weeks to prepare your aerobic base, refine your technique, or complete a preparatory strength phase.
-*   **If the Plan is Too Short (Time Crunch):** Drop the earliest weeks of the plan, starting at the week that matches your current training volume. If you must skip ahead to a week with higher-intensity intervals, adapt safety margins: replace VO2 max sessions with lighter fartlek sessions, and swap threshold blocks for shorter cruise intervals.
+*   **If the Plan is Too Short (Time Crunch):** Drop the earliest weeks of the plan, starting at the week that matches your current training volume. If you must skip ahead to a week with higher-intensity intervals, adapt safety margins: replace VO2 max sessions with lighter fartlek sessions, and swap threshold mesocycles for shorter cruise intervals.
 
 ## 3. Integrating "B" Races
 "B" races are secondary events used for experience, training, or fun without a full taper.

@@ -9,7 +9,7 @@ from trainmate.adherence import analyze_adherence, date_covered, format_discrepa
 from trainmate.google_calendar import event_url
 from trainmate.util import (
     bold, green, red, yellow, cyan, magenta, gray, cmd, aside, step, pad_visible, wrap_text,
-    format_labeled_block, today_str as _today_str, today_date as _today_date, days_between,
+    format_labeled_paragraph, today_str as _today_str, today_date as _today_date, days_between,
     fmt_date, fmt_span, fmt_timestamp, notice, keep_whole, warn,
 )
 from trainmate import settings
@@ -29,7 +29,7 @@ from trainmate.cli.workouts._helpers import workout_line
 
 
 def _resolve_ambiguous_matches(date_str: str, auto: bool) -> None:
-    """Asks the athlete about any pairing the matcher had to guess at, before the coach
+    """Asks the athlete about any pairing the matcher had to guess at, before the week planner
     is told a session was performed (ARCHITECTURE.md §15).
 
     Skipped under `--auto` and on any non-interactive run, which then falls back to the
@@ -78,7 +78,7 @@ def run_workout_adapt(args: argparse.Namespace) -> None:
         date_str, no_pull=args.no_pull, force_pull=getattr(args, 'force_pull', False)
     )
 
-    # The coach reads the full per-day trajectory (HRV/RHR/sleep/PMC) from the same
+    # The week planner reads the full per-day trajectory (HRV/RHR/sleep/PMC) from the same
     # window; here we only tell the athlete how many days fed the decision, not the numbers.
     try:
         history_days = getattr(args, "lookback", None) or config.metrics_lookback_days
@@ -94,7 +94,7 @@ def run_workout_adapt(args: argparse.Namespace) -> None:
     if plan_is_behind(date_str):
         # Nothing to adapt *towards* once the whole periodization is behind us — say what
         # to do instead of an all-clear over an empty calendar (DESIGN_runway_nudge.md §4,
-        # extending DESIGN_block_boundary.md §6's "adapt requires a block").
+        # extending DESIGN_mesocycle_boundary.md §6's "adapt requires a mesocycle").
         runtime.render.adapt_plan_behind(state, date_str)
         runtime.render.queue_hint(*athlete_queue.waiting_counts())
         return
@@ -102,7 +102,7 @@ def run_workout_adapt(args: argparse.Namespace) -> None:
     # What waits in the athlete queue shares that place (DESIGN_athlete_queue.md §5.2).
     runtime.render.queue_hint(*athlete_queue.waiting_counts())
 
-    # Before the coach is told anything: settle any pairing the matcher had to guess at.
+    # Before the week planner is told anything: settle any pairing the matcher had to guess at.
     _resolve_ambiguous_matches(date_str, auto=args.auto)
 
     step(f"Evaluating daily Garmin metrics adaptation for {fmt_date(date_str)}...")
@@ -168,7 +168,7 @@ def _confirm_regeneration(span_start: str, span_end: str) -> bool:
     manual = sum(1 for w in live if w.get('source') == 'manual')
     hand_edited = f", {manual} added by hand" if manual else ""
     days = settings.commitment_days()
-    # The coach has to account for the near days one by one, so a rewrite of them is not
+    # The week planner has to account for the near days one by one, so a rewrite of them is not
     # the blanket archive the rest of the span is (DESIGN_plan_change_continuity.md §4).
     committed = (
         f" The next {days} day(s) are yours: the coach must answer for each session "
@@ -232,10 +232,10 @@ def _confirm_out_of_date_plans(
     """Warns when a plan governing this horizon was generated from inputs that have since
     changed. Read off the dates, like the generation itself, so a horizon long enough to
     cross from one goal's plan into the next checks both. Returns False to stop."""
-    blocks, _ = runtime.db.get_governing_mesocycles(
+    mesocycles, _ = runtime.db.get_governing_mesocycles(
         start_date, end_date, prefer_macro_id=prefer_macro_id
     )
-    for macro_id in dict.fromkeys(b['macrocycle_id'] for b in blocks):
+    for macro_id in dict.fromkeys(b['macrocycle_id'] for b in mesocycles):
         macro = runtime.db.get_macrocycle(macro_id)
         if not macro:
             continue
@@ -254,9 +254,9 @@ def _confirm_out_of_date_plans(
                 "Proceeding anyway (--force)."
             )
             continue
-        # Same block as `plan generate` asks with, so the two questions cannot drift
+        # Same prompt as `plan generate` asks with, so the two questions cannot drift
         # (DESIGN_plan_staleness.md §10). Proceeding is the "keep" answer here, so the
-        # default follows the coach's read the other way round.
+        # default follows the verdict call's read the other way round.
         reshaping = staleness.explain(change_reason, macro)
         if not runtime.prompt.confirm(
             yellow(warning + " Proceed anyway?"), default=reshaping is False,
@@ -288,7 +288,7 @@ def _resolve_span(args: argparse.Namespace) -> Optional[tuple[str, str]]:
 
     An unselected start is the day after the schedule stops (today once it has run out)
     and an unselected end is the config horizon, so the span is always bounded
-    (DESIGN_cli_selectors.md §8). None when the selection is entirely behind us — a block
+    (DESIGN_cli_selectors.md §8). None when the selection is entirely behind us — a mesocycle
     that has already run is history, and silently regenerating today instead is not what
     was asked for — or when the plan is already covered to its last day."""
     today = _today_str()
@@ -369,8 +369,8 @@ def standing_outcome_words(line) -> str:
     """What this run does to a session the athlete was already told about (§4.5).
 
     A move names the day it went to, a revision the form it takes, and a removal says so;
-    a session the coach never named says that too, because its being kept is the app's
-    doing and not a decision the coach made."""
+    a session the week planner never named says that too, because its being kept is the
+    app's doing and not a decision the week planner made."""
     if line.outcome == 'kept':
         return "kept" if line.mentioned else "kept (not mentioned by the coach)"
     if line.outcome == 'moved':
@@ -416,7 +416,7 @@ def print_standing_report(proposal) -> None:
 def print_generate_preview(proposal) -> bool:
     """The expert `workout generate` preview: the reasoning, then the proposed sessions.
 
-    Returns False when the coach proposed nothing, so the caller stops before the apply
+    Returns False when the week planner proposed nothing, so the caller stops before the apply
     question. The companion form of this is CompanionRenderer.workout_generate_preview
     (DESIGN_render_persona.md §5)."""
     print(bold(cyan("\n=== WORKOUTS PROPOSED BY COACH ===")))
@@ -457,7 +457,7 @@ def run_workout_generate(args: argparse.Namespace) -> None:
         return
 
     if not force and not _confirm_regeneration(span_start, span_end):
-        notice("Workout generation cancelled — your current plan is unchanged.")
+        notice("Workout generation cancelled — your schedule is unchanged.")
         return
 
     proposal = runtime.coach_service.workout_generate(
@@ -467,7 +467,7 @@ def run_workout_generate(args: argparse.Namespace) -> None:
         return
 
     if not force and not _confirm_apply(proposal):
-        notice("Workouts discarded — your current plan is unchanged.")
+        notice("Workouts discarded — your schedule is unchanged.")
         return
 
     saved = runtime.coach_service.workout_generate_apply(
@@ -621,7 +621,7 @@ def _list_verdicts(workouts: list, args: argparse.Namespace) -> dict:
 
 
 def run_workout_list(args: argparse.Namespace) -> None:
-    """Lists stored workouts chronologically, by ID, date range, block, plan or sport."""
+    """Lists stored workouts chronologically, by ID, date range, mesocycle, plan or sport."""
     ids, date_targets = split_targets(getattr(args, "targets", None))
     # Named dates narrow like any other selector; named IDs are looked up directly, since
     # an ID the athlete typed is not a window (DESIGN_cli_selectors.md §4).
@@ -662,7 +662,7 @@ def run_workout_list(args: argparse.Namespace) -> None:
 
 def run_workout_show(args: argparse.Namespace) -> None:
     """`workout show ID` is `workout list -v ID`: the same listing with the per-workout
-    detail block always on."""
+    detail lines always on."""
     args.verbose = True
     run_workout_list(args)
 
@@ -672,7 +672,7 @@ def print_workout_table(
     start_date: Optional[str], end_date: Optional[str], ids: list, names_a_range: bool,
 ) -> None:
     """The expert `workout list` body: the filter echo, one line per session (`-v` adds
-    the detail block), and the end-of-schedule marker.
+    the detail lines), and the end-of-schedule marker.
 
     The companion form of this is CompanionRenderer.workout_list
     (DESIGN_render_persona.md §5)."""
@@ -720,16 +720,16 @@ def print_workout_table(
             print(gray(f"  Actual: {format_actual(actual)}"))
         for reason in (verdict or {}).get('reasons') or []:
             notice(f"  Discrepancy: {reason}")
-        print(format_labeled_block("  Description:", w['description']))
+        print(format_labeled_paragraph("  Description:", w['description']))
         summary = w.get('adaptation_summary')
         # Show the per-workout note inline, unless it's just the batch reason echoed
         # (the fallback when the model gave no per-workout change_reason) — that would
         # duplicate the Adapt summary printed below.
         if w.get('modification_reason') and w['modification_reason'] != summary:
-            print(format_labeled_block("  Reason:", w['modification_reason'], color_fn=yellow))
+            print(format_labeled_paragraph("  Reason:", w['modification_reason'], color_fn=yellow))
         if summary and summary not in seen_summaries:
             seen_summaries.add(summary)
-            print(format_labeled_block("  Adapt summary:", summary, color_fn=gray))
+            print(format_labeled_paragraph("  Adapt summary:", summary, color_fn=gray))
         print(gray("-" * 40))
     # Where the schedule stops, when the listed range runs past it (§4). A listing with
     # nothing to show renders it alone: an empty range past the cliff is exactly where the
@@ -767,7 +767,7 @@ def run_workout_compare(args: argparse.Namespace) -> None:
     end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
     history_days = (end_date_obj - start_date_obj).days + 1
 
-    # Planned blocks overlapping the window: an activity on a date outside every block
+    # Planned mesocycles overlapping the window: an activity on a date outside every mesocycle
     # is history no plan governed, shown as informational rather than "unplanned".
     covered_ranges = runtime.db.get_mesocycle_ranges(start_date, end_date)
 

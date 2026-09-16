@@ -9,7 +9,7 @@ from trainmate.sports import sport_aliases
 from trainmate.baselines import classify_metric, is_anomalous, UNKNOWN
 from trainmate.util import (
     aside, bold, green, red, yellow, cyan, magenta, gray, cmd, color_load_ratio, pmc_cells,
-    visible_len, wrap_text, format_labeled_text, format_labeled_block, render_table,
+    visible_len, wrap_text, format_labeled_text, format_labeled_paragraph, render_table,
     is_narrow_client, default_wrap_width, fmt_date, fmt_span, notice, warn,
 )
 from trainmate.cli.common import mark_adherence_range, pmc_warmup_cutoff
@@ -252,7 +252,7 @@ def _load_cell(act: dict) -> str:
     The figure is `activity_load()`, NOT the stored `tss`. `measured_tss` defines that
     column as a pure measurement — no coverage gate, never RPE — while `progress`, the
     PMC and every coaching path use `activity_load()`, so the two commands already
-    disagreed about a session's load, silently. A tag on the measurement would name a
+    disagreed about an activity's load, silently. A tag on the measurement would name a
     provenance that is not the provenance of the number shown.
     """
     return f"{activity_load(act):.1f} ({LOAD_TAGS.get(load_method(act), '?')})"
@@ -410,7 +410,7 @@ def run_data_show_activities(args: argparse.Namespace) -> None:
     total_distance_km = sum(act.get('distance_km') or 0.0 for act in activities)
     total_elevation_m = sum(act.get('elevation_gain_m') or 0.0 for act in activities)
     # The load, matching the column above — so this command and `progress` finally quote
-    # one number for the same session (§9.7).
+    # one number for the same activity (§9.7).
     total_tss = sum(activity_load(act) for act in activities)
 
     tot_h = int(total_duration_sec // 3600)
@@ -566,18 +566,18 @@ def _render_analysis_report(result: dict, inspect_only: bool) -> None:
     # over is read as a span, not as days to train on.
     if "inferred_macrocycle" in result:
         im = result["inferred_macrocycle"]
-        print("\n" + format_labeled_block(
+        print("\n" + format_labeled_paragraph(
             f"{bold('Macrocycle Focus')} "
             f"({magenta(im.get('start_date', ''))} to {magenta(im.get('end_date', ''))}):",
             im.get('overall_focus', 'N/A'), color_fn=cyan
         ))
     
     if "macrocycle_summary" in result:
-        print(format_labeled_block(f"{bold('Summary')}:", result["macrocycle_summary"]))
+        print(format_labeled_paragraph(f"{bold('Summary')}:", result["macrocycle_summary"]))
 
     # Inferred Mesocycles
     if "inferred_mesocycles" in result and result["inferred_mesocycles"]:
-        print(bold(cyan("\nDetected Mesocycle Blocks:")))
+        print(bold(cyan("\nDetected Mesocycles:")))
         for meso in result["inferred_mesocycles"]:
             c_tag = meso.get("estimated_consistency", "Moderate")
             if c_tag == "High":
@@ -593,7 +593,7 @@ def _render_analysis_report(result: dict, inspect_only: bool) -> None:
                 f"({cyan(meso.get('start_date', ''))} to {cyan(meso.get('end_date', ''))}) "
                 f"{c_disp}"
             ))
-            print(format_labeled_block(
+            print(format_labeled_paragraph(
                 "    * Detected Focus:", str(meso.get('focus_detected', 'N/A'))
             ))
             print(f"    * Avg Weekly TSS: {meso.get('average_weekly_tss', 'N/A')}")
@@ -650,18 +650,18 @@ def _render_analysis_report(result: dict, inspect_only: bool) -> None:
             elif op == "reinforce":
                 tag = f"  ↑ reinforced [{u.get('id')}]{suffix}"
                 text = _existing_text(u.get("id"))
-                print(format_labeled_block(tag, text) if text else tag)
+                print(format_labeled_paragraph(tag, text) if text else tag)
             elif op == "contradict":
                 tag = f"  ↓ contradicted [{u.get('id')}]{suffix}"
                 text = _existing_text(u.get("id"))
-                print(format_labeled_block(tag, text) if text else tag)
+                print(format_labeled_paragraph(tag, text) if text else tag)
                 if isinstance(u.get("reason"), str) and u["reason"].strip():
                     print(format_labeled_text("      because: ", u["reason"].strip()))
             elif op == "retire":
                 print(f"  - retired [{u.get('id')}]")
             else:
                 # Named no op the app knows, so nothing was saved for it. Printing the
-                # skip keeps the block from rendering empty under a "Saved" header
+                # skip keeps the section from rendering empty under a "Saved" header
                 # (DESIGN_backward_evaluation.md §13).
                 notice(f"  ! unreadable update (op={op!r}) — skipped")
 
@@ -721,7 +721,7 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             "and metrics. With no date filter, the window is auto-detected from the active "
             "goal (since the previous goal, else 12 weeks back). Two outputs: (1) coach "
             "learnings, delta-updated from the evidence; and (2) a cached reconstruction — "
-            "the inferred macro focus, mesocycle blocks, and physiological insights — which "
+            "the inferred macro focus, mesocycles, and physiological insights — which "
             "'plan generate' replays read-only into its strategy prompt so the next plan "
             "builds on your demonstrated training arc. Also establishes the reflect "
             "watermark so later 'data reflect' runs only ingest newer evidence. Cached by "
@@ -840,7 +840,7 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
              "one row per activity and currency, so a ride with both a meter and a "
              "strap gets a [pwr] row and an [HR] row. Includes per-activity zone "
              "coverage — the column that turns 'the strap dropped out somewhere this "
-             "week' into a named session."
+             "week' into a named activity."
     )
     d_sa.add_argument(
         "-a", "--all", action="store_true", dest="all",
@@ -854,7 +854,7 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
              "'data bootstrap' (read-only: no LLM call, no Garmin pull)",
         description=(
             "Print the reconstruction cached by the last 'data bootstrap': the inferred "
-            "macro focus, the mesocycle blocks 'tm progress' draws as '~' bands, and the "
+            "macro focus, the mesocycles 'tm progress' draws as '~' bands, and the "
             "physiological insights. Read-only in the strict sense — it renders what is "
             "stored and never calls the LLM, unlike 'data bootstrap --inspect-only' which "
             "recomputes as soon as the evidence has moved. --short shows the last "

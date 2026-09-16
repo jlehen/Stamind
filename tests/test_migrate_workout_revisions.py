@@ -232,7 +232,7 @@ class TestMigrateWorkoutRevisions(unittest.TestCase):
         _summary, db = self._migrate()
 
         self.assertEqual([w["title"] for w in db.get_workouts()], ["Kept Run"])
-        # It is a void the PLAN produced, not one the athlete asked for, so the coach is
+        # It is a void the PLAN produced, not one the athlete asked for, so the week planner is
         # not told the session was cancelled.
         dropped = db.get_workouts(include_removed=True)[0]
         self.assertTrue(dropped["removed"])

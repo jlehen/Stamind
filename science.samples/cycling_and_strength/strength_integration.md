@@ -2,8 +2,8 @@
 
 > **AUTHORITY: REFERENCE ONLY.** This document exists to explain *why* the plan
 > works, in athlete-facing rationale and commentary. It is NOT a source of
-> workout parameters. Do not derive durations, intensities, block lengths,
-> taper percentages, session counts, or block ordering from this document.
+> workout parameters. Do not derive durations, intensities, mesocycle lengths,
+> taper percentages, session counts, or mesocycle ordering from this document.
 
 This guide synthesizes the sources below on integrating heavy resistance training with high-intensity endurance work and the physiology of non-failure lifting.
 
@@ -34,8 +34,8 @@ Integrating heavy resistance training and high-intensity cycling requires carefu
 4.  **Use Rating of Perceived Exertion (RPE) to Adjust Loads:** Instead of trying to hit fixed weight percentages on double-session days, adjust your weights based on your RPE (e.g., target a 6/10 effort). This accommodates the fatigue from your morning ride while still providing a quality strength stimulus.
 
 ### Strength Phase Sequencing (Preparatory vs. In-Season)
-*   **Preparatory/Base Blocks (High Frequency):** Lift heavy twice per week to build strength, motor unit recruitment, and structural resilience.
-*   **In-Season/Competition Blocks (Low Frequency):** Drop to one high-intensity, heavy gym session per week. Research shows that once-weekly heavy lifting is sufficient to maintain baseline strength gains for up to 13 weeks.
+*   **Preparatory/Base Mesocycles (High Frequency):** Lift heavy twice per week to build strength, motor unit recruitment, and structural resilience.
+*   **In-Season/Competition Mesocycles (Low Frequency):** Drop to one high-intensity, heavy gym session per week. Research shows that once-weekly heavy lifting is sufficient to maintain baseline strength gains for up to 13 weeks.
 
 ### Neuromuscular Priming (PAP)
 In elite training, athletes occasionally use **Post-Activation Potentiation (PAP)**, or priming, before sprint sessions. This is a brief, low-fatigue, heavy-resistance sequence designed to stimulate the central nervous system:

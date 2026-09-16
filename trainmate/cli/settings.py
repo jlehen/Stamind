@@ -170,7 +170,7 @@ def _detail_timezone() -> None:
         print(dim(f"  Set:      {fmt_timestamp(clock.stored_at())}"))
 
 
-# Settings whose detail view carries more than the generic block — a menu to pick from,
+# Settings whose detail view carries more than the generic listing — a menu to pick from,
 # a clock to check. Keyed by name so the registry stays free of display code.
 DETAIL_EXTRAS = {
     settings.COACH_MODEL: _detail_model_menu,

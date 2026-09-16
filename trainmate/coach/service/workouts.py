@@ -16,7 +16,7 @@ from trainmate.util import green, cmd, notice, keep_whole
 import trainmate.coach.service as _svc
 
 
-# What a void says when nothing the coach answered explains it: the second and later
+# What a void says when nothing the week planner answered explains it: the second and later
 # sessions on a date a rest constraint clears carry the constraint's own title, and
 # everything else at least names who did it (DESIGN_plan_change_continuity.md §5.5).
 REPLACED_DAY_REASON = "Your coach replaced this day."
@@ -37,21 +37,21 @@ class WorkoutGenMixin:
         return (opened + timedelta(days=days - 1)).strftime("%Y-%m-%d")
 
     @staticmethod
-    def _standing_block(
-        standing: List[Workout], window_end: Optional[str]
+    def _standing_sessions(
+        span_sessions: List[Workout], window_end: Optional[str]
     ) -> List[Workout]:
-        """The sessions the coach must answer for (§4.2): the ones inside the commitment
+        """The sessions the week planner must answer for (§4.2): the ones inside the commitment
         window, plus every session the athlete added by hand anywhere in the span.
 
-        Both are already bounded by the span, because `standing` is read from it — which
+        Both are already bounded by the span, because `span_sessions` is read from it — which
         is the second bound the intersection needs, or a forward-selected run would ask
-        the coach about days it cannot write and the preview would lie."""
-        block = [
-            w for w in standing
+        the week planner about days it cannot write and the preview would lie."""
+        chosen = [
+            w for w in span_sessions
             if (window_end is not None and w['date'] <= window_end)
             or w.get('source') == 'manual'
         ]
-        return sorted(block, key=lambda w: (w['date'], canonical_sport(w['sport_type'])))
+        return sorted(chosen, key=lambda w: (w['date'], canonical_sport(w['sport_type'])))
 
     def _today_workout_completed(
         self, today_str: str, completed_activities: List[Dict[str, Any]]
@@ -122,12 +122,12 @@ class WorkoutGenMixin:
     @classmethod
     def _enforce_rest_windows_generate(
         cls, workouts: List[Dict[str, Any]], constraints: List[Constraint], gen_start: str,
-        gen_end: str, standing: Optional[List[Workout]] = None
+        gen_end: str, span_sessions: Optional[List[Workout]] = None
     ) -> Tuple[List[Dict[str, Any]], Dict[Tuple[str, str], str]]:
         """Forces `rest` constraints onto a freshly generated workout list (§6): every rest
         date inside the generated span becomes a single rest, deterministically, bypassing
         the LLM for that date entirely. Every other constraint is advisory only — left to
-        the model via the prompt block, not enforced here (§5).
+        the model via the prompt section, not enforced here (§5).
 
         Dates the model simply left out are filled too, not only the ones it scheduled: an
         absent row and an explicit rest day mean different things to adherence (§6). The
@@ -135,8 +135,8 @@ class WorkoutGenMixin:
         return — a rest window at the tail of the range is exactly the case the model
         answers with silence, so bounding by its last date would reopen the gap (§6).
 
-        The rest row continues the first standing session on the date, so that day keeps
-        one event and the constraint's own title is the reason on it; any further standing
+        The rest row continues the first session already on the date, so that day keeps
+        one event and the constraint's own title is the reason on it; any further
         session there is voided under the same reason, which is what the returned
         `{slot: reason}` map carries (DESIGN_plan_change_continuity.md §5.5)."""
         full_rest = cls._hard_rest_windows(constraints)
@@ -156,7 +156,7 @@ class WorkoutGenMixin:
 
         rest_sport = canonical_sport('rest')
         by_date: Dict[str, List[Workout]] = {}
-        for live in standing or []:
+        for live in span_sessions or []:
             by_date.setdefault(live['date'], []).append(live)
 
         out = [w for w in workouts if w.get('date', '') not in forced]
@@ -166,11 +166,11 @@ class WorkoutGenMixin:
             rows = sorted(
                 by_date.get(day, []), key=lambda w: canonical_sport(w['sport_type'])
             )
-            # A rest day already standing on the date is the slot the rest row lands in,
+            # A rest day already on the date is the slot the rest row lands in,
             # so it is revised in place and no lineage is carried across.
             carrier = None
-            standing_sports = {canonical_sport(r['sport_type']) for r in rows}
-            if rest_sport not in standing_sports and rows:
+            sports_there = {canonical_sport(r['sport_type']) for r in rows}
+            if rest_sport not in sports_there and rows:
                 carrier = rows[0]
             if carrier is not None:
                 rest['replaces_slot'] = (carrier['date'], carrier['sport_type'])
@@ -319,16 +319,16 @@ class WorkoutGenMixin:
 
     @classmethod
     def _resolve_standing(
-        cls, workouts: List[Dict[str, Any]], standing: List[Workout],
+        cls, workouts: List[Dict[str, Any]], standing_sessions: List[Workout],
         gen_start: str, gen_end: str
     ) -> Tuple[List[Dict[str, Any]], Dict[Tuple[str, str], str]]:
-        """Maps the coach's answers onto the standing block, so every pass after this one
+        """Maps the week planner's answers onto the standing sessions, so every pass after this one
         sees a uniform list of full sessions
         (DESIGN_plan_change_continuity.md §4.5, §7).
 
         `keep` becomes the session it names, `drop` becomes a rest day replacing it, and a
         full entry on a date whose only standing session is a rest day replaces that rest
-        day whether the coach said so or not. What an entry takes the place of travels on
+        day whether the week planner said so or not. What an entry takes the place of travels on
         it as `replaces_slot`/`replaces_lineage`, which apply turns into a void plus an
         append on the same lineage. A standing session no answer names is kept.
 
@@ -337,11 +337,11 @@ class WorkoutGenMixin:
         the athlete meets says what the coach said (§5.5).
         """
         rest_sport = canonical_sport('rest')
-        by_slot = {(w['date'], canonical_sport(w['sport_type'])): w for w in standing}
+        by_slot = {(w['date'], canonical_sport(w['sport_type'])): w for w in standing_sessions}
         per_date: Dict[str, List[Workout]] = {}
-        for live in standing:
+        for live in standing_sessions:
             per_date.setdefault(live['date'], []).append(live)
-        # A rest day and a session on the same date cannot both be true, so the coach is
+        # A rest day and a session on the same date cannot both be true, so the week planner is
         # not offered the choice: a full entry there replaces the rest day (§4.5).
         rest_only = {
             day: rows[0] for day, rows in per_date.items()
@@ -457,7 +457,7 @@ class WorkoutGenMixin:
                 entry = {
                     **entry,
                     'replaces_slot': (occupant['date'], occupant['sport_type']),
-                    # A session the athlete added keeps its own lineage: the coach's
+                    # A session the athlete added keeps its own lineage: the week planner's
                     # replacement starts a new one, or the event would read "[Manual]"
                     # (§5.3).
                     'replaces_lineage': (
@@ -497,7 +497,7 @@ class WorkoutGenMixin:
 
     @staticmethod
     def _generate_voids(
-        workouts: List[Dict[str, Any]], standing: List[Workout],
+        workouts: List[Dict[str, Any]], span_sessions: List[Workout],
         void_reasons: Dict[Tuple[str, str], str]
     ) -> Tuple[Tuple[str, str, str], ...]:
         """Every slot this run ends, with the reason it will carry (§5.5).
@@ -521,7 +521,7 @@ class WorkoutGenMixin:
             seen.add(slot)
             reason = str(w.get('change_reason') or '').strip() or REPLACED_DAY_REASON
             voids.append((replaced[0], replaced[1], reason))
-        for live in standing:
+        for live in span_sessions:
             slot = (live['date'], canonical_sport(live['sport_type']))
             if slot in seen or slot in kept:
                 continue
@@ -562,7 +562,7 @@ class WorkoutGenMixin:
 
     @classmethod
     def _standing_lines(
-        cls, workouts: List[Dict[str, Any]], block: List[Workout],
+        cls, workouts: List[Dict[str, Any]], standing_sessions: List[Workout],
         voids: Tuple[Tuple[str, str, str], ...]
     ) -> Tuple[StandingLine, ...]:
         """The §4.5 report, built from what apply will write rather than from what the
@@ -577,7 +577,7 @@ class WorkoutGenMixin:
         reasons = {(d, canonical_sport(sp)): r for (d, sp, r) in voids}
 
         lines: List[StandingLine] = []
-        for live in block:
+        for live in standing_sessions:
             slot = (live['date'], canonical_sport(live['sport_type']))
             # What this session became, wherever it went: a move, a sport change and the
             # rest day of a drop all carry it out of its slot.
@@ -633,9 +633,9 @@ class WorkoutGenMixin:
         for a boundary week reaching into the goal's own week, where a maximal test would
         compete with the event it is meant to serve (§4.1).
 
-        `mesocycles` are the blocks governing this span, which may come from more than one
+        `mesocycles` govern this span, which may come from more than one
         plan when a long horizon runs from one goal into the next — so the goal week that
-        silences a test is read per block, not once for the run."""
+        silences a test is read per mesocycle, not once for the run."""
         if not workouts or not mesocycles:
             return
         dated = [w for w in workouts if w.get('date')]
@@ -745,7 +745,7 @@ class WorkoutGenMixin:
         self, start_date: Optional[str] = None, end_date: Optional[str] = None,
         prefer_macro_id: Optional[int] = None
     ) -> GenerateProposal:
-        """Proposes workouts (microcycles) from the plan blocks governing the span.
+        """Proposes workouts (microcycles) from the plan mesocycles governing the span.
 
         Writes nothing: the caller previews the sessions and passes the proposal back to
         `workout_generate_apply` on a `y`, so a regeneration cannot archive the live plan
@@ -757,7 +757,7 @@ class WorkoutGenMixin:
 
         Which plan applies is read off the dates being generated, not off a goal the
         caller names: the goal was only ever an indirection to the macrocycle, and the
-        blocks a span falls in are what actually shape the sessions
+        mesocycles a span falls in are what actually shape the sessions
         (DESIGN_cli_selectors.md §8)."""
         if not self._db.get_active_objective():
             return GenerateProposal(
@@ -786,7 +786,7 @@ class WorkoutGenMixin:
 
         # A regeneration replaces every workout in the span, but a session the athlete has
         # already completed should be preserved as history rather than overwritten. When
-        # today's planned workout is already in the books, start the regenerated plan
+        # today's planned workout is already in the books, start the regenerated sessions
         # tomorrow and leave today's row (and its Calendar event) intact.
         if gen_start_str == today_str and self._today_workout_completed(
             today_str, completed_activities
@@ -808,26 +808,26 @@ class WorkoutGenMixin:
             num_days = config.workout_generation_span_days
             gen_end_str = (gen_start_obj + timedelta(days=num_days - 1)).strftime("%Y-%m-%d")
 
-        # Back to the start of the block the athlete is in, not to the span: a constraint
-        # that ended last week is why three sessions are missing from the block's record,
-        # and the coach cannot see the days themselves (§6.1). Only the ones still live
+        # Back to the start of the mesocycle the athlete is in, not to the span: a constraint
+        # that ended last week is why three sessions are missing from the mesocycle's record,
+        # and the week planner cannot see the days themselves (§6.1). Only the ones still live
         # are worked around; the rest are context, and are kept out of the honoring and
         # rest-window passes below.
-        block_now = self._db.get_covering_mesocycle(today_str)
+        mesocycle_now = self._db.get_covering_mesocycle(today_str)
         constraint_floor = min(
-            (block_now or {}).get('start_date') or gen_start_str, gen_start_str
+            (mesocycle_now or {}).get('start_date') or gen_start_str, gen_start_str
         )
         all_constraints = self._db.get_constraints(constraint_floor)
         constraints = [c for c in all_constraints if c['end_date'] >= gen_start_str]
         past_constraints = [c for c in all_constraints if c['end_date'] < gen_start_str]
         self._maybe_nudge_no_threshold()
 
-        # The blocks governing the days about to be written — the whole periodization
+        # The mesocycles governing the days about to be written — the whole periodization
         # input to this run, resolved from the window itself (§8).
-        blocks, dropped_macros = self._db.get_governing_mesocycles(
+        mesocycles, dropped_macros = self._db.get_governing_mesocycles(
             gen_start_str, gen_end_str, prefer_macro_id=prefer_macro_id
         )
-        if not blocks:
+        if not mesocycles:
             raise ValueError(
                 "No active periodization strategy found. Run "
                 + cmd("plan generate") + " first."
@@ -838,37 +838,37 @@ class WorkoutGenMixin:
                 f"recently generated plan instead. Pass "
                 + cmd(keep_whole(f"-M {macro_id}"), quote=False) + " to follow that one.",
             )
-        plan_end = max(b['end_date'] for b in blocks)
+        plan_end = max(b['end_date'] for b in mesocycles)
         if plan_end < gen_end_str:
             notice(
                 f"The plan runs out on {plan_end}, before this horizon ({gen_end_str}) — "
-                f"sessions after it have no block to follow. Run "
+                f"sessions after it have no mesocycle to follow. Run "
                 + cmd("plan generate") + " to extend the periodization first.",
             )
 
-        # All upcoming goals still reach the prompt as context; only the blocks above
+        # All upcoming goals still reach the prompt as context; only the mesocycles above
         # decide what the sessions are shaped like.
-        ctx = self._coach_context(constraints, blocks=blocks)
+        ctx = self._coach_context(constraints, mesocycles=mesocycles)
         objectives = ctx.objectives
         guidelines, profile = ctx.guidelines, ctx.profile
         strategy, meso_text, learnings = ctx.strategy, ctx.meso_text, ctx.learnings
 
         pmc_cutoff, pmc_context = self._pmc_prompt_context(today_str)
-        # What the block has already banked, when this run re-plans only its remainder
-        # (DESIGN_block_progress.md §3). Anchored on gen_start, so the day preserved for a
+        # What the mesocycle has already banked, when this run re-plans only its remainder
+        # (DESIGN_mesocycle_progress.md §3). Anchored on gen_start, so the day preserved for a
         # completed session counts as history rather than as a day still to write.
-        block_progress, block_has_intensity = self._block_progress_context(
+        mesocycle_progress, mesocycle_has_intensity = self._mesocycle_progress_context(
             today_str, gen_start_str
         )
-        # The plan this run would rewrite, and the part of it the athlete has already
+        # The sessions this run would rewrite, and the part of them the athlete has already
         # been told about (DESIGN_plan_change_continuity.md §4.2). Read once and used by
         # the prompt, the resolver, the void set and the report.
-        standing = self._db.get_workouts(
+        span_sessions = self._db.get_workouts(
             start_date=gen_start_str, end_date=gen_end_str
         )
         window_end = self._commitment_window(today_str)
-        standing_block = self._standing_block(standing, window_end)
-        plan_data = self.engine._workout_generate_logic(
+        standing_sessions = self._standing_sessions(span_sessions, window_end)
+        planner_reply = self.engine._workout_generate_logic(
             objectives=objectives,
             constraints=constraints,
             today_str=today_str,
@@ -884,11 +884,11 @@ class WorkoutGenMixin:
             baseline=baseline,
             pmc_warmup_cutoff=pmc_cutoff,
             pmc_context=pmc_context,
-            block_progress=block_progress,
-            block_has_intensity=block_has_intensity,
+            mesocycle_progress=mesocycle_progress,
+            mesocycle_has_intensity=mesocycle_has_intensity,
             zone_currencies=self._planning_zone_currencies(today_str),
             anchor_history=self._anchor_history_text(gen_start_str),
-            standing_workouts=standing_block,
+            standing_workouts=standing_sessions,
             commitment_end=window_end,
             past_constraints=past_constraints,
         )
@@ -898,15 +898,15 @@ class WorkoutGenMixin:
         # memory is authored only by `analyze` and `plan generate`.
 
         # Save workouts to database
-        workouts = plan_data.get("workouts", [])
+        workouts = planner_reply.get("workouts", [])
 
         # Every answer becomes a full session, so each pass below sees one kind of entry
-        # and the void loop has nothing to void in the standing block
+        # and the void loop has nothing to void among the standing sessions
         # (DESIGN_plan_change_continuity.md §7).
         workouts, void_reasons = self._resolve_standing(
-            workouts, standing_block, gen_start_str, gen_end_str
+            workouts, standing_sessions, gen_start_str, gen_end_str
         )
-        athlete_note = str(plan_data.get("athlete_note") or "").strip() or None
+        athlete_note = str(planner_reply.get("athlete_note") or "").strip() or None
 
         # Integers, before the preview and the save both read these numbers.
         normalize_load_fields(workouts)
@@ -926,18 +926,18 @@ class WorkoutGenMixin:
         # Deterministic rest-window pre-pass (DESIGN_constraints.md §6): a `rest`
         # constraint forces its dates to rest regardless of what the LLM produced. Every
         # other constraint is advisory and left to the model. Applied after generation so
-        # the guarantee holds even if the model ignores the constraint block it was shown.
+        # the guarantee holds even if the model ignores the constraint section it was shown.
         workouts, forced_reasons = self._enforce_rest_windows_generate(
-            workouts, constraints, gen_start_str, gen_end_str, standing
+            workouts, constraints, gen_start_str, gen_end_str, span_sessions
         )
         # The constraint wins on its own dates, so its title is the reason there.
         void_reasons.update(forced_reasons)
 
         # Boundary-week benchmark post-check (§4.1): warn (don't auto-insert) if a covered
-        # block boundary lacks a fitness test. Runs after the rest pass so a rest-covered
+        # mesocycle boundary lacks a fitness test. Runs after the rest pass so a rest-covered
         # boundary week is already silenced.
         self._warn_missing_boundary_benchmarks(
-            workouts, constraints, blocks, gen_start_str
+            workouts, constraints, mesocycles, gen_start_str
         )
 
         # Coverage backstop (DESIGN_runway_nudge.md §2.1): every date of the span carries a
@@ -946,14 +946,14 @@ class WorkoutGenMixin:
         workouts = self._fill_coverage_gaps(workouts, gen_start_str, gen_end_str)
 
         # Which plan version each session belongs to, per date: a span long enough to run
-        # from one goal's last block into the next goal's first produces workouts from two
+        # from one goal's last mesocycle into the next goal's first produces workouts from two
         # macrocycles, and `plan rollback` accounting keys off this tag. Days past the last
-        # block fall back to the plan that governed the start.
+        # mesocycle fall back to the plan that governed the start.
         def _macro_for(date_str: str) -> int:
-            for b in blocks:
+            for b in mesocycles:
                 if b['start_date'] <= date_str <= b['end_date']:
                     return b['macrocycle_id']
-            return blocks[0]['macrocycle_id']
+            return mesocycles[0]['macrocycle_id']
 
         for w in workouts:
             w['macrocycle_id'] = _macro_for(w['date'])
@@ -968,10 +968,10 @@ class WorkoutGenMixin:
         displaced = self._db.get_workouts(
             start_date=gen_start_str, end_date=gen_end_str, include_removed=True
         )
-        voids = self._generate_voids(workouts, standing, void_reasons)
+        voids = self._generate_voids(workouts, span_sessions, void_reasons)
 
         return GenerateProposal(
-            reasoning=plan_data.get("reasoning", "Plan generated."),
+            reasoning=planner_reply.get("reasoning", "Plan generated."),
             workouts=tuple(workouts),
             displaced=tuple(displaced),
             gen_start=gen_start_str,
@@ -982,7 +982,7 @@ class WorkoutGenMixin:
                 constraints, gen_start_str, gen_end_str
             ),
             voids=voids,
-            standing=self._standing_lines(workouts, standing_block, voids),
+            standing=self._standing_lines(workouts, standing_sessions, voids),
             athlete_note=athlete_note,
             commitment_end=window_end,
         )
@@ -992,7 +992,7 @@ class WorkoutGenMixin:
     ) -> List[Workout]:
         """Commits an accepted `workout generate` proposal: one change, then one reconcile.
 
-        Every day the new plan does not fill, *inside the generated span*, gets a void
+        Every day the new sessions do not fill, *inside the generated span*, gets a void
         revision; every day it does fill gets a revision — unless the prescription is
         identical to what is already live, in which case §9 suppresses it and the day is
         left alone. A day the plan KEEPS is claimed but not written: it is spared the void
@@ -1027,14 +1027,14 @@ class WorkoutGenMixin:
                 commitment_end=proposal.commitment_end,
             ) as change,
         ):
-            standing = self._db.get_workouts(
+            span_sessions = self._db.get_workouts(
                 start_date=proposal.gen_start, end_date=proposal.gen_end or None
             )
             voided_slots = {
                 (day, canonical_sport(sport)) for (day, sport, _r) in proposal.voids
             }
             replaced_manual = [
-                live for live in standing
+                live for live in span_sessions
                 if live.get('source') == 'manual'
                 and (live['date'], canonical_sport(live['sport_type'])) in voided_slots
             ]
@@ -1046,14 +1046,14 @@ class WorkoutGenMixin:
             # as adapt already does).
             tested_slots = {
                 (live['date'], canonical_sport(live['sport_type']))
-                for live in standing if live.get('benchmark_type')
+                for live in span_sessions if live.get('benchmark_type')
             }
             for w in proposal.workouts:
                 # Claimed above, so it escaped the void; writing it again would churn a
                 # day that did not change (§7.1).
                 if w.get('keep'):
                     continue
-                # The intensity target the coach stated while it still knew the intent
+                # The intensity target the week planner stated while it still knew the intent
                 # (DESIGN_intensity_distribution.md §9.8) — validated, never rescaled.
                 zone_currency, zone_sec = intensity.parse_planned_zones(w)
                 slot = (w['date'], canonical_sport(w['sport_type']))

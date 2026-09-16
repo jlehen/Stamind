@@ -23,7 +23,7 @@ shutdown, including while a command computes, which is what lets a ✋ Stop tap 
 ``/cancel`` reach a command waiting on the coach (DESIGN_bot_stop_button.md §5).
 
 Run with: ``./tm-bot`` (or ``venv/bin/python trainmate_bot.py``). Configure the token +
-allowlist under a ``telegram:`` block in config.yaml (see config_template.yaml).
+allowlist under a ``telegram:`` section in config.yaml (see config_template.yaml).
 """
 import asyncio
 import datetime
@@ -126,7 +126,7 @@ SIMPLE_HELP = SIMPLE_WELCOME + (
     "• Something to remember — a rule, a rough night, a new goal, a change of date — "
     "I write it down and ask you first.\n"
     "• Something about how you're doing or what's in the way — that goes to your coach "
-    "in your own words, and your plan comes back adjusted."
+    "in your own words, and your week comes back adjusted."
 )
 
 CAPTURE_PROMPT = "I'm listening — what should I know? (or /cancel)"
@@ -650,7 +650,7 @@ def _cli_env(
     wrap_width: Optional[int], simple: bool = False, source: str = "bot"
 ) -> Dict[str, str]:
     """Environment for a bot-driven CLI subprocess: structured prompts, no colour,
-    unbuffered I/O (so prompt requests arrive before the child blocks on stdin), and
+    unbuffered I/O (so prompt requests arrive before the child waits on stdin), and
     the narrow wrap width phones want. `simple` opts commands into the companion
     rendering (DESIGN_bot_simple_frontend.md §6).
 
@@ -724,7 +724,7 @@ async def restart_teardown(session: Optional[_Session], stop_polling) -> None:
 
 
 def main() -> None:
-    """Starts the long-polling Telegram bot. Blocks until interrupted."""
+    """Starts the long-polling Telegram bot. Runs until interrupted."""
     token = config.telegram_bot_token
     if not token:
         sys.exit(
@@ -1181,7 +1181,7 @@ def main() -> None:
         commands = SIMPLE_MENU_COMMANDS if target else MENU_COMMANDS
         try:
             await bot.set_my_commands([BotCommand(n, d) for n, d in commands])
-        except Exception as exc:  # the menu is cosmetic — never let it block the switch
+        except Exception as exc:  # the menu is cosmetic — never let it stop the switch
             journal.debug("bot.event", f"command menu not updated: {exc}")
         if announce and target:
             await bot.send_message(

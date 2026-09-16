@@ -344,7 +344,7 @@ def clear(name: str) -> bool:
 # their behaviour; the morning-push knobs and the router role have no such module.
 
 def commitment_days() -> int:
-    """How many days from today the coach must account for session by session
+    """How many days from today the week planner must account for session by session
     (DESIGN_plan_change_continuity.md §4.1). Operator-only: not in ROUTABLE_SETTINGS."""
     return value(COMMITMENT_DAYS)
 

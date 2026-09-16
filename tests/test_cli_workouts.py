@@ -135,7 +135,7 @@ class TestCliWorkouts(unittest.TestCase):
     def test_a_text_revision_shows_the_sentences_that_moved(
         self, mock_coach, _mock_ensure
     ):
-        """Title and load are the only columns the table can show, so a session the coach
+        """Title and load are the only columns the table can show, so a session the week planner
         revised in words alone rendered as `X | X | 85m/RPE7/TSS84 -> 85m/RPE7/TSS84` and
         read as a change made for no reason. Such a revision is real and worth reading, so
         the preview prints what moved (DESIGN_workout_revisions.md §9.1)."""
@@ -153,7 +153,7 @@ class TestCliWorkouts(unittest.TestCase):
             "Wednesday's execution was exactly right — same discipline again."
         ))
         mock_coach.workout_adapt.return_value = RevisionProposal(
-            reason="Holding the block; the cue now references Wednesday.",
+            reason="Holding the mesocycle; the cue now references Wednesday.",
             workouts=[adapted], new_constraints=[],
             range_start="2026-06-05", range_end="2026-06-30",
             pairs=(RevisionPair(proposal=adapted, original=original, is_swap=False),),
@@ -177,7 +177,7 @@ class TestCliWorkouts(unittest.TestCase):
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_a_text_revision_wraps_at_the_client_width(self, mock_coach, _mock_ensure):
-        """Over the bot the CLI is told the phone's width; the wording block used to wrap
+        """Over the bot the CLI is told the phone's width; the wording diff used to wrap
         at a fixed 88 columns regardless, so the phone re-wrapped every line and the
         old/new halves became indistinguishable."""
         original = {
@@ -195,7 +195,7 @@ class TestCliWorkouts(unittest.TestCase):
             "than chasing a higher average."
         ))
         mock_coach.workout_adapt.return_value = RevisionProposal(
-            reason="Holding the block.", workouts=[adapted], new_constraints=[],
+            reason="Holding the mesocycle.", workouts=[adapted], new_constraints=[],
             range_start="2026-06-05", range_end="2026-06-30",
             pairs=(RevisionPair(proposal=adapted, original=original, is_swap=False),),
         )
@@ -204,16 +204,16 @@ class TestCliWorkouts(unittest.TestCase):
             exit_code, stdout, _stderr = self.run_cli(["workout", "adapt"])
 
         self.assertEqual(exit_code, 0)
-        block = stdout.split("TEXT REVISED")[1]
-        self.assertIn("Was: Even power", block)
-        self.assertIn("Now: Wednesday's execution", block)
-        passages = [line for line in block.splitlines() if line.startswith("    ")]
-        self.assertTrue(passages and all(len(line) <= 48 for line in passages), block)
+        revised = stdout.split("TEXT REVISED")[1]
+        self.assertIn("Was: Even power", revised)
+        self.assertIn("Now: Wednesday's execution", revised)
+        passages = [line for line in revised.splitlines() if line.startswith("    ")]
+        self.assertTrue(passages and all(len(line) <= 48 for line in passages), revised)
 
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_simple_render_previews_the_revision_as_prose(self, mock_coach, _mock_ensure):
-        """Simple mode sends flowed text, not a <pre> block, so the preview is one
+        """Simple mode sends flowed text, not a <pre> message, so the preview is one
         paragraph per touched day — no table, no diff signs — and the ask is in
         companion words (DESIGN_bot_simple_frontend.md §6)."""
         lift = {
@@ -272,11 +272,11 @@ class TestCliWorkouts(unittest.TestCase):
 
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
-    def test_a_real_load_change_carries_no_text_revision_block(
+    def test_a_real_load_change_carries_no_text_revision_section(
         self, mock_coach, _mock_ensure
     ):
-        """The block is for changes the columns CANNOT show. A load change is visible in
-        them already, so repeating its prose would be noise."""
+        """The TEXT REVISED section is for changes the columns CANNOT show. A load change is
+        visible in them already, so repeating its prose would be noise."""
         original = {
             "date": "2026-06-05", "sport_type": "cycling", "title": "Climb Threshold",
             "description": "2x20 at threshold.",
@@ -309,7 +309,7 @@ class TestCliWorkouts(unittest.TestCase):
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_adapt_reports_metric_day_count_not_values(self, mock_coach, _mock_ensure):
-        # The coach still reads the full trajectory; the CLI only tells the athlete how
+        # The week planner still reads the full trajectory; the CLI only tells the athlete how
         # many days fed the decision and never prints the raw per-day numbers.
         mock_coach.workout_adapt.return_value = RevisionProposal(
             reason="Metrics are green", workouts=[], new_constraints=[],
@@ -543,7 +543,7 @@ class TestCliWorkouts(unittest.TestCase):
     @patch("trainmate.runtime.calendar_syncer")
     def test_workout_rm_soft_deletes(self, mock_calendar):
         """`workout rm` marks the row removed (kept in DB), hides it from reads, and
-        updates its calendar event — but it stays retrievable for the coach."""
+        updates its calendar event — but it stays retrievable for the week planner."""
         w_id = save_workout(test_db,
             date="2026-06-02", sport_type="running", title="Interval Session",
             description="5x800m", google_event_id="evt-1",
@@ -863,7 +863,7 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertIn("Tomorrow Ride", stdout)
         self.assertIn("Future Lift", stdout)
 
-        # Bare -m is the current block, bounded both ends; -m ID.. keeps the end open.
+        # Bare -m is the current mesocycle, bounded both ends; -m ID.. keeps the end open.
         exit_code, stdout, stderr = self.run_cli(["workout", "list", "-m"])
         self.assertEqual(exit_code, 0)
         self.assertNotIn("Past Yoga", stdout)
@@ -922,7 +922,7 @@ class TestCliWorkouts(unittest.TestCase):
         save_workout(test_db,
             date=today_str, sport_type="running", title="Tempo",
             description="eased", duration_minutes=45, tss=45,
-            adaptation_summary="block too hard", modification_reason="eased",
+            adaptation_summary="mesocycle too hard", modification_reason="eased",
         )
         exit_code, stdout, _ = self.run_cli(["workout", "list"])
         self.assertEqual(exit_code, 0)
@@ -1024,7 +1024,7 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertIn("Actual: [running] Cut Short", stdout)
         self.assertIn("Discrepancy: duration mismatch", stdout)
         self.assertIn("Discrepancy: workload mismatch", stdout)
-        # The rest of the detail block is untouched.
+        # The rest of the detail lines are untouched.
         self.assertIn("Description:", stdout)
 
     def test_a_narrowed_listing_is_still_graded_against_the_whole_day(self):
@@ -1345,7 +1345,7 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertNotIn(fmt_date(d1), question)
         self.assertIn(fmt_date(d2), question)
         self.assertIn("1 added by hand", question)
-        self.assertIn("your current plan is unchanged", stdout)
+        self.assertIn("your schedule is unchanged", stdout)
         mock_coach.workout_generate.assert_not_called()
 
         # Accepting proceeds.
@@ -1474,7 +1474,7 @@ class TestCliWorkouts(unittest.TestCase):
             mock_stamp.assert_not_called()
         mock_coach.workout_generate.assert_called_once()
 
-    def _goal_with_plan(self, target_days_out: int, block_days_out: int = 20):
+    def _goal_with_plan(self, target_days_out: int, mesocycle_days_out: int = 20):
         today_date = datetime.now(timezone.utc).date()
         goal_id = test_db.add_objective(
             title="Autumn Marathon",
@@ -1489,7 +1489,7 @@ class TestCliWorkouts(unittest.TestCase):
                 "name": "Base",
                 "start_date": today_date.strftime("%Y-%m-%d"),
                 "end_date": (
-                    today_date + timedelta(days=block_days_out)
+                    today_date + timedelta(days=mesocycle_days_out)
                 ).strftime("%Y-%m-%d"),
                 "focus": "Aerobic",
             }],
@@ -1533,8 +1533,8 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertNotEqual(exit_code, 0)
         self.assertIn("unrecognized arguments", stderr)
 
-    def _two_block_plan(self):
-        """A plan whose second block starts three weeks out, so a `-m` span on it opens
+    def _two_mesocycle_plan(self):
+        """A plan whose second mesocycle starts three weeks out, so a `-m` span on it opens
         well after today."""
         today_date = datetime.now(timezone.utc).date()
 
@@ -1554,23 +1554,23 @@ class TestCliWorkouts(unittest.TestCase):
                  "focus": "Threshold"},
             ],
         )
-        blocks = test_db.get_mesocycles_for_macrocycle(
+        mesocycles = test_db.get_mesocycles_for_macrocycle(
             test_db.get_macrocycle_for_objective(goal_id)["id"]
         )
-        return {b["name"]: b for b in blocks}
+        return {b["name"]: b for b in mesocycles}
 
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.prompt")
     @patch("trainmate.runtime.coach_service")
-    def test_generate_m_writes_the_block_from_its_own_first_day(
+    def test_generate_m_writes_the_mesocycle_from_its_own_first_day(
         self, mock_coach, mock_prompt, _ensure
     ):
-        """`-m 5` generates block 5 and nothing else — both ends come from the block,
+        """`-m 5` generates mesocycle 5 and nothing else — both ends come from the mesocycle,
         where the span used to reach back to today (DESIGN_cli_selectors.md §8)."""
         mock_coach.workout_generate.return_value = _proposal()
         mock_coach.config_changed.return_value = None
-        blocks = self._two_block_plan()
-        build = blocks["Build"]
+        mesocycles = self._two_mesocycle_plan()
+        build = mesocycles["Build"]
 
         exit_code, _, _ = self.run_cli(
             ["workout", "generate", "-m", str(build["id"]), "-f"]
@@ -1601,8 +1601,8 @@ class TestCliWorkouts(unittest.TestCase):
         touches — and stays quiet when the two readings agree."""
         mock_coach.workout_generate.return_value = _proposal()
         mock_coach.config_changed.return_value = None
-        blocks = self._two_block_plan()
-        base, build = blocks["Base"], blocks["Build"]
+        mesocycles = self._two_mesocycle_plan()
+        base, build = mesocycles["Base"], mesocycles["Build"]
 
         # The notice is wrapped for the terminal; compare on a single logical line.
         def _said(argv):
@@ -1635,7 +1635,7 @@ class TestCliWorkouts(unittest.TestCase):
     def test_generate_refuses_a_span_that_is_entirely_behind_us(
         self, mock_coach, mock_prompt, _ensure
     ):
-        """A block that has already run is history. Now that a selector names both ends,
+        """A mesocycle that has already run is history. Now that a selector names both ends,
         naming a finished one has to be refused rather than quietly regenerating today."""
         mock_coach.config_changed.return_value = None
         today = datetime.now(timezone.utc).date()

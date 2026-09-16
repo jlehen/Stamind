@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 
 from trainmate import runtime
 from trainmate.util import (
-    aside, bold, dim, green, red, cyan, gray, cmd, format_labeled_block, fmt_date,
+    aside, bold, dim, green, red, cyan, gray, cmd, format_labeled_paragraph, fmt_date,
     today_str as _today_str, notice,
 )
 from trainmate.cli.selectors import add_single_date_arg
@@ -119,7 +119,7 @@ def run_benchmark_record(args: argparse.Namespace) -> None:
     if not args.yes:
         crosses = _crosses_replan_band(kind, value, prev)
         tail = (
-            " — record and suggest replanning the next block?"
+            " — record and suggest replanning the next mesocycle?"
             if crosses else " — record?"
         )
         if not runtime.prompt.confirm(f"New {label} {new_disp}{change}{tail}"):
@@ -140,7 +140,7 @@ def run_benchmark_record(args: argparse.Namespace) -> None:
         notice(
             "This moves your effective threshold past the replan band — run "
             + cmd("plan generate")
-            + " to rebuild the next block against the fresh number.",
+            + " to rebuild the next mesocycle against the fresh number.",
         )
 
 
@@ -169,7 +169,7 @@ def run_benchmark_list(args: argparse.Namespace) -> None:
     for r, prev_value in benchmarks.with_previous(rows):
         print(_benchmark_line(r, prev_value))
         if r.get("note"):
-            print(format_labeled_block("  Note:", r["note"]))
+            print(format_labeled_paragraph("  Note:", r["note"]))
 
 
 def run_benchmark_rm(args: argparse.Namespace) -> None:
@@ -215,7 +215,7 @@ def add_benchmark_parser(subparsers):
             "you record here as authoritative, but Garmin buckets every activity into "
             "zones using ITS OWN thresholds at the time. An auto-detected bump silently "
             "moves the zone boundaries in your activity history, so the same effort lands "
-            "one zone lower and a training block looks easier than it was.\n\n"
+            "one zone lower and a training mesocycle looks easier than it was.\n\n"
             "For --e1rm, track ONE lift for now: the logbook has no per-exercise field, so "
             "a deadlift PR logged after a squat PR reads as one e1RM value jumping 70%."
         ),

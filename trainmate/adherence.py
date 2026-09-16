@@ -90,7 +90,7 @@ def format_discrepancies(discrepancies: List["Discrepancy"]) -> List[str]:
 def date_covered(
     date_str: str, covered_ranges: Optional[List[Tuple[str, str]]]
 ) -> bool:
-    """Whether `date_str` falls inside any planned block (mesocycle span).
+    """Whether `date_str` falls inside any planned mesocycle's span.
 
     `covered_ranges` of None means "assume covered" — preserves the original
     behavior for callers that don't supply coverage. Dates are YYYY-MM-DD, so
@@ -102,7 +102,7 @@ def date_covered(
 
 def planned_load(w: Dict[str, Any]) -> float:
     """Expected load of a planned workout as a single value (mirrors the actual
-    side): the coach's planned TSS, or sRPE (RPE x 10 x hours) when no TSS was
+    side): the week planner's planned TSS, or sRPE (RPE x 10 x hours) when no TSS was
     assigned. Replaces the former `tss + rpe*hours` blend.
 
     An explicit ``tss = 0`` means zero, not "unset" — it is a real planned load
@@ -302,7 +302,7 @@ def analyze_adherence(
         completed_activities: List of completed activities in the window.
         start_date_obj: Start date of the evaluation window.
         history_days: Length of the window in days.
-        covered_ranges: (start, end) spans of planned blocks. An activity on a day with
+        covered_ranges: (start, end) spans of planned mesocycles. An activity on a day with
             no planned workout is reported as a deviation ("Unplanned Activity!") only if
             its date falls within one of these spans; outside all coverage it is softened
             to an informational note. None means treat every date as covered.
@@ -319,7 +319,7 @@ def analyze_adherence(
             - List of text discrepancy messages (deviations from the plan).
             - List of mapping results with date, planned workout, completed activity, and
               the `pending` flag consumers must use rather than re-deriving the date rule.
-            - List of completed activities that fall outside any planned block (informational).
+            - List of completed activities that fall outside any planned mesocycle (informational).
     """
     matching_results = []
     discrepancies = []
@@ -411,7 +411,7 @@ def analyze_adherence(
                 "completed": matched_act,
                 "pending": pending,
                 # A pairing the athlete should get the chance to reject before it reaches
-                # the coach as fact. Rest days are excluded: a rest "match" is a violation,
+                # the week planner as fact. Rest days are excluded: a rest "match" is a violation,
                 # not a claim that the athlete performed the session.
                 "ambiguous": bool(
                     matched_act is not None

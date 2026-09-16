@@ -44,7 +44,7 @@ lacks.
 ## 1. Motivation
 
 A coach learning carries a `confidence` (`tentative | moderate | established`)
-that weights how much the planner trusts it. Today that level is **whatever the
+that weights how much the coaching calls trust it. Today that level is **whatever the
 LLM writes** in a delta, and it can only ever move **up or dormant**:
 
 - **Not anchored to evidence.** "established" is an LLM vibe, not a fact about how
@@ -70,7 +70,7 @@ shipped mechanisms:
 So this is **not** a rescue. It is a correctness/honesty upgrade: make the
 confidence *label* mean something concrete, and give contradiction a voice. The
 fingerprint's all-or-nothing guard also still leaks on a *partial* window change
-(§8 "Edges": add one session → fingerprint shifts → the whole window's
+(§8 "Edges": add one activity → fingerprint shifts → the whole window's
 reinforcement re-fires, including for learnings whose real support is older weeks).
 A per-learning basis closes that structurally.
 
@@ -92,7 +92,7 @@ A per-learning basis closes that structurally.
   `--auto` path applies staleness demotions unattended (§7).
 
 **Non-Goals**
-- Per-*session* provenance. Evidence is keyed on **weeks** (see §4) — the unit the
+- Per-*activity* provenance. Evidence is keyed on **weeks** (see §4) — the unit the
   LLM is actually shown.
 - Silent auto-erasure. Demotions are human-confirmed by default; `--auto` is an
   explicit opt-out for unattended runs, and only for *staleness* (§7). Note that the
@@ -136,7 +136,7 @@ learning_confidence_thresholds:   # distinct net supporting weeks to reach each 
 ```
 
 A loader reads these with the defaults above as fallback (tentative is always ≥1,
-retirement always ≤0 — not knobs); `config_template_full.yaml` carries the commented block
+retirement always ≤0 — not knobs); `config_template_full.yaml` carries the commented section
 next to `learning_staleness_days`. Tuning the map re-levels learnings on the next
 recompute without a migration — `db.recompute_all_confidence()` is the entry point that
 re-derives every learning from its basis on demand.
@@ -155,7 +155,7 @@ for the human to accept or dismiss (§7).
 
 ---
 
-## 4. Why Weeks, Not Sessions
+## 4. Why Weeks, Not Activities
 
 The analysis prompt (`CoachService._run_workout_analysis`, now in
 `coach/service/analysis.py`) feeds the LLM **weekly
@@ -167,13 +167,13 @@ This is a feature, not a compromise:
 
 - **Weeks dedupe trivially** — one `YYYY-MM-DD` (Monday) string per bucket.
 - **The gate thresholds become span-free.** The original sketch needed "≥3
-  sessions *over ≥2 weeks*" to stop five sessions in one week from minting
+  activities *over ≥2 weeks*" to stop five activities in one week from minting
   "established." Counting **distinct weeks** encodes the span automatically: "≥3
   distinct weeks" *is* "spread across ≥3 calendar weeks." No separate span check.
 - **No prompt restructure.** The weeks are already in front of the model.
 
-Going to session granularity would mean reshaping what the LLM sees and managing
-stable session IDs, for marginal benefit. Deferred (§10).
+Going to activity granularity would mean reshaping what the LLM sees and managing
+stable activity IDs, for marginal benefit. Deferred (§10).
 
 ---
 
@@ -309,7 +309,7 @@ The three human actions and their effects are:
 
 > **AS BUILT (rev 1) — resolved at the end of a run, not by new CLI verbs.** The three
 > actions are offered as an **interactive prompt at the end of `data bootstrap`/`data
-> reflect`**, one block per pending proposal. It is not the `y`/`N`/`s` `input()` idiom
+> reflect`**, one mesocycle per pending proposal. It is not the `y`/`N`/`s` `input()` idiom
 > the draft assumed: it uses the shared `cli.prompt.choose` selection menu, with
 > **`skip` as the default answer** — the safest of the three, since an unattended Enter
 > then changes nothing. `--auto` skips the prompt entirely (staleness applied directly,
@@ -439,7 +439,7 @@ Schema is additive (new table + nullable column), consistent with the in-place
 ## 10. Decisions & Open Questions
 
 **Resolved**
-- **Week granularity** over session (§4) — fits the prompt, encodes span for free.
+- **Week granularity** over activity (§4) — fits the prompt, encodes span for free.
 - **App computes confidence; LLM only attributes evidence** (§3, §6). The
   `confidence` field is removed from the delta protocol.
 - **Upgrades auto, downgrades proposed** (§7) — the agreed "propose gradual demote,
@@ -477,7 +477,7 @@ Schema is additive (new table + nullable column), consistent with the in-place
 ---
 
 ## 11. Out of Scope
-- Per-session evidence provenance.
+- Per-activity evidence provenance.
 - Auto-applied *contradiction* demotion/retirement (always human-confirmed; only
   *staleness* demotions auto-apply, and only under `--auto` — §7).
 - Confidence in `workout adapt` / `workout generate` (read-only consumers).

@@ -83,7 +83,7 @@ class TestFormatMetricsHistory(unittest.TestCase):
         self.assertIn(PMC_TSB_LAG_NOTE, out)
 
     def test_no_tsb_no_lag_footnote(self):
-        # ...and conversely: a CTL/ATL-only block shows no TSB, so there is no lag
+        # ...and conversely: a CTL/ATL-only history shows no TSB, so there is no lag
         # on display to explain and the footnote must be omitted.
         rows = [{"date": "2026-07-02", "rhr": 52, "hrv": 61, "sleep_score": 78,
                  "stress": 31, "ctl": 62.4, "atl": 71.7, "tsb": None}]
@@ -93,7 +93,7 @@ class TestFormatMetricsHistory(unittest.TestCase):
 
 
 # ==============================================================================
-# _format_athlete_profile — the prompt's who-you-are block
+# _format_athlete_profile — the prompt's who-you-are section
 # ==============================================================================
 class TestFormatAthleteProfile(unittest.TestCase):
     def _render(self, **profile):

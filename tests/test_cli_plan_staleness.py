@@ -89,14 +89,14 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self._seed(stale=True)
 
         exit_code, stdout, _ = run_cli(["plan", "show"])
-        flowed = " ".join(stdout.split())  # the block is wrapped to the terminal width
+        flowed = " ".join(stdout.split())  # the text is wrapped to the terminal width
 
         self.assertEqual(exit_code, 0)
         self.assertIn("An input has changed since this plan was generated", flowed)
         # Names the field, so the athlete knows which input to go and look at (§5).
         self.assertIn("chronic_injuries", stdout)
         # The test being applied, not just the fact that something moved (§9).
-        self.assertIn("block structure, phase order or volume ramp", flowed)
+        self.assertIn("mesocycle structure, phase order or volume ramp", flowed)
         # The command that actually reaches the days already scheduled (§6.5).
         self.assertIn("'workout generate -d today..' applies it to the days already "
                       "scheduled", flowed)
@@ -153,7 +153,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         _code, again, _ = run_cli(["plan", "keep"])
         self.assertIn("already reflects your current inputs", again)
 
-    # --- §10: the diff, and the coach's read ---
+    # --- §10: the diff, and the verdict call's read ---
 
     @patch("trainmate.runtime.garmin")
     def test_plan_show_prints_the_edit_itself(self, _mock_garmin):
@@ -236,7 +236,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         return kwargs.get("default"), out.getvalue(), client.complete
 
     def test_the_coach_is_asked_with_the_diff_and_the_plan(self):
-        """The verdict call is small on purpose: the §2 rubric, the diff, and the blocks
+        """The verdict call is small on purpose: the §2 rubric, the diff, and the mesocycles
         as they stand — on the coach's own model, under its own journal label."""
         _default, _out, complete = self._confirm_regenerate(
             {"reshaping": False, "why": "Wording only."}
@@ -245,29 +245,29 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         complete.assert_called_once()
         system_prompt, user_content = complete.call_args[0][:2]
         self.assertEqual(complete.call_args[1]["label"], "plan_verdict")
-        self.assertIn("block structure", system_prompt)
+        self.assertIn("mesocycle structure", system_prompt)
         self.assertIn("-a sentence that has since been reworded", user_content)
         self.assertIn("Base (", user_content)
         self.assertIn("strategy", user_content)
 
     def test_a_keep_verdict_is_shown_and_the_default_stays_no(self):
         default, out, _ = self._confirm_regenerate(
-            {"reshaping": False, "why": "Wording only; the blocks stand."}
+            {"reshaping": False, "why": "Wording only; the mesocycles stand."}
         )
 
         self.assertFalse(default)
-        self.assertIn("Coach: keep the plan. Wording only; the blocks stand.", out)
+        self.assertIn("Coach: keep the plan. Wording only; the mesocycles stand.", out)
         self.assertIn("-a sentence that has since been reworded", out)
 
     def test_a_reshaping_verdict_flips_the_default_to_yes(self):
         """A coach that says "re-shaping" and a question defaulting to No would be two
         answers on one screen (§10)."""
         default, out, _ = self._confirm_regenerate(
-            {"reshaping": True, "why": "The strength block would move earlier."}
+            {"reshaping": True, "why": "The strength mesocycle would move earlier."}
         )
 
         self.assertTrue(default)
-        self.assertIn("Coach: re-shaping. The strength block would move earlier.", out)
+        self.assertIn("Coach: re-shaping. The strength mesocycle would move earlier.", out)
 
     def test_a_failed_verdict_leaves_the_question_and_no_read(self):
         """Fail open: the network must never stand between the athlete and the
@@ -276,7 +276,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
 
         self.assertFalse(default)
         self.assertNotIn("Coach:", out)
-        self.assertIn("block structure, phase order or volume ramp", " ".join(out.split()))
+        self.assertIn("mesocycle structure, phase order or volume ramp", " ".join(out.split()))
 
     def test_a_malformed_verdict_counts_as_none(self):
         default, out, _ = self._confirm_regenerate({"reshaping": "yes please"})
@@ -286,7 +286,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
 
     def test_workout_generate_proceeds_by_default_only_when_the_coach_says_keep(self):
         """Proceeding with the stale plan is the "keep" answer, so its default follows
-        the coach's read the other way round from `plan generate` (§10)."""
+        the verdict call's read the other way round from `plan generate` (§10)."""
         import io
         from contextlib import redirect_stdout
         from trainmate.cli.workouts.generate import _confirm_out_of_date_plans
@@ -471,7 +471,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             end_date=self._days_out(31), replan=1,
         )
         with patch("trainmate.coach.engine.openrouter_client") as client:
-            client.complete.return_value = {"reshaping": True, "why": "a lost block"}
+            client.complete.return_value = {"reshaping": True, "why": "a lost mesocycle"}
             _code, shaping, _ = run_cli(["plan", "show"])
         self.assertIn("plan-shaping constraints changed", shaping)
 

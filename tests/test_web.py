@@ -174,7 +174,7 @@ class TestCompareEndpoint(unittest.TestCase):
         self.assertIn("Complete Miss", missed["text"])
 
     def test_unplanned_activity_is_flagged(self):
-        # An activity on a day with no planned workout, inside a planned block
+        # An activity on a day with no planned workout, inside a planned mesocycle
         # (mesocycle), surfaces as an unplanned deviation.
         obj_id = test_db.add_objective(
             title="Race", target_date="2026-09-01", sport_type="running",
@@ -398,14 +398,14 @@ class TestPlanDiffEndpoint(unittest.TestCase):
         self.assertEqual(diff["to"]["id"], v2)
         self.assertFalse(diff["strategy"]["changed"])
 
-        blocks = {m["change"]: m for m in diff["mesocycles"]}
-        self.assertEqual(blocks["changed"]["name"], "Base")
+        mesocycles = {m["change"]: m for m in diff["mesocycles"]}
+        self.assertEqual(mesocycles["changed"]["name"], "Base")
         self.assertEqual(
-            blocks["changed"]["dates"],
+            mesocycles["changed"]["dates"],
             {"from": {"start": "2026-06-01", "end": "2026-06-28"},
              "to": {"start": "2026-06-01", "end": "2026-07-05"}},
         )
-        self.assertEqual(blocks["removed"]["name"], "Dropped")
+        self.assertEqual(mesocycles["removed"]["name"], "Dropped")
 
         (drift,) = diff["thresholds"]["changed"]
         self.assertEqual(drift["key"], "ftp")

@@ -21,7 +21,7 @@ from trainmate import athlete_queue, progression, runtime
 from trainmate.strength.sets import session_lines
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.config import config
-from trainmate.progression import RUNWAY_BLOCK, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
+from trainmate.progression import RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
 from trainmate.sports import canonical_sport
 from trainmate.prompt import emit_buttons
 from trainmate.util import (
@@ -43,7 +43,7 @@ from trainmate.cli.workouts.generate import (
     print_workout_table,
 )
 from trainmate.cli.workouts.revisions import (
-    print_revision_preview, rewritten_text_only, wording_block_lines, wording_blocks,
+    print_revision_preview, rewritten_text_only, wording_group_lines, wording_groups,
 )
 
 # --- The companion line builders (DESIGN_bot_simple_frontend.md §6) ---
@@ -106,7 +106,7 @@ def simple_day_lines(
     verdicts: Optional[Dict[int, Dict[str, Any]]] = None,
 ) -> List[str]:
     """Simple rendering of one day's schedule: session line(s) plus the wrapped
-    description (the coach's actual prescription), or the one-line rest message.
+    description (the week planner's actual prescription), or the one-line rest message.
     Any empty day gets the rest line, whatever the reason it is empty
     (DESIGN_bot_simple_frontend.md §10).
 
@@ -434,8 +434,8 @@ def simple_plan_shaping_line(impact: Dict[str, Any]) -> str:
 def simple_focus_snippet(text: str, limit: int = 220) -> str:
     """The opening of a mesocycle's focus, for the plan view: the first sentence when
     one ends within `limit` chars, else a word-boundary cut with an ellipsis. A one-word
-    label the planner likes to open with ("Purpose: …") goes — it is a field name, not
-    a headline. The full prescription is a tap away (`bot block`, §11.2)."""
+    label the `plan generate` model likes to open with ("Purpose: …") goes — it is a field
+    name, not a headline. The full prescription is a tap away (`bot mesocycle`, §11.2)."""
     text = " ".join(text.split())
     text = re.sub(r"^[A-Za-z]+:\s+", "", text)
     text = text[:1].upper() + text[1:]
@@ -447,17 +447,17 @@ def simple_focus_snippet(text: str, limit: int = 220) -> str:
     return text[:text.rfind(" ", 0, limit)] + "…"
 
 
-def simple_block_window(start: str, end: str) -> str:
-    """A training block's span as the plan view's leading column — 'Aug 17 – Sep 06'.
-    Weekday and year go, where `simple_date_word` keeps the weekday: a block boundary is
+def simple_mesocycle_window(start: str, end: str) -> str:
+    """A training mesocycle's span as the plan view's leading column — 'Aug 17 – Sep 06'.
+    Weekday and year go, where `simple_date_word` keeps the weekday: a mesocycle boundary is
     a week rather than an appointment, and the column has to stay scannable (§11.1)."""
     def month_day(date_str: str) -> str:
         return datetime.strptime(date_str, "%Y-%m-%d").strftime("%b %d")
     return f"{month_day(start)} – {month_day(end)}"
 
 
-def simple_block_length(total_days: int) -> str:
-    """How long a block runs. Exact-week blocks read in weeks; anything ragged reads in
+def simple_mesocycle_length(total_days: int) -> str:
+    """How long a mesocycle runs. Exact-week mesocycles read in weeks; anything ragged reads in
     days rather than as a rounded lie."""
     if total_days % 7 == 0:
         weeks = total_days // 7
@@ -477,43 +477,43 @@ def picker_label(text: str) -> str:
     return text
 
 
-def simple_block_lines(m: Dict[str, Any], today: str) -> List[str]:
-    """One training block as a stanza head: the marker and name, then the window and
-    the one thing the window cannot say — nothing behind her, how far into the block
+def simple_mesocycle_lines(m: Dict[str, Any], today: str) -> List[str]:
+    """One training mesocycle as a stanza head: the marker and name, then the window and
+    the one thing the window cannot say — nothing behind her, how far into the mesocycle
     she is, length ahead (§11.2). The plan view adds the focus headline under the
-    active block; `bot block` adds the whole focus."""
+    active mesocycle; `bot mesocycle` adds the whole focus."""
     start, end = str(m["start_date"]), str(m["end_date"])
     total_days = max(1, days_between(start, end) + 1)
-    window = simple_block_window(start, end)
+    window = simple_mesocycle_window(start, end)
     if end < today:
         return [f"✅ {m['name']}", window]
     if start <= today:
         total_weeks = max(1, -(-total_days // 7))  # ceiling
         week_now = min(total_weeks, days_between(start, today) // 7 + 1)
         return [f"📍 {m['name']}", f"{window} · you're in week {week_now} of {total_weeks}"]
-    return [f"⏳ {m['name']}", f"{window} · {simple_block_length(total_days)}"]
+    return [f"⏳ {m['name']}", f"{window} · {simple_mesocycle_length(total_days)}"]
 
 
 def simple_plan_lines(
     goal: Dict[str, Any], macrocycle: Dict[str, Any],
     mesocycles: List[Dict[str, Any]], today: str,
 ) -> List[str]:
-    """Simple rendering of one periodization plan: the road to the goal — blocks done,
-    the block the athlete is in (with its focus headline), blocks ahead — closed by the
+    """Simple rendering of one periodization plan: the road to the goal — mesocycles done,
+    the mesocycle the athlete is in (with its focus headline), mesocycles ahead — closed by the
     goal day. Strategy prose, IDs, feedback and snapshotted inputs stay expert detail
     (§11).
 
-    Each block is a stanza with a blank line before it: a phone flows the text, so
+    Each mesocycle is a stanza with a blank line before it: a phone flows the text, so
     whitespace is the only column it can draw (§11.2)."""
     lines = [f"🧭 The road to {goal['title']}"]
     if macrocycle.get("status") == "superseded":
         lines.append("(an older version of the plan — a newer one has replaced it)")
     if not mesocycles:
-        lines.append("No training blocks drawn up yet — check back soon 🌱")
+        lines.append("No training mesocycles drawn up yet — check back soon 🌱")
         return lines
     for m in mesocycles:
         lines.append("")
-        lines.extend(simple_block_lines(m, today))
+        lines.extend(simple_mesocycle_lines(m, today))
         focus = (m.get("focus") or "").strip()
         if focus and str(m["start_date"]) <= today <= str(m["end_date"]):
             lines.append(wrap_text(simple_focus_snippet(focus)))
@@ -527,17 +527,17 @@ def simple_plan_lines(
     return lines
 
 
-def simple_block_buttons(mesocycles: List[Dict[str, Any]], today: str) -> List[dict]:
-    """The door under the plan view to a block's full prescription (§11.2): one leaf
-    per block under way or still ahead, each sending the read-only `bot block <id>`.
+def simple_mesocycle_buttons(mesocycles: List[Dict[str, Any]], today: str) -> List[dict]:
+    """The door under the plan view to a mesocycle's full prescription (§11.2): one leaf
+    per mesocycle under way or still ahead, each sending the read-only `bot mesocycle <id>`.
     A lone candidate is offered directly; several sit behind one "Tell me more", so
-    the row is never wider than a thumb. Finished blocks say nothing here either (§6)."""
+    the row is never wider than a thumb. Finished mesocycles say nothing here either (§6)."""
     ahead = [m for m in mesocycles if str(m["end_date"]) >= today]
     if not ahead:
         return []
     leaves = [
-        {"label": picker_label(simple_block_lines(m, today)[0]),
-         "send": f"bot block {m['id']}"}
+        {"label": picker_label(simple_mesocycle_lines(m, today)[0]),
+         "send": f"bot mesocycle {m['id']}"}
         for m in ahead
     ]
     if len(leaves) == 1:
@@ -574,15 +574,15 @@ def simple_revision_lines(proposal: RevisionProposal) -> List[str]:
     for pair in proposal.pairs:
         pw, existing = pair.proposal, pair.original
         day = "Today" if pw['date'] == today else simple_date_word(pw['date'])
-        block = [f"{simple_session_line(pw, lead=day)} ({_simple_was_clause(pw, existing)})"]
+        entry_lines = [f"{simple_session_line(pw, lead=day)} ({_simple_was_clause(pw, existing)})"]
         why = (pw.get('modification_reason') or '').strip()
         if why and why != (proposal.reason or '').strip():
-            block.append(why)
-        paragraphs = ["\n".join(block)]
+            entry_lines.append(why)
+        paragraphs = ["\n".join(entry_lines)]
         if rewritten_text_only(pw, existing):
-            # A blank line between blocks, so each Was/Now pair reads as one passage.
+            # A blank line between pairs, so each Was/Now pair reads as one passage.
             paragraphs.extend(
-                "\n".join(wording_block_lines(b)) for b in wording_blocks(pw, existing)
+                "\n".join(wording_group_lines(b)) for b in wording_groups(pw, existing)
             )
         entries.append((pw['date'], "\n\n".join(paragraphs)))
     for ew in proposal.removals:
@@ -657,11 +657,11 @@ def simple_runway_lines(state: Dict[str, Any], today: str) -> List[str]:
     """The morning push's companion wording for one runway state
     (DESIGN_runway_nudge.md §6).
 
-    Span and block cliffs read as an offer, because the button beside them performs it;
+    Span and mesocycle cliffs read as an offer, because the button beside them performs it;
     a plan cliff reads as a wrap-up, because periodization is operator work in companion
     mode and there is nothing here for the athlete to tap."""
     kind, days_left = state["kind"], state["days_left"]
-    if kind in (RUNWAY_BLOCK, RUNWAY_SPAN):
+    if kind in (RUNWAY_MESOCYCLE, RUNWAY_SPAN):
         if days_left < 0:
             return ["Want me to plan the next few weeks?"]
         when = simple_when(state["last_covered_date"], today)
@@ -719,7 +719,7 @@ class ExpertRenderer:
 
     def adapt_no_change(self) -> None:
         print(green(
-            "\nAll metrics are green and workout plan is on track. "
+            "\nAll metrics are green and the schedule is on track. "
             "No changes recommended."
         ))
 
@@ -728,7 +728,7 @@ class ExpertRenderer:
         supplies the words; `runtime.prompt` asks (§4)."""
         return (
             "PROPOSED WORKOUT ADAPTATIONS:",
-            "Apply these adaptations to your training plan and sync to Calendar?",
+            "Apply these adaptations to your schedule and sync to Calendar?",
         )
 
     def adapt_discarded(self) -> None:
@@ -980,7 +980,7 @@ class CompanionRenderer(ExpertRenderer):
         print("\nOkay — nothing changed.")
 
     def adapt_applied(self) -> None:
-        print(green("Done — your plan is updated. 💪"))
+        print(green("Done — your week is updated. 💪"))
 
     # -- confirming a note's candidates --
     # The companion's main felt surface once notes stop riding the coach: she says
@@ -1069,7 +1069,7 @@ class CompanionRenderer(ExpertRenderer):
         self, days: list, *, start_date: str, end_date: str, sport_filter: Optional[str],
         discrepancies: list, informational: list, covered_ranges: list,
     ) -> None:
-        # The discrepancy list, the load-from-RPE note and the in-block/off-plan
+        # The discrepancy list, the load-from-RPE note and the in-mesocycle/off-plan
         # distinction are expert detail: the glyph on each line is the whole verdict here,
         # and an effort under the minor-load bar is not mentioned at all
         # (DESIGN_bot_simple_frontend.md §6).
@@ -1097,10 +1097,10 @@ class CompanionRenderer(ExpertRenderer):
         today = _today_date().strftime("%Y-%m-%d")
         for line in simple_plan_lines(goal, macrocycle, mesocycles, today):
             print(line)
-        # The road names the blocks; the button is how she reads one in full (§11.2).
-        # Only for the version in force — an older version's blocks are history.
+        # The road names the mesocycles; the button is how she reads one in full (§11.2).
+        # Only for the version in force — an older version's mesocycles are history.
         if macrocycle.get("status") != "superseded":
-            buttons = simple_block_buttons(mesocycles, today)
+            buttons = simple_mesocycle_buttons(mesocycles, today)
             if buttons:
                 emit_buttons(buttons)
 

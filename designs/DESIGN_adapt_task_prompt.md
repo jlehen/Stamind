@@ -40,7 +40,7 @@ heading that says what they are:
 ```
 STANDING RULES — these govern every section below, and it does not restate them:
 1. MOVE BEFORE YOU EASE, EASE BEFORE YOU DELETE.
-2. THE BLOCK IS NOT YOURS TO RESHAPE.
+2. THE MESOCYCLE IS NOT YOURS TO RESHAPE.
 3. NAME THE CAUSE.
 4. NOT EVERY GAP IS A MISS.
 5. RECOVERY METRICS LAG.
@@ -55,10 +55,10 @@ Each rule earns its place by having been load-bearing in more than one section:
 - **Rule 1** is the single most repeated instruction in the old prompt, and the one most at
   risk of quiet divergence. It is a preference order, not a prohibition — every section that
   used to restate it wanted exactly the same order.
-- **Rule 2** is the firewall `DESIGN_block_boundary.md` §2 and
+- **Rule 2** is the firewall `DESIGN_mesocycle_boundary.md` §2 and
   `DESIGN_intensity_distribution.md` §9.2 both describe from their own side. It is what
-  "adapt is tactical and within-block" means operationally. The rule names the three signals
-  that were each separately declared insufficient to re-cut a block — a depressed morning, a
+  "adapt is tactical and within-mesocycle" means operationally. The rule names the three signals
+  that were each separately declared insufficient to re-cut a mesocycle — a depressed morning, a
   note, a drift reading — so a fourth signal added later inherits the rule instead of needing
   its own copy of it.
 - **Rule 3** was stated in three sections *and* in the `change_reason` schema field itself,
@@ -90,7 +90,7 @@ was stated *only* for tests, leaving an ordinary moved session to the model's in
 analogy. And a rule that fires whenever the model moves anything at all should not be
 discoverable only by reading the benchmark section. Likewise the drift section
 keeps its escalation to `workout generate` (§9.2a's handoff) and the terminal window keeps
-"do not deepen a cut to carry the athlete into the next block" — both are specific
+"do not deepen a cut to carry the athlete into the next mesocycle" — both are specific
 consequences, not restatements.
 
 ## 3. Result
@@ -121,8 +121,8 @@ now does:
 | removed from the prompt | lives in |
 | --- | --- |
 | why a test may never be softened, why moving it is the model's call | `DESIGN_benchmark_workouts.md` §4 |
-| why an easing at a block's end cannot rebound | `DESIGN_block_boundary.md` §1, §3 |
-| why adapt may sharpen a prescription but not re-shape a block | `DESIGN_intensity_distribution.md` §9.2, §9.2a |
+| why an easing at a mesocycle's end cannot rebound | `DESIGN_mesocycle_boundary.md` §1, §3 |
+| why adapt may sharpen a prescription but not re-shape a mesocycle | `DESIGN_intensity_distribution.md` §9.2, §9.2a |
 | why drift up and drift down are the same correction mirrored | `DESIGN_intensity_distribution.md` §9.4 |
 | why the standing rules exist and what each replaced | this document, §2 |
 
@@ -149,7 +149,7 @@ the reasoning goes in the design doc, and neither is duplicated across files.
 `tests/test_prompt_gates.py` pins the conditional regions: each gated feature must appear in
 every place it belongs or in none, and the schema must stay well-formed across the gated
 member. `tests/test_adaptation_adapt.py` pins the section headers and the phrases the
-handoffs depend on — `THIS BLOCK IS ENDING` with its rendered day count,
+handoffs depend on — `THIS MESOCYCLE IS ENDING` with its rendered day count,
 `CORRECTING EXECUTION DRIFT:`, the drift branch's "even when recovery metrics are fine", and
 the escalation "belongs to the next `workout generate`". A rewrite that dissolves one of
 those into a standing rule would pass a reading and fail the suite, which is the point: the

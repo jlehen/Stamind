@@ -142,7 +142,7 @@ Morning push
     adapt-first       off                      default
 ```
 
-`settings list <name>` adds what the generic block cannot say: for `coach-model` the
+`settings list <name>` adds what the generic listing cannot say: for `coach-model` the
 numbered menu, marked with which entry coaches and which one routes; for `timezone` the
 local date and time the zone produces, so it can be checked against a watch rather than
 trusted by name. Those renderers live in `trainmate/cli/settings.py`, keyed by name, so

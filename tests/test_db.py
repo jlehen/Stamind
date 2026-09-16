@@ -281,7 +281,7 @@ class TestDatabase(unittest.TestCase):
     def test_the_merge_tally_is_empty_when_there_is_nothing_to_do(self):
         self.assertEqual(test_db.apply_learning_deltas([]), {"applied": 0, "skipped": 0})
 
-    def test_evidence_dedup_blocks_inflation(self):
+    def test_evidence_dedup_prevents_inflation(self):
         """Re-citing counted weeks is a structural no-op: confidence cannot ratchet and
         recency is not refreshed (DESIGN_evidence_based_confidence.md §6)."""
         test_db.apply_learning_deltas([
@@ -784,7 +784,7 @@ class TestGoalStateIsDerived(unittest.TestCase):
         obj_id = self._goal(title, target)
         test_db.save_macrocycle(
             objective_id=obj_id, strategy=title, goals_hash="g", constraints_hash="c",
-            mesocycles=[{"name": f"{title} block", "start_date": "2026-06-01",
+            mesocycles=[{"name": f"{title} mesocycle", "start_date": "2026-06-01",
                          "end_date": "2026-06-28", "focus": "base"}],
         )
         return obj_id
@@ -799,7 +799,7 @@ class TestGoalStateIsDerived(unittest.TestCase):
 
     def test_governing_plan_falls_back_to_the_last_completed_goal(self):
         """The day after an event the workouts behind the athlete still belong to that
-        plan; blanking the timeline's block labels right then would be worse than keeping
+        plan; blanking the timeline's mesocycle labels right then would be worse than keeping
         them (§12)."""
         self._planned_goal("Spring race", "2026-06-01")
         latest = self._planned_goal("Last month's race", "2026-07-04")

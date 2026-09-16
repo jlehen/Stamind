@@ -7,9 +7,9 @@ from trainmate.coach.proposals import PlanFingerprints
 from trainmate.adherence import planned_load
 from trainmate.sports import canonical_sport
 from trainmate import signals
-from trainmate.db.periodization import repair_block_contiguity
+from trainmate.db.periodization import repair_mesocycle_contiguity
 from trainmate.util import (
-    aside, step, cyan, bold, cmd, wrap_text, format_labeled_block, default_wrap_width,
+    aside, step, cyan, bold, cmd, wrap_text, format_labeled_paragraph, default_wrap_width,
     notice,
 )
 import trainmate.coach.service as _svc
@@ -39,18 +39,18 @@ def _print_new_strategy(
 ) -> None:
     """Shows the freshly generated plan for the apply/discard decision.
 
-    Each block is a head line plus its focus indented underneath, matching
+    Each mesocycle is a head line plus its focus indented underneath, matching
     `plan show`, rather than one long line the terminal breaks where it likes."""
     head, rule = _banner("NEW PERIODIZATION STRATEGY (MACROCYCLE)", width)
     print(cyan(bold(f"\n{head}")))
-    print(format_labeled_block(bold("Overall Strategy:"), strategy, width))
+    print(format_labeled_paragraph(bold("Overall Strategy:"), strategy, width))
     print()
-    print(bold("Mesocycle Blocks:"))
+    print(bold("Mesocycles:"))
     for m in mesocycles:
-        block_head = wrap_text(
+        mesocycle_head = wrap_text(
             f"- {m['name']} ({m['start_date']} to {m['end_date']})", width
         )
-        print(format_labeled_block(bold(block_head), m['focus'], width))
+        print(format_labeled_paragraph(bold(mesocycle_head), m['focus'], width))
     print(cyan(bold(f"{rule}\n")))
 
 
@@ -277,7 +277,7 @@ class PlanningMixin:
     def plan_reshape_verdict(
         self, macro: Dict[str, Any], change_reason: str,
     ) -> Optional[Dict[str, Any]]:
-        """The coach's read on whether `change_reason` would have reshaped `macro`:
+        """The verdict call's read on whether `change_reason` would have reshaped `macro`:
         {"reshaping": bool, "why": str}, or None when no verdict could be had. Fails open
         on purpose — the staleness question must never hang on the network, so any error
         or malformed reply leaves the athlete with the question and no verdict (§10)."""
@@ -304,7 +304,7 @@ class PlanningMixin:
         auto_apply: bool = True, fresh: bool = False, start_date: Optional[str] = None,
         show_context: bool = False
     ) -> PlanProposal:
-        """Determines the macrocycle strategy and mesocycle blocks.
+        """Determines the macrocycle strategy and mesocycles.
 
         With `auto_apply` the proposal is saved before returning; otherwise the caller
         hands it back to :meth:`plan_apply` once the athlete accepts it.
@@ -459,12 +459,12 @@ class PlanningMixin:
                 ), cyan)
 
         if not reused:
-            # The plan being replaced, for the "PREVIOUS PERIODIZATION STRATEGY" block —
-            # deliberately singular, since that block is about the intent this one departs
+            # The plan being replaced, for the "PREVIOUS PERIODIZATION STRATEGY" section —
+            # deliberately singular, since that section is about the intent this one departs
             # from. The *review* below sees both (§6.1).
             prev_macro = existing_macro or preceding_macro
 
-            # `fresh` withholds only this block: `prev_macro` still reaches the
+            # `fresh` withholds only this mesocycle: `prev_macro` still reaches the
             # planned-vs-actual review below, which is what the athlete trained, not the
             # intent they are departing from.
             prev_strategy_text = None
@@ -482,11 +482,11 @@ class PlanningMixin:
                     f"- Mesocycles:\n{prev_meso_text or '  - None\n'}"
                 )
 
-            # The block the athlete is mid-way through, offered so the new plan may let it
-            # finish rather than cutting it at today (DESIGN_block_progress.md §7). Gated on
+            # The mesocycle the athlete is mid-way through, offered so the new plan may let it
+            # finish rather than cutting it at today (DESIGN_mesocycle_progress.md §7). Gated on
             # the plan starting today: a start pinned after a preceding goal's target must
-            # not be reached back past, or the kept block would overlap that goal's season.
-            current_block = None
+            # not be reached back past, or the kept mesocycle would overlap that goal's season.
+            current_mesocycle = None
             if existing_macro and not fresh and plan_start_date == today_date:
                 covering = self._db.get_covering_mesocycle(today_str)
                 if (
@@ -494,7 +494,7 @@ class PlanningMixin:
                     and covering['macrocycle_id'] == existing_macro['id']
                     and covering['start_date'] < today_str
                 ):
-                    current_block = covering
+                    current_mesocycle = covering
 
             # The pending log, verbatim and oldest first, so a later note reads as an
             # amendment of an earlier one. Filed notes carry the phase NAME: names
@@ -561,7 +561,7 @@ class PlanningMixin:
                 history_summary=history_summary,
                 prior_training_text=prior_training_text,
                 learnings=learnings,
-                current_block=current_block,
+                current_mesocycle=current_mesocycle,
                 changed_inputs=self._changed_inputs_text(prev_macro),
             )
             strategy = macro_data.get("strategy", "Endurance preparation strategy.")
@@ -598,9 +598,9 @@ class PlanningMixin:
 
         # Repair within-plan gaps/overlaps here, where the note can reach the user; the
         # write boundary re-applies the same repair as a no-op (DOMAIN_MODEL.md §4).
-        mesocycles, repair_notes = repair_block_contiguity(mesocycles)
+        mesocycles, repair_notes = repair_mesocycle_contiguity(mesocycles)
         for note in repair_notes:
-            notice(f"Note: block dates repaired — {note}.")
+            notice(f"Note: mesocycle dates repaired — {note}.")
 
         if fingerprints is None:
             today_str = _svc._today_str()
@@ -714,7 +714,7 @@ class PlanningMixin:
     def replan(
         self, force: bool = False, objective_id: Optional[int] = None
     ) -> Tuple[str, List[Workout]]:
-        """Generates or adapts the training plan from today onwards.
+        """Runs `plan generate`, then `workout generate`, from today onwards.
 
         Unattended by design — it applies the generated workouts without a preview, unlike
         the CLI's `workout generate`, which shows them and asks."""
@@ -726,7 +726,7 @@ class PlanningMixin:
                 []
             )
 
-        # Workouts follow the blocks covering the days they land on, so the plan just
+        # Workouts follow the mesocycles covering the days they land on, so the plan just
         # saved needs no naming here — it is the newest, and therefore wins any overlap
         # with an older goal's plan. Named explicitly all the same, so an explicit replan
         # of one goal still settles that contest its way (DESIGN_cli_selectors.md §8).

@@ -13,7 +13,7 @@ bold, and §11's rev notes carry the changes made after the first landing.
 Time-in-zone is the only signal already in the database that recovers the distinction.
 
 The failure mode this leaves open is **intensity creep**: easy days drift to moderate across a
-base block while volume quietly gives way to make room. Weekly TSS stays flat, CTL stays flat,
+base mesocycle while volume quietly gives way to make room. Weekly TSS stays flat, CTL stays flat,
 the PMC reads healthy — and the athlete stagnates:
 
 | Running, per week | Base 1 | Base 2 |        Δ |
@@ -47,7 +47,7 @@ and §9's split of responsibility between `adapt` and `generate`, depends on the
 - **Intensity** — effort relative to threshold. In TrainMate this is *only* ever observable as
   the zone distribution. There is no other intensity signal in the schema.
 - **Load** — TSS. One scalar folding the other two together (`compute_load`), structurally
-  `duration × IF²`, and for HR-derived sessions literally `Σ(zone_seconds × weight)`.
+  `duration × IF²`, and for HR-derived activities literally `Σ(zone_seconds × weight)`.
 
 ```
 load = volume × intensity
@@ -65,7 +65,7 @@ because the rest of the design argues against it, not because anything here is s
 Zone-seconds were already summed in two places, so this design was mostly consolidation:
 
 - **Per elapsed mesocycle** — `coach/service/context.py::_build_prior_training_context` emitted
-  HR `Z1-2/Z3/Z4-5` and power `Z1-2/Z3-4/Z5-7` minutes per block, for the strategy prompt. It
+  HR `Z1-2/Z3/Z4-5` and power `Z1-2/Z3-4/Z5-7` minutes per mesocycle, for the strategy prompt. It
   now delegates to `_intensity_history_context` and the old rollup is gone.
 - **Per week** — `coach/service/analysis.py` puts `zone_distribution_sec` and
   `power_zone_distribution_sec` into every weekly summary fed to the analysis LLM.
@@ -73,10 +73,10 @@ Zone-seconds were already summed in two places, so this design was mostly consol
 Three gaps, and they were the whole of this design:
 
 1. **Not per sport.** Running Z4 and cycling Z4 were summed into one number. Closed by §6.
-2. **Prior plan only.** The block-grained view covered the *previous* macrocycle. The block the
-   athlete is currently in was never summarized, so drift was diagnosed after it was fixable.
+2. **Prior plan only.** The mesocycle-grained view covered the *previous* macrocycle. The mesocycle
+   the athlete is currently in was never summarized, so drift was diagnosed after it was fixable.
    Closed by §4.1/§9.3.
-3. **No delta.** Absolute minutes describe; block-over-block change is what carries signal.
+3. **No delta.** Absolute minutes describe; mesocycle-over-mesocycle change is what carries signal.
    Closed by §4.1.
 
 ## 4. Grain
@@ -88,37 +88,37 @@ Per sport is not optional. Garmin applies different HR zone boundaries per sport
 Z4 and cycling Z4 are different physiological places; power zones exist only where a meter was
 recording, so a merged table mixes a 7-zone Coggan model with a 5-zone Friel model. And the
 merged view hides the finding: *"85% easy overall"* is unactionable next to *"running was 89%
-easy, but every hard minute in the block went into cycling"*.
+easy, but every hard minute in the mesocycle went into cycling"*.
 
 **Currency is per activity, not per sport (§6).** An activity joins its sport's HR row if it
 recorded HR zones and the power row if it recorded power zones — both, when it did both.
 
-**Rates, not totals.** Blocks are unequal length and the current one is always partial. Emit
-per-week figures alongside the week count, so a partial block reads as partial
+**Rates, not totals.** Mesocycles are unequal length and the current one is always partial. Emit
+per-week figures alongside the week count, so a partial mesocycle reads as partial
 (`Build 1 (2 completed weeks of 4)`).
 
-**A week is 7 days from the block's `start_date`, and only completed weeks divide:**
+**A week is 7 days from the mesocycle's `start_date`, and only completed weeks divide:**
 
 ```
-completed_weeks = (today - block.start_date).days // 7
+completed_weeks = (today - mesocycle.start_date).days // 7
 ```
 
-The partial tail is excluded from the rate entirely. Including it biases every mid-block
+The partial tail is excluded from the rate entirely. Including it biases every mid-mesocycle
 reading the same way: the long easy session usually sits on the weekend, so a Wednesday
 reading that divides by 2.3 weeks understates easy volume — every time, in the same
 direction, which reads as a trend rather than as noise. That matters here more than
 elsewhere: the drift this feature exists to catch is a ~27% fall in Z2, and the choice of
 divisor moves the reported figure by more than the signal does (7h of Z2 over 16 days is
 3h03/wk at 2.3 weeks, 3h30/wk at 2). Under 7 elapsed days there is no rate — emit raw
-minutes and say the block is too young to rate. Weeks run from the block start rather than
-from calendar Mondays, so a block starting on a Thursday has Thursday-to-Wednesday weeks:
-ragged at one end only, and consistent between blocks, which is what comparison needs.
+minutes and say the mesocycle is too young to rate. Weeks run from the mesocycle start rather than
+from calendar Mondays, so a mesocycle starting on a Thursday has Thursday-to-Wednesday weeks:
+ragged at one end only, and consistent between mesocycles, which is what comparison needs.
 
-Both minutes and percentages. Percentages answer "was this block polarized"; minutes answer
-"did easy volume actually go up". A block can hold 85% easy in both of two blocks while easy
+Both minutes and percentages. Percentages answer "was this mesocycle polarized"; minutes answer
+"did easy volume actually go up". A mesocycle can hold 85% easy in both of two mesocycles while easy
 volume falls 20%.
 
-**Percentages are of recorded zone-seconds**, not of session duration — so they sum to 100 and
+**Percentages are of recorded zone-seconds**, not of activity duration — so they sum to 100 and
 the coverage line (§7) carries the recording gap on its own. The two differ by exactly that
 gap, and the gap is not spread evenly: it sits entirely below Z1.
 
@@ -126,16 +126,16 @@ gap, and the gap is not spread evenly: it sits entirely below Z1.
 
 Gap 3 above is the reason for the feature, so it needs specifying rather than implying.
 
-**The delta is a plan-generation view, not an adapt view.** Block-over-block change answers
+**The delta is a plan-generation view, not an adapt view.** Mesocycle-over-mesocycle change answers
 *"is intensity creeping across the macrocycle"* — a periodization question, and §9.2 assigns
-those to `generate`. `adapt` gets the current block measured against its own stated focus,
-plus the current week (§9.3); it never needs a preceding block.
+those to `generate`. `adapt` gets the current mesocycle measured against its own stated focus,
+plus the current week (§9.3); it never needs a preceding mesocycle.
 
-- The **current block to date** against the **immediately preceding block**, both as
+- The **current mesocycle to date** against the **immediately preceding mesocycle**, both as
   per-week rates over completed weeks. Comparing a partial rate to a complete rate is the
   only sane pairing, and rates are what make it legitimate.
 - **No new accessor, and no date-ordered mesocycle query.** Navigate macrocycle-first:
-  `get_mesocycles_for_macrocycle` returns a block list in order, so the preceding block is
+  `get_mesocycles_for_macrocycle` returns a mesocycle list in order, so the preceding mesocycle is
   the preceding element. `_build_prior_training_context` already walks the prior
   macrocycle's list exactly this way, and `planning.py` already holds `prev_macro` for the
   cross-plan case (`get_preceding_macrocycle` exists — the previous *goal's* plan, not
@@ -144,10 +144,10 @@ plus the current week (§9.3); it never needs a preceding block.
   existing mesocycle accessor filters `mac.status = 'active'`, and `set_active_macrocycle`
   marks the outgoing plan `superseded`, so that filter hides precisely the cross-plan case;
   but dropping it is worse, because `superseded` also covers earlier *versions* of the
-  current plan (rollback history) whose blocks overlap the live ones in date and describe
+  current plan (rollback history) whose mesocycles overlap the live ones in date and describe
   training that never happened. Navigating by macrocycle id fixes the lineage before any
   dates are compared, so neither trap can fire.
-- A block whose sport mix differs materially from its predecessor gets the delta suppressed
+- A mesocycle whose sport mix differs materially from its predecessor gets the delta suppressed
   per-sport rather than globally: a sport absent from one side is reported as absent, never as
   a -100% swing.
 
@@ -160,21 +160,21 @@ Power   Z1 recovery · Z2 endurance · Z3 tempo · Z4 threshold · Z5 VO2max ·
 ```
 
 No banding. The existing `Z1-2 / Z3 / Z4-5` grouping comes from the polarized-training
-framing, which answers *"is the overall distribution 80/20?"*. Grading a block's stated intent
+framing, which answers *"is the overall distribution 80/20?"*. Grading a mesocycle's stated intent
 is a different question, and every boundary the grouping erases carries a coaching decision:
 
-- **Z3 / Z4 / Z5.** Tempo, threshold and VO2max are three different blocks written three
-  different ways. Under `Z4-5` a block labelled "VO2max development" that produced 48 min
+- **Z3 / Z4 / Z5.** Tempo, threshold and VO2max are three different mesocycles written three
+  different ways. Under `Z4-5` a mesocycle labelled "VO2max development" that produced 48 min
   threshold and 11 min VO2max reads as "hard work up 90%, on track"; separated, it reads as a
-  threshold block wearing a VO2max label. That verdict is the point of the feature.
+  threshold mesocycle wearing a VO2max label. That verdict is the point of the feature.
 - **Z1 vs Z2.** Z1 is recovery; Z2 is the aerobic base where a polarized week's volume is
-  meant to sit. A "base" block showing 6h Z1 against 1h Z2 is not base training — it is junk
-  volume, or sessions logged with a lot of coasting. Recovery weeks legitimately shift toward
+  meant to sit. A "base" mesocycle showing 6h Z1 against 1h Z2 is not base training — it is junk
+  volume, or activities recorded with a lot of coasting. Recovery weeks legitimately shift toward
   Z1. The artifacts that argue for merging (warm-ups, walking back to the car, autopause gaps)
   are real but small, and are a data-hygiene matter rather than grounds for erasing a
   physiological boundary.
 - **Z6 vs Z7.** Power Z6 is anaerobic capacity (30s–3min, glycolytic); Z7 is neuromuscular
-  sprint work. Merged, a `Z6-7: 25 min` block cannot be told apart from a lot of surging out
+  sprint work. Merged, a `Z6-7: 25 min` line cannot be told apart from a lot of surging out
   of corners.
 
 The aggregation in §8 sums per-zone seconds either way, so banding is extra code whose only
@@ -200,9 +200,9 @@ its zone minutes dropped — was considered and rejected. The canonical mapping 
 ```
 
 Garmin's `indoor_cardio` and `fitness` fold into `strength_training`. Those are the buckets a
-HIIT kettlebell session lands in — genuinely hard cardiovascular work, deliberately scheduled
+HIIT kettlebell activity lands in — genuinely hard cardiovascular work, deliberately scheduled
 here in place of a cycling interval session. Routing by sport drops its Z4 minutes, and a
-block containing four such sessions reports **zero hard minutes**. A coach reading that
+mesocycle containing four such activities reports **zero hard minutes**. A coach reading that
 prescribes more intensity on top of intensity already done. That is not a rounding error, it
 is the opposite conclusion.
 
@@ -225,7 +225,7 @@ Base 2 (4 completed weeks) — focus "aerobic volume"
     e1RM               102kg -> 108kg (+5.9%)
 ```
 
-Three things that table does that the routed version could not: the kettlebell sessions' 22 min
+Three things that table does that the routed version could not: the kettlebell activities' 22 min
 of Z4 are counted; heavy-lifting Z2 minutes stay visible but annotated, so a model can discount
 them against the RPE instead of never seeing them; and the bike appears under both currencies
 on purpose — 4h21 of riding, of which the HR strap captured 4h11 and a meter recorded 2h54, so
@@ -258,7 +258,7 @@ today, independent of this feature.
 
 `CYCLING_TERMS` is deleted and `sync.py`'s gate becomes
 `if canonical_sport(type_key) == "cycling":`. `road_biking` was never an honest canonical
-name — `indoor_cycling` and `virtual_ride` are already aliases of it, so a trainer session is
+name — `indoor_cycling` and `virtual_ride` are already aliases of it, so a trainer ride is
 currently stored as "road biking" — and road, gravel, cyclocross, MTB and BMX all share one
 set of Garmin cycling zone boundaries, which is the §4 criterion for sharing a row.
 
@@ -308,7 +308,7 @@ The app aligns; the LLM reasons (`DESIGN_quantitative_signal_impact.md`). Each a
 would mislead a model reading the numbers naively is stated as a fact beside them:
 
 - **Coverage.** `config.hr_zone_coverage_min` exists because low HR coverage means the effort
-  sat *below* Z1. A base block of genuinely easy sessions can show few zone minutes, and a
+  sat *below* Z1. A base mesocycle of genuinely easy sessions can show few zone minutes, and a
   model reading that will prescribe more aerobic volume. Emit the coverage fraction per sport
   **and per currency**, so absence reads as "not recorded", not "not done" — the same
   reasoning as the existing `power_zone_distribution_sec: None` guard. Note the columns
@@ -329,15 +329,15 @@ would mislead a model reading the numbers naively is stated as a fact beside the
   row is emitted only when that currency has recorded seconds for the sport, so strength
   training never grows a `[pwr] 0%` row.
 - **HR lag under-reports Z5 on short intervals.** HR needs 60–90s to climb, so a 30/30 VO2max
-  session banks most of its seconds in Z4. Measured by HR, a genuine VO2max block *will* look
-  like a threshold block. Two consequences: for cycling the power table is preferred (power is
+  activity banks most of its seconds in Z4. Measured by HR, a genuine VO2max mesocycle *will* look
+  like a threshold mesocycle. Two consequences: for cycling the power table is preferred (power is
   instantaneous), and a one-line note travels with any HR-derived Z5 figure.
 
 ### 7.1 Threshold drift is prevented, not detected
 
 Garmin bucketed each activity using the zones in force *at the time*, derived from Garmin's
 own FTP and lactate-threshold values — not TrainMate's benchmark logbook. An auto-detected FTP
-bump moves the Z4/Z5 boundary, and the same effort then lands one zone lower: a block looks
+bump moves the Z4/Z5 boundary, and the same effort then lands one zone lower: a mesocycle looks
 easier when nothing changed. Per-zone reporting surfaces this at every boundary rather than
 two, and §4.1's delta is precisely the view it contaminates.
 
@@ -370,7 +370,7 @@ The residual risk is stated here instead, once: a delta showing hard minutes fal
 for no visible reason may be an FTP auto-bump moving the Z4/Z5 boundary rather than a change
 in training. Manually-edited Garmin zones are invisible in the same way. Both accepted.
 
-No app-coded verdict on whether a block matched its focus. The block's free-text `focus` is
+No app-coded verdict on whether a mesocycle matched its focus. The mesocycle's free-text `focus` is
 emitted beside the measured distribution and the model judges — the same split as the existing
 "planned vs actual" section, which this replaces.
 
@@ -378,54 +378,54 @@ emitted beside the measured distribution and the model judges — the same split
 
 A sum over rows already stored. No new table, no migration, no Garmin calls, no LLM calls. The
 aggregation currently inline in `_build_prior_training_context` is extracted into a reusable
-helper taking a date window, and called three ways: the current block to date and the current
-week (for `adapt`), and the preceding block (for the strategy prompt's delta). One `UPDATE`
+helper taking a date window, and called three ways: the current mesocycle to date and the current
+week (for `adapt`), and the preceding mesocycle (for the strategy prompt's delta). One `UPDATE`
 on `workouts.sport_type` for the §6.1 rename is the only write.
 
-One accessor detail, since the current block is new territory: `get_active_mesocycle` falls
-back to the next *future* block, then to the absolute first one, when today sits inside none.
-Called naively that renders `Build 1 (0 completed weeks of 4)` with an empty table for a block
-that has not started. The helper takes the block it is given and reports nothing when today is
-outside every block.
+One accessor detail, since the current mesocycle is new territory: `get_active_mesocycle` falls
+back to the next *future* mesocycle, then to the absolute first one, when today sits inside none.
+Called naively that renders `Build 1 (0 completed weeks of 4)` with an empty table for a mesocycle
+that has not started. The helper takes the mesocycle it is given and reports nothing when today is
+outside every mesocycle.
 
 ## 9. Where it surfaces
 
 Two views, because two different questions:
 
-- **`workout adapt` — primary.** *Is this block being executed as written?* The current block
-  to date beside its stated focus, plus the current week (§9.3). No preceding block, no
-  delta. Drift caught in week 2 of a block is correctable; drift diagnosed at plan-generation
+- **`workout adapt` — primary.** *Is this mesocycle being executed as written?* The current
+  mesocycle to date beside its stated focus, plus the current week (§9.3). No preceding mesocycle,
+  no delta. Drift caught in week 2 of a mesocycle is correctable; drift diagnosed at plan-generation
   time is history.
 - **Strategy prompt — the delta's home among the prompts.** *Is intensity creeping across
-  blocks?* Replaces the inline computation in `_build_prior_training_context`, now per-sport
-  and per-zone, and extended to the current plan's elapsed blocks (it walks only the prior
+  mesocycles?* Replaces the inline computation in `_build_prior_training_context`, now per-sport
+  and per-zone, and extended to the current plan's elapsed mesocycles (it walks only the prior
   macrocycle today — gap 2 of §3). No *prompt* other than this one carries the delta; §9.6
   puts it in front of a human too, which is a different constraint and not in tension with
   §4.1.
-- **`tm status` — the block you are in.** Rendered in the block summary display, beside
-  `Cycle Focus`. The snapshot: current block, all sports, no history.
+- **`tm status` — the mesocycle you are in.** Rendered in the mesocycle summary display, beside
+  `Cycle Focus`. The snapshot: current mesocycle, all sports, no history.
 - **`tm progress -z [sport ...]` — the trend (§9.6).** *Where did it change?* One table per
   sport, weekly grain, the whole displayed window. The only view that survives a mesocycle
   boundary moving.
-- **`data show-activities` — the receipt (§9.7).** *Which session, and is the recording
+- **`data show-activities` — the receipt (§9.7).** *Which activity, and is the recording
   trustworthy?* One row per activity, both currencies, nothing aggregated.
 
 This also closes the loop with `DESIGN_evidence_based_confidence.md`: the coach prescribes a
-concrete distribution ("hold Z2 near 4h30/wk, add 20 min Z4"), and the next block's measured
+concrete distribution ("hold Z2 near 4h30/wk, add 20 min Z4"), and the next mesocycle's measured
 table grades it.
 
 ### 9.1 Why `adapt` did nothing with this
 
 **Pre-implementation motivation; the missing branch below now ships.** The adapt TASK carries a
 fourth branch (`drift_branch`, gated on `has_intensity`) beside the `CORRECTING EXECUTION
-DRIFT` guidance and the `MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE BLOCK` data section
+DRIFT` guidance and the `MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE MESOCYCLE` data section
 (`coach/engine/workouts.py`). The argument is kept because it is what those three pieces of
 prompt text answer to.
 
-`DESIGN_block_boundary.md` §2 constrains `adapt` in two ways that must not be confused. The
-**range boundary** — adapt's writes stop at the mesocycle end, and the next block is out of
+`DESIGN_mesocycle_boundary.md` §2 constrains `adapt` in two ways that must not be confused. The
+**range boundary** — adapt's writes stop at the mesocycle end, and the next mesocycle is out of
 reach — is mechanized in code and is what that document calls a firewall. It is irrelevant
-here: intensity correction happens entirely inside the current block. The **mandate** — adapt
+here: intensity correction happens entirely inside the current mesocycle. The **mandate** — adapt
 is tactical, eases transiently, does not reshape periodization — is prompt text plus one tag
 string, and it is the part in play.
 
@@ -452,37 +452,38 @@ branch, §9.4's.
 ### 9.2 The line: adapt owns execution, generate owns periodization
 
 > Changing what zone Tuesday's run is prescribed at is **execution** — adapt's call.
-> Changing how many hard sessions the block contains is **periodization** — not adapt's call.
+> Changing how many hard sessions the mesocycle contains is **periodization** — not adapt's call.
 
 Stated in §2's vocabulary: adapt may move the intensity factor of a scheduled session. It may
-not change the block's composition. This resolves the apparent conflict with
-`DESIGN_block_boundary.md` without loosening anything about fatigue-driven cuts, and it gives
+not change the mesocycle's composition. This resolves the apparent conflict with
+`DESIGN_mesocycle_boundary.md` without loosening anything about fatigue-driven cuts, and it gives
 "do not reshape the mesocycle" a definition it currently lacks.
 
 ### 9.2a Amendment: the other end of the handoff
 
-§9.4's drift section ends by telling the model that a block genuinely containing too much hard
+§9.4's drift section ends by telling the model that a mesocycle genuinely containing too much hard
 work "belongs to the next `workout generate`, not to you". As first shipped, that escalation
 landed nowhere: `workout generate` was given no measured intensity at all. The athlete was
 told to run the one command that could act — and it could not see the evidence.
 
 This section is the amendment. **`generate` now receives the measured distribution too**,
-threaded through the block-progress section (`DESIGN_block_progress.md`). §9.2's line is
+threaded through the mesocycle-progress section (`DESIGN_mesocycle_progress.md`). §9.2's line is
 unchanged — adapt still may not alter composition — but the consumer §9.2 assigns composition
 to can finally read the signal it is meant to act on.
 
 Three things travel to `generate` that `adapt` deliberately does not get:
 
-- **The block-over-block delta** (`block_report`'s `previous=`). Its own docstring already
-  said this belongs to plan generation; `_intensity_block_context` withholds it from adapt for
-  exactly that reason. Intensity creeping up every block is periodization by definition.
-- **What the plan PRESCRIBED over the same weeks** (`block_report`'s `fetch_workouts=`), from
+- **The mesocycle-over-mesocycle delta** (`mesocycle_report`'s `previous=`). Its own docstring
+  already said this belongs to plan generation; `_intensity_mesocycle_context` withholds it from
+  adapt for exactly that reason. Intensity creeping up every mesocycle is periodization by
+  definition.
+- **What the plan PRESCRIBED over the same weeks** (`mesocycle_report`'s `fetch_workouts=`), from
   §9.8's `planned_zone_sec`, rendered by the same `format_table` at the same divisor so the
   two are compared line for line.
 - **The composition verdict itself** — permission to change how many hard sessions the
   remaining weeks hold, which is the thing adapt is forbidden to touch.
 
-**Why the prescribed table is load-bearing, not decoration.** A block measuring off its focus
+**Why the prescribed table is load-bearing, not decoration.** A mesocycle measuring off its focus
 has two opposite causes and they demand opposite responses:
 
 | measured vs prescribed | measured vs focus | cause | whose |
@@ -491,11 +492,11 @@ has two opposite causes and they demand opposite responses:
 | disagrees | disagrees | the athlete is mis-executing | `adapt` — sharpen the prescription |
 | agrees | agrees | nothing wrong | nobody |
 
-Without the prescribed table `generate` sees only the second column, and the failure mode is
-sharp: an athlete running their easy days at Z3 makes a threshold block measure like a tempo
-block, and a coach reading that alone cuts the threshold work. That **rewards the drift** —
-the athlete gets an easier block for ignoring the plan, and the block's intent is lost to the
-very deviation adapt was correcting. The prompt therefore forbids re-shaping around a
+Without the prescribed table `generate` sees only the second column, and the failure mode is sharp:
+an athlete running their easy days at Z3 makes a threshold mesocycle measure like a tempo mesocycle,
+and a coach reading that alone cuts the threshold work. That **rewards the drift** — the athlete
+gets an easier mesocycle for ignoring the plan, and the mesocycle's intent is lost to the very
+deviation adapt was correcting. The prompt therefore forbids re-shaping around a
 measured-vs-prescribed gap by name.
 
 `adapt` is deliberately not given the prescribed table. Measured diverging from the
@@ -503,22 +504,22 @@ prescription is precisely the execution question adapt already owns via §9.4, a
 sharper instrument for it: a guard rail on the next session.
 
 **`plan generate` gets it too.** The rule is the consumer's job, not one command's: whoever may
-reshape blocks needs both columns of the table above, and `plan generate` reshapes them at the
-coarsest grain there is. It reads the pair per *elapsed* block via
-`_intensity_history_context`, which already passed `previous=` for the block-over-block delta
-and now passes `fetch_workouts=` alongside it. Without the prescribed column the failure mode is
-the same one described above, one level up: a threshold block that measures like a tempo block
-because its easy days were run hard would be *replanned* as a tempo block, writing the drift
-into the periodization instead of correcting it. The consumer list is therefore
-"the two generate paths, never adapt" — see DESIGN_backward_evaluation.md §6 (AS BUILT).
+reshape mesocycles needs both columns of the table above, and `plan generate` reshapes them at the
+coarsest grain there is. It reads the pair per *elapsed* mesocycle via `_intensity_history_context`,
+which already passed `previous=` for the mesocycle-over-mesocycle delta and now passes
+`fetch_workouts=` alongside it. Without the prescribed column the failure mode is the same one
+described above, one level up: a threshold mesocycle that measures like a tempo mesocycle because
+its easy days were run hard would be *replanned* as a tempo mesocycle, writing the drift into the
+periodization instead of correcting it. The consumer list is therefore "the two generate paths,
+never adapt" — see DESIGN_backward_evaluation.md §6 (AS BUILT).
 
 ### 9.3 What `adapt` sees, and how it gets there
 
-Two blocks, neither of them a rate:
+Two tables, neither of them a rate:
 
 ```
 Build 1 — focus "threshold development" (2 completed weeks of 4, plus 2 days)
-  Block to date, per week (2 completed weeks)
+  Mesocycle to date, per week (2 completed weeks)
     running  [HR]  Z1 55m (13%)  Z2 3h39 (53%)  Z3 1h20 (19%)  Z4 48m (12%)  Z5 11m (3%)
     ...
   Current week so far — day 2 of 7 (29% elapsed)
@@ -530,7 +531,7 @@ The current week is **raw minutes with the elapsed fraction stated, never extrap
 Turning 22 min of Z3 on day 2 into "77 min Z3 this week" would be a fabrication; a model given
 the raw figure and "29% elapsed" reasons about it perfectly well. It is also the part that
 makes this feature worth putting in `adapt` at all: two days in, already over the week's whole
-Z3 allowance is correctable *now*, which the block-to-date average would take another fortnight
+Z3 allowance is correctable *now*, which the mesocycle-to-date average would take another fortnight
 to reveal.
 
 **Threading.** Follow `pmc_context` exactly — it already does this end to end. Compute in the
@@ -549,19 +550,19 @@ have. It is the shortest path and nothing would fail; hence stating it.
 One added TASK bullet, alongside the existing three:
 
 ```
-- If the block's measured intensity distribution has diverged from its stated
+- If the mesocycle's measured intensity distribution has diverged from its stated
   focus, correct the prescriptions of the sessions still ahead — even when
   recovery metrics are fine. A healthy athlete executing the wrong workout is
   the case no other branch here covers.
 ```
 
 One added section, in the shape of the existing `DO NOT COMPOUND` and `PROTECTING A BENCHMARK`
-blocks:
+sections:
 
 ```
 CORRECTING EXECUTION DRIFT:
-The block summary shows what the athlete's sessions ACTUALLY measured, per sport
-and zone, beside the block's stated focus — as a per-week rate over the block's
+The mesocycle summary shows what the athlete's activities ACTUALLY measured, per sport
+and zone, beside the mesocycle's stated focus — as a per-week rate over the mesocycle's
 completed weeks, then the current week's raw minutes so far with how much of that
 week has elapsed. The current week is NOT extrapolated: read it against the
 elapsed fraction yourself.
@@ -573,26 +574,26 @@ the intensity target and give it an explicit guard rail the athlete can act on
 mid-session (a HR ceiling, a pace cap, "walk the hills").
 - Drift upward means the athlete WANTS more, so do not only cap it: say where the
   appetite may legitimately go, in the batch-level reason, and spend it in the
-  block's own currency — in a volume block, more easy minutes; in an intensity
-  block, a fuller effort on the days already designated hard.
+  mesocycle's own currency — in a volume mesocycle, more easy minutes; in an intensity
+  mesocycle, a fuller effort on the days already designated hard.
 - Drift downward means under-execution, so the guard rail becomes a floor and the
   advice is about how to reach it. Condition this on the power table where one
   exists — HR lag makes under-execution look real when it is not (§7).
 
-This is never a load reduction. If the block genuinely contains too much hard work
+This is never a load reduction. If the mesocycle genuinely contains too much hard work
 — as opposed to easy work being run too hard — that is composition, and it
 belongs to the next `workout generate`, not to you.
 ```
 
 Three things this section deliberately no longer says, because the TASK's STANDING RULES
 say them once for every section (`DESIGN_adapt_task_prompt.md` §2): name the evidence in
-`change_reason` (rule 3), that a drift reading is not licence to re-cut the block (rule 2),
+`change_reason` (rule 3), that a drift reading is not licence to re-cut the mesocycle (rule 2),
 and the up/down cases spelled out as separate paragraphs rather than as the two bullets they
 are. The escalation clause is kept in full — it is the load-bearing half.
 
 That last paragraph hands a decision to `workout generate`. §9.2a is the other end of the
 handoff: generate receives the measured distribution, what was prescribed beside it, and the
-block-over-block delta, so the escalation reaches a prompt that can act on it.
+mesocycle-over-mesocycle delta, so the escalation reaches a prompt that can act on it.
 
 The correction is load-neutral by construction. What the model emits for a drifting Tuesday
 changes only the prose:
@@ -601,13 +602,13 @@ changes only the prose:
 date / sport_type / duration_minutes / tss / title    unchanged
 description    "60 min conversational. HR ceiling 145 — hard cap, walk the
                 climbs if needed."
-change_reason  "Third block week where 'easy' runs averaged Z3; adding an
+change_reason  "Third mesocycle week where 'easy' runs averaged Z3; adding an
                 explicit ceiling."
 ```
 
 …with the batch-level reason (`adaptation_summary`) carrying the appetite advice: *"…if you
-want more this week, add 15–20 min to Sunday at the same easy effort — that's this block's
-currency. Adding actual hard work changes the block's shape and belongs in the next plan
+want more this week, add 15–20 min to Sunday at the same easy effort — that's this mesocycle's
+currency. Adding actual hard work changes the mesocycle's shape and belongs in the next plan
 generation."*
 
 ### 9.5 The one collision with existing machinery
@@ -635,7 +636,7 @@ six hand-maintained denormalizations (`original_description`, `original_duration
 history that would properly exist, which is what `modification_state.py` already argues for.
 
 That is a new table touching every workout write path and belongs in its own design doc; this
-feature does not block on it.
+feature does not wait on it.
 
 **Interim stopgap — decide per session in the save loop, not in `save_workout`.** The DB layer
 is a generic writer that stamps whatever it is told, and other callers rely on that; the caller
@@ -701,7 +702,7 @@ Which sports, in order:
 - Those named in `athlete.sport_preferences`, **in config order** — the athlete's own
   priority list, and stable across invocations. A screen someone checks daily must not
   reshuffle its rows because last week's volume moved.
-- That have at least one activity **with zone data** in the window. A sport with sessions but
+- That have at least one activity **with zone data** in the window. A sport with activities but
   no recording renders a table of `—` and says nothing; it is named in the footer instead.
 - That account for at least **10% of the window's total duration**. The rest are named, never
   silently dropped, matching the honesty the load table already has with
@@ -743,7 +744,7 @@ is consumed: `progress` resolving its default sports, once per invocation that u
 
 **It scopes the intensity content only.** CTL, ATL, TSB, the projection and the WEEKLY LOAD
 table stay whole-athlete. A running-only CTL is not a quantity — the fitness model integrates
-every session the body paid for — and adherence is measured against the whole plan. `tm
+every activity the body paid for — and adherence is measured against the whole plan. `tm
 progress cycling` therefore shows whole-athlete form beside cycling-only intensity, and the
 help text must say so, because the command shape invites the opposite reading. The multi-sport
 default largely dissolves the false-creep reading above, but an explicitly narrowed
@@ -775,7 +776,7 @@ tables roughly triple the length of `tm progress` (~23 lines to ~38 for one spor
 per additional sport), and they answer a different question from the load table above them —
 *where did the intensity go*, not *how much work was done*. So the load table, the PMC and the
 projection stay the default screen and `-z` adds the intensity half. **Naming a sport implies
-`-z`**, because naming a sport is already a request for its zone table, and `--blocks` implies
+`-z`**, because naming a sport is already a request for its zone table, and `--mesocycles` implies
 it too. The help text and `ARCHITECTURE.md` state the flag; nothing about the tables' content
 changes with it.
 
@@ -865,18 +866,18 @@ reach ten hours in a week, so nothing above tempo loses precision anywhere.
 That lands the 7-zone power table at **48 columns** and the 5-zone HR table at **38**, both
 inside the budget, and the band rules span the full 48 in every table so the halves align.
 Against the existing `WEEK_COL_WIDTH = 11`: 11 + 6 + 6 + 5×5 = 48 and 11 + 6 + 6 + 3×5 = 38,
-beside a load row of 40. `block_report` keeps plain `fmt_duration`: it runs at `PROMPT_WIDTH`
+beside a load row of 40. `mesocycle_report` keeps plain `fmt_duration`: it runs at `PROMPT_WIDTH`
 and lays one cell per line at phone width, so width is not its constraint.
 
 **The capped cell is a new formatter, and the grid lives with the load table.** `fmt_duration`
-is unchanged — `block_report` and both prompt paths want `12h30` — so the cap is its own
+is unchanged — `mesocycle_report` and both prompt paths want `12h30` — so the cap is its own
 function in `cli/progress.py`, beside `format_weekly_table`. The grid belongs there too, not in
 `intensity.py`: it has to align row for row with the load table and it shares that table's week
 column, band walk and 48-column budget. `intensity.py` keeps what it already owns, the
 aggregation (`zone_rows`) and the prompt-width table the coach reads.
 
 **Every glyph means one thing, and none of them overlap.** `~` is already taken: `meso_bands`
-prefixes it to the label of a block TrainMate *reconstructed from training history* rather
+prefixes it to the label of a mesocycle TrainMate *reconstructed from training history* rather
 than one a plan prescribed (`progression.py`), and the load table's legend reads `~ inferred`.
 Reusing it for coverage would put two definitions of one character fifteen lines apart on one
 screen.
@@ -886,7 +887,7 @@ The full set on this screen, kept here because this table is where a reader look
 
 | Glyph | Where | Means |
 |---|---|---|
-| `~` | prefix on a band label | block inferred from history, not prescribed by a plan (unchanged) |
+| `~` | prefix on a band label | mesocycle inferred from history, not prescribed by a plan (unchanged) |
 | `*` | after the week label | week in progress, so its numbers are partial (unchanged) |
 | `!` | after the week label | zone minutes undercounted — the recording missed time |
 | `—` | in place of the numbers | this sport was not trained that week |
@@ -903,7 +904,7 @@ week can be both in progress and undercounted, so that row wants a test.
 
 **`—` is not a zero, and this is why the marker set needs three states rather than two.**
 Coverage divides a currency's recorded seconds by the sport's *total* duration in the window
-(§7), so a sport with no sessions divides by nothing and reads 0.0 — and `zone_rows` emits no
+(§7), so a sport with no activities divides by nothing and reads 0.0 — and `zone_rows` emits no
 row for it at all. Rendered as zeros with a coverage marker, a week the athlete simply did
 not run would assert that they trained without recording it, which is §7's meaning turned
 exactly backwards. Not-trained, badly-recorded and genuinely-easy are three different facts.
@@ -964,7 +965,7 @@ for its own instrument.
 
 The `hr_sparse` case is worse and belongs to the *load* table, not this one: the athlete
 trained normally, the strap died, no RPE was entered, and the week reads as a genuine
-adherence miss that the coach will then adapt the plan around. `_measurement_is_load`
+adherence miss that the week planner will then adapt the sessions around. `_measurement_is_load`
 (`garmin/load.py`) already implements the test; the load table should mark it. Filed in §11
 because it is a `progress` defect that predates this design.
 
@@ -990,16 +991,15 @@ reader knows what fraction of the sport's time is on screen without consulting a
 a mixed-meter cyclist neither currency is the truth: HR under-reads VO2max work, power
 under-reads the commutes. That header number is the honest disclosure.
 
-**Why a weekly grain exists at all, when §4's grain is the block.** A mesocycle is a plan
-object and `workout generate` rewrites plan objects. Regenerate, and the boundaries move:
-blocks shorten, shift or open a gap, and completed activities that used to sit inside a block
-now sit inside none. Every block-grained view drops them silently — `block_report` reports on
-the window it is handed and nothing tells it a fortnight went missing. **A calendar week is
-not a plan object.** It cannot move, and every activity belongs to exactly one, so the weekly
-table is the only intensity view whose coverage of the athlete's actual training is
-guaranteed. `progress` already renders these weeks — `progression._week_meso` returns a null
-label and `band_header` bands them `unplanned` — so the zone table inherits the fix by
-reusing the band walk.
+**Why a weekly grain exists at all, when §4's grain is the mesocycle.** A mesocycle is a plan object
+and `workout generate` rewrites plan objects. Regenerate, and the boundaries move: mesocycles
+shorten, shift or open a gap, and completed activities that used to sit inside a mesocycle now sit
+inside none. Every mesocycle-grained view drops them silently — `mesocycle_report` reports on the
+window it is handed and nothing tells it a fortnight went missing. **A calendar week is not a plan
+object.** It cannot move, and every activity belongs to exactly one, so the weekly table is the only
+intensity view whose coverage of the athlete's actual training is guaranteed. `progress` already
+renders these weeks — `progression._week_meso` returns a null label and `band_header` bands them
+`unplanned` — so the zone table inherits the fix by reusing the band walk.
 
 **Where the numbers come from: `weekly_aggregates`, not a second fetch.** `render_progress` is
 handed one payload and reads no database, and that payload — `progression.assemble_timeline` —
@@ -1020,31 +1020,31 @@ are given.
 
 This is not hypothetical loss. In the worked example above, the two weeks a regeneration
 orphaned are `06-15` and `06-22`, and `06-22` is precisely the week Z3 doubled (35m → 1h02).
-The block delta reports Z3 up 100% and cannot say when; the weekly table points at the week.
+The mesocycle delta reports Z3 up 100% and cannot say when; the weekly table points at the week.
 
 **The two grains slice time differently, and that is fine as long as it is written down.**
-`rate_window` runs a block's weeks from the block's own start date, not calendar Mondays, so
-blocks compare like for like (§4); the weekly table is Monday-aligned because a calendar week
+`rate_window` runs a mesocycle's weeks from the mesocycle's own start date, not calendar Mondays, so
+mesocycles compare like for like (§4); the weekly table is Monday-aligned because a calendar week
 is the thing that cannot move. So `Z3 1h02 in w/c 06-22` and `Z3 45m/wk in Base 2` are
 averages over different seven-day spans and will not reconcile. Related: `_week_meso` labels
-a week by majority overlap, so a week straddling two blocks sits under one band while its
-earlier days counted into the other block's numbers. Neither is a defect and neither is worth
-fixing — but the coach reads block grain (`coach/service/context.py`) while the athlete's
+a week by majority overlap, so a week straddling two mesocycles sits under one band while its
+earlier days counted into the other mesocycle's numbers. Neither is a defect and neither is worth
+fixing — but the coach reads mesocycle grain (`coach/service/context.py`) while the athlete's
 default screen is week grain, so the mismatch can surface inside one conversation, and the
 next reader of this code will otherwise try to "fix" it.
 
-**`--blocks` keeps the graded view.** Per-week rates over completed weeks, beside the block's
-stated `focus`, with §4.1's block-over-block delta and the structural rows — `block_report`
-handed a sport-filtered fetch. It replaces the weekly zone table rather than appending to it:
-the flag is a choice of grain, not an extra section. Two grains, two questions: the week table
-answers *when did it change*, the block table answers *did the block do what it said*. Only
-the block has a stated intent to be graded against, which is why the weekly table carries no
-verdict and no focus.
+**`--mesocycles` keeps the graded view.** Per-week rates over completed weeks, beside the
+mesocycle's stated `focus`, with §4.1's mesocycle-over-mesocycle delta and the structural rows —
+`mesocycle_report` handed a sport-filtered fetch. It replaces the weekly zone table rather than
+appending to it: the flag is a choice of grain, not an extra section. Two grains, two questions: the
+week table answers *when did it change*, the mesocycle table answers *did the mesocycle do what it
+said*. Only the mesocycle has a stated intent to be graded against, which is why the weekly table
+carries no verdict and no focus.
 
-`--blocks` stays **single-sport**, defaulting to the first qualifying preference. N sports × M
-blocks is not a view. And it trades brevity for grain rather than the other way round: at
-phone width `_lay_out` fits one zone per line, so a single block with one sport and one
-currency is about 25 lines, and three blocks is seventy-five. That is the opposite of what a
+`--mesocycles` stays **single-sport**, defaulting to the first qualifying preference. N sports × M
+mesocycles is not a view. And it trades brevity for grain rather than the other way round: at
+phone width `_lay_out` fits one zone per line, so a single mesocycle with one sport and one
+currency is about 25 lines, and three mesocycles is seventy-five. That is the opposite of what a
 reader reaching for a coarser grain expects, so the help text says so.
 
 **Width and length.** The HR zone table runs 38 columns, the 7-zone power table 48, the load
@@ -1061,22 +1061,22 @@ read row against row.
 | Option | | Effect |
 |---|---|---|
 | `[sport ...]` | new | Canonical sports to report intensity for, one table each in the order given. **Implies `-z`.** Default: every `sport_preferences` entry with zone data in the window and at least 10% of its duration, in config order, the rest named in the footer. Scopes the zone tables only — never the PMC, the projection or the load table. A name with no rows in the window lists the sports that have them. |
-| `-z` / `--zones` | new | Show the weekly zone tables at all. Off by default: they roughly triple the output. Implied by naming a sport and by `--blocks`. |
-| `--blocks` | new | Per mesocycle instead of per week, single-sport: rates over completed weeks, the stated `focus`, §4.1's delta, the current week, the structural rows. Replaces the weekly zone table; the load table stays. Longer than what it replaces, not shorter. |
+| `-z` / `--zones` | new | Show the weekly zone tables at all. Off by default: they roughly triple the output. Implied by naming a sport and by `--mesocycles`. |
+| `--mesocycles` | new | Per mesocycle instead of per week, single-sport: rates over completed weeks, the stated `focus`, §4.1's delta, the current week, the structural rows. Replaces the weekly zone table; the load table stays. Longer than what it replaces, not shorter. |
 | `--power` / `--hr` | new | Force the currency instead of choosing it by coverage. Mutually exclusive; no effect on a sport that has only one. |
-| `--weeks N\|all` | | Windows the tables: `--weeks 8` shows 8 past *and* 8 future weeks, of load and (since §9.8) of zones alike. `--blocks` reports the mesocycles overlapping the *past* half — a future block has not started, and `block_report` returns nothing for it. Default 8. |
+| `--weeks N\|all` | | Windows the tables: `--weeks 8` shows 8 past *and* 8 future weeks, of load and (since §9.8) of zones alike. `--mesocycles` reports the mesocycles overlapping the *past* half — a future mesocycle has not started, and `mesocycle_report` returns nothing for it. Default 8. |
 | `--explain` | | The PMC footnote (§7.1). Does not touch any table. |
 | `--chart [PATH]` | | Unchanged, and **unaffected by `[sport]`**: the PNG's two panels are PMC and whole-athlete weekly load. A per-sport zone stack is `DESIGN_progress_timeline.md` §8 follow-on 3. The web app's *chart* is the same PNG and gains nothing; its read-only `/api/zones` view is a separate surface (see §10). |
 | `--no-pull` / `--force-pull` | | The standard auto-ensure throttle, mutually exclusive. No effect on layout. |
 
 **What the option sweep exposes**, all of it in `intensity.py` and `cli/progress.py`:
 
-- **`block_report` must stop printing its own notes, which means it does change.** Today
-  `format_notes` is called inside it, so three blocks render the same caveats three times —
-  nine lines saying two things. They belong once per section, under the last block. That needs
+- **`mesocycle_report` must stop printing its own notes, which means it does change.** Today
+  `format_notes` is called inside it, so three mesocycles render the same caveats three times —
+  nine lines saying two things. They belong once per section, under the last mesocycle. That needs
   a `notes: bool = True` parameter, defaulting true so `cli/status.py` and
-  `coach/service/context.py` are untouched, with `--blocks` passing `notes=False` and emitting
-  once itself. The prompt path keeps its per-block notes deliberately: it sends one block.
+  `coach/service/context.py` are untouched, with `--mesocycles` passing `notes=False` and emitting
+  once itself. The prompt path keeps its per-mesocycle notes deliberately: it sends one mesocycle.
 - **`HR_REST_NOTE` has to be split in two, not re-keyed.** It reads "HR during strength *and
   interval-with-rest* work reflects rest intervals as much as effort", which is two claims
   with different scopes joined by an "and". Strength is a property of the sport and can be
@@ -1088,29 +1088,29 @@ read row against row.
   HR row. Gating the first needs a strength-sport set in `sports.py`, which has no notion of
   sport categories today — small, but a new concept in a module that advertises itself as flat
   vocabulary, and a change to the coach's prompt text rather than a formatting tweak.
-- **`--blocks` reproduces the very loss §9.6 exists to prevent, and by more than one route.**
-  The mesocycles overlapping the window are reported; weeks belonging to none are silently
-  absent — in the worked example `06-15` and `06-22` vanish, and `06-22` is where Z3 doubled.
-  `rate_window` additionally excludes each block's partial tail from both sides of its
-  division, correctly (§4) and invisibly, dropping up to six more days per block. So the block
-  section must end naming both, and pointing at a view the flag has just replaced:
+- **`--mesocycles` reproduces the very loss §9.6 exists to prevent, and by more than one route.**
+  The mesocycles overlapping the window are reported; weeks belonging to none are silently absent —
+  in the worked example `06-15` and `06-22` vanish, and `06-22` is where Z3 doubled. `rate_window`
+  additionally excludes each mesocycle's partial tail from both sides of its division, correctly
+  (§4) and invisibly, dropping up to six more days per mesocycle. So the mesocycle section must end
+  naming both, and pointing at a view the flag has just replaced:
 
   ```
-  2 weeks in this window belong to no block (06-15, 06-22), and each block's final
-  partial week is excluded from its rate — run without --blocks for the weekly view
+  2 weeks in this window belong to no mesocycle (06-15, 06-22), and each mesocycle's final
+  partial week is excluded from its rate — run without --mesocycles for the weekly view
   ```
 
   At `--weeks all` that list is capped: `12 weeks … (06-15, 06-22, +10 more)`. Silence in
-  either case would be the block-grained blindness this section was written about,
-  reintroduced by the flag that opts into block grain.
-- **`block_report`'s prose lines ignore `width`.** `format_header` and the `Change vs …`
+  either case would be the mesocycle-grained blindness this section was written about,
+  reintroduced by the flag that opts into mesocycle grain.
+- **`mesocycle_report`'s prose lines ignore `width`.** `format_header` and the `Change vs …`
   header are bare appends, measuring 57 and 84 characters at `width=48` — the 48-column
-  contract this section claims is false under `--blocks` today. Both are prose; route them
+  contract this section claims is false under `--mesocycles` today. Both are prose; route them
   through `_wrap`. The zone *rows* must not be.
 - **`run_progress` re-wraps any line over 48 columns**, which is exactly what `intensity.py`'s
   module docstring forbids ("wrapped once here and never re-wrapped downstream — a
-  screen-width re-wrap would shred the columns"). **As shipped, only the `--blocks` section is
-  printed outside that loop** — `block_report` lays one zone cell per line at phone width and
+  screen-width re-wrap would shred the columns"). **As shipped, only the `--mesocycles` section is
+  printed outside that loop** — `mesocycle_report` lays one zone cell per line at phone width and
   genuinely can exceed 48. The weekly zone tables stay inside it, protected by width instead
   of by structure: every zone line is ≤48 columns *by construction* (`fmt_zone_cell`'s cap,
   the column arithmetic above, `_legend` wrapping the prose to `TABLE_WIDTH`), the wrap is a
@@ -1123,7 +1123,7 @@ read row against row.
   exist would be silent about it in the half of the screen this whole section is about.
 - **`* in progress` is explained under the load table**, fifteen lines above the zone row it
   also governs, and the partial current week sits inline with full weeks — the comparison
-  `rate_window` explicitly refuses to make for blocks. The `*` needs repeating in each zone
+  `rate_window` explicitly refuses to make for mesocycles. The `*` needs repeating in each zone
   legend; the inline partial week is accepted, because the marker is what §4's argument asks
   for at weekly grain and a separate section for one week would cost more than it saves.
 
@@ -1132,7 +1132,7 @@ read row against row.
 §9.6 is a coaching view: aggregated to the week, scoped to a sport, one currency chosen for
 the reader. `data show-activities` is the opposite and should stay that way — one row per
 activity, both currencies, nothing chosen on the reader's behalf. It is also the only view
-where a bad recording is *actionable*, because it names the session you would go and fix.
+where a bad recording is *actionable*, because it names the activity you would go and fix.
 
 The constraint is width. The table already carries twelve columns
 (`Date | Time | Type | Name | Duration | Distance | Elev | Avg HR | Max HR | Avg Watts | RPE |
@@ -1150,7 +1150,7 @@ with the zone half traces back to a provenance that was invisible.
 **The column shows the load, which means the figure changes.** Today it prints the stored `tss`,
 which `measured_tss` defines as a pure measurement — no coverage gate, never RPE — while
 `progress`, the PMC and every coaching path use `activity_load()`. So the two commands already
-disagree about a session's load, silently, and a tag on the measurement would name a provenance
+disagree about an activity's load, silently, and a tag on the measurement would name a provenance
 that is not the provenance of the number shown. The column and the summary total therefore move
 to `activity_load()`. The view is informational and nothing is recorded from it, so the cost is
 one changed figure on some rows and the benefit is that every surface finally quotes one number.
@@ -1161,7 +1161,7 @@ one changed figure on some rows and the benefit is that every surface finally qu
 materially more strain, so the load came from RPE anyway — the kettlebell case §6 exists for.
 Without it those rows would read `(hr)` above a figure hrTSS never produced. The remaining two
 close `load_method`'s return set rather than adding a claim: `tss` for a stored TSS with no
-zone columns to attribute it to, and `—` for a session with no power, HR or RPE at all. One
+zone columns to attribute it to, and `—` for an activity with no power, HR or RPE at all. One
 tag per value `load_method` can return, so no row ever falls through to `?`.
 
 The figure prints one decimal (`188.0 (pwr)`): `activity_load` returns a float and this is the
@@ -1179,7 +1179,7 @@ tagged `[pwr]` and `[HR]` — `zone_rows`' existing model, and it keeps §6's pr
 structural: the two views of the same time are separate rows, not adjacent columns inviting
 addition. `NEVER_SUM_NOTE` goes in the footer. HR rows leave Z6/Z7 blank. `Cov` is what earns
 the view its place: per-activity coverage turns "the strap dropped out somewhere this week"
-into a named session.
+into a named activity.
 
 **CSV gets everything, unconditionally.** `_show_activities_csv` has no width constraint and
 its consumers want completeness, so all twelve zone-second columns, coverage and method go in
@@ -1194,7 +1194,7 @@ with §6.1's canonical rename, since that is the change touching this vocabulary
 ### 9.8 Planned zones — the future half of the table
 
 §9.6 stopped the zone tables at today because nothing in the schema gave a planned workout an
-intensity target. The coach already decides one — it writes `6×3min @ VO2max` — and it is the
+intensity target. The week planner already decides one — it writes `6×3min @ VO2max` — and it is the
 only thing in the system that knows the intent. So it should emit the distribution as
 structured data at authoring time.
 
@@ -1258,11 +1258,11 @@ revision log unchanged (DESIGN_workout_revisions.md §7), which is the same comp
 read time instead of write time.
 
 **Back-compat needs nothing, and `data pull` could not help if it did.** A pull re-fetches
-*completed activities* from Garmin; these columns sit on `workouts` and are authored by the coach,
-so there is nothing upstream to fetch. Nor is there anything to backfill: the columns feed the
-*future* half of the table only, and the rolling horizon rewrites the future on every generation.
-Sessions planned before this ships render no ghost row until the next `workout generate`, which
-is a gap of days and wants one note line, not a migration.
+*completed activities* from Garmin; these columns sit on `workouts` and are authored by the week
+planner, so there is nothing upstream to fetch. Nor is there anything to backfill: the columns feed
+the *future* half of the table only, and the rolling horizon rewrites the future on every
+generation. Sessions planned before this ships render no ghost row until the next `workout
+generate`, which is a gap of days and wants one note line, not a migration.
 
 **Nothing has to be done about the calendar hash, and one thing must not be done.**
 `CALENDAR_FIELDS` (`calendar_state.py`) is an allowlist, so new columns are excluded by
@@ -1295,9 +1295,9 @@ record` note is therefore a prerequisite of this section, not a cross-reference.
 
 **Some sports get no planned zones at all.** Swimming is anchored on CSS and strength on
 e1RM; neither yields a zone model, and the columns stay NULL. §6's rule that no sport is
-routed away governs the *measured* table — a kettlebell session's Z4 minutes are real work and
+routed away governs the *measured* table — a kettlebell activity's Z4 minutes are real work and
 belong there. Prescribing HR zone targets for it would be inventing a distribution from a
-session whose HR mostly reflects rest between sets: the fake precision §10 already refuses for
+activity whose HR mostly reflects rest between sets: the fake precision §10 already refuses for
 RPE bands, and the artifact the strength half of `HR_REST_NOTE` warns about.
 
 What this unlocks is bigger than the comparison: the zone tables gain a future half, ghost
@@ -1349,9 +1349,9 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
 >
 > The floor gained the branch it was missing at the same time. `!` on a week
 > where a sport was **trained but recorded nothing in this currency** read the
-> sport's whole duration, so a single 5-minute unrecorded session lit the row
+> sport's whole duration, so a single 5-minute activity with no zone data lit the row
 > while a 5-minute *recorded* one was correctly ignored. It now reads
-> `judged_sport_seconds` — `sport_durations` over the judgeable sessions,
+> `judged_sport_seconds` — `sport_durations` over the judgeable activities,
 > computed in `weekly_aggregates` beside the unfiltered one — so both `!` paths
 > answer to the same floor. `/api/zones`' `undercounted` flag moves with it;
 > its `trained` flag does not, because "did they train" is a fact about the week
@@ -1364,14 +1364,14 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
 > big enough to carry the claim*:
 >
 > - **A duration floor** (`config.zone_min_activity_minutes`, default 20). Seven
->   of the ten `hr_sparse` sessions in the window were under 15 minutes: a
->   5-minute yoga worth 0.8 TSS, a 5-minute strength session worth 0.3. None of
+>   of the ten `hr_sparse` activities in the window were under 15 minutes: a
+>   5-minute yoga worth 0.8 TSS, a 5-minute strength activity worth 0.3. None of
 >   them is evidence that a 344-TSS week is undercounted, and none is evidence
 >   about the strap either — they are below the noise floor of both questions.
->   Sessions under the floor keep their load and their zone minutes everywhere;
+>   Activities under the floor keep their load and their zone minutes everywhere;
 >   they lose only their vote on the markers. 20 minutes sits just above this
->   athlete's 25th-percentile session length (16 min), so it excludes the
->   mobility/micro-session tail without touching a real workout. Implemented as
+>   athlete's 25th-percentile activity length (16 min), so it excludes the
+>   mobility/micro-workout tail without touching a real workout. Implemented as
 >   `intensity.judgeable`, read by `progression.weekly_aggregates` (for `?`) and
 >   by `zone_rows`' new `judged_coverage` (for `!`).
 > - **A per-sport bar** (`intensity.COVERAGE_MIN_BY_SPORT`, overridable via
@@ -1401,10 +1401,10 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
 - **Tests** (`unittest`, `venv/bin/python -m unittest discover -s tests -p "test_*.py"`).
   The `road_biking` sweep is done; the files that still spell it use it as an alias-folding
   fixture and should keep it. Worth their own: the
-  completed-weeks divisor at a block's first 6 days and across a partial tail (§4); the
+  completed-weeks divisor at a mesocycle's first 6 days and across a partial tail (§4); the
   coverage formula with a meterless ride in the set (§7); the §9.5 stopgap, specifically a
   description-only edit leaving `adaptation_count` untouched; `show-activities` quoting the
-  same load as `progress` for an RPE-divergent session, tagged `rpe+` (§9.7).
+  same load as `progress` for an RPE-divergent activity, tagged `rpe+` (§9.7).
 - **README.md** and `benchmark record`'s help gain the Garmin auto-detection note (§7.1) —
   which §9.8 promotes from advice to a prerequisite.
 - **Two defects `progress` already has**, both surfaced by §9.6 and neither caused by it: the
@@ -1421,5 +1421,5 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
   `hr_zone_coverage_min`; a week whose chosen currency has no data; a sport not trained in a
   week rendering `—` rather than zeros; `w/c 07-06*!` fitting the week column; the 7-zone
   power table at exactly 48 columns with a 10h+ Z2; an orphaned week appearing in the weekly
-  table and in no block; `--blocks` naming both the orphaned weeks and the excluded partial
+  table and in no mesocycle; `--mesocycles` naming both the orphaned weeks and the excluded partial
   tails; `tm progress weeks 4` still reaching the dashless translator past the new positional.

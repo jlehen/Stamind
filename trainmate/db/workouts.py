@@ -22,7 +22,7 @@ CHANGE_KINDS = (
 )
 
 # The voids the athlete asked for, as against the ones the plan produced. A session
-# `workout rm` cancelled or a goal stood down is a decision, and both the coach and
+# `workout rm` cancelled or a goal stood down is a decision, and both the week planner and
 # Calendar treat it as one: the prompt calls it a deliberate cancellation and the event
 # stays, retitled. A day a generate or an adapt simply stopped scheduling is neither.
 ATHLETE_VOID_KINDS = ("rm", "stand-down")
@@ -557,7 +557,7 @@ class WorkoutsMixin:
         Cancelled sessions (a void revision — `workout rm`, a goal stood down, an adapt
         dropping a session) are excluded by default so they never appear in listings,
         comparisons, adaptation inputs or the calendar push. Pass include_removed=True to
-        retrieve them, e.g. to tell the coach a session was deliberately cancelled.
+        retrieve them, e.g. to tell the week planner a session was deliberately cancelled.
 
         There is no `include_archived` any more: a superseded revision is not a flagged
         row but an older sibling in its slot, and the history surfaces read it through

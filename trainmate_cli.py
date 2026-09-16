@@ -14,7 +14,7 @@ from trainmate import clock, journal, runtime
 from trainmate.prompt import PromptCancelled
 from trainmate.util import (
     bold, dim, green, red, cyan, blue, magenta, gray, aside, visible_len, pad_visible,
-    wrap_text, format_labeled_text, format_labeled_block, default_wrap_width,
+    wrap_text, format_labeled_text, format_labeled_paragraph, default_wrap_width,
     today_str as _today_str, today_date as _today_date, notice,
 )
 

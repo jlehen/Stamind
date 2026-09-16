@@ -63,7 +63,7 @@ class ConstraintsMixin:
                 )
             return [dict(row) for row in cursor.fetchall()]  # type: ignore
 
-    # No `get_unhonored_constraints` here on purpose. "Does the plan reflect this yet, and
+    # No `get_unhonored_constraints` here on purpose. "Does the schedule reflect this yet, and
     # is the window tier the right answer?" is a four-term rule that also has to ask
     # whether the window holds any sessions, and this layer cannot import `coach`. It has
     # one owner, `coach/honoring.py::needs_a_pass`; a SQL half-copy of it here is how the

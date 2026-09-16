@@ -66,7 +66,7 @@ def run_workout_rm(args: argparse.Namespace) -> None:
     The session is not deleted: the slot now says "no session here", and everything before
     that is still in the log (DESIGN_workout_revisions.md §3). Cancelled sessions are
     excluded from listings, comparisons and the calendar push, but are still surfaced to
-    the coach as a deliberate cancellation — and their Calendar event is kept, retitled
+    the week planner as a deliberate cancellation — and their Calendar event is kept, retitled
     "[Deleted]", by the reconcile the change schedules (§8)."""
     workout = runtime.db.get_workout_by_id(args.id)
     if not workout:

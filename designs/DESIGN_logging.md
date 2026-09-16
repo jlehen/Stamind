@@ -140,7 +140,7 @@ records the exception and re-raises it.
 
 **Runs have parents, and `tm shell` is one.** `run_once` is re-entrant: it handles the
 `shell` command by calling `_repl`, which calls `run_once` for every line typed. So three
-lines in a shell session produce four runs — the shell, and one per line naming the shell
+lines typed into `tm shell` produce four runs — the shell, and one per line naming the shell
 as its parent. That is the right reading of what happened, and it is the same shape as
 the bot: the bot spawns the CLI as a subprocess and passes its own run id down in
 `TRAINMATE_PARENT_RUN`, which the child records on `run.start`. The morning push — the bot
@@ -483,7 +483,7 @@ to be a flag, that is the moment it earns `prompt.answer`.
 **Which run it lands on.** `record()` reads the innermost open run of the process that
 writes, so the note carries the run of the command that asked. On a TTY that is the
 `run_once` bracket around the handler. Under the bot the CLI is a subprocess and
-`JsonPrompt.confirm` blocks and returns *inside the child*, so the note lands on the
+`JsonPrompt.confirm` waits and returns *inside the child*, so the note lands on the
 child's run — the same id as that command's other events, not the bot's long-lived one.
 This matters because the bot already logs `answer: Yes` through `_log`, and that record is
 written in the bot's process, on the bot's run. The two are not redundant: one says a
@@ -765,7 +765,7 @@ logging:
   retain_exchange_days: 90   # logs/llm_exchanges/*.md
 ```
 
-Every key has a working default, so an install with no `logging:` block behaves exactly
+Every key has a working default, so an install with no `logging:` section behaves exactly
 as described. `level: debug` is the switch that turns the swallowed-exception tier on; it
 is off by default because those records are noise until the day they are not.
 

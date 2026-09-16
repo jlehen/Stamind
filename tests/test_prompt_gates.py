@@ -2,7 +2,7 @@
 
 `_workout_adapt_logic` has two gated features, and each controls three or four regions
 that sit hundreds of lines apart in a 388-line builder: instructions telling the model
-how to weigh the thing, the data block containing it, a schema member for what to say
+how to weigh the thing, the data section containing it, a schema member for what to say
 about it, and a clause spliced into shared wording. That they move together was
 guaranteed by comments. Half-applying one is the failure that matters — the model is
 told to read a section that was never sent, or is sent data it was never told to use —
@@ -34,7 +34,7 @@ VACATE_SECTION = "### RE-FILLING A DATE YOU VACATE"
 
 DRIFT_INSTRUCTIONS = "### CORRECTING EXECUTION DRIFT"
 DRIFT_BRANCH = "measured intensity distribution has diverged from its stated"
-DRIFT_DATA = "## MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE BLOCK"
+DRIFT_DATA = "## MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE MESOCYCLE"
 
 STANDING_INSTRUCTIONS = "### THE SESSIONS THE ATHLETE IS ALREADY LOOKING AT"
 STANDING_KEEP_MEMBER = '"keep": true'
@@ -46,8 +46,8 @@ STANDING_RULE = "unless it contradicts the athlete's profile, the plan, or a"
 STANDING_DATA = "## SESSIONS ALREADY STANDING"
 STANDING_SCOPE = "You must answer for every session listed here"
 
-PAST_CONSTRAINTS_INSTRUCTIONS = "### WHAT ALREADY HAPPENED IN THIS BLOCK"
-PAST_CONSTRAINTS_DATA = "## CONSTRAINTS EARLIER IN THIS BLOCK"
+PAST_CONSTRAINTS_INSTRUCTIONS = "### WHAT ALREADY HAPPENED IN THIS MESOCYCLE"
+PAST_CONSTRAINTS_DATA = "## CONSTRAINTS EARLIER IN THIS MESOCYCLE"
 
 BASE = dict(
     history_days=7,
@@ -180,7 +180,7 @@ class TestTheSchemaStaysWellFormed(unittest.TestCase):
     """The response schema is assembled from string fragments joined with commas, so a
     gated member is exactly where punctuation desyncs."""
 
-    def test_the_schema_block_has_no_double_or_trailing_comma(self):
+    def test_the_schema_object_has_no_double_or_trailing_comma(self):
         for extra in ({}, {"athlete_message": "sore knee"}):
             with self.subTest(extra=list(extra)):
                 system, _ = build_prompt(**extra)
@@ -209,7 +209,7 @@ class TestTheStandingRules(unittest.TestCase):
     def test_adapt_gets_five_standing_rules_including_the_two_named_ones(self):
         system, _user = build_prompt()
         self.assertIn(wk.RULE_MOVE_FIRST, system)
-        self.assertIn(wk.RULE_BLOCK_NOT_YOURS, system)
+        self.assertIn(wk.RULE_MESOCYCLE_NOT_YOURS, system)
         # Adapt's other three are written inline at its call site — counted, not quoted,
         # so rewording one does not break a test about how many rules the model is given.
         rules = system.split("### STANDING RULES")[1].split("###")[0]
@@ -299,7 +299,7 @@ class TestStandingSessionsGate(unittest.TestCase):
         self.assertIn("ERG-locked, no surges.", user)
 
     def test_a_session_past_the_window_does_not(self):
-        """Past the window the coach answers for the session, it does not rewrite its
+        """Past the window the week planner answers for the session, it does not rewrite its
         interval structure — so the prose is not paid for."""
         _system, user = build_generate_prompt(standing_workouts=self.EASED)
         self.assertNotIn("ERG-locked, no surges.", user)
@@ -320,7 +320,7 @@ class TestStandingSessionsGate(unittest.TestCase):
 
     def test_the_generate_schema_stays_well_formed_either_way(self):
         """The answer members are spliced ahead of `benchmark_type`, so their own trailing
-        comma is what a bad splice loses and the block's last member runs on. (The schema
+        comma is what a bad splice loses and the object's last member runs on. (The schema
         mixes two annotation styles — comma after the value, or after the closing paren —
         so the member ahead of the splice is not asserted against one rule.)"""
         for standing in ([], self.EASED):
@@ -330,17 +330,17 @@ class TestStandingSessionsGate(unittest.TestCase):
                 self.assertNotIn(",\n}", system)
 
         system, _user = build_generate_prompt(standing_workouts=self.EASED)
-        block = system.split('"workouts": [')[1].split("\n    }")[0]
-        member = block[block.index('"keep"'):].split('\n      "')[0]
+        schema = system.split('"workouts": [')[1].split("\n    }")[0]
+        member = schema[schema.index('"keep"'):].split('\n      "')[0]
         self.assertTrue(member.rstrip().endswith(","), msg=repr(member))
         self.assertGreater(
-            block.index('"benchmark_type"'), block.rindex('"change_reason"'),
-            "the answer members must sit ahead of the block's last member",
+            schema.index('"benchmark_type"'), schema.rindex('"change_reason"'),
+            "the answer members must sit ahead of the object's last member",
         )
 
 
 class TestPastConstraintsGate(unittest.TestCase):
-    """A constraint that ended earlier in the block is why a week went quiet, and the
+    """A constraint that ended earlier in the mesocycle is why a week went quiet, and the
     coach cannot see those days any other way (DESIGN_plan_change_continuity.md §6.1)."""
 
     PAST = [{
@@ -376,7 +376,7 @@ GATES_WITHOUT_A_TEST = {
     "signal_earliest_date",
     # generate
     "num_days", "start_str", "metrics", "completed_activities", "baseline",
-    "block_progress", "block_has_intensity", "anchor_history", "commitment_end",
+    "mesocycle_progress", "mesocycle_has_intensity", "anchor_history", "commitment_end",
 }
 
 BUILDERS = ("_workout_adapt_logic", "_workout_generate_logic")

@@ -52,7 +52,7 @@ class PromptBuildMixin:
             lines.append(f"- Preferences / Static Constraints: {preferences}")
             lines.append(
                 "  (Preferences describe how sessions are written up, where they happen, "
-                "with what kit, and how to speak to the athlete. Session counts, block "
+                "with what kit, and how to speak to the athlete. Session counts, mesocycle "
                 "order and taper depth come from the athlete-provided science guidelines, "
                 "never from here.)"
             )
@@ -175,7 +175,7 @@ principles.
 1. Design periodized training plans (macro, meso, micro cycles) leading up to the target goals.
 2. Focus scheduling on the NEXT CHRONOLOGICAL GOAL only. If there are multiple goals, identify
    synergies between them (e.g. general base or strength building phases).
-3. Dynamically adjust training plans based on recent Garmin metrics (Resting HR, HRV, Sleep,
+3. Dynamically adjust the scheduled sessions based on recent Garmin metrics (Resting HR, HRV, Sleep,
    and the PMC CTL/ATL/TSB) to optimize recovery and prevent injury.
 4. Shift or scale training volume and intensity around the athlete's active constraints
    (travel, injury, capacity/intensity caps, preferences) to manage fatigue and respect
@@ -309,7 +309,7 @@ prescription the athlete trains from, and stays as complete as the session requi
         """Fingerprints the *evidence* a backward evaluation reconstructs from — the
         completed activities + daily metrics (+ overlapping constraints) within a window —
         so a re-run over unchanged data can be detected (see DESIGN_backward_evaluation.md
-        §5, §8). `signal_days` is the *full-history* episode block, hashed as computed
+        §5, §8). `signal_days` is the *full-history* episode mesocycle, hashed as computed
         because it is built outside the window (DESIGN_quantitative_signal_impact.md §8).
 
         We hash the load-bearing fields (not just activity ids) so that a re-pull which

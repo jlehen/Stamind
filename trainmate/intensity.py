@@ -1,14 +1,14 @@
 """Per-mesocycle, per-sport, per-zone time in zone — the intensity axis TSS folds away.
 
 ``load = volume x intensity``, and TSS is the product: given it you can recover neither
-factor, so a block whose easy days drifted to tempo reads as flat weekly TSS and a flat
+factor, so a mesocycle whose easy days drifted to tempo reads as flat weekly TSS and a flat
 PMC. Zone distribution is the only intensity signal in the schema. The whole rationale —
 why every zone is reported separately, why per sport, why rates over completed weeks
 only — lives in DESIGN_intensity_distribution.md.
 
 No DB access here (same rule as ``trainmate.sports``): callers pass activity rows or a
 fetch callable, so one implementation serves `workout adapt`, the strategy prompt and
-the CLI block summary.
+the CLI mesocycle summary.
 """
 from datetime import date, datetime, timedelta
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Tuple
@@ -73,7 +73,7 @@ def judgeable(act: Dict[str, Any]) -> bool:
     """Whether an activity is big enough to carry a claim about recording quality, or
     about undercounted load (`config.zone_min_activity_minutes`, §11).
 
-    A 5-minute mobility session with a cold strap is not evidence that a 340-TSS week is
+    A 5-minute mobility activity with a cold strap is not evidence that a 340-TSS week is
     undercounted, and it is not evidence about the strap either — it is below the noise
     floor of both questions. Its load and its zone minutes still count everywhere; only
     its vote on the markers is withheld."""
@@ -97,8 +97,8 @@ HR_INTERVAL_NOTE = (
 )
 HR_LAG_NOTE = (
     "Note: HR needs 60-90s to climb, so short VO2max intervals bank most of their "
-    "seconds in Z4 — measured by HR a genuine VO2max block looks like a threshold "
-    "block. Prefer the power row where one exists."
+    "seconds in Z4 — measured by HR a genuine VO2max mesocycle looks like a threshold "
+    "mesocycle. Prefer the power row where one exists."
 )
 NEVER_SUM_NOTE = (
     "Note: the HR and power rows of one sport are two views of the SAME time, never a "
@@ -122,17 +122,17 @@ def _s(value: date) -> str:
 
 
 def counted_days(start: str, end: str, as_of: str) -> int:
-    """Days of the block that are over: elapsed before `as_of`, capped at the block's
-    own span. Zero or negative means the block has not started."""
+    """Days of the mesocycle that are over: elapsed before `as_of`, capped at the mesocycle's
+    own span. Zero or negative means the mesocycle has not started."""
     span = (_d(end) - _d(start)).days + 1
     return min((_d(as_of) - _d(start)).days, span)
 
 
 def rate_window(start: str, end: str, as_of: str) -> Optional[Tuple[str, str, int]]:
-    """``(window_start, window_end, completed_weeks)`` — the whole 7-day weeks of a block
+    """``(window_start, window_end, completed_weeks)`` — the whole 7-day weeks of a mesocycle
     finished by `as_of`, the only span a per-week rate may divide (§4).
 
-    Weeks run from the block's own start, not calendar Mondays, so blocks compare
+    Weeks run from the mesocycle's own start, not calendar Mondays, so mesocycles compare
     like for like. The partial tail is excluded from BOTH sides of the division;
     including it understates easy volume every time, in the same direction, because
     the long easy session sits on the weekend. None when under a week has elapsed.
@@ -146,7 +146,7 @@ def rate_window(start: str, end: str, as_of: str) -> Optional[Tuple[str, str, in
 
 def current_week_window(start: str, end: str, as_of: str) -> Optional[Tuple[str, str, int]]:
     """``(week_start, as_of, day_of_week)`` for the week in progress (§9.3), or None when
-    `as_of` sits outside the block or exactly on a week boundary with nothing elapsed."""
+    `as_of` sits outside the mesocycle or exactly on a week boundary with nothing elapsed."""
     if not (start <= as_of <= end):
         return None
     elapsed = (_d(as_of) - _d(start)).days
@@ -157,10 +157,10 @@ def current_week_window(start: str, end: str, as_of: str) -> Optional[Tuple[str,
 
 
 def measured_window(start: str, end: str, as_of: str) -> Tuple[str, str, int]:
-    """``(window_start, window_end, weeks)`` — the window a block's zone table divides.
+    """``(window_start, window_end, weeks)`` — the window a mesocycle's zone table divides.
 
-    The whole-week rate window where one exists (§4), else the block's elapsed span raw
-    with ``weeks = 0``, which is how `block_report` labels a block too young to average.
+    The whole-week rate window where one exists (§4), else the mesocycle's elapsed span raw
+    with ``weeks = 0``, which is how `mesocycle_report` labels a mesocycle too young to average.
     Shared so a caller deciding whether a table will HAVE rows asks about the same window
     the table is built from.
     """
@@ -168,8 +168,8 @@ def measured_window(start: str, end: str, as_of: str) -> Tuple[str, str, int]:
     return win if win else (start, min(as_of, end), 0)
 
 
-def block_weeks(start: str, end: str) -> int:
-    """The block's planned length in weeks, rounded up — the denominator of
+def mesocycle_weeks(start: str, end: str) -> int:
+    """The mesocycle's planned length in weeks, rounded up — the denominator of
     '2 completed weeks of 4'."""
     return max(1, ((_d(end) - _d(start)).days + 7) // 7)
 
@@ -185,7 +185,7 @@ class ZoneRow(NamedTuple):
 
     `judged_coverage` is the same ratio over the activities big enough to say anything
     about recording quality (`judgeable`), and is what the `!` marker reads; None when
-    none of the window's sessions for this sport clear that floor, which is not a
+    none of the window's activities for this sport clear that floor, which is not a
     failing recording but an unanswerable question (§11). `coverage` keeps every
     session, because the header percentage and the currency choice are about how much
     of the training this currency saw — a different question.
@@ -212,7 +212,7 @@ class ZoneRow(NamedTuple):
 
 def sport_durations(activities: Sequence[Dict[str, Any]]) -> Dict[str, float]:
     """Total recorded duration per canonical sport — `zone_rows`' denominator, exposed
-    on its own because a sport can have sessions and no zone rows at all.
+    on its own because a sport can have activities and no zone rows at all.
 
     That distinction is the whole reason the weekly table needs three states rather than
     two: no duration means not trained, duration with no zone seconds means trained and
@@ -418,7 +418,7 @@ def zone_rows(activities: Sequence[Dict[str, Any]]) -> List[ZoneRow]:
     """
     duration: Dict[str, float] = {}
     acc: Dict[Tuple[str, str], List[float]] = {}
-    # The same two totals over judgeable sessions only — the basis for `!` (§11).
+    # The same two totals over judgeable activities only — the basis for `!` (§11).
     judged_duration: Dict[str, float] = {}
     judged: Dict[Tuple[str, str], float] = {}
     for act in activities:
@@ -489,7 +489,7 @@ class WeekZoneState(NamedTuple):
     duration in this sport was *not trained* and is unmarked; a week with duration but
     nothing recorded in this currency is *undercounted*, and calling that "not trained"
     would turn §7's meaning exactly backwards; a week with a row reports its seconds. `undercounted` reads the JUDGEABLE duration, so a single five-minute
-    unrecorded session cannot light the week (§11).
+    activity with no zone data cannot light the week (§11).
 
     `currency_mismatch` applies to future weeks only: work planned in the other
     currency is offered as a fact and never converted, because Power Z6/Z7 have no HR
@@ -611,7 +611,7 @@ def format_coverage(
 
     Low coverage means the effort sat BELOW Z1, not that nothing was done — a model
     reading absence as inactivity prescribes more aerobic volume on top of a base
-    block that already had it (§7). Zeros are indistinguishable from NULLs in the
+    mesocycle that already had it (§7). Zeros are indistinguishable from NULLs in the
     columns themselves, so this fraction does all that work.
     """
     if not rows:
@@ -670,7 +670,7 @@ def format_delta_table(
     prev_rows: Sequence[ZoneRow], prev_weeks: int, prev_name: str,
     indent: str = "", width: int = PROMPT_WIDTH,
 ) -> List[str]:
-    """Block-over-block change in per-week rates (§4.1).
+    """Mesocycle-over-mesocycle change in per-week rates (§4.1).
 
     A sport or currency missing from either side is reported as absent rather than as a
     -100% swing: a changed sport mix is not intensity creep.
@@ -726,7 +726,7 @@ def format_structural(
     that moved inside the window.
 
     No sport is routed away from the zone table into this one (§6) — a HIIT kettlebell
-    session's Z4 minutes are real work, and dropping them tells a coach to prescribe
+    activity's Z4 minutes are real work, and dropping them tells a coach to prescribe
     intensity on top of intensity already done. This section sits BESIDE the zone rows,
     never instead of them.
     """
@@ -758,7 +758,7 @@ def format_structural(
     for sport, agg in rows:
         n = int(agg["n"])
         lines.append(
-            f"{indent}{sport.ljust(label_width)}  {n} session{'s' if n != 1 else ''}, "
+            f"{indent}{sport.ljust(label_width)}  {n} activit{'ies' if n != 1 else 'y'}, "
             f"{fmt_duration(agg['sec'])}, avg RPE {agg['rpe_sum'] / agg['rpe_n']:.1f}, "
             f"{agg['srpe']:.0f} sRPE load"
         )
@@ -804,13 +804,13 @@ def _benchmark_lines(
 def format_header(meso: Dict[str, Any], as_of: str, with_focus: bool = True) -> str:
     """'Build 1 — focus "threshold development" (2 completed weeks of 4, plus 2 days)'.
 
-    Rates, not totals: blocks are unequal length and the current one is always partial,
+    Rates, not totals: mesocycles are unequal length and the current one is always partial,
     so the reader is told exactly what divided the numbers (§4). `with_focus` is off for
     the CLI, which has already printed the focus above the table."""
     start, end = meso["start_date"], meso["end_date"]
     days = max(0, counted_days(start, end, as_of))
     weeks, spare = days // 7, days % 7
-    total = block_weeks(start, end)
+    total = mesocycle_weeks(start, end)
     parts = [f"{weeks} completed week{'s' if weeks != 1 else ''}"]
     if weeks < total:
         parts[0] += f" of {total}"
@@ -825,10 +825,10 @@ def format_header(meso: Dict[str, Any], as_of: str, with_focus: bool = True) -> 
 class _WindowCache:
     """Serves overlapping sub-windows of one span from a single fetch.
 
-    `block_report` asks its fetcher for up to four windows per block — elapsed, the
-    rate window, the current week, the previous block — and all but the last are
-    sub-ranges of the block itself. Against the database that was four queries per
-    block, which `progress --blocks` multiplied by the number of blocks. Dates are
+    `mesocycle_report` asks its fetcher for up to four windows per mesocycle — elapsed, the
+    rate window, the current week, the previous mesocycle — and all but the last are
+    sub-ranges of the mesocycle itself. Against the database that was four queries per
+    mesocycle, which `progress --mesocycles` multiplied by the number of mesocycles. Dates are
     ISO strings, so slicing by comparison is chronological.
     """
 
@@ -840,7 +840,7 @@ class _WindowCache:
 
     def __call__(self, start: str, end: str) -> Sequence[Dict[str, Any]]:
         if start < self._start or end > self._end:
-            # Outside the span we cached (the previous block); ask directly.
+            # Outside the span we cached (the previous mesocycle); ask directly.
             self.calls += 1
             return self._fetch(start, end)
         if self._rows is None:
@@ -849,7 +849,7 @@ class _WindowCache:
         return [a for a in self._rows if start <= str(a.get("date") or "") <= end]
 
 
-def block_report(
+def mesocycle_report(
     meso: Dict[str, Any],
     as_of: str,
     fetch_activities: FetchActivities,
@@ -868,26 +868,26 @@ def block_report(
     `fetch_activities(start, end)` returns completed activities over an inclusive window.
     `current_week` adds the in-progress week as RAW minutes beside the elapsed fraction —
     never extrapolated, which would be a fabrication (§9.3). `previous` adds the
-    block-over-block delta, which belongs to plan generation only (§4.1/§9.2).
+    mesocycle-over-mesocycle delta, which belongs to plan generation only (§4.1/§9.2).
 
     `fetch_workouts` adds what the plan PRESCRIBED over the same rate window, in the same
-    units and format as the measured table — the pair that separates a mis-designed block
+    units and format as the measured table — the pair that separates a mis-designed mesocycle
     from a mis-executed one (§9.2a). Only the periodization consumer passes it: measured
     diverging from the prescription is an execution question, and adapt owns those.
 
-    `notes` off leaves the measurement caveats to the caller: three blocks in a row would
+    `notes` off leaves the measurement caveats to the caller: three mesocycles in a row would
     otherwise repeat them three times, nine lines saying two things (§9.6). It defaults on
-    for the prompt paths, which send one block each.
+    for the prompt paths, which send one mesocycle each.
 
-    The block it is given is the block it reports: no fallback to a future or first
-    mesocycle, so a not-yet-started block renders nothing rather than an empty table (§8).
+    The mesocycle it is given is the mesocycle it reports: no fallback to a future or first
+    mesocycle, so a not-yet-started mesocycle renders nothing rather than an empty table (§8).
     """
     start, end = meso["start_date"], meso["end_date"]
     days = counted_days(start, end, as_of)
     if days <= 0:
         return None
 
-    # One fetch covers every window inside this block; see _WindowCache.
+    # One fetch covers every window inside this mesocycle; see _WindowCache.
     fetch_activities = _WindowCache(fetch_activities, start, max(end, as_of))
 
     inner = indent + "  "
@@ -905,7 +905,7 @@ def block_report(
         return "\n".join(lines)
     lines.extend(_wrap(
         f"Volume and load ({start}..{through}): {len(elapsed)} "
-        f"session{'s' if len(elapsed) != 1 else ''}, "
+        f"activit{'ies' if len(elapsed) != 1 else 'y'}, "
         f"{fmt_duration(sum(float(a.get('duration_sec') or 0.0) for a in elapsed))}, "
         f"{sum(activity_load(a) for a in elapsed):.0f} TSS",
         inner, width,
@@ -919,7 +919,7 @@ def block_report(
         ))
     else:
         lines.extend(_wrap(
-            f"Intensity distribution, RAW minutes ({win_start}..{win_end}) — the block is "
+            f"Intensity distribution, RAW minutes ({win_start}..{win_end}) — the mesocycle is "
             f"{days} day{'s' if days != 1 else ''} old, too young for a per-week rate",
             inner, width
         ))
@@ -935,7 +935,7 @@ def block_report(
     # Beside the measured table, never instead of it: same rows, same divisor, same
     # renderer, so the two are compared line for line (§9.2a). Only over the rate window —
     # a prescription and a recording must divide the same weeks to be comparable. Silent
-    # when the block's sessions carry no planned zones (nothing prescribed them, or they
+    # when the mesocycle's sessions carry no planned zones (nothing prescribed them, or they
     # predate §9.8): an empty table would read as "the plan asked for nothing".
     if fetch_workouts is not None and rows:
         planned = planned_zone_rows(fetch_workouts(win_start, win_end))
@@ -949,7 +949,7 @@ def block_report(
             ))
 
     if previous and weeks:
-        # A finished block's own last day is over, so measure it one day past its end —
+        # A finished mesocycle's own last day is over, so measure it one day past its end —
         # counted_days counts days that are OVER, not days that exist.
         prev_window = rate_window(
             previous["start_date"], previous["end_date"],
@@ -994,7 +994,7 @@ def _current_week_lines(
     """The in-progress week: raw minutes and how much of the week has gone (§9.3).
 
     Two days in and already over the week's whole Z3 allowance is correctable NOW;
-    the block-to-date average would take another fortnight to show it."""
+    the mesocycle-to-date average would take another fortnight to show it."""
     win = current_week_window(start, end, as_of)
     if win is None:
         return []

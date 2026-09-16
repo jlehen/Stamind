@@ -3,7 +3,7 @@ TRAINING LOAD MONITORING GUIDELINES (FITNESS/FATIGUE MODEL)
 
 AUTHORITY: DIAGNOSTIC. This file describes how to READ training load; it does
 not decide what load to prescribe. Where a plan document in science/ specifies
-volumes, block lengths, session counts or taper depth, that document governs —
+volumes, mesocycle lengths, session counts or taper depth, that document governs —
 use the models here to judge whether the athlete is absorbing it. The one
 exception is §5's final directive, which is a floor rather than a default.
 
@@ -40,7 +40,7 @@ fatigue, and the balance between them ("form").
                        taper.
    - TSB -10 to +5:    Neutral / "grey zone". Maintenance or light build.
    - TSB -10 to -30:   Productive overload. Normal and desirable inside a build
-                       block: fitness is being built while fatigue is carried.
+                       mesocycle: fitness is being built while fatigue is carried.
    - TSB < -30:        Excessive fatigue. High overreaching / injury risk;
                        insert recovery.
 
@@ -56,7 +56,7 @@ per week).
 
    - Ramp rate ~3-5:   Sustainable for most athletes building fitness.
    - Ramp rate ~5-7:   Aggressive; acceptable for experienced athletes in a
-                       focused build block, monitored closely.
+                       focused build mesocycle, monitored closely.
    - Ramp rate > 8:    High risk of non-functional overreaching / injury.
                        Avoid outside short, deliberate overload weeks.
 
@@ -101,7 +101,7 @@ fitness levels. What ATL has to reach for TSB to hit -30:
    - > 1.5:            Acute load has spiked far above the athlete's base.
                        Reduce load unless this is a planned, capped overload.
    - < 1.0:            Unloading. Deliberate in a taper, deload, or a
-                       low-volume intensity block; a sign of drift or lost
+                       low-volume intensity mesocycle; a sign of drift or lost
                        consistency only when NOT planned. See §4 — a low ratio
                        is not by itself a fault to correct.
 
@@ -115,7 +115,7 @@ fitness levels. What ATL has to reach for TSB to hit -30:
    the PMC already computes.
 
 
-4. PLANNED vs UNPLANNED: READING THESE INSIDE A BLOCK
+4. PLANNED vs UNPLANNED: READING THESE INSIDE A MESOCYCLE
 -----------------------------------------------------
 TSB and ATL:CTL detect UNINTENDED load. They cannot, by themselves, tell a
 deliberate training decision apart from a mistake — and periodization is built
@@ -126,19 +126,19 @@ mechanism is concentrated loading and sharp transitions.
    A value that matches its planned trajectory is on plan, whatever band it
    falls in. A value that departs from the planned trajectory is the signal.
 
-   Do not look the athlete's block up in a table of block names — plans use
+   Do not look the athlete's mesocycle up in a table of mesocycle names — plans use
    different vocabularies (periodization.txt §2B). Derive the expected
-   direction from what the block SAYS IT IS FOR, then compare:
+   direction from what the mesocycle SAYS IT IS FOR, then compare:
 
-   - A block whose purpose is accumulating VOLUME: ATL:CTL steps up on entry
+   - A mesocycle whose purpose is accumulating VOLUME: ATL:CTL steps up on entry
      and settles back down as CTL catches up; TSB sits in the productive-
      overload range. Do NOT trim planned volume merely because the ratio is
      elevated; that sands the step off and turns block periodization into a
      linear ramp.
-   - A block that CUTS VOLUME to concentrate INTENSITY: ATL:CTL falls and TSB
-     rises, because the ratio tracks load, not effort. This is the block
+   - A mesocycle that CUTS VOLUME to concentrate INTENSITY: ATL:CTL falls and TSB
+     rises, because the ratio tracks load, not effort. This is the mesocycle
      working as designed. Do NOT add volume back to "correct" the low ratio —
-     the block's effect depends on staying concentrated and low-volume.
+     the mesocycle's effect depends on staying concentrated and low-volume.
    - A TAPER or DELOAD: load is cut deliberately, so ATL:CTL falls and TSB
      rises toward freshness. A low ratio here is the goal, not a lapse.
    - Unstructured, off-plan, or returning from a layoff/illness: no planned
@@ -146,7 +146,7 @@ mechanism is concentrated loading and sharp transitions.
      directly. This is where an unplanned spike is genuinely dangerous and
      where the ratio earns its keep.
 
-   Note that the second case is the one most often misread: an intensity block
+   Note that the second case is the one most often misread: an intensity mesocycle
    can be the hardest fortnight of the athlete's year and still show a falling
    ratio and a rising TSB, because neither metric can see intensity.
 
@@ -161,9 +161,9 @@ These are how to interpret the numbers. With one exception, flagged below, they
 are defaults that a plan document overrides.
 
    - Establish which phase the athlete is in BEFORE reading any band. Inside a
-     declared block, derive the expected direction as in §4 and compare against
+     declared mesocycle, derive the expected direction as in §4 and compare against
      that. Outside one, read the bands directly.
-   - Outside a deliberate overload block, ATL:CTL near 1.0-1.3 is the
+   - Outside a deliberate overload mesocycle, ATL:CTL near 1.0-1.3 is the
      unremarkable case. A departure is something to EXPLAIN — against the plan
      first — not something to correct on sight.
    - Treat an UNPLANNED ATL:CTL above 1.5, or a ramp rate above 8, as a caution
@@ -171,10 +171,10 @@ are defaults that a plan document overrides.
      spike the ratio while ramp stays fine; a smooth relentless build can hold
      the ratio near 1.1 while ramp exceeds 8.
    - Do NOT treat a low ATL:CTL as a fault to correct without first checking
-     whether it is planned (taper, deload, intensity block). If it is planned,
+     whether it is planned (taper, deload, intensity mesocycle). If it is planned,
      hold the plan.
    - When TSB falls below -30, default to recovery/deload and override
-     continued loading — unless this is a short, deliberate overreach block,
+     continued loading — unless this is a short, deliberate overreach mesocycle,
      in which case cap its duration and watch recovery metrics closely.
    - Scale the TSB and ramp thresholds down for a low-CTL athlete, and lean on
      ATL:CTL instead: at CTL under ~30 the absolute bands are too permissive
@@ -189,4 +189,4 @@ are defaults that a plan document overrides.
    - THIS ONE IS A FLOOR, NOT A DEFAULT: cross-check all of the above against
      recovery metrics (HRV, RHR, sleep). Depressed recovery overrides a "safe"
      reading on any of these models, and is the abort signal that outranks a
-     planned block — including a plan document that says to keep loading.
+     planned mesocycle — including a plan document that says to keep loading.

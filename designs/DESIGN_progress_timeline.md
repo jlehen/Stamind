@@ -44,7 +44,7 @@ the *presentation*-side view of past **and future**)
 > now its own payload field; renderers dispatch on `code`.
 > (5) **One windowing implementation** (§7.1). "Which weeks does `--weeks` show"
 > lived in three places — the text table, `clip_payload_for_weeks(cap_future)`
-> for the chart, and `--blocks`. All three now call `progression.select_weeks`.
+> for the chart, and `--mesocycles`. All three now call `progression.select_weeks`.
 > (6) **The zone tables move behind `-z`/`--zones`** (naming a sport implies it).
 > They tripled a numbers-first command from ~27 lines to 96 at phone width and
 > answer a different question from the load table.
@@ -52,7 +52,7 @@ the *presentation*-side view of past **and future**)
 > nobody can fix no longer keeps the banner permanently lit; the FORM line prints
 > CTL/ATL at one decimal to match the TSB beside it and `tm status`; the config
 > `sport_preferences` check only runs when zone tables are asked for; and
-> `--blocks` no longer crashes on `get_previous_macrocycle()` (its hand-rolled
+> `--mesocycles` no longer crashes on `get_previous_macrocycle()` (its hand-rolled
 > test stub had the wrong signature, so the suite passed while the flag died on
 > every real database).
 >
@@ -175,7 +175,7 @@ the *presentation*-side view of past **and future**)
 > rule, empty states, CLI auto-ensure.
 
 A single continuous timeline that shows how training load has actually
-accumulated and where the current plan takes it: **past days are measured
+accumulated and where the scheduled sessions take it: **past days are measured
 load** (from `completed_activities`), **future days are planned load** (from
 `workouts`), and one fitness/fatigue model runs across the seam. The
 centerpiece is a projected Performance Management Chart — CTL (fitness), ATL
@@ -254,14 +254,14 @@ the same content:
   planned bar is `progression.week_plan_denom` (§5), so the current week bars
   its **elapsed** slice and the picture cannot disagree with the CLI table about
   the same week (§3 comparable days). The
-  mesocycle band beneath labels each week's block via the layered lookup
+  mesocycle band beneath labels each week's mesocycle via the layered lookup
   (§6.1): plan mesocycles where a plan governed the week, bootstrap-inferred
-  blocks (rendered hatched/lighter, `~`-prefixed) for pre-plan history.
+  mesocycles (rendered hatched/lighter, `~`-prefixed) for pre-plan history.
 
 The projection is the point of the feature: because `workout adapt` and
 `workout generate` rewrite future `workouts` rows, the dashed half answers
 "what does the *current* plan do to my fitness" — and visibly moves when the
-plan is adapted.
+sessions are adapted.
 
 ## 3. Load semantics — one currency across the seam
 
@@ -275,7 +275,7 @@ The past and future halves must be in the same units or the seam is a lie.
   load bars and the stored CTL/ATL/TSB they sit under agree by construction.
   This also absorbs the ~24 activities with NULL `tss` without special-casing.
 - **Future days** (`date > today`): daily load = Σ `adherence.planned_load(w)`
-  over that day's non-`removed` `workouts` rows — the coach's `tss` when set,
+  over that day's non-`removed` `workouts` rows — the week planner's `tss` when set,
   else sRPE (RPE × 10 × hours) from `rpe` + `duration_minutes`. This is the
   *existing* planned-side valuation the adherence verdicts already use
   (`adherence._planned_load`, promoted public in step 1 of §10); inventing a
@@ -389,12 +389,12 @@ the row is partial and the footnote says *why*.
   instrument-derived. If the plan systematically over- or under-states TSS,
   the projection inherits that bias. A display-time calibration layer
   (scaling planned loads by the historical actual÷planned ratio) was
-  considered and **rejected** as too indirect: if the coach's TSS estimates
+  considered and **rejected** as too indirect: if the week planner's TSS estimates
   are biased, the fix belongs in plan generation, not in rescaling at render
-  time. The projection stays *consistent* with the coach's own beliefs —
+  time. The projection stays *consistent* with the week planner's own beliefs —
   the same numbers already drive adaptation decisions.
 - Relatedly, actual loads include the RPE-divergence bump (§12): weeks heavy
-  in sessions where RPE overrides the measurement (typically strength) can
+  in activities where RPE overrides the measurement (typically strength) can
   legitimately show >100% of planned. Accepted for the same reason: the
   number is honest, and the bias source is upstream of this feature.
 - Days with no Garmin data (sync gap, vacation, dated wipe) are
@@ -579,8 +579,8 @@ def weekly_aggregates(activities, workouts, today, meso_spans, *,
     # the db (DESIGN_intensity_distribution.md §9.6/§9.8/§11).
     # The `_by_sport` dicts are the same totals bucketed by sports.canonical_sport
     # (activity_type for actual, sport_type for planned) — the per-sport gap
-    # annotation `_block_week_lines` derives from them lives in
-    # DESIGN_block_progress.md §3.3, not here: this module stays pure maths, the
+    # annotation `_mesocycle_week_lines` derives from them lives in
+    # DESIGN_mesocycle_progress.md §3.3, not here: this module stays pure maths, the
     # rendering decision belongs to the prompt-facing caller.
 
 def week_plan_denom(week) -> float | None
@@ -593,7 +593,7 @@ def week_plan_denom(week) -> float | None
 def week_plan_denom_by_sport(week) -> dict[str, float] | None
     # week_plan_denom's per-sport counterpart, same elapsed-vs-full rule, keyed
     # by canonical sport. Sole consumer today is the §3.3 gap annotation
-    # (DESIGN_block_progress.md), not a rendered bar/percentage of its own.
+    # (DESIGN_mesocycle_progress.md), not a rendered bar/percentage of its own.
 
 def assemble_timeline(activities, workouts, metrics_rows, mesocycles,
                       inferred_mesocycles, objectives, today,
@@ -766,18 +766,18 @@ column and the chart band:
    the *latest* completed objective's plan does label its weeks again; only
    earlier ones and superseded versions still fall back to `~inferred`.
 2. **Bootstrap reconstruction** — for weeks the active plan doesn't cover: `data
-   bootstrap`'s reverse-engineered blocks from `analysis_cache["long"]`,
+   bootstrap`'s reverse-engineered mesocycles from `analysis_cache["long"]`,
    nested at `cache["reconstruction"]["inferred_mesocycles"]` (fields
    `name`/`start_date`/`end_date`/`focus_detected`, engine.py:1022 — rev 5
    misnamed both the path and the focus field). These are *descriptive*
    (what the athlete actually did), not prescriptive, so they render
    `~`-prefixed in text and hatched/lighter as chart bands. Staleness,
    honestly: `data bootstrap --force` *rewrites* this cache up to the
-   present, so the blocks are LLM output that can change shape between runs
+   present, so the mesocycles are LLM output that can change shape between runs
    and can sprawl over plan-governed weeks — the label layering (plan wins)
    and the band trimming below contain that, and a re-run relabeling
    *pre-plan* weeks is acceptable precisely because this layer is
-   descriptive. The dates are LLM-authored strings: blocks with unparseable
+   descriptive. The dates are LLM-authored strings: mesocycles with unparseable
    dates are skipped (and counted into `warnings`), spans sorted, overlaps
    resolved by the trim rule — never compared raw.
 3. **No match** (bootstrap never run, no plan coverage, or a genuine gap)
@@ -795,9 +795,9 @@ coverage never depended on labels — it reads the week's own rows (below).
 Rev 7 kept the version-in-force rule for governance alone; rev 9 cut that too,
 so no version archaeology survives anywhere in this feature.
 
-Week → block assignment: neither real nor inferred mesocycles are
-Monday-aligned, so a week belongs to the block covering the **majority of
-its days** (tie → the later block, so a block starting mid-week owns that
+Week → mesocycle assignment: neither real nor inferred mesocycles are
+Monday-aligned, so a week belongs to the mesocycle covering the **majority of
+its days** (tie → the later mesocycle, so a mesocycle starting mid-week owns that
 week from its first majority). Labels longer than the CLI column (8 chars)
 are truncated with `…`.
 
@@ -826,7 +826,7 @@ planned zero. That is the better of the two readings anyway — nothing
 survives to compare against.
 
 **Band trimming.** `meso_bands` are date spans, not per-week votes, so
-overlaps are possible where an inferred block runs into plan coverage (the
+overlaps are possible where an inferred mesocycle runs into plan coverage (the
 transition week). Precedence follows the layers: plan bands win; inferred
 bands are trimmed to the non-overlapping remainder and dropped when fully
 covered. The payload never contains overlapping bands — renderers draw
@@ -891,7 +891,7 @@ objective line, wrapped inside the same width budget:
 `🏁 2026-09-30 Trail marathon` / `   projected CTL 68, TSB +12`.)
 
 - **The FORM line shows today per the §4 fold** — and tags where today's
-  load came from: `FORM today (actual)` once today's session has synced,
+  load came from: `FORM today (actual)` once today's activity has synced,
   `FORM today (planned)` while the fold is counting the planned session in
   its place. Presentation conventions are `tm status`'s, reused not
   reimplemented: same `color_tsb`, same one-decimal CTL/ATL, same
@@ -983,7 +983,7 @@ objective line, wrapped inside the same width budget:
   `done`/`adh` columns omitted rather than filled with em-dashes; current week
   per the §3 in-progress rule. The plan figure a row bars and divides by is
   `progression.week_plan_denom` (§5) on every surface, the PNG included.
-- **A second week-column marker, `?`** — the week holds a session whose HR
+- **A second week-column marker, `?`** — the week holds an activity whose HR
   recording was too sparse to trust *and* carried no RPE, so the week's own
   **load** is undercounted and reads as an adherence miss it never was. It earns
   its own legend line (`? load undercounted — recording gap, no RPE`) and is a
@@ -1141,14 +1141,14 @@ additive:
    merged §3 series; shade the 0.8–1.3 band and flag future weeks the plan
    pushes past 1.3. Actionable: the fix is one `adapt`/`swap` away.
 2. **Plan-drift view.** Third bar layer from `original_tss` /
-   `original_duration_minutes` + `adaptation_count`: original plan vs
-   adapted plan vs actual — a visualization of the adaptation engine itself.
+   `original_duration_minutes` + `adaptation_count`: original prescription vs
+   adapted prescription vs actual — a visualization of the adaptation engine itself.
 3. **Zone-distribution stack.** Weekly stacked zone1–5 time (HR and power
    variants) from `completed_activities`. **The text half has shipped** —
    `DESIGN_intensity_distribution.md` §9.6: a positional sport argument
    (defaulting to every qualifying `sport_preferences` entry, one table
    each, not just the first), a per-zone weekly table stacked under the
-   WEEKLY LOAD table, and `--blocks` for the graded per-mesocycle view.
+   WEEKLY LOAD table, and `--mesocycles` for the graded per-mesocycle view.
    **Behind `-z`/`--zones` since rev 9** (naming a sport implies it): on real
    data the tables took `tm progress` from 27 lines to 96 at phone width, and
    they answer a different question from the load table they sit under — the

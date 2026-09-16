@@ -73,7 +73,7 @@ class AdaptationMixin:
         ruled on — `adherence.is_ambiguous_match` (ARCHITECTURE.md §15).
 
         Asked BEFORE the LLM call, because a wrong pairing does not merely mislabel a row:
-        it tells the coach a session was performed. Each entry carries the planned session
+        it tells the week planner a session was performed. Each entry carries the planned session
         and the activity so the caller can render the question without re-deriving it.
         """
         if not target_date_str:
@@ -174,7 +174,7 @@ class AdaptationMixin:
         # Workouts are fetched across the whole span (lookback start -> mesocycle end), not
         # just the backward window: otherwise the LLM never sees already-scheduled future
         # sessions and reinvents them, overwriting the athlete's plan. And no plan means no
-        # adaptation — there is nothing to adapt *towards* (DESIGN_block_boundary.md §6).
+        # adaptation — there is nothing to adapt *towards* (DESIGN_mesocycle_boundary.md §6).
         active_meso = self._db.get_active_mesocycle(target_date_str)
         if not active_meso:
             raise ValueError(
@@ -190,7 +190,7 @@ class AdaptationMixin:
         )
         planned_workouts = [w for w in lookback_workouts if not w.get('removed')]
         # Only the cancellations the ATHLETE made. A day the plan simply stopped
-        # scheduling is a void too, and telling the coach it was cancelled would put words
+        # scheduling is a void too, and telling the week planner it was cancelled would put words
         # in the athlete's mouth (DESIGN_workout_revisions.md §3).
         removed_workouts = [
             w for w in lookback_workouts
@@ -200,7 +200,7 @@ class AdaptationMixin:
         baseline = self._db.get_baseline(target_date_str)
         baseline_str = format_baseline(baseline)
 
-        # Planned blocks overlapping the window. Activities on dates outside every block
+        # Planned mesocycles overlapping the window. Activities on dates outside every mesocycle
         # are history the plan never governed (e.g. before tool adoption), so they are
         # reported as informational rather than as "unplanned" deviations.
         covered_ranges = self._db.get_mesocycle_ranges(start_date_str, target_date_str)
@@ -260,12 +260,12 @@ class AdaptationMixin:
         # separate classification pass. The same LLM call also extracts any
         # constraint-shaped directives from it (see `new_constraints` below).
         pmc_cutoff, pmc_context = self._pmc_prompt_context(target_date_str)
-        # The block's measured intensity distribution — adapt's primary view, since drift
+        # The mesocycle's measured intensity distribution — adapt's primary view, since drift
         # caught in week 2 is correctable and drift diagnosed at plan-generation time is
         # history (DESIGN_intensity_distribution.md §9). Threaded as its own argument, NOT
         # folded into meso_text: that string is shared with plan generation, which §9.2
         # says must not grow this section.
-        intensity_context = self._intensity_block_context(target_date_str)
+        intensity_context = self._intensity_mesocycle_context(target_date_str)
         decision = self.engine._workout_adapt_logic(
             target_date_str=target_date_str,
             history_days=history_days,
@@ -314,9 +314,9 @@ class AdaptationMixin:
         # Integers, before the no-op backstop and the preview both read these numbers.
         normalize_load_fields(adapted)
 
-        # Drop any proposal dated past the adaptation range: the next block is out of reach
+        # Drop any proposal dated past the adaptation range: the next mesocycle is out of reach
         # and was never shown to the model, so a post-boundary date is a hallucination
-        # (DESIGN_block_boundary.md §1).
+        # (DESIGN_mesocycle_boundary.md §1).
         adapted = [w for w in adapted if str(w.get("date", "")) <= meso_end_date_str]
 
         # Drop any proposal that targets an already-completed session — those are locked
@@ -342,7 +342,7 @@ class AdaptationMixin:
                 changed.append(w)
         adapted = changed
 
-        # A completed session is held by history, not by the coach naming it: the drop
+        # A completed session is held by history, not by the week planner naming it: the drop
         # guard above only catches a proposal aimed AT its slot, while a rest day (or any
         # other sport) proposed for the same date displaces it without ever naming it
         # (DESIGN_workout_revisions.md §9.2).
@@ -355,7 +355,7 @@ class AdaptationMixin:
             adapted, planned_workouts, constraints, completed_keys, target_date_str
         )
         # A forced-rest day is cleared outright, so nothing on it is held: the constraint
-        # outranks the coach's wish to keep the session (§6 over §9.1). A session already
+        # outranks the week planner's wish to keep the session (§6 over §9.1). A session already
         # trained is the exception — no constraint reaches backwards into work that is
         # already done (§9.2).
         forced_rest = self._forced_rest_days(
@@ -408,7 +408,7 @@ class AdaptationMixin:
         """Appends a revision's sessions under one change, and lets Calendar follow.
 
         Takes the whole proposal so the range and the displacement decisions are the ones
-        the coach actually made, not a reconstruction.
+        the week planner actually made, not a reconstruction.
 
         A session the pass drops becomes a void revision rather than a `DELETE`, and one it
         substitutes cross-sport becomes a void at the source plus a revision at the
@@ -430,7 +430,7 @@ class AdaptationMixin:
         proposed_by_date: Dict[str, List[Dict[str, Any]]] = {}
         for pw in proposed_workouts:
             proposed_by_date.setdefault(pw['date'], []).append(pw)
-        # Sessions the coach kept as planned. They append nothing, but they are spoken for,
+        # Sessions the week planner kept as planned. They append nothing, but they are spoken for,
         # so the displacement rule below must not read them as sessions it wants gone
         # (§9.1) — the same union the preview made in `pair_revisions`.
         held_by_date = held_slots(proposal.held)

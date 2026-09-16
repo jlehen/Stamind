@@ -206,10 +206,10 @@ class Config:
 
     @property
     def adapt_terminal_window_days(self) -> int:
-        """Gets how close to a block's end counts as its terminal window, defaulting to 3.
+        """Gets how close to a mesocycle's end counts as its terminal window, defaulting to 3.
 
-        See DESIGN_block_boundary.md §3/§4 — inside this window an adaptation has no runway
-        to rebound, and the next block is out of reach.
+        See DESIGN_mesocycle_boundary.md §3/§4 — inside this window an adaptation has no runway
+        to rebound, and the next mesocycle is out of reach.
         """
         return self.get("coach", {}).get("adapt_terminal_window_days", 3)
 
@@ -535,7 +535,7 @@ class Config:
     def telegram_wrap_width(self) -> int:
         """Column width the CLI wraps prose to when driven by the bot (via the
         TRAINMATE_WRAP_WIDTH env var). The CLI's terminal default is 80, which a
-        phone-width monospace block then double-wraps; ~48 fits portrait without
+        phone-width monospace message then double-wraps; ~48 fits portrait without
         the client re-wrapping. Default 48."""
         return int(self.get("telegram", {}).get("wrap_width", 48))
 
@@ -591,7 +591,7 @@ PROFILE_THRESHOLD_FIELDS = ('max_hr', 'lthr', 'ftp')
 # are fingerprinted on their own (§11).
 PROFILE_NON_PLAN_FIELDS = ('name', 'equipment', 'preferences')
 
-# Per-day `weekly_schedule` sub-keys that shape individual sessions but not the block
+# Per-day `weekly_schedule` sub-keys that shape individual sessions but not the mesocycle
 # structure — swapping a day's kit changes what that day is, not the periodization
 # (DESIGN_plan_staleness.md §4). The day's hours/max_sessions/certainty_percent stay in.
 SCHEDULE_NON_PLAN_KEYS = ('equipment',)

@@ -37,10 +37,10 @@ class JournalTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.log_dir = tempfile.mkdtemp(prefix="tm-journal-test-")
         self.addCleanup(shutil.rmtree, self.log_dir, True)
-        block = config.data.setdefault("logging", {})
-        previous = dict(block)
-        self.addCleanup(lambda: (block.clear(), block.update(previous)))
-        block["dir"] = self.log_dir
+        logging_section = config.data.setdefault("logging", {})
+        previous = dict(logging_section)
+        self.addCleanup(lambda: (logging_section.clear(), logging_section.update(previous)))
+        logging_section["dir"] = self.log_dir
         journal.reset()
         self.addCleanup(journal.reset)
 

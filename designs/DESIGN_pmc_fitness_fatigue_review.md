@@ -52,7 +52,7 @@ manually for exactly this reason). Here the numbers land in LLM prompts next
 to hard directive thresholds, and the LLM has no way to know the early
 values are artifacts. The analyze/bootstrap paths are guaranteed to hit
 this: their weekly digests start at the beginning of DB history, so §5.3's
-`min_tsb` and `week_ramp` will narrate a phantom overreach block in every
+`min_tsb` and `week_ramp` will narrate a phantom overreach mesocycle in every
 bootstrap.
 
 **Fix:** no seeding machinery needed. Compute from day one as designed, but

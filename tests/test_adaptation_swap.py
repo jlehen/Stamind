@@ -63,7 +63,7 @@ class TestAdaptationSwap(unittest.TestCase):
         )
 
     def test_swap_validation_safe_swap(self):
-        # Two easy days far from any hard block: swapping them is harmless.
+        # Two easy days far from any hard day: swapping them is harmless.
         save_workout(test_db, "2026-06-10", "yoga", "Mobility", "easy", rpe=2, tss=10)
         save_workout(test_db, "2026-06-12", "running", "Recovery", "easy", rpe=3, tss=15)
         ops = self._swap_ops_for_dates("2026-06-10", "2026-06-12")

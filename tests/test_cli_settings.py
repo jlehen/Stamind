@@ -259,9 +259,9 @@ class TestMorningPushKnobs(SettingsTestCase):
 
     def test_config_seeds_them(self):
         from trainmate.config import config
-        block = {"push": {"enabled": False, "morning_time": "07:30",
+        telegram = {"push": {"enabled": False, "morning_time": "07:30",
                           "morning_deadline": "12:00", "adapt_first": True}}
-        with patch.dict(config.data, {"telegram": block}):
+        with patch.dict(config.data, {"telegram": telegram}):
             self.assertFalse(settings.push_enabled())
             self.assertEqual(settings.morning_time(), "07:30")
             self.assertEqual(settings.morning_deadline(), "12:00")

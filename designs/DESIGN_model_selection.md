@@ -37,7 +37,7 @@ stored choice still points at the same model.
 ## §1 — Config: the menu
 
 `llm.model` (a single string) is replaced by `llm.models` (a list). The commented-out
-alternatives above become the list literally. The block below is an **example** menu, not the
+alternatives above become the list literally. The YAML below is an **example** menu, not the
 shipped one — the list is meant to be edited freely, every install ends up with its own, and
 `config_template.yaml` starts from a short two-entry list:
 

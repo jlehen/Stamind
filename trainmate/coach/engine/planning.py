@@ -15,21 +15,21 @@ class PlanStrategyMixin:
         plan_start_str: Optional[str] = None, athlete_feedback: Optional[str] = None,
         history_summary: Optional[str] = None, prior_training_text: Optional[str] = None,
         learnings: Optional[str] = None,
-        current_block: Optional[Dict[str, Any]] = None,
+        current_mesocycle: Optional[Dict[str, Any]] = None,
         changed_inputs: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Queries LLM to determine the overall macrocycle strategy and mesocycle blocks.
+        """Queries LLM to determine the overall macrocycle strategy and mesocycles.
 
         The plan always runs from the start date to the goal, however far out that is: how
         a long horizon gets structured is a question for the science guidelines, not for a
         duration threshold in the app.
 
         Builds its own system prompt rather than calling `_build_system_prompt`: that one
-        states the ACTIVE strategy and blocks as settled fact, which is the very thing this
+        states the ACTIVE strategy and mesocycles as settled fact, which is the very thing this
         call produces (DESIGN_backward_evaluation.md §10.1).
 
         `changed_inputs` is the staleness reason and its diff, when this run is answering
-        one: the coach may open the strategy text with a paragraph saying what moved
+        one: the model may open the strategy text with a paragraph saying what moved
         (DESIGN_plan_change_continuity.md §6.2)."""
         plan_start = plan_start_str or today_str
         # The date-as-event framing is structural — repeated in the task, the response
@@ -42,35 +42,36 @@ Determine the overall periodization strategy (macrocycle) from {plan_start} unti
 goal ({next_goal['target_date']}).
 
 Divide this timeframe into contiguous, sequential mesocycles (determining the duration of each
-block based on the periodization style guidelines provided in the science file). When planning
-mesocycles, it is acceptable to shorten/extend a block by a few days to align its transition or
+mesocycle based on the periodization style guidelines provided in the science file). When planning
+mesocycles, it is acceptable to shorten/extend a mesocycle by a few days to align its transition or
 recovery boundaries with the athlete's active constraints (e.g. aligning a deload week or phase
-change with a long travel block).
+change with a long trip).
 Make sure there are no gaps between the end date of one mesocycle and the start date of the next.
 The last mesocycle must end on or around the goal date ({next_goal['target_date']}).
 """
-        # Keeping the in-flight block means repeating its ORIGINAL start date: blocks own
+        # Keeping the in-flight mesocycle means repeating its ORIGINAL start date: mesocycles own
         # their sessions by date containment, so one re-dated to today reads as empty
-        # (DESIGN_block_progress.md §7).
-        if current_block:
+        # (DESIGN_mesocycle_progress.md §7).
+        if current_mesocycle:
+            meso = current_mesocycle
             trained_days = (
                 datetime.strptime(today_str, "%Y-%m-%d").date()
-                - datetime.strptime(current_block['start_date'], "%Y-%m-%d").date()
+                - datetime.strptime(meso['start_date'], "%Y-%m-%d").date()
             ).days
             custom_task += f"""
-### THE BLOCK ALREADY UNDER WAY
-The athlete is part-way through a block of the plan you are replacing:
+### THE MESOCYCLE ALREADY UNDER WAY
+The athlete is part-way through a mesocycle of the plan you are replacing:
 
-  "{current_block['name']}" ({current_block['start_date']} to {current_block['end_date']})
-  Focus: {current_block['focus']}
-  Already trained: {trained_days} days of it, starting {current_block['start_date']}.
+  "{meso['name']}" ({meso['start_date']} to {meso['end_date']})
+  Focus: {meso['focus']}
+  Already trained: {trained_days} days of it, starting {meso['start_date']}.
 
-Decide whether that block still fits the plan you are now designing.
+Decide whether that mesocycle still fits the plan you are now designing.
 
 - If it DOES, keep it: emit it as your FIRST mesocycle with its ORIGINAL start date
-  ({current_block['start_date']}), its original end date ({current_block['end_date']}),
+  ({meso['start_date']}), its original end date ({meso['end_date']}),
   its name and its focus, all unchanged. Do NOT re-date it to {plan_start}: the athlete
-  finishes the block they are in, and the days already trained stay part of it. Your
+  finishes the mesocycle they are in, and the days already trained stay part of it. Your
   second mesocycle then starts the day after it ends.
 - If it does NOT, because the goals, the constraints or the athlete's profile have changed
   enough that continuing it would be wrong, discard it and start your first mesocycle on
@@ -86,7 +87,7 @@ The first mesocycle must start on the start date ({plan_start}).
             custom_task += f"""
 The goal's date is a TRAINING HORIZON, not a scheduled event: nothing happens on
 {next_goal['target_date']} itself. Do NOT plan a peak, taper, or race-day realization phase
-pinned to that date — finish with an ordinary training block, and let any performance attempt
+pinned to that date — finish with an ordinary training mesocycle, and let any performance attempt
 (e.g. a timed effort at the goal) fall wherever the plan has the athlete fit and fresh.
 """
 
@@ -97,7 +98,7 @@ Verbatim notes from the athlete about the plan in place, oldest first. A note ma
 (phase: <name>) was filed against that mesocycle; unmarked notes address the plan as a whole.
 {athlete_feedback}
 You MUST address every note: revise the macrocycle strategy and/or the duration, boundaries,
-and focuses of individual mesocycles accordingly (e.g. scheduling more rest, changing block
+and focuses of individual mesocycles accordingly (e.g. scheduling more rest, changing mesocycle
 emphasis, extending/shortening specific cycles), while continuing to respect overall sports
 science principles and guidelines.
 """
@@ -110,7 +111,7 @@ from; the change is given above as its own section, with the edit itself. You ma
 your "strategy" text with ONE paragraph saying what moved and why the plan is now shaped
 as it is — written for the athlete, in their language, naming the line that changed
 rather than the field it lives in. If the change did not actually reshape anything,
-write no such paragraph: an opening that announces a change the blocks do not show is
+write no such paragraph: an opening that announces a change the mesocycles do not show is
 worse than none. Everything after that paragraph is the strategy as usual.
 """
 
@@ -139,7 +140,7 @@ You MUST respond with a JSON object containing:
       "name": "Phase Name (e.g., {phase_examples})",
       "start_date": "YYYY-MM-DD",
       "end_date": "YYYY-MM-DD",
-      "focus": "Key focus and description of this block (e.g., volume progression,
+      "focus": "Key focus and description of this mesocycle (e.g., volume progression,
         aerobic threshold, rest, peak load, etc.)"
     }}
   ]
@@ -180,7 +181,7 @@ You MUST respond with a JSON object containing:
                 "Accumulated by the training-history analysis, tagged "
                 "[id|sports|confidence].\n"
                 f"{learnings}\n"
-                "Weigh these when shaping the blocks — a higher confidence means more weeks "
+                "Weigh these when shaping the mesocycles — a higher confidence means more weeks "
                 "of evidence\nbehind the observation. They are input only here: authoring "
                 "and revising them belongs\nto the analysis flow.\n"
             )
@@ -207,13 +208,13 @@ You MUST respond with a JSON object containing:
         else:
             goal_phrase = f"'{next_goal['title']}' on {next_goal['target_date']}"
         start_phrase = (
-            f"starting from {plan_start}, unless you keep the block already under way, "
-            f"which starts {current_block['start_date']}"
-            if current_block else f"starting from {plan_start}"
+            f"starting from {plan_start}, unless you keep the mesocycle already under way, "
+            f"which starts {current_mesocycle['start_date']}"
+            if current_mesocycle else f"starting from {plan_start}"
         )
         user_content = (
             f"Today's date is {today_str}. The target goal is {goal_phrase}. "
-            f"Please determine the macrocycle and mesocycle blocks {start_phrase}."
+            f"Please determine the macrocycle and mesocycles {start_phrase}."
         )
 
         step(wrap_text(
@@ -229,15 +230,15 @@ You MUST respond with a JSON object containing:
         self, change_reason: str, diff_text: str, strategy: str,
         mesocycles: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
-        """Asks the coach whether a changed input would have altered the periodization —
-        the DESIGN_plan_staleness.md §2 test, applied by the model that would do the
-        rebuilding rather than by the athlete alone (§10).
+        """The verdict call: asks the coach model whether a changed input would have altered
+        the periodization — the DESIGN_plan_staleness.md §2 test, applied by the model that
+        would do the rebuilding rather than by the athlete alone (§10).
 
         A small call on purpose: the rubric, the diff, and the plan as it stands. No
         science file, no history — the question is structural, and a model told to look
         for a reason to regenerate will find one, so the rubric demands the concrete
         change it would make and treats "cannot name one" as keep."""
-        blocks = "\n".join(
+        mesocycle_lines = "\n".join(
             f"- {m['name']} ({m['start_date']} to {m['end_date']}): {m['focus']}"
             for m in mesocycles
         )
@@ -247,8 +248,8 @@ You MUST respond with a JSON object containing:
 One of the inputs the plan was generated from has changed. Decide whether, had the new value
 been in force at generation time, you would have built a structurally different periodization.
 
-"Structurally different" means one of exactly three things: a different block structure
-(number, type or length of blocks), a different phase order, or a different volume ramp.
+"Structurally different" means one of exactly three things: a different mesocycle structure
+(number, type or length of mesocycles), a different phase order, or a different volume ramp.
 Nothing else counts. Changes to wording, tone, motivation, how sessions should be described,
 what to listen to, or which days sessions land on are absorbed by the next workout
 generation and do NOT reshape the plan.
@@ -271,8 +272,8 @@ Return a JSON object with exactly these keys:
 ## THE PLAN AS IT STANDS
 {strategy}
 
-Blocks:
-{blocks}
+Mesocycles:
+{mesocycle_lines}
 """
         step("Asking the coach whether this change reshapes the plan...", cyan)
         return _eng.openrouter_client.complete(

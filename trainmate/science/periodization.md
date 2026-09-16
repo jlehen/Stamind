@@ -2,7 +2,7 @@
 
 > **AUTHORITY: VOCABULARY.** This document defines periodization terms and the
 > structures they name. It does not prescribe durations, loading ratios, taper
-> magnitudes, or block order — a plan document in `science/` decides those.
+> magnitudes, or mesocycle order — a plan document in `science/` decides those.
 > Where no plan document specifies, the defaults noted here apply.
 
 ## 1. Core Architectural Overview
@@ -13,7 +13,7 @@ Training time is organised as a hierarchy of nested containers. Time containers
 those containers.
 
 *   **Macrocycle** (Overarching Goal Timeline)
-    *   **Mesocycle Blocks** (Targeted Phase Adaptation)
+    *   **Mesocycles** (Targeted Phase Adaptation)
         *   **Microcycles** (Fluid Work/Rest Schedule)
             *   **Daily Workout Blueprints**
 
@@ -34,7 +34,7 @@ objective.
   macrocycles separated by a formal recovery period. What counts as "too long"
   is a plan-document decision, not a fixed number.
 
-### B. Mesocycle (The Phase Block)
+### B. Mesocycle (The Phase)
 
 A medium-sized container dedicated to forcing a specific physical or metabolic
 adaptation.
@@ -59,8 +59,8 @@ function. These are *roles*, not durations:
 * **Realization:** sheds accumulated fatigue so the adaptation becomes
   performance. This is the taper.
 
-A plan may name its blocks by their *stimulus* instead (e.g. a threshold block,
-a sprint block). Either naming is fine; what matters is that each block states
+A plan may name its mesocycles by their *stimulus* instead (e.g. a threshold mesocycle,
+a sprint mesocycle). Either naming is fine; what matters is that each mesocycle states
 what it is for, so its expected load signature can be derived
 (`training_load.txt` §4).
 
@@ -68,7 +68,7 @@ what it is for, so its expected load signature can be derived
 
 Mesocycles usually alternate a run of progressively loaded microcycles with a
 lighter recovery microcycle. The ratio of loading to recovery is a plan choice,
-and some blocks — typically short, low-volume ones — carry no scheduled deload
+and some mesocycles — typically short, low-volume ones — carry no scheduled deload
 at all.
 
 * **Deload Protocol:** a deload **cuts volume substantially more than
@@ -108,7 +108,7 @@ These apply unless a plan document deliberately specifies otherwise:
 A **training residual** is how long an adaptation takes to decay back toward
 baseline after training for it stops. Loss begins within days — the figure
 marks roughly when the quality is gone, not a window in which it holds.
-Figures are for trained athletes. What to do about a residual — block order,
+Figures are for trained athletes. What to do about a residual — mesocycle order,
 revisit frequency — is a plan-document decision.
 
 * **Aerobic endurance: 30 ± 5 days.**
@@ -126,7 +126,7 @@ revisit frequency — is a plan-document decision.
   decays faster than VO2max: time-to-exhaustion falls ~4–25% inside the
   first 2–4 weeks.
 * Novices (< 1–2 years of training) have much shorter residuals; a longer
-  block leaves a longer residual.
+  mesocycle leaves a longer residual.
 * A maintenance dose stops the decay: intensity must survive, volume and
   frequency can drop sharply — as little as one weekly heavy session has
   been shown to hold maximal strength, and endurance has held 4–8 weeks on

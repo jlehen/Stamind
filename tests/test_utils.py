@@ -53,7 +53,7 @@ class TestUtils(unittest.TestCase):
         # band render bare and the assertions below pass without testing anything.
         with patch("trainmate.util.is_color_enabled", return_value=True):
             # Only the overload end is coloured. A LOW ratio is phase-dependent
-            # (taper, deload, intensity block), so it must render bare — see
+            # (taper, deload, intensity mesocycle), so it must render bare — see
             # training_load.md §3/§4.
             self.assertEqual("0.70", color_load_ratio(0.70))
             self.assertEqual("1.10", color_load_ratio(1.10))
@@ -317,7 +317,7 @@ class TestWarningTierWraps(unittest.TestCase):
     (DESIGN_output_verbosity.md §3.5) — the whole reason `notice` exists."""
 
     LONG = ("The plan runs out on 2026-09-30, before this horizon (2026-10-14) — "
-            "sessions after it have no block to follow. Run 'plan generate' to extend "
+            "sessions after it have no mesocycle to follow. Run 'plan generate' to extend "
             "the periodization first.")
 
     def setUp(self):

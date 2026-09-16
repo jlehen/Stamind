@@ -378,9 +378,9 @@ class GoalLinesTest(unittest.TestCase):
 
 
 class PlanLinesTest(unittest.TestCase):
-    """`simple_plan_lines` — the companion plan view (§11, §11.2): one stanza per block,
+    """`simple_plan_lines` — the companion plan view (§11, §11.2): one stanza per mesocycle,
     a blank line before each — marker and name, then the window and the one thing the
-    window cannot say — the active block's focus headline, and the goal day closing
+    window cannot say — the active mesocycle's focus headline, and the goal day closing
     the road."""
 
     GOAL = {"id": 1, "title": "Marathon", "target_date": "2026-09-26",
@@ -426,13 +426,13 @@ class PlanLinesTest(unittest.TestCase):
             if line[:1] in ("✅", "📍", "⏳", "🏁"):
                 self.assertEqual(lines[i - 1], "", f"no blank line before {line!r}")
 
-    def test_a_finished_block_says_nothing_past_its_window(self):
+    def test_a_finished_mesocycle_says_nothing_past_its_window(self):
         """✅ says done and the window says when, so no tail and no focus behind them."""
         lines = self._lines()
         i = lines.index("✅ Base")
         self.assertEqual(lines[i + 1:i + 3], ["Jul 27 – Aug 16", ""])
 
-    def test_exact_week_blocks_read_in_weeks(self):
+    def test_exact_week_mesocycles_read_in_weeks(self):
         lines = render.simple_plan_lines(
             self.GOAL, self.ACTIVE_MACRO,
             [{"id": 3, "name": "Peak", "start_date": "2026-09-07",
@@ -462,8 +462,8 @@ class PlanLinesTest(unittest.TestCase):
         self.assertLessEqual(len(lines[4]), 221)
 
     def test_a_leading_label_is_not_the_headline(self):
-        """The planner likes to open a focus with "Purpose: …" — a field name, not a
-        headline. Only a one-word label goes; a sentence with a colon in it stays."""
+        """The `plan generate` model likes to open a focus with "Purpose: …" — a field
+        name, not a headline. Only a one-word label goes; a sentence with a colon in it stays."""
         self.assertEqual(
             render.simple_focus_snippet("Purpose: make the week non-negotiable. Then more."),
             "Make the week non-negotiable.",
@@ -473,7 +473,7 @@ class PlanLinesTest(unittest.TestCase):
             "Three weeks: two loading microcycles.",
         )
 
-    def test_only_the_active_block_carries_its_focus(self):
+    def test_only_the_active_mesocycle_carries_its_focus(self):
         joined = "\n".join(self._lines())
         self.assertNotIn("Aerobic volume.", joined)
         self.assertNotIn("Race sharpening.", joined)
@@ -497,36 +497,36 @@ class PlanLinesTest(unittest.TestCase):
             self.assertNotIn("ID", line)
             self.assertNotIn("Macrocycle", line)
 
-    def test_no_blocks_is_a_gentle_note(self):
+    def test_no_mesocycles_is_a_gentle_note(self):
         lines = render.simple_plan_lines(self.GOAL, self.ACTIVE_MACRO, [], "2026-08-30")
-        self.assertIn("No training blocks drawn up yet", lines[-1])
+        self.assertIn("No training mesocycles drawn up yet", lines[-1])
 
 
-class BlockButtonsTest(unittest.TestCase):
-    """`simple_block_buttons` — the door under the plan view (§11.2): one "Tell me
-    more" whose leaves send `bot block <id>` for the blocks under way or ahead."""
+class MesocycleButtonsTest(unittest.TestCase):
+    """`simple_mesocycle_buttons` — the door under the plan view (§11.2): one "Tell me
+    more" whose leaves send `bot mesocycle <id>` for the mesocycles under way or ahead."""
 
     MESOCYCLES = PlanLinesTest.MESOCYCLES
 
-    def test_blocks_under_way_or_ahead_sit_behind_one_button(self):
-        buttons = render.simple_block_buttons(self.MESOCYCLES, "2026-08-30")
+    def test_mesocycles_under_way_or_ahead_sit_behind_one_button(self):
+        buttons = render.simple_mesocycle_buttons(self.MESOCYCLES, "2026-08-30")
         self.assertEqual(len(buttons), 1)
         self.assertEqual(buttons[0]["label"], "🔎 Tell me more")
         leaves = buttons[0]["menu"]
         self.assertEqual([leaf["label"] for leaf in leaves], ["📍 Build", "⏳ Peak"])
-        self.assertEqual([leaf["send"] for leaf in leaves], ["bot block 2", "bot block 3"])
+        self.assertEqual([leaf["send"] for leaf in leaves], ["bot mesocycle 2", "bot mesocycle 3"])
 
-    def test_a_lone_block_is_offered_directly(self):
-        buttons = render.simple_block_buttons(self.MESOCYCLES, "2026-09-10")
-        self.assertEqual(buttons, [{"label": "🔎 Tell me more", "send": "bot block 3"}])
+    def test_a_lone_mesocycle_is_offered_directly(self):
+        buttons = render.simple_mesocycle_buttons(self.MESOCYCLES, "2026-09-10")
+        self.assertEqual(buttons, [{"label": "🔎 Tell me more", "send": "bot mesocycle 3"}])
 
     def test_nothing_ahead_offers_nothing(self):
-        self.assertEqual(render.simple_block_buttons(self.MESOCYCLES, "2026-09-20"), [])
+        self.assertEqual(render.simple_mesocycle_buttons(self.MESOCYCLES, "2026-09-20"), [])
 
     def test_a_long_name_is_cut_to_a_label(self):
-        blocks = [self.MESOCYCLES[1],
+        mesocycles = [self.MESOCYCLES[1],
                   dict(self.MESOCYCLES[2], name="Climb-Specific Severe / HIIT Transmutation")]
-        label = render.simple_block_buttons(blocks, "2026-08-30")[0]["menu"][1]["label"]
+        label = render.simple_mesocycle_buttons(mesocycles, "2026-08-30")[0]["menu"][1]["label"]
         self.assertLessEqual(len(label), render.PICKER_LABEL_MAX)
         self.assertTrue(label.endswith("…"))
 

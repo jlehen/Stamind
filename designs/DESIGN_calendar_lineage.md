@@ -29,7 +29,7 @@ Planned: 2026-08-01 06:00 · Last adapted: 2026-08-30 06:00 · Adapted ×2
 
 "Adapted ×2" says the session was walked down twice. The event then shows the *first* form
 and the *last* form and nothing in between, so the middle form — the one that says whether
-the block eased gradually or fell off a cliff — is missing. `Reason` is the newest reason
+the session eased gradually or fell off a cliff — is missing. `Reason` is the newest reason
 only; the earlier one is gone. And the two "Originally" lines say the same thing twice, in
 different vocabulary, one as prose and one as numbers.
 
@@ -41,7 +41,7 @@ reason for it not to.
 
 ## 2. Decision
 
-**A Calendar event whose session has more than one revision carries a `History` block:
+**A Calendar event whose session has more than one revision carries a `History` section:
 every earlier revision of the lineage, newest first, each as its own labelled entry with
 its date, load, intensity target, reason and body.**
 
@@ -129,18 +129,18 @@ first. Not a filtered subset:
   `Originally:`.
 
 The lineage is read whole, at render time, from the log. There is nothing to store and
-nothing to keep in step: the block is a pure function of rows that can never be edited.
+nothing to keep in step: the section is a pure function of rows that can never be edited.
 
 ## 5. What it replaces
 
-Three things in the current event become duplication the moment the history block exists,
+Three things in the current event become duplication the moment the `History` section exists,
 and two of them go:
 
 1. **The `Adapted:` / `Originally:` pair in the body.** Its condition is
    `original_description != description`, and under the revision model
    `original_description` *is* the first revision's description
    (DESIGN_workout_revisions.md §7) — so the branch can only fire when the lineage has more
-   than one revision, which is exactly when the history block renders the first revision in
+   than one revision, which is exactly when the `History` section renders the first revision in
    full, with its date and its load. The body at the top is now just the current
    description, with `Reason:` under it.
 2. **The `Originally: 180m | TSS 210 | RPE 8` footer line.** Same numbers as the oldest
@@ -152,7 +152,7 @@ and two of them go:
 
 It sits, with the `Goal / Macro / Meso / Workout` id line under it, **directly below the
 current prescription and above the history** — both lines describe the session as it stands
-today, so they belong with the form they describe rather than stranded past a block of
+today, so they belong with the form they describe rather than stranded past a list of
 earlier ones. Placement and sizing are separate questions: the history is laid out last but
 still budgeted last too (§7), so a long lineage yields to the footer rather than pushing it
 off the end.
@@ -166,7 +166,7 @@ grows.
 
 **`revision_id` joins `CALENDAR_FIELDS`.** It is the id of the live revision the event
 speaks for, it is assigned by the log and never reused, and a lineage only ever changes by
-gaining a revision — so `revision_id` moves exactly when the history block does. Nothing
+gaining a revision — so `revision_id` moves exactly when the `History` section does. Nothing
 else in the field list has that property. Two holes close with it:
 
 - **an unpushed adapt, then a rollback.** The rollback appends a copy of the pre-adapt
@@ -192,7 +192,7 @@ session that has ever been revised, because their descriptions genuinely changed
 
 Google caps an event description at 8192 characters. A lineage is normally a handful of
 revisions, but nothing bounds it — each `workout generate` over a future week appends a
-revision to every session it changes, and a long block regenerated often could accumulate
+revision to every session it changes, and a long mesocycle regenerated often could accumulate
 dozens.
 
 The history is therefore **rendered last, into the room the rest of the event did not
@@ -221,7 +221,7 @@ one more entry gives way to it rather than the other way round.
 
 - an adapted session's event contains its earlier form's date, load, target, reason and
   body, and the entries run newest first;
-- a session with one revision renders with no `History` block at all — the ordinary case
+- a session with one revision renders with no `History` section at all — the ordinary case
   is untouched;
 - a swapped session's history names both the destination and the vacated date;
 - a void entry prints no `Duration:` and no `Target:`;

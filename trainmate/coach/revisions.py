@@ -26,7 +26,7 @@ def structure_revision(
 ) -> List[Dict[str, Any]]:
     """The row shape `workout_revision_apply` consumes, built from the model's response.
 
-    One builder for every revision the coach proposes: the rules
+    One builder for every revision the week planner proposes: the rules
     about how a returned change becomes a row — the `modification_reason` fallback below
     above all — are written once rather than copied into each propose method.
     """
@@ -56,7 +56,7 @@ def prescription_matches(proposed: Dict[str, Any], live: Dict[str, Any]) -> bool
     """Whether appending `proposed` over `live` would be suppressed as a no-op.
 
     The §9 no-op rule lives in the write path (`db.workouts.WorkoutChange._write`), so a
-    preview built from the coach's answers would report a wording-only revision as a
+    preview built from the week planner's answers would report a wording-only revision as a
     change to the day. The proposal step asks this instead, against the standing rows it
     already loaded (DESIGN_plan_change_continuity.md §4.5). It mirrors `append`'s merge:
     a field the proposal omits carries forward and is therefore not a change.
@@ -105,7 +105,7 @@ def held_slots(held: Sequence[Tuple[str, str]]) -> Dict[str, set]:
     """`date -> {canonical sport}` for the sessions a revision holds rather than rewrites.
 
     A held session appends nothing, but it is still spoken for: the displacement rule
-    below and in `workout_revision_apply` reads an unmentioned sport as one the coach
+    below and in `workout_revision_apply` reads an unmentioned sport as one the week planner
     wants gone, so omitting it here deletes it (§9.1).
     """
     by_date: Dict[str, set] = {}
@@ -125,7 +125,7 @@ def pair_revisions(
     existing session whose canonical sport is not among that date's proposals is the one
     being overridden, and is paired with that date's new-sport proposal.
 
-    `held` names sessions the coach kept as planned. They produce no pair — there is
+    `held` names sessions the week planner kept as planned. They produce no pair — there is
     nothing to show — but they count as proposed, so a date's other change cannot
     displace them (§9.1).
 

@@ -13,7 +13,7 @@ operator's name is config, so what the sketch wrote as a constant had to become 
   fallback is "the person who set this up for you", and "…for you sets that up" reads
   as a stutter. The wording with a name set is unaffected.
 - The three shared wording-diff helpers in `cli/workouts/revisions.py`
-  (`rewritten_text_only`, `wording_blocks`, `wording_block_lines`) lost their leading
+  (`rewritten_text_only`, `wording_groups`, `wording_group_lines`) lost their leading
   underscore: the companion builder that moved to `render.py` in step 5 calls them, so
   they are that module's interface now rather than its internals.
 
@@ -140,7 +140,7 @@ class CompanionRenderer(ExpertRenderer):
     def adapt_no_change(self):          print(green("\nAll clear — the plan stands as it is. 💪"))
     def adapt_confirm_words(self):      return "Here's what I'd change:", "Shall I make these changes?"
     def adapt_discarded(self):          print("\nOkay — nothing changed.")
-    def adapt_applied(self):            print(green("Done — your plan is updated. 💪"))
+    def adapt_applied(self):            print(green("Done — your week is updated. 💪"))
     def goal_list(self, goals, called_off, show_all, today):
         for line in simple_goal_lines(goals, today):
             print(line)
@@ -309,9 +309,9 @@ gets uncomfortable. Before them, one wording commit: the operator's name replace
    relocation; six branches gone.
 3. **Shape.** One command at a time: the expert method delegates to the function
    that draws today, and the companion override calls the existing line builder.
-   Where the expert block is inline in a command body (`workout list`, the
+   Where the expert code is inline in a command body (`workout list`, the
    `workout generate` preview) it becomes a named function in its own module first.
-   The expert blocks stay where they are: they are hundred-line table renderers with
+   The expert renderers stay where they are: they are hundred-line table renderers with
    no sentence-level twin, and moving them would make `render.py` the owner of three
    commands' internals for no reviewable gain. Only the six word sites earn
    side-by-side.
@@ -361,7 +361,7 @@ what makes it cheap to add a third persona later. Not scheduled.
 - `trainmate/cli/workouts/generate.py`, `cli/goals.py`, `cli/plans.py`,
   `cli/progress.py`, `cli/workouts/revisions.py`, `cli/constraints.py`,
   `cli/runway.py`, `cli/status.py` — command bodies call `runtime.render.*`; inline
-  expert blocks become named functions in place.
+  expert code becomes named functions in place.
 - `trainmate/cli/bot.py` — import path of the line builders only.
 - `tests/helpers.py` — `run_cli` resets the renderer per invocation; the env-patching
   tests are untouched.
@@ -402,5 +402,5 @@ what makes it cheap to add a third persona later. Not scheduled.
    worker)? Today those paths never reach a rendering command, so: no, until one
    does.
 2. `progress` and `workout_list` carry `args` through for their flags (`--sports`,
-   `--blocks`, `--weeks`; `--link`, `--verbose`). Cleaner would be a small options
+   `--mesocycles`, `--weeks`; `--link`, `--verbose`). Cleaner would be a small options
    record, but that is a command refactor, not a persona one. Pass `args`.

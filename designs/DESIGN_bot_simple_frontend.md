@@ -2,14 +2,14 @@
 
 **Status:** Implemented — rollout phases 1-3 (2026-08-25), the §11 breadth pass
 (2026-08-30), the §12 writes pass, phases 4-7 (2026-09-02), the §11.1 plan-view date
-column (2026-09-03), the §11.2 stanzas and block door (2026-09-04) · **Date:** 2026-08-25 ·
+column (2026-09-03), the §11.2 stanzas and mesocycle door (2026-09-04) · **Date:** 2026-08-25 ·
 **Branch:** worktree-config-env-and-frontend-design
 
 ## 1. Motivation
 
 TrainMate gets its second athlete, and she is not going to learn a command language.
 The Telegram bot today is deliberately a terminal in a chat window: every message must
-be a valid CLI command line, replies come back as monospace `<pre>` blocks, and the bot
+be a valid CLI command line, replies come back as monospace `<pre>` messages, and the bot
 never speaks first. That is exactly right for an expert operator and exactly wrong for
 someone who just wants a coach.
 
@@ -91,7 +91,7 @@ them. Tapping:
 - **Feeling tired** — runs `workout adapt -m "feeling tired this morning"`; the existing
   adaptation flow (including its confirm prompts) takes over.
 - **Can't today** — a bot-level choose row (move it / shorten it / skip it), each option
-  mapping to an `adapt -m` message. The coach decides; the buttons only phrase the ask.
+  mapping to an `adapt -m` message. The week planner decides; the buttons only phrase the ask.
 
 ### 4.2 Where the content comes from
 
@@ -165,7 +165,7 @@ bot feeds back through the normal pipeline when tapped (callback namespace `ui:`
 distinct from prompt nonces, valid until the next row replaces it — one live row per
 chat, a lifetime §12.3 has to own now that rows multiply).
 
-Prompts ask and block; buttons offer and exit. Keeping WHAT to offer in the CLI keeps
+Prompts ask and wait; buttons offer and exit. Keeping WHAT to offer in the CLI keeps
 the parity principle: the bot renders, it does not decide.
 
 Amended 2026-09-14 (DESIGN_athlete_queue.md §6.2): a fifth sentinel, `\x1eTM-QUEUE
@@ -362,7 +362,7 @@ the plan did not ask for, ⏳ still ahead today. A trained session says what was
 ("you did 43 min"); a kept rest day is a ✅; a rest day trained through is a ❌ that
 names the effort. The expert report's extra facts stay expert: the discrepancy list,
 the load-from-RPE note (it qualifies a load figure the companion line does not carry),
-the in-block versus off-plan distinction, and efforts under the minor-load bar, which
+the in-mesocycle versus off-plan distinction, and efforts under the minor-load bar, which
 the companion does not mention at all. The closing count follows the tone rule — what
 was done leads, the gap is a number after it — and a window with nothing behind it is
 not a miss. The ❌ is the one place the companion names a gap per line: in a look back
@@ -377,7 +377,7 @@ a 160-column table and signed diff lines re-wrapped by the phone (observed 2026-
 The preview now renders one paragraph per touched day under "Here's what I'd change:" —
 the session line in the day-view form, a parenthetical saying what it replaces ("was
 Strength — Deload Volume, 55 min", "was a rest day", "same session, wording updated"),
-the coach's per-session reason when it adds to the batch reason, and for a wording-only
+the week planner's per-session reason when it adds to the batch reason, and for a wording-only
 revision the changed passages as `Was:` / `Now:` pairs (DESIGN_workout_revisions.md
 §9.1). The confirm asks "Shall I make these changes?"; the outcome lines are companion
 words as well. Expert mode keeps the table, whose narrow-client form already stacks
@@ -433,7 +433,7 @@ earns it is expert detail, and the chat surface does not audit.
   the writes pass (§12) makes a bounded set of reversible-or-confirm-gated
   mutations routable and lets the model *nominate* (never execute) — §12.9 is now
   the authoritative statement of this posture. Amended 2026-09-04: the plan view's
-  "Tell me more" leaves send `bot block <id>`, a read-only view (§11.2).
+  "Tell me more" leaves send `bot mesocycle <id>`, a read-only view (§11.2).
 - Free text reaching the router or `adapt -m` is data, not instructions, and the argv
   table bounds its blast radius; the exposure is the same one `adapt -m` already has
   today.
@@ -452,7 +452,7 @@ earns it is expert detail, and the chat surface does not audit.
 |---|---|
 | `trainmate_bot.py` | ui-mode switch (config at start, `/ui` flips it live, §5.6), reply keyboard + label→argv table, capture-tap chat state (§5.2), `ui:` callback namespace, `TM-BUTTONS` parsing, push scheduler task |
 | `trainmate/prompt.py` | `BUTTONS_SENTINEL` + `emit_buttons()` (mirror of `emit_photo`) |
-| `trainmate/cli/bot.py` | new hidden family: `bot morning`, `bot route`, `bot constraints`, `bot block` (§11.2) |
+| `trainmate/cli/bot.py` | new hidden family: `bot morning`, `bot route`, `bot constraints`, `bot mesocycle` (§11.2) |
 | `trainmate/config.py` | `telegram_ui`; the push knobs and the router role resolve through `trainmate/settings.py` |
 | `trainmate/cli/render.py` | the companion voice: line builders, `ExpertRenderer`/`CompanionRenderer`, `TRAINMATE_RENDER` interpretation (was a helper in `cli/common.py` — DESIGN_render_persona.md §7) |
 | `trainmate/cli/candidates.py` | the confirm loops a note's candidates pass through, shared by `workout adapt -m` and `bot capture note` (§12.10, §12.11) |
@@ -495,7 +495,7 @@ Each phase ships alone; her onboarding starts at phase 1.
   for the operator; config.yaml stays authoritative across restarts.
 - A day already trained is congratulated, not briefed, and loses the button row with it
   (2026-08-26, §4.1). The adaptation still runs first when `adapt-first` is on: it
-  revises the whole forward range to the block's end, not just today, so a session
+  revises the whole forward range to the mesocycle's end, not just today, so a session
   finished before breakfast is no reason to skip the day's pass.
 - Goals and the plan join the companion surface (2026-08-30, §11): two new keyboard
   buttons and router intents, `goal list` / `plan show` opted into simple rendering,
@@ -542,7 +542,7 @@ Each phase ships alone; her onboarding starts at phase 1.
   can live in the simple UI and still reach the expert CLI from the same chat, and a
   receiving-first athlete has no reason to type slash commands; the danger confirms
   remain the backstop.
-- The plan view joins the date column (2026-09-03, §11.1): each block leads with its
+- The plan view joins the date column (2026-09-03, §11.1): each mesocycle leads with its
   window the way the week and look-back lines lead with the day, which leaves each tail
   carrying only what the window cannot say. ⚪ becomes ⏳, borrowing the look back's word
   for "still ahead", and ✅ takes over the goals view's completed line so 🏁 means the
@@ -581,10 +581,10 @@ empty list is an invitation, not a gap.
 
 **The plan — `show_plan` → `plan show`.** "Plan" here is the periodization —
 macrocycle + mesocycles, never the scheduled sessions (those are 🗓 My week). The
-companion form is the road to the goal, one line per block: done blocks get a ✅ and
-nothing more, the block she is in is located by week ("you're here, week 2 of 3") and
+companion form is the road to the goal, one line per mesocycle: done mesocycles get a ✅ and
+nothing more, the mesocycle she is in is located by week ("you're here, week 2 of 3") and
 carries the first sentence of its focus (`simple_focus_snippet` — the full prescription
-is dense coach prose and stays expert detail), and future blocks get their start day and
+is dense coach prose and stays expert detail), and future mesocycles get their start day and
 length. The three line markers are stops on that road, sized to match the 🧭 opener and
 🏁 close: ✅ behind her, 📍 where she stands, ⚪ still ahead. Badge-style emoji (🔜, and
 its family) are out — at chat size they render as a coloured box with unreadable text,
@@ -609,27 +609,27 @@ expert vocabulary.
 ### 11.1 The date column, and one meaning per glyph (2026-09-03)
 
 Read on a phone, the plan view buried its dates. The eye had to cross a long mesocycle
-name to reach "starts Mon Sep 07", and a finished block carried no date at all. Every
+name to reach "starts Mon Sep 07", and a finished mesocycle carried no date at all. Every
 other list on this surface already leads with the date — "Thu 03 · ✅ 🏋️ Strength" in the
-week view, the same shape in the look back — so the plan now does too: the block's
+week view, the same shape in the look back — so the plan now does too: the mesocycle's
 window, then the marker, then the name.
 
     Jul 27 – Aug 16 · ✅ Base
     Aug 17 – Sep 06 · 📍 Build — you're here, week 2 of 3
     Sep 07 – Sep 16 · ⏳ Peak — 10 days
 
-The window is `simple_block_window`: month and day at both ends, dropping the weekday
-`simple_date_word` keeps. A block boundary is a week rather than an appointment, and the
+The window is `simple_mesocycle_window`: month and day at both ends, dropping the weekday
+`simple_date_word` keeps. A mesocycle boundary is a week rather than an appointment, and the
 column has to stay narrow enough to scan. The §6 no-year rule is untouched — the closing
 countdown still carries the year.
 
 Leading with the window shrinks every tail to what the window cannot say. "starts Mon
-Sep 07" was the window restated, so a future block now carries only its length; "— done"
-was the ✅ restated, so a finished block carries nothing. The active block is the one
+Sep 07" was the window restated, so a future mesocycle now carries only its length; "— done"
+was the ✅ restated, so a finished mesocycle carries nothing. The active mesocycle is the one
 with nothing to drop: how far into it she is — "week 2 of 3" — is the single fact
 neither the window nor the pin already gives her.
 
-Two emoji changes ride along. **⚪ becomes ⏳** for a block still ahead: the pale circle
+Two emoji changes ride along. **⚪ becomes ⏳** for a mesocycle still ahead: the pale circle
 reads as a bullet rather than a status and all but disappears on a light background,
 where ⏳ already means "still ahead" in the look back (§6). The plan view's vocabulary is
 then ✅ and ⏳ borrowed whole from a screen she already reads, plus 📍 as its one private
@@ -647,16 +647,16 @@ stands.)*
 
 §11.1 put the window first so that a date column would run down the left edge. On a
 phone the column never appeared: companion replies are proportional text the client
-flows (§6), so a block line like "Aug 30 – Sep 26 · 📍 Habit Foundation & Aerobic
+flows (§6), so a mesocycle line like "Aug 30 – Sep 26 · 📍 Habit Foundation & Aerobic
 Re-Set — you're here, week 1 of 4" wrapped into three ragged lines, and the dates —
 the first thing on each — were the least useful thing to lead with. With no blank
-line between blocks, the active block's focus sentence sat between two block lines
+line between mesocycles, the active mesocycle's focus sentence sat between two mesocycle lines
 and belonged to neither. The view was still one dense paragraph.
 
-The plan is now a stanza per block, each opened by a blank line: the marker and the
+The plan is now a stanza per mesocycle, each opened by a blank line: the marker and the
 name on one line, then the window and the one thing the window cannot say — nothing
-behind her, "you're in week 1 of 4" for the block she is in, the length for a block
-ahead — and, under the active block only, the focus headline.
+behind her, "you're in week 1 of 4" for the mesocycle she is in, the length for a mesocycle
+ahead — and, under the active mesocycle only, the focus headline.
 
     🧭 The road to Zürcher Sylvesterlauf
 
@@ -672,27 +672,27 @@ ahead — and, under the active block only, the focus headline.
 Whitespace is the only column a phone can draw, so it is the one the view uses. Each
 line now carries one kind of thing — a name, a window, a sentence — which is what
 lets it wrap without losing its shape. The §11.1 vocabulary (✅ 📍 ⏳ 🏁, one meaning
-each), `simple_block_window`, `simple_block_length` and the §6 no-year rule are
-unchanged. The headline drops a one-word label the planner likes to open with
-("Purpose: …"): a field name, not a headline.
+each), `simple_mesocycle_window`, `simple_mesocycle_length` and the §6 no-year rule are
+unchanged. The headline drops a one-word label the `plan generate` model likes to open
+with ("Purpose: …"): a field name, not a headline.
 
-**The door.** The names are the planner's, and they are coach vocabulary —
+**The door.** The names are written by `plan generate`, and they are coach vocabulary —
 "Race-Specific Sharpening" says nothing to the athlete about what October will ask of
 her. The full focus is dense coach prose and stays out of the view (§11), but it is
 now one tap away: the view attaches a §4.4 row, "🔎 Tell me more", whose leaves — one
-per block under way or still ahead; finished blocks say nothing here as everywhere —
-each send the read-only `bot block <id>`. That renders the block's stanza followed by
+per mesocycle under way or still ahead; finished mesocycles say nothing here as everywhere —
+each send the read-only `bot mesocycle <id>`. That renders the mesocycle's stanza followed by
 the whole focus. A lone candidate is offered directly rather than behind a menu of
 one. The leaves follow the picker shape (§12.1): the CLI builds them from real IDs,
 the tap chooses, and the model is nowhere in it. A stale tap after a replan lands
-softly — "That block isn't on your plan any more" — and a block from a superseded
+softly — "That mesocycle isn't on your plan any more" — and a mesocycle from a superseded
 version says so, the way the plan view does. Only the version in force gets the row:
-an older version's blocks are history, not a road. The §7 guardrail widens by one
+an older version's mesocycles are history, not a road. The §7 guardrail widens by one
 read-only argv.
 
 Still open, and the bigger lever: the names themselves. A short athlete-facing line
-per block, written by the planner at plan time ("run easy, run often, start the
-10-minute strength habit"), would let the road say what each block is *for* without a
+per mesocycle, written by `plan generate` with the plan ("run easy, run often, start the
+10-minute strength habit"), would let the road say what each mesocycle is *for* without a
 tap. That is a schema and prompt change, not a rendering one, and it waits for the
 stanza shape to settle.
 
@@ -703,7 +703,7 @@ drops the message into `adapt -m`. Three things it cannot do. It has **no slots*
 model returns an intent name and nothing else, so "move my marathon to October 12" has
 nowhere to put the date. It has **no way to name an object** — companion prose hides
 IDs, so "I'm not doing the 10k" cannot safely become `goal rm 3`. And **recording a
-rule rides the coach** — `add_constraint` pays for a full adaptation call on the
+rule rides the week planner** — `add_constraint` pays for a full adaptation call on the
 coaching model when all the athlete wanted was to be heard. This pass closes all three
 without giving the model any new authority.
 
@@ -773,8 +773,8 @@ and I slept terribly" — loses nothing by being routed here rather than to adap
 
 The decoupling is the point: recording becomes instant and cheap, and the coach becomes
 an offer. After a capture persists — constraint *or* signal (amended 2026-09-02) — the
-reply carries a §4.4 button: "🔄 Adjust the plan around it" → `workout adapt`. Prompts
-ask and block; buttons offer and exit (§4.4): she is heard immediately, and invoking
+reply carries a §4.4 button: "🔄 Adjust my week around it" → `workout adapt`. Prompts
+ask and wait; buttons offer and exit (§4.4): she is heard immediately, and invoking
 the coach is her call, not a toll. The first draft gave signals no offer — the record
 points backward (§5.5) and adapts nothing — but the athlete *reporting* one usually
 expects forward notice: "I slept terribly" filed as a row behind a cheerful confirm
@@ -786,7 +786,7 @@ tap, not the message.
 
 **The two lanes are taught, not discovered** (2026-09-02; reworked the same day when
 §5.2 retired the armed channel this paragraph first hung its copy on). The offer runs
-bare `workout adapt`, so the coach reads the stored row, not the original words —
+bare `workout adapt`, so the week planner reads the stored row, not the original words —
 transcription is the price of the instant lane. The lane that carries her exact words
 is `coach_message` → `adapt -m`, plus the "📨 Send it to your coach as written" button
 when capture finds nothing — a routing outcome now, not a button of its own, since
@@ -811,7 +811,7 @@ what the athlete is told, never what is stored, and `RouterTablesTest` keeps pin
 that. What changes is that `coach_message` now genuinely differs: state and
 availability go to the coach, records go to capture. A misroute across *that* line
 degrades gracefully in both directions — a rule misread as state still lands in adapt,
-whose inbox still extracts it (just paying the coach call the athlete would have been
+whose inbox still extracts it (just paying for the week planner call the athlete would have been
 offered anyway); state misread as a rule is caught at the capture confirm, and the
 no-find fallback's button walks it to the coach. The §5.2 rescue window lands here
 too: while a 💬 tap is live, text the router returns `unclear` for rides this capture

@@ -1,7 +1,7 @@
 """Intensity-distribution tests — see DESIGN_intensity_distribution.md §11.
 
 Four things carry the design and are worth pinning: the completed-weeks divisor at a
-block's first six days and across a partial tail (§4), the coverage formula with a
+mesocycle's first six days and across a partial tail (§4), the coverage formula with a
 meterless ride in the set (§7), the canonical `cycling` mapping that stops one athlete's
 riding splitting across two rows (§6.1), and the per-sport delta suppression that keeps a
 changed sport mix from reading as a -100% swing (§4.1).
@@ -40,18 +40,18 @@ def flat(text):
     return " ".join(text.split())
 
 
-BLOCK = {
+MESOCYCLE = {
     "name": "Base 2", "focus": "aerobic volume",
     "start_date": "2026-06-01", "end_date": "2026-06-28",
 }
 
 
 class TestCompletedWeeksDivisor(unittest.TestCase):
-    """§4: only whole 7-day weeks from the block's own start divide a rate, and the
+    """§4: only whole 7-day weeks from the mesocycle's own start divide a rate, and the
     partial tail is excluded from BOTH sides of the division."""
 
     def test_first_six_days_have_no_rate(self):
-        # Day 6 of the block: nothing has completed a week, so there is no divisor.
+        # Day 6 of the mesocycle: nothing has completed a week, so there is no divisor.
         self.assertIsNone(
             intensity.rate_window("2026-06-01", "2026-06-28", "2026-06-06")
         )
@@ -66,34 +66,34 @@ class TestCompletedWeeksDivisor(unittest.TestCase):
         window = intensity.rate_window("2026-06-01", "2026-06-28", "2026-06-17")
         self.assertEqual(window, ("2026-06-01", "2026-06-14", 2))
 
-    def test_finished_block_counts_its_last_day(self):
+    def test_finished_mesocycle_counts_its_last_day(self):
         # Measured one day past the end, all 28 days are over -> 4 weeks, not 3.
         window = intensity.rate_window("2026-06-01", "2026-06-28", "2026-06-29")
         self.assertEqual(window, ("2026-06-01", "2026-06-28", 4))
 
-    def test_weeks_run_from_the_block_start_not_calendar_mondays(self):
+    def test_weeks_run_from_the_mesocycle_start_not_calendar_mondays(self):
         # 2026-06-04 is a Thursday; its weeks are Thursday-to-Wednesday.
         window = intensity.rate_window("2026-06-04", "2026-07-01", "2026-06-12")
         self.assertEqual(window, ("2026-06-04", "2026-06-10", 1))
 
-    def test_too_young_block_reports_raw_minutes_and_says_so(self):
+    def test_too_young_mesocycle_reports_raw_minutes_and_says_so(self):
         acts = [act("2026-06-02", "running", 3600, hr=[300, 3000, 200, 100, 0])]
-        text = intensity.block_report(BLOCK, "2026-06-05", fetch_from(acts))
+        text = intensity.mesocycle_report(MESOCYCLE, "2026-06-05", fetch_from(acts))
         self.assertIn("RAW minutes", text)
         self.assertIn("too young for a per-week rate", flat(text))
         self.assertNotIn("per week over", text)
 
-    def test_block_that_has_not_started_reports_nothing(self):
-        # get_active_mesocycle falls back to the next FUTURE block; the helper must not
+    def test_mesocycle_that_has_not_started_reports_nothing(self):
+        # get_active_mesocycle falls back to the next FUTURE mesocycle; the helper must not
         # render an empty table for training that has not happened (§8).
         self.assertIsNone(
-            intensity.block_report(BLOCK, "2026-05-20", fetch_from([]))
+            intensity.mesocycle_report(MESOCYCLE, "2026-05-20", fetch_from([]))
         )
 
-    def test_a_block_is_fetched_once_not_once_per_window(self):
+    def test_a_mesocycle_is_fetched_once_not_once_per_window(self):
         """The report asks for elapsed, the rate window and the current week — all
-        sub-ranges of the block. Against the database each was its own query, and
-        `progress --blocks` multiplied that by the number of blocks."""
+        sub-ranges of the mesocycle. Against the database each was its own query, and
+        `progress --mesocycles` multiplied that by the number of mesocycles."""
         acts = [
             act("2026-06-03", "running", 7200, hr=[0, 7200, 0, 0, 0]),
             act("2026-06-10", "running", 7200, hr=[0, 7200, 0, 0, 0]),
@@ -105,21 +105,21 @@ class TestCompletedWeeksDivisor(unittest.TestCase):
             calls.append((start, end))
             return [a for a in acts if start <= a["date"] <= end]
 
-        text = intensity.block_report(
-            BLOCK, "2026-06-17", counting_fetch, current_week=True
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-17", counting_fetch, current_week=True
         )
         self.assertIsNotNone(text)
         self.assertEqual(len(calls), 1, calls)
 
         # Same numbers as the uncached path, so this is caching and not a shortcut.
         self.assertEqual(
-            text, intensity.block_report(
-                BLOCK, "2026-06-17", fetch_from(acts), current_week=True
+            text, intensity.mesocycle_report(
+                MESOCYCLE, "2026-06-17", fetch_from(acts), current_week=True
             )
         )
 
-    def test_a_window_outside_the_block_still_reaches_the_fetcher(self):
-        """The previous block sits before this one's span, so it cannot be served from
+    def test_a_window_outside_the_mesocycle_still_reaches_the_fetcher(self):
+        """The previous mesocycle sits before this one's span, so it cannot be served from
         the cached rows."""
         acts = [act("2026-06-03", "running", 7200, hr=[0, 7200, 0, 0, 0])]
         calls = []
@@ -128,12 +128,12 @@ class TestCompletedWeeksDivisor(unittest.TestCase):
             calls.append((start, end))
             return [a for a in acts if start <= a["date"] <= end]
 
-        intensity.block_report(
-            BLOCK, "2026-06-29", counting_fetch,
+        intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-29", counting_fetch,
             previous={"name": "Prep", "start_date": "2026-05-01",
                       "end_date": "2026-05-28"},
         )
-        self.assertTrue(any(start < BLOCK["start_date"] for start, _ in calls), calls)
+        self.assertTrue(any(start < MESOCYCLE["start_date"] for start, _ in calls), calls)
 
     def test_rate_divides_by_completed_weeks_only(self):
         # 4h of Z2 inside the first two complete weeks, plus 2h in the partial tail that
@@ -143,7 +143,7 @@ class TestCompletedWeeksDivisor(unittest.TestCase):
             act("2026-06-10", "running", 7200, hr=[0, 7200, 0, 0, 0]),
             act("2026-06-16", "running", 7200, hr=[0, 7200, 0, 0, 0]),
         ]
-        text = intensity.block_report(BLOCK, "2026-06-17", fetch_from(acts))
+        text = intensity.mesocycle_report(MESOCYCLE, "2026-06-17", fetch_from(acts))
         self.assertIn("Z2 aerobic 2h00", text)
 
 
@@ -280,7 +280,7 @@ class TestZonesAndRendering(unittest.TestCase):
 
     def test_every_zone_is_reported_separately_and_named(self):
         acts = [act("2026-06-02", "running", 3600, hr=[600, 1800, 600, 480, 120])]
-        text = intensity.block_report(BLOCK, "2026-06-09", fetch_from(acts))
+        text = intensity.mesocycle_report(MESOCYCLE, "2026-06-09", fetch_from(acts))
         for label in ("Z1 recovery", "Z2 aerobic", "Z3 tempo", "Z4 threshold",
                       "Z5 VO2max+"):
             self.assertIn(label, text)
@@ -290,7 +290,7 @@ class TestZonesAndRendering(unittest.TestCase):
     def test_power_reports_all_seven_zones(self):
         acts = [act("2026-06-02", "cycling", 3600,
                     power=[300, 1800, 600, 480, 300, 100, 20])]
-        text = intensity.block_report(BLOCK, "2026-06-09", fetch_from(acts))
+        text = intensity.mesocycle_report(MESOCYCLE, "2026-06-09", fetch_from(acts))
         for label in ("Z5 VO2max", "Z6 anaerobic", "Z7 neuromuscular"):
             self.assertIn(label, text)
 
@@ -306,7 +306,7 @@ class TestZonesAndRendering(unittest.TestCase):
     def test_hr_and_power_rows_carry_the_never_sum_warning(self):
         acts = [act("2026-06-02", "cycling", 3600, hr=[0, 3600, 0, 0, 0],
                     power=[0, 3600, 0, 0, 0, 0, 0])]
-        text = intensity.block_report(BLOCK, "2026-06-09", fetch_from(acts))
+        text = intensity.mesocycle_report(MESOCYCLE, "2026-06-09", fetch_from(acts))
         self.assertIn("never a total", text)
 
     def test_every_line_stays_inside_the_prompt_width(self):
@@ -317,8 +317,8 @@ class TestZonesAndRendering(unittest.TestCase):
                 rpe=8),
             act("2026-06-06", "trail_running", 7200, hr=[600, 5400, 900, 200, 60]),
         ]
-        text = intensity.block_report(
-            BLOCK, "2026-06-20", fetch_from(acts), current_week=True
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-20", fetch_from(acts), current_week=True
         )
         for line in text.split("\n"):
             self.assertLessEqual(len(line), intensity.PROMPT_WIDTH, line)
@@ -332,8 +332,8 @@ class TestCurrentWeek(unittest.TestCase):
             act("2026-06-02", "running", 3600, hr=[0, 2400, 1200, 0, 0]),
             act("2026-06-16", "running", 1800, hr=[0, 600, 1200, 0, 0]),
         ]
-        text = intensity.block_report(
-            BLOCK, "2026-06-16", fetch_from(acts), current_week=True
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-16", fetch_from(acts), current_week=True
         )
         self.assertIn("day 2 of 7 (29% elapsed)", flat(text))
         self.assertIn("NOT extrapolated", flat(text))
@@ -344,17 +344,17 @@ class TestCurrentWeek(unittest.TestCase):
         ]
         self.assertTrue(week_line, text)
 
-    def test_too_young_block_does_not_print_the_week_twice(self):
+    def test_too_young_mesocycle_does_not_print_the_week_twice(self):
         # With no completed week the raw table IS the current week — same window, same
         # numbers.
         acts = [act("2026-06-02", "running", 3600, hr=[0, 3600, 0, 0, 0])]
-        text = intensity.block_report(
-            BLOCK, "2026-06-04", fetch_from(acts), current_week=True
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-04", fetch_from(acts), current_week=True
         )
         self.assertIn("RAW minutes", text)
         self.assertNotIn("Current week so far", text)
 
-    def test_current_week_window_tracks_the_block_grid(self):
+    def test_current_week_window_tracks_the_mesocycle_grid(self):
         self.assertEqual(
             intensity.current_week_window("2026-06-01", "2026-06-28", "2026-06-16"),
             ("2026-06-15", "2026-06-16", 2),
@@ -362,7 +362,7 @@ class TestCurrentWeek(unittest.TestCase):
 
 
 class TestDelta(unittest.TestCase):
-    """§4.1: block-over-block change, suppressed per sport rather than globally."""
+    """§4.1: mesocycle-over-mesocycle change, suppressed per sport rather than globally."""
 
     PREV = {
         "name": "Base 1", "focus": "aerobic base",
@@ -370,13 +370,13 @@ class TestDelta(unittest.TestCase):
     }
 
     def _report(self, acts):
-        return intensity.block_report(
-            BLOCK, "2026-06-29", fetch_from(acts), previous=self.PREV
+        return intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-29", fetch_from(acts), previous=self.PREV
         )
 
     def test_intensity_creep_shows_as_z2_down_and_z3_up(self):
         # The failure mode the feature exists for: same weekly load, easy volume traded
-        # for tempo. Both blocks are 4 weeks, so per-week rates compare directly.
+        # for tempo. Both mesocycles are 4 weeks, so per-week rates compare directly.
         acts = []
         for week in range(4):
             acts.append(act(f"2026-05-{4 + week * 7:02d}", "running", 20700,
@@ -410,10 +410,10 @@ class TestDelta(unittest.TestCase):
         text = self._report(acts)
         self.assertIn("present in Base 1, not trained here", text)
 
-    def test_no_delta_when_the_current_block_has_no_completed_week(self):
+    def test_no_delta_when_the_current_mesocycle_has_no_completed_week(self):
         acts = [act("2026-05-06", "running", 3600, hr=[0, 3600, 0, 0, 0])]
-        text = intensity.block_report(
-            BLOCK, "2026-06-04", fetch_from(acts + [
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-04", fetch_from(acts + [
                 act("2026-06-02", "running", 3600, hr=[0, 3600, 0, 0, 0])
             ]), previous=self.PREV
         )
@@ -424,14 +424,14 @@ class TestStructural(unittest.TestCase):
     """§6: no sport is routed away — the structural row sits beside the zone rows."""
 
     def test_hiit_strength_keeps_its_hard_minutes_in_the_zone_table(self):
-        # Garmin files a HIIT kettlebell session as `indoor_cardio`, which folds into
-        # strength_training. Routing it away would report ZERO hard minutes for a block
+        # Garmin files a HIIT kettlebell activity as `indoor_cardio`, which folds into
+        # strength_training. Routing it away would report ZERO hard minutes for a mesocycle
         # containing four of them.
         acts = [
             act("2026-06-02", "indoor_cardio", 3600, hr=[300, 1200, 900, 1100, 100],
                 rpe=8),
         ]
-        text = intensity.block_report(BLOCK, "2026-06-09", fetch_from(acts))
+        text = intensity.mesocycle_report(MESOCYCLE, "2026-06-09", fetch_from(acts))
         self.assertIn("strength_training", text)
         self.assertIn("Z4 threshold 18m", text)
         self.assertIn("avg RPE 8.0", text)
@@ -442,19 +442,19 @@ class TestStructural(unittest.TestCase):
             {"anchor_kind": "ftp", "date": "2026-04-01", "value": 240.0, "id": 1},
             {"anchor_kind": "ftp", "date": "2026-06-10", "value": 252.0, "id": 2},
         ]
-        text = intensity.block_report(
-            BLOCK, "2026-06-20", fetch_from(acts), benchmarks=benchmarks
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-20", fetch_from(acts), benchmarks=benchmarks
         )
         self.assertIn("240 W -> 252 W (+5.0%)", text)
 
     def test_volume_and_load_line_survives_the_zone_table(self):
         acts = [act("2026-06-02", "running", 3600, hr=[0, 3600, 0, 0, 0])]
-        text = intensity.block_report(BLOCK, "2026-06-09", fetch_from(acts))
+        text = intensity.mesocycle_report(MESOCYCLE, "2026-06-09", fetch_from(acts))
         self.assertIn("Volume and load", text)
-        self.assertIn("1 session, 1h00", text)
+        self.assertIn("1 activity, 1h00", text)
 
-    def test_block_with_no_activities_says_so_once(self):
-        text = intensity.block_report(BLOCK, "2026-06-09", fetch_from([]))
+    def test_mesocycle_with_no_activities_says_so_once(self):
+        text = intensity.mesocycle_report(MESOCYCLE, "2026-06-09", fetch_from([]))
         self.assertIn("No completed activities recorded", text)
         self.assertNotIn("Coverage:", text)
 
@@ -489,11 +489,11 @@ class TestNotes(unittest.TestCase):
         self.assertNotIn("interval work with rest", text)
         self.assertNotIn("rest between sets", text)
 
-    def test_block_report_can_leave_the_notes_to_its_caller(self):
+    def test_mesocycle_report_can_leave_the_notes_to_its_caller(self):
         acts = [act("2026-06-02", "running", 3600, hr=[0, 3600, 0, 0, 0])]
-        with_notes = intensity.block_report(BLOCK, "2026-06-09", fetch_from(acts))
-        without = intensity.block_report(
-            BLOCK, "2026-06-09", fetch_from(acts), notes=False
+        with_notes = intensity.mesocycle_report(MESOCYCLE, "2026-06-09", fetch_from(acts))
+        without = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-09", fetch_from(acts), notes=False
         )
         self.assertIn("interval work with rest", flat(with_notes))
         self.assertNotIn("interval work with rest", flat(without))
@@ -533,7 +533,7 @@ class TestSportDurations(unittest.TestCase):
 
 
 class TestPlannedZones(unittest.TestCase):
-    """§9.8: the coach states the distribution as structured data while it still knows
+    """§9.8: the week planner states the distribution as structured data while it still knows
     the intent, instead of the app parsing it back out of prose afterwards."""
 
     def test_parses_an_hr_prescription(self):
@@ -652,14 +652,14 @@ class TestMeasuredWindow(unittest.TestCase):
             ("2026-06-01", "2026-06-06", 0),
         )
 
-    def test_never_runs_past_the_block(self):
+    def test_never_runs_past_the_mesocycle(self):
         _, end, _ = intensity.measured_window("2026-06-01", "2026-06-28", "2026-09-01")
         self.assertLessEqual(end, "2026-06-28")
 
 
 class TestPrescribedTable(unittest.TestCase):
     """§9.2a: what the plan asked, beside what the athlete produced — the pair that tells a
-    mis-designed block from a mis-executed one."""
+    mis-designed mesocycle from a mis-executed one."""
 
     ACTS = [
         act("2026-06-02", "running", 3600, hr=[0, 1200, 2400, 0, 0]),
@@ -673,12 +673,12 @@ class TestPrescribedTable(unittest.TestCase):
     def test_absent_unless_asked_for(self):
         """Only the periodization consumer passes `fetch_workouts`; adapt must not grow
         this table, since measured-vs-prescribed divergence is an execution question."""
-        text = intensity.block_report(BLOCK, "2026-06-17", fetch_from(self.ACTS))
+        text = intensity.mesocycle_report(MESOCYCLE, "2026-06-17", fetch_from(self.ACTS))
         self.assertNotIn("PRESCRIBED", text)
 
     def test_rendered_in_the_same_units_as_the_measured_table(self):
-        text = intensity.block_report(
-            BLOCK, "2026-06-17", fetch_from(self.ACTS),
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-17", fetch_from(self.ACTS),
             fetch_workouts=fetch_from(self.PLAN),
         )
         self.assertIn("What the plan PRESCRIBED over the same weeks, per week", flat(text))
@@ -691,8 +691,8 @@ class TestPrescribedTable(unittest.TestCase):
         """Sessions predating §9.8, or a sport with no zone model: an empty table would
         read as "the plan asked for nothing"."""
         bare = [{"date": "2026-06-02", "sport_type": "running"}]
-        text = intensity.block_report(
-            BLOCK, "2026-06-17", fetch_from(self.ACTS), fetch_workouts=fetch_from(bare),
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-17", fetch_from(self.ACTS), fetch_workouts=fetch_from(bare),
         )
         self.assertNotIn("PRESCRIBED", text)
 
@@ -700,8 +700,8 @@ class TestPrescribedTable(unittest.TestCase):
         """A prescription and a recording must divide the same weeks to be comparable, so
         a session in the excluded partial tail must not inflate the prescribed rate."""
         tail = self.PLAN + [planned("2026-06-16", "running", "hr", [0, 0, 3600, 0, 0])]
-        text = intensity.block_report(
-            BLOCK, "2026-06-17", fetch_from(self.ACTS), fetch_workouts=fetch_from(tail),
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-17", fetch_from(self.ACTS), fetch_workouts=fetch_from(tail),
         )
         # Still 1200s/2 weeks = 10m, not (1200s + 3600s)/2 = 40m.
         self.assertIn("Z3 tempo 10m", flat(text))
@@ -709,7 +709,7 @@ class TestPrescribedTable(unittest.TestCase):
 
 
 class TestPromptWidthContract(unittest.TestCase):
-    def test_block_report_prose_respects_the_width_it_is_given(self):
+    def test_mesocycle_report_prose_respects_the_width_it_is_given(self):
         # §9.6: `format_header` and the `Change vs` header were bare appends measuring
         # 57 and 84 characters at width=48, so the column contract was false there.
         acts = [act("2026-06-02", "running", 3600, hr=[0, 3600, 0, 0, 0]),
@@ -717,8 +717,8 @@ class TestPromptWidthContract(unittest.TestCase):
         previous = {"name": "Base 1 — Aerobic Volume Accumulation",
                     "focus": "aerobic volume accumulation across a long base",
                     "start_date": "2026-05-04", "end_date": "2026-05-31"}
-        text = intensity.block_report(
-            BLOCK, "2026-06-16", fetch_from(acts), previous=previous,
+        text = intensity.mesocycle_report(
+            MESOCYCLE, "2026-06-16", fetch_from(acts), previous=previous,
             notes=False, indent="", width=48,
         )
         for line in text.split("\n"):

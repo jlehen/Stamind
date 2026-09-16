@@ -34,9 +34,9 @@ rebind_test_db(test_db)
 
 from trainmate.coach import coach_service
 
-# Three blocks around today, so a bare `-m`, a date atom and a name infix all have
+# Three mesocycles around today, so a bare `-m`, a date atom and a name infix all have
 # something to resolve to — and 'build' deliberately matches two of them.
-BLOCKS = [
+MESOCYCLES = [
     {"name": "Base Building", "start_date": _days_out(-30), "end_date": _days_out(-1),
      "focus": "Zone 2"},
     {"name": "Build Specific", "start_date": _days_out(0), "end_date": _days_out(20),
@@ -69,7 +69,7 @@ class FeedbackTestCase(unittest.TestCase):
     def run_cli(self, args, input_value="n"):
         return run_cli(args, input_value)
 
-    def _plan(self, blocks=None, strategy="Keep heart rate low"):
+    def _plan(self, mesocycles=None, strategy="Keep heart rate low"):
         """A goal with an active plan; returns (goal_id, macrocycle_id, mesocycles)."""
         obj_id = test_db.add_objective(
             title="Zurich Marathon", target_date=GOAL_DATE,
@@ -77,7 +77,7 @@ class FeedbackTestCase(unittest.TestCase):
         )
         macro_id = test_db.save_macrocycle(
             objective_id=obj_id, strategy=strategy, goals_hash="ghash",
-            constraints_hash="chash", mesocycles=blocks or BLOCKS,
+            constraints_hash="chash", mesocycles=mesocycles or MESOCYCLES,
         )
         return obj_id, macro_id, test_db.get_mesocycles_for_macrocycle(macro_id)
 
@@ -183,29 +183,29 @@ class TestFeedbackFiling(FeedbackTestCase):
     def _file(self, *atom):
         return self.run_cli(["plan", "feedback", "a note", "-m", *atom])
 
-    def _filed_block(self, macro_id):
+    def _filed_mesocycle(self, macro_id):
         notes = test_db.list_plan_feedback(macro_id)
         return notes[-1]["mesocycle_name"] if notes else None
 
-    def test_bare_m_files_to_the_block_containing_today(self):
+    def test_bare_m_files_to_the_mesocycle_containing_today(self):
         obj_id, macro_id, _ = self._plan()
         exit_code, stdout, _ = self.run_cli(["plan", "feedback", "a note", "-m"])
         self.assertEqual(exit_code, 0)
-        self.assertEqual(self._filed_block(macro_id), "Build Specific")
+        self.assertEqual(self._filed_mesocycle(macro_id), "Build Specific")
         self.assertIn("filed: Build Specific", stdout)
 
-    def test_an_id_inside_the_plan_files_to_that_block(self):
+    def test_an_id_inside_the_plan_files_to_that_mesocycle(self):
         obj_id, macro_id, mesos = self._plan()
         exit_code, _, _ = self._file(str(mesos[0]["id"]))
         self.assertEqual(exit_code, 0)
-        self.assertEqual(self._filed_block(macro_id), "Base Building")
+        self.assertEqual(self._filed_mesocycle(macro_id), "Base Building")
 
     def test_an_id_outside_the_active_plan_is_refused(self):
         obj_id, macro_id, mesos = self._plan()
         exit_code, stdout, _ = self._file(str(max(m["id"] for m in mesos) + 50))
         self.assertEqual(exit_code, 1)
         self.assertIn("is not part of this plan", stdout)
-        # The error lists the blocks to retry against, rather than a bare refusal.
+        # The error lists the mesocycles to retry against, rather than a bare refusal.
         self.assertIn("Climb-Specific Transmutation", stdout)
         self.assertEqual(test_db.list_plan_feedback(macro_id), [])
 
@@ -229,7 +229,7 @@ class TestFeedbackFiling(FeedbackTestCase):
         self.assertIn("belongs to the plan for 'Sierre-Zinal'", stdout)
         self.assertIn(f"-g {other_id}", stdout)
 
-    def test_date_atoms_resolve_to_the_block_covering_that_day(self):
+    def test_date_atoms_resolve_to_the_mesocycle_covering_that_day(self):
         obj_id, macro_id, _ = self._plan()
         for atom, expected in (
             ("-7d", "Base Building"),
@@ -242,7 +242,7 @@ class TestFeedbackFiling(FeedbackTestCase):
                 obj_id, macro_id, _ = self._plan()
                 exit_code, stdout, _ = self._file(atom)
                 self.assertEqual(exit_code, 0, stdout)
-                self.assertEqual(self._filed_block(macro_id), expected)
+                self.assertEqual(self._filed_mesocycle(macro_id), expected)
 
     def test_an_unsigned_span_is_refused_by_name(self):
         obj_id, macro_id, _ = self._plan()
@@ -255,28 +255,28 @@ class TestFeedbackFiling(FeedbackTestCase):
         obj_id, macro_id, mesos = self._plan()
         exit_code, stdout, _ = self._file(f"{mesos[0]['id']}..{mesos[1]['id']}")
         self.assertEqual(exit_code, 1)
-        self.assertIn("a note files to one block", stdout)
+        self.assertIn("a note files to one mesocycle", stdout)
 
-    def test_a_unique_name_infix_files_to_that_block(self):
+    def test_a_unique_name_infix_files_to_that_mesocycle(self):
         obj_id, macro_id, _ = self._plan()
         exit_code, stdout, _ = self._file("climb")
         self.assertEqual(exit_code, 0)
-        self.assertEqual(self._filed_block(macro_id), "Climb-Specific Transmutation")
+        self.assertEqual(self._filed_mesocycle(macro_id), "Climb-Specific Transmutation")
 
-    def test_an_ambiguous_name_infix_lists_the_blocks(self):
+    def test_an_ambiguous_name_infix_lists_the_mesocycles(self):
         obj_id, macro_id, _ = self._plan()
         exit_code, stdout, _ = self._file("build")
         self.assertEqual(exit_code, 1)
-        self.assertIn("matches several blocks", stdout)
+        self.assertIn("matches several mesocycles", stdout)
         self.assertIn("Base Building", stdout)
         self.assertIn("Build Specific", stdout)
         self.assertEqual(test_db.list_plan_feedback(macro_id), [])
 
-    def test_a_name_infix_matching_nothing_lists_the_blocks(self):
+    def test_a_name_infix_matching_nothing_lists_the_mesocycles(self):
         obj_id, macro_id, _ = self._plan()
         exit_code, stdout, _ = self._file("taper")
         self.assertEqual(exit_code, 1)
-        self.assertIn("No block name contains 'taper'", stdout)
+        self.assertIn("No mesocycle name contains 'taper'", stdout)
         self.assertIn("Base Building", stdout)
 
 

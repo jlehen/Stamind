@@ -12,18 +12,18 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import progression
 from trainmate.config import config
-from trainmate.progression import RUNWAY_BLOCK, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
+from trainmate.progression import RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
 from trainmate.util import (
     cmd, days_between, fmt_date, gray, today_str as _today_str,
 )
 
-# What the morning push offers on a span or block cliff (§6). The label is the athlete's;
+# What the morning push offers on a span or mesocycle cliff (§6). The label is the athlete's;
 # the argv behind it comes from the detector, never from the free-text router.
 RUNWAY_BUTTON_LABEL = "📅 Plan my next weeks"
 
 
-def _plan_blocks() -> List[Dict[str, Any]]:
-    """The blocks of the plan the current workouts implement.
+def _plan_mesocycles() -> List[Dict[str, Any]]:
+    """The mesocycles of the plan the current workouts implement.
 
     `get_governing_macrocycle`, deliberately not `upcoming_objectives`: that filter drops
     a goal the day after its target date, which is exactly the morning the wrap-up
@@ -41,7 +41,7 @@ def current_runway(as_of: Optional[str] = None) -> Optional[Dict[str, Any]]:
     from trainmate import runtime
     return progression.runway(
         runtime.db.get_workouts(),
-        _plan_blocks(),
+        _plan_mesocycles(),
         runtime.db.get_objectives(),
         as_of or _today_str(),
         config.runway_warning_days,
@@ -52,8 +52,8 @@ def schedule_coverage() -> Tuple[Optional[str], Optional[str]]:
     """`(last covered date, plan end)` — the raw facts behind the detector, for the
     listing marker that draws them whether or not the nudge is firing (§4)."""
     from trainmate import runtime
-    blocks = _plan_blocks()
-    ends = [str(b["end_date"]) for b in blocks if b.get("end_date")]
+    mesocycles = _plan_mesocycles()
+    ends = [str(b["end_date"]) for b in mesocycles if b.get("end_date")]
     return progression.coverage_end(runtime.db.get_workouts()), max(ends) if ends else None
 
 
@@ -65,15 +65,15 @@ def schedule_exhausted(as_of: str) -> bool:
 
 
 def plan_is_behind(as_of: str) -> bool:
-    """Whether every block of the governing plan ended before `as_of` — the state in
+    """Whether every mesocycle of the governing plan ended before `as_of` — the state in
     which `workout adapt` has nothing to adapt towards and refuses (§4)."""
-    blocks = _plan_blocks()
-    ends = [str(b["end_date"]) for b in blocks if b.get("end_date")]
+    mesocycles = _plan_mesocycles()
+    ends = [str(b["end_date"]) for b in mesocycles if b.get("end_date")]
     return bool(ends) and max(ends) < as_of
 
 
 def _when(days_left: int, date_str: str) -> str:
-    """'today' / 'in 4 day(s), on <date>' / '3 day(s) ago, on <date>' — the old block
+    """'today' / 'in 4 day(s), on <date>' / '3 day(s) ago, on <date>' — the old mesocycle
     hint's idiom, extended to the passed state. Day zero never reads 'in 0 day(s)' (§4)."""
     if days_left == 0:
         return "today"
@@ -101,10 +101,10 @@ def runway_hint_lines(state: Dict[str, Any], today: str) -> List[str]:
     when = _when(days_left, state["last_covered_date"])
     kind = state["kind"]
 
-    if kind == RUNWAY_BLOCK:
+    if kind == RUNWAY_MESOCYCLE:
         meso_id = state["next_mesocycle"]["id"]
         return [
-            f"This block {'ends' if days_left >= 0 else 'ended'} {when}, and the next "
+            f"This mesocycle {'ends' if days_left >= 0 else 'ended'} {when}, and the next "
             f"one has no fresh sessions.",
             "Run " + cmd(f"workout generate -m ..{meso_id}")
             + " to plan it against current metrics.",
@@ -167,7 +167,7 @@ def runway_argv(state: Optional[Dict[str, Any]]) -> Optional[str]:
     generate` becomes tappable here and only here, with argv the detector chose."""
     if not state:
         return None
-    if state["kind"] == RUNWAY_BLOCK:
+    if state["kind"] == RUNWAY_MESOCYCLE:
         return f"workout generate -m ..{state['next_mesocycle']['id']}"
     if state["kind"] == RUNWAY_SPAN:
         return "workout generate"

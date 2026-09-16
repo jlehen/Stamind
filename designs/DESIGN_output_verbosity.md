@@ -28,7 +28,7 @@ and those lines are how you know it is alive and what it is spending the time on
 
 But the Telegram front-end **buffers**. `trainmate_bot._drive` accumulates the subprocess's
 stdout into a list and flushes it at a prompt boundary or at exit. So the athlete's phone
-buzzes once, with the whole run in one `<pre>` block — the progress narration on top,
+buzzes once, with the whole run in one `<pre>` message — the progress narration on top,
 already finished, describing work that is over, pushing the answer below the fold. Live
 narration delivered as history is not narration. It is padding.
 
@@ -40,12 +40,12 @@ with a "Decision Summary" the model writes free-hand. A representative one, in f
 > normal (1.07), and the CTL ramp is conservative. Earlier depressed sleep/HRV episodes
 > align chiefly with alcohol and lifestyle disruption and rebounded, rather than showing
 > sustained training-driven autonomic fatigue. However, the first three days of this rebuild
-> block accumulated 236 TSS, and today's endurance anchor exceeded planned load by 35% with
+> mesocycle accumulated 236 TSS, and today's endurance anchor exceeded planned load by 35% with
 > 32 minutes above Z2 power, including threshold/VO2 work. Historical adherence also shows
 > repeated excess duration/load on easy and strength sessions. Preserve Thursday's
 > controlled climbing session and Sunday's protected FTP benchmark by modestly reducing
 > Monday's muscular stress and making Tuesday's easy-power guard rail firmer; this corrects
-> execution drift without reshaping the block or attempting catch-up changes.
+> execution drift without reshaping the mesocycle or attempting catch-up changes.
 
 150 words, wrapped at the phone's 48 columns: roughly 22 lines, every day, above a table
 that already states which sessions changed and by how much. Most of it is the model
@@ -60,7 +60,7 @@ keeping. But parity of *commands* is not parity of *reading conditions*:
 
 | | terminal | chat |
 | --- | --- | --- |
-| output arrives | line by line, as it happens | in one buffered block, at the end |
+| output arrives | line by line, as it happens | in one buffered message, at the end |
 | progress narration | tells you the run is alive | describes work already finished |
 | width | 80 columns | ~48 columns |
 | cost of a spare line | a glance | a scroll |
@@ -118,8 +118,8 @@ answer. The distinction was never about the lines themselves, it was about who w
 Two hints stayed at answer level because they are actionable and conditional rather than
 standing boilerplate:
 
-- the **block-boundary hint** (`DESIGN_block_boundary.md` §4): adapt cannot reach the next
-  block, and the athlete has a few days to notice. It kept its place but lost half its
+- the **mesocycle-boundary hint** (`DESIGN_mesocycle_boundary.md` §4): adapt cannot reach the next
+  mesocycle, and the athlete has a few days to notice. It kept its place but lost half its
   bulk — four lines (headline, wrapped explanation, indented command, blank) became two.
 - `ensure_recent_data`'s "today's Garmin metrics are not available yet", which changes how
   the answer should be read.
@@ -138,7 +138,7 @@ this generalises the rule it discovered.
 One care point: `intensity.format_notes` feeds **both** the CLI tables and the LLM prompt,
 where the caveats are load-bearing ("the app aligns; the LLM reasons"). So the gate goes on
 the two CLI call sites — `cli/status.py` passes `notes=asides_enabled()` into the flag
-`block_report` already had, `cli/progress.py` skips its own once-per-section block — and
+`mesocycle_report` already had, `cli/progress.py` skips its own once-per-section notes — and
 never inside `intensity.py`.
 
 ### 3.3 What is deliberately still printed
@@ -180,7 +180,7 @@ before a `print`, because a table or a listing knows its own layout. The warning
 inherited that habit without the discipline: nothing wrapped, and by 2026-08-31 sixteen
 warnings and errors were going out as a single line of 107 to 178 characters. On a
 terminal they soft-wrap and nobody notices. Over Telegram they land inside a `<pre>`
-block, which does not wrap, so the phone renders a 178-column line the athlete has to
+message, which does not wrap, so the phone renders a 178-column line the athlete has to
 drag sideways — while every table beside them fits, because §7 taught them to.
 
 The fix is not sixteen `wrap_text` calls. It is that the tier had two printers and needed
@@ -203,7 +203,7 @@ calling `wrap_text` themselves and simply dropped it.
 
 What the test does *not* forbid is colour used as a fragment rather than a message: a
 bold yellow section heading, one red cell inside a row, `red(f"Error: {e}") + hint`.
-Those are layout, they are short by construction, and wrapping them would break the block
+Those are layout, they are short by construction, and wrapping them would break the layout
 they sit in.
 
 The same pass settled thirteen messages that had been spelling `Warning: ` into their own
@@ -228,7 +228,7 @@ events are out of date and this push did not cover them. Run 'workout push -d
 2026-08-27..' to update them.
 ```
 
-In the expert front-end that command is inside a `<pre>` block, which is where the
+In the expert front-end that command is inside a `<pre>` message, which is where the
 athlete copies it from. Split over two lines it cannot be copied, and a hint nobody can
 act on is not worth the line it takes. So the rule: **a command occupies whole lines or
 none.** A command longer than the width overflows rather than splits — the two cannot
@@ -325,7 +325,7 @@ this change simply gives that declaration a second meaning.
 Rev 2. §3 sorted every line into answer / warning / aside, and that held — until you
 measure the one thing it did not cover.
 
-`plan generate` echoed the whole `PRIOR TRAINING REVIEW` block to the screen before
+`plan generate` echoed the whole `PRIOR TRAINING REVIEW` section to the screen before
 calling the model: the planned-vs-actual comparison of every plan the athlete has trained
 through, with a per-sport zone table per plan. On this athlete's real database that is
 **164 lines and about 1,900 words**, and re-laid-out at Telegram's 48 columns it becomes
@@ -339,7 +339,7 @@ line you skim past; 164 of them is a scroll past. A terminal reader loses the an
 the top of the screen just as surely as a phone reader loses it below the fold. So this
 one is off on **both** front-ends by default, which no aside is.
 
-It is also not free to produce. The block is built twice when shown — once at prompt
+It is also not free to produce. The section is built twice when shown — once at prompt
 width for the model, once re-laid-out at the terminal's width, because the zone tables are
 column-aligned and re-wrapping shreds the columns rather than fitting them
 (`DESIGN_intensity_distribution.md` §6). Off the flag, that second full pass over the same
@@ -361,12 +361,12 @@ shared `llm_debug_parser`: `plan generate` is the only command that echoes promp
 and a flag accepted by five commands that ignore it is worse than a flag on one. Move it
 there when a second command has something to show.
 
-Left behind in its place is a one-line aside naming the flag, so the block is discoverable
+Left behind in its place is a one-line aside naming the flag, so the section is discoverable
 rather than merely gone.
 
 ### 7.3 Flushing before the wait
 
-Hiding the block fixes the terminal. Chat needs one more thing: `trainmate_bot._drive`
+Hiding the section fixes the terminal. Chat needs one more thing: `trainmate_bot._drive`
 buffers stdout and flushes at a photo, a button row, a prompt, or exit — so with
 `--show-llm-context` the 321 lines and the strategy arrive **in the same message**, after
 a wait of tens of seconds, which is exactly the shape §1 set out to kill.
@@ -385,7 +385,7 @@ it stands. Three details:
 - **It lives in `openrouter.complete()`**, immediately before the POST — not next to the
   print it was added for. That is the one point where every LLM command is about to go
   quiet, so all six get it, and the flush covers warnings printed before the call as well
-  as the context block. An empty buffer flushes to nothing, so the extra markers cost
+  as the printed context. An empty buffer flushes to nothing, so the extra markers cost
   nothing on a quiet run.
 
 An old bot build against a new CLI is safe by construction: `_drive` already drops

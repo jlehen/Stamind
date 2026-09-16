@@ -8,7 +8,7 @@ from trainmate import plan_diff
 from trainmate.adherence import planned_load
 from trainmate.util import (
     aside, step, bold, green, red, yellow, cyan, blue, magenta, gray, cmd, visible_len,
-    pad_visible, wrap_text, format_labeled_block, default_wrap_width, fmt_date, fmt_span,
+    pad_visible, wrap_text, format_labeled_paragraph, default_wrap_width, fmt_date, fmt_span,
     today_date as _today_date, notice, warn,
 )
 from trainmate.cli import staleness
@@ -273,7 +273,7 @@ def _generate_one_plan(
 def _print_hanging(head: str, text: str, width: int, color_fn=None) -> str:
     """Prints ``text`` after ``head``, wrapped with continuation lines aligned under it.
 
-    Returns the indent string so the caller can align the block's follow-up lines
+    Returns the indent string so the caller can align the mesocycle's follow-up lines
     (dates, progress bar, prose) to the same column. A narrow client gets a plain
     2-space indent instead, since aligning under a long head leaves no usable width."""
     pad_len = visible_len(head)
@@ -287,7 +287,7 @@ def _print_hanging(head: str, text: str, width: int, color_fn=None) -> str:
 
 
 def _print_indented(text: str, pad: str, width: int, color_fn=None) -> None:
-    """Prints wrapped prose at an existing block's indent."""
+    """Prints wrapped prose at an existing mesocycle's indent."""
     for line in textwrap.wrap(text, width=max(20, width - len(pad))):
         print(pad + (color_fn(line) if color_fn else line))
 
@@ -311,7 +311,7 @@ def _print_segments(pad: str, segments: list, width: int) -> None:
 
 
 def _print_feedback_notes(notes: List[dict], width: int, indent: str = "") -> None:
-    """The log's one rendering — '[id] date · plan-level|<block> · text', oldest first —
+    """The log's one rendering — '[id] date · plan-level|<mesocycle> · text', oldest first —
     shared by the listing, `plan show` and `plan diff` (DESIGN_plan_feedback.md §4)."""
     for n in notes:
         filing = n.get('mesocycle_name') or 'plan-level'
@@ -439,7 +439,7 @@ def _print_considered_inputs(macrocycle: dict) -> None:
 
 
 def _fmt_duration(minutes: float) -> str:
-    """'8h20' / '45min' for a workout-block total."""
+    """'8h20' / '45min' for the total duration of a mesocycle's workouts."""
     if minutes >= 60:
         return f"{int(minutes // 60)}h{int(minutes % 60):02d}"
     return f"{int(minutes)}min"
@@ -569,7 +569,7 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
         [magenta(sport_str), cyan(fmt_date(next_goal['target_date']))],
         width,
     )
-    print(format_labeled_block(f"{bold('Macrocycle Strategy')}:", macrocycle['strategy']))
+    print(format_labeled_paragraph(f"{bold('Macrocycle Strategy')}:", macrocycle['strategy']))
     print()
     _print_plan_feedback(macrocycle, width)
     _print_considered_inputs(macrocycle)
@@ -725,7 +725,7 @@ def _print_change(marker: str, text: str, width: int, color_fn, indent: str = " 
 def _print_prose_diff(
     prose: dict, width: int, full: bool, indent: str = "  "
 ) -> None:
-    """Renders a `plan_diff.diff_prose` result. A block the coach rewrote wholesale
+    """Renders a `plan_diff.diff_prose` result. A strategy `plan generate` rewrote wholesale
     collapses to a one-line note unless `full` — the sentence lists would otherwise just
     reprint both versions in their entirety."""
     if not prose['changed']:
@@ -737,15 +737,15 @@ def _print_prose_diff(
             f"pass --full for the sentence-level diff", width, yellow, indent=indent,
         )
         return
-    for block in prose['blocks']:
-        for s in block['removed']:
+    for group in prose['groups']:
+        for s in group['removed']:
             _print_change("-", s, width, red, indent=indent)
-        for s in block['added']:
+        for s in group['added']:
             _print_change("+", s, width, green, indent=indent)
 
 
 def _print_mesocycles_diff(entries: list, width: int, full: bool) -> None:
-    """Renders a `plan_diff.diff_mesocycles` result, skipping untouched blocks."""
+    """Renders a `plan_diff.diff_mesocycles` result, skipping untouched mesocycles."""
     changed = [e for e in entries if e['change'] != 'unchanged']
     if not changed:
         print(f"  {gray('unchanged')}")
@@ -1140,7 +1140,7 @@ def run_plan_feedback(args: argparse.Namespace) -> None:
         return
 
     # `-g` picks the plan, `-m` resolves inside it: filing to a superseded version cannot
-    # steer the next one, so the atom only ever sees the active plan's blocks (§5).
+    # steer the next one, so the atom only ever sees the active plan's mesocycles (§5).
     meso = None
     if args.meso is not None:
         try:
@@ -1195,7 +1195,7 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     p_gen.add_argument(
         "--fresh", action="store_true",
         help=(
-            "Clean slate: don't show the coach the plan currently in place, so the new "
+            "Clean slate: don't show the model the plan currently in place, so the new "
             "strategy is not asked to continue it (implies --force). Your training "
             "history and plan feedback still feed in."
         )
@@ -1211,7 +1211,7 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     p_gen.add_argument(
         "--show-llm-context", action="store_true", dest="show_llm_context",
         help="Also print the planned-vs-actual review of your past plans that goes to "
-             "the coach as prompt context. Off by default: it is long, and it pushes "
+             "the model as prompt context. Off by default: it is long, and it pushes "
              "the new strategy below the fold"
     )
     p_gen.add_argument(
@@ -1333,7 +1333,7 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         description=(
             "Delete every periodization plan version a goal owns — superseded ones "
             "included, so the goal is left with no plan history at all. Its mesocycle "
-            "blocks and plan feedback go with them, and upcoming sessions are left "
+            "mesocycles and plan feedback go with them, and upcoming sessions are left "
             "behind with no plan to explain them. The inventory is shown before "
             f"anything is deleted. Use '{green('plan generate --force')}' to replace a "
             f"plan reversibly, or '{green('plan rollback')}' to step back one "
@@ -1384,7 +1384,7 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             "accumulate against the active plan — a second thought adds to the first "
             "rather than replacing it — and are consumed when a new version supersedes "
             "the one they were written against. Bare text is plan-level; -m files the "
-            "note to one block, by name, date or ID. A bare run lists what is pending; "
+            "note to one mesocycle, by name, date or ID. A bare run lists what is pending; "
             "nothing here calls the LLM, so capture is instant."
         )
     )
@@ -1397,9 +1397,9 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     )
     p_fb.add_argument(
         "-m", "--mesocycle", dest="meso", nargs="?", const=CURRENT, metavar="ATOM",
-        help="File the note to ONE block: its name (any part of it), a date it covers "
+        help="File the note to ONE mesocycle: its name (any part of it), a date it covers "
              "(YYYY-MM-DD, today, -7d, +2w) or its mesocycle ID. Bare -m is the current "
-             "block; without -m the note is plan-level"
+             "mesocycle; without -m the note is plan-level"
     )
     p_fb.add_argument(
         "-g", "--goal", "--goal-id", type=int, dest="goal_id",

@@ -202,7 +202,7 @@ class TestCliData(unittest.TestCase):
 
         learning_id = test_db.add_learning(
             "Long-run durability is the limiter: pace decays sharply beyond 90 minutes "
-            "even at conversational effort, consistently across the last three blocks."
+            "even at conversational effort, consistently across the last three mesocycles."
         )
         result = {
             "inferred_macrocycle": {
@@ -224,7 +224,7 @@ class TestCliData(unittest.TestCase):
                 "estimated_consistency": "High",
             }],
             "physiological_insights": [
-                "Aerobic decoupling on long runs fell from 8% to 4% over the block, which "
+                "Aerobic decoupling on long runs fell from 8% to 4% over the mesocycle, which "
                 "points to genuine durability gains rather than pacing discipline alone.",
             ],
             "learning_updates": [
@@ -254,7 +254,7 @@ class TestCliData(unittest.TestCase):
                 self.assertLessEqual(visible_len(line), int(width), msg=repr(line))
 
     def test_unreadable_learning_deltas_are_shown_not_silently_dropped(self):
-        """The kimi-k3 shape: every delta key prefixed, so no op is recognized. The block
+        """The kimi-k3 shape: every delta key prefixed, so no op is recognized. The section
         must not render empty under a 'Saved to learnings' header
         (DESIGN_backward_evaluation.md §13)."""
         from trainmate.cli.data import _render_analysis_report
@@ -309,35 +309,35 @@ class TestCliData(unittest.TestCase):
     def test_data_show_analysis_renders_the_stored_reconstruction(self):
         # Read-only: renders the stored slot, names where it came from, and never
         # reaches the coach service (no LLM call, unlike bootstrap --inspect-only).
-        self._seed_reconstruction("long", "Base Block", "2026-01-01", "2026-03-31")
+        self._seed_reconstruction("long", "Base Mesocycle", "2026-01-01", "2026-03-31")
         with patch("trainmate.runtime.coach_service") as mock_coach:
             exit_code, stdout, stderr = self.run_cli(["data", "show-analysis"])
         self.assertEqual(exit_code, 0)
         self.assertIn("data bootstrap", stdout)
         self.assertIn("window 2026-01-01 to 2026-03-31", stdout)
-        self.assertIn("Base Block", stdout)
-        self.assertIn("Base Block insight", stdout)
+        self.assertIn("Base Mesocycle", stdout)
+        self.assertIn("Base Mesocycle insight", stdout)
         mock_coach.data_bootstrap.assert_not_called()
 
     def test_data_show_analysis_alias_and_short_horizon(self):
         # The two slots are separately addressable; `san` reaches the same command.
-        self._seed_reconstruction("long", "Base Block", "2026-01-01", "2026-03-31")
+        self._seed_reconstruction("long", "Base Mesocycle", "2026-01-01", "2026-03-31")
         self._seed_reconstruction("short", "Recent Week", "2026-04-01", "2026-04-07")
 
         exit_code, stdout, stderr = self.run_cli(["data", "san"])
         self.assertEqual(exit_code, 0)
-        self.assertIn("Base Block", stdout)
+        self.assertIn("Base Mesocycle", stdout)
 
         exit_code, stdout, stderr = self.run_cli(["data", "show-analysis", "--short"])
         self.assertEqual(exit_code, 0)
         self.assertIn("data reflect", stdout)
         self.assertIn("Recent Week", stdout)
-        self.assertNotIn("Base Block", stdout)
+        self.assertNotIn("Base Mesocycle", stdout)
 
     def test_data_show_analysis_flags_evidence_the_slot_predates(self):
         # The slot is only refreshed by a re-run, so activities past its window are
         # absent from the picture; silence there would read as "this is current".
-        self._seed_reconstruction("long", "Base Block", "2026-01-01", "2026-03-31")
+        self._seed_reconstruction("long", "Base Mesocycle", "2026-01-01", "2026-03-31")
         test_db.save_completed_activity(
             activity_id="act_after", date="2026-04-02", start_time="10:00",
             activity_name="Ride", activity_type="cycling", duration_sec=3600,

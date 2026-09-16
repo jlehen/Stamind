@@ -174,7 +174,7 @@ class PromptConfigMixin:
     def _get_science_snapshot(self) -> str:
         """JSON of the athlete's science documents, {filename: text}, persisted on the
         macrocycle so config_changed() can name the file that moved and show the edit
-        (DESIGN_plan_staleness.md §11). The text itself, not a hash: the coach's verdict
+        (DESIGN_plan_staleness.md §11). The text itself, not a hash: the verdict call
         reads the diff, and the prompt already carries these files on every call."""
         return json.dumps(athlete_science_documents(), sort_keys=True)
 
@@ -238,7 +238,7 @@ class PromptConfigMixin:
 
         EVERY reason is collected, not the first one found. Returning early let a profile
         edit swallow a concurrent threshold move: `plan show` named one of them, the
-        coach's verdict never learned about the other, and `plan keep` stamped both away.
+        verdict call never learned about the other, and `plan keep` stamped both away.
         """
         reasons: List[str] = []
         if macro.get('config_hash') != self.engine._get_config_hash():
@@ -331,7 +331,7 @@ class PromptConfigMixin:
         constraints: List[Dict[str, Any]],
         objectives: Optional[List[Objective]] = None,
         objective_id: Optional[int] = None,
-        blocks: Optional[List[Dict[str, Any]]] = None,
+        mesocycles: Optional[List[Dict[str, Any]]] = None,
     ) -> CoachContext:
         """Assembles the shared context every prompt builder needs.
 
@@ -340,7 +340,7 @@ class PromptConfigMixin:
         differs — adaptation asks for the adaptation range, generation for the
         generation window — and that difference is deliberate.
 
-        `blocks` is the date-keyed path (DESIGN_cli_selectors.md §8): a caller that has
+        `mesocycles` is the date-keyed path (DESIGN_cli_selectors.md §8): a caller that has
         already resolved which mesocycles govern its window takes its strategy text from
         those, rather than from whichever macrocycle a goal points at. Generation uses it;
         planning and adaptation still name a goal.
@@ -348,7 +348,7 @@ class PromptConfigMixin:
         if objectives is None:
             objectives = self._db.upcoming_objectives()
         strategy, meso_text = (
-            self.strategy_text_for_blocks(blocks) if blocks is not None
+            self.strategy_text_for_mesocycles(mesocycles) if mesocycles is not None
             else self._get_active_strategy_and_meso_text(
                 objectives, objective_id=objective_id
             )
@@ -391,16 +391,16 @@ class PromptConfigMixin:
             meso_text = "  - Not established yet."
         return strategy, meso_text
 
-    def strategy_text_for_blocks(self, blocks: List[Dict[str, Any]]) -> Tuple[str, str]:
-        """Renders (strategy, meso_text) for a window's governing blocks.
+    def strategy_text_for_mesocycles(self, mesocycles: List[Dict[str, Any]]) -> Tuple[str, str]:
+        """Renders (strategy, meso_text) for a window's governing mesocycles.
 
-        Each governing plan's blocks are listed in full, not just the ones the window
-        touches: how a block is written depends on what follows it, so the coach still
+        Each governing plan's mesocycles are listed in full, not just the ones the window
+        touches: how a mesocycle is written depends on what follows it, so the week planner still
         needs to see the ones past the horizon. The covered ones are marked so it no
-        longer has to infer which blocks the span falls in from the dates alone.
+        longer has to infer which mesocycles the span falls in from the dates alone.
         """
         macro_ids: List[int] = []
-        for b in blocks:
+        for b in mesocycles:
             if b['macrocycle_id'] not in macro_ids:
                 macro_ids.append(b['macrocycle_id'])
         if not macro_ids:
@@ -410,7 +410,7 @@ class PromptConfigMixin:
                 "  - Not established yet.",
             )
 
-        covered = {b['id'] for b in blocks}
+        covered = {b['id'] for b in mesocycles}
         multi = len(macro_ids) > 1
         strategy_parts: List[str] = []
         meso_parts: List[str] = []
@@ -433,16 +433,16 @@ class PromptConfigMixin:
                     f"  {mark} {m['name']} ({m['start_date']} to "
                     f"{m['end_date']}): {m['focus']}"
                 )
-        # "this window", not "this generation window": callers that pass `blocks=`
+        # "this window", not "this generation window": callers that pass `mesocycles=`
         # reach this same assembler and generate nothing.
         meso_parts.append(
-            "  ('>' marks the blocks this window falls in; '-' blocks are "
+            "  ('>' marks the mesocycles this window falls in; '-' mesocycles are "
             "context, outside it.)"
         )
         return "\n\n".join(strategy_parts), "\n".join(meso_parts) + "\n"
 
     def _get_learnings_text(self) -> str:
-        """Renders active athlete observations as a tagged block for prompts. Each line is
+        """Renders active athlete observations as tagged lines for prompts. Each line is
         `[id|sports|confidence] text`. Dormant (decayed) and archived observations are
         omitted, so stale notes stop influencing planning until reaffirmed or restored."""
         learnings = [

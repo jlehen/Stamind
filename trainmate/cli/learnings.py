@@ -5,7 +5,7 @@ from typing import Optional
 from trainmate import runtime
 from trainmate.learning_doubts import contradiction_reasons
 from trainmate.util import (
-    bold, green, red, yellow, cyan, magenta, gray, cmd, fmt_timestamp, format_labeled_block,
+    bold, green, red, yellow, cyan, magenta, gray, cmd, fmt_timestamp, format_labeled_paragraph,
     format_labeled_text, notice,
 )
 
@@ -31,11 +31,11 @@ def _print_learning(l: dict) -> None:
         # Kept on record but no longer fed to the coach until restored or reaffirmed.
         state = "archived" if l.get("archived") else "dormant"
         tag = f"  [{l['id']}|{sports_str}|{conf_str}]"
-        print(format_labeled_block(gray(tag), gray(f"{l['text']} ({state})")))
+        print(format_labeled_paragraph(gray(tag), gray(f"{l['text']} ({state})")))
     else:
         conf_disp = _confidence_color(conf_str)(conf_str)
         tag = f"  [{cyan(str(l['id']))}|{magenta(sports_str)}|{conf_disp}]"
-        print(format_labeled_block(tag, l['text']))
+        print(format_labeled_paragraph(tag, l['text']))
 
     # Pending, human-confirmable confidence downgrade (resolve with 'learnings demote'/'keep'
     # here, or through the question the reflect run queued for the athlete).

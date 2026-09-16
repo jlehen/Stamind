@@ -6,7 +6,7 @@ Running a command with no arguments does different things depending on the
 command: some act (`workout list`), some preview-then-confirm (`workout adapt`),
 and some refuse because they need a target (`workout swap`). Each is defensible
 alone, but the mix is unpredictable until learned, and the "refuse" case used to
-answer with argparse's bare usage block, which names the missing argument
+answer with argparse's bare usage text, which names the missing argument
 without saying what belongs in it.
 
 ## The convention
@@ -36,7 +36,7 @@ defaulting mutator safe, so those commands act rather than refuse.
 `WrapAwareArgumentParser.error` (trainmate/cli/argparse_ext.py) intercepts the
 argparse "the following arguments are required: …" message and answers it with
 the command's own `-h` output, followed by that line — last, where the eye lands
-after a block of text and where the shell prompt puts it next to what you type.
+after a screen of text and where the shell prompt puts it next to what you type.
 
 Pointing at `-h` was enough while the mandatory fields were named flags: the
 message said `--reason` and that *was* the answer. Now that mandatory means
@@ -46,12 +46,12 @@ already answers. Printing it beats making the athlete re-type the command to get
 it, and the case is narrow enough not to be noisy: it fires only when arguments
 are missing outright.
 
-Every other error (bad choice, bad value) keeps argparse's short usage block —
+Every other error (bad choice, bad value) keeps argparse's short usage text —
 there the shape is already known and only one token is wrong.
 
 **The exception is chat.** All of this goes to stderr, which the bot merges into
 stdout, so whatever the terminal prints the athlete reads as a message — and a
-help block that costs a scroll in a terminal costs a screenful of chat (37 lines
+help text that costs a scroll in a terminal costs a screenful of chat (37 lines
 for a forgotten `constraint add` title, at the bot's ~48-col wrap). So under
 `TRAINMATE_FRONTEND=json` the error keeps its older, shorter shape: the missing
 line plus a pointer to the `-h` the athlete can ask for on its own. The medium
@@ -103,7 +103,7 @@ This is *not* §a's path. The sub-command is registered as an optional argument,
 so argparse never raises "the following arguments are required" and the parser
 override never fires: there is no missing line to print, and none of §a's chat
 short form either. Under `TRAINMATE_FRONTEND=json` a bare `goal` therefore sends
-the whole help block to chat — the screenful §a exists to avoid.
+the whole help text to chat — the screenful §a exists to avoid.
 
 That is deliberate, because the two cases differ in what the athlete asked for. A
 leaf command with a missing argument already knows what you wanted; the help is a
@@ -139,7 +139,7 @@ resolves — the workouts table holds no foreign key, by design, so a session
 outlives its plan. (Plain `goal rm` calls the goal off and destroys nothing, so it
 is not a §b1 command at all — DESIGN_backward_evaluation.md §14.5.)
 
-Both therefore print the inventory first — versions, blocks, notes, and the count
+Both therefore print the inventory first — versions, mesocycles, notes, and the count
 of upcoming sessions left stranded — then a dimmed pointer at the reversible
 alternative, and only then the confirm, which defaults to **no** so piped stdin
 and cron decline rather than proceed. `-y` skips it for scripted use. They differ
@@ -276,7 +276,7 @@ ran past the edge, on a real terminal as well as in chat.
 **Descriptions.** The formatter inherited `RawDescriptionHelpFormatter`, which
 prints a description verbatim. Ours are single-line prose strings — one command's
 summary reached 500 characters on one line, leaving the terminal to soft-wrap it
-into a ragged block. They are now wrapped one blank-line-separated paragraph at a
+into a ragged paragraph. They are now wrapped one blank-line-separated paragraph at a
 time (`_fill_text`): prose re-flows, and a description that deliberately breaks
 into paragraphs (`benchmark record`'s Garmin warning) keeps those breaks. That
 also retires the one parser that had opted out of the formatter to protect them.

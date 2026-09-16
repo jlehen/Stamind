@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS sync_state (
 *Rev. 2 — the table went multi-tenant.* It was designed for one row but the `key` column
 did its job: four sources now share it — `garmin` (this design), `calendar_signals`
 (DESIGN_calendar_signal_ingest.md, the only user of the added `sync_token` column),
-`reflect` and `bootstrap` (the coach's analysis watermarks). Each source owns a key and
+`reflect` and `bootstrap` (the analysis calls' watermarks). Each source owns a key and
 leaves the columns it doesn't use NULL. Accessors are
 `db.get_sync_state(key="garmin")` / `db.set_sync_state(through_date, last_pull_utc,
 key="garmin", sync_token=None)`.
@@ -327,7 +327,7 @@ Cold start uses `garmin_initial_backfill_days` (default 90) to compute the
 suggested range.
 
 This policy also keeps the **automatic** path to small forward pulls only — which
-is why MFA never blocks it (§11).
+is why MFA never stops it (§11).
 
 ---
 
@@ -515,7 +515,7 @@ Each gets a typed accessor on `Config` alongside the existing properties.
 > syncs too, so it isn't Garmin's) — that one line rev. 1 got right. The confusion is
 > easy to inherit because the Python *accessors* kept the flat names —
 > `config.garmin_mutable_days` reads `garmin: mutable_days:` — so code and config do not
-> spell these the same way. Copying rev. 1's block into `config.yaml` produces no error
+> spell these the same way. Copying rev. 1's section into `config.yaml` produces no error
 > and no effect: unknown top-level keys are ignored and every knob silently stays at its
 > default. `hr_zone_coverage_min` and the other load-model knobs live under `garmin:` too.
 

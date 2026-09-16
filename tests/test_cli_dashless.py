@@ -174,7 +174,7 @@ class TestCommandPrefixResolution(unittest.TestCase):
             self._xlate("progress running cycling weeks 4"),
             ["progress", "running", "cycling", "--weeks", "4"],
         )
-        self.assertEqual(self._xlate("progress blocks"), ["progress", "--blocks"])
+        self.assertEqual(self._xlate("progress mesocycles"), ["progress", "--mesocycles"])
 
     def test_option_keywords_win_over_command_prefixes(self):
         # 'help' is a real top-level command; 'helpall' is a root flag whose exact

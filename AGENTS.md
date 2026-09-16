@@ -10,6 +10,11 @@
 - Test every sentence with "does this need the doc or the code open to follow?"
 - A **plan** is the periodization: the macrocycle and its mesocycles. Sessions are
   "sessions", "workouts" or "the schedule", never "the plan".
+- Say **mesocycle**, never "block". A **session** is planned; an **activity** is what Garmin
+  recorded. Name the model call, never "the planner" or "the call": the **week
+  planner** is the call inside `workout generate` and `workout adapt` that writes the sessions,
+  the **strength planner** is the call that writes a strength session. "The coach" is TrainMate
+  speaking to the athlete, whichever call wrote the words.
 - Never say "regeneration" or "generate" bare. Say `plan generate` (writes the
   periodization) or `workout generate` (writes the sessions). They are a chain, so an
   ambiguous word makes a finding about one read as a finding about the other.
@@ -74,7 +79,7 @@
   quoted verbatim. Names stay ALL CAPS, no trailing colon. See
   designs/DESIGN_prompt_structure.md before adding a section (every design doc lives
   under designs/).
-- Prefer early exits — `continue`, `return`, `raise` — over nesting a block
+- Prefer early exits — `continue`, `return`, `raise` — over nesting code
   inside a conditional. This is about removing *indentation levels*, not about
   removing *lines*: never compress a branch into a conditional expression to
   save one. Two plain four-line branches beat one dense ternary, and a ternary

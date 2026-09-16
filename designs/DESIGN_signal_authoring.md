@@ -68,7 +68,7 @@ signal add METRIC [TEXT] [-d RANGE] [--value N] [-l LABEL]
 ```
 - `-d` takes the shared selector grammar (DESIGN_cli_selectors.md), defaulting to
   **today**; it must stay bounded, since an open-ended range has no last day to
-  write. No `-m`/`-M` here: a signal spans days, not blocks. One **all-day event
+  write. No `-m`/`-M` here: a signal spans days, not mesocycles. One **all-day event
   per day** in the range —
   one event ⇒ one `daily_signals` row, so it round-trips through the existing
   per-day ingest with zero schema change.
@@ -117,8 +117,8 @@ signal rm [METRIC] [-d RANGE] [-m|-M|-g RANGE] [--metric M] [-y]
 signal list [METRIC] [-d RANGE] [-m|-M|-g RANGE]
 ```
 - Defaults to the last `config.metrics_lookback_days` days when unbounded (15
-  by default) — the **same window the coach reads signals over** in the analysis
-  path, so `list` shows what the coach sees, from one config knob. The positional
+  by default) — the **same window the analysis call reads signals over** in the analysis
+  path, so `list` shows what the analysis call sees, from one config knob. The positional
   `METRIC` (or `--metric`) filters. Prints `id · date · metric · value · text`.
 
 ### `signal list-metrics` (`lm`)

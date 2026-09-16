@@ -1,5 +1,5 @@
-"""The mid-block progress section of the `workout generate` prompt
-(DESIGN_block_progress.md)."""
+"""The mid-mesocycle progress section of the `workout generate` prompt
+(DESIGN_mesocycle_progress.md)."""
 import os
 import unittest
 from unittest.mock import patch
@@ -21,15 +21,15 @@ rebind_test_db(test_db)
 from trainmate import intensity
 from trainmate.coach import coach_service
 from trainmate.coach.engine.workouts import (
-    _block_composition_task, _block_progress_task,
+    _mesocycle_composition_task, _mesocycle_progress_task,
 )
 
 # Build 1 runs Monday 2026-07-06 through Sunday 2026-08-02 — four whole weeks, so the
-# Monday-week buckets line up with the block and no edge week is partial by accident.
-BLOCK_START, BLOCK_END = "2026-07-06", "2026-08-02"
+# Monday-week buckets line up with the mesocycle and no edge week is partial by accident.
+MESOCYCLE_START, MESOCYCLE_END = "2026-07-06", "2026-08-02"
 
 
-class TestBlockProgressContext(unittest.TestCase):
+class TestMesocycleProgressContext(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if os.path.exists(TEST_DB_PATH):
@@ -49,10 +49,10 @@ class TestBlockProgressContext(unittest.TestCase):
 
     def setUp(self):
         clear_all_tables(test_db)
-        self.macro_id = self._block()
+        self.macro_id = self._mesocycle()
 
     @staticmethod
-    def _block(start: str = BLOCK_START, end: str = BLOCK_END) -> int:
+    def _mesocycle(start: str = MESOCYCLE_START, end: str = MESOCYCLE_END) -> int:
         obj_id = test_db.add_objective(
             title="Gran Fondo", target_date="2026-10-15",
             sport_type="cycling",
@@ -68,7 +68,7 @@ class TestBlockProgressContext(unittest.TestCase):
     @staticmethod
     def _context(as_of: str, gen_start: str):
         """Just the rendered text — the `has_intensity` gate has its own tests below."""
-        return coach_service._block_progress_context(as_of, gen_start)[0]
+        return coach_service._mesocycle_progress_context(as_of, gen_start)[0]
 
     def _planned(self, date: str, tss: float, **kwargs) -> int:
         return save_workout(test_db,
@@ -97,22 +97,22 @@ class TestBlockProgressContext(unittest.TestCase):
 
     # ------------------------------------------------------------------ gating
 
-    def test_none_when_the_block_has_not_started(self):
-        """gen_start on the block's first day: generate is writing the whole block, so
+    def test_none_when_the_mesocycle_has_not_started(self):
+        """gen_start on the mesocycle's first day: generate is writing the whole mesocycle, so
         there is no fulfilled part to continue from."""
         self.assertIsNone(
-            self._context(BLOCK_START, BLOCK_START)
+            self._context(MESOCYCLE_START, MESOCYCLE_START)
         )
 
-    def test_none_when_today_falls_outside_every_block(self):
-        """`get_active_mesocycle` falls back to a future/first block, which would describe
+    def test_none_when_today_falls_outside_every_mesocycle(self):
+        """`get_active_mesocycle` falls back to a future/first mesocycle, which would describe
         training that never happened — so the guard must reject it."""
         self.assertIsNone(
             self._context("2026-06-01", "2026-06-01")
         )
 
     def test_none_when_the_elapsed_part_holds_no_data(self):
-        """A block under way but with nothing recorded yet renders no section rather than a
+        """A mesocycle under way but with nothing recorded yet renders no section rather than a
         bare header."""
         self.assertIsNone(
             self._context("2026-07-22", "2026-07-22")
@@ -157,20 +157,20 @@ class TestBlockProgressContext(unittest.TestCase):
             max(text.splitlines(), key=len),
         )
 
-    def test_a_week_the_block_straddles_is_flagged_incomparable(self):
-        """A block starting mid-week compares a part-week of plan against a whole week of
+    def test_a_week_the_mesocycle_straddles_is_flagged_incomparable(self):
+        """A mesocycle starting mid-week compares a part-week of plan against a whole week of
         training, and no honest percentage comes from that pair."""
         clear_all_tables(test_db)
-        # Block starts on a Wednesday, so its first Monday-week is only partly its own.
-        self.macro_id = self._block(start="2026-07-08", end="2026-08-02")
+        # Mesocycle starts on a Wednesday, so its first Monday-week is only partly its own.
+        self.macro_id = self._mesocycle(start="2026-07-08", end="2026-08-02")
         self._planned("2026-07-09", 100.0)
         self._done("2026-07-09", 100.0, "a")
-        self._done("2026-07-06", 90.0, "before-the-block")
+        self._done("2026-07-06", 90.0, "before-the-mesocycle")
         self._planned("2026-07-14", 100.0)
         self._done("2026-07-14", 100.0, "b")
         text = self._context("2026-07-22", "2026-07-22")
         self.assertIn("week of 2026-07-06", text)
-        self.assertIn("[block covers only part of this week]", text)
+        self.assertIn("[mesocycle covers only part of this week]", text)
         # The whole-week that follows is comparable and carries no flag.
         self.assertIn("week of 2026-07-13: planned 100, actual 100 (100%)", text)
 
@@ -189,7 +189,7 @@ class TestBlockProgressContext(unittest.TestCase):
         self.assertNotIn("210", text)
 
     def test_a_week_the_plan_never_covered_says_so(self):
-        """Training inside the block on days no plan spoke for is informational, matching
+        """Training inside the mesocycle on days no plan spoke for is informational, matching
         `adherence.py`'s precedent — it must not read as 0% adherence."""
         self._two_weeks_trained()
         # An unplanned week 3 session, with no planned row anywhere in that week.
@@ -221,7 +221,7 @@ class TestBlockProgressContext(unittest.TestCase):
             value=271, unit="W", workout_id=wid,
         )
         text = self._context("2026-07-22", "2026-07-22")
-        self.assertIn("Fitness tests this block has already run:", text)
+        self.assertIn("Fitness tests this mesocycle has already run:", text)
         self.assertIn("2026-07-15: ftp_20min (cycling)", text)
         self.assertIn("Functional Threshold Power (FTP) 271 W", text)
 
@@ -257,13 +257,13 @@ class TestBlockProgressContext(unittest.TestCase):
         self.assertNotIn("ftp_20min", text)
 
 
-class TestBlockCompositionContext(unittest.TestCase):
-    """The intensity half — §9.2a's amendment: generate is the periodization consumer, so
-    it gets the measured distribution, what was prescribed, and the block-over-block delta."""
+class TestMesocycleCompositionContext(unittest.TestCase):
+    """The intensity half — §9.2a's amendment: generate is the periodization consumer, so it
+    gets the measured distribution, what was prescribed, and the mesocycle-over-mesocycle delta."""
 
-    setUpClass = TestBlockProgressContext.setUpClass
-    tearDownClass = TestBlockProgressContext.tearDownClass
-    _done = TestBlockProgressContext._done
+    setUpClass = TestMesocycleProgressContext.setUpClass
+    tearDownClass = TestMesocycleProgressContext.tearDownClass
+    _done = TestMesocycleProgressContext._done
 
     def setUp(self):
         clear_all_tables(test_db)
@@ -275,7 +275,7 @@ class TestBlockCompositionContext(unittest.TestCase):
             mesocycles=[
                 {"name": "Base 3", "start_date": "2026-06-08", "end_date": "2026-07-05",
                  "focus": "aerobic volume"},
-                {"name": "Build 1", "start_date": BLOCK_START, "end_date": BLOCK_END,
+                {"name": "Build 1", "start_date": MESOCYCLE_START, "end_date": MESOCYCLE_END,
                  "focus": "threshold development"},
             ],
         )
@@ -309,7 +309,7 @@ class TestBlockCompositionContext(unittest.TestCase):
 
     def test_measured_and_prescribed_tables_sit_side_by_side(self):
         self._two_weeks_zoned()
-        text, has_intensity = coach_service._block_progress_context(
+        text, has_intensity = coach_service._mesocycle_progress_context(
             "2026-07-22", "2026-07-22"
         )
         self.assertTrue(has_intensity)
@@ -317,32 +317,32 @@ class TestBlockCompositionContext(unittest.TestCase):
         self.assertIn("What the plan PRESCRIBED over the same weeks", text)
         # Both halves of the section are present: the zone tables and the week loads.
         self.assertIn("Weeks already trained", text)
-        # Exactly one header — block_report's stands in for the section's own.
+        # Exactly one header — mesocycle_report's stands in for the section's own.
         self.assertEqual(text.count('focus "threshold development"'), 1)
 
-    def test_the_preceding_block_supplies_the_periodization_delta(self):
+    def test_the_preceding_mesocycle_supplies_the_periodization_delta(self):
         self._two_weeks_zoned()
-        # Four whole weeks of easy work in the block before this one.
+        # Four whole weeks of easy work in the mesocycle before this one.
         for i, date in enumerate(
             ("2026-06-09", "2026-06-11", "2026-06-16", "2026-06-18",
              "2026-06-23", "2026-06-25", "2026-06-30", "2026-07-02")
         ):
             self._zoned(date, [900, 4200, 600, 120, 0], f"p{i}")
-        text, _ = coach_service._block_progress_context("2026-07-22", "2026-07-22")
+        text, _ = coach_service._mesocycle_progress_context("2026-07-22", "2026-07-22")
         self.assertIn("Change vs Base 3", text)
 
-    def test_no_delta_when_the_block_is_the_first_of_its_plan(self):
+    def test_no_delta_when_the_mesocycle_is_the_first_of_its_plan(self):
         clear_all_tables(test_db)
         obj_id = test_db.add_objective(
             title="Gran Fondo", target_date="2026-10-15", sport_type="cycling",
         )
         self.macro_id = test_db.save_macrocycle(
             objective_id=obj_id, strategy="Build", goals_hash="g", constraints_hash="c",
-            mesocycles=[{"name": "Build 1", "start_date": BLOCK_START,
-                         "end_date": BLOCK_END, "focus": "threshold development"}],
+            mesocycles=[{"name": "Build 1", "start_date": MESOCYCLE_START,
+                         "end_date": MESOCYCLE_END, "focus": "threshold development"}],
         )
         self._two_weeks_zoned()
-        text, _ = coach_service._block_progress_context("2026-07-22", "2026-07-22")
+        text, _ = coach_service._mesocycle_progress_context("2026-07-22", "2026-07-22")
         self.assertNotIn("Change vs", text)
 
     def test_has_intensity_is_false_without_zone_recordings(self):
@@ -351,7 +351,7 @@ class TestBlockCompositionContext(unittest.TestCase):
         for i, date in enumerate(("2026-07-07", "2026-07-14")):
             self._prescribed(date, [600, 2400, 300, 1200, 0])
             self._done(date, 100.0, f"bare{i}")
-        text, has_intensity = coach_service._block_progress_context(
+        text, has_intensity = coach_service._mesocycle_progress_context(
             "2026-07-22", "2026-07-22"
         )
         self.assertIsNotNone(text)
@@ -360,86 +360,86 @@ class TestBlockCompositionContext(unittest.TestCase):
 
     def test_prompt_width_is_respected_across_the_whole_section(self):
         self._two_weeks_zoned()
-        text, _ = coach_service._block_progress_context("2026-07-22", "2026-07-22")
+        text, _ = coach_service._mesocycle_progress_context("2026-07-22", "2026-07-22")
         for line in text.splitlines():
             self.assertLessEqual(len(line), intensity.PROMPT_WIDTH, msg=repr(line))
 
 
-class TestBlockProgressReachesThePrompt(unittest.TestCase):
+class TestMesocycleProgressReachesThePrompt(unittest.TestCase):
     """The threading end to end: service -> engine -> both halves of the LLM call."""
 
     @patch("trainmate.coach.engine.openrouter_client")
-    def _prompts(self, block_progress, has_intensity, mock_client):
+    def _prompts(self, mesocycle_progress, has_intensity, mock_client):
         mock_client.complete.return_value = {"reasoning": "ok", "workouts": []}
         coach_service.engine._workout_generate_logic(
             objectives=[], constraints=[], today_str="2026-07-22", guidelines="",
             profile={}, strategy="Build", meso_text="  - Build 1", learnings="",
-            num_days=14, block_progress=block_progress,
-            block_has_intensity=has_intensity,
+            num_days=14, mesocycle_progress=mesocycle_progress,
+            mesocycle_has_intensity=has_intensity,
         )
         return mock_client.complete.call_args[0]
 
     def test_both_halves_carry_it(self):
         system, user = self._prompts("Build 1 — 2 completed weeks of 4", False)
         # The instruction rides in the system prompt's TASK...
-        self.assertIn("CONTINUING A BLOCK ALREADY UNDER WAY", system)
+        self.assertIn("CONTINUING A MESOCYCLE ALREADY UNDER WAY", system)
         # ...and the data in the user content, under the name the TASK refers to.
-        self.assertIn("BLOCK PROGRESS SO FAR", user)
+        self.assertIn("MESOCYCLE PROGRESS SO FAR", user)
         self.assertIn("Build 1 — 2 completed weeks of 4", user)
 
-    def test_a_clean_block_start_is_unchanged(self):
-        """No block progress -> neither half mentions it, so starting a block cleanly
+    def test_a_clean_mesocycle_start_is_unchanged(self):
+        """No mesocycle progress -> neither half mentions it, so starting a mesocycle cleanly
         produces the prompt it always did."""
         system, user = self._prompts(None, False)
-        self.assertNotIn("CONTINUING A BLOCK", system)
-        self.assertNotIn("BLOCK PROGRESS", user)
+        self.assertNotIn("CONTINUING A MESOCYCLE", system)
+        self.assertNotIn("MESOCYCLE PROGRESS", user)
 
     def test_composition_section_follows_the_zone_tables(self):
         """Gate discipline: the composition instructions quote the zone tables, so they
         appear only when those tables have rows."""
         without, _ = self._prompts("Build 1 — ...", False)
-        self.assertNotIn("JUDGING THE BLOCK'S COMPOSITION", without)
+        self.assertNotIn("JUDGING THE MESOCYCLE'S COMPOSITION", without)
         with_zones, _ = self._prompts("Build 1 — ...", True)
-        self.assertIn("JUDGING THE BLOCK'S COMPOSITION", with_zones)
+        self.assertIn("JUDGING THE MESOCYCLE'S COMPOSITION", with_zones)
         # Both progress sections coexist — continuity and composition are separate calls.
-        self.assertIn("CONTINUING A BLOCK ALREADY UNDER WAY", with_zones)
+        self.assertIn("CONTINUING A MESOCYCLE ALREADY UNDER WAY", with_zones)
 
     def test_the_flag_alone_cannot_conjure_the_section(self):
         """has_intensity is meaningless without the data it describes."""
         system, _ = self._prompts(None, True)
-        self.assertNotIn("JUDGING THE BLOCK'S COMPOSITION", system)
+        self.assertNotIn("JUDGING THE MESOCYCLE'S COMPOSITION", system)
 
 
-class TestBlockProgressTask(unittest.TestCase):
-    """The prompt section is gated on the data, so a clean block start is unchanged."""
+class TestMesocycleProgressTask(unittest.TestCase):
+    """The prompt section is gated on the data, so a clean mesocycle start is unchanged."""
 
     def test_absent_without_data(self):
-        self.assertEqual(_block_progress_task(None), "")
-        self.assertEqual(_block_progress_task(""), "")
+        self.assertEqual(_mesocycle_progress_task(None), "")
+        self.assertEqual(_mesocycle_progress_task(""), "")
 
     def test_names_the_data_section_and_bounds_benchmark_placement(self):
-        task = _block_progress_task("Build 1 — ...")
-        self.assertIn("BLOCK PROGRESS SO FAR", task)
+        task = _mesocycle_progress_task("Build 1 — ...")
+        self.assertIn("MESOCYCLE PROGRESS SO FAR", task)
         self.assertIn("BENCHMARK PLACEMENT", task)
         self.assertIn("deload", task)
         # Wraps at 100 like every other prompt literal (AGENTS.md).
         self.assertTrue(all(len(line) <= 100 for line in task.splitlines()))
 
     def test_composition_task_needs_both_the_data_and_the_tables(self):
-        self.assertEqual(_block_composition_task(None, True), "")
-        self.assertEqual(_block_composition_task("Build 1", False), "")
-        self.assertNotEqual(_block_composition_task("Build 1", True), "")
+        self.assertEqual(_mesocycle_composition_task(None, True), "")
+        self.assertEqual(_mesocycle_composition_task("Build 1", False), "")
+        self.assertNotEqual(_mesocycle_composition_task("Build 1", True), "")
 
     def test_composition_task_states_the_attribution_rule(self):
-        """The whole point of §9.2a: a block measuring off-focus has two opposite causes,
+        """The whole point of §9.2a: a mesocycle measuring off-focus has two opposite causes,
         and only one of them is generate's to fix."""
-        task = _block_composition_task("Build 1", True)
+        task = _mesocycle_composition_task("Build 1", True)
         self.assertIn("PRESCRIBED", task)
         # Names adapt's half, so generate does not also start rewriting prescriptions.
         self.assertIn("workout adapt", task)
-        # And refuses to reshape the block around the athlete's deviation.
+        # And refuses to reshape the mesocycle around the athlete's deviation.
         self.assertIn("rewards the drift", task)
-        # The HR caveat, so a power-less block is not judged too soft on heart rate alone.
+        # The HR caveat, so a power-less mesocycle is not judged too soft on heart rate alone.
         self.assertIn("HR-only", task)
         self.assertTrue(all(len(line) <= 100 for line in task.splitlines()))
 

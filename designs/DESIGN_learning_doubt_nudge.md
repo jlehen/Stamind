@@ -267,7 +267,7 @@ What a tap prints back is a renderer method with a companion body, the way
 really. A tap on a question whose proposal
 was settled in the meantime, by the operator or by a reflect run that reinforced the
 learning, gets the queue's "Already settled — thanks!" (§5). The expert bodies keep today's
-text and the labeled learning block.
+text and the labeled learning lines.
 
 ## 5. The queued item
 
@@ -390,7 +390,7 @@ question then closes as stale.
   the archive (§6).
 - **Showing the numbers.** The CLI's `learnings show` lists the weeks for and against.
   The companion asks about her experience instead; the weeks would be dates she cannot
-  act on. If a "why do you think so?" is ever wanted, it is a `bot` view like `bot block`,
+  act on. If a "why do you think so?" is ever wanted, it is a `bot` view like `bot mesocycle`,
   not more text in the question.
 - **Keeping the end-of-run prompt for runs someone watches.** On the operator's own instance
   it would save typing `queue answer`. On a companion instance it asks the operator about

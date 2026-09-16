@@ -116,7 +116,7 @@ class CalendarSyncer:
         end_date_str = end_date.strftime("%Y-%m-%d")
 
         # Format Summary and Description. The body is the session's CURRENT form only;
-        # every earlier form is rendered by the history block below
+        # every earlier form is rendered by the `History` section below
         # (DESIGN_calendar_lineage.md §5).
         is_manual = workout.get('source') == 'manual'
         change_kind = workout.get('change_kind')
@@ -548,7 +548,7 @@ def sync_calendar_signals(force: bool = False) -> None:
     Rides along with `data pull` (force=True) and the auto-ensure-before-read path
     (force=False, where it runs at most once per process and skips entirely while the
     last sync is still fresh). Best-effort: no calendar configured is a silent no-op,
-    and any Calendar error is swallowed with a warning so a data read never blocks
+    and any Calendar error is swallowed with a warning so a data read never stops on it
     (DESIGN_calendar_signal_ingest.md §6).
     """
     global _signals_synced

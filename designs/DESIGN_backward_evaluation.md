@@ -124,13 +124,13 @@ A **backward evaluation** is an LLM pass over past completed activities + metric
 that reconstructs/assesses what actually happened. It serves two distinct jobs
 that must not be conflated:
 
-- **Durable memory formation** — distilling general, cross-block,
+- **Durable memory formation** — distilling general, cross-mesocycle,
   decaying observations into `coach_learnings` ("responds badly to consecutive
   hard days"). Slow-moving. Owned by `data analyze` (as built: `data bootstrap` /
   `data reflect` — the *only* learnings writers).
 - **Situational assessment** — a point-in-time judgement about a *specific* past
-  period ("*this* base block did not build base"), consumed immediately by the
-  plan it informs and written to that block's `feedback`. Owned by
+  period ("*this* base mesocycle did not build base"), consumed immediately by the
+  plan it informs and written to that mesocycle's `feedback`. Owned by
   `plan generate`. **Superseded (Option A):** the assessment is real and is owned
   by `plan generate`, but it is *built and shown*, never written — it lands in the
   strategy prompt instead of in `feedback`.
@@ -272,14 +272,14 @@ absent, else recompute and `save_analysis_cache(...)`.
 
 1. `CoachService._build_prior_training_context()` → the strategy prompt (§6).
 2. `trainmate/timeline.py` → `progression.assemble_timeline()`, which draws the
-   inferred mesocycle blocks as `~`-prefixed bands wherever no planned block
+   inferred mesocycles as `~`-prefixed bands wherever no planned mesocycle
    covers the span (`progress timeline` and the web dashboard's read-only view).
    Added later by DESIGN_progress_timeline.md §6.1; the sections below that call
    the strategy prompt the *only* consumer predate it.
 3. `data show-analysis` (`san`) → `cli/data.py:_render_analysis_report`, the same
    renderer `bootstrap`/`reflect` print through. It exists because the two ways to
    *read* a stored reconstruction before it were both indirect: the timeline shows
-   block names only, and `bootstrap --inspect-only` — read-only as to writes — still
+   mesocycle names only, and `bootstrap --inspect-only` — read-only as to writes — still
    pays for a fresh LLM pass the moment the fingerprint has moved, so "show me what
    is stored" could silently become "recompute it". `--short` addresses the other
    slot. Retention being one-row-per-horizon, it reports the current picture and
@@ -300,12 +300,12 @@ absent, else recompute and `save_analysis_cache(...)`.
 The single most valuable planning input: you hold two representations of the same
 past period — the **planned** macrocycle/mesocycles (in the DB) and the
 **inferred** ones (from reconstruction). Nobody currently subtracts them at the
-cycle level (`adherence.py` diffs individual workouts, not blocks).
+cycle level (`adherence.py` diffs individual workouts, not mesocycles).
 
 **Reconstruction is the base layer; the diff is an optional overlay.** There is
 no special "first macrocycle" branch:
 
-- **No prior plan** → inferred cycles stand alone ("here is the block structure
+- **No prior plan** → inferred cycles stand alone ("here is the mesocycle structure
   your training fell into"). The overlay is simply empty.
 - **Prior plan exists** → overlay the comparison *wherever planned data covers* —
   per-segment, not all-or-nothing. The first-macrocycle case is the degenerate
@@ -316,33 +316,33 @@ mesocycle boundaries will never line up, so do *not* try to reconcile two
 boundary sets. Instead take each *planned* mesocycle window as the anchor and ask
 "did the actual training in this window match the stated `focus`?" (intent
 fidelity). This sidesteps the alignment problem entirely. The inferred view is
-then used to flag blocks that *emerged outside* what was planned. Timing fidelity
+then used to flag mesocycles that *emerged outside* what was planned. Timing fidelity
 ("did transitions happen when planned?") is secondary and noisier — defer it.
 
 Diff output has a natural home in existing fields: macro diff →
-`macrocycle.feedback`, per-block diff → `mesocycle.feedback`.
+`macrocycle.feedback`, per-mesocycle diff → `mesocycle.feedback`.
 
 > **AS BUILT (Option A).** Nothing is written. The review is assembled read-only by
 > `CoachService._build_prior_training_context()`, printed, and injected into the
 > strategy prompt as `PRIOR TRAINING REVIEW`. Two refinements over the text above:
 >
-> - **The anchor is wider than "the prior plan".** Elapsed blocks of the prior
+> - **The anchor is wider than "the prior plan".** Elapsed mesocycles of the prior
 >   macrocycle *and* of the currently governing one are both walked: drift
 >   diagnosed only one macrocycle late is history, not a finding
 >   (DESIGN_intensity_distribution.md §3, gap 2).
-> - **The per-block comparison is quantitative, not just intent-fidelity.** Each
->   planned block shows its stated `focus` beside what the athlete's sessions
+> - **The per-mesocycle comparison is quantitative, not just intent-fidelity.** Each
+>   planned mesocycle shows its stated `focus` beside what the athlete's activities
 >   actually measured — volume, load, and the **per-sport per-zone intensity
->   distribution as a per-week rate, with the delta against the preceding block**
+>   distribution as a per-week rate, with the delta against the preceding mesocycle**
 >   (DESIGN_intensity_distribution.md §4.1/§9). That delta is the intensity-creep
 >   check: weekly TSS can hold flat while easy volume quietly gives way to tempo.
 > - **Adherence joins intent fidelity.** The measured half alone cannot say whether
->   a block was *carried out*: 545 TSS over four weeks reads identically whether it
->   was 100% or 50% of what the plan asked, so a half-missed block looked exactly
+>   a mesocycle was *carried out*: 545 TSS over four weeks reads identically whether it
+>   was 100% or 50% of what the plan asked, so a half-missed mesocycle looked exactly
 >   like a completed one and the next macrocycle ramped from a load the athlete
->   never reached. Each elapsed block therefore also carries **one line per week —
+>   never reached. Each elapsed mesocycle therefore also carries **one line per week —
 >   planned load beside produced load** — from `progression.weekly_aggregates`, the
->   same computation `tm progress` renders, so the coach and the athlete can never
+>   same computation `tm progress` renders, so the `plan generate` prompt and the athlete can never
 >   read different numbers for the same week. The in-progress week states raw load
 >   beside its elapsed day count and is never extrapolated
 >   (DESIGN_intensity_distribution.md §9.3).
@@ -364,12 +364,12 @@ interchangeable:
 - `preceding_macro` — the latest goal *before* this one that has a plan. Found by
   the `get_preceding_objectives` loop.
 - `prev_macro` — the plan this generation *replaces*, which on a re-plan is the
-  goal's own. It feeds the singular `PREVIOUS PERIODIZATION STRATEGY` block, which
+  goal's own. It feeds the singular `PREVIOUS PERIODIZATION STRATEGY` section, which
   is about the intent the new plan departs from, so singular is right there.
 
 The split between the two is what makes `plan generate --fresh` a coherent option
 rather than an amnesia switch. Asking for a clean slate withholds the
-`PREVIOUS PERIODIZATION STRATEGY` block and its continuity instruction — the athlete
+`PREVIOUS PERIODIZATION STRATEGY` section and its continuity instruction — the athlete
 is saying *don't build on that intent* — while `prev_macro` still reaches the review
 below, because what they actually trained under the old plan is evidence, not intent,
 and a plan written blind to it would be the idealized template §6 exists to prevent.
@@ -382,16 +382,16 @@ only with three or more planned goals in the chain, where the middle one is neit
 the earliest nor the one being replanned. The fix is still worth making (the two
 names now mean what they say), but it is not the common case.
 
-**The order.** This is the one that bit. The blocks of every macrocycle are
-flattened into a single list, and `block_report`'s delta baseline is
-`blocks[i - 1]` — the block before it. The list was built in *argument* order, and
+**The order.** This is the one that bit. The mesocycles of every macrocycle are
+flattened into a single list, and `mesocycle_report`'s delta baseline is
+`mesocycles[i - 1]` — the mesocycle before it. The list was built in *argument* order, and
 argument order is not chronological: on a re-plan of a later goal the pair is
 `[the replaced plan, the governing plan]`, and the governing plan is the **earlier**
-one. So the flattened list ran later-blocks-then-earlier-blocks, and every delta
-compared a block against one that happened *after* it. The first block of the later
+one. So the flattened list ran later-mesocycles-then-earlier-mesocycles, and every delta
+compared a mesocycle against one that happened *after* it. The first mesocycle of the later
 plan also silently got no delta at all.
 
-Macrocycles are therefore sorted by their first block's start date before
+Macrocycles are therefore sorted by their first mesocycle's start date before
 flattening. Sorting the chosen lineages is not the same as the date-ordered
 mesocycle *query* §6's implementation notes forbid: that query drags in superseded
 rollback versions, whereas this only orders macrocycles the caller already picked.
@@ -424,7 +424,7 @@ single-voice, last-write-wins, but **never silently** overwritten.
 
 **Lifecycle.** A `feedback` field's job ends at `plan generate`: its whole
 purpose is "notes for the next replanning," so the moment it is consumed into a
-plan it is free to hold the assessment of the block that just closed. Overwriting
+plan it is free to hold the assessment of the mesocycle that just closed. Overwriting
 is not destroying useful state — it is turning the field over at the exact moment
 its contents were used.
 
@@ -533,8 +533,8 @@ which is exactly why the two layers must stay distinct.
 `data analyze` and `plan generate` both look backward — is that "looking back
 twice"? No:
 
-- They produce **different products**: durable cross-block *memory* (learnings)
-  vs. a situational *this-block* assessment (feedback) + a new plan.
+- They produce **different products**: durable cross-mesocycle *memory* (learnings)
+  vs. a situational *this-mesocycle* assessment (feedback) + a new plan.
 - The earlier worry — "`analyze` creates feedback for `plan generate`" — is moot:
   `plan generate` now auto-writes its *own* feedback (§7). **Superseded
   (Option A):** the worry is moot for a simpler reason — nothing writes feedback
@@ -571,7 +571,7 @@ its system prompt through `engine._build_system_prompt`, which carries a
 `COACH LEARNINGS …` section; `_plan_generate_strategy` composes its own and
 simply had no `learnings` parameter. So an established observation like *"responds
 poorly to back-to-back threshold days"* shaped every individual session and never
-the block structure that schedules them — and `plan generate` closed by nudging
+the mesocycle structure that schedules them — and `plan generate` closed by nudging
 the athlete toward `data bootstrap`, whose durable output it would not read.
 
 **`_plan_generate_strategy` now takes `learnings` and renders it** as
@@ -706,7 +706,7 @@ the case that recurs on every run; this one happens once per bootstrap.
   `_build_system_prompt`) but authors none. This *stops* the existing
   `learning_updates` writes in `_generate_workouts_logic` — a behavioral change
   from today (ARCHITECTURE §3). Rationale: generation's observations are already
-  better-authored elsewhere — tactical/recent ones by `adapt`, durable/cross-block
+  better-authored elsewhere — tactical/recent ones by `adapt`, durable/cross-mesocycle
   ones by `analyze`. Durable memory stays limited to the deliberate paths
   (`data analyze`, `plan generate`). Revisit only if generation is empirically
   seen surfacing learnings the others miss.
@@ -873,7 +873,7 @@ syntactically perfect JSON in which every *nested* key carried a `>` prefix:
 
 Top-level keys were intact, so `_parse_json_content` succeeded and the response
 walked the whole flow. Every `.get('overall_focus')` missed. The report printed
-`Macrocycle Focus ( to ): N/A` over three nameless mesocycle blocks; all three
+`Macrocycle Focus ( to ): N/A` over three nameless mesocycles; all three
 learning deltas had a `">op"` instead of an `"op"`, so `apply_learning_deltas` skipped
 each one under its skip-malformed rule and said nothing; and the next command
 greeted the user with *"No coach learnings yet. Run `data bootstrap`"* — the command
@@ -895,7 +895,7 @@ no bootstrap record.
 
 Partial damage is not failure, though. One good part is a result worth keeping, so
 a response with a real summary and a mangled macrocycle still saves — it just names
-the parts that came back unreadable instead of letting them render as blank blocks.
+the parts that came back unreadable instead of letting them render as blank sections.
 Presence is the discriminator: an omitted key is the model declining to answer, a
 populated one whose fields all miss is a shape mismatch.
 
@@ -932,7 +932,7 @@ it.
 
 Setting `status = 'archived'` hides the goal, its macrocycle and its mesocycles
 from every planning reader — the objective filter in `get_governing_macrocycle`
-and the `o.status = 'active'` join in the four date-keyed block lookups. The plan
+and the `o.status = 'active'` join in the four date-keyed mesocycle lookups. The plan
 rows themselves survive untouched, which is the point: `--status active`
 reinstates the goal and everything about it comes back.
 
@@ -968,7 +968,7 @@ delete became a flag on it.
 and it takes every live workout from a date onward. That floor is right —
 a called-off race does not un-train the months already behind the athlete — but
 the date alone is the wrong *filter*: two goals' plans routinely have sessions in
-the same week, and a horizon long enough to cross from one goal's last block into
+the same week, and a horizon long enough to cross from one goal's last mesocycle into
 the next is a case the generator explicitly supports.
 
 So the sweep takes an optional set of macrocycle IDs and archives only sessions
@@ -1008,7 +1008,7 @@ What was left of the case for deleting is that a goal entered by mistake — a
 typo, a duplicate — had nowhere to go but a permanent grey `[ARCHIVED]` line in
 `goal list`. That is a real annoyance and it is the *only* thing archiving does
 not answer, so it keeps a hatch and not a default: `goal rm ID --purge` is the
-old cascade, unchanged. It prints the inventory first — plan versions, blocks,
+old cascade, unchanged. It prints the inventory first — plan versions, mesocycles,
 feedback notes, and the count of upcoming sessions it would strand — points at
 plain `goal rm` as the reversible alternative, and asks. `-y` skips that prompt
 for scripted use, as on `goal wipe`.

@@ -49,7 +49,7 @@ The learning question does not come on Wednesday at all. Wednesday has a session
 push has buttons, and the question only comes on a morning without them. It waits for the
 next rest day.
 
-So one question blocks the chat at the one moment of the day she most needs it. The other
+So one question holds up the chat at the one moment of the day she most needs it. The other
 waits days for a free slot and keeps its own record of what it asked. Both problems have
 the same cause: TrainMate has no place to put a question that can wait.
 

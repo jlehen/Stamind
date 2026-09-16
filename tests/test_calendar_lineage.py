@@ -22,13 +22,13 @@ ZONES = [None, 40 * 60, 90 * 60, None, None, None, None]
 
 
 def entries(description):
-    """The history block split into its entries, keyed by their `[n/total]` marker."""
+    """The `History` section split into its entries, keyed by their `[n/total]` marker."""
     if "History · " not in description:
         return {}
-    block = description.split("History · ", 1)[1]
-    block = block.split("\n\n", 1)[1] if "\n\n" in block else ""
+    section = description.split("History · ", 1)[1]
+    section = section.split("\n\n", 1)[1] if "\n\n" in section else ""
     found, current = {}, None
-    for line in block.split("\n"):
+    for line in section.split("\n"):
         if line.startswith("["):
             current = line.split("]")[0] + "]"
             found[current] = line + "\n"
@@ -317,7 +317,7 @@ class TestCalendarLineage(unittest.TestCase):
         self.assertIsNone(calendar_lineage.for_workout({"id": 999, "revision_id": None}))
 
 
-class TestHistoryBlock(unittest.TestCase):
+class TestHistorySection(unittest.TestCase):
     """The renderer alone, over rows shaped like the log's."""
 
     def _revision(self, revision_id, **overrides):
@@ -332,28 +332,28 @@ class TestHistoryBlock(unittest.TestCase):
         return row
 
     def test_a_lone_revision_has_no_history(self):
-        self.assertIsNone(calendar_lineage.history_block([self._revision(1)], 1))
+        self.assertIsNone(calendar_lineage.history_section([self._revision(1)], 1))
 
     def test_the_rendered_revision_is_not_repeated_in_its_own_history(self):
         rows = [self._revision(1), self._revision(2, kind="adapt")]
-        block = calendar_lineage.history_block(rows, 2)
-        self.assertIn("[1/2]", block)
-        self.assertNotIn("[2/2]", block)
+        section = calendar_lineage.history_section(rows, 2)
+        self.assertIn("[1/2]", section)
+        self.assertNotIn("[2/2]", section)
 
     def test_an_unknown_kind_renders_as_itself(self):
-        block = calendar_lineage.history_block(
+        section = calendar_lineage.history_section(
             [self._revision(1, kind="teleport"), self._revision(2)], 2
         )
-        self.assertIn("teleport", block)
+        self.assertIn("teleport", section)
 
     def test_a_multiline_description_stays_indented(self):
         rows = [
             self._revision(1, description="Warm up.\nMain set.\nCool down."),
             self._revision(2),
         ]
-        block = calendar_lineage.history_block(rows, 2)
+        section = calendar_lineage.history_section(rows, 2)
         for line in ("Warm up.", "Main set.", "Cool down."):
-            self.assertIn(calendar_lineage._INDENT + line, block)
+            self.assertIn(calendar_lineage._INDENT + line, section)
 
 
 if __name__ == "__main__":

@@ -65,7 +65,7 @@ class TestApplyingAlwaysStamps(unittest.TestCase):
     """The mirror of the rule above, and the half that actually shipped broken: a method
     that TAKES a *Proposal* is acting on the athlete's `y`, so it must record the coach
     pass — `honoring.stamp` — or every surface goes on reporting the constraint as one the
-    plan does not reflect (DESIGN_constraint_honoring.md §2).
+    schedule does not reflect (DESIGN_constraint_honoring.md §2).
 
     Keyed on the parameter annotation, the same way `TestProposingNeverWrites` is keyed on
     the return annotation, so an apply method written tomorrow is covered tomorrow.

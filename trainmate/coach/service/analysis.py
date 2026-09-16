@@ -63,7 +63,7 @@ def _unreadable_parts(decision: Dict[str, Any], cycles: bool) -> List[str]:
         if decision.get("inferred_macrocycle") and not content["macrocycle"]:
             parts.append("macrocycle")
         if decision.get("inferred_mesocycles") and not content["mesocycles"]:
-            parts.append("mesocycle blocks")
+            parts.append("mesocycles")
     return parts
 
 
@@ -774,7 +774,7 @@ class DataAnalysisMixin:
             raise ValueError(
                 f"The model's {label} response parsed but contained none of the requested "
                 "content — no summary, no insights"
-                + (", no macrocycle or mesocycle blocks" if cycles else "")
+                + (", no macrocycle or mesocycles" if cycles else "")
                 + ". Nothing was saved. The raw response is in the LLM exchange log; re-run "
                 "to ask again, or switch models with " + cmd("settings set coach-model") + "."
             )

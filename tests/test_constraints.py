@@ -276,8 +276,8 @@ class TestMessageCapture(unittest.TestCase):
 
     def setUp(self):
         clear_all_tables(test_db)
-        # `adapt` refuses without a plan (DESIGN_block_boundary.md §6); these cases are
-        # about the note, not the block, so give them one wide enough to ignore.
+        # `adapt` refuses without a plan (DESIGN_mesocycle_boundary.md §6); these cases are
+        # about the note, not the mesocycle, so give them one wide enough to ignore.
         obj_id = test_db.add_objective(
             title="Background goal", target_date="2026-12-31",
             sport_type="running",
@@ -542,17 +542,17 @@ class TestHonoredAt(unittest.TestCase):
         self._edit(cid, replan=True)
         self.assertIsNotNone(test_db.get_constraint(cid)["honored_at"])
 
-    def test_the_add_time_message_fires_when_the_window_outruns_the_block(self):
+    def test_the_add_time_message_fires_when_the_window_outruns_the_mesocycle(self):
         """§4: below the replan threshold nothing used to say WHEN a constraint takes
-        effect. Fires for a window landing beyond the active block AND for one straddling
+        effect. Fires for a window landing beyond the active mesocycle AND for one straddling
         its boundary, which daily adapt honors only in part."""
-        self._plan_blocks([
+        self._plan_mesocycles([
             ("Base 2", "2026-06-01", "2026-06-30"),
             ("Build 1", "2026-07-01", "2026-08-15"),
         ])
         from trainmate.cli.constraints import point_at_honor
         for start, end, should_fire in (
-            ("2026-07-05", "2026-07-10", True),    # wholly beyond the active block
+            ("2026-07-05", "2026-07-10", True),    # wholly beyond the active mesocycle
             ("2026-06-28", "2026-07-04", True),    # straddling its boundary
             ("2026-06-10", "2026-06-20", False),   # inside it — adapt's, and it says so
         ):
@@ -565,11 +565,11 @@ class TestHonoredAt(unittest.TestCase):
                 out = " ".join(buf.getvalue().split())
                 self.assertEqual("workout generate -m" in out, should_fire)
 
-    def test_the_add_time_message_names_the_landing_block_and_when_adapt_reaches_it(self):
-        """Adapt at date D reaches to the end of D's block, so it sees the constraint once
-        its window rolls onto the LANDING block — that block's first day, not the current
-        block's last."""
-        self._plan_blocks([
+    def test_the_add_time_message_names_the_landing_mesocycle_and_when_adapt_reaches_it(self):
+        """Adapt at date D reaches to the end of D's mesocycle, so it sees the constraint once
+        its window rolls onto the LANDING mesocycle — that mesocycle's first day, not the current
+        mesocycle's last."""
+        self._plan_mesocycles([
             ("Base 2", "2026-06-01", "2026-06-30"),
             ("Build 1", "2026-07-01", "2026-08-15"),
         ])
@@ -583,11 +583,11 @@ class TestHonoredAt(unittest.TestCase):
         self.assertIn("Lands in Build 1 (2026-07-01 Wed — 2026-08-15 Sat)", out)
         self.assertIn("adapt reaches it on 2026-07-01 Wed", out)
 
-    def test_a_straddling_constraint_names_the_block_holding_its_UNREACHED_days(self):
-        """The block is read off the constraint's END. Asked of its start, a straddling
-        window names the CURRENT block — the one adapt reaches today — and offers a
+    def test_a_straddling_constraint_names_the_mesocycle_holding_its_UNREACHED_days(self):
+        """The mesocycle is read off the constraint's END. Asked of its start, a straddling
+        window names the CURRENT mesocycle — the one adapt reaches today — and offers a
         past date as the day adapt will get to it (§1, the seam case)."""
-        self._plan_blocks([
+        self._plan_mesocycles([
             ("Build 1", "2026-08-15", "2026-09-14"),
             ("Build 2", "2026-09-15", "2026-10-04"),
         ])
@@ -600,11 +600,11 @@ class TestHonoredAt(unittest.TestCase):
         out = " ".join(buf.getvalue().split())
         self.assertIn("Straddles the end of Build 1 (2026-09-14 Mon)", out)
         self.assertIn("Build 2 holds the rest", out)
-        # One run covers both blocks, because generation starts today and runs through
-        # the end of the block it is given — so it is Build 2 that must be named.
+        # One run covers both mesocycles, because generation starts today and runs through
+        # the end of the mesocycle it is given — so it is Build 2 that must be named.
         build_2 = test_db.get_covering_mesocycle("2026-09-20")
         self.assertIn(f"workout generate -m {build_2['id']}", out)
-        # The two ways it used to be wrong: the current block named as out of reach, and
+        # The two ways it used to be wrong: the current mesocycle named as out of reach, and
         # a date already behind the athlete offered as when adapt arrives.
         self.assertNotIn("Lands in Build 1", out)
         self.assertNotIn("2026-08-15", out)
@@ -612,7 +612,7 @@ class TestHonoredAt(unittest.TestCase):
     def test_a_constraint_running_off_the_plans_end_is_offered_its_governed_days(self):
         """Its last day is ungoverned but its first is not, so there are still governed
         days to build around — named, with `plan generate` for the rest."""
-        self._plan_blocks([("Build 1", "2026-08-15", "2026-09-14")])
+        self._plan_mesocycles([("Build 1", "2026-08-15", "2026-09-14")])
         from trainmate.cli.constraints import point_at_honor
         cid = self._constraint("2026-09-10", "2026-09-25")
         buf = io.StringIO()
@@ -627,8 +627,8 @@ class TestHonoredAt(unittest.TestCase):
         self.assertNotIn("Starts 2026-09-10", out)
 
     def test_a_constraint_past_the_plans_end_is_pointed_at_plan_generate(self):
-        # `get_active_mesocycle` falls back to a neighbouring block when none covers the
-        # date, so naming one here would name a block the constraint is not in.
+        # `get_active_mesocycle` falls back to a neighbouring mesocycle when none covers the
+        # date, so naming one here would name a mesocycle the constraint is not in.
         self._plan("2026-06-01", "2026-06-30")
         from trainmate.cli.constraints import point_at_honor
         cid = self._constraint("2026-09-01", "2026-09-05")
@@ -667,12 +667,12 @@ class TestHonoredAt(unittest.TestCase):
         """A rule that spans files gets a test that spans them (AGENTS.md).
 
         The `status` count, the one-line rendering, the `show` detail and the add-time
-        nudge each answer "does the plan reflect this yet?" — and each one used to answer
+        nudge each answer "does the schedule reflect this yet?" — and each one used to answer
         it for itself, which is how `constraint show` came to flag a plan-shaping
         directive the count deliberately skips (§2).
         """
         from trainmate.cli.constraints import point_at_honor, run_constraint_show
-        self._plan_blocks([("Base 2", "2026-06-01", "2026-06-30"),
+        self._plan_mesocycles([("Base 2", "2026-06-01", "2026-06-30"),
                            ("Build 1", "2026-07-01", "2026-08-15")])
         cases = {
             "offered": self._constraint("2026-07-05", "2026-07-10", title="Away"),
@@ -697,22 +697,22 @@ class TestHonoredAt(unittest.TestCase):
                     line = constraint_line(constraint, cid in swept)
                 offered = cid in swept
                 # All four surfaces say the same thing, whatever that thing is.
-                self.assertEqual("not yet in the plan" in line, offered)
+                self.assertEqual("not yet in the schedule" in line, offered)
                 self.assertEqual("Coach pass: none yet" in buf.getvalue(), offered)
                 self.assertEqual("workout generate" in buf.getvalue(), offered)
 
     @classmethod
     def _plan(cls, start, end):
-        cls._plan_blocks([("Base", start, end)])
+        cls._plan_mesocycles([("Base", start, end)])
 
     @staticmethod
-    def _plan_blocks(blocks):
+    def _plan_mesocycles(mesocycles):
         obj_id = test_db.add_objective(title="Goal", target_date="2026-12-31",
                                        sport_type="running")
         test_db.save_macrocycle(
             objective_id=obj_id, strategy="Prep.", goals_hash="h", constraints_hash="h",
             mesocycles=[{"name": name, "start_date": start, "end_date": end,
-                         "focus": "Aerobic base"} for name, start, end in blocks],
+                         "focus": "Aerobic base"} for name, start, end in mesocycles],
         )
 
 

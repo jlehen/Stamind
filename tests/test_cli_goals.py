@@ -292,7 +292,7 @@ class TestCliGoalArchival(unittest.TestCase):
         return run_cli(args, input_value)
 
     def _goal_with_session(self):
-        """A goal with a one-block plan and one session inside it."""
+        """A goal with a one-mesocycle plan and one session inside it."""
         oid = test_db.add_objective("Spring Race", _days_out(60), "running", "", 1)
         mid = test_db.save_macrocycle(
             oid, "strategy", "gh", "ch",
@@ -378,7 +378,7 @@ class TestCliGoalArchival(unittest.TestCase):
         exit_code, stdout, _stderr = self.run_cli(["goal", "rm", str(oid), "--purge"])
         self.assertEqual(exit_code, 0)
         self.assertIn("1 periodization plan version(s)", stdout)
-        self.assertIn("1 mesocycle block(s)", stdout)
+        self.assertIn("1 mesocycle(s)", stdout)
         self.assertIn("1 plan feedback note(s)", stdout)
         self.assertIn("leaves 1 upcoming session(s)", stdout)
         self.assertIn(f"goal rm {oid}", stdout)

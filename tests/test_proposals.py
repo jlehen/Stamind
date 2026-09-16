@@ -90,7 +90,7 @@ class TestPairAdaptations(unittest.TestCase):
 
 
     def test_a_held_session_is_neither_paired_nor_removed(self):
-        """A session the coach kept is spoken for. Left out of the list, the swap rule
+        """A session the week planner kept is spoken for. Left out of the list, the swap rule
         below reads it as overridden and apply voids it — the bug that deleted a lift
         the model had explicitly asked to keep (DESIGN_workout_revisions.md §9.1)."""
         proposal = self._planned("2026-06-10", "cycling", "Climb Threshold — Indoors")
@@ -156,7 +156,7 @@ class TestRevisionProposalCarriesItsRange(unittest.TestCase):
     def test_the_range_is_the_window_evaluated_not_the_proposal_span(self):
         """The CLI used to rebuild the range from min/max of the proposal dates and hand
         that to apply, which deletes overridden sessions across it. A single proposal
-        therefore produced a one-day range, so a session displaced later in the block
+        therefore produced a one-day range, so a session displaced later in the mesocycle
         was never removed — preview and apply disagreeing about what disappears."""
         proposal = RevisionProposal(
             reason="Ease the week",

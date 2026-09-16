@@ -9,7 +9,7 @@
 # documents every knob that could appear here. Copy this to config.yaml (gitignored)
 # and make it yours.
 #
-# What makes a profile useful is honesty and texture: the free-text blocks below
+# What makes a profile useful is honesty and texture: the free-text fields below
 # (injuries, preferences) are read verbatim by the LLM coach, so write them the way
 # you'd brief a human coach — specifics, quirks, non-negotiables.
 
@@ -33,7 +33,7 @@ garmin:
   password: "correct-horse-battery-staple"
 
 coach:
-  # This athlete rides a 3-week block and wants generation to match it.
+  # This athlete rides a 3-week mesocycle and wants generation to match it.
   workout_generation_span_days: 21
 
 user_profile:
@@ -53,7 +53,7 @@ user_profile:
     court or stop-and-go sports. Running is fine on trails, unpleasant on
     pavement beyond ~45 minutes.
   # Session-level only: how sessions are written up, where they happen, what kit, how to
-  # talk to you. Anything countable — sessions per week, block order, taper depth — goes
+  # talk to you. Anything countable — sessions per week, mesocycle order, taper depth — goes
   # in a science/ file instead (see science.samples/*/athlete_weekly_structure.md). An
   # edit here never proposes a replan; an edit to science/ does.
   preferences: |

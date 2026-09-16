@@ -15,9 +15,9 @@ from trainmate.coach.proposals import RevisionProposal
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
-# A block of the wording diff: the sentences dropped and the sentences that took their
+# A group of the wording diff: the sentences dropped and the sentences that took their
 # place, in reading order. Either side may be empty.
-WordingBlock = Tuple[List[str], List[str]]
+WordingGroup = Tuple[List[str], List[str]]
 
 
 def _stats(w: dict) -> str:
@@ -32,7 +32,7 @@ def _stats(w: dict) -> str:
 def rewritten_text_only(proposal: dict, original: dict) -> bool:
     """True when the prescription the table can SHOW is identical and only the text moved.
 
-    Its columns are title and load, so a session the coach revised in words alone renders
+    Its columns are title and load, so a session the week planner revised in words alone renders
     as `X | X | 85m/RPE7/TSS84 -> 85m/RPE7/TSS84` and reads as a change made for no
     reason. Those are the rows the diff below exists for
     (DESIGN_workout_revisions.md §9.1)."""
@@ -54,10 +54,10 @@ def _sentences(text) -> List[str]:
     return out
 
 
-def wording_blocks(proposal: dict, original: dict) -> List[WordingBlock]:
-    """What moved between two descriptions, as (dropped, replacement) sentence blocks.
+def wording_groups(proposal: dict, original: dict) -> List[WordingGroup]:
+    """What moved between two descriptions, as (dropped, replacement) sentence groups.
 
-    Blocks rather than a line-per-sentence `-`/`+` listing: a reader wants "this passage
+    Groups rather than a line-per-sentence `-`/`+` listing: a reader wants "this passage
     became that passage", and sign-prefixed lines lose their sign the moment a phone
     re-flows them (DESIGN_workout_revisions.md §9.1)."""
     a = _sentences(original.get('description'))
@@ -69,10 +69,10 @@ def wording_blocks(proposal: dict, original: dict) -> List[WordingBlock]:
     ]
 
 
-def wording_block_lines(block: WordingBlock, indent: str = "") -> List[str]:
-    """One block as a labelled 'Was:' / 'Now:' pair (or 'Dropped:' / 'Added:' when one
+def wording_group_lines(group: WordingGroup, indent: str = "") -> List[str]:
+    """One group as a labelled 'Was:' / 'Now:' pair (or 'Dropped:' / 'Added:' when one
     side is empty), wrapped at the client's width with the text hanging under its label."""
-    dropped, added = block
+    dropped, added = group
     lines: List[str] = []
     if dropped:
         label = "Was: " if added else "Dropped: "
@@ -86,7 +86,7 @@ def wording_block_lines(block: WordingBlock, indent: str = "") -> List[str]:
 def _print_wording_changes(proposal: RevisionProposal) -> None:
     """Shows what a revision changed when the table's columns cannot.
 
-    The athlete reads the description, so revising it is a real adaptation — the coach
+    The athlete reads the description, so revising it is a real adaptation — the week planner
     makes them deliberately, e.g. rewriting a pacing cue to reference the session just
     executed. Printed rather than merely flagged: a preview that says a session changed
     but not how is what makes an honest text revision look like a bug (§9.1)."""
@@ -99,8 +99,8 @@ def _print_wording_changes(proposal: RevisionProposal) -> None:
     print(bold(yellow("\nTEXT REVISED (same load, so the columns above cannot show it):")))
     for pw, existing in reworded:
         print(f"\n  {cyan(pw['date'])} {magenta(pw['sport_type'].upper())} — {pw['title']}")
-        for block in wording_blocks(pw, existing):
-            for line in wording_block_lines(block, indent="    "):
+        for group in wording_groups(pw, existing):
+            for line in wording_group_lines(group, indent="    "):
                 print(line)
 
 

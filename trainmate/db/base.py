@@ -266,7 +266,7 @@ class BaseDB:
 
             # When a coach pass last had this constraint in scope with authority over
             # every day of it still ahead (DESIGN_constraint_honoring.md §2). NULL = the
-            # plan does not reflect it yet. Not "the plan definitely changed".
+            # schedule does not reflect it yet. Not "the schedule definitely changed".
             self._add_column(
                 cursor, "constraints", "honored_at",
                 "ALTER TABLE constraints ADD COLUMN honored_at TEXT"
@@ -619,7 +619,7 @@ class BaseDB:
                     "ALTER TABLE macrocycles "
                     "RENAME COLUMN lifeevents_snapshot TO constraints_snapshot"
                 )
-            # The coach's re-shaping read, cached against the snapshot it was asked
+            # The verdict call's re-shaping read, cached against the snapshot it was asked
             # about, so `plan show` asks once per edit rather than on every read
             # (DESIGN_plan_change_continuity.md §7).
             self._add_column(

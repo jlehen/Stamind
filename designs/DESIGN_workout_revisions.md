@@ -186,7 +186,7 @@ The failure is not cosmetic. It breaks a live safety guard.
  current form is the reduced plan, not the original; do not compound]
 ```
 
-Its job is to stop the coach cutting an already-cut session again while recovery metrics are
+Its job is to stop the week planner cutting an already-cut session again while recovery metrics are
 still lagging. Without it, three bad mornings walk a 90-minute ride down to nothing.
 `workout generate` reads the same tag against the opposite risk and closes it
 `do not silently restore it` instead (§7.1).
@@ -208,7 +208,7 @@ Thursday morning, metrics still poor, `workout adapt` runs. It looks at the live
 — a 65-minute long ride — and asks the chain how often this has been eased.
 
 **Thursday's chain says never.** Two revisions, one generate and one swap, zero adapts. The
-guard does not fire, and the coach cuts a session that has already been cut twice.
+guard does not fire, and the week planner cuts a session that has already been cut twice.
 
 Note *when* it fails: at a swap. The athlete swapped because life got in the way, which is
 also when recovery is worst and the guard matters most.
@@ -305,7 +305,7 @@ SELECT * FROM workouts WHERE archived_at IS NULL AND COALESCE(removed,0) = 0 AND
 SELECT * FROM live_workouts WHERE void = 0 AND date >= ?
 ```
 
-The view includes void revisions on purpose. A cancelled session is still a fact the coach
+The view includes void revisions on purpose. A cancelled session is still a fact the week planner
 must see — it is a deliberate cancellation, not a miss — and `prune-calendar` needs it too,
 because a soft-removed session keeps its "[Deleted]" Calendar event. Readers filter voids the
 same way they filter `removed = 1` today.
@@ -456,7 +456,7 @@ A rollback skips the span it undid:
 
 A generate starts a fresh tally:
 
-  r1 generate 90' ── r2 adapt 75' ── r3 generate 60' (a new plan re-prescribes the day)
+  r1 generate 90' ── r2 adapt 75' ── r3 generate 60' (`workout generate` re-prescribes the day)
   walk: r3 is a generate, stop immediately
   adaptation_count = 0  — easings of the old prescription do not describe the new one
 ```
@@ -529,9 +529,9 @@ until the model deliberately replaces it.
 **The intensity target is part of the metadata, and the description is not.** Duration and
 TSS fold intensity away — 40min steady and 12min of VO2max inside 40min carry the same two
 numbers — so without the zones the KEEP/REPLACE call is made blind to what the day
-contributes. It is not an abstract loss: REPLACE turns on whether "the block's remainder
-genuinely needs that day for something else", the block's composition is defined to the model
-in zones (`JUDGING THE BLOCK'S COMPOSITION`), and `generate` authors `planned_zone_sec` for
+contributes. It is not an abstract loss: REPLACE turns on whether "the mesocycle's remainder
+genuinely needs that day for something else", the mesocycle's composition is defined to the model
+in zones (`JUDGING THE MESOCYCLE'S COMPOSITION`), and `generate` authors `planned_zone_sec` for
 every session it writes, so a kept day is otherwise a hole in the distribution it is
 balancing. `intensity.format_planned_zones` renders it from the columns at display time
 (`DESIGN_intensity_distribution.md` §9.8), and it costs ~54 characters per session, measured
@@ -562,8 +562,8 @@ and the slot reverts to an ordinary write.
   — one more clause in the filter, no change to `keep` — but the prompt is advisory, and an
   athlete's own session is not the model's to overrule. That one wants the deterministic
   post-pass `_drop_benchmark_collisions` has, and is a separate decision.
-- **Carrying the rest of the forward plan.** `DESIGN_block_boundary.md` §5 and
-  `DESIGN_block_progress.md` §6 both decline a prompt-visible list of sessions the model may
+- **Carrying the rest of the forward plan.** `DESIGN_mesocycle_boundary.md` §5 and
+  `DESIGN_mesocycle_progress.md` §6 both decline a prompt-visible list of sessions the model may
   not touch. These are not that: they are sessions `generate` is being asked to decide about,
   and there is a handful of them rather than a horizon.
 - **Showing what the session was eased *from*.** The tag asserts the current form is the
@@ -688,7 +688,7 @@ Adapt's proposal list answers two different questions at once, and conflating th
 session.
 
 1. *What am I rewriting?* — every entry becomes a revision.
-2. *What does this date keep?* — a date the coach touches keeps only the sports it names.
+2. *What does this date keep?* — a date the week planner touches keeps only the sports it names.
    Anything else on that date is read as displaced and voided (§4, "Swap, in full").
 
 The adaptation prompt asks for changed sessions only, so a date carrying a ride and a lift
@@ -705,16 +705,16 @@ displace it"* was voided by that same pass.
 came back identical in title, duration, RPE, TSS and zones, with one coaching cue rewritten
 from a forward-looking note about the goal climb to a backward-looking one about the session
 just executed — while its `change_reason` said *"Unchanged and held as planned"*. Do not
-read that as the model failing to copy. **The coach revises descriptions deliberately and
+read that as the model failing to copy. **The week planner revises descriptions deliberately and
 often, and should**: the athlete reads the description, so a better cue or an updated
 reference is worth making, and §9 applies such a revision like any other. The defect was
 that the intent could not be *said* — "hold this" and "keep this but reword it" had the same
 encoding — and that the preview could not show the difference.
 
-**A held session is therefore a first-class thing, not an absent one.** The coach names it
+**A held session is therefore a first-class thing, not an absent one.** The week planner names it
 with a keep marker — `{"date", "sport_type", "keep": true}`, and nothing else. It carries no
 prescription, so a hold cannot be mistaken for a rewrite; it appends no revision; and it
-counts as *proposed* for the displacement rule, so the date keeps it. A session the coach
+counts as *proposed* for the displacement rule, so the date keeps it. A session the week planner
 wants reworded takes a full entry instead, and is applied as the change it is.
 `RevisionProposal.held` carries the held slots, and `pair_revisions` (preview) and
 `workout_revision_apply` (write) both union them into the date's proposed sports — one rule,
@@ -732,16 +732,16 @@ that says a session changed but not how is what makes an honest revision look li
 
 **The passages are shown as `Was:` / `Now:` pairs, not as a `-`/`+` diff.** The first
 version printed a unified diff: one line per sentence, signed. Observed 2026-08-31, over
-Telegram: the block was wrapped at a fixed 88 columns whatever the client had asked for, and
+Telegram: the diff was wrapped at a fixed 88 columns whatever the client had asked for, and
 the phone re-flowed every line, so the sign survived only on the first line of each
 sentence and the reader could not tell old from new. Even on a terminal a sentence-level
 `-`/`+` listing interleaves three dropped lines with four added ones and reads as noise. So
-the diff is grouped by block — each run of dropped sentences with the run that replaced
+the diff is grouped — each run of dropped sentences with the run that replaced
 it, joined back into a paragraph — and labelled in words: `Was:` / `Now:`, or `Dropped:` /
-`Added:` when a block has one side only. The text hangs under its label at the client's
-wrap width, so a narrow client keeps the label on every block. Simple mode
+`Added:` when a group has one side only. The text hangs under its label at the client's
+wrap width, so a narrow client keeps the label on every group. Simple mode
 (DESIGN_bot_simple_frontend.md §6) renders the whole preview as prose and reuses the same
-blocks, unwrapped, since that client flows text itself.
+groups, unwrapped, since that client flows text itself.
 
 **What a text revision costs, precisely.** Nothing that matters. It appends a revision row
 and re-pushes the Calendar event, and that is all: `_eased` (§7) counts a revision only when
@@ -751,7 +751,7 @@ intent expressible, not to suppress rewording.
 
 ### 9.2 A completed session is held by history
 
-§9.1 gives the coach a way to say *this date keeps that session*. A session the athlete has
+§9.1 gives the week planner a way to say *this date keeps that session*. A session the athlete has
 already trained needs no such statement: it is spoken for by having happened. The service
 seeds `held` with every locked slot in the proposal's range, so the displacement rule reads
 a finished session the way it reads a keep marker — present, and not up for removal.
@@ -760,11 +760,11 @@ a finished session the way it reads a keep marker — present, and not up for re
 locked slot (§4, "you cannot adapt a workout you have already finished today"). But that
 guard matches on `(date, sport)`, and the way a session gets dropped is by *not being
 named*: a rest day proposed for the date takes everything on it that the response does not
-mention. So the one encoding the coach reaches for most — "rest, the lift is off" — walked
+mention. So the one encoding the week planner reaches for most — "rest, the lift is off" — walked
 straight past a guard that was only ever watching the front door.
 
 Observed 2026-08-30. The athlete rode a 150-minute Z2 session in the morning and then wrote
-*"Not going to do the KB workout today."* The coach returned exactly one entry — a `rest`
+*"Not going to do the KB workout today."* The week planner returned exactly one entry — a `rest`
 day titled *"Rest — Kettlebell Session Dropped"* — and the pass offered to void the ride,
 rendering it as `CYCLING->REST, 120m/RPE4/TSS92 -> 0m/RPE0/TSS0`. Two and a half hours of
 completed work, proposed for deletion by a change that was about the lift. Under §9.2 the
@@ -847,7 +847,7 @@ still has days ahead), and reports it exactly as today. Same comparison, new tim
 
 | Command | Change kind | What it appends |
 |---|---|---|
-| `workout generate` | `generate` | A revision per changed day in the horizon; a void for every live slot from the generation start onward that the new plan does not fill — open-ended past the horizon, matching today's `archive_future_workouts`, which has no end bound. A slot the plan KEEPS (§7.1) gets neither: it is claimed, so no void, and left alone, so no revision. |
+| `workout generate` | `generate` | A revision per changed day in the horizon; a void for every live slot from the generation start onward that the new sessions do not fill — open-ended past the horizon, matching today's `archive_future_workouts`, which has no end bound. A slot the plan KEEPS (§7.1) gets neither: it is claimed, so no void, and left alone, so no revision. |
 | `workout adapt` | `adapt` | A revision per eased session; a void for a session it drops. A session it moves or substitutes cross-sport: a void at the source and a revision at the destination carrying the session's lineage — the swap shape (§4). **No more `DELETE`.** |
 | `workout swap` | `swap` | Two revisions (same sport) or four (cross-sport), per §4. |
 | `workout add` | `add` | One revision; with `--replace-day`, a void per other session that day. **No more `DELETE`.** |
@@ -1027,7 +1027,7 @@ migration function.
   the keep marker is what separates a hold from a rewrite, not a similarity threshold.
 - A completed session survives a rest day proposed for its date (§9.2): the ride stays live
   with a zero tally, the rest entry pairs with the lift instead, and the day reports no rest
-  violation afterwards. Pinned twice — once against the coach's own rest entry, once against
+  violation afterwards. Pinned twice — once against the week planner's own rest entry, once against
   the forced rest a `rest` constraint writes.
 - Restoring an archived revision appends a copy and makes it live, and the previously live
   revision stays in the chain.

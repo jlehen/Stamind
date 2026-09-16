@@ -248,7 +248,7 @@ def zero_load_workout_count(workouts: List[Dict[str, Any]], today: str) -> int:
 
 
 def _valid_span(start: Any, end: Any) -> bool:
-    """Whether an inferred (LLM-authored) mesocycle block has parseable dates with
+    """Whether an inferred (LLM-authored) mesocycle has parseable dates with
     start <= end — the guard for §6.1's 'unparseable dates are skipped'."""
     try:
         return bool(start) and bool(end) and _to_date(start) <= _to_date(end)
@@ -286,8 +286,8 @@ def meso_bands(
 
     - **Plan bands** — the governing objective's mesocycles (the caller resolves
       which plan governs via `db.get_governing_macrocycle`), labelled by name.
-    - **Inferred bands** — the bootstrap reconstruction's blocks, `~`-prefixed and
-      `source='inferred'`. Blocks with unparseable dates are skipped; the survivors
+    - **Inferred bands** — the bootstrap reconstruction's mesocycles, `~`-prefixed and
+      `source='inferred'`. Mesocycles with unparseable dates are skipped; the survivors
       are trimmed to the parts no plan band covers, and dropped where fully covered
       (plan wins). The payload therefore never contains overlapping bands — renderers
       draw spans as given."""
@@ -315,7 +315,7 @@ def meso_bands(
 def _load_by_sport(
     items: List[Dict[str, Any]], load_fn, sport_field: str
 ) -> Dict[str, float]:
-    """Sums `load_fn(item)` per canonical sport (DESIGN_block_progress.md §3.3) — the
+    """Sums `load_fn(item)` per canonical sport (DESIGN_mesocycle_progress.md §3.3) — the
     same bucketing `intensity.sport_durations` uses, so a week's per-sport load and its
     per-sport duration never disagree about which sport an item belongs to.
 
@@ -332,8 +332,8 @@ def _load_by_sport(
 
 def _week_meso(week_dates: List[str], meso_spans: List[Dict[str, Any]]):
     """Majority-overlap mesocycle label/source for one Monday-aligned week (§6.1):
-    the block covering the most of the week's 7 days wins; a tie favors the later
-    block (spans are given chronological, so a later match on an equal count
+    the mesocycle covering the most of the week's 7 days wins; a tie favors the later
+    mesocycle (spans are given chronological, so a later match on an equal count
     overwrites the earlier one)."""
     best = None
     best_count = 0
@@ -366,7 +366,7 @@ def weekly_aggregates(
          judged_sport_seconds, load_sparse, planned_zone_rows}
 
     The `_by_sport` dicts (canonical sport -> load) let a caller tell WHICH sport drove a
-    week's gap without re-deriving it — the raw material for DESIGN_block_progress.md
+    week's gap without re-deriving it — the raw material for DESIGN_mesocycle_progress.md
     §3.3. Bucketed on `activity_type` for the actual dict and `sport_type` for the two
     planned ones, the same split `intensity.py`'s sport-keyed helpers draw.
 
@@ -419,16 +419,16 @@ def weekly_aggregates(
             # reads no database — the property the one-payload rule exists to protect.
             "zone_rows": intensity.zone_rows(week_acts),
             "sport_seconds": intensity.sport_durations(week_acts),
-            # The same durations over sessions big enough to grade: what the "trained but
+            # The same durations over activities big enough to grade: what the "trained but
             # nothing recorded" `!` reads, so the floor applies there too (§11).
             "judged_sport_seconds": intensity.sport_durations(
                 [a for a in week_acts if intensity.judgeable(a)]
             ),
             # The athlete trained normally, the strap died, and no RPE was entered — so
             # the week's own LOAD is undercounted and reads as an adherence miss the
-            # coach will then adapt the plan around. A `progress` defect that predates
-            # the zone tables (DESIGN_intensity_distribution.md §11). Only sessions big
-            # enough to hide material load count: a 5-minute mobility session with a
+            # week planner will then adapt the sessions around. A `progress` defect that predates
+            # the zone tables (DESIGN_intensity_distribution.md §11). Only activities big
+            # enough to hide material load count: a 5-minute mobility activity with a
             # cold strap lit this on two thirds of a real athlete's weeks.
             "load_sparse": any(
                 garmin.load_method(a) == "hr_sparse" for a in week_acts
@@ -538,7 +538,7 @@ def plan_gap(
 # --- End-of-runway detection (DESIGN_runway_nudge.md §2) ---
 # The shapes the end of the schedule can take. Surfaces dispatch on these rather than on
 # the wording, the same contract `_warning`'s `code` gives the payload banners.
-RUNWAY_BLOCK = "block"
+RUNWAY_MESOCYCLE = "mesocycle"
 RUNWAY_SPAN = "span"
 RUNWAY_PLAN_END_NEXT_GOAL = "plan_end_next_goal"
 RUNWAY_PLAN_END_NO_GOAL = "plan_end_no_goal"
@@ -574,12 +574,12 @@ def runway(
     words the same structured answer itself, so `status`, `workout adapt` and the morning
     push cannot diverge on *when* the schedule runs out or on which command fixes it (§3).
 
-    `mesocycles` are the blocks of the plan the current workouts implement, whichever
+    `mesocycles` belong to the plan the current workouts implement, whichever
     goal it was drawn for. `warning_days` is `config.runway_warning_days`; it bounds both
     the run-up and the passed-state window (§7).
 
     Returns `{last_covered_date, days_left, kind, plan_end}`, plus `next_mesocycle` on a
-    block cliff and `objective`/`weeks_before` on a plan cliff with a goal beyond it.
+    mesocycle cliff and `objective`/`weeks_before` on a plan cliff with a goal beyond it.
     `days_left` is negative once the cliff is behind the athlete."""
     last_covered = coverage_end(workouts)
     ends = [str(m["end_date"]) for m in mesocycles if m.get("end_date")]
@@ -607,13 +607,13 @@ def runway(
     # adapt` refuses on (§4). Otherwise the comparison is the exact one the coverage
     # invariant makes possible.
     if plan_end_date >= today and last_covered < plan_end_date:
-        blocks = sorted(mesocycles, key=lambda m: str(m["start_date"]))
-        next_block = next(
-            (m for m in blocks if str(m["start_date"]) > last_covered), None
+        ordered = sorted(mesocycles, key=lambda m: str(m["start_date"]))
+        next_mesocycle = next(
+            (m for m in ordered if str(m["start_date"]) > last_covered), None
         )
-        ends_a_block = any(str(m["end_date"]) == last_covered for m in mesocycles)
-        if ends_a_block and next_block is not None:
-            return {**state, "kind": RUNWAY_BLOCK, "next_mesocycle": next_block}
+        ends_a_mesocycle = any(str(m["end_date"]) == last_covered for m in mesocycles)
+        if ends_a_mesocycle and next_mesocycle is not None:
+            return {**state, "kind": RUNWAY_MESOCYCLE, "next_mesocycle": next_mesocycle}
         return {**state, "kind": RUNWAY_SPAN}
 
     # Fed the mesocycle-derived plan end, not `plan_end`: the question here is whether the
@@ -676,7 +676,7 @@ def assemble_timeline(
     if skipped:
         warnings.append(_warning(
             "bootstrap_dates",
-            f"{skipped} bootstrap mesocycle block{_plural(skipped)} skipped "
+            f"{skipped} bootstrap mesocycle{_plural(skipped)} skipped "
             f"— unparseable dates",
         ))
     bands = meso_bands(mesocycles, valid_inferred)
@@ -780,7 +780,7 @@ def select_weeks(
     ``'all'``.
 
     THE one answer to "which weeks", so the text table, the `--chart` window and the
-    `--blocks` section cannot disagree about the span they are all describing (§7.1).
+    `--mesocycles` section cannot disagree about the span they are all describing (§7.1).
     `hidden` covers both sides: a default run over a long history drops far more past
     weeks than projected ones, and the legend names the total."""
     past = [w for w in weeks if w["week_commencing"] <= today]

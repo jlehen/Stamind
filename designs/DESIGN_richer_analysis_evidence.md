@@ -93,7 +93,7 @@ reasons about the days it was given, and tagging such a week `"partial"` would s
 untouched training days that are not actually in the summary.
 
 ### Prompt
-`_data_analyze_logic`'s TASK gains a "reading the per-week context fields" block: when a
+`_data_analyze_logic`'s TASK gains a "reading the per-week context fields" section: when a
 week carries `constraints`, consider them as a possible explanation for
 load/▼performance/▼recovery anomalies before attributing to training adaptation, and
 avoid authoring a training learning from a week whose anomaly a constraint already
@@ -103,13 +103,13 @@ explains.
 and this is load-bearing enough to state plainly: *a constraint may only explain an
 anomaly away — it may never be cited as supporting evidence for a learning.* The field is
 one-directional. It can lower confidence in a would-be learning ("that HRV crash was the
-flu, not the block"), but it can never raise confidence in one ("the athlete adapts well
+flu, not the mesocycle"), but it can never raise confidence in one ("the athlete adapts well
 under work stress" is not something a `work crunch` constraint may be used to argue).
 
 The reason is the observation/directive split in `DESIGN_constraints.md` §2/§6. A
 constraint is a **directive** — something the athlete asked the coach to work around. It
 records an intention, not a measurement. "I couldn't train Thursday" is not physiological
-data that the block is too hard, so letting it flow into the evidence/confidence machinery
+data that the mesocycle is too hard, so letting it flow into the evidence/confidence machinery
 would manufacture durable learnings out of scheduling. Discounting is the one sanctioned
 crossing because it only ever *removes* unwarranted confidence, which is safe in a way the
 supporting direction is not. Observations (`signal` / `daily_signals`) are the objects
@@ -192,7 +192,7 @@ author *no* learning for the week, not to author one citing the constraint.
 Later designs put more fields on the same weekly summary: `power_zone_distribution_sec`
 (DESIGN_intensity_distribution.md), `end_ctl` / `week_ramp` / `min_tsb`
 (DESIGN_pmc_fitness_fatigue.md), and an optional `daily_signals` list
-(DESIGN_calendar_signal_ingest.md). A separate full-history `signal_days` block rides
+(DESIGN_calendar_signal_ingest.md). A separate full-history `signal_days` section rides
 *beside* the summaries in the same user content (DESIGN_quantitative_signal_impact.md).
 `trainmate/coach/service/analysis.py` is the authority on the emitted shape.
 
@@ -214,7 +214,7 @@ The hashed tuples, as implemented (this list governs cache correctness, so keep 
 | `metrics` | `date, rhr, hrv, sleep_score, stress, ctl, atl, tsb` |
 | `constraints` | `id, start_date, end_date, rest, title, description` |
 | `daily_signals` | `date, metric, value, text` |
-| `signal_days` | the assembled block itself, hashed as computed |
+| `signal_days` | the assembled section itself, hashed as computed |
 
 plus the `[window_start, window_end]` pair. Each digest is a sorted set/list, serialized
 with `sort_keys=True` and SHA-256'd.

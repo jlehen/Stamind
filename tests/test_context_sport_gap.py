@@ -1,4 +1,4 @@
-"""`PmcContextMixin._week_sport_gap_note`: the per-sport annotation on a block's
+"""`PmcContextMixin._week_sport_gap_note`: the per-sport annotation on a mesocycle's
 "Weeks already trained" prompt lines (coach/service/context.py). Pure function —
 reads only its arguments, no `self._db` — so it is exercised directly here rather
 than through a full CoachService/DB fixture."""

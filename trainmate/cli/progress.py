@@ -51,7 +51,7 @@ ZONE_COL = 5
 NOT_TRAINED = "—"
 UNDERCOUNTED = "!"
 # The load table's own marker, and a different claim from the zone table's `!`: the week
-# contains a session whose HR recording was too sparse to trust AND carried no RPE, so
+# contains an activity whose HR recording was too sparse to trust AND carried no RPE, so
 # the LOAD is undercounted too and the week reads as an adherence miss it never was
 # (DESIGN_intensity_distribution.md §11).
 LOAD_SPARSE = "?"
@@ -389,7 +389,7 @@ def zone_week_cells(
     backwards; a real row renders its minutes and takes a `!` below the display bar.
 
     The unrecorded branch reads the JUDGEABLE duration, so one 5-minute unrecorded
-    session does not light the week — §11's floor, applied to both `!` paths.
+    activity does not light the week — §11's floor, applied to both `!` paths.
     """
     state = intensity.week_zone_state(week, sport, currency)
     if state.seconds is None:
@@ -570,7 +570,7 @@ def zone_section(
         ))
     if no_data:
         footer.extend(_legend(
-            f"{', '.join(no_data)}: sessions but no zone recording in this window"
+            f"{', '.join(no_data)}: activities but no zone recording in this window"
         ))
     if low:
         footer.extend(_legend(
@@ -621,7 +621,7 @@ def render_progress(
     under the load table (DESIGN_intensity_distribution.md §9.6). It scopes the intensity
     content ONLY: CTL, ATL, TSB, the projection and the WEEKLY LOAD table stay
     whole-athlete, because a running-only CTL is not a quantity — the fitness model
-    integrates every session the body paid for — and adherence is measured against the
+    integrates every activity the body paid for — and adherence is measured against the
     whole plan. Every line it emits is inside the 48-column budget, so `run_progress`'s
     re-wrap never fires on one."""
     today = payload["today"]
@@ -747,8 +747,8 @@ def render_progress(
     return lines
 
 
-def _blocks_in_window(dbh, start: str, end: str) -> List[Dict[str, Any]]:
-    """Every mesocycle overlapping `start..end`, plus the block preceding the first of
+def _mesocycles_in_window(dbh, start: str, end: str) -> List[Dict[str, Any]]:
+    """Every mesocycle overlapping `start..end`, plus the mesocycle preceding the first of
     them so §4.1's delta has a left-hand side.
 
     The preceding plan is the previous *goal's* — the one that governed the window's
@@ -765,14 +765,14 @@ def _blocks_in_window(dbh, start: str, end: str) -> List[Dict[str, Any]]:
 def _orphan_week_note(
     weeks: List[Dict[str, Any]], reported: List[Dict[str, Any]]
 ) -> List[str]:
-    """The weeks in the window that belong to no reported block, named.
+    """The weeks in the window that belong to no reported mesocycle, named.
 
-    `--blocks` reproduces the very loss §9.6 exists to prevent, and by more than one
+    `--mesocycles` reproduces the very loss §9.6 exists to prevent, and by more than one
     route: weeks belonging to no mesocycle are silently absent, and `rate_window`
-    additionally excludes each block's partial tail from both sides of its division —
-    correctly, and invisibly, dropping up to six more days per block. Silence would be
-    the block-grained blindness this section was written about, reintroduced by the flag
-    that opts into block grain.
+    additionally excludes each mesocycle's partial tail from both sides of its division —
+    correctly, and invisibly, dropping up to six more days per mesocycle. Silence would be
+    the mesocycle-grained blindness this section was written about, reintroduced by the flag
+    that opts into mesocycle grain.
     """
     orphans = []
     for week in weeks:
@@ -789,25 +789,25 @@ def _orphan_week_note(
     tail = f", +{len(orphans) - len(shown)} more" if len(orphans) > len(shown) else ""
     return _legend(
         f"{len(orphans)} week{'s' if len(orphans) != 1 else ''} in this window "
-        f"belong to no block ({', '.join(shown)}{tail}), and each block's final partial "
-        f"week is excluded from its rate — run without --blocks for the weekly view"
+        f"belong to no mesocycle ({', '.join(shown)}{tail}), and each mesocycle's final partial "
+        f"week is excluded from its rate — run without --mesocycles for the weekly view"
     )
 
 
-def render_block_section(
+def render_mesocycle_section(
     dbh, payload: Dict[str, Any], weeks_window: Any, today: str,
     explicit: Sequence[str], preferences: Sequence[str],
 ) -> List[str]:
-    """`--blocks`: the graded view, per mesocycle instead of per week (§9.6).
+    """`--mesocycles`: the graded view, per mesocycle instead of per week (§9.6).
 
-    Two grains, two questions — the week table answers *when did it change*, the block
-    table answers *did the block do what it said*. Only the block has a stated intent to
+    Two grains, two questions — the week table answers *when did it change*, the mesocycle
+    table answers *did the mesocycle do what it said*. Only the mesocycle has a stated intent to
     be graded against, which is why the weekly table carries no verdict and no focus. It
     REPLACES the weekly zone table rather than appending to it: the flag is a choice of
     grain, not an extra section.
 
-    Single-sport, because N sports x M blocks is not a view. And it trades brevity for
-    grain rather than the other way round — a single block runs about 25 lines at phone
+    Single-sport, because N sports x M mesocycles is not a view. And it trades brevity for
+    grain rather than the other way round — a single mesocycle runs about 25 lines at phone
     width — so the help text says so.
     """
     weeks, _, _ = progression.select_weeks(payload["weeks"], weeks_window, today)
@@ -827,17 +827,17 @@ def render_block_section(
             if canonical_sport(a.get("activity_type") or "unknown") == sport
         ]
 
-    blocks = _blocks_in_window(dbh, window_start, today)
+    mesocycles = _mesocycles_in_window(dbh, window_start, today)
     benchmarks = dbh.get_benchmark_results()
-    lines: List[str] = [bold(f"ZONES BY BLOCK — {sport}")]
+    lines: List[str] = [bold(f"ZONES BY MESOCYCLE — {sport}")]
     reported: List[Dict[str, Any]] = []
-    for i, meso in enumerate(blocks):
+    for i, meso in enumerate(mesocycles):
         if meso["end_date"] < window_start or meso["start_date"] > today:
             continue
-        text = intensity.block_report(
+        text = intensity.mesocycle_report(
             meso, today, fetch,
             current_week=meso["start_date"] <= today <= meso["end_date"],
-            previous=delta_baseline(blocks, i),
+            previous=delta_baseline(mesocycles, i),
             benchmarks=benchmarks, notes=False, indent="", width=TABLE_WIDTH,
         )
         if text:
@@ -848,8 +848,8 @@ def render_block_section(
     if not reported:
         return [yellow("No mesocycle overlaps this window.")]
 
-    # Once per section, under the last block — `block_report` printing its own would
-    # render the same two caveats three times over three blocks (§9.6). Standing
+    # Once per section, under the last mesocycle — `mesocycle_report` printing its own would
+    # render the same two caveats three times over three mesocycles (§9.6). Standing
     # boilerplate, so terminal-only (DESIGN_output_verbosity.md §3.2).
     rows = intensity.zone_rows(fetch(window_start, today))
     notes = intensity.format_notes(rows, width=TABLE_WIDTH) if asides_enabled() else []
@@ -918,7 +918,7 @@ def run_progress(args: argparse.Namespace) -> None:
 def print_progress_report(
     payload: Dict[str, Any], args: argparse.Namespace, today: str, weeks_window: int,
 ) -> None:
-    """The expert `progress` body: the load table, the optional zone and block sections,
+    """The expert `progress` body: the load table, the optional zone and mesocycle sections,
     and the chart captioned with the table's first line.
 
     The companion form of this is CompanionRenderer.progress
@@ -926,11 +926,11 @@ def print_progress_report(
     from trainmate import runtime
     from trainmate.config import config
     sports = list(getattr(args, "sports", None) or [])
-    blocks = getattr(args, "blocks", False)
+    mesocycles = getattr(args, "mesocycles", False)
     # Naming a sport IS a request for its zone table; otherwise the tables are opt-in
     # (`-z`). They are the longest thing on the screen and answer a different question
     # from the load table above them (DESIGN_intensity_distribution.md §9.6).
-    zones = blocks or bool(sports) or getattr(args, "zones", False)
+    zones = mesocycles or bool(sports) or getattr(args, "zones", False)
     forced = "power" if getattr(args, "power", False) else (
         "hr" if getattr(args, "hr", False) else None
     )
@@ -942,7 +942,7 @@ def print_progress_report(
 
     zone_opts = {
         "preferences": preferences, "sports": sports, "currency": forced,
-    } if (zones and not blocks) else None
+    } if (zones and not mesocycles) else None
     lines = render_progress(
         payload, weeks_window, getattr(args, "explain", False), zone_opts
     )
@@ -950,10 +950,10 @@ def print_progress_report(
         # Table rows are already fixed-width; prose (banners, footnotes) wraps.
         print(wrap_text(line) if visible_len(line) > 48 else line)
 
-    if blocks:
-        # Printed outside the loop above: `block_report` lays one zone cell per line at
+    if mesocycles:
+        # Printed outside the loop above: `mesocycle_report` lays one zone cell per line at
         # phone width, and a screen-width re-wrap would shred those columns (§9.6).
-        for line in render_block_section(
+        for line in render_mesocycle_section(
             runtime.db, payload, weeks_window, today, sports, preferences
         ):
             print(line)
@@ -977,7 +977,7 @@ def add_progress_parser(subparsers, pull_bypass_parser):
         help="Show the training progress timeline: measured load to date, projected forward",
         description=(
             "Show a single continuous timeline of training load: past days measured "
-            "from completed activities, future days planned from the current plan, one "
+            "from completed activities, future days from the scheduled sessions, one "
             "fitness/fatigue model (CTL/ATL/TSB) run across the seam. Projects to plan "
             "end (or each objective the plan reaches) so you can see whether the plan "
             "as written delivers peak fitness with positive form on race day. Add -z "
@@ -1009,10 +1009,10 @@ def add_progress_parser(subparsers, pull_bypass_parser):
              "always run to plan end regardless."
     )
     progress_parser.add_argument(
-        "--blocks", action="store_true",
+        "--mesocycles", action="store_true",
         help="Report intensity per mesocycle instead of per week, single-sport: "
-             "per-week rates over each block's completed weeks beside its stated focus, "
-             "the block-over-block delta and the structural rows. Replaces the weekly "
+             "per-week rates over each mesocycle's completed weeks beside its stated focus, "
+             "the mesocycle-over-mesocycle delta and the structural rows. Replaces the weekly "
              "zone table (the load table stays) and is LONGER than what it replaces."
     )
     currency = progress_parser.add_mutually_exclusive_group()

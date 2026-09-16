@@ -87,7 +87,7 @@ def compute_load(
 
     hr = _zone_tss(hr_zone_sec, "zone", HR_ZONE_TSS_PER_SEC)
     if hr is not None:
-        # Trust hrTSS only when the HR zones cover enough of the session; sparse
+        # Trust hrTSS only when the HR zones cover enough of the activity; sparse
         # coverage means the effort sat below zone 1 (low-intensity work) and
         # hrTSS undercounts, so prefer the user's RPE when available.
         if _hr_zone_coverage(hr_zone_sec, duration_sec) >= config.hr_zone_coverage_min:

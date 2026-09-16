@@ -311,7 +311,7 @@ class TestWeeklyAggregates(unittest.TestCase):
         week = next(w for w in weeks if w["week_commencing"] == "2026-06-29")
         self.assertEqual(week["planned_load_elapsed"], 40 * 5)  # Mon..Fri
 
-    def test_majority_overlap_labeling_with_tiebreak_to_later_block(self):
+    def test_majority_overlap_labeling_with_tiebreak_to_later_mesocycle(self):
         activities = [_act(-4, tss=10.0)]
         majority = self._span(-4, -2, label="A")   # Mon-Wed
         minority = {"label": "B", "source": "plan",
@@ -454,7 +454,7 @@ class TestAssembleTimeline(unittest.TestCase):
         p = self._assemble(activities=[_act(0, tss=30.0)], workouts=[_w(1, tss=50)])
         self.assertIn("pmc_warming", self._codes(p))
 
-    def test_unparseable_inferred_block_skipped_and_warned(self):
+    def test_unparseable_inferred_mesocycle_skipped_and_warned(self):
         inferred = [{"name": "Bad", "start_date": "not-a-date", "end_date": _d(0)}]
         p = self._assemble(activities=[_act(-1, tss=30.0)], workouts=[_w(2, tss=50)],
                            inferred=inferred)

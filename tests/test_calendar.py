@@ -38,7 +38,7 @@ class TestCalendarSync(unittest.TestCase):
 
     def test_sync_workout_adapted_body_is_the_current_form_only(self):
         """The body states what the session IS now, plus why. Every earlier form is the
-        history block's job (DESIGN_calendar_lineage.md §5), so the old
+        `History` section's job (DESIGN_calendar_lineage.md §5), so the old
         "Adapted:"/"Originally:" prose pair is gone."""
         workout = {
             "date": "2026-06-12",
@@ -84,7 +84,7 @@ class TestCalendarSync(unittest.TestCase):
 
     def test_sync_workout_lifecycle_footer(self):
         # An adapted session surfaces its plan->adapt lifecycle in the footer. The load it
-        # was planned with is NOT repeated here: the history block carries it, with its
+        # was planned with is NOT repeated here: the `History` section carries it, with its
         # date and target (DESIGN_calendar_lineage.md §5).
         workout = {
             "date": "2026-06-12",
@@ -168,7 +168,7 @@ class TestCalendarSync(unittest.TestCase):
     def test_sync_workout_swap_does_not_duplicate_description(self):
         # A swap moves a workout's date without changing its content, so
         # description == original_description. The calendar should show the
-        # description once rather than identical "Adapted"/"Originally" blocks.
+        # description once rather than identical "Adapted"/"Originally" lines.
         workout = {
             "date": "2026-06-11",
             "sport_type": "running",
@@ -798,7 +798,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
                     date="2026-09-11", sport_type="cycling", title="My ride",
                     description="60 min.", duration_minutes=60,
                 )
-        # Its own void is outside nobody's window, so the coach's session goes.
+        # Its own void is outside nobody's window, so the week planner's session goes.
         pushes, teardowns = self._plan(lineage)
         self.assertEqual(pushes, [])
         self.assertEqual([t[0] for t in teardowns], [lineage])

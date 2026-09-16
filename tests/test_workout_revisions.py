@@ -126,7 +126,7 @@ class TestTheGuardSurvivesASwap(unittest.TestCase):
     Tuesday holds a long ride, Thursday an easy spin. Two bad mornings ease the ride
     twice, then a swap moves it to Thursday. Thursday's SLOT has seen one generate and one
     swap and no adapts at all, so slot chains alone would report a session never eased —
-    and the coach would cut a session already cut twice, on the exact morning recovery is
+    and the week planner would cut a session already cut twice, on the exact morning recovery is
     worst.
     """
 

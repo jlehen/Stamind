@@ -281,7 +281,7 @@ class TestCliPlans(unittest.TestCase):
         exit_code, stdout, _stderr = self.run_cli(["plan", "rm", str(oid)])
         self.assertEqual(exit_code, 0)
         self.assertIn("1 periodization plan version(s)", stdout)
-        self.assertIn("1 mesocycle block(s)", stdout)
+        self.assertIn("1 mesocycle(s)", stdout)
         self.assertIn("1 plan feedback note(s)", stdout)
         self.assertIn("leaves 1 upcoming session(s)", stdout)
         self.assertIn("Removal cancelled", stdout)
@@ -370,7 +370,7 @@ class TestCliPlans(unittest.TestCase):
             mesocycles=[
                 {"name": "Base", "start_date": "2026-06-01",
                  "end_date": "2026-06-28", "focus": "Aerobic volume."},
-                {"name": "Dropped Block", "start_date": "2026-06-29",
+                {"name": "Dropped Mesocycle", "start_date": "2026-06-29",
                  "end_date": "2026-07-12", "focus": "Filler."},
             ],
             goals_snapshot=json.dumps(
@@ -396,7 +396,7 @@ class TestCliPlans(unittest.TestCase):
 
     def test_plan_diff(self):
         """`plan diff` reports what changed between two versions: mesocycle dates, dropped
-        blocks, and the snapshotted goals/constraints/thresholds."""
+        mesocycles, and the snapshotted goals/constraints/thresholds."""
         oid, v1, v2 = self._seed_two_versions()
 
         # No version given: previous vs active.
@@ -406,10 +406,10 @@ class TestCliPlans(unittest.TestCase):
         self.assertIn(f"Macrocycle {v2}", stdout)
         # Identical strategy text is reported as such, not re-printed.
         self.assertIn("unchanged", stdout)
-        # Mesocycle end date moved; the second block disappeared.
+        # Mesocycle end date moved; the second mesocycle disappeared.
         self.assertIn("2026-06-28", stdout)
         self.assertIn("2026-07-05", stdout)
-        self.assertIn("Dropped Block", stdout)
+        self.assertIn("Dropped Mesocycle", stdout)
         # Inputs: the constraint went away, the goal's date moved, ftp moved.
         self.assertIn("Holiday", stdout)
         self.assertIn("target_date", stdout)

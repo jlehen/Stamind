@@ -11,7 +11,7 @@
 >   the session is a benchmark", read against a date that holds a test, says preserve. §4.2
 >   now states the rule in terms of the session — the flag travels with the test, and any
 >   other session landing on the test's date carries `null` — and names the two costs
->   (a social ride read as an FTP result; the block believing it already tested).
+>   (a social ride read as an FTP result; the mesocycle believing it already tested).
 > - **The flag could not be cleared even when the model got it right.** `save_workout`'s
 >   UPDATE branch COALESCE-preserved `benchmark_type`, so a proposal emitting `null` was
 >   silently overridden by the stored value — which made §4.2's POSTPONE fallback
@@ -20,12 +20,12 @@
 >   a returned change lands on a benchmark row without re-emitting the flag (§3.1, §4.2).
 >
 > Left as-is deliberately: adapt may still legitimately drop a test the athlete cannot do.
-> With the flag cleared, the block-progress section reports no test run and the next
+> With the flag cleared, the mesocycle-progress section reports no test run and the next
 > `workout generate` re-places it — the system self-heals rather than needing a guard.
 
 > **Rev. 3 (2026-08-17) — due-ness moved to the science file.** Rev. 2's placement rule
 > ("one test per mesocycle boundary", §4.1; resolved in §8 as the cadence knob) over-tested
-> short blocks: an 11- and a 21-day block produced FTP tests 21 days apart, inside the
+> short mesocycles: an 11- and a 21-day mesocycle produced FTP tests 21 days apart, inside the
 > noise floor `benchmarks.md` §1 already named — the TASK prompt was overriding the
 > guideline it pointed at. `benchmarks.md` now carries the mechanics as FLOOR-marked
 > rules (4-week same-anchor minimum, 8-12 week typical cadence, minimum meaningful
@@ -42,8 +42,8 @@
 >   cannot know which anchor a missing test would have measured; a false silence costs
 >   one un-nudged athlete where a false nag contradicts the generator.
 > - Adapt's last-day fallback (§4.2) inverted: a benchmark that cannot be moved to a
->   fresh in-block day is POSTPONED (replaced with an easy session), not run compromised
->   — a skipped test costs a retest, a wrong anchor mis-scales a block.
+>   fresh in-mesocycle day is POSTPONED (replaced with an easy session), not run compromised
+>   — a skipped test costs a retest, a wrong anchor mis-scales a mesocycle.
 > - `benchmark record --source` defaults to `manual`: a typed value is an assumption
 >   unless declared a test, so §3.4's seeding commands record what they are and cannot
 >   start the interval clock or satisfy the never-measured trigger.
@@ -69,17 +69,17 @@
 > 4. **§5.3's activity-disambiguation rule was never built**; it is Phase 3 work, and the
 >    matcher that actually runs is described in its place.
 > 5. **Two surfaces rev. 1 did not name ship today**: the read-only web `/api/benchmarks`
->    view and the anchor-trend lines in the intensity block report (§6). The progress
+>    view and the anchor-trend lines in the intensity mesocycle report (§6). The progress
 >    timeline plot rev. 1 listed under §6 is still Phase 3.
 
 Make fitness tests (FTP, threshold pace, CSS, e1RM) a **first-class, planned**
-part of TrainMate: the planner schedules them on fresh days, daily adaptation
+part of TrainMate: the week planner schedules them on fresh days, daily adaptation
 protects them, and their results are recorded in a dated logbook that becomes the
 source of truth for the athlete's thresholds — feeding the coaching prompt, the
 replan trigger, and long-term progress tracking.
 
 *Before this design*, a benchmark existed only as prose in
-`trainmate/science/benchmarks.md`. The coach *could* schedule one as an ordinary
+`trainmate/science/benchmarks.md`. The week planner *could* schedule one as an ordinary
 workout, but nothing placed them reliably, nothing stopped daily `adapt` from softening
 one into meaninglessness, and there was nowhere to put the result. This design closes
 those three gaps.
@@ -100,7 +100,7 @@ load model. They feed exactly two things:
 - the **coaching prompt** the LLM reads (so it prescribes zones/targets), and
 - the **plan-staleness check** (`config_changed()`, `coach/service/prompt.py:60`).
 
-A third reader arrived later and is worth naming: the intensity **block report** renders
+A third reader arrived later and is worth naming: the intensity **mesocycle report** renders
 the anchor trend over the reported window (`intensity.py:710`, §6). It feeds the coaching
 prompt too, so it does not widen the blast radius — but it is a consumer of the logbook.
 
@@ -342,8 +342,8 @@ proceeds, and a cold-start hint (`_maybe_nudge_no_threshold()`,
 one (`benchmark record …`) or complete the scheduled benchmark."* `max_hr` alone does not
 silence it: config physiology is not a measured anchor. The very first generated plan
 schedules a benchmark anyway (§4.1),
-so the gap closes itself within the first block. Refusing to plan would create
-a bootstrapping paradox — the planner is how a benchmark gets scheduled.
+so the gap closes itself within the first mesocycle. Refusing to plan would create
+a bootstrapping paradox — the week planner is how a benchmark gets scheduled.
 
 ### 3.5 No privileged anchor kinds
 
@@ -351,7 +351,7 @@ a bootstrapping paradox — the planner is how a benchmark gets scheduled.
 happens to hold. Every kind (`css`, `threshold_pace`, `e1rm`, `mas`, …) flows
 identically: recorded via `benchmark record`, rendered into the prompt generically
 (§3.3), drift-checked by the same skip-absent-keys snapshot rule (§3.3), trended by
-`benchmark list`, the web logbook and the block report (§6). Adding a future kind is a
+`benchmark list`, the web logbook and the mesocycle report (§6). Adding a future kind is a
 vocabulary addition — a new row in `ANCHOR_KINDS` carrying its unit and its
 better-direction sign (§3.2) — not new machinery.
 
@@ -365,26 +365,26 @@ snapshotted, prompted, trended and displayed like everything else.
 
 ### 4.1 Placement — instruct, then verify
 
-Benchmarks belong at block boundaries and on a ~4–6 week cadence
+Benchmarks belong at mesocycle boundaries and on a ~4–6 week cadence
 (`benchmarks.md` §1). The split of labor plays to each side's strength:
 
 - **The LLM places.** The generation prompt (`coach/engine/workouts.py:155-167`)
-  instructs the coach to schedule one benchmark of the appropriate kind in each
-  mesocycle-boundary week the generated span covers — except the terminal block's —
+  instructs the week planner to schedule one benchmark of the appropriate kind in each
+  mesocycle-boundary week the generated span covers — except the terminal mesocycle's —
   preceded by an opener/easy day so TSB is positive on test day, phrased
   venue-neutrally (§5.4), and never in a rest week. Day choice stays with the
   model — it already handles weekly availability, equipment, and rest days, and
   a deterministic pass re-implementing that logic is exactly the machinery we
   do not want.
 
-**Why the boundary is the block's END.** The anchor exists to scale the *next*
-block's targets, and `workout generate` writes a whole span in one shot — so
+**Why the boundary is the mesocycle's END.** The anchor exists to scale the *next*
+mesocycle's targets, and `workout generate` writes a whole span in one shot — so
 everything scheduled after a test in that span was authored before the result
-existed. Testing at the end of block N leaves only the tail of a finishing block
+existed. Testing at the end of mesocycle N leaves only the tail of a finishing mesocycle
 authored blind, and the next generate run writes all of N+1 from the new anchor;
-testing at the *start* of N+1 leaves N+1 itself — the block the test was meant to
+testing at the *start* of N+1 leaves N+1 itself — the mesocycle the test was meant to
 calibrate — authored blind. The seam placement also lands a >`threshold_replan_pct`
-move before `config_changed()` (§3.3) rewrites the upcoming block, rather than part-way
+move before `config_changed()` (§3.3) rewrites the upcoming mesocycle, rather than part-way
 into days already begun.
 
 **Why there is no pre-goal validation test.** An earlier revision asked for one in
@@ -395,18 +395,18 @@ above the tested value, making a mid-taper anchor stale in the optimistic direct
 by race day. The final boundary test already sets a current anchor, and
 `benchmarks.md` §1 puts re-tests inside ~3-4 weeks in the noise. The clause also
 collided with the boundary rule whenever the taper was short enough to make "the
-block's final week" and "the last week before the goal" adjacent.
+mesocycle's final week" and "the last week before the goal" adjacent.
 
 Removing it is not sufficient on its own, because a goal-directed macrocycle's
-**last block ends ON the goal date** — its boundary week *is* race week, so the
+**last mesocycle ends ON the goal date** — its boundary week *is* race week, so the
 boundary rule alone would still ask for a test there. Hence the goal-week exemption,
 applied on both sides: the prompt excludes such a week, and
 `_warn_missing_boundary_benchmarks()` skips any boundary ending later than seven days
 before the goal (`_goal_date_for_macrocycle()` resolves the date through the
 macrocycle's objective; an unresolvable goal exempts nothing).
 
-The exemption keys on the **goal date, not the block's ordinal position**: a macrocycle
-whose final block ends months before its target date is an ordinary boundary and still
+The exemption keys on the **goal date, not the mesocycle's ordinal position**: a macrocycle
+whose final mesocycle ends months before its target date is an ordinary boundary and still
 gets its test. Only the run-in to the event is protected.
 - **A deterministic post-check verifies.** After generation, if a covered
   boundary week ended up with no `benchmark_type` workout,
@@ -422,14 +422,14 @@ gets its test. Only the run-in to the event is protected.
   would otherwise advise regenerating again to recover a benchmark the athlete has
   already done. That lookup is bounded below `gen_start`, because the displaced plan's
   future rows are still live when the check runs and must not answer for sessions this
-  run just replaced (DESIGN_block_progress.md §4.1).
+  run just replaced (DESIGN_mesocycle_progress.md §4.1).
 
-**Not placing a test the block already ran.** The placement instruction above is
+**Not placing a test the mesocycle already ran.** The placement instruction above is
 unconditional on its own, so a regeneration inside the boundary week re-places a
 completed test. It is bounded at the source rather than post-hoc: when the generate prompt
-carries a block-progress section, that section names the tests the block has already run
+carries a mesocycle-progress section, that section names the tests the mesocycle has already run
 and tells the model a boundary week listed there needs no second test
-(DESIGN_block_progress.md §4.1). De-duplication keys on the planned benchmark *session*,
+(DESIGN_mesocycle_progress.md §4.1). De-duplication keys on the planned benchmark *session*,
 not the logbook, so a test performed but never recorded still counts.
 
 **Same-day collision.** `save_workout` keys on (date, sport), so a second
@@ -444,8 +444,8 @@ session cannot slip past a `cycling` benchmark on a spelling.
 
 **It is its own helper** (`coach/engine/workouts.py::_benchmark_task`) rather than prose
 inline in the TASK, because of the closing line below: the two must not drift apart. Note
-that adapt's postponement escape — "the next generated block re-places the test when it is
-due" — is honest only because a block boundary really does bring a `workout generate`. A
+that adapt's postponement escape — "the next generated mesocycle re-places the test when it is
+due" — is honest only because a mesocycle boundary really does bring a `workout generate`. A
 scope that carries no such guarantee may not repeat the promise; it would tell the model a
 postponement is cheaper than it is.
 
@@ -460,7 +460,7 @@ by engineering guards around it**. A deterministic guard here would have to
 reverse-engineer intent from a proposal batch — is this pair of changes a move,
 a displacement, or a softening? (Concretely: exempting benchmark rows from the
 overridden-workout deletion in `workout_revision_apply`,
-`coach/service/adaptation.py:299-322`, would block the very deletion that completes a
+`coach/service/adaptation.py:299-322`, would prevent the very deletion that completes a
 legitimate move, leaving the test duplicated on both days.) That is precisely the
 judgement the model already has in front of it, so the model keeps it — the deletion
 there carries no benchmark exemption, as designed.
@@ -468,16 +468,16 @@ there carries no benchmark exemption, as designed.
 **The prompt rule** (`coach/engine/workouts.py:373-381`): never reduce or soften a
 benchmark session; if the athlete
 will not be fresh (negative TSB), move it *intact* — same content,
-`benchmark_type` preserved — to a later day within the block and lighten the
+`benchmark_type` preserved — to a later day within the mesocycle and lighten the
 days before it. Moving is necessarily the LLM's call: TSB is backward-looking
 only (`garmin/pmc.py:47` — computed from *completed* load), so no deterministic
 pass can know which future day will be fresh; the model, which sees the TSB
 history and the planned load ahead, judges it. Fallback the model is told
-explicitly: when the benchmark sits on the last day of the block and no later
-in-block day exists, POSTPONE it — replace it with an ordinary easy session, no
+explicitly: when the benchmark sits on the last day of the mesocycle and no later
+in-mesocycle day exists, POSTPONE it — replace it with an ordinary easy session, no
 `benchmark_type` — because a compromised maximal test sets a wrong anchor that
 mis-scales every session after it: a skipped test costs a retest where a bad
-number costs a block. The next generated block re-places the test when it is
+number costs a mesocycle. The next generated mesocycle re-places the test when it is
 due.
 
 A moved benchmark rides the normal apply path like any rescheduled session; the
@@ -493,8 +493,8 @@ wrong reading — the date holds a benchmark, so preserve — and a model-compar
 three models emitting "Friends Group Ride [BENCHMARK]" after converting a test day into a
 social ride. The prompt now says the flag travels with the test and that any other session
 on that date carries `null`, and names what a mislabel costs: `benchmark record` and the
-adherence matcher read the ride as the completed test, `_block_benchmark_lines` tells the
-next generate run the block already tested (DESIGN_block_progress.md §4.1), and
+adherence matcher read the ride as the completed test, `_mesocycle_benchmark_lines` tells the
+next generate run the mesocycle already tested (DESIGN_mesocycle_progress.md §4.1), and
 `_drop_benchmark_collisions` starts protecting a group ride's date.
 
 The app-side half is not a guard on the model's judgement but the absence of one: with
@@ -512,10 +512,10 @@ narrowest version of that mistake costs nothing anyway: a verbatim re-list that 
 the field never reaches the apply step, because `_revision_is_change()` compares title,
 description and load and discards it as a no-op.
 
-This composes cleanly with the existing block-boundary firewall
-(`DESIGN_block_boundary.md`): `adapt` already never crosses into the next
-mesocycle, and the end-of-block benchmark lands exactly where the block-boundary
-machinery already nudges the athlete to replan the next block against fresh
+This composes cleanly with the existing mesocycle-boundary firewall
+(`DESIGN_mesocycle_boundary.md`): `adapt` already never crosses into the next
+mesocycle, and the end-of-mesocycle benchmark lands exactly where the mesocycle-boundary
+machinery already nudges the athlete to replan the next mesocycle against fresh
 numbers.
 
 ---
@@ -531,7 +531,7 @@ extraction and coach-learning downgrades. Nothing auto-mutates thresholds
 
 Example:
 
-    New FTP 250 (was 235, +6.4%) — record and suggest replanning the next block? [y/N]
+    New FTP 250 (was 235, +6.4%) — record and suggest replanning the next mesocycle? [y/N]
 
 The "suggest replanning" half of that sentence appears only when the new value crosses
 `coach.threshold_replan_pct` against the current latest of the kind — the same band
@@ -594,7 +594,7 @@ into the coaching prompt (`coach/engine/prompt.py:52-57`) — carries the venue:
     Tests FTP indoors on Zwift (ramp or 20-min protocol).
 ```
 
-The coach reads that during `workout generate` and phrases the session as
+The week planner reads that during `workout generate` and phrases the session as
 indoor/Zwift on its own. Zero new machinery, and the benchmark *type* stays
 generic so an outdoor test just needs a preference edit.
 
@@ -619,7 +619,7 @@ generic so an outdoor test just needs a preference edit.
     the blunt reset for a bad import.
 - `status` shows the current effective threshold per kind and its last-tested date,
   with `max_hr` labelled `(config)` (`cli/status.py:128-157`).
-- The intensity **block report** renders anchor movement across the reported window —
+- The intensity **mesocycle report** renders anchor movement across the reported window —
   `_benchmark_lines()` (`intensity.py:710`), fed both into the coaching prompt
   (`coach/service/context.py:251, 295-300`) and into `progress`
   (`cli/progress.py:846-856`). This is the shipped "is overload working?" surface.
@@ -630,7 +630,7 @@ generic so an outdoor test just needs a preference edit.
   cannot disagree about what a row is compared against. Reads only — recording stays
   in the CLI (see the read-only demotion in ARCHITECTURE.md §"Web dashboard").
 - **Phase 3, not built:** the progress timeline (`DESIGN_progress_timeline.md`) plotting
-  the anchor trend beside CTL. `trainmate/chart.py` has no anchor series today; the block
+  the anchor trend beside CTL. `trainmate/chart.py` has no anchor series today; the mesocycle
   report above covers the need in text.
 
 ---
@@ -657,7 +657,7 @@ the adapt "reschedule, don't dilute" prompt rule (§4.2) · same-day collision
 rule · `[BENCHMARK]` marker.
 
 Shipped after both phases, not planned in rev. 1: the `benchmark wipe` verb, the
-block-report anchor lines, the read-only web Benchmarks view (all §6), and the
+mesocycle-report anchor lines, the read-only web Benchmarks view (all §6), and the
 sport/kind mismatch check on `record` (§3.2).
 
 **Phase 3 — richer — NOT BUILT:**
@@ -687,15 +687,15 @@ too — it is what would retire the drift exclusion in §3.3.
 
 ## 9. Interactions with existing designs
 
-- `DESIGN_block_boundary.md` — end-of-block benchmark is the natural replan
-  trigger; adapt's within-block firewall already prevents a test from being
+- `DESIGN_mesocycle_boundary.md` — end-of-mesocycle benchmark is the natural replan
+  trigger; adapt's within-mesocycle firewall already prevents a test from being
   dragged across a boundary.
 - `DESIGN_pmc_fitness_fatigue.md` — TSB gates test-day freshness (the adapt
   prompt rule reads TSB history; benchmarks do not alter PMC math). TSB is
   backward-looking, which is why *moving* a test is the LLM's judgement, not a
   deterministic pass (§4.2).
 - `DESIGN_progress_timeline.md` — the anchor time series is a first-class
-  progress signal to plot beside CTL. Still Phase 3 (§6); the block report carries the
+  progress signal to plot beside CTL. Still Phase 3 (§6); the mesocycle report carries the
   signal in text meanwhile.
-- `DESIGN_intensity_distribution.md` §10 — the block report's anchor-trend lines, and the
+- `DESIGN_intensity_distribution.md` §10 — the mesocycle report's anchor-trend lines, and the
   reason `e1rm` is excluded from the drift check (§3.3).

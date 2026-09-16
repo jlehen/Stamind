@@ -35,23 +35,23 @@ _SPORT_TYPE_ENUM = _sport_type_enum()
 
 
 def _terminal_window_task(days_left: int, meso_end_date_str: str) -> str:
-    """Renders the adapt-prompt section used when the block is about to end.
+    """Renders the adapt-prompt section used when the mesocycle is about to end.
 
-    An easing proposed here cannot rebound inside the block and the next block is out of
-    reach, so the model is biased toward holding load (DESIGN_block_boundary.md §3).
+    An easing proposed here cannot rebound inside the mesocycle and the next mesocycle is out of
+    reach, so the model is biased toward holding load (DESIGN_mesocycle_boundary.md §3).
     """
     ending = (
         "ends today" if days_left == 0
         else f"ends in {days_left} day(s), on {meso_end_date_str}"
     )
     return f"""
-### THIS BLOCK IS ENDING
-The block you are adapting {ending}.
+### THIS MESOCYCLE IS ENDING
+The mesocycle you are adapting {ending}.
 An easing applied now therefore has no runway to rebound — no later session remains in which
 to restore the load you shed — and the days after {meso_end_date_str} belong to the next
-block, which you can neither adapt nor pre-empt.
+mesocycle, which you can neither adapt nor pre-empt.
 Hold the planned load unless the signal is one you would act on even if this were the
-block's very last session. Do not deepen a cut to "carry" the athlete into the next block:
+mesocycle's very last session. Do not deepen a cut to "carry" the athlete into the next mesocycle:
 it is planned separately, against their metrics as they stand when it is generated.
 """
 
@@ -121,42 +121,42 @@ session contradicts. An easing answers "how is the athlete today"; a constraint 
 
 
 def _past_constraints_task(past_constraints: Optional[List[Constraint]]) -> str:
-    """The section naming the constraints that ended earlier in this block
+    """The section naming the constraints that ended earlier in this mesocycle
     (DESIGN_plan_change_continuity.md §6.1)."""
     if not past_constraints:
         return ""
     return """
-### WHAT ALREADY HAPPENED IN THIS BLOCK
-The user content includes a section titled "CONSTRAINTS EARLIER IN THIS BLOCK": directives
-whose dates have passed but which fall inside the block the athlete is in. They are not
-yours to work around any more — they explain the block's record. A week that shows far less
+### WHAT ALREADY HAPPENED IN THIS MESOCYCLE
+The user content includes a section titled "CONSTRAINTS EARLIER IN THIS MESOCYCLE": directives
+whose dates have passed but which fall inside the mesocycle the athlete is in. They are not
+yours to work around any more — they explain the mesocycle's record. A week that shows far less
 training than it was planned was often a week under one of these, and reading it as the
-athlete failing to train, or as evidence the block is too hard, would be wrong.
+athlete failing to train, or as evidence the mesocycle is too hard, would be wrong.
 """
 
 
-def _block_progress_task(block_progress: Optional[str]) -> str:
-    """The CONTINUING A BLOCK section (DESIGN_block_progress.md §4).
+def _mesocycle_progress_task(mesocycle_progress: Optional[str]) -> str:
+    """The CONTINUING A MESOCYCLE section (DESIGN_mesocycle_progress.md §4).
 
-    Gated on the data being present, so a run that starts a block cleanly produces the
+    Gated on the data being present, so a run that starts a mesocycle cleanly produces the
     prompt it always did. It also conditions BENCHMARK PLACEMENT above, which on its own
-    cannot know a boundary test was already run earlier in the block (§4.1).
+    cannot know a boundary test was already run earlier in the mesocycle (§4.1).
     """
-    if not block_progress:
+    if not mesocycle_progress:
         return ""
     return """
-### CONTINUING A BLOCK ALREADY UNDER WAY
-The user content includes a section titled "BLOCK PROGRESS SO FAR": what the block the
+### CONTINUING A MESOCYCLE ALREADY UNDER WAY
+The user content includes a section titled "MESOCYCLE PROGRESS SO FAR": what the mesocycle the
 athlete is currently in has already banked — its volume and measured intensity, then each
 already-trained week with the load the plan asked of it beside the load the athlete actually
 produced, then any fitness test it has already run. Those days are history and are not yours
-to write — you are producing this block's REMAINDER, not the block.
+to write — you are producing this mesocycle's REMAINDER, not the mesocycle.
 
-Read it as the progression's starting point, not as a fresh block. Carry the ramp on from
+Read it as the progression's starting point, not as a fresh mesocycle. Carry the ramp on from
 where the last completed week left it instead of restarting at week-one volume, and keep
-the block's remaining weeks pointed at the focus it was given. If one elapsed week's
-planned load dips clearly below the weeks around it, that week WAS this block's deload —
-do not schedule a second one; if no such dip has happened yet and the block's design calls
+the mesocycle's remaining weeks pointed at the focus it was given. If one elapsed week's
+planned load dips clearly below the weeks around it, that week WAS this mesocycle's deload —
+do not schedule a second one; if no such dip has happened yet and the mesocycle's design calls
 for one, it still belongs in the weeks you are writing. A dip that recurs on a fixed rhythm
 — every other week, where the athlete's guidelines alternate a heavier and a lighter week —
 is the microcycle, not the deload: the deload is the one-off dip below that rhythm.
@@ -168,50 +168,50 @@ with a further jump on top.
 
 This also BOUNDS the BENCHMARK PLACEMENT rule above: a boundary week whose fitness test
 already appears in that section has had its test, and must not be given a second one.
-Place a benchmark only where this block has not already run it.
+Place a benchmark only where this mesocycle has not already run it.
 """
 
 
-def _block_composition_task(block_progress: Optional[str], has_intensity: bool) -> str:
-    """The JUDGING THE BLOCK'S COMPOSITION section — the other end of
+def _mesocycle_composition_task(mesocycle_progress: Optional[str], has_intensity: bool) -> str:
+    """The JUDGING THE MESOCYCLE'S COMPOSITION section — the other end of
     DESIGN_intensity_distribution.md §9.4's handoff, which tells `adapt` that an over-hard
-    block "belongs to the next `workout generate`" (§9.2a).
+    mesocycle "belongs to the next `workout generate`" (§9.2a).
 
-    Gated on the zone tables actually having rows, not merely on the block-progress section
+    Gated on the zone tables actually having rows, not merely on the mesocycle-progress section
     existing: every paragraph below quotes those tables, and an athlete with no zone
     recordings would be pointed at a table that says "no zone data".
     """
-    if not block_progress or not has_intensity:
+    if not mesocycle_progress or not has_intensity:
         return ""
     return """
-### JUDGING THE BLOCK'S COMPOSITION
-The block-progress section carries what the athlete's sessions actually MEASURED, per sport
-and zone, beside what the plan PRESCRIBED over the same weeks and beside the block's stated
-focus. Composition is yours: how many hard sessions the block holds, and how its easy and
+### JUDGING THE MESOCYCLE'S COMPOSITION
+The mesocycle-progress section carries what the athlete's activities actually MEASURED, per sport
+and zone, beside what the plan PRESCRIBED over the same weeks and beside the mesocycle's stated
+focus. Composition is yours: how many hard sessions the mesocycle holds, and how its easy and
 hard work divide. `workout adapt` owns the other half — it sharpens how an already-scheduled
-session is prescribed and may not change what the block contains — and it defers exactly
+session is prescribed and may not change what the mesocycle contains — and it defers exactly
 this question to you.
 
 ATTRIBUTE BEFORE YOU ACT. Read the measured table against the PRESCRIBED table first,
 because the same divergence from the focus has two opposite causes and one wrong answer:
 - Measured tracks the prescription, but neither delivers the focus -> the PLAN is wrong,
-  and fixing it is yours. Re-shape the weeks still ahead so the block's hard/easy split
+  and fixing it is yours. Re-shape the weeks still ahead so the mesocycle's hard/easy split
   actually produces what its focus asks for.
 - Measured diverges from the prescription -> the athlete is executing something other than
   what was written. That is adapt's lane and it is already correcting it session by
-  session. Do NOT re-shape the block to match the deviation: cutting hard sessions because
-  easy days were run hard rewards the drift and hands the athlete an easier block for
+  session. Do NOT re-shape the mesocycle to match the deviation: cutting hard sessions because
+  easy days were run hard rewards the drift and hands the athlete an easier mesocycle for
   ignoring the plan. Hold the composition and keep the prescription honest.
 - Both track the focus -> there is nothing to correct here. Carry the design on.
 
-Where a change against the preceding block is shown, that is the periodization signal
-proper: intensity creeping up block over block is how a base phase quietly becomes a race
+Where a change against the preceding mesocycle is shown, that is the periodization signal
+proper: intensity creeping up mesocycle over mesocycle is how a base phase quietly becomes a race
 season, and deciding whether the weeks you are writing continue or arrest that trend is the
 one intensity judgement no other command can make.
 
 Condition all of this on the coverage line and the power table where one exists. An HR-only
-table under-reads a hard session, so a block can measure easy that was not — do not
-conclude a block was too soft from heart rate alone.
+table under-reads a hard session, so a mesocycle can measure easy that was not — do not
+conclude a mesocycle was too soft from heart rate alone.
 """
 
 
@@ -319,7 +319,7 @@ NEW_SIGNALS_SCHEMA = (
 def _planned_zone_task(zone_currencies: Optional[Dict[str, str]]) -> str:
     """The PRESCRIBING INTENSITY section (DESIGN_intensity_distribution.md §9.8).
 
-    The coach already decides an intensity target — it writes "6x3min @ VO2max" — and is
+    The week planner already decides an intensity target — it writes "6x3min @ VO2max" — and is
     the only thing in the system that knows the intent. So it states the distribution as
     structured data while it still knows it, instead of the app parsing it back out of
     prose afterwards (§10). Which currency each sport is planned in is the APP's call,
@@ -359,7 +359,7 @@ def _standing_answer_fields(standing_workouts: Optional[List[Workout]]) -> str:
     """The `keep`, `drop`, `replaces` and `change_reason` members of the generate response
     schema (DESIGN_plan_change_continuity.md §4.5).
 
-    Third region on the same gate as the TASK section and the data block: a schema that
+    Third region on the same gate as the TASK section and the data section: a schema that
     offers these where the prompt never explained them is exactly the half-application
     `tests/test_prompt_gates.py` exists to catch.
     """
@@ -422,11 +422,11 @@ RULE_MOVE_FIRST = (
     "   preserves the planned work; deleting it loses it."
 )
 
-RULE_BLOCK_NOT_YOURS = (
-    "THE BLOCK IS NOT YOURS TO RESHAPE. You adapt the sessions inside it.\n"
+RULE_MESOCYCLE_NOT_YOURS = (
+    "THE MESOCYCLE IS NOT YOURS TO RESHAPE. You adapt the sessions inside it.\n"
     "   No single day's signal — a depressed morning, a note, a drift reading —\n"
-    "   is evidence the BLOCK is too hard, and none permanently re-cuts its planned\n"
-    "   volume/intensity. When you do believe the block itself is wrong, say so in\n"
+    "   is evidence the MESOCYCLE is too hard, and none permanently re-cuts its planned\n"
+    "   volume/intensity. When you do believe the mesocycle itself is wrong, say so in\n"
     "   \"reason\" and leave it alone."
 )
 
@@ -477,13 +477,13 @@ usual "ease the hard day" logic is exactly wrong for it — run tired it reads l
 mis-scales every workout after it. NEVER reduce, soften or shorten a benchmark, and never
 blank the flag on the session that still IS the test. If the athlete will not be fresh on
 test day (negative TSB / poor recovery), MOVE it intact — same content, same
-benchmark_type — to a later day within THIS block where they will be fresher, and lighten
+benchmark_type — to a later day within THIS mesocycle where they will be fresher, and lighten
 the days before it; emit the test on its new date and a replacement for its old one.
-If it already sits on the block's LAST day and no later in-block day exists,
+If it already sits on the mesocycle's LAST day and no later in-mesocycle day exists,
 POSTPONE it: replace it with an ordinary easy session (no benchmark_type) — a compromised
 maximal test sets a wrong anchor that mis-scales every session after it, so a skipped test
-costs a retest where a bad number costs a block.
-The next generated block re-places the test when it is due.
+costs a retest where a bad number costs a mesocycle.
+The next generated mesocycle re-places the test when it is due.
 A benchmark you are NOT changing is not returned at all — like any unchanged session.
 
 benchmark_type says what a session IS, not which day it sits on — it travels with the test,
@@ -491,7 +491,7 @@ not with the date. So any OTHER session you put on a test's date — the replace
 behind by a move, the easy day of a postponement, or something the athlete asked for
 instead — is NOT the test and MUST carry "benchmark_type": null. Copying the flag onto it
 files that session as a completed fitness test: a social ride is then read as an FTP
-result, and the block believes it has already tested and skips the real one. If you replace
+result, and the mesocycle believes it has already tested and skips the real one. If you replace
 a test rather than move it, say so in the reason and leave the flag off.
 """
 
@@ -510,8 +510,8 @@ class WorkoutLogicMixin:
         baseline: Optional[Dict[str, Any]] = None,
         pmc_warmup_cutoff: Optional[str] = None,
         pmc_context: Optional[str] = None,
-        block_progress: Optional[str] = None,
-        block_has_intensity: bool = False,
+        mesocycle_progress: Optional[str] = None,
+        mesocycle_has_intensity: bool = False,
         zone_currencies: Optional[Dict[str, str]] = None,
         anchor_history: Optional[str] = None,
         standing_workouts: Optional[List[Workout]] = None,
@@ -527,7 +527,7 @@ class WorkoutLogicMixin:
         `standing_workouts` are the sessions the athlete has already been told about that
         this span would rewrite, and `commitment_end` the last day of the window they were
         promised for (DESIGN_plan_change_continuity.md §4.2). `past_constraints` ended
-        earlier in the current block and explain its record (§6.1).
+        earlier in the current mesocycle and explain its record (§6.1).
         """
         start_str = start_str or today_str
         starting_phrase = "today" if start_str == today_str else start_str
@@ -550,7 +550,7 @@ class WorkoutLogicMixin:
         else:
             goal_week_exception = (
                 " Never place a test inside the last seven days before the goal or the\n"
-                "goal's own week — the final block tapers into the event, and a maximal "
+                "goal's own week — the final mesocycle tapers into the event, and a maximal "
                 "test there\n"
                 "competes with the effort it is meant to serve."
             )
@@ -560,7 +560,7 @@ class WorkoutLogicMixin:
             f"{starting_phrase}.\n"
             "Ensure the microcycles — one week, or longer where the athlete's guidelines\n"
             "alternate weeks — are designed specifically to match the focus, target volume, and\n"
-            "intensity of the active mesocycle block(s) the athlete is in during this period, and\n"
+            "intensity of the active mesocycle(s) the athlete is in during this period, and\n"
             "incorporate any deload weeks or exceptions for the athlete's active constraints in accordance\n"
             "with the science guidelines.\n"
             "Cover EVERY date of the span: a training day carries its session, a rest\n"
@@ -569,7 +569,7 @@ class WorkoutLogicMixin:
             "record, and a hole reads as the schedule ending.\n"
             "\n"
             "### BENCHMARK PLACEMENT (fitness tests — see the BENCHMARK guidelines above)\n"
-            "A mesocycle-boundary week (a block's final week) is the natural slot for a fitness test;\n"
+            "A mesocycle's final week is the natural slot for a fitness test;\n"
             "whether one is DUE there is the BENCHMARK guidelines' call. Apply their re-benchmark\n"
             "triggers, typical cadence and minimum-interval floor — counting any tests you are placing\n"
             "in this same span — and leave a boundary week without a test when none is due. ANCHORS ON\n"
@@ -579,8 +579,8 @@ class WorkoutLogicMixin:
             "or easy day so the athlete is fresh (positive TSB) on test day, keep the title/description\n"
             "venue-neutral (e.g. \"20-min FTP test\" — the athlete's preferences say where\n"
             "they test), and never put it in a week the athlete's constraints put under full rest.\n"
-            + _block_progress_task(block_progress)
-            + _block_composition_task(block_progress, block_has_intensity)
+            + _mesocycle_progress_task(mesocycle_progress)
+            + _mesocycle_composition_task(mesocycle_progress, mesocycle_has_intensity)
             + _standing_sessions_task(standing_workouts)
             + _past_constraints_task(past_constraints)
             + _planned_zone_task(zone_currencies)
@@ -649,17 +649,17 @@ class WorkoutLogicMixin:
                 "starts the interval clock.\n" + anchor_history
             )
         # First of the history sections: it frames what the metrics and activities below
-        # mean — the same volume reads differently in a block's first week than its last.
+        # mean — the same volume reads differently in a mesocycle's first week than its last.
         # Same gate as the task section above, so the two never disagree about its presence.
-        if block_progress:
+        if mesocycle_progress:
             history_text_parts.append(
-                "## BLOCK PROGRESS SO FAR\n"
-                "The part of the current block already trained — see CONTINUING A BLOCK "
-                f"ALREADY UNDER WAY.\n{block_progress}"
+                "## MESOCYCLE PROGRESS SO FAR\n"
+                "The part of the current mesocycle already trained — see CONTINUING A MESOCYCLE "
+                f"ALREADY UNDER WAY.\n{mesocycle_progress}"
             )
         if metrics:
             metrics_text = format_metrics_history(metrics, pmc_warmup_cutoff)
-            # The single CTL ramp line + warm-up flag ride beside the per-day block (not
+            # The single CTL ramp line + warm-up flag ride beside the per-day lines (not
             # repeated per day), so the prompt that sets next week's load sees the fitness
             # trajectory (§5.2).
             if pmc_context:
@@ -678,14 +678,14 @@ class WorkoutLogicMixin:
                 f"## ACTUAL COMPLETED GARMIN ACTIVITIES IN WINDOW\n{completed_text}"
             )
 
-        # Why a week in this block went quiet, for a coach that can no longer see the
+        # Why a week in this mesocycle went quiet, for a coach that can no longer see the
         # days themselves — the metrics window does not reach them (§6.1).
         if past_constraints:
             history_text_parts.append(
-                "## CONSTRAINTS EARLIER IN THIS BLOCK\n"
+                "## CONSTRAINTS EARLIER IN THIS MESOCYCLE\n"
                 "These have passed — they are not yours to work around. They are why the "
-                "block's record\nreads as it does. See WHAT ALREADY HAPPENED IN THIS "
-                "BLOCK.\n"
+                "mesocycle's record\nreads as it does. See WHAT ALREADY HAPPENED IN THIS "
+                "MESOCYCLE.\n"
                 + self._render_constraints(past_constraints)
             )
 
@@ -708,10 +708,10 @@ class WorkoutLogicMixin:
             user_content += "\n\n" + "\n\n".join(history_text_parts)
 
         step("Querying OpenRouter to generate training workouts (microcycles)...", cyan)
-        plan_data = _eng.openrouter_client.complete(
+        planner_reply = _eng.openrouter_client.complete(
             system_prompt, user_content, label="workout_generate"
         )
-        return plan_data
+        return planner_reply
 
     def _workout_adapt_logic(
         self, target_date_str: str, history_days: int, start_date_str: str,
@@ -737,7 +737,7 @@ class WorkoutLogicMixin:
         `athlete_message` is an optional free-text note for THIS adaptation only; when
         present it is surfaced as a clearly-bounded section of the user content and the
         model is told to weigh it as today's intent without treating it as a durable
-        signal about the block.
+        signal about the mesocycle.
         """
         # has_message gates SIX regions that sit hundreds of lines apart: the clause
         # spliced into the change_reason wording, the note-handling instructions, the
@@ -768,7 +768,7 @@ class WorkoutLogicMixin:
         # adaptation as a response to fatigue or absence, and an athlete running their
         # easy days at Z3 is neither — they showed up for everything and feel fine.
         drift_branch = "" if not has_intensity else (
-            "- If the block's measured intensity distribution has diverged from its stated\n"
+            "- If the mesocycle's measured intensity distribution has diverged from its stated\n"
             "  focus, correct the prescriptions of the sessions still ahead — even when\n"
             "  recovery metrics are fine. A healthy athlete executing the wrong workout is\n"
             "  the case no other branch here covers.\n"
@@ -778,7 +778,7 @@ class WorkoutLogicMixin:
         # are adapt's alone and live here rather than as hoisted constants.
         standing_rules = _standing_rules_task(
             RULE_MOVE_FIRST,
-            RULE_BLOCK_NOT_YOURS,
+            RULE_MESOCYCLE_NOT_YOURS,
             "NAME THE CAUSE. Every session you change carries a \"change_reason\" (see the\n"
             "   schema); when something other than the metrics drove it, that cause belongs\n"
             "   there.",
@@ -796,8 +796,8 @@ the past {history_days} days: completed activities against planned workouts, the
 discrepancies (misses, workload/duration differences, rest violations), and the rolling
 baseline against the daily metrics sequence for signs of accumulated fatigue.
 
-Based on this, determine if we need to adapt the training plan for the remainder of
-the active mesocycle block (from {target_date_str} to {meso_end_date_str}).
+Based on this, determine if we need to adapt the sessions for the remainder of
+the active mesocycle (from {target_date_str} to {meso_end_date_str}).
 - If they are showing high fatigue or injury risk (e.g. elevated RHR, depressed HRV,
   poor sleep, or ATL:CTL > 1.3 without a planned overload reason), replace hard workouts
   with recovery or rest.
@@ -857,12 +857,12 @@ athlete recovers is encouraged; deepening an already-fresh cut is not.
 
         # Adapt owns execution, generate owns periodization (§9.2): changing what zone
         # Tuesday's run is prescribed at is adapt's call; changing how many hard sessions
-        # the block contains is not.
+        # the mesocycle contains is not.
         if has_intensity:
             custom_task += """
 ### CORRECTING EXECUTION DRIFT
-The block summary shows what the athlete's sessions ACTUALLY measured, per sport
-and zone, beside the block's stated focus — as a per-week rate over the block's
+The mesocycle summary shows what the athlete's activities ACTUALLY measured, per sport
+and zone, beside the mesocycle's stated focus — as a per-week rate over the mesocycle's
 completed weeks, then the current week's raw minutes so far with how much of that
 week has elapsed. The current week is NOT extrapolated: read it against the
 elapsed fraction yourself.
@@ -874,13 +874,13 @@ the intensity target and give it an explicit guard rail the athlete can act on
 mid-session (a HR ceiling, a pace cap, "walk the hills").
 - Drift upward means the athlete WANTS more, so do not only cap it: say where the
   appetite may legitimately go, in the batch-level reason, and spend it in the
-  block's own currency — in a volume block, more easy minutes; in an intensity
-  block, a fuller effort on the days already designated hard.
+  mesocycle's own currency — in a volume mesocycle, more easy minutes; in an intensity
+  mesocycle, a fuller effort on the days already designated hard.
 - Drift downward means under-execution, so the guard rail becomes a floor and the
   advice is about how to reach it. Condition this on the power table where one
   exists — HR lag makes under-execution look real when it is not.
 
-This is never a load reduction. If the block genuinely contains too much hard work
+This is never a load reduction. If the mesocycle genuinely contains too much hard work
 — as opposed to easy work being run too hard — that is composition, and it
 belongs to the next `workout generate`, not to you.
 """
@@ -892,8 +892,8 @@ belongs to the next `workout generate`, not to you.
         # a target no longer on the page (§9.8).
         custom_task += _planned_zone_task(zone_currencies)
 
-        # Inside the block's terminal window a cut cannot rebound before the block ends
-        # (DESIGN_block_boundary.md §3). Outside it the prompt is unchanged.
+        # Inside the mesocycle's terminal window a cut cannot rebound before the mesocycle ends
+        # (DESIGN_mesocycle_boundary.md §3). Outside it the prompt is unchanged.
         days_left = days_between(target_date_str, meso_end_date_str)
         if 0 <= days_left <= config.adapt_terminal_window_days:
             custom_task += _terminal_window_task(days_left, meso_end_date_str)
@@ -907,7 +907,7 @@ can't show (e.g. a niggle to protect, no access to a sport/venue on a given day,
 they feel). Weigh it as today's intent alongside the data: honour stated constraints, and
 let it tip a judgement call. It is advisory, not an override — do NOT schedule clearly
 unsafe load just because the athlete asks (if recovery signals warrant easing, ease and say
-why). It speaks for this adaptation only and is never durable evidence about the block.
+why). It speaks for this adaptation only and is never durable evidence about the mesocycle.
 """
 
             custom_task += constraint_extraction_task(
@@ -932,7 +932,7 @@ evidence-backed observations are authored only by the weekly history analysis
             '  "change_needed": true | false',
             (
                 '  "reason": "Overall rationale for the whole adaptation: the readiness/load\n'
-                '    picture and the strategy applied across the block, in AT MOST 3 SENTENCES\n'
+                '    picture and the strategy applied to the mesocycle, in AT MOST 3 SENTENCES\n'
                 '    (~60 words). Adapt runs daily, so this is the line the athlete reads most\n'
                 '    often — name the signal you acted on and what you did about it, and leave\n'
                 '    out the readings that did NOT change your mind. This is the batch-level\n'
@@ -998,7 +998,7 @@ evidence-backed observations are authored only by the weekly history analysis
         )
 
         metrics_text = format_metrics_history(metrics, pmc_warmup_cutoff)
-        # Single ramp line + warm-up flag beside the per-day block, so adapt sees the
+        # Single ramp line + warm-up flag beside the per-day mesocycle, so adapt sees the
         # fatigue trajectory (§5.2).
         if pmc_context:
             metrics_text += "\n" + pmc_context
@@ -1037,17 +1037,17 @@ evidence-backed observations are authored only by the weekly history analysis
             message_section = (
                 "\n## ATHLETE'S NOTE FOR THIS ADAPTATION\n"
                 "Free-text intent/constraints for today only — advisory, not an override;\n"
-                "do not treat as durable evidence about the block.\n"
+                "do not treat as durable evidence about the mesocycle.\n"
                 f"{athlete_message.strip()}\n"
             )
 
-        # The measured block summary (§9.3). Kept out of the metrics block on purpose:
+        # The measured mesocycle summary (§9.3). Kept out of the metrics section on purpose:
         # this is an execution signal, not a readiness one, and the two must not blur.
         intensity_section = ""
         if has_intensity:
             intensity_section = (
-                "\n## MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE BLOCK\n"
-                "What the athlete's sessions actually recorded, per sport and zone —\n"
+                "\n## MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE MESOCYCLE\n"
+                "What the athlete's activities actually recorded, per sport and zone —\n"
                 "see CORRECTING EXECUTION DRIFT.\n"
                 f"{intensity_context.strip()}\n"
             )

@@ -28,7 +28,7 @@ class TestSchemaStamping(unittest.TestCase):
         self.assertEqual(version, SCHEMA_VERSION)
 
     def test_a_stamped_database_skips_the_migrations(self):
-        """The 630-line DDL block used to run on every process start — for `--help`, and
+        """The 630-line DDL script used to run on every process start — for `--help`, and
         against the athlete's real file."""
         Database(db_path=self.path)
 
@@ -48,7 +48,7 @@ class TestSchemaStamping(unittest.TestCase):
             sqlite3.connect = real_connect
 
         # `schema_version` itself is created before it can be read; everything else
-        # belongs to the migration block that should not have run.
+        # belongs to the migration code that should not have run.
         ddl = [
             s for s in statements
             if ("CREATE TABLE" in s or "ALTER TABLE" in s) and "schema_version" not in s

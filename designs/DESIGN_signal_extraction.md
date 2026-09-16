@@ -48,7 +48,7 @@ same `has_message` flag, extracted by the same call. No extra round-trip, no ext
 **The confirmation flow gains a step 1b.** `DESIGN_constraints.md` §8 confirms constraints
 before the adaptation preview; signals are confirmed straight after them, each candidate
 its own `[y/N]`, still before the preview. Independent commits, as before: declining a
-signal does not block the adaptation, and vice versa.
+signal does not stop the adaptation, and vice versa.
 
 **A signal confirmed here informs the NEXT run, not this one.** The LLM call that proposed
 it has already returned. This is already true of constraints, but it is more

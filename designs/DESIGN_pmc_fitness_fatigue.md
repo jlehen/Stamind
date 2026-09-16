@@ -425,7 +425,7 @@ params exist for deliberate experimentation, not casual tuning.
   `recompute_derived()` lives in the `garmin` package, which imports `db`; a
   module-level call from `db/wipes.py` would be a circular import. And it
   opens its own connection, so calling it *inside* the wipe's
-  `with self._get_connection()` block either won't see the uncommitted deletes or
+  `with self._get_connection()` statement either won't see the uncommitted deletes or
   hits SQLite `database is locked`. So the recompute belongs one level up, at the
   command layer that already imports both: `cli/data.py` does
   `db.wipe_garmin_data(...)`, then `garmin.recompute_derived(dbh=cli.db)` immediately
@@ -477,7 +477,7 @@ of the PMC group — see §7. The rest of the line is unchanged.)
 - **TSB won't equal the shown CTL − ATL.** Per §3.1, `TSB = CTL(yesterday) −
   ATL(yesterday)`, but the line shows *today's* CTL/ATL. This is correct
   (matching TrainingPeaks' lag) but reads as an arithmetic error, so a one-line
-  footnote states the lag wherever TSB itself is surfaced (a CTL/ATL-only block
+  footnote states the lag wherever TSB itself is surfaced (a CTL/ATL-only line
   has no lag to explain, so it gets no footnote).
 - **Ramp is *not* on the per-day line.** Ramp is a slow-moving weekly figure;
   stamping it on all ~30 daily lines is repetition the LLM must wade through. It
@@ -505,7 +505,7 @@ after — see §7.)
   generate and adapt (`coach/engine/workouts.py`) — *and* the strategy/plan
   prompts. So the same one-liner is emitted into **both** contexts: once in the
   data summary, and once in the generate/adapt metrics context (a single line
-  beside the per-day block, not repeated per day). It is computed from the **full
+  beside the per-day lines, not repeated per day). It is computed from the **full
   stored CTL series** (§3.1), independent of the short prompt window, so a small
   window never spuriously drops it.
 - The §3.3(b) **warm-up flag line** appends here too when today's values are
@@ -532,7 +532,7 @@ so a suppressed field serializes as `null` — unambiguous to the LLM.)
 Two guards:
 
 - **Warm-up:** weeks entirely inside the §3.3 warm-up window emit `None` for all
-  three — otherwise every bootstrap narrates a phantom overreach block from
+  three — otherwise every bootstrap narrates a phantom overreach mesocycle from
   seeding artifacts. **Straddle guard:** for a week that only *partly* clears the
   cutoff, `end_ctl`/`min_tsb` may show but `week_ramp` is still suppressed
   whenever its `−7d` lookback lands *before* the warm-up cutoff — otherwise the

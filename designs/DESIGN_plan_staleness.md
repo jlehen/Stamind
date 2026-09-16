@@ -33,8 +33,8 @@ changed' regen proposal."* The profile fingerprint simply never got the same tre
 > a different value at generation time?
 
 Not "would the LLM have noticed it" — every profile field reaches every prompt through the
-one `_format_athlete_profile()` block, so prompt presence proves nothing. The question is
-whether the block structure, phase ordering, or volume ramp depends on it.
+one `_format_athlete_profile()` section, so prompt presence proves nothing. The question is
+whether the mesocycle structure, phase ordering, or volume ramp depends on it.
 
 ## 3. The partition
 
@@ -43,7 +43,7 @@ whether the block structure, phase ordering, or volume ramp depends on it.
 | `name` | **no** | A label. Nothing downstream branches on it. |
 | `equipment` | **no** | Edits are additive and session-level; per-day kit in `weekly_schedule` is what actually gates a session. |
 | `birth_year` | yes | Age drives recovery capacity and intensity distribution. Changes only as a *correction* — you do not age into a new birth year — so it fires rarely, and when it does the plan was built on a materially wrong age. |
-| `gender` | yes | Sex-specific physiology (hormonal cycle, substrate use, injury risk) belongs in the block structure, not just the session detail. Like `birth_year` it changes rarely, so over-triggering costs nothing. |
+| `gender` | yes | Sex-specific physiology (hormonal cycle, substrate use, injury risk) belongs in the mesocycle structure, not just the session detail. Like `birth_year` it changes rarely, so over-triggering costs nothing. |
 | `weekly_target_hours` | yes | Volume is the spine of the periodization. |
 | `sport_preferences` | yes | The modality palette. Adding or dropping a sport changes the mesocycle mix wholesale. |
 | `chronic_injuries` | yes | Free text, but structural in content ("no court sports"). The one field where *under*-triggering has a physical cost. |
@@ -69,7 +69,7 @@ and its failure mode is silently *under*-triggering on an injury edit.
   load structure.
 - `certainty_percent` — in. It steers how much load the plan dares commit to a given day.
 - per-day `equipment` — out. Swapping Tuesday's kettlebells for a rower changes what
-  Tuesday is, not the block structure.
+  Tuesday is, not the mesocycle structure.
 
 ## 5. Naming the field
 
@@ -138,7 +138,7 @@ one blob that over-triggers by design (§4), the athlete meets this question mos
 exactly the case where the answer is *no* — a reworded sentence about how sessions should
 be described. So the test is now printed with the question:
 
-> Regenerate only if the change would have altered the block structure, phase order or
+> Regenerate only if the change would have altered the mesocycle structure, phase order or
 > volume ramp. Wording, tone or how sessions are described: keep the plan — your next
 > `workout generate` picks it up anyway.
 
@@ -153,7 +153,7 @@ command whose whole job is to show a plan and the inputs it was generated from, 
 check at all. So the notice appeared where it could not be acted on and was absent where
 it would be looked for.
 
-It now prints in `plan show`, immediately under the `Inputs considered` block it
+It now prints in `plan show`, immediately under the `Inputs considered` section it
 contradicts, naming both routes out. `status` keeps a one-line mention and points there
 rather than at `plan generate`: an overview reports, it does not adjudicate a replan.
 
@@ -176,7 +176,7 @@ companion voice draws nothing — regenerating is operator work, and the compani
 has no shell to run either command in (DESIGN_render_persona.md §5), the same silence
 `runway_hint` already takes.
 
-## 10. Showing the edit, and asking the coach
+## 10. Showing the edit, and asking the coach model
 
 **Date:** 2026-09-06 · **Branch:** worktree-staleness-diff-verdict
 
@@ -192,12 +192,12 @@ sorted JSON, so a reordered dict is not a change. Threshold drift shows no diff 
 reason already carries the numbers. One renderer in the service (`profile_diff`), one
 printer in `cli/staleness.py`, and `plan show`, `plan keep` and both questions use it.
 
-**The coach's read.** Before either question the coach is asked the §2 test itself: given
+**The verdict call.** Before either question, the coach model is asked the §2 test itself: given
 this diff and the plan as it stands, would you have built a structurally different
 periodization? It answers `{"reshaping": bool, "why": str}` and the line prints as
 `Coach: keep the plan. …` or `Coach: re-shaping. …`.
 
-- *Small on purpose.* The rubric, the diff, the strategy text and the block list. No
+- *Small on purpose.* The rubric, the diff, the strategy text and the mesocycle list. No
   science file, no history, no metrics: the question is structural, and everything the
   athlete's state would add is already baked into the plan being judged. First run on a
   real instance: ~5k prompt tokens.
@@ -205,7 +205,7 @@ periodization? It answers `{"reshaping": bool, "why": str}` and the line prints 
   rubric names the three things that count, lists what does not (wording, tone,
   motivation, what to listen to, which days), and demands the concrete structural change
   it would make — "cannot name one" is keep.
-- *On the coach's model, not the router's.* The verdict predicts what the coach would do.
+- *On the coach's model, not the router's.* The verdict predicts what `plan generate` would do.
   The router model exists because bot routing runs on every message and must be cheap;
   this runs only when an input changed. The gain from using the same model is
   consistency between the prediction and the regeneration, not accuracy — the model has
@@ -238,7 +238,7 @@ fields only. The bot has no path to this question (§9's companion exemption sta
 directive ("keep 2 sessions/week through every phase") with tone and session flavour.
 The directive was the problem, not the blob: it was a second prescription living beside
 the athlete's science documents, whose banner already tells the coach they "govern what
-is prescribed: volumes, durations, session counts, block order, taper depth". Nothing said
+is prescribed: volumes, durations, session counts, mesocycle order, taper depth". Nothing said
 which of the two won, and the coach resolved it by judgement on every call. Meanwhile an
 edit to the science files — the prescriptive input — flagged nothing, because
 `science_dir` was not fingerprinted at all.
@@ -258,13 +258,13 @@ one level up.
   macrocycle carries `science_snapshot`, the documents as `{filename: text}` JSON, written
   at `plan generate` and by every keep-stamp. The reason reads
   `training guidelines changed: sustainable_training.md`, names added and removed files
-  the same way, and the diff and the coach's verdict get the edit like any profile field.
+  the same way, and the diff and the verdict call get the edit like any profile field.
   The text is stored rather than a hash because the verdict needs the old lines, and the
   prompt already carries these files on every call. The app's own `trainmate/science/` is
   not fingerprinted: it changes with the code and yields to the athlete's files.
 - A plan without a snapshot is not held to one — the rule the goals hash already follows
   — so nothing flags on upgrade; the first stamp or `plan generate` records it.
-- The profile block tells the coach, in one sentence beside the preferences, what they are
+- The profile section tells the coach, in one sentence beside the preferences, what they are
   for and where structure comes from. No conflict-resolution rule: after the move there
   is no conflict in a config that follows the split, and a rule for the residue would be
   the kind of mechanism that exists for a case no athlete hits in a real week.

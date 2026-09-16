@@ -42,7 +42,7 @@ The Coggan model, which is also Garmin's default power banding.
    7     neuromuscular  > 150    10 (all-out)      ATP-PC power, neuromuscular recruitment.
 
 Zones are measurement vocabulary, not targets. A plan may deliberately aim a
-session at a band offset from a zone boundary (e.g. a threshold block hedging
+session at a band offset from a zone boundary (e.g. a threshold interval hedging
 below FTP); the plan's stated target governs, not the zone name nearest to it.
 
 

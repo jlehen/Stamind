@@ -1,25 +1,25 @@
-# Block progress: regenerating the remainder of a block already under way
+# Mesocycle progress: regenerating the remainder of a mesocycle already under way
 
 ## 1. The problem
 
 `workout generate` archives every workout from today onward and writes a fresh span
-(`coach/service/workouts.py::workout_generate`). Run mid-block — the ordinary case, since the
+(`coach/service/workouts.py::workout_generate`). Run mid-mesocycle — the ordinary case, since the
 default span is `workout_generation_span_days` (28) from today while a mesocycle is typically
-four weeks — it is therefore writing the **remainder** of a block whose first weeks are
+four weeks — it is therefore writing the **remainder** of a mesocycle whose first weeks are
 already trained.
 
 It was given nothing about those weeks. Its whole view of the athlete was
 `coach.metrics_lookback_days` (15) of raw activities and metrics, the CTL ramp line, the
 baseline, and `meso_text`: a flat list of `name (start to end): focus` built by
 `coach/service/prompt.py::_get_active_strategy_and_meso_text`. No planned workouts at all,
-so no adherence signal; nothing block-relative, so no sense of where in the block it stood.
+so no adherence signal; nothing mesocycle-relative, so no sense of where in the mesocycle it stood.
 
-This made it the only one of the three coach prompts blind to the block's elapsed part:
+This made it the only one of the three coach prompts blind to the mesocycle's elapsed part:
 
-| prompt | block-progress context |
+| prompt | mesocycle-progress context |
 | --- | --- |
-| `plan generate` | `_build_prior_training_context` — per-elapsed-block planned-vs-actual: volume, load, per-sport per-zone distribution, block-over-block deltas (DESIGN_backward_evaluation.md §6) |
-| `workout adapt` | `_intensity_block_context` — the active block to date as a per-week rate beside its focus, plus the current week raw (DESIGN_intensity_distribution.md §9.3) |
+| `plan generate` | `_build_prior_training_context` — per-elapsed-mesocycle planned-vs-actual: volume, load, per-sport per-zone distribution, mesocycle-over-mesocycle deltas (DESIGN_backward_evaluation.md §6) |
+| `workout adapt` | `_intensity_mesocycle_context` — the active mesocycle to date as a per-week rate beside its focus, plus the current week raw (DESIGN_intensity_distribution.md §9.3) |
 | `workout generate` | none |
 
 Four consequences, in the order they bite:
@@ -27,16 +27,16 @@ Four consequences, in the order they bite:
 - **The deload is duplicated or dropped.** The TASK instructs the model to "incorporate any
   deload weeks … in accordance with the science guidelines". There is no structural deload
   concept anywhere in TrainMate — it is prompt prose only — so nothing said whether the
-  block's easy week had already been taken. A second one in week 4 was a compliant answer.
+  mesocycle's easy week had already been taken. A second one in week 4 was a compliant answer.
 - **The progression restarts.** With only a 15-day activity average to anchor on, the
-  block's remaining weeks get re-derived as though they were its opening weeks. CTL is a
+  mesocycle's remaining weeks get re-derived as though they were its opening weeks. CTL is a
   single scalar and does not carry per-week volume.
 - **The boundary benchmark is re-placed.** BENCHMARK PLACEMENT says to schedule one fitness
   test in each mesocycle-boundary week the span covers, unconditionally. Regenerate *inside*
   the boundary week after the test was run and the model places a second one; the only
   counter-signal was a quietly-updated threshold in the profile, which the prompt never
   connected to "the test already happened".
-- **A missed block reads as a completed one.** With no planned rows, generate cannot form
+- **A missed mesocycle reads as a completed one.** With no planned rows, generate cannot form
   planned-vs-actual at all: an athlete who trained four of eight planned sessions looks
   identical to one who trained four of four, and the next weeks ramp from a number the
   athlete never reached.
@@ -48,7 +48,7 @@ Two things ride in this one section, and it is worth keeping them apart:
 - **Volume, adherence and test history** (§3, §4) — facts about a job
   `DESIGN_intensity_distribution.md` §9.2 already assigns to `generate`. No design line moves.
 - **The measured intensity distribution** (§5) — §9.4's handoff, which tells `adapt` that an
-  over-hard block "belongs to the next `workout generate`". Landing that needed a deliberate
+  over-hard mesocycle "belongs to the next `workout generate`". Landing that needed a deliberate
   amendment, recorded as §9.2a of the intensity design.
 
 §9.3's warning is respected throughout: nothing here travels via `meso_text`, which plan
@@ -56,7 +56,7 @@ generation also reads. Both halves are threaded as arguments of their own.
 
 ## 3. The context (data)
 
-`coach/service/context.py::_block_progress_context(as_of, gen_start)` renders the block's
+`coach/service/context.py::_mesocycle_progress_context(as_of, gen_start)` renders the mesocycle's
 elapsed part, threaded exactly as `pmc_context` is: computed in the service layer beside
 `_pmc_prompt_context(...)`, passed as one new named argument into
 `engine._workout_generate_logic(...)`, rendered as its own user-content section.
@@ -81,11 +81,11 @@ Build 1 — focus "threshold development" (2 completed weeks of 4, plus 2 days)
     - week of 2026-07-06: planned 200, actual 200 (100%)
     - week of 2026-07-13: planned 200, actual 100 (50%)
     - week of 2026-07-20 (in progress, 2 of 7 days): planned 60 so far, actual 60 (100%)
-  Fitness tests this block has already run:
+  Fitness tests this mesocycle has already run:
     - 2026-07-15: ftp_20min (cycling) — Functional Threshold Power (FTP) 271 W
 ```
 
-The intensity half is `intensity.block_report`, unchanged except for §5's added table. It
+The intensity half is `intensity.mesocycle_report`, unchanged except for §5's added table. It
 opens with the same `format_header` line the section would print for itself, so it **stands in
 for** that header rather than being stacked under a second copy.
 
@@ -95,16 +95,16 @@ today is history and must be counted as such — otherwise the header's complete
 the week lines below disagree by a day. The header itself is `intensity.format_header`,
 unchanged, so it states what divided the numbers (§4 of the intensity design).
 
-**Returns None** — and the prompt is then byte-identical to before — when there is no
-fulfilled part to report: `as_of` outside every block (`get_active_mesocycle` falls back to a
-future or first block, which would describe training that never happened), `gen_start` on or
-before the block's first day (generate is writing the whole block, with nothing to continue),
-or an elapsed part holding no rows at all.
+**Returns None** — and the prompt is then byte-identical to before — when there is no fulfilled part
+to report: `as_of` outside every mesocycle (`get_active_mesocycle` falls back to a future or first
+mesocycle, which would describe training that never happened), `gen_start` on or before the
+mesocycle's first day (generate is writing the whole mesocycle, with nothing to continue), or an
+elapsed part holding no rows at all.
 
 ### 3.1 Reusing the weekly maths
 
 The week lines come from `progression.weekly_aggregates` — the same planned-vs-actual weekly
-computation `tm progress` renders — so the coach and the athlete can never read different
+computation `tm progress` renders — so the week planner and the athlete can never read different
 numbers for the same week. `progression.week_plan_denom` supplies the comparable denominator,
 which for the in-progress week is its elapsed slice.
 
@@ -113,9 +113,9 @@ extrapolated**, following DESIGN_intensity_distribution.md §9.3: turning two da
 week's projection would be a fabrication, and a model given the raw figure reasons about it
 fine.
 
-**Partiality is judged against the block, not `partial_plan`.** That flag compares a week
+**Partiality is judged against the mesocycle, not `partial_plan`.** That flag compares a week
 against the workout rows handed in, so a Monday the athlete simply had no session on reads as
-"the plan starts mid-week" when it does not. Only a week the block itself straddles is
+"the plan starts mid-week" when it does not. Only a week the mesocycle itself straddles is
 genuinely incomparable, and that is what gets flagged.
 
 ### 3.2 No deload label
@@ -129,11 +129,11 @@ explicitly that a clear dip in an elapsed week *was* the deload.
 **Amendment, 2026-09-16.** An athlete whose guidelines alternate a heavier and a lighter
 week — two hard rides one week, one hard ride and a kettlebell HIIT the next — produces a
 dip every other week by design. Read literally, the rule above would take the first light
-week as the block's deload and suppress the real one. So the rule now adds: a dip that
+week as the mesocycle's deload and suppress the real one. So the rule now adds: a dip that
 recurs on a fixed rhythm is the microcycle, not the deload; the deload is the one-off dip
 below that rhythm. Still no label, no threshold and no field — the model reads the rhythm
 the same way it reads the dip. The alternation itself lives in the athlete's science
-documents, anchored to the block start so that a `workout generate` opening mid-block can
+documents, anchored to the mesocycle start so that a `workout generate` opening mid-mesocycle can
 tell which week it is resuming into; the app stores no cycle phase.
 
 ### 3.3 Per-sport gap annotation
@@ -152,7 +152,7 @@ strength sessions and the cycling the goal depended on was on plan.
 `progression.weekly_aggregates` therefore also buckets each week's load by
 `sports.canonical_sport` (`actual_load_by_sport`, `planned_load_by_sport`,
 `planned_load_elapsed_by_sport?`; `week_plan_denom_by_sport` is the per-sport counterpart of
-`week_plan_denom`, same elapsed-vs-full rule). `_block_week_lines` appends a second, indented
+`week_plan_denom`, same elapsed-vs-full rule). `_mesocycle_week_lines` appends a second, indented
 line — `of which cycling: 212/205 (103%), strength_training: 0/32 (0%)` — under any week where
 some sport's own adherence rate sits >=20 points off the week's blended rate, i.e. that sport
 is not telling the same story as the total. The trigger is deliberately NOT "the blended total
@@ -162,8 +162,8 @@ gets no second line — there is nothing the split would add.
 
 ## 4. The prompt
 
-`coach/engine/workouts.py::_block_progress_task` appends a `CONTINUING A BLOCK ALREADY UNDER
-WAY` section, gated on the data being present so a clean block start produces the prompt it
+`coach/engine/workouts.py::_mesocycle_progress_task` appends a `CONTINUING A MESOCYCLE ALREADY UNDER
+WAY` section, gated on the data being present so a clean mesocycle start produces the prompt it
 always did. It names the data section, states that those days are history, and asks for three
 things: carry the ramp on rather than restarting it; treat a clear dip in an elapsed week as
 the deload already taken; build from the load the athlete actually produced rather than from an
@@ -179,7 +179,7 @@ where it is stated beats dropping a duplicate after the fact.
 De-duplication keys on the **planned benchmark session**, not the logbook: a test the athlete
 performed but never recorded still must not be scheduled twice. A logbook row is matched to its
 session by `workout_id`, falling back to a same-date reading for a result recorded without the
-link; an in-block row matching no session is reported as an ad-hoc test. The window stops at
+link; an in-mesocycle row matching no session is reported as an ad-hoc test. The window stops at
 `gen_start`, so a benchmark in the part being re-planned is never reported as run — claiming it
 had would suppress the very test generate must place.
 
@@ -192,38 +192,38 @@ down) and must not answer for sessions this run just replaced.
 
 ## 5. The composition half
 
-`_block_progress_context` also calls `intensity.block_report` for the block it is reporting,
-with two arguments `adapt` never passes (`DESIGN_intensity_distribution.md` §9.2a):
-`previous=` for the block-over-block delta, and a new `fetch_workouts=` for what the plan
-prescribed over the same rate window. `coach/engine/workouts.py::_block_composition_task` then
-appends a `JUDGING THE BLOCK'S COMPOSITION` section.
+`_mesocycle_progress_context` also calls `intensity.mesocycle_report` for the mesocycle it is
+reporting, with two arguments `adapt` never passes (`DESIGN_intensity_distribution.md` §9.2a):
+`previous=` for the mesocycle-over-mesocycle delta, and a new `fetch_workouts=` for what the plan
+prescribed over the same rate window. `coach/engine/workouts.py::_mesocycle_composition_task` then
+appends a `JUDGING THE MESOCYCLE'S COMPOSITION` section.
 
-Its core is an **attribution rule**, not a licence to cut. A block measuring off its focus has
+Its core is an **attribution rule**, not a licence to cut. A mesocycle measuring off its focus has
 two opposite causes: if measured tracks the prescription, the plan is mis-designed and
 re-shaping the remaining weeks is generate's; if measured diverges from the prescription, the
-athlete is mis-executing, which is adapt's, and re-shaping the block around it would reward the
-drift — the athlete gets an easier block for ignoring the plan. §9.2a tabulates the cases.
+athlete is mis-executing, which is adapt's, and re-shaping the mesocycle around it would reward the
+drift — the athlete gets an easier mesocycle for ignoring the plan. §9.2a tabulates the cases.
 
 The section also names adapt's half explicitly, so generate does not start writing HR ceilings
 into descriptions, and repeats §7's coverage caveat: an HR-only table under-reads a hard
-session, so a block must not be judged too soft on heart rate alone.
+session, so a mesocycle must not be judged too soft on heart rate alone.
 
 ### 5.1 Gate discipline
 
-`_block_progress_context` returns `(text, has_intensity)` — a pair, like
+`_mesocycle_progress_context` returns `(text, has_intensity)` — a pair, like
 `_pmc_prompt_context`'s. Every paragraph of the composition section quotes the zone tables, so
-it is gated on those tables *having rows*, not on the block-progress section merely existing:
+it is gated on those tables *having rows*, not on the mesocycle-progress section merely existing:
 an athlete with no HR or power recordings gets the volume half and none of the composition
 instructions. Otherwise the prompt would point at a table reading "no zone data recorded".
 
-The flag asks `intensity.measured_window` — factored out of `block_report` for this — so the
+The flag asks `intensity.measured_window` — factored out of `mesocycle_report` for this — so the
 gate and the table are decided from the same window. Asking `rate_window` directly instead
-would disagree with the table on a block too young to average, whose data all sits in the
+would disagree with the table on a mesocycle too young to average, whose data all sits in the
 partial tail the rate window excludes.
 
 The section as a whole is gated on **banked evidence** (week lines or tests), not on
-`block_report` returning something: a started block with nothing recorded still yields a report
-("no completed activities in …"), and pairing that with instructions about carrying a ramp on
+`mesocycle_report` returning something: a started mesocycle with nothing recorded still yields a
+report ("no completed activities in …"), and pairing that with instructions about carrying a ramp on
 from the last completed week describes a week that does not exist.
 
 ## 6. Deliberately not done
@@ -233,7 +233,7 @@ from the last completed week describes a week that does not exist.
   rail on the next session (§9.2a).
 - **Dropping a model-proposed duplicate benchmark deterministically.** The rest-window
   pre-pass has that shape, but a date-window heuristic here would also suppress legitimate
-  re-tests — a short block whose boundary test falls close behind the previous block's above
+  re-tests — a short mesocycle whose boundary test falls close behind the previous mesocycle's above
   all. The prompt names the completed tests, and the existing same-day collision guard still
   runs.
 - **Per-week session counts.** `weekly_aggregates` returns loads, not counts, and the
@@ -242,36 +242,36 @@ from the last completed week describes a week that does not exist.
 - **Showing the elapsed part's planned *sessions*.** Only weekly loads cross into the prompt.
   The microcycle's weekday rhythm is visible in the completed-activity list generate already
   receives, and a second read-only-but-prompt-visible workout list is the cost
-  DESIGN_block_boundary.md §5 declined for the same modest gain. This entry stands, and is
+  DESIGN_mesocycle_boundary.md §5 declined for the same modest gain. This entry stands, and is
   about the *elapsed* part: the forward sessions a prior adapt eased do reach the prompt
   (DESIGN_workout_revisions.md §7.1), but those are days generate is being asked to decide
   about rather than history it may only read.
 
-## 7. Surviving a replan: keeping the block under way
+## 7. Surviving a replan: keeping the mesocycle under way
 
-Everything above keys off `meso['start_date']`. `_block_progress_context` returns None when
-`elapsed_end < meso['start_date']`, and `intensity.block_report` measures its window from the
-same field. That is not incidental: **a block owns its sessions by date containment.** There is
+Everything above keys off `meso['start_date']`. `_mesocycle_progress_context` returns None when
+`elapsed_end < meso['start_date']`, and `intensity.mesocycle_report` measures its window from the
+same field. That is not incidental: **a mesocycle owns its sessions by date containment.** There is
 no column on `workouts` pointing at a mesocycle — `get_covering_mesocycle`,
 `get_governing_mesocycles` and `get_periodization_ids_for_date` all resolve by comparing the
-block's two dates against the day in question. A block re-dated to today therefore contains
+mesocycle's two dates against the day in question. A mesocycle re-dated to today therefore contains
 none of the sessions already trained under it.
 
 `plan generate` used to guarantee exactly that. Its task said, unconditionally, that the first
-mesocycle must start on the plan start date, and that date is today. So a replan run mid-block
-cut the block in flight and opened a fresh one today. The result was that this whole section
+mesocycle must start on the plan start date, and that date is today. So a replan run mid-mesocycle
+cut the mesocycle in flight and opened a fresh one today. The result was that this whole section
 went silent precisely when a plan had just changed, and §1's four consequences came back — the
 deload duplicated or dropped, the progression restarted, the boundary benchmark re-placed, a
-partly-missed block reading as a completed one.
+partly-missed mesocycle reading as a completed one.
 
-The task now branches. When a block is under way it is quoted to the coach with its dates,
-focus and days already trained, and the coach picks one of two outcomes: keep it as the first
-mesocycle **with its original start date**, or judge that it no longer fits and start fresh on
-the plan start date. It must state which it chose, and why, in the strategy text, so the choice
-is auditable afterwards from the plan itself.
+The task now branches. When a mesocycle is under way it is quoted to `plan generate`'s model call
+with its dates, focus and days already trained, and that call picks one of two outcomes: keep it
+as the first mesocycle **with its original start date**, or judge that it no longer fits and
+start fresh on the plan start date. It must state which it chose, and why, in the strategy
+text, so the choice is auditable afterwards from the plan itself.
 
 Naming the original start date is the load-bearing half. An instruction that only says "let the
-current block finish" is honoured by emitting the same name, focus and end date re-dated to
+current mesocycle finish" is honoured by emitting the same name, focus and end date re-dated to
 today — which reads as continuity in `plan show` and delivers none of the machinery above. The
 two cases are indistinguishable to a reader and opposite to every consumer, so the date is
 stated explicitly and negatively as well (`Do NOT re-date it to …`).
@@ -280,23 +280,23 @@ Three cases withhold the offer:
 
 - **The plan start is pinned past today.** A preceding goal's plan sets the start to the day
   after that goal's target. Reaching back before it would overlap that goal's season.
-- **`--fresh`.** A clean slate is not asked to finish the block it is departing from
+- **`--fresh`.** A clean slate is not asked to finish the mesocycle it is departing from
   (DESIGN_backward_evaluation.md §6.1).
-- **The covering block starts today.** Nothing is under way, so there is nothing to finish.
+- **The covering mesocycle starts today.** Nothing is under way, so there is nothing to finish.
 
 There is deliberately **no duration threshold** — no "only keep it if a week remains". The plan
 window itself has no minimum or maximum length for the same reason (ARCHITECTURE.md §10): how
-much of a block is worth finishing is a judgement the science guidelines inform, not one the app
+much of a mesocycle is worth finishing is a judgement the science guidelines inform, not one the app
 pre-empts with a number.
 
 ### Deliberately not done
 
-- **De-duplicating the kept block across plan versions.** A kept block now exists as a row under
-  both the superseded macrocycle and the new one, over overlapping dates. `plan_lineage` dedupes
-  by macrocycle id, not by date span, so at the *next* replan the planned-vs-actual review
-  flattens both and reports the same trained days twice. It bites only from the second replan
-  on, and the fix (prefer the newest macrocycle's version of an overlapping span) is a change to
-  the lineage walk that the review's cross-season delta has its own opinions about.
-- **Restoring the block-over-block delta.** `_preceding_mesocycle` navigates by macrocycle id,
-  so a kept block — first in a fresh macrocycle — still has no predecessor there and reports no
-  delta. That is what happened before this change too; it is simply not fixed by it.
+- **De-duplicating the kept mesocycle across plan versions.** A kept mesocycle now exists as a row
+  under both the superseded macrocycle and the new one, over overlapping dates. `plan_lineage`
+  dedupes by macrocycle id, not by date span, so at the *next* replan the planned-vs-actual review
+  flattens both and reports the same trained days twice. It bites only from the second replan on,
+  and the fix (prefer the newest macrocycle's version of an overlapping span) is a change to the
+  lineage walk that the review's cross-season delta has its own opinions about.
+- **Restoring the mesocycle-over-mesocycle delta.** `_preceding_mesocycle` navigates by macrocycle
+  id, so a kept mesocycle — first in a fresh macrocycle — still has no predecessor there and reports
+  no delta. That is what happened before this change too; it is simply not fixed by it.
