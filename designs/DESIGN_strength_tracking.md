@@ -1,6 +1,12 @@
 # Strength tracking: reading the sets, naming them, prescribing in kilograms
 
-**Status:** Phase 1 implemented (§11.1) · Phase 2 draft (the watch's guesses in §6–§7, and §8–§10) · **Date:** 2026-09-16 (rev. 12) · **Branch:** worktree-strength-tracking-design
+**Status:** Phase 1 implemented (§11.1) · Phase 2 draft (the watch's guesses in §6–§7, and §8–§10) · **Date:** 2026-09-17 (rev. 13) · **Branch:** worktree-strength-tracking-design
+
+Revision 13 takes the first fixes from a review of revision 12. `prescribed_sets` and
+`strength_checks` are schema 16, since main reached 15 in the meantime. A session the athlete
+added by hand is left out of the sessions to write and of what makes the strength planner
+run, until the week planner writes a brief over it (§9). And "brief", a word this design
+brought in and used without saying so, joins the names below.
 
 Revision 12 fixes what a review of revision 11 found in phase 2. A session is written as a
 rep range at one load, "3×4–6 @ 140": the reps are the athlete's dial and the load the
@@ -48,7 +54,11 @@ planner** is the LLM call inside `workout generate` and `workout adapt` that wri
 sessions of the coming weeks, several at a time, inside the mesocycles the plan gives it:
 a day, a sport, a duration, an RPE, a load, a title and a description each. The **strength
 planner** is the call this design adds: it writes a strength session from the week
-planner's brief and the athlete's history. A **session** is a planned workout and an
+planner's brief and the athlete's history. A **brief** is what the week planner writes as
+the description of a strength day from phase 2 on: what the session is for and what the plan
+asks of it that day, with no exercise, set, rep or load in it (§9). The word is this
+design's own, and AGENTS.md gains it when phase 2 lands (§11). A **session** is a planned
+workout and an
 **activity** is what Garmin recorded, the way the tables already split them; a **strength
 activity** is one that returned sets (§3). "The coach" is TrainMate speaking to the
 athlete, whichever call wrote the words. The design uses these names and no others for
@@ -758,14 +768,20 @@ path that writes strength sessions gets it: the two commands with their previews
   general, two lists in the profile, and the prose of the constraints active that day, which
   is where "hotel gym, dumbbells only" would be written. Equipment is not a constraint type,
   so these two places are all there is.
-- The sessions to write: every strength session in the span that has no prescribed sets,
-  with its title, duration, RPE and brief. That is every new session the week planner wrote
-  in this proposal, and a kept session written before phase 2, whose old prose stands in for
-  the brief.
-- The sessions to check: every other strength session in the span, whether the week planner
-  kept, revised or moved it, with the brief it has now and its prescribed sets. A session the
-  athlete added by hand is shown as context only: it is never asked about and never
-  rewritten.
+- The sessions to write: every strength session in the span that has no prescribed sets
+  and is not the athlete's own, with its title, duration, RPE and brief. That is every new
+  session the week planner wrote in this proposal, and a kept session written before phase
+  2, whose old prose stands in for the brief.
+- The sessions to check: every other strength session in the span that has prescribed sets,
+  whether the week planner kept, revised or moved it, with the brief it has now and those
+  sets.
+- A session the athlete added with `workout add` is the athlete's own, and the code knows it
+  by its source, "manual". It is shown as context only: never asked about, never written,
+  and never a reason to run. The week planner may still revise it
+  (DESIGN_plan_change_continuity.md §4.5), and when it does it writes a brief over the
+  athlete's text, as for any strength day. In that proposal the session is a session to
+  write like any other, and from then on it has prescribed sets and is checked like any
+  other.
 
 **What it returns.** For each session to write, its exercises in order: the name, the number
 of sets, the lowest and highest reps, and the load in kilograms, or no load for a bodyweight
@@ -875,7 +891,8 @@ does a session `workout swap` moved, whose lineage the row follows.
 
 The same stamp says when the strength planner runs at all: when the week planner wrote or
 revised at least one strength session, when a strength session in the span has no prescribed
-sets, or when the stamp is later than the row of a strength session in the span. Otherwise
+sets and is not the athlete's own, or when the stamp is later than the row of a strength
+session in the span. Otherwise
 there is nothing new to write from, and a morning adapt in a week with no lifting costs no
 call. An adapt whose week planner changed nothing still becomes a proposal when the strength
 planner updates a kept session.
@@ -888,10 +905,10 @@ session is written. A session whose every entry fails counts as a failed call. W
 strength planner's call fails it is tried once more, and when the second try fails too the
 proposal fails, the way it does today when the week planner's call fails: nothing is
 written, the command says so, and the morning adapt tries again the next morning. A session
-with a brief and no sets therefore never exists, and the one kept session without prescribed
-sets is one written before phase 2.
+with a brief and no sets therefore never exists. The kept sessions without prescribed sets
+are the ones written before phase 2 and the athlete's own.
 
-**Where the prescribed sets live.** A new table, schema 15:
+**Where the prescribed sets live.** A new table, schema 16:
 
 ```sql
 CREATE TABLE prescribed_sets (
@@ -1033,7 +1050,7 @@ or not a session is planned today, then the set-reading step, then its walk.
    `strength name` confirms it; and the naming answers come from names a person gave.
 2. The strength history, `trainmate/strength/history.py`, accessories and the not-done
    lines included (§8), and the `strength.history_changed_at` stamp its writers bump (§5).
-3. `prescribed_sets` and `strength_checks` (schema 15), with `WorkoutChange.append`,
+3. `prescribed_sets` and `strength_checks` (schema 16), with `WorkoutChange.append`,
    `restore` and `workout swap` carrying the sets, and the description split at its seam when a strength session is
    shown to the week planner (§9).
 4. The strength science, `trainmate/strength/progression.md` (§10).
@@ -1045,7 +1062,8 @@ or not a session is planned today, then the set-reading step, then its walk.
 Two implemented designs are amended when it lands. DESIGN_workout_revisions.md: a revision
 can carry prescribed sets, written with it and copied by a restore and a swap.
 DESIGN_plan_change_continuity.md: a standing strength session with prescribed sets is shown
-to the week planner as its title and brief, not its full description. The queue design's
+to the week planner as its title and brief, not its full description. AGENTS.md's list of
+words gains "brief". The queue design's
 list of kinds needs nothing: it points at §7 for both kinds and holds no wording of its own.
 
 **The science trim** no longer comes between the phases (§10). It is still worth doing for
@@ -1165,7 +1183,8 @@ Decided:
   weeks of it, the week planner is the call that writes the sessions, the strength planner
   is the call that writes a strength session, a session is planned where an activity is
   recorded, a strength activity is one that returned sets, and a group is consecutive
-  unnamed sets at one load.
+  unnamed sets at one load. One word is this design's own: a brief is the week planner's
+  description of a strength day, its purpose and no exercise, set, rep or load.
 - The week planner's reply schema does not change; its TASK gains one instruction, to write
   a brief for a strength day and no exercises, sets, reps or loads. The week planner learns
   nothing new about strength and is never shown a kilogram.
