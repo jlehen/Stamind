@@ -1,6 +1,11 @@
 # Strength tracking: reading the sets, naming them, prescribing in kilograms
 
-**Status:** Phase 1 implemented (§11.1) · Phase 2 draft (the watch's guesses in §6–§7, and §8–§10) · **Date:** 2026-09-17 (rev. 14) · **Branch:** worktree-strength-tracking-design
+**Status:** Phase 1 implemented (§11.1) · Phase 2 draft (the watch's guesses in §6–§7, and §8–§10) · **Date:** 2026-09-17 (rev. 15) · **Branch:** worktree-strength-tracking-design
+
+Revision 15 narrows what a failed strength planner call costs. It fails the proposal only
+when a session was to be written. When sessions were only to be checked, they are kept, the
+week planner's changes go through, and the athlete is told in the preview and the morning
+briefing that the kilograms were not rechecked (§9).
 
 Revision 14 takes the rest of what the athlete accepted from that review. A change the
 strength planner makes to a session the week planner did not mention holds the day's other
@@ -952,14 +957,30 @@ planner updates a kept session.
 must be whole numbers above zero, with the lowest reps not above the highest, and a load
 must not be negative. An entry that fails is dropped with a line in the preview — "Mon Sep
 21: 'Nordic curl' is not an exercise TrainMate knows, left out" — and the rest of the
-session is written. A session whose every entry fails counts as a failed call. When the
-strength planner's call fails it is tried once more, and when the second try fails too the
-proposal fails, the week planner's changes with it, the way it does today when the week
-planner's call fails: nothing is written, the command says so in the terminal, and the
-morning push renders the schedule as stored, the error a terminal aside
-(DESIGN_bot_simple_frontend.md), and tries again the next morning. A session
-with a brief and no sets therefore never exists. The kept sessions without prescribed sets
-are the ones written before phase 2 and the athlete's own.
+session is written. A session to write whose every entry fails counts as a failed call, and
+a session to check whose every entry fails is a "keep". When the strength planner's call
+fails it is tried once more. What a second failure costs depends on what was asked.
+
+With a session to write in the proposal, the proposal fails, the week planner's changes with
+it, the way it does today when the week planner's call fails: nothing is written, the command
+says so in the terminal, and the morning push renders the schedule as stored, the error a
+terminal aside (DESIGN_bot_simple_frontend.md), and tries again the next morning. A strength
+day with a brief and no exercises is worse than yesterday's schedule, so a session with a
+brief and no sets never exists. The kept sessions without prescribed sets are the ones
+written before phase 2 and the athlete's own.
+
+With only sessions to check, the failure is a "keep" for all of them. Their sets stand, the
+week planner's changes are applied, and no `strength_checks` row is written, so the next
+adapt asks again. Say that on Tuesday September 15 the week planner eases today's intervals
+to an easy hour after a bad night, and the strength planner, asked about Thursday, times out
+twice: the easing reaches the athlete, because nothing about Thursday's belt squat needed
+deciding before Thursday. The athlete is told, in one sentence the proposal carries as a
+notice: "I could not recheck Thursday's kilograms this morning. They stand as written, and I
+will look again tomorrow." The preview prints it, and the morning briefing's note includes
+it whether or not anything else changed, which covers the morning of the gym day itself. It
+does not go into the session's description: that text is rendered from the stored rows, so a
+line added to it would be a new revision of a session whose content did not change, and one
+more the next morning to take it out.
 
 **Where the prescribed sets live.** A new table, schema 16:
 
@@ -1119,11 +1140,12 @@ or not a session is planned today, then the set-reading step, then its walk.
    rule for a kept session, and its place in `workout_generate` and `workout_adapt` (§9).
 6. The exercise lines in the `workout generate` preview (§9).
 
-Two implemented designs are amended when it lands. DESIGN_workout_revisions.md: a revision
+Three implemented designs are amended when it lands. DESIGN_workout_revisions.md: a revision
 can carry prescribed sets, written with it and copied by a restore and a swap.
 DESIGN_plan_change_continuity.md: a standing strength session with prescribed sets is shown
-to the week planner as its title and brief, not its full description. AGENTS.md's list of
-words gains "brief". The queue design's
+to the week planner as its title and brief, not its full description.
+DESIGN_bot_simple_frontend.md: the morning adapt's note includes a proposal's notice, even
+when the proposal changed nothing. AGENTS.md's list of words gains "brief". The queue design's
 list of kinds needs nothing: it points at §7 for both kinds and holds no wording of its own.
 
 **The science trim** no longer comes between the phases (§10). It is still worth doing for
@@ -1255,8 +1277,10 @@ Decided:
 - The strength planner's exercises land in `prescribed_sets`, one row per group of sets
   with a rep range, keyed by the revision and copied by a restore and a swap. The
   description is rendered from them, brief above the seam and session below. An unknown
-  name drops that exercise, not the session, and a call that fails twice fails the
-  proposal. A session's sets change only when the returned sets differ and only on new
+  name drops that exercise, not the session. A call that fails twice fails the proposal
+  when a session was to be written; when sessions were only to be checked they are kept,
+  the week planner's changes apply, and the preview and the morning briefing say the
+  kilograms were not rechecked. A session's sets change only when the returned sets differ and only on new
   evidence, the `strength.history_changed_at` stamp being later than the session's last
   check in `strength_checks`, or when its brief or duration changed. The sets follow the
   lineage: a swapped session keeps them, and one `workout adapt` moves across dates is
