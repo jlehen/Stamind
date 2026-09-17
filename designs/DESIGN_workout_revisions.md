@@ -776,7 +776,7 @@ outright, but that authority runs forward, not backward: a constraint cannot un-
 session. Locked slots are the one thing a forced-rest day leaves standing.
 
 **Where this leaves the record.** The vacated session still becomes a planned rest day (§2,
-"RE-FILLING A DATE YOU VACATE"), so a day can carry both a completed ride and a rest row.
+"MOVING A SESSION TO ANOTHER DAY"), so a day can carry both a completed ride and a rest row.
 That is not a rest violation: the day's sessions pair in `id` order, the ride's own session
 is older than the rest row appended beside it, so the activity is consumed by the session
 that planned it and the rest day reads `rest_ok`.
@@ -848,7 +848,7 @@ still has days ahead), and reports it exactly as today. Same comparison, new tim
 | Command | Change kind | What it appends |
 |---|---|---|
 | `workout generate` | `generate` | A revision per changed day in the horizon; a void for every live slot from the generation start onward that the new sessions do not fill — open-ended past the horizon, matching today's `archive_future_workouts`, which has no end bound. A slot the plan KEEPS (§7.1) gets neither: it is claimed, so no void, and left alone, so no revision. |
-| `workout adapt` | `adapt` | A revision per eased session; a void for a session it drops. A session it moves or substitutes cross-sport: a void at the source and a revision at the destination carrying the session's lineage — the swap shape (§4). **No more `DELETE`.** |
+| `workout adapt` | `adapt` | A revision per eased session; a void for a session it drops. A session it moves to another day or substitutes cross-sport: a void at the source and a revision at the destination carrying the session's lineage — the swap shape (§4). The move is named in the answer's `replaces`, the field `workout generate` already uses (DESIGN_plan_change_continuity.md §4.5); the day it empties gets a rest row written by the app. **No more `DELETE`.** |
 | `workout swap` | `swap` | Two revisions (same sport) or four (cross-sport), per §4. |
 | `workout add` | `add` | One revision; with `--replace-day`, a void per other session that day. **No more `DELETE`.** |
 | `workout rm` | `rm` | One void revision carrying the athlete's reason. |

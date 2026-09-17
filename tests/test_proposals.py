@@ -63,6 +63,40 @@ class TestPairAdaptations(unittest.TestCase):
         self.assertTrue(pairs[0].is_swap)
         self.assertEqual(removals, ())
 
+    def test_a_moved_session_pairs_with_the_day_it_came_from(self):
+        """Thursday's gym goes to Friday, and Friday holds the rest day the plan wrote.
+        Paired by date alone, Friday's entry would replace that rest day and Thursday's
+        gym would read as cancelled — the move printed as two unrelated changes
+        (DESIGN_workout_revisions.md §11)."""
+        proposal = self._planned("2026-06-12", "strength", "Gym: Lower")
+        proposal["replaces_slot"] = ("2026-06-11", "strength")
+        thursday = self._planned("2026-06-11", "strength", "Gym: Lower")
+        friday_rest = self._planned("2026-06-12", "rest", "Rest Day")
+
+        pairs, removals = pair_revisions([proposal], [thursday, friday_rest])
+
+        self.assertEqual(pairs[0].original["date"], "2026-06-11")
+        self.assertFalse(pairs[0].is_swap, "a move keeps its sport")
+        # Friday's rest day is what the arriving session displaces, and Thursday's gym is
+        # not removed at all — it is the session that arrived.
+        self.assertEqual([r["title"] for r in removals], ["Rest Day"])
+
+    def test_the_day_a_move_empties_is_not_reported_as_replaced(self):
+        """The rest day the move leaves behind is a new session on Thursday, not the gym
+        session's replacement: the gym went to Friday, and saying both would hand its
+        history to two rows."""
+        moved = self._planned("2026-06-12", "strength", "Gym: Lower")
+        moved["replaces_slot"] = ("2026-06-11", "strength")
+        vacated = self._planned("2026-06-11", "rest", "Rest Day")
+        thursday = self._planned("2026-06-11", "strength", "Gym: Lower")
+
+        pairs, removals = pair_revisions([moved, vacated], [thursday])
+
+        by_date = {p.proposal["date"]: p for p in pairs}
+        self.assertEqual(by_date["2026-06-12"].original["date"], "2026-06-11")
+        self.assertIsNone(by_date["2026-06-11"].original)
+        self.assertEqual(removals, ())
+
     def test_alias_spellings_are_matched_canonically(self):
         proposal = self._planned("2026-06-10", "strength_training", "Lighter Lift")
         existing = self._planned("2026-06-10", "strength", "Heavy Lower")

@@ -99,8 +99,8 @@ in place and the History section shows the earlier form, its load, its target an
 reason (DESIGN_calendar_lineage.md §3). That reads as a change to something the athlete
 recognises.
 
-**`workout adapt` already leaves the trace this design wants.** Its vacate rule requires a
-replacement on any date it empties (`coach/engine/workouts.py::_vacate_task`), the
+**`workout adapt` already leaves the trace this design wants.** Its move rule leaves a
+replacement on any date it empties (`coach/engine/workouts.py::_move_task`), the
 replacement carries the displaced session's lineage, and the event is retitled
 "[Adapted] Rest Day" with the reason and the old session in History. Nothing in this
 design changes adapt's behaviour except what §4.6 shows it about a session's earlier form.
@@ -563,8 +563,8 @@ not continue the athlete's lineage, or it would render `[Manual]`.
 ### 5.4 A dropped session is a rest day on its own lineage
 
 Thursday's dropped ride becomes Thursday's "Rest Day" in the ride's lineage, the reason
-on it, the ride in its History. That is what `workout adapt`'s vacate rule already
-produces (`coach/engine/workouts.py::_vacate_task`), and the same event, retitled, is
+on it, the ride in its History. That is what `workout adapt`'s move rule already
+produces (`coach/engine/workouts.py::_move_task`), and the same event, retitled, is
 what the athlete sees in both cases. The `[Cancelled]` word does not appear: nothing was
 left without a replacement. The rest row's body carries the coach's sentence — "Long ride
 cancelled — never two hard days in a row" — and not the coverage backstop's "no session
@@ -822,8 +822,16 @@ generate answers "what does the plan say".** Adapt's cause is the athlete's stat
 not reshape the mesocycle (DESIGN_mesocycle_boundary.md §2), and it holds its easing tag over its
 whole reach. Generate's cause is the plan and the profile as they stand, it may reshape
 freely outside the window, and it reads the easing tag only inside it (§4.6).
-`replaces` across dates is new to both; adapt may adopt it later so that a move keeps its
-history there too.
+
+`replaces` across dates was new to both, and **adapt has since adopted it**
+(DESIGN_workout_revisions.md §11), which is what makes a session moved by an adaptation
+keep its history rather than start over on its new day. What the two share is the reading
+of the field and the two rules that follow from it — `coach/revisions.py`'s
+`replaces_source`, `carried_lineage` and `rest_in_place_of`. What stays apart is the set
+of answers each resolves it among: generate weighs a `replaces` against `keep`, `drop`
+and the standing sessions no answer named, adapt against the sessions the athlete has
+already trained. Those conflict rules are short and different, so each command states its
+own rather than sharing a parameterised one.
 
 **`workout generate` still resets the easing tally** wherever it revises, inside the
 window or out. A `keep` appends nothing, so a kept session's tally stands; inside the

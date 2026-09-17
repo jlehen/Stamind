@@ -2398,13 +2398,24 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    side) and any targeting an already-completed session, then returns
    a `RevisionProposal` ([§3](#coachservice)) — caller decides whether to apply, and
    confirms each extracted constraint and signal candidate before persisting it.
+5b. `_resolve_moves` reads each entry's `replaces` — the same field `workout generate`
+   uses (§4b) — and turns an accepted one into `replaces_slot`/`replaces_lineage` on the
+   entry. It is refused, with a notice and the entry still written where it stands, when
+   no session stands in the named slot, when the athlete has already trained it, when the
+   destination already holds a same-sport session, or when a second entry claims the same
+   source. A date a move empties gets a rest day carrying the coach's sentence, unless
+   another entry covers it or another session still stands there — adapt has no coverage
+   backstop, and a hole and a planned rest day mean different things to the adherence
+   record.
 6. If applied: `workout_revision_apply()` opens one `adapt` change. A session the pass
    overrides with nothing becomes a **void** — this path used to `DELETE` the row, with no
-   way back. A session it substitutes cross-sport becomes a void at the source plus a
-   revision at the destination carrying the same lineage, the swap shape, which is what
-   keeps the adaptation tally following the session. Every revised session appends with
-   its own note; the batch rationale lands on the change row. Nothing here touches
-   Calendar — the reconcile does (see [§5](#5-database-schema)).
+   way back. A session it moves to another day or substitutes cross-sport becomes a void
+   at the source plus a revision at the destination carrying the same lineage, the swap
+   shape, which is what keeps the adaptation tally and the first prescription following
+   the session. A named source is kept out of the same-date displacement rule, so its
+   lineage is handed out once. Every revised session appends with its own note; the batch
+   rationale lands on the change row. Nothing here touches Calendar — the reconcile does
+   (see [§5](#5-database-schema)).
 
    There is no `adapted_at` to stamp any more, and so no flag to carry or forget. Whether
    a revision counts as an easing is decided at read time, by comparing it against its own

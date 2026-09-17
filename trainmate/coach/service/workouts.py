@@ -6,7 +6,10 @@ from trainmate.types import Constraint, Workout
 from trainmate.adherence import analyze_adherence
 from trainmate.coach import honoring
 from trainmate.coach.proposals import GenerateProposal, StandingLine
-from trainmate.coach.revisions import normalize_load_fields, prescription_matches
+from trainmate.coach.revisions import (
+    carried_lineage, normalize_load_fields, prescription_matches, replaces_source,
+    rest_in_place_of,
+)
 from trainmate import settings
 from trainmate.sports import canonical_sport
 from trainmate.benchmarks import MIN_RETEST_DAYS
@@ -174,9 +177,7 @@ class WorkoutGenMixin:
                 carrier = rows[0]
             if carrier is not None:
                 rest['replaces_slot'] = (carrier['date'], carrier['sport_type'])
-                rest['replaces_lineage'] = (
-                    None if carrier.get('source') == 'manual' else carrier['id']
-                )
+                rest['replaces_lineage'] = carried_lineage(carrier)
             for row in rows:
                 slot = (row['date'], canonical_sport(row['sport_type']))
                 if row is carrier or slot[1] == rest_sport:
@@ -303,19 +304,12 @@ class WorkoutGenMixin:
         There is one path through apply for every answer but `keep`, and a dropped ride
         leaves exactly what an adapted one does: one event on the day, now titled "Rest
         Day", with the ride underneath it in History and the coach's sentence on it."""
-        reason = str(answer.get('change_reason') or '').strip()
-        body = reason or f"{source['title']} cancelled by your coach."
-        return {
-            'date': source['date'],
-            'sport_type': 'rest',
-            'title': 'Rest Day',
-            'description': f"[Rest Day]\n{body}",
-            'duration_minutes': 0,
-            'rpe': 0,
-            'tss': 0,
-            'change_reason': reason,
-            'replaces': {'date': source['date'], 'sport_type': source['sport_type']},
-        }
+        rest = rest_in_place_of(
+            source, str(answer.get('change_reason') or ''),
+            f"{source['title']} cancelled by your coach.",
+        )
+        rest['replaces'] = {'date': source['date'], 'sport_type': source['sport_type']}
+        return rest
 
     @classmethod
     def _resolve_standing(
@@ -368,10 +362,7 @@ class WorkoutGenMixin:
             slot = (entry.get('date'), canonical_sport(entry.get('sport_type', '')))
             replaces = entry.get('replaces')
             if isinstance(replaces, dict) and replaces.get('date'):
-                named = (
-                    replaces['date'], canonical_sport(replaces.get('sport_type', ''))
-                )
-                return None if named == slot else named
+                return replaces_source(entry)
             rest = rest_only.get(entry.get('date'))
             if rest is None:
                 return None
@@ -457,12 +448,7 @@ class WorkoutGenMixin:
                 entry = {
                     **entry,
                     'replaces_slot': (occupant['date'], occupant['sport_type']),
-                    # A session the athlete added keeps its own lineage: the week planner's
-                    # replacement starts a new one, or the event would read "[Manual]"
-                    # (§5.3).
-                    'replaces_lineage': (
-                        None if occupant.get('source') == 'manual' else occupant['id']
-                    ),
+                    'replaces_lineage': carried_lineage(occupant),
                 }
                 answered.add(source)
             elif slot in by_slot:

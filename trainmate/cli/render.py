@@ -549,10 +549,16 @@ def _is_rest(w: Optional[dict]) -> bool:
     return bool(w) and (w.get('sport_type') or '').lower() == 'rest'
 
 
-def _simple_was_clause(pw: dict, existing: Optional[dict]) -> str:
+def _simple_was_clause(pw: dict, existing: Optional[dict], today: str) -> str:
     """The parenthetical after a proposed session, saying what it replaces."""
     if not existing:
         return "new"
+    if existing['date'] != pw['date']:
+        # The same session, on a new day. Said before anything else the clause could
+        # say about it, because a session moved unchanged would otherwise read as
+        # "new" on one day and vanish from the other.
+        day = "today" if existing['date'] == today else simple_date_word(existing['date'])
+        return f"moved from {day}"
     if rewritten_text_only(pw, existing):
         return "same session, wording updated"
     if _is_rest(existing):
@@ -574,7 +580,10 @@ def simple_revision_lines(proposal: RevisionProposal) -> List[str]:
     for pair in proposal.pairs:
         pw, existing = pair.proposal, pair.original
         day = "Today" if pw['date'] == today else simple_date_word(pw['date'])
-        entry_lines = [f"{simple_session_line(pw, lead=day)} ({_simple_was_clause(pw, existing)})"]
+        entry_lines = [
+            f"{simple_session_line(pw, lead=day)} "
+            f"({_simple_was_clause(pw, existing, today)})"
+        ]
         why = (pw.get('modification_reason') or '').strip()
         if why and why != (proposal.reason or '').strip():
             entry_lines.append(why)

@@ -30,7 +30,8 @@ NOTE_SIGNAL_SCHEMA_MEMBER = '"new_signals"'
 
 import trainmate.coach.engine.workouts as wk
 
-VACATE_SECTION = "### RE-FILLING A DATE YOU VACATE"
+MOVE_SECTION = "### MOVING A SESSION TO ANOTHER DAY"
+MOVE_SCHEMA_MEMBER = '"replaces"'
 
 DRIFT_INSTRUCTIONS = "### CORRECTING EXECUTION DRIFT"
 DRIFT_BRANCH = "measured intensity distribution has diverged from its stated"
@@ -189,16 +190,29 @@ class TestTheSchemaStaysWellFormed(unittest.TestCase):
 
 
 class TestAlwaysOnSections(unittest.TestCase):
-    """Not every shared section is gated — the vacate rule fires on almost every pass,
+    """Not every shared section is gated — the move rule fires on almost every pass,
     so its failure mode is being absent, not being half-applied
     (DESIGN_adapt_task_prompt.md §2)."""
 
-    def test_the_vacate_rule_is_always_on_in_the_adapt_task(self):
+    def test_the_move_rule_and_its_field_are_always_on_in_the_adapt_task(self):
+        # The section tells the model to name the slot a moved session came from, and
+        # the schema member is where it names it. Either one alone is the
+        # half-application that loses the session's history
+        # (DESIGN_workout_revisions.md §11).
         for extra in ({}, {"athlete_message": "knee is sore"},
                       {"intensity_context": "Base 2 — focus \"volume\""}):
             with self.subTest(extra=sorted(extra)):
                 system, _user = build_prompt(**extra)
-                self.assertIn(VACATE_SECTION, system)
+                self.assertIn(MOVE_SECTION, system)
+                self.assertIn(MOVE_SCHEMA_MEMBER, system)
+
+    def test_the_moved_session_names_the_list_adapt_was_actually_shown(self):
+        # Generate's copy of the field points at SESSIONS ALREADY STANDING, which adapt
+        # is never sent: a shared field that named the wrong section would send the model
+        # looking for a list that is not there.
+        system, _user = build_prompt()
+        self.assertIn(wk._replaces_field("PLANNED WORKOUTS"), system)
+        self.assertNotIn("SESSIONS ALREADY STANDING", system)
 
 
 class TestTheStandingRules(unittest.TestCase):
