@@ -1,6 +1,7 @@
 # Strength tracking: reading the sets, naming the blocks, prescribing in kilograms
 
-**Status:** Phase 1 implemented (§11.1) · **Date:** 2026-09-14 (rev. 7) · **Branch:** worktree-strength-tracking-design
+**Status:** Phase 1 implemented (§11.1) · **Date:** 2026-09-14 (rev. 7), amended
+2026-09-17 with the two reading commands of §7 · **Branch:** worktree-strength-tracking-design
 
 Revision 7 reads a session's sets once. The pull reads them the morning after the session,
 and from the moment they are final nothing under the athlete's answers moves again: a
@@ -464,6 +465,23 @@ its waiting questions are stale; since all of those are computed on every read, 
 is enough, and the command's one write is to recompute the session's modeled rows
 (§8.1), which undo does again.
 
+**Two commands read the record back.** `strength log` is the athlete's own logbook — the
+one §1 says she keeps by hand. With no argument it is the index: every lift on record under
+its movement pattern, with how many sessions it appears in and when it was last done. With
+an exercise it is that lift's history, one line per session, oldest first, the sets in the
+same words the activity line uses. A part of a name matches every lift it is part of, so
+`strength log squat` is the belt squat and the goblet squat, each under its own heading, and
+`--pattern squat` is the whole family. **The view groups, and never merges.** §4 keeps the
+pattern for *did you do it* and the exercise for *how strong are you*; one squat series
+mixing 16 kg goblets with 140 kg belt squats would answer neither question. Sessions are
+counted by day (§3), a discarded session and an unnamed set are off the record, and nothing
+is derived: the training max is phase 2's, computed once by the rule of §8 and stored in the
+logbook of §8.1, never a second time in a view. `strength exercises` is §4's vocabulary read
+out loud — the nine patterns and how many exercises each holds, then the exercises
+themselves under `--pattern` or a search term, with the athlete's own marked. It is how she
+finds the name to type, and it is what stops a shipped table of 1,493 exercises from being a
+file nobody can see.
+
 ## 8. Tracked lifts, the training max, and the strength test
 
 Nobody configures a list of lifts. The set of **tracked** exercises is derived from two
@@ -703,9 +721,9 @@ commitment window (§9) is this pass's output, rendered per session.
 **Phase 1 — data, no prompt changes.** The vocabulary table with the full Garmin mapping,
 `exercise_sets` and the three activity columns, the `sets_since` setting, the set-reading
 step with its one-night wait and its freeze (§6), the `sets_final` and `set_names` queue
-kinds with the model-backed "Something else…", `strength name`, `strength reset` and
-`strength discard`, and sets shown in `workout compare` / "Done lately" with their name
-source and the "sets not read yet" line — both of which today render a strength session
+kinds with the model-backed "Something else…", `strength name`, `strength reset`,
+`strength discard`, `strength log` and `strength exercises`, and sets shown in
+`workout compare` / "Done lately" with their name source and the "sets not read yet" line — both of which today render a strength session
 as duration, load and RPE only (`cli/common.py::format_actual`,
 `cli/render.py::simple_compare_lines`). At the end of it TrainMate knows what the athlete
 lifts and the coach does not use it yet. Deliberately boring, so it can be checked against
@@ -800,6 +818,14 @@ given.
 **`tm st` is still `status`.** `strength` shares the prefix, so `st` became an alias, the
 way `s` already was.
 
+**The record had no way to be read back.** Phase 1 stores every set and shows a session's
+sets under its activity line, which answers "what did I do on Monday" and nothing else. The
+question an athlete asks *before* a session is the other one — what did I lift last time,
+and how much — and that is §1's hand-kept log, the thing this design set out to retire.
+Phase 2 hands it to the coach; nothing was going to hand it to the athlete. `strength log`
+and `strength exercises` (§7) close that, one phase early and deriving nothing, because the
+data is already there and the alternative is reading `workout compare` over a fortnight.
+
 Not verified: whether a session's first read the morning after already has her Connect
 corrections. The four sessions since she started correcting all came back fully named, but
 they were read days later.
@@ -832,8 +858,11 @@ Decided:
   proposal; "Leave it unnamed" the drop; a block whose sets are named, discarded or frozen
   again is stale. `strength name` is the only command that asks on the spot and the only
   place a block is split.
-- Three commands: `strength name <date>`, `strength reset <date>` and
-  `strength discard <date> [--undo]`.
+- Five commands. Three do the surgery — `strength name <date>`, `strength reset <date>`
+  and `strength discard <date> [--undo]` — and two read the record back:
+  `strength log [EXERCISE] [--pattern P]`, which groups by movement pattern and never
+  merges two lifts into one series, and `strength exercises [TEXT] [--pattern P]`, which
+  reads out the shipped vocabulary. Neither reader derives a number.
 - Body weight is not stored; bodyweight lifts are tracked by reps.
 - Tracked lifts by frequency and prescription, never by load, never by config.
 - One training max rule: the set with the highest Epley estimate over sets of 12 reps or

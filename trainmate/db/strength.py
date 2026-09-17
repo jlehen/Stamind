@@ -111,6 +111,21 @@ class StrengthMixin:
             )
             conn.commit()
 
+    def exercise_history(self) -> List[Dict[str, Any]]:
+        """Every named active set of every session that counts, oldest day first: the rows
+        `strength log` reads (§7). Ordered so a day with two lifting activities reads as one
+        session (§3)."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT a.date, s.exercise, s.reps, s.load_kg, s.duration_sec, s.named_by "
+                "FROM exercise_sets s "
+                "JOIN completed_activities a ON a.activity_id = s.activity_id "
+                "WHERE s.set_type = ? AND s.exercise IS NOT NULL AND a.discarded = 0 "
+                "ORDER BY a.date, a.start_time, s.seq",
+                (ACTIVE,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
     def session_exercises_by_day(self) -> List[Dict[str, Any]]:
         """Every active set of every session that was not discarded, newest day first:
         `{date, exercise}` rows, what the recent-exercises answers count (§7)."""

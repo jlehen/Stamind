@@ -159,11 +159,10 @@ def reps_and_load(
     return f"{counts} {unit} {'at' if companion else '@'} {fmt_kg(load_kg)} kg"
 
 
-def named_line(block: Block) -> str:
-    """'deadlift 1×5 @ 40, 4×4 @ 80 (watch)': consecutive equal sets collapsed, and a mark
-    on a name only the watch guessed (§7)."""
+def set_chunks(sets: Sequence[Dict[str, Any]]) -> str:
+    """'1×5 @ 40, 4×4 @ 80': consecutive equal sets collapsed (§7)."""
     chunks: List[List[Any]] = []
-    for s in block.sets:
+    for s in sets:
         key = (s["reps"], s["load_kg"], None if s["reps"] is not None else s["duration_sec"])
         if chunks and chunks[-1][0] == key:
             chunks[-1][1] += 1
@@ -174,8 +173,18 @@ def named_line(block: Block) -> str:
         amount = str(reps) if reps is not None else f"{round(duration or 0)}s"
         weight = f" @ {fmt_kg(load_kg)}" if load_kg else ""
         parts.append(f"{count}×{amount}{weight}")
-    mark = " (watch)" if any(s["named_by"] == WATCH for s in block.sets) else ""
-    return f"{block.exercise} {', '.join(parts)}{mark}"
+    return ", ".join(parts)
+
+
+def watch_mark(sets: Sequence[Dict[str, Any]]) -> str:
+    """The mark on a name only the watch guessed (§7)."""
+    return " (watch)" if any(s["named_by"] == WATCH for s in sets) else ""
+
+
+def named_line(block: Block) -> str:
+    """'deadlift 1×5 @ 40, 4×4 @ 80 (watch)': consecutive equal sets collapsed, and a mark
+    on a name only the watch guessed (§7)."""
+    return f"{block.exercise} {set_chunks(block.sets)}{watch_mark(block.sets)}"
 
 
 def position_list(numbers: Sequence[int]) -> str:
@@ -245,6 +254,26 @@ def recent_exercises() -> List[str]:
         last_seen.setdefault(row["exercise"], len(days))
     ranked = sorted(done_on, key=lambda name: (-len(done_on[name]), last_seen[name], name))
     return ranked[:MAX_ANSWERS]
+
+
+class Logged(NamedTuple):
+    """One lift on one day: the day, and that day's sets in words."""
+    date: str
+    sets: str
+
+
+def logbook() -> Dict[str, List[Logged]]:
+    """Every lift on record, with the days it was done oldest first (§7). A day with two
+    lifting activities is one session (§3); discarded sessions and unnamed sets are not on
+    record."""
+    by_day: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+    for row in runtime.db.exercise_history():
+        by_day.setdefault(row["exercise"], {}).setdefault(row["date"], []).append(row)
+    return {
+        exercise: [Logged(day, set_chunks(rows) + watch_mark(rows))
+                   for day, rows in days.items()]
+        for exercise, days in by_day.items()
+    }
 
 
 def read_new_sessions(client: Any = None) -> SetsRead:
