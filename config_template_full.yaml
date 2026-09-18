@@ -279,13 +279,27 @@ garmin:
   #pmc_ctl_days: 42
   #pmc_atl_days: 7
 
-# Strength tracking (DESIGN_strength_tracking.md). This key only seeds a setting; change it
-# live with `settings set strength-sets-since 2026-09-03`.
+# Strength tracking (DESIGN_strength_tracking.md).
 #strength:
 #  # First day whose strength sets are read from Garmin. Before it you did not correct the
 #  # watch's exercise names in Garmin Connect, so they were not checked. Unset, no sets are
-#  # read. Quote the date.
+#  # read. Quote the date. This key only seeds a setting; change it live with
+#  # `settings set strength-sets-since 2026-09-03`.
 #  #sets_since: "2026-09-03"
+#  # How many of your recent strength days the coach reads when it writes a strength
+#  # session: what you lifted, and each of those days as a whole session. A strength day is
+#  # a day with at least one strength activity whose sets were read. The exercises a naming
+#  # question offers come from the same days.
+#  #recent_days: 8
+#  # How many times you do something other than what a strength session prescribed —
+#  # another exercise in place of one, an exercise skipped or added, a different number of
+#  # sets — before the coach writes it into your next sessions. Once is a one-off. The
+#  # coach only counts the days `recent_days` shows, so the two keys go together. Say this
+#  # is 4 and you swap an exercise that is prescribed on Thursdays only. Four Thursdays are
+#  # about ten strength days for someone who lifts two or three times a week. With
+#  # `recent_days` at 8, the first swap is no longer shown by the time you make the fourth,
+#  # so the count never gets there. Raise `recent_days` with it.
+#  #habit_after: 2
 
 coach:
   # Days of recent metrics history fed to the coach as context.

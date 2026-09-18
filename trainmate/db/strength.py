@@ -191,12 +191,13 @@ class StrengthMixin:
         """Every active set of every strength activity from `since` on that was not
         discarded, newest day first — what the strength history is built from (§8).
 
-        A set carries its activity's day, start time and RPE, so a day the watch split into
-        two activities keeps them apart. A name only the watch guessed comes back as no
-        name: the history shows names a person gave.
+        A set carries its activity's day, start time, length and RPE, so a day the watch
+        split into two activities keeps them apart. A name only the watch guessed comes back
+        as no name: the history shows names a person gave.
         """
         sql = (
-            "SELECT a.date, a.start_time, a.activity_id, a.rpe, s.seq, s.reps, s.load_kg, "
+            "SELECT a.date, a.start_time, a.activity_id, a.rpe, "
+            "  a.duration_sec AS activity_duration_sec, s.seq, s.reps, s.load_kg, "
             "  s.duration_sec, "
             f"  CASE WHEN s.named_by IN ({_person_marks()}) THEN s.exercise END AS exercise "
             "FROM exercise_sets s "

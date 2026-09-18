@@ -27,8 +27,8 @@ ATHLETE = "athlete"
 
 # An activity older than this when its sets are first read is frozen as read (§6).
 ASK_WITHIN_DAYS = 7
-# The naming question offers the exercises of the last strength days (§7).
-RECENT_DAYS = 8
+# The naming question offers at most this many of the exercises of the recent strength
+# days, whose number is `strength.recent_days` (§7, §8).
 MAX_ANSWERS = 9
 
 YES_FINAL = {"label": "yes, final"}
@@ -249,14 +249,14 @@ def activity_ref(activity: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def recent_exercises() -> List[str]:
-    """The exercises named in the last eight strength days, discarded activities skipped,
-    the ones done on the most days first (§7)."""
+    """The exercises named in the recent strength days, discarded activities skipped, the
+    ones done on the most days first (§7). How many days is `strength.recent_days` (§8)."""
     days: List[str] = []
     done_on: Dict[str, set] = {}
     last_seen: Dict[str, int] = {}
     for row in runtime.db.activity_exercises_by_day():
         if row["date"] not in days:
-            if len(days) == RECENT_DAYS:
+            if len(days) == config.strength_recent_days:
                 break
             days.append(row["date"])
         if not row["exercise"]:

@@ -13,7 +13,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from trainmate import runtime
-from trainmate.config import science_documents
+from trainmate.config import config, science_documents
 from trainmate.sports import canonical_sport
 from trainmate.strength import history, prescription, vocabulary
 from trainmate.util import cyan, step
@@ -29,6 +29,10 @@ SCIENCE_PATH = os.path.join(os.path.dirname(__file__), "progression.md")
 
 _RULE = "=" * 80
 
+# The line on a session to check whose sets were written under another brief or duration:
+# the third ground for changing a kept session (§9).
+MOVED_ON = "Its brief or its duration changed since these sets were written: write it again."
+
 NOT_RECHECKED = (
     "I could not recheck {days} kilograms this morning. They stand as written, and I will "
     "look again tomorrow."
@@ -41,12 +45,17 @@ and kilograms of one athlete's strength sessions.
 For each session under SESSIONS TO WRITE, write the whole session: every exercise in the
 order it is done, how many sets, the rep range, and the load in kilograms. Accessory work is
 part of the session — write it too. The brief says what the session is for and what the plan
-asks of it; the duration says how much fits; the equipment says what the athlete can reach
-that day. Nothing else decides the content.
+asks of it; the duration says how long it lasts; the equipment says what the athlete can
+reach that day. The athlete's habits decide the rest (CHOOSING THE EXERCISES).
 
-For each session under SESSIONS TO CHECK, the athlete has already been shown those
-kilograms. Answer "keep" unless the sets on record since it was written say the load should
-move. When you do change it, return the whole session again and say in one sentence why,
+For each session under SESSIONS TO CHECK, the athlete has already been shown it. Answer
+"keep" unless one of these three is true:
+- The sets on record since it was written say a load should move.
+- The athlete has made a habit of doing something other than what it holds (CHOOSING THE
+  EXERCISES).
+- It says that its brief or its duration changed. Then write it again, the way you write a
+  session under SESSIONS TO WRITE.
+When you do change it, return the whole session again and say in one sentence why,
 written for the athlete to read: "Monday's sets all reached 6 at 140; add 5."
 
 ### WRITING THE LOADS
@@ -56,6 +65,36 @@ rule. Never leave a load out because you are unsure: an athlete who follows the 
 the letter must not meet a blank where a number belongs.
 
 ### CHOOSING THE EXERCISES
+Write each session from the most comparable session under SESSIONS AS DONE: one done with
+the same equipment, of about the same length and the same character. A day of belt squats
+and pulldowns is a gym day, and a day of goblet squats and swings is a day at home. Take its
+exercises, their order, which ones were alternated and how many sets each got. Then change
+only what the brief, the duration, the day's equipment or HOW TO PROGRESS asks for. Write
+alternated exercises one after the other, and name them in the notes.
+
+Size the session to what the athlete fits in the time: the head line of each session as done
+gives its length and how many sets it held. Do not size it by adding up rests. Alternating
+two exercises does not shorten the rests the athlete's guidelines ask for: an athlete who
+does a set of belt squats, then a set of push presses, then belt squats again has rested the
+belt squat about three minutes.
+
+A difference between what was prescribed and what the athlete did becomes a habit once it
+has happened {habit_after} times in comparable sessions under SESSIONS AS DONE. The
+difference can be an exercise done in place of another, one skipped, one added, or another
+number of sets. NOT DONE lists what was prescribed and not done, and "(not prescribed)"
+marks what was done and not prescribed. A NOT DONE line older than the oldest session as
+done does not count. Before a difference is a habit, it is a one-off: keep writing what was
+prescribed. Once it is a habit, write it into the session, even where the brief asked for
+what the athlete refused. An activity that was not an attempt at a prescription holds
+nothing to differ from, and everything in it counts at once: a day with nothing prescribed,
+or the activity without the marks on a day the watch split in two. Where a habit and the
+athlete's own guidelines disagree, the guidelines win.
+
+The brief may ask for something the comparable session does not hold, such as single-leg
+work when the plan prepares a ski season. Then write the new exercise in the place of the one
+that did the same job, and keep everything else as the athlete does it. With no sets on
+record, the brief, the equipment and the guidelines decide on their own.
+
 Use only names from EXERCISES TRAINMATE KNOWS, spelled exactly as they appear there. Each
 name carries its movement pattern and the equipment it usually needs. Pick exercises the
 day's equipment allows: a travel week with dumbbells only gets goblet squats and dumbbell
@@ -66,9 +105,13 @@ Write an exercise more than once when it needs a warm-up ramp: the same name at 
 load first, then the working sets.
 
 ### THE NOTES
-Each session's notes are one short paragraph for the athlete: the rests, the warm-up, a cue
-where one is due, and the starting point for anything with no history. Do not restate the
-exercises — they are printed above your notes from the data you return.
+Each session's notes are one short paragraph for the athlete: the rests, the warm-up, which
+exercises to alternate ("alternate the belt squat and the push press, then the hamstring curl
+and the pulldown"), a cue where one is due, and the starting point for anything with no
+history. An exercise the athlete has not been doing gets one sentence saying what is new,
+why, and what it replaces: "Step-ups are new. The plan wants single-leg work for skiing.
+They take the place of the leg press." Do not restate the exercises — they are printed above
+your notes from the data you return.
 
 {science}
 
@@ -83,8 +126,8 @@ You MUST respond with a JSON object containing:
   "sessions": [
     {{
       "date": "YYYY-MM-DD",
-      "keep": false, (ONLY on a session under SESSIONS TO CHECK whose kilograms you are
-        leaving exactly as they are. Then "date" and "keep" are the only fields to give.)
+      "keep": false, (ONLY on a session under SESSIONS TO CHECK you are leaving exactly as
+        it is. Then "date" and "keep" are the only fields to give.)
       "light": false, (true when you wrote this session as a light week's — see HOW TO
         PROGRESS. Every exercise of a light session is marked, not some of them.)
       "reason": "One sentence for the athlete, REQUIRED on a session under SESSIONS TO
@@ -241,12 +284,23 @@ def _constraints_for(day: str, constraints: Sequence[Dict[str, Any]]) -> str:
     )
 
 
+def _system_prompt(done: Set[str]) -> str:
+    """The strength planner's system prompt, with the vocabulary's accessories limited to
+    the ones in `done` (§9)."""
+    return SYSTEM_PROMPT.format(
+        science=_shipped_science(), guidelines=_athlete_science(),
+        exercises=_exercise_list(done), habit_after=config.strength_habit_after,
+    )
+
+
 def _session_block(
     session: _Session, profile: Optional[Dict[str, Any]],
     constraints: Sequence[Dict[str, Any]],
 ) -> str:
     duration = f"{session.duration} min" if session.duration else "duration not stated"
     lines = [f"- {session.date} ({duration}) \"{session.title}\""]
+    if session.rows and _moved_on(session):
+        lines.append(f"  {MOVED_ON}")
     lines.append(f"  Equipment that day: {_equipment_for(session.date, profile)}")
     active = _constraints_for(session.date, constraints)
     if active:
@@ -276,8 +330,9 @@ def _user_content(
     if to_check:
         parts.append(
             "## SESSIONS TO CHECK\n"
-            "The athlete has already been shown these kilograms. Keep them unless the sets "
-            "on\nrecord say the load should move.\n"
+            "The athlete has already been shown these. Keep each unless the sets on record say "
+            "a load\nshould move, the athlete has made a habit of doing something else, or it "
+            "says that its\nbrief or its duration changed.\n"
             + "\n\n".join(_session_block(s, profile, constraints) for s in to_check)
         )
     if context:
@@ -541,10 +596,7 @@ def run(
         return None
 
     built = history.build(today)
-    system = SYSTEM_PROMPT.format(
-        science=_shipped_science(), guidelines=_athlete_science(),
-        exercises=_exercise_list(built.exercises),
-    )
+    system = _system_prompt(built.exercises)
     user = _user_content(
         to_write, to_check, context, built.text, today, profile, constraints
     )
