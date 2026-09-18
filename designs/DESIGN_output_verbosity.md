@@ -480,3 +480,34 @@ captured by `trainmate_bot._route_intent` and discarded but for the last JSON li
 notice there reaches nobody and the journal read is pure waste on the hot path of every
 chat message. `complete(..., wait_notice=False)` turns it off, and that flag is the
 place to say "nobody is waiting on this output" if a second such call ever appears.
+
+### 8.5 The terminal during the wait, and the keys pressed in it
+
+§8 gave chat a line to read during the wait. The terminal still had nothing but a still
+cursor under "past runs: ~1.5 minutes", and that stillness cost a plan.
+
+On 18 September the athlete ran `plan generate -g 4`. While the model worked for three
+minutes, a Left-arrow key reached the terminal. The command was not reading the keyboard,
+so the terminal held the key and echoed it as `^[[D`. The plan preview then printed 360
+lines below it. Five minutes later the athlete typed `y` at "Apply this new periodization
+strategy? [y/N]". The terminal handed over the held key and the `y` as one line. The
+confirm read anything but "y" or "yes" as No, printed "Plan discarded." and dropped a plan
+the athlete had just approved.
+
+Three changes, each closing one part of that story:
+
+- **A spinner and a clock.** `util.Spinner` draws `⠹ 1:23 elapsed` on one line while the
+  request is out, and erases it when the reply lands. It wraps the POST in
+  `openrouter.complete()`, the one call site §8.2 already relies on. Like `Progress`, it
+  draws only when stdout is a terminal, so the bot and piped output never see it.
+- **Keys pressed before the question are dropped.** `TtyPrompt` flushes the terminal's
+  pending input before each question. A key pressed before the question was on screen
+  cannot be an answer to it. Piped stdin is not a terminal and is left alone, so a
+  scripted `yes | tm ...` still works.
+- **An unclear answer is asked again.** A confirm accepts `y`, `yes`, `n`, `no`, or a blank
+  line for the default. Anything else prints "Please answer y or n." and asks again. A
+  stray key typed *after* the question, which the flush cannot catch, now costs one
+  more question instead of the plan.
+
+Not handled: pressing Enter during the wait leaves one stale spinner frame on the line
+above. `choose` keeps falling back to its default on an unrecognised answer.

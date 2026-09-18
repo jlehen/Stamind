@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 from trainmate.util import (
     RESET, wrap_text, visible_len, pad_visible, color_load_ratio, format_labeled_text,
-    render_table, truncate_visible, yellow, Progress,
+    render_table, truncate_visible, yellow, Progress, Spinner,
 )
 
 
@@ -112,6 +112,36 @@ class TestProgress(unittest.TestCase):
             with Progress(0) as bar:
                 bar.step()
         self.assertEqual(tty.getvalue(), "")
+
+
+class TestSpinner(unittest.TestCase):
+    """The LLM wait's clock (DESIGN_output_verbosity.md §8.5)."""
+
+    class _Tty(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    def test_ticks_minutes_and_seconds_on_a_terminal_and_erases_itself(self):
+        import itertools
+        import time
+        out = self._Tty()
+        with patch("sys.stdout", out), patch("trainmate.util.time") as clock:
+            # Started at t=1000, every later reading is 83 seconds on.
+            clock.monotonic.side_effect = itertools.chain([1000.0], itertools.repeat(1083.0))
+            with Spinner():
+                deadline = time.monotonic() + 2
+                while "1:23 elapsed" not in out.getvalue() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+        written = out.getvalue()
+        self.assertIn("1:23 elapsed", written)
+        self.assertTrue(written.endswith("\r\033[K"))
+
+    def test_silent_when_not_a_terminal(self):
+        out = io.StringIO()
+        with patch("sys.stdout", out):
+            with Spinner():
+                pass
+        self.assertEqual(out.getvalue(), "")
 
 
 class TestWrapWidth(unittest.TestCase):

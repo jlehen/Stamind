@@ -9,7 +9,8 @@ Telegram bot, or any future front-end. The active implementation is chosen at st
 Two transports ship here:
 
 * ``TtyPrompt`` — ``input()`` with ``[y/N]`` rendering, EOF falling back to the supplied
-  default (this is what keeps piped/cron runs aborting cleanly).
+  default (this is what keeps piped/cron runs aborting cleanly). Keys pressed before a
+  question is printed are dropped, and a confirm asks again on anything but yes/no/blank.
 * ``JsonPrompt`` — non-blocking *for the front-end*: it writes one sentinel-framed JSON
   request line to ``out`` (see ``PROMPT_SENTINEL``) and waits to read a single response
   line from ``inp``, so the process stays parked on its stdin read while the front-end
@@ -172,6 +173,24 @@ def _yes_no(answer: bool) -> str:
     return "yes" if answer else "no"
 
 
+# What a terminal confirm accepts; a blank line takes the default, anything else asks again.
+_YES_NO_WORDS = {"y": True, "yes": True, "n": False, "no": False}
+
+
+def _discard_typeahead() -> None:
+    """Drops keys pressed before the question was printed, since they cannot answer it
+    (DESIGN_output_verbosity.md §8.5). Only a terminal: piped answers are kept."""
+    try:
+        import termios
+    except ImportError:
+        return
+    try:
+        if sys.stdin.isatty():
+            termios.tcflush(sys.stdin, termios.TCIFLUSH)
+    except (termios.error, OSError, ValueError):
+        return
+
+
 def _resolve_choice(ans: str, choices: Sequence[Choice], default: Optional[str]) -> str:
     """The value an entered line names: an index, a value, a label, else the default.
 
@@ -199,16 +218,21 @@ class TtyPrompt:
     def confirm(self, message: str, *, default: bool = False,
                 danger: bool = False) -> bool:
         suffix = " [Y/n]: " if default else " [y/N]: "
-        try:
-            ans = input(message + suffix).strip().lower()
-        except EOFError:
-            # Piped stdin or cron: nobody answered, so the record must not say they did.
-            _record_answer(message, _yes_no(default), answer=default, defaulted=True)
-            return default
-        if not ans:
-            answer = default
-        else:
-            answer = ans in ("y", "yes")
+        while True:
+            _discard_typeahead()
+            try:
+                ans = input(message + suffix).strip().lower()
+            except EOFError:
+                # Piped stdin or cron: nobody answered, so the record must not say they did.
+                _record_answer(message, _yes_no(default), answer=default, defaulted=True)
+                return default
+            if not ans:
+                answer = default
+                break
+            if ans in _YES_NO_WORDS:
+                answer = _YES_NO_WORDS[ans]
+                break
+            print("Please answer y or n.")
         _record_answer(message, _yes_no(answer), answer=answer)
         return answer
 
@@ -219,6 +243,7 @@ class TtyPrompt:
             marker = " (default)" if c.value == default else ""
             print(f"  [{i}] {c.label}{marker}")
         eof = False
+        _discard_typeahead()
         try:
             ans = input("Choice: ").strip().lower()
         except EOFError:
@@ -230,6 +255,7 @@ class TtyPrompt:
 
     def ask_text(self, message: str, *, secret: bool = False,
                  default: Optional[str] = None) -> str:
+        _discard_typeahead()
         try:
             if secret:
                 import getpass

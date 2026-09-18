@@ -9,7 +9,7 @@ from typing import Any, Optional
 from trainmate import journal
 from trainmate.config import config
 from trainmate.prompt import emit_flush, is_json_frontend
-from trainmate.util import aside, warn
+from trainmate.util import Spinner, aside, warn
 
 # A fenced reply may be one line (```{"a":1}```) or many, with or without a language
 # tag; the one-line form has no newline to split on. The `$` anchor deliberately
@@ -372,10 +372,11 @@ class OpenRouterClient:
             # as one mesocycle after a wait of tens of seconds (DESIGN_output_verbosity.md
             # §7). Every LLM command passes through here, so this is the one call site.
             emit_flush()
-            response = requests.post(
-                self.api_url, headers=headers, json=payload,
-                timeout=config.llm_request_timeout,
-            )
+            with Spinner():
+                response = requests.post(
+                    self.api_url, headers=headers, json=payload,
+                    timeout=config.llm_request_timeout,
+                )
             response.raise_for_status()
             resp_data = response.json()
 

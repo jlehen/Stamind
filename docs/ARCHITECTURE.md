@@ -257,7 +257,8 @@ classes themselves.
     `Working on it — this usually takes about 40s.`, where the number is the median `ms`
     of recent successful `llm.call` records for the same label and model
     (`journal.llm_durations`) — no new storage, and no estimate at all until two past
-    calls exist. A terminal gets the same number folded into the aside it already prints.
+    calls exist. A terminal gets the same number folded into the aside it already prints,
+    then `util.Spinner` ticks a clock on one self-erasing line until the reply lands (§8.5).
     `complete(..., wait_notice=False)` suppresses it for `tm bot route`, whose output
     nobody reads (DESIGN_output_verbosity.md §8).
   - **The athlete queue:** a fifth one-way sentinel, `QUEUE_SENTINEL`/`emit_queue_item`
@@ -464,7 +465,9 @@ classes themselves.
 | `util.py`            | —                    | ANSI color helpers (`bold`, `green`, `red`, …),  |
 |                      |                      | `cmd` (every "run X" call to action), `wrap_text`,|
 |                      |                      | `format_labeled_text`, `strip_ansi`, `Progress`  |
-|                      |                      | (self-erasing bar, silent off a terminal), and   |
+|                      |                      | (self-erasing bar, silent off a terminal),       |
+|                      |                      | `Spinner` (self-erasing spinner and clock for    |
+|                      |                      | the LLM wait, silent off a terminal), and        |
 |                      |                      | the four output verbs: `print` (the answer),     |
 |                      |                      | `aside`/`asides_enabled` (a hint or standing     |
 |                      |                      | caveat, terminal only,                           |
@@ -1867,8 +1870,10 @@ argument (`prompt_instance=`, defaulting to `runtime.prompt`) so the service can
 question without importing a frontend — it used to do `import trainmate_cli as cli`
 mid-method, which meant any non-terminal caller got a terminal conversation.
 `make_prompt()` selects the transport from
-`TRAINMATE_FRONTEND`: `TtyPrompt` (the default — `input()` with `[y/N]`, EOF→default)
-or `JsonPrompt` (`json` — the Telegram bot). Every interactive `input()` site routes
+`TRAINMATE_FRONTEND`: `TtyPrompt` (the default — `input()` with `[y/N]`, EOF→default,
+keys pressed before the question dropped, a confirm re-asked on anything but
+yes/no/blank, DESIGN_output_verbosity.md §8.5) or `JsonPrompt` (`json` — the Telegram
+bot). Every interactive `input()` site routes
 through `cli.prompt.confirm(message, danger=…)` / `cli.prompt.choose(message, [Choice…],
 default=…)` / `cli.prompt.ask_text(...)`. `JsonPrompt` writes one sentinel-framed
 request line (`\x1eTM-PROMPT {json}`, fields `v/id/type/message/default/danger/choices`)

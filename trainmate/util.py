@@ -3,6 +3,8 @@ import re
 import shutil
 import sys
 import textwrap
+import threading
+import time
 from datetime import date, datetime
 from typing import Optional, Tuple
 
@@ -402,6 +404,48 @@ class Progress:
         bar = "#" * filled + "." * (self.BAR_WIDTH - filled)
         sys.stdout.write(f"\r\033[K  [{bar}] {self.done_count}/{self.total}")
         sys.stdout.flush()
+
+
+class Spinner:
+    """A self-erasing '⠹ 1:23 elapsed' line that ticks while one blocking call runs: the
+    LLM wait (DESIGN_output_verbosity.md §8.5).
+
+    Silent unless stdout is a terminal, like `Progress`. A daemon thread redraws it, so a
+    Ctrl-C in the wrapped call still exits; leaving the context erases the line."""
+
+    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+    INTERVAL = 0.1
+
+    def __init__(self) -> None:
+        self.active = sys.stdout.isatty()
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._started = 0.0
+
+    def __enter__(self) -> "Spinner":
+        if self.active:
+            self._started = time.monotonic()
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        if not self.active:
+            return
+        self._stop.set()
+        self._thread.join()
+        sys.stdout.write("\r\033[K")
+        sys.stdout.flush()
+
+    def _run(self) -> None:
+        frame = 0
+        while not self._stop.is_set():
+            elapsed = int(time.monotonic() - self._started)
+            glyph = self.FRAMES[frame % len(self.FRAMES)]
+            sys.stdout.write(f"\r\033[K  {glyph} {elapsed // 60}:{elapsed % 60:02d} elapsed")
+            sys.stdout.flush()
+            frame += 1
+            self._stop.wait(self.INTERVAL)
 
 
 def is_narrow_client() -> bool:
