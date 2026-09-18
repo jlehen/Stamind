@@ -766,6 +766,14 @@ schedule with nothing on today (`run_bot_morning`) — stamps the marker without
 second marker holds the id of the last change whose line was delivered, and is written
 only when something was actually sent.
 
+Amended 2026-09-18 (DESIGN_change_heads_up.md §6, §7): the morning message no longer opens
+with the week line, and the second marker is gone. Each change records on its own row
+when the athlete was told about it (`told_at`). The bot's scheduler sends a change the
+athlete did not watch as a message of its own, just before the morning message, or at once
+when the operator runs `workout notify`. A rollback's message now quotes the line of each change it
+undid that the athlete was told about, and falls back to "The change to your week was
+undone." only when none of them has a line.
+
 ### 6.5 The staleness chain, repaired on its own account
 
 These stood in rev. 3 as inputs to the diff. They stand now because `plan show` is wrong

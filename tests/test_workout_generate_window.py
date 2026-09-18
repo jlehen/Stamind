@@ -11,7 +11,9 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, save_workout
+from tests.helpers import (
+    as_instance, clear_all_tables, pin_clock, rebind_test_db, save_workout,
+)
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_workout_generate_window.db")
@@ -522,24 +524,37 @@ class TestPastConstraintsReachThePrompt(WindowTestCase):
 
 
 class TestTheAthleteNote(WindowTestCase):
-    """One line about the change as a whole, for the morning push (§6.3)."""
+    """One line about the change as a whole (§6.3), which waits to be sent when the
+    athlete did not watch the run (DESIGN_change_heads_up.md §6)."""
 
-    def test_it_lands_on_the_change_row(self):
+    def setUp(self):
+        super().setUp()
+        as_instance(self, "simple")
+
+    def test_it_lands_on_the_change_row_and_waits(self):
         self.ride(_days_out(2))
         self.generate(
             self.session(_days_out(2), sport="cycling", title="Easy spin",
                          change_reason="never two hard days in a row"),
             note="Four sessions a week now, never two hard days in a row.",
         )
-        change = test_db.newest_change_with_note()
+        [change] = test_db.waiting_changes()
         self.assertEqual(
             change["note"], "Four sessions a week now, never two hard days in a row."
         )
         self.assertEqual(change["kind"], "generate")
 
-    def test_a_run_that_carries_none_writes_none(self):
+    def test_a_run_that_carries_none_leaves_nothing_waiting(self):
         self.generate(self.session(_days_out(5)))
-        self.assertIsNone(test_db.newest_change_with_note())
+        self.assertEqual(test_db.waiting_changes(), [])
+
+    def test_a_run_from_the_athletes_chat_is_told_as_it_is_written(self):
+        """So its line no longer opens the next morning message (§7)."""
+        as_instance(self, "simple", from_chat=True)
+        self.generate(self.session(_days_out(5)), note="Longer runs from Monday.")
+        self.assertEqual(test_db.waiting_changes(), [])
+        [change] = [c for c in test_db.get_workout_changes() if c["kind"] == "generate"]
+        self.assertIsNotNone(test_db.get_change(change["id"])["told_at"])
 
 
 if __name__ == "__main__":

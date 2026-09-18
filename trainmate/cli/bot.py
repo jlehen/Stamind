@@ -2,8 +2,9 @@
 
 Hidden maintenance commands the Telegram bot spawns, never typed by the athlete
 (DESIGN_bot_simple_frontend.md §4.2, §5.3, §12). `bot morning` renders the morning push;
-`bot route` classifies one free-text chat message into a fixed intent; `bot constraints`
-and `bot goals` render a companion list with its picker (§5.5, §12.6); `bot capture
+`bot changes` sends the changes to the athlete's week they have not been told about yet
+(DESIGN_change_heads_up.md §4); `bot route` classifies one free-text chat message into a
+fixed intent; `bot constraints` and `bot goals` render a companion list with its picker (§5.5, §12.6); `bot capture
 <intent>` is the write path — a second, domain-focused LLM call that extracts a typed
 proposal, previews it from real rows, and asks before anything is stored (§12.2). `bot
 queue` acts on a tap on a queued item; its handler lives in `cli/queue.py` with the rest of
@@ -20,7 +21,7 @@ import shlex
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from trainmate import clock, settings
+from trainmate import clock, heads_up, settings
 from trainmate.strength.sets import read_new_activities
 from trainmate.cli.candidates import (
     confirm_new_constraints, confirm_new_signals, open_ended,
@@ -38,7 +39,7 @@ from trainmate.cli.queue import run_bot_queue, send_walk_step
 from trainmate.cli.runway import current_runway, runway_buttons, schedule_exhausted
 from trainmate.cli.settings import ROUTABLE_SETTINGS, routable_setting
 from trainmate.config import config
-from trainmate.prompt import emit_buttons
+from trainmate.prompt import emit_buttons, emit_flush
 from trainmate.sports import CANONICAL_SPORTS, canonical_sport
 from trainmate.util import step, today_str as _today_str, wrap_text
 
@@ -46,18 +47,6 @@ from trainmate.util import step, today_str as _today_str, wrap_text
 # lives in the instance's database so the bot process stays stateless across restarts
 # (DESIGN_bot_simple_frontend.md §4.2).
 MORNING_MARKER = "push_morning_last"
-
-# The change whose line to the athlete the push last delivered. A date is enough for
-# per-day idempotency and not enough here: a forced re-run would repeat the line, and the
-# push's one silent early return stamps the date without sending
-# (DESIGN_plan_change_continuity.md §6.4).
-NOTE_MARKER = "push_note_last"
-
-# The fixed half of the week line. English, as every fixed string in the companion is
-# (DESIGN_bot_simple_frontend.md); the coach's own sentence follows it in the athlete's
-# language.
-PUSH_CHANGE_LEAD = "Your coach changed your week:"
-PUSH_CHANGE_UNDONE = "The change to your week was undone."
 
 # What the morning push offers (§4.1/§4.4): the CLI owns WHAT to offer, the bot only
 # renders. Each `send` is a canned utterance the bot feeds back through its normal
@@ -320,40 +309,16 @@ def _trained_today(date_str: str) -> Dict[int, Dict[str, Any]]:
         return {}
 
 
-def _delivered_change_id() -> int:
-    """The change whose line the push last delivered, 0 when it has delivered none."""
+def run_bot_changes(args: argparse.Namespace) -> None:
+    """Sends each change waiting to be told, oldest first, one message each, and records
+    each as told once it is printed (DESIGN_change_heads_up.md §4, §6). The bot starts it
+    on a scheduler wake or ahead of the athlete's own input."""
     from trainmate import runtime
-    try:
-        return int(runtime.db.get_setting(NOTE_MARKER) or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
-def pending_week_note() -> Optional[Tuple[str, int]]:
-    """The line the push opens with and the change id sending it consumes, or None.
-
-    A finished, applied change has already happened to the athlete's week, so unlike the
-    staleness flag it is theirs to hear about (DESIGN_plan_change_continuity.md §6.4). A
-    bare `workout generate` that extended the schedule carries no line, so it neither
-    speaks nor silences an older one; a rollback that undid a delivered change says so,
-    once, however many batches it covered; and a rollback before the line was ever sent
-    says nothing, because the athlete never heard of the change.
-    """
-    from trainmate import runtime
-    delivered = _delivered_change_id()
-    noted = runtime.db.newest_change_with_note()
-    if noted and noted["id"] > delivered:
-        # Undone before it was ever sent: the athlete never heard of the change, so
-        # there is nothing to announce and nothing to take back.
-        if not runtime.db.change_has_live_revisions(noted["id"]):
-            return None
-        return f"{PUSH_CHANGE_LEAD} {noted['note']}", noted["id"]
-    if not delivered:
-        return None
-    undo = runtime.db.newest_change_of_kind("rollback", after_id=delivered)
-    if undo and not runtime.db.change_has_live_revisions(delivered):
-        return PUSH_CHANGE_UNDONE, undo["id"]
-    return None
+    for position, change in enumerate(heads_up.waiting()):
+        if position:
+            emit_flush(wait=False)
+        print(wrap_text(heads_up.message(change)))
+        runtime.db.mark_changes_told([change["id"]])
 
 
 def run_bot_morning(args: argparse.Namespace) -> None:
@@ -383,9 +348,6 @@ def run_bot_morning(args: argparse.Namespace) -> None:
         return
     _refresh_garmin(today)
 
-    # Read before the adaptation, so the line is about the change the athlete's week
-    # actually carries rather than one this run is about to make (§6.4).
-    week_note = pending_week_note()
     adapt_note = _auto_adapt_note(today) if settings.adapt_first() else None
     # After the adaptation, so the verdicts grade the sessions this push is about to show.
     workouts = runtime.db.get_workouts(start_date=today, end_date=today)
@@ -395,9 +357,6 @@ def run_bot_morning(args: argparse.Namespace) -> None:
         if (verdicts.get(w.get("id")) or {}).get("status") not in SIMPLE_DONE_STATUSES
     ]
 
-    # First: it is what the rest of the message is now different because of.
-    if week_note:
-        print(wrap_text(week_note[0]))
     if workouts and not ahead:
         print(PUSH_ALL_DONE_LINE)
     elif not workouts and runway is not None and runway["days_left"] < 0:
@@ -418,9 +377,6 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     if buttons:
         emit_buttons(buttons)
     runtime.db.set_setting(MORNING_MARKER, today)
-    # Consumed only now, when the line has actually been sent.
-    if week_note:
-        runtime.db.set_setting(NOTE_MARKER, str(week_note[1]))
     # After the briefing, the first item of the athlete queue, as a message of its own
     # (DESIGN_athlete_queue.md §6.1).
     send_walk_step(clock.command_start())
@@ -1205,6 +1161,19 @@ def add_bot_parser(subparsers):
         "-f", "--force", action="store_true",
         help="Send even when already recorded as sent today",
     )
+
+    # bot changes
+    b_changes = bot_subparsers.add_parser(
+        "changes",
+        help="Send the changes to the athlete's week not yet told, one message each",
+        description=(
+            "Print one message per change to the athlete's week that they have not been "
+            "told about yet, oldest first, and record each as told. The bot's scheduler "
+            "runs it when the changes are due, and the bot runs it before acting on the "
+            "athlete's own tap or message (DESIGN_change_heads_up.md §4)."
+        ),
+    )
+    b_changes.set_defaults(func=run_bot_changes)
 
     # bot route
     b_route = bot_subparsers.add_parser(

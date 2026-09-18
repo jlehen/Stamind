@@ -1,5 +1,6 @@
 from typing import Any, List, Optional, Dict
 from trainmate.config import config
+from trainmate.prompt import athlete_watching
 from trainmate.types import Objective, Constraint, Workout, CompletedActivity
 from trainmate.util import cyan, days_between, step
 from trainmate.coach.formatting import (
@@ -944,7 +945,10 @@ belongs to the next `workout generate`, not to you.
         if 0 <= days_left <= config.adapt_terminal_window_days:
             custom_task += _terminal_window_task(days_left, meso_end_date_str)
 
-        if has_message:
+        # A run the athlete does not watch sends its reason to them later, so the note is
+        # presented as their coach's and the reason is written to them, never as a reply
+        # (DESIGN_change_heads_up.md §3). Only this paragraph changes; the titles stay.
+        if has_message and athlete_watching():
             custom_task += """
 ### ATHLETE'S NOTE FOR TODAY
 The user content includes a section titled "ATHLETE'S NOTE FOR THIS ADAPTATION": a
@@ -955,7 +959,24 @@ let it tip a judgement call. It is advisory, not an override — do NOT schedule
 unsafe load just because the athlete asks (if recovery signals warrant easing, ease and say
 why). It speaks for this adaptation only and is never durable evidence about the mesocycle.
 """
+        elif has_message:
+            custom_task += """
+### ATHLETE'S NOTE FOR TODAY
+The user content includes a section titled "ATHLETE'S NOTE FOR THIS ADAPTATION". Despite
+that title, the athlete did NOT write it: it is a note from the athlete's human coach, who
+manages their week from outside their chat, and the athlete has not seen it. It carries
+extra intent or constraints the metrics can't show (e.g. the weather, no access to a
+sport/venue on a given day, a niggle to protect). Weigh it as today's intent alongside the
+data: honour stated constraints, and let it tip a judgement call. It is advisory, not an
+override — do NOT schedule clearly unsafe load just because the note asks (if recovery
+signals warrant easing, ease and say why). It speaks for this adaptation only and is never
+durable evidence about the mesocycle.
+The "reason" is sent to the athlete as a message about the change to their week. Write it
+to the athlete: what changed and why, in plain words. Never write it as a reply to the
+note — the athlete asked for nothing, so "as you asked" or "as requested" is wrong.
+"""
 
+        if has_message:
             custom_task += constraint_extraction_task(
                 "Separately from adapting today's sessions, this is a second job."
             )

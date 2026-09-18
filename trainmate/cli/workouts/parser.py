@@ -14,6 +14,7 @@ from trainmate.cli.workouts.generate import (
     run_workout_adapt, run_workout_batches, run_workout_compare,
     run_workout_generate, run_workout_list, run_workout_rollback, run_workout_show,
 )
+from trainmate.cli.workouts.heads_up import run_workout_notify
 
 
 def _add_listing_args(parser):
@@ -206,6 +207,24 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         )
     )
     _batches_parser.set_defaults(func=run_workout_batches)
+
+    # workout notify
+    w_notify = workout_subparsers.add_parser(
+        "notify",
+        help="Send the athlete the changes to their week not yet told, at once",
+        description=(
+            "Companion mode only. A change made in the terminal reaches the athlete's "
+            "Telegram just before their next morning message, even one that changes "
+            "today's sessions. This lists the changes still waiting, each with the line the "
+            "athlete will get, and asks the bot to send them on its next wake, within five "
+            "minutes, whatever the hour. "
+            f"'{green('workout batches')}' marks them 'not sent yet'."
+        ),
+    )
+    w_notify.set_defaults(func=run_workout_notify)
+    w_notify.add_argument(
+        "-y", "--yes", action="store_true", help="Skip confirmation prompt"
+    )
 
     # workout add
     w_add = workout_subparsers.add_parser(

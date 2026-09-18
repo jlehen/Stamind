@@ -9,7 +9,7 @@ from trainmate.config import config
 # migrations are idempotent, so this is a "skip the work" marker rather than a ledger of
 # steps to replay — TrainMate has one user and one database, and the alternative (a
 # numbered migration framework) would be more machinery than that warrants.
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 
 # How long a connection waits for a writer to finish before raising "database is
@@ -334,6 +334,15 @@ class BaseDB:
                 cursor, "workout_changes", "commitment_end",
                 "ALTER TABLE workout_changes ADD COLUMN commitment_end TEXT"
             )
+            # When the athlete was told about this change (DESIGN_change_heads_up.md §6).
+            # One-off on the way in (§9): every existing change counts as told, so the first
+            # wake does not send every old line at once, and the morning push's own marker
+            # goes with the code that read it.
+            if not self._table_has_column(cursor, "workout_changes", "told_at"):
+                cursor.execute("ALTER TABLE workout_changes ADD COLUMN told_at TEXT")
+                cursor.execute("UPDATE workout_changes SET told_at = created_at")
+                if self._table_exists(cursor, "settings"):
+                    cursor.execute("DELETE FROM settings WHERE key = 'push_note_last'")
 
             # Calendar sync bookkeeping, keyed by lineage (§8). Off the row because a
             # successful push is not a prescription change: leaving it there would make

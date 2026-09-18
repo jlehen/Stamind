@@ -1,6 +1,21 @@
 # Design: Telling the athlete when her week changes out of her sight
 
-**Status:** Draft · **Date:** 2026-09-18 (rev. 6)
+**Status:** Implemented · **Date:** 2026-09-18 (rev. 8)
+
+Revision 8 drops the automatic same-day send. Every change now waits for her morning time,
+a change to today's sessions included. When a terminal run changes today's sessions, the
+terminal says so and tells the operator to run `workout notify` (§4, §8). The 15-minute wait
+that the same-day send needed goes with it.
+
+Revision 7 folds in a second review against the code:
+
+- A change that a rollback brings back is waiting to be told again (§6).
+- "Replace" says that it undoes the unsent attempt at once, and the terminal no longer claims
+  the schedule is unchanged when the run that follows writes nothing (§5).
+- The replace question names the change by kind and time, the terminal notice gives the real
+  time, and `workout batches` prints no description under a rollback (§5, §8).
+- The adapt prompt change is spelled out (§3), and one change to the `workout generate` runs
+  she starts herself is listed (§7).
 
 Revision 5 adds `workout notify`: the operator sends what is waiting at once, for the change
 that should not wait for the morning (§4). Revision 6 gives it that name, because `queue
@@ -64,10 +79,10 @@ sessions stay silent for now (§12).
 ## 2. The rule
 
 > When `workout generate` or `workout adapt` changes the athlete's week and she did not
-> watch it happen, TrainMate tells her on Telegram just before her next morning message. A
-> change that touches today's sessions does not wait for the morning: it goes out the same
-> day, once the operator has left her week alone for 15 minutes. If she opens her chat before
-> either, she is told first. The operator can also send what is waiting at once.
+> watch it happen, TrainMate tells her on Telegram just before her next morning message. If
+> she opens her chat before that, she is told first. The operator can send what is waiting
+> at once with `workout notify`, and the terminal says to when the change touches today's
+> sessions.
 
 She watched a run when it started from her chat: a button she tapped, a message she typed,
 or the morning message itself. The run's output is the reply she reads, so she already
@@ -82,8 +97,8 @@ In expert mode the athlete is the operator, who started every run and watched it
 sent.
 
 The one sentence she needs: whenever your coach changes your week without you, you get a
-message saying what changed with your next morning message, or the same day if it is about
-today.
+message saying what changed with your next morning message, or sooner if your coach sends
+it.
 
 ## 3. What she gets
 
@@ -115,6 +130,14 @@ written to her: what changed and why, never as a reply to the note. Everything e
 prompt does with the note stays as it is, including the constraints and daily signals read
 from it. A run without a message, and every run she watches, keeps today's prompt byte for
 byte.
+
+The prompt says "the athlete's note" in five places: the paragraph that tells the week
+planner how to weigh the note, the title of the section that carries the note, the wording of
+each session's own reason, and the two comments on the constraints and the daily signals read
+from the note. Only the first one changes. That paragraph is swapped for one that says who
+wrote the note and who reads the reason. The two titles stay as they are:
+`tests/test_prompt_gates.py` pins them, and the rest of the prompt points at the section by
+its title.
 
 **A rollback says what was undone.** When `workout rollback` or `plan rollback` undoes a
 change she was told about, she gets that change's line back:
@@ -159,23 +182,23 @@ Waiting also keeps the operator's work behind the scenes. The operator often get
 right week by trial and error: a run, a look at the result, another run. Nothing reaches her
 phone while that goes on, and §5 makes sure the attempt that survives reads correctly.
 
-**A change that touches today does not wait.** The second gap of §1 is the case: at 12:30 the
-operator changes tonight's run, and 08:00 tomorrow is too late. A change touches today when
-one of the session rows it wrote is dated today in her time zone, a session moved out of
-today included. Such a change goes out once the newest waiting change is at least 15 minutes
-old, so that a second attempt made a few minutes later still finds the first one unsent (§5).
-At 12:30 the operator changes tonight's run, and she is told between 12:45 and 12:50. It goes
-out only between her morning time and 21:00. After 21:00 today's session is behind her, and
-the change waits for the morning like any other. The 15 minutes and the 21:00 are constants.
+**A change that touches today waits too, and the terminal says so.** The second gap of §1 is
+the case: at 12:30 the operator changes tonight's run, and 08:00 tomorrow is too late.
+TrainMate does not send it on its own, because it cannot tell a finished change from one
+the operator is still working out. The terminal says that the change touches today's
+sessions and that `workout notify` sends it now (§8), and the operator decides. A change
+touches today when one of the sessions it writes is dated today in her time zone, a session
+moved out of today included.
 
-Put together, the scheduler sends when it is between her morning time and 21:00, the newest
-waiting change is at least 15 minutes old, and at least one waiting change either touches
-today or was made before today's morning time. It then sends every waiting change, oldest
-first, so that she reads them in the order they were made. A change made in the last 15
-minutes before her morning time arrives a few minutes after the morning message.
+Put together, the scheduler sends when it is between her morning time and 21:00 and at least
+one waiting change was made before today's morning time. A change made during the day waits
+for the next morning. The scheduler then sends every waiting change, oldest first, so that
+she reads them in the order they were made. The 21:00 is a constant. It matters only when
+the bot was down at her morning time: the changes go out when it comes back, but not after
+21:00.
 
 **The operator can send it now.** TrainMate cannot know that the operator is done trying, or
-that a change to tomorrow matters tonight. The operator can. It is Wednesday 18:00 and the
+that a change matters before the next morning. The operator can. It is Wednesday 18:00 and the
 operator moves Thursday's run to the morning, because Thursday evening is taken. Nothing
 touches Wednesday, so the message would wait for Thursday 08:00, an hour before the run. The
 operator runs `workout notify` in the terminal. It lists the changes that are waiting, each
@@ -191,12 +214,9 @@ changes are rolled back before the wake, no waiting change is that old, and the 
 the operator makes is not sent early by a leftover. With nothing waiting, or on an expert
 instance, `workout notify` says so and does nothing.
 
-The automatic rule for today stays. With the command alone, forgetting it after changing
-tonight's run would bring back the second gap of §1.
-
-**If she opens her chat, she is told first.** Both waits exist so that a message does not
-reach her at a bad moment or in the middle of the operator's work. Neither matters once she
-is in the chat, because she is about to see the changed week anyway. It is Wednesday 22:00
+**If she opens her chat, she is told first.** The wait exists so that a message does not
+reach her at a bad moment or in the middle of the operator's work. That does not matter once
+she is in the chat, because she is about to see the changed week anyway. It is Wednesday 22:00
 and the operator moves the test; the message waits for 08:00. On Thursday at 07:15 she taps
 "🗓 My week" over breakfast. Without this rule she sees the test on Saturday with no word
 about why, which is the very complaint of §1. So when she taps a button or types a message
@@ -230,13 +250,30 @@ running the second attempt against the week she knows.
 So a `workout generate` or `workout adapt` started in the terminal asks one question first,
 when the newest change that wrote sessions is one still waiting to be told:
 
-> Change #7 (adapt, Wed 22:00) has not been sent to the athlete yet.
-> Replace it, or build on it?
+> The newest change (adapt, Wed 22:00) has not been sent to the athlete yet.
+> Replace it, or build on it? Replace undoes it now.
+
+The question names the change by its kind and time. `workout batches` numbers its rows by
+position, newest first, so the change's internal number would match no number the operator
+can see.
 
 **Replace** rolls change 7 back, exactly as `workout rollback` would, and then runs the
 command. The week planner sees the week she knows, so the line it writes is right for her.
 The rollback itself says nothing, because she never heard of change 7 (§3). Three attempts in
 a row, each replacing the one before, leave one change and one message.
+
+Replace undoes change 7 before the week planner is called, because the week planner has to
+see the week she knows. So change 7 stays undone when the run that follows writes nothing:
+the operator cancels at a later question, the LLM call fails, or the operator declines the
+proposal. She is not misled by that. Her week is back to the one she knows, and nothing is
+waiting to be sent. The terminal has to say it, though. Today those exits print "your
+schedule is unchanged", which would be false. After a Replace they say that the earlier
+attempt stays undone, and that `workout rollback` brings it back. Bringing it back that way
+brings its message back too (§6).
+
+The scheduler may send change 7 while the question sits unanswered. So Replace checks again
+that change 7 is still unsent. If it was sent in the meantime, the terminal says so and the
+run builds on it.
 
 **Build on it** runs the command on top, as today. It is there because two real changes in a
 row are legitimate: `workout generate` for next month, then `workout adapt` for Friday's
@@ -276,6 +313,21 @@ wrote is still the current session of its day (`change_has_live_revisions`). A c
 was rolled back before it was told fails that test. So does a change that a later run
 completely overwrote. Neither is sent.
 
+A rollback can bring a change back, and the test has to see that. A rollback does not make
+old rows current again. It writes copies of them, and the copies belong to the rollback. It
+is Wednesday 22:00 and the operator runs `workout generate -d today..`: change 5, waiting. At
+22:10 the operator runs it again and answers "build on it". Change 6 rewrites every day
+change 5 wrote, so change 5 no longer stands. At 22:20 the operator decides the first attempt
+was better and runs `workout rollback`. Change 7 copies change 5's sessions back. On Thursday
+her week is change 5's week. With the test as it is today she gets nothing: change 5's own
+rows are not current, change 6 was undone, and change 7 has no line because it undid a change
+she never heard of.
+
+So the test also counts a current row that is a copy of one of the change's rows. Each copy
+already records the row it copies (`restored_from`), and a copy of a copy is followed back
+the way `_describing_revision` already does. Change 5 stands again at 22:20, and its line
+goes out at 08:00.
+
 `workout adapt` now stores its reason in `note` as well as in `summary`, so the line for the
 athlete lives in one column for both commands. `summary` stays the description `workout
 batches` shows (§8). An adaptation that changed nothing stores no `note`, as today.
@@ -306,6 +358,11 @@ The morning message stops opening with the week line. `pending_week_note`, the
 go. Nothing is lost: a change still waiting when the morning message is due is sent by the
 scheduler just before it (§4).
 
+One thing changes for a `workout generate` she starts from her own chat, for example from the
+button that extends her schedule. Today its week line opens the next morning message, like
+any other. From now on it does not: she watched the run, and the reply showed her the week
+planner's reasoning and the new sessions.
+
 The morning message's own adaptation is a run in her chat. Its change is recorded as told
 when it is written, and the briefing prints its reason after today's sessions, as it does
 today.
@@ -315,16 +372,23 @@ today.
 Until now the reason of a terminal `workout adapt` never left the terminal. From now on it
 reaches her phone, so the terminal says so. On a companion instance, a terminal `workout
 generate` prints one line under "Your coach:", and a terminal `workout adapt` prints it under
-its reason, both before the question that accepts the change:
+its reason, both before the question that accepts the change. The line gives the real time:
 
-> The athlete gets this line on Telegram before her next morning message, or in about 20
-> minutes if today's sessions change. `workout notify` sends it now.
+> The athlete gets this line on Telegram at 08:00 tomorrow. `workout notify` sends it now.
+
+It says "today" when the run is made before her morning time. When the proposal touches
+today's sessions and the line would only go out tomorrow, the terminal says so instead:
+
+> This changes today's session, and the athlete gets this line on Telegram only at 08:00
+> tomorrow. Run `workout notify` to send it now.
 
 `workout batches` lists every change with its date, kind, size and span, and nothing about
 what the change was, although a description is already stored with most of them: the week
-planner's reasoning for a `workout generate`, its reason for a `workout adapt`, the typed
-reason of a `workout rm`, and "Undo of change #6 (generate)." for a rollback. It now prints
-that description under each row, cut at about 200 characters. A change still waiting to be
+planner's reasoning for a `workout generate`, its reason for a `workout adapt`, and the typed
+reason of a `workout rm`. It now prints that description under each row, cut at about 200
+characters. A rollback's row gets none. Its stored description is "Undo of change #6
+(generate).", which names the change by its internal number, and the list numbers its rows by
+position: the 6 would point at the wrong row. A change still waiting to be
 told also says "not sent yet", which is what the question of §5 refers to. No command gains
 an LLM call for this: the commands that have none are instant today and stay so.
 
@@ -341,28 +405,33 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
 - `trainmate/db/workouts.py`: `workout_change` stamps `told_at` when she is watching;
   `rollback_to_change` builds the rollback's `note` from the told changes it undoes (§6); a
   query for the changes waiting to be told, and a write that marks them told;
-  `get_workout_changes` also says which changes are waiting. `newest_change_with_note` and
-  `newest_change_of_kind` lose their only caller and go, and the test in
-  `tests/test_workout_generate_window.py` that reads the first one moves to the new query.
+  `get_workout_changes` also says which changes are waiting. `change_has_live_revisions`
+  also counts a current row that is a copy of one of the change's rows (§6).
+  `newest_change_with_note` and `newest_change_of_kind` lose their only caller and go, and
+  the test in `tests/test_workout_generate_window.py` that reads the first one moves to the
+  new query.
 - The helper that says whether she is watching, beside `is_json_frontend` in
   `trainmate/prompt.py`.
 - `trainmate/coach/service/adaptation.py`: `workout_revision_apply` stores the reason in
   `note`.
 - `trainmate/coach/engine/workouts.py`: the adapt prompt presents the `-m` message as her
-  coach's note when she is not watching (§3). It is one more branch on the existing
-  `has_message` gate.
+  coach's note when she is not watching (§3). Only the paragraph that tells the week planner
+  how to weigh the note is swapped, under the existing `has_message` gate. The section titles
+  stay.
 - `trainmate/cli/workouts/generate.py`: the replace question at the start of
-  `run_workout_generate` and `run_workout_adapt`, before the LLM call (§5); the notice under
-  the line (§8); `_change_line` prints the description and "not sent yet"; the new `workout
-  notify` (§4), with its parser entry in `trainmate/cli/workouts/parser.py`.
+  `run_workout_generate` and `run_workout_adapt`, before the LLM call (§5); the wording of
+  the exits that write nothing after a Replace (§5); the notice under the line (§8);
+  `_change_line` prints the description and "not sent yet"; the new `workout notify` (§4),
+  with its parser entry in `trainmate/cli/workouts/parser.py`. As built, the question, the
+  notice and `workout notify` live in `trainmate/cli/workouts/heads_up.py`, because
+  `generate.py` is past the size limit, and the send rule in `trainmate/heads_up.py`.
 - `trainmate/cli/bot.py`: the hidden `bot changes`; `run_bot_morning` loses the week line.
 - `trainmate_bot.py`: `scheduler_wake` runs `bot changes` after the due reminders and before
-  the morning message, in companion mode, when the chat is free and either the three
-  conditions of §4 hold or a waiting change is no newer than `changes_notify_upto`. One helper
-  runs `bot changes`
-  ahead of her input, called where `on_message` and `on_callback` accept a tap or a message,
-  before anything is routed or started. Both checks are a database read inside the bot, like
-  the one for reminders. The 21:00 and the 15 minutes are constants beside them.
+  the morning message, in companion mode, when the chat is free and either the morning rule
+  of §4 holds or a waiting change is no newer than `changes_notify_upto`. One helper runs `bot
+  changes` ahead of her input, called where `on_message` and `on_callback` accept a tap or a
+  message, before anything is routed or started. Both checks are a database read inside the
+  bot, like the one for reminders. The 21:00 is a constant beside them.
 - `docs/ARCHITECTURE.md`: the `workout_changes` table (`note`, `told_at`), the scheduler, and
   the internal settings markers.
 - DESIGN_plan_change_continuity.md §6.4 is implemented, so it gets a dated amendment pointing
@@ -378,32 +447,40 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   and is unchanged byte for byte otherwise.
 - `bot changes` sends each waiting change once, oldest first, with the right wording, and
   sends nothing when run again.
+- A waiting change that a second run overwrote completely is not sent. Once that second run
+  is rolled back, the first change is waiting again and is sent.
 - A change rolled back before it was told is never sent, and the rollback sends nothing. A
   change rolled back after it was told makes the rollback quote its line; several are quoted
   oldest first; a told change without a line gives the plain sentence; a told adaptation that
   changed nothing gives no message at all.
 - The scheduler sends waiting changes after due reminders and before the morning message on
-  the same wake. It does not send while the chat is busy, in expert mode, or while the newest
-  waiting change is younger than 15 minutes. It sends whether or not the morning message is
-  switched on.
-- A change that touches no session of today is not sent that day. It goes out at her next
-  morning time, ahead of the morning message, and also when the bot was down at that time and
-  comes back later in the day.
-- A change that touches today, a session moved out of today included, goes out the same day
-  once it is 15 minutes old, together with any older waiting change, oldest first. Made at
-  21:00 or later, or before her morning time, it waits for her morning time.
+  the same wake. It does not send while the chat is busy or in expert mode. It sends whether
+  or not the morning message is switched on.
+- A change made during the day is not sent that day, even when it touches today. It goes out
+  at her next morning time, ahead of the morning message, together with any other waiting
+  change, oldest first, and also when the bot was down at that time and comes back later in
+  the day, before 21:00.
 - A tap or a message from her while a change is waiting gets the change first, whatever the
-  hour and however young the change, and then its own reply.
+  hour, and then its own reply.
 - `workout notify` lists the waiting changes and, once confirmed, makes the scheduler send them
-  on its next wake, after 21:00 and under 15 minutes old included. With nothing waiting, or
-  on an expert instance, it does nothing. A marker left behind by a rollback of every waiting
-  change does not send the next change early.
+  on its next wake, after 21:00 included. With nothing waiting, or on an expert instance, it
+  does nothing. A marker left behind by a rollback of every waiting change does not send the
+  next change early.
 - A terminal run asks the replace question when the newest change that wrote sessions is
   waiting. Replace rolls it back before the week planner is called and leaves one waiting
   change. Nothing is asked when her own change came after it, when the waiting change was
   already sent, with `-y`, or on an expert instance.
-- The terminal notice appears on a companion instance and not on an expert one.
-- `workout batches` prints each description and marks a waiting change.
+- After a Replace, a run that is cancelled, declined or fails leaves the earlier attempt
+  undone and says so. It never prints that the schedule is unchanged. A change that was sent
+  while the question waited is not rolled back, and the run builds on it.
+- The terminal notice appears on a companion instance and not on an expert one. It names her
+  morning time. When the proposal touches today, a session moved out of today included, and
+  the line would only go out tomorrow, it says so and tells the operator to run `workout
+  notify`.
+- `workout batches` prints each description, none under a rollback, and marks a waiting
+  change.
+- A `workout generate` she starts from her chat is told as it is written, so its week line
+  does not open the next morning message.
 - The morning message no longer carries the week line.
 - The migration marks existing changes as told and removes `push_note_last`.
 
@@ -417,17 +494,18 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   need a prompt of its own and an LLM call on each send. Replacing the unsent attempt (§5)
   gets the right sentence without either. What stays uncovered: the operator answers "build
   on it", and the second run then overwrites everything the first one wrote. The first
-  message is dropped and the second may refer to it.
+  message is dropped and the second may refer to it. If the operator then rolls the second
+  run back, the first one is waiting again (§6).
 - Undoing a rollback. She is told "The change to your week was undone." and not that the
   earlier change is back.
 - The athlete queue. It is the place for things TrainMate wants to tell or ask her, but its
   messages carry "Got it" and "Not now" and come back every morning until she taps one. A
   change is read once, like the briefing. The queue also does not record whether a message
   went out, which the undone message needs.
-- Telling her the same day, on its own, about a change to tomorrow's sessions. She hears at
-  her morning time, which is before she trains and is when she learns what any day holds.
-  When the evening before matters, for a bag to pack or a lane to book, the operator runs
-  `workout notify` (§4).
+- Telling her the same day, on its own, about any change, a change to today's sessions
+  included. She hears at her morning time, which is when she learns what any day holds.
+  When sooner matters — tonight's run changed, or a bag to pack for tomorrow — the operator
+  runs `workout notify`, and for a change to today the terminal says so (§4, §8).
 - Sending the morning's changes ahead of her morning time, for example an hour before. Her
   morning time is the hour she chose to hear from TrainMate, which is the same reason nothing
   is sent after 21:00.
@@ -439,9 +517,8 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   command that sends them sits beside it.
 - Sending a `queue tell` message at once. The queue has the same gap: a note queued at 21:10
   about tonight goes out the next morning. That belongs to DESIGN_athlete_queue.md.
-- Settings for the evening hour and the settle time. Both are constants. An evening setting
-  beside `morning-time` would only matter for an athlete who trains after 21:00 and whose
-  session the operator changes that same evening.
+- A setting for the evening hour. It is a constant, and it only stops a late catch-up after
+  the bot was down at her morning time.
 - Holding reminders overnight too. She chose their time herself (DESIGN_athlete_queue.md
   §10).
 - A coach-written description for the commands that make no LLM call. They already store the

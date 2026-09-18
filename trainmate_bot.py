@@ -38,7 +38,7 @@ import sys
 import time
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
-from trainmate import athlete_queue, journal, settings
+from trainmate import athlete_queue, heads_up, journal, settings
 from trainmate.clock import now as athlete_now, reset_cache as forget_timezone
 from trainmate.config import config
 from trainmate.prompt import (
@@ -332,10 +332,12 @@ async def scheduler_wake(
 
     Reminders that are due go first, and `run` waits for them: a push due on the same wake
     would otherwise find the chat busy. They go out whatever the persona and whether or not
-    the push is on (DESIGN_athlete_queue.md §6.5). In companion mode `reflect` starts `data
-    reflect --auto` outside the chat once a day, and nothing waits for it
-    (DESIGN_learning_doubt_nudge.md §3.1). The push fires inside the [morning_time,
-    deadline] window once per bot-day (DESIGN_bot_simple_frontend.md §4.3)."""
+    the push is on (DESIGN_athlete_queue.md §6.5). The changes to the athlete's week that
+    are due go next, waited for too, so they come before the push; the config file's
+    persona decides, and the `push` switch does not (DESIGN_change_heads_up.md §4). In
+    companion mode `reflect` starts `data reflect --auto` outside the chat once a day, and
+    nothing waits for it (DESIGN_learning_doubt_nudge.md §3.1). The push fires inside the
+    [morning_time, deadline] window once per bot-day (DESIGN_bot_simple_frontend.md §4.3)."""
     # The athlete's wall clock, not the machine's: morning-time/morning-deadline are the
     # hours they wake up in (DESIGN_user_timezone.md §2). Every knob here is re-read each
     # wake — `settings set` runs in a CLI subprocess, so this long-lived process would
@@ -343,6 +345,8 @@ async def scheduler_wake(
     forget_timezone()
     if not busy() and athlete_queue.reminders_due():
         await run(["bot", "queue", "--remind"], True)
+    if not busy() and heads_up.changes_due():
+        await run(["bot", "changes"], True)
     now = athlete_now()
     today = now.date().isoformat()
     if simple and reflect_due(now) and last_run.get("reflect") != today:
@@ -444,6 +448,16 @@ def is_flush_request(line: str) -> bool:
     no fields, and an always-empty dict would read as falsy at every call site
     (DESIGN_output_verbosity.md §7)."""
     return line.startswith(FLUSH_SENTINEL)
+
+
+def flush_before_wait(line: str) -> bool:
+    """Whether a flush marker announces a wait, and so earns a Stop button. Only
+    ``{"wait": false}`` says no: it merely ends a message (DESIGN_change_heads_up.md §4)."""
+    try:
+        payload = json.loads(line[len(FLUSH_SENTINEL):])
+    except json.JSONDecodeError:
+        return True
+    return not isinstance(payload, dict) or payload.get("wait", True) is not False
 
 
 def parse_queue_request(line: str) -> Optional[dict]:
@@ -1010,7 +1024,7 @@ def main() -> None:
                     # here, before the CLI goes quiet for an LLM call (§7). That message
                     # is the wait notice, and it carries the Stop button
                     # (DESIGN_bot_stop_button.md §4) — no message, nothing to hang it on.
-                    if await _flush_output(session, buf):
+                    if await _flush_output(session, buf) and flush_before_wait(raw):
                         await _offer_stop(session)
                     buf = []
                     continue
@@ -1258,6 +1272,9 @@ def main() -> None:
             )
             return
 
+        # About to act on the athlete's own message: what changed in their week goes first.
+        await _tell_changes_first(chat.id)
+
         # A tap on the companion keyboard is the companion, whatever persona this
         # process last settled on: the keyboard sits on the phone until Telegram is
         # told to drop it, so a restart back into expert leaves it live (§5.6).
@@ -1424,6 +1441,10 @@ def main() -> None:
         if not is_authorized(chat.id, allowed_ids):
             return
         data = query.data or ""
+        # A tap on an offer is the athlete's own input: what changed in their week goes
+        # first. A prompt answer or a Stop tap belongs to a command already running.
+        if data.startswith(("q:", "ui:")):
+            await _tell_changes_first(chat.id)
         if data.startswith("q:"):
             await _handle_queue_callback(query, chat.id, data)
             return
@@ -1473,6 +1494,16 @@ def main() -> None:
         session = await _start_command(push_chat_id, argv, quiet=True, source="push")
         if wait:
             await session.task
+
+    async def _tell_changes_first(chat_id: int) -> None:
+        """Sends the changes to the athlete's week not told yet, before acting on their own
+        tap or message, whatever the hour and however young the change
+        (DESIGN_change_heads_up.md §4)."""
+        if chat_id != push_chat_id or sessions.get(chat_id) is not None:
+            return
+        if not heads_up.waiting():
+            return
+        await _run_scheduled(["bot", "changes"], True)
 
     # Held until each ends: asyncio keeps only a weak reference to a running task.
     reflect_tasks: set = set()

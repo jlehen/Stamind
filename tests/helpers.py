@@ -55,6 +55,22 @@ def pin_clock(testcase, day: str) -> None:
     testcase.addCleanup(patcher.stop)
 
 
+def as_instance(testcase, ui: str, from_chat: bool = False) -> None:
+    """Runs one test on an instance whose config says `telegram.ui: <ui>`, as if started
+    from the terminal or, with `from_chat`, from the athlete's chat.
+
+    Whether the athlete watches a run turns on both (DESIGN_change_heads_up.md §6), and the
+    operator's own config.yaml must not decide it for a test."""
+    from trainmate.config import config
+    telegram = dict(config.data.get("telegram") or {}, ui=ui)
+    for patcher in (patch.dict(config.data, {"telegram": telegram}), patch.dict(os.environ)):
+        patcher.start()
+        testcase.addCleanup(patcher.stop)
+    os.environ.pop("TRAINMATE_FRONTEND", None)
+    if from_chat:
+        os.environ["TRAINMATE_FRONTEND"] = "json"
+
+
 # Delete children before parents to satisfy foreign-key constraints. `workouts` is
 # absent on purpose: it is append-only and guarded by a trigger, so it is reset through
 # `wipe_workouts`, which also clears its changes and Calendar state

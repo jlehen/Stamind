@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from typing import (
     Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple,
 )
+from trainmate.heads_up import undone_note
+from trainmate.prompt import athlete_watching
 from trainmate.types import Constraint, Workout
 from trainmate.sports import canonical_sport
 
@@ -406,19 +408,21 @@ class WorkoutsMixin:
 
         `note` is the coach's line to the athlete about this change and `commitment_end`
         the last day of the window in force while it ran
-        (DESIGN_plan_change_continuity.md §6.3, §5.2).
+        (DESIGN_plan_change_continuity.md §6.3, §5.2). A change the athlete watched is
+        told as it is written (DESIGN_change_heads_up.md §6).
         """
         if kind not in CHANGE_KINDS:
             raise ValueError(f"unknown workout change kind: {kind!r}")
         created_at = datetime.now(timezone.utc).isoformat()
+        told_at = created_at if athlete_watching() else None
         change: Optional[WorkoutChange] = None
         with self.transaction() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO workout_changes "
-                "(created_at, kind, summary, macrocycle_id, note, commitment_end) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (created_at, kind, summary, macrocycle_id, note, commitment_end),
+                "(created_at, kind, summary, macrocycle_id, note, commitment_end, told_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (created_at, kind, summary, macrocycle_id, note, commitment_end, told_at),
             )
             change = WorkoutChange(self, conn, int(cursor.lastrowid), kind, created_at)
             yield change
@@ -800,13 +804,15 @@ class WorkoutsMixin:
         every batch is undoable, adapts and manual edits included. A change that appended
         nothing is listed too, flagged `held`.
 
-        Each entry: {id, created_at, kind, summary, workouts, first_date, last_date,
-        macrocycle_ids, held} plus, when `from_date` is given, `restorable` — how many of
-        its revisions are dated from there on.
+        Each entry: {id, created_at, kind, summary, note, workouts, first_date, last_date,
+        macrocycle_ids, held, waiting} plus, when `from_date` is given, `restorable` — how
+        many of its revisions are dated from there on. `waiting` says the athlete has not
+        been told about it yet (DESIGN_change_heads_up.md §8).
         """
+        waiting = {c["id"] for c in self.waiting_changes()}
         with self._get_connection() as conn:
             rows = conn.execute(
-                "SELECT c.id, c.created_at, c.kind, c.summary, "
+                "SELECT c.id, c.created_at, c.kind, c.summary, c.note, "
                 "       COUNT(w.id) AS workouts, MIN(w.date) AS first_date, "
                 "       MAX(w.date) AS last_date, "
                 "       GROUP_CONCAT(DISTINCT w.macrocycle_id) AS macro_ids "
@@ -821,6 +827,7 @@ class WorkoutsMixin:
                     "created_at": row["created_at"],
                     "kind": row["kind"],
                     "summary": row["summary"],
+                    "note": row["note"],
                     "workouts": row["workouts"],
                     "first_date": row["first_date"],
                     "last_date": row["last_date"],
@@ -828,6 +835,7 @@ class WorkoutsMixin:
                         int(i) for i in raw_ids.split(",") if i.strip()
                     ),
                     "held": row["workouts"] == 0,
+                    "waiting": row["id"] in waiting,
                 })
             if from_date is None:
                 return changes
@@ -856,39 +864,58 @@ class WorkoutsMixin:
             ).fetchone()
             return int(row["c"]) if row and row["c"] is not None else None
 
-    def newest_change_with_note(self) -> Optional[Dict[str, Any]]:
-        """The newest change carrying a line written for the athlete, or None.
-
-        Only `workout generate` writes one, and only when something the athlete would
-        notice changed — so a run that merely extended the schedule is not here
-        (DESIGN_plan_change_continuity.md §6.3)."""
+    def newest_change_with_sessions(self) -> Optional[Dict[str, Any]]:
+        """The newest change that wrote at least one revision, or None: the one a terminal
+        run offers to replace (DESIGN_change_heads_up.md §5)."""
         with self._get_connection() as conn:
             row = conn.execute(
-                "SELECT * FROM workout_changes WHERE note IS NOT NULL AND note != '' "
-                "ORDER BY id DESC LIMIT 1"
-            ).fetchone()
-            return dict(row) if row else None
-
-    def newest_change_of_kind(
-        self, kind: str, after_id: int = 0
-    ) -> Optional[Dict[str, Any]]:
-        """The newest change of one kind made after `after_id`, or None."""
-        with self._get_connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM workout_changes WHERE kind = ? AND id > ? "
-                "ORDER BY id DESC LIMIT 1",
-                (kind, after_id),
+                "SELECT c.* FROM workout_changes c "
+                "WHERE EXISTS (SELECT 1 FROM workouts w WHERE w.change_id = c.id) "
+                "ORDER BY c.id DESC LIMIT 1"
             ).fetchone()
             return dict(row) if row else None
 
     def change_has_live_revisions(self, change_id: int) -> bool:
         """Whether anything this change wrote is still the live revision of its slot —
-        that is, whether the change still stands (§6.4)."""
+        that is, whether the change still stands (DESIGN_plan_change_continuity.md §6.4).
+
+        A rollback brings a change back by writing copies of its rows, so a live copy
+        counts too, and so does a copy of a copy (DESIGN_change_heads_up.md §6)."""
         with self._get_connection() as conn:
             row = conn.execute(
-                "SELECT 1 FROM live_workouts WHERE change_id = ? LIMIT 1", (change_id,)
+                "WITH RECURSIVE copies(id) AS ("
+                "  SELECT id FROM workouts WHERE change_id = ? "
+                "  UNION "
+                "  SELECT w.id FROM workouts w JOIN copies c ON w.restored_from = c.id"
+                ") "
+                "SELECT 1 FROM live_workouts WHERE id IN (SELECT id FROM copies) LIMIT 1",
+                (change_id,),
             ).fetchone()
             return row is not None
+
+    def waiting_changes(self) -> List[Dict[str, Any]]:
+        """The changes waiting to be told, oldest first: each has a line for the athlete,
+        no `told_at`, and still stands (DESIGN_change_heads_up.md §6)."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM workout_changes "
+                "WHERE note IS NOT NULL AND note != '' AND told_at IS NULL "
+                "ORDER BY id ASC"
+            ).fetchall()
+        return [dict(row) for row in rows if self.change_has_live_revisions(row["id"])]
+
+    def mark_changes_told(self, change_ids: Sequence[int]) -> None:
+        """Records that the athlete was told about these changes (§6)."""
+        if not change_ids:
+            return
+        told_at = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE workout_changes SET told_at = ? "
+                f"WHERE told_at IS NULL AND id IN ({','.join('?' * len(change_ids))})",
+                [told_at, *change_ids],
+            )
+            conn.commit()
 
     def next_change_after(self, change_id: int) -> Optional[int]:
         """The change that ran immediately after `change_id`, if any."""
@@ -916,12 +943,27 @@ class WorkoutsMixin:
         into a past slot would silently make it the live session for a day already
         trained (DESIGN_plan_rollback.md §9).
 
+        The rollback's `note` tells the athlete what was undone, quoting the changes they
+        were told about (DESIGN_change_heads_up.md §6).
+
         Returns `(restored sessions, constraints un-honored by the restore)`.
         """
         target = self.get_change(change_id)
         if target is None:
             raise ValueError(f"No workout change #{change_id}.")
-        with self.workout_change(kind="rollback", summary=summary) as change:
+        with self._get_connection() as conn:
+            told = [
+                dict(row) for row in conn.execute(
+                    "SELECT c.* FROM workout_changes c "
+                    "WHERE c.id >= ? AND c.told_at IS NOT NULL AND EXISTS ("
+                    "  SELECT 1 FROM workouts w WHERE w.change_id = c.id AND w.date >= ?"
+                    ") ORDER BY c.id ASC",
+                    (change_id, from_date),
+                ).fetchall()
+            ]
+        with self.workout_change(
+            kind="rollback", summary=summary, note=undone_note(told)
+        ) as change:
             slots = change.conn.execute(
                 "SELECT DISTINCT date, sport_canonical FROM workouts "
                 "WHERE change_id >= ? AND date >= ? ORDER BY date ASC",

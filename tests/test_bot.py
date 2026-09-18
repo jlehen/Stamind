@@ -745,6 +745,7 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(bot.settings, "morning_deadline", return_value="15:00"),
             mock.patch.object(bot.settings, "push_enabled", return_value=True),
             mock.patch.object(bot.athlete_queue, "reminders_due", return_value=True),
+            mock.patch.object(bot.heads_up, "changes_due", return_value=False),
         ]
         for patcher in patches:
             patcher.start()
@@ -807,6 +808,49 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
         self.now = dt.datetime(2026, 9, 16, 3, 0).astimezone()
         await self.wake(simple=False)
         self.assertEqual(self.reflects, [])
+
+    async def test_changes_go_out_after_reminders_and_before_the_push(self):
+        """DESIGN_change_heads_up.md §4: waited for, so the push finds the chat free."""
+        with mock.patch.object(bot.heads_up, "changes_due", return_value=True):
+            await self.wake()
+        self.assertEqual(self.ran, [
+            (["bot", "queue", "--remind"], True), (["bot", "changes"], True),
+            (["bot", "morning"], False),
+        ])
+
+    async def test_changes_go_out_with_the_push_switched_off(self):
+        with mock.patch.object(bot.heads_up, "changes_due", return_value=True), \
+                mock.patch.object(bot.settings, "push_enabled", return_value=False):
+            await self.wake()
+        self.assertIn((["bot", "changes"], True), self.ran)
+        self.assertNotIn((["bot", "morning"], False), self.ran)
+
+    async def test_a_busy_chat_leaves_the_changes_to_the_next_wake(self):
+        with mock.patch.object(bot.heads_up, "changes_due", return_value=True):
+            await self.wake(busy=True)
+        self.assertEqual(self.ran, [])
+
+
+class FlushMarkerTest(unittest.TestCase):
+    """A flush that only ends a message hangs no Stop button (DESIGN_change_heads_up.md §4)."""
+
+    def _emitted(self, **kwargs):
+        import io
+        from trainmate.prompt import emit_flush
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
+            emit_flush(out=buf, **kwargs)
+        return buf.getvalue()
+
+    def test_an_ordinary_flush_announces_a_wait(self):
+        line = self._emitted()
+        self.assertTrue(bot.is_flush_request(line))
+        self.assertTrue(bot.flush_before_wait(line))
+
+    def test_a_message_break_does_not(self):
+        line = self._emitted(wait=False)
+        self.assertTrue(bot.is_flush_request(line))
+        self.assertFalse(bot.flush_before_wait(line))
 
 
 class QueueProtocolTest(unittest.TestCase):

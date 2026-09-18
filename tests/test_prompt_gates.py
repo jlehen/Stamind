@@ -12,7 +12,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from tests.helpers import bind_test_db
+from tests.helpers import as_instance, bind_test_db
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_prompt_gates.db")
@@ -134,6 +134,37 @@ class TestStrengthBriefRegion(unittest.TestCase):
             with self.subTest(call=name):
                 self.assertIn(STRENGTH_BRIEF_INSTRUCTIONS, prompt)
                 self.assertIn("no set count", prompt)
+
+
+class TestTheNoteTheAthleteDidNotWrite(unittest.TestCase):
+    """A terminal run on a companion instance: the -m message is the athlete's coach's, and
+    the reason goes to the athlete later (DESIGN_change_heads_up.md §3)."""
+
+    NOTE = "rain all Friday, move the test to Saturday"
+    COACH_NOTE = "the athlete did NOT write it"
+
+    def test_the_paragraph_says_who_wrote_the_note_and_who_reads_the_reason(self):
+        as_instance(self, "simple")
+        system, user = build_prompt(athlete_message=self.NOTE)
+        self.assertIn(self.COACH_NOTE, system)
+        self.assertIn('"as you asked"', system)
+        # Only the paragraph changes: every region the note governs is still there.
+        for region in NOTE_REGIONS:
+            self.assertIn(region, system + user, f"missing region: {region!r}")
+
+    def test_a_run_the_athlete_watches_keeps_the_prompt_byte_for_byte(self):
+        as_instance(self, "expert")
+        expert = build_prompt(athlete_message=self.NOTE)
+        as_instance(self, "simple", from_chat=True)
+        from_chat = build_prompt(athlete_message=self.NOTE)
+        self.assertEqual(expert, from_chat)
+        self.assertNotIn(self.COACH_NOTE, expert[0])
+
+    def test_a_run_without_a_message_keeps_the_prompt_byte_for_byte(self):
+        as_instance(self, "expert")
+        expert = build_prompt()
+        as_instance(self, "simple")
+        self.assertEqual(expert, build_prompt())
 
 
 class TestAthleteNoteGate(unittest.TestCase):

@@ -11,7 +11,7 @@ from trainmate.google_calendar import event_url
 from trainmate.util import (
     bold, green, red, yellow, cyan, magenta, gray, cmd, aside, step, pad_visible, wrap_text,
     format_labeled_paragraph, today_str as _today_str, today_date as _today_date, days_between,
-    fmt_date, fmt_span, fmt_timestamp, notice, keep_whole, warn,
+    fmt_date, fmt_span, fmt_timestamp, notice, keep_whole, warn, truncate_visible,
 )
 from trainmate import settings
 from trainmate.cli import staleness
@@ -27,6 +27,9 @@ from trainmate.coach.proposals import GenerateProposal
 
 from trainmate.cli.selectors import has_selector as _has_selector, resolve_window, split_targets
 from trainmate.cli.workouts._helpers import workout_line
+from trainmate.cli.workouts.heads_up import (
+    generate_dates, print_send_notice, replacing_unsent, revision_dates,
+)
 
 
 def _resolve_ambiguous_matches(date_str: str, auto: bool) -> None:
@@ -70,6 +73,11 @@ def _resolve_ambiguous_matches(date_str: str, auto: bool) -> None:
 
 def run_workout_adapt(args: argparse.Namespace) -> None:
     # Executes the daily workout Garmin adaptation checks command.
+    with replacing_unsent(skip=args.auto):
+        _adapt(args)
+
+
+def _adapt(args: argparse.Namespace) -> None:
     date_str = args.date or _today_str()
     if not args.date:
         # Name the defaulted target so a bare `adapt` isn't silent (DESIGN_cli_noargs.md §b).
@@ -137,6 +145,7 @@ def run_workout_adapt(args: argparse.Namespace) -> None:
             # claims — requiring a *change* would flag them forever (§8).
             runtime.coach_service.workout_revision_record_no_change(proposal)
             return
+        print_send_notice(revision_dates(proposal))
 
         # The renderer draws the preview, the prompt asks the question: voice and
         # transport are two objects and neither calls the other
@@ -390,7 +399,9 @@ def print_standing_report(proposal) -> None:
     if not proposal.standing:
         return
     if proposal.athlete_note:
-        print(f"{bold('Your coach')}: {wrap_text(proposal.athlete_note)}\n")
+        print(f"{bold('Your coach')}: {wrap_text(proposal.athlete_note)}")
+        print_send_notice(generate_dates(proposal))
+        print()
     window = (
         f" (through {fmt_date(proposal.commitment_end)})"
         if proposal.commitment_end else ""
@@ -445,6 +456,14 @@ def print_generate_preview(proposal) -> bool:
 def run_workout_generate(args: argparse.Namespace) -> None:
     """Executes the AI workout generation command based on active strategy."""
     force = getattr(args, 'force', False)
+    with replacing_unsent(skip=force) as replaced:
+        _generate(args, force, replaced)
+
+
+def _generate(args: argparse.Namespace, force: bool, replaced: bool) -> None:
+    # Untrue once a Replace has undone the earlier attempt; the way out says so instead
+    # (DESIGN_change_heads_up.md §5).
+    unchanged = "." if replaced else " — your schedule is unchanged."
     ensure_recent_data(
         no_pull=args.no_pull, force_pull=getattr(args, 'force_pull', False)
     )
@@ -465,7 +484,7 @@ def run_workout_generate(args: argparse.Namespace) -> None:
         return
 
     if not force and not _confirm_regeneration(span_start, span_end):
-        notice("Workout generation cancelled — your schedule is unchanged.")
+        notice(f"Workout generation cancelled{unchanged}")
         return
 
     proposal = runtime.coach_service.workout_generate(
@@ -475,7 +494,7 @@ def run_workout_generate(args: argparse.Namespace) -> None:
         return
 
     if not force and not _confirm_apply(proposal):
-        notice("Workouts discarded — your schedule is unchanged.")
+        notice(f"Workouts discarded{unchanged}")
         return
 
     saved = runtime.coach_service.workout_generate_apply(
@@ -492,11 +511,16 @@ def run_workout_generate(args: argparse.Namespace) -> None:
 
 
 def _change_line(label: str, change: dict) -> str:
-    """One `workout batches` row: '<label>  <when>  <kind>  <n> workouts · <span>  plan …'.
+    """One `workout batches` row: '<label>  <when>  <kind>  <n> workouts · <span>  plan …',
+    then what the change was, cut short.
 
     Every change is listed, adapts and manual edits included, because every change is
     undoable now (DESIGN_workout_revisions.md §10). A change that appended nothing — an
-    adapt that looked at the metrics and held — says so rather than being left out."""
+    adapt that looked at the metrics and held — says so rather than being left out.
+
+    A rollback gets no description: its stored one names a change by an internal number
+    this list does not show. A change the athlete has not been told about says so
+    (DESIGN_change_heads_up.md §8)."""
     when = fmt_timestamp(change['created_at'])
     if change['held']:
         count = gray("(held) — nothing changed")
@@ -511,11 +535,17 @@ def _change_line(label: str, change: dict) -> str:
         span = f"{fmt_date(change['first_date'])} → {fmt_date(change['last_date'])}"
     macros = change.get('macrocycle_ids') or []
     plan = f"plan ID {', '.join(str(m) for m in macros)}" if macros else "unversioned"
-    return (
+    row = (
         f"{pad_visible(label, 5)} {pad_visible(when, 22)} "
         f"{pad_visible(change['kind'], 12)} {pad_visible(count, 32)} "
         f"{gray(span)}  {gray(plan)}"
     )
+    if change.get('waiting'):
+        row += f"  {yellow('not sent yet')}"
+    summary = " ".join((change.get('summary') or "").split())
+    if change['kind'] == 'rollback' or not summary:
+        return row
+    return row + "\n" + gray(wrap_text("      " + truncate_visible(summary, 200)))
 
 
 def run_workout_batches(args: argparse.Namespace) -> None:

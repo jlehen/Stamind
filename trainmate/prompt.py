@@ -86,17 +86,21 @@ def emit_buttons(buttons: Sequence[dict], out=None) -> None:
 FLUSH_SENTINEL = "\x1eTM-FLUSH "
 
 
-def emit_flush(out=None) -> None:
+def emit_flush(out=None, wait: bool = True) -> None:
     """Writes one sentinel-framed flush marker: ``\\x1eTM-FLUSH {}``.
 
     Does nothing on a terminal, where output already reaches the screen line by line.
     The front-end test lives here rather than at each call site because a flush has no
-    meaning outside a buffering front-end (DESIGN_output_verbosity.md §7)."""
+    meaning outside a buffering front-end (DESIGN_output_verbosity.md §7).
+
+    `wait=False` writes ``{"wait": false}``: the marker only ends a message, no wait
+    follows it, so the bot hangs no Stop button on it (DESIGN_change_heads_up.md §4)."""
     if not is_json_frontend():
         return
     if out is None:
         out = sys.stdout
-    out.write(FLUSH_SENTINEL + json.dumps({}) + "\n")
+    payload = {} if wait else {"wait": False}
+    out.write(FLUSH_SENTINEL + json.dumps(payload) + "\n")
     out.flush()
 
 
@@ -365,6 +369,17 @@ def is_json_frontend(frontend: Optional[str] = None) -> bool:
     if frontend is None:
         frontend = os.environ.get("TRAINMATE_FRONTEND", "")
     return frontend.lower() == "json"
+
+
+def athlete_watching() -> bool:
+    """Whether the athlete watches this run happen, and so needs no message about it.
+
+    Always on an expert instance, where the athlete is the operator. In companion mode only
+    when the run started from the athlete's chat, which is every run the bot starts
+    (DESIGN_change_heads_up.md §6). The config file decides, not the chat's `/ui` switch.
+    The import is deferred to keep this module stdlib-only."""
+    from trainmate.config import config
+    return config.telegram_ui != "simple" or is_json_frontend()
 
 
 def make_prompt(frontend: Optional[str] = None, out=None, inp=None):

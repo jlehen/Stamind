@@ -5,7 +5,9 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
+from tests.helpers import (
+    as_instance, clear_all_tables, run_cli, rebind_test_db, save_workout,
+)
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_cli_bot.db")
@@ -15,13 +17,11 @@ import trainmate.db
 import trainmate_cli
 
 from trainmate import runtime
-from trainmate.cli.bot import (
-    MORNING_MARKER, NOTE_MARKER, PUSH_ALL_DONE_LINE, PUSH_CHANGE_LEAD,
-    PUSH_CHANGE_UNDONE,
-)
+from trainmate.cli.bot import MORNING_MARKER, PUSH_ALL_DONE_LINE
 from trainmate.cli.render import SIMPLE_DONE_LINE
 from trainmate.config import config
-from trainmate.prompt import BUTTONS_SENTINEL
+from trainmate.heads_up import CHANGE_LEAD, UNDONE_ONE, UNDONE_PLAIN, UNDONE_SEVERAL
+from trainmate.prompt import BUTTONS_SENTINEL, FLUSH_SENTINEL
 from trainmate.util import today_str
 
 # One database for the whole module: the three test classes below share it and
@@ -39,9 +39,9 @@ def tearDownModule():
         pass
 
 
-class TheWeekLineTest(unittest.TestCase):
-    """The push opens with the coach's line about the change to the athlete's week
-    (DESIGN_plan_change_continuity.md §6.4)."""
+class ChangesCommandTest(unittest.TestCase):
+    """`bot changes` tells the athlete about the changes made out of their sight, and a
+    rollback of a change they were told about says so (DESIGN_change_heads_up.md §3, §6)."""
 
     def setUp(self):
         rebind_test_db(test_db)
@@ -49,80 +49,110 @@ class TheWeekLineTest(unittest.TestCase):
         garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
         garmin.start()
         self.addCleanup(garmin.stop)
-        # A session today, so the push has something to open ABOUT.
-        save_workout(
-            test_db, today_str(), "running", "Easy run", description="40 min.",
-            duration_minutes=40,
-        )
+        calendar = patch("trainmate.runtime.calendar_syncer")
+        calendar.start()
+        self.addCleanup(calendar.stop)
+        # A companion instance, run from the terminal: the athlete watches nothing here.
+        as_instance(self, "simple")
 
-    def _noted(self, note="Four sessions a week now."):
-        """A `workout generate` that carried a line, and the change id it wrote."""
-        with test_db.workout_change(kind="generate", note=note) as change:
+    def _change(self, kind="generate", note="Four sessions a week now.", day=None,
+                sport="cycling", title="Ride"):
+        """One change that wrote one session, and its id."""
+        with test_db.workout_change(kind=kind, note=note) as change:
             change.append(
-                date=today_str(), sport_type="cycling", title="Ride",
+                date=day or today_str(), sport_type=sport, title=title,
                 description="60 min.", duration_minutes=60,
             )
             return change.id
 
-    def test_the_line_opens_the_push_once(self):
-        self._noted()
-        _code, first, _ = run_cli(["bot", "morning"])
-        self.assertIn(f"{PUSH_CHANGE_LEAD} Four sessions a week now.", first)
-        self.assertTrue(
-            first.index(PUSH_CHANGE_LEAD) < first.index("Easy run"),
-            "the week line opens the message",
-        )
-        # A forced second push the same day does not repeat it.
-        _code, again, _ = run_cli(["bot", "morning", "--force"])
-        self.assertNotIn(PUSH_CHANGE_LEAD, again)
+    def _told(self, **kwargs):
+        change_id = self._change(**kwargs)
+        test_db.mark_changes_told([change_id])
+        return change_id
 
-    def test_a_generate_that_carried_no_line_does_not_silence_an_older_one(self):
-        self._noted()
-        with test_db.workout_change(kind="generate") as change:
-            change.append(
-                date=today_str(), sport_type="swimming", title="Swim",
-                description="30 min.", duration_minutes=30,
-            )
+    def test_each_waiting_change_goes_once_oldest_first(self):
+        self._change(note="Friday's test moves to Saturday.")
+        self._change(kind="adapt", note="Friday becomes a rest day.", sport="running")
+        _code, out, _ = run_cli(["bot", "changes"])
+        self.assertIn(f"{CHANGE_LEAD} Friday's test moves to Saturday.", out)
+        self.assertIn(f"{CHANGE_LEAD} Friday becomes a rest day.", out)
+        self.assertLess(out.index("moves to Saturday"), out.index("rest day"))
+        _code, again, _ = run_cli(["bot", "changes"])
+        self.assertEqual(again.strip(), "")
+
+    def test_one_message_per_change_in_the_chat(self):
+        self._change(note="First.")
+        self._change(note="Second.", sport="running")
+        with patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
+            _code, out, _ = run_cli(["bot", "changes"])
+        first, second = out.split(FLUSH_SENTINEL)
+        self.assertIn("First.", first)
+        self.assertIn("Second.", second)
+        self.assertIn('"wait": false', second)
+
+    def test_nothing_goes_out_on_an_expert_instance(self):
+        self._change()
+        as_instance(self, "expert")
+        _code, out, _ = run_cli(["bot", "changes"])
+        self.assertEqual(out.strip(), "")
+
+    def test_a_change_the_athlete_watched_is_never_sent(self):
+        as_instance(self, "simple", from_chat=True)
+        self._change()
+        self.assertEqual(test_db.waiting_changes(), [])
+
+    def test_a_change_rolled_back_before_it_was_told_is_never_sent(self):
+        change_id = self._change()
+        test_db.rollback_to_change(change_id, today_str(), summary="undo")
+        _code, out, _ = run_cli(["bot", "changes"])
+        self.assertEqual(out.strip(), "")
+
+    def test_a_rollback_quotes_the_line_of_a_change_that_was_told(self):
+        change_id = self._told(note="Friday's test moves to Saturday.")
+        test_db.rollback_to_change(change_id, today_str(), summary="undo")
+        _code, out, _ = run_cli(["bot", "changes"])
+        self.assertIn(f"{UNDONE_ONE} Friday's test moves to Saturday.", out)
+        self.assertNotIn(CHANGE_LEAD, out)
+
+    def test_several_told_changes_are_quoted_oldest_first(self):
+        first = self._told(note="Longer runs.")
+        self._told(kind="adapt", note="Rest on Friday.", sport="running")
+        test_db.rollback_to_change(first, today_str(), summary="undo")
+        _code, out, _ = run_cli(["bot", "changes"])
+        self.assertIn(UNDONE_SEVERAL, out)
+        self.assertLess(out.index("Longer runs."), out.index("Rest on Friday."))
+
+    def test_a_told_change_without_a_line_gives_the_plain_sentence(self):
+        change_id = self._told(kind="swap", note=None)
+        test_db.rollback_to_change(change_id, today_str(), summary="undo")
+        _code, out, _ = run_cli(["bot", "changes"])
+        self.assertIn(UNDONE_PLAIN, out)
+
+    def test_a_told_adaptation_that_changed_nothing_gives_no_message(self):
+        with test_db.workout_change(kind="adapt", summary="All green.") as change:
+            held = change.id
+        test_db.mark_changes_told([held])
+        test_db.rollback_to_change(held, today_str(), summary="undo")
+        _code, out, _ = run_cli(["bot", "changes"])
+        self.assertEqual(out.strip(), "")
+
+    def test_an_overwritten_change_waits_again_once_the_overwrite_is_undone(self):
+        """§6's story: attempt 5 waits, attempt 6 rewrites every day it wrote, and the
+        operator then rolls attempt 6 back."""
+        first = self._change(note="The first attempt.")
+        second = self._change(note="The second attempt.", title="Long ride")
+        self.assertEqual([c["id"] for c in test_db.waiting_changes()], [second])
+        test_db.rollback_to_change(second, today_str(), summary="undo")
+        self.assertEqual([c["id"] for c in test_db.waiting_changes()], [first])
+        _code, out, _ = run_cli(["bot", "changes"])
+        self.assertIn("The first attempt.", out)
+        self.assertNotIn("The second attempt.", out)
+
+    def test_the_morning_message_no_longer_carries_the_line(self):
+        self._change(note="Four sessions a week now.")
         _code, out, _ = run_cli(["bot", "morning"])
-        self.assertIn(PUSH_CHANGE_LEAD, out)
-
-    def test_a_push_that_returns_silently_does_not_consume_it(self):
-        """An exhausted schedule with nothing on today sends nothing at all, and must not
-        eat the line while it is at it (§6.4)."""
-        self._noted()
-        # Today's session removed, and the schedule already run out: the one silent path.
-        with test_db.workout_change(kind="rm") as change:
-            change.void(date=today_str(), sport_type="running", reason="gone")
-            change.void(date=today_str(), sport_type="cycling", reason="gone")
-        with patch("trainmate.cli.bot.schedule_exhausted", return_value=True), \
-                patch("trainmate.cli.bot.current_runway", return_value=None):
-            _code, out, _ = run_cli(["bot", "morning"])
-
-        self.assertNotIn(PUSH_CHANGE_LEAD, out)
-        self.assertIsNone(test_db.get_setting(NOTE_MARKER))
-        self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
-
-    def test_it_says_the_change_was_undone_after_a_rollback(self):
-        change_id = self._noted()
-        run_cli(["bot", "morning"])
-        self.assertEqual(test_db.get_setting(NOTE_MARKER), str(change_id))
-
-        with patch("trainmate.runtime.calendar_syncer"):
-            test_db.rollback_to_change(change_id, today_str(), summary="undo")
-        _code, out, _ = run_cli(["bot", "morning", "--force"])
-        self.assertIn(PUSH_CHANGE_UNDONE, out)
-        # And once only.
-        _code, again, _ = run_cli(["bot", "morning", "--force"])
-        self.assertNotIn(PUSH_CHANGE_UNDONE, again)
-
-    def test_a_rollback_before_the_line_was_sent_says_nothing(self):
-        """The athlete never heard of the change (§6.4)."""
-        change_id = self._noted()
-        with patch("trainmate.runtime.calendar_syncer"):
-            test_db.rollback_to_change(change_id, today_str(), summary="undo")
-        _code, out, _ = run_cli(["bot", "morning"])
-        self.assertNotIn(PUSH_CHANGE_UNDONE, out)
-        self.assertNotIn(PUSH_CHANGE_LEAD, out)
+        self.assertNotIn(CHANGE_LEAD, out)
+        self.assertEqual(len(test_db.waiting_changes()), 1)
 
 
 class MorningPushTest(unittest.TestCase):

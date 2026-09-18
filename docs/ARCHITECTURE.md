@@ -92,7 +92,7 @@ classes themselves.
 - **`trainmate/cli/`** — per-command-family handler modules (`run_*()`): `status`,
   `progress`, `goals`, `constraints`, `benchmarks`, `signals`, `learnings`,
   `plans`, `data`, `settings`, `journal`, `queue`, `bot`, the `workouts/` package
-  (`parser`/`generate`/`edit`/`revisions`/`_helpers`), plus the shared modules:
+  (`parser`/`generate`/`edit`/`revisions`/`heads_up`/`_helpers`), plus the shared modules:
   `common` (renderers and the adherence pairing), `selectors` (the range grammar),
   `argparse_ext` (parser/help extensions), `render` (the two voices, [§6](#6-singletons)),
   `candidates` (the note-capture confirm loops), `staleness` (the changed-input wording)
@@ -276,6 +276,22 @@ classes themselves.
     --remind` and waits for it before it considers the push, whatever the persona and the
     `push` switch. On a terminal the item's line becomes the two-line hint that `status`
     and `workout adapt` print.
+  - **Changes to the athlete's week** (DESIGN_change_heads_up.md). In companion mode a
+    `workout generate` or `workout adapt` the athlete did not watch — any run not started
+    from their chat — leaves its line waiting in `workout_changes` (`note` set, `told_at`
+    NULL). After the reminders, each wake asks `heads_up.changes_due()` (a database read,
+    like `reminders_due`) and, when it says yes, runs the hidden `bot changes` and waits for
+    it, so the changes come before the push on the same wake. The rule lives in
+    `trainmate/heads_up.py`: from `morning-time` to 21:00, once one waiting change was made
+    before this morning's `morning-time` — so a change made during the day waits for the
+    next morning, a change to today's sessions included — or at once when `workout notify`
+    asked for it. The terminal warns the operator when a change to today would otherwise
+    reach the athlete only the next morning. The `push`
+    switch does not stop it, and the config file's `telegram.ui` decides, not `/ui`. A tap
+    on an offer or a message from the athlete first runs `bot changes` whenever a change
+    waits (`_tell_changes_first`). `bot changes` sends one message per change, split by a
+    `TM-FLUSH` carrying `{"wait": false}`, which the bot does not hang a Stop button on
+    (`flush_before_wait`).
   - **The nightly reflect:** in companion mode, from Wednesday to Sunday, the scheduler's
     first wake after 03:00 on the athlete's clock also starts `data reflect --auto`, once a
     day (`reflect_due`). It runs as a process of its own outside the chat, the way the
@@ -289,8 +305,9 @@ classes themselves.
 |----------------------|----------------------|--------------------------------------------------|
 | `types.py`           | —                    | TypedDicts: `Objective`, `Constraint`, `DailySignal`, `Workout` (the hydrated session, not a table row — §5), `CompletedActivity` (incl. `bike_avg_watts`, `zone1_sec`–`zone5_sec`, `power_zone1_sec`–`power_zone7_sec`, and the strength columns `sets_read_at`/`sets_final_at`/`discarded`), `AthleteMetric`, `AthleteBaseline`, `Macrocycle`, `Mesocycle`, `PlanFeedback`, `PlanProposal` |
 | `config.py`          | `config`             | Reads `config.yaml`; exposes typed properties.   |
-| `prompt.py`          | (`cli.prompt`)       | Front-end-agnostic prompt broker: `confirm`/`choose`/`ask_text` over `TtyPrompt` (`input()`) or `JsonPrompt` (chat/web). Journals every answer on the asking run (DESIGN_logging.md §5.6). See [§6](#6-singletons). |
+| `prompt.py`          | (`cli.prompt`)       | Front-end-agnostic prompt broker: `confirm`/`choose`/`ask_text` over `TtyPrompt` (`input()`) or `JsonPrompt` (chat/web). Journals every answer on the asking run (DESIGN_logging.md §5.6). See [§6](#6-singletons). Also `athlete_watching()`: whether the athlete watches this run — always on an expert instance, and in companion mode only for a run the bot started (DESIGN_change_heads_up.md §6); `workout_change`, the adapt prompt and the terminal's replace question all ask it. |
 | `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, and `learning` from `learning_doubts.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
+| `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workouts.py` imports it safely. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
 | `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
 | `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class and listing the Garmin names that mean it (Connect's catalog and the FIT SDK names). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the last eight strength days, what was prescribed beside what was done, then the days the prescription was not followed. `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — the call that writes the exercises and kilograms — and `progression.md` the shipped science only it reads. Rows in `db/strength.py`; surgery in `cli/strength.py`. |
@@ -1071,7 +1088,11 @@ connection + schema setup), `objectives.py`, `constraints.py`,
   rollback` (targeted at the moment just after the restored version's newest change) and
   the goal reinstate all reduce to this. The floor is the same rule archival had:
   appending a copy into a past slot would silently make it the live session for a day
-  already trained (DESIGN_plan_rollback.md §9, DESIGN_workout_revisions.md §10).
+  already trained (DESIGN_plan_rollback.md §9, DESIGN_workout_revisions.md §10). The
+  rollback writes its own `note` as it is recorded: the changes it undoes that the athlete
+  was told about and that wrote a session from `from_date` on, quoted oldest first — the
+  plain "The change to your week was undone." when none of them has a line, and nothing
+  when there are none (`heads_up.undone_note`, DESIGN_change_heads_up.md §6).
 
 ### Methods by domain
 
@@ -1101,7 +1122,14 @@ methods whose behavior is *not* obvious from that convention are called out belo
   addressing a dead revision. Voids are excluded unless `include_removed=True`; there is
   no `include_archived` any more. The history readers are `get_plan_revisions` (every
   revision, flagged live) and `get_workout_changes` (the batch list `workout batches`
-  renders). The push recorders `mark_workout_pushed` / `mark_workout_adherence_pushed`
+  renders, each entry with its `note` and a `waiting` flag). The heads-up readers
+  (DESIGN_change_heads_up.md §6): `waiting_changes()` — a line for the athlete, no
+  `told_at`, and the change still stands — with
+  `mark_changes_told` its one writer besides `workout_change` itself, which stamps
+  `told_at` as it writes when `prompt.athlete_watching()`. "Still stands" is
+  `change_has_live_revisions`: a live revision the change wrote, or a live rollback copy
+  of one, followed through `restored_from` however many copies deep.
+  `newest_change_with_sessions` is what the terminal's replace question looks at. The push recorders `mark_workout_pushed` / `mark_workout_adherence_pushed`
   are the **only** writers of `pushed_signature` / `adherence_pushed_signature`, and they
   write `workout_calendar_state`, not the log. Undo: `rollback_to_change` (above).
 - **Completed Activities** (`activities.py`) — `save_completed_activity` upserts on
@@ -1302,7 +1330,8 @@ nothing, because an adapt that looked at the metrics and held is a real event.
 | `kind`          | TEXT       | `generate` · `adapt` · `swap` · `add` · `rm` · `restore` · `rollback` · `stand-down` · `reinstate`. Fixed at write time; one invocation has exactly one kind. |
 | `summary`       | TEXT       | The batch rationale — what `adaptation_summary` used to copy onto every row. |
 | `macrocycle_id` | INTEGER    | The plan version in force when this ran: context for `workout batches`, distinct from the per-row tag. |
-| `note`          | TEXT       | The coach's one line to the athlete about this change, for the morning push. NULL on a change with nothing they would notice — which is most of them (DESIGN_plan_change_continuity.md §6.3). |
+| `note`          | TEXT       | The coach's one line to the athlete about this change. A `generate` writes it only when something they would notice changed (DESIGN_plan_change_continuity.md §6.3); an `adapt` that changed something stores its reason here too; a `rollback` writes its own line about what it undid. NULL on everything else (DESIGN_change_heads_up.md §6). |
+| `told_at`       | TEXT       | UTC ISO, when the athlete was told about this change: stamped as it is written when they watched the run, else by `bot changes`. A change is **waiting** when it has a `note`, no `told_at`, and still stands (DESIGN_change_heads_up.md §6). |
 | `commitment_end`| TEXT       | Last day of the commitment window in force when this ran, so a removal is judged by the window it was written under rather than by the one standing when the Calendar sync happens to run (§5.2). |
 
 ### workout_calendar_state
@@ -1578,13 +1607,15 @@ identifiers; `timezone`, the IANA zone every date is computed in;
 treated as already committed to; `push_enabled`, `push_morning_time`,
 `push_morning_deadline` and `push_adapt_first`, the morning-push window and its switches.
 Three internal markers are the exception, not preferences: `push_morning_last`, the
-per-day idempotency stamp (`DESIGN_bot_simple_frontend.md` §4.3), `push_note_last`,
-the id of the last change whose line to the athlete the push delivered
-(DESIGN_plan_change_continuity.md §6.4), and `strength_history_changed_at`, bumped by every
+per-day idempotency stamp (`DESIGN_bot_simple_frontend.md` §4.3);
+`changes_notify_upto`, the id of the newest change `workout notify` asked the bot to send
+at once — an id rather than a flag, so it cannot send a later change early
+(DESIGN_change_heads_up.md §4); and `strength_history_changed_at`, bumped by every
 write that changes what the strength history shows — a read that stored sets, a freeze, a
 name given or cleared, a discard or its undo, and the pull's reconcile deleting a strength
 activity that had sets. That last one is the evidence a kept strength session's kilograms
-may move on (DESIGN_strength_tracking.md §5, §9).
+may move on (DESIGN_strength_tracking.md §5, §9). `push_note_last` is gone: whether the
+athlete heard of a change is `workout_changes.told_at` now.
 
 | Column       | Type    | Notes                                              |
 |--------------|---------|----------------------------------------------------|
@@ -1938,13 +1969,13 @@ patchable singletons; the handler functions, named
 `run_<command>_<subcommand>()`, live in the `trainmate/cli/` package
 (one module per command family: `status`, `progress`, `goals`, `constraints`,
 `benchmarks`, `signals`, `learnings`, `plans`, `data`, `settings`, `journal`, `queue`, `bot`
-(hidden: `bot morning`/`route`/`constraints`/`goals`/`mesocycle`/`capture`/`queue`, spawned by the
-Telegram bot —
+(hidden: `bot morning`/`changes`/`route`/`constraints`/`goals`/`mesocycle`/`capture`/`queue`,
+spawned by the Telegram bot —
 DESIGN_bot_simple_frontend.md; `candidates.py` holds the confirm loops that turn a
 note's extracted constraints and signals into rows, shared by `workout adapt -m` and
 `bot capture note` so both inboxes ask the same questions),
 plus the
-`workouts/` **package** — `parser`/`generate`/`edit`/`revisions`/`_helpers`;
+`workouts/` **package** — `parser`/`generate`/`edit`/`revisions`/`heads_up`/`_helpers`;
 `selectors.py` holds the shared range grammar, `argparse_ext.py` the parser/help
 extensions, `render.py` the two voices ([§6](#6-singletons)) and `staleness.py` the
 changed-input wording). `help` is the one
@@ -2039,13 +2070,14 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `workout`    | `list`       | `w l`    | Show planned workouts. Defaults to a 7-day window from today. Positional `TARGET…` (workout IDs and/or date selectors, e.g. `wo li 12 15 -v`) plus the shared selectors `-d`/`-m`/`-M`/`-g` and `-t/--type TYPE`, `--removed`, `-l/--link` (each synced session's Calendar event link) (DESIGN_cli_selectors.md). Every listed session dated **today or earlier** also carries its adherence verdict — `[DONE]`/`[PARTIAL]`/`[MISSED]`/`[REST OK]`/`[REST BROKEN]`, or `[NOT YET]` for one still ahead today — and `-v` adds the matched activity and the mismatch behind a `[PARTIAL]`. Freshens Garmin over that past span unless `--no-pull` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)). A listing whose range runs past the last scheduled session ends on one gray marker naming that — unconditional, a fact of the listing rather than a warning; an empty listing renders it alone (DESIGN_runway_nudge.md §4). |
 | `workout`    | `show`       | `w sh`   | `workout list -v` under a name that says what it does: the same handler with the detail flag pinned on, the same positional targets and the same selectors. `wo sh 12` details one session; a bare `wo sh` details the same 7-day window `list` lists. Adding it made the bare `w s` prefix ambiguous — `swap` now needs `w sw` |
 | `workout`    | `compare`    | `w c`    | Compare planned vs completed (`analyze_adherence()`): prints PLANNED/ACTUAL per day, flags misses (red), rest violations (red), unplanned high-load (yellow), then a discrepancy summary. Today's untrained sessions read `(not yet — still ahead today)` and are not misses (`pending_from`, [§10](#10-key-data-flows)). Same selectors as `workout list`; default 14-day lookback; a bare span (`-d 7d`) looks *back*; end capped at today. |
-| `workout`    | `generate`   | `w g`    | Generate workouts from the plan mesocycles covering the days generated (the dates pick the plan, not a goal — DESIGN_cli_selectors.md §8). No selector → from the day after the schedule stops (today once it has run out) for `config.workout_generation_span_days` (28 default), so a run adds days rather than rewriting covered ones; refused when the plan is already covered to its last day. Span flags (mutually exclusive, **both** ends of the resolved window are used, and a span never opens before today): `-g/--goal [ID]` = the goal's whole plan span; `-d`; `-m` = that mesocycle's own days; `-M` (which also settles which plan to follow where two cover the same days). Lists the proposed sessions the way `workout list` renders them and asks before writing; on a `y` it archives the span's existing workouts, leaves the days outside it alone, and pushes the new ones to Calendar immediately. `-f/-y` skips both prompts, but the report of what changed for the sessions inside the commitment window still prints (DESIGN_plan_change_continuity.md §4.4). |
+| `workout`    | `generate`   | `w g`    | Generate workouts from the plan mesocycles covering the days generated (the dates pick the plan, not a goal — DESIGN_cli_selectors.md §8). No selector → from the day after the schedule stops (today once it has run out) for `config.workout_generation_span_days` (28 default), so a run adds days rather than rewriting covered ones; refused when the plan is already covered to its last day. Span flags (mutually exclusive, **both** ends of the resolved window are used, and a span never opens before today): `-g/--goal [ID]` = the goal's whole plan span; `-d`; `-m` = that mesocycle's own days; `-M` (which also settles which plan to follow where two cover the same days). Lists the proposed sessions the way `workout list` renders them and asks before writing; on a `y` it archives the span's existing workouts, leaves the days outside it alone, and pushes the new ones to Calendar immediately. `-f/-y` skips both prompts, but the report of what changed for the sessions inside the commitment window still prints (DESIGN_plan_change_continuity.md §4.4). Run from the terminal of a companion instance, it first asks to replace the newest change when the athlete was never told about it, and prints under "Your coach:" when that line reaches the athlete's Telegram — with a warning to run `workout notify` when it changes today's sessions and would otherwise arrive only the next morning (DESIGN_change_heads_up.md §5, §8; shared with `workout adapt` in `cli/workouts/heads_up.py`). |
 | `workout`    | `add`        | `w add`  | Schedule one session by hand, no LLM (`DATE SPORT TITLE` positional, `--desc`, `--duration`, `--rpe`, `--tss`, `--reason`). Replaces any same-sport session that day — every session with `--replace-day` — and names what it replaced on the new session's note ([§11](#11-terminology-plans-vs-workouts)). Inside the commitment window the replaced session keeps its Calendar event, marked `[Deleted]` — the athlete's own hand (DESIGN_plan_change_continuity.md §5.1/§5.2). `w a` is `adapt`, so this one needs the full word |
 | `workout`    | `rm`         | `w rm`   | Soft-remove by ID (`ID REASON`, both positional): marks `removed`, marks the Calendar event deleted; kept in DB, hidden from list/compare, shown to coach as a cancellation. |
 | `workout`    | `restore`    | `w res`  | Bring a cancelled session back by ID: appends a copy of the revision its void ended, and the reconcile removes the `[Deleted]` mark. Unrelated to `workout rollback`, which undoes a whole change. |
 | `workout`    | `rollback`   | `w rb`   | Undo a workout change **and every change after it**, putting the sessions back the way they were the moment before it ran (`--batch N` per `workout batches`, default #1 the newest; `-y`). Any change qualifies, an adapt included. Leaves the active plan version alone — unlike `plan rollback` (DESIGN_workout_revisions.md §10). Unrelated to `workout restore`. |
-| `workout`    | `batches`    | `w b`    | List every command that wrote workouts, newest first: positional `#N`, when, kind, revision count, date span, plan version. A pass that appended nothing reads `(held)`. Every entry is undoable, including the newest — there is no separate unnumbered `live` row, because the change that wrote the plan in force is itself in the list (DESIGN_workout_revisions.md §10) |
-| `workout`    | `adapt`      | `w a`    | Run daily adaptation check (`-d/--date` one day: `YYYY-MM-DD`, `today`, `-1d`; `-m` athlete note — kept, since adapt takes no mesocycle selector; `--lookback DAYS` overrides `metrics_lookback_days` for this run; `-y` auto-apply). Draws the same end-of-schedule hint `status` does, and **refuses** outright when every mesocycle of the plan is behind today — there is nothing to adapt towards, and it used to close with a green all-clear over an empty calendar (DESIGN_runway_nudge.md §4) |
+| `workout`    | `batches`    | `w b`    | List every command that wrote workouts, newest first: positional `#N`, when, kind, revision count, date span, plan version, and under each row its stored description cut at 200 characters — none under a rollback, whose description names a change by an internal number the list does not show. A pass that appended nothing reads `(held)`; a change the athlete has not been told about reads `not sent yet` (DESIGN_change_heads_up.md §8). Every entry is undoable, including the newest — there is no separate unnumbered `live` row, because the change that wrote the plan in force is itself in the list (DESIGN_workout_revisions.md §10) |
+| `workout`    | `notify`     | `w n`    | Companion mode only: list the changes to the athlete's week not yet told, each with the line they will get, and on a `y` (`-y` skips the question) ask the bot to send them on its next wake, whatever the hour — by storing the newest one's id as `changes_notify_upto`. Says so and does nothing with nothing waiting or on an expert instance (DESIGN_change_heads_up.md §4) |
+| `workout`    | `adapt`      | `w a`    | Run daily adaptation check (`-d/--date` one day: `YYYY-MM-DD`, `today`, `-1d`; `-m` athlete note — kept, since adapt takes no mesocycle selector; `--lookback DAYS` overrides `metrics_lookback_days` for this run; `-y` auto-apply). Draws the same end-of-schedule hint `status` does, and **refuses** outright when every mesocycle of the plan is behind today — there is nothing to adapt towards, and it used to close with a green all-clear over an empty calendar (DESIGN_runway_nudge.md §4). From the terminal of a companion instance it asks the same replace question as `workout generate`, presents `-m` to the week planner as the athlete's coach's note, and prints under the reason when it reaches the athlete, with the same `workout notify` warning for a change to today (DESIGN_change_heads_up.md §3, §5, §8) |
 | `workout`    | `push`       | `w p`    | Sync planned workouts to Google Calendar. Defaults to today onward; pushes only unsynced unless `-f`/`--force` re-pushes already-synced ones. |
 | `workout`    | `swap`       | `w sw`   | Swap two workouts by dates (`<date> <date>`) or IDs (`<id> <id>`), same kind on both sides, plus a mandatory positional `REASON`. Runs recovery checks (consecutive hard days, load spikes, mesocycle crossings), prompts on warnings unless `-f`; syncs unless `--no-sync`; the reason is folded into `modification_reason`. |
 | `workout`    | `wipe`       | —        | Delete all workouts                                                      |
@@ -2400,6 +2432,8 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    without asking but still prints the report.
 6. On a `y`, `workout_generate_apply(proposal)` opens one `generate` change, stamped with
    the coach's line to the athlete (`note`) and the window in force (`commitment_end`).
+   The bot sends that line later when the athlete did not watch the run; it no longer
+   opens the morning message (DESIGN_change_heads_up.md §6, §7).
    The proposal's voids go first, so a session the proposal drops is ended before anything
    else can take its slot — and so a session the athlete added is marked rather than
    erased. Then every day the proposal fills gets a revision tagged with the `macrocycle_id`
@@ -2487,8 +2521,10 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    shape, which is what keeps the adaptation tally and the first prescription following
    the session. A named source is kept out of the same-date displacement rule, so its
    lineage is handed out once. Every revised session appends with its own note; the batch
-   rationale lands on the change row. Nothing here touches Calendar — the reconcile does
-   (see [§5](#5-database-schema)).
+   rationale lands on the change row, as `summary` and as the athlete's line `note`, which
+   the bot sends later when the athlete did not watch the run (DESIGN_change_heads_up.md
+   §6). Nothing here touches Calendar — the reconcile does (see
+   [§5](#5-database-schema)).
 
    There is no `adapted_at` to stamp any more, and so no flag to carry or forget. Whether
    a revision counts as an easing is decided at read time, by comparing it against its own
@@ -2884,6 +2920,7 @@ venv/bin/python -m unittest discover -s tests -p "test_*.py"
 |                                | kinds, `strength name`/`reset`/`discard`, the lines under the    |
 |                                | activity, `strength log`/`exercises` reading the record back,    |
 |                                | the morning push reading sets before its walk                    |
+| `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the warning for a change to today, who is watching, the replace question and its ways out, `workout notify`, `workout batches`, the migration. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.as_instance` pins the persona, which the operator's own config.yaml must not decide |
 | `tests/test_constraints.py`    | constraint DB windowing, hard-rest pre-pass, §7 magnitude, §8 message capture |
 | `tests/test_cli_*.py`          | One file per command family: output and argument handling, with |
 |                                | the service mocked. `test_dispatch.py` walks the parser tree     |
