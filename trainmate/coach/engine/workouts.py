@@ -689,12 +689,7 @@ class WorkoutLogicMixin:
         # What BENCHMARK PLACEMENT's interval rule reads against — without dates the
         # model cannot know whether an anchor is due (DESIGN_benchmark_workouts.md §4.1).
         if anchor_history:
-            history_text_parts.append(
-                "## ANCHORS ON RECORD\n"
-                "The dated logbook behind the profile's thresholds. A 'manual' or "
-                "'modeled' value is\nan assumption, not a measurement — only a test "
-                "starts the interval clock.\n" + anchor_history
-            )
+            history_text_parts.append(self._anchors_on_record_section(anchor_history))
         # First of the history sections: it frames what the metrics and activities below
         # mean — the same volume reads differently in a mesocycle's first week than its last.
         # Same gate as the task section above, so the two never disagree about its presence.

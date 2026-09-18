@@ -2,6 +2,24 @@
 
 **Status:** Phase 1 & Phase 2 **implemented**; Phase 3 unbuilt (§7).
 
+> **Rev. 5 (2026-09-18) — `plan generate` sees how each threshold was obtained.** The
+> athlete rode a 20-minute FTP test on Zwift on 2026-09-05 and recorded it: 235 W, source
+> `test`, note "Zwift 20 min FTP test". On 2026-09-18 they ran `plan generate`. The new plan
+> said 235 W "was modelled from interval and climb data, not measured", and scheduled a
+> test to "establish" it. The model had not been told otherwise. Its prompt carried the
+> profile line "FTP: 235 W", a "220 W -> 235 W" line in the review of the previous
+> mesocycle, and the previous plan's own text, which had said FTP would be modelled from
+> the intervals rather than tested. Rev. 3's ANCHORS ON RECORD section, the one place that
+> says a value came from a test, reached only `workout generate`.
+>
+> - `plan generate` now gets the same section, placed right after the athlete profile. One
+>   helper renders its heading for both calls.
+> - The heading says the logbook, not an earlier plan's text, is the record of how a
+>   value was obtained. That is the conflict this model resolved the wrong way.
+> - Each anchor line carries the athlete's note. The source says a test was run; the note
+>   says which protocol, and the protocol lock in `benchmarks.md` needs that to tell
+>   whether two results belong to one series.
+
 > **Rev. 4 (2026-08-19) — the flag travels with the test, not with the date.** A
 > model-comparison run found three models converting an FTP-test day into a social ride and
 > emitting the replacement with `benchmark_type` still set — "Friends Group Ride

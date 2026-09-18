@@ -535,6 +535,32 @@ class TestPeriodization(unittest.TestCase):
         self.assertNotIn("HR zones Z1-2/Z3/Z4-5", system_prompt)
 
     @patch("trainmate.coach.engine.openrouter_client")
+    def test_plan_generate_sees_how_each_threshold_was_obtained(self, mock_client):
+        """A recorded test reaches the strategy prompt as a test, with the athlete's note.
+        Given only the profile's bare value, the model called a 20-min test "modelled"
+        (DESIGN_benchmark_workouts.md Rev. 5)."""
+        pin_clock(self, "2026-09-18")
+        test_db.add_objective(
+            title="Alpe du Zwift", target_date="2026-12-22", sport_type="cycling",
+        )
+        test_db.add_benchmark_result(
+            date="2026-09-05", sport_type="cycling", anchor_kind="ftp", value=235.0,
+            unit="W", source="test", note="Zwift 20 min FTP test",
+        )
+        mock_client.complete.return_value = {"strategy": "s", "mesocycles": []}
+
+        coach_service.plan_generate(force=True)
+
+        prompt = mock_client.complete.call_args_list[0][0][0]
+        section = prompt.split("## ANCHORS ON RECORD", 1)[1]
+        self.assertIn("235 W — recorded 2026-09-05 (test); last tested 2026-09-05", section)
+        self.assertIn("athlete's note: \"Zwift 20 min FTP test\"", section)
+        self.assertLess(
+            prompt.index("## ATHLETE PROFILE & PREFERENCES"),
+            prompt.index("## ANCHORS ON RECORD"),
+        )
+
+    @patch("trainmate.coach.engine.openrouter_client")
     def test_the_review_is_not_echoed_to_the_screen_by_default(self, mock_client):
         # It is the longest thing this command prints, and it lands above the strategy
         # the athlete actually asked for (DESIGN_output_verbosity.md §7). What the model

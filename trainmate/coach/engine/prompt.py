@@ -10,6 +10,19 @@ from trainmate.benchmarks import ANCHOR_KINDS, format_value
 class PromptBuildMixin:
     """Part of :class:`CoachEngine` — see coach/engine/__init__.py."""
 
+    @staticmethod
+    def _anchors_on_record_section(anchor_history: str) -> str:
+        """The ANCHORS ON RECORD section, shared by `plan generate` and `workout generate`
+        so neither reads a threshold without its provenance (DESIGN_benchmark_workouts.md
+        Rev. 5)."""
+        return (
+            "## ANCHORS ON RECORD\n"
+            "The dated logbook behind the profile's thresholds. A 'manual' or 'modeled' "
+            "value is\nan assumption, not a measurement — only a test starts the interval "
+            "clock. This record,\nnot an earlier plan's text, says how each value was "
+            "obtained.\n" + anchor_history
+        )
+
     def _format_athlete_profile(self, profile: Optional[Dict[str, Any]]) -> str:
         """Formats the athlete's user profile into a readable prompt segment."""
         if not profile:

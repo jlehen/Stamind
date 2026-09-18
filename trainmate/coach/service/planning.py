@@ -563,6 +563,7 @@ class PlanningMixin:
                 learnings=learnings,
                 current_mesocycle=current_mesocycle,
                 changed_inputs=self._changed_inputs_text(prev_macro),
+                anchor_history=self._anchor_history_text(plan_start_str),
             )
             strategy = macro_data.get("strategy", "Endurance preparation strategy.")
             mesocycles = macro_data.get("mesocycles", [])

@@ -643,6 +643,10 @@ default the user layer overrides.
   stating which in the strategy. A mesocycle re-dated to today would contain none of the
   sessions already trained under it, since mesocycles own their sessions by date containment
   (`DESIGN_mesocycle_progress.md` §7).
+  Takes `anchor_history`, the same ANCHORS ON RECORD text `workout generate` gets
+  (`CoachService._anchor_history_text()`): each threshold's latest value with its date,
+  source and note, placed after the athlete profile so a value is never read without how
+  it was obtained (`DESIGN_benchmark_workouts.md` Rev. 5).
   Builds its own system prompt rather than calling `_build_system_prompt`, which states
   the ACTIVE strategy and mesocycles as settled fact — the very artifact this call produces;
   the plan prompt shows the *previous* strategy instead. It takes `learnings` explicitly

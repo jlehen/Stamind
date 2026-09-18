@@ -17,6 +17,7 @@ class PlanStrategyMixin:
         learnings: Optional[str] = None,
         current_mesocycle: Optional[Dict[str, Any]] = None,
         changed_inputs: Optional[str] = None,
+        anchor_history: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Queries LLM to determine the overall macrocycle strategy and mesocycles.
 
@@ -164,6 +165,10 @@ You MUST respond with a JSON object containing:
         system_prompt += (
             f"\n## ATHLETE PROFILE & PREFERENCES\n{athlete_profile}\n"
         )
+        # Beside the profile's bare threshold values, which say nothing of how each was
+        # obtained (DESIGN_benchmark_workouts.md Rev. 5).
+        if anchor_history:
+            system_prompt += f"\n{self._anchors_on_record_section(anchor_history)}\n"
         if history_summary:
             system_prompt += (
                 f"\n## ATHLETE RECENT TRAINING SUMMARY (PAST 15 DAYS)\n{history_summary}\n"

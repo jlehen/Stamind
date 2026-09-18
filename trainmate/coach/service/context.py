@@ -461,8 +461,9 @@ class PmcContextMixin:
         return out
 
     def _anchor_history_text(self, gen_start: str) -> str:
-        """ANCHORS ON RECORD: each anchor's latest value with its date and source — the
-        dates BENCHMARK PLACEMENT's interval floor is judged against (§4.1). Planned test
+        """ANCHORS ON RECORD: each anchor's latest value with its date, source and the
+        athlete's note (which names the protocol) — the dates BENCHMARK PLACEMENT's
+        interval floor is judged against (§4.1). Planned test
         sessions count too, like §4.1's de-dup: a test performed but never recorded must
         still hold the interval. Bounded below `gen_start` — the displaced plan's future
         rows are live here and must not answer for days this run is rewriting."""
@@ -478,10 +479,13 @@ class PmcContextMixin:
             label = anchor.label if anchor else kind
             when = (f"last tested {tested[kind]}" if kind in tested
                     else "never measured by a test")
-            lines.append(
+            line = (
                 f"  - {label}: {format_value(kind, float(r['value']))} — recorded "
                 f"{r['date']} ({r.get('source', 'test')}); {when}"
             )
+            if r.get('note'):
+                line += f"; athlete's note: \"{r['note']}\""
+            lines.append(line)
         # Tests on the calendar in the typical-cadence horizon (benchmarks.md §1).
         lookback = (
             datetime.strptime(gen_start, "%Y-%m-%d").date() - timedelta(days=90)
