@@ -180,11 +180,11 @@ llm:
 #  # it alone. Raise it on tablets. Ignored in simple ui mode, which sends flowing prose
 #  # and lets the client wrap it.
 #  #wrap_width: 48
-#  # Which face the bot puts on (DESIGN_bot_simple_frontend.md). 'expert' (the default) is
-#  # the raw CLI over chat. 'simple' is companion mode for a non-technical athlete: a reply
-#  # keyboard, free-text messages routed to the right command, the morning push below, and
-#  # answers in plain prose. Typed /commands still work in simple mode.
-#  #ui: expert
+#  # Which face the bot puts on (DESIGN_bot_simple_frontend.md). 'simple' (the default) is
+#  # companion mode for a non-technical athlete: a reply keyboard, free-text messages routed
+#  # to the right command, the morning push below, and answers in plain prose. Typed
+#  # /commands still work in simple mode. 'expert' is the raw CLI over chat.
+#  #ui: simple
 #  # Your name, as the companion says it to the athlete (simple ui mode only). The athlete
 #  # already calls the app "coach", so the person running the CLI needs a different word:
 #  # this is what fills the blank in "tell ___ — setting up a new goal happens from the

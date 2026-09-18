@@ -126,13 +126,25 @@ coach:
 
 # Optional: drive TrainMate from your phone (./tm-bot). Omit the whole mesocycle to disable
 # it. Create a bot with @BotFather for the token; message it once and use @userinfobot
-# to find your numeric chat id. See config_template_full.yaml for the timeouts, the
-# 'simple' companion persona and the morning push.
+# to find your numeric chat id. The bot starts in companion mode: a reply keyboard, plain
+# prose and a morning message. See config_template_full.yaml for the timeouts and the
+# 'expert' raw-CLI mode.
 #telegram:
 #  bot_token: "123456789:ABCdef..."   # or set TELEGRAM_BOT_TOKEN
 #  # Allowlist of chat ids permitted to drive the bot. Empty/absent = nobody.
 #  allowed_chat_ids:
 #    - 123456789
+#  # Morning push: the bot opens the day by itself with today's session and a few buttons.
+#  # These are the defaults; `settings set push|morning-time|morning-deadline|adapt-first`
+#  # overrides them live. Quote the times — an unquoted 07:30 is not a time to YAML.
+#  push:
+#    enabled: true
+#    morning_time: "08:00"
+#    # A push missed while the bot was down is still sent until this time, then skipped.
+#    morning_deadline: "15:00"
+#    # Run `workout adapt -y` first, so the push accounts for overnight signals. Costs one
+#    # LLM call every morning.
+#    adapt_first: false
 
 # Second athlete, same checkout: give them their own config file and select it with
 # TRAINMATE_CONFIG=/path/to/other/config.yaml ./tm status. Their database, logs, science

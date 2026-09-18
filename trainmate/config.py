@@ -542,9 +542,9 @@ class Config:
     @property
     def telegram_ui(self) -> str:
         """Which persona the Telegram bot presents (DESIGN_bot_simple_frontend.md §3):
-        'expert' (default) is the raw CLI-over-chat; 'simple' adds the reply keyboard,
-        free-text router, morning push and simple rendering. Under `telegram:`."""
-        return str(self.get("telegram", {}).get("ui", "expert")).strip().lower()
+        'simple' (default) adds the reply keyboard, free-text router, morning push and
+        simple rendering; 'expert' is the raw CLI-over-chat. Under `telegram:`."""
+        return str(self.get("telegram", {}).get("ui", "simple")).strip().lower()
 
     @property
     def telegram_operator_name(self) -> str:

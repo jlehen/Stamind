@@ -395,10 +395,11 @@ Learnings and History. Each panel names the CLI command that would change it.
 subprocess, so it supports exactly what the CLI does. It has two personae,
 chosen per install with `telegram.ui:` in the config:
 
-- **Expert mode** (the default) is a terminal in a chat window. Every message is
-  a command line, with or without the leading slash: `/status`,
-  `workout list -d 1w`, `/help workout`. Replies keep their column alignment.
-- **Companion mode** (`telegram.ui: simple`) is for an athlete who does not want
+- **Expert mode** (`telegram.ui: expert`) is a terminal in a chat window.
+  Every message is a command line, with or without the leading slash:
+  `/status`, `workout list -d 1w`, `/help workout`. Replies keep their column
+  alignment.
+- **Companion mode** (the default) is for an athlete who does not want
   a command language. A persistent keyboard covers the daily surface: Today, My
   week, Done lately, Goals, My plan, Progress, and Talk to me. Free text goes
   through a small intent router on a cheap model: "what's on today" shows the
@@ -418,11 +419,12 @@ Setup for either mode:
      bot_token: "123456789:ABCdef..."   # or set TELEGRAM_BOT_TOKEN
      allowed_chat_ids:
        - 123456789                      # only these chat ids may use the bot
-     ui: simple                         # omit for expert mode
+     # ui: expert                       # the raw CLI instead of companion mode
    ```
-   `config_template_full.yaml` documents the companion knobs: the morning push
-   time and deadline, whether the push runs the daily adaptation first, and
-   `operator_name`, which is how the bot refers to the person who set it up.
+   `config_template.yaml` shows the morning push settings: when it fires, how
+   late a missed one is still sent, and whether it runs the daily adaptation
+   first. `config_template_full.yaml` adds `operator_name`, which is how the bot
+   refers to the person who set it up.
 4. Start the long-polling bot. No public URL is needed:
    ```bash
    ./tm-bot

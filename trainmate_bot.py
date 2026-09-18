@@ -15,8 +15,8 @@ The pure helpers (parse/format/auth/prompt-encoding) are import-safe without
 ``python-telegram-bot`` so they can be unit-tested; the library is imported lazily
 inside ``main``.
 
-``telegram.ui: simple`` swaps in the companion persona — reply keyboard, intent router,
-morning scheduler, prose replies; ``/ui`` flips it per-process
+``telegram.ui: simple`` (the default) is the companion persona — reply keyboard, intent
+router, morning scheduler, prose replies; ``expert`` is the raw CLI; ``/ui`` flips it per-process
 (DESIGN_bot_simple_frontend.md). ``tm-bot`` supervises this process and relaunches it on
 ``RESTART_EXIT_CODE``, which is what ``/restart`` exits with. Polling runs from start to
 shutdown, including while a command computes, which is what lets a ✋ Stop tap or

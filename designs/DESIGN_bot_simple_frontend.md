@@ -60,9 +60,9 @@ read like a coach instead of a terminal.
 
 One bot binary, two personae, chosen by the instance's config:
 
-- `telegram.ui: expert` (default) — today's behavior, untouched.
-- `telegram.ui: simple` — the companion: reply keyboard (§5.1), free-text router
-  (§5.3), morning push (§4), simple rendering (§6).
+- `telegram.ui: expert` — today's behavior, untouched.
+- `telegram.ui: simple` (default since 2026-09-18) — the companion: reply keyboard
+  (§5.1), free-text router (§5.3), morning push (§4), simple rendering (§6).
 
 Underneath both personae sits the same pipeline: message → argv → CLI subprocess →
 streamed output + prompts. Simple mode changes how argv is *obtained* (buttons, router)
