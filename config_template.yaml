@@ -33,7 +33,7 @@ garmin:
   email: "you@example.com"
   password: "your-garmin-password"
 
-# The athlete the coach plans for. This mesocycle is the single biggest influence on the
+# The athlete the coach plans for. This section is the single biggest influence on the
 # quality of the plan, so fill it in honestly rather than optimistically — the free-text
 # fields are read verbatim by the coach, so write them the way you'd brief a human one.
 user_profile:
@@ -64,7 +64,7 @@ user_profile:
     - "Garmin watch"
     - "running shoes"
     - "road bike"
-  # Per-day availability. Optional: omit the whole mesocycle and the coach places sessions
+  # Per-day availability. Optional: omit the whole section and the coach places sessions
   # on any day, sized by weekly_target_hours. certainty_percent is how likely you are to
   # actually train that day — the coach weights planning toward higher-certainty days.
   weekly_schedule:
@@ -124,7 +124,7 @@ coach:
     altitude: "sleeping or training above ~1500 m; value = altitude in metres"
     medication: "a drug that moves recovery — antihistamine, steroid, decongestant"
 
-# Optional: drive TrainMate from your phone (./tm-bot). Omit the whole mesocycle to disable
+# Optional: drive TrainMate from your phone (./tm-bot). Omit the whole section to disable
 # it. Create a bot with @BotFather for the token; message it once and use @userinfobot
 # to find your numeric chat id. The bot starts in companion mode: a reply keyboard, plain
 # prose and a morning message. See config_template_full.yaml for the timeouts and the
