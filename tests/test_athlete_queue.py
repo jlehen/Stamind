@@ -5,6 +5,7 @@ import os
 import unittest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
 from tests import test_db_path
 from tests.helpers import clear_all_tables, rebind_test_db, run_cli, save_workout
@@ -402,6 +403,62 @@ class TerminalTest(_QueueCase):
         self.assertLess(watch, row)
         self.assertIn("hidden until 09:00", lines[row])
         self.assertIn("1 waiting, 1 hidden.", out)
+
+    def test_closed_lists_what_closed_in_the_order_it_closed(self):
+        dropped, waiting, stale = self.ask("A"), self.ask("B"), self.ask("C")
+        message = athlete_queue.tell("Charge your watch tonight.")
+        athlete_queue.act(self.item(message), "a1", self.at(9))
+        athlete_queue.act(self.item(dropped), athlete_queue.DROP, self.at(10))
+        self.stale.add("C")
+        self.at(11)
+        athlete_queue.settle_if_stale(self.item(stale))
+        code, out, _ = run_cli(["queue", "list", "--closed"])
+        self.assertEqual(code, 0)
+        self.assertIn("=== QUEUE · CLOSED 2026-09-10 Thu .. 2026-09-16 Wed ===", out)
+        lines = out.split("\n")
+        rows = [
+            next(line for line in lines if f"#{item_id} " in line)
+            for item_id in (message, dropped, stale)
+        ]
+        positions = [lines.index(row) for row in rows]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("09:00  Charge your watch tonight.  · answered", rows[0])
+        self.assertIn("10:00  A: what was it?  · dropped", rows[1])
+        self.assertIn("· stale", rows[2])
+        self.assertNotIn("B: what was it?", out)
+        self.assertIn("3 closed: 1 answered, 1 dropped, 1 stale.", out)
+
+    def test_a_date_range_keeps_the_items_closed_on_the_athletes_own_days(self):
+        """00:30 in Paris is the evening before in UTC: the day is the athlete's."""
+        paris = ZoneInfo("Europe/Paris")
+        zone = patch("trainmate.clock.active_zone", return_value=paris)
+        zone.start()
+        self.addCleanup(zone.stop)
+        self.now = datetime(2026, 9, 14, 8, 0, tzinfo=paris)
+        monday, tuesday, wednesday = self.ask("A"), self.ask("B"), self.ask("C")
+        for item_id, moment in (
+            (monday, datetime(2026, 9, 14, 12, 0, tzinfo=paris)),
+            (tuesday, datetime(2026, 9, 15, 23, 30, tzinfo=paris)),
+            (wednesday, datetime(2026, 9, 16, 0, 30, tzinfo=paris)),
+        ):
+            self.now = moment
+            athlete_queue.act(self.item(item_id), athlete_queue.DROP, moment)
+        self.now = datetime(2026, 9, 16, 9, 0, tzinfo=paris)
+        _, today, _ = run_cli(["queue", "list", "--closed", "-d", "today"])
+        self.assertIn("C: what was it?", today)
+        self.assertNotIn("B: what was it?", today)
+        self.assertIn("1 closed: 1 dropped.", today)
+        _, before, _ = run_cli(["queue", "list", "--closed", "-d", "..-1d"])
+        self.assertIn("A: what was it?", before)
+        self.assertIn("B: what was it?", before)
+        self.assertNotIn("C: what was it?", before)
+
+    def test_a_date_range_without_closed_says_it_needs_it(self):
+        self.ask("A")
+        code, out, _ = run_cli(["queue", "list", "-d", "7d"])
+        self.assertEqual(code, 0)
+        self.assertIn("-d picks closed items by the day they closed, so it needs --closed.", out)
+        self.assertNotIn("A: what was it?", out)
 
     def test_a_walk_goes_through_the_items_with_the_chooser(self):
         question, message = self.ask("A"), athlete_queue.tell("Charge your watch.")

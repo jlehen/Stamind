@@ -213,6 +213,25 @@ $ tm queue
 The questions in these examples come from features that do not exist yet; they show the
 shape. Hidden items are listed after the waiting ones, with the time they come back.
 
+`tm queue list --closed` lists the closed items instead, in the order they closed. Each line
+shows when the item closed and, at its end, how: answered, dropped, or stale. `-d` picks the
+days they closed on, in the athlete's timezone and in the range grammar every filtering
+command shares (DESIGN_cli_selectors.md §1). With no `-d` it shows the last 7 days. `-d`
+without `--closed` is refused with a one-line hint, because the waiting list is the whole
+queue and has no days to pick. The queue records when an item closed, not when the bot sent
+it: a message sent on Tuesday morning and acknowledged that evening shows the evening.
+
+```
+$ tm queue list --closed
+=== QUEUE · CLOSED 2026-09-10 Thu .. 2026-09-16 Wed ===
+
+  #13  question  2026-09-16 Wed 08:04  Tue Sep 15 18:10 gym session, sets 1–4: …  · answered
+  #11  message   2026-09-16 Wed 08:05  Charge your watch tonight — long ride tomorrow.  · answered
+  #14  question  2026-09-16 Wed 21:10  Tue Sep 15 18:10 gym session, sets 5–8: …  · dropped
+
+3 closed: 2 answered, 1 dropped.
+```
+
 `tm queue answer` walks the waiting items with the blocking chooser, one at a time:
 
 ```

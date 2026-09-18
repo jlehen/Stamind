@@ -33,7 +33,8 @@ from trainmate.cli.learnings import print_learning_demoted, print_learning_kept
 from trainmate.cli.plans import print_plan
 from trainmate.cli.progress import emit_chart, print_progress_report
 from trainmate.cli.queue import (
-    print_queue_acted, print_queue_list, queue_buttons, queue_chat_message, queue_hint_lines,
+    print_closed_queue_list, print_queue_acted, print_queue_list, queue_buttons,
+    queue_chat_message, queue_hint_lines,
 )
 from trainmate.cli.runway import (
     crossing_the_end, current_runway, runway_buttons, runway_hint_lines,
@@ -964,6 +965,9 @@ class ExpertRenderer:
 
     def queue_list(self, items: List[Dict[str, Any]], now: datetime) -> None:
         print_queue_list(items, now)
+
+    def queue_closed_list(self, items: List[Dict[str, Any]], start: str, end: str) -> None:
+        print_closed_queue_list(items, start, end)
 
     def queue_message(
         self, item: Dict[str, Any], left: Optional[int]

@@ -1590,7 +1590,7 @@ Questions and messages held for the athlete until she is there to answer
 (DESIGN_athlete_queue.md §3). A `(kind, subject)` is queued once, ever, so a dropped
 question is never asked again. The queue's order is `queued_at, id`. Every instant is a UTC
 ISO string to the microsecond, in one form, so the columns compare as strings. Untouched by
-every `wipe`, and closed rows are kept.
+every `wipe`, and closed rows are kept; `queue list --closed` lists them.
 
 | Column      | Type    | Notes                                                              |
 |-------------|---------|--------------------------------------------------------------------|
@@ -2051,7 +2051,7 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `settings`   | `list`       | `se l`   | Every preference with its value and where that value came from — the stored row, `config.yaml`, or the built-in default. With a NAME, that one setting in detail: the numbered model menu for `coach-model`, the local clock for `timezone`. A bare `settings` lists — the read-only-family exception (DESIGN_cli_noargs.md §a3, applied by DESIGN_settings.md §4) |
 | `settings`   | `set`        | `se s`, `se use` | Change one preference: `settings set coach-model 3`, `settings set timezone Europe/Paris`, `settings set morning-time 07:00`. The name takes any unambiguous prefix. Validated by the setting's own parser — a value it cannot read is refused and nothing is written. Stored in `settings`; survives restarts |
 | `settings`   | `reset`      | `se r`   | Forget one stored preference so `config.yaml`, or the built-in default, rules again |
-| `queue`      | `list`       | `q l`    | Every waiting question and message in queue order, then the ones put off until later with when they come back. A bare `queue` lists — the second read-only family (DESIGN_cli_noargs.md §a3, DESIGN_athlete_queue.md §5.1) |
+| `queue`      | `list`       | `q l`    | Every waiting question and message in queue order, then the ones put off until later with when they come back. `--closed` lists the closed ones instead, in the order they closed, each with its outcome; `-d RANGE` picks the days they closed on (default: the last 7). A bare `queue` lists — the second read-only family (DESIGN_cli_noargs.md §a3, DESIGN_athlete_queue.md §5.1) |
 | `queue`      | `answer`     | `q a`    | Go through the waiting items with the blocking chooser: each item's answers, then drop, skip (Enter), and later — in 1 hour, in 1 day, after the others. `queue answer <id>` shows that item alone. In chat it sends the first item with its buttons instead |
 | `queue`      | `tell`       | `q t`    | Queue a message for the athlete: `queue tell "Charge your watch tonight."` It goes out with the next morning push, or with `queue answer` |
 | `strength`   | `name`       | `str n`  | `strength name DATE`: go through every group of that day's strength activities, named or not, and name it on the spot from the recent exercises or a typed name the model matches to the vocabulary; after a name, "all 6 sets, or how many?" splits the group. Keeping a name the watch guessed confirms it. Freezes an activity still waiting for "are the sets final?" (DESIGN_strength_tracking.md §7) |
@@ -2866,7 +2866,8 @@ venv/bin/python -m unittest discover -s tests -p "test_*.py"
 | `tests/test_athlete_queue.py`  | the athlete queue (DESIGN_athlete_queue.md): a subject queued once, |
 |                                | the order and "after the others", a walk showing each item once, |
 |                                | stale items, "in 1 day" from the walk start, reminders sent once, |
-|                                | the chat and terminal surfaces, the hint in `status` and `adapt`  |
+|                                | the chat and terminal surfaces, the closed list and its local     |
+|                                | days, the hint in `status` and `adapt`                           |
 | `tests/test_strength.py`       | strength tracking phase 1 (DESIGN_strength_tracking.md): the     |
 |                                | vocabulary's integrity, parsing Garmin's sets (grams, watch guess |
 |                                | vs pick, the bodyweight check), read once and frozen, both queue |

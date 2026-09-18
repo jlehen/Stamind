@@ -52,6 +52,15 @@ class QueueMixin:
             ).fetchall()
             return [_item(row) for row in rows]
 
+    def closed_queue_items(self) -> List[Dict[str, Any]]:
+        """Every closed item, in the order they closed (§5.1)."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM athlete_queue WHERE closed_at IS NOT NULL "
+                "ORDER BY closed_at, id"
+            ).fetchall()
+            return [_item(row) for row in rows]
+
     def queue_walk(
         self, since: datetime, now: datetime, after: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:

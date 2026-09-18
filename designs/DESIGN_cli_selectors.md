@@ -87,7 +87,7 @@ there.
 | direction | Missing start | Missing end | Bare span `7d` | Commands |
 | --- | --- | --- | --- | --- |
 | `forward` | today | stays open | today → +6d | `workout list`, `workout push`, `constraint list` |
-| `backward` | `default_span` before the end | today | −6d → today | `workout compare`, `data show-*`, `data pull`, `signal list` |
+| `backward` | `default_span` before the end | today | −6d → today | `workout compare`, `data show-*`, `data pull`, `signal list`, `queue list --closed` |
 | `none` | stays open | stays open | −6d → today | `data wipe`, `workout prune-calendar`, `data backfill-tss`, `data bootstrap`/`reflect` |
 
 `default` (a selector string like `7d`, `14d`, `today..`) applies **only when no dimension

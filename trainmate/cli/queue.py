@@ -10,12 +10,15 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import athlete_queue, clock, runtime
-from trainmate.athlete_queue import DROP, MESSAGE, SKIP
+from trainmate.athlete_queue import ANSWERED, DROP, DROPPED, MESSAGE, SKIP, STALE
+from trainmate.cli.selectors import add_selector_args, has_selector, resolve_window
 from trainmate.prompt import (
     QUEUE_LATER_BACK, QUEUE_LATER_CHOICES, QUEUE_LATER_DAY, QUEUE_LATER_HOUR,
     QUEUE_NOT_NOW, Choice, emit_queue_item, is_json_frontend,
 )
-from trainmate.util import bold, cmd, cyan, fmt_timestamp, gray, notice, red, wrap_text
+from trainmate.util import (
+    bold, cmd, cyan, fmt_span, fmt_timestamp, gray, notice, red, wrap_text,
+)
 
 QUEUE_DONE_LINE = "That's all for now — thanks!"
 QUEUE_SETTLED_LINE = "Already settled — thanks!"
@@ -79,10 +82,7 @@ def print_queue_list(items: List[Dict[str, Any]], now: datetime) -> None:
     )
     id_width = max(len(f"#{item['id']}") for item in items)
     for item in waiting + hidden:
-        number = f"#{item['id']}".ljust(id_width)
-        shape = athlete_queue.kind_of(item).shape.ljust(len(athlete_queue.QUESTION))
-        text = (athlete_queue.wording(item).splitlines() or [""])[0]
-        line = f"  {number}  {shape}  {fmt_timestamp(item['queued_at'])}  {text}"
+        line = _list_row(item, id_width, item["queued_at"])
         if athlete_queue.is_hidden(item, now):
             back = datetime.fromisoformat(item["remind_at"])
             line += gray(f"  · hidden until {short_when(back, now)}")
@@ -95,6 +95,39 @@ def print_queue_list(items: List[Dict[str, Any]], now: datetime) -> None:
         summary += " Answer one now with " + cmd("queue answer <id>") + "."
     print()
     print(wrap_text(summary))
+
+
+def print_closed_queue_list(items: List[Dict[str, Any]], start: str, end: str) -> None:
+    """The items that closed from `start` to `end`, in the order they closed, each with its
+    outcome (§5.1)."""
+    print(bold(cyan(f"=== QUEUE · CLOSED {fmt_span(start, end, sep=' .. ')} ===")))
+    print()
+    if not items:
+        print("Nothing closed on those days.")
+        return
+    id_width = max(len(f"#{item['id']}") for item in items)
+    for item in items:
+        print(_list_row(item, id_width, item["closed_at"]) + gray(f"  · {item['outcome']}"))
+    outcomes = [item["outcome"] for item in items]
+    counts = ", ".join(
+        f"{outcomes.count(outcome)} {outcome}"
+        for outcome in (ANSWERED, DROPPED, STALE) if outcome in outcomes
+    )
+    print()
+    print(f"{len(items)} closed: {counts}.")
+
+
+def _list_row(item: Dict[str, Any], id_width: int, stamp: str) -> str:
+    """One item as `queue list` shows it: its id, its shape, a time and its first line."""
+    number = f"#{item['id']}".ljust(id_width)
+    shape = athlete_queue.kind_of(item).shape.ljust(len(athlete_queue.QUESTION))
+    text = (athlete_queue.wording(item).splitlines() or [""])[0]
+    return f"  {number}  {shape}  {fmt_timestamp(stamp)}  {text}"
+
+
+def _closed_day(item: Dict[str, Any]) -> str:
+    """The athlete's local day an item closed on, as YYYY-MM-DD."""
+    return clock.to_local(datetime.fromisoformat(item["closed_at"])).strftime("%Y-%m-%d")
 
 
 def _button_label(text: str) -> str:
@@ -224,7 +257,19 @@ def _ask_on_terminal(item: Dict[str, Any], since: datetime, position: Optional[s
 
 
 def run_queue_list(args: argparse.Namespace) -> None:
-    """Lists the waiting items, and the hidden ones with when they come back (§5.1)."""
+    """Lists the waiting items, and the hidden ones with when they come back; with
+    `--closed`, the items that closed on the days `-d` picks (§5.1)."""
+    if getattr(args, "closed", False):
+        start, end = resolve_window(args)
+        items = [
+            item for item in runtime.db.closed_queue_items()
+            if start <= _closed_day(item) <= end
+        ]
+        runtime.render.queue_closed_list(items, start, end)
+        return
+    if has_selector(args):
+        notice("-d picks closed items by the day they closed, so it needs --closed.", red)
+        return
     runtime.render.queue_list(runtime.db.waiting_queue_items(), clock.now())
 
 
@@ -335,9 +380,17 @@ def add_queue_parser(subparsers):
         help="List what is waiting, and what is put off until later",
         description=(
             "Every waiting item in queue order, then the items put off until a later "
-            "time, with when they come back. Same as a bare 'queue'."
+            "time, with when they come back. Same as a bare 'queue'. With --closed, the "
+            "items already closed instead, in the order they closed, each with its "
+            "outcome: answered, dropped, or stale (no longer worth asking). -d picks the "
+            "days they closed on."
         ),
     )
+    q_list.add_argument(
+        "--closed", action="store_true",
+        help="List the closed items instead, from the last 7 days unless -d picks the days",
+    )
+    add_selector_args(q_list, direction="backward", default="7d")
     q_list.set_defaults(func=run_queue_list)
 
     q_answer = queue_subparsers.add_parser(
