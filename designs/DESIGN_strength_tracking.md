@@ -11,13 +11,16 @@ athlete's own. The athlete's gym Monday of September 7 held twelve exercises and
 exercises and 18 sets in 65 minutes, and one of the five was a split squat the athlete has
 never done. Three things caused it. The strength planner saw the lifting one exercise at a
 time, so it never saw a session. Its TASK said that the brief, the duration and the
-equipment decide the content, and "nothing else". And it sized a session by adding up rests,
-where this athlete takes turns on two exercises and fits twice as much in the hour. Now the
+equipment decide the content, and "nothing else". And it sized a session by adding up the
+2 to 3 minute rests the athlete's own science file asks for, where this athlete takes turns
+on two exercises, rests as long, and fits twice as much in the hour. Now the
 strength planner is also shown the recent strength days as whole sessions (§8). It writes a
 session from the most comparable one the athlete did, and a difference between what was
 written and what was done counts as a habit the second time it happens (§9). How many days
 are shown and how many times make a habit are two config keys. Alternated exercises are
-said in the session's notes, so no table changes.
+said in the session's notes, so no table changes. A session whose brief the week planner
+wrote anew is written again too (§9), which is how one `workout generate` brings the 24
+sessions already on the calendar to the new shape (§11.3).
 
 Revision 17 records phase 2 as built (§11.2). The design itself is unchanged; §11.2 lists
 the six places the code departed from the text or had to decide something the text left
@@ -789,9 +792,9 @@ whole. From the athlete's record, as it stands on September 18:
 
 ```
 ## SESSIONS AS DONE
-The same 8 strength days, each activity as a whole: its length, every set the watch
-recorded, its RPE, then the exercises in the order they first came. Exercises joined by "+"
-were alternated.
+The same 8 strength days, each activity as a whole: its length, every set lifted in it, its
+RPE, then the exercises in the order they first came. Exercises joined by "+" were
+alternated.
   Thu Sep 17, 53 min, 23 sets, RPE 7
     goblet squat 3×10 @ 44 + romanian deadlift 3×10 @ 22
     one arm swing 3×20 @ 26
@@ -811,8 +814,9 @@ were alternated.
 The head line is the day, the activity's length, its number of sets and its RPE. A day the
 watch split into two activities gets two head lines, each with its start time, as in the
 entries. The number of sets counts every set the athlete lifted in the activity, named or
-not, because its job is to say how much this athlete fits in the time. The lines under it
-show named sets only, as everywhere in the history, and print them the way the entries do.
+not, because its job is to say how much this athlete fits in the time. The rests the watch
+records between them are not sets and are not counted. The lines under it show named sets
+only, as everywhere in the history, and print them the way the entries do.
 
 Exercises the athlete took turns on share a line. Code reads that from the order of the
 sets and from nothing else. An exercise runs from its first set in the activity to its last.
@@ -837,10 +841,23 @@ press in their place. The not-done lines already say "Thu Oct 1: dumbbell step u
     ...
 ```
 
-Both marks are made by code, by comparing names, so the strength planner does not have to
-find a swap by reading twelve exercises against six. A day with no prescribed session has no
-marks: everything in it was the athlete's own choice. A planned day with no strength
-activity has no session to show, and the not-done lines are where it appears.
+The not-done line and the "(not prescribed)" mark are both made by code, by comparing
+names, so the strength planner does not have to find a swap by reading twelve exercises
+against six. A day with no prescribed session has no marks: everything in it was the
+athlete's own choice. A planned day with no strength activity has no session to show, and
+the not-done lines are where it appears.
+
+On a day with two activities, one of them gets the marks: the one that holds the most
+prescribed exercises, and the earlier one when they tie. The other is the athlete's own, like
+a day with no prescribed session. It is Tuesday September 22. The gym session is prescribed,
+and the athlete does it at 09:00, goblet squats included. At 20:10 they do goblet squats and
+one-arm rows with a 16 kg kettlebell at home, as on the evening of September 3: 18 minutes
+at RPE 2. The morning holds the most prescribed exercises, so it gets the marks. The evening
+is not an attempt at the gym session, so its rows are not "(not prescribed)", and two such
+evenings do not put rows into the gym day (§9). Code compares names and nothing else. It
+does not decide that the evening is a light session or an accessory one. Its head line,
+"20:10, 18 min, 12 sets, RPE 2", is what tells the strength planner that it is not
+comparable to a 65 minute gym day.
 
 Eight days of this athlete's lifting are about fifty lines, some 1,500 tokens.
 
@@ -937,7 +954,8 @@ prints, is the strength planner's reasons, one sentence per session it changed, 
   2, whose old prose stands in for the brief.
 - The sessions to check: every other strength session in the span that has prescribed sets,
   whether the week planner kept or revised it or it arrived from another date with its
-  lineage (below), with the brief it has now and those sets.
+  lineage (below), with the brief it has now and those sets. One whose brief or duration is
+  not the one its sets were written under says so on a line of its own (below).
 - A session the athlete added with `workout add` is the athlete's own, and the code knows it
   by its source, "manual". It is shown as context only: never asked about, never written,
   and never a reason to run. The week planner may still revise it
@@ -983,10 +1001,16 @@ recorded, and code does not guess it.
 The head lines of the sessions as done say how much this athlete fits in the time, 42 sets
 in 64 minutes on September 7. The strength planner sizes a session to that, not to a sum of
 rests. The athlete gets there by taking turns on two exercises, so the session keeps the
-pairs. Alternated exercises are written one after the other, and the notes say "alternate
-the belt squat and the push press, then the hamstring curl and the pulldown". The rows of
-`prescribed_sets` do not change. A column that holds the pairs as data is left out until
-something reads it, which pushing a session to the watch would (§12).
+pairs. This does not shorten the rests. The athlete's own science file asks for 2 to 3
+minutes between sets, the October 1 brief says "long complete rests", and revision 17 read
+both as minutes when nothing is lifted: October 5 came out at 18 sets. An athlete who does a
+set of belt squats, then a set of push presses, then belt squats again has rested the belt
+squat about three minutes. The TASK says so in one sentence, so the science file and the
+habit ask for the same session. Where they do disagree, the science file wins, as it does
+everywhere (below). Alternated exercises are written one after the other, and the notes say
+"alternate the belt squat and the push press, then the hamstring curl and the pulldown". The
+rows of `prescribed_sets` do not change. A column that holds the pairs as data is left out
+until something reads it, which pushing a session to the watch would (§12).
 
 An athlete with no sets on record has no session to start from. The brief, the equipment
 and the science decide, as in revision 17, and the habits appear as the sets come in.
@@ -1000,24 +1024,28 @@ Everything else in the session stays as the athlete does it.
 
 **Twice makes a habit.** A variation can be a one-off for no reason at all: the step-up box
 was taken. So where what the athlete did differs from what was prescribed that day, the
-difference counts from the second time it happens in comparable sessions among the days
-shown. It is Thursday October 1. The session says step-ups, and the athlete does the leg
-press. Friday morning the strength planner sees one not-done line and one "(not prescribed)"
-mark. That is once, and Thursday October 8 keeps its step-ups. On October 8 the athlete does
-the leg press again. Friday morning the strength planner sees the same swap twice, and the
-leg press goes into October 15 and every later session (below). The same count applies to
-an exercise the athlete adds, one they skip, and a number of sets they do differently: three
-sets written and four done, twice, means four. A day with no prescribed sets has nothing to
-differ from. Everything in it was the athlete's choice and counts at once. That is every
-activity of this athlete's September, all done before a kilogram was prescribed.
+difference counts from the second time it happens in comparable sessions among the days the
+sessions as done show. It is Thursday October 1. The session says step-ups, and the athlete
+does the leg press. Friday morning the strength planner sees one not-done line and one "(not
+prescribed)" mark. That is once, and Thursday October 8 keeps its step-ups. On October 8 the
+athlete does the leg press again. Friday morning the strength planner sees the same swap
+twice, and the leg press goes into every Thursday left in the mesocycle (below). The same
+count applies to an exercise the athlete adds, one they skip, and a number of sets they do
+differently: three sets written and four done, twice, means four. An activity with no "(not
+prescribed)" mark to get, because the day had no prescribed sets or because the day's other
+activity was the attempt at them (§8), has nothing to differ from. Everything in it was the
+athlete's choice and counts at once. That is every activity of this athlete's September, all
+done before a kilogram was prescribed.
 
 The count is a config key, `strength.habit_after`, 2 when unset, beside `recent_days` (§8)
 and formatted into the TASK. The plan gets no exemption: after two refusals the step-ups go,
 whatever the brief says. A coach who writes a third time what was refused twice is not
 listening. The two keys depend on each other. Say `habit_after` is 4 and step-ups are
-prescribed on Thursdays only. Four Thursdays span about ten strength days, the history shows
-eight, and the fourth refusal is never on the page. The comment in the template says so, and
-no code guards it.
+prescribed on Thursdays only. Four Thursdays span about ten strength days, the sessions as
+done show eight, and by the fourth refusal the first has left them. The comment in the
+template says so, and no code guards it. A not-done line can be older than the eight days,
+because the not-done lines start where the oldest entry does (§11.2). It has no session
+beside it, and it is not counted.
 
 The strength planner does the counting, from the marks code made (§8). Nothing detects a
 habit in code, and nothing stores one. A refusal is forgotten when it leaves the days shown,
@@ -1085,18 +1113,47 @@ briefing prints the proposal's reason, which is the strength planner's when only
 something (above).
 
 A kept session's exercises go stale the same way, and the same check renews them. A `workout
-generate` wrote step-ups into every Thursday of the mesocycle. The athlete does the leg
-press in their place on October 1. On October 2 the strength planner is asked about October
-8 and answers "keep": once is not a habit (above). The athlete does the leg press again on
-October 8. On October 9 the strength planner is asked about October 15, sees the swap twice,
-and returns the session with the leg press in the step-ups' place and the reason "You did
-the leg press in place of the step-ups twice, so I wrote it in." The later Thursdays follow
-as each comes into a span. So the check of a kept session has two grounds for a change: the
-sets on record say the load should move, or the athlete has done something else than what
-is written as many times as make a habit. Nothing else changes in how a check is applied.
-The answer is still compared with the stored rows as a list, and the evidence rule below
-still decides whether it is applied, so a kept session's exercises cannot change on a
-morning with no new lifting.
+generate` wrote step-ups into every Thursday of the mesocycle: October 1, 8, 15, 22 and 29.
+`workout adapt` hands the strength planner every strength session from today to the last day
+of the mesocycle, not the coming week's. The athlete does the leg press in the step-ups'
+place on October 1. On October 2 the strength planner is asked about all four Thursdays left
+and answers "keep" for each: once is not a habit (above). The athlete does the leg press
+again on October 8. On October 9 the strength planner is asked about October 15, 22 and 29,
+sees the swap twice, and returns the three sessions with the leg press in the step-ups'
+place and the reason "You did the leg press in place of the step-ups twice, so I wrote it
+in." So a habit reaches the rest of the mesocycle in one morning.
+
+The check of a kept session has three grounds for a change. The sets on record say the load
+should move. The athlete has done something else than what is written as many times as make
+a habit. Or the brief or the duration is not the one the sets were written under. The third
+is not new to the code. The evidence rule below has applied such a change since phase 2, and
+its example is the Thursday cut from 70 to 40 minutes. It was missing from the prompt.
+Revision 17 told the strength planner to keep a session unless the load should move, and
+never told it that a brief was new, so it answered "keep" to a change code would have
+applied. Now a session to check whose brief or duration moved carries a line that says so,
+and the TASK says to write that session again, from the most comparable session as done,
+like a session to write. It stays a session to check all the same, so a call that fails
+twice keeps its sets and does not fail the proposal.
+
+That is what a `workout generate` over days that already hold sessions does. It is Sunday
+September 20, and the athlete runs `workout generate -g 4`. The week planner writes every
+session of the goal again, the briefs with them. A strength session that lands on a date
+where one already stands is the same session (below), so it arrives as a session to check
+with October 5's five exercises. Its brief is new, so the strength planner writes it again,
+and the preview shows the twelve exercises before the athlete accepts them. This is also how
+the 24 sessions revision 17 wrote get the new shape (§11.3), and how the sessions follow a
+change to the athlete's science file. Inside the committed days
+(DESIGN_plan_change_continuity.md §4) the week planner is asked to keep a session rather
+than write it again, a kept session keeps its brief, and its sets stand. `replan` runs `workout
+generate` with no preview, so it rewrites the strength sessions unseen, as it already
+rewrites every other session.
+
+Nothing else changes in how a check is applied. The answer is still compared with the
+stored rows as a list, and the evidence rule below still decides whether it is applied, so
+a kept session's exercises cannot change on a morning with no new lifting and no new brief.
+Alternation lives in the notes, and notes alone never change a session (below). So a kept
+session whose exercises and order stand keeps the pairs its notes name, whatever the athlete
+paired since.
 
 Code decides whether an answer changes a session, from the sets and not from the words.
 The exercises returned are compared with the stored prescribed sets as a list. When they
@@ -1507,7 +1564,9 @@ data is already there and the alternative is reading `workout compare` over a fo
 
 ### 11.3 Revision 18: the habits, to build
 
-Four pieces. No table changes, so there is no migration.
+Four pieces. No table changes, so there is no migration. The 24 sessions revision 17 wrote,
+October 1 to December 21, are written again by one `workout generate -g 4` run after the
+build: every brief is new, so every session is written again (§9).
 
 1. The two config keys, `strength.recent_days` and `strength.habit_after`, as properties in
    `config.py` with 8 and 2 as defaults, and a comment each in the `strength:` section of
@@ -1516,16 +1575,22 @@ Four pieces. No table changes, so there is no migration.
    `history.py` and `sets.py` read the first key where each holds a `RECENT_DAYS = 8` of
    its own, and the history's heading prints the number.
 2. The sessions as done in `history.py` (§8): the head line, the lines joined by
-   overlapping runs, and the "(not prescribed)" mark. Tests on the join: a pair, a trio, a
-   circuit, two exercises done one after the other, and an unnamed set inside a run.
+   overlapping runs, and the "(not prescribed)" mark. The head line needs two things the
+   history drops today: the unnamed sets, which `_activities_by_day` leaves out, and the
+   activity's length, which `strength_set_rows` does not select. Tests on the join: a pair,
+   a trio, a circuit, two exercises done one after the other, and an unnamed set inside a
+   run. A test on the marks: a day with two activities marks the one that holds the most
+   prescribed exercises and leaves the other bare.
 3. The strength planner's prompt in `planner.py` (§9). The sentence "Nothing else decides
    the content" goes. `### CHOOSING THE EXERCISES` opens with the rule: start from the most
    comparable session as done, change only what the brief, the duration, the equipment or
    the progression asks for, size the session to what the athlete fits in the time, and
-   count a difference from the prescription as a habit from the `habit_after`-th time.
-   `### THE NOTES` gains the alternation and the sentence for a new exercise. The line under
-   SESSIONS TO CHECK names the second ground for a change. One region more for
-   `tests/test_prompt_gates.py`.
+   count a difference from the prescription as a habit from the `habit_after`-th time. One
+   sentence says that alternating two exercises keeps the rest between two sets of the same
+   one. `### THE NOTES` gains the alternation and the sentence for a new exercise. The line
+   under SESSIONS TO CHECK names the second and the third ground for a change, and a session
+   to check whose brief or duration moved, which `_moved_on` already knows, prints a line
+   that says so. One region more for `tests/test_prompt_gates.py`.
 4. docs/ARCHITECTURE.md: the history's second section and the two keys.
 
 ## 12. Decisions and open questions
@@ -1581,8 +1646,14 @@ Decided:
   difference between what was written and what was done is a habit from the second time,
   `strength.habit_after`, with no exemption for the plan, and a kept session's exercises
   change on it through the check that moves its kilograms. The strength planner counts, from
-  marks code made. Nothing detects or stores a habit. Alternated exercises are said in the
-  notes, and `prescribed_sets` has no column for them.
+  marks code made. On a day with two activities the marks go to the one that holds the most
+  prescribed exercises. Nothing detects or stores a habit, and nothing defines an accessory
+  or a light activity: its length, sets and RPE are on its head line. Alternated exercises
+  are said in the notes, and `prescribed_sets` has no column for them. Alternating keeps the
+  rests the athlete's science file asks for.
+- A session to check whose brief or duration moved is written again, and the strength
+  planner is told which ones those are. So a `workout generate` over days that already hold
+  sessions rewrites their exercises, outside the committed days, and needs no option for it.
 - The benchmark logbook is untouched: no modeled rows, no exercise column, and `e1rm`
   stays one lift, as `benchmark record` says.
 - The words are main's (AGENTS.md): the plan is the periodization, a mesocycle is a few
@@ -1626,7 +1697,9 @@ Open:
 - Whether the strength planner counts to two reliably. It reads the not-done lines and the
   "(not prescribed)" marks and decides whether the same departure happened twice in
   comparable sessions. If it adopts a one-off, or keeps writing what was refused twice, the
-  count moves into code. The marks are already made per day, so that is a small step.
+  count moves into code. The marks are already made per day, so that is a small step. The
+  check reaches every strength session left in the mesocycle, so a wrong count changes all of
+  them on one morning.
 - Whether sessions written in kilograms get followed. On September 7 and 10 the athlete did
   other exercises than the week planner's prose named, and on the 10th did sets of 10 where
   4 were written and kettlebell swings where "no swings" was. The strength planner is shown
