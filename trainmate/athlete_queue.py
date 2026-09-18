@@ -56,6 +56,12 @@ def wording(item: Dict[str, Any], companion: bool = False) -> str:
     return kind.companion_wording(item) if companion else kind.wording(item)
 
 
+def drop_label(item: Dict[str, Any]) -> Optional[str]:
+    """What this item's drop button says, or None when its kind offers no drop (§4)."""
+    label = kind_of(item).drop_label
+    return label(item) if callable(label) else label
+
+
 def answers(item: Dict[str, Any]) -> List[Dict[str, Any]]:
     """The answers an item offers, fixed when it was queued (§3)."""
     if kind_of(item).shape == MESSAGE:
@@ -127,6 +133,8 @@ def act(
     kind = kind_of(item)
     # A question kind without a drop label refuses one (§4).
     if action == DROP and kind.shape == QUESTION and kind.drop_label:
+        if kind.on_drop:
+            kind.on_drop(item)
         runtime.db.close_queue_item(item["id"], DROPPED, now)
         return None
     if action == QUEUE_LATER_BACK:

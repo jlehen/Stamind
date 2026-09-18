@@ -395,6 +395,18 @@ caller's memory.
 4. Insert. Set `lineage_id` by §4's rules: inherit the live revision's lineage, or start a
    new one where §4 says the revision introduces a different session.
 
+**A revision can carry prescribed sets** (DESIGN_strength_tracking.md §9). A strength
+session's exercises, reps and kilograms live in `prescribed_sets`, keyed by the revision
+they belong to, so they inherit this table's rule: they are written with their row, in the
+same transaction, and no row is ever updated. Three consequences follow from the steps
+above. A revision that continues the session in the slot and is given none keeps the ones it
+had, the way every other field carries forward at step 2. A revision step 3 suppresses as a
+no-op writes none either, and the live row's sets stand — always right, because the
+description is rendered from the sets, so different kilograms make a different description.
+And `change.restore` copies the sets of the revision it restores, or the kilograms in its
+text would have no rows behind them; `workout swap` passes the moved session's along for the
+same reason, since its destination starts from an empty base by §4.
+
 Step 2 is the whole of what `save_workout`'s `COALESCE` ladder does today — roughly forty
 lines of SQL whose only job is "a partial re-save must not read an omission as a deletion",
 plus a bolted-on `CASE WHEN ? THEN NULL ELSE COALESCE(?, benchmark_type) END` escape hatch

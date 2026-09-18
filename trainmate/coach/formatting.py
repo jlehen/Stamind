@@ -7,6 +7,20 @@ from trainmate.sports import canonical_sport
 from trainmate.adherence import Performed
 from trainmate import intensity
 from trainmate.config import science_documents
+from trainmate.strength.prescription import brief_of
+
+
+def _for_the_week_planner(workout: Workout) -> str:
+    """A session's description as the week planner is shown it.
+
+    A strength session whose kilograms the strength planner wrote is shown as its title and
+    its brief and nothing below the seam, so the week planner never meets a kilogram and so
+    never copies one into a revision (DESIGN_strength_tracking.md §9).
+    """
+    description = (workout.get('description') or '').strip()
+    if not workout.get('prescribed_sets'):
+        return description
+    return brief_of(description)
 
 
 def _first_form(workout: Workout) -> str:
@@ -245,7 +259,7 @@ def format_standing_workouts(
     for w in standing:
         committed = bool(window_end and w['date'] <= window_end)
         header = _planned_summary(w, eval_date, _standing_markers(w, window_end))
-        desc = (w.get('description') or '').strip() if committed else ''
+        desc = _for_the_week_planner(w) if committed else ''
         if not desc:
             sections.append(header)
             continue
@@ -314,7 +328,7 @@ def format_planned_workouts_detailed(
         if w.get('benchmark_type'):
             markers += f" [BENCHMARK: {w['benchmark_type']} — if changed at all, move intact; never dilute]"
         header = _planned_summary(w, eval_date, markers)
-        desc = (w.get('description') or '').strip()
+        desc = _for_the_week_planner(w)
         if desc:
             indented = "\n".join("    " + ln for ln in desc.splitlines())
             sections.append(f"{header}\n  Full description:\n{indented}")

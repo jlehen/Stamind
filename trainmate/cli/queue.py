@@ -111,8 +111,10 @@ def queue_buttons(item: Dict[str, Any], skip: bool) -> List[dict]:
     ]
     if kind.shape == MESSAGE:
         buttons[0]["label"] = "👍 " + buttons[0]["label"]
-    elif kind.drop_label:
-        buttons.append({"label": _button_label(kind.drop_label), "action": DROP})
+    else:
+        dropped = athlete_queue.drop_label(item)
+        if dropped:
+            buttons.append({"label": _button_label(dropped), "action": DROP})
     if skip:
         buttons.append({"label": "⏭ Skip", "action": SKIP})
     buttons.append({"label": NOT_NOW_LABEL, "action": QUEUE_NOT_NOW})
@@ -182,8 +184,9 @@ def terminal_choices(item: Dict[str, Any], since: datetime) -> List[Choice]:
         choices.append(Choice(SKIP, "tell me again next time"))
         lead = "remind me"
     else:
-        if kind.drop_label:
-            choices.append(Choice(DROP, f"{kind.drop_label} — drop, never asked again"))
+        dropped = athlete_queue.drop_label(item)
+        if dropped:
+            choices.append(Choice(DROP, f"{dropped} — drop, never asked again"))
         choices.append(Choice(SKIP, "skip — first in line next time"))
         lead = "later —"
     for code, words, _emoji in QUEUE_LATER_CHOICES:

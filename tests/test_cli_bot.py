@@ -238,7 +238,8 @@ class MorningPushTest(unittest.TestCase):
     def test_adapt_first_applies_and_surfaces_the_reason(self):
         save_workout(test_db, today_str(), "running", "Easy run")
         proposal = MagicMock(
-            workouts=[{"date": today_str()}], reason="Eased today — rough night."
+            workouts=[{"date": today_str()}], reason="Eased today — rough night.",
+            strength_notice=None,
         )
         coach = MagicMock()
         coach.workout_adapt.return_value = proposal
@@ -250,7 +251,7 @@ class MorningPushTest(unittest.TestCase):
         self.assertIn("Eased today", out)
 
     def test_adapt_first_no_change_records_and_adds_no_reason(self):
-        proposal = MagicMock(workouts=[], reason="All green.")
+        proposal = MagicMock(workouts=[], reason="All green.", strength_notice=None)
         coach = MagicMock()
         coach.workout_adapt.return_value = proposal
         cfg, svc, pull = self._adapt_first_env(coach)

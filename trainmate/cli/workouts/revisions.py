@@ -11,6 +11,7 @@ from typing import List, Tuple
 from trainmate.util import (
     bold, green, red, yellow, cyan, magenta, gray, render_table, format_labeled_text,
 )
+from trainmate.cli.common import print_strength_notes
 from trainmate.coach.proposals import RevisionProposal
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
@@ -145,3 +146,6 @@ def print_revision_preview(proposal: RevisionProposal, heading: str) -> None:
     rows.sort(key=lambda r: r[0])
     print(render_table(headers, rows))
     _print_wording_changes(proposal)
+    # The strength planner's own report: what its checks dropped, and the morning it could
+    # not recheck the kilograms at all (DESIGN_strength_tracking.md §9).
+    print_strength_notes(proposal)

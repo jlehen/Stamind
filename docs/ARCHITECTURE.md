@@ -292,7 +292,7 @@ classes themselves.
 | `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, and `learning` from `learning_doubts.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
 | `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
-| `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class and listing the Garmin names that mean it (Connect's catalog and the FIT SDK names). `sets.py` parses Garmin's `exerciseSets`, reads each strength session once the morning after (`read_new_sessions`, run by `garmin.pull` and the morning push), freezes it or queues "are the sets final?", groups sets into mesocycles, and renders the lines under the activity (`session_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. Rows in `db/strength.py`; surgery in `cli/strength.py`. |
+| `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class and listing the Garmin names that mean it (Connect's catalog and the FIT SDK names). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the last eight strength days, what was prescribed beside what was done, then the days the prescription was not followed. `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — the call that writes the exercises and kilograms — and `progression.md` the shipped science only it reads. Rows in `db/strength.py`; surgery in `cli/strength.py`. |
 | `db/`                | `db`                 | SQLite wrapper; `Database` composed from         |
 |                      |                      | per-domain mixins. Full CRUD for all tables.     |
 | `coach/honoring.py`  | —                    | Which coach pass owns a constraint, and whether  |
@@ -515,7 +515,8 @@ flow for each lives in [§10](#10-key-data-flows).
 | Which timezone dates are read in | `trainmate/clock.py` (the zone, the cache, the fallback), `util.today_date`/`fmt_timestamp` (the only callers), the push loop in `trainmate_bot.py`, DESIGN_user_timezone.md. Changing it is one row of `settings` |
 | A preference the athlete can change at runtime | `trainmate/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`trainmate/queue_kind.py`) added to `KINDS` in `trainmate/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
-| A strength session's sets | `strength/sets.py` (parse, read once, freeze, blocks, `session_lines`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
+| A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `activity_lines`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
+| What a strength session prescribes | `strength/planner.py` (the call), `strength/progression.md` (the science it reads), `strength/history.py` (what the athlete lifted), `strength/prescription.py` (the description and its seam), `prescribed_sets` + `strength_checks` in `db/base.py`, the carry in `db/workouts.py::WorkoutChange`, and the pass's place in `coach/service/workouts.py` and `coach/service/adaptation.py`. DESIGN_strength_tracking.md §9 |
 | A CLI command                    | `trainmate/cli/<family>.py` (`run_*`), dispatcher in `trainmate_cli.py` ([§7](#7-cli-commands-reference)) |
 | A message telling the athlete to run something | wrap the command in `util.cmd()`, nested *inside* the line's colour call, so it renders as the bright shade of that colour — and emit it with `util.aside`, not `print`: a "you could now run X" hint is side information |
 | Whether a line reaches the chat front-end | `util.aside` (side information, terminal only) vs `print` (the answer, warnings, errors). Building a list of lines rather than printing? gate on `util.asides_enabled()`. DESIGN_output_verbosity.md §3 |
@@ -1101,9 +1102,14 @@ methods whose behavior is *not* obvious from that convention are called out belo
 - **Strength sets** (`strength.py`) — `strength_activities` (raw `strength_training` rows,
   optionally unread), `store_exercise_sets` (replaces an activity's sets and stamps
   `sets_read_at`, and `sets_final_at` when frozen), `name_exercise_sets` (the only writer of
-  `named_by = athlete`), `freeze_exercise_sets`, `set_activity_discarded`, and
-  `session_exercises_by_day` for the recent-exercises answers. The sets cascade with their
-  activity, so the pull's deletion reconcile and `wipe_garmin_data` take them along.
+  `named_by = athlete`), `confirm_watch_names` (the watch's guesses become the athlete's
+  when she says the sets are final), `freeze_exercise_sets`, `set_activity_discarded`,
+  `activity_exercises_by_day` for the recent-exercises answers, and `strength_set_rows`, the
+  one query the strength history is built from. The sets cascade with their activity, so the
+  pull's deletion reconcile and `wipe_garmin_data` take them along. Every write that changes
+  what the history shows calls `bump_strength_history`, which is the evidence a kept
+  session's kilograms may move on; `get_prescribed_sets` / `record_strength_check` read and
+  write the planned side (DESIGN_strength_tracking.md §5, §9).
 - **Metrics & Baselines** (`activities.py`) — `get_baseline(date)` returns the
   *closest prior* baseline. The scoped wipes (in `wipes.py`) are the non-obvious part:
   `wipe_garmin_data(start, end)` also clears the evidence-derived `analysis_cache`
@@ -1434,7 +1440,7 @@ tells them apart, and it is what decides whether the Calendar event is kept or t
 | `power_zone1_sec`–`power_zone7_sec` | INTEGER | Time in each Coggan power zone (seconds); NULL unless a power meter recorded |
 | `sets_read_at`      | TEXT    | Strength sessions: when the sets were read from Garmin (UTC, queue form); NULL until the morning after (DESIGN_strength_tracking.md §6) |
 | `sets_final_at`     | TEXT    | When the sets were frozen; NULL while "are the sets final?" waits. Part of a naming question's subject |
-| `discarded`         | INTEGER | 1 after `strength discard`: the session's sets are left out of weight planning; the workout still counts as training |
+| `discarded`         | INTEGER | 1 after `strength discard`: the activity's sets are left out of the strength history; it still counts as training |
 
 ### exercise_sets
 Every set of a strength session as Garmin recorded it, rest entries included
@@ -1452,6 +1458,36 @@ session again. Rows cascade with their `completed_activities` row.
 | `load_kg`      | REAL    | Garmin's grams / 1000; NULL when no weight was entered. On a bodyweight exercise, the added load |
 | `duration_sec` | REAL    |                                                                       |
 | `named_by`     | TEXT    | `watch` (the watch's guess), `garmin` (a person's pick in Garmin), `athlete` (an answer in TrainMate), NULL while unnamed |
+
+### prescribed_sets
+What the strength planner wrote for one revision of one strength session
+(DESIGN_strength_tracking.md §9). The session's description is rendered from these rows, so
+the kilograms the athlete reads and the kilograms stored as data cannot disagree. Planned
+sessions are append-only, so the rows belong to a revision and go with it: they are written
+in the same transaction, copied by a restore and by `workout swap`, carried forward by a
+revision that continues the session, and cascaded away with their `workouts` row.
+
+| Column       | Type    | Notes                                                        |
+|--------------|---------|--------------------------------------------------------------|
+| `workout_id` | INTEGER | The revision; `UNIQUE (workout_id, position)`, `ON DELETE CASCADE` |
+| `position`   | INTEGER | Order in the session, from 1                                 |
+| `exercise`   | TEXT    | A vocabulary name                                            |
+| `sets`       | INTEGER |                                                              |
+| `reps_low` / `reps_high` | INTEGER | The rep range, equal for a fixed count. The reps are the athlete's dial, the load the strength planner's (§10) |
+| `load_kg`    | REAL    | NULL for a bodyweight exercise with nothing added            |
+| `light`      | INTEGER | 1 on every row of a light week's session, which the history marks "(light)" |
+
+### strength_checks
+Which evidence each strength session's kilograms were last weighed against
+(DESIGN_strength_tracking.md §9). Keyed by lineage, so it follows the session across
+revisions and across a swap. Written when a proposal is applied or recorded as no change,
+never when it is proposed. Without it a kept Thursday could come back at 142.5 where it
+stood at 145 the next morning, from lifting already weighed.
+
+| Column            | Type    | Notes                                                    |
+|-------------------|---------|----------------------------------------------------------|
+| `lineage_id`      | INTEGER | PK — `workouts.lineage_id`, the session                   |
+| `checked_against` | TEXT    | The value `strength_history_changed_at` had when the history shown to the strength planner was built — not the clock, so sets read while a preview waited are not counted as weighed |
 
 ### activity_match_decisions
 The athlete's answer to a planned-vs-completed pairing the matcher had to guess at
@@ -1534,10 +1570,14 @@ identifiers; `timezone`, the IANA zone every date is computed in;
 `workout_commitment_days` (`commitment-days`), how many days from today the athlete is
 treated as already committed to; `push_enabled`, `push_morning_time`,
 `push_morning_deadline` and `push_adapt_first`, the morning-push window and its switches.
-Two internal markers are the exception, not preferences: `push_morning_last`, the
-per-day idempotency stamp (`DESIGN_bot_simple_frontend.md` §4.3), and `push_note_last`,
+Three internal markers are the exception, not preferences: `push_morning_last`, the
+per-day idempotency stamp (`DESIGN_bot_simple_frontend.md` §4.3), `push_note_last`,
 the id of the last change whose line to the athlete the push delivered
-(DESIGN_plan_change_continuity.md §6.4).
+(DESIGN_plan_change_continuity.md §6.4), and `strength_history_changed_at`, bumped by every
+write that changes what the strength history shows — a read that stored sets, a freeze, a
+name given or cleared, a discard or its undo, and the pull's reconcile deleting a strength
+activity that had sets. That last one is the evidence a kept strength session's kilograms
+may move on (DESIGN_strength_tracking.md §5, §9).
 
 | Column       | Type    | Notes                                              |
 |--------------|---------|----------------------------------------------------|
@@ -2014,9 +2054,9 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `queue`      | `list`       | `q l`    | Every waiting question and message in queue order, then the ones put off until later with when they come back. A bare `queue` lists — the second read-only family (DESIGN_cli_noargs.md §a3, DESIGN_athlete_queue.md §5.1) |
 | `queue`      | `answer`     | `q a`    | Go through the waiting items with the blocking chooser: each item's answers, then drop, skip (Enter), and later — in 1 hour, in 1 day, after the others. `queue answer <id>` shows that item alone. In chat it sends the first item with its buttons instead |
 | `queue`      | `tell`       | `q t`    | Queue a message for the athlete: `queue tell "Charge your watch tonight."` It goes out with the next morning push, or with `queue answer` |
-| `strength`   | `name`       | `str n`  | `strength name DATE`: go through every block of that day's strength session, named or not, and name it on the spot from the recent exercises or a typed name the model matches to the vocabulary; after a name, "all 6 sets, or how many?" splits the block. Freezes a session still waiting for "are the sets final?" (DESIGN_strength_tracking.md §7) |
-| `strength`   | `reset`      | `str r`  | `strength reset DATE`: read that day's sets again from Garmin, dropping the names given in TrainMate, freeze them anew and queue a question for every block still unnamed. How a name fixed in Connect after the freeze comes in. On a day with two strength sessions it asks which one |
-| `strength`   | `discard`    | `str d`  | `strength discard DATE [--undo]`: keep that day's session out of weight planning; it still counts as training. The sets stay stored; its waiting questions are settled. On a day with two strength sessions it asks which one |
+| `strength`   | `name`       | `str n`  | `strength name DATE`: go through every group of that day's strength activities, named or not, and name it on the spot from the recent exercises or a typed name the model matches to the vocabulary; after a name, "all 6 sets, or how many?" splits the group. Keeping a name the watch guessed confirms it. Freezes an activity still waiting for "are the sets final?" (DESIGN_strength_tracking.md §7) |
+| `strength`   | `reset`      | `str r`  | `strength reset DATE`: read that day's sets again from Garmin, dropping the names given in TrainMate, freeze them anew, make the watch's guesses still standing the athlete's, and queue a question for every group still unnamed. How a name fixed in Connect after the freeze comes in. On a day with two strength activities it asks which one |
+| `strength`   | `discard`    | `str d`  | `strength discard DATE [--undo]`: keep that day's activity out of the strength history; it still counts as training. The sets stay stored; its waiting questions are settled. On a day with two strength activities it asks which one |
 | `journal`    | —            | `j`      | The operational record: one row per command run, newest first — id, when (athlete's zone), source, command, wall time, model calls · tokens, and how it ended (`ok`, `warn`, `cancelled`, `FAILED`, `?` for a run with no `run.end`), with a gray legend under the table glossing the outcomes on screen. Every run that did not simply finish also gets a line under the table saying why — the exception for a `FAILED` one, the first warning it logged otherwise — so `warn` is never a status you have to open a second command to decode. Runs that only looked — `list`, `show`, `status`, `journal`, any `-h` — are left out unless `-a` asks for them, unless they went wrong or called a model; command lines and those reasons are clipped to the width of the screen unless `-v` asks for them in full (DESIGN_logging.md §7.1–§7.3). Filters: `-n N`, the shared `-d RANGE`, `--source`, `--command`, `--failed`, plus `--cost` for the by-model/by-command token rollup and `--follow` to tail the file live (DESIGN_logging.md §7) |
 | `journal`    | `show`       | `j 5a0e` | Everything one run wrote, by id prefix: where it ran, each event as an offset from its start, the LLM exchange files it produced, the traceback if it failed, and the runs it spawned. The bare `journal <id>` form is the same command; an ambiguous prefix lists what it matched |
 | `journal`    | `prune`      | `j p`    | Force the retention sweep now — journal days past `logging.retain_days`, exchange files past `logging.retain_exchange_days`. Otherwise it runs at most once a UTC day, off the first command to finish (DESIGN_logging.md §10) |
@@ -2323,6 +2363,19 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    that stands (§4.5). The deterministic passes run after: a `rest` constraint's row
    continues the first session already on the date and voids any other under the
    constraint's own title (§5.5).
+4c. **The strength planner** (DESIGN_strength_tracking.md §9). The week planner writes a
+   strength day as a *brief* — what the session is for and what the plan asks of it, with no
+   exercise, set, rep or load in it — and a second LLM call writes the session under it,
+   from the brief, the athlete's recent sets, the shipped progression science, the athlete's
+   own guidelines and the day's equipment. `strength/planner.py::run` sorts the proposal's
+   strength sessions into the ones to write (no prescribed sets yet, and not the athlete's
+   own) and the ones to check (they have sets and the athlete has already been shown them),
+   calls once for all of them, and edits the proposal in place: a written session gets its
+   description and its rows, a checked one keeps its sets unless the evidence, the brief or
+   the duration moved. It runs only when there is something new to write from, so a week
+   with no lifting costs no call; a call that fails twice fails the whole proposal when a
+   session was to be written, and is a "keep" plus a sentence for the athlete when sessions
+   were only to be checked.
 5. `workout_generate` returns the sessions as a `GenerateProposal` — nothing written yet.
    It carries the voids this run will make, with their reasons, and a `StandingLine` per
    session the athlete was already told about, computed from what apply *will* write
@@ -2396,6 +2449,16 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    side) and any targeting an already-completed session, then returns
    a `RevisionProposal` ([§3](#coachservice)) — caller decides whether to apply, and
    confirms each extracted constraint and signal candidate before persisting it.
+5b. **The strength planner** runs between the two, after the week planner's reply has been
+   structured and before the revisions are paired against the window
+   (DESIGN_strength_tracking.md §9; the same `strength/planner.py::run` generate calls at
+   step 4c). Two things follow from its place here. A kilogram change can land on a date the
+   week planner never mentioned, and apply reads a mentioned date as holding only the
+   sessions proposed for it, so that date's other sessions join the held list — otherwise
+   Thursday's intervals would be voided because the belt squat went up 5 kg. And when the
+   week planner changed nothing and the strength planner changed something, the proposal's
+   reason — the line the morning briefing prints — is the strength planner's sentences, in
+   place of "No adaptation needed.".
 6. If applied: `workout_revision_apply()` opens one `adapt` change. A session the pass
    overrides with nothing becomes a **void** — this path used to `DELETE` the row, with no
    way back. A session it substitutes cross-sport becomes a void at the source plus a
@@ -2422,11 +2485,13 @@ design: `DESIGN_garmin_direct_pull.md`.
    range — even all-null ones** — so the table's date coverage records what has
    been pulled. Activities with low HR-zone coverage and no RPE are reported in
    an aggregated warning (their load is an underestimate). Then it reads the sets of every
-   strength session never read (`strength.sets.read_new_sessions`, DESIGN_strength_tracking.md
-   §6): raw type `strength_training`, dated from the `strength-sets-since` setting on and
-   before today. Each is read once: frozen at once when every set has a name or the session
-   is over a week old, otherwise stored and asked about with a `sets_final` queue item. A
-   Garmin name the vocabulary lacks is stored in words and reported.
+   strength activity never read (`strength.sets.read_new_activities`,
+   DESIGN_strength_tracking.md §6): raw type `strength_training`, dated from the
+   `strength-sets-since` setting on and before today. Each is read once: frozen at once when
+   every set carries a name a person gave, or when the activity is over a week old,
+   otherwise stored and asked about with a `sets_final` queue item — which is also what a
+   name the watch guessed on its own earns, since a guess counts only once the athlete has
+   looked at it. A Garmin name the vocabulary lacks is stored in words and reported.
 2. `garmin.recompute_derived()` runs a **full sweep** over all cached days: the PMC
    EWMAs CTL/ATL/TSB (`compute_pmc`, walking every calendar day so rest days decay)
    and the 28-day RHR/HRV/sleep baseline — that is the whole sweep. The ATL:CTL load

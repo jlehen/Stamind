@@ -14,6 +14,7 @@ from trainmate.coach.revisions import (
     held_slots, normalize_load_fields, pair_revisions, structure_revision,
 )
 from trainmate.db.workouts import ATHLETE_VOID_KINDS
+from trainmate.strength import planner as strength_planner
 import trainmate.coach.service as _svc
 
 
@@ -384,6 +385,28 @@ class AdaptationMixin:
         window_workouts = self._db.get_workouts(
             start_date=target_date_str, end_date=meso_end_date_str
         )
+
+        # The kilograms, written by a call of its own from the sets the athlete actually
+        # lifted — after the week planner's reply is parsed and before the revisions are
+        # paired, so the preview shows what apply will write
+        # (DESIGN_strength_tracking.md §9).
+        week_planner_changed = bool(structured)
+        strength = strength_planner.run(
+            structured, window_workouts, target_date_str, meso_end_date_str,
+            target_date_str, profile, constraints,
+            reason_key='modification_reason', held=held,
+        )
+        if strength is not None:
+            structured.extend(strength.added)
+            held.extend(self._hold_around(strength.held_dates, window_workouts))
+            # When only the strength planner changed something, its sentences are what the
+            # morning briefing prints, in place of "No adaptation needed." (§9).
+            if strength.reasons and not week_planner_changed:
+                reason = " ".join(strength.reasons)
+                for row in structured:
+                    if not row.get('modification_reason'):
+                        row['modification_reason'] = reason
+
         pairs, removals = pair_revisions(structured, window_workouts, held)
         return RevisionProposal(
             reason=reason,
@@ -400,7 +423,30 @@ class AdaptationMixin:
             covered_constraint_ids=honoring.covered_ids(
                 constraints, target_date_str, meso_end_date_str
             ),
+            strength_checks=tuple(strength.checked) if strength else (),
+            strength_stamp=strength.stamp if strength else "",
+            strength_notice=strength.notice if strength else None,
+            strength_dropped=tuple(strength.dropped) if strength else (),
         )
+
+    @staticmethod
+    def _hold_around(
+        days: List[str], window_workouts: List[Dict[str, Any]]
+    ) -> List[Tuple[str, str]]:
+        """The other sessions of a date the strength planner named on its own.
+
+        Apply reads a date the proposal mentions as holding only the sessions named for it
+        and voids the rest (DESIGN_workout_revisions.md §9.1). The week planner knows that
+        and names what it keeps; a kilogram change arrives after it has spoken, on a day it
+        may never have mentioned, so Thursday's intervals would be removed because the belt
+        squat went up 5 kg (DESIGN_strength_tracking.md §9).
+        """
+        strength = canonical_sport('strength_training')
+        return [
+            (w['date'], canonical_sport(w['sport_type']))
+            for w in window_workouts
+            if w['date'] in days and canonical_sport(w['sport_type']) != strength
+        ]
 
     def workout_revision_apply(
         self, proposal: RevisionProposal
@@ -495,6 +541,9 @@ class AdaptationMixin:
                     benchmark_type=w.get('benchmark_type'),
                     clear_benchmark=clear_benchmark,
                     lineage_id=displaced['id'] if displaced else None,
+                    # The strength planner's exercises, written with the revision they
+                    # belong to (DESIGN_strength_tracking.md §9).
+                    prescribed_sets=w.get('prescribed_sets'),
                     # A drift correction rewrites HOW a session is prescribed, so its zone
                     # target moves with it; omitted, the carry-forward preserves what the
                     # plan already held (DESIGN_intensity_distribution.md §9.8).
@@ -504,6 +553,7 @@ class AdaptationMixin:
 
         # Stamped on the athlete's `y`, never on a proposal they declined (§8).
         honoring.stamp(self._db, proposal.covered_constraint_ids)
+        strength_planner.record_checks(self._db, proposal)
 
     def workout_revision_record_no_change(self, proposal: RevisionProposal) -> None:
         """Records a pass that proposed nothing. Every revision command's no-change branch
@@ -522,3 +572,6 @@ class AdaptationMixin:
         with self._db.workout_change(kind="adapt", summary=proposal.reason):
             pass
         honoring.stamp(self._db, proposal.covered_constraint_ids)
+        # A pass that weighed a session's kilograms and kept them has still weighed them,
+        # which is what stops tomorrow asking again (DESIGN_strength_tracking.md §9).
+        strength_planner.record_checks(self._db, proposal)

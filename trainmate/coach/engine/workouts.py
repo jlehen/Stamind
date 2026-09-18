@@ -120,6 +120,30 @@ session contradicts. An easing answers "how is the athlete today"; a constraint 
 """
 
 
+def _strength_brief_task() -> str:
+    """The one instruction that makes a strength day's description a brief
+    (DESIGN_strength_tracking.md §9).
+
+    Always on, in both the generate and the adapt TASK: a strength day can fall anywhere in
+    a span, and TrainMate's strength planner writes every one of them from the sets the
+    athlete actually lifted — which this call is never shown.
+    """
+    return """
+### WRITING A STRENGTH DAY
+A strength session's "description" is a BRIEF, not a session: what the session is for in the
+plan, its character, and what the plan asks of it that day. Write NO exercise, no set count,
+no rep count and no load into it. TrainMate's strength planner writes those, from the sets
+the athlete has actually lifted; you are not shown them, so a rep count written here would
+fix a number only that call can read. When the week is a light one, say so in the brief — the
+plan's mesocycle is where that is decided, and the brief is how it travels.
+The date, the duration, the RPE and the load stay yours: they are the week's budget and the
+fit against the endurance days.
+A brief reads like this: "[Full-Body Strength (Heavy, Non-Failure)]\\nHeavy full-body
+strength, second week of the build, non-failure. 70 min at the gym. Keep the legs fresh for
+Saturday's long ride."
+"""
+
+
 def _past_constraints_task(past_constraints: Optional[List[Constraint]]) -> str:
     """The section naming the constraints that ended earlier in this mesocycle
     (DESIGN_plan_change_continuity.md §6.1)."""
@@ -581,6 +605,7 @@ class WorkoutLogicMixin:
             "they test), and never put it in a week the athlete's constraints put under full rest.\n"
             + _mesocycle_progress_task(mesocycle_progress)
             + _mesocycle_composition_task(mesocycle_progress, mesocycle_has_intensity)
+            + _strength_brief_task()
             + _standing_sessions_task(standing_workouts)
             + _past_constraints_task(past_constraints)
             + _planned_zone_task(zone_currencies)
@@ -845,6 +870,10 @@ fresh constraint/signal event) warrants it — and the more recently and more ti
 already eased (see the tag), the higher your bar. Restoring load toward the original as the
 athlete recovers is encouraged; deepening an already-fresh cut is not.
 """
+
+        # A strength day's description is a brief, here as in generate: the same rule has
+        # to reach every call that writes one (DESIGN_strength_tracking.md §9).
+        custom_task += _strength_brief_task()
 
         # How to encode a move at all — its own section rather than a clause inside the
         # benchmark text, because an ordinary move relies on it too

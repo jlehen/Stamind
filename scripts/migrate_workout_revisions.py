@@ -12,8 +12,9 @@ names and seals the result with the immutability triggers.
 
 It opens the database with plain sqlite3 rather than through `trainmate.db`, because
 constructing a `Database` runs `_init_db`, which would try to create the live view and the
-triggers against the pre-migration column set. The script stamps the schema version itself
-when it is done, so the next start finds the database current.
+triggers against the pre-migration column set. The script stamps the schema version it
+produces — the one this migration was written against — so the next start skips the work
+already done here and runs the migrations added since.
 
 Idempotent in the only sense that matters: it refuses to run against a database that has
 already been migrated.
@@ -28,8 +29,12 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from trainmate.config import config
-from trainmate.db.base import SCHEMA_VERSION
 from trainmate.sports import canonical_sport
+
+# The schema this rebuild produces, fixed: it is what `workouts` looked like the day this
+# migration was written. Stamping the app's current SCHEMA_VERSION instead would claim the
+# database was current and skip every migration added after this one.
+PRODUCES_SCHEMA = 11
 
 # The two deterministic prefixes the old writers stamped onto `modification_reason`. They
 # live here rather than in the app because this is their last job: the heuristic they fed
@@ -372,7 +377,7 @@ def migrate(conn) -> dict:
     """)
     cursor.execute(
         "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
-        (SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()),
+        (PRODUCES_SCHEMA, datetime.now(timezone.utc).isoformat()),
     )
     return {
         "slots": len(emissions),

@@ -9,7 +9,7 @@ from trainmate.config import config
 # migrations are idempotent, so this is a "skip the work" marker rather than a ledger of
 # steps to replay — TrainMate has one user and one database, and the alternative (a
 # numbered migration framework) would be more machinery than that warrants.
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 
 
 # How long a connection waits for a writer to finish before raising "database is
@@ -861,6 +861,36 @@ class BaseDB:
                     UNIQUE (activity_id, seq),
                     FOREIGN KEY (activity_id) REFERENCES completed_activities(activity_id)
                         ON DELETE CASCADE
+                )
+            """)
+
+            # What the strength planner wrote for one revision of one strength session:
+            # an exercise, a count of sets, a rep range and a load
+            # (DESIGN_strength_tracking.md §9). Planned sessions are append-only, so these
+            # belong to the revision and go with it.
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS prescribed_sets (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    workout_id  INTEGER NOT NULL,
+                    position    INTEGER NOT NULL,
+                    exercise    TEXT NOT NULL,
+                    sets        INTEGER NOT NULL,
+                    reps_low    INTEGER NOT NULL,
+                    reps_high   INTEGER NOT NULL,
+                    load_kg     REAL,
+                    light       INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE (workout_id, position),
+                    FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
+                )
+            """)
+
+            # Which evidence the strength planner last weighed for one session, so a
+            # "keep" is not asked again the next morning with a fresh draw of randomness
+            # (DESIGN_strength_tracking.md §9). Keyed by lineage: it follows the session.
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS strength_checks (
+                    lineage_id       INTEGER PRIMARY KEY,
+                    checked_against  TEXT NOT NULL
                 )
             """)
 

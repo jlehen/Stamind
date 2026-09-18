@@ -100,13 +100,22 @@ class ActivitiesMixin:
                 for row in cursor.fetchall()
                 if row["activity_id"] not in keep
             ]
+            # The sets go with the activity, so a deleted strength activity changes what the
+            # strength history shows (DESIGN_strength_tracking.md §5).
+            lifted = False
             for activity_id in stale:
+                lifted = lifted or bool(cursor.execute(
+                    "SELECT 1 FROM exercise_sets WHERE activity_id = ? LIMIT 1",
+                    (activity_id,),
+                ).fetchone())
                 cursor.execute(
                     "DELETE FROM completed_activities WHERE activity_id = ?",
                     (activity_id,),
                 )
             conn.commit()
-            return len(stale)
+        if lifted:
+            self.bump_strength_history()
+        return len(stale)
 
     def get_completed_activities(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None

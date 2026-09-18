@@ -102,6 +102,10 @@ class Workout(TypedDict):
     planned_zone5_sec: Optional[int]
     planned_zone6_sec: Optional[int]
     planned_zone7_sec: Optional[int]
+    # The strength planner's exercises for this revision, empty for every other session
+    # (DESIGN_strength_tracking.md §9). The description is rendered from them, so the two
+    # cannot disagree.
+    prescribed_sets: List[Dict[str, Any]]
 
 class CompletedActivity(TypedDict):
     """Represents a completed Garmin activity synced from Sheets."""

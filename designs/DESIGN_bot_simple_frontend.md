@@ -117,6 +117,13 @@ scheduled run) and then renders the result — the push reflects overnight signa
 an applied change surfaces as its one reason line ("Eased today — rough night."). Off,
 the schedule renders as-is and "Feeling tired" stays the trigger for adaptation.
 
+One sentence joins that line even when the adaptation changed nothing: the notice a
+proposal carries when the strength planner could not recheck a gym day's kilograms
+("I could not recheck Thursday's kilograms this morning. They stand as written, and I will
+look again tomorrow." — DESIGN_strength_tracking.md §9). It has to reach the athlete on a
+morning where nothing else moved, because the morning of the gym day itself is exactly such
+a morning.
+
 ### 4.3 Scheduling
 
 An asyncio task inside the bot (`python-telegram-bot` is installed without the

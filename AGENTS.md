@@ -15,6 +15,9 @@
   planner** is the call inside `workout generate` and `workout adapt` that writes the sessions,
   the **strength planner** is the call that writes a strength session. "The coach" is TrainMate
   speaking to the athlete, whichever call wrote the words.
+- A **brief** is the week planner's description of a strength day: what the session is for
+  and what the plan asks of it, with no exercise, set, rep or load in it. The strength
+  planner writes the session under it (DESIGN_strength_tracking.md §9).
 - Never say "regeneration" or "generate" bare. Say `plan generate` (writes the
   periodization) or `workout generate` (writes the sessions). They are a chain, so an
   ambiguous word makes a finding about one read as a finding about the other.

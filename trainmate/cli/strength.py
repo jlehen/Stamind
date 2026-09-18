@@ -80,6 +80,12 @@ def _ask_group(activity_id: str, group: sets.Group, recent: List[str]) -> int:
     choices.append(Choice(KEEP, "keep it as it is"))
     picked = runtime.prompt.choose(wrap_text(_group_prompt(group)), choices, default=KEEP)
     if picked == KEEP:
+        # Keeping a name the watch guessed confirms it: the athlete has just looked at it,
+        # which is the whole of what makes a guess count (§7).
+        if any(s["named_by"] == sets.WATCH for s in group.sets):
+            runtime.db.name_exercise_sets(activity_id, group.seqs, group.exercise)
+            print(f"{_capitalize(sets.set_span(group.first, group.last))} confirmed: "
+                  f"{group.exercise}.")
         return group.last + 1
     if picked == CLEAR:
         runtime.db.name_exercise_sets(activity_id, group.seqs, None)

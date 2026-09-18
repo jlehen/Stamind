@@ -6,7 +6,7 @@ answers queue items of their own, so the feature imports this module and the que
 imports the feature.
 """
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Union
 
 from trainmate import clock, runtime
 
@@ -26,14 +26,22 @@ class Kind:
     `apply` gets the item, the position of the chosen answer and the typed text when that
     answer asks for one (an answer with an `ask` key), and returns the line confirming it.
     It raises `NotApplied` when the answer could not be applied, and the item waits (§4). A
-    question without a `drop_label` offers no drop: every one of its answers settles it."""
+    question without a `drop_label` offers no drop: every one of its answers settles it.
+
+    `drop_label` is one wording, or a function of the item when what the drop costs depends
+    on what was asked — "the watch's names won't count" only where the watch guessed one
+    (DESIGN_strength_tracking.md §7)."""
     name: str
     shape: str
     wording: Callable[[Dict[str, Any]], str]
     companion_wording: Callable[[Dict[str, Any]], str]
     is_stale: Callable[[Dict[str, Any]], bool]
     apply: Callable[[Dict[str, Any], int, Optional[str]], Optional[str]]
-    drop_label: Optional[str] = None
+    drop_label: Optional[Union[str, Callable[[Dict[str, Any]], str]]] = None
+    # What the drop itself writes, where dropping a question settles something in the
+    # feature as well as in the queue — "leave it as it is" freezes an activity's sets as
+    # they were first read (DESIGN_strength_tracking.md §7).
+    on_drop: Optional[Callable[[Dict[str, Any]], None]] = None
 
 
 class NotApplied(Exception):

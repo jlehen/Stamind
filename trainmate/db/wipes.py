@@ -53,6 +53,11 @@ class WipesMixin:
             cursor.execute("DELETE FROM workouts")
             cursor.execute("DELETE FROM workout_changes")
             cursor.execute("DELETE FROM workout_calendar_state")
+            # The prescribed sets ride on a revision and cascade with it; the checks are
+            # keyed by lineage and have no cascade to ride on
+            # (DESIGN_strength_tracking.md §9).
+            cursor.execute("DELETE FROM prescribed_sets")
+            cursor.execute("DELETE FROM strength_checks")
             cursor.execute("""
                 CREATE TRIGGER workouts_no_update BEFORE UPDATE ON workouts
                 WHEN NOT (OLD.lineage_id IS NULL AND NEW.lineage_id = NEW.id)

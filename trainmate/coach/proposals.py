@@ -48,6 +48,15 @@ class RevisionProposal:
     # displacement rule must still count them as spoken for
     # (DESIGN_workout_revisions.md §9.1).
     held: Tuple[Tuple[str, str], ...] = ()
+    # What the strength planner weighed, and the stamp the history it read was built from.
+    # The rows are written when this proposal is applied or recorded as no change, never
+    # when it is proposed (DESIGN_strength_tracking.md §9).
+    strength_checks: Tuple[Tuple[str, str], ...] = ()
+    strength_stamp: str = ""
+    # The one sentence the athlete is told when the kilograms were not rechecked, and the
+    # entries the output checks dropped — both shown in the preview (§9).
+    strength_notice: Optional[str] = None
+    strength_dropped: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -109,6 +118,11 @@ class GenerateProposal:
     # The last day of the commitment window this run answered under, stamped on the
     # change so a void is judged by the window it was written under (§5.2).
     commitment_end: Optional[str] = None
+    # As on `RevisionProposal` above (DESIGN_strength_tracking.md §9).
+    strength_checks: Tuple[Tuple[str, str], ...] = ()
+    strength_stamp: str = ""
+    strength_notice: Optional[str] = None
+    strength_dropped: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

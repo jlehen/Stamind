@@ -196,6 +196,19 @@ def bind_test_db(db_path: str, fresh: bool = True):
     return test_db
 
 
+def skip_strength_planner(testcase) -> None:
+    """Stubs the strength planner out for a test that is not about it.
+
+    It is a second LLM call, made by every proposal that holds a strength session
+    (DESIGN_strength_tracking.md §9), so a test that mocks only the week planner's client
+    would reach the network through it. Returning None is what the pass itself does when
+    there is nothing new to write from, so the proposal is the one the test expects.
+    """
+    patcher = patch("trainmate.strength.planner.run", return_value=None)
+    patcher.start()
+    testcase.addCleanup(patcher.stop)
+
+
 def run_cli(args: list, input_value: str = "n"):
     """Invoke trainmate_cli.main() and capture stdout/stderr."""
     import trainmate_cli

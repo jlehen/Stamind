@@ -49,6 +49,8 @@ STANDING_SCOPE = "You must answer for every session listed here"
 PAST_CONSTRAINTS_INSTRUCTIONS = "### WHAT ALREADY HAPPENED IN THIS MESOCYCLE"
 PAST_CONSTRAINTS_DATA = "## CONSTRAINTS EARLIER IN THIS MESOCYCLE"
 
+STRENGTH_BRIEF_INSTRUCTIONS = "### WRITING A STRENGTH DAY"
+
 BASE = dict(
     history_days=7,
     start_date_str="2026-05-28",
@@ -113,6 +115,24 @@ NOTE_REGIONS = (
     NOTE_INSTRUCTIONS, NOTE_SCHEMA_MEMBER, NOTE_CLAUSE, NOTE_DATA,
     NOTE_SIGNAL_INSTRUCTIONS, NOTE_SIGNAL_SCHEMA_MEMBER,
 )
+
+
+class TestStrengthBriefRegion(unittest.TestCase):
+    """A strength day's description is a brief in BOTH calls that write one
+    (DESIGN_strength_tracking.md §9).
+
+    Not a gate — nothing switches it off — but the same failure applies: if only one of the
+    two calls carries it, `workout adapt` quietly writes kilograms into a description the
+    strength planner then renders from its rows, and the two disagree on the athlete's
+    screen.
+    """
+
+    def test_both_calls_tell_the_week_planner_to_write_a_brief(self):
+        for name, prompt in (("adapt", build_prompt()[0]),
+                             ("generate", build_generate_prompt()[0])):
+            with self.subTest(call=name):
+                self.assertIn(STRENGTH_BRIEF_INSTRUCTIONS, prompt)
+                self.assertIn("no set count", prompt)
 
 
 class TestAthleteNoteGate(unittest.TestCase):

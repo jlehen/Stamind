@@ -3,6 +3,7 @@ import argparse
 from datetime import datetime, timedelta
 from typing import Optional
 from trainmate import athlete_queue, runtime
+from trainmate.strength.prescription import exercise_lines
 from trainmate.strength.sets import activity_lines
 from trainmate.config import config
 from trainmate.adherence import analyze_adherence, date_covered, format_discrepancies
@@ -17,7 +18,7 @@ from trainmate.cli import staleness
 from trainmate.cli.candidates import confirm_new_constraints, confirm_new_signals
 from trainmate.cli.common import (
     adherence_verdicts, ensure_recent_data, format_actual,
-    mark_adherence_from_results, report_unhonored,
+    mark_adherence_from_results, print_strength_notes, report_unhonored,
 )
 from trainmate.cli.runway import (
     current_runway, list_end_marker, plan_is_behind, schedule_coverage,
@@ -430,6 +431,11 @@ def print_generate_preview(proposal) -> bool:
     # to accept reads exactly like the plan they will be living with.
     for w in proposal.workouts:
         print(workout_line(w))
+        # A strength session's kilograms are the one thing the one-line form leaves out,
+        # and accepting them unseen is what this shows (DESIGN_strength_tracking.md §9).
+        for line in exercise_lines(w.get('prescribed_sets') or []):
+            print(f"      {gray(line)}")
+    print_strength_notes(proposal)
     print()
     return True
 

@@ -199,12 +199,44 @@ class WorkoutChange:
 
     # --- writing ---
 
+    def prescribed_sets(self, revision_id: int) -> List[Dict[str, Any]]:
+        """One revision's prescribed exercises, read inside this change's transaction
+        (DESIGN_strength_tracking.md §9)."""
+        rows = self._conn.execute(
+            "SELECT exercise, sets, reps_low, reps_high, load_kg, light "
+            "FROM prescribed_sets WHERE workout_id = ? ORDER BY position",
+            (revision_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def _write_prescribed(
+        self, revision_id: int, rows: Sequence[Dict[str, Any]]
+    ) -> None:
+        """The strength planner's exercises, written with the revision they belong to and in
+        the same transaction (DESIGN_strength_tracking.md §9)."""
+        self._conn.executemany(
+            "INSERT INTO prescribed_sets "
+            "  (workout_id, position, exercise, sets, reps_low, reps_high, load_kg, light) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (revision_id, position, row["exercise"], row["sets"], row["reps_low"],
+                 row["reps_high"], row.get("load_kg"), 1 if row.get("light") else 0)
+                for position, row in enumerate(rows, start=1)
+            ],
+        )
+
     def _write(
         self, row: Dict[str, Any],
         decision: Tuple[Optional[int], Optional[Dict[str, Any]], bool],
         live: Optional[Dict[str, Any]],
+        prescribed: Optional[Sequence[Dict[str, Any]]] = None,
     ) -> Optional[int]:
-        """Inserts one revision, or returns None when §9 suppresses it as a no-op."""
+        """Inserts one revision, or returns None when §9 suppresses it as a no-op.
+
+        `prescribed` are the strength planner's exercises for this revision. A suppressed
+        no-op writes none of them either, and the live row's sets stand — which is always
+        right, because the description is rendered from them, so different kilograms make a
+        different description (DESIGN_strength_tracking.md §9)."""
         lineage_id, superseded, manual = decision
         if live is not None and live["lineage_id"] is not None:
             self.touched_lineages.add(live["lineage_id"])
@@ -231,6 +263,8 @@ class WorkoutChange:
                 "UPDATE workouts SET lineage_id = id WHERE id = ?", (revision_id,)
             )
             self.touched_lineages.add(revision_id)
+        if prescribed:
+            self._write_prescribed(revision_id, prescribed)
         if manual and superseded is not None:
             self.replaced_manual.append(dict(superseded))
         self.appended.append(revision_id)
@@ -246,6 +280,7 @@ class WorkoutChange:
         planned_zone_sec: Optional[Sequence[Optional[int]]] = None,
         macrocycle_id: Optional[int] = None, lineage_id: Optional[int] = None,
         restored_from: Optional[int] = None,
+        prescribed_sets: Optional[Sequence[Dict[str, Any]]] = None,
     ) -> Optional[int]:
         """Appends one revision of the session in `(date, sport_type)`.
 
@@ -256,6 +291,11 @@ class WorkoutChange:
         an adaptation that replaces a test with something that is no longer that test
         (DESIGN_benchmark_workouts.md §4.2). `lineage_id` names the session explicitly,
         which is what a swap's destination needs (§4).
+
+        `prescribed_sets` are the strength planner's exercises for this revision
+        (DESIGN_strength_tracking.md §9). Omitted, a revision that CONTINUES the session in
+        the slot keeps the ones it already had, the way every other field carries forward;
+        one that starts a new lineage is given them or has none.
 
         Returns the new revision's id, or None when §9 suppressed it as a no-op.
         """
@@ -300,7 +340,9 @@ class WorkoutChange:
         # When the session first entered the plan. Carried across a lineage's revisions;
         # a new session starts its own clock at the change that created it.
         row["created_at"] = base.get("created_at") or self.created_at
-        return self._write(row, decision, live)
+        if prescribed_sets is None and continues:
+            prescribed_sets = self.prescribed_sets(live["id"])
+        return self._write(row, decision, live, prescribed_sets)
 
     def void(
         self, *, date: str, sport_type: str, reason: Optional[str] = None
@@ -329,13 +371,19 @@ class WorkoutChange:
         Restore is a duplicate rather than an un-flag: the copy gets a new, higher id and
         becomes live by the same rule as everything else, so there is no second mechanism
         (§5). The stamp is what lets the adaptation tally skip the span this undid (§7).
+
+        The copy carries the restored revision's prescribed sets, or the kilograms in its
+        text would have no rows behind them (DESIGN_strength_tracking.md §9).
         """
         row = {k: revision[k] for k in REVISION_COLUMNS}
         row["restored_from"] = revision["id"]
         if reason is not None:
             row["reason"] = reason
         live = self.live_revision(revision["date"], revision["sport_canonical"])
-        return self._write(row, (revision["lineage_id"], None, False), live)
+        return self._write(
+            row, (revision["lineage_id"], None, False), live,
+            self.prescribed_sets(revision["id"]),
+        )
 
 
 class WorkoutsMixin:
@@ -432,9 +480,30 @@ class WorkoutsMixin:
         return {row["lineage_id"]: dict(row) for row in rows}
 
     @staticmethod
+    def _prescribed_set_rows(
+        conn, revision_ids: Sequence[int]
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """The strength planner's exercises for these revisions, in one query — hydration
+        must not turn a sixty-row listing into sixty lookups (DESIGN_strength_tracking.md
+        §9)."""
+        if not revision_ids:
+            return {}
+        placeholders = ",".join("?" * len(revision_ids))
+        rows = conn.execute(
+            f"SELECT * FROM prescribed_sets WHERE workout_id IN ({placeholders}) "
+            "ORDER BY workout_id, position",
+            tuple(revision_ids),
+        ).fetchall()
+        grouped: Dict[int, List[Dict[str, Any]]] = {}
+        for row in rows:
+            grouped.setdefault(row["workout_id"], []).append(dict(row))
+        return grouped
+
+    @staticmethod
     def _hydrated(
         row: Dict[str, Any], revisions: List[Dict[str, Any]],
         calendar: Optional[Dict[str, Any]],
+        prescribed: Optional[List[Dict[str, Any]]] = None,
     ) -> Workout:
         """One live revision as the dict the rest of the app reads (§5).
 
@@ -484,6 +553,10 @@ class WorkoutsMixin:
             "benchmark_type": row["benchmark_type"],
             "planned_zone_currency": row["planned_zone_currency"],
             **{column: row[column] for column in _ZONE_COLUMNS},
+            # What the strength planner wrote for this revision, empty for every other
+            # session. The description is rendered from these, so the week planner is shown
+            # only the brief above them (DESIGN_strength_tracking.md §9).
+            "prescribed_sets": list(prescribed or []),
         }
 
     def _hydrate(self, conn, rows: List[Dict[str, Any]]) -> List[Workout]:
@@ -492,10 +565,12 @@ class WorkoutsMixin:
         lineage_ids = sorted({r["lineage_id"] for r in rows if r["lineage_id"]})
         revisions = self._lineage_revisions(conn, lineage_ids)
         calendar = self._calendar_state_rows(conn, lineage_ids)
+        prescribed = self._prescribed_set_rows(conn, [r["id"] for r in rows])
         return [
             self._hydrated(
                 row, revisions.get(row["lineage_id"], []),
                 calendar.get(row["lineage_id"]),
+                prescribed.get(row["id"]),
             )
             for row in rows
         ]

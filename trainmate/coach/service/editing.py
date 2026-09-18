@@ -180,6 +180,10 @@ class WorkoutEditMixin:
                         benchmark_type=workout.get('benchmark_type'),
                         reason=self._swap_reason(workout, new_date, reason),
                         lineage_id=workout['id'],
+                        # The moved session is the same session, so its kilograms move with
+                        # it; the text would otherwise have no rows behind it
+                        # (DESIGN_strength_tracking.md §9).
+                        prescribed_sets=workout.get('prescribed_sets'),
                         planned_zone_currency=workout.get('planned_zone_currency'),
                         planned_zone_sec=[
                             workout.get(f'planned_zone{i}_sec') for i in range(1, 8)

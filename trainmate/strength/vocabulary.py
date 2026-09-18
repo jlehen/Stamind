@@ -15,6 +15,9 @@ PATTERNS = (
 )
 EQUIPMENT = ("barbell", "dumbbell", "kettlebell", "cable", "machine", "bodyweight")
 BODYWEIGHT = "bodyweight"
+# Isolation work: written into a session at what the athlete last lifted, never progressed
+# by rule (§4, §10).
+ACCESSORY = "accessory"
 
 # Above the 20–40 kg a strong athlete adds to dips and pull-ups (§6).
 BODYWEIGHT_CEILING_KG = 50.0

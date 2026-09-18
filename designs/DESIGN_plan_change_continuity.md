@@ -390,6 +390,14 @@ form, and the model is told to keep it unless the moment the easing answered has
 the tag is not about continuity but about not easing a session twice from an
 already-reduced baseline.
 
+**A standing strength session is shown as its title and its brief, not its full
+description** (DESIGN_strength_tracking.md §9). From phase 2 of strength tracking on, a
+strength day's description is written by two authors: the week planner's brief above a blank
+line, and the exercises and kilograms the strength planner rendered from `prescribed_sets`
+below it. That blank line is a seam, and both this section and `workout adapt`'s planned
+sessions cut the description there. The week planner therefore never meets a kilogram, so it
+never copies one into a revision, and the strength planner stays the only author of loads.
+
 **Both commands are shown what a session used to be, not just that it changed.** Today the
 line reads `[ALREADY EASED 2x, most recently 3 days ago — do not compound]`
 (`coach/formatting.py::_planned_summary`). The model is told *that* the numbers are

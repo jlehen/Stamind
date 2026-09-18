@@ -272,14 +272,81 @@ class ReadingTest(_StrengthCase):
         self.assertEqual((item["kind"], item["subject"]), (sets.SETS_FINAL, "tue"))
         self.assertEqual(
             athlete_queue.wording(item),
-            "Tue Sep 15 18:10 gym session: 2 groups the watch couldn't name (sets 2–3, 4). "
-            "Are the sets in Garmin final?",
+            "Tue Sep 15 18:10 gym session: the watch couldn't name 2 groups "
+            "(sets 2–3, 4). Are the sets in Garmin final?",
         )
         self.assertEqual(
             athlete_queue.wording(item, companion=True),
             "Tuesday's 18:10 gym session has 2 groups of sets the watch couldn't name. "
             "Are the sets in Garmin final?",
         )
+
+    def test_a_recent_activity_the_watch_guessed_is_not_final_on_its_own(self):
+        """September 3, 20:45: two guesses stand in an evening where nothing weighed more
+        than 16 kg, so the activity waits for the athlete rather than freezing (§6)."""
+        self.activity("tue", payload=garmin_sets(
+            lift("SQUAT", "BELT_SQUAT"),
+            guess("DEADLIFT", "BARBELL_DEADLIFT", 12, 16),
+            guess("LATERAL_RAISE", "LATERAL_RAISE", 12, 16),
+        ))
+        self.read()
+        self.assertIsNone(self.row("tue")["sets_final_at"])
+        [item] = test_db.waiting_queue_items()
+        self.assertEqual(
+            athlete_queue.wording(item),
+            "Tue Sep 15 18:10 gym session: the watch guessed 2 exercises "
+            "(barbell deadlift, lateral raise). Are the sets in Garmin final?",
+        )
+        self.assertEqual(
+            athlete_queue.wording(item, companion=True),
+            "Tuesday's 18:10 gym session has 2 exercises the watch only guessed. "
+            "Are the sets in Garmin final?",
+        )
+        self.assertEqual(athlete_queue.drop_label(item),
+                         "no, leave it — the watch's names won't count")
+
+    def test_both_halves_of_the_question_when_the_watch_guessed_and_gave_up(self):
+        self.activity("tue", payload=garmin_sets(
+            guess("DEADLIFT", "BARBELL_DEADLIFT", 12, 16), unnamed(10, 60),
+        ))
+        self.read()
+        [item] = test_db.waiting_queue_items()
+        self.assertEqual(
+            athlete_queue.wording(item),
+            "Tue Sep 15 18:10 gym session: the watch guessed 1 exercise "
+            "(barbell deadlift) and couldn't name 1 group (set 2). "
+            "Are the sets in Garmin final?",
+        )
+        self.assertEqual(
+            athlete_queue.wording(item, companion=True),
+            "Tuesday's 18:10 gym session has 1 exercise the watch only guessed and "
+            "1 group of sets it couldn't name. Are the sets in Garmin final?",
+        )
+
+    def test_a_guess_counts_for_nothing_until_the_athlete_looks_at_it(self):
+        self.activity("tue", payload=garmin_sets(guess("SQUAT", "BELT_SQUAT", 5, 140)))
+        self.read()
+        self.assertEqual(sets.recent_exercises(), [])
+
+    def test_yes_final_makes_the_guesses_still_standing_the_athletes(self):
+        self.activity("tue", payload=garmin_sets(
+            guess("DEADLIFT", "BARBELL_DEADLIFT", 12, 16), unnamed(10, 60),
+        ))
+        self.answer_final()
+        named = [(row["exercise"], row["named_by"])
+                 for row in test_db.get_exercise_sets("tue") if row["set_type"] == "active"]
+        self.assertEqual(named, [("barbell deadlift", "athlete"), (None, None)])
+        self.assertEqual(sets.recent_exercises(), ["barbell deadlift"])
+
+    def test_the_drop_leaves_the_guesses_guesses(self):
+        self.activity("tue", payload=garmin_sets(guess("SQUAT", "BELT_SQUAT", 5, 140)))
+        self.read()
+        [item] = test_db.waiting_queue_items()
+        athlete_queue.act(item, athlete_queue.DROP, self.now)
+        self.assertEqual([row["named_by"] for row in test_db.get_exercise_sets("tue")
+                          if row["set_type"] == "active"], ["watch"])
+        self.assertEqual(sets.recent_exercises(), [])
+        self.assertTrue(self.row("tue")["sets_final_at"])
 
     def test_an_old_session_is_frozen_as_read_and_asks_nothing(self):
         self.activity("old", day="2026-09-02", payload=garmin_sets(unnamed()))
@@ -477,6 +544,23 @@ class CommandsTest(_StrengthCase):
         self.assertTrue(self.row("tue")["sets_final_at"])
         self.assertEqual(athlete_queue.walk(self.now), [])
 
+    def test_keeping_a_guess_in_name_confirms_it(self):
+        self.activity("tue", payload=garmin_sets(guess("SQUAT", "BELT_SQUAT", 5, 140)))
+        self.read()
+        runtime.prompt = _Prompt(picks=["keep"])
+        _, out, _ = run_cli(["strength", "name", TUESDAY])
+        self.assertIn("Set 1 confirmed: belt squat.", out)
+        self.assertEqual([row["named_by"] for row in test_db.get_exercise_sets("tue")
+                          if row["set_type"] == "active"], ["athlete"])
+
+    def test_reset_makes_the_guesses_still_standing_the_athletes(self):
+        self.activity("tue", payload=garmin_sets(guess("SQUAT", "BELT_SQUAT", 5, 140)))
+        self.read()
+        code, _, _ = run_cli(["strength", "reset", TUESDAY])
+        self.assertEqual(code, 0)
+        self.assertEqual([row["named_by"] for row in test_db.get_exercise_sets("tue")
+                          if row["set_type"] == "active"], ["athlete"])
+
     def test_reset_reads_again_and_asks_anew(self):
         self.activity("tue", payload=garmin_sets(unnamed(10, 60), unnamed(12, 30)))
         self.answer_final()
@@ -603,7 +687,7 @@ class MorningPushTest(_StrengthCase):
         self.assertIn("Tuesday's 18:10 gym session has 1 group of sets the watch couldn't "
                       "name.", item["text"])
         self.assertEqual([b["label"] for b in item["buttons"]],
-                         ["Yes, final", "Leave it unnamed", "🕐 Not now"])
+                         ["Yes, final", "No, leave it unnamed", "🕐 Not now"])
 
 
 if __name__ == "__main__":

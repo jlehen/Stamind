@@ -12,6 +12,7 @@ from trainmate.sports import canonical_sport
 from trainmate.benchmarks import MIN_RETEST_DAYS
 from trainmate.calendar_reconcile import verbose_events
 from trainmate import intensity
+from trainmate.strength import planner as strength_planner
 from trainmate.util import green, cmd, notice, keep_whole
 import trainmate.coach.service as _svc
 
@@ -945,6 +946,16 @@ class WorkoutGenMixin:
         # After the benchmark post-check, which reads the span the model actually reached.
         workouts = self._fill_coverage_gaps(workouts, gen_start_str, gen_end_str)
 
+        # The kilograms, written by a call of its own from the sets the athlete actually
+        # lifted (DESIGN_strength_tracking.md §9). Before the proposal is built, so the
+        # preview shows the exercise lines the athlete is accepting.
+        strength = strength_planner.run(
+            workouts, span_sessions, gen_start_str, gen_end_str, today_str,
+            profile, constraints, reason_key='change_reason',
+        )
+        if strength is not None:
+            workouts.extend(strength.added)
+
         # Which plan version each session belongs to, per date: a span long enough to run
         # from one goal's last mesocycle into the next goal's first produces workouts from two
         # macrocycles, and `plan rollback` accounting keys off this tag. Days past the last
@@ -985,6 +996,10 @@ class WorkoutGenMixin:
             standing=self._standing_lines(workouts, standing_sessions, voids),
             athlete_note=athlete_note,
             commitment_end=window_end,
+            strength_checks=tuple(strength.checked) if strength else (),
+            strength_stamp=strength.stamp if strength else "",
+            strength_notice=strength.notice if strength else None,
+            strength_dropped=tuple(strength.dropped) if strength else (),
         )
 
     def workout_generate_apply(
@@ -1074,6 +1089,9 @@ class WorkoutGenMixin:
                     ),
                     macrocycle_id=w.get('macrocycle_id'),
                     lineage_id=w.get('replaces_lineage'),
+                    # The strength planner's exercises, written with the revision they
+                    # belong to (DESIGN_strength_tracking.md §9).
+                    prescribed_sets=w.get('prescribed_sets'),
                     planned_zone_currency=zone_currency,
                     planned_zone_sec=zone_sec,
                 )
@@ -1090,6 +1108,7 @@ class WorkoutGenMixin:
 
         # The same warrant every other constraint this run built around gets (§8).
         honoring.stamp(self._db, proposal.covered_constraint_ids)
+        strength_planner.record_checks(self._db, proposal)
 
         # The sessions the plan now holds in the slots it proposed — which is not the same
         # as the revisions it appended, because §9 leaves an unchanged day alone.

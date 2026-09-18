@@ -272,16 +272,22 @@ def _auto_adapt_note(date_str: str) -> Optional[str]:
     """Runs the daily adaptation non-interactively (the `workout adapt -y` flow minus
     its preview) and returns the reason line when a change was applied (§4.2). A
     failure must not sink the push: the schedule then renders as stored, and the error
-    surfaces only as a terminal aside — never in the athlete's chat."""
+    surfaces only as a terminal aside — never in the athlete's chat.
+
+    The strength planner's notice joins the line whether or not anything else changed,
+    which is what covers the morning of the gym day itself
+    (DESIGN_strength_tracking.md §9)."""
     from trainmate import runtime
     try:
         ensure_recent_data(date_str)
         proposal = runtime.coach_service.workout_adapt(date_str)
         if not proposal.workouts:
             runtime.coach_service.workout_revision_record_no_change(proposal)
-            return None
+            return proposal.strength_notice
         runtime.coach_service.workout_revision_apply(proposal)
-        return proposal.reason
+        return " ".join(
+            part for part in (proposal.reason, proposal.strength_notice) if part
+        )
     except Exception as e:
         step(f"Morning adaptation failed, rendering the stored schedule: {e}")
         return None

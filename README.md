@@ -141,6 +141,15 @@ means one thing.
   description for each day. `workout generate` asks it to write the coming
   weeks; `workout adapt` asks it each morning which of them to ease, move or
   keep.
+- **Strength planner.** The model call that writes a gym day's actual session:
+  the exercises, the sets, the rep ranges and the kilograms. It reads the sets
+  your watch recorded, so it knows what you last lifted on every exercise. The
+  week planner decides that Thursday is a 70-minute gym day and what that day is
+  for; the strength planner turns that into "belt squat 3×4–6 @ 140 kg".
+- **Brief.** What the week planner writes for a gym day: what the session is for
+  and what the plan asks of it, with no exercise, set, rep or load in it. It is
+  the first paragraph of the session's description, and the strength planner
+  writes the rest underneath it.
 - **The coach.** TrainMate talking to you, whichever model call wrote the words.
   Every one of those calls runs on the coach model, see
   [Choosing a model](#choosing-a-model).

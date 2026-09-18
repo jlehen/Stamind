@@ -63,25 +63,68 @@ def _activity(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 # --- sets_final: are the sets in Garmin final? ---
 
+def _guessed(payload: Dict[str, Any]) -> List[str]:
+    """The exercises the watch named on its own, as the question was queued with them. An
+    item queued before phase 2 carries none (§6)."""
+    return list(payload.get("guesses") or [])
+
+
 def _sets_final_wording(item: Dict[str, Any]) -> str:
     payload = item["payload"]
     spans = payload["groups"]
-    count = len(spans)
-    listed = ", ".join(sets.positions(first, last) for first, last in spans)
-    word = "set" if count == 1 and spans[0][0] == spans[0][1] else "sets"
-    return (
-        f"{activity_words(payload)}: {count} group{'s' if count != 1 else ''} the watch "
-        f"couldn't name ({word} {listed}). Are the sets in Garmin final?"
-    )
+    guesses = _guessed(payload)
+    halves = []
+    if guesses:
+        halves.append(
+            f"guessed {len(guesses)} exercise{'s' if len(guesses) != 1 else ''} "
+            f"({', '.join(guesses)})"
+        )
+    if spans:
+        listed = ", ".join(sets.positions(first, last) for first, last in spans)
+        word = "set" if len(spans) == 1 and spans[0][0] == spans[0][1] else "sets"
+        halves.append(
+            f"couldn't name {len(spans)} group{'s' if len(spans) != 1 else ''} "
+            f"({word} {listed})"
+        )
+    return (f"{activity_words(payload)}: the watch {' and '.join(halves)}. "
+            "Are the sets in Garmin final?")
 
 
 def _sets_final_companion(item: Dict[str, Any]) -> str:
-    count = len(item["payload"]["groups"])
-    return (
-        f"{_capitalized(companion_activity_words(item))} has {count} "
-        f"group{'s' if count != 1 else ''} of sets the watch couldn't name. "
-        "Are the sets in Garmin final?"
-    )
+    payload = item["payload"]
+    spans = payload["groups"]
+    guesses = _guessed(payload)
+    halves = []
+    if guesses:
+        halves.append(
+            f"{len(guesses)} exercise{'s' if len(guesses) != 1 else ''} the watch only "
+            "guessed"
+        )
+    if spans:
+        halves.append(
+            f"{len(spans)} group{'s' if len(spans) != 1 else ''} of sets it couldn't name"
+            if guesses else
+            f"{len(spans)} group{'s' if len(spans) != 1 else ''} of sets the watch "
+            "couldn't name"
+        )
+    return (f"{_capitalized(companion_activity_words(item))} has {' and '.join(halves)}. "
+            "Are the sets in Garmin final?")
+
+
+def _sets_final_drop(item: Dict[str, Any]) -> str:
+    """The drop's label says what it costs: "it's fine" and "yes, final" read alike at
+    breakfast, and the wrong tap keeps six names out of the history for good (§7)."""
+    if _guessed(item["payload"]):
+        return "no, leave it — the watch's names won't count"
+    return "no, leave it unnamed"
+
+
+def _drop_sets_final(item: Dict[str, Any]) -> None:
+    """"No, leave it": the sets are frozen as they were first read, the guesses stay
+    guesses and the unnamed groups stay unnamed (§7)."""
+    activity = _activity(item)
+    if activity and not activity["sets_final_at"]:
+        runtime.db.freeze_exercise_sets(activity["activity_id"], clock.now())
 
 
 def _sets_final_stale(item: Dict[str, Any]) -> bool:
@@ -91,7 +134,8 @@ def _sets_final_stale(item: Dict[str, Any]) -> bool:
 
 
 def _apply_sets_final(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
-    """"Yes, final": reads the sets again, freezes them and queues the naming questions."""
+    """"Yes, final": reads the sets again, freezes them, makes the guesses still standing
+    the athlete's and queues the naming questions."""
     try:
         found = sets.read_again(_activity(item), runtime.garmin.connect())
     except Exception as e:
@@ -182,7 +226,8 @@ def choose_proposed(text: str) -> str:
 SETS_FINAL_KIND = Kind(
     name=sets.SETS_FINAL, shape=QUESTION,
     wording=_sets_final_wording, companion_wording=_sets_final_companion,
-    is_stale=_sets_final_stale, apply=_apply_sets_final, drop_label=LEAVE_UNNAMED,
+    is_stale=_sets_final_stale, apply=_apply_sets_final, drop_label=_sets_final_drop,
+    on_drop=_drop_sets_final,
 )
 
 SET_NAMES_KIND = Kind(

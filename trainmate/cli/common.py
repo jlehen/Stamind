@@ -8,12 +8,27 @@ from typing import Any, Dict, List, Optional
 from trainmate.config import config
 from trainmate.adherence import STATUS_LABELS, analyze_adherence, classify_adherence
 from trainmate.util import (
-    cyan, yellow, cmd, fmt_date, today_str as _today_str, notice, warn,
+    cyan, yellow, cmd, fmt_date, today_str as _today_str, notice, warn, wrap_text,
 )
 
 # `trainmate_cli` (the `db`/`garmin`/`calendar_syncer` facade) is imported lazily
 # inside the functions below: it imports this module, so a module-level import here
 # is a cycle that breaks whenever `common` is imported first (e.g. in isolation).
+
+
+def print_strength_notes(proposal) -> None:
+    """What the strength planner could not do, under every preview that shows its work
+    (DESIGN_strength_tracking.md §9).
+
+    Two things: the exercises its output checks dropped, each naming the day and the name
+    TrainMate does not know, and the one sentence for a morning it could not recheck the
+    kilograms at all. Shared by `workout generate`'s preview, `workout adapt`'s and the
+    companion's, which is why it lives here rather than in whichever one printed it first.
+    """
+    for line in getattr(proposal, 'strength_dropped', ()):
+        notice(line)
+    if getattr(proposal, 'strength_notice', None):
+        print(wrap_text(proposal.strength_notice))
 
 
 def resolve_cleanup_range(args) -> tuple[Optional[str], Optional[str]]:

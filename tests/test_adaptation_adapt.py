@@ -5,7 +5,9 @@ from datetime import date
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from tests.helpers import clear_all_tables, rebind_test_db, save_workout
+from tests.helpers import (
+    clear_all_tables, rebind_test_db, save_workout, skip_strength_planner,
+)
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_adaptation_adapt.db")
@@ -46,6 +48,7 @@ class TestAdaptationAdapt(unittest.TestCase):
 
     def setUp(self):
         clear_all_tables(test_db)
+        skip_strength_planner(self)
         # `adapt` refuses without a plan (§6), so every case needs one. A single wide
         # mesocycle keeps it out of the way: tests that care about mesocycle edges save their
         # own plan over this one.

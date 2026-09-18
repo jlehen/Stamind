@@ -42,9 +42,11 @@ from trainmate.cli.workouts.generate import (
     print_calendar_marked, print_generate_preview, print_workout_compare,
     print_workout_table,
 )
+from trainmate.strength.prescription import exercise_lines
 from trainmate.cli.workouts.revisions import (
     print_revision_preview, rewritten_text_only, wording_group_lines, wording_groups,
 )
+from trainmate.cli.common import print_strength_notes
 
 # --- The companion line builders (DESIGN_bot_simple_frontend.md §6) ---
 # Pure functions over rows: the *how* of the companion voice, where the renderer below
@@ -1062,6 +1064,12 @@ class CompanionRenderer(ExpertRenderer):
             return False
         for line in simple_week_lines(list(proposal.workouts)):
             print(line)
+        # The kilograms are what the athlete is being asked to accept on a gym day, so they
+        # are shown here too (DESIGN_strength_tracking.md §9).
+        for w in proposal.workouts:
+            for line in exercise_lines(w.get('prescribed_sets') or []):
+                print(f"   {line}")
+        print_strength_notes(proposal)
         print()
         return True
 
@@ -1127,6 +1135,10 @@ class CompanionRenderer(ExpertRenderer):
             if index:
                 print(f"\n{SIMPLE_SESSION_RULE}")
             print(f"\n{entry}")
+        # The kilograms not being rechecked is hers to know too, in the same words
+        # (DESIGN_strength_tracking.md §9).
+        if proposal.strength_notice:
+            print(f"\n{wrap_text(proposal.strength_notice)}")
 
     # -- goals a tap can reach --
 

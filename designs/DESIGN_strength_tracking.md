@@ -1,6 +1,10 @@
 # Strength tracking: reading the sets, naming them, prescribing in kilograms
 
-**Status:** Phase 1 implemented (§11.1) · Phase 2 draft (the watch's guesses in §6–§7, and §8–§10) · **Date:** 2026-09-17 (rev. 16) · **Branch:** worktree-strength-tracking-design
+**Status:** Phase 1 implemented (§11.1) · Phase 2 implemented (§11.2) · **Date:** 2026-09-17 (rev. 17) · **Branch:** worktree-strength-tracking-phase2
+
+Revision 17 records phase 2 as built (§11.2). The design itself is unchanged; §11.2 lists
+the six places the code departed from the text or had to decide something the text left
+open.
 
 Revision 16 takes the review's small things. An exercise written at several loads prints
 every entry in the history, and the progression reads the working sets only, so a warm-up
@@ -1235,6 +1239,66 @@ than seven days and so frozen without a question.
 Not verified: whether an activity's first read the morning after already has the athlete's
 Connect corrections. The four activities since the athlete started correcting came back with
 every set named, a few of them by the watch alone, but they were read days later.
+
+### 11.2 Phase 2 as built
+
+All six pieces landed together. Seven things the text left open, or that the code had to
+settle differently, are recorded here.
+
+**Two strength sessions planned on one day cannot happen, so the history never lists two.**
+§8 says that when two strength sessions were planned on a date, each is listed with its
+title. The planned side keys a session by its date and its canonical sport, so one date
+holds at most one live strength session: there is no way to plan two. The history therefore
+reads one prescription per day. The recorded side is untouched — a gym visit the watch split
+into two activities still shows two lines, which is the case that actually happens.
+
+**The not-done lines start at the oldest day the entries show, not at the oldest of the
+eight strength days.** Take an athlete who lifted on Tuesday and skipped the Monday that was
+planned for them. Monday is not a strength day, because no activity happened on it, so the
+oldest of the strength days is Tuesday and the walk §8 describes would never reach Monday —
+the one day it exists to report. The entries reach back further than eight days on their own
+(each exercise shows its last three), so the oldest day any entry shows is the floor, and
+the two halves of the history then cover the same span. That is also how they are read: an
+entry says what was done on Monday and a not-done line says what was not.
+
+**"No, leave it" now freezes the activity.** §6 says an activity's sets are read once and
+then frozen, and §7 makes the drop of the first question freeze them as they were first
+read. Phase 1 closed the queue item and left the freeze time empty, which nothing noticed
+because a closed question is never asked again. Leaving it that way would have made
+"read, never frozen, but settled" a third state the design does not have, so the queue
+gained one thing: a kind can now say what its drop writes, and this kind's drop stamps the
+freeze.
+
+**The first question's drop label is a function of the item.** §7 gives it two wordings —
+"no, leave it — the watch's names won't count" when the watch guessed an exercise, "no,
+leave it unnamed" when it only gave up. The queue held one wording per kind, so a kind's
+drop label may now be a function of the item as well as a fixed string.
+
+**A session the proposal is removing is left alone.** §9 says which strength sessions the
+call is given, and one case falls between its two lists. A week planner that moves Thursday's
+gym to Friday for the rain returns Thursday as a rest day and Friday as a gym day. Thursday's
+session still stands in the database while the proposal is being built, and it has prescribed
+sets, so by §9's words it is a session to check — and a change to it would add a Thursday gym
+session back to a proposal whose whole point was to take it away. So a strength session on a
+date the proposal speaks for is only checked when the week planner named it or kept it; on a
+date the proposal never mentions it is checked as before.
+
+**The strength planner is retried on an unusable reply, not only on a failed call.** §9 says
+a session to write whose every entry fails the output checks counts as a failed call. So the
+parsing and the checks sit inside the retry, and a reply that names no usable exercise for a
+session that had to be written is a first failure like a timeout is.
+
+**The history's heading is a prompt section.** §8 writes it as one long parenthetical line.
+DESIGN_prompt_structure.md §2 asks for a short ALL-CAPS section name, so it is
+`## STRENGTH HISTORY` with the caveat about loads on the lines under it. The entries and the
+not-done lines are unchanged.
+
+One thing outside strength tracking had to be corrected on the way. The one-off script that
+rebuilt `workouts` as a revision log stamped the app's *current* schema version when it
+finished, which claimed the database was up to date in every respect. It produces the schema
+of the day it was written, version 11, so that is what it stamps now; the migrations added
+since then run on the next start, as they always did for every database that did not go
+through the script.
 
 ## 12. Decisions and open questions
 

@@ -133,6 +133,16 @@ def unnamed_groups(sets: Sequence[Dict[str, Any]]) -> List[Group]:
     return [group for group in groups(sets) if group.exercise is None]
 
 
+def watch_guesses(sets: Sequence[Dict[str, Any]]) -> List[str]:
+    """The exercises the watch named on its own, in the order they came, each once (§6).
+    Until the athlete says the sets are final these count for nothing (§8)."""
+    guessed: List[str] = []
+    for s in sets:
+        if s["named_by"] == WATCH and s["exercise"] not in guessed:
+            guessed.append(s["exercise"])
+    return guessed
+
+
 def fmt_kg(load_kg: float) -> str:
     """A load as the athlete writes it: '60', '62.5'."""
     return f"{round(load_kg, 2):g}"
@@ -159,12 +169,13 @@ def reps_and_load(
     return f"{counts} {unit} {'at' if companion else '@'} {fmt_kg(load_kg)} kg"
 
 
-def named_line(group: Group) -> str:
-    """'deadlift 1×5 @ 40, 4×4 @ 80 (watch)': consecutive equal sets collapsed, and a mark
-    on a name only the watch guessed (§7)."""
+def collapsed(rows: Sequence[Dict[str, Any]]) -> str:
+    """'1×5 @ 40, 4×4 @ 80': the sets as they were done, consecutive equal ones collapsed.
+    A set with no reps is a timed one and shows its seconds (§7, §8)."""
     chunks: List[List[Any]] = []
-    for s in group.sets:
-        key = (s["reps"], s["load_kg"], None if s["reps"] is not None else s["duration_sec"])
+    for s in rows:
+        key = (s["reps"], s["load_kg"],
+               None if s["reps"] is not None else s.get("duration_sec"))
         if chunks and chunks[-1][0] == key:
             chunks[-1][1] += 1
             continue
@@ -174,8 +185,14 @@ def named_line(group: Group) -> str:
         amount = str(reps) if reps is not None else f"{round(duration or 0)}s"
         weight = f" @ {fmt_kg(load_kg)}" if load_kg else ""
         parts.append(f"{count}×{amount}{weight}")
+    return ", ".join(parts)
+
+
+def named_line(group: Group) -> str:
+    """'deadlift 1×5 @ 40, 4×4 @ 80 (watch)': what was lifted, with a mark on a name only
+    the watch guessed (§7)."""
     mark = " (watch)" if any(s["named_by"] == WATCH for s in group.sets) else ""
-    return f"{group.exercise} {', '.join(parts)}{mark}"
+    return f"{group.exercise} {collapsed(group.sets)}{mark}"
 
 
 def position_list(numbers: Sequence[int]) -> str:
@@ -288,22 +305,25 @@ def report(result: SetsRead) -> None:
 
 
 def _first_read(activity: Dict[str, Any], rows: List[Dict[str, Any]], today: str) -> None:
-    """Stores a first read and freezes it, unless it has unnamed sets and is recent enough
-    for the athlete to fix them in Connect: then it asks whether the sets are final (§6)."""
+    """Stores a first read and freezes it, unless the watch guessed a name or left sets
+    unnamed and the activity is recent enough for the athlete to fix it in Connect: then it
+    asks whether the sets are final (§6)."""
     activity_id = activity["activity_id"]
     now = clock.now()
     if not any(row["set_type"] == ACTIVE for row in rows):
         runtime.db.store_exercise_sets(activity_id, [], now, now)
         return
     unnamed = unnamed_groups(rows)
+    guessed = watch_guesses(rows)
     asked_from = (date.fromisoformat(today) - timedelta(days=ASK_WITHIN_DAYS)).isoformat()
-    if not unnamed or activity["date"] < asked_from:
+    if (not unnamed and not guessed) or activity["date"] < asked_from:
         runtime.db.store_exercise_sets(activity_id, rows, now, now)
         return
     runtime.db.store_exercise_sets(activity_id, rows, now, None)
     queue(SETS_FINAL, activity_id, {
         **activity_ref(activity),
         "groups": [[group.first, group.last] for group in unnamed],
+        "guesses": guessed,
         "answers": [YES_FINAL],
     })
 
@@ -311,11 +331,15 @@ def _first_read(activity: Dict[str, Any], rows: List[Dict[str, Any]], today: str
 def read_again(activity: Dict[str, Any], client: Any) -> List[Group]:
     """Reads an activity's sets again, replacing the rows and the answers on them, freezes them
     and queues a naming question per group still unnamed; returns every group (§6, §7).
-    Garmin's errors propagate, and then nothing has changed."""
+
+    The watch's guesses still standing become the athlete's, because this runs when the
+    athlete has just said the names in Garmin are right (§6). Garmin's errors propagate,
+    and then nothing has changed."""
     payload = client.get_activity_exercise_sets(activity["activity_id"])
     rows, _ = parse_sets(payload)
     now = clock.now()
     runtime.db.store_exercise_sets(activity["activity_id"], rows, now, now)
+    runtime.db.confirm_watch_names(activity["activity_id"])
     found = groups(rows)
     ask_names(activity, queue_stamp(now), [group for group in found if group.exercise is None])
     return found
