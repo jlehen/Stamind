@@ -238,6 +238,8 @@ class CheckingTest(_PlannerCase):
                    row("chin up", 3, 3, 5), reason="Forty minutes: the two main lifts."),
         ]}]
         result = self.strength_pass([entry])
+        # The strength planner is told, or it answers "keep" to a change code would apply.
+        self.assertIn(planner.MOVED_ON, self.asked[0][1])
         self.assertEqual(result.added, [])
         self.assertIn("Chin up 3×3–5", entry["description"])
         self.assertEqual([r["exercise"] for r in entry["prescribed_sets"]],
@@ -255,6 +257,7 @@ class CheckingTest(_PlannerCase):
             answer("2026-09-17", row("belt squat", 3, 4, 6, 150.0), reason="Jump."),
         ]}]
         result = self.strength_pass([entry])
+        self.assertNotIn(planner.MOVED_ON, self.asked[0][1])
         self.assertEqual(result.added, [])
         self.assertIn("Belt squat 3×4–6 @ 140 kg", entry["description"])
         self.assertEqual([r["load_kg"] for r in entry["prescribed_sets"]], [140.0])

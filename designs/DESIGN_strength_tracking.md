@@ -1,11 +1,11 @@
 # Strength tracking: reading the sets, naming them, prescribing in kilograms
 
 **Status:** Phase 1 implemented (§11.1), with the two reading commands of §7 ·
-Phase 2 implemented (§11.2) · Revision 18 designed, not built (§11.3) ·
+Phase 2 implemented (§11.2) · Revision 18 implemented (§11.3) ·
 **Date:** 2026-09-18 (rev. 18) · **Branch:** worktree-strength-habits-design
 
 Revision 18 makes the athlete's habits decide what a strength session contains. It is
-designed and not built yet (§11.3). The first sessions phase 2 wrote did not look like the
+built (§11.3). The first sessions phase 2 wrote did not look like the
 athlete's own. The athlete's gym Monday of September 7 held twelve exercises and 42 sets in
 64 minutes, most of them alternated in pairs. The Monday written for October 5 held five
 exercises and 18 sets in 65 minutes, and one of the five was a split squat the athlete has
@@ -1562,9 +1562,9 @@ Phase 2 hands it to the coach; nothing was going to hand it to the athlete. `str
 and `strength exercises` (§7) close that, one phase early and deriving nothing, because the
 data is already there and the alternative is reading `workout compare` over a fortnight.
 
-### 11.3 Revision 18: the habits, to build
+### 11.3 Revision 18: the habits, as built
 
-Four pieces. No table changes, so there is no migration. The 24 sessions revision 17 wrote,
+Four pieces, all built together. No table changes, so there is no migration. The 24 sessions revision 17 wrote,
 October 1 to December 21, are written again by one `workout generate -g 4` run after the
 build: every brief is new, so every session is written again (§9).
 
@@ -1592,6 +1592,24 @@ build: every brief is new, so every session is written again (§9).
    to check whose brief or duration moved, which `_moved_on` already knows, prints a line
    that says so. One region more for `tests/test_prompt_gates.py`.
 4. docs/ARCHITECTURE.md: the history's second section and the two keys.
+
+Three things the text left open were settled in the code.
+
+**A split day's head line starts with the day.** §8 quotes the evening's head line as
+"20:10, 18 min, 12 sets, RPE 2". As built it reads "Tue Sep 22, 20:10, 18 min, 12 sets, RPE
+2", so each head line can be read on its own, without a day line above it.
+
+**An activity whose every set is unnamed shows its head line alone.** Its sets count toward
+the head line, and no line under it names them, since the lines show named sets only. The
+morning of September 3, whose every name is a watch guess, shows as its "Thu Sep 3" head line
+with nothing under it. It still says that the athlete lifted that day, and how much.
+
+**The section's caveat says what the mark means.** The heading of `## SESSIONS AS DONE`
+adds one sentence to the text of §8: "(not prescribed)" marks an exercise the session planned
+for that day did not hold. The prompt-gates test pins the three names the habit rule quotes
+from the history, "SESSIONS AS DONE", "NOT DONE" and "(not prescribed)", and the habit count
+read from `strength.habit_after`. A rename in `history.py` then fails a test instead of
+leaving the rule pointing at nothing.
 
 ## 12. Decisions and open questions
 

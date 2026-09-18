@@ -2,41 +2,53 @@
 written out for the strength planner and for nothing else.
 
 Built on read from `exercise_sets` and `prescribed_sets`. Nothing is stored for it and it
-holds no computed number: it lists what was prescribed beside what was done, and the
-progression in `progression.md` is what turns that into the next session's kilograms.
+holds no computed number: it lists what was prescribed beside what was done, per exercise
+and then as whole sessions. The progression in `progression.md` turns the first into the
+next session's kilograms; the second is what the next session's content is written from.
 """
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Set
 
 from trainmate import runtime, settings
+from trainmate.config import config
 from trainmate.db.strength import STRENGTH_TYPE
 from trainmate.strength import prescription, sets, vocabulary
 
-# How many strength days decide which exercises appear, and how many of its own days each
-# exercise then shows (§8, §12: both are a first guess).
-RECENT_DAYS = 8
+# How many of its own days each exercise shows (§8, §12: a first guess). How many strength
+# days decide which exercises appear is `strength.recent_days`.
 DAYS_PER_EXERCISE = 3
 
-# A prompt section of its own, so the heading is a section name and the caveat its first
-# line (DESIGN_prompt_structure.md §2).
+# Prompt sections of their own, so each heading is a section name and the caveat its first
+# line (DESIGN_prompt_structure.md §2). `{days}` is `strength.recent_days`.
 HEADING = (
     "## STRENGTH HISTORY\n"
-    "The exercises a person named in the last 8 strength days. Loads are in kg as recorded,\n"
-    "per exercise: they are not comparable across exercises, and the smaller number is often\n"
-    "the harder lift."
+    "The exercises a person named in the last {days} strength days. Loads are in kg as\n"
+    "recorded, per exercise: they are not comparable across exercises, and the smaller number\n"
+    "is often the harder lift."
 )
 NOT_DONE_HEADING = "NOT DONE"
+SESSIONS_HEADING = (
+    "## SESSIONS AS DONE\n"
+    "The same {days} strength days, each activity as a whole: its length, how many sets were\n"
+    "lifted in it, named or not, and its RPE, then its named exercises in the order they first\n"
+    "came. Exercises joined by \"+\" were alternated. \"(not prescribed)\" marks an exercise the\n"
+    "session planned for that day did not hold."
+)
+NOT_PRESCRIBED = " (not prescribed)"
 SETS_NOT_READ = sets.SETS_NOT_READ
 
 
 @dataclass
 class _Activity:
-    """One strength activity of a day: when it started, how hard it was, what was lifted."""
+    """One strength activity of a day: when it started, how long and how hard it was, the
+    sets a person named in it, and how many sets it held, named or not (§8)."""
     activity_id: str
     start: str
     rpe: Optional[float]
+    duration_sec: Optional[float]
     rows: List[Dict[str, Any]] = field(default_factory=list)
+    set_count: int = 0
 
     def of(self, exercise: str) -> List[Dict[str, Any]]:
         return [row for row in self.rows if row["exercise"] == exercise]
@@ -58,7 +70,7 @@ def _day_words(day: str) -> str:
 
 def _activities_by_day(since: str) -> Dict[str, List[_Activity]]:
     """Every strength activity from `since` on that was not discarded, by day, each with
-    the sets a person named in it."""
+    the sets a person named in it and its count of every set."""
     by_day: Dict[str, List[_Activity]] = {}
     by_id: Dict[str, _Activity] = {}
     for row in runtime.db.strength_set_rows(since):
@@ -68,9 +80,11 @@ def _activities_by_day(since: str) -> Dict[str, List[_Activity]]:
                 activity_id=row["activity_id"],
                 start=(row["start_time"] or "")[11:16],
                 rpe=row["rpe"],
+                duration_sec=row["activity_duration_sec"],
             )
             by_id[row["activity_id"]] = activity
             by_day.setdefault(row["date"], []).append(activity)
+        activity.set_count += 1
         if row["exercise"]:
             activity.rows.append(row)
     return by_day
@@ -206,6 +220,84 @@ def _days_with_unread_sets(since: str, today: str) -> set:
     }
 
 
+def _alternated(activity: _Activity) -> List[List[str]]:
+    """The activity's named exercises in the order they first came, those the athlete took
+    turns on sharing a group (§8).
+
+    An exercise runs from its first set in the activity to its last, and exercises whose
+    runs overlap were alternated. Read from the order of the sets and from nothing else.
+    """
+    runs: Dict[str, List[int]] = {}
+    for row in activity.rows:
+        runs.setdefault(row["exercise"], [row["seq"], row["seq"]])[1] = row["seq"]
+    joined: List[List[str]] = []
+    end = 0
+    for exercise, (first, last) in runs.items():
+        if joined and first < end:
+            joined[-1].append(exercise)
+            end = max(end, last)
+            continue
+        joined.append([exercise])
+        end = last
+    return joined
+
+
+def _attempt(
+    activities: Sequence[_Activity], prescribed: Optional[_Prescription]
+) -> Optional[_Activity]:
+    """The activity that gets the "(not prescribed)" marks: the one holding the most of the
+    day's prescribed exercises, the earlier on a tie. None on a day with no prescription,
+    where everything was the athlete's own choice (§8)."""
+    if prescribed is None:
+        return None
+    return max(
+        activities,
+        key=lambda activity: sum(1 for name in prescribed.by_exercise if activity.of(name)),
+    )
+
+
+def _session_head(day: str, activity: _Activity, split: bool) -> str:
+    """'Thu Sep 17, 53 min, 23 sets, RPE 7', with the start time on a day the watch split
+    into two activities (§8)."""
+    parts = [_day_words(day)]
+    if split:
+        parts.append(activity.start)
+    if activity.duration_sec:
+        parts.append(f"{round(activity.duration_sec / 60)} min")
+    parts.append(f"{activity.set_count} set{'' if activity.set_count == 1 else 's'}")
+    if activity.rpe is not None:
+        parts.append(f"RPE {activity.rpe:g}")
+    return "  " + ", ".join(parts)
+
+
+def _session_lines(
+    recent: Sequence[str], by_day: Dict[str, List[_Activity]],
+    prescriptions: Dict[str, _Prescription],
+) -> List[str]:
+    """The recent strength days as whole sessions, newest first (§8): each activity's head
+    line, then one line per group of alternated exercises."""
+    lines: List[str] = []
+    for day in recent:
+        activities = by_day[day]
+        prescribed = prescriptions.get(day)
+        attempt = _attempt(activities, prescribed)
+        for activity in activities:
+            lines.append(_session_head(day, activity, split=len(activities) > 1))
+            marked = prescribed if activity is attempt else None
+            for group in _alternated(activity):
+                lines.append("    " + " + ".join(_done(activity, name, marked) for name in group))
+    return lines
+
+
+def _done(activity: _Activity, name: str, marked: Optional[_Prescription]) -> str:
+    """'leg press 3×12 @ 70 (not prescribed)': one exercise as the activity held it, marked
+    when `marked` is the day's session and did not hold it (§8)."""
+    text = f"{name} {sets.set_chunks(activity.of(name))}"
+    if marked is None or name in marked.by_exercise:
+        return text
+    return text + NOT_PRESCRIBED
+
+
 @dataclass(frozen=True)
 class History:
     """What the strength planner is shown of the athlete's lifting, and every exercise a
@@ -230,10 +322,11 @@ def build(today: str) -> History:
     if not days:
         return History("", on_record)
     prescriptions = _prescriptions(since, today)
-    recent = days[:RECENT_DAYS]
+    recent_days = config.strength_recent_days
+    recent = days[:recent_days]
 
     # Which exercises appear: the ones a person named in the recent days, in the order they
-    # are met walking those days from the newest. The eight days decide which exercises
+    # are met walking those days from the newest. The recent days decide which exercises
     # appear, not how much of each is shown (§8).
     listed: List[str] = []
     for day in recent:
@@ -242,7 +335,7 @@ def build(today: str) -> History:
                 if row["exercise"] not in listed:
                     listed.append(row["exercise"])
 
-    lines = [HEADING]
+    lines = [HEADING.format(days=recent_days)]
     shown: List[str] = []
     for exercise in listed:
         known = vocabulary.get(exercise)
@@ -259,4 +352,8 @@ def build(today: str) -> History:
         lines.append("")
         lines.append(NOT_DONE_HEADING)
         lines.extend(not_done)
+
+    lines.append("")
+    lines.append(SESSIONS_HEADING.format(days=recent_days))
+    lines.extend(_session_lines(recent, by_day, prescriptions))
     return History("\n".join(lines), on_record)

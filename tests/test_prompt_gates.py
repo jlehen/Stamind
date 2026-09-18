@@ -19,6 +19,8 @@ TEST_DB_PATH = test_db_path("test_prompt_gates.db")
 test_db = bind_test_db(TEST_DB_PATH)
 
 from trainmate.coach.engine import CoachEngine
+from trainmate.config import config
+from trainmate.strength import history as strength_history, planner as strength_planner
 
 # Sentinels for each region a gate controls, matched against the built prompt.
 NOTE_INSTRUCTIONS = "### ATHLETE'S NOTE FOR TODAY"
@@ -165,6 +167,27 @@ class TestTheNoteTheAthleteDidNotWrite(unittest.TestCase):
         expert = build_prompt()
         as_instance(self, "simple")
         self.assertEqual(expert, build_prompt())
+
+
+class TestStrengthHabitsRegion(unittest.TestCase):
+    """The strength planner's habit rule reads what the strength history prints
+    (DESIGN_strength_tracking.md §8, §9).
+
+    Not a gate either, but the same silent failure: the rule names the history's sections and
+    its mark, and a history that renamed one would leave the rule pointing at nothing.
+    """
+
+    def test_the_rule_names_what_the_history_prints_and_counts_to_the_configured_number(self):
+        with patch.dict(config.data, {"strength": {"habit_after": 3}}):
+            system = strength_planner._system_prompt(set())
+        self.assertIn("has happened 3 times", system)
+        for printed in (
+            strength_history.SESSIONS_HEADING.splitlines()[0].lstrip("# "),
+            strength_history.NOT_DONE_HEADING,
+            strength_history.NOT_PRESCRIBED.strip(),
+        ):
+            with self.subTest(printed=printed):
+                self.assertIn(printed, system)
 
 
 class TestAthleteNoteGate(unittest.TestCase):

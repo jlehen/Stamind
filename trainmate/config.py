@@ -234,6 +234,18 @@ class Config:
         return int(raw)
 
     @property
+    def strength_recent_days(self) -> int:
+        """How many recent strength days the strength history shows and the naming answers
+        are ranked over, defaulting to 8 (DESIGN_strength_tracking.md §8)."""
+        return int(self.get("strength", {}).get("recent_days", 8))
+
+    @property
+    def strength_habit_after(self) -> int:
+        """How many times a departure from the prescription happens before the strength
+        planner treats it as a habit, defaulting to 2 (DESIGN_strength_tracking.md §9)."""
+        return int(self.get("strength", {}).get("habit_after", 2))
+
+    @property
     def replan_displaced_load_pct(self) -> float:
         """Displaced-load trigger for the §7 replan proposal: propose a replan when a
         constraint's overlapping planned load is at least this percentage of the plan's
