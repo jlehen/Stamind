@@ -123,7 +123,16 @@
 
 # Test
 - Use "unittest" module.
-- Run tests using: `venv/bin/python -m unittest discover -s tests -p "test_*.py"`
+- Run tests under a memory cap. A test stuck in a loop can fill the memory, and then the
+  kernel kills the whole terminal session, not just the test. The cap makes it kill only
+  the test. The full suite peaks near 200 MB, so 1 GB leaves plenty of room:
+
+  ```
+  systemd-run --user --scope -q -p MemoryMax=1G -p MemorySwapMax=0 \
+      venv/bin/python -m unittest discover -s tests -p "test_*.py"
+  ```
+
+  To run one file, put its name after `-p`, for example `-p "test_bot.py"`.
 - You can run the tests without asking the user.
 - A fresh worktree fails at test collection until `config.yaml`, `service_account.json`
   and `venv` are symlinked in from the main checkout. Do not symlink `trainmate.db`: the
