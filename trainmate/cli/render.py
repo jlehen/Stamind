@@ -551,10 +551,16 @@ def _is_rest(w: Optional[dict]) -> bool:
     return bool(w) and (w.get('sport_type') or '').lower() == 'rest'
 
 
-def _simple_was_clause(pw: dict, existing: Optional[dict]) -> str:
+def _simple_was_clause(pw: dict, existing: Optional[dict], today: str) -> str:
     """The parenthetical after a proposed session, saying what it replaces."""
     if not existing:
         return "new"
+    if existing['date'] != pw['date']:
+        # The same session, on a new day. Said before anything else the clause could
+        # say about it, because a session moved unchanged would otherwise read as
+        # "new" on one day and vanish from the other.
+        day = "today" if existing['date'] == today else simple_date_word(existing['date'])
+        return f"moved from {day}"
     if rewritten_text_only(pw, existing):
         return "same session, wording updated"
     if _is_rest(existing):
@@ -576,7 +582,10 @@ def simple_revision_lines(proposal: RevisionProposal) -> List[str]:
     for pair in proposal.pairs:
         pw, existing = pair.proposal, pair.original
         day = "Today" if pw['date'] == today else simple_date_word(pw['date'])
-        entry_lines = [f"{simple_session_line(pw, lead=day)} ({_simple_was_clause(pw, existing)})"]
+        entry_lines = [
+            f"{simple_session_line(pw, lead=day)} "
+            f"({_simple_was_clause(pw, existing, today)})"
+        ]
         why = (pw.get('modification_reason') or '').strip()
         if why and why != (proposal.reason or '').strip():
             entry_lines.append(why)
@@ -755,6 +764,15 @@ class ExpertRenderer:
 
     def constraint_candidate_discarded(self) -> None:
         print("Discarded — not saved as a constraint.")
+
+    def constraints_open_ended(self, titles: List[str], text: str) -> None:
+        """A rule with no time bound has no home in the constraints table; the profile is
+        where it belongs (DESIGN_bot_simple_frontend.md §12.3, 2026-09-16)."""
+        quoted = ", ".join(f"“{t}”" for t in titles)
+        notice(
+            f"Not saved: {quoted} — a rule for good, not a dated constraint. Record it "
+            "in config.yaml under user_profile.preferences, or the weekly schedule."
+        )
 
     def constraint_plan_shaping(self, constraint_id: int, impact: Dict[str, Any]) -> None:
         """What a capture says when the directive it just stored is big enough to
@@ -1001,6 +1019,17 @@ class CompanionRenderer(ExpertRenderer):
 
     def constraint_candidate_discarded(self) -> None:
         print("Okay — I won't note that one.")
+
+    def constraints_open_ended(self, titles: List[str], text: str) -> None:
+        """One forwardable message: her words are quoted so a Telegram forward carries
+        the rule to the operator without retyping (§12.3, 2026-09-16)."""
+        print(wrap_text(
+            "That sounds like a rule, not something for the next few days. Ask "
+            f"{config.telegram_operator_name} to record this in your preferences for "
+            "good. You can just forward this message:"
+        ))
+        print()
+        print(f"“{text.strip()}”")
 
     def constraint_plan_shaping(self, constraint_id: int, impact: Dict[str, Any]) -> None:
         """The same fact, without the commands: reshaping the plan around it is one tap

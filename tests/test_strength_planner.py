@@ -92,7 +92,9 @@ class _PlannerCase(unittest.TestCase):
                 description=description, duration_minutes=duration, rpe=7, tss=50,
                 prescribed_sets=list(rows) or None,
             )
-        return test_db.get_workout(day, "strength_training")
+        saved = test_db.get_workout(day, "strength_training")
+        self.gym_lineage = saved["id"]
+        return saved
 
     def strength_pass(self, entries, **kwargs):
         live = test_db.get_workouts(start_date=TODAY, end_date=MESO_END)
@@ -150,6 +152,25 @@ class WhenItRunsTest(_PlannerCase):
         self.assertEqual(result.added, [])
         self.assertEqual(result.checked, [("2026-09-18", "strength_training")])
         self.assertIn("Belt squat 3×4–6 @ 140 kg", friday["description"])
+
+    def test_a_session_that_says_where_it_came_from_keeps_its_kilograms(self):
+        """The sets follow the lineage (§9). `workout adapt` now names the slot a moved
+        session came from, so Friday opens with Thursday's kilograms rather than being
+        written from scratch at the same numbers."""
+        self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        test_db.bump_strength_history()
+        thursday_rest = {"date": "2026-09-17", "sport_type": "rest", "title": "Rest Day",
+                         "description": "[Rest Day]\nGym moved to Friday — rain."}
+        friday = {"date": "2026-09-18", "sport_type": "strength_training", "title": "Gym",
+                  "description": "[Gym]\nHeavy full-body, moved from Thursday.",
+                  "duration_minutes": 70,
+                  "replaces_slot": ("2026-09-17", "strength_training"),
+                  "replaces_lineage": self.gym_lineage}
+        self.replies = [{"sessions": [answer("2026-09-18", keep=True)]}]
+        result = self.strength_pass([thursday_rest, friday])
+        self.assertEqual(result.checked, [("2026-09-18", "strength_training")])
+        self.assertIn("Belt squat 3×4–6 @ 140 kg", friday["description"])
+        self.assertEqual([r["load_kg"] for r in friday["prescribed_sets"]], [140.0])
 
     def test_a_session_held_on_a_mentioned_date_is_still_checked(self):
         """The other half of the same rule: the week planner changed the run and kept the

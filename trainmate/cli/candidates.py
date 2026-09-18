@@ -28,19 +28,27 @@ def _stated_value(candidate: Dict[str, Any]) -> Optional[float]:
     return value
 
 
+def open_ended(candidate: Dict[str, Any]) -> bool:
+    """A rule with no time bound — "never two workouts in a day" — which the extraction
+    marks rather than dates. It has no home in the constraints table
+    (DESIGN_bot_simple_frontend.md §12.3, 2026-09-16)."""
+    return bool(candidate.get('open_ended')) and bool((candidate.get('title') or '').strip())
+
+
 def confirm_new_constraints(
-    candidates: Sequence[Dict[str, Any]], date_str: str
+    candidates: Sequence[Dict[str, Any]], date_str: str, text: str = ""
 ) -> List[int]:
     """Asks about each directive the note produced and stores the confirmed ones
     (DESIGN_constraints.md §8 two-confirmation flow, step 1).
 
     Returns the ids created. Declining discards the extraction — on the adapt path the
     note has already informed that run's adaptation regardless, since the same LLM call
-    produced both."""
+    produced both. An open-ended rule is never stored: the athlete is told where it
+    belongs instead, quoting `text`, the note as written, so it can be passed on."""
     captured: List[int] = []
     for candidate in candidates:
         title = (candidate.get('title') or '').strip()
-        if not title:
+        if not title or open_ended(candidate):
             continue
         start, end = _span(candidate, 'start_date', date_str)
         if not runtime.prompt.confirm(
@@ -53,6 +61,9 @@ def confirm_new_constraints(
             continue
         captured.append(cid)
         runtime.render.constraint_captured(cid, title, start, end, date_str)
+    rules = [candidate['title'].strip() for candidate in candidates if open_ended(candidate)]
+    if rules:
+        runtime.render.constraints_open_ended(rules, text)
     return captured
 
 

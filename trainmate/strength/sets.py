@@ -169,11 +169,11 @@ def reps_and_load(
     return f"{counts} {unit} {'at' if companion else '@'} {fmt_kg(load_kg)} kg"
 
 
-def collapsed(rows: Sequence[Dict[str, Any]]) -> str:
+def set_chunks(sets: Sequence[Dict[str, Any]]) -> str:
     """'1×5 @ 40, 4×4 @ 80': the sets as they were done, consecutive equal ones collapsed.
     A set with no reps is a timed one and shows its seconds (§7, §8)."""
     chunks: List[List[Any]] = []
-    for s in rows:
+    for s in sets:
         key = (s["reps"], s["load_kg"],
                None if s["reps"] is not None else s.get("duration_sec"))
         if chunks and chunks[-1][0] == key:
@@ -188,11 +188,15 @@ def collapsed(rows: Sequence[Dict[str, Any]]) -> str:
     return ", ".join(parts)
 
 
+def watch_mark(sets: Sequence[Dict[str, Any]]) -> str:
+    """The mark on a name only the watch guessed (§7)."""
+    return " (watch)" if any(s["named_by"] == WATCH for s in sets) else ""
+
+
 def named_line(group: Group) -> str:
     """'deadlift 1×5 @ 40, 4×4 @ 80 (watch)': what was lifted, with a mark on a name only
     the watch guessed (§7)."""
-    mark = " (watch)" if any(s["named_by"] == WATCH for s in group.sets) else ""
-    return f"{group.exercise} {collapsed(group.sets)}{mark}"
+    return f"{group.exercise} {set_chunks(group.sets)}{watch_mark(group.sets)}"
 
 
 def position_list(numbers: Sequence[int]) -> str:
@@ -261,6 +265,26 @@ def recent_exercises() -> List[str]:
         last_seen.setdefault(row["exercise"], len(days))
     ranked = sorted(done_on, key=lambda name: (-len(done_on[name]), last_seen[name], name))
     return ranked[:MAX_ANSWERS]
+
+
+class Logged(NamedTuple):
+    """One lift on one day: the day, and that day's sets in words."""
+    date: str
+    sets: str
+
+
+def logbook() -> Dict[str, List[Logged]]:
+    """Every lift on record, with the days it was done oldest first (§7). A day with two
+    lifting activities is one session (§3); discarded sessions and unnamed sets are not on
+    record."""
+    by_day: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+    for row in runtime.db.exercise_history():
+        by_day.setdefault(row["exercise"], {}).setdefault(row["date"], []).append(row)
+    return {
+        exercise: [Logged(day, set_chunks(rows) + watch_mark(rows))
+                   for day, rows in days.items()]
+        for exercise, days in by_day.items()
+    }
 
 
 def read_new_activities(client: Any = None) -> SetsRead:

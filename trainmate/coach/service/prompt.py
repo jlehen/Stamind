@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Tuple, Dict
 from trainmate import learning_doubts, runtime
 from trainmate.config import (
     athlete_science_documents, changed_plan_profile_fields, changed_science_documents,
-    config, plan_profile,
+    config, plan_profile, plan_shaping,
 )
 from trainmate.types import Objective, Constraint
 from trainmate.util import cmd, notice
@@ -100,6 +100,7 @@ def profile_diff_text(old_profile: Dict[str, Any]) -> str:
     live config, so the athlete and the coach see the same edit the flag names
     (DESIGN_plan_staleness.md §10). Empty when nothing differs."""
     current = plan_profile()
+    old_profile = plan_shaping(old_profile)
     chunks = []
     for field in changed_plan_profile_fields(old_profile):
         lines = difflib.unified_diff(

@@ -141,10 +141,10 @@ def _day_lines(
     lifted = [(a, rows) for a, rows in lifted if rows]
     if len(lifted) == 1:
         activity, rows = lifted[0]
-        return [f"    {head}: {sets.collapsed(rows)}{_rpe(activity)}"]
+        return [f"    {head}: {sets.set_chunks(rows)}{_rpe(activity)}"]
     lines = [f"    {head}:"]
     for activity, rows in lifted:
-        lines.append(f"      {activity.start}: {sets.collapsed(rows)}{_rpe(activity)}")
+        lines.append(f"      {activity.start}: {sets.set_chunks(rows)}{_rpe(activity)}")
     return lines
 
 

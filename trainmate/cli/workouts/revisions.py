@@ -13,6 +13,7 @@ from trainmate.util import (
 )
 from trainmate.cli.common import print_strength_notes
 from trainmate.coach.proposals import RevisionProposal
+from trainmate.coach.revisions import RevisionPair
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
@@ -84,6 +85,21 @@ def wording_group_lines(group: WordingGroup, indent: str = "") -> List[str]:
     return lines
 
 
+def _original_label(pair: RevisionPair) -> str:
+    """The Original column: the session this proposal stands in for, and the day it stood
+    on when that is not the day it lands on.
+
+    The Date column shows only where a moved session ends up, so without the source date
+    the row reads as a session appearing from nowhere (DESIGN_workout_revisions.md §11).
+    """
+    existing = pair.original
+    if not existing:
+        return "[None]"
+    if existing['date'] == pair.proposal['date']:
+        return existing['title']
+    return f"{existing['title']} (from {existing['date']})"
+
+
 def _print_wording_changes(proposal: RevisionProposal) -> None:
     """Shows what a revision changed when the table's columns cannot.
 
@@ -119,7 +135,7 @@ def print_revision_preview(proposal: RevisionProposal, heading: str) -> None:
 
     for pair in proposal.pairs:
         pw, existing = pair.proposal, pair.original
-        orig_title = existing['title'] if existing else "[None]"
+        orig_title = _original_label(pair)
         stats_diff = (
             f"{_stats(existing)} -> {_stats(pw)}" if existing else _stats(pw)
         )

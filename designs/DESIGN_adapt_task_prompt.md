@@ -83,8 +83,8 @@ they stay written where they are read, at the call site.
 preference, it keeps it in full. That was true of `PROTECTING A BENCHMARK` spelling out that
 moving a test means emitting it on its new date plus a replacement on the old one, because
 rule 1 tells the model to prefer moving and says nothing about how to encode one — and the
-mechanic has since been promoted out of that section into `RE-FILLING A DATE YOU VACATE`, a
-named `###` of its own in both revision TASKs. Two reasons. A `###` scheme leaves no room for
+mechanic has since been promoted out of that section into `MOVING A SESSION TO ANOTHER DAY`,
+a named `###` of its own in the adapt TASK. Two reasons. A `###` scheme leaves no room for
 the rule to live as a clause tucked inside the benchmark text, which is where the encoding
 was stated *only* for tests, leaving an ordinary moved session to the model's inference by
 analogy. And a rule that fires whenever the model moves anything at all should not be
@@ -139,6 +139,14 @@ the reasoning goes in the design doc, and neither is duplicated across files.
   `moved_from` field with the delete-and-reinsert done in code, retiring most of
   `PROTECTING A BENCHMARK`. That is a behaviour change with a proposal-path and apply-path
   cost; this rewrite is text-only and deliberately load-neutral.
+
+  **Since done, under the name `replaces`** — the field `workout generate` already had
+  (DESIGN_plan_change_continuity.md §4.5), rather than a second one meaning the same
+  thing. A move is now one entry naming the slot it came from, the app voids that slot
+  and writes the rest day the day it left needs, and the session's history travels with
+  it (DESIGN_workout_revisions.md §11). `PROTECTING A BENCHMARK` keeps everything that is
+  about a *test* — why it may not be softened, why a postponed one loses its flag — and
+  hands the encoding of the move itself to `MOVING A SESSION TO ANOTHER DAY`.
 - **Trimming the response schema.** It is a contract with the parser. Shortening it trades
   tokens for malformed responses.
 - **Touching the user-content preamble.** The "Planned Workouts" framing is verbose, but it
@@ -155,3 +163,11 @@ the escalation "belongs to the next `workout generate`". A rewrite that dissolve
 those into a standing rule would pass a reading and fail the suite, which is the point: the
 escalation in particular must stay inside the gated drift section, not float up into an
 always-on rule, or the test would no longer be proving it is gated.
+
+`MOVING A SESSION TO ANOTHER DAY` and the `replaces` schema member are pinned together,
+always-on, in `tests/test_prompt_gates.py`. They are not a gated pair — a move is possible
+on every pass — but either one alone is the same half-application: the section telling the
+model to name the day a session came from with no field to name it in, or the field with
+nothing saying what it is for. The same test pins that adapt's copy of the field points at
+`PLANNED WORKOUTS`, the list adapt is actually sent, and not at generate's
+`SESSIONS ALREADY STANDING`, which adapt never sees.

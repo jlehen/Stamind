@@ -21,6 +21,58 @@ class RevisionPair:
     is_swap: bool
 
 
+def replaces_source(entry: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+    """The `(date, canonical sport)` an entry's `replaces` names, or None.
+
+    `replaces` is how the week planner says a session it wrote in one slot is the session
+    that was standing in another — moved to a different day, or given a different sport
+    (DESIGN_plan_change_continuity.md §4.5). Both `workout generate` and `workout adapt`
+    read it, so the reading lives here rather than in whichever resolver got it first.
+
+    None when the field is absent, or when it names the entry's own slot: that is an
+    ordinary in-place revision writing itself down twice.
+    """
+    replaces = entry.get('replaces')
+    if not isinstance(replaces, dict) or not replaces.get('date'):
+        return None
+    named = (replaces['date'], canonical_sport(replaces.get('sport_type', '')))
+    slot = (entry.get('date'), canonical_sport(entry.get('sport_type', '')))
+    return None if named == slot else named
+
+
+def carried_lineage(occupant: Dict[str, Any]) -> Optional[int]:
+    """The lineage the session replacing `occupant` joins, or None to start a fresh one.
+
+    A session the athlete added by hand keeps its own lineage: inheriting it would make
+    the coach's replacement render "[Manual]" (DESIGN_plan_change_continuity.md §5.3).
+    """
+    return None if occupant.get('source') == 'manual' else occupant['id']
+
+
+def rest_in_place_of(
+    source: Dict[str, Any], reason: str, fallback: str
+) -> Dict[str, Any]:
+    """The rest day that takes over a date whose session is gone.
+
+    One builder for the two answers that empty a date: `workout generate` dropping a
+    session (DESIGN_plan_change_continuity.md §5.4) and `workout adapt` carrying one to
+    another day (DESIGN_workout_revisions.md §11). `reason` is the coach's own sentence
+    about the change, which the athlete reads on the day; `fallback` is what the day says
+    when the coach wrote no sentence.
+    """
+    body = reason.strip() or fallback
+    return {
+        'date': source['date'],
+        'sport_type': 'rest',
+        'title': 'Rest Day',
+        'description': f"[Rest Day]\n{body}",
+        'duration_minutes': 0,
+        'rpe': 0,
+        'tss': 0,
+        'change_reason': reason.strip(),
+    }
+
+
 def structure_revision(
     revised: List[Dict[str, Any]], reason: str
 ) -> List[Dict[str, Any]]:
@@ -48,6 +100,12 @@ def structure_revision(
             # drops it clears the stored flag at apply time
             # (DESIGN_benchmark_workouts.md §3.1/§4.2).
             'benchmark_type': w.get('benchmark_type'),
+            # The slot this session was standing in before the change, and the lineage it
+            # carries out of it — already resolved against the sessions in the window, so
+            # the preview and apply read the same decision (DESIGN_workout_revisions.md
+            # §11). None on a session that is not going anywhere.
+            'replaces_slot': w.get('replaces_slot'),
+            'replaces_lineage': w.get('replaces_lineage'),
         } for w in revised
     ]
 
@@ -125,6 +183,12 @@ def pair_revisions(
     existing session whose canonical sport is not among that date's proposals is the one
     being overridden, and is paired with that date's new-sport proposal.
 
+    A session the week planner MOVED says so itself, in `replaces_slot`, and is paired
+    with the session standing in the slot it names — which may be another date. That
+    session is then not overridden by whatever else lands on its own date: it left, and
+    saying otherwise would print the move as a cancellation and an arrival
+    (DESIGN_workout_revisions.md §11).
+
     `held` names sessions the week planner kept as planned. They produce no pair — there is
     nothing to show — but they count as proposed, so a date's other change cannot
     displace them (§9.1).
@@ -145,6 +209,17 @@ def pair_revisions(
     swap_original: Dict[int, Dict[str, Any]] = {}
     removals: List[Dict[str, Any]] = []
 
+    by_slot = {(w["date"], canonical_sport(w["sport_type"])): w for w in existing}
+    moved_from: Dict[int, Dict[str, Any]] = {}
+    departed: set = set()
+    for proposal in proposals:
+        named = proposal.get("replaces_slot")
+        slot = (named[0], canonical_sport(named[1])) if named else None
+        if slot is None or slot not in by_slot:
+            continue
+        moved_from[id(proposal)] = by_slot[slot]
+        departed.add(slot)
+
     for date, date_proposals in proposed_by_date.items():
         on_date = existing_by_date.get(date, [])
         proposed_sports = {canonical_sport(p["sport_type"]) for p in date_proposals}
@@ -152,11 +227,14 @@ def pair_revisions(
         existing_sports = {canonical_sport(e["sport_type"]) for e in on_date}
 
         overridden = [
-            e for e in on_date if canonical_sport(e["sport_type"]) not in proposed_sports
+            e for e in on_date
+            if canonical_sport(e["sport_type"]) not in proposed_sports
+            and (e["date"], canonical_sport(e["sport_type"])) not in departed
         ]
         new_sport_proposals = [
             p for p in date_proposals
             if canonical_sport(p["sport_type"]) not in existing_sports
+            and id(p) not in moved_from
         ]
         # The common case is one overridden session and one new-sport proposal — a clean
         # swap — so pair positionally and treat the surplus as deletions.
@@ -173,12 +251,18 @@ def pair_revisions(
             ),
             None,
         )
-        displaced = swap_original.get(id(proposal))
+        displaced = moved_from.get(id(proposal)) or swap_original.get(id(proposal))
         pairs.append(
             RevisionPair(
                 proposal=proposal,
                 original=same_sport or displaced,
-                is_swap=same_sport is None and displaced is not None,
+                # A move to another day keeps its sport, so the sport label must not
+                # claim a swap the athlete would not recognize.
+                is_swap=(
+                    same_sport is None and displaced is not None
+                    and canonical_sport(displaced["sport_type"])
+                    != canonical_sport(proposal["sport_type"])
+                ),
             )
         )
     return tuple(pairs), tuple(removals)

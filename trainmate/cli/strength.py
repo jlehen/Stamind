@@ -2,18 +2,23 @@
 
 `strength name` names a day's groups on the spot, `strength reset` reads a day's sets again
 from Garmin, and `strength discard` keeps a day's activity out of the strength history. On a
-day with two strength activities, reset and discard ask which one.
+day with two strength activities, reset and discard ask which one. `strength log` reads the
+record back, and `strength exercises` the vocabulary behind it.
 """
 import argparse
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from trainmate import clock, runtime, settings
 from trainmate.cli.selectors import parse_single_date
 from trainmate.db.strength import ACTIVE
 from trainmate.prompt import Choice
 from trainmate.queue_kind import NotApplied
-from trainmate.strength import questions, sets
-from trainmate.util import bold, cmd, fail, fmt_date, notice, red, wrap_text
+from trainmate.strength import questions, sets, vocabulary
+from trainmate.util import bold, cmd, fail, fmt_date, gray, notice, red, wrap_text
+
+# The heading for a lift whose Garmin name the vocabulary lacks: stored verbatim, with
+# no pattern (§4).
+NO_PATTERN = "no pattern"
 
 KEEP = "keep"
 CLEAR = "clear"
@@ -223,15 +228,151 @@ def run_strength_discard(args: argparse.Namespace) -> None:
     ))
 
 
+def _plural(count: int, word: str) -> str:
+    return f"{count} {word}{'' if count == 1 else 's'}"
+
+
+def _pattern_of(name: str) -> str:
+    """A lift's movement pattern, or the heading for one the vocabulary lacks (§4)."""
+    known = vocabulary.get(name)
+    return known.pattern if known else NO_PATTERN
+
+
+def _matches(text: str, names: Sequence[str]) -> List[str]:
+    """The lifts `text` names: the exact name if there is one, else everything it is part
+    of, case ignored."""
+    wanted = text.strip().lower()
+    exact = [name for name in names if name.lower() == wanted]
+    return exact or sorted(name for name in names if wanted in name.lower())
+
+
+def _sessions_block(name: str, days: List[sets.Logged]) -> None:
+    """One lift's record: its name, where it sits in the vocabulary, and a line per day."""
+    known = vocabulary.get(name)
+    where = f" — {known.pattern}, {known.equipment}" if known else ""
+    print()
+    print(bold(f"{name.upper()}{where}"))
+    for day, lifted in days:
+        print(f"  {fmt_date(day)}   {lifted}")
+
+
+def _log_index(logbook: Dict[str, List[sets.Logged]]) -> None:
+    """Every lift on record under its movement pattern."""
+    days = {day for entries in logbook.values() for day, _ in entries}
+    print(bold(f"YOUR LIFTS — {_plural(len(logbook), 'exercise')} over "
+               f"{_plural(len(days), 'session')}"))
+    width = max(len(name) for name in logbook)
+    for pattern in vocabulary.PATTERNS + (NO_PATTERN,):
+        named = sorted(name for name in logbook if _pattern_of(name) == pattern)
+        if not named:
+            continue
+        print()
+        print(pattern)
+        for name in named:
+            entries = logbook[name]
+            known = vocabulary.get(name)
+            equipment = known.equipment if known else ""
+            print(f"  {name:<{width}}  {equipment:<10} "
+                  + gray(f"{_plural(len(entries), 'session')}, last "
+                         f"{fmt_date(entries[-1].date)}"))
+    print()
+    notice("A lift's own sets: " + cmd("strength log EXERCISE") + ", a whole pattern: "
+           + cmd("strength log --pattern squat") + ".")
+
+
+def run_strength_log(args: argparse.Namespace) -> None:
+    """The athlete's own logbook: what was lifted, and when (§7). With no exercise and no
+    pattern it is the index of the lifts on record."""
+    logbook = sets.logbook()
+    if not logbook:
+        since = settings.strength_sets_since()
+        if not since:
+            notice("Strength sets are not read. Set the first day to read them from with "
+                   + cmd("settings set strength-sets-since YYYY-MM-DD") + ".", red)
+            return
+        notice(f"No named sets on record since {since}. They are read the morning after a "
+               "session, and " + cmd("strength name DATE") + " names what the watch could "
+               "not.")
+        return
+    wanted = list(logbook)
+    if args.pattern:
+        wanted = [name for name in wanted if _pattern_of(name) == args.pattern]
+        if not wanted:
+            notice(f"No {args.pattern} lift on record yet.")
+            return
+    if args.exercise:
+        wanted = _matches(args.exercise, wanted)
+        if not wanted:
+            where = f" {args.pattern}" if args.pattern else ""
+            notice(f"No{where} lift on record is called '{args.exercise}'. "
+                   + cmd("strength log") + " lists yours, " + cmd("strength exercises")
+                   + " every name TrainMate knows.")
+            return
+    elif not args.pattern:
+        _log_index(logbook)
+        return
+    for name in sorted(wanted, key=lambda n: (_pattern_of(n), n)):
+        _sessions_block(name, logbook[name])
+
+
+def _pattern_index(mine: Dict[str, int]) -> None:
+    """The nine movement patterns, what the vocabulary holds for each, and what the athlete
+    has done in it (§4)."""
+    catalog = vocabulary.all_exercises()
+    print(bold(f"MOVEMENT PATTERNS — {_plural(len(catalog), 'exercise')} TrainMate can name"))
+    print()
+    for pattern in vocabulary.PATTERNS:
+        known = [e for e in catalog if e.pattern == pattern]
+        yours = mine.get(pattern, 0)
+        mine_here = gray(f"{yours} on your record") if yours else ""
+        print(f"  {pattern:<16} {_plural(len(known), 'exercise'):<16} {mine_here}".rstrip())
+    print()
+    notice("One pattern's exercises: " + cmd("strength exercises --pattern squat")
+           + ", by name: " + cmd("strength exercises row") + ".")
+
+
+def run_strength_exercises(args: argparse.Namespace) -> None:
+    """The shipped vocabulary: which movement patterns exist and which exercises are in them
+    (§4). It ships with the code and nobody configures it."""
+    mine = set(sets.logbook())
+    if not args.pattern and not args.search:
+        done: Dict[str, int] = {}
+        for name in mine:
+            done[_pattern_of(name)] = done.get(_pattern_of(name), 0) + 1
+        _pattern_index(done)
+        return
+    listed = vocabulary.all_exercises()
+    if args.pattern:
+        listed = [e for e in listed if e.pattern == args.pattern]
+    if args.search:
+        wanted = args.search.strip().lower()
+        listed = [e for e in listed if wanted in e.name.lower()]
+    if not listed:
+        notice(f"No {args.pattern or ''} exercise TrainMate knows is called "
+               f"'{args.search}'.".replace("  ", " "))
+        return
+    title = args.pattern.upper() if args.pattern else f"'{args.search}'"
+    print(bold(f"{title} — {_plural(len(listed), 'exercise')}"))
+    width = max(len(e.name) for e in listed)
+    for exercise in sorted(listed, key=lambda e: e.name):
+        mark = "•" if exercise.name in mine else " "
+        pattern = "" if args.pattern else f"  {exercise.pattern}"
+        print(f"  {mark} {exercise.name:<{width}}  {exercise.equipment:<10}{pattern}".rstrip())
+    if mine & {e.name for e in listed}:
+        print()
+        print(gray("• on your record."))
+
+
 def add_strength_parser(subparsers):
     # strength command & subparsers — the sets of strength activities
     # (DESIGN_strength_tracking.md §7).
     strength_parser = subparsers.add_parser(
         "strength",
-        help="Name, read again or discard the sets of a strength activity",
+        help="Read back what you lifted, or fix an activity's sets by hand",
         description=(
             "TrainMate reads your sets from Garmin the morning after you lift. Anything it "
-            "can't name, it asks you about through the queue. These commands fix a day by "
+            "can't name, it asks you about through the queue. `log` and `exercises` read "
+            "your record and the vocabulary behind it back; the other three fix a day by "
             "hand."
         ),
     )
@@ -279,4 +420,44 @@ def add_strength_parser(subparsers):
     s_discard.add_argument("--undo", action="store_true",
                            help="Bring the activity back into the strength history")
     s_discard.set_defaults(func=run_strength_discard)
+    s_log = strength_subparsers.add_parser(
+        "log",
+        help="What you have lifted: one exercise's sessions, or the index of them all",
+        description=(
+            "Your own logbook, read back from the sets Garmin recorded. With no exercise, "
+            "the lifts you have on record grouped by movement pattern. With one, every "
+            "session it was done in, oldest first. Discarded sessions are left out, and a "
+            "day with two lifting activities is one session."
+        ),
+    )
+    s_log.add_argument(
+        "exercise", metavar="EXERCISE", nargs="?",
+        help="An exercise on your record: its full name, or a part of one",
+    )
+    s_log.add_argument(
+        "-p", "--pattern", choices=vocabulary.PATTERNS,
+        help="Every lift of one movement pattern, each with its own sessions",
+    )
+    s_log.set_defaults(func=run_strength_log)
+
+    s_exercises = strength_subparsers.add_parser(
+        "exercises",
+        help="The exercises TrainMate can name, and the movement patterns they sit in",
+        description=(
+            "The shipped vocabulary: every exercise TrainMate can name, each in one "
+            "movement pattern and one equipment class. It ships with the code and nobody "
+            "configures it. With no argument, the patterns and how many exercises each "
+            "holds."
+        ),
+    )
+    s_exercises.add_argument(
+        "search", metavar="TEXT", nargs="?",
+        help="Only exercises whose name contains this",
+    )
+    s_exercises.add_argument(
+        "-p", "--pattern", choices=vocabulary.PATTERNS,
+        help="Only exercises of this movement pattern",
+    )
+    s_exercises.set_defaults(func=run_strength_exercises)
+
     return strength_parser

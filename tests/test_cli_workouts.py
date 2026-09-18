@@ -71,6 +71,26 @@ class TestCliWorkouts(unittest.TestCase):
 
     @patch("trainmate.runtime.garmin")
     @patch("trainmate.runtime.coach_service")
+    def test_adapt_message_open_ended_rule_is_named_not_stored(self, mock_coach, _garmin):
+        """A note with no time bound is not a dated constraint: the terminal says where it
+        belongs and asks nothing (DESIGN_bot_simple_frontend.md §12.3, 2026-09-16)."""
+        mock_coach.workout_adapt.return_value = RevisionProposal(
+            reason="Metrics are green", workouts=[],
+            new_constraints=[{"title": "never two workouts in a day",
+                              "start_date": None, "end_date": None, "open_ended": True}],
+            range_start="2026-06-03", range_end="2026-06-30", pairs=(),
+        )
+        exit_code, stdout, _ = self.run_cli(
+            ["workout", "adapt", "--auto", "-m", "I have no time for two workouts a day"]
+        )
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Not saved", stdout)
+        self.assertIn("never two workouts in a day", stdout)
+        self.assertIn("user_profile.preferences", stdout)
+        mock_coach.capture_message_constraint.assert_not_called()
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
     def test_workout_commands(self, mock_coach, mock_garmin):
         adapted = {
             "date": "2026-06-03",
@@ -269,6 +289,58 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertNotIn("Duration/RPE/TSS", stdout)
         self.assertNotIn("TEXT REVISED", stdout)
         self.assertIn("Okay — nothing changed.", stdout)
+
+    @staticmethod
+    def _moved_gym_proposal():
+        """Thursday's gym, carried to Friday — the proposal both previews below draw."""
+        thursday = {
+            "date": "2026-06-11", "sport_type": "strength_training",
+            "title": "Gym: Lower", "description": "[Gym: Lower]\n5x5 back squat.",
+            "duration_minutes": 65, "rpe": 7, "tss": 55,
+        }
+        friday = dict(
+            thursday, date="2026-06-12",
+            modification_reason="Gym moved to Friday — you are away Thursday evening.",
+            replaces_slot=("2026-06-11", "strength_training"),
+        )
+        return RevisionProposal(
+            reason="Away Thursday evening.", workouts=[friday], new_constraints=[],
+            range_start="2026-06-11", range_end="2026-06-30",
+            pairs=(RevisionPair(proposal=friday, original=thursday, is_swap=False),),
+        )
+
+    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.runtime.coach_service")
+    def test_the_table_says_which_day_a_moved_session_came_from(
+        self, mock_coach, _mock_ensure
+    ):
+        """The Date column shows only where the session lands, so without the day it
+        came from the row reads as a session appearing from nowhere on Friday
+        (DESIGN_workout_revisions.md §11)."""
+        mock_coach.workout_adapt.return_value = self._moved_gym_proposal()
+
+        exit_code, stdout, _stderr = self.run_cli(["workout", "adapt"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Gym: Lower (from 2026-06-11)", stdout)
+        # Same sport on both days, so the sport column must not claim a swap.
+        self.assertNotIn("->STRENGTH_TRAINING", stdout)
+
+    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.runtime.coach_service")
+    def test_the_companion_says_a_session_moved_rather_than_appeared(
+        self, mock_coach, _mock_ensure
+    ):
+        """Unchanged but for its day, the session would otherwise be announced as "new" —
+        which is what the athlete reads when a move is told as two unrelated changes."""
+        mock_coach.workout_adapt.return_value = self._moved_gym_proposal()
+
+        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+            exit_code, stdout, _stderr = self.run_cli(["workout", "adapt"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("(moved from Thu Jun 11)", stdout)
+        self.assertNotIn("(new)", stdout)
 
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")

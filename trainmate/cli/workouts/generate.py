@@ -124,7 +124,9 @@ def run_workout_adapt(args: argparse.Namespace) -> None:
         # informs the NEXT run, not this one — the call that proposed it has returned.
         # Both loops live in cli/candidates.py: `bot capture note` asks the same questions
         # about the same candidates (DESIGN_bot_simple_frontend.md §12.10).
-        confirm_new_constraints(proposal.new_constraints, date_str)
+        confirm_new_constraints(
+            proposal.new_constraints, date_str, getattr(args, 'message', None) or ""
+        )
         confirm_new_signals(proposal.new_signals, date_str)
 
         runtime.render.adapt_reason(reason)

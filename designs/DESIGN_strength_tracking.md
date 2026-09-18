@@ -1,6 +1,8 @@
 # Strength tracking: reading the sets, naming them, prescribing in kilograms
 
-**Status:** Phase 1 implemented (§11.1) · Phase 2 implemented (§11.2) · **Date:** 2026-09-17 (rev. 17) · **Branch:** worktree-strength-tracking-phase2
+**Status:** Phase 1 implemented (§11.1), with the two reading commands of §7 ·
+Phase 2 implemented (§11.2) · **Date:** 2026-09-18 (rev. 17) ·
+**Branch:** worktree-strength-tracking-phase2
 
 Revision 17 records phase 2 as built (§11.2). The design itself is unchanged; §11.2 lists
 the six places the code departed from the text or had to decide something the text left
@@ -31,8 +33,8 @@ written under (§9). The `strength_checks` rows are written when a proposal is a
 recorded as no change, never when it is proposed, and hold the stamp the history was built
 from (§9). The stamp moves only when a read stored sets, and when the pull's reconcile
 deletes a strength activity (§5, §9). And the sets follow the lineage: a session that
-arrives with its lineage keeps them, which a `workout swap` and a `replace` in `workout
-generate` do, and a move across dates in `workout adapt` does not do yet (§9).
+arrives with its lineage keeps them, which a `workout swap`, a `replace` in `workout
+generate` and — since rev. 17 — a move in `workout adapt` all do (§9).
 
 Revision 13 takes the first fixes from a review of revision 12. `prescribed_sets` and
 `strength_checks` are schema 16, since main reached 15 in the meantime. A session the athlete
@@ -626,6 +628,23 @@ remembers: Garmin's activity number is eleven digits that no TrainMate screen sh
 `strength name` does not ask: it goes through every activity of the day, each under its
 start time, and "keep it as it is" leaves a group alone.
 
+**Two commands read the record back.** `strength log` is the athlete's own logbook — the
+one §1 says she keeps by hand. With no argument it is the index: every lift on record under
+its movement pattern, with how many days it appears on and when it was last done. With
+an exercise it is that lift's history, one line per day, oldest first, the sets in the
+same words the activity line uses. A part of a name matches every lift it is part of, so
+`strength log squat` is the belt squat and the goblet squat, each under its own heading, and
+`--pattern squat` is the whole family. **The view groups, and never merges.** §4 keeps the
+pattern for *did you do it* and the exercise for *how strong are you*; one squat series
+mixing 16 kg goblets with 140 kg belt squats would answer neither question. Days are counted
+as §3 counts them, a discarded activity and an unnamed set are off the record, and nothing is
+derived: no number per exercise is computed here or anywhere, because phase 2 stores none —
+a training max belongs to the progress view §12 leaves for later. `strength exercises` is
+§4's vocabulary read out loud — the nine patterns and how many exercises each holds, then the
+exercises themselves under `--pattern` or a search term, with the athlete's own marked. It is
+how she finds the name to type, and it is what stops a shipped table of 1,493 exercises from
+being a file nobody can see.
+
 ## 8. The strength history
 
 The strength planner cannot write kilograms without last time's kilograms. The **strength
@@ -918,13 +937,12 @@ wording alone never touches the kilograms.
 
 **The sets follow the lineage.** A session that arrives on a date with its lineage
 (DESIGN_workout_revisions.md §4) is the same session, so it is a session to check and keeps
-its sets and its `strength_checks` row. A `workout swap` does that, and so does a `replace`
-in `workout generate`, which names the date a session came from. `workout adapt` cannot say
-that yet: a week planner that moves Thursday's gym to Friday for the rain returns a rest day
-on Thursday and a gym session on Friday, two unrelated changes to TrainMate, so Friday starts
-a lineage and is written anew, at the next one's numbers like every session (§10).
-DESIGN_plan_change_continuity.md already notes that adapt may adopt `replaces`; the day it
-does, Friday keeps Thursday's sets with nothing to change here.
+its sets and its `strength_checks` row. All three ways of moving a session do that: a
+`workout swap`, a `replace` in `workout generate`, and — since main taught it to name where
+a session came from — a move in `workout adapt`. A week planner that carries Thursday's gym
+to Friday for the rain returns one entry on Friday saying it replaces Thursday, and Friday
+opens with Thursday's kilograms rather than being written from scratch. The day it left is
+not checked at all: the session standing there is the one that moved away.
 
 **A session's sets change on new evidence only.** A kept session is one the week planner
 promised would not change, and inside the committed days the athlete has planned around it
@@ -1129,10 +1147,11 @@ already ranked in every coaching prompt.
 **Phase 1 — data, no prompt changes.** The vocabulary table with the full Garmin mapping,
 `exercise_sets` and the three activity columns, the `sets_since` setting, the set-reading
 step with its one-night wait and its freeze (§6), the `sets_final` and `set_names` queue
-kinds with the model-backed "Something else…", `strength name`, `strength reset` and
-`strength discard`, and sets shown in `workout compare` / "Done lately" with their name
-source and the "sets not read yet" line — both of which rendered a strength activity as
-duration, load and RPE only (`cli/common.py::format_actual`,
+kinds with the model-backed "Something else…", `strength name`, `strength reset`,
+`strength discard`, `strength log` and `strength exercises`, and sets shown in
+`workout compare` / "Done lately" with their name source and the "sets not read yet"
+line — both of which rendered a strength activity as duration, load and RPE only
+(`cli/common.py::format_actual`,
 `cli/render.py::simple_compare_lines`). At the end of it TrainMate knows what the athlete
 lifts and the coach does not use it yet. Deliberately boring, so it can be checked against
 reality before anything depends on it.
@@ -1242,7 +1261,7 @@ every set named, a few of them by the watch alone, but they were read days later
 
 ### 11.2 Phase 2 as built
 
-All six pieces landed together. Seven things the text left open, or that the code had to
+All six pieces landed together. Eight things the text left open, or that the code had to
 settle differently, are recorded here.
 
 **Two strength sessions planned on one day cannot happen, so the history never lists two.**
@@ -1274,6 +1293,13 @@ freeze.
 leave it unnamed" when it only gave up. The queue held one wording per kind, so a kind's
 drop label may now be a function of the item as well as a fixed string.
 
+**A moved session opens with the kilograms it left with.** `workout adapt` learned to name
+the slot a moved session came from while phase 2 was being written, so the case §9 called a
+gap is closed: a session that arrives carrying another's lineage takes that session's
+prescribed sets, from the slot it left rather than from whatever stood where it landed. The
+athlete who is told the gym moved from Thursday to Friday for the rain opens Friday on
+Thursday's numbers.
+
 **A session the proposal is removing is left alone.** §9 says which strength sessions the
 call is given, and one case falls between its two lists. A week planner that moves Thursday's
 gym to Friday for the rain returns Thursday as a rest day and Friday as a gym day. Thursday's
@@ -1299,6 +1325,14 @@ finished, which claimed the database was up to date in every respect. It produce
 of the day it was written, version 11, so that is what it stamps now; the migrations added
 since then run on the next start, as they always did for every database that did not go
 through the script.
+
+**The record had no way to be read back.** Phase 1 stores every set and shows an activity's
+sets under its activity line, which answers "what did I do on Monday" and nothing else. The
+question an athlete asks *before* a session is the other one — what did I lift last time,
+and how much — and that is §1's hand-kept log, the thing this design set out to retire.
+Phase 2 hands it to the coach; nothing was going to hand it to the athlete. `strength log`
+and `strength exercises` (§7) close that, one phase early and deriving nothing, because the
+data is already there and the alternative is reading `workout compare` over a fortnight.
 
 ## 12. Decisions and open questions
 
@@ -1330,10 +1364,13 @@ Decided:
   a model proposal; "Leave it unnamed" the drop; a group whose sets are named, discarded or
   frozen again is stale. `strength name` is the only command that asks on the spot and the
   only place a group is split.
-- Three commands: `strength name <date>`, `strength reset <date>` and
-  `strength discard <date> [--undo]`. On a day with two strength activities, reset and
-  discard ask which one, "none" by default. A discarded activity's sets leave the history
-  and the naming answers; the activity still counts as training.
+- Five commands. Three do the surgery — `strength name <date>`, `strength reset <date>`
+  and `strength discard <date> [--undo]`; on a day with two strength activities, reset and
+  discard ask which one, "none" by default, and a discarded activity's sets leave the
+  history and the naming answers while the activity still counts as training. Two read the
+  record back: `strength log [EXERCISE] [--pattern P]`, which groups by movement pattern
+  and never merges two lifts into one series, and `strength exercises [TEXT] [--pattern P]`,
+  which reads out the shipped vocabulary. Neither reader derives a number.
 - Body weight is not stored; loads are shown as recorded.
 - The strength history shows every exercise a person named in the last eight strength
   days, accessories included, each with its last three days, built on read; a day with
@@ -1372,8 +1409,7 @@ Decided:
   strength planner's, with reps in reserve read as reps not done; every session of an
   exercise written at the next one's numbers; the plan decides when a week is light, the
   file how much comes off, the rows remember it, and the week after resumes from the day
-  before the light one.
-- The load is the weight moved in one rep; reps on one-sided exercises are per side; both
+  before the light one.- The load is the weight moved in one rep; reps on one-sided exercises are per side; both
   athletes on this instance log the pair.
 
 Open:

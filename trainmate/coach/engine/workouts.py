@@ -257,9 +257,13 @@ stated preference with a date or date range (e.g. "no run Thursday", "only 45 mi
 distinct directive, exactly as if the athlete had run `constraint add`. A note only about
 how they feel right now ("felt flat, ease today") is NOT a constraint — leave
 "new_constraints" empty for it (it may still be a signal, below). When unsure, leave it
-out: a durable-looking note mis-filed as a constraint is worse than a missed one. This is
-extraction only — never invent a plan-shaping escalation, and never omit "start_date"/
-"end_date" (default both to today when the note doesn't say). Extracted constraints are
+out: a durable-looking note mis-filed as a constraint is worse than a missed one. A rule
+with no time bound at all — "I never have time for two workouts in a day", "no gym on
+Fridays, ever" — is OPEN-ENDED: return it with "open_ended": true and both dates null.
+The app does not store those as constraints; it tells the athlete where such a rule
+belongs. Everything else is dated: never omit "start_date"/"end_date" for it (default
+both to today when the note is about the days at hand but names none). This is
+extraction only — never invent a plan-shaping escalation. Extracted constraints are
 always advisory; the deterministic-rest and plan-shaping escalations are deliberate human
 actions and the app, not you, decides those.
 """
@@ -316,6 +320,7 @@ NEW_CONSTRAINTS_SCHEMA = (
     '      "title": "the directive, stated short (required)",\n'
     '      "start_date": "YYYY-MM-DD (required; default today)",\n'
     '      "end_date": "YYYY-MM-DD (required; == start for a single day)",\n'
+    '      "open_ended": "true ONLY for a rule with no time bound at all (dates null)",\n'
     '      "description": "optional richer context or null/omit"\n'
     "    }\n"
     "  ]"
@@ -379,6 +384,24 @@ an accounting identity. HR sessions fill zones 1-5 and leave 6 and 7 null.
 """
 
 
+def _replaces_field(listing: str) -> str:
+    """The `replaces` member of a revision response schema: how a session says which slot
+    it came from (DESIGN_plan_change_continuity.md §4.5).
+
+    `listing` names the user-content section holding the sessions it may point at —
+    `workout generate` answers for SESSIONS ALREADY STANDING, `workout adapt` for the
+    PLANNED WORKOUTS it was shown. One builder for both, because a second copy of a field
+    slowly stops meaning the same thing in the two prompts (DESIGN_adapt_task_prompt.md §1).
+    """
+    return (
+        '      "replaces": {"date": "YYYY-MM-DD", "sport_type": "..."} (OMIT unless this\n'
+        f"        session takes the place of one listed in {listing} that\n"
+        "        stood in a DIFFERENT slot — moved to another day, or changed sport. Names\n"
+        "        the slot it came from, so that day's session follows this one instead of\n"
+        "        vanishing and reappearing),\n"
+    )
+
+
 def _standing_answer_fields(standing_workouts: Optional[List[Workout]]) -> str:
     """The `keep`, `drop`, `replaces` and `change_reason` members of the generate response
     schema (DESIGN_plan_change_continuity.md §4.5).
@@ -398,11 +421,7 @@ def _standing_answer_fields(standing_workouts: Optional[List[Workout]]) -> str:
         "        in SESSIONS ALREADY STANDING that you are removing, in which case\n"
         '        "date", "sport_type" and "change_reason" are the only other fields to\n'
         "        give. The date becomes a rest day carrying your sentence),\n"
-        '      "replaces": {"date": "YYYY-MM-DD", "sport_type": "..."} (OMIT unless this\n'
-        "        session takes the place of one listed in SESSIONS ALREADY STANDING that\n"
-        "        stood in a DIFFERENT slot — moved to another day, or changed sport. Names\n"
-        "        the slot it came from, so that day's session follows this one instead of\n"
-        "        vanishing and reappearing),\n"
+        + _replaces_field("SESSIONS ALREADY STANDING") +
         '      "change_reason": "One sentence for the athlete about this day, naming the\n'
         "        line it answers. REQUIRED on any session listed in SESSIONS ALREADY\n"
         "        STANDING that you revise, move or drop; omitted on every other session.\",\n"
@@ -465,24 +484,26 @@ These govern every section below, and none of them restates these rules:
 """
 
 
-def _vacate_task() -> str:
-    """The RE-FILLING A DATE YOU VACATE section, always-on in the adapt TASK.
+def _move_task() -> str:
+    """The MOVING A SESSION TO ANOTHER DAY section, always-on in the adapt TASK.
 
-    Apply removes a displaced session only on dates the response covers, so a move that
-    emits only its destination leaves the original standing — the session twice, on both
-    days, and invisibly, since the preview renders only what the proposal targets
-    (DESIGN_adapt_task_prompt.md §2).
+    A move used to be two entries the model had to remember to pair, and forgetting the
+    second left the session standing on both days (DESIGN_adapt_task_prompt.md §2). It is
+    now one entry naming the slot it came from, which is also what carries the session's
+    history to its new day (DESIGN_workout_revisions.md §11).
     """
     return """
-### RE-FILLING A DATE YOU VACATE
-Moving a session means emitting TWO entries: the session on its new date, and a replacement
-on the date it left. A date you vacate is never simply omitted — an omitted date keeps the
-session that is already on it, so the work ends up scheduled twice, on both days.
-The replacement is normally rest, and its "change_reason" says where the session went
-(e.g. "Long ride moved to Sunday — away Saturday."). Use an easy session instead only when
-the day should still carry work. Never leave the date empty: an empty date and a planned
-rest day mean different things to the athlete's adherence record, so a hole is never the
-right way to encode a move.
+### MOVING A SESSION TO ANOTHER DAY
+Return the session ONCE, on its new date, written out in full, with
+"replaces": {"date": ..., "sport_type": ...} naming the slot it came from, and a
+"change_reason" saying where it went and why (e.g. "Long ride moved to Sunday — away
+Saturday."). Its history follows it, so the athlete reads one change rather than a
+disappearance and an arrival, and the day it left becomes a rest day carrying that same
+sentence — you do not write one yourself.
+Return an entry for the day it left ONLY when that day should still carry work: an easy
+session in place of the one that moved. Never return the same session on both days, and
+never write it on its new date without "replaces" — the day it left would keep the session
+it already has, and the work would be scheduled twice.
 """
 
 
@@ -502,7 +523,8 @@ mis-scales every workout after it. NEVER reduce, soften or shorten a benchmark, 
 blank the flag on the session that still IS the test. If the athlete will not be fresh on
 test day (negative TSB / poor recovery), MOVE it intact — same content, same
 benchmark_type — to a later day within THIS mesocycle where they will be fresher, and lighten
-the days before it; emit the test on its new date and a replacement for its old one.
+the days before it; emit the test on its new date, naming the day it came from in
+"replaces" as MOVING A SESSION TO ANOTHER DAY says.
 If it already sits on the mesocycle's LAST day and no later in-mesocycle day exists,
 POSTPONE it: replace it with an ordinary easy session (no benchmark_type) — a compromised
 maximal test sets a wrong anchor that mis-scales every session after it, so a skipped test
@@ -511,12 +533,12 @@ The next generated mesocycle re-places the test when it is due.
 A benchmark you are NOT changing is not returned at all — like any unchanged session.
 
 benchmark_type says what a session IS, not which day it sits on — it travels with the test,
-not with the date. So any OTHER session you put on a test's date — the replacement left
-behind by a move, the easy day of a postponement, or something the athlete asked for
-instead — is NOT the test and MUST carry "benchmark_type": null. Copying the flag onto it
-files that session as a completed fitness test: a social ride is then read as an FTP
-result, and the mesocycle believes it has already tested and skips the real one. If you replace
-a test rather than move it, say so in the reason and leave the flag off.
+not with the date. So any OTHER session you put on a test's date — the easy day of a
+postponement, or something the athlete asked for instead — is NOT the test and MUST carry
+"benchmark_type": null. Copying the flag onto it files that session as a completed fitness
+test: a social ride is then read as an FTP result, and the mesocycle believes it has already
+tested and skips the real one. If you replace a test rather than move it, say so in the
+reason and leave the flag off.
 """
 
 
@@ -878,7 +900,7 @@ athlete recovers is encouraged; deepening an already-fresh cut is not.
         # How to encode a move at all — its own section rather than a clause inside the
         # benchmark text, because an ordinary move relies on it too
         # (DESIGN_adapt_task_prompt.md §2).
-        custom_task += _vacate_task()
+        custom_task += _move_task()
 
         # Why a test may never be softened, and why moving it is the model's call and not a
         # deterministic pass: DESIGN_benchmark_workouts.md §4.2.
@@ -997,7 +1019,8 @@ evidence-backed observations are authored only by the weekly history analysis
                 '      "duration_minutes": 45,\n'
                 '      "rpe": 5,\n'
                 '      "tss": 30,\n'
-                + _planned_zone_fields(zone_currencies) +
+                + _planned_zone_fields(zone_currencies)
+                + _replaces_field("PLANNED WORKOUTS") +
                 '      "benchmark_type": null (Preserve VERBATIM on the row that still IS\n'
                 "        the test — a moved/kept test must stay a test. null on EVERY\n"
                 "        other session, including one that takes over a test's date.\n"
@@ -1102,8 +1125,9 @@ usually be fine and should be left untouched; return a session in "adapted_worko
 only if you are genuinely changing it (the schema's "adapted_workouts" comment covers
 omitting unchanged sessions and why re-listing one is a spurious adaptation).
 When you DO change a session, modify it in place: preserve its date and sport_type
-unless deliberately swapping the sport. Only invent a brand-new session for a date that
-currently has none.
+unless you are deliberately moving it to another day or changing its sport, which
+MOVING A SESSION TO ANOTHER DAY says how to write. Only invent a brand-new session for a
+date that currently has none.
 Each session below includes its full description so you can reuse its specifics —
 interval structure, heart-rate zones, rest/recovery durations — when you carry a changed
 session over largely as-is. Adapt as boldly as the athlete's state warrants, but only

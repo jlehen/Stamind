@@ -369,6 +369,29 @@ def _brief_now(session: Dict[str, Any]) -> str:
     return prescription.title_line(session.get("description")) or f"[{session['title']}]"
 
 
+def _moved_from(
+    entry: Dict[str, Any], live_by_slot: Dict[Tuple[str, str], Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """The strength session an entry carries to a new slot, or None when it carries none.
+
+    A move writes the session at its destination under the lineage of the one it replaces
+    (DESIGN_workout_revisions.md §4, §11), so it is the same session and keeps its
+    kilograms. A replacement that starts a fresh lineage — the athlete's own session, which
+    the coach may not inherit — does not (DESIGN_plan_change_continuity.md §5.3).
+    """
+    named = entry.get("replaces_slot") or entry.get("replaces")
+    if not named:
+        return None
+    if isinstance(named, dict):
+        named = (named.get("date"), named.get("sport_type"))
+    if "replaces_lineage" in entry and entry.get("replaces_lineage") is None:
+        return None
+    source = live_by_slot.get((named[0], canonical_sport(named[1] or "")))
+    if source is None or canonical_sport(source["sport_type"]) != STRENGTH:
+        return None
+    return source
+
+
 def _collect(
     entries: Sequence[Dict[str, Any]], live_sessions: Sequence[Dict[str, Any]],
     span_start: str, span_end: str, held: Sequence[Tuple[str, str]] = (),
@@ -386,9 +409,12 @@ def _collect(
     A week planner moving Thursday's gym to Friday for the rain returns Thursday as rest and
     Friday as a gym day, and Thursday's session must go.
     """
+    live_by_slot = {
+        (w["date"], canonical_sport(w["sport_type"])): w for w in live_sessions
+        if not w.get("removed")
+    }
     live_by_date = {
-        w["date"]: w for w in live_sessions
-        if canonical_sport(w["sport_type"]) == STRENGTH and not w.get("removed")
+        day: w for (day, sport), w in live_by_slot.items() if sport == STRENGTH
     }
     to_write: List[_Session] = []
     to_check: List[_Session] = []
@@ -402,12 +428,14 @@ def _collect(
         if not (span_start <= day <= span_end):
             continue
         answered.add(day)
-        live = live_by_date.get(day)
         kept = bool(entry.get("keep"))
-        # A session arriving from another date starts a lineage of its own, so it is written
-        # anew at the next one's numbers rather than carrying the old day's kilograms (§9).
-        moved = bool(entry.get("replaces_slot") or entry.get("replaces"))
-        rows = list(live["prescribed_sets"]) if live and not moved else []
+        # The sets follow the lineage (§9). A session that arrives on a date carrying the
+        # lineage of the one it replaces is the same session, so its kilograms come from
+        # the slot it left, not from whatever stood where it landed. Both `workout
+        # generate` and `workout adapt` say so with `replaces`.
+        came_from = _moved_from(entry, live_by_slot)
+        live = came_from or live_by_date.get(day)
+        rows = list(live["prescribed_sets"]) if live else []
         brief = (
             _brief_now(live) if kept and live
             else prescription.collapse_brief(entry.get("description"))

@@ -663,6 +663,105 @@ class ShownTest(_StrengthCase):
         self.assertTrue(activity)
 
 
+class LogTest(_StrengthCase):
+    """`strength log` reads the record back, `strength exercises` the vocabulary behind
+    it (§7)."""
+
+    def setUp(self):
+        super().setUp()
+        os.environ.pop("TRAINMATE_FRONTEND", None)
+        self.activity("sun", day="2026-09-13", payload=garmin_sets(
+            lift("SQUAT", "BELT_SQUAT", 5, 120),
+            lift("SQUAT", "BELT_SQUAT", 5, 140),
+            lift("SQUAT", "GOBLET_SQUAT", 12, 16),
+            unnamed(10, 55),
+        ))
+        # Monday at the gym twice: a split session is one session (§3).
+        self.activity("mon-am", day="2026-09-14", start="08:00:00", payload=garmin_sets(
+            lift("SQUAT", "BELT_SQUAT", 5, 145),
+        ))
+        self.activity("mon-pm", day="2026-09-14", start="18:00:00", payload=garmin_sets(
+            guess("DEADLIFT", "BARBELL_DEADLIFT", 4, 80),
+        ))
+        self.read()
+
+    def test_a_lifts_sessions_read_oldest_first(self):
+        _, out, _ = run_cli(["strength", "log", "belt squat"])
+        self.assertIn("BELT SQUAT — squat, machine", out)
+        self.assertIn("2026-09-13 Sun   1×5 @ 120, 1×5 @ 140", out)
+        self.assertIn("2026-09-14 Mon   1×5 @ 145", out)
+        self.assertLess(out.index("2026-09-13"), out.index("2026-09-14"))
+
+    def test_a_name_only_the_watch_guessed_is_marked(self):
+        _, out, _ = run_cli(["strength", "log", "barbell deadlift"])
+        self.assertIn("2026-09-14 Mon   1×4 @ 80 (watch)", out)
+
+    def test_the_index_counts_sessions_by_day_and_skips_unnamed_sets(self):
+        _, out, _ = run_cli(["strength", "log"])
+        self.assertIn("YOUR LIFTS — 3 exercises over 2 sessions", out)
+        self.assertIn("belt squat", out)
+        self.assertNotIn("unnamed", out)
+        # Grouped by movement pattern, the two squats under one heading and the pull under
+        # its own.
+        self.assertLess(out.index("squat\n"), out.index("hinge\n"))
+        self.assertIn("2 sessions, last 2026-09-14 Mon", out)
+
+    def test_a_pattern_groups_the_lifts_and_never_merges_them(self):
+        _, out, _ = run_cli(["strength", "log", "--pattern", "squat"])
+        self.assertIn("BELT SQUAT — squat, machine", out)
+        self.assertIn("GOBLET SQUAT — squat, dumbbell", out)
+        self.assertNotIn("DEADLIFT", out)
+        # One 140 kg belt squat and one 16 kg goblet squat, never one squat series.
+        self.assertIn("1×12 @ 16", out)
+        self.assertNotIn("1×5 @ 140, 1×12 @ 16", out)
+
+    def test_part_of_a_name_finds_the_lifts_it_is_part_of(self):
+        _, out, _ = run_cli(["strength", "log", "SQUAT"])
+        self.assertIn("BELT SQUAT", out)
+        self.assertIn("GOBLET SQUAT", out)
+        self.assertNotIn("DEADLIFT", out)
+
+    def test_a_name_off_the_record_says_where_to_look(self):
+        _, out, _ = run_cli(["strength", "log", "bicep curl"])
+        self.assertIn("No lift on record is called 'bicep curl'", out)
+        self.assertIn("strength exercises", out)
+
+    def test_a_discarded_session_is_off_the_record(self):
+        # Monday is two activities, so discard asks which; "all of them" takes the day.
+        runtime.prompt = _Prompt(picks=["all"])
+        run_cli(["strength", "discard", "2026-09-14"])
+        _, out, _ = run_cli(["strength", "log", "belt squat"])
+        self.assertIn("2026-09-13 Sun", out)
+        self.assertNotIn("2026-09-14", out)
+        _, out, _ = run_cli(["strength", "log"])
+        self.assertIn("YOUR LIFTS — 2 exercises over 1 session", out)
+
+    def test_an_empty_record_says_how_it_fills(self):
+        clear_all_tables(test_db)
+        settings.write(settings.STRENGTH_SETS_SINCE, "2026-09-01")
+        _, out, _ = run_cli(["strength", "log"])
+        self.assertIn("No named sets on record since 2026-09-01", out)
+
+    def test_the_patterns_list_the_vocabulary_and_what_is_on_the_record(self):
+        _, out, _ = run_cli(["strength", "exercises"])
+        for pattern in vocabulary.PATTERNS:
+            self.assertIn(pattern, out)
+        self.assertIn(f"{len(vocabulary.all_exercises())} exercises TrainMate can name", out)
+        self.assertIn("2 on your record", out)  # belt squat and goblet squat
+
+    def test_one_pattern_lists_its_exercises_and_marks_the_athletes_own(self):
+        _, out, _ = run_cli(["strength", "exercises", "--pattern", "squat"])
+        lines = [line for line in out.split("\n") if "goblet squat" in line]
+        self.assertTrue(any(line.strip().startswith("•") for line in lines))
+        self.assertIn("barbell back squat", out)
+        self.assertNotIn("barbell deadlift", out)
+
+    def test_a_search_crosses_the_patterns(self):
+        _, out, _ = run_cli(["strength", "exercises", "deadlift"])
+        self.assertIn("barbell deadlift", out)
+        self.assertIn("hinge", out)
+        self.assertNotIn("belt squat", out)
+
 class MorningPushTest(_StrengthCase):
     """The push reads new sets before its walk, so the question comes with it (§11)."""
 

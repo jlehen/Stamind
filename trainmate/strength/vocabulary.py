@@ -56,6 +56,11 @@ def names() -> List[str]:
     return list(_table()[0])
 
 
+def all_exercises() -> List[Exercise]:
+    """Every exercise the vocabulary knows, in table order."""
+    return list(_table()[0].values())
+
+
 def garmin_key(category: str, name: Optional[str]) -> str:
     """A Garmin name as the table and `exercise_sets.garmin_name` write it: CATEGORY/NAME, or
     the bare CATEGORY for a set tagged with a category and no exercise."""

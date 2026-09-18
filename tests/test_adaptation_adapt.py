@@ -322,9 +322,9 @@ class TestAdaptationAdapt(unittest.TestCase):
             coach_service.workout_adapt("2026-06-10")
             system_prompt = mock_client.complete.call_args[0][0]
 
-        # Always-on: adapt has the same latent vacate gap, and only its benchmark section
-        # used to state the encoding.
-        self.assertIn("### RE-FILLING A DATE YOU VACATE", system_prompt)
+        # Always-on: an ordinary move needs the encoding as much as a test move does,
+        # and only the benchmark section used to state it.
+        self.assertIn("### MOVING A SESSION TO ANOTHER DAY", system_prompt)
         # Rule 2 keeps adapt's own three signals, not the window pass's constraint wording.
         self.assertIn("a depressed morning, a note, a drift reading", system_prompt)
         self.assertNotIn("No constraint, however disruptive,", system_prompt)
@@ -1282,3 +1282,226 @@ class TestAdaptationAdapt(unittest.TestCase):
         # The unadapted yoga line carries no such tag.
         yoga_line = [ln for ln in text.splitlines() if "(YOGA)" in ln][0]
         self.assertNotIn("eased", yoga_line)
+
+    # -- a session that changes DAY (DESIGN_workout_revisions.md §11) --
+
+    def _eased_thursday_gym(self):
+        """Thursday 11 June holds a gym session two earlier adaptations have already
+        walked down from 65 minutes to 45. Returns the session as it now stands."""
+        save_workout(test_db,
+            "2026-06-11", "strength_training", "Gym: Lower",
+            "[Gym: Lower]\n5x5 back squat, accessories.",
+            duration_minutes=65, rpe=7, tss=55, source="generated",
+            google_event_id="evt-gym",
+        )
+        service = trainmate.coach.CoachService(db_instance=test_db)
+        for minutes, load in ((55, 45), (45, 35)):
+            with redirect_stdout(io.StringIO()):
+                service.workout_revision_apply(RevisionProposal(
+                    reason="Recovery still below baseline",
+                    range_start="2026-06-11", range_end="2026-06-13",
+                    workouts=[{
+                        "date": "2026-06-11", "sport_type": "strength_training",
+                        "title": "Gym: Lower",
+                        "description": f"[Gym: Lower]\n{minutes} min, lighter.",
+                        "modification_reason": "Eased while recovery is low.",
+                        "duration_minutes": minutes, "rpe": 6, "tss": load,
+                    }],
+                ))
+        thursday = test_db.get_workout("2026-06-11", "strength_training")
+        self.assertEqual(thursday["adaptation_count"], 2)
+        return thursday
+
+    def _adapt_returning(self, mock_client, reason, adapted, on="2026-06-10"):
+        """Runs `workout adapt` on `on` against a canned week-planner answer."""
+        with patch.dict(trainmate.coach.config.data, {
+            "user_profile": {"lthr": 165, "max_hr": 185},
+            "coach": {"metrics_lookback_days": 3,
+                      "minor_activity_load_threshold": 10.0},
+        }):
+            mock_client.complete.return_value = {
+                "change_needed": True, "reason": reason, "adapted_workouts": adapted,
+            }
+            test_db.save_metric_cache(on, 50, 60, 80, 20, 10.0, 8.0, 1.1)
+            test_db.save_baseline(on, 50.0, 2.0, 60.0, 5.0, 80.0, 5.0)
+            with redirect_stdout(io.StringIO()):
+                return coach_service.workout_adapt(on)
+
+    @patch("trainmate.coach.engine.openrouter_client")
+    def test_a_moved_session_keeps_its_history_and_its_easing_tally(self, mock_client):
+        """It is Wednesday 10 June. Thursday's gym session has already been eased twice.
+        The athlete is away Thursday evening, so the coach moves it to Friday and names
+        the day it came from in `replaces`.
+
+        Friday's session IS Thursday's session: what it was first prescribed as, the day
+        it was first planned for and its easing tally all follow it. That tally is what
+        the next morning's adapt reads before deciding whether to cut it again, and
+        without the move being said out loud Friday would start over at zero
+        (DESIGN_workout_revisions.md §4/§11)."""
+        from trainmate.coach.formatting import format_planned_workouts_detailed
+
+        thursday = self._eased_thursday_gym()
+        proposal = self._adapt_returning(
+            mock_client, "Away Thursday evening, so the gym day moves to Friday.",
+            [{
+                "date": "2026-06-12", "sport_type": "strength_training",
+                "title": "Gym: Lower",
+                "description": "[Gym: Lower]\n45 min, lighter.",
+                "change_reason": "Gym moved to Friday — you are away Thursday evening.",
+                "duration_minutes": 45, "rpe": 6, "tss": 35,
+                "replaces": {"date": "2026-06-11", "sport_type": "strength_training"},
+            }],
+        )
+        # The move, and the rest day the app writes onto the day it emptied.
+        self.assertEqual(
+            [(w["date"], w["sport_type"]) for w in proposal.workouts],
+            [("2026-06-12", "strength_training"), ("2026-06-11", "rest")],
+        )
+        self.assertEqual(proposal.removals, ())
+
+        service = trainmate.coach.CoachService(db_instance=test_db)
+        with redirect_stdout(io.StringIO()):
+            service.workout_revision_apply(proposal)
+
+        self.assertIsNone(test_db.get_workout("2026-06-11", "strength_training"))
+        vacated = test_db.get_workout("2026-06-11", "rest")
+        self.assertEqual(vacated["title"], "Rest Day")
+        self.assertIn("away Thursday evening", vacated["description"])
+
+        friday = test_db.get_workout("2026-06-12", "strength_training")
+        self.assertEqual(friday["id"], thursday["id"], "same session, same lineage")
+        # The athlete's calendar shows one event moving, not one deleted and one created:
+        # the event handle is keyed by lineage (DESIGN_workout_revisions.md §8).
+        self.assertEqual(friday["google_event_id"], "evt-gym")
+        self.assertEqual(friday["adaptation_count"], 2)
+        self.assertEqual(friday["original_date"], "2026-06-11")
+        self.assertEqual(friday["original_duration_minutes"], 65)
+        # And so the tag that stops a third cut still fires on Friday morning, carrying
+        # the form the two easings started from.
+        tag = format_planned_workouts_detailed([friday], eval_date="2026-06-12")
+        self.assertIn("first prescribed as 65m", tag)
+        self.assertIn("eased 2x", tag)
+
+    @patch("trainmate.coach.engine.openrouter_client")
+    def test_a_move_leaves_the_day_it_emptied_carrying_the_coach_s_sentence(
+        self, mock_client
+    ):
+        """Thursday is not left as a hole. An empty date and a planned rest day mean
+        different things to the adherence record, so the day a move empties becomes a
+        rest day — and it says where the session went, because that is the coach's own
+        sentence about the change."""
+        self._eased_thursday_gym()
+        proposal = self._adapt_returning(
+            mock_client, "The gym day moves to Friday.",
+            [{
+                "date": "2026-06-12", "sport_type": "strength_training",
+                "title": "Gym: Lower", "description": "[Gym: Lower]\n45 min, lighter.",
+                "change_reason": "Gym moved to Friday — you are away Thursday evening.",
+                "duration_minutes": 45, "rpe": 6, "tss": 35,
+                "replaces": {"date": "2026-06-11", "sport_type": "strength_training"},
+            }],
+        )
+        rest = [w for w in proposal.workouts if w["date"] == "2026-06-11"][0]
+        self.assertEqual(rest["sport_type"], "rest")
+        self.assertEqual(rest["duration_minutes"], 0)
+        self.assertEqual(
+            rest["modification_reason"],
+            "Gym moved to Friday — you are away Thursday evening.",
+        )
+
+    @patch("trainmate.coach.engine.openrouter_client")
+    def test_a_move_onto_a_day_that_already_carries_work_keeps_that_day(
+        self, mock_client
+    ):
+        """Friday already holds its own gym session. Moving Thursday's onto it would
+        write one session over another and hand Thursday's history to Friday's — so the
+        move is refused, Friday is revised where it stands and Thursday is left alone."""
+        self._eased_thursday_gym()
+        save_workout(test_db,
+            "2026-06-12", "strength_training", "Gym: Upper",
+            "[Gym: Upper]\nBench and rows.",
+            duration_minutes=50, rpe=6, tss=40, source="generated",
+        )
+        proposal = self._adapt_returning(
+            mock_client, "Consolidating the gym days.",
+            [{
+                "date": "2026-06-12", "sport_type": "strength_training",
+                "title": "Gym: Full Body", "description": "[Gym: Full Body]\nBoth days.",
+                "change_reason": "One gym day this week.",
+                "duration_minutes": 60, "rpe": 7, "tss": 50,
+                "replaces": {"date": "2026-06-11", "sport_type": "strength_training"},
+            }],
+        )
+        self.assertEqual(
+            [(w["date"], w["sport_type"]) for w in proposal.workouts],
+            [("2026-06-12", "strength_training")],
+        )
+        self.assertIsNone(proposal.workouts[0]["replaces_slot"])
+
+        service = trainmate.coach.CoachService(db_instance=test_db)
+        with redirect_stdout(io.StringIO()):
+            service.workout_revision_apply(proposal)
+
+        thursday = test_db.get_workout("2026-06-11", "strength_training")
+        self.assertEqual(thursday["title"], "Gym: Lower", "left where it stands")
+        friday = test_db.get_workout("2026-06-12", "strength_training")
+        self.assertEqual(friday["title"], "Gym: Full Body")
+        self.assertEqual(friday["original_duration_minutes"], 50, "Friday's own lineage")
+
+    @patch("trainmate.coach.engine.openrouter_client")
+    def test_a_move_from_a_day_with_no_session_writes_the_new_one_and_nothing_else(
+        self, mock_client
+    ):
+        """The coach names a Wednesday session that does not exist. Only the half it can
+        honour is honoured: Friday's session is written, and no day is emptied on the
+        strength of a slot the run was never shown."""
+        proposal = self._adapt_returning(
+            mock_client, "Adding a gym day.",
+            [{
+                "date": "2026-06-12", "sport_type": "strength_training",
+                "title": "Gym: Lower", "description": "[Gym: Lower]\n45 min.",
+                "change_reason": "Moved off Wednesday.",
+                "duration_minutes": 45, "rpe": 6, "tss": 35,
+                "replaces": {"date": "2026-06-10", "sport_type": "strength_training"},
+            }],
+        )
+        self.assertEqual(
+            [(w["date"], w["sport_type"]) for w in proposal.workouts],
+            [("2026-06-12", "strength_training")],
+        )
+        self.assertIsNone(proposal.workouts[0]["replaces_slot"])
+
+    @patch("trainmate.coach.engine.openrouter_client")
+    def test_a_session_already_trained_cannot_be_moved_off_its_day(self, mock_client):
+        """The athlete lifted on Wednesday morning and the coach then tries to carry
+        Wednesday's session to Friday. History is not movable: the completed session
+        stays on Wednesday with its Calendar event, and Friday's entry is written as a
+        session of its own (DESIGN_workout_revisions.md §9.2)."""
+        save_workout(test_db,
+            "2026-06-10", "strength_training", "Gym: Lower",
+            "[Gym: Lower]\n5x5 back squat.",
+            duration_minutes=60, rpe=7, tss=50, source="generated",
+        )
+        test_db.save_completed_activity(
+            "lifted", "2026-06-10", "2026-06-10 07:00:00", "Gym", "strength_training",
+            3600.0, 0.0, 0.0, 110, 140, None, 50.0,
+        )
+        proposal = self._adapt_returning(
+            mock_client, "Gym moves to Friday.",
+            [{
+                "date": "2026-06-12", "sport_type": "strength_training",
+                "title": "Gym: Lower", "description": "[Gym: Lower]\n60 min.",
+                "change_reason": "Moved to Friday.",
+                "duration_minutes": 60, "rpe": 7, "tss": 50,
+                "replaces": {"date": "2026-06-10", "sport_type": "strength_training"},
+            }],
+        )
+        self.assertIsNone(proposal.workouts[0]["replaces_slot"])
+
+        service = trainmate.coach.CoachService(db_instance=test_db)
+        with redirect_stdout(io.StringIO()):
+            service.workout_revision_apply(proposal)
+
+        wednesday = test_db.get_workout("2026-06-10", "strength_training")
+        self.assertIsNotNone(wednesday, "a session already trained is not moved away")
+        self.assertEqual(wednesday["title"], "Gym: Lower")
