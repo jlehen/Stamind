@@ -86,8 +86,8 @@ plan feedback "text"                   Append a plan-level note
 plan feedback "text" -m               Append a note filed to the current mesocycle
 plan feedback "text" -m ATOM          … filed to the mesocycle ATOM resolves to (§5)
 plan feedback --rm ID [-y]             Delete one pending note (y/N confirm unless -y)
-plan feedback … -g ID                  Target another goal's plan (default: soonest active goal,
-                                       matching today's behavior)
+plan feedback … -g ID                  Target another goal's plan (default: the plan -m names,
+                                       else the soonest active goal)
 plan feedback "text" --replan          Append, then enter the regeneration flow immediately
 ```
 
@@ -118,8 +118,13 @@ gets the §a missing-argument treatment. Over the bot every form is one-line and
 human `y`, per the constraints precedent that nothing regenerates a plan without one
 (trainmate/cli/constraints.py §7 note). It does not imply `--force`; it does not need to (§7).
 
-Conflict rule: `-g` picks the plan first; `-m` resolves inside it. A mesocycle ID that belongs to
-a different goal's plan errors naming the goal it belongs to.
+Which plan a note joins: without `-g`, `-m` searches the active plans of every upcoming goal, and
+the mesocycle it lands on decides the plan — a mesocycle ID, a date or a name already says which
+plan it means, so asking for `-g` as well is friction. Where two plans cover one day, the soonest
+goal's wins, as it does for a note with no `-m`. With `-g`, `-m` resolves inside that goal's plan
+only, and a mesocycle ID belonging to a different goal's plan errors naming the goal it belongs
+to. When the note lands on a plan other than the soonest goal's, the echo says so and names
+`plan generate -g ID`, since a bare `plan generate` would plan the soonest goal instead.
 
 ## 5. The `-m` atom, humanized
 
@@ -128,19 +133,19 @@ one mesocycle. The atom set extends the shared grammar's "a mesocycle ID":
 
 | ATOM | Resolves to |
 | --- | --- |
-| bare integer | Mesocycle ID (a bare number is never a date — DESIGN_cli_selectors.md §1); must belong to the target plan |
+| bare integer | Mesocycle ID (a bare number is never a date — DESIGN_cli_selectors.md §1); must belong to a plan searched (§4) |
 | date atom: `2026-09-05`, `today`, `-7d`, `+2w` | The mesocycle whose start–end range contains that day |
 | anything else | Case-insensitive infix of a mesocycle *name*; must match exactly one |
 | *(absent)* | The mesocycle containing today — same meaning bare `-m` already has in the shared grammar |
 
 Date atoms reuse the `-d` atom parser. An unsigned span (`7d`) is rejected by name: it describes a
-window, not a day. A name infix matching zero or several mesocycles errors and lists the plan's
-mesocycles (name + dates) to retry against — an error listing, not an interactive picker, so the bot
-behaves identically.
+window, not a day. A name infix matching zero or several mesocycles errors and lists the searched
+mesocycles (name + dates, grouped by goal when several plans were searched) to retry against — an
+error listing, not an interactive picker, so the bot behaves identically.
 
-All resolution happens against the **active** macrocycle of the target goal. Filing to a
-superseded version is meaningless for steering the next one, so a mesocycle ID outside the active
-plan errors (this tightens today's unchecked `get_mesocycle`).
+All resolution happens against **active** macrocycles only. Filing to a superseded version is
+meaningless for steering the next one, so a mesocycle ID outside the active plans errors (this
+tightens today's unchecked `get_mesocycle`).
 
 The resolver lives in `trainmate/cli/selectors.py` beside the range machinery, as a single-atom
 function the range grammar can lift the day every command wants `workout list -m climb`. Add a

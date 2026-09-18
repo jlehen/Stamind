@@ -152,23 +152,32 @@ def _maybe_date_atom(raw: str) -> Optional[str]:
 
 
 def _mesocycle_listing(mesocycles: list) -> str:
-    """This plan's mesocycles, name and dates, to retry an unmatched atom against — an error
-    listing rather than an interactive picker, so the bot behaves identically (§5)."""
-    lines = "\n".join(
-        f"  [{m['id']}] {m['name']} ({fmt_span(m['start_date'], m['end_date'], sep=' -> ')})"
-        for m in mesocycles
+    """The mesocycles searched, name and dates, to retry an unmatched atom against — an
+    error listing rather than an interactive picker, so the bot behaves identically (§5).
+    Mesocycles from several plans are grouped under their `goal_title`."""
+    def row(m):
+        return f"[{m['id']}] {m['name']} ({fmt_span(m['start_date'], m['end_date'], sep=' -> ')})"
+
+    goals = list(dict.fromkeys(m.get('goal_title') for m in mesocycles))
+    if len(goals) < 2:
+        return "This plan's mesocycles:\n" + "\n".join(f"  {row(m)}" for m in mesocycles)
+    groups = "\n".join(
+        f"  {goal}:\n" + "\n".join(f"    {row(m)}" for m in mesocycles
+                                   if m.get('goal_title') == goal)
+        for goal in goals
     )
-    return f"This plan's mesocycles:\n{lines}"
+    return f"The active plans' mesocycles:\n{groups}"
 
 
 def resolve_meso_atom(atom, mesocycles: list) -> dict:
-    """The ONE mesocycle an atom names, resolved against a plan's own mesocycles
-    (DESIGN_plan_feedback.md §5).
+    """The ONE mesocycle an atom names, resolved against the mesocycles given — one plan's,
+    or several plans' in date order (DESIGN_plan_feedback.md §5).
 
     A bare integer is a mesocycle ID, a date atom is the mesocycle covering that day, and
     anything else is a case-insensitive infix of a mesocycle name that must match exactly
-    one. `CURRENT` (a bare `-m`) is the mesocycle covering today. Raises `SelectorError`
-    naming the plan's mesocycles when nothing — or more than one thing — matches.
+    one. `CURRENT` (a bare `-m`) is the mesocycle covering today. Where two plans cover the
+    same day, the first one given wins. Raises `SelectorError` listing the mesocycles when
+    nothing — or more than one thing — matches.
 
     Single-target on purpose: range spellings are refused, because a note files to one
     mesocycle. The range grammar can lift this the day a command wants `-m climb` as a
@@ -176,6 +185,8 @@ def resolve_meso_atom(atom, mesocycles: list) -> dict:
     if not mesocycles:
         raise SelectorError("This plan has no mesocycles to file a note against.")
     listing = _mesocycle_listing(mesocycles)
+    where = ("this plan" if len({m['macrocycle_id'] for m in mesocycles}) == 1
+             else "the active plans")
 
     if atom is None or atom == CURRENT or (isinstance(atom, str) and not atom.strip()):
         today = _today_str()
@@ -183,7 +194,7 @@ def resolve_meso_atom(atom, mesocycles: list) -> dict:
             (m for m in mesocycles if m['start_date'] <= today <= m['end_date']), None
         )
         if not mesocycle:
-            raise SelectorError(f"No mesocycle of this plan covers today ({today}).\n{listing}")
+            raise SelectorError(f"No mesocycle of {where} covers today ({today}).\n{listing}")
         return mesocycle
 
     text = str(atom).strip()
@@ -195,7 +206,7 @@ def resolve_meso_atom(atom, mesocycles: list) -> dict:
         mesocycle = next((m for m in mesocycles if m['id'] == int(text)), None)
         if not mesocycle:
             raise SelectorError(
-                f"Mesocycle {text} is not part of this plan.\n{listing}"
+                f"Mesocycle {text} is not part of {where}.\n{listing}"
             )
         return mesocycle
 
@@ -205,7 +216,7 @@ def resolve_meso_atom(atom, mesocycles: list) -> dict:
             (m for m in mesocycles if m['start_date'] <= day <= m['end_date']), None
         )
         if not mesocycle:
-            raise SelectorError(f"No mesocycle of this plan covers {day}.\n{listing}")
+            raise SelectorError(f"No mesocycle of {where} covers {day}.\n{listing}")
         return mesocycle
 
     matches = [m for m in mesocycles if text.lower() in m['name'].lower()]

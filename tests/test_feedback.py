@@ -209,8 +209,8 @@ class TestFeedbackFiling(FeedbackTestCase):
         self.assertIn("Climb-Specific Transmutation", stdout)
         self.assertEqual(test_db.list_plan_feedback(macro_id), [])
 
-    def test_an_id_from_another_goals_plan_names_that_goal(self):
-        obj_id, macro_id, _ = self._plan()
+    def _later_goal_plan(self):
+        """A second goal after the marathon, with its own active plan."""
         other_id = test_db.add_objective(
             title="Sierre-Zinal", target_date=_days_out(120),
             sport_type="running",
@@ -221,13 +221,54 @@ class TestFeedbackFiling(FeedbackTestCase):
             mesocycles=[{"name": "Their Base", "start_date": _days_out(72),
                          "end_date": _days_out(120), "focus": "Z2"}],
         )
-        theirs = test_db.get_mesocycles_for_macrocycle(other_macro)[0]
+        return other_id, other_macro, test_db.get_mesocycles_for_macrocycle(other_macro)[0]
+
+    def test_without_g_an_id_from_a_later_goals_plan_files_to_that_plan(self):
+        obj_id, macro_id, _ = self._plan()
+        other_id, other_macro, theirs = self._later_goal_plan()
 
         exit_code, stdout, _ = self._file(str(theirs["id"]))
 
+        self.assertEqual(exit_code, 0, stdout)
+        self.assertEqual(self._filed_mesocycle(other_macro), "Their Base")
+        self.assertEqual(test_db.list_plan_feedback(macro_id), [])
+        # A bare `plan generate` would plan the marathon, so the echo names the -g it needs.
+        self.assertIn("on the plan for 'Sierre-Zinal'", stdout)
+        self.assertIn(f"plan generate -g {other_id}", stdout)
+
+    def test_without_g_a_date_only_a_later_plan_covers_files_there(self):
+        obj_id, macro_id, _ = self._plan()
+        other_id, other_macro, _ = self._later_goal_plan()
+
+        exit_code, stdout, _ = self._file(_days_out(80))
+
+        self.assertEqual(exit_code, 0, stdout)
+        self.assertEqual(self._filed_mesocycle(other_macro), "Their Base")
+
+    def test_without_g_a_name_matching_two_plans_lists_both_goals(self):
+        self._plan()
+        self._later_goal_plan()
+
+        exit_code, stdout, _ = self._file("base")
+
         self.assertEqual(exit_code, 1)
+        self.assertIn("matches several mesocycles", stdout)
+        self.assertIn("Zurich Marathon:", stdout)
+        self.assertIn("Sierre-Zinal:", stdout)
+
+    def test_with_g_an_id_from_another_goals_plan_names_that_goal(self):
+        obj_id, macro_id, _ = self._plan()
+        other_id, other_macro, theirs = self._later_goal_plan()
+
+        exit_code, stdout, _ = self.run_cli(
+            ["plan", "feedback", "a note", "-g", str(obj_id), "-m", str(theirs["id"])]
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Mesocycle", stdout)
         self.assertIn("belongs to the plan for 'Sierre-Zinal'", stdout)
         self.assertIn(f"-g {other_id}", stdout)
+        self.assertEqual(test_db.list_plan_feedback(other_macro), [])
 
     def test_date_atoms_resolve_to_the_mesocycle_covering_that_day(self):
         obj_id, macro_id, _ = self._plan()

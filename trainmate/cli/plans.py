@@ -1073,6 +1073,20 @@ def _feedback_rm(args: argparse.Namespace) -> None:
     print(green(f"Removed feedback note {args.rm}."))
 
 
+def _feedback_mesocycles(goal_id: Optional[int], macro: dict) -> list:
+    """What `-m` may name: with `-g`, that goal's plan; without it, every upcoming goal's
+    active plan, soonest first, so the mesocycle picks the plan (DESIGN_plan_feedback.md §4)."""
+    if goal_id is not None:
+        return runtime.db.get_mesocycles_for_macrocycle(macro['id'])
+    mesocycles = []
+    for goal in runtime.db.upcoming_objectives():
+        plan = runtime.db.get_macrocycle_for_objective(goal['id'])
+        if plan:
+            mesocycles += [dict(m, goal_title=goal['title'])
+                           for m in runtime.db.get_mesocycles_for_macrocycle(plan['id'])]
+    return mesocycles
+
+
 def _meso_owner_hint(atom, goal: dict) -> str:
     """Where a rejected mesocycle ID actually lives — another goal's plan, or a
     superseded version of this one (DESIGN_plan_feedback.md §4/§5)."""
@@ -1083,12 +1097,12 @@ def _meso_owner_hint(atom, goal: dict) -> str:
     if not macro:
         return ""
     if macro.get('status') == 'superseded':
-        return (f"\nBlock {atom} ('{meso['name']}') belongs to a superseded version of "
+        return (f"\nMesocycle {atom} ('{meso['name']}') belongs to a superseded version of "
                 "this plan, and a note can only steer the active one.")
     owner = runtime.db.get_objective(macro['objective_id'])
     if not owner or owner['id'] == goal['id']:
         return ""
-    return (f"\nBlock {atom} ('{meso['name']}') belongs to the plan for "
+    return (f"\nMesocycle {atom} ('{meso['name']}') belongs to the plan for "
             f"'{owner['title']}' — reach it with " + cmd("-g " + str(owner['id'])) + ".")
 
 
@@ -1139,17 +1153,18 @@ def run_plan_feedback(args: argparse.Namespace) -> None:
         _feedback_list(goal, macro)
         return
 
-    # `-g` picks the plan, `-m` resolves inside it: filing to a superseded version cannot
-    # steer the next one, so the atom only ever sees the active plan's mesocycles (§5).
+    # Filing to a superseded version cannot steer the next one, so the atom only ever sees
+    # active plans' mesocycles (§5); the one it names decides which plan the note joins.
     meso = None
     if args.meso is not None:
         try:
-            meso = resolve_meso_atom(
-                args.meso, runtime.db.get_mesocycles_for_macrocycle(macro['id'])
-            )
+            meso = resolve_meso_atom(args.meso, _feedback_mesocycles(args.goal_id, macro))
         except SelectorError as e:
             print(red(f"Error: {e}") + _meso_owner_hint(args.meso, goal))
             sys.exit(1)
+        if meso['macrocycle_id'] != macro['id']:
+            macro = runtime.db.get_macrocycle(meso['macrocycle_id'])
+            goal = runtime.db.get_objective(macro['objective_id'])
 
     note_id = runtime.db.add_plan_feedback(
         macro['id'], args.text.strip(), meso['id'] if meso else None
@@ -1161,9 +1176,14 @@ def run_plan_feedback(args: argparse.Namespace) -> None:
         _feedback_replan(goal)
         return
     pending = len(runtime.db.list_plan_feedback(macro['id']))
+    # A bare `plan generate` plans the soonest goal only; any other goal needs its -g.
+    upcoming = runtime.db.upcoming_objectives()
+    soonest = bool(upcoming) and upcoming[0]['id'] == goal['id']
+    generate = "plan generate" if soonest else f"plan generate -g {goal['id']}"
+    on_plan = "" if soonest else f" on the plan for '{goal['title']}'"
     aside(
-        f"{pending} note{'s' if pending != 1 else ''} pending — "
-        f"{'they feed' if pending != 1 else 'it feeds'} the next {cmd('plan generate')} "
+        f"{pending} note{'s' if pending != 1 else ''} pending{on_plan} — "
+        f"{'they feed' if pending != 1 else 'it feeds'} the next {cmd(generate)} "
         f"({cmd('--replan')} runs it now)."
     )
 
@@ -1397,15 +1417,15 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     )
     p_fb.add_argument(
         "-m", "--mesocycle", dest="meso", nargs="?", const=CURRENT, metavar="ATOM",
-        help="File the note to ONE mesocycle: its name (any part of it), a date it covers "
-             "(YYYY-MM-DD, today, -7d, +2w) or its mesocycle ID. Bare -m is the current "
-             "mesocycle; without -m the note is plan-level"
+        help="File the note to ONE mesocycle of any upcoming goal's plan: its name (any "
+             "part of it), a date it covers (YYYY-MM-DD, today, -7d, +2w) or its mesocycle "
+             "ID. Bare -m is the current mesocycle; without -m the note is plan-level"
     )
     p_fb.add_argument(
         "-g", "--goal", "--goal-id", type=int, dest="goal_id",
         help=(
-            "Target goal ID whose plan the feedback should attach to "
-            "(defaults to the next active goal)"
+            "Target goal ID whose plan the feedback should attach to (defaults to the "
+            "plan -m names, else the next active goal); with -m, only that plan is searched"
         )
     )
     p_fb.add_argument(
