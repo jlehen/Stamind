@@ -185,7 +185,7 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
         notice(str(e), red)
 
 
-def _confirm_regeneration(span_start: str, span_end: str) -> bool:
+def _confirm_regeneration(span_start: str, span_end: str, fresh: bool) -> bool:
     """Gates the LLM call: a regen ultimately replaces the plan across the span, so name
     what is at stake before spending it (README §"Steering the plan"). Nothing is archived
     here — the proposal is shown first and `_confirm_apply` owns the write.
@@ -195,9 +195,10 @@ def _confirm_regeneration(span_start: str, span_end: str) -> bool:
     if not live:
         return True
 
-    days = settings.commitment_days()
     # The week planner has to account for the near days one by one, so a rewrite of them is not
     # the blanket archive the rest of the span is (DESIGN_plan_change_continuity.md §4).
+    # `--fresh` drops that hold, so there is nothing to promise.
+    days = 0 if fresh else settings.commitment_days()
     committed = (
         f" The next {days} day(s) are yours: the coach must answer for each session "
         f"standing in them, and you see what it did before anything is written."
@@ -499,12 +500,14 @@ def _generate(args: argparse.Namespace, force: bool, replaced: bool) -> None:
     if not _confirm_out_of_date_plans(span_start, span_end, prefer_macro_id, force):
         return
 
-    if not force and not _confirm_regeneration(span_start, span_end):
+    fresh = getattr(args, 'fresh', False)
+    if not force and not _confirm_regeneration(span_start, span_end, fresh):
         notice(f"Workout generation cancelled{unchanged}")
         return
 
     proposal = runtime.coach_service.workout_generate(
-        start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id
+        start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id,
+        fresh=fresh,
     )
     if not runtime.render.workout_generate_preview(proposal):
         return

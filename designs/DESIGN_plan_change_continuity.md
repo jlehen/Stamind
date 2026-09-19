@@ -264,6 +264,14 @@ no `--ignore-commitment` flag; the rule is advisory by construction, and §4.5 m
 model's judgement visible instead of constraining it. `--force` skips the accept question
 but still prints §4.5's report, so a forced run says what it did.
 
+Amended 2026-09-18: `workout generate --fresh` turns the rule off for one run, the way
+`plan generate --fresh` withholds the plan in place. The operator sometimes wants the near
+week redone, not kept, and "keep unless it contradicts a line" then works against them.
+Under `--fresh` the commitment window is empty for that run, so no session reaches the
+prompt as standing, and every day of the span is written the way a day past the window is.
+The change stamps no `commitment_end`, so a session it removes loses its Calendar event
+instead of being marked `[Cancelled]` (§5.2).
+
 ### 4.5 The model accounts for every standing session
 
 Today the model is shown the eased sessions and may answer `keep` for each
@@ -1013,7 +1021,7 @@ record it already has.
 
 **The metrics window is not widened.** See §6.1.
 
-**No override flag.** See §4.4.
+**No override flag.** See §4.4. Amended 2026-09-18: `workout generate --fresh` is that flag.
 
 **`commitment-days` is not routable.** See §4.1.
 

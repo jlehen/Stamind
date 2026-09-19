@@ -676,13 +676,15 @@ Three things to know when you regenerate:
 - **The next week does not move under the athlete's feet.** The days they have
   already read — the next 7 by default, `settings set commitment-days N` — are
   not rewritten blind. The week planner is shown every session standing there,
-  plus every hand-added session anywhere in the span, and has to account for
-  each one: keep it, revise it, move it or drop it, each with a sentence written
-  for the athlete. A session it does not mention is kept. `workout generate`
+  and has to account for each one: keep it, revise it, move it or drop it, each
+  with a sentence written for the athlete. A session it does not mention is kept. `workout generate`
   prints what it will do to each of them before you accept, and prints that
   report under `-f` too. A session it removes in there keeps its Calendar event,
   marked with the reason, rather than vanishing overnight. Past the window, a
-  rebuild is a rebuild.
+  rebuild is a rebuild. `workout generate --fresh` makes the whole span a
+  rebuild, for the times you want the week redone rather than kept: the week
+  planner is shown none of the sessions already there, and writes every day
+  again.
 
 ## Choosing a model
 

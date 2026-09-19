@@ -148,6 +148,16 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         help="Name each Calendar event as it is deleted and created, instead of the "
              "progress bar"
     )
+    p_w_gen.add_argument(
+        "--fresh", action="store_true",
+        help=(
+            "Clean slate: don't show the coach the sessions already in the span, so it "
+            "rewrites every day of it. Without this flag it keeps the sessions of the next "
+            "commitment-days days (a setting, 7 by default), unless they contradict your "
+            "profile, the plan or a constraint. A session it removes has its Calendar event "
+            "deleted, not marked [Cancelled]."
+        )
+    )
     # The selectors name the span to write, both ends of it, and are grouped because a
     # span is one choice, not several (DESIGN_cli_selectors.md §8). `-M` doubles as the
     # tiebreaker when two plans cover the same days.

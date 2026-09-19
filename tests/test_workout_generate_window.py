@@ -104,7 +104,7 @@ class WindowTestCase(unittest.TestCase):
         entry.update(extra)
         return entry
 
-    def generate(self, *entries, start=None, end=None, note=None, apply=True):
+    def generate(self, *entries, start=None, end=None, note=None, apply=True, fresh=False):
         """The whole flow against a canned reply. Returns the proposal."""
         from trainmate import runtime
         response = {"reasoning": "why", "workouts": list(entries)}
@@ -114,7 +114,7 @@ class WindowTestCase(unittest.TestCase):
                 patch("trainmate.coach.engine.openrouter_client") as client:
             client.complete.return_value = response
             proposal = runtime.coach_service.workout_generate(
-                start_date=start, end_date=end
+                start_date=start, end_date=end, fresh=fresh
             )
             self.prompt_system = client.complete.call_args.args[0]
             self.prompt_user_content = client.complete.call_args.args[1]
@@ -309,6 +309,37 @@ class TestTheWindow(WindowTestCase):
         self.ride(_days_out(15), title="FTP test", benchmark_type="ftp_20min")
         proposal = self.generate()
         self.assertEqual(proposal.standing, ())
+
+
+class TestFresh(WindowTestCase):
+    """`workout generate --fresh` holds nothing: the whole span is written the way a day
+    past the window is (DESIGN_plan_change_continuity.md §4.4)."""
+
+    def test_the_week_planner_is_shown_no_standing_session(self):
+        self.window(7)
+        self.ride(_days_out(2))
+        proposal = self.generate(self.session(_days_out(5)), fresh=True)
+        self.assertEqual(proposal.standing, ())
+        self.assertIsNone(proposal.commitment_end)
+        self.assertNotIn("SESSIONS ALREADY STANDING", self.prompt_system)
+        self.assertNotIn("SESSIONS ALREADY STANDING", self.prompt_user_content)
+
+    def test_a_session_it_does_not_mention_is_replaced_not_kept(self):
+        """Inside the window too: the coverage backstop leaves a rest day where it stood."""
+        self.window(7)
+        self.ride(_days_out(2))
+        self.generate(self.session(_days_out(5)), fresh=True)
+        self.assertEqual([w["sport_type"] for w in self.live(_days_out(2))], ["rest"])
+
+    def test_the_change_carries_no_window(self):
+        """So a session it removes inside the window loses its Calendar event rather than
+        being marked [Cancelled] (§5.2)."""
+        self.window(7)
+        self.ride(_days_out(2))
+        self.generate(self.session(_days_out(5)), fresh=True)
+        # The fixture's own save is a `generate` change too; the run is the newest.
+        newest = max(c["id"] for c in test_db.get_workout_changes())
+        self.assertIsNone(test_db.get_change(newest)["commitment_end"])
 
 
 class TestTheConflictRules(WindowTestCase):

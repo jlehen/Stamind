@@ -1188,6 +1188,37 @@ class TestCliWorkouts(unittest.TestCase):
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.prompt")
     @patch("trainmate.runtime.coach_service")
+    def test_generate_fresh_reaches_the_service_and_promises_nothing(
+        self, mock_coach, mock_prompt, _ensure
+    ):
+        """`--fresh` holds no session, so the question before the LLM call stops saying the
+        near days are the athlete's (DESIGN_plan_change_continuity.md §4.4)."""
+        mock_coach.workout_generate.return_value = _proposal()
+        test_db.set_setting("workout_commitment_days", "7")
+        tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
+        save_workout(test_db,
+            date=tomorrow.strftime("%Y-%m-%d"), sport_type="running", title="Tempo",
+            description="30 min",
+        )
+        mock_prompt.confirm.return_value = False
+
+        self.run_cli(["workout", "generate", "-d", "today.."])
+        question = " ".join(mock_prompt.confirm.call_args.args[0].split())
+        self.assertIn("The next 7 day(s) are yours", question)
+
+        self.run_cli(["workout", "generate", "-d", "today..", "--fresh"])
+        question = " ".join(mock_prompt.confirm.call_args.args[0].split())
+        self.assertNotIn("are yours", question)
+        mock_coach.workout_generate.assert_not_called()
+
+        self.run_cli(["workout", "generate", "-d", "today..", "--fresh", "-f"])
+        self.assertTrue(mock_coach.workout_generate.call_args.kwargs["fresh"])
+        self.run_cli(["workout", "generate", "-d", "today..", "-f"])
+        self.assertFalse(mock_coach.workout_generate.call_args.kwargs["fresh"])
+
+    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.runtime.prompt")
+    @patch("trainmate.runtime.coach_service")
     def test_generate_previews_the_workouts_then_asks_before_writing(
         self, mock_coach, mock_prompt, _ensure
     ):

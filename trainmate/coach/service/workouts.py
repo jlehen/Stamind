@@ -727,7 +727,7 @@ class WorkoutGenMixin:
 
     def workout_generate(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None,
-        prefer_macro_id: Optional[int] = None
+        prefer_macro_id: Optional[int] = None, fresh: bool = False
     ) -> GenerateProposal:
         """Proposes workouts (microcycles) from the plan mesocycles governing the span.
 
@@ -738,6 +738,10 @@ class WorkoutGenMixin:
         `start_date` opens the span and never reaches into the past — the caller's
         selectors pick which days are rebuilt, and the rest of the plan is left alone
         (DESIGN_cli_selectors.md §8).
+
+        `fresh` (CLI `--fresh`) empties the commitment window for this run, so the week
+        planner writes every day of the span the way it writes a day past the window
+        (DESIGN_plan_change_continuity.md §4.4).
 
         Which plan applies is read off the dates being generated, not off a goal the
         caller names: the goal was only ever an indirection to the macrocycle, and the
@@ -850,7 +854,9 @@ class WorkoutGenMixin:
         span_sessions = self._db.get_workouts(
             start_date=gen_start_str, end_date=gen_end_str
         )
-        window_end = self._commitment_window(today_str)
+        window_end: Optional[str] = None
+        if not fresh:
+            window_end = self._commitment_window(today_str)
         standing_sessions = self._standing_sessions(span_sessions, window_end)
         planner_reply = self.engine._workout_generate_logic(
             objectives=objectives,
