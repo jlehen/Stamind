@@ -816,8 +816,8 @@ called by the UIs.
   planned-vs-actual review still covers the replaced plan's elapsed mesocycles, as do the
   history summary, the learnings and the athlete's plan feedback
   (DESIGN_backward_evaluation.md §6.1).
-- **`workout_generate(start_date, end_date, prefer_macro_id, fresh)`** — requires an existing
-  macrocycle.
+- **`workout_generate(start_date, end_date, prefer_macro_id, fresh, fresh_strength)`** —
+  requires an existing macrocycle.
   Writes nothing: it returns a `GenerateProposal` (reasoning, the proposed sessions
   already tagged with their date's `macrocycle_id`, the live plan they would displace,
   and `gen_start`), which the caller previews and hands back to
@@ -826,6 +826,9 @@ called by the UIs.
   `fresh` (CLI `--fresh`) empties the commitment window for that run, so the week planner
   writes every day of the span the way it writes a day past the window, and the change
   stamps no `commitment_end` (DESIGN_plan_change_continuity.md §4.4).
+  `fresh_strength` (CLI `--fresh-strength`) has the strength planner write every strength
+  session of the span again, the committed days' included; `fresh` implies it
+  (DESIGN_strength_tracking.md §9).
   Applies the deterministic rest-window pre-pass to the generated workouts
   (`_enforce_rest_windows_generate(workouts, constraints, gen_start, gen_end)`: every
   `rest = 1` date in the *requested* span `[gen_start, gen_end]` — not the span the model
@@ -2092,7 +2095,7 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `workout`    | `list`       | `w l`    | Show planned workouts. Defaults to a 7-day window from today. Positional `TARGET…` (workout IDs and/or date selectors, e.g. `wo li 12 15 -v`) plus the shared selectors `-d`/`-m`/`-M`/`-g` and `-t/--type TYPE`, `-l/--link` (each synced session's Calendar event link) (DESIGN_cli_selectors.md). Every listed session dated **today or earlier** also carries its adherence verdict — `[DONE]`/`[PARTIAL]`/`[MISSED]`/`[REST OK]`/`[REST BROKEN]`, or `[NOT YET]` for one still ahead today — and `-v` adds the matched activity and the mismatch behind a `[PARTIAL]`. Freshens Garmin over that past span unless `--no-pull` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)). A listing whose range runs past the last scheduled session ends on one gray marker naming that — unconditional, a fact of the listing rather than a warning; an empty listing renders it alone (DESIGN_runway_nudge.md §4). |
 | `workout`    | `show`       | `w sh`   | `workout list -v` under a name that says what it does: the same handler with the detail flag pinned on, the same positional targets and the same selectors. `wo sh 12` details one session; a bare `wo sh` details the same 7-day window `list` lists. |
 | `workout`    | `compare`    | `w c`    | Compare planned vs completed (`analyze_adherence()`): prints PLANNED/ACTUAL per day, flags misses (red), rest violations (red), unplanned high-load (yellow), then a discrepancy summary. Today's untrained sessions read `(not yet — still ahead today)` and are not misses (`pending_from`, [§10](#10-key-data-flows)). Same selectors as `workout list`; default 14-day lookback; a bare span (`-d 7d`) looks *back*; end capped at today. |
-| `workout`    | `generate`   | `w g`    | Generate workouts from the plan mesocycles covering the days generated (the dates pick the plan, not a goal — DESIGN_cli_selectors.md §8). No selector → from the day after the schedule stops (today once it has run out) for `config.workout_generation_span_days` (28 default), so a run adds days rather than rewriting covered ones; refused when the plan is already covered to its last day. Span flags (mutually exclusive, **both** ends of the resolved window are used, and a span never opens before today): `-g/--goal [ID]` = the goal's whole plan span; `-d`; `-m` = that mesocycle's own days; `-M` (which also settles which plan to follow where two cover the same days). Lists the proposed sessions the way `workout list` renders them and asks before writing; on a `y` it archives the span's existing workouts, leaves the days outside it alone, and pushes the new ones to Calendar immediately. `-f/-y` skips both prompts, but the report of what changed for the sessions inside the commitment window still prints (DESIGN_plan_change_continuity.md §4.4). `--fresh` empties the commitment window for that run: the week planner is shown none of the sessions already in the span, so it rewrites every day, and a session it removes loses its Calendar event instead of being marked `[Cancelled]` (§4.4). Run from the terminal of a companion instance, it first asks to replace the newest change when the athlete was never told about it, and prints under "Your coach:" when that line reaches the athlete's Telegram — with a warning to run `workout notify` when it changes today's sessions and would otherwise arrive only the next morning (DESIGN_change_heads_up.md §5, §8; shared with `workout adapt` in `cli/workouts/heads_up.py`). |
+| `workout`    | `generate`   | `w g`    | Generate workouts from the plan mesocycles covering the days generated (the dates pick the plan, not a goal — DESIGN_cli_selectors.md §8). No selector → from the day after the schedule stops (today once it has run out) for `config.workout_generation_span_days` (28 default), so a run adds days rather than rewriting covered ones; refused when the plan is already covered to its last day. Span flags (mutually exclusive, **both** ends of the resolved window are used, and a span never opens before today): `-g/--goal [ID]` = the goal's whole plan span; `-d`; `-m` = that mesocycle's own days; `-M` (which also settles which plan to follow where two cover the same days). Lists the proposed sessions the way `workout list` renders them and asks before writing; on a `y` it archives the span's existing workouts, leaves the days outside it alone, and pushes the new ones to Calendar immediately. `-f/-y` skips both prompts, but the report of what changed for the sessions inside the commitment window still prints (DESIGN_plan_change_continuity.md §4.4). `--fresh` empties the commitment window for that run: the week planner is shown none of the sessions already in the span, so it rewrites every day, and a session it removes loses its Calendar event instead of being marked `[Cancelled]` (§4.4). `--fresh-strength` keeps the window but has the strength planner write every strength session of the span again, with a reason for each one it changes; `--fresh` implies it (DESIGN_strength_tracking.md §9). Run from the terminal of a companion instance, it first asks to replace the newest change when the athlete was never told about it, and prints under "Your coach:" when that line reaches the athlete's Telegram — with a warning to run `workout notify` when it changes today's sessions and would otherwise arrive only the next morning (DESIGN_change_heads_up.md §5, §8; shared with `workout adapt` in `cli/workouts/heads_up.py`). |
 | `workout`    | `rollback`   | `w r`    | Undo a workout change **and every change after it**, putting the sessions back the way they were the moment before it ran (`--batch N` per `workout batches`, default #1 the newest; `-y`). Any change qualifies, an adapt or a tweak included. The only undo. Leaves the active plan version alone — unlike `plan rollback` (DESIGN_workout_revisions.md §10). |
 | `workout`    | `batches`    | `w b`    | List every command that wrote workouts, newest first: positional `#N`, when, kind, revision count, date span, plan version, and under each row its stored description cut at 200 characters — none under a rollback, whose description names a change by an internal number the list does not show. A pass that appended nothing reads `(held)`; a change the athlete has not been told about reads `not sent yet` (DESIGN_change_heads_up.md §8). Every entry is undoable, including the newest — there is no separate unnumbered `live` row, because the change that wrote the plan in force is itself in the list (DESIGN_workout_revisions.md §10) |
 | `workout`    | `notify`     | `w n`    | Companion mode only: list the changes to the athlete's week not yet told, each with the line they will get, and on a `y` (`-y` skips the question) ask the bot to send them on its next wake, whatever the hour — by storing the newest one's id as `changes_notify_upto`. Says so and does nothing with nothing waiting or on an expert instance (DESIGN_change_heads_up.md §4) |
@@ -2375,9 +2378,11 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
 1b. Before spending the LLM call, the CLI confirms it when live workouts already exist
    inside that span — a regen is archive-and-rebuild, not fill-in, so a repeat run
    would otherwise cost a call the athlete never meant to spend. The question names the
-   count, span, how many were hand-added, and the span being rebuilt. `-f/--force` skips
+   count and dates of those workouts, the span being rebuilt, and how many days the
+   commitment window holds, which `--fresh` leaves out. `-f/--force` skips
    it (and the apply gate at step 5, and the out-of-date-plan warning) for unattended runs.
-2. `CoachService.workout_generate(start_date=..., end_date=..., prefer_macro_id=..., fresh=...)`
+2. `CoachService.workout_generate(start_date=..., end_date=..., prefer_macro_id=..., fresh=...,
+   fresh_strength=...)`
    clamps the start to today, computes `num_days` from `(end_date − gen_start)`, then
    resolves the periodization mesocycles governing `[gen_start, gen_end]` via
    `db.get_governing_mesocycles` — no goal is named, the dates decide
@@ -2442,8 +2447,12 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    equipment or the progression asks for, and treats a departure from the prescription as a
    habit once it has happened `strength.habit_after` times; a checked session whose brief or
    duration moved carries a line saying so (`MOVED_ON`) and is written again, which is how
-   one `workout generate` brings the standing strength sessions to a new brief. It runs
-   only when there is something new to write from, so a week with no lifting costs no call;
+   one `workout generate` brings the standing strength sessions to a new brief.
+   `--fresh-strength` (and `--fresh`) passes `write_again`, which puts a line saying the
+   athlete asked (`ASKED_AGAIN`) on every session to check and lets its answer through the
+   evidence rule the way a new brief does, so the committed days' sessions are written again
+   too. It runs only when there is something new to write from or the athlete asked, so a
+   week with no lifting costs no call;
    a call that fails twice fails the whole proposal when a session was to be written, and
    is a "keep" plus a sentence for the athlete when sessions were only to be checked.
 5. `workout_generate` returns the sessions as a `GenerateProposal` — nothing written yet.

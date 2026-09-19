@@ -155,7 +155,18 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             "rewrites every day of it. Without this flag it keeps the sessions of the next "
             "commitment-days days (a setting, 7 by default), unless they contradict your "
             "profile, the plan or a constraint. A session it removes has its Calendar event "
-            "deleted, not marked [Cancelled]."
+            "deleted, not marked [Cancelled]. Strength sessions are written again as with "
+            "--fresh-strength."
+        )
+    )
+    p_w_gen.add_argument(
+        "--fresh-strength", action="store_true", dest="fresh_strength",
+        help=(
+            "Write every strength session of the span again: its exercises, sets and "
+            "kilograms, under the brief it has now. The coach still keeps the sessions of the "
+            "next commitment-days days; only their strength content changes. Without this "
+            "flag, a strength session already written changes only when what you have lifted "
+            "since, a new brief or a new duration calls for it."
         )
     )
     # The selectors name the span to write, both ends of it, and are grouped because a

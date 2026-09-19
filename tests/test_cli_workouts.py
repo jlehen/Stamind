@@ -1215,6 +1215,9 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertTrue(mock_coach.workout_generate.call_args.kwargs["fresh"])
         self.run_cli(["workout", "generate", "-d", "today..", "-f"])
         self.assertFalse(mock_coach.workout_generate.call_args.kwargs["fresh"])
+        self.assertFalse(mock_coach.workout_generate.call_args.kwargs["fresh_strength"])
+        self.run_cli(["workout", "generate", "-d", "today..", "--fresh-strength", "-f"])
+        self.assertTrue(mock_coach.workout_generate.call_args.kwargs["fresh_strength"])
 
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.prompt")

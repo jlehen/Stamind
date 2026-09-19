@@ -101,6 +101,7 @@ class _PlannerCase(unittest.TestCase):
         return planner.run(
             entries, live, TODAY, MESO_END, TODAY, kwargs.pop("profile", None),
             kwargs.pop("constraints", []), reason_key="modification_reason",
+            write_again=kwargs.pop("write_again", False),
         )
 
 
@@ -256,6 +257,43 @@ class CheckingTest(_PlannerCase):
         self.assertEqual([r["load_kg"] for r in entry["prescribed_sets"]], [140.0])
 
 
+class WriteAgainTest(_PlannerCase):
+    """`workout generate --fresh-strength`: the athlete asks for Thursday to be written again
+    though nothing was lifted since it was weighed (§9)."""
+
+    def setUp(self):
+        super().setUp()
+        self.session = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        test_db.record_strength_check(self.session["id"],
+                                      test_db.strength_history_stamp())
+
+    def test_without_it_a_weighed_session_costs_no_call(self):
+        self.assertIsNone(self.strength_pass([]))
+        self.assertEqual(self.asked, [])
+
+    def test_it_is_asked_and_its_answer_is_written_with_the_reason(self):
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0),
+                   row("barbell push press", 3, 5, 7, 50.0),
+                   reason="Your gym days alternate the belt squat and the push press."),
+        ]}]
+        result = self.strength_pass([], write_again=True)
+        self.assertIn(planner.ASKED_AGAIN, self.asked[0][1])
+        [added] = result.added
+        self.assertEqual([r["exercise"] for r in added["prescribed_sets"]],
+                         ["belt squat", "barbell push press"])
+        self.assertEqual(added["modification_reason"],
+                         "Your gym days alternate the belt squat and the push press.")
+
+    def test_the_same_sets_back_change_nothing(self):
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0), reason="Same."),
+        ]}]
+        result = self.strength_pass([], write_again=True)
+        self.assertEqual(result.added, [])
+        self.assertEqual(result.checked, [("2026-09-17", "strength_training")])
+
+
 class OutputChecksTest(_PlannerCase):
     def test_an_unknown_name_drops_that_exercise_not_the_session(self):
         self.gym("2026-09-17")
@@ -409,6 +447,69 @@ class ThroughAdaptTest(_PlannerCase):
         shown = "\n".join(str(call.args[0]) if call.args else "" for call in printed.mock_calls)
         self.assertIn("Belt squat 3×4–6 @ 140 kg", shown)
         self.assertIn("Nordic curl", shown)
+
+
+class ThroughGenerateTest(_PlannerCase):
+    """`workout generate --fresh-strength` on Tuesday: the week planner keeps Thursday's gym,
+    which is inside the commitment window, and the strength planner writes it again (§9)."""
+
+    def setUp(self):
+        super().setUp()
+        objective_id = test_db.add_objective(
+            title="Race", target_date="2026-12-01", sport_type="cycling",
+        )
+        test_db.save_macrocycle(
+            objective_id=objective_id, strategy="Build.", goals_hash="g",
+            constraints_hash="c",
+            mesocycles=[{"name": "Build", "start_date": "2026-09-01",
+                         "end_date": MESO_END, "focus": "Build"}],
+        )
+        gym = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        test_db.record_strength_check(gym["id"], test_db.strength_history_stamp())
+
+    def generate(self, **flags):
+        with patch("trainmate.runtime.calendar_syncer"), \
+                patch("trainmate.coach.engine.openrouter_client") as week_planner:
+            week_planner.complete.return_value = {"reasoning": "Build.", "workouts": []}
+            proposal = coach_service.workout_generate(**flags)
+            coach_service.workout_generate_apply(proposal)
+        return proposal
+
+    def test_the_kept_session_gets_new_sets_and_the_reason(self):
+        reason = "Your gym days alternate the belt squat and the push press."
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0),
+                   row("barbell push press", 3, 5, 7, 50.0), reason=reason),
+        ]}]
+        proposal = self.generate(fresh_strength=True)
+        line = next(l for l in proposal.standing if l.date == "2026-09-17")
+        self.assertEqual((line.outcome, line.reason), ("revised", reason))
+        gym = test_db.get_workout("2026-09-17", "strength_training")
+        self.assertEqual([r["exercise"] for r in gym["prescribed_sets"]],
+                         ["belt squat", "barbell push press"])
+        self.assertEqual(gym["modification_reason"], reason)
+
+    def test_without_it_the_kept_session_is_not_asked_about(self):
+        proposal = self.generate()
+        self.assertEqual(self.asked, [])
+        line = next(l for l in proposal.standing if l.date == "2026-09-17")
+        self.assertEqual(line.outcome, "kept")
+
+    def test_fresh_implies_it(self):
+        """The week planner writes Thursday again with the brief it had, so only the
+        athlete's request makes the strength planner write it again."""
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("goblet squat", 3, 8, 10, 32.0), reason="New."),
+        ]}]
+        thursday = {"date": "2026-09-17", "sport_type": "strength_training",
+                    "title": "Full-Body Strength", "description": BRIEF,
+                    "duration_minutes": 70, "rpe": 7, "tss": 50}
+        with patch("trainmate.runtime.calendar_syncer"), \
+                patch("trainmate.coach.engine.openrouter_client") as week_planner:
+            week_planner.complete.return_value = {"reasoning": "Build.",
+                                                  "workouts": [thursday]}
+            coach_service.workout_generate(fresh=True)
+        self.assertIn(planner.ASKED_AGAIN, self.asked[0][1])
 
 
 class RecordingTest(_PlannerCase):

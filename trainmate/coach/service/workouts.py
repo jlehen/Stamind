@@ -727,7 +727,8 @@ class WorkoutGenMixin:
 
     def workout_generate(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None,
-        prefer_macro_id: Optional[int] = None, fresh: bool = False
+        prefer_macro_id: Optional[int] = None, fresh: bool = False,
+        fresh_strength: bool = False,
     ) -> GenerateProposal:
         """Proposes workouts (microcycles) from the plan mesocycles governing the span.
 
@@ -741,7 +742,9 @@ class WorkoutGenMixin:
 
         `fresh` (CLI `--fresh`) empties the commitment window for this run, so the week
         planner writes every day of the span the way it writes a day past the window
-        (DESIGN_plan_change_continuity.md §4.4).
+        (DESIGN_plan_change_continuity.md §4.4). `fresh_strength` (CLI `--fresh-strength`)
+        has the strength planner write every strength session of the span again, the window
+        held; `fresh` implies it (DESIGN_strength_tracking.md §9).
 
         Which plan applies is read off the dates being generated, not off a goal the
         caller names: the goal was only ever an indirection to the macrocycle, and the
@@ -941,6 +944,7 @@ class WorkoutGenMixin:
         strength = strength_planner.run(
             workouts, span_sessions, gen_start_str, gen_end_str, today_str,
             profile, constraints, reason_key='change_reason',
+            write_again=fresh or fresh_strength,
         )
         if strength is not None:
             workouts.extend(strength.added)

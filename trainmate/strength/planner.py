@@ -32,6 +32,8 @@ _RULE = "=" * 80
 # The line on a session to check whose sets were written under another brief or duration:
 # the third ground for changing a kept session (§9).
 MOVED_ON = "Its brief or its duration changed since these sets were written: write it again."
+# The line for the fourth ground, the athlete asking: `workout generate --fresh-strength` (§9).
+ASKED_AGAIN = "The athlete asked for this session to be written again: write it again."
 
 NOT_RECHECKED = (
     "I could not recheck {days} kilograms this morning. They stand as written, and I will "
@@ -53,8 +55,8 @@ For each session under SESSIONS TO CHECK, the athlete has already been shown it.
 - The sets on record since it was written say a load should move.
 - The athlete has made a habit of doing something other than what it holds (CHOOSING THE
   EXERCISES).
-- It says that its brief or its duration changed. Then write it again, the way you write a
-  session under SESSIONS TO WRITE.
+- It says to write it again, because its brief or its duration changed or because the athlete
+  asked for it. Then write it again, the way you write a session under SESSIONS TO WRITE.
 When you do change it, return the whole session again and say in one sentence why,
 written for the athlete to read: "Monday's sets all reached 6 at 140; add 5."
 
@@ -167,6 +169,7 @@ class _Session:
     live: Optional[Dict[str, Any]]       # the session standing on that date, when one does
     rows: List[Dict[str, Any]] = field(default_factory=list)
     to_write: bool = True
+    asked_again: bool = False            # the athlete asked for it to be written again
 
     @property
     def lineage_id(self) -> Optional[int]:
@@ -305,6 +308,8 @@ def _session_block(
     lines = [f"- {session.date} ({duration}) \"{session.title}\""]
     if session.rows and _moved_on(session):
         lines.append(f"  {MOVED_ON}")
+    elif session.asked_again:
+        lines.append(f"  {ASKED_AGAIN}")
     lines.append(f"  Equipment that day: {_equipment_for(session.date, profile)}")
     active = _constraints_for(session.date, constraints)
     if active:
@@ -335,7 +340,7 @@ def _user_content(
             "## SESSIONS TO CHECK\n"
             "The athlete has already been shown these. Keep each unless the sets on record say "
             "a load\nshould move, the athlete has made a habit of doing something else, or it "
-            "says that its\nbrief or its duration changed.\n"
+            "says to write it\nagain.\n"
             + "\n\n".join(_session_block(s, profile, constraints) for s in to_check)
         )
     return "\n\n".join(parts)
@@ -553,7 +558,7 @@ def run(
     entries: List[Dict[str, Any]], live_sessions: Sequence[Dict[str, Any]],
     span_start: str, span_end: str, today: str,
     profile: Optional[Dict[str, Any]], constraints: Sequence[Dict[str, Any]],
-    reason_key: str, held: Sequence[Tuple[str, str]] = (),
+    reason_key: str, held: Sequence[Tuple[str, str]] = (), write_again: bool = False,
 ) -> Optional[StrengthPass]:
     """Writes and checks the proposal's strength sessions, in place (§9).
 
@@ -562,12 +567,17 @@ def run(
     `StrengthPass.added` for the caller to add. Returns None when there is nothing new to
     write from, which is what makes a morning adapt in a week with no lifting cost no call.
 
+    `write_again` (`workout generate --fresh-strength`) asks for every session to check to be
+    written again, new evidence or not (§9).
+
     Raises `StrengthPlannerFailed` when the call fails twice with a session to write: a
     strength day with a brief and no exercises must never exist.
     """
     to_write, to_check = _collect(entries, live_sessions, span_start, span_end, held)
     if not to_write and not to_check:
         return None
+    for session in to_check:
+        session.asked_again = write_again
     stamp = runtime.db.strength_history_stamp()
     checks = runtime.db.strength_checks_for(
         [s.lineage_id for s in to_check if s.lineage_id is not None]
@@ -576,7 +586,8 @@ def run(
     written_by_the_week_planner = any(
         s.entry is not None and not s.entry.get("keep") for s in to_write + to_check
     )
-    if not to_write and not fresh_evidence and not written_by_the_week_planner:
+    if (not to_write and not fresh_evidence and not written_by_the_week_planner
+            and not write_again):
         return None
 
     built = history.build(today)
@@ -660,9 +671,13 @@ def _fold_in(
                reason_key)
     for session in to_check:
         answer = answers.get(session.date)
-        # New evidence, a new brief or a new duration: without one of those a kept session
-        # could come back at 142.5 where it stood at 145, for no reason anyone can defend.
-        weighed_already = _weighed_before(session, stamp, checks) and not _moved_on(session)
+        # New evidence, a new brief, a new duration or the athlete asking: without one of
+        # those a kept session could come back at 142.5 where it stood at 145, for no reason
+        # anyone can defend.
+        weighed_already = (
+            _weighed_before(session, stamp, checks) and not _moved_on(session)
+            and not session.asked_again
+        )
         if (answer is None or answer.keep or not answer.rows
                 or weighed_already or _same_rows(answer.rows, session.rows)):
             _keep(session)

@@ -507,7 +507,7 @@ def _generate(args: argparse.Namespace, force: bool, replaced: bool) -> None:
 
     proposal = runtime.coach_service.workout_generate(
         start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id,
-        fresh=fresh,
+        fresh=fresh, fresh_strength=getattr(args, 'fresh_strength', False),
     )
     if not runtime.render.workout_generate_preview(proposal):
         return
