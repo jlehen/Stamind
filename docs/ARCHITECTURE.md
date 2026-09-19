@@ -166,7 +166,10 @@ classes themselves.
     (DESIGN_bot_simple_frontend.md §5.1, §11); "💬 Talk to me" only shows the capture
     prompt — every non-label message, tapped or not, is classified by `tm bot route`
     (a hidden CLI command calling `llm.router_model`) and mapped to argv from the bot's
-    own `ROUTER_INTENT_ARGV` table — the model picks an intent, never argv. The tap's
+    own `ROUTER_INTENT_ARGV` table — the model picks an intent, never argv. Two intents
+    carry the athlete's words to the coach instead (`ROUTER_MESSAGE_ARGV`): how the
+    athlete is (`coach_message`) goes to `workout adapt -m`, a change they decided
+    (`tweak_session`) to `workout tweak` (DESIGN_workout_tweak.md §3.4). The tap's
     one effect is invisible and can only help: while it is live, text the router calls
     `unclear` rides the `bot capture note` inbox instead of bouncing, so the button never
     redirects a message, only rescues one (§5.2, §12.3).
@@ -520,7 +523,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Workout generation span          | `coach/service/workouts.py:workout_generate`, `cli/workouts/generate.py:_resolve_span`, `cli/workouts/parser.py` (flag parsing), `config.workout_generation_span_days` |
 | Commitment window                | `settings.commitment_days`, `coach/service/workouts.py:_commitment_window`/`_standing_sessions`/`_resolve_standing`, `coach/formatting.py:format_standing_workouts`, `calendar_reconcile.py:leaves_trace`, `workout_changes.commitment_end`   |
 | Telling the athlete a plan-shaping input changed since the plan was built | `config.py` (`plan_profile`/`changed_plan_profile_fields`/`plan_config_hash` — the partition and the fields that moved; `athlete_science_documents`/`changed_science_documents` — the science files that moved), `coach/service/prompt.py:config_changed` (the judgment, every axis), **`cli/staleness.py`** (canonical for everything the athlete sees: the reason, the §2 test said out loud, the re-stamp, and the four surfaces' shared wording), and the surfaces that draw it: `cli/plans.py` (`plan show` reports, `plan keep` dismisses, `plan generate` offers), `cli/workouts/generate.py`, `cli/status.py` (a pointer to `plan show`, nothing more), `trainmate_web.py` (a read-only banner off `plan_config_hash()`, deliberately not through the engine — §8). Built in **one** place for the same reason the runway nudge is: three call sites each phrasing a two-sentence explanation is how they drift (DESIGN_plan_staleness.md §9) |
-| Telling the athlete the schedule is running out | `progression.py` (`coverage_end`, `runway` — the pure detector and its four kinds), `cli/runway.py` (the row fetch, every wording, the morning-push button), and the four surfaces that draw it: `cli/workouts/generate.py` (`workout adapt`'s hint and refusal, `workout list`'s marker), `cli/status.py`, `cli/bot.py:run_bot_morning`, `config.runway_warning_days`, DESIGN_runway_nudge.md. The wording is built in **one** place on purpose — the hint used to live on `workout adapt` alone, which is how `status` came to answer differently on the same morning (§3 of that doc) |
+| Telling the athlete the schedule is running out | `progression.py` (`plan_end`, `runway` — the pure detector and its four kinds), `cli/runway.py` (the row fetch, every wording, the morning-push button), and the four surfaces that draw it: `cli/workouts/generate.py` (`workout adapt`'s hint and refusal, `workout list`'s marker), `cli/status.py`, `cli/bot.py:run_bot_morning`, `config.runway_warning_days`, DESIGN_runway_nudge.md. The wording is built in **one** place on purpose — the hint used to live on `workout adapt` alone, which is how `status` came to answer differently on the same morning (§3 of that doc) |
 | Generation covering every date of its span | `coach/engine/workouts.py` (the TASK sentence), `coach/service/workouts.py:_fill_coverage_gaps` (the deterministic backstop, over the same `_rest_workout` factory the rest-window pre-pass uses), DESIGN_runway_nudge.md §2.1. The invariant is what lets the end of the schedule be read straight off the rows, with no margin |
 | Knowing whether the schedule reflects a constraint | `coach/honoring.py` (**canonical** for `honored_at`: what it means, who may stamp it, the write, and `needs_a_pass` — whether the schedule is missing a directive at all), `coach/proposals.py` (`covered_constraint_ids`, decided at proposal time on both proposal types so apply never re-derives it), `coach/service/adaptation.py` + `coach/service/workouts.py` (the two stamping commands), `cli/constraints.py:_maybe_point_at_honor` (the add-time message naming the mesocycle and the run that would build it in), `cli/status.py`, `cli/common.py:constraint_line`/`report_unhonored`, `db/constraints.py` (`mark_honored`, `clear_honored`, `clear_honored_after`), DESIGN_constraint_honoring.md. There is deliberately **no dedicated command** and no SQL half-copy of the predicate in `db/` — §5 of that doc records why |
 | Coach-learnings / confidence     | `db/learnings.py`, `coach/service/prompt.py` (`_apply_learning_updates`, `_review_learning_proposals`), `learning_doubts.py` (the athlete's question about a doubt), model is **canonical** in [§3](#3-coach-package-architecture) |
@@ -902,8 +905,23 @@ called by the UIs.
     it still counts as proposed on its date, so the displacement rule cannot void the
     session the re-list was protecting. Held slots travel on `RevisionProposal.held`, which
     both the preview and apply union into the date's proposed sports (§9.1).
-- **`workout_revision_apply(proposal)`** — the accepted half of `workout_adapt`. Opens
-  one `adapt` change: a session the pass drops becomes a **void** revision (never a
+- **`workout_tweak(message, tweak_dates, today_str)`** — `workout adapt`'s path with a
+  narrower job: the athlete has decided the change, the week planner writes it
+  (DESIGN_workout_tweak.md §3). It calls `workout_adapt(..., tweak=True)`, which swaps
+  the adapt TASK for the request's, leaves out the fatigue-reading sections and the drift
+  context, and lists every cancelled session ahead (`get_cancelled_workouts`) so one can
+  be brought back. After the reply, the days are the caller's `-d` days, else the
+  `tweak_dates` the week planner returned; a reply that changes sessions and names none,
+  or names a day past the current mesocycle, raises. Every entry on another date is
+  dropped, and so is a move whose other end is on another date, before the moves are
+  resolved. The strength planner is shown those days only. The proposal carries
+  `kind="tweak"` and covers no constraint.
+- **Moves and swaps** (`_resolve_moves` / `_move_source`): a move may land on a slot
+  whose session is itself moving out in the same reply, which is how two sessions of the
+  same sport swap days (DESIGN_workout_tweak.md §3.1).
+- **`workout_revision_apply(proposal)`** — the accepted half of `workout_adapt` and
+  `workout_tweak`. Opens one change of the proposal's `kind` (`adapt` or `tweak`): a
+  session the pass drops becomes a **void** revision (never a
   `DELETE`), a cross-sport substitution is a void at the source plus a revision at the
   destination on the same lineage, and every revised session appends with its own
   `modification_reason`; the batch `reason` lands on the `workout_changes` row. Voids go
@@ -915,14 +933,6 @@ called by the UIs.
   looked at the metrics and held still writes its `workout_changes` row (appending
   nothing) and stamps `honored_at`, so "no adaptation needed" is a recorded event and a
   valid honoring claim ([§10](#daily-adaptation-workout-adapt), step 6).
-- **`workout_add(date, sport_type, title, description, …, replace_day=False)`** —
-  manually schedules a workout (deterministic, no LLM), **replacing** any same-sport
-  session that day — or every session that day with `replace_day`. A manual session is a
-  *new* session, so it starts its own lineage and inherits neither the replaced session's
-  load nor its Calendar event (DESIGN_workout_revisions.md §4). What it overwrote is
-  recorded on its note — each replaced title + duration/TSS/RPE, plus the athlete's
-  `--reason` — and rendered as "Reason:" on the event. Load re-balancing is left to
-  `workout_adapt`. (See [§11](#11-terminology-plans-vs-workouts).)
 - **`data_bootstrap(...)` / `data_reflect(...)`** — read past training from completed
   activities + metrics via the shared `_run_workout_analysis` core, which passes the
   horizon down so each asks its own question (§10.3). `bootstrap` = cold-start over the
@@ -1042,8 +1052,7 @@ connection + schema setup), `objectives.py`, `constraints.py`,
   (DESIGN_workout_revisions.md §6/§8).
 - **Sport-type matching is alias-aware** (`trainmate/sports.py`, `SPORT_MAPPING`):
   the coach's prompts/generated/adapted workouts speak canonical names
-  (`strength_training`), while manual (`workout add`) or legacy rows may use an alias
-  (`strength`). `workout add` normalizes input via `canonical_sport()`; `get_workout`
+  (`strength_training`), while legacy rows may use an alias (`strength`). `get_workout`
   and the append path key on `sport_canonical`, so a canonical lookup or write resolves
   an aliased session instead of reporting it missing or inserting a duplicate; the stored
   `sport_type` keeps the spelling as written. Adaptation's override check compares
@@ -1081,8 +1090,8 @@ connection + schema setup), `objectives.py`, `constraints.py`,
 - `rollback_to_change(change_id, from_date)` is the **one** undo primitive, and it is
   point-in-time: it reverts that change *and every change after it*. It works per slot
   rather than per lineage, because a change can end a lineage by appending over it — a
-  `generate` landing on a manual session, an `add` replacing a generated one — and the
-  session to bring back is then the slot's previous occupant. For every slot the target or
+  move landing on a slot another session held — and the session to bring back is then
+  the slot's previous occupant. For every slot the target or
   a later change wrote, the revision live there just before it is copied forward, stamped
   `restored_from`; a slot that held nothing gets a void. `workout rollback`, `plan
   rollback` (targeted at the moment just after the restored version's newest change) and
@@ -1115,12 +1124,16 @@ methods whose behavior is *not* obvious from that convention are called out belo
   table is a log rather than a set of rows to edit. The whole write side is
   `workout_change` (see Key Patterns above); there is no `save_`, no `update_`, no
   `delete_`. On the read side, `get_workouts` / `get_workout` / `get_workout_by_id` return
-  the *hydrated* session — the live revision plus what its lineage derives (`original_*`,
-  the adaptation tally, `source`) — so everything above this module sees the dict shape it
+  the *hydrated* session — the live revision plus what its lineage derives (`original_*`
+  and the adaptation tally) — so everything above this module sees the dict shape it
   always did. `get_workout_by_id` takes a **lineage** id, the one `workout list` prints,
-  and resolves it to that session's newest live revision, which is what stops `workout rm`
-  addressing a dead revision. Voids are excluded unless `include_removed=True`; there is
-  no `include_archived` any more. The history readers are `get_plan_revisions` (every
+  and resolves it to that session's newest live revision, which is what stops `workout
+  show` addressing a dead revision. Voids are excluded unless `include_removed=True`; there
+  is no `include_archived` any more. `get_cancelled_workouts(start, end)` is the wider read
+  `workout tweak` needs: every slot in the range whose live revision is a void, including
+  a session that lives on as a rest day on the same date, but not one that moved to
+  another date and stands there (DESIGN_workout_tweak.md §3.1). The history readers are
+  `get_plan_revisions` (every
   revision, flagged live) and `get_workout_changes` (the batch list `workout batches`
   renders, each entry with its `note` and a `waiting` flag). The heads-up readers
   (DESIGN_change_heads_up.md §6): `waiting_changes()` — a line for the athlete, no
@@ -1306,7 +1319,7 @@ facts are **derived, not stored**. See DESIGN_workout_revisions.md.
 | `tss`                   | INTEGER    | Expected Training Stress Score                   |
 | `void`                  | INTEGER    | 0/1 — 1 ⟺ this slot holds no session as of this revision. When it is the newest revision in the slot there is no session that day; when it is not, it is history like any other row. |
 | `reason`                | TEXT       | This revision's note: why it changed, or why it was cancelled. The change kind says which. |
-| `restored_from`         | INTEGER    | Only on a `rollback`/`restore`/`reinstate` copy: the revision it duplicates. The adaptation tally follows it to skip spans that were undone. |
+| `restored_from`         | INTEGER    | Only on a `rollback`/`reinstate` copy: the revision it duplicates. The adaptation tally follows it to skip spans that were undone. |
 | `macrocycle_id`         | INTEGER    | Plan version this revision belongs to — the per-date tag every scoping read uses (goal stand-down, `plan show`). |
 | `created_at`            | TEXT       | UTC ISO — when the SESSION entered the plan, carried across its revisions. Distinct from the change's own timestamp. |
 | `benchmark_type`        | TEXT       | Benchmark identity: non-NULL ⟺ this session is a fitness test (`ftp_20min`, `run_5k_tt`, `e1rm`, …). Creation-time intent, carried forward by the append merge so a partial re-save preserves it; `change.append(clear_benchmark=True)` is the one way to blank it, used when an adaptation replaces a test with something that is no longer that test (`DESIGN_benchmark_workouts.md` §4.2). Rendered as `[BENCHMARK]` in `workout list`. |
@@ -1328,7 +1341,7 @@ nothing, because an adapt that looked at the metrics and held is a real event.
 |-----------------|------------|---------------------------------------------------|
 | `id`            | INTEGER PK | The batch key. `workout rollback` undoes a change and everything after it. |
 | `created_at`    | TEXT       | UTC ISO, when the command ran.                    |
-| `kind`          | TEXT       | `generate` · `adapt` · `swap` · `add` · `rm` · `restore` · `rollback` · `stand-down` · `reinstate`. Fixed at write time; one invocation has exactly one kind. |
+| `kind`          | TEXT       | `generate` · `adapt` · `tweak` · `rollback` · `stand-down` · `reinstate`. Fixed at write time; one invocation has exactly one kind. Schema 18 relabelled the kinds of the four removed hand-edit commands (`add`, `rm`, `swap`, `restore`) as `tweak` (DESIGN_workout_tweak.md §7). |
 | `summary`       | TEXT       | The batch rationale — what `adaptation_summary` used to copy onto every row. |
 | `macrocycle_id` | INTEGER    | The plan version in force when this ran: context for `workout batches`, distinct from the per-row tag. |
 | `note`          | TEXT       | The coach's one line to the athlete about this change. A `generate` writes it only when something they would notice changed (DESIGN_plan_change_continuity.md §6.3); an `adapt` that changed something stores its reason here too; a `rollback` writes its own line about what it undid. NULL on everything else (DESIGN_change_heads_up.md §6). |
@@ -1362,22 +1375,23 @@ no precedence rule — the kind was recorded when the change ran:
 |---|---|
 | `generate` | unmodified |
 | `adapt` | adapted |
-| `swap` | swapped |
-| `add` | replaced |
+| `tweak` | tweaked (changed on request) |
 
-  - A `rollback`/`restore`/`reinstate` copy re-establishes an earlier prescription, so it
-    reads as whatever *that* prescription was — the same `restored_from` jump the tally
-    makes. `rm`/`stand-down` produce voids, which carry `[REMOVED]` instead.
+  - A `rollback`/`reinstate` copy re-establishes an earlier prescription, so it reads as
+    whatever *that* prescription was — the same `restored_from` jump the tally makes.
+    Voids carry `[REMOVED]` instead.
   - **Markers:** `workout list` renders the kind *and* the standing easings, so a session
-    eased twice and then swapped reads `[SWAPPED, ADAPTED ×2]`. Two facts rather than one,
-    which is why there is no longer a rule about which wins. `modification_markers` in
-    `cli/workouts/_helpers.py` is the single renderer; the web API serves its output.
+    eased twice reads `[ADAPTED ×2]` and one changed on request `[TWEAKED]`. Two facts
+    rather than one, which is why there is no longer a rule about which wins.
+    `modification_markers` in `cli/workouts/_helpers.py` is the single renderer; the web
+    API serves its output.
   - **The adaptation tally** (`adaptation_count` / `adapted_at`) is derived by walking the
     lineage backwards from the live revision: jump over any span a `restored_from` copy
-    undid, stop at the first `generate` (a re-prescription; easings of the old form do not
-    describe the new one), and count the `adapt` revisions whose duration or TSS fell
-    against their own predecessor. Because the walk follows the *lineage*, it survives a
-    swap — which is the whole reason `lineage_id` exists. The daily adaptation renders it
+    undid, stop at the first `generate` or `tweak` (a re-prescription; easings of the old
+    form do not describe the new one), and count the `adapt` revisions whose duration or
+    TSS fell against their own predecessor. Because the walk follows the *lineage*, it
+    survives a move — which is the whole reason `lineage_id` exists. The daily adaptation
+    renders it
     as the `[ALREADY EASED …]` tag so a re-run holds an already-eased session instead of
     stacking another cut onto still-lagging recovery.
 
@@ -1402,13 +1416,14 @@ no precedence rule — the kind was recorded when the change ran:
     revision**, live in its slot or not (`get_lineage_head`): a session that still owns
     its slot and whose signature differs is pushed; one that no longer owns it was
     superseded, and its event goes. A void is decided by `leaves_trace`
-    (DESIGN_plan_change_continuity.md §5.2) — the athlete's own removal, a session they
-    added, or one removed inside the commitment window the change ran under keeps its
+    (DESIGN_plan_change_continuity.md §5.2) — the athlete's own removal (a goal stood
+    down), or one removed inside the commitment window the change ran under keeps its
     event, retitled, and gets one if it never had one; every other void's event is
     deleted and its state row dropped. Reading the lineage rather than the slot is what
     lets a marker written and then covered in the same run survive the run that wrote it.
-  - **What the event says.** Title tags first (`[Done]`/`[Manual]`/`[Adapted]`/
-    `[Deleted]`/`[Cancelled]`), then the body: the current load line, the current
+  - **What the event says.** Title tags first (`[Done]`/`[Adapted]`/`[Deleted]`/
+    `[Cancelled]`; a tweaked session has no tag, its `Reason:` says what was asked), then
+    the body: the current load line, the current
     description, its `Reason:`, the intensity target, the **`History` section** — every
     earlier revision of the lineage, newest first, each with its date, load, target,
     reason and body (`calendar_lineage.py`, DESIGN_calendar_lineage.md) — and last the
@@ -1416,7 +1431,7 @@ no precedence rule — the kind was recorded when the change ran:
     workout ids. A session that has never been revised has no `History` section and renders
     exactly as before.
   - **Stale is a retry marker, not a defect.** It persists only when the push could not
-    land (offline, API error) or was declined (`swap --no-sync`). `workout push` defaults
+    land (offline, API error) or was declined (`--no-sync`). `workout push` defaults
     to **today onward**, so `warn_stale_before` (in `cli/workouts/_helpers.py`) reports
     anything stranded stale in the past and the `-d START..` window to recover it.
   - **Orphans** are the reverse direction: an event whose session is gone (fresh DB,
@@ -1448,14 +1463,16 @@ no precedence rule — the kind was recorded when the change ran:
     it freshens Garmin over that past span first (`--no-pull` skips it); a listing
     entirely in the future costs neither a pull nor a query.
 
-**3. Removed?** = the live revision is a **void**. `workout rm` appends one carrying the
-athlete's reason; the session is not deleted, and everything before the void is still in
-the log. `get_workouts` excludes voids by default (`include_removed=False`), so they
-vanish from `workout list`/`compare`, adherence, generation and the web API, and are
-**not** counted as misses. The adapt flow re-fetches them (`include_removed=True`) and
-surfaces them to the week planner as deliberate cancellations. A goal stood down, a session an
-adapt dropped and a session a plan no longer holds are voids too — the change kind is what
-tells them apart, and it is what decides whether the Calendar event is kept or torn down.
+**3. Removed?** = the live revision is a **void**. The session is not deleted, and
+everything before the void is still in the log. `get_workouts` excludes voids by default
+(`include_removed=False`), so they vanish from `workout list`/`compare`, adherence,
+generation and the web API, and are **not** counted as misses. The adapt flow re-fetches
+the voids of a goal stood down (`include_removed=True`) and surfaces them to the week
+planner as deliberate cancellations; `workout tweak` is shown every void ahead instead
+(`get_cancelled_workouts`), so a request can bring one back. A session an adapt or a
+tweak dropped and a session a plan no longer holds are voids too — the change kind is
+what tells them apart, and it is what decides whether the Calendar event is kept or torn
+down.
 
 ### completed_activities
 | Column              | Type    | Notes                                              |
@@ -1501,8 +1518,9 @@ What the strength planner wrote for one revision of one strength session
 (DESIGN_strength_tracking.md §9). The session's description is rendered from these rows, so
 the kilograms the athlete reads and the kilograms stored as data cannot disagree. Planned
 sessions are append-only, so the rows belong to a revision and go with it: they are written
-in the same transaction, copied by a restore and by `workout swap`, carried forward by a
-revision that continues the session, and cascaded away with their `workouts` row.
+in the same transaction, copied by a rollback, carried to a moved session's new day by
+the strength planner, carried forward by a revision that continues the session, and
+cascaded away with their `workouts` row.
 
 | Column       | Type    | Notes                                                        |
 |--------------|---------|--------------------------------------------------------------|
@@ -1517,7 +1535,7 @@ revision that continues the session, and cascaded away with their `workouts` row
 ### strength_checks
 Which evidence each strength session's kilograms were last weighed against
 (DESIGN_strength_tracking.md §9). Keyed by lineage, so it follows the session across
-revisions and across a swap. Written when a proposal is applied or recorded as no change,
+revisions and across a move. Written when a proposal is applied or recorded as no change,
 never when it is proposed. Without it a kept Thursday could come back at 142.5 where it
 stood at 145 the next morning, from lifting already weighed.
 
@@ -1989,7 +2007,7 @@ command at its level *is* that command — `pl g` is `plan generate`, `constr ed
 set. An ambiguous prefix (`p` → `plan`/`progress`)
 is refused, naming the candidates. Only shorthands that are *not* prefixes
 (`lm`, `df`, `rb`, `sm`, `sa`, `san`, `use`) or that pick a winner among an
-ambiguous set (`s` → `status`, `workout a` → `adapt`, `workout p` → `push`,
+ambiguous set (`s` → `status`, `workout p` → `push`,
 `signal l` → `list`, `data b` → `bootstrap`) stay registered as real aliases.
 `rm` deliberately gets no winner — `r` stays ambiguous rather than shortening the
 destructive command. Anything in the column that is *not* in those two registered
@@ -1998,7 +2016,7 @@ letters lands; DESIGN_cli_noargs.md §d is the canonical authority on the distin
 
 **LLM commands share two flags** the table omits: `--show-llm-prompt-only` prints the
 prompt the command would send and exits before the call (`plan generate`, `workout
-generate`/`adapt`/`swap`, `data bootstrap`/`reflect`), and the root `--llm-model MODEL`
+generate`/`adapt`/`tweak`, `data bootstrap`/`reflect`), and the root `--llm-model MODEL`
 pins the coaching model for one invocation ([§6](#6-singletons)).
 
 **Range filters** (DESIGN_cli_selectors.md): every command that filters by span takes the
@@ -2068,19 +2086,16 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `plan`       | `feedback`   | `pl f`   | Append a note about the plan to its append-only log — bare text is plan-level, `-m [ATOM]` files it to one mesocycle of any upcoming goal's plan by name-infix / date / mesocycle ID (bare `-m` = the current mesocycle), and that mesocycle picks the plan. Bare run lists what is pending, `--rm ID [-y]` deletes one, `--replan` regenerates straight away, `-g/--goal ID` targets another goal's plan (and confines `-m` to it). No LLM at capture; the next `plan generate` reads the whole log and must address every note (DESIGN_plan_feedback.md) |
 | `plan`       | `wipe`       | —        | Delete all plans                                                         |
 | `progress`   | `[SPORT ...]` | `pr`    | Show the progress timeline: measured load to date, plan-projected forward (CTL/ATL/TSB), weekly planned-vs-actual bars (`-w/--weeks N`, `--chart [PATH]` for a PNG, `--explain` for the TSB-lag note; DESIGN_progress_timeline.md). `-z`/`--zones` (implied by naming a sport) adds one weekly time-in-zone table per sport — measured behind today, prescribed ahead of it (`--mesocycles` for mesocycle grain, `--power`/`--hr` to force the currency; DESIGN_intensity_distribution.md §9.6/§9.8). The sport argument scopes the **zone tables only**: CTL/ATL/TSB, the projection and the load table stay whole-athlete |
-| `workout`    | `list`       | `w l`    | Show planned workouts. Defaults to a 7-day window from today. Positional `TARGET…` (workout IDs and/or date selectors, e.g. `wo li 12 15 -v`) plus the shared selectors `-d`/`-m`/`-M`/`-g` and `-t/--type TYPE`, `--removed`, `-l/--link` (each synced session's Calendar event link) (DESIGN_cli_selectors.md). Every listed session dated **today or earlier** also carries its adherence verdict — `[DONE]`/`[PARTIAL]`/`[MISSED]`/`[REST OK]`/`[REST BROKEN]`, or `[NOT YET]` for one still ahead today — and `-v` adds the matched activity and the mismatch behind a `[PARTIAL]`. Freshens Garmin over that past span unless `--no-pull` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)). A listing whose range runs past the last scheduled session ends on one gray marker naming that — unconditional, a fact of the listing rather than a warning; an empty listing renders it alone (DESIGN_runway_nudge.md §4). |
-| `workout`    | `show`       | `w sh`   | `workout list -v` under a name that says what it does: the same handler with the detail flag pinned on, the same positional targets and the same selectors. `wo sh 12` details one session; a bare `wo sh` details the same 7-day window `list` lists. Adding it made the bare `w s` prefix ambiguous — `swap` now needs `w sw` |
+| `workout`    | `list`       | `w l`    | Show planned workouts. Defaults to a 7-day window from today. Positional `TARGET…` (workout IDs and/or date selectors, e.g. `wo li 12 15 -v`) plus the shared selectors `-d`/`-m`/`-M`/`-g` and `-t/--type TYPE`, `-l/--link` (each synced session's Calendar event link) (DESIGN_cli_selectors.md). Every listed session dated **today or earlier** also carries its adherence verdict — `[DONE]`/`[PARTIAL]`/`[MISSED]`/`[REST OK]`/`[REST BROKEN]`, or `[NOT YET]` for one still ahead today — and `-v` adds the matched activity and the mismatch behind a `[PARTIAL]`. Freshens Garmin over that past span unless `--no-pull` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)). A listing whose range runs past the last scheduled session ends on one gray marker naming that — unconditional, a fact of the listing rather than a warning; an empty listing renders it alone (DESIGN_runway_nudge.md §4). |
+| `workout`    | `show`       | `w sh`   | `workout list -v` under a name that says what it does: the same handler with the detail flag pinned on, the same positional targets and the same selectors. `wo sh 12` details one session; a bare `wo sh` details the same 7-day window `list` lists. |
 | `workout`    | `compare`    | `w c`    | Compare planned vs completed (`analyze_adherence()`): prints PLANNED/ACTUAL per day, flags misses (red), rest violations (red), unplanned high-load (yellow), then a discrepancy summary. Today's untrained sessions read `(not yet — still ahead today)` and are not misses (`pending_from`, [§10](#10-key-data-flows)). Same selectors as `workout list`; default 14-day lookback; a bare span (`-d 7d`) looks *back*; end capped at today. |
 | `workout`    | `generate`   | `w g`    | Generate workouts from the plan mesocycles covering the days generated (the dates pick the plan, not a goal — DESIGN_cli_selectors.md §8). No selector → from the day after the schedule stops (today once it has run out) for `config.workout_generation_span_days` (28 default), so a run adds days rather than rewriting covered ones; refused when the plan is already covered to its last day. Span flags (mutually exclusive, **both** ends of the resolved window are used, and a span never opens before today): `-g/--goal [ID]` = the goal's whole plan span; `-d`; `-m` = that mesocycle's own days; `-M` (which also settles which plan to follow where two cover the same days). Lists the proposed sessions the way `workout list` renders them and asks before writing; on a `y` it archives the span's existing workouts, leaves the days outside it alone, and pushes the new ones to Calendar immediately. `-f/-y` skips both prompts, but the report of what changed for the sessions inside the commitment window still prints (DESIGN_plan_change_continuity.md §4.4). Run from the terminal of a companion instance, it first asks to replace the newest change when the athlete was never told about it, and prints under "Your coach:" when that line reaches the athlete's Telegram — with a warning to run `workout notify` when it changes today's sessions and would otherwise arrive only the next morning (DESIGN_change_heads_up.md §5, §8; shared with `workout adapt` in `cli/workouts/heads_up.py`). |
-| `workout`    | `add`        | `w add`  | Schedule one session by hand, no LLM (`DATE SPORT TITLE` positional, `--desc`, `--duration`, `--rpe`, `--tss`, `--reason`). Replaces any same-sport session that day — every session with `--replace-day` — and names what it replaced on the new session's note ([§11](#11-terminology-plans-vs-workouts)). Inside the commitment window the replaced session keeps its Calendar event, marked `[Deleted]` — the athlete's own hand (DESIGN_plan_change_continuity.md §5.1/§5.2). `w a` is `adapt`, so this one needs the full word |
-| `workout`    | `rm`         | `w rm`   | Soft-remove by ID (`ID REASON`, both positional): marks `removed`, marks the Calendar event deleted; kept in DB, hidden from list/compare, shown to coach as a cancellation. |
-| `workout`    | `restore`    | `w res`  | Bring a cancelled session back by ID: appends a copy of the revision its void ended, and the reconcile removes the `[Deleted]` mark. Unrelated to `workout rollback`, which undoes a whole change. |
-| `workout`    | `rollback`   | `w rb`   | Undo a workout change **and every change after it**, putting the sessions back the way they were the moment before it ran (`--batch N` per `workout batches`, default #1 the newest; `-y`). Any change qualifies, an adapt included. Leaves the active plan version alone — unlike `plan rollback` (DESIGN_workout_revisions.md §10). Unrelated to `workout restore`. |
+| `workout`    | `rollback`   | `w r`    | Undo a workout change **and every change after it**, putting the sessions back the way they were the moment before it ran (`--batch N` per `workout batches`, default #1 the newest; `-y`). Any change qualifies, an adapt or a tweak included. The only undo. Leaves the active plan version alone — unlike `plan rollback` (DESIGN_workout_revisions.md §10). |
 | `workout`    | `batches`    | `w b`    | List every command that wrote workouts, newest first: positional `#N`, when, kind, revision count, date span, plan version, and under each row its stored description cut at 200 characters — none under a rollback, whose description names a change by an internal number the list does not show. A pass that appended nothing reads `(held)`; a change the athlete has not been told about reads `not sent yet` (DESIGN_change_heads_up.md §8). Every entry is undoable, including the newest — there is no separate unnumbered `live` row, because the change that wrote the plan in force is itself in the list (DESIGN_workout_revisions.md §10) |
 | `workout`    | `notify`     | `w n`    | Companion mode only: list the changes to the athlete's week not yet told, each with the line they will get, and on a `y` (`-y` skips the question) ask the bot to send them on its next wake, whatever the hour — by storing the newest one's id as `changes_notify_upto`. Says so and does nothing with nothing waiting or on an expert instance (DESIGN_change_heads_up.md §4) |
 | `workout`    | `adapt`      | `w a`    | Run daily adaptation check (`-d/--date` one day: `YYYY-MM-DD`, `today`, `-1d`; `-m` athlete note — kept, since adapt takes no mesocycle selector; `--lookback DAYS` overrides `metrics_lookback_days` for this run; `-y` auto-apply). Draws the same end-of-schedule hint `status` does, and **refuses** outright when every mesocycle of the plan is behind today — there is nothing to adapt towards, and it used to close with a green all-clear over an empty calendar (DESIGN_runway_nudge.md §4). From the terminal of a companion instance it asks the same replace question as `workout generate`, presents `-m` to the week planner as the athlete's coach's note, and prints under the reason when it reaches the athlete, with the same `workout notify` warning for a change to today (DESIGN_change_heads_up.md §3, §5, §8) |
+| `workout`    | `tweak`      | `w t`    | Ask the coach for a change the athlete decided (`MESSAGE` positional, e.g. `"Saturday: a 4 hour hike instead of the ride"`): shorter or harder, another sport, other exercises in a strength session, a session added, dropped or brought back, moved, two days swapped. `workout adapt`'s flow, preview and apply with a narrower job: only the days the request is about may change, each between today and the end of the current mesocycle. `-d DATE` names a day and may be given more than once; without it the week planner reads the days off the message. `-y` applies without asking; `--no-pull` and the LLM debug flags as on `adapt`. Recorded as kind `tweak`, undone by `workout rollback` (DESIGN_workout_tweak.md §3) |
 | `workout`    | `push`       | `w p`    | Sync planned workouts to Google Calendar. Defaults to today onward; pushes only unsynced unless `-f`/`--force` re-pushes already-synced ones. |
-| `workout`    | `swap`       | `w sw`   | Swap two workouts by dates (`<date> <date>`) or IDs (`<id> <id>`), same kind on both sides, plus a mandatory positional `REASON`. Runs recovery checks (consecutive hard days, load spikes, mesocycle crossings), prompts on warnings unless `-f`; syncs unless `--no-sync`; the reason is folded into `modification_reason`. |
 | `workout`    | `wipe`       | —        | Delete all workouts                                                      |
 | `workout`    | `prune-calendar` | —    | Delete Calendar workout events that no local row references — the orphans a fresh DB, a restored backup, or a wipe that never reached Calendar leaves behind. Ownership read from the `source=TrainMate` tag, not from stored ids; events of soft-removed workouts are kept. `-d RANGE` windows it (as on `data wipe`), `-n`/`--dry-run` previews, `-y` skips the prompt |
 | `data`       | `pull`       | `d p`    | Fetch Garmin activities/metrics and Google Calendar signals (`-d RANGE`/`--metrics-only`/`--activities-only`/`--sleep`). Defaults to the last 2 days ending today. |
@@ -2166,7 +2181,7 @@ top-level tabs, all lazy-loaded on first show:
   calendar strip per metric shaded within that metric's own range, over the raw rows.
 
 Panels that used to carry a button now name the command that does the job
-(`tm plan generate`, `tm workout swap`, `tm learnings demote`, …), including the
+(`tm plan generate`, `tm workout tweak`, `tm learnings demote`, …), including the
 long-standing CLI-only flows `data pull`/`bootstrap`/`reflect` (interactive / MFA-bound,
 DESIGN_garmin_direct_pull.md §11). Sport filter dropdowns are built from the sports
 actually present in the data rather than a hardcoded `<option>` list — the old list had
@@ -2206,8 +2221,8 @@ exactly that reason.
 Every other verb on every path returns **405** `{error, method, path}`.
 
 Writes live in the CLI: `goal`/`constraint`/`signal`/`benchmark` authoring,
-`plan generate`/`rollback`/`feedback`, `workout add`/`swap`/`rm`/`restore`/`adapt`/
-`generate`/`push`/`rollback`, `learnings edit`/`demote`/`keep`/`rm`, `settings set`, and
+`plan generate`/`rollback`/`feedback`, `workout adapt`/`tweak`/`generate`/`push`/
+`rollback`, `learnings edit`/`demote`/`keep`/`rm`, `settings set`, and
 `data pull`/`bootstrap`/`reflect`.
 
 ---
@@ -2389,9 +2404,8 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    prompt is then byte-identical to before.
 3c. **The commitment window** (`commitment-days`, default 7, DESIGN_plan_change_continuity.md
    §4). The sessions already standing in the span that the athlete has read — today
-   through `today + N − 1` — plus every session they added by hand anywhere in the span,
-   reach the prompt as "SESSIONS ALREADY STANDING", each tagged `[COMMITTED]`,
-   `[BENCHMARK: …]`, `[ADDED BY THE ATHLETE]` or `[REST DAY]`, with what it was first
+   through `today + N − 1` — reach the prompt as "SESSIONS ALREADY STANDING", each tagged
+   `[COMMITTED]`, `[BENCHMARK: …]` or `[REST DAY]`, with what it was first
    prescribed as when an adaptation has eased it. Both bounds matter: a bare run extends
    into empty days and sees no standing session, and a forward-selected run must not be asked
    about days it cannot write. The week planner also gets the constraints that ended earlier in
@@ -2415,8 +2429,8 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    exercise, set, rep or load in it — and a second LLM call writes the session under it,
    from the brief, the athlete's recent sets, the shipped progression science, the athlete's
    own guidelines and the day's equipment. `strength/planner.py::run` sorts the proposal's
-   strength sessions into the ones to write (no prescribed sets yet, and not the athlete's
-   own) and the ones to check (they have sets and the athlete has already been shown them),
+   strength sessions into the ones to write (no prescribed sets yet) and the ones to check
+   (they have sets and the athlete has already been shown them),
    calls once for all of them, and edits the proposal in place: a written session gets its
    description and its rows, a checked one keeps its sets unless the evidence, the brief or
    the duration moved. The call writes a session from the most comparable one the athlete
@@ -2443,14 +2457,13 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    The bot sends that line later when the athlete did not watch the run; it no longer
    opens the morning message (DESIGN_change_heads_up.md §6, §7).
    The proposal's voids go first, so a session the proposal drops is ended before anything
-   else can take its slot — and so a session the athlete added is marked rather than
-   erased. Then every day the proposal fills gets a revision tagged with the `macrocycle_id`
+   else can take its slot. Then every day the proposal fills gets a revision tagged with the
+   `macrocycle_id`
    the proposal carries, its `change_reason` in the row's `reason` column, and the lineage
    of the session it replaces when it replaces one — unless the prescription is identical
    to what is already live, in which case nothing is written and the day is left alone. A
    day the proposal KEEPS is spared both. Calendar follows from the change handle's reconcile
-   pass, not from the command. A session the athlete added by hand that the proposal removed
-   is named, with the change id to undo it. Undoable via `workout rollback`, or
+   pass, not from the command. Undoable via `workout rollback`, or
    `plan rollback` to step the strategy back with it
    (see [§3](#3-coach-package-architecture)).
 
@@ -2525,8 +2538,8 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
 6. If applied: `workout_revision_apply()` opens one `adapt` change. A session the pass
    overrides with nothing becomes a **void** — this path used to `DELETE` the row, with no
    way back. A session it moves to another day or substitutes cross-sport becomes a void
-   at the source plus a revision at the destination carrying the same lineage, the swap
-   shape, which is what keeps the adaptation tally and the first prescription following
+   at the source plus a revision at the destination carrying the same lineage, which is
+   what keeps the adaptation tally and the first prescription following
    the session. A named source is kept out of the same-date displacement rule, so its
    lineage is handed out once. Every revised session appends with its own note; the batch
    rationale lands on the change row, as `summary` and as the athlete's line `note`, which
@@ -2539,6 +2552,36 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    predecessor in the lineage: a drift correction that rewrites the prescription and holds
    the load never counts. That was the interim measure DESIGN_intensity_distribution.md
    §9.5 flagged; DESIGN_workout_revisions.md §7 is the fix it named.
+
+### A change on request (`workout tweak`)
+
+There is one author of the schedule: the coach. With `workout adapt` the coach decides
+what changes; with `workout tweak "…"` the athlete decides and the coach writes it
+(DESIGN_workout_tweak.md). There is no command that writes a session by hand.
+
+1. `run_workout_tweak` runs `workout adapt`'s CLI flow (`_adapt(args, tweak=True)`): the
+   same pull, the same preview, the same apply. `-d` may be given once per day.
+2. `CoachService.workout_tweak()` calls `workout_adapt(..., tweak=True)`. The prompt keeps
+   what may not be touched, the strength-day brief, the move section, the benchmark rule,
+   the planned-zone target and the constraint and signal extraction. It swaps the TASK
+   head for the request's ("find the days, change only those, it is the athlete's call,
+   name the request in `change_reason`"), and leaves out the fatigue-reading sections, the
+   drift context and the terminal-window section. The request sits under THE ATHLETE'S
+   REQUEST, and every cancelled session ahead sits under SESSIONS NO LONGER ON THE SCHEDULE,
+   so "put Tuesday's run back" can be written from its line.
+3. After the reply, the days are the `-d` days, else the reply's `tweak_dates`. A reply
+   that changes sessions and names no day, or names a day past the current mesocycle,
+   stops the run with a message. Every entry on another date is dropped, and so is a move
+   whose other end is on another date. This cut runs before the moves are resolved, so a
+   move left half out writes no rest day. The strength planner is shown those days only.
+4. The proposal has `kind="tweak"` and covers no constraint. Apply records a `tweak`
+   change: it has no `[Adapted]` title tag, "Changed on request" in the event's History,
+   and it restarts the count of easings the way a `generate` does.
+
+A request inside a strength session ("step-ups instead of belt squats") reaches the
+strength planner through the brief: the week planner rewrites that session's brief in its
+own words, and the strength planner treats an exercise a brief names as the athlete's
+request (DESIGN_workout_tweak.md §4). The same holds for `workout adapt -m`.
 
 ### Data Pull (`data pull`) and auto-ensure
 
@@ -2669,41 +2712,19 @@ The shared core then:
   `--all` every goal's, `--workouts` each mesocycle's sessions; `plan diff` compares two
   versions.
 - **Workouts** = the planned sessions of each microcycle, implementing the mesocycle focus.
-  Commands: `workout generate/adapt/push/swap/add/rollback/batches`. `workout generate`
+  Commands: `workout generate/adapt/tweak/push/rollback/batches`. `workout generate`
   lists what it proposes and, on a `y`, pushes it to Calendar eagerly; `workout rollback`
   undoes one change and everything after it (`workout batches` lists them), and
   `plan rollback` does the same while also stepping the strategy back
   (DESIGN_plan_rollback.md, DESIGN_workout_revisions.md §10).
 
-A `workout add` manually schedules a single session on a date (athlete-driven,
-not coach-driven, and LLM-free). It **replaces** any existing same-sport workout
-that day — or, with `--replace-day`, **every** session that day regardless of
-sport — recording the overwritten session(s) on the new session's note the way
-an adaptation does (`CoachService.workout_add`, §3): each replaced title +
-duration/TSS/RPE plus the athlete's optional `--reason` become the
-`modification_reason` (rendered "Reason:"), and other-sport entries are prefixed
-with their sport. The new session starts its own lineage, so it inherits neither
-the replaced session's load nor its Calendar event: a new event is created and
-every replaced session's event is torn down. The `source='manual'` surfaces on the
-Calendar event as a `[Manual]` summary prefix (composing with `[Adapted]` when
-the manual add also replaced a session), so athlete-added sessions are
-distinguishable at a glance from coach-generated ones. Load re-balancing of
-surrounding days is intentionally **not** done here — run `workout adapt` for that.
-
-A `workout swap` exchanges the dates of two workouts (or moves one onto an
-empty rest day). Moved workouts get a `modification_reason` recording the swap
-(`Swapped from X to Y`, plus the athlete's mandatory reason appended as
-`. Reason given: …`), so they read as `swapped` ([§5](#5-database-schema)), are
-re-synced by `workout push`, and are visibly distinguished from untouched ones.
-If a swap returns a workout to its
-`original_date`, the `modification_reason` is cleared to `NULL` — the workout
-is no longer considered modified. The `modification_reason` is surfaced to the
-week planner in the adaptation prompt (`format_planned_workouts_detailed`), so a swap informs
-the week planner symmetrically to how `workout rm`'s `removed_reason` does. Swaps are
-validated first (`CoachService.workout_swap_validate`): the
-new schedule is simulated and the user is warned about newly-created >2-day
-high-intensity streaks, weekly load spikes (a relative-overload proxy — a pure
-weekly-TSS-delta heuristic), and mesocycle-boundary crossings.
+Every session is written by the coach. An athlete who has decided a change asks for it
+with `workout tweak` ([§10](#a-change-on-request-workout-tweak)); the four hand-edit
+commands (`workout add`, `rm`, `swap`, `restore`) are gone, and with them the "manual"
+session and its special cases (DESIGN_workout_tweak.md §5). A session changed on request
+carries the request in its `modification_reason` ("On request: …"), which the next
+`workout adapt` reads beside the session and leaves alone unless the metrics call for a
+change.
 
 Plan must be generated before workouts. Workouts cover the span the selector flags on
 `workout generate` name, both ends of it — by default from the day after the schedule
@@ -2910,9 +2931,10 @@ venv/bin/python -m unittest discover -s tests -p "test_*.py"
 
 | File                           | What it tests                                                   |
 |--------------------------------|-----------------------------------------------------------------|
-| `tests/test_adaptation_*.py`   | One file per service mixin: `_adapt` (`workout_adapt()` end-to-end), |
-|                                | `_swap` (validation/apply), `_add`, and `_adherence`             |
+| `tests/test_adaptation_*.py`   | `_adapt` (`workout_adapt()` end-to-end) and `_adherence`         |
 |                                | (`analyze_adherence()` — misses, tolerances, violations)        |
+| `tests/test_workout_tweak.py`  | `workout tweak` end to end: which days, what it writes, the     |
+|                                | cancelled sessions it is shown, the request in a strength brief |
 | `tests/test_analysis.py`       | `data_bootstrap`/`data_reflect`: date resolution, weekly |
 |                                | aggregation, cache reuse/force/inspect_only, learnings           |
 |                                | injection, reflect watermark advance/skip, bootstrap re-run      |
@@ -3197,7 +3219,7 @@ DESIGN_workout_revisions.md; the shape is in [§5](#workouts).
 - **The lineage is not optional.** `(date, sport_canonical)` answers "what happened to
   Tuesday's ride"; `lineage_id` answers "what happened to *this* ride". The second is what
   lets `adaptation_count` / `adapted_at` be deleted as columns and counted from the chain
-  instead — and it is load-bearing rather than tidy. Count over the slot alone and a swap
+  instead — and it is load-bearing rather than tidy. Count over the slot alone and a move
   resets the tally, so the DO NOT COMPOUND guard goes quiet on the morning the session
   moved: exactly when life got in the way, recovery is worst, and the guard matters most.
 - **A change is a row.** Each command invocation writes one `workout_changes` row and
@@ -3206,9 +3228,9 @@ DESIGN_workout_revisions.md; the shape is in [§5](#workouts).
   primitive — including an adapt, on its own, without reverting the generation beneath it.
 - **Modification kind is recorded, not inferred.** It is the change kind of the live
   revision. The heuristic that sniffed magic string prefixes, `date != original_date` and
-  `source == 'manual'` — with a documented catch-all for rows predating a split — is
+  a stored source — with a documented catch-all for rows predating a split — is
   deleted, along with the precedence rule it needed. The marker and the tally are two
-  facts now, so a session eased twice and then swapped simply reads both.
+  facts now.
 - **Recency is derived too, now.** `adapted_at` / `adaptation_count` were stored because
   no other field carried *when* or *how often* a session was eased. The chain carries it:
   walk the lineage backwards, jump over any span a rollback undid, stop at the first
@@ -3256,7 +3278,7 @@ views — `workout compare` (per-day adherence, no accumulation) and the workout
 mesocycle listings (periodization visible in the data but never drawn). `tm
 progress` / the bot photo / the web **Progress** tab draw them as one continuous
 timeline instead, with the stored CTL/ATL/TSB series folded forward across the seam
-so the projection visibly moves the instant `adapt`/`generate`/`swap`/`remove`
+so the projection visibly moves the instant `adapt`/`tweak`/`generate`
 rewrite future `workouts`. `trainmate/progression.py` is the single row-in/row-out
 computation (`assemble_timeline`); `trainmate/timeline.py` is the one db-reads path
 both front-ends call, so CLI and endpoint render one identical payload (the fix for

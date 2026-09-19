@@ -3,7 +3,7 @@
 What the strength planner is shown of the athlete's lifting: one entry per exercise a
 person named, what was prescribed beside what was done, the days the prescription was not
 followed, and the recent days as whole sessions. Plus the prescribed sets themselves, which
-ride on a revision and follow the session across a restore and a swap.
+ride on a revision and follow the session across a rollback.
 """
 import os
 import unittest
@@ -18,7 +18,7 @@ TEST_DB_PATH = test_db_path("test_strength_history.db")
 from trainmate.db import Database
 import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
-from trainmate import runtime, settings
+from trainmate import settings
 from trainmate.config import config
 from trainmate.strength import history, prescription, sets
 
@@ -367,26 +367,18 @@ class PrescribedSetsTest(_HistoryCase):
         self.assertEqual([r["exercise"] for r in workout["prescribed_sets"]],
                          ["belt squat"])
 
-    def test_a_swap_carries_the_rows_to_the_new_date(self):
-        workout = self.planned("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
-        runtime.coach_service.workout_swap_apply(
-            [{"id": workout["id"], "new_date": "2026-09-18"}], reason="Rain"
-        )
-        moved = test_db.get_workout("2026-09-18", "strength_training")
-        self.assertEqual([r["load_kg"] for r in moved["prescribed_sets"]], [140.0])
-
     def test_a_restore_brings_back_the_rows_of_the_revision_it_copies(self):
         self.planned("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
         first = test_db.get_workout("2026-09-17", "strength_training")["revision_id"]
         self.planned("2026-09-17", row("belt squat", 3, 4, 6, 145.0))
-        with test_db.workout_change(kind="restore") as change:
+        with test_db.workout_change(kind="rollback") as change:
             change.restore(test_db.get_workout_revision(first))
         back = test_db.get_workout("2026-09-17", "strength_training")
         self.assertEqual([r["load_kg"] for r in back["prescribed_sets"]], [140.0])
 
     def test_a_void_has_no_rows(self):
         self.planned("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
-        with test_db.workout_change(kind="rm") as change:
+        with test_db.workout_change(kind="tweak") as change:
             change.void(date="2026-09-17", sport_type="strength_training", reason="Away")
         [voided] = test_db.get_workouts(
             start_date="2026-09-17", end_date="2026-09-17", include_removed=True

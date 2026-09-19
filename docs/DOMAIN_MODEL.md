@@ -97,7 +97,7 @@ Each level has its own notion of "alive", and they are deliberately different:
 | Macrocycle | `plan generate` accepted | `status = 'active'` — the one version the workouts follow | a newer version supersedes it | Yes — `plan rollback` makes a superseded version active again |
 | Mesocycle | with its macrocycle | its macrocycle is active and its goal is not archived | with its macrocycle | Only with its macrocycle |
 | Microcycle | — | — | — | — (not an entity) |
-| Workout | first revision of a lineage (`generate`, `add`, a swap or a cross-sport substitution landing) | its newest revision is the newest thing in its `(date, sport)` slot, and is not a void | a void revision is appended (`rm`, `generate`, `adapt`, a goal stood down) | Yes — `restore`, `rollback`, `reinstate` append a copy of an earlier revision |
+| Workout | first revision of a lineage (a `generate`, `adapt` or `tweak` writing a new session) | its newest revision is the newest thing in its `(date, sport)` slot, and is not a void | a void revision is appended (`generate`, `adapt`, `tweak`, a goal stood down) | Yes — `rollback`, `reinstate` append a copy of an earlier revision |
 
 Sections 2 to 6 take each level in turn. Section 7 says who may write what. Section 8 is
 a worked example. Section 9 lists what happens when something upstream changes.
@@ -627,7 +627,7 @@ So the concept lives in exactly three places:
    aggregates planned-vs-actual load into **Monday-commencing** weeks and labels each week
    with the mesocycle that has the majority overlap. `tm progress` and the mesocycle-progress
    prompt section both read it, so the week planner and the athlete can never read different
-   numbers. `workout swap`'s weekly-load-spike check uses the same Monday week.
+   numbers.
 
 ### The practical consequence
 
@@ -655,13 +655,13 @@ everything else in this section follows from them:
   That is the `live_workouts` view, and it is what every reader goes through.
 - **A session's identity is its `lineage_id`**, carried across every revision of it,
   including a move to another date. That is the id `workout list` prints and the id
-  `workout rm` / `swap` / benchmark results address — never the row id.
+  `workout show` / benchmark results address — never the row id.
 
 So there are two words for two things. A **slot** is a `(date, sport)` cell on the
 calendar; it holds whatever revision is newest there. A **lineage** is one session's
 story across every slot it has occupied. Most of the time they line up one-to-one. They
-part company on a swap (one lineage, two slots: a void where it left, a copy where it
-landed) and on an `add` over a generated session (one slot, two lineages: the old one
+part company on a move (one lineage, two slots: a void where it left, a copy where it
+landed) and on a session written over a void (one slot, two lineages: the old one
 ended, the new one begun).
 
 ### The fields, by what kind of fact they carry
@@ -678,14 +678,15 @@ slots with their `planned_zone_currency` (`hr` or `power`).
 | `change_id` | The command invocation that wrote it — a row in `workout_changes`, carrying its `kind`, its `summary` and its timestamp. |
 | `void` | 1 ⇔ this slot holds **no session** as of this revision. The way a cancellation, a departure and a dropped day are all recorded. |
 | `reason` | Why *this session* changed — or, on a void, why it went. |
-| `restored_from` | Set when the revision is a copy of an earlier one, put back by `restore`, `rollback` or `reinstate`. |
+| `restored_from` | Set when the revision is a copy of an earlier one, put back by `rollback` or `reinstate`. |
 | `macrocycle_id` | The plan version that wrote this revision. |
 | `created_at` | When the *session* first entered the plan, carried across its lineage. Distinct from `date` and from the change's own timestamp. |
 
-The change `kind` is one of nine words, fixed at write time: `generate`, `adapt`, `swap`,
-`add`, `rm`, `restore`, `rollback`, `stand-down`, `reinstate`.
+The change `kind` is one of six words, fixed at write time: `generate`, `adapt`, `tweak`,
+`rollback`, `stand-down`, `reinstate`. A `tweak` is a change the athlete asked for
+(`DESIGN_workout_tweak.md` §3.3).
 
-**Nothing else is stored, because nothing else needs to be.** `original_*`, `source`,
+**Nothing else is stored, because nothing else needs to be.** `original_*`,
 `adapted_at`, `adaptation_count` and the modification kind are all **derived from the
 lineage** at read time and handed to callers on the hydrated row (below).
 
@@ -697,29 +698,30 @@ revision.
 ### Lifecycle of one session
 
 ```
-              generate / add / swap-landing / cross-sport substitution
+              generate / adapt / tweak (a new session on a free day)
                                      │
                                      ▼  first revision: lineage_id = id
    ┌────────────────────────────────────────────────────────────────────┐
    │                               LIVE                                 │
    │   the newest revision in its slot, and void = 0                    │
    │                                                                    │
-   │      adapt / swap / add / generate ──► a new revision, same        │
-   │      lineage (a swap lands it in another slot)                     │
+   │      adapt / tweak / generate ──► a new revision, same lineage     │
+   │      (a move lands it in another slot)                             │
    └────────────────────────────────────────────────────────────────────┘
           │                                              ▲
-          │ rm, stand-down                               │ restore, rollback,
-          │ (the athlete's voids: event kept, retitled)  │ reinstate:
+          │ stand-down                                   │ rollback,
+          │ (the athlete's void: event kept, retitled)   │ reinstate:
           │                                              │ a COPY of an earlier
-          │ generate, adapt                              │ revision, stamped
-          │ (the plan's voids: event deleted)            │ restored_from
+          │ generate, adapt, tweak                       │ revision, stamped
+          │ (the coach's voids: event deleted, except a  │ restored_from
+          │ generate's inside the commitment window)     │
           ▼                                              │
    ┌────────────────────────────────────────────────────────────────────┐
    │                               VOID                                 │
    │   the newest revision in its slot is a void: no session this day   │
    └────────────────────────────────────────────────────────────────────┘
           │
-          │ something newer takes the slot (a generate, an add)
+          │ something newer takes the slot (a generate, an adapt, a tweak)
           ▼
         SUPERSEDED — the lineage is still in the log, but a different
         lineage now speaks for that slot
@@ -733,12 +735,9 @@ an un-delete.
 
 A few transitions deserve a sentence each:
 
-- **A `generate` over a manually added session starts a new lineage.** The plan owns the
-  horizon, so the generate proceeds, but under a new lineage — which is also what keeps
-  `source` honest. The command names each replaced session and the change to undo.
 - **Appending over a void is a new session, not a resurrection.** It must not inherit the
   removed session's Calendar event, its originals or its tally.
-- **A swap carries the lineage to the destination.** That is why `lineage_id` exists at
+- **A move carries the lineage to the destination.** That is why `lineage_id` exists at
   all: the adaptation tally has to follow the session across the move, or the week planner
   would cut an already-cut session again.
 - **A void is always the last chapter of the lineage it ends**, never a first revision.
@@ -750,16 +749,17 @@ A few transitions deserve a sentence each:
 
 `get_workouts` and friends return the live revision **plus the lineage-derived fields**, so
 every caller above `db/workouts.py` sees one dict shape: `id` (the lineage),
-`revision_id` (the physical row), `original_*`, `source`, `adapted_at`,
-`adaptation_count`, `change_kind`, `removed`, and the Calendar columns joined in. The
-revision model stops at that boundary.
+`revision_id` (the physical row), `original_*`, `adapted_at`, `adaptation_count`,
+`change_kind`, `removed`, and the Calendar columns joined in. The revision model stops at
+that boundary.
 
 Two derivations are worth naming:
 
 - **`adaptation_count` / `adapted_at`** walk the lineage backwards, jumping over any span
-  an undo took back, stopping at the first `generate`, and counting only the `adapt`
-  revisions whose duration or TSS actually *fell*. Because the walk follows the lineage it
-  survives a date move.
+  an undo took back, stopping at the first `generate` or `tweak`, and counting only the
+  `adapt` revisions whose duration or TSS actually *fell*. Because the walk follows the
+  lineage it survives a date move. A tweak stops it because the session was written
+  again on request, so earlier easings no longer describe it.
 - **`original_*`** is simply the lineage's first revision.
 
 ### Workout state is three orthogonal axes, not one enum
@@ -768,8 +768,8 @@ There is no `status` column. Three independent facts, all derived:
 
 | Axis | How you ask it |
 |---|---|
-| **Modified?** | The `kind` of the change that wrote the live revision — `generate` / `adapt` / `swap` / `add` / … There is no stored flag and no precedence rule: the kind says what last happened, and the derived tally says how often the session has been eased, so one walked down twice and then moved reads `[SWAPPED, ADAPTED ×2]`. A restored copy reads as whatever the revision it copied was. |
-| **Removed?** | The live revision is a **void**. `workout rm` appends one carrying the athlete's reason; nothing is deleted, and every revision before the void is still in the log. Hidden from listings, comparisons, adaptation inputs and the Calendar push, but still shown to the coach as a deliberate *cancellation* — which is not the same thing as a miss. Only the athlete's voids (`rm`, `stand-down`) are shown that way; a day the plan simply stopped scheduling is not a cancellation. |
+| **Modified?** | The `kind` of the change that wrote the live revision — `generate` / `adapt` / `tweak` / … There is no stored flag and no precedence rule: the kind says what last happened, and the derived tally says how often the session has been eased, so one walked down twice reads `[ADAPTED ×2]` and one changed on request reads `[TWEAKED]`. A restored copy reads as whatever the revision it copied was. |
+| **Removed?** | The live revision is a **void**. Nothing is deleted, and every revision before the void is still in the log. Hidden from listings, comparisons and the Calendar push. The morning adaptation is shown the voids of a goal the athlete called off (`stand-down`) as a deliberate *cancellation*, which is not the same thing as a miss; a day the coach stopped scheduling is not a cancellation. `workout tweak` is shown every void ahead, whoever wrote it, so it can bring a session back. |
 | **Pushed / fresh?** | Comparing the live hash of the Calendar-relevant fields against `pushed_signature`. Never stored as a boolean. |
 
 **"Archived" is not an axis.** It was the old model's way of saying "this row is not the
@@ -779,10 +779,11 @@ current one", and in a revision log that is not a property of a row at all — i
 undoable on its own), and a day the plan emptied is stated by a void rather than left
 implicit in an absence.
 
-Voids come in two kinds, and the Calendar tells them apart: a void from `rm` or a goal
+Voids come in two kinds, and the Calendar tells them apart: a void from a goal
 stand-down is the athlete cancelling, and its Calendar event is kept, retitled
-`[Deleted]`; a void from a `generate` or an `adapt` is the app dropping a day, and the
-event goes with it.
+`[Deleted]`; a void from a `generate`, an `adapt` or a `tweak` is the coach writing the
+week, and the event goes with it. The one exception is a `generate` void inside the
+commitment window, whose event stays, retitled `[Cancelled]`.
 
 The rationale for deriving rather than storing is in `ARCHITECTURE.md §15 "Workout
 state"`. The short version: a stored enum has to be updated by every writer, and the day
@@ -837,11 +838,9 @@ change after the restored version's newest write.
 | `workout show` | The same listing with `-v` always on: `workout show 12` details one session. |
 | `workout compare` | Planned vs completed, with misses, rest violations and unplanned high load. Today's untrained sessions read *"not yet"* and are **not** misses. |
 | `workout generate` | Write the sessions for a span, from the mesocycles governing those days (details in §7). |
-| `workout adapt` | Daily readiness adjustment, within the current mesocycle only. `-m "note"` passes a free-text note in the same call. |
-| `workout add` | Manually schedule one session. No LLM. Replaces the same-sport session that day (or, with `--replace-day`, every session that day), recording what it overwrote on the new session's note. Starts a new lineage. Deliberately does **not** re-balance surrounding days — that is `adapt`'s job. |
-| `workout swap` | Exchange two sessions' dates, or move one onto a rest day. Mandatory reason. Validated first: warns about new >2-day hard streaks, weekly load spikes, and mesocycle-boundary crossings. |
-| `workout rm` / `restore` | Append a void with the athlete's reason / append a copy of the revision that void ended. |
-| `workout rollback` / `batches` | Undo (above). |
+| `workout adapt` | Daily readiness adjustment, within the current mesocycle only. `-m "note"` passes a free-text note in the same call. The coach decides what changes. |
+| `workout tweak "…"` | A change the athlete decided: shorter, another sport, other exercises, a session added, dropped or brought back, moved, two days swapped. The same path as `workout adapt`, with a narrower job: the week planner writes the change and only the days the request is about may change (`-d` names them, else the week planner reads them off the message). Recorded as kind `tweak`. |
+| `workout rollback` / `batches` | Undo (above). The only undo. |
 | `workout push` | Sync to Google Calendar. Only stale rows unless `-f`. |
 | `workout prune-calendar` | Delete Calendar events no local row references. |
 | `workout wipe` | Delete all. |
@@ -858,7 +857,7 @@ level may never rewrite a higher one.
 | `plan generate` | macrocycle + mesocycles | plan start → goal date (`-g <id>` opens it at the goal's own span) | 15-day summary + PMC lines | 1 |
 | `workout generate` | workout revisions | the span `-d`/`-m`/`-M`/`-g` names; by default, the day after the schedule stops, for 28 days | Yes — full `metrics_lookback_days` window | 1 |
 | `workout adapt` | workout revisions | evaluation date → **end of the current mesocycle** | Yes — full window, plus daily signals | 1 |
-| `workout add` / `swap` / `rm` / `restore` | one or two workout revisions | a single date | No | 0 |
+| `workout tweak` | workout revisions | the days the request names, between today and the end of the current mesocycle | Yes — as `workout adapt` | 1 |
 | `goal rm` / `goal edit --status` | `stand-down` / `reinstate` revisions | today → the goal's last session | No | 0 |
 
 Read that table top to bottom as an authority ladder:
@@ -867,7 +866,7 @@ Read that table top to bottom as an authority ladder:
 - `workout generate` may rewrite sessions freely, but only within the mesocycles it was
   handed. It cannot move a mesocycle boundary.
 - `workout adapt` may not cross a mesocycle boundary at all.
-- `workout add` / `swap` / `rm` touch exactly what you name and nothing else.
+- `workout tweak` touches the days you name and nothing else.
 
 ### What `workout generate` actually does
 

@@ -123,7 +123,7 @@ class ChangesCommandTest(unittest.TestCase):
         self.assertLess(out.index("Longer runs."), out.index("Rest on Friday."))
 
     def test_a_told_change_without_a_line_gives_the_plain_sentence(self):
-        change_id = self._told(kind="swap", note=None)
+        change_id = self._told(kind="tweak", note=None)
         test_db.rollback_to_change(change_id, today_str(), summary="undo")
         _code, out, _ = run_cli(["bot", "changes"])
         self.assertIn(UNDONE_PLAIN, out)

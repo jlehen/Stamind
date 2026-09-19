@@ -735,6 +735,9 @@ class ExpertRenderer:
             "No changes recommended."
         ))
 
+    def tweak_no_change(self) -> None:
+        print("\nNothing was changed.")
+
     def adapt_confirm_words(self) -> Tuple[str, str]:
         """The preview's heading and the question that follows it. The renderer only
         supplies the words; `runtime.prompt` asks (§4)."""
@@ -996,6 +999,9 @@ class CompanionRenderer(ExpertRenderer):
 
     def adapt_no_change(self) -> None:
         print(green("\nAll clear — the plan stands as it is. 💪"))
+
+    def tweak_no_change(self) -> None:
+        print("\nSo I left your week as it is.")
 
     def adapt_confirm_words(self) -> Tuple[str, str]:
         return "Here's what I'd change:", "Shall I make these changes?"

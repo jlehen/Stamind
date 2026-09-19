@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional, Dict, Sequence
 from trainmate.config import config
 from trainmate.prompt import athlete_watching
 from trainmate.types import Objective, Constraint, Workout, CompletedActivity
@@ -69,14 +69,13 @@ def _standing_sessions_task(standing_workouts: Optional[List[Workout]]) -> str:
     return """
 ### THE SESSIONS THE ATHLETE IS ALREADY LOOKING AT
 The user content includes a section titled "SESSIONS ALREADY STANDING": the sessions this
-span already holds that the athlete has already been told about, plus every session they
-scheduled themselves. Each one carries its tags:
+span already holds that the athlete has already been told about. Each one carries its
+tags:
 
 - "[COMMITTED]" — inside the days the athlete has already read and planned around.
 - "[BENCHMARK: ...]" — a scheduled fitness test, and the strongest commitment on the
   calendar: the athlete arranges to be fresh for it, so moving or dropping one needs a
   reason that says why the test can wait.
-- "[ADDED BY THE ATHLETE]" — they put this session there themselves.
 - "[REST DAY]" — a day they were told holds no session. Putting work on it is a change
   like any other, and needs the same reason.
 
@@ -121,15 +120,66 @@ session contradicts. An easing answers "how is the athlete today"; a constraint 
 """
 
 
-def _strength_brief_task() -> str:
+# What no revision may rewrite: shared by `workout adapt` and `workout tweak`.
+_LOCKED_HISTORY_TASK = """
+### WHAT YOU MAY NOT TOUCH
+Sessions tagged "[COMPLETED — locked history, not adaptable]" have already been performed,
+including any the athlete trained earlier on the evaluation date. Do NOT adapt them, and
+never restate a finished session to match what was actually done — adapt only sessions
+still ahead.
+A session tagged "[PARTIAL — ...]" did NOT go as planned: the tag reports the duration and
+load actually performed, and those are the truth — do not read the planned numbers beside
+it as work the athlete banked. Where the tag also says "locked history", the day is behind
+us, so the difference is a fact to plan AROUND, not a session to rewrite. Where it says the
+session is not yet history, the athlete started it and stopped, and today is still yours to
+shape: salvage what remains of it, move the exposure to another day, or — if the athlete
+tells you the day is gone — write that day off to rest so the calendar records what
+actually happened. Do not leave a session standing that the athlete has told you they
+abandoned.
+"""
+
+# How to read a depressed morning, and why not to cut twice. Adapt's alone: a tweak does
+# not ask whether the athlete's state calls for a change (DESIGN_workout_tweak.md §3.2).
+_FATIGUE_READING_TASK = """
+### ATTRIBUTING A DEPRESSED MORNING — TRAINING FATIGUE vs LIFESTYLE NOISE
+By rule 5, read the externally-logged daily signal from the DAY BEFORE a depressed
+morning: if one (e.g. alcohol, a bad night, high stress) explains the dip, that suppression
+is transient lifestyle noise, NOT accumulated training fatigue.
+That changes WHY, not WHAT TO DO TODAY: a suppressed body trains a hard session poorly and
+with more risk regardless of cause, so easing or moving today's hard session remains a fair
+call on acute readiness. What it changes is what the day is EVIDENCE of — reserve genuine
+load REDUCTIONS for fatigue the TRAINING actually caused (a depressed morning following
+genuinely hard days, with no lifestyle signal to explain it). When a hard day AND a
+lifestyle signal coincide, both may contribute — weigh them rather than blaming training.
+
+### DO NOT COMPOUND A PRIOR ADAPTATION
+Sessions tagged "[ALREADY EASED by a prior adaptation ...]" are NOT the original plan —
+their numbers are the reduced form a previous adaptation already produced. Rule 5 again:
+the morning after an easing still looks depressed from the very fatigue you already acted
+on, and reading that as "still too hard" spirals the load down without ever letting it
+rebound. Default to HOLDING the already-eased form. Cut further only if the metrics have
+clearly WORSENED since it was eased, or a genuinely NEW signal (a hard completed session, a
+fresh constraint/signal event) warrants it — and the more recently and more times it was
+already eased (see the tag), the higher your bar. Restoring load toward the original as the
+athlete recovers is encouraged; deepening an already-fresh cut is not.
+"""
+
+
+def _strength_brief_task(has_message: bool = False) -> str:
     """The one instruction that makes a strength day's description a brief
     (DESIGN_strength_tracking.md §9).
 
     Always on, in both the generate and the adapt TASK: a strength day can fall anywhere in
     a span, and TrainMate's strength planner writes every one of them from the sets the
     athlete actually lifted — which this call is never shown.
+
+    `has_message` adds how a request made inside a strength session reaches that call: the
+    week planner writes it into the brief (DESIGN_workout_tweak.md §4).
     """
-    return """
+    return _STRENGTH_BRIEF_TASK + (_STRENGTH_REQUEST_TASK if has_message else "")
+
+
+_STRENGTH_BRIEF_TASK = """
 ### WRITING A STRENGTH DAY
 A strength session's "description" is a BRIEF, not a session: what the session is for in the
 plan, its character, and what the plan asks of it that day. Write NO exercise, no set count,
@@ -142,6 +192,85 @@ fit against the endurance days.
 A brief reads like this: "[Full-Body Strength (Heavy, Non-Failure)]\\nHeavy full-body
 strength, second week of the build, non-failure. 70 min at the gym. Keep the legs fresh for
 Saturday's long ride."
+A brief names an exercise in one case only: it was requested, and the brief says "as
+requested". When you rewrite such a brief, keep what it says was requested.
+"""
+
+_STRENGTH_REQUEST_TASK = """
+When the message you were given asks for something INSIDE a strength session (an exercise
+swapped, added or left out, a lighter session), rewrite that session's brief so that it says
+what was requested, in your own words, and return the session. Mark it "as requested", never
+"as you asked": the request may come from the athlete's coach rather than the athlete. Take
+only the part of the message that is about that session. Still write no set, rep or load.
+For example: "[Lower-Body Strength (Heavy)]\\nLower-body strength, heavy and low in volume.
+Step-ups take the place of belt squats, as requested: the machine is broken." The strength
+planner reads the brief and writes the exercises from it.
+A message that is not about the inside of a strength session leaves every brief as it was.
+"""
+
+
+def _tweak_task(
+    target_date_str: str, meso_end_date_str: str, tweak_dates: Sequence[str], watching: bool
+) -> str:
+    """The head of the `workout tweak` TASK: the days the request is about, changed as
+    asked (DESIGN_workout_tweak.md §3.2).
+
+    `tweak_dates` are the days the caller already knows, from `-d`; empty, the week planner
+    reads them off the request. `watching` is false when the athlete's human coach typed
+    the request from outside their chat, so the reason is written to the athlete and never
+    as a reply (DESIGN_change_heads_up.md §3).
+    """
+    if tweak_dates:
+        days_line = f"The days are: {', '.join(sorted(tweak_dates))}."
+    else:
+        days_line = (
+            'Read them off the request ("Friday", "tomorrow", "swap Thursday and Friday").\n'
+            "  The Evaluation Date is today, and every day must fall between "
+            f"{target_date_str} and\n  {meso_end_date_str}. If you cannot tell which days "
+            "are meant, or one falls outside that\n"
+            '  range, return "change_needed": false and "tweak_dates": [], and say why in\n'
+            '  "reason".'
+        )
+    if watching:
+        opening = "The athlete asks for a change to the schedule."
+        voice = ""
+    else:
+        opening = (
+            "The athlete's human coach, who manages their week from outside their chat, "
+            "asks for\na change to the schedule."
+        )
+        voice = """
+The athlete has not seen the request. The "reason" is sent to them as a message about the
+change to their week. Write it to the athlete: what changed and why, in plain words. Never
+write it as a reply — the athlete asked for nothing, so "as you asked" is wrong.
+"""
+    return f"""
+## TASK
+{opening}
+The request is in the user content under THE ATHLETE'S REQUEST. Carrying it out is this
+run's whole job. Do not adapt the schedule to the metrics here: the morning adaptation does
+that.
+{voice}
+- FIND THE DAYS the request is about, and return them as "tweak_dates".
+  {days_line}
+- CHANGE ONLY THOSE DAYS. Every session on every other date stays exactly as planned. A
+  session may move between those days, never to or from another date.
+- DO WHAT IS ASKED. The request may be for a session made shorter, longer, easier or
+  harder; another sport in its place; other exercises in a strength session; a session
+  added; a session dropped, which you write as a rest day; a session moved to another day,
+  or two days swapped, which MOVING A SESSION TO ANOTHER DAY says how to write; or a
+  cancelled session brought back, which you write again from its line under SESSIONS NO
+  LONGER ON THE SCHEDULE. Write each session in full — title, description, duration, RPE
+  and TSS — sized to fit the week around it. The metrics and the planned sessions are your
+  context for that. To change a session's sport, return the new session on the same date
+  with "replaces" naming the slot it takes over.
+- IT IS THE ATHLETE'S CALL. If the request looks unwise, carry it out and say so in one
+  sentence of "reason": three hard days in a row after a swap is that kind of sentence.
+  Refuse only what is clearly unsafe given the recovery metrics, or what would rewrite a
+  session already performed: return "change_needed": false and say why in "reason".
+- NAME THE REQUEST. Every session you change carries a "change_reason" that says what was
+  asked, e.g. "On request: hike with friends in place of the long ride." A later run reads
+  it, knows this session was asked for, and leaves it alone.
 """
 
 
@@ -773,7 +902,9 @@ class WorkoutLogicMixin:
         intensity_context: Optional[str] = None,
         zone_currencies: Optional[Dict[str, str]] = None,
         signal_vocabulary: Optional[str] = None,
-        signal_earliest_date: Optional[str] = None
+        signal_earliest_date: Optional[str] = None,
+        tweak: bool = False,
+        tweak_dates: Sequence[str] = (),
     ) -> Dict[str, Any]:
         """Queries LLM to evaluate metrics/activities and adapt workouts if needed.
 
@@ -781,6 +912,11 @@ class WorkoutLogicMixin:
         present it is surfaced as a clearly-bounded section of the user content and the
         model is told to weigh it as today's intent without treating it as a durable
         signal about the mesocycle.
+
+        `tweak` makes this the `workout tweak` call: the message is a request to change the
+        days it is about, `tweak_dates` when the caller already knows them, and the TASK
+        asks for that and nothing else (DESIGN_workout_tweak.md §3.2). `removed_workouts`
+        is then every cancelled session in the range, not only the athlete's (§3.1).
         """
         # has_message gates SIX regions that sit hundreds of lines apart: the clause
         # spliced into the change_reason wording, the note-handling instructions, the
@@ -794,16 +930,21 @@ class WorkoutLogicMixin:
         has_intensity = bool(intensity_context and intensity_context.strip())
         # Shared change_reason wording, with the note-footprint clause spliced in only when
         # a note could actually have driven the change.
-        change_reason_field = (
-            '      "change_reason": "One short sentence on why THIS specific session\n'
-            '        changed, e.g. \"Cut to easy Z2 to shed intensity.\"'
-            + (
+        note_clause = ''
+        if tweak:
+            note_clause = ' Say what was\n        asked: see NAME THE REQUEST.'
+        elif has_message:
+            note_clause = (
                 ' If an external\n'
                 '        constraint from the athlete\'s note drove the change rather than\n'
                 '        the metrics, name that cause here so a future run without the note\n'
                 '        understands it, e.g. \"Rest — athlete away, no training access this\n'
-                '        day.\"' if has_message else ''
+                '        day.\"'
             )
+        change_reason_field = (
+            '      "change_reason": "One short sentence on why THIS specific session\n'
+            '        changed, e.g. \"Cut to easy Z2 to shed intensity.\"'
+            + note_clause
             + '\n        Keep it to a single sentence of at most 20 words; do not restate\n'
               '        the overall reason.",\n'
         )
@@ -826,13 +967,13 @@ class WorkoutLogicMixin:
             "   schema); when something other than the metrics drove it, that cause belongs\n"
             "   there.",
             "NOT EVERY GAP IS A MISS. Activities listed as informational fell on dates no\n"
-            "   plan governed; sessions listed as deliberately removed are the athlete's own\n"
-            "   plan edits. Count both when judging load and intent — neither is an adherence\n"
-            "   failure.",
+            "   plan governed; sessions listed as deliberately removed belonged to a goal the\n"
+            "   athlete called off. Count both when judging load and intent — neither is an\n"
+            "   adherence failure.",
             "RECOVERY METRICS LAG. A morning reflects what came before it, not what you\n"
             "   schedule after it. Two sections below turn on this.",
         )
-        custom_task = f"""
+        adapt_task = f"""
 ## TASK
 Analyze the athlete's actual workout adherence and physiological metrics trajectory over
 the past {history_days} days: completed activities against planned workouts, the calculated
@@ -849,49 +990,18 @@ the active mesocycle (from {target_date_str} to {meso_end_date_str}).
 - If they are fully recovered and on track, keep the plan as scheduled or make minor
   optimal adjustments.
 {drift_branch}{standing_rules}
-### WHAT YOU MAY NOT TOUCH
-Sessions tagged "[COMPLETED — locked history, not adaptable]" have already been performed,
-including any the athlete trained earlier on the evaluation date. Do NOT adapt them, and
-never restate a finished session to match what was actually done — adapt only sessions
-still ahead.
-A session tagged "[PARTIAL — ...]" did NOT go as planned: the tag reports the duration and
-load actually performed, and those are the truth — do not read the planned numbers beside
-it as work the athlete banked. Where the tag also says "locked history", the day is behind
-us, so the difference is a fact to plan AROUND, not a session to rewrite. Where it says the
-session is not yet history, the athlete started it and stopped, and today is still yours to
-shape: salvage what remains of it, move the exposure to another day, or — if the athlete
-tells you the day is gone — write that day off to rest so the calendar records what
-actually happened. Do not leave a session standing that the athlete has told you they
-abandoned.
-Sessions tagged "[athlete-added]" are the athlete's own deliberate intent:
-preserve them as planned unless fatigue or injury risk clearly warrants easing.
-
-### ATTRIBUTING A DEPRESSED MORNING — TRAINING FATIGUE vs LIFESTYLE NOISE
-By rule 5, read the externally-logged daily signal from the DAY BEFORE a depressed
-morning: if one (e.g. alcohol, a bad night, high stress) explains the dip, that suppression
-is transient lifestyle noise, NOT accumulated training fatigue.
-That changes WHY, not WHAT TO DO TODAY: a suppressed body trains a hard session poorly and
-with more risk regardless of cause, so easing or moving today's hard session remains a fair
-call on acute readiness. What it changes is what the day is EVIDENCE of — reserve genuine
-load REDUCTIONS for fatigue the TRAINING actually caused (a depressed morning following
-genuinely hard days, with no lifestyle signal to explain it). When a hard day AND a
-lifestyle signal coincide, both may contribute — weigh them rather than blaming training.
-
-### DO NOT COMPOUND A PRIOR ADAPTATION
-Sessions tagged "[ALREADY EASED by a prior adaptation ...]" are NOT the original plan —
-their numbers are the reduced form a previous adaptation already produced. Rule 5 again:
-the morning after an easing still looks depressed from the very fatigue you already acted
-on, and reading that as "still too hard" spirals the load down without ever letting it
-rebound. Default to HOLDING the already-eased form. Cut further only if the metrics have
-clearly WORSENED since it was eased, or a genuinely NEW signal (a hard completed session, a
-fresh constraint/signal event) warrants it — and the more recently and more times it was
-already eased (see the tag), the higher your bar. Restoring load toward the original as the
-athlete recovers is encouraged; deepening an already-fresh cut is not.
 """
+        if tweak:
+            custom_task = _tweak_task(
+                target_date_str, meso_end_date_str, tweak_dates, athlete_watching()
+            )
+            custom_task += _LOCKED_HISTORY_TASK
+        else:
+            custom_task = adapt_task + _LOCKED_HISTORY_TASK + _FATIGUE_READING_TASK
 
         # A strength day's description is a brief, here as in generate: the same rule has
         # to reach every call that writes one (DESIGN_strength_tracking.md §9).
-        custom_task += _strength_brief_task()
+        custom_task += _strength_brief_task(has_message)
 
         # How to encode a move at all — its own section rather than a clause inside the
         # benchmark text, because an ordinary move relies on it too
@@ -942,13 +1052,14 @@ belongs to the next `workout generate`, not to you.
         # Inside the mesocycle's terminal window a cut cannot rebound before the mesocycle ends
         # (DESIGN_mesocycle_boundary.md §3). Outside it the prompt is unchanged.
         days_left = days_between(target_date_str, meso_end_date_str)
-        if 0 <= days_left <= config.adapt_terminal_window_days:
+        if not tweak and 0 <= days_left <= config.adapt_terminal_window_days:
             custom_task += _terminal_window_task(days_left, meso_end_date_str)
 
         # A run the athlete does not watch sends its reason to them later, so the note is
         # presented as their coach's and the reason is written to them, never as a reply
         # (DESIGN_change_heads_up.md §3). Only this paragraph changes; the titles stay.
-        if has_message and athlete_watching():
+        # A tweak's request is spoken for by its own TASK head.
+        if has_message and not tweak and athlete_watching():
             custom_task += """
 ### ATHLETE'S NOTE FOR TODAY
 The user content includes a section titled "ATHLETE'S NOTE FOR THIS ADAPTATION": a
@@ -959,7 +1070,7 @@ let it tip a judgement call. It is advisory, not an override — do NOT schedule
 unsafe load just because the athlete asks (if recovery signals warrant easing, ease and say
 why). It speaks for this adaptation only and is never durable evidence about the mesocycle.
 """
-        elif has_message:
+        elif has_message and not tweak:
             custom_task += """
 ### ATHLETE'S NOTE FOR TODAY
 The user content includes a section titled "ATHLETE'S NOTE FOR THIS ADAPTATION". Despite
@@ -1045,6 +1156,11 @@ evidence-backed observations are authored only by the weekly history analysis
                 "  ]"
             ),
         ]
+        if tweak:
+            schema_members.append(
+                '  "tweak_dates": ["YYYY-MM-DD", ...] (every day the request is about; []\n'
+                '    when you cannot tell)'
+            )
         if has_message:
             schema_members.append(NEW_CONSTRAINTS_SCHEMA)
             schema_members.append(NEW_SIGNALS_SCHEMA)
@@ -1084,7 +1200,14 @@ evidence-backed observations are authored only by the weekly history analysis
         completed_text = format_completed_activities(completed_activities)
 
         removed_section = ""
-        if removed_workouts:
+        if removed_workouts and tweak:
+            removed_section = (
+                "\n## SESSIONS NO LONGER ON THE SCHEDULE\n"
+                "Cancelled, dropped or replaced, by the coach or the athlete. A request to\n"
+                "bring one back is written again from its line.\n"
+                + format_removed_workouts(removed_workouts) + "\n"
+            )
+        elif removed_workouts:
             removed_section = (
                 "\n## WORKOUTS REMOVED BY ATHLETE (deliberately cancelled — not misses)\n"
                 + format_removed_workouts(removed_workouts) + "\n"
@@ -1101,7 +1224,13 @@ evidence-backed observations are authored only by the weekly history analysis
         # has_message gate as the instructions above, so the two never disagree. Omitted
         # entirely when absent so a message-less run is byte-for-byte the prior behaviour.
         message_section = ""
-        if has_message:
+        if tweak:
+            message_section = (
+                "\n## THE ATHLETE'S REQUEST\n"
+                "The change asked for, to the days it is about only — see the TASK.\n"
+                f"{(athlete_message or '').strip()}\n"
+            )
+        elif has_message:
             message_section = (
                 "\n## ATHLETE'S NOTE FOR THIS ADAPTATION\n"
                 "Free-text intent/constraints for today only — advisory, not an override;\n"
@@ -1120,6 +1249,16 @@ evidence-backed observations are authored only by the weekly history analysis
                 f"{intensity_context.strip()}\n"
             )
 
+        descriptions_note = (
+            "Adapt as boldly as the athlete's state warrants, but only\nwhere their state "
+            "actually warrants it; the descriptions are here only so detail you are\n"
+            "keeping isn't lost for lack of being restated:"
+        )
+        if tweak:
+            descriptions_note = (
+                "The descriptions are here only so detail you\nare keeping isn't lost for "
+                "lack of being restated:"
+            )
         user_content = f"""
 Evaluation Date: {target_date_str}
 Adaptation Range: {target_date_str} to {meso_end_date_str}
@@ -1146,9 +1285,7 @@ MOVING A SESSION TO ANOTHER DAY says how to write. Only invent a brand-new sessi
 date that currently has none.
 Each session below includes its full description so you can reuse its specifics —
 interval structure, heart-rate zones, rest/recovery durations — when you carry a changed
-session over largely as-is. Adapt as boldly as the athlete's state warrants, but only
-where their state actually warrants it; the descriptions are here only so detail you are
-keeping isn't lost for lack of being restated:
+session over largely as-is. {descriptions_note}
 {planned_text}
 {removed_section}
 ## ACTUAL COMPLETED GARMIN ACTIVITIES IN WINDOW
@@ -1157,6 +1294,11 @@ keeping isn't lost for lack of being restated:
 ## ADHERENCE DISCREPANCIES & VIOLATIONS
 {discrepancy_text}
 {informational_section}"""
+        if tweak:
+            step("Querying OpenRouter to make the change asked for...", cyan)
+            return _eng.openrouter_client.complete(
+                system_prompt, user_content, label="workout_tweak"
+            )
         step(f"Querying OpenRouter to evaluate adaptation for the remainder of the mesocycle "
              f"({target_date_str} -> {meso_end_date_str})...", cyan)
         decision = _eng.openrouter_client.complete(

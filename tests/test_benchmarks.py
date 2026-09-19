@@ -111,7 +111,7 @@ class TestBenchmarkDB(unittest.TestCase):
     def test_workout_benchmark_type_persists_and_preserves(self):
         wid = save_workout(test_db,
             date="2026-08-05", sport_type="cycling", title="FTP Test",
-            description="[FTP Test]", benchmark_type="ftp_20min", source="generated",
+            description="[FTP Test]", benchmark_type="ftp_20min",
         )
         self.assertEqual(
             test_db.get_workout_by_id(wid)["benchmark_type"], "ftp_20min"
@@ -131,7 +131,7 @@ class TestBenchmarkDB(unittest.TestCase):
         (DESIGN_benchmark_workouts.md §3.1)."""
         wid = save_workout(test_db,
             date="2026-08-05", sport_type="cycling", title="FTP Test",
-            description="[FTP Test]", benchmark_type="ftp_20min", source="generated",
+            description="[FTP Test]", benchmark_type="ftp_20min",
         )
         save_workout(test_db,
             date="2026-08-05", sport_type="cycling", title="Easy Spin",

@@ -139,14 +139,11 @@ class TestCliMisc(unittest.TestCase):
         self.assertIn("backfill-tss", stdout)
         self.assertIn("maintenance", stdout)
 
-    def test_restore_and_rollback_help_point_at_each_other(self):
-        # DESIGN_plan_rollback.md §9: the two easily-confused undos each name the other.
-        exit_code, stdout, stderr = self.run_cli(["workout", "restore", "--help"])
+    def test_tweak_help_points_at_rollback_for_a_whole_change(self):
+        # Putting a whole change back is rollback's job (DESIGN_workout_tweak.md §3.1).
+        exit_code, stdout, stderr = self.run_cli(["workout", "tweak", "--help"])
         self.assertEqual(exit_code, 0)
         self.assertIn("rollback", stdout)
-        exit_code, stdout, stderr = self.run_cli(["workout", "rollback", "--help"])
-        self.assertEqual(exit_code, 0)
-        self.assertIn("restore", stdout)
 
     def test_helpall_flag_reveals_advanced_at_root(self):
         # The top-level `--helpall` flag is the discoverable equivalent of `help --all`.

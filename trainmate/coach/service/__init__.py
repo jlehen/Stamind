@@ -15,12 +15,11 @@ from trainmate.coach.service.prompt import PromptConfigMixin
 from trainmate.coach.service.planning import PlanningMixin
 from trainmate.coach.service.workouts import WorkoutGenMixin
 from trainmate.coach.service.adaptation import AdaptationMixin
-from trainmate.coach.service.editing import WorkoutEditMixin
 from trainmate.coach.service.analysis import DataAnalysisMixin
 
 
 class CoachService(PmcContextMixin, PromptConfigMixin, PlanningMixin, WorkoutGenMixin,
-                   AdaptationMixin, WorkoutEditMixin, DataAnalysisMixin):
+                   AdaptationMixin, DataAnalysisMixin):
     """Orchestrates sports science coaching by coordinating data I/O and business logic."""
 
     def __init__(

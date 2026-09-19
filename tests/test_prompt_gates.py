@@ -53,6 +53,16 @@ PAST_CONSTRAINTS_INSTRUCTIONS = "### WHAT ALREADY HAPPENED IN THIS MESOCYCLE"
 PAST_CONSTRAINTS_DATA = "## CONSTRAINTS EARLIER IN THIS MESOCYCLE"
 
 STRENGTH_BRIEF_INSTRUCTIONS = "### WRITING A STRENGTH DAY"
+STRENGTH_KEEP_THE_REQUEST = "A brief names an exercise in one case only"
+STRENGTH_REQUEST_INSTRUCTIONS = "asks for something INSIDE a strength session"
+
+TWEAK_TASK = "- FIND THE DAYS the request is about"
+TWEAK_SCHEMA_MEMBER = '"tweak_dates"'
+TWEAK_DATA = "## THE ATHLETE'S REQUEST"
+TWEAK_CANCELLED_DATA = "## SESSIONS NO LONGER ON THE SCHEDULE"
+FATIGUE_SECTIONS = (
+    "### ATTRIBUTING A DEPRESSED MORNING", "### DO NOT COMPOUND A PRIOR ADAPTATION",
+)
 
 BASE = dict(
     history_days=7,
@@ -136,6 +146,14 @@ class TestStrengthBriefRegion(unittest.TestCase):
             with self.subTest(call=name):
                 self.assertIn(STRENGTH_BRIEF_INSTRUCTIONS, prompt)
                 self.assertIn("no set count", prompt)
+                # A request written into a brief outlives any rewrite of it
+                # (DESIGN_workout_tweak.md §4).
+                self.assertIn(STRENGTH_KEEP_THE_REQUEST, prompt)
+
+    def test_the_rule_for_a_request_comes_with_the_message(self):
+        """Only a run with a message has a request to write into a brief (§4)."""
+        self.assertIn(STRENGTH_REQUEST_INSTRUCTIONS, build_prompt(athlete_message="x")[0])
+        self.assertNotIn(STRENGTH_REQUEST_INSTRUCTIONS, build_prompt()[0])
 
 
 class TestTheNoteTheAthleteDidNotWrite(unittest.TestCase):
@@ -231,6 +249,68 @@ class TestExecutionDriftGate(unittest.TestCase):
         for region in (DRIFT_INSTRUCTIONS, DRIFT_BRANCH, DRIFT_DATA):
             with self.subTest(region=region):
                 self.assertNotIn(region, whole)
+
+
+class TestTheTweakGate(unittest.TestCase):
+    """`tweak` puts the request's TASK in place of adapt's, and its data section and schema
+    member come with it (DESIGN_workout_tweak.md §3.2)."""
+
+    REQUEST = "Friday: step-ups instead of belt squats, the machine is broken"
+
+    def test_the_request_regions_appear_together(self):
+        system, user = build_prompt(tweak=True, athlete_message=self.REQUEST)
+        self.assertIn(TWEAK_TASK, system)
+        self.assertIn(TWEAK_SCHEMA_MEMBER, system)
+        self.assertIn(TWEAK_DATA, user)
+        self.assertIn(self.REQUEST, user)
+
+    def test_the_fatigue_reading_and_the_note_are_left_out(self):
+        system, user = build_prompt(tweak=True, athlete_message=self.REQUEST)
+        for section in FATIGUE_SECTIONS:
+            with self.subTest(section=section):
+                self.assertNotIn(section, system)
+        self.assertNotIn(NOTE_INSTRUCTIONS, system)
+        self.assertNotIn(NOTE_DATA, user)
+
+    def test_the_shared_sections_stay(self):
+        system, _user = build_prompt(tweak=True, athlete_message=self.REQUEST)
+        for section in (
+            "### WHAT YOU MAY NOT TOUCH", STRENGTH_BRIEF_INSTRUCTIONS,
+            STRENGTH_REQUEST_INSTRUCTIONS, MOVE_SECTION, "### PROTECTING A BENCHMARK",
+            NOTE_SCHEMA_MEMBER, NOTE_SIGNAL_INSTRUCTIONS,
+        ):
+            with self.subTest(section=section):
+                self.assertIn(section, system)
+
+    def test_an_adapt_has_none_of_the_request_regions(self):
+        system, user = build_prompt(athlete_message="knee is sore")
+        whole = system + user
+        for region in (TWEAK_TASK, TWEAK_SCHEMA_MEMBER, TWEAK_DATA):
+            with self.subTest(region=region):
+                self.assertNotIn(region, whole)
+        for section in FATIGUE_SECTIONS:
+            self.assertIn(section, system)
+
+    def test_the_cancelled_sessions_come_under_the_tweaks_own_heading(self):
+        """A tweak may bring any of them back, whoever cancelled it (§3.1)."""
+        cancelled = [{
+            "date": "2026-06-09", "sport_type": "running", "title": "Tempo run",
+            "duration_minutes": 45, "rpe": 7, "tss": 50, "removed_reason": "Fatigue.",
+        }]
+        _system, user = build_prompt(
+            tweak=True, athlete_message="put Tuesday's run back",
+            removed_workouts=cancelled,
+        )
+        self.assertIn(TWEAK_CANCELLED_DATA, user)
+        self.assertIn("Tempo run", user)
+        self.assertNotIn("WORKOUTS REMOVED BY ATHLETE", user)
+
+    def test_days_given_with_d_are_named_rather_than_asked_for(self):
+        system, _user = build_prompt(
+            tweak=True, athlete_message="make it shorter", tweak_dates=["2026-06-05"]
+        )
+        self.assertIn("The days are: 2026-06-05.", system)
+        self.assertNotIn("Read them off the request", system)
 
 
 class TestTheGatesAreIndependent(unittest.TestCase):
@@ -452,6 +532,7 @@ class TestPastConstraintsGate(unittest.TestCase):
 # The optional inputs whose regions are asserted above.
 GATES_WITH_A_TEST = {
     "athlete_message", "intensity_context", "standing_workouts", "past_constraints",
+    "tweak", "tweak_dates",
 }
 
 # The rest of the two builders' optional inputs. Being here is not a claim that an input

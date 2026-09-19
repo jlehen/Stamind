@@ -7,7 +7,7 @@ stops a stray write at runtime, but a rule that spans files needs a test that sp
 (AGENTS.md), and by the time SQLite raises, the author has already shipped the call.
 
 The behaviour ones each pin something the design claims. The one that matters most is the
-first: the DO NOT COMPOUND guard surviving a swap is the reason `lineage_id` exists at
+first: the DO NOT COMPOUND guard surviving a move is the reason `lineage_id` exists at
 all, and it fails on slot chains alone.
 """
 import ast
@@ -120,14 +120,14 @@ def _fresh_db(testcase) -> Database:
     return db
 
 
-class TestTheGuardSurvivesASwap(unittest.TestCase):
+class TestTheGuardSurvivesAMove(unittest.TestCase):
     """The §4 scenario, end to end.
 
     Tuesday holds a long ride, Thursday an easy spin. Two bad mornings ease the ride
-    twice, then a swap moves it to Thursday. Thursday's SLOT has seen one generate and one
-    swap and no adapts at all, so slot chains alone would report a session never eased —
-    and the week planner would cut a session already cut twice, on the exact morning recovery is
-    worst.
+    twice, then a third morning's adaptation swaps the two days. Thursday's SLOT has seen
+    one generate and one move and no easing at all, so slot chains alone would report a
+    session never eased — and the week planner would cut a session already cut twice, on
+    the exact morning recovery is worst.
     """
 
     def setUp(self):
@@ -142,19 +142,19 @@ class TestTheGuardSurvivesASwap(unittest.TestCase):
                 change.append(date="2026-09-01", sport_type="cycling", title="Long ride",
                               description=f"{minutes} min", duration_minutes=minutes,
                               tss=load, reason="Eased")
-        self._swap("2026-09-01", "2026-09-03")
+        self._move_both("2026-09-01", "2026-09-03")
 
-    def _swap(self, date_a: str, date_b: str) -> None:
+    def _move_both(self, date_a: str, date_b: str) -> None:
         a = self.db.get_workout(date_a, "cycling")
         b = self.db.get_workout(date_b, "cycling")
-        with self.db.workout_change(kind="swap") as change:
+        with self.db.workout_change(kind="adapt", summary="Rain on Tuesday") as change:
             for session, destination in ((b, date_a), (a, date_b)):
                 change.append(
                     date=destination, sport_type=session["sport_type"],
                     title=session["title"], description=session["description"],
                     duration_minutes=session["duration_minutes"], tss=session["tss"],
                     lineage_id=session["id"],
-                    reason=f"Swapped from {session['date']} to {destination}",
+                    reason=f"Moved from {session['date']} to {destination}",
                 )
 
     def test_the_rendered_prompt_tag_still_says_already_eased(self):
@@ -172,12 +172,12 @@ class TestTheGuardSurvivesASwap(unittest.TestCase):
         self.assertIn("first prescribed as 90m", rendered)
         self.assertIn("eased 2x", rendered)
 
-    def test_the_marker_reflects_the_latest_change_and_the_count_stands_beside_it(self):
-        """No precedence rule any more: a session eased twice and then swapped renders
-        both facts (§12)."""
+    def test_the_move_is_not_counted_as_a_third_easing(self):
+        """The move kept the ride's numbers, so the marker still counts the two easings
+        and no more (§12)."""
         from trainmate.cli.workouts._helpers import modification_markers
         moved = self.db.get_workout("2026-09-03", "cycling")
-        self.assertEqual(modification_markers(moved), ["SWAPPED", "ADAPTED ×2"])
+        self.assertEqual(modification_markers(moved), ["ADAPTED ×2"])
 
 
 class TestRevisionBehaviour(unittest.TestCase):
@@ -229,7 +229,7 @@ class TestRevisionBehaviour(unittest.TestCase):
         adapt_change = self.db.get_workout_changes()[0]["id"]
         ride = self.db.get_workout("2026-09-01", "cycling")
         spin = self.db.get_workout("2026-09-03", "cycling")
-        with self.db.workout_change(kind="swap") as change:
+        with self.db.workout_change(kind="tweak") as change:
             for session, destination in ((spin, "2026-09-01"), (ride, "2026-09-03")):
                 change.append(date=destination, sport_type="cycling",
                               title=session["title"], description=session["description"],
@@ -250,7 +250,7 @@ class TestRevisionBehaviour(unittest.TestCase):
         self._generate(("2026-09-01", "cycling", "Long ride", 90))
         removed = self.db.get_workout("2026-09-01", "cycling")
         self.db.mark_workout_pushed(removed["id"], "evt-old", "sig")
-        with self.db.workout_change(kind="rm") as change:
+        with self.db.workout_change(kind="tweak") as change:
             change.void(date="2026-09-01", sport_type="cycling", reason="work trip")
 
         self._generate(("2026-09-01", "cycling", "Threshold", 60), summary="v2")
@@ -260,30 +260,6 @@ class TestRevisionBehaviour(unittest.TestCase):
         self.assertEqual(fresh["adaptation_count"], 0)
         self.assertIsNone(fresh["google_event_id"])
         self.assertEqual(fresh["original_description"], "60 min")
-
-    def test_a_generate_over_a_manual_session_replaces_it_and_says_so(self):
-        """The plan owns the horizon, so the generate proceeds — under a new lineage, and
-        naming what it replaced so the athlete can undo it (§4, §12)."""
-        save_workout(self.db, "2026-09-01", "cycling", "My own ride", "60 min",
-                     duration_minutes=60, source="manual")
-        manual = self.db.get_workout("2026-09-01", "cycling")
-        self.assertEqual(manual["source"], "manual")
-
-        with self.db.workout_change(kind="generate", summary="v2") as change:
-            change.append(date="2026-09-01", sport_type="cycling", title="Threshold",
-                          description="75 min", duration_minutes=75, tss=90)
-            replaced = list(change.replaced_manual)
-            generate_change = change.id
-        self.assertEqual([r["title"] for r in replaced], ["My own ride"])
-
-        planned = self.db.get_workout("2026-09-01", "cycling")
-        self.assertEqual(planned["source"], "generated")
-        self.assertNotEqual(planned["id"], manual["id"])
-
-        self.db.rollback_to_change(generate_change, "2026-09-01")
-        back = self.db.get_workout("2026-09-01", "cycling")
-        self.assertEqual(back["title"], "My own ride")
-        self.assertEqual(back["source"], "manual")
 
     def test_regenerating_an_unchanged_horizon_appends_nothing(self):
         """Make regeneration churn the thing you read when you ask what happened to
@@ -302,10 +278,11 @@ class TestRevisionBehaviour(unittest.TestCase):
     def test_restoring_leaves_the_revision_it_replaced_in_the_chain(self):
         self._generate(("2026-09-01", "cycling", "Long ride", 90))
         session = self.db.get_workout("2026-09-01", "cycling")
-        with self.db.workout_change(kind="rm") as change:
+        before = self.db.get_workout_revision(session["revision_id"])
+        with self.db.workout_change(kind="tweak") as change:
             change.void(date="2026-09-01", sport_type="cycling", reason="ill")
-        with self.db.workout_change(kind="restore") as change:
-            change.restore(self.db.revision_before_live_void(session["id"]))
+        with self.db.workout_change(kind="rollback") as change:
+            change.restore(before)
 
         back = self.db.get_workout("2026-09-01", "cycling")
         self.assertFalse(back["removed"])
@@ -334,7 +311,7 @@ class TestRevisionBehaviour(unittest.TestCase):
                        ("2026-09-03", "running", "Tempo", 45))
         ride = self.db.get_workout("2026-09-01", "cycling")
         run = self.db.get_workout("2026-09-03", "running")
-        with self.db.workout_change(kind="swap") as change:
+        with self.db.workout_change(kind="tweak") as change:
             change.void(date="2026-09-01", sport_type="cycling", reason="Swapped away")
             change.void(date="2026-09-03", sport_type="running", reason="Swapped away")
             change.append(date="2026-09-01", sport_type="running", title=run["title"],
@@ -414,7 +391,7 @@ class TestRevisionBehaviour(unittest.TestCase):
         self.assertEqual(len({w["id"] for w in live}), 2)
 
     def test_rm_by_lineage_id_acts_on_the_live_revision_after_an_adapt(self):
-        """With raw revision ids, `workout rm 42` after an adapt would mark a dead
+        """With raw revision ids, a command given id 42 after an adapt would act on a dead
         revision and report success — a lie. The id the athlete reads is the id the
         command needs (§5)."""
         self._generate(("2026-09-01", "cycling", "Long ride", 90))

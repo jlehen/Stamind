@@ -79,7 +79,7 @@ def _annotate_workout(
     workout: Dict[str, Any], adherence: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Adds the *derived* calendar fact the CLI shows as [SYNCED]/[STALE], the
-    modification markers it shows as [ADAPTED ×2]/[SWAPPED]/…, and — for a session
+    modification markers it shows as [ADAPTED ×2]/[TWEAKED]/…, and — for a session
     today or earlier — the adherence verdict it shows as [DONE]/[MISSED]/…
     (ARCHITECTURE.md §5).
 
@@ -374,7 +374,7 @@ def get_timeline_png() -> Any:
 
     Never calls `garmin.ensure_data`; freshness is surfaced via `sync_state` on the
     Dashboard. Not cached: recomputed per request so the projection moves the instant a
-    CLI `adapt`/`generate`/`swap`/`remove` rewrites future workouts.
+    CLI `adapt`/`tweak`/`generate` rewrites future workouts.
 
     `?weeks=N` re-windows the past half exactly like the CLI's `--weeks` (default 8,
     must be >= 1 else 400; `all` extends to full history). The future half always runs

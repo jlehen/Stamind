@@ -45,9 +45,9 @@ def _easing_recency_tag(workout: Workout, eval_date: Optional[str]) -> str:
     recently and how often it was eased.
 
     Gated on the derived tally, NOT on the kind of the latest change: under revisions the
-    marker reflects the latest change, so an adapted-then-swapped session reads `swapped`,
-    and a kind gate would silence this tag in exactly the scenario the lineage exists to
-    protect (DESIGN_workout_revisions.md §7).
+    marker reflects the latest change, so an eased session a rollback copied forward reads
+    `rollback`, and a kind gate would silence this tag in exactly the scenario the lineage
+    exists to protect (DESIGN_workout_revisions.md §7).
 
     Both prompts read the same tag. It used to close with an instruction — "do not
     compound" for `adapt`, "do not silently restore it" for `generate` — because neither
@@ -238,8 +238,6 @@ def _standing_markers(w: Workout, window_end: Optional[str]) -> str:
         markers += " [COMMITTED]"
     if w.get('benchmark_type'):
         markers += f" [BENCHMARK: {w['benchmark_type']}]"
-    if w.get('source') == 'manual':
-        markers += " [ADDED BY THE ATHLETE]"
     if canonical_sport(w.get('sport_type', '')) == canonical_sport('rest'):
         markers += " [REST DAY]"
     return markers
@@ -300,9 +298,6 @@ def format_planned_workouts_detailed(
     The one-line summary alone omits these details, so adaptations otherwise lose
     them (the model reconstructs the session from title + duration + RPE + TSS).
 
-    Sessions the athlete scheduled themselves (source == 'manual') are tagged
-    "[athlete-added]" so the adaptation can treat them as deliberate intent.
-
     `performed` maps `(date, canonical_sport)` to what the session actually got
     (`adherence.performed_sessions`), so the model has the authoritative verdict instead
     of re-pairing the plan against the completed-activity list itself. A full session is
@@ -321,8 +316,6 @@ def format_planned_workouts_detailed(
         p = performed.get((w['date'], canonical_sport(w['sport_type'])))
         if p is not None:
             markers += _performed_marker(p)
-        if w.get('source') == 'manual':
-            markers += " [athlete-added]"
         # A benchmark (fitness test) must be rescheduled intact, never softened — see the
         # adapt prompt's PROTECTING A BENCHMARK rule (DESIGN_benchmark_workouts.md §4.2).
         if w.get('benchmark_type'):

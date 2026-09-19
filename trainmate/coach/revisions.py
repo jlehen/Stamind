@@ -40,15 +40,6 @@ def replaces_source(entry: Dict[str, Any]) -> Optional[Tuple[str, str]]:
     return None if named == slot else named
 
 
-def carried_lineage(occupant: Dict[str, Any]) -> Optional[int]:
-    """The lineage the session replacing `occupant` joins, or None to start a fresh one.
-
-    A session the athlete added by hand keeps its own lineage: inheriting it would make
-    the coach's replacement render "[Manual]" (DESIGN_plan_change_continuity.md §5.3).
-    """
-    return None if occupant.get('source') == 'manual' else occupant['id']
-
-
 def rest_in_place_of(
     source: Dict[str, Any], reason: str, fallback: str
 ) -> Dict[str, Any]:

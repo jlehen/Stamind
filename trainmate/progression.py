@@ -56,23 +56,16 @@ def _days_between(start: str, end: str) -> int:
 
 
 def plan_end(workouts: List[Dict[str, Any]]) -> Optional[str]:
-    """Last non-removed **generated** workout date (DESIGN_progress_timeline.md §3
-    'Plan end'). The projection runs exactly to here and stops — no zero-fill ghost
-    line past it.
+    """The last date the schedule covers: the last non-removed workout, planned rest rows
+    included (DESIGN_progress_timeline.md §3 'Plan end', DESIGN_runway_nudge.md §2). The
+    projection runs exactly to here and stops — no zero-fill ghost line past it. None when
+    there are no non-removed workouts at all.
 
-    Manual rows (`workout add`) count toward daily loads *inside* the range but
-    never *extend* it: one far-future race-day placeholder would otherwise drag the
-    projection over months of assumed rest. Fallback for a fully-manual DB (no
-    generated workouts at all): the last non-removed workout of any source. None
-    when there are no non-removed workouts at all."""
-    generated = [
-        w["date"] for w in workouts
-        if not w.get("removed") and w.get("source") == "generated"
-    ]
-    if generated:
-        return max(generated)
-    any_non_removed = [w["date"] for w in workouts if not w.get("removed")]
-    return max(any_non_removed) if any_non_removed else None
+    No margin and no guessing at a quiet tail: the coverage invariant of
+    DESIGN_runway_nudge.md §2.1 makes every date of a generated span carry a row, so the
+    last covered date is read straight off them."""
+    dates = [w["date"] for w in workouts if not w.get("removed")]
+    return max(dates) if dates else None
 
 
 def _window_end(workouts: List[Dict[str, Any]], today: str) -> str:
@@ -544,23 +537,6 @@ RUNWAY_PLAN_END_NEXT_GOAL = "plan_end_next_goal"
 RUNWAY_PLAN_END_NO_GOAL = "plan_end_no_goal"
 
 
-def coverage_end(workouts: List[Dict[str, Any]]) -> Optional[str]:
-    """The last date the generated schedule covers — planned rest rows included, manual
-    rows excluded (DESIGN_runway_nudge.md §2). None when nothing was ever generated.
-
-    Deliberately not `plan_end`, which falls back to manual rows for a fully-manual
-    database: a race put on the calendar by hand weeks out must not make the schedule
-    look as if it reaches that far while the generated sessions end next Thursday.
-
-    No margin and no guessing at a quiet tail: §2.1's coverage invariant makes every date
-    of a generated span carry a row, so the last covered date is read straight off them."""
-    dates = [
-        w["date"] for w in workouts
-        if not w.get("removed") and w.get("source") == "generated"
-    ]
-    return max(dates) if dates else None
-
-
 def runway(
     workouts: List[Dict[str, Any]],
     mesocycles: List[Dict[str, Any]],
@@ -581,7 +557,7 @@ def runway(
     Returns `{last_covered_date, days_left, kind, plan_end}`, plus `next_mesocycle` on a
     mesocycle cliff and `objective`/`weeks_before` on a plan cliff with a goal beyond it.
     `days_left` is negative once the cliff is behind the athlete."""
-    last_covered = coverage_end(workouts)
+    last_covered = plan_end(workouts)
     ends = [str(m["end_date"]) for m in mesocycles if m.get("end_date")]
     if last_covered is None or not ends:
         return None
@@ -706,15 +682,6 @@ def assemble_timeline(
 
     gap = None
     if end is not None:
-        beyond = [
-            w for w in workouts if not w.get("removed") and w["date"] > end
-        ]
-        if beyond:
-            warnings.append(_warning(
-                "beyond_plan_end",
-                f"{len(beyond)} workout{_plural(len(beyond))} beyond plan end "
-                f"— not projected",
-            ))
         gap = plan_gap(objectives, end)
 
     history_start = _history_start(activities, metrics_rows)

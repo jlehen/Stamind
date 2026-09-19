@@ -1748,7 +1748,7 @@ class TestCompletedSeasonsReachTheReview(unittest.TestCase):
             save_workout(test_db,
                 date=day, sport_type="cycling", title="Endurance",
                 description="[Endurance]\n2h", duration_minutes=120, rpe=5, tss=100.0,
-                source="generated", macrocycle_id=macro_id,
+                macrocycle_id=macro_id,
             )
             test_db.save_completed_activity(
                 activity_id=f"s{i}", date=day, start_time=f"{day}T07:00:00",
@@ -2565,15 +2565,6 @@ class TestTheStandingSessionsReachGeneration(unittest.TestCase):
         self.assertIn("Easy Z2 Spin", user)
         self.assertNotIn("Steady Run", user)
 
-    def test_a_manual_session_past_the_window_is_a_standing_session(self):
-        """The window's argument is that past it the athlete has not seen the day. That
-        is false for a session they typed in themselves (§4.2)."""
-        self._window(3)
-        self._untouched(_days_out(10), source="manual")
-        _proposal, user = self._run()
-        self.assertIn("Steady Run", user)
-        self.assertIn("[ADDED BY THE ATHLETE]", user)
-
     def test_an_empty_window_carries_nothing(self):
         """`0` protects nothing: today's session may change too (§4.1)."""
         self._window(0)
@@ -2582,7 +2573,7 @@ class TestTheStandingSessionsReachGeneration(unittest.TestCase):
         self.assertNotIn("SESSIONS ALREADY STANDING", user)
 
     def test_a_cancelled_session_is_not_a_standing_session(self):
-        """`workout rm` ended the session; there is nothing standing to answer for."""
+        """A cancelled session has nothing standing to answer for."""
         self._eased(_days_out(3), removed=True, removed_reason="travelling")
         _proposal, user = self._run()
         self.assertNotIn("SESSIONS ALREADY STANDING", user)

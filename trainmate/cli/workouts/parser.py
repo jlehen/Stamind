@@ -7,12 +7,12 @@ from trainmate.config import config
 from trainmate.util import green
 from trainmate.cli.selectors import add_selector_args, add_single_date_arg, parse_target
 from trainmate.cli.workouts.edit import (
-    run_workout_add, run_workout_prune_calendar, run_workout_push,
-    run_workout_restore, run_workout_rm, run_workout_swap, run_workout_wipe,
+    run_workout_prune_calendar, run_workout_push, run_workout_wipe,
 )
 from trainmate.cli.workouts.generate import (
     run_workout_adapt, run_workout_batches, run_workout_compare,
     run_workout_generate, run_workout_list, run_workout_rollback, run_workout_show,
+    run_workout_tweak,
 )
 from trainmate.cli.workouts.heads_up import run_workout_notify
 
@@ -27,10 +27,6 @@ def _add_listing_args(parser):
     add_selector_args(
         parser, meso=True, macro=True, goal=True, sport=True,
         direction="forward", default="7d",
-    )
-    parser.add_argument(
-        "--removed", action="store_true",
-        help="Include soft-removed workouts (e.g. to find their ID for restoring)"
     )
     parser.add_argument(
         "--link", "-l", action="store_true",
@@ -168,14 +164,13 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         help="Undo a workout change, and every change made after it",
         description=(
             "Put the sessions back the way they were the moment before a change ran. "
-            "Any command that wrote workouts qualifies — a generation, an adapt, a swap, "
-            "a manual edit — and undoing one also undoes everything after it, which is "
+            "Any command that wrote workouts qualifies — a generation, an adapt, a "
+            "tweak — and undoing one also undoes everything after it, which is "
             "what stops a session ending up live on two days. Defaults to the newest "
             f"change; list them with '{green('workout batches')}' and pick one with "
             "--batch. Sessions dated before today are left alone. The active "
             f"periodization plan is left untouched — use '{green('plan rollback')}' to "
-            f"step the strategy back as well. This is unrelated to "
-            f"'{green('workout restore')}', which un-cancels a single session."
+            "step the strategy back as well."
         )
     )
     w_rollback.set_defaults(func=run_workout_rollback)
@@ -226,69 +221,9 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         "-y", "--yes", action="store_true", help="Skip confirmation prompt"
     )
 
-    # workout add
-    w_add = workout_subparsers.add_parser(
-        "add",
-        help="Manually schedule a workout on a date (replaces any same-sport session)",
-        description=(
-            "Manually add a workout on a specific date — driven by you rather than the "
-            "coach. If a workout of the same sport already exists that day it is "
-            "replaced (use --replace-day to instead replace every session that day "
-            "regardless of sport), and each replaced session's description, duration, "
-            "TSS and RPE are recorded on the new workout (and its Calendar event) so the "
-            "change stays traceable. Saved and synced to Google Calendar immediately. To "
-            f"have the coach re-balance surrounding load afterward, run '{green('workout adapt')}'."
-        )
-    )
-    w_add.set_defaults(func=run_workout_add)
-    w_add.add_argument("date", help="Workout date (YYYY-MM-DD)")
-    w_add.add_argument("sport_type", help="Sport type (e.g. running, cycling)")
-    w_add.add_argument("title", help="Workout title")
-    w_add.add_argument(
-        "--description", "--desc", dest="description", help="Workout description / details"
-    )
-    w_add.add_argument(
-        "--duration", type=int, dest="duration", metavar="MIN",
-        help="Planned duration in minutes"
-    )
-    w_add.add_argument("--rpe", type=int, help="Target RPE (1-10)")
-    w_add.add_argument("--tss", type=int, help="Target training stress score")
-    w_add.add_argument(
-        "--reason",
-        help="Why you're adding/replacing this session (recorded and shown to the coach)"
-    )
-    w_add.add_argument(
-        "--replace-day", dest="replace_day", action="store_true",
-        help="Replace every session that day, not just the same sport"
-    )
-
-    # workout rm
-    w_rm = workout_subparsers.add_parser(
-        "rm", help="Remove a workout by ID"
-    )
-    w_rm.set_defaults(func=run_workout_rm)
-    w_rm.add_argument("id", type=int, help="Workout ID to remove")
-    w_rm.add_argument(
-        "reason",
-        help="Why the workout is being removed (shown to the coach as a deliberate "
-             "cancellation)"
-    )
-
-    # workout restore
-    w_restore = workout_subparsers.add_parser(
-        "restore", help="Bring a cancelled workout back by ID",
-        description=(
-            "Un-cancel a single session and put it back on the schedule, as it stood "
-            f"before it was removed. This is unrelated to '{green('workout rollback')}', "
-            "which undoes a whole change (DESIGN_workout_revisions.md §10)."
-        )
-    )
-    w_restore.set_defaults(func=run_workout_restore)
-    w_restore.add_argument("id", type=int, help="Workout ID to restore")
-    
     # workout adapt
     w_adapt = workout_subparsers.add_parser(
-        "adapt", aliases=["a"],
+        "adapt",
         parents=[pull_bypass_parser, llm_debug_parser],
         help="Run the daily Garmin check for today (syncs adapted workouts to Calendar)",
         description=(
@@ -324,6 +259,42 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         help="Apply proposed adaptations automatically without prompting"
     )
     
+    # workout tweak
+    w_tweak = workout_subparsers.add_parser(
+        "tweak",
+        parents=[pull_bypass_parser, llm_debug_parser],
+        help="Ask the coach for a change you decided: shorter, moved, swapped, dropped, added",
+        description=(
+            "Ask the coach for a change to your schedule, in your own words: a session "
+            "made shorter or harder, another sport in its place, other exercises in a "
+            "strength session, a session added, dropped or brought back, a session moved "
+            "to another day, or two days swapped. The coach writes the sessions so that "
+            "they fit the week, and only the days the request is about change. Say the "
+            "days in the message ('Friday: ...'), or name them with --date, which may be "
+            "given more than once. Every day must lie between today and the end of the "
+            "current mesocycle. The change is shown first and applied on a yes, then "
+            "synced to Google Calendar. When a whole change was a mistake, "
+            f"'{green('workout rollback')}' is the better tool: it puts back exactly what "
+            "was there. To tell the coach how you are and let it decide what to change, "
+            f"use '{green('workout adapt')} -m' instead."
+        )
+    )
+    w_tweak.set_defaults(func=run_workout_tweak)
+    w_tweak.add_argument(
+        "message",
+        help="What you want changed, e.g. 'Saturday: a 4 hour hike instead of the ride'"
+    )
+    add_single_date_arg(
+        w_tweak,
+        "A day to change: YYYY-MM-DD, 'today' or an offset like +2d. Give it once per "
+        "day. Without it, the coach reads the days off the message",
+        repeat=True,
+    )
+    w_tweak.add_argument(
+        "-y", "--yes", "--auto", action="store_true", dest="auto",
+        help="Apply the proposed change without prompting"
+    )
+
     # workout push
     w_push = workout_subparsers.add_parser(
         "push", aliases=["p"], advanced=True,
@@ -344,43 +315,6 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         "-f", "--force", action="store_true",
         help="Re-push already-synced workouts, overwriting existing calendar entries"
     )
-
-    # workout swap
-    w_swap = workout_subparsers.add_parser(
-        "swap",
-        parents=[llm_debug_parser],
-        help="Swap two workouts, given either two dates or two workout IDs",
-        description=(
-            "Swap two workouts, given either two dates (YYYY-MM-DD) or two workout "
-            "IDs. Both targets must be the same kind - two dates or two IDs, not a "
-            "mix. Runs recovery checks (consecutive hard days, weekly load spikes, "
-            "mesocycle crossings) and prompts on warnings unless -f/--force. "
-            "The swap is synced to Google Calendar unless --no-sync is given."
-        )
-    )
-    w_swap.set_defaults(func=run_workout_swap)
-    w_swap.add_argument(
-        "target1",
-        help="First workout to swap: a date (YYYY-MM-DD) or a workout ID"
-    )
-    w_swap.add_argument(
-        "target2",
-        help="Second workout to swap: a date (YYYY-MM-DD) or a workout ID"
-    )
-    w_swap.add_argument(
-        "reason",
-        help="Why the workouts are being swapped (recorded and shown to the coach)"
-    )
-    w_swap.add_argument(
-        "--no-sync", action="store_true", dest="no_sync",
-        help="Do not sync the swapped workouts to Google Calendar"
-    )
-    w_swap.add_argument(
-        "-f", "--force", action="store_true", dest="force",
-        help="Apply the swap without prompting, even if warnings are raised"
-    )
-
-
 
     # workout wipe
     w_wipe = workout_subparsers.add_parser(

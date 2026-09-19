@@ -46,7 +46,7 @@ def _act(offset, tss=None, rpe=None, duration_sec=3600.0, activity_id=None,
 
 
 def _w(offset, sport_type="running", tss=None, rpe=None, duration_minutes=None,
-       removed=False, source="generated"):
+       removed=False):
     return {
         "date": _d(offset),
         "sport_type": sport_type,
@@ -54,7 +54,6 @@ def _w(offset, sport_type="running", tss=None, rpe=None, duration_minutes=None,
         "rpe": rpe,
         "duration_minutes": duration_minutes,
         "removed": removed,
-        "source": source,
     }
 
 
@@ -67,12 +66,8 @@ def _dp(offset, load, source="actual"):
 
 
 class TestPlanEnd(unittest.TestCase):
-    def test_last_generated_workout_wins_over_far_future_manual(self):
-        workouts = [_w(2, tss=50), _w(60, tss=50, source="manual")]
-        self.assertEqual(progression.plan_end(workouts), _d(2))
-
-    def test_fully_manual_db_falls_back_to_last_non_removed(self):
-        workouts = [_w(5, tss=50, source="manual")]
+    def test_the_last_non_removed_workout_ends_the_plan(self):
+        workouts = [_w(2, tss=50), _w(9, tss=50, removed=True), _w(5, sport_type="rest")]
         self.assertEqual(progression.plan_end(workouts), _d(5))
 
     def test_none_when_no_non_removed_workouts(self):
@@ -419,11 +414,6 @@ class TestAssembleTimeline(unittest.TestCase):
         p = self._assemble(workouts=[_w(1, tss=50)])
         self.assertIn("no_history", self._codes(p))
         self.assertTrue(p["weeks"])  # planned bars still render
-
-    def test_beyond_plan_end_warning(self):
-        workouts = [_w(2, tss=50), _w(30, tss=50, source="manual")]
-        p = self._assemble(activities=[_act(-1, tss=30.0)], workouts=workouts)
-        self.assertIn("beyond_plan_end", self._codes(p))
 
     def test_plan_gap_is_structured_not_a_warning_string(self):
         objectives = [{"id": 1, "title": "Marathon", "target_date": _d(60), "status": "active"}]

@@ -97,13 +97,10 @@ def leaves_trace(head: Dict[str, Any]) -> bool:
     torn down (DESIGN_plan_change_continuity.md §5.2).
 
     A day the athlete was counting on does not disappear: it is marked, with a reason.
-    Which days those are is the void's own three clauses — the athlete asked for it, it
-    was a session they added, or it fell inside the commitment window the change that
-    removed it ran under.
+    Which days those are is the void's own two clauses — the athlete decided it, or it
+    fell inside the commitment window the change that removed it ran under.
     """
     if head["change_kind"] in ATHLETE_VOID_KINDS:
-        return True
-    if head.get("source") == "manual":
         return True
     commitment_end = head.get("commitment_end")
     return commitment_end is not None and head["date"] <= commitment_end

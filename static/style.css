@@ -684,23 +684,6 @@ header {
     overflow-wrap: break-word;
 }
 
-/* Origin badge: athlete-scheduled session (`workout add`). Orthogonal to the
-   adapted/synced border colors — magenta to match the CLI's [MANUAL] marker. */
-.workout-tag-manual {
-    display: inline-block;
-    vertical-align: middle;
-    margin-left: 0.4rem;
-    padding: 0.05rem 0.4rem;
-    border-radius: 6px;
-    font-family: var(--font-body, inherit);
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    color: #f0abfc;
-    background: rgba(217, 70, 239, 0.12);
-    border: 1px solid rgba(217, 70, 239, 0.3);
-}
-
 .workout-reason {
     margin-top: 0.5rem;
     padding: 0.5rem;
@@ -1321,8 +1304,7 @@ header {
     font-weight: 700;
     letter-spacing: 0.5px;
 }
-.wbadge.adapted, .wbadge.swapped, .wbadge.replaced { color: #fcd34d; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); }
-.wbadge.manual { color: #f0abfc; background: rgba(217,70,239,0.12); border: 1px solid rgba(217,70,239,0.3); }
+.wbadge.adapted { color: #fcd34d; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); }
 .wbadge.synced { color: #6ee7b7; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); }
 .wbadge.stale { color: #fcd34d; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); }
 .wbadge.removed { color: #fca5a5; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); }

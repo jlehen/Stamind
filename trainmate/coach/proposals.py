@@ -32,6 +32,9 @@ class RevisionProposal:
     workouts: List[Dict[str, Any]]
     range_start: str
     range_end: str
+    # The change kind apply records: "adapt", or "tweak" for one day changed on request
+    # (DESIGN_workout_tweak.md §3.3).
+    kind: str = "adapt"
     pairs: Tuple[RevisionPair, ...] = ()
     removals: Tuple[Dict[str, Any], ...] = ()
     # Candidate directives extracted from the athlete's note, raw and unconfirmed

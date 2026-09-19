@@ -500,8 +500,8 @@ class RouterTablesTest(unittest.TestCase):
     # the echo, so a misroute between them changes what the athlete is told the coach
     # heard, never what is stored (§12.3).
     NOTE_INTENTS = {"add_constraint", "add_signal"}
-    # Intents the bot answers itself, or maps with the athlete's text attached.
-    SPECIAL = {"coach_message", "help", "unclear"}
+    # Intents the bot answers itself.
+    SPECIAL = {"help", "unclear"}
 
     def test_every_cli_intent_lands_somewhere_in_the_bot(self):
         from trainmate.cli.bot import ROUTER_INTENTS
@@ -509,13 +509,14 @@ class RouterTablesTest(unittest.TestCase):
             self.assertTrue(
                 intent in bot.ROUTER_INTENT_ARGV
                 or intent in bot.ROUTER_CAPTURE_INTENTS
+                or intent in bot.ROUTER_MESSAGE_ARGV
                 or intent in self.SPECIAL, intent
             )
 
     def test_bot_tables_name_no_unknown_intent(self):
         from trainmate.cli.bot import ROUTER_INTENTS
         for intent in (list(bot.ROUTER_INTENT_ARGV) + list(bot.ROUTER_ECHO)
-                       + list(bot.ROUTER_CAPTURE_INTENTS)):
+                       + list(bot.ROUTER_CAPTURE_INTENTS) + list(bot.ROUTER_MESSAGE_ARGV)):
             self.assertIn(intent, ROUTER_INTENTS)
 
     def test_every_capture_intent_reaches_the_capture_command(self):
@@ -533,11 +534,19 @@ class RouterTablesTest(unittest.TestCase):
         echoes = [bot.ROUTER_ECHO[i] for i in self.NOTE_INTENTS]
         self.assertEqual(len(set(echoes)), len(echoes))
 
-    def test_the_coach_lane_stays_the_only_one_that_carries_her_words(self):
-        """`coach_message` is now genuinely different from the note intents: state goes
-        to the coach verbatim, records go to capture, which transcribes (§12.3)."""
-        self.assertNotIn("coach_message", bot.ROUTER_CAPTURE_INTENTS)
-        self.assertNotIn("coach_message", bot.ROUTER_INTENT_ARGV)
+    def test_the_two_coach_lanes_carry_the_words_to_different_commands(self):
+        """State goes to the coach verbatim, records go to capture, which transcribes
+        (§12.3). How the athlete is goes to `workout adapt`; a change they decided goes to
+        `workout tweak` (DESIGN_workout_tweak.md §3.4). Both carry the text, so neither
+        owns a fixed argv."""
+        self.assertEqual(
+            bot.ROUTER_MESSAGE_ARGV["coach_message"], ["workout", "adapt", "-m"]
+        )
+        self.assertEqual(bot.ROUTER_MESSAGE_ARGV["tweak_session"], ["workout", "tweak"])
+        for intent in bot.ROUTER_MESSAGE_ARGV:
+            self.assertNotIn(intent, bot.ROUTER_INTENT_ARGV, intent)
+            self.assertNotIn(intent, bot.ROUTER_CAPTURE_INTENTS, intent)
+            self.assertIn(intent, bot.ROUTER_ECHO, intent)
 
 
 class ButtonsProtocolTest(unittest.TestCase):

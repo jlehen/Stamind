@@ -1,23 +1,33 @@
 from datetime import datetime, timedelta
-from typing import Any, List, Optional, Dict, Tuple
+from typing import Any, List, Optional, Dict, Sequence, Set, Tuple
 from trainmate.config import config
 from trainmate.adherence import (
     analyze_adherence, format_discrepancies, performed_sessions,
 )
 from trainmate.sports import canonical_sport
 from trainmate import intensity, signals
-from trainmate.util import cmd, notice
+from trainmate.util import cmd, fmt_date, notice
 from trainmate.coach.formatting import format_baseline
 from trainmate.coach import honoring
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.coach.revisions import (
-    carried_lineage, held_slots, normalize_load_fields, pair_revisions, replaces_source,
+    held_slots, normalize_load_fields, pair_revisions, replaces_source,
     rest_in_place_of, structure_revision,
 )
 from trainmate.db.workouts import ATHLETE_VOID_KINDS
 from trainmate.strength import planner as strength_planner
 from trainmate.types import Workout
 import trainmate.coach.service as _svc
+
+
+def _outside_tweak_reach(days: Sequence[str], meso_end: str) -> str:
+    """The refusal for days a tweak cannot reach: it goes as far as `workout adapt`, from
+    today to the end of the current mesocycle (DESIGN_workout_tweak.md §3.2)."""
+    return (
+        f"A tweak reaches from today to the end of the current mesocycle "
+        f"({fmt_date(meso_end)}). Outside that: {', '.join(fmt_date(d) for d in days)}. "
+        f"To plan around a day further out, add a constraint with {cmd('constraint add')}."
+    )
 
 
 class AdaptationMixin:
@@ -45,7 +55,7 @@ class AdaptationMixin:
     @staticmethod
     def _move_source(
         entry: Dict[str, Any], by_slot: Dict[Tuple[str, str], Workout],
-        completed_keys: set, claimed: set,
+        completed_keys: set, claimed: set, leaving: set,
     ) -> Optional[Workout]:
         """The session an entry's `replaces` takes out of another slot, or None.
 
@@ -54,6 +64,10 @@ class AdaptationMixin:
         trained, a destination that already holds a same-sport session, and a second
         entry claiming a source the first one took. A refused entry is still written
         where it stands — only its claim on the other day is dropped.
+
+        A destination whose session is itself `leaving`, moved out by another entry, is
+        free: that is a swap of two sessions of the same sport (DESIGN_workout_tweak.md
+        §3.1).
         """
         source = replaces_source(entry)
         if source is None:
@@ -73,7 +87,7 @@ class AdaptationMixin:
             )
             return None
         slot = (entry.get('date'), canonical_sport(entry.get('sport_type', '')))
-        if slot in by_slot:
+        if slot in by_slot and slot not in leaving:
             notice(
                 f"The coach moved the {source[0]} session onto {entry.get('date')}, "
                 f"where a session of yours already stands — revising that one and "
@@ -100,17 +114,25 @@ class AdaptationMixin:
         by_slot = {
             (w['date'], canonical_sport(w['sport_type'])): w for w in window_workouts
         }
+        # The sessions some entry carries out of their slot, and could: the other half of
+        # a swap lands where one of them stood.
+        leaving = {
+            source for source in map(replaces_source, adapted)
+            if source in by_slot and source not in completed_keys
+        }
         out: List[Dict[str, Any]] = []
         movers: Dict[Tuple[str, str], Dict[str, Any]] = {}   # source slot -> its mover
         for entry in adapted:
-            occupant = self._move_source(entry, by_slot, completed_keys, set(movers))
+            occupant = self._move_source(
+                entry, by_slot, completed_keys, set(movers), leaving
+            )
             if occupant is None:
                 out.append(entry)
                 continue
             entry = {
                 **entry,
                 'replaces_slot': (occupant['date'], occupant['sport_type']),
-                'replaces_lineage': carried_lineage(occupant),
+                'replaces_lineage': occupant['id'],
             }
             movers[(occupant['date'], canonical_sport(occupant['sport_type']))] = entry
             out.append(entry)
@@ -236,8 +258,54 @@ class AdaptationMixin:
         every adherence surface reads the same pairing."""
         self._db.save_match_decision(activity_id, canonical_sport(sport), accepted)
 
+    def workout_tweak(
+        self, message: str, tweak_dates: Sequence[str] = (),
+        today_str: Optional[str] = None,
+    ) -> RevisionProposal:
+        """Changes the days a request is about: `workout adapt`'s path with a narrower job
+        (DESIGN_workout_tweak.md §3.2). Empty `tweak_dates` lets the week planner read the
+        days off the message."""
+        return self.workout_adapt(
+            today_str, message=message, tweak=True, tweak_dates=tweak_dates
+        )
+
+    @staticmethod
+    def _tweak_days(
+        decision: Dict[str, Any], tweak_dates: Sequence[str], first: str, last: str
+    ) -> Set[str]:
+        """The days a tweak may write: the caller's, else the ones the week planner named.
+        Raises when the reply changes sessions and names no usable day, or a day past
+        what a tweak reaches (§3.2)."""
+        if tweak_dates:
+            return set(tweak_dates)
+        named = {str(day) for day in decision.get("tweak_dates") or []}
+        if not named:
+            raise ValueError(
+                "The coach could not tell which day you mean. Name it: "
+                + cmd('workout tweak -d DATE "..."')
+            )
+        outside = sorted(day for day in named if not first <= day <= last)
+        if outside:
+            raise ValueError(_outside_tweak_reach(outside, last))
+        return named
+
+    @staticmethod
+    def _only_on(days: Set[str], adapted: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """A tweak's rows cut down to its days: nothing on another date, and no session
+        moved in from one (§3.2)."""
+        kept = []
+        for w in adapted:
+            if w.get("date") not in days:
+                continue
+            came_from = replaces_source(w)
+            if came_from and came_from[0] not in days:
+                continue
+            kept.append(w)
+        return kept
+
     def workout_adapt(
-        self, target_date_str: Optional[str] = None, message: Optional[str] = None
+        self, target_date_str: Optional[str] = None, message: Optional[str] = None,
+        tweak: bool = False, tweak_dates: Sequence[str] = (),
     ) -> RevisionProposal:
         """Evaluates metrics/activities over a rolling window and adapts mesocycle if needed.
 
@@ -248,6 +316,8 @@ class AdaptationMixin:
         caller must confirm each with the athlete (echo + y/N) before persisting it via
         `capture_message_constraint`, per the two-confirmation flow. Nothing here creates
         a constraint row or triggers a plan regen on its own.
+
+        `tweak` narrows the job to the days a request is about; see `workout_tweak`.
         """
         if not target_date_str:
             target_date_str = _svc._today_str()
@@ -287,6 +357,12 @@ class AdaptationMixin:
                 + cmd("plan generate") + " first."
             )
         meso_end_date_str = active_meso['end_date']
+        outside = sorted(
+            day for day in tweak_dates
+            if not target_date_str <= day <= meso_end_date_str
+        )
+        if outside:
+            raise ValueError(_outside_tweak_reach(outside, meso_end_date_str))
 
         # The BACKWARD window — from the adherence lookback start, removed rows included —
         # not the forward one the proposal carries. Two different ranges, so two names.
@@ -301,6 +377,12 @@ class AdaptationMixin:
             w for w in lookback_workouts
             if w.get('removed') and w.get('change_kind') in ATHLETE_VOID_KINDS
         ]
+        if tweak:
+            # A tweak may bring any of them back, so it is shown every one ahead, whoever
+            # cancelled it (DESIGN_workout_tweak.md §3.1).
+            removed_workouts = self._db.get_cancelled_workouts(
+                target_date_str, meso_end_date_str
+            )
 
         baseline = self._db.get_baseline(target_date_str)
         baseline_str = format_baseline(baseline)
@@ -371,6 +453,9 @@ class AdaptationMixin:
         # folded into meso_text: that string is shared with plan generation, which §9.2
         # says must not grow this section.
         intensity_context = self._intensity_mesocycle_context(target_date_str)
+        if tweak:
+            # Drift is the morning adaptation's question, not a request's (§3.2).
+            intensity_context = None
         decision = self.engine._workout_adapt_logic(
             target_date_str=target_date_str,
             history_days=history_days,
@@ -403,6 +488,8 @@ class AdaptationMixin:
                 config.signal_metrics, self._db.list_signal_metrics()
             ),
             signal_earliest_date=start_date_str,
+            tweak=tweak,
+            tweak_dates=tweak_dates,
         )
 
         # NOTE: daily adaptation is read-only w.r.t. coach learnings
@@ -415,6 +502,13 @@ class AdaptationMixin:
         adapted = []
         if decision.get("change_needed"):
             adapted = decision.get("adapted_workouts", [])
+        # The days a tweak may write, read before the passes below add rows of their own
+        # (DESIGN_workout_tweak.md §3.2). A reply that changes nothing needs none.
+        tweak_days: Set[str] = set(tweak_dates)
+        if tweak and adapted:
+            tweak_days = self._tweak_days(
+                decision, tweak_dates, target_date_str, meso_end_date_str
+            )
 
         # Integers, before the no-op backstop and the preview both read these numbers.
         normalize_load_fields(adapted)
@@ -486,6 +580,11 @@ class AdaptationMixin:
         window_workouts = self._db.get_workouts(
             start_date=target_date_str, end_date=meso_end_date_str
         )
+        # A tweak writes its days only, whatever came back and whatever the passes above
+        # added. Cut before the moves are resolved, so a move left half out writes no rest
+        # day with a reason about it (DESIGN_workout_tweak.md §3.2).
+        if tweak:
+            adapted = self._only_on(tweak_days, adapted)
         # A session the week planner carried to another day says where it came from, and
         # the lineage travels with it rather than ending where it left (§11). Last of the
         # passes, so a move whose destination a rest constraint cleared is already gone.
@@ -499,8 +598,17 @@ class AdaptationMixin:
         # known to be the same session, and before the revisions are paired, so the preview
         # shows what apply will write (DESIGN_strength_tracking.md §9).
         week_planner_changed = bool(structured)
+        # A tweak shows the strength planner its own days only, and nothing when the week
+        # planner changed nothing (DESIGN_workout_tweak.md §3.2).
+        strength_sessions = window_workouts
+        strength_span = (target_date_str, meso_end_date_str)
+        if tweak:
+            strength_sessions = [w for w in window_workouts if w['date'] in tweak_days]
+            strength_span = ("", "")
+            if structured:
+                strength_span = (min(tweak_days), max(tweak_days))
         strength = strength_planner.run(
-            structured, window_workouts, target_date_str, meso_end_date_str,
+            structured, strength_sessions, strength_span[0], strength_span[1],
             target_date_str, profile, constraints,
             reason_key='modification_reason', held=held,
         )
@@ -516,6 +624,12 @@ class AdaptationMixin:
                         row['modification_reason'] = reason
 
         pairs, removals = pair_revisions(structured, window_workouts, held)
+        # Decided at proposal time so apply stamps this list rather than re-deriving
+        # it from a set that may have been edited since (§8). A tweak had authority over
+        # a few days, so it may stamp nothing (DESIGN_workout_tweak.md §3.2).
+        covered = honoring.covered_ids(constraints, target_date_str, meso_end_date_str)
+        if tweak:
+            covered = ()
         return RevisionProposal(
             reason=reason,
             workouts=structured,
@@ -523,14 +637,11 @@ class AdaptationMixin:
             new_signals=tuple(new_signals),
             range_start=target_date_str,
             range_end=meso_end_date_str,
+            kind="tweak" if tweak else "adapt",
             pairs=pairs,
             removals=removals,
             held=tuple(held),
-            # Decided at proposal time so apply stamps this list rather than re-deriving
-            # it from a set that may have been edited since (§8).
-            covered_constraint_ids=honoring.covered_ids(
-                constraints, target_date_str, meso_end_date_str
-            ),
+            covered_constraint_ids=covered,
             strength_checks=tuple(strength.checked) if strength else (),
             strength_stamp=strength.stamp if strength else "",
             strength_notice=strength.notice if strength else None,
@@ -619,7 +730,7 @@ class AdaptationMixin:
         # The reason is also the athlete's line about this change, in the one column both
         # revision commands use (DESIGN_change_heads_up.md §6).
         with self._db.workout_change(
-            kind="adapt", summary=proposal.reason, note=proposal.reason
+            kind=proposal.kind, summary=proposal.reason, note=proposal.reason
         ) as change:
             for (day, sport), mover in moved_out.items():
                 source = by_slot.get((day, sport))
@@ -656,8 +767,7 @@ class AdaptationMixin:
                 # a session in its own right and starts its own lineage.
                 #
                 # A move already named the session it carries, so it skips that rule
-                # entirely: its lineage is the one the source slot held, and a source the
-                # athlete added by hand hands over none (§11).
+                # entirely: its lineage is the one the source slot held (§11).
                 if w.get('replaces_slot'):
                     lineage_id = w.get('replaces_lineage')
                 else:
@@ -712,7 +822,7 @@ class AdaptationMixin:
         flagged forever (§8). Separate from `workout_revision_apply` because there is
         nothing to apply, and outside the propose call because a propose writes nothing.
         """
-        with self._db.workout_change(kind="adapt", summary=proposal.reason):
+        with self._db.workout_change(kind=proposal.kind, summary=proposal.reason):
             pass
         honoring.stamp(self._db, proposal.covered_constraint_ids)
         # A pass that weighed a session's kilograms and kept them has still weighed them,

@@ -84,7 +84,7 @@ WELCOME = (
 MENU_COMMANDS = [
     ("status", "Athlete status, goals, recent metrics"),
     ("progress", "Training progress timeline (add --chart for a PNG)"),
-    ("workout", "List/generate/adapt/swap workouts"),
+    ("workout", "List/generate/adapt/tweak workouts"),
     ("plan", "Show/generate periodization plans"),
     ("goal", "Manage training goals"),
     ("data", "Pull/show Garmin metrics & activities"),
@@ -125,8 +125,9 @@ SIMPLE_HELP = SIMPLE_WELCOME + (
     "\n\nWhen you write to me, one of two things happens:\n"
     "• Something to remember — a rule, a rough night, a new goal, a change of date — "
     "I write it down and ask you first.\n"
-    "• Something about how you're doing or what's in the way — that goes to your coach "
-    "in your own words, and your week comes back adjusted."
+    "• Something about how you're doing, what's in the way, or a session you'd like "
+    "changed — that goes to your coach in your own words, and your week comes back "
+    "adjusted."
 )
 
 CAPTURE_PROMPT = "I'm listening — what should I know? (or /cancel)"
@@ -164,6 +165,14 @@ ROUTER_INTENT_ARGV = {
     "remove_goal": ["bot", "goals"],
 }
 
+# The two intents that carry the athlete's words to the coach, and the argv the text is
+# appended to: how the athlete is goes to `workout adapt`, a change they decided goes to
+# `workout tweak` (DESIGN_workout_tweak.md §3.4).
+ROUTER_MESSAGE_ARGV = {
+    "coach_message": ["workout", "adapt", "-m"],
+    "tweak_session": ["workout", "tweak"],
+}
+
 # The intents that need values out of the message: each runs `bot capture <intent>` with
 # the athlete's text, and that second, domain-focused call extracts, previews and asks
 # (§12.2). The two note intents share one inbox — they differ only in the echo, so a
@@ -189,6 +198,7 @@ ROUTER_ECHO = {
     "show_plan": "showing your plan",
     "show_progress": "showing your progress",
     "coach_message": "passing that on to your coach",
+    "tweak_session": "asking your coach to change that",
     "add_constraint": "noting that rule for your coach",
     "add_signal": "logging that for your coach",
     "show_constraints": "showing what I'm working around",
@@ -1132,8 +1142,8 @@ def main() -> None:
         # State and availability go to the coach in her own words; anything to be
         # remembered goes to the capture inbox, which asks before it stores and costs no
         # adaptation. A misroute across that line degrades gracefully both ways (§12.3).
-        if intent == "coach_message":
-            argv = ["workout", "adapt", "-m", text]
+        if intent in ROUTER_MESSAGE_ARGV:
+            argv = [*ROUTER_MESSAGE_ARGV[intent], text]
         elif intent in ROUTER_CAPTURE_INTENTS:
             argv = ["bot", "capture", ROUTER_CAPTURE_INTENTS[intent], text]
         elif intent in ROUTER_INTENT_ARGV:

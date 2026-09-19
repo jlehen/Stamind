@@ -256,7 +256,7 @@ def save_workout(
     db, date, sport_type, title, description="",
     duration_minutes=None, rpe=None, tss=None,
     modification_reason=None, adaptation_summary=None,
-    source=None, adapted_at=None, macrocycle_id=None,
+    adapted_at=None, macrocycle_id=None,
     benchmark_type=None, clear_benchmark=False,
     removed=False, removed_reason=None,
     original_description=None, original_date=None,
@@ -272,12 +272,13 @@ def save_workout(
     `save_workout` argument list, because that is what those fixtures say, and translates
     it onto the revision model (DESIGN_workout_revisions.md §6):
 
-    * `kind` defaults to what the arguments imply — `add` for a manual session, `adapt`
-      when a reason or a batch summary says the session was revised, else `generate`.
+    * `kind` defaults to what the arguments imply — `adapt` when a reason or a batch
+      summary says the session was revised, else `generate`.
     * `original_*` describe a session that has since been walked down, so they are written
       as a real FIRST revision under `generate`, and the arguments proper as the revision
       after it. That is how the lineage derives them now.
-    * `removed=True` appends the void `workout rm` would.
+    * `removed=True` appends a void under a `tweak`: the athlete asked for the session to
+      go (DESIGN_workout_tweak.md §3.3).
     * `google_event_id` lands in `workout_calendar_state`, keyed by the lineage (§8). The
       signature defaults to one that matches nothing, so the session reads `[STALE]` —
       what an event handle with no recorded push always meant.
@@ -285,9 +286,7 @@ def save_workout(
     Returns the session's lineage id — the id `workout list` prints.
     """
     if kind is None:
-        if source == 'manual':
-            kind = 'add'
-        elif adapted_at or adaptation_summary or modification_reason:
+        if adapted_at or adaptation_summary or modification_reason:
             kind = 'adapt'
         else:
             kind = 'generate'
@@ -329,7 +328,7 @@ def save_workout(
         seeded = db.get_workout(date, sport_type)
         db.mark_workout_pushed(seeded['id'], google_event_id, pushed_signature)
     if removed:
-        with db.workout_change(kind='rm') as change:
+        with db.workout_change(kind='tweak') as change:
             change.void(date=date, sport_type=sport_type, reason=removed_reason)
     saved = db.get_workout(date, sport_type)
     return saved['id'] if saved else None

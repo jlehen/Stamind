@@ -326,9 +326,10 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
 - **A fast-capture inbox.** `workout adapt -m "away with no gym Thursday"` is
   classified and saved as a real constraint you can list and remove. "Felt
   flat, ease today" stays a one-off hint for today's session.
-- **Manual overrides.** `workout add`, `swap`, `rm` and `restore` edit single
-  sessions by hand. Adaptation treats a hand-added session as deliberate and
-  rebalances the days around it.
+- **Changes you decide.** `workout tweak "Saturday: a hike instead of the
+  ride"` asks the coach for a change you have already decided: a session made
+  shorter, another sport, other exercises, a day dropped, two days swapped. The
+  coach writes it, and only the days you name change.
 - **A coach that learns, with evidence.** TrainMate keeps durable learnings
   about you, such as how you respond to back-to-back hard days. Each learning's
   confidence is computed from the training weeks that support or contradict it,
@@ -648,12 +649,13 @@ around.
 | `constraint add` | You want the coach to *work around* something: "no run Thursday", "only 45 min today", a trip, an injury layoff. `--rest` makes it a hard no-training window that rests those dates deterministically; without it the constraint is advisory and the coach honors it by judgement. Whether it is big enough to reshape the plan is derived from its size and confirmed by you, or forced with `--replan`. |
 | `signal add`, or a tagged Calendar event | You are *reporting* something: alcohol, poor sleep, stress, heat. Signals help the morning adaptation read a rough day correctly. They never reshape the plan. |
 | `workout adapt -m "…"` | Quick capture in the moment. A durable note ("away, no gym Thursday") is saved as a real constraint; a one-off nudge ("felt flat, ease today") is folded into today's adaptation. |
+| `workout tweak "…"` | You have decided the change yourself: "Friday: step-ups instead of belt squats", "swap Thursday and Friday", "drop Tuesday". The coach writes it and changes only the days the request is about. With `workout adapt -m` the coach decides what changes; with `workout tweak` you do. |
 | `plan feedback "…"` | You have an opinion about the plan itself: "drop the second FTP test", "Friday sessions should progress duration, not surges". The next `plan generate` must address each note. `-m` files a note to one mesocycle, `--replan` regenerates on the spot. |
 
-Alongside these, `workout add`, `swap`, `rm` and `restore` edit single sessions
-by hand. Adaptation treats a hand-added session as deliberate intent and
-rebalances around it, though it can still ease one if your recovery demands it.
-Only completed sessions are locked history.
+There is no way to edit a session by hand: every change goes through the coach,
+and `workout rollback` undoes any of them. A session you asked for carries your
+request in its reason, so the next morning's adaptation leaves it alone unless
+your recovery demands otherwise. Only completed sessions are locked history.
 
 Three things to know when you regenerate:
 
@@ -662,15 +664,15 @@ Three things to know when you regenerate:
   coach learnings, so it refines the arc rather than redrawing it. When the arc
   is the thing you want gone, `plan generate --fresh` withholds only the plan in
   place. `--show-llm-context` shows exactly what the model was shown.
-- **`workout generate` replaces the span you name.** Manual edits included,
-  though they are recoverable with `workout rollback`. With no flag the span is
+- **`workout generate` replaces the span you name.** Tweaks included, though they
+  are recoverable with `workout rollback`. With no flag the span is
   today onward for 28 days; `-m 5` is mesocycle 5's own days; `-g` is a goal's
   whole plan. Because it replaces rather than fills in, it asks twice: once
   before spending the LLM call, naming how many sessions are at stake, and again
   with the week planner's proposal in front of you. `-f` skips both for
   unattended runs. So make strategic changes first (constraint, `plan generate`,
-  `workout generate`), then layer manual tweaks on top, not the other way
-  around.
+  `workout generate`), then layer tweaks on top, not the other way around. A
+  wish that must survive the next `workout generate` is a constraint.
 - **The next week does not move under the athlete's feet.** The days they have
   already read — the next 7 by default, `settings set commitment-days N` — are
   not rewritten blind. The week planner is shown every session standing there,

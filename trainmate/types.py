@@ -57,12 +57,12 @@ class Workout(TypedDict):
     """One planned session, as `get_workouts()` returns it.
 
     Not a table row: `workouts` is an append-only revision log, and this is the live
-    revision hydrated with what its lineage derives — `original_*`, the adaptation tally,
-    `source` (DESIGN_workout_revisions.md §5). tests/test_types.py pins these keys against
+    revision hydrated with what its lineage derives — `original_*` and the adaptation tally
+    (DESIGN_workout_revisions.md §5). tests/test_types.py pins these keys against
     a session written and read back, so a new key must be declared here in the same commit
     that starts hydrating it.
     """
-    id: Optional[int]  # the LINEAGE id: stable session identity, what `rm`/`swap` address
+    id: Optional[int]  # the LINEAGE id: stable session identity, what `workout show` takes
     revision_id: Optional[int]  # the physical row; only history surfaces read it
     date: str
     sport_type: str
@@ -78,7 +78,6 @@ class Workout(TypedDict):
     google_event_id: Optional[str]  # set <=> a Calendar event exists (may be stale)
     removed: Optional[bool]  # the live revision is a void: no session this day (§3)
     removed_reason: Optional[str]  # this revision's note, when it is a void
-    source: Optional[str]  # 'manual' <=> the lineage was started by `workout add`, else 'generated'
     duration_minutes: Optional[int]
     rpe: Optional[int]
     tss: Optional[int]

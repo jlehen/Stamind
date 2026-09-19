@@ -302,14 +302,7 @@ class TestTheWindow(WindowTestCase):
             test_db.get_workout(_days_out(0), "cycling")["title"], "Morning ride"
         )
 
-    def test_a_manual_session_past_the_window_is_still_answered_for(self):
-        self.window(2)
-        self.long_run(_days_out(15), title="Club run", source="manual")
-        proposal = self.generate()
-        self.assertEqual([l.date for l in proposal.standing], [_days_out(15)])
-        self.assertIn("[ADDED BY THE ATHLETE]", self.prompt_user_content)
-
-    def test_a_benchmark_past_the_window_is_not(self):
+    def test_a_benchmark_past_the_window_is_not_answered_for(self):
         """The week planner re-places tests itself out there, from the record it already has
         (§4.2)."""
         self.window(2)

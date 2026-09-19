@@ -98,6 +98,13 @@ ROUTER_INTENTS = {
         "(tired, sore, sick, busy, travelling, no equipment, ...), or that a planned "
         "ride, event or session has changed — its size, route or date"
     ),
+    "tweak_session": (
+        "the athlete asks for a change they have decided, to sessions they name — make "
+        "one shorter, longer, easier or harder, another sport instead, other exercises, "
+        "drop it, add one, move it, or swap two days ('make Thursday's ride 45 minutes', "
+        "'step-ups instead of belt squats on Friday', 'add a swim on Sunday', 'swap "
+        "Thursday and Friday')"
+    ),
     "add_constraint": (
         "the athlete states a standing rule or restriction to remember going forward "
         "('no training on Wednesdays', 'I can't swim until June', 'keep Sundays free')"
@@ -157,7 +164,10 @@ ROUTER_SYSTEM_PROMPT = (
     "The athlete's goals and rules come with the message. A name in the message that\n"
     "matches one of those rows means that row, not a new one. A planned ride, event or\n"
     "session changing in size, route or date is coach_message even when a goal or rule\n"
-    "names it: the coach reads the message and re-plans around it.\n\n"
+    "names it: the coach reads the message and re-plans around it.\n"
+    "A request that says what to change in the schedule is tweak_session: the athlete has\n"
+    "decided. A report of how the athlete is, or of what changed around them, is\n"
+    "coach_message: the coach decides what to change.\n\n"
     "## INTENTS\n\n"
     + "\n".join(f"- {name}: {desc}" for name, desc in ROUTER_INTENTS.items())
     + "\n\n## OUTPUT FORMAT\n\n"

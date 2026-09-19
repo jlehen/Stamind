@@ -165,8 +165,8 @@ class TestCalendarSync(unittest.TestCase):
         self.assertNotIn("Last adapted:", desc)
         self.assertNotIn("Adapted ×", desc)
 
-    def test_sync_workout_swap_does_not_duplicate_description(self):
-        # A swap moves a workout's date without changing its content, so
+    def test_sync_workout_move_does_not_duplicate_description(self):
+        # A move changes a workout's date without changing its content, so
         # description == original_description. The calendar should show the
         # description once rather than identical "Adapted"/"Originally" lines.
         workout = {
@@ -204,68 +204,6 @@ class TestCalendarSync(unittest.TestCase):
         self.assertIn("Reason:\nSwapped from 2026-06-09 to 2026-06-11", desc)
         # The description text appears exactly once.
         self.assertEqual(desc.count("40 min tempo at threshold."), 1)
-
-    def test_sync_workout_manual_marks_summary(self):
-        # A manually-added session (no replacement) should be flagged "[Manual]"
-        # in the calendar summary so it's distinguishable from generated ones.
-        workout = {
-            "date": "2026-06-13",
-            "sport_type": "running",
-            "title": "Easy Run",
-            "description": "Casual 30 min jog.",
-            "original_description": "Casual 30 min jog.",
-            "duration_minutes": 30,
-            "tss": 25,
-            "google_event_id": None,
-            "source": "manual",
-        }
-
-        mock_service = MagicMock()
-        mock_event_result = {"id": "evt-manual-1", "htmlLink": "http://calendar/event/3"}
-        mock_service.events().insert().execute.return_value = mock_event_result
-
-        with patch.object(calendar_syncer, "service", mock_service):
-            calendar_syncer.sync_workout(workout)
-
-        insert_calls = [
-            call for call in mock_service.events().insert.call_args_list
-            if call.kwargs.get("body")
-        ]
-        self.assertEqual(len(insert_calls), 1)
-        body = insert_calls[0].kwargs["body"]
-        self.assertEqual(body.get("summary"), "[Manual] Easy Run")
-
-    def test_sync_workout_manual_replacement_composes_markers(self):
-        # A manual add that overwrote an existing session is both manual and
-        # adapted; the summary carries both markers.
-        workout = {
-            "date": "2026-06-14",
-            "sport_type": "running",
-            "title": "Tempo Run",
-            "description": "New 45 min tempo.",
-            "original_description": "Old 60 min intervals.",
-            "modification_reason": "Manually replaced previous session: Intervals.",
-            "change_kind": "adapt",
-            "duration_minutes": 45,
-            "tss": 55,
-            "google_event_id": None,
-            "source": "manual",
-        }
-
-        mock_service = MagicMock()
-        mock_event_result = {"id": "evt-manual-2", "htmlLink": "http://calendar/event/4"}
-        mock_service.events().insert().execute.return_value = mock_event_result
-
-        with patch.object(calendar_syncer, "service", mock_service):
-            calendar_syncer.sync_workout(workout)
-
-        insert_calls = [
-            call for call in mock_service.events().insert.call_args_list
-            if call.kwargs.get("body")
-        ]
-        self.assertEqual(len(insert_calls), 1)
-        body = insert_calls[0].kwargs["body"]
-        self.assertEqual(body.get("summary"), "[Manual] [Adapted] Tempo Run")
 
     def test_sync_workout_adherence_marks_title_and_header(self):
         # A past event marked with an adherence verdict gets a [Partial] title tag
@@ -442,7 +380,7 @@ class TestCalendarSync(unittest.TestCase):
             "tss": 15,
             "google_event_id": "evt-removed-123",
             "removed": True,
-            "change_kind": "rm",
+            "change_kind": "stand-down",
             "removed_reason": "Injury flare-up",
         }
 
@@ -715,14 +653,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
 
     def test_an_athlete_void_keeps_its_event_outside_the_window(self):
         lineage = self._session("2026-10-20")
-        self._void("2026-10-20", kind="rm")
-        pushes, teardowns = self._plan(lineage)
-        self.assertEqual([w["id"] for w in pushes], [lineage])
-        self.assertEqual(teardowns, [])
-
-    def test_a_manual_session_keeps_its_event_outside_the_window(self):
-        lineage = self._session("2026-10-20", kind="add")
-        self._void("2026-10-20", kind="generate")
+        self._void("2026-10-20", kind="stand-down")
         pushes, teardowns = self._plan(lineage)
         self.assertEqual([w["id"] for w in pushes], [lineage])
         self.assertEqual(teardowns, [])
@@ -776,29 +707,31 @@ class TestARemovalLeavesATrace(unittest.TestCase):
         """`live_workouts` is "highest id in the slot", so a marker written and then
         covered is never the slot's live row — read it from its lineage (§5.2)."""
         from trainmate.calendar_reconcile import no_calendar_sync
-        manual = self._session("2026-09-11", kind="add")
+        replaced = self._session("2026-09-11")
         with no_calendar_sync():
-            with test_db.workout_change(kind="generate") as change:
+            with test_db.workout_change(
+                kind="generate", commitment_end="2026-09-15"
+            ) as change:
                 change.void(date="2026-09-11", sport_type="cycling", reason="replaced")
                 change.append(
-                    date="2026-09-11", sport_type="cycling", title="Coach's ride",
+                    date="2026-09-11", sport_type="cycling", title="Another ride",
                     description="60 min.", duration_minutes=60,
                 )
-        pushes, teardowns = self._plan(manual)
-        self.assertEqual([w["id"] for w in pushes], [manual])
+        pushes, teardowns = self._plan(replaced)
+        self.assertEqual([w["id"] for w in pushes], [replaced])
         self.assertEqual(teardowns, [])
 
     def test_a_lineage_superseded_in_place_is_still_torn_down(self):
         from trainmate.calendar_reconcile import no_calendar_sync
         lineage = self._session("2026-09-11")
         with no_calendar_sync():
-            with test_db.workout_change(kind="add") as change:
-                change.void(date="2026-09-11", sport_type="cycling", reason="mine now")
+            with test_db.workout_change(kind="tweak") as change:
+                change.void(date="2026-09-11", sport_type="cycling", reason="replaced")
                 change.append(
-                    date="2026-09-11", sport_type="cycling", title="My ride",
+                    date="2026-09-11", sport_type="cycling", title="Another ride",
                     description="60 min.", duration_minutes=60,
                 )
-        # Its own void is outside nobody's window, so the week planner's session goes.
+        # Its own void is inside no window, so the replaced session's event goes.
         pushes, teardowns = self._plan(lineage)
         self.assertEqual(pushes, [])
         self.assertEqual([t[0] for t in teardowns], [lineage])
@@ -839,8 +772,8 @@ class TestARemovalLeavesATrace(unittest.TestCase):
             "description": "90 min.", "removed": True, "removed_reason": "because",
         }
         for kind, word in (
-            ("rm", "[Deleted]"), ("stand-down", "[Deleted]"), ("add", "[Deleted]"),
-            ("generate", "[Cancelled]"), ("adapt", "[Cancelled]"),
+            ("stand-down", "[Deleted]"), ("generate", "[Cancelled]"),
+            ("adapt", "[Cancelled]"), ("tweak", "[Cancelled]"),
         ):
             with self.subTest(kind=kind):
                 self.assertEqual(
@@ -848,9 +781,10 @@ class TestARemovalLeavesATrace(unittest.TestCase):
                     f"{word} Long ride",
                 )
 
-    def test_a_generate_revision_with_a_reason_is_not_titled_adapted(self):
+    def test_a_generate_or_tweak_revision_with_a_reason_is_not_titled_adapted(self):
         """"[Adapted]" means the coach eased this because of how the athlete was doing;
-        a `workout generate` revision is the plan being written (§5.1)."""
+        a `workout generate` revision is the plan being written (§5.1), and a `workout
+        tweak` one is what the athlete asked for (DESIGN_workout_tweak.md §3.3)."""
         base = {
             "date": "2026-09-11", "sport_type": "cycling", "title": "Easy spin",
             "description": "60 min.",
@@ -858,6 +792,9 @@ class TestARemovalLeavesATrace(unittest.TestCase):
         }
         self.assertEqual(
             self._summary({**base, "change_kind": "generate"}), "Easy spin"
+        )
+        self.assertEqual(
+            self._summary({**base, "change_kind": "tweak"}), "Easy spin"
         )
         self.assertEqual(
             self._summary({**base, "change_kind": "adapt"}), "[Adapted] Easy spin"

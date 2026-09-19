@@ -95,6 +95,11 @@ work when the plan prepares a ski season. Then write the new exercise in the pla
 that did the same job, and keep everything else as the athlete does it. With no sets on
 record, the brief, the equipment and the guidelines decide on their own.
 
+A brief names an exercise only when it was requested, as in "step-ups take the place of belt
+squats, as requested". Do what it says in that session, and keep everything else as it was: that
+brief changes one exercise, not the session. For that session it outranks the athlete's
+habits. Only the day's equipment can rule it out, and then the notes say so.
+
 Use only names from EXERCISES TRAINMATE KNOWS, spelled exactly as they appear there. Each
 name carries its movement pattern and the equipment it usually needs. Pick exercises the
 day's equipment allows: a travel week with dumbbells only gets goblet squats and dumbbell
@@ -146,8 +151,7 @@ You MUST respond with a JSON object containing:
     }}
   ]
 }}
-Return one entry per session you were asked about, and no entry for a session shown only as
-context.
+Return one entry per session you were asked about.
 """
 
 
@@ -315,9 +319,8 @@ def _session_block(
 
 
 def _user_content(
-    to_write: Sequence[_Session], to_check: Sequence[_Session],
-    context: Sequence[_Session], history_text: str, today: str,
-    profile: Optional[Dict[str, Any]], constraints: Sequence[Dict[str, Any]],
+    to_write: Sequence[_Session], to_check: Sequence[_Session], history_text: str,
+    today: str, profile: Optional[Dict[str, Any]], constraints: Sequence[Dict[str, Any]],
 ) -> str:
     parts = [f"Today's date is {today}."]
     parts.append(history_text or "## STRENGTH HISTORY\nNo sets on record yet.")
@@ -334,11 +337,6 @@ def _user_content(
             "a load\nshould move, the athlete has made a habit of doing something else, or it "
             "says that its\nbrief or its duration changed.\n"
             + "\n\n".join(_session_block(s, profile, constraints) for s in to_check)
-        )
-    if context:
-        parts.append(
-            "## SESSIONS THE ATHLETE ADDED (context only — never answer for these)\n"
-            + "\n\n".join(_session_block(s, profile, constraints) for s in context)
         )
     return "\n\n".join(parts)
 
@@ -431,16 +429,13 @@ def _moved_from(
 
     A move writes the session at its destination under the lineage of the one it replaces
     (DESIGN_workout_revisions.md §4, §11), so it is the same session and keeps its
-    kilograms. A replacement that starts a fresh lineage — the athlete's own session, which
-    the coach may not inherit — does not (DESIGN_plan_change_continuity.md §5.3).
+    kilograms.
     """
     named = entry.get("replaces_slot") or entry.get("replaces")
     if not named:
         return None
     if isinstance(named, dict):
         named = (named.get("date"), named.get("sport_type"))
-    if "replaces_lineage" in entry and entry.get("replaces_lineage") is None:
-        return None
     source = live_by_slot.get((named[0], canonical_sport(named[1] or "")))
     if source is None or canonical_sport(source["sport_type"]) != STRENGTH:
         return None
@@ -450,13 +445,11 @@ def _moved_from(
 def _collect(
     entries: Sequence[Dict[str, Any]], live_sessions: Sequence[Dict[str, Any]],
     span_start: str, span_end: str, held: Sequence[Tuple[str, str]] = (),
-) -> Tuple[List[_Session], List[_Session], List[_Session]]:
-    """The sessions to write, the sessions to check and the athlete's own, shown as context
-    (§9).
+) -> Tuple[List[_Session], List[_Session]]:
+    """The sessions to write and the sessions to check (§9).
 
     A session with prescribed sets is checked, whether the week planner kept it, revised it
-    or it arrived with its lineage. Every other strength session is written — except one the
-    athlete added by hand, which stays theirs until the week planner writes a brief over it.
+    or it arrived with its lineage. Every other strength session is written.
 
     `held` are the slots the week planner named only to keep. It matters for the strength
     session standing on a date the proposal speaks for without naming it: that session is
@@ -473,7 +466,6 @@ def _collect(
     }
     to_write: List[_Session] = []
     to_check: List[_Session] = []
-    context: List[_Session] = []
     answered: Set[str] = set()
 
     for entry in entries:
@@ -501,9 +493,6 @@ def _collect(
             duration=entry.get("duration_minutes"), brief=brief, entry=entry, live=live,
             rows=rows, to_write=not rows,
         )
-        if kept and live and live.get("source") == "manual" and not rows:
-            context.append(session)
-            continue
         (to_check if rows else to_write).append(session)
 
     # A standing session no answer named: the week planner kept it by saying nothing.
@@ -523,11 +512,8 @@ def _collect(
             duration=live.get("duration_minutes"), brief=_brief_now(live), entry=None,
             live=live, rows=rows, to_write=not rows,
         )
-        if live.get("source") == "manual" and not rows:
-            context.append(session)
-            continue
         (to_check if rows else to_write).append(session)
-    return to_write, to_check, context
+    return to_write, to_check
 
 
 def _moved_on(session: _Session) -> bool:
@@ -579,9 +565,7 @@ def run(
     Raises `StrengthPlannerFailed` when the call fails twice with a session to write: a
     strength day with a brief and no exercises must never exist.
     """
-    to_write, to_check, context = _collect(
-        entries, live_sessions, span_start, span_end, held
-    )
+    to_write, to_check = _collect(entries, live_sessions, span_start, span_end, held)
     if not to_write and not to_check:
         return None
     stamp = runtime.db.strength_history_stamp()
@@ -597,9 +581,7 @@ def run(
 
     built = history.build(today)
     system = _system_prompt(built.exercises)
-    user = _user_content(
-        to_write, to_check, context, built.text, today, profile, constraints
-    )
+    user = _user_content(to_write, to_check, built.text, today, profile, constraints)
     step(f"Querying OpenRouter to write {len(to_write)} strength session(s) and check "
          f"{len(to_check)}...", cyan)
 

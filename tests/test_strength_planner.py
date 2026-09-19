@@ -187,13 +187,6 @@ class WhenItRunsTest(_PlannerCase):
         )
         self.assertEqual(result.checked, [("2026-09-17", "strength_training")])
 
-    def test_the_athletes_own_session_is_context_and_never_a_reason_to_run(self):
-        save_workout(test_db, "2026-09-19", "strength_training", "Gym with Paul",
-                     description="[Gym with Paul]\n60 min.", duration_minutes=60,
-                     source="manual")
-        self.assertIsNone(self.strength_pass([]))
-        self.assertEqual(self.asked, [])
-
 
 class CheckingTest(_PlannerCase):
     def setUp(self):

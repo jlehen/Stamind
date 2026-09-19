@@ -54,7 +54,7 @@ def schedule_coverage() -> Tuple[Optional[str], Optional[str]]:
     from trainmate import runtime
     mesocycles = _plan_mesocycles()
     ends = [str(b["end_date"]) for b in mesocycles if b.get("end_date")]
-    return progression.coverage_end(runtime.db.get_workouts()), max(ends) if ends else None
+    return progression.plan_end(runtime.db.get_workouts()), max(ends) if ends else None
 
 
 def schedule_exhausted(as_of: str) -> bool:

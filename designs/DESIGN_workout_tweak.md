@@ -1,6 +1,6 @@
 # Design: `workout tweak`, and the end of the four hand-edit commands
 
-**Status:** Proposed, not reviewed · **Date:** 2026-09-18 (rev. 3)
+**Status:** Implemented (rev. 3), not reviewed · **Date:** 2026-09-18 (rev. 3)
 
 Revision 3 changes §4 after a first review comment. The week planner no longer quotes the
 athlete's message at the end of the brief. It writes what the athlete asked for into the
@@ -8,8 +8,8 @@ brief, in its own words, and only the part that concerns that session.
 
 Revision 2 adds `workout swap` and `workout restore` to the commands that go. That changes
 one thing in the design: a tweak may now touch more than one day, because moving a session
-is a tweak (§3.1). Revision 1 was written and then built without a review. That code is
-parked, uncommitted, in the worktree `workout-tweak`. §9 says what it holds.
+is a tweak (§3.1). Revision 1 was written and then built without a review. Revision 3 is
+now built on top of it, in the worktree `workout-tweak`. §9 says what the build found.
 
 ## 1. The problem
 
@@ -207,9 +207,14 @@ exercise, and the strength planner never hears the request.
 **The rule.** The week planner writes the request into the brief. When the athlete's message
 asks for something inside a strength session, the week planner rewrites that session's
 brief so that it says what the athlete wants, in the week planner's own words: "Lower-body
-strength, heavy and low in volume. Step-ups take the place of belt squats, as you asked:
+strength, heavy and low in volume. Step-ups take the place of belt squats, as requested:
 the machine is broken." It takes only the part of the message that is about that session.
 It writes no set, rep or load.
+
+The brief says "as requested", never "as you asked". On a companion instance the request
+may come from the athlete's human coach, and the athlete reads the brief on the Calendar.
+"As requested" is true whoever asked, and it tells a later week planner which part of the
+brief to keep.
 
 This is the one case where a brief may name an exercise: the athlete named it first. The
 strength planner is told that when a brief names an exercise, the athlete asked for it, and
@@ -339,16 +344,27 @@ the past.
 - **The bot's "Move it", "Shorten it" and "Skip it" buttons** still run `workout adapt -m`.
   They are about today and how the athlete is, which is what `workout adapt` is for.
 
-## 9. The code that is parked
+## 9. What the build found
 
-Revision 1 was built before it was reviewed. The code is uncommitted in the worktree
-`workout-tweak`: 31 files, 482 lines added, 543 removed. The test suite is not green there:
-about 40 tests still describe the removed commands.
+Revision 3 is built in the worktree `workout-tweak`. Three things needed more than the
+sections above say.
 
-It holds the first table of §5, `workout tweak` limited to one day, the brief rule of §4
-as revision 1 had it (the athlete's message quoted at the end of the brief), the bot intent
-and the migration for `add` and `rm`. It does not hold the removal of
-`workout swap` and `workout restore`, or a tweak over several days.
+**A dropped session was invisible to the tweak prompt.** It is Monday. The athlete ran
+`workout tweak "drop Saturday"`, and Saturday's long ride became a rest day. On Tuesday they
+ask "put Saturday's ride back". The rest day continues the ride's history, so the read that
+lists removed sessions hides the ride: to that read, the ride is still live, as a rest day.
+Widening the filter of §3.1 therefore listed nothing. The tweak prompt now uses a read of
+its own: every day in the range where a session was cancelled, unless that session only
+moved to another day and still stands there.
+
+**Two rides could not swap days.** "Swap Thursday and Friday" with a ride on each day comes
+back as two moves. The move check refused both, because each lands on a day that holds a
+ride. It now lets a move land there when the ride standing there is moving away in the same
+reply. `workout adapt` gains the same swap.
+
+**One warning could no longer fire.** The progress timeline warned about "workouts beyond
+plan end". Only a manual session could stand past the plan's last day, so the warning is
+removed with `coverage_end`.
 
 ## 10. Tests
 

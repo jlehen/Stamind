@@ -151,21 +151,6 @@ class TestMigrateWorkoutRevisions(unittest.TestCase):
                          ["Displaced Run", "Restored Run"])
         self.assertEqual(len({r["lineage_id"] for r in revisions}), 1)
 
-    def test_a_manual_session_still_reads_as_the_athletes(self):
-        """A manual session added onto an empty day carries no `modification_reason`, so
-        the heuristic would call it unmodified and root it in a `generate` — and §5 would
-        then derive its source as 'generated'. The override roots it in an `add`."""
-        _insert(
-            self.conn, date="2026-09-03", sport_type="yoga", title="Mobility",
-            description="30 min", source="manual",
-            created_at="2026-08-20T06:00:00+00:00",
-        )
-        _summary, db = self._migrate()
-
-        session = db.get_workout("2026-09-03", "yoga")
-        self.assertEqual(session["source"], "manual")
-        self.assertEqual(session["change_kind"], "add")
-
     def test_a_removed_session_migrates_to_a_void_that_keeps_its_reason(self):
         _insert(
             self.conn, date="2026-09-04", sport_type="running", title="Tempo",

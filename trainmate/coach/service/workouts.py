@@ -7,7 +7,7 @@ from trainmate.adherence import analyze_adherence
 from trainmate.coach import honoring
 from trainmate.coach.proposals import GenerateProposal, StandingLine
 from trainmate.coach.revisions import (
-    carried_lineage, normalize_load_fields, prescription_matches, replaces_source,
+    normalize_load_fields, prescription_matches, replaces_source,
     rest_in_place_of,
 )
 from trainmate import settings
@@ -44,17 +44,15 @@ class WorkoutGenMixin:
     def _standing_sessions(
         span_sessions: List[Workout], window_end: Optional[str]
     ) -> List[Workout]:
-        """The sessions the week planner must answer for (§4.2): the ones inside the commitment
-        window, plus every session the athlete added by hand anywhere in the span.
+        """The sessions the week planner must answer for (§4.2): the ones inside the
+        commitment window.
 
-        Both are already bounded by the span, because `span_sessions` is read from it — which
+        They are already bounded by the span, because `span_sessions` is read from it — which
         is the second bound the intersection needs, or a forward-selected run would ask
         the week planner about days it cannot write and the preview would lie."""
-        chosen = [
-            w for w in span_sessions
-            if (window_end is not None and w['date'] <= window_end)
-            or w.get('source') == 'manual'
-        ]
+        if window_end is None:
+            return []
+        chosen = [w for w in span_sessions if w['date'] <= window_end]
         return sorted(chosen, key=lambda w: (w['date'], canonical_sport(w['sport_type'])))
 
     def _today_workout_completed(
@@ -178,7 +176,7 @@ class WorkoutGenMixin:
                 carrier = rows[0]
             if carrier is not None:
                 rest['replaces_slot'] = (carrier['date'], carrier['sport_type'])
-                rest['replaces_lineage'] = carried_lineage(carrier)
+                rest['replaces_lineage'] = carrier['id']
             for row in rows:
                 slot = (row['date'], canonical_sport(row['sport_type']))
                 if row is carrier or slot[1] == rest_sport:
@@ -449,7 +447,7 @@ class WorkoutGenMixin:
                 entry = {
                     **entry,
                     'replaces_slot': (occupant['date'], occupant['sport_type']),
-                    'replaces_lineage': carried_lineage(occupant),
+                    'replaces_lineage': occupant['id'],
                 }
                 answered.add(source)
             elif slot in by_slot:
@@ -514,10 +512,9 @@ class WorkoutGenMixin:
                 continue
             explicit = void_reasons.get(slot)
             # Written over where it stands, and superseded by the append: a void is only
-            # needed when the removal has to leave a trace of its own — a session the
-            # athlete added (§5.3), or one an answer ended before something else took its
-            # slot (§5.1).
-            if slot in final and explicit is None and live.get('source') != 'manual':
+            # needed when the removal has to leave a trace of its own — a session an answer
+            # ended before something else took its slot (§5.1).
+            if slot in final and explicit is None:
                 continue
             seen.add(slot)
             voids.append((
@@ -1031,14 +1028,6 @@ class WorkoutGenMixin:
             span_sessions = self._db.get_workouts(
                 start_date=proposal.gen_start, end_date=proposal.gen_end or None
             )
-            voided_slots = {
-                (day, canonical_sport(sport)) for (day, sport, _r) in proposal.voids
-            }
-            replaced_manual = [
-                live for live in span_sessions
-                if live.get('source') == 'manual'
-                and (live['date'], canonical_sport(live['sport_type'])) in voided_slots
-            ]
             for (day, sport_type, reason) in proposal.voids:
                 change.void(date=day, sport_type=sport_type, reason=reason)
             # The flag belongs to the TEST, not to the slot: a rewrite of a benchmark's
@@ -1081,16 +1070,6 @@ class WorkoutGenMixin:
                     planned_zone_currency=zone_currency,
                     planned_zone_sec=zone_sec,
                 )
-            change_id = change.id
-
-        # The plan owns the horizon, so a regeneration may replace a session the athlete
-        # added — but it says which, and names the change to undo if they disagree (§12).
-        for w in replaced_manual:
-            notice(
-                f"Replaced the session you added on {w['date']}: {w['title']} "
-                f"({w['sport_type']}). Run {cmd(f'workout rollback --batch {change_id}')} "
-                "to bring it back.",
-            )
 
         # The same warrant every other constraint this run built around gets (§8).
         honoring.stamp(self._db, proposal.covered_constraint_ids)

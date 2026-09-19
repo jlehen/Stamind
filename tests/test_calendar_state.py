@@ -77,37 +77,37 @@ class TestCalendarState(unittest.TestCase):
             date="2026-07-01", sport_type="running", title="Run", description="easy",
         )
         self._push(wid)
-        with self.db.workout_change(kind="swap") as change:
+        with self.db.workout_change(kind="tweak") as change:
             change.append(
                 date="2026-07-03", sport_type="running", title="Run",
                 description="easy", lineage_id=wid, reason="Travelling",
             )
         self.assertEqual(calendar_status(self._row(wid)), "stale")
 
-    def test_remove_and_restore_toggle_stale(self):
+    def test_cancel_and_bring_back_toggle_stale(self):
         wid = save_workout(self.db,
             date="2026-07-01", sport_type="running", title="Run", description="easy",
         )
         self._push(wid)
-        with self.db.workout_change(kind="rm") as change:
+        before = self.db.get_workout_revision(self._row(wid)["revision_id"])
+        with self.db.workout_change(kind="tweak") as change:
             change.void(date="2026-07-01", sport_type="running", reason="Sick")
         # Cancelled sessions are excluded from default reads; fetch by id.
         self.assertEqual(calendar_status(self._row(wid)), "stale")
-        # Re-push the cancelled state, then restore: back to stale again.
+        # Re-push the cancelled state, then roll the cancellation back: stale again.
         self._push(wid)
         self.assertEqual(calendar_status(self._row(wid)), "synced")
-        with self.db.workout_change(kind="restore") as change:
-            change.restore(self.db.revision_before_live_void(wid))
+        with self.db.workout_change(kind="rollback") as change:
+            change.restore(before)
         self.assertEqual(calendar_status(self._row(wid)), "stale")
 
     def test_generated_workout_synced_after_eager_push(self):
-        """A freshly generated workout is pushed from its persisted row (source='generated').
+        """A freshly generated workout is pushed from its persisted row.
         Regression: a hand-built sync dict once omitted `source`, so the push-time hash was
         computed with source=None while the stored row had 'generated' — every generated
         workout read stale the instant it synced. Pushing the row itself keeps them equal."""
         wid = save_workout(self.db,
             date="2026-07-01", sport_type="running", title="Run", description="easy",
-            source="generated",
         )
         # Mirror workout_generate's eager sync: sign the persisted row, not a partial dict.
         self._push(wid)

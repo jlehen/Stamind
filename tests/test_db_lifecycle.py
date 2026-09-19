@@ -78,7 +78,7 @@ class TestSchemaStamping(unittest.TestCase):
         fingerprint = hashlib.sha256("\n".join(columns).encode()).hexdigest()[:16]
 
         self.assertEqual(
-            (SCHEMA_VERSION, fingerprint), (17, "f7b32a14a2eb041e"),
+            (SCHEMA_VERSION, fingerprint), (18, "f7b32a14a2eb041e"),
             "the schema changed without a matching SCHEMA_VERSION bump — existing "
             "databases would skip the migration",
         )
@@ -142,6 +142,28 @@ class TestSchemaStamping(unittest.TestCase):
         self.assertNotIn("daily_context", tables)
         self.assertEqual([tuple(r) for r in rows], [("alcohol", 2.0)])
         self.assertEqual(token[0], "tok")
+
+    def test_the_four_hand_edit_kinds_become_tweaks(self):
+        """`workout add`, `rm`, `swap` and `restore` are gone, and what they wrote was the
+        athlete's own request (DESIGN_workout_tweak.md §7)."""
+        db = Database(db_path=self.path)
+        kinds = ("add", "rm", "swap", "restore", "adapt")
+        with db._get_connection() as conn:
+            for kind in kinds:
+                conn.execute(
+                    "INSERT INTO workout_changes (created_at, kind) VALUES (?, ?)",
+                    ("2026-09-01T06:00:00+00:00", kind),
+                )
+            conn.commit()
+        unstamp_schema(db)
+
+        Database(db_path=self.path)
+
+        with db._get_connection() as conn:
+            migrated = [
+                r[0] for r in conn.execute("SELECT kind FROM workout_changes ORDER BY id")
+            ]
+        self.assertEqual(migrated, ["tweak", "tweak", "tweak", "tweak", "adapt"])
 
 
 class TestTransaction(unittest.TestCase):

@@ -154,63 +154,59 @@ class TestCalendarLineage(unittest.TestCase):
 
     def test_a_moved_session_names_the_date_it_left(self):
         lineage = self._plan()
-        # The shape `workout swap` writes: void the source first, then the copy that
-        # carries the lineage to the destination (DESIGN_workout_revisions.md §4).
-        with self.db.workout_change(kind="swap") as change:
+        # The shape a move writes: void the source first, then the copy that carries the
+        # lineage to the destination (DESIGN_workout_revisions.md §4).
+        with self.db.workout_change(kind="tweak") as change:
             change.void(
                 date="2026-08-31", sport_type="cycling",
-                reason="Swapped from 2026-08-31 to 2026-09-02",
+                reason="Long ride moved to Wednesday, it rains on Monday.",
             )
             change.append(
                 date="2026-09-02", sport_type="cycling", title="Long ride",
                 description="3h steady endurance.", duration_minutes=180, tss=210, rpe=8,
-                lineage_id=lineage, reason="Swapped from 2026-08-31 to 2026-09-02",
+                lineage_id=lineage,
+                reason="Long ride moved to Wednesday, it rains on Monday.",
             )
 
         desc = self._description(lineage)
         vacated = entries(desc)["[2/3]"]
-        self.assertIn("Moved away", vacated)
+        self.assertIn("Dropped on request", vacated)
         self.assertIn("2026-08-31 Mon", vacated)
-        self.assertIn("Swapped from 2026-08-31 to 2026-09-02", vacated)
+        self.assertIn("Long ride moved to Wednesday", vacated)
         # And the form it had before the move is still there, at its old date.
         self.assertIn("2026-08-31 Mon", entries(desc)["[1/3]"])
+
+    def _cancel_and_roll_back(self, lineage, kind, reason):
+        """Cancels the day under `kind`, then rolls it back, so the void is an entry of the
+        History rather than the event's title."""
+        before = self.db.get_lineage_revisions(lineage)[-1]
+        with self.db.workout_change(kind=kind) as change:
+            change.void(date="2026-08-31", sport_type="cycling", reason=reason)
+        with self.db.workout_change(kind="rollback") as change:
+            change.restore(before)
 
     def test_a_void_entry_states_no_prescription(self):
         """A void copies the departing session's columns forward, so it still carries a
         duration and a target. Printing them would prescribe a day that holds nothing."""
         lineage = self._plan()
-        with self.db.workout_change(kind="rm") as change:
-            change.void(
-                date="2026-08-31", sport_type="cycling", reason="Work trip",
-            )
-        revision = self.db.revision_before_live_void(lineage)
-        with self.db.workout_change(kind="restore") as change:
-            change.restore(revision)
+        self._cancel_and_roll_back(lineage, "adapt", "Work trip")
 
         cancelled = entries(self._description(lineage))["[2/3]"]
-        self.assertIn("Cancelled", cancelled)
+        self.assertIn("Dropped by the adaptation", cancelled)
         self.assertIn("Reason: Work trip", cancelled)
         self.assertNotIn("Duration:", cancelled)
         self.assertNotIn("Target:", cancelled)
         self.assertNotIn("3h steady endurance.", cancelled)
 
-    def test_a_void_the_athlete_typed_over_says_so(self):
-        """A `workout add` void is the athlete replacing the day, not the coach dropping
-        it, so the entry has its own word rather than the raw change kind
-        (DESIGN_plan_change_continuity.md §5.1)."""
+    def test_a_void_the_athlete_asked_for_says_so(self):
+        """A `workout tweak` void is the athlete's request, not the coach dropping the
+        day, so the entry has its own word rather than the raw change kind
+        (DESIGN_workout_tweak.md §3.3)."""
         lineage = self._plan()
-        with self.db.workout_change(kind="add") as change:
-            change.void(
-                date="2026-08-31", sport_type="cycling", reason="Club run instead",
-            )
-        # While the void is the head the word is the event's title; it reaches the History
-        # once the lineage carries on, which is what a rollback of the `add` does.
-        revision = self.db.revision_before_live_void(lineage)
-        with self.db.workout_change(kind="restore") as change:
-            change.restore(revision)
+        self._cancel_and_roll_back(lineage, "tweak", "Club run instead")
 
         entry = entries(self._description(lineage))["[2/3]"]
-        self.assertIn("Replaced by hand", entry)
+        self.assertIn("Dropped on request", entry)
         self.assertNotIn("Dropped from the plan", entry)
 
     def test_one_reason_label_and_the_summary_only_stands_in_for_it(self):

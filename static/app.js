@@ -609,7 +609,6 @@ function renderWorkoutCard(w) {
     const modMarkers = w.modification_markers || [];
     const calStatus = w.calendar_status || "unpushed";
     const isRemoved = !!w.removed;
-    const isManual = w.source === "manual";
 
     let cardClass = "workout-card";
     if (isRemoved) cardClass += " removed";
@@ -630,15 +629,11 @@ function renderWorkoutCard(w) {
         badges.push(`<span class="wbadge adh-${escapeHtml(adherence.status)}"${title}>`
             + `${escapeHtml(adherence.label.toUpperCase())}</span>`);
     }
-    // One badge per marker: a session eased twice and then swapped shows both
-    // (DESIGN_workout_revisions.md §12).
+    // One badge per marker: the kind of the latest change and the easings that still
+    // stand (DESIGN_workout_revisions.md §12).
     for (const marker of modMarkers) {
-        const cls = marker.startsWith("ADAPTED") ? "adapted"
-            : marker === "SWAPPED" ? "swapped"
-            : marker === "REPLACED" ? "replaced" : "adapted";
-        badges.push(`<span class="wbadge ${cls}">${escapeHtml(marker)}</span>`);
+        badges.push(`<span class="wbadge adapted">${escapeHtml(marker)}</span>`);
     }
-    if (isManual) badges.push(`<span class="wbadge manual">MANUAL</span>`);
     if (calStatus === "synced") badges.push(`<span class="wbadge synced">SYNCED</span>`);
     else if (calStatus === "stale") badges.push(`<span class="wbadge stale">STALE</span>`);
     if (isRemoved) badges.push(`<span class="wbadge removed">REMOVED</span>`);

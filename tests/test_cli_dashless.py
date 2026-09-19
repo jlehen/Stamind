@@ -143,7 +143,7 @@ class TestCommandPrefixResolution(unittest.TestCase):
     def test_the_new_verbs_do_not_disturb_the_prefixes_around_them(self):
         # Pinned so a later verb change cannot quietly re-break the spellings
         # ARCHITECTURE.md documents.
-        self.assertEqual(self._xlate("w res 3"), ["workout", "restore", "3"])
+        self.assertEqual(self._xlate("w t"), ["workout", "tweak"])
         self.assertEqual(self._xlate("w a"), ["workout", "adapt"])
 
     def test_surviving_aliases_normalize_to_canonical(self):
@@ -154,9 +154,7 @@ class TestCommandPrefixResolution(unittest.TestCase):
 
     def test_ambiguous_prefix_is_rejected(self):
         # 'rm' gets no tiebreaker alias on purpose: no one-letter destructive command.
-        for line, expected in [("p", "plan, progress"), ("workout ad", "adapt, add"),
-                               ("workout r", "restore, rm, rollback"),
-                               ("benchmark r", "record, rm")]:
+        for line, expected in [("p", "plan, progress"), ("benchmark r", "record, rm")]:
             with patch("sys.stderr", io.StringIO()) as err:
                 with self.assertRaises(SystemExit) as ctx:
                     self._xlate(line)
@@ -249,7 +247,7 @@ class TestCommandTreeInvariants(unittest.TestCase):
 
     def test_no_alias_is_redundant_with_prefix_matching(self):
         # An alias earns its place only by being unreachable as a prefix (`ctx`, `lm`)
-        # or by breaking a tie (`s`, `a`). Anything else is a shortcut prefix matching
+        # or by breaking a tie (`s`). Anything else is a shortcut prefix matching
         # already provides — delete it rather than maintain it in two places.
         for path, action, _ in self._levels():
             for alias, target in action.alias_of.items():

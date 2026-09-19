@@ -134,22 +134,6 @@ class TestCliWorkouts(unittest.TestCase):
             "knee is sore, keep impact low",
         )
 
-        w_id = save_workout(test_db,
-            date="2026-06-02",
-            sport_type="running",
-            title="Interval Session",
-            description="5x800m",
-
-        )
-        exit_code, stdout, stderr = self.run_cli(
-            ["workout", "rm", str(w_id), "Travelling"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn(
-            f"Workout with ID {w_id} ('Interval Session') removed successfully", stdout
-        )
-
-
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_a_text_revision_shows_the_sentences_that_moved(
@@ -456,215 +440,6 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertNotIn("still read [STALE]", stdout)
 
-    @patch("trainmate.runtime.coach_service")
-    def test_workout_swap_by_date(self, mock_coach):
-        today = datetime.now(timezone.utc).date()
-        d1 = (today + timedelta(days=1)).strftime("%Y-%m-%d")
-        d2 = (today + timedelta(days=3)).strftime("%Y-%m-%d")
-        mock_coach.workout_swap_validate.return_value = []
-        # The real service returns whole workout rows; the swap echo renders them in
-        # the 'workout list' format, so the stubs carry the same shape.
-        mock_coach.workout_swap_apply.return_value = [
-            {"id": 1, "title": "Run A", "date": d2, "sport_type": "running",
-             "duration_minutes": 45, "rpe": 4, "tss": 30},
-            {"id": 2, "title": "Ride B", "date": d1, "sport_type": "cycling",
-             "duration_minutes": 60, "rpe": 4, "tss": 30},
-        ]
-        a = save_workout(test_db,
-            date=d1, sport_type="running", title="Run A",
-            description="easy", rpe=4, tss=30,
-        )
-        b = save_workout(test_db,
-            date=d2, sport_type="cycling", title="Ride B",
-            description="easy", rpe=4, tss=30,
-        )
-        exit_code, stdout, stderr = self.run_cli(
-            ["workout", "swap", d1, d2, "Travelling"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn("Swapped 2 workout(s) successfully", stdout)
-        # Each moved session is echoed in the 'workout list' format, at its new date.
-        self.assertIn(f"ID: 1 | {fmt_date(d2)} | RUNNING | Run A", stdout)
-        self.assertIn(f"ID: 2 | {fmt_date(d1)} | CYCLING | Ride B", stdout)
-        # Each date's workout is moved to the other date.
-        ops, no_sync = mock_coach.workout_swap_apply.call_args[0]
-        self.assertCountEqual(ops, [
-            {"id": a, "new_date": d2},
-            {"id": b, "new_date": d1},
-        ])
-        self.assertFalse(no_sync)
-
-    @patch("trainmate.runtime.coach_service")
-    def test_workout_swap_by_id_no_sync(self, mock_coach):
-        today = datetime.now(timezone.utc).date()
-        d1 = (today + timedelta(days=1)).strftime("%Y-%m-%d")
-        d2 = (today + timedelta(days=3)).strftime("%Y-%m-%d")
-        mock_coach.workout_swap_validate.return_value = []
-        mock_coach.workout_swap_apply.return_value = []
-        a = save_workout(test_db,
-            date=d1, sport_type="running", title="Run A",
-            description="easy", rpe=4, tss=30,
-        )
-        b = save_workout(test_db,
-            date=d2, sport_type="cycling", title="Ride B",
-            description="easy", rpe=4, tss=30,
-        )
-        exit_code, stdout, stderr = self.run_cli(
-            ["workout", "swap", str(a), str(b), "Travelling", "--no-sync"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn("Calendar sync skipped", stdout)
-        ops, no_sync = mock_coach.workout_swap_apply.call_args[0]
-        self.assertCountEqual(ops, [
-            {"id": a, "new_date": d2},
-            {"id": b, "new_date": d1},
-        ])
-        self.assertTrue(no_sync)
-
-    @patch("trainmate.runtime.coach_service")
-    def test_workout_swap_warning_declined(self, mock_coach):
-        today = datetime.now(timezone.utc).date()
-        d1 = (today + timedelta(days=1)).strftime("%Y-%m-%d")
-        d2 = (today + timedelta(days=3)).strftime("%Y-%m-%d")
-        mock_coach.workout_swap_validate.return_value = ["Creates 3 consecutive high days"]
-        a = save_workout(test_db,
-            date=d1, sport_type="running", title="Run A",
-            description="easy", rpe=8, tss=90,
-        )
-        b = save_workout(test_db,
-            date=d2, sport_type="cycling", title="Ride B",
-            description="easy", rpe=8, tss=90,
-        )
-        # Default input is "n": the swap is cancelled and never applied.
-        exit_code, stdout, stderr = self.run_cli(
-            ["workout", "swap", d1, d2, "Travelling"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn("Swap warnings", stdout)
-        self.assertIn("Swap cancelled", stdout)
-        mock_coach.workout_swap_apply.assert_not_called()
-
-    @patch("trainmate.runtime.coach_service")
-    def test_workout_swap_past_date_rejected(self, mock_coach):
-        today = datetime.now(timezone.utc).date()
-        past = (today - timedelta(days=2)).strftime("%Y-%m-%d")
-        future = (today + timedelta(days=2)).strftime("%Y-%m-%d")
-        save_workout(test_db,
-            date=past, sport_type="running", title="Run A",
-            description="easy", rpe=4, tss=30,
-        )
-        save_workout(test_db,
-            date=future, sport_type="cycling", title="Ride B",
-            description="easy", rpe=4, tss=30,
-        )
-        exit_code, stdout, stderr = self.run_cli(
-            ["workout", "swap", past, future, "Travelling"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn("in the past", stdout)
-        mock_coach.workout_swap_apply.assert_not_called()
-
-    def test_workout_swap_missing_args(self):
-        # Both targets and the reason are positional and mandatory, so argparse stops
-        # the run before any handler and answers with the command's own help, the
-        # missing line last (DESIGN_cli_noargs.md §a).
-        exit_code, stdout, stderr = self.run_cli(["workout", "swap", "2026-06-10"])
-        self.assertEqual(exit_code, 2)
-        self.assertIn("positional arguments:", stderr)
-        self.assertIn("Why the workouts are being swapped", stderr)
-        self.assertIn(
-            "the following arguments are required: target2, reason",
-            stderr.strip().splitlines()[-1],
-        )
-
-    def test_workout_swap_mixed_date_and_id_rejected(self):
-        exit_code, stdout, stderr = self.run_cli(
-            ["workout", "swap", "2026-06-10", "7", "Travelling"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn("not one of each", stdout)
-
-    def test_workout_swap_invalid_target_rejected(self):
-        exit_code, stdout, stderr = self.run_cli(
-            ["workout", "swap", "tomorrow", "friday", "Travelling"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn("neither a date", stdout)
-
-    @patch("trainmate.runtime.calendar_syncer")
-    def test_workout_rm_synced(self, mock_calendar):
-        w_id = save_workout(test_db,
-            date="2026-06-02", sport_type="running", title="Synced Run",
-            description="30 mins", google_event_id="mock_event_123",
-        )
-        mock_calendar.reset_mock()
-        exit_code, stdout, stderr = self.run_cli(
-            ["workout", "rm", str(w_id), "Travelling"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn(f"Workout with ID {w_id} ('Synced Run') removed successfully", stdout)
-        # A deliberate cancellation KEEPS its event, retitled — the reconcile the change
-        # scheduled does that, so no command carries Calendar code (§8).
-        self.assertIn("Google Calendar updated", stdout)
-        mock_calendar.sync_workout.assert_called_once()
-        mock_calendar.delete_workout_event.assert_not_called()
-        synced_workout = mock_calendar.sync_workout.call_args[0][0]
-        self.assertEqual(synced_workout['id'], w_id)
-        self.assertTrue(synced_workout['removed'])
-
-    @patch("trainmate.runtime.calendar_syncer")
-    def test_workout_rm_soft_deletes(self, mock_calendar):
-        """`workout rm` marks the row removed (kept in DB), hides it from reads, and
-        updates its calendar event — but it stays retrievable for the week planner."""
-        w_id = save_workout(test_db,
-            date="2026-06-02", sport_type="running", title="Interval Session",
-            description="5x800m", google_event_id="evt-1",
-        )
-        exit_code, stdout, _ = self.run_cli(
-            ["workout", "rm", str(w_id), "Travelling for work"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn("Reason: Travelling for work", stdout)
-
-        # Row is kept, flagged removed, reason stored, and retains calendar event reference.
-        row = test_db.get_workout_by_id(w_id)
-        self.assertIsNotNone(row)
-        self.assertTrue(row["removed"])
-        self.assertEqual(row["removed_reason"], "Travelling for work")
-        self.assertEqual(row["google_event_id"], "evt-1")
-
-        # Excluded from default reads, retrievable with include_removed=True.
-        self.assertEqual(test_db.get_workouts(start_date="2026-06-02", end_date="2026-06-02"), [])
-        self.assertEqual(
-            len(test_db.get_workouts(
-                start_date="2026-06-02", end_date="2026-06-02", include_removed=True
-            )),
-            1,
-        )
-
-        # Removing an already-removed workout is a no-op that does not re-hit the calendar.
-        mock_calendar.sync_workout.reset_mock()
-        exit_code, stdout, _ = self.run_cli(
-            ["workout", "rm", str(w_id), "Travelling"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn("already removed", stdout)
-        mock_calendar.sync_workout.assert_not_called()
-
-        # Verify CLI list command excludes or includes the removed workout depending on --removed.
-        exit_code, stdout, _ = self.run_cli(
-            ["workout", "list", "-d", "2026-06-02"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertNotIn("Interval Session", stdout)
-
-        exit_code, stdout, _ = self.run_cli(
-            ["workout", "list", "-d", "2026-06-02", "--removed"]
-        )
-        self.assertEqual(exit_code, 0)
-        self.assertIn("Interval Session", stdout)
-        self.assertIn("[REMOVED]", stdout)
-
     @patch("trainmate.runtime.calendar_syncer")
     def test_workout_wipe(self, mock_calendar):
         save_workout(test_db,
@@ -710,7 +485,7 @@ class TestCliWorkouts(unittest.TestCase):
             date="2026-06-03", sport_type="running", title="Run 2",
             description="30 mins", google_event_id="ge_removed",
         )
-        with test_db.workout_change(kind="rm") as change:
+        with test_db.workout_change(kind="stand-down") as change:
             change.void(date="2026-06-03", sport_type="running", reason="not today")
 
         mock_calendar.list_workout_events.return_value = [
@@ -779,7 +554,7 @@ class TestCliWorkouts(unittest.TestCase):
         with no_calendar_sync():
             save_workout(test_db,
                 date="2026-06-02", sport_type="running", title="Club run",
-                description="45 mins", source="manual", google_event_id="ge_marker",
+                description="45 mins", google_event_id="ge_marker",
             )
             with test_db.workout_change(
                 kind="generate", commitment_end="2026-06-08"
@@ -807,30 +582,6 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertNotIn("Club run", stdout)
         mock_calendar.delete_event.assert_called_once_with("ge_orphan")
-
-    @patch("trainmate.runtime.coach_service")
-    def test_workout_add_echoes_list_line(self, mock_coach):
-        """`add` echoes the new session in the exact 'workout list' rendering."""
-        saved = {
-            "id": 7, "date": "2026-06-02", "sport_type": "running",
-            "title": "Tempo 6x800", "description": "intervals",
-            "duration_minutes": 60, "tss": 70, "rpe": 7, "source": "manual",
-            "google_event_id": "evt-1",
-        }
-        mock_coach.workout_add.return_value = (saved, [])
-        exit_code, stdout, _ = self.run_cli([
-            "workout", "add", "2026-06-02", "running", "Tempo 6x800",
-            "--description", "intervals", "--duration", "60", "--tss", "70", "--rpe", "7",
-        ])
-        self.assertEqual(exit_code, 0)
-        self.assertIn(
-            "ID: 7 | 2026-06-02 Tue | RUNNING | Tempo 6x800", stdout
-        )
-        self.assertIn("[MANUAL]", stdout)
-        self.assertIn("60min", stdout)
-        self.assertIn("TSS 70", stdout)
-        self.assertIn("RPE 7", stdout)
-        self.assertIn("Workout added successfully", stdout)
 
     def test_workout_list_filters(self):
         today_date = datetime.now(timezone.utc).date()
@@ -1152,8 +903,8 @@ class TestCliWorkouts(unittest.TestCase):
         mock_garmin.ensure_data.assert_not_called()
 
     def test_a_cancelled_session_is_not_graded(self):
-        """A session stood down is not a miss: it never reaches the pairing, so it
-        carries no verdict even when `--removed` puts it back in the listing."""
+        """A cancelled session is not a miss: it never reaches the pairing or the
+        listing."""
         yesterday = (
             datetime.now(timezone.utc).date() - timedelta(days=1)
         ).strftime("%Y-%m-%d")
@@ -1163,12 +914,11 @@ class TestCliWorkouts(unittest.TestCase):
             removed=True, removed_reason="travelling",
         )
         exit_code, stdout, _ = self.run_cli([
-            "workout", "list", "-d", yesterday, "--removed", "--no-pull",
+            "workout", "list", "-d", yesterday, "--no-pull",
         ])
         self.assertEqual(exit_code, 0)
-        line = _line_for(stdout, "Called Off")
-        self.assertIn("[REMOVED]", line)
-        self.assertNotIn("[MISSED]", line)
+        self.assertNotIn("Called Off", stdout)
+        self.assertNotIn("[MISSED]", stdout)
 
     def test_workout_compare(self):
         today = datetime.now(timezone.utc).date()
@@ -1379,13 +1129,13 @@ class TestCliWorkouts(unittest.TestCase):
         """A regen is archive-and-rebuild, so an existing upcoming plan is confirmed
         before the LLM call; --force skips the prompt.
 
-        A bare run opens the day after the generated schedule stops (§8), so the sessions
-        at stake are the ones sitting past it — here the hand-added one, not the generated
-        session that defines where coverage ends."""
+        The sessions at stake are the ones inside the span about to be rebuilt, here the
+        one inside `-d`, not the one before it (§8)."""
         mock_coach.workout_generate.return_value = _proposal()
         today = datetime.now(timezone.utc).date()
         d1 = (today + timedelta(days=1)).strftime("%Y-%m-%d")
         d2 = (today + timedelta(days=5)).strftime("%Y-%m-%d")
+        span = ["-d", f"{d2}..{(today + timedelta(days=8)).strftime('%Y-%m-%d')}"]
 
         # Empty plan: nothing to lose, so no prompt stands between the athlete and the
         # coach — the only question asked is the apply gate, after the preview.
@@ -1400,29 +1150,27 @@ class TestCliWorkouts(unittest.TestCase):
         )
         save_workout(test_db,
             date=d2, sport_type="running", title="Long", description="90 min",
-            source="manual",
         )
 
         # Declining leaves the live plan alone and never spends the LLM call.
         mock_prompt.confirm.reset_mock()
         mock_coach.workout_generate.reset_mock()
-        exit_code, stdout, _ = self.run_cli(["workout", "generate"])
+        exit_code, stdout, _ = self.run_cli(["workout", "generate", *span])
         self.assertEqual(exit_code, 0)
         # The question is wrapped for the terminal; compare on a single logical line.
         question = " ".join(mock_prompt.confirm.call_args.args[0].split())
         # Counted over the span about to be rebuilt, not "everything from today on" — a
         # bounded regen only puts the sessions inside it at stake (§8).
         self.assertIn("You already have 1 workout(s) planned in this span", question)
-        # d1 is the generated session the span now opens after, so it is not at stake.
+        # d1 lies before the span, so it is not at stake.
         self.assertNotIn(fmt_date(d1), question)
         self.assertIn(fmt_date(d2), question)
-        self.assertIn("1 added by hand", question)
         self.assertIn("your schedule is unchanged", stdout)
         mock_coach.workout_generate.assert_not_called()
 
         # Accepting proceeds.
         mock_prompt.confirm.return_value = True
-        exit_code, _, _ = self.run_cli(["workout", "generate"])
+        exit_code, _, _ = self.run_cli(["workout", "generate", *span])
         self.assertEqual(exit_code, 0)
         mock_coach.workout_generate.assert_called_once()
 
@@ -1431,7 +1179,7 @@ class TestCliWorkouts(unittest.TestCase):
         mock_prompt.confirm.return_value = False
         mock_coach.workout_generate.reset_mock()
         mock_coach.workout_generate_apply.reset_mock()
-        exit_code, _, _ = self.run_cli(["workout", "generate", "--force"])
+        exit_code, _, _ = self.run_cli(["workout", "generate", "--force", *span])
         self.assertEqual(exit_code, 0)
         mock_prompt.confirm.assert_not_called()
         mock_coach.workout_generate.assert_called_once()

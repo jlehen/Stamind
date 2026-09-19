@@ -75,7 +75,7 @@ class TestMesocycleProgressContext(unittest.TestCase):
             date=date, sport_type=kwargs.pop("sport_type", "cycling"),
             title=kwargs.pop("title", "Threshold"),
             description="[Threshold]\n4x8min", duration_minutes=60, rpe=7, tss=tss,
-            source="generated", macrocycle_id=self.macro_id, **kwargs,
+            macrocycle_id=self.macro_id, **kwargs,
         )
 
     def _done(self, date: str, tss: float, activity_id: str) -> None:
@@ -294,7 +294,7 @@ class TestMesocycleCompositionContext(unittest.TestCase):
         return save_workout(test_db,
             date=date, sport_type="cycling", title="Threshold",
             description="[Threshold]\n4x8min", duration_minutes=int(sum(zones) / 60),
-            rpe=7, tss=100.0, source="generated", macrocycle_id=self.macro_id,
+            rpe=7, tss=100.0, macrocycle_id=self.macro_id,
             planned_zone_currency="hr", planned_zone_sec=list(zones) + [None, None],
         )
 

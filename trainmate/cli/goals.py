@@ -115,8 +115,8 @@ def report_archived_sessions(result: dict) -> None:
     if result['untagged']:
         notice(
             f"Left {result['untagged']} upcoming session(s) in place: they carry no plan "
-            "version, so no goal owns them. Remove them with " + cmd("workout rm")
-            + " if they were for this goal.",
+            "version, so no goal owns them. If they were for this goal, ask your coach to "
+            "drop them with " + cmd("workout tweak") + ".",
         )
 
 

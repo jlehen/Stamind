@@ -60,11 +60,8 @@ def _out(offset: int) -> str:
     return _d(offset, today_str())
 
 
-def _w(offset: int, sport_type="running", source="generated", removed=False):
-    return {
-        "date": _d(offset), "sport_type": sport_type,
-        "source": source, "removed": removed,
-    }
+def _w(offset: int, sport_type="running", removed=False):
+    return {"date": _d(offset), "sport_type": sport_type, "removed": removed}
 
 
 def _meso(start: int, end: int, meso_id: int = 1, name="Mesocycle"):
@@ -130,15 +127,6 @@ class RunwayDetectorTest(unittest.TestCase):
         )
         self.assertEqual(state["kind"], RUNWAY_PLAN_END_NO_GOAL)
 
-    def test_a_manual_row_does_not_extend_the_schedule(self):
-        """The race put on the calendar by hand must not make the schedule look as if it
-        reaches it while the generated sessions end next Thursday (§2)."""
-        state = self._run(
-            [_w(4), _w(40, source="manual")], [_meso(-30, 45)]
-        )
-        self.assertEqual(state["last_covered_date"], _d(4))
-        self.assertEqual(state["kind"], RUNWAY_SPAN)
-
     def test_a_removed_row_does_not_extend_the_schedule(self):
         state = self._run([_w(4), _w(9, removed=True)], [_meso(-30, 45)])
         self.assertEqual(state["last_covered_date"], _d(4))
@@ -183,8 +171,8 @@ class RunwayDetectorTest(unittest.TestCase):
     def test_silent_without_a_plan_on_record(self):
         self.assertIsNone(self._run([_w(2)], []))
 
-    def test_silent_without_a_generated_row_on_record(self):
-        self.assertIsNone(self._run([_w(2, source="manual")], [_meso(-30, 45)]))
+    def test_silent_without_a_session_on_record(self):
+        self.assertIsNone(self._run([_w(2, removed=True)], [_meso(-30, 45)]))
 
     def test_the_window_is_the_configured_width(self):
         self.assertIsNone(self._run([_w(10)], [_meso(-30, 45)], warn=7))

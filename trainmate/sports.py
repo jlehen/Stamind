@@ -3,7 +3,7 @@
 A single planned/canonical sport maps to the family of Garmin activity types (and
 historical free-form spellings) that count as the same sport. The coach's prompts
 and generated/adapted workouts speak the canonical names (e.g. ``strength_training``);
-manually-added or legacy rows may use an alias (e.g. ``strength``). Normalizing at
+legacy rows may use an alias (e.g. ``strength``). Normalizing at
 write time and matching alias-aware on read keeps the two in agreement so a session
 is never duplicated or lost just because two layers spelled its sport differently.
 

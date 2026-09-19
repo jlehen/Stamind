@@ -32,10 +32,7 @@ _INDENT = " " * 6
 _KIND_LABELS = {
     "generate": "Planned",
     "adapt": "Adapted",
-    "swap": "Moved",
-    "add": "Added by hand",
-    "rm": "Cancelled",
-    "restore": "Restored",
+    "tweak": "Changed on request",
     "rollback": "Rolled back",
     "stand-down": "Stood down",
     "reinstate": "Reinstated",
@@ -46,9 +43,7 @@ _KIND_LABELS = {
 _VOID_LABELS = {
     "generate": "Dropped from the plan",
     "adapt": "Dropped by the adaptation",
-    "swap": "Moved away",
-    "add": "Replaced by hand",
-    "rm": "Cancelled",
+    "tweak": "Dropped on request",
     "rollback": "Undone",
     "stand-down": "Goal stood down",
 }

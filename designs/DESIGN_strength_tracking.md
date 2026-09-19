@@ -108,7 +108,9 @@ a day, a sport, a duration, an RPE, a load, a title and a description each. The 
 planner** is the call this design adds: it writes a strength session from the week
 planner's brief and the athlete's history. A **brief** is what the week planner writes as
 the description of a strength day from phase 2 on: what the session is for and what the plan
-asks of it that day, with no exercise, set, rep or load in it (§9). The word is this
+asks of it that day, with no exercise, set, rep or load in it (§9). The one exception is an
+exercise the athlete asked for, which the brief then names (DESIGN_workout_tweak.md §4). The
+word is this
 design's own, and AGENTS.md gains it when phase 2 lands (§11). A **session** is a planned
 workout and an
 **activity** is what Garmin recorded, the way the tables already split them; a **strength
@@ -948,21 +950,18 @@ prints, is the strength planner's reasons, one sentence per session it changed, 
   general, two lists in the profile, and the prose of the constraints active that day, which
   is where "hotel gym, dumbbells only" would be written. Equipment is not a constraint type,
   so these two places are all there is.
-- The sessions to write: every strength session in the span that has no prescribed sets
-  and is not the athlete's own, with its title, duration, RPE and brief. That is every new
-  session the week planner wrote in this proposal, and a kept session written before phase
-  2, whose old prose stands in for the brief.
+- The sessions to write: every strength session in the span that has no prescribed sets,
+  with its title, duration, RPE and brief. That is every new session the week planner
+  wrote in this proposal, and a kept session written before phase 2, whose old prose
+  stands in for the brief.
 - The sessions to check: every other strength session in the span that has prescribed sets,
   whether the week planner kept or revised it or it arrived from another date with its
   lineage (below), with the brief it has now and those sets. One whose brief or duration is
   not the one its sets were written under says so on a line of its own (below).
-- A session the athlete added with `workout add` is the athlete's own, and the code knows it
-  by its source, "manual". It is shown as context only: never asked about, never written,
-  and never a reason to run. The week planner may still revise it
-  (DESIGN_plan_change_continuity.md §4.5), and when it does it writes a brief over the
-  athlete's text, as for any strength day. In that proposal the session is a session to
-  write like any other, and from then on it has prescribed sets and is checked like any
-  other.
+- There is no session of the athlete's own any more: `workout add` is gone, and every
+  strength session is written or checked (DESIGN_workout_tweak.md §5). A session the athlete
+  wants changed goes through `workout tweak`, and a request inside it reaches the strength
+  planner through the brief (DESIGN_workout_tweak.md §4).
 
 **What it returns.** For each session to write, its exercises in order: the name, the number
 of sets, the lowest and highest reps, and the load in kilograms, or no load for a bodyweight

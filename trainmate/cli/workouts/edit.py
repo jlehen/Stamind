@@ -1,19 +1,16 @@
-"""Workout CLI: push / rm / restore / swap / add / wipe (deterministic edits)."""
+"""Workout CLI: push / wipe / prune-calendar (the Calendar and the database, no session
+edits)."""
 import argparse
 import sys
-from datetime import datetime
 from typing import Optional
 from trainmate import runtime
 from trainmate.calendar_state import calendar_status
-from trainmate.sports import canonical_sport
 from trainmate.util import (
-    step, bold, dim, green, red, yellow, cyan, gray, cmd, fmt_date, fmt_span,
-    today_str as _today_str, notice,
+    step, dim, green, red, cyan, cmd, fmt_date, fmt_span, today_str as _today_str, notice,
 )
 from trainmate.cli.selectors import resolve_window
 
-from trainmate.cli.workouts._helpers import (_resolve_swap_ops,
-    workout_line, warn_stale_before)
+from trainmate.cli.workouts._helpers import warn_stale_before
 
 
 def run_workout_push(args: argparse.Namespace) -> None:
@@ -60,126 +57,8 @@ def run_workout_push(args: argparse.Namespace) -> None:
     except Exception as e:
         notice(f"Error syncing to Google Calendar: {e}", red)
     warn_stale_before(start_date)
-def run_workout_rm(args: argparse.Namespace) -> None:
-    """Cancels a planned session by appending a void revision.
 
-    The session is not deleted: the slot now says "no session here", and everything before
-    that is still in the log (DESIGN_workout_revisions.md §3). Cancelled sessions are
-    excluded from listings, comparisons and the calendar push, but are still surfaced to
-    the week planner as a deliberate cancellation — and their Calendar event is kept, retitled
-    "[Deleted]", by the reconcile the change schedules (§8)."""
-    workout = runtime.db.get_workout_by_id(args.id)
-    if not workout:
-        notice(f"Workout with ID {args.id} not found.", red)
-        return
 
-    if workout.get('removed'):
-        notice(f"Workout with ID {args.id} ('{workout['title']}') is already removed.")
-        return
-
-    with runtime.db.workout_change(kind="rm", summary=args.reason) as change:
-        change.void(
-            date=workout['date'], sport_type=workout['sport_type'], reason=args.reason
-        )
-
-    print(green(
-        f"Workout with ID {args.id} ('{workout['title']}') removed successfully."
-    ))
-    if args.reason:
-        print(f"Reason: {args.reason}")
-def run_workout_restore(args: argparse.Namespace) -> None:
-    """Brings a cancelled session back by appending a copy of the revision its void ended.
-
-    A restore is a duplicate, not an un-flag: the copy gets a new, higher id and becomes
-    live by the same rule as everything else (§5)."""
-    workout = runtime.db.get_workout_by_id(args.id)
-    if not workout:
-        notice(f"Workout with ID {args.id} not found.", red)
-        return
-
-    if not workout.get('removed'):
-        notice(f"Workout with ID {args.id} ('{workout['title']}') is not removed.")
-        return
-
-    revision = runtime.db.revision_before_live_void(args.id)
-    if revision is None:
-        notice(
-            f"Workout with ID {args.id} has no earlier version to restore — it was "
-            "cancelled before it was ever scheduled.", red,
-        )
-        return
-
-    with runtime.db.workout_change(kind="restore") as change:
-        change.restore(revision)
-
-    print(green(f"Workout with ID {args.id} restored successfully."))
-def run_workout_swap(args: argparse.Namespace) -> None:
-    """Exchanges workouts between two dates or two IDs, with recovery validation."""
-    ops = _resolve_swap_ops(args)
-    if not ops:
-        return
-
-    warnings = runtime.coach_service.workout_swap_validate(ops)
-    if warnings:
-        print(bold(yellow("\nSwap warnings:")))
-        for msg in warnings:
-            notice(f"  - {msg}")
-        if not args.force:
-            if not runtime.prompt.confirm("Proceed with the swap anyway?"):
-                print("\nSwap cancelled.")
-                return
-
-    updated = runtime.coach_service.workout_swap_apply(ops, args.no_sync, reason=args.reason)
-    print()
-    for w in updated:
-        print(workout_line(w))
-    print(green(f"Swapped {len(updated)} workout(s) successfully."))
-    if args.reason:
-        print(f"Reason: {args.reason}")
-    if args.no_sync:
-        print(gray("Calendar sync skipped (--no-sync)."))
-def run_workout_add(args: argparse.Namespace) -> None:
-    """Manually schedules a workout on a date, replacing any same-sport session."""
-    try:
-        datetime.strptime(args.date, "%Y-%m-%d")
-    except ValueError:
-        notice(f"Invalid date format: '{args.date}'. Use YYYY-MM-DD.", red)
-        sys.exit(1)
-
-    # Normalize to the coach's canonical sport vocabulary so the stored session and the
-    # "Replacing existing ..." preview both match what generate/adapt will look up.
-    args.sport_type = canonical_sport(args.sport_type)
-
-    if args.replace_day:
-        to_replace = runtime.db.get_workouts(start_date=args.date, end_date=args.date)
-    else:
-        same = runtime.db.get_workout(args.date, args.sport_type)
-        to_replace = [same] if same else []
-    for w in to_replace:
-        notice(
-            f"Replacing existing {w['sport_type']} workout on {fmt_date(args.date)}: "
-            f"{w['title']}",
-        )
-
-    saved, replaced = runtime.coach_service.workout_add(
-        date=args.date,
-        sport_type=args.sport_type,
-        title=args.title,
-        description=args.description or "",
-        duration_minutes=args.duration,
-        rpe=args.rpe,
-        tss=args.tss,
-        reason=args.reason,
-        replace_day=args.replace_day,
-    )
-
-    if not saved:
-        notice("Failed to save workout.", red)
-        sys.exit(1)
-
-    print(workout_line(saved))
-    verb = "replaced" if replaced else "added"
-    print(green(f"Workout {verb} successfully and synced to Calendar."))
 def run_workout_wipe(args: argparse.Namespace) -> None:
     """Wipes all workouts from the database and Google Calendar after confirmation."""
     if not args.yes:

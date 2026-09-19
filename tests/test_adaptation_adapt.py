@@ -1171,7 +1171,6 @@ class TestAdaptationAdapt(unittest.TestCase):
         save_workout(test_db,
             "2026-06-24", "cycling", "FTP Test", "[FTP Test]\n20-min test or ramp.",
             duration_minutes=75, rpe=9, tss=90, benchmark_type="ftp_20min",
-            source="generated",
         )
         service = trainmate.coach.CoachService(db_instance=test_db)
         proposed = [{
@@ -1195,7 +1194,6 @@ class TestAdaptationAdapt(unittest.TestCase):
         save_workout(test_db,
             "2026-06-24", "cycling", "FTP Test", "[FTP Test]\n20-min test or ramp.",
             duration_minutes=75, rpe=9, tss=90, benchmark_type="ftp_20min",
-            source="generated",
         )
         service = trainmate.coach.CoachService(db_instance=test_db)
         proposed = [
@@ -1291,7 +1289,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         save_workout(test_db,
             "2026-06-11", "strength_training", "Gym: Lower",
             "[Gym: Lower]\n5x5 back squat, accessories.",
-            duration_minutes=65, rpe=7, tss=55, source="generated",
+            duration_minutes=65, rpe=7, tss=55,
             google_event_id="evt-gym",
         )
         service = trainmate.coach.CoachService(db_instance=test_db)
@@ -1420,7 +1418,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         save_workout(test_db,
             "2026-06-12", "strength_training", "Gym: Upper",
             "[Gym: Upper]\nBench and rows.",
-            duration_minutes=50, rpe=6, tss=40, source="generated",
+            duration_minutes=50, rpe=6, tss=40,
         )
         proposal = self._adapt_returning(
             mock_client, "Consolidating the gym days.",
@@ -1480,7 +1478,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         save_workout(test_db,
             "2026-06-10", "strength_training", "Gym: Lower",
             "[Gym: Lower]\n5x5 back squat.",
-            duration_minutes=60, rpe=7, tss=50, source="generated",
+            duration_minutes=60, rpe=7, tss=50,
         )
         test_db.save_completed_activity(
             "lifted", "2026-06-10", "2026-06-10 07:00:00", "Gym", "strength_training",

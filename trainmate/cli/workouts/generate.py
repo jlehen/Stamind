@@ -77,9 +77,19 @@ def run_workout_adapt(args: argparse.Namespace) -> None:
         _adapt(args)
 
 
-def _adapt(args: argparse.Namespace) -> None:
-    date_str = args.date or _today_str()
-    if not args.date:
+def run_workout_tweak(args: argparse.Namespace) -> None:
+    """Changes the days a request is about: `workout adapt`'s flow with a narrower job
+    (DESIGN_workout_tweak.md §3)."""
+    with replacing_unsent(skip=args.auto):
+        _adapt(args, tweak=True)
+
+
+def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
+    # A tweak's `--date` names the days to change; the run itself is evaluated today.
+    date_str = _today_str()
+    if not tweak and args.date:
+        date_str = args.date
+    elif not tweak:
         # Name the defaulted target so a bare `adapt` isn't silent (DESIGN_cli_noargs.md §b).
         step(f"No date given — adapting today ({fmt_date(date_str)}).")
 
@@ -114,11 +124,17 @@ def _adapt(args: argparse.Namespace) -> None:
     # Before the week planner is told anything: settle any pairing the matcher had to guess at.
     _resolve_ambiguous_matches(date_str, auto=args.auto)
 
-    step(f"Evaluating daily Garmin metrics adaptation for {fmt_date(date_str)}...")
     try:
-        proposal = runtime.coach_service.workout_adapt(
-            date_str, message=getattr(args, 'message', None)
-        )
+        if tweak:
+            step("Asking the coach for the change...")
+            proposal = runtime.coach_service.workout_tweak(
+                args.message, tweak_dates=args.date or (), today_str=date_str
+            )
+        else:
+            step(f"Evaluating daily Garmin metrics adaptation for {fmt_date(date_str)}...")
+            proposal = runtime.coach_service.workout_adapt(
+                date_str, message=getattr(args, 'message', None)
+            )
         reason = proposal.reason
         proposed_workouts = proposal.workouts
 
@@ -139,8 +155,11 @@ def _adapt(args: argparse.Namespace) -> None:
 
         runtime.render.adapt_reason(reason)
 
-        if not proposed_workouts:
+        if not proposed_workouts and tweak:
+            runtime.render.tweak_no_change()
+        elif not proposed_workouts:
             runtime.render.adapt_no_change()
+        if not proposed_workouts:
             # The pass still had its constraints in scope, which is all `honored_at`
             # claims — requiring a *change* would flag them forever (§8).
             runtime.coach_service.workout_revision_record_no_change(proposal)
@@ -167,18 +186,15 @@ def _adapt(args: argparse.Namespace) -> None:
 
 
 def _confirm_regeneration(span_start: str, span_end: str) -> bool:
-    """Gates the LLM call: a regen ultimately replaces the plan across the span, manual
-    edits included, so name what is at stake before spending it (README §"Steering the
-    plan"). Nothing is archived here — the proposal is shown first and `_confirm_apply`
-    owns the write.
+    """Gates the LLM call: a regen ultimately replaces the plan across the span, so name
+    what is at stake before spending it (README §"Steering the plan"). Nothing is archived
+    here — the proposal is shown first and `_confirm_apply` owns the write.
 
     Returns True when there is nothing live to lose or the athlete confirmed."""
     live = runtime.db.get_workouts(start_date=span_start, end_date=span_end)
     if not live:
         return True
 
-    manual = sum(1 for w in live if w.get('source') == 'manual')
-    hand_edited = f", {manual} added by hand" if manual else ""
     days = settings.commitment_days()
     # The week planner has to account for the near days one by one, so a rewrite of them is not
     # the blanket archive the rest of the span is (DESIGN_plan_change_continuity.md §4).
@@ -190,7 +206,7 @@ def _confirm_regeneration(span_start: str, span_end: str) -> bool:
     return runtime.prompt.confirm(
         wrap_text(
             f"You already have {len(live)} workout(s) planned in this span "
-            f"({fmt_date(live[0]['date'])} → {fmt_date(live[-1]['date'])}{hand_edited}). "
+            f"({fmt_date(live[0]['date'])} → {fmt_date(live[-1]['date'])}). "
             f"Regenerating rebuilds {fmt_date(span_start)} → {fmt_date(span_end)} at the "
             f"cost of one LLM call, and archives them if you accept the result; "
             f"{cmd('workout rollback')} restores them.{committed} Regenerate?"
@@ -514,7 +530,7 @@ def _change_line(label: str, change: dict) -> str:
     """One `workout batches` row: '<label>  <when>  <kind>  <n> workouts · <span>  plan …',
     then what the change was, cut short.
 
-    Every change is listed, adapts and manual edits included, because every change is
+    Every change is listed, adapts and tweaks included, because every change is
     undoable now (DESIGN_workout_revisions.md §10). A change that appended nothing — an
     adapt that looked at the metrics and held — says so rather than being left out.
 
@@ -621,7 +637,7 @@ def run_workout_rollback(args: argparse.Namespace) -> None:
     ))
     report_unhonored(result['unhonored'])
     print(green(f"Run {cmd('workout list')} to review the restored sessions."))
-def _workouts_by_id(ids: list, sport_type: Optional[str], include_removed: bool) -> list:
+def _workouts_by_id(ids: list, sport_type: Optional[str]) -> list:
     """Looks up the workout IDs named as positional targets, reporting the ones it can't."""
     found = []
     for workout_id in ids:
@@ -629,8 +645,8 @@ def _workouts_by_id(ids: list, sport_type: Optional[str], include_removed: bool)
         if not w:
             notice(f"No workout with ID {workout_id}.")
             continue
-        if w.get('removed') and not include_removed:
-            notice(f"Workout {workout_id} is removed; pass --removed to show it.")
+        if w.get('removed'):
+            notice(f"Workout {workout_id} was cancelled.")
             continue
         if sport_type and w['sport_type'].lower() != sport_type.lower():
             continue
@@ -666,7 +682,6 @@ def run_workout_list(args: argparse.Namespace) -> None:
     args._extra_windows = [(r.start, r.end) for r in date_targets]
     windowed = bool(date_targets) or _has_selector(args)
 
-    include_removed = getattr(args, "removed", False)
     workouts = []
     if windowed or not ids:
         start_date, end_date = resolve_window(args)
@@ -674,12 +689,11 @@ def run_workout_list(args: argparse.Namespace) -> None:
             start_date=start_date,
             end_date=end_date,
             sport_type=args.sport_type,
-            include_removed=include_removed,
         )
     else:
         start_date = end_date = None
     if ids:
-        workouts += _workouts_by_id(ids, args.sport_type, include_removed)
+        workouts += _workouts_by_id(ids, args.sport_type)
         seen = set()
         workouts = [
             w for w in sorted(workouts, key=lambda w: (w['date'], w['id']))

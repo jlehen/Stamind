@@ -49,8 +49,8 @@ COMMAND_ORDER = {
     "signal": ["list", "list-metrics", "add", "rm"],
     "learnings": ["list", "show", "edit", "demote", "keep", "rm"],
     "plan": ["show", "generate", "keep", "feedback", "versions", "diff", "rollback"],
-    "workout": ["list", "show", "adapt", "compare", "generate", "swap", "add",
-                "restore", "rm", "rollback", "batches"],
+    "workout": ["list", "show", "adapt", "tweak", "compare", "generate", "rollback",
+                "batches"],
     "data": ["pull", "reflect", "show-metrics", "show-activities"],
 }
 
@@ -76,10 +76,9 @@ from trainmate.cli.plans import (
     run_plan_rollback, run_plan_versions, run_plan_diff,
 )
 from trainmate.cli.workouts import (
-    run_workout_list, run_workout_compare, run_workout_generate, run_workout_rm,
-    run_workout_restore, run_workout_adapt, run_workout_push, run_workout_swap,
-    run_workout_add, run_workout_wipe, run_workout_batches, run_workout_rollback,
-    run_workout_prune_calendar,
+    run_workout_list, run_workout_compare, run_workout_generate, run_workout_adapt,
+    run_workout_tweak, run_workout_push, run_workout_wipe, run_workout_batches,
+    run_workout_rollback, run_workout_prune_calendar,
 )
 from trainmate.cli.data import (
     run_data_pull, run_data_bootstrap, run_data_reflect, run_data_backfill_tss,

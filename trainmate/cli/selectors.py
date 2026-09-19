@@ -305,11 +305,17 @@ def add_selector_args(
     parser.set_defaults(_selector_policy=(direction, default, span_days))
 
 
-def add_single_date_arg(parser, help_text: str):
-    """Registers `-d/--date` for a command that acts on one day rather than a range."""
+def add_single_date_arg(parser, help_text: str, repeat: bool = False):
+    """Registers `-d/--date` for a command that acts on days rather than a range.
+
+    `repeat` lets it be given more than once, and `args.date` is then the list of days
+    (`workout tweak`, DESIGN_workout_tweak.md §3.1)."""
+    action = "store"
+    if repeat:
+        action = "append"
     parser.add_argument(
         "-d", "--date", dest="date", type=parse_single_date, metavar="DATE",
-        help=help_text
+        action=action, help=help_text
     )
 
 

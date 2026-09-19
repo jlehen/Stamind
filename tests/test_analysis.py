@@ -1064,7 +1064,7 @@ class TestPriorTrainingContext(unittest.TestCase):
         save_workout(test_db,
             date=date, sport_type="cycling", title="Endurance",
             description="[Endurance]\n2h steady", duration_minutes=120, rpe=5, tss=tss,
-            source="generated", macrocycle_id=macro_id,
+            macrocycle_id=macro_id,
             planned_zone_currency="hr", planned_zone_sec=self.ZONES,
         )
 

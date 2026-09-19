@@ -19,15 +19,14 @@ from trainmate.sports import canonical_sport
 
 # One value per command invocation, fixed at write time (§3).
 CHANGE_KINDS = (
-    "generate", "adapt", "swap", "add", "rm",
-    "restore", "rollback", "stand-down", "reinstate",
+    "generate", "adapt", "tweak", "rollback", "stand-down", "reinstate",
 )
 
-# The voids the athlete asked for, as against the ones the plan produced. A session
-# `workout rm` cancelled or a goal stood down is a decision, and both the week planner and
-# Calendar treat it as one: the prompt calls it a deliberate cancellation and the event
-# stays, retitled. A day a generate or an adapt simply stopped scheduling is neither.
-ATHLETE_VOID_KINDS = ("rm", "stand-down")
+# The voids the athlete decided, as against the ones the coach wrote. A goal stood down is
+# a decision, and both the week planner and Calendar treat it as one: the prompt calls it a
+# deliberate cancellation and the event stays, retitled. A day a generate, an adapt or a
+# tweak stopped scheduling is the coach's writing (DESIGN_workout_tweak.md §6).
+ATHLETE_VOID_KINDS = ("stand-down",)
 
 _ZONE_COLUMNS = tuple(f"planned_zone{i}_sec" for i in range(1, 8))
 
@@ -98,8 +97,8 @@ def _adaptation_tally(
     """Walks a lineage backwards from `head_id` and counts the easings still standing (§7).
 
     Not a `COUNT(*)`: a rollback/restore copy jumps over the span it undid, and a
-    `generate` re-prescribes the session so easings of the previous prescription stop
-    describing it. Returns `(adaptation_count, adapted_at)`.
+    `generate` or a `tweak` re-prescribes the session so easings of the previous
+    prescription stop describing it. Returns `(adaptation_count, adapted_at)`.
     """
     by_id = {r["id"]: r for r in revisions}
     position = {r["id"]: i for i, r in enumerate(revisions)}
@@ -111,7 +110,7 @@ def _adaptation_tally(
         if current["restored_from"] is not None:
             current = by_id.get(current["restored_from"])
             continue
-        if current["kind"] == "generate":
+        if current["kind"] in ("generate", "tweak"):
             break
         index = position[current["id"]]
         previous = revisions[index - 1] if index else None
@@ -142,9 +141,6 @@ class WorkoutChange:
         # and catches a session whose event was never pushed.
         self.touched_lineages: Set[int] = set()
         self.appended: List[int] = []
-        # Sessions the athlete added by hand that a `generate` replaced, so the command
-        # can name them (§12). Only `generate` fills this.
-        self.replaced_manual: List[Dict[str, Any]] = []
 
     # --- reading the slot ---
 
@@ -163,41 +159,24 @@ class WorkoutChange:
         ).fetchone()
         return dict(row) if row else None
 
-    def _lineage_is_manual(self, lineage_id: int) -> bool:
-        """Whether a lineage was started by `workout add` — its first change kind (§5)."""
-        row = self._conn.execute(
-            "SELECT c.kind FROM workouts w JOIN workout_changes c ON c.id = w.change_id "
-            "WHERE w.lineage_id = ? ORDER BY w.id ASC LIMIT 1",
-            (lineage_id,),
-        ).fetchone()
-        return bool(row) and row["kind"] == "add"
-
     # --- the lineage rules (§4) ---
 
     def _lineage_for(
         self, live: Optional[Dict[str, Any]], explicit: Optional[int]
-    ) -> Tuple[Optional[int], Optional[Dict[str, Any]], bool]:
-        """Which lineage a revision joins. Returns `(lineage_id, superseded, manual)`:
-        `lineage_id` None means start a new one, `superseded` is the live revision whose
-        lineage this append ends, and `manual` flags the athlete-added case §12 reports.
+    ) -> Optional[int]:
+        """Which lineage a revision joins, or None to start a new one.
 
         "Next occupant of the slot" and "same session" are different things, so this is
         not a blanket inherit-from-the-slot (§4)."""
         if explicit is not None:
-            # A swap — or an adapt moving a session — carries the moved session's lineage
-            # to the destination, not the destination slot's.
-            return explicit, None, False
+            # A moved session carries its own lineage to the destination, not the
+            # destination slot's.
+            return explicit
         if live is None or live["void"]:
             # Appending over a void is a new session, not a resurrection of the removed
             # one: it must not inherit its Calendar event, its originals or its tally.
-            return None, live, False
-        if self.kind == "add":
-            return None, live, False
-        if self.kind == "generate" and self._lineage_is_manual(live["lineage_id"]):
-            # The plan owns the horizon, so the generate proceeds — but under a new
-            # lineage, which is also what keeps `source` honest.
-            return None, live, True
-        return live["lineage_id"], None, False
+            return None
+        return live["lineage_id"]
 
     # --- writing ---
 
@@ -228,8 +207,7 @@ class WorkoutChange:
         )
 
     def _write(
-        self, row: Dict[str, Any],
-        decision: Tuple[Optional[int], Optional[Dict[str, Any]], bool],
+        self, row: Dict[str, Any], lineage_id: Optional[int],
         live: Optional[Dict[str, Any]],
         prescribed: Optional[Sequence[Dict[str, Any]]] = None,
     ) -> Optional[int]:
@@ -239,7 +217,6 @@ class WorkoutChange:
         no-op writes none of them either, and the live row's sets stand — which is always
         right, because the description is rendered from them, so different kilograms make a
         different description (DESIGN_strength_tracking.md §9)."""
-        lineage_id, superseded, manual = decision
         if live is not None and live["lineage_id"] is not None:
             self.touched_lineages.add(live["lineage_id"])
         if lineage_id is not None:
@@ -267,8 +244,6 @@ class WorkoutChange:
             self.touched_lineages.add(revision_id)
         if prescribed:
             self._write_prescribed(revision_id, prescribed)
-        if manual and superseded is not None:
-            self.replaced_manual.append(dict(superseded))
         self.appended.append(revision_id)
         return revision_id
 
@@ -292,7 +267,7 @@ class WorkoutChange:
         omitted. `clear_benchmark` is the one way to blank `benchmark_type` in place, for
         an adaptation that replaces a test with something that is no longer that test
         (DESIGN_benchmark_workouts.md §4.2). `lineage_id` names the session explicitly,
-        which is what a swap's destination needs (§4).
+        which is what a moved session's destination needs (§4).
 
         `prescribed_sets` are the strength planner's exercises for this revision
         (DESIGN_strength_tracking.md §9). Omitted, a revision that CONTINUES the session in
@@ -303,12 +278,12 @@ class WorkoutChange:
         """
         sport_canonical = canonical_sport(sport_type)
         live = self.live_revision(date, sport_canonical)
-        decision = self._lineage_for(live, lineage_id)
+        joined = self._lineage_for(live, lineage_id)
         # Only a revision that CONTINUES the session already in the slot carries its
-        # fields forward. One that starts a new lineage — a manual `add`, a session
-        # appended over a void, a swap's destination — must not inherit the previous
-        # occupant's load, or an `add` with no --duration would silently adopt it (§4/§6).
-        continues = live is not None and decision[0] == live["lineage_id"]
+        # fields forward. One that starts a new lineage — a session appended over a void,
+        # a moved session's destination — must not inherit the previous occupant's load
+        # (§4/§6).
+        continues = live is not None and joined == live["lineage_id"]
         base = live if continues else {}
         row: Dict[str, Any] = {
             "date": date,
@@ -344,7 +319,7 @@ class WorkoutChange:
         row["created_at"] = base.get("created_at") or self.created_at
         if prescribed_sets is None and continues:
             prescribed_sets = self.prescribed_sets(live["id"])
-        return self._write(row, decision, live, prescribed_sets)
+        return self._write(row, joined, live, prescribed_sets)
 
     def void(
         self, *, date: str, sport_type: str, reason: Optional[str] = None
@@ -363,7 +338,7 @@ class WorkoutChange:
         row["void"] = 1
         row["reason"] = reason
         row["restored_from"] = None
-        return self._write(row, (live["lineage_id"], None, False), live)
+        return self._write(row, live["lineage_id"], live)
 
     def restore(
         self, revision: Dict[str, Any], reason: Optional[str] = None
@@ -383,8 +358,7 @@ class WorkoutChange:
             row["reason"] = reason
         live = self.live_revision(revision["date"], revision["sport_canonical"])
         return self._write(
-            row, (revision["lineage_id"], None, False), live,
-            self.prescribed_sets(revision["id"]),
+            row, revision["lineage_id"], live, self.prescribed_sets(revision["id"]),
         )
 
 
@@ -512,15 +486,14 @@ class WorkoutsMixin:
         """One live revision as the dict the rest of the app reads (§5).
 
         `id` is the LINEAGE id, which is what makes the athlete-visible ids stable and
-        what `workout rm` / `workout swap` address; the physical row id travels as
-        `revision_id` for the history surfaces."""
+        what `workout show` addresses; the physical row id travels as `revision_id` for the
+        history surfaces."""
         by_id = {r["id"]: r for r in revisions}
         head = by_id.get(row["id"], dict(row, kind=None, change_summary=None))
         first = revisions[0] if revisions else row
         count, adapted_at = _adaptation_tally(revisions, row["id"])
         void = bool(row["void"])
         calendar = calendar or {}
-        source_kind = revisions[0]["kind"] if revisions else None
         describing = _describing_revision(by_id, head) if revisions else head
         return {  # type: ignore[return-value]
             "id": row["lineage_id"],
@@ -542,7 +515,6 @@ class WorkoutsMixin:
             "google_event_id": calendar.get("google_event_id"),
             "removed": void,
             "removed_reason": row["reason"] if void else None,
-            "source": "manual" if source_kind == "add" else "generated",
             "duration_minutes": row["duration_minutes"],
             "rpe": row["rpe"],
             "tss": row["tss"],
@@ -633,7 +605,7 @@ class WorkoutsMixin:
     ) -> List[Workout]:
         """The live sessions, ordered by date, optionally within a range or by sport.
 
-        Cancelled sessions (a void revision — `workout rm`, a goal stood down, an adapt
+        Cancelled sessions (a void revision — a goal stood down, an adapt or a tweak
         dropping a session) are excluded by default so they never appear in listings,
         comparisons, adaptation inputs or the calendar push. Pass include_removed=True to
         retrieve them, e.g. to tell the week planner a session was deliberately cancelled.
@@ -660,12 +632,47 @@ class WorkoutsMixin:
             rows = [dict(r) for r in conn.execute(query, params).fetchall()]
             return self._hydrate(conn, self._speaking(conn, rows))
 
+    def get_cancelled_workouts(self, start_date: str, end_date: str) -> List[Workout]:
+        """Every session cancelled in a range, whoever cancelled it: each slot whose live
+        revision is a void, ordered by date (DESIGN_workout_tweak.md §3.1).
+
+        Wider than `get_workouts(include_removed=True)`, which hides a void whose session
+        lives on as a rest day or another sport on the same date. Such a session is still
+        gone from the schedule. A void whose session moved to another date and stands
+        there is not listed: that session was moved, not cancelled.
+        """
+        with self._get_connection() as conn:
+            rows = [
+                dict(r) for r in conn.execute(
+                    "SELECT * FROM live_workouts WHERE void = 1 AND date >= ? AND date <= ? "
+                    "ORDER BY date ASC, id ASC",
+                    (start_date, end_date),
+                ).fetchall()
+            ]
+            if not rows:
+                return []
+            lineages = sorted({r["lineage_id"] for r in rows})
+            placeholders = ",".join("?" * len(lineages))
+            standing_on = {
+                row["lineage_id"]: row["date"]
+                for row in conn.execute(
+                    "SELECT lineage_id, date FROM live_workouts WHERE void = 0 "
+                    f"AND lineage_id IN ({placeholders})",
+                    tuple(lineages),
+                )
+            }
+            cancelled = [
+                r for r in rows
+                if standing_on.get(r["lineage_id"], r["date"]) == r["date"]
+            ]
+            return self._hydrate(conn, cancelled)
+
     def get_workout_by_id(self, workout_id: int) -> Optional[Workout]:
         """The live session a lineage id names, or None when it no longer holds a slot.
 
-        `workout_id` is a lineage: the id `workout list` printed and the one `workout rm`
-        or `workout swap` was given. Resolving it to the lineage's newest live revision is
-        what stops those commands addressing a dead revision (§5)."""
+        `workout_id` is a lineage: the id `workout list` printed and the one `workout show`
+        is given. Resolving it to the lineage's newest live revision is what stops a
+        command addressing a dead revision (§5)."""
         with self._get_connection() as conn:
             row = conn.execute(
                 "SELECT * FROM live_workouts WHERE lineage_id = ? ORDER BY id DESC LIMIT 1",
@@ -705,7 +712,7 @@ class WorkoutsMixin:
             return {**hydrated[0], "superseded": not slot_live}  # type: ignore[return-value]
 
     def get_workout_revision(self, revision_id: int) -> Optional[Dict[str, Any]]:
-        """One physical revision, raw — the history reader behind restore and rollback."""
+        """One physical revision, raw."""
         with self._get_connection() as conn:
             row = conn.execute(
                 "SELECT * FROM workouts WHERE id = ?", (revision_id,)
@@ -801,7 +808,7 @@ class WorkoutsMixin:
 
         The batch key moved from `archived_at` (stamped on the rows a command killed) to
         `change_id` (carried by the rows a command created), so every write is a batch and
-        every batch is undoable, adapts and manual edits included. A change that appended
+        every batch is undoable, adapts and tweaks included. A change that appended
         nothing is listed too, flagged `held`.
 
         Each entry: {id, created_at, kind, summary, note, workouts, first_date, last_date,
@@ -933,11 +940,11 @@ class WorkoutsMixin:
         """Point-in-time undo: reverts change N and every change after it (§10).
 
         Worked per SLOT rather than per lineage, because a change can end a lineage by
-        appending over it — a `generate` landing on a manual session, an `add` replacing a
-        generated one — and the session to bring back is then the slot's previous
-        occupant, whose own lineage the change never touched. For every slot N or a later
-        change wrote, the revision live there just before N is copied forward, stamped
-        `restored_from`; a slot that held nothing before N gets a void.
+        appending over it — a move landing on a slot another session held — and the session
+        to bring back is then the slot's previous occupant, whose own lineage the change
+        never touched. For every slot N or a later change wrote, the revision live there
+        just before N is copied forward, stamped `restored_from`; a slot that held nothing
+        before N gets a void.
 
         The date floor is the same rule `archive_future_workouts` had: appending a copy
         into a past slot would silently make it the live session for a day already
@@ -1009,25 +1016,6 @@ class WorkoutsMixin:
                 ).fetchall()
             ]
             return self._hydrate(conn, rows)
-
-    def revision_before_live_void(self, lineage_id: int) -> Optional[Dict[str, Any]]:
-        """The revision a lineage's live void ended — what `workout restore` copies back.
-
-        None when the lineage's live revision is not a void, or when the void is the
-        lineage's first revision and there is nothing behind it."""
-        with self._get_connection() as conn:
-            void = conn.execute(
-                "SELECT * FROM live_workouts WHERE lineage_id = ? ORDER BY id DESC LIMIT 1",
-                (lineage_id,),
-            ).fetchone()
-            if not void or not void["void"]:
-                return None
-            ended = conn.execute(
-                "SELECT * FROM workouts WHERE lineage_id = ? AND id < ? "
-                "ORDER BY id DESC LIMIT 1",
-                (lineage_id, void["id"]),
-            ).fetchone()
-            return dict(ended) if ended else None
 
     def stood_down_sessions(
         self, macrocycle_ids: Sequence[int], from_date: str

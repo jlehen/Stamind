@@ -1,13 +1,10 @@
 """Shared resolvers/formatters for the workout CLI handlers."""
-import argparse
-import re
 from datetime import datetime, timedelta
 from typing import Optional
 from trainmate import runtime
 from trainmate.calendar_state import calendar_status
 from trainmate.util import (
-    bold, gray, green, red, yellow, cyan, blue, magenta, cmd, fmt_date, fmt_span,
-    today_str as _today_str, notice,
+    bold, gray, green, red, yellow, cyan, blue, magenta, cmd, fmt_date, notice,
 )
 
 
@@ -16,8 +13,7 @@ from trainmate.util import (
 # gets no marker, and a void carries [REMOVED] instead.
 _KIND_MARKERS = {
     'adapt': 'ADAPTED',
-    'swap': 'SWAPPED',
-    'add': 'REPLACED',
+    'tweak': 'TWEAKED',
 }
 
 
@@ -26,7 +22,8 @@ def modification_markers(w: dict) -> list:
     that still stand.
 
     Two facts rather than one, which is why there is no precedence rule any more: a
-    session eased twice and then swapped reads `[SWAPPED, ADAPTED ×2]` (§12)."""
+    session eased twice and then copied forward by a rollback still reads `[ADAPTED ×2]`
+    (§12)."""
     kind = w.get('change_kind')
     count = w.get('adaptation_count') or 0
     eased = f"ADAPTED ×{count}" if count > 1 else ("ADAPTED" if count else "")
@@ -62,7 +59,7 @@ def adherence_marker(adherence: Optional[dict]) -> str:
 
 
 def workout_line(w: dict, adherence: Optional[dict] = None) -> str:
-    """One-line rendering of a workout for `list` (and the `add` echo).
+    """One-line rendering of a workout for `list`.
 
     Also renders a *proposed* session — a `workout generate` preview, which has no row and
     so no ID — so the plan being accepted reads exactly like the plan `list` will show.
@@ -80,9 +77,6 @@ def workout_line(w: dict, adherence: Optional[dict] = None) -> str:
     rem_marker = ""
     if w.get('removed'):
         rem_marker = bold(red(" [REMOVED]"))
-    src_marker = ""
-    if w.get('source') == 'manual':
-        src_marker = bold(magenta(" [MANUAL]"))
     # Only a `workout generate` proposal carries this: the day is being left alone rather
     # than rewritten, which the rest of the line cannot show
     # (DESIGN_workout_revisions.md §7.1).
@@ -104,7 +98,7 @@ def workout_line(w: dict, adherence: Optional[dict] = None) -> str:
     return (
         f"{ident}{cyan(fmt_date(w['date']))} | {magenta(w['sport_type'].upper())} | "
         f"{bold(w['title'])}{adh_marker}{bench_marker}{mod_marker}{sync_marker}"
-        f"{rem_marker}{src_marker}{keep_marker}{duration_str}{tss_str}{rpe_str}"
+        f"{rem_marker}{keep_marker}{duration_str}{tss_str}{rpe_str}"
     )
 def warn_stale_before(start_date: str) -> None:
     """Flags workouts left `stale` on days earlier than the window just pushed.
@@ -129,92 +123,4 @@ def warn_stale_before(start_date: str) -> None:
         f"Note: {len(stale)} {label} before {fmt_date(start_date)} still read [STALE] "
         f"— their calendar events are out of date and this push did not cover them. "
         f"Run {cmd(f'workout push -d {earliest}..')} to update them.",
-    )
-
-def _classify_swap_target(value: str) -> str | None:
-    """Classifies a swap positional as 'date' (YYYY-MM-DD) or 'id' (bare integer)."""
-    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
-        return "date"
-    if value.isdigit():
-        return "id"
-    return None
-
-
-def _resolve_swap_ops(args: argparse.Namespace) -> list | None:
-    """Turns CLI args into swap operations, or returns None on a usage/lookup error."""
-    kind1 = _classify_swap_target(args.target1)
-    kind2 = _classify_swap_target(args.target2)
-    for target, kind in ((args.target1, kind1), (args.target2, kind2)):
-        if kind is None:
-            notice(
-                f"'{target}' is neither a date (YYYY-MM-DD) nor a workout ID. Swap "
-                "two dates (e.g. "
-                + cmd("workout swap 2026-06-09 2026-06-11 'travelling'")
-                + ") or two workout IDs (e.g. "
-                + cmd("workout swap 5 8 'travelling'") + ").", red,
-            )
-            return None
-    if kind1 != kind2:
-        notice("Swap two dates or two workout IDs, not one of each.", red)
-        return None
-
-    if kind1 == "id":
-        id1, id2 = int(args.target1), int(args.target2)
-        w1 = runtime.db.get_workout_by_id(id1)
-        w2 = runtime.db.get_workout_by_id(id2)
-        if not w1:
-            notice(f"Workout with ID {id1} not found.", red)
-            return None
-        if not w2:
-            notice(f"Workout with ID {id2} not found.", red)
-            return None
-        if w1['date'] == w2['date']:
-            notice("Both workouts are already on the same date; nothing to swap.")
-            return None
-        today = _today_str()
-        for w in (w1, w2):
-            if w['date'] < today:
-                notice(
-                    f"Cannot swap [{w['id']}] {w['title']} ({fmt_date(w['date'])}): "
-                    "it is in the past.", red,
-                )
-                return None
-        print(
-            f"Swapping [{w1['id']}] {w1['title']} ({fmt_date(w1['date'])}) <-> "
-            f"[{w2['id']}] {w2['title']} ({fmt_date(w2['date'])})"
-        )
-        return [
-            {'id': w1['id'], 'new_date': w2['date']},
-            {'id': w2['id'], 'new_date': w1['date']},
-        ]
-
-    date1, date2 = args.target1, args.target2
-    for d in (date1, date2):
-        try:
-            datetime.strptime(d, "%Y-%m-%d")
-        except ValueError:
-            notice(f"Invalid date format: '{d}'. Use YYYY-MM-DD.", red)
-            return None
-    if date1 == date2:
-        notice("The two dates are identical; nothing to swap.")
-        return None
-    today = _today_str()
-    for d in (date1, date2):
-        if d < today:
-            notice(f"Cannot swap {fmt_date(d)}: it is in the past.", red)
-            return None
-    on_1 = runtime.db.get_workouts(start_date=date1, end_date=date1)
-    on_2 = runtime.db.get_workouts(start_date=date2, end_date=date2)
-    if not on_1 and not on_2:
-        notice(
-            f"No workouts on either {fmt_date(date1)} or {fmt_date(date2)}; "
-            f"nothing to swap.",
-        )
-        return None
-    desc_1 = ", ".join(w['title'] for w in on_1) or "(rest)"
-    desc_2 = ", ".join(w['title'] for w in on_2) or "(rest)"
-    print(f"Swapping {fmt_date(date1)} [{desc_1}] <-> {fmt_date(date2)} [{desc_2}]")
-    return (
-        [{'id': w['id'], 'new_date': date2} for w in on_1]
-        + [{'id': w['id'], 'new_date': date1} for w in on_2]
     )

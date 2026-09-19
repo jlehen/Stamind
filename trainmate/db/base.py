@@ -9,7 +9,7 @@ from trainmate.config import config
 # migrations are idempotent, so this is a "skip the work" marker rather than a ledger of
 # steps to replay — TrainMate has one user and one database, and the alternative (a
 # numbered migration framework) would be more machinery than that warrants.
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 
 
 # How long a connection waits for a writer to finish before raising "database is
@@ -343,6 +343,12 @@ class BaseDB:
                 cursor.execute("UPDATE workout_changes SET told_at = created_at")
                 if self._table_exists(cursor, "settings"):
                     cursor.execute("DELETE FROM settings WHERE key = 'push_note_last'")
+            # One-off: the four hand-edit commands are gone, and what they wrote was the
+            # athlete's own request, which is what a tweak is (DESIGN_workout_tweak.md §7).
+            cursor.execute(
+                "UPDATE workout_changes SET kind = 'tweak' "
+                "WHERE kind IN ('add', 'rm', 'swap', 'restore')"
+            )
 
             # Calendar sync bookkeeping, keyed by lineage (§8). Off the row because a
             # successful push is not a prescription change: leaving it there would make
