@@ -474,6 +474,99 @@ class TestFeedbackReplan(FeedbackTestCase):
         self.assertFalse(mock_coach.plan_generate.call_args.kwargs["force"])
 
 
+class TestFeedbackFromGenerate(FeedbackTestCase):
+    """`plan generate --feedback TEXT` files the note as `plan feedback` does, then generates."""
+
+    def _proposal(self, mock_coach, obj_id):
+        mock_coach.config_changed.return_value = None
+        mock_coach.plan_generate.return_value = {
+            "strategy": "Proposed", "mesocycles": [], "reused": False,
+            "goal": test_db.get_objective(obj_id),
+        }
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
+    def test_the_note_is_filed_then_the_new_plan_waits_for_a_yes(self, mock_coach, mock_garmin):
+        obj_id, macro_id, _ = self._plan()
+        self._proposal(mock_coach, obj_id)
+
+        exit_code, stdout, _ = self.run_cli(
+            ["plan", "generate", "--feedback", " ease the Fridays "], input_value="n"
+        )
+
+        self.assertEqual(exit_code, 0)
+        notes = test_db.list_plan_feedback(macro_id)
+        self.assertEqual([n["text"] for n in notes], ["ease the Fridays"])
+        self.assertIsNone(notes[0]["mesocycle_id"])
+        self.assertIn(f"Noted [id {notes[0]['id']}, plan-level]", stdout)
+        mock_coach.plan_generate.assert_called_once()
+        self.assertFalse(mock_coach.plan_generate.call_args.kwargs["force"])
+        mock_coach.plan_apply.assert_not_called()
+        self.assertIn("Plan discarded", stdout)
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
+    def test_a_changed_input_asks_nothing_when_a_note_is_pending(self, mock_coach, mock_garmin):
+        obj_id, _, _ = self._plan()
+        self._proposal(mock_coach, obj_id)
+        mock_coach.config_changed.return_value = "athlete profile changed: preferences"
+
+        exit_code, stdout, _ = self.run_cli(
+            ["plan", "generate", "--feedback", "ease the Fridays"], input_value="n"
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertNotIn("A plan-shaping input has changed", stdout)
+        self.assertNotIn("Keeping the current periodization strategy", stdout)
+        mock_coach.plan_generate.assert_called_once()
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
+    def test_a_goal_with_no_plan_is_refused(self, mock_coach, mock_garmin):
+        obj_id = test_db.add_objective(
+            title="Zurich Marathon", target_date=GOAL_DATE, sport_type="running",
+        )
+
+        exit_code, stdout, _ = self.run_cli(
+            ["plan", "generate", "--feedback", "ease the Fridays"]
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("has no plan yet", stdout)
+        self.assertIn(f"goal edit {obj_id} --desc", stdout)
+        mock_coach.plan_generate.assert_not_called()
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
+    def test_a_range_of_goals_is_refused(self, mock_coach, mock_garmin):
+        first_id, first_macro, _ = self._plan()
+        second_id = test_db.add_objective(
+            title="Autumn Trail", target_date=_days_out(120), sport_type="running",
+        )
+
+        exit_code, stdout, _ = self.run_cli(
+            ["plan", "generate", "-g", f"{first_id}..{second_id}",
+             "--feedback", "ease the Fridays"]
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("a note goes to one plan", stdout)
+        self.assertEqual(test_db.list_plan_feedback(first_macro), [])
+        mock_coach.plan_generate.assert_not_called()
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
+    def test_an_empty_note_is_refused(self, mock_coach, mock_garmin):
+        _, macro_id, _ = self._plan()
+
+        exit_code, stdout, _ = self.run_cli(["plan", "generate", "--feedback", "  "])
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("the note is empty", stdout)
+        self.assertEqual(test_db.list_plan_feedback(macro_id), [])
+        mock_coach.plan_generate.assert_not_called()
+
+
 class TestFeedbackDisplay(FeedbackTestCase):
     """`plan show`, `plan diff` and `status` read the log (§8)."""
 

@@ -307,7 +307,8 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
   nothing happens on. `goal add --date-type horizon` says which.
 - **Plan feedback.** `plan feedback "drop the second FTP test"` files a note
   against the plan. Notes pile up, cost nothing to capture, and the next
-  `plan generate` has to address every one.
+  `plan generate` has to address every one. To say it and get the new plan in
+  one step, run `plan generate --feedback "drop the second FTP test"`.
 - **Versioning and rollback.** Regenerating supersedes the old plan instead of
   destroying it. `plan versions` lists them, `plan diff` compares two, and
   `plan rollback` restores one with its workouts. Workouts have the same undo on
@@ -653,7 +654,7 @@ around.
 | `signal add`, or a tagged Calendar event | You are *reporting* something: alcohol, poor sleep, stress, heat. Signals help the morning adaptation read a rough day correctly. They never reshape the plan. |
 | `workout adapt -m "…"` | Quick capture in the moment. A durable note ("away, no gym Thursday") is saved as a real constraint; a one-off nudge ("felt flat, ease today") is folded into today's adaptation. |
 | `workout tweak "…"` | You have decided the change yourself: "Friday: step-ups instead of belt squats", "swap Thursday and Friday", "drop Tuesday". The coach writes it and changes only the days the request is about. With `workout adapt -m` the coach decides what changes; with `workout tweak` you do. |
-| `plan feedback "…"` | You have an opinion about the plan itself: "drop the second FTP test", "Friday sessions should progress duration, not surges". The next `plan generate` must address each note. `-m` files a note to one mesocycle, `--replan` regenerates on the spot. |
+| `plan feedback "…"` | You have an opinion about the plan itself: "drop the second FTP test", "Friday sessions should progress duration, not surges". The next `plan generate` must address each note. `-m` files a note to one mesocycle, `--replan` regenerates on the spot. `plan generate --feedback "…"` does the same as `--replan` for a plan-level note. |
 
 There is no way to edit a session by hand: every change goes through the coach,
 and `workout rollback` undoes any of them. A session you asked for carries your

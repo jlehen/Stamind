@@ -89,6 +89,7 @@ plan feedback --rm ID [-y]             Delete one pending note (y/N confirm unle
 plan feedback … -g ID                  Target another goal's plan (default: the plan -m names,
                                        else the soonest active goal)
 plan feedback "text" --replan          Append, then enter the regeneration flow immediately
+plan generate --feedback "text"        The same as --replan, typed from the generate side
 ```
 
 Removed, deliberately:
@@ -117,6 +118,15 @@ gets the §a missing-argument treatment. Over the bot every form is one-line and
 `--replan` runs the same flow as `plan generate` for that goal after saving — preview, then a
 human `y`, per the constraints precedent that nothing regenerates a plan without one
 (trainmate/cli/constraints.py §7 note). It does not imply `--force`; it does not need to (§7).
+
+`plan generate --feedback "text"` is the same thing for an athlete who starts from `plan
+generate`. It files a plan-level note exactly as `plan feedback "text"` does, then runs the
+generate flow. So if the athlete declines the new plan, the note stays pending, as it does after
+`--replan`. It has no `-m`: that letter means "mesocycle" everywhere in the command tree
+(DESIGN_cli_selectors.md §5), and the athlete can name the mesocycle in the note itself. Two
+cases are refused before any data is pulled. A goal range (`-g ..3`) is refused, because a note
+goes to one plan. A goal with no plan yet is refused, because there is no plan to give feedback
+on; the refusal points to the goal's description, which the first plan already reads.
 
 Which plan a note joins: without `-g`, `-m` searches the active plans of every upcoming goal, and
 the mesocycle it lands on decides the plan — a mesocycle ID, a date or a name already says which
@@ -188,6 +198,12 @@ the goals/constraints/config hashes all match. OR one more disjunct into that te
 feedback exists*. Notes are plan inputs; their presence makes regeneration proceed without
 `--force`. `_FEEDBACK_REGEN_NOTE` and its `--force` advice die with this — the append echo (§4)
 replaces them.
+
+For the same reason, `plan generate` does not ask "an input changed, regenerate?" while notes are
+pending. Example: the athlete edited their profile on Monday and left a note on Tuesday. On
+Wednesday `plan generate` would ask about the profile edit, and a "no" would print "keeping the
+current plan" just before the note rewrote it anyway. The new plan is built from the current
+inputs, so the profile edit reaches it without the question.
 
 **Prompt.** In `trainmate/coach/engine/planning.py`, the `### ATHLETE FEEDBACK ON THE PREVIOUS
 PLAN` section becomes:

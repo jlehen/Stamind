@@ -146,6 +146,32 @@ def _announce_targets(targets: list) -> None:
     ))
 
 
+def _file_generate_feedback(text: str, targets: list) -> bool:
+    """`plan generate --feedback`: files the note exactly as `plan feedback "TEXT"` would, so
+    the strategy call reads it with the rest of the pending log (DESIGN_plan_feedback.md §4).
+    False, with the reason printed, when there is no single plan to file it to."""
+    if not text.strip():
+        notice("Error: the note is empty; nothing was saved.", red)
+        return False
+    if len(targets) != 1:
+        notice("Error: a note goes to one plan. Name one goal with -g, not a range.", red)
+        return False
+    goal = _resolve_goal(targets[0][0])
+    if not goal:
+        return False
+    macro = runtime.db.get_macrocycle_for_objective(goal['id'])
+    if not macro:
+        edit = cmd(f"goal edit {goal['id']} --desc \"…\"")
+        notice(
+            f"Error: '{goal['title']}' has no plan yet, so there is no plan to give "
+            f"feedback on. What you want from the first plan goes in the goal's "
+            f"description: {edit}.", red
+        )
+        return False
+    _add_feedback_note(macro, text.strip())
+    return True
+
+
 def run_plan_generate(args: argparse.Namespace) -> None:
     """Executes the AI periodization strategy plan generation command."""
     # A clean slate is a regeneration by definition, so the staleness question below —
@@ -157,6 +183,9 @@ def run_plan_generate(args: argparse.Namespace) -> None:
     targets = _plan_targets(args)
     if targets is None:
         return
+    feedback = getattr(args, 'feedback', None)
+    if feedback is not None and not _file_generate_feedback(feedback, targets):
+        sys.exit(1)
 
     # Make sure we have latest metrics cached
     ensure_recent_data(no_pull=args.no_pull, force_pull=getattr(args, 'force_pull', False))
@@ -219,7 +248,9 @@ def _generate_one_plan(
 
         if next_goal:
             macro = runtime.db.get_macrocycle_for_objective(next_goal['id'])
-            if macro:
+            # Pending notes regenerate the plan whatever the answer, so the question would
+            # be moot (DESIGN_plan_feedback.md §7).
+            if macro and not runtime.db.list_plan_feedback(macro['id']):
                 change_reason = staleness.reason(macro)
                 if change_reason and not force:
                     if staleness.confirm_regenerate(change_reason, macro):
@@ -1042,6 +1073,13 @@ def run_plan_rollback(args: argparse.Namespace) -> None:
 _RM_NO_ID = object()
 
 
+def _add_feedback_note(macro: dict, text: str, meso: Optional[dict] = None) -> None:
+    """Appends one note to the plan's log and echoes it (DESIGN_plan_feedback.md §4)."""
+    note_id = runtime.db.add_plan_feedback(macro['id'], text, meso['id'] if meso else None)
+    filing = f"filed: {meso['name']}" if meso else "plan-level"
+    print(green(f"Noted [id {note_id}, {filing}]: ") + f"\"{text}\"")
+
+
 def _feedback_list(goal: dict, macro: dict) -> None:
     """The bare run: the pending log, read-only (DESIGN_cli_noargs.md bucket 1)."""
     notes = runtime.db.list_plan_feedback(macro['id'])
@@ -1166,11 +1204,7 @@ def run_plan_feedback(args: argparse.Namespace) -> None:
             macro = runtime.db.get_macrocycle(meso['macrocycle_id'])
             goal = runtime.db.get_objective(macro['objective_id'])
 
-    note_id = runtime.db.add_plan_feedback(
-        macro['id'], args.text.strip(), meso['id'] if meso else None
-    )
-    filing = f"filed: {meso['name']}" if meso else "plan-level"
-    print(green(f"Noted [id {note_id}, {filing}]: ") + f"\"{args.text.strip()}\"")
+    _add_feedback_note(macro, args.text.strip(), meso)
 
     if args.replan:
         _feedback_replan(goal)
@@ -1219,6 +1253,14 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             "strategy is not asked to continue it (implies --force). Your training "
             "history and plan feedback still feed in."
         )
+    )
+    # Not -m: that letter means "mesocycle" everywhere in the tree (DESIGN_cli_selectors.md §5).
+    p_gen.add_argument(
+        "--feedback", metavar="TEXT",
+        help="Tell the coach what you think of the plan in place, then write the new one. "
+             "The note is saved exactly as 'plan feedback \"TEXT\"' saves it: the new "
+             "plan must address it along with any other pending note, and it stays "
+             "pending if you decline the new plan"
     )
     p_gen.add_argument(
         "-y", "--yes", "--auto", action="store_true", dest="auto",
