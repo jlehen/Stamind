@@ -52,10 +52,10 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         description=(
             "List planned workouts chronologically. With no filter at all, shows a 7-day "
             "window from today; with only --type, shows today onward. Name workout IDs or "
-            "dates as arguments to show just those (handy with -v). Every listed session "
+            "dates as arguments to show just those (handy with -vv). Every listed session "
             "dated today or earlier also carries what became of it — "
             "[DONE]/[PARTIAL]/[MISSED]/[REST OK]/[REST BROKEN], or [NOT YET] for one still "
-            "ahead of you today — and -v names the effort it matched and what a [PARTIAL] "
+            "ahead of you today — and -vv names the effort it matched and what a [PARTIAL] "
             "differed by. Garmin data is freshened over that past span first unless "
             "--no-pull is given; a listing entirely in the future never pulls."
         )
@@ -63,9 +63,10 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     w_list.set_defaults(func=run_workout_list)
     _add_listing_args(w_list)
     w_list.add_argument(
-        "--verbose", "-v", action="store_true",
-        help="Show full detail per workout (description, lifecycle, adapt notes) "
-             "instead of one line each"
+        "--verbose", "-v", action="count", default=0,
+        help="-v adds a short form in gray under each session: the exercises and kilograms "
+             "of a strength session, the time planned in each intensity zone of any other. "
+             "-vv shows the full detail instead (description, lifecycle, adapt notes)"
     )
 
     # workout show
@@ -76,7 +77,7 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         description=(
             "Show workouts with their full details: the description, when the session "
             "was planned and last adapted, the effort a past session was graded against, "
-            f"and any adapt notes. Same output as '{green('workout list')} -v', under a "
+            f"and any adapt notes. Same output as '{green('workout list')} -vv', under a "
             "name that says what it does. Name workout IDs or dates as arguments "
             f"('{green('workout show')} 12'), and every filter '{green('workout list')}' "
             "takes works here too. With no argument at all, it details the same 7-day "

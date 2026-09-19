@@ -586,6 +586,17 @@ class TestPlannedZones(unittest.TestCase):
         self.assertEqual(text, "Target: ~25min recovery, ~30min aerobic, ~10min threshold")
         self.assertNotIn("Z1", text)
 
+    def test_a_proposal_renders_from_the_week_planners_list(self):
+        # Not written yet, so no columns: the list is read through the write's own check,
+        # which drops the slots past the currency's five HR zones.
+        text = intensity.format_planned_zones({
+            "planned_zone_currency": "HR", "planned_zone_sec": [1500, 1800, 0, 600, 0, 900],
+        })
+        self.assertEqual(text, "Target: ~25min recovery, ~30min aerobic, ~10min threshold")
+        self.assertIsNone(intensity.format_planned_zones({
+            "planned_zone_currency": "hr", "planned_zone_sec": [0, 0, 0, 0, 0],
+        }))
+
     def test_a_session_with_no_target_renders_nothing(self):
         self.assertIsNone(intensity.format_planned_zones({"title": "Rest"}))
 

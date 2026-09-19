@@ -263,7 +263,7 @@ def save_workout(
     original_duration_minutes=None, original_tss=None, original_rpe=None,
     planned_zone_currency=None, planned_zone_sec=None,
     google_event_id=None, pushed_signature="",
-    kind=None,
+    kind=None, prescribed_sets=None,
 ):
     """Writes one session through the change handle, the way a command would.
 
@@ -321,7 +321,7 @@ def save_workout(
             reason=modification_reason, benchmark_type=benchmark_type,
             clear_benchmark=clear_benchmark, macrocycle_id=macrocycle_id,
             planned_zone_currency=planned_zone_currency,
-            planned_zone_sec=planned_zone_sec,
+            planned_zone_sec=planned_zone_sec, prescribed_sets=prescribed_sets,
             lineage_id=lineage if original_date and original_date != date else None,
         )
     if google_event_id:

@@ -31,6 +31,12 @@ def _line_for(stdout, title):
     return matches[0]
 
 
+def _line_after(stdout, title):
+    """The line printed right under one session's `workout list` line."""
+    lines = stdout.splitlines()
+    return lines[lines.index(_line_for(stdout, title)) + 1]
+
+
 def _proposal(displaced=()):
     """One proposed session, as `workout generate` hands it to the CLI for preview."""
     today = datetime.now(timezone.utc).date()
@@ -39,6 +45,7 @@ def _proposal(displaced=()):
         workouts=({
             "date": PROPOSED_DATE, "sport_type": "running", "title": "Base Run",
             "description": "45 min easy", "duration_minutes": 45, "tss": 40, "rpe": 4,
+            "planned_zone_currency": "hr", "planned_zone_sec": [600, 2100, 0, 0, 0],
         },),
         displaced=tuple(displaced),
         gen_start=today.strftime("%Y-%m-%d"),
@@ -703,8 +710,58 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertIn("Tomorrow Ride", stdout)
         self.assertIn("Future Lift", stdout)
 
-    def test_workout_show_is_workout_list_v(self):
-        """`workout show 12` prints exactly what `workout list -v 12` prints.
+    def test_workout_list_v_draws_the_short_form_under_each_session(self):
+        """-v adds gray lines under each session: a strength session's exercises, none
+        until the strength planner wrote them, and the zones of any other. -vv is the full
+        detail, and still carries the zones, which the description never does."""
+        today_str = datetime.now(timezone.utc).date().strftime("%Y-%m-%d")
+        tomorrow_str = (
+            datetime.now(timezone.utc).date() + timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+        save_workout(test_db,
+            date=today_str, sport_type="strength_training", title="Gym",
+            description="Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg",
+            planned_zone_currency="hr", planned_zone_sec=[1200, 600, 0, 0, 0],
+            prescribed_sets=[{"exercise": "belt squat", "sets": 3, "reps_low": 4,
+                              "reps_high": 6, "load_kg": 140.0}],
+        )
+        save_workout(test_db,
+            date=tomorrow_str, sport_type="cycling", title="Sharpener",
+            description="3x5 min at 240-250 W",
+            planned_zone_currency="power", planned_zone_sec=[900, 1500, 0, 180, 900],
+        )
+        # A gym day the week planner wrote before the strength planner existed.
+        save_workout(test_db,
+            date=tomorrow_str, sport_type="strength_training", title="Old Gym",
+            description="Squat 3x4, press 3x5",
+            planned_zone_currency="hr", planned_zone_sec=[1800, 600, 0, 0, 0],
+        )
+
+        exit_code, plain, _ = self.run_cli(["workout", "list", "--no-pull"])
+        self.assertEqual(exit_code, 0)
+        self.assertNotIn("Belt squat", plain)
+        self.assertNotIn("Target:", plain)
+
+        exit_code, short, _ = self.run_cli(["workout", "list", "-v", "--no-pull"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Belt squat 3×4–6 @ 140 kg", _line_after(short, "Gym"))
+        self.assertIn(
+            "Target: ~15min recovery, ~25min endurance, ~3min threshold, ~15min VO2max",
+            _line_after(short, "Sharpener"),
+        )
+        # A strength session shows its exercises, never the zones the week planner put on it.
+        self.assertNotIn("~20min recovery", short)
+        self.assertNotIn("~30min recovery", short)
+        self.assertNotIn("Description:", short)
+
+        exit_code, full, _ = self.run_cli(["workout", "list", "-vv", "--no-pull"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Description:", full)
+        self.assertIn("3x5 min at 240-250 W", full)
+        self.assertIn("Target: ~15min recovery, ~25min endurance", full)
+
+    def test_workout_show_is_workout_list_vv(self):
+        """`workout show 12` prints exactly what `workout list -vv 12` prints.
 
         The two commands are one handler with the detail flag pinned on, so the test
         compares the whole output rather than sampling it: that is what keeps the second
@@ -718,7 +775,7 @@ class TestCliWorkouts(unittest.TestCase):
         code_show, show_out, _ = self.run_cli(
             ["workout", "show", str(workout_id), "--no-pull"])
         code_list, list_out, _ = self.run_cli(
-            ["workout", "list", "-v", str(workout_id), "--no-pull"])
+            ["workout", "list", "-vv", str(workout_id), "--no-pull"])
         self.assertEqual(code_show, 0)
         self.assertEqual(code_list, 0)
         self.assertIn("Description:", show_out)
@@ -754,8 +811,8 @@ class TestCliWorkouts(unittest.TestCase):
         # The lifecycle line is verbose-only; the default listing is one line per workout.
         self.assertNotIn("Planned:", stdout)
 
-        # Lifecycle line under -v: creation stamp always shown, last-adapted stamp when eased.
-        exit_code, stdout_v, _ = self.run_cli(["workout", "list", "-v"])
+        # Lifecycle line under -vv: creation stamp always shown, last-adapted stamp when eased.
+        exit_code, stdout_v, _ = self.run_cli(["workout", "list", "-vv"])
         self.assertEqual(exit_code, 0)
         self.assertIn("Planned:", stdout_v)
         self.assertIn(f"Last adapted: {today_str}", stdout_v)
@@ -835,12 +892,12 @@ class TestCliWorkouts(unittest.TestCase):
         for marker in ("[DONE]", "[MISSED]", "[PARTIAL]", "[NOT YET]", "[REST OK]"):
             self.assertNotIn(marker, ahead)
 
-    def test_workout_list_v_names_the_effort_and_the_difference(self):
-        """The marker says a session came in off-plan; -v says by how much, and against
+    def test_workout_list_vv_names_the_effort_and_the_difference(self):
+        """The marker says a session came in off-plan; -vv says by how much, and against
         which activity it was graded."""
         day = self._adherence_fixture()
         exit_code, stdout, _ = self.run_cli([
-            "workout", "list", "-d", f"{day(-2)}..{day(-1)}", "--no-pull", "-v",
+            "workout", "list", "-d", f"{day(-2)}..{day(-1)}", "--no-pull", "-vv",
         ])
         self.assertEqual(exit_code, 0)
         self.assertIn("Actual: [running] Morning Run", stdout)
@@ -1247,6 +1304,8 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertIn("Base Run", stdout)
         self.assertIn("45min", stdout)
         self.assertNotIn("ID:", stdout)
+        # Under it, the zones as the week planner wrote them, the line `workout list -v` draws.
+        self.assertIn("Target: ~10min recovery, ~35min aerobic", stdout)
         self.assertIn("Workouts discarded", stdout)
         mock_coach.workout_generate_apply.assert_not_called()
 

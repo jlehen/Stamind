@@ -377,7 +377,14 @@ def parse_planned_zones(
 
 def planned_zone_seconds(workout: Dict[str, Any]) -> Optional[Tuple[str, Tuple[int, ...]]]:
     """`(currency, seconds per zone)` from a planned workout's columns, or None when the
-    session carries no intensity target (§9.8)."""
+    session carries no intensity target (§9.8). A proposal not yet written carries the week
+    planner's list instead, read through the check the write applies to it."""
+    if "planned_zone_sec" in workout:
+        currency, raw = parse_planned_zones(workout)
+        if currency is None:
+            return None
+        count = len(CURRENCY_BY_KEY[currency].labels)
+        return currency, tuple(int(s or 0) for s in raw[:count])
     currency = (workout.get("planned_zone_currency") or "").strip().lower()
     spec = CURRENCY_BY_KEY.get(currency)
     if spec is None:

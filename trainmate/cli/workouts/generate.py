@@ -2,8 +2,7 @@
 import argparse
 from datetime import datetime, timedelta
 from typing import Optional
-from trainmate import athlete_queue, runtime
-from trainmate.strength.prescription import exercise_lines
+from trainmate import athlete_queue, intensity, runtime
 from trainmate.strength.sets import activity_lines
 from trainmate.config import config
 from trainmate.adherence import analyze_adherence, date_covered, format_discrepancies
@@ -26,7 +25,7 @@ from trainmate.cli.runway import (
 from trainmate.coach.proposals import GenerateProposal
 
 from trainmate.cli.selectors import has_selector as _has_selector, resolve_window, split_targets
-from trainmate.cli.workouts._helpers import workout_line
+from trainmate.cli.workouts._helpers import prescription_lines, workout_line
 from trainmate.cli.workouts.heads_up import (
     generate_dates, print_send_notice, replacing_unsent, revision_dates,
 )
@@ -461,9 +460,9 @@ def print_generate_preview(proposal) -> bool:
     # to accept reads exactly like the plan they will be living with.
     for w in proposal.workouts:
         print(workout_line(w))
-        # A strength session's kilograms are the one thing the one-line form leaves out,
-        # and accepting them unseen is what this shows (DESIGN_strength_tracking.md §9).
-        for line in exercise_lines(w.get('prescribed_sets') or []):
+        # What the one-line form leaves out: the kilograms of a gym day, the zones of any
+        # other session. The same lines `workout list -v` draws.
+        for line in prescription_lines(w):
             print(f"      {gray(line)}")
     print_strength_notes(proposal)
     print()
@@ -716,9 +715,9 @@ def run_workout_list(args: argparse.Namespace) -> None:
 
 
 def run_workout_show(args: argparse.Namespace) -> None:
-    """`workout show ID` is `workout list -v ID`: the same listing with the per-workout
+    """`workout show ID` is `workout list -vv ID`: the same listing with the per-workout
     detail lines always on."""
-    args.verbose = True
+    args.verbose = 2
     run_workout_list(args)
 
 
@@ -727,7 +726,7 @@ def print_workout_table(
     start_date: Optional[str], end_date: Optional[str], ids: list, names_a_range: bool,
 ) -> None:
     """The expert `workout list` body: the filter echo, one line per session (`-v` adds
-    the detail lines), and the end-of-schedule marker.
+    its short form in gray, `-vv` the detail lines), and the end-of-schedule marker.
 
     The companion form of this is CompanionRenderer.workout_list
     (DESIGN_render_persona.md §5)."""
@@ -755,8 +754,13 @@ def print_workout_table(
         if getattr(args, "link", False):
             url = event_url(w.get('google_event_id'), config.google_calendar_id)
             print(gray(f"  Calendar: {url}") if url else gray("  Calendar: (not synced)"))
-        # Default listing is one line per workout; -v adds the full per-workout detail.
-        if not getattr(args, "verbose", False):
+        # Default listing is one line per workout; -v adds the short form under it, the
+        # same lines the `workout generate` preview draws; -vv the full detail.
+        verbosity = getattr(args, "verbose", 0) or 0
+        if verbosity == 1:
+            for line in prescription_lines(w):
+                print(f"      {gray(line)}")
+        if verbosity < 2:
             continue
         # Lifecycle timestamps: when the session first entered the plan and, if ever
         # eased, when the most recent `workout adapt` run touched it. Both NULL on
@@ -776,6 +780,11 @@ def print_workout_table(
         for reason in (verdict or {}).get('reasons') or []:
             notice(f"  Discrepancy: {reason}")
         print(format_labeled_paragraph("  Description:", w['description']))
+        # The zone target, which the description never carries (§9.8 of
+        # DESIGN_intensity_distribution.md).
+        target = intensity.format_planned_zones(w)
+        if target:
+            print(gray(f"  {target}"))
         summary = w.get('adaptation_summary')
         # Show the per-workout note inline, unless it's just the batch reason echoed
         # (the fallback when the model gave no per-workout change_reason) — that would

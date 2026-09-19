@@ -730,7 +730,7 @@ revision.
 Nothing in that diagram is a flag being set. A session is live because its revision is
 the newest in its slot; it is void because that newest revision says so; it is superseded
 because something newer exists. Every earlier revision is still there, which is what makes
-`workout list -v` able to show a session's history and what makes undo a copy rather than
+`workout list -vv` able to show a session's history and what makes undo a copy rather than
 an un-delete.
 
 A few transitions deserve a sentence each:
@@ -834,8 +834,8 @@ change after the restored version's newest write.
 
 | Command | What it does |
 |---|---|
-| `workout list` | Show planned sessions. Default 7-day forward window. `-v` shows each session's lifecycle. |
-| `workout show` | The same listing with `-v` always on: `workout show 12` details one session. |
+| `workout list` | Show planned sessions. Default 7-day forward window. `-v` adds each session's short form: its exercises and kilograms, or its zone target. `-vv` shows each session in full, lifecycle included. |
+| `workout show` | The same listing with `-vv` always on: `workout show 12` details one session. |
 | `workout compare` | Planned vs completed, with misses, rest violations and unplanned high load. Today's untrained sessions read *"not yet"* and are **not** misses. |
 | `workout generate` | Write the sessions for a span, from the mesocycles governing those days (details in §7). |
 | `workout adapt` | Daily readiness adjustment, within the current mesocycle only. `-m "note"` passes a free-text note in the same call. The coach decides what changes. |

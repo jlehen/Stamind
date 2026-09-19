@@ -1,8 +1,10 @@
 """Shared resolvers/formatters for the workout CLI handlers."""
 from datetime import datetime, timedelta
-from typing import Optional
-from trainmate import runtime
+from typing import List, Optional
+from trainmate import intensity, runtime
 from trainmate.calendar_state import calendar_status
+from trainmate.sports import is_strength_sport
+from trainmate.strength.prescription import exercise_lines
 from trainmate.util import (
     bold, gray, green, red, yellow, cyan, blue, magenta, cmd, fmt_date, notice,
 )
@@ -100,6 +102,21 @@ def workout_line(w: dict, adherence: Optional[dict] = None) -> str:
         f"{bold(w['title'])}{adh_marker}{bench_marker}{mod_marker}{sync_marker}"
         f"{rem_marker}{keep_marker}{duration_str}{tss_str}{rpe_str}"
     )
+
+
+def prescription_lines(w: dict) -> List[str]:
+    """The short form of what a session asks, drawn in gray under its `workout_line`: a
+    strength session's exercises, none until the strength planner wrote them
+    (DESIGN_strength_tracking.md §9); any other session's time in each intensity zone
+    (DESIGN_intensity_distribution.md §9.8)."""
+    if is_strength_sport(w['sport_type']):
+        return exercise_lines(w.get('prescribed_sets') or [])
+    target = intensity.format_planned_zones(w)
+    if not target:
+        return []
+    return [target]
+
+
 def warn_stale_before(start_date: str) -> None:
     """Flags workouts left `stale` on days earlier than the window just pushed.
 

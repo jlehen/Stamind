@@ -232,8 +232,11 @@ day is not over. The same verdict is stamped on the Calendar event.
 Thursday's hill repeats came in `[PARTIAL]` and you want to know why.
 `./tm workout show 125` prints that one session in full: the workout
 description, when it was planned and last adapted, the activity it was graded
-against, and how far off it landed. It is `workout list -v` under a name that
-says what it does, and it takes the same filters.
+against, and how far off it landed. It is `workout list -vv` under a name that
+says what it does, and it takes the same filters. `workout list -v` sits in
+between: each session's line, and under it in gray what it asks of you. That is
+the exercises and kilograms on a gym day, and the time in each intensity zone on
+a ride or a run.
 
 **Sunday.** You check the bigger picture:
 
