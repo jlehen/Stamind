@@ -10,7 +10,7 @@ TEST_DB_PATH = test_db_path("test_trainmate_calendar.db")
 from trainmate.db import Database
 import trainmate.db
 import trainmate.google_calendar
-from trainmate.google_calendar import calendar_syncer
+from trainmate.google_calendar import calendar_syncer, quiet_events
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -59,7 +59,7 @@ class TestCalendarSync(unittest.TestCase):
         mock_service.events().insert().execute.return_value = mock_event_result
 
         # Run the sync with patched service
-        with patch.object(calendar_syncer, "service", mock_service):
+        with patch.object(calendar_syncer, "service", mock_service), quiet_events():
             event_id = calendar_syncer.sync_workout(workout)
 
         # Verify returned event ID
@@ -108,7 +108,7 @@ class TestCalendarSync(unittest.TestCase):
 
         mock_service = MagicMock()
         mock_service.events().insert().execute.return_value = {"id": "evt-1"}
-        with patch.object(calendar_syncer, "service", mock_service):
+        with patch.object(calendar_syncer, "service", mock_service), quiet_events():
             calendar_syncer.sync_workout(workout)
 
         body = [
@@ -151,7 +151,7 @@ class TestCalendarSync(unittest.TestCase):
 
         mock_service = MagicMock()
         mock_service.events().insert().execute.return_value = {"id": "evt-2"}
-        with patch.object(calendar_syncer, "service", mock_service):
+        with patch.object(calendar_syncer, "service", mock_service), quiet_events():
             calendar_syncer.sync_workout(workout)
 
         body = [
@@ -186,7 +186,7 @@ class TestCalendarSync(unittest.TestCase):
         mock_event_result = {"id": "evt-swap-1", "htmlLink": "http://calendar/event/2"}
         mock_service.events().insert().execute.return_value = mock_event_result
 
-        with patch.object(calendar_syncer, "service", mock_service):
+        with patch.object(calendar_syncer, "service", mock_service), quiet_events():
             calendar_syncer.sync_workout(workout)
 
         insert_calls = [
@@ -567,8 +567,6 @@ class TestCalendarSync(unittest.TestCase):
     def test_quiet_events_silences_per_event_lines_but_not_failures(self):
         """`quiet_events` hides the routine 'Created'/'Deleted' lines a batch push would
         repeat per session; failures stay visible, and the flag is restored on exit."""
-        from trainmate.google_calendar import quiet_events
-
         mock_service = MagicMock()
         with patch.object(calendar_syncer, "service", mock_service), \
                 patch.object(calendar_syncer, "calendar_id", "cal-test"):
@@ -757,7 +755,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
     def _summary(self, workout):
         mock_service = MagicMock()
         mock_service.events().insert().execute.return_value = {"id": "evt-x"}
-        with patch.object(calendar_syncer, "service", mock_service):
+        with patch.object(calendar_syncer, "service", mock_service), quiet_events():
             calendar_syncer.sync_workout(workout)
         body = [
             call.kwargs["body"]

@@ -3057,6 +3057,12 @@ run, so `logging.dir` is redirected to a scratch directory (swept at exit) and
 `TRAINMATE_SOURCE=test` is set. Without it a suite run appends several hundred KB of
 `test` runs to the operator's own journal.
 
+It also silences the one line `calendar_reconcile.reconcile` prints, "Google Calendar
+updated: 1 event(s) pushed.": every workout write reconciles against the mock syncer, so
+the line otherwise shows up several hundred times in a run. A failed push still prints,
+through `util.fail`. The tests that drive `sync_workout` directly wrap it in
+`quiet_events()` for the same reason.
+
 Fixture dates ride on today (`_days_out(...)`/`GOAL_DATE`) rather than on fixed
 dates wherever the code compares them against the clock: a plan window needs its
 goal in the future, so a hardcoded date silently expires the test once it passes.

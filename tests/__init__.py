@@ -62,6 +62,11 @@ def test_db_path(name: str) -> str:
 # (DESIGN_calendar_signal_ingest.md §6). Stub the bridge, not the callers.
 mock.patch("trainmate.garmin.sync._sync_calendar_signals", lambda *a, **k: None).start()
 
+# Every workout write reconciles the Calendar and prints "Google Calendar updated: 1
+# event(s) pushed." (DESIGN_workout_revisions.md §8), several hundred times a run. That
+# line is the module's only print; a failed push prints through `util.fail` and still shows.
+mock.patch("trainmate.calendar_reconcile.print", create=True).start()
+
 # Third seam, same idea: every command a test runs opens a journal run
 # (DESIGN_logging.md §3), so a suite left pointing at the real logging.dir appends
 # several hundred KB of `test` runs to the operator's own journal. Redirect the whole

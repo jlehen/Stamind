@@ -13,7 +13,7 @@ from tests.helpers import rebind_test_db, save_workout
 from trainmate import calendar_lineage
 from trainmate.calendar_state import calendar_signature, calendar_status
 from trainmate.db import Database
-from trainmate.google_calendar import calendar_syncer
+from trainmate.google_calendar import calendar_syncer, quiet_events
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_cal_lineage.db")
@@ -75,7 +75,7 @@ class TestCalendarLineage(unittest.TestCase):
         service = MagicMock()
         service.events().insert().execute.return_value = {"id": "evt-1"}
         service.events().update().execute.return_value = {"id": "evt-1"}
-        with patch.object(calendar_syncer, "service", service):
+        with patch.object(calendar_syncer, "service", service), quiet_events():
             calendar_syncer.sync_workout(workout)
         # A session with a stored event id is updated, not inserted.
         calls = (
