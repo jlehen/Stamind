@@ -687,10 +687,10 @@ Three things to know when you regenerate:
   rebuild is a rebuild. `workout generate --fresh` makes the whole span a
   rebuild, for the times you want the week redone rather than kept: the week
   planner is shown none of the sessions already there, and writes every day
-  again. `workout generate --fresh-strength` keeps the week but has the strength
-  planner write every gym day of the span again, the committed ones included,
-  each change with its sentence: for when the way you lift has changed and
-  this week's gym days should follow now. `--fresh` does that too.
+  again. `workout generate --strength-only` writes only the gym days again,
+  this week's included, each change with its sentence, and leaves every other
+  session as it is: for when the way you lift has changed and the gym days
+  should follow now.
 
 ## Choosing a model
 

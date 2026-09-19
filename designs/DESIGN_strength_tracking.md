@@ -1142,18 +1142,21 @@ than write it again, a kept session keeps its brief, and its sets stand. `replan
 generate` with no preview, so it rewrites the strength sessions unseen, as it already
 rewrites every other session.
 
-Amended 2026-09-19: the athlete can ask for the committed days' strength sessions too. It is
-Tuesday September 15, and Thursday's gym, inside the committed days, still holds the five
-exercises revision 17 wrote. The athlete runs `workout generate --fresh-strength`. The week
-planner keeps Thursday, as before. The strength planner is shown Thursday as a session to
-check, with a line saying the athlete asked for it to be written again. That request is a
-fourth ground for a change, and the evidence rule below applies it the way it applies a new
-brief. So Thursday comes back written from the most comparable session as done, with a
-one-sentence reason that goes on the Calendar's `Reason:` line. Every other strength session
-of the span gets the same line. An answer with the same sets changes nothing. `workout
-generate --fresh` (DESIGN_plan_change_continuity.md §4.4) implies the flag: a clean slate
-that kept Thursday's kilograms because the week planner wrote the same brief again would not
-be one.
+Amended 2026-09-19: the athlete can ask for the strength sessions alone to be written
+again. It is Tuesday September 15. Thursday holds the intervals and the gym, both inside the
+committed days, and the gym still holds the five exercises revision 17 wrote. The athlete
+runs `workout generate --strength-only`. The week planner is not called, so no other session
+can change, and the question before the call counts the strength sessions only. The strength
+planner is shown every strength session of the span as a session to check, with a line
+saying the athlete asked for it to be written again. That request is a fourth ground for a
+change, and the evidence rule below applies it the way it applies a new brief. So Thursday
+comes back written from the most comparable session as done, with a one-sentence reason
+that goes on the Calendar's `Reason:` line. An answer with the same sets changes nothing.
+The sessions that changed are written as one `generate` change, the way `workout adapt`
+writes its own, so Thursday's intervals are held and stand. `workout generate --fresh`
+(DESIGN_plan_change_continuity.md §4.4) puts the same line on every session to check: a
+clean slate that kept Thursday's kilograms because the week planner wrote the same brief
+again would not be one.
 
 Nothing else changes in how a check is applied. The answer is still compared with the
 stored rows as a list, and the evidence rule below still decides whether it is applied, so

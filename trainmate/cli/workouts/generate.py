@@ -29,6 +29,7 @@ from trainmate.cli.workouts._helpers import prescription_lines, workout_line
 from trainmate.cli.workouts.heads_up import (
     generate_dates, print_send_notice, replacing_unsent, revision_dates,
 )
+from trainmate.cli.workouts.strength_only import generate_strength_only
 
 
 def _resolve_ambiguous_matches(date_str: str, auto: bool) -> None:
@@ -196,8 +197,10 @@ def _confirm_regeneration(span_start: str, span_end: str, fresh: bool) -> bool:
 
     # The week planner has to account for the near days one by one, so a rewrite of them is not
     # the blanket archive the rest of the span is (DESIGN_plan_change_continuity.md §4).
-    # `--fresh` drops that hold, so there is nothing to promise.
+    # `--fresh` drops that hold, and a span that opens after the held days has none in it.
     days = 0 if fresh else settings.commitment_days()
+    if span_start > _shift(_today_str(), days - 1):
+        days = 0
     committed = (
         f" The next {days} day(s) are yours: the coach must answer for each session "
         f"standing in them, and you see what it did before anything is written."
@@ -483,6 +486,9 @@ def _generate(args: argparse.Namespace, force: bool, replaced: bool) -> None:
     ensure_recent_data(
         no_pull=args.no_pull, force_pull=getattr(args, 'force_pull', False)
     )
+    if getattr(args, 'strength_only', False):
+        generate_strength_only(args, force, unchanged)
+        return
 
     span = _resolve_span(args)
     if span is None:
@@ -506,7 +512,7 @@ def _generate(args: argparse.Namespace, force: bool, replaced: bool) -> None:
 
     proposal = runtime.coach_service.workout_generate(
         start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id,
-        fresh=fresh, fresh_strength=getattr(args, 'fresh_strength', False),
+        fresh=fresh,
     )
     if not runtime.render.workout_generate_preview(proposal):
         return

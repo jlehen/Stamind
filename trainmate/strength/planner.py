@@ -32,7 +32,7 @@ _RULE = "=" * 80
 # The line on a session to check whose sets were written under another brief or duration:
 # the third ground for changing a kept session (§9).
 MOVED_ON = "Its brief or its duration changed since these sets were written: write it again."
-# The line for the fourth ground, the athlete asking: `workout generate --fresh-strength` (§9).
+# The line for the fourth ground, the athlete asking: `workout generate --strength-only` (§9).
 ASKED_AGAIN = "The athlete asked for this session to be written again: write it again."
 
 NOT_RECHECKED = (
@@ -567,8 +567,8 @@ def run(
     `StrengthPass.added` for the caller to add. Returns None when there is nothing new to
     write from, which is what makes a morning adapt in a week with no lifting cost no call.
 
-    `write_again` (`workout generate --fresh-strength`) asks for every session to check to be
-    written again, new evidence or not (§9).
+    `write_again` (`workout generate --strength-only` and `--fresh`) asks for every session to
+    check to be written again, new evidence or not (§9).
 
     Raises `StrengthPlannerFailed` when the call fails twice with a session to write: a
     strength day with a brief and no exercises must never exist.

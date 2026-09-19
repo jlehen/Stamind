@@ -5,9 +5,9 @@ from trainmate.config import config
 from trainmate.types import Constraint, Workout
 from trainmate.adherence import analyze_adherence
 from trainmate.coach import honoring
-from trainmate.coach.proposals import GenerateProposal, StandingLine
+from trainmate.coach.proposals import GenerateProposal, RevisionProposal, StandingLine
 from trainmate.coach.revisions import (
-    normalize_load_fields, prescription_matches, replaces_source,
+    normalize_load_fields, pair_revisions, prescription_matches, replaces_source,
     rest_in_place_of,
 )
 from trainmate import settings
@@ -16,7 +16,7 @@ from trainmate.benchmarks import MIN_RETEST_DAYS
 from trainmate.calendar_reconcile import verbose_events
 from trainmate import intensity
 from trainmate.strength import planner as strength_planner
-from trainmate.util import green, cmd, notice, keep_whole
+from trainmate.util import green, cmd, fmt_date, notice, keep_whole
 import trainmate.coach.service as _svc
 
 
@@ -727,8 +727,7 @@ class WorkoutGenMixin:
 
     def workout_generate(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None,
-        prefer_macro_id: Optional[int] = None, fresh: bool = False,
-        fresh_strength: bool = False,
+        prefer_macro_id: Optional[int] = None, fresh: bool = False
     ) -> GenerateProposal:
         """Proposes workouts (microcycles) from the plan mesocycles governing the span.
 
@@ -742,9 +741,8 @@ class WorkoutGenMixin:
 
         `fresh` (CLI `--fresh`) empties the commitment window for this run, so the week
         planner writes every day of the span the way it writes a day past the window
-        (DESIGN_plan_change_continuity.md §4.4). `fresh_strength` (CLI `--fresh-strength`)
-        has the strength planner write every strength session of the span again, the window
-        held; `fresh` implies it (DESIGN_strength_tracking.md §9).
+        (DESIGN_plan_change_continuity.md §4.4). It also has the strength planner write
+        every strength session of the span again (DESIGN_strength_tracking.md §9).
 
         Which plan applies is read off the dates being generated, not off a goal the
         caller names: the goal was only ever an indirection to the macrocycle, and the
@@ -943,7 +941,7 @@ class WorkoutGenMixin:
         strength = strength_planner.run(
             workouts, span_sessions, gen_start_str, gen_end_str, today_str,
             profile, constraints, reason_key='change_reason',
-            write_again=fresh or fresh_strength,
+            write_again=fresh,
         )
         if strength is not None:
             workouts.extend(strength.added)
@@ -1094,3 +1092,48 @@ class WorkoutGenMixin:
         return [by_slot[slot] for slot in
                 ((w['date'], canonical_sport(w['sport_type'])) for w in proposal.workouts)
                 if slot in by_slot]
+
+    def workout_generate_strength(self, start_date: str, end_date: str) -> RevisionProposal:
+        """`workout generate --strength-only`: the strength planner writes every strength
+        session of the span again, and no other session changes. The week planner is not
+        called (DESIGN_strength_tracking.md §9).
+
+        Writes nothing: the proposal holds only the sessions whose sets changed, and
+        `workout_revision_apply` writes them under a `generate` change, holding the other
+        sessions of their dates."""
+        today_str = _svc._today_str()
+        start = max(start_date, today_str)
+        # Today's session already done is history, as in `workout_generate`.
+        done_today = self._db.get_completed_activities(start_date=today_str, end_date=today_str)
+        if start == today_str and self._today_workout_completed(today_str, done_today):
+            start = (date.fromisoformat(today_str) + timedelta(days=1)).isoformat()
+        span = self._db.get_workouts(start_date=start, end_date=end_date)
+        strength = strength_planner.run(
+            [], span, start, end_date, today_str, self._effective_profile(),
+            self._db.get_constraints(start, end_date), reason_key='modification_reason',
+            write_again=True,
+        )
+        written = list(strength.added) if strength else []
+        held = self._hold_around(strength.held_dates, span) if strength else []
+        reason = (
+            f"I wrote {len(written)} of your strength sessions again, between "
+            f"{fmt_date(start)} and {fmt_date(end_date)}."
+        )
+        if not written:
+            reason = (
+                f"Your strength sessions between {fmt_date(start)} and "
+                f"{fmt_date(end_date)} stand as written."
+            )
+        # A session written with no sets before it has no sentence of its own.
+        for row in written:
+            if not row.get('modification_reason'):
+                row['modification_reason'] = reason
+        pairs, removals = pair_revisions(written, span, held)
+        return RevisionProposal(
+            reason=reason, workouts=written, range_start=start, range_end=end_date,
+            kind="generate", pairs=pairs, removals=removals, held=tuple(held),
+            strength_checks=tuple(strength.checked) if strength else (),
+            strength_stamp=strength.stamp if strength else "",
+            strength_notice=strength.notice if strength else None,
+            strength_dropped=tuple(strength.dropped) if strength else (),
+        )

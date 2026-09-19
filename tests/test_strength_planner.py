@@ -258,7 +258,7 @@ class CheckingTest(_PlannerCase):
 
 
 class WriteAgainTest(_PlannerCase):
-    """`workout generate --fresh-strength`: the athlete asks for Thursday to be written again
+    """`workout generate --strength-only`: the athlete asks for Thursday to be written again
     though nothing was lifted since it was weighed (§9)."""
 
     def setUp(self):
@@ -450,8 +450,9 @@ class ThroughAdaptTest(_PlannerCase):
 
 
 class ThroughGenerateTest(_PlannerCase):
-    """`workout generate --fresh-strength` on Tuesday: the week planner keeps Thursday's gym,
-    which is inside the commitment window, and the strength planner writes it again (§9)."""
+    """`workout generate --strength-only` on Tuesday: Thursday holds the intervals and the
+    gym, inside the commitment window. The strength planner writes the gym again, and no
+    other session changes (§9)."""
 
     def setUp(self):
         super().setUp()
@@ -464,40 +465,57 @@ class ThroughGenerateTest(_PlannerCase):
             mesocycles=[{"name": "Build", "start_date": "2026-09-01",
                          "end_date": MESO_END, "focus": "Build"}],
         )
+        save_workout(test_db, "2026-09-17", "running", "Intervals", duration_minutes=60)
         gym = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
         test_db.record_strength_check(gym["id"], test_db.strength_history_stamp())
 
-    def generate(self, **flags):
+    def strength_only(self):
         with patch("trainmate.runtime.calendar_syncer"), \
                 patch("trainmate.coach.engine.openrouter_client") as week_planner:
-            week_planner.complete.return_value = {"reasoning": "Build.", "workouts": []}
-            proposal = coach_service.workout_generate(**flags)
-            coach_service.workout_generate_apply(proposal)
+            proposal = coach_service.workout_generate_strength(TODAY, MESO_END)
+            if proposal.workouts:
+                coach_service.workout_revision_apply(proposal)
+        self.assertFalse(week_planner.complete.called)
         return proposal
 
-    def test_the_kept_session_gets_new_sets_and_the_reason(self):
+    def test_the_gym_is_written_again_and_the_intervals_stand(self):
         reason = "Your gym days alternate the belt squat and the push press."
         self.replies = [{"sessions": [
             answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0),
                    row("barbell push press", 3, 5, 7, 50.0), reason=reason),
         ]}]
-        proposal = self.generate(fresh_strength=True)
-        line = next(l for l in proposal.standing if l.date == "2026-09-17")
-        self.assertEqual((line.outcome, line.reason), ("revised", reason))
+        proposal = self.strength_only()
+        self.assertIn(planner.ASKED_AGAIN, self.asked[0][1])
+        self.assertEqual(proposal.kind, "generate")
+        self.assertEqual([w["sport_type"] for w in proposal.workouts], ["strength_training"])
+        self.assertIn(("2026-09-17", "running"), proposal.held)
         gym = test_db.get_workout("2026-09-17", "strength_training")
         self.assertEqual([r["exercise"] for r in gym["prescribed_sets"]],
                          ["belt squat", "barbell push press"])
         self.assertEqual(gym["modification_reason"], reason)
+        self.assertEqual(test_db.get_workout("2026-09-17", "running")["title"], "Intervals")
 
-    def test_without_it_the_kept_session_is_not_asked_about(self):
-        proposal = self.generate()
+    def test_the_same_sets_back_write_nothing(self):
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0), reason="Same."),
+        ]}]
+        proposal = self.strength_only()
+        self.assertEqual(proposal.workouts, [])
+        self.assertIn("stand as written", proposal.reason)
+
+    def test_a_plain_workout_generate_keeps_the_committed_gym_unasked(self):
+        with patch("trainmate.runtime.calendar_syncer"), \
+                patch("trainmate.coach.engine.openrouter_client") as week_planner:
+            week_planner.complete.return_value = {"reasoning": "Build.", "workouts": []}
+            proposal = coach_service.workout_generate()
         self.assertEqual(self.asked, [])
-        line = next(l for l in proposal.standing if l.date == "2026-09-17")
+        line = next(l for l in proposal.standing if l.date == "2026-09-17"
+                    and l.sport_type == "strength_training")
         self.assertEqual(line.outcome, "kept")
 
-    def test_fresh_implies_it(self):
-        """The week planner writes Thursday again with the brief it had, so only the
-        athlete's request makes the strength planner write it again."""
+    def test_fresh_writes_the_strength_sessions_again(self):
+        """The week planner writes Thursday again with the brief it had, so only `--fresh`
+        makes the strength planner write it again."""
         self.replies = [{"sessions": [
             answer("2026-09-17", row("goblet squat", 3, 8, 10, 32.0), reason="New."),
         ]}]

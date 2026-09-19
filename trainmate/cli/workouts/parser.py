@@ -149,25 +149,26 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         help="Name each Calendar event as it is deleted and created, instead of the "
              "progress bar"
     )
-    p_w_gen.add_argument(
+    # `--fresh` writes every session again and `--strength-only` the strength ones only.
+    p_w_gen_scope = p_w_gen.add_mutually_exclusive_group()
+    p_w_gen_scope.add_argument(
         "--fresh", action="store_true",
         help=(
             "Clean slate: don't show the coach the sessions already in the span, so it "
             "rewrites every day of it. Without this flag it keeps the sessions of the next "
             "commitment-days days (a setting, 7 by default), unless they contradict your "
             "profile, the plan or a constraint. A session it removes has its Calendar event "
-            "deleted, not marked [Cancelled]. Strength sessions are written again as with "
-            "--fresh-strength."
+            "deleted, not marked [Cancelled]. Strength sessions are written again in full, as "
+            "with --strength-only."
         )
     )
-    p_w_gen.add_argument(
-        "--fresh-strength", action="store_true", dest="fresh_strength",
+    p_w_gen_scope.add_argument(
+        "--strength-only", action="store_true", dest="strength_only",
         help=(
-            "Write every strength session of the span again: its exercises, sets and "
-            "kilograms, under the brief it has now. The coach still keeps the sessions of the "
-            "next commitment-days days; only their strength content changes. Without this "
-            "flag, a strength session already written changes only when what you have lifted "
-            "since, a new brief or a new duration calls for it."
+            "Write only the strength sessions of the span again: their exercises, sets and "
+            "kilograms, under the brief each has now, those of the next commitment-days days "
+            "included. No other session changes. With no end selected, the span runs to the "
+            "last scheduled day."
         )
     )
     # The selectors name the span to write, both ends of it, and are grouped because a

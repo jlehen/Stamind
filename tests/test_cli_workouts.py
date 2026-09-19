@@ -1272,9 +1272,61 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertTrue(mock_coach.workout_generate.call_args.kwargs["fresh"])
         self.run_cli(["workout", "generate", "-d", "today..", "-f"])
         self.assertFalse(mock_coach.workout_generate.call_args.kwargs["fresh"])
-        self.assertFalse(mock_coach.workout_generate.call_args.kwargs["fresh_strength"])
-        self.run_cli(["workout", "generate", "-d", "today..", "--fresh-strength", "-f"])
-        self.assertTrue(mock_coach.workout_generate.call_args.kwargs["fresh_strength"])
+
+    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.runtime.prompt")
+    @patch("trainmate.runtime.coach_service")
+    def test_generate_promises_no_held_day_to_a_span_past_them(
+        self, mock_coach, mock_prompt, _ensure
+    ):
+        """The span opens on the tenth day: the seven held days are not in it."""
+        test_db.set_setting("workout_commitment_days", "7")
+        tenth = datetime.now(timezone.utc).date() + timedelta(days=10)
+        save_workout(test_db,
+            date=tenth.strftime("%Y-%m-%d"), sport_type="running", title="Tempo",
+            description="30 min",
+        )
+        mock_prompt.confirm.return_value = False
+        self.run_cli(["workout", "generate", "-d", f"{tenth:%Y-%m-%d}.."])
+        question = " ".join(mock_prompt.confirm.call_args.args[0].split())
+        self.assertIn("Regenerate?", question)
+        self.assertNotIn("are yours", question)
+
+    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.runtime.prompt")
+    @patch("trainmate.runtime.coach_service")
+    def test_generate_strength_only_counts_and_writes_the_strength_sessions(
+        self, mock_coach, mock_prompt, _ensure
+    ):
+        """No other session can change, so the question counts the strength sessions and
+        the week planner's path is never taken (DESIGN_strength_tracking.md §9)."""
+        tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
+        day = tomorrow.strftime("%Y-%m-%d")
+        save_workout(test_db, date=day, sport_type="running", title="Tempo",
+                     description="30 min")
+        save_workout(test_db, date=day, sport_type="strength_training", title="Gym",
+                     description="[Gym]\nHeavy full-body.")
+        mock_coach.workout_generate_strength.return_value = RevisionProposal(
+            reason="Your strength sessions stand as written.", workouts=[],
+            range_start=day, range_end=day,
+        )
+        mock_prompt.confirm.return_value = False
+
+        self.run_cli(["workout", "generate", "-d", "today..", "--strength-only"])
+        question = " ".join(mock_prompt.confirm.call_args.args[0].split())
+        self.assertIn("You have 1 strength session(s)", question)
+        mock_coach.workout_generate_strength.assert_not_called()
+
+        self.run_cli(["workout", "generate", "-d", "today..", "--strength-only", "-f"])
+        start, end = mock_coach.workout_generate_strength.call_args.args
+        self.assertEqual(end, day)
+        mock_coach.workout_revision_record_no_change.assert_called_once()
+        mock_coach.workout_generate.assert_not_called()
+
+        exit_code, _, _ = self.run_cli(
+            ["workout", "generate", "--strength-only", "--fresh", "-f"]
+        )
+        self.assertNotEqual(exit_code, 0)
 
     @patch("trainmate.cli.workouts.generate.ensure_recent_data")
     @patch("trainmate.runtime.prompt")
