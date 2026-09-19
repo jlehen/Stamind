@@ -4,10 +4,10 @@
 
 Running a command with no arguments does different things depending on the
 command: some act (`workout list`), some preview-then-confirm (`workout adapt`),
-and some refuse because they need a target (`workout swap`). Each is defensible
-alone, but the mix is unpredictable until learned, and the "refuse" case used to
-answer with argparse's bare usage text, which names the missing argument
-without saying what belongs in it.
+and some refuse because they cannot run without an argument (`workout tweak`).
+Each is defensible alone, but the mix is unpredictable until learned, and the
+"refuse" case used to answer with argparse's bare usage text, which names the
+missing argument without saying what belongs in it.
 
 ## The convention
 
@@ -20,7 +20,7 @@ fourth case with its own rule (§a3):
 | --- | --- | --- |
 | Read-only | Just act | `status`, `workout list`, `plan show` (defaults to the next active goal) |
 | Mutating, preview-then-confirm | Act on a sensible default, show the preview, gate the write behind a confirm | `workout adapt` (defaults to today), `plan generate` (defaults to the nearest goal) |
-| Mutating, immediate / no natural default | Print the command's help, then the line naming what's missing (in chat, that line plus a `-h` pointer instead of the help) | `workout swap`, `goal add`, `constraint add` |
+| Mutating, immediate / no natural default | Print the command's help, then the line naming what's missing (in chat, that line plus a `-h` pointer instead of the help) | `workout tweak`, `goal add`, `constraint add` |
 | Command group, no sub-command | Print the group's own help and exit 1 — the same output in chat, since no argument is missing (§a3) | `goal`, `workout`, `plan`; `settings` is the one exception |
 
 Read-only is about the *bare* run, not the command name: `constraint show` and
@@ -40,7 +40,7 @@ after a screen of text and where the shell prompt puts it next to what you type.
 
 Pointing at `-h` was enough while the mandatory fields were named flags: the
 message said `--reason` and that *was* the answer. Now that mandatory means
-positional (§a2), the same message names a slot — `target2`, `reason` — without
+positional (§a2), the same message names a slot — `date`, `message` — without
 saying what belongs in it or in what order, so it raises a question the help
 already answers. Printing it beats making the athlete re-type the command to get
 it, and the case is narrow enough not to be noisy: it fires only when arguments
@@ -71,8 +71,7 @@ about which arguments are the command's subject. So the rule is mechanical:
 **If a command cannot run without it, it is a positional. If it can, it is a flag.**
 
 `goal add TITLE DATE SPORT…`, `constraint add TITLE`, `signal add METRIC [TEXT…]`,
-`learnings edit ID TEXT`, `workout add DATE SPORT TITLE`, `workout rm ID REASON`,
-`workout swap TARGET1 TARGET2 REASON`, `benchmark record SPORT --<anchor> VALUE`.
+`learnings edit ID TEXT`, `workout tweak MESSAGE`, `benchmark record SPORT --<anchor> VALUE`.
 Everything those commands can do without stays a flag, `--desc` and `--date-type`
 included. The same field is a positional where it is mandatory and a flag where it
 is not: `add` takes `TITLE` positionally, `edit` takes `--title` because an edit
@@ -218,12 +217,11 @@ That leaves exactly two reasons for an explicit alias to survive:
 
 * it is **not a prefix** of its command — `lm`, `df`, `rb`, `sm`, `sa`, `use`;
 * it **picks the winner** among an ambiguous prefix — `s` is `status` (not `shell`),
-  `workout a` is `adapt` (not `add`), `signal l` is `list` (not `list-metrics`),
-  `data b` is `bootstrap` (not `backfill-tss`), `workout p` is `push` (not
-  `prune-calendar`).
+  `signal l` is `list` (not `list-metrics`), `data b` is `bootstrap` (not
+  `backfill-tss`), `workout p` is `push` (not `prune-calendar`).
 
-`rm` gets no winner: `r` is left ambiguous (with `restore`/`rollback` under `workout`,
-with `record` under `benchmark`) rather than aliased. A one-letter shortcut for the
+`rm` gets no winner: `r` is left ambiguous (with `restore` under `learnings`, `rollback`
+under `plan`, `record` under `benchmark`) rather than aliased. A one-letter shortcut for the
 destructive command is worth less than the two characters it saves, and `rm` is
 already the full name.
 
@@ -234,7 +232,7 @@ retired. The two deliberate exceptions both concern a destructive command:
 * `plan d` used to delete a plan and now resolves to `plan diff` — an exact alias
   beating the natural prefix of a visible everyday command is the trap this rule
   exists to remove, and the safe direction to fail in;
-* `workout r` / `benchmark r` used to remove; both now report the ambiguity instead.
+* `benchmark r` used to remove; it now reports the ambiguity instead.
 
 ### Where it lives
 

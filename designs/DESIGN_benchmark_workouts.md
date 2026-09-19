@@ -179,7 +179,7 @@ therefore threaded through each enumeration:
 **One app-side guard, deliberately.** "The model owns survival" is the rule for the
 *proposal*; the SQL keeps a belt-and-braces default underneath it. The UPDATE branch of
 `save_workout` writes `benchmark_type = COALESCE(?, benchmark_type)`
-(`db/workouts.py:105`), exactly like `source`, `tss` and the other optional columns — so a
+(`db/workouts.py:105`), exactly like `tss` and the other optional columns — so a
 same-`(date, sport)` re-save that simply omits the field preserves the stored value
 instead of nulling it. This is not the kind of guard §4.2 argues against: it reverses no
 model intent and reads no proposal batch, it only stops an omission from being read as a
@@ -190,12 +190,10 @@ fallback needs to strip it, and for one revision could not. `save_workout` there
 a `clear_benchmark` flag (`db/workouts.py:21, 105`) that blanks the column in place; the
 UPDATE reads `CASE WHEN ? THEN NULL ELSE COALESCE(?, benchmark_type) END`. It is off for
 every caller but adapt (§4.2), so the default behaviour — omission preserves — is
-unchanged, and a delete-then-insert (the manual-replace path,
-`coach/service/editing.py:248, 257`) still clears the flag as it always did.
+unchanged.
 
-As a stored column it is creation-time intent, exactly like the existing
-`source` column — *not* like the `[MANUAL]`/`[SWAPPED]` markers, which are
-deliberately **derived** from `modification_reason` (`modification_state.py`
+As a stored column it is creation-time intent — *not* like the `[ADAPTED]`
+marker, which is deliberately **derived** from `modification_reason` (`modification_state.py`
 documents why derived kind-columns are preferred for mutable state). A
 benchmark's identity is fixed when the session is created, so a column is the
 right shape here.
@@ -620,7 +618,7 @@ generic so an outdoor test just needs a preference edit.
 
 ## 6. Surfacing
 
-- `workout list` carries a `[BENCHMARK]` marker (alongside `[MANUAL]`, `[SWAPPED]`) —
+- `workout list` carries a `[BENCHMARK]` marker (alongside `[ADAPTED]`) —
   `cli/workouts/_helpers.py:60-62`.
 - CLI verb `benchmark`, mirroring `goal` / `constraint` (`cli/benchmarks.py`,
   dispatched at `trainmate_cli.py:325-337`):

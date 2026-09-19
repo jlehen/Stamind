@@ -82,7 +82,7 @@ def workout_line(w: dict, adherence: Optional[dict] = None) -> str:
     # (DESIGN_workout_revisions.md §7.1).
     keep_marker = bold(green(" [KEPT]")) if w.get('keep') else ""
     # Benchmark identity is a stored column, orthogonal to the modification/sync/removed
-    # axes (a benchmark can also be swapped), so it gets its own marker straight off the
+    # axes (a benchmark can also be adapted), so it gets its own marker straight off the
     # column (DESIGN_benchmark_workouts.md §3.1/§6).
     bench_marker = bold(blue(" [BENCHMARK]")) if w.get('benchmark_type') else ""
     duration = w.get('duration_minutes')

@@ -882,7 +882,6 @@ class WorkoutGenMixin:
             zone_currencies=self._planning_zone_currencies(today_str),
             anchor_history=self._anchor_history_text(gen_start_str),
             standing_workouts=standing_sessions,
-            commitment_end=window_end,
             past_constraints=past_constraints,
         )
 

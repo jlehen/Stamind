@@ -29,7 +29,7 @@ from typing import Literal
 CALENDAR_FIELDS = (
     "revision_id", "date", "sport_type", "title", "description",
     "original_description", "modification_reason", "duration_minutes", "tss",
-    "rpe", "removed", "removed_reason", "source",
+    "rpe", "removed", "removed_reason",
 )
 
 CalendarStatus = Literal["unpushed", "synced", "stale"]

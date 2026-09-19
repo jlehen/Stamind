@@ -104,12 +104,10 @@ never given.
 is how you read two sessions in full without inventing a window that happens to contain
 them. `signal rm` takes the same shape, with a metric name in place of a date.
 
-A bare integer is an ID, anything else is a date selector (`parse_target`); the same
-classification `workout swap` has always made between its two targets. IDs are looked up
-directly rather than folded into the window — an ID the athlete typed is not a range, and
+A bare integer is an ID, anything else is a date selector (`parse_target`). IDs are looked
+up directly rather than folded into the window — an ID the athlete typed is not a range, and
 demanding it fall inside the default 7 days would defeat the point. Date targets narrow
-like any other selector, and named IDs bypass the window but still respect `--type` and
-`--removed`.
+like any other selector, and named IDs bypass the window but still respect `--type`.
 
 ## §5 — The reserved vocabulary
 
@@ -274,8 +272,8 @@ case; what changed is which day the command's own policy fills in.
 Opening at today left the default unable to answer its own nudge. When the generated
 sessions run out mid-plan, the runway hint (DESIGN_runway_nudge.md §4) asks for a
 `workout generate` — and a span opening at today rebuilt the days already covered and
-stopped where it always did. `coverage_end` never moved, so the same hint returned the
-next morning, and the athlete's planned week had been replaced for nothing. Opening after
+stopped where it always did. The last covered day never moved, so the same hint returned
+the next morning, and the athlete's planned week had been replaced for nothing. Opening after
 the covered days makes the run add days, which is the only thing that changes the fact the
 nudge reports.
 

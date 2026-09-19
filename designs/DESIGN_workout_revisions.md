@@ -17,23 +17,23 @@ That mismatch shows up in four places.
 |---|---|
 | `workout generate`, `plan rollback`, goal archive | Archive and rebuild — the old row is kept |
 | `workout adapt` | Edit in place — the old values are overwritten |
-| Adapt displacing a session, `workout add --replace-day` | Hard `DELETE` — the old row is gone |
+| Adapt displacing a session | Hard `DELETE` — the old row is gone |
 
 The third one is unrecoverable data loss on a normal day's use
-(`coach/service/adaptation.py`, `coach/service/editing.py`).
+(`coach/service/adaptation.py`).
 
 **Seven columns exist to fake a history a chain would give for free.**
 `original_date`, `original_description`, `original_duration_minutes`, `original_tss`,
 `original_rpe`, `adaptation_count`, `adapted_at`. They record the first version and the
 current one, never anything between. And `original_date` has a permanent hole: a backfill
-migration set `original_date = date` on legacy rows, erasing every swap made before the
-column existed.
+migration set `original_date = date` on legacy rows, erasing every date move made before
+the column existed.
 
 **`modification_state.py` reconstructs a fact nobody recorded.** It classifies a workout as
-`unmodified` / `adapted` / `swapped` / `replaced` by sniffing whether `adaptation_summary`
-is non-NULL, whether `modification_reason` starts with one of two magic string prefixes,
-whether `date != original_date`, and whether `source == 'manual'` — with a documented
-catch-all for rows that predate the split. It is a heuristic standing in for a column.
+unmodified, adapted or changed some other way by sniffing whether `adaptation_summary` is
+non-NULL, whether `modification_reason` starts with one of two magic string prefixes, and
+whether `date != original_date` — with a documented catch-all for rows that predate the
+split. It is a heuristic standing in for a column.
 
 **Undo is coarse and uneven.** `workout rollback`'s batch key is `archived_at`, a timestamp
 stamped on the rows that *died*. Adapt kills no rows, so adapt creates no batch, so there is
@@ -43,7 +43,7 @@ preceded it (DESIGN_plan_rollback.md §9).
 ## 2. Decision
 
 **`workouts` becomes append-only. A row is a revision and is never updated or deleted.**
-Every change — generate, adapt, swap, add, remove, restore, rollback — appends
+Every change — generate, adapt, tweak, rollback, a goal stood down or reinstated — appends
 new rows. The most recent revision in a slot is the live one. Everything else is history.
 
 Six parts:
@@ -52,7 +52,7 @@ Six parts:
    highest `id` is live. There is no flag marking a row obsolete — being superseded *is*
    having a newer sibling.
 2. **The lineage.** A `lineage_id` gives a session a stable identity that survives both
-   edits and date moves. Copies inherit it; a swap carries it across dates. It is also the
+   edits and date moves. Copies inherit it; a move carries it across dates. It is also the
    id the CLI and Calendar show, so athlete-visible ids never churn.
 3. **A change is a row.** Each command invocation writes one `workout_changes` row and
    points every revision it appends at it. That row carries the kind of change and the
@@ -83,8 +83,8 @@ CREATE TABLE workout_changes (
 
 **Kind vocabulary** — one value per command, fixed at write time:
 
-`generate` · `adapt` · `swap` · `add` · `rm` · `restore` · `rollback` ·
-`stand-down` (goal archived) · `reinstate` (goal reactivated).
+`generate` · `adapt` · `tweak` · `rollback` · `stand-down` (goal archived) ·
+`reinstate` (goal reactivated).
 
 There is no `legacy` kind. Every pre-migration row classifies into one of today's four
 modification statuses, and each of those maps onto a real kind (§13 step 3) — a special
@@ -127,7 +127,7 @@ See §8.
 | `sport_canonical TEXT NOT NULL` | The slot key. `sport_type` keeps the spelling as written. |
 | `void INTEGER NOT NULL DEFAULT 0` | 1 means this slot holds no session as of this revision. |
 | `reason TEXT` | Per-revision note. Replaces `modification_reason` and `removed_reason`. |
-| `restored_from INTEGER` | Only on a `rollback`/`restore`/`reinstate` copy: the id of the revision this row is a copy of. NULL everywhere else. The adaptation tally follows it to skip spans that were undone (§7). |
+| `restored_from INTEGER` | Only on a `rollback`/`reinstate` copy: the id of the revision this row is a copy of. NULL everywhere else. The adaptation tally follows it to skip spans that were undone (§7). |
 
 `reason` merges two columns that never legitimately coexisted on one *revision*: a row's
 note is either why it was changed or why it was cancelled, and the change kind says which.
@@ -141,7 +141,8 @@ Sixteen columns:
 - **Superseded by the chain:** `archived_at`.
 - **Derived from the lineage (§7):** `original_date`, `original_description`,
   `original_duration_minutes`, `original_tss`, `original_rpe`, `adaptation_count`,
-  `adapted_at`, `source`.
+  `adapted_at`.
+- **Dropped outright:** `source`.
 - **Renamed or re-homed:** `modification_reason` and `removed_reason` → `reason`;
   `removed` → `void`; `adaptation_summary` → `workout_changes.summary`.
 - **Moved to the side table:** `google_event_id`, `pushed_signature`, `marked_signature`.
@@ -176,7 +177,7 @@ for one specific reason.
 
 Among the columns §3 deletes are `adaptation_count` and `adapted_at`. They are deleted
 because you can count the chain instead of maintaining a counter. **That deletion only works
-if the chain follows the session, and a swap moves a session to a different date.**
+if the chain follows the session, and a move takes a session to a different date.**
 
 The failure is not cosmetic. It breaks a live safety guard.
 `coach/formatting.py::_easing_recency_tag` injects this into the adapt prompt, per session:
@@ -192,32 +193,36 @@ still lagging. Without it, three bad mornings walk a 90-minute ride down to noth
 `do not silently restore it` instead (§7.1).
 
 Now watch it fail with slot chains alone. Tuesday has a long ride, 90 minutes. Thursday has
-an easy spin, 45. Two bad mornings, two adapts, then a swap on Wednesday:
+an easy spin, 45. Two bad mornings, two adapts ease the ride. Then a third morning's adapt
+trades the two days, so the long ride comes later in the week:
 
 ```
 Tue / cycling:   r1  long ride 90   (generate)
                  r2  long ride 75   (adapt)
                  r3  long ride 65   (adapt)
-                 r4  easy spin 45   (swap)
+                 r4  void           (adapt: the ride leaves)
+                 r5  easy spin 45   (adapt: the spin arrives)
 
 Thu / cycling:   r1  easy spin 45   (generate)
-                 r2  long ride 65   (swap)
+                 r2  void           (adapt: the spin leaves)
+                 r3  long ride 65   (adapt: the ride arrives)
 ```
 
 Thursday morning, metrics still poor, `workout adapt` runs. It looks at the live Thursday row
 — a 65-minute long ride — and asks the chain how often this has been eased.
 
-**Thursday's chain says never.** Two revisions, one generate and one swap, zero adapts. The
-guard does not fire, and the week planner cuts a session that has already been cut twice.
+**Thursday's chain says never.** Three revisions: a generate, a void and the ride's arrival,
+and none of them lowered the load. The guard does not fire, and the week planner cuts a
+session that has already been cut twice.
 
-Note *when* it fails: at a swap. The athlete swapped because life got in the way, which is
+Note *when* it fails: at a move. A session is moved when the week has gone wrong, which is
 also when recovery is worst and the guard matters most.
 
 With `lineage_id`, the Thursday long ride carries the lineage of the Tuesday rows it descends
-from. Counting adapts over the lineage returns 2, and the guard fires.
+from. Counting easings over the lineage returns 2, and the guard fires.
 
 The alternative is to keep `adaptation_count` and `adapted_at` as ordinary columns copied
-forward by every revision and carried across by a swap. That works, and it is what happens
+forward by every revision and carried across by a move. That works, and it is what happens
 today. But then those columns are not deleted, a writer still has to remember to increment
 one of them, and the rewrite has bought less than it cost. **One integer column, or two
 hand-maintained fields forever.**
@@ -229,23 +234,17 @@ Inheriting from the slot's live revision is the common case, but it is not uncon
 would corrupt every lineage-derived field. The rules:
 
 - **A revision continues the slot's lineage** when it modifies the session live there:
-  `adapt`, a `generate` refreshing its own generated session,
-  `rollback`/`restore` copies, `stand-down`/`reinstate`.
-- **A revision starts a new lineage** when it introduces a different session:
-  - the slot is empty, or its live revision is a **void** — appending over a void is a new
-    session, not a resurrection of the removed one (which would otherwise inherit its
-    Calendar event, its `original_*` and its adaptation tally);
-  - the change kind is **`add`** — a manual replace is a new session even over a live one.
-    This is also what keeps `source` honest: an `add` inheriting a generated lineage would
-    derive as `'generated'` (§5);
-  - a **`generate` lands on a manually added session**. The generate proceeds — the plan
-    owns the horizon — but starts a new lineage and prints a notice naming the manual
-    session it replaced, so the athlete can undo the change (§10).
+  `adapt`, `tweak`, a `generate` refreshing the session, `rollback` copies,
+  `stand-down`/`reinstate`.
+- **A revision starts a new lineage** when it introduces a different session: the slot is
+  empty, or its live revision is a **void**. Appending over a void is a new session, not a
+  resurrection of the removed one (which would otherwise inherit its Calendar event, its
+  `original_*` and its adaptation tally).
 - **A void carries the lineage of the session it ends** — the removed or departing
   session, never a fresh one. A void is the last chapter of a lineage, not a first.
-- **A swap** — and an adapt moving or substituting a session (§11) — appends at the
-  destination a revision carrying the *moved session's* lineage, not the destination
-  slot's.
+- **A move** — `workout adapt` or `workout tweak` taking a session to another day, or
+  substituting another sport (§11) — appends at the destination a revision carrying the
+  *moved session's* lineage, not the destination slot's.
 
 Mechanically, a session's first revision is written as insert, then
 `UPDATE workouts SET lineage_id = id WHERE id = ?` in the same transaction: the one write
@@ -256,27 +255,32 @@ until the insert assigns it, so a first revision is necessarily born with a NULL
 The trigger, not a column constraint, is what keeps that NULL transient: the only UPDATE
 it lets through is the one that fills it with the row's own id.
 
-### Swap, in full
+### A move, in full
 
-A same-sport swap of A (Tue/cycling) and B (Thu/cycling) appends two revisions:
+Moving ride A from Tuesday to Thursday appends two revisions under one change, the void
+first:
 
 ```
-Tue / cycling  ← copy of B, date=Tue, lineage = B's lineage
-Thu / cycling  ← copy of A, date=Thu, lineage = A's lineage
+Tue / cycling  ← void       (the ride left), lineage = A's lineage
+Thu / cycling  ← copy of A, date=Thu,        lineage = A's lineage
 ```
 
-A cross-sport swap of A (Tue/cycling) and B (Thu/running) touches four slots, because the
-sessions land in different slots than they left:
+If nothing else stands on Tuesday afterwards, the app writes a rest day there (§11).
+
+Two sessions may trade days in one reply (DESIGN_workout_tweak.md §9). That is two moves.
+Ride A on Tuesday and run B on Thursday trade like this:
 
 ```
 Tue / cycling  ← void       (the ride left)
-Tue / running  ← copy of B, date=Tue, lineage = B's lineage
 Thu / running  ← void       (the run left)
+Tue / running  ← copy of B, date=Tue, lineage = B's lineage
 Thu / cycling  ← copy of A, date=Thu, lineage = A's lineage
 ```
 
-Four appends where today there are two date updates. The extra two are the honest cost of
-saying out loud that two slots became empty — today that fact is implicit and unrecorded.
+Four appends where the old table made two date updates. The extra two are the honest cost
+of saying out loud that two slots became empty — the old table left that fact implicit and
+unrecorded. Two rides trading days append the same four rows, each copy landing in the slot
+the other ride's void just emptied.
 
 ## 5. Reading — the live view and the hydrated row
 
@@ -307,7 +311,8 @@ SELECT * FROM live_workouts WHERE void = 0 AND date >= ?
 
 The view includes void revisions on purpose. A cancelled session is still a fact the week planner
 must see — it is a deliberate cancellation, not a miss — and `prune-calendar` needs it too,
-because a soft-removed session keeps its "[Deleted]" Calendar event. Readers filter voids the
+because a removed session can keep its Calendar event, retitled
+(DESIGN_plan_change_continuity.md §5.2). Readers filter voids the
 same way they filter `removed = 1` today.
 
 ### The hydrated row — the contract that keeps this contained
@@ -325,7 +330,6 @@ removed and renamed keys named below and in §8.
 | `revision_id` | the physical row id (new key; only history surfaces read it) |
 | `original_date`, `original_description`, `original_duration_minutes`, `original_tss`, `original_rpe` | the lineage's first revision |
 | `adaptation_count`, `adapted_at` | walked over the lineage (§7) |
-| `source` | `'manual'` if the lineage's first change kind is `add`, else `'generated'` |
 | `modification_reason`, `removed_reason` | `reason` |
 | `removed` | `void` |
 | `adaptation_summary` | `workout_changes.summary` |
@@ -342,12 +346,13 @@ would happen:
 $ tm workout list
   [42] 2026-08-25  cycling  Long ride (90 min, TSS 110)
 $ tm workout adapt            # row 42 superseded; live ride is now row 87
-$ tm workout rm 42 --reason "work trip"
-  Workout with ID 42 ('Long ride') removed successfully.
+$ tm workout show 42
+  [42] 2026-08-25  cycling  Long ride (90 min, TSS 110)
 ```
 
-That last line would be a lie — a dead revision marked, the live session untouched, success
-reported. With lineage ids the id the athlete reads is the id the command needs.
+That last line would be a lie — the dead revision shown as the session, while the ride the
+athlete will actually do is the eased one in row 87. With lineage ids the id the athlete
+reads is the id the command needs.
 
 `archived_at` is the one key that disappears from the dict. Its history readers
 (`workout batches`, `workout rollback`, `plan show`'s archived listing) move to
@@ -404,8 +409,7 @@ had, the way every other field carries forward at step 2. A revision step 3 supp
 no-op writes none either, and the live row's sets stand — always right, because the
 description is rendered from the sets, so different kilograms make a different description.
 And `change.restore` copies the sets of the revision it restores, or the kilograms in its
-text would have no rows behind them; `workout swap` passes the moved session's along for the
-same reason, since its destination starts from an empty base by §4.
+text would have no rows behind them.
 
 Step 2 is the whole of what `save_workout`'s `COALESCE` ladder does today — roughly forty
 lines of SQL whose only job is "a partial re-save must not read an omission as a deletion",
@@ -430,13 +434,13 @@ predecessor rather than a flag threaded through the proposal. But the tally is n
 `COUNT(*)` over the lineage, because two kinds of revision make older adapts stop
 describing the live session:
 
-- **A `rollback`/`restore` copy undoes a span.** The copy records the revision it
+- **A `rollback` copy undoes a span.** The copy records the revision it
   duplicates in `restored_from`; everything between that revision and the copy was undone
   and must not count. Otherwise an adapt, rolled back a minute later, would still leave
   the guard shouting `ALREADY EASED` at a session running at full prescription.
-- **A `generate` re-prescribes the session.** Easings of the previous prescription do not
-  describe the new one. This matches today, where a regeneration created a fresh row with
-  a zero count.
+- **A `generate` or a `tweak` re-prescribes the session.** Easings of the previous
+  prescription do not describe the new one. This matches today, where a regeneration
+  created a fresh row with a zero count.
 
 So the derivation is a short backward walk, in Python, over the lineage's rows — a lineage
 is a handful of rows, fetched once per §5's batching:
@@ -444,7 +448,7 @@ is a handful of rows, fetched once per §5's batching:
 1. Start at the live revision.
 2. On a row with `restored_from` set, jump to the revision it names and continue from
    there — the undone span is skipped.
-3. Stop at the first `generate` revision, or at the lineage's first revision.
+3. Stop at the first `generate` or `tweak` revision, or at the lineage's first revision.
 4. Count the `adapt` rows encountered whose duration or TSS fell against their
    predecessor. That is `adaptation_count`; the newest such row's change `created_at` is
    `adapted_at`.
@@ -453,10 +457,11 @@ Three chains, one rule each — `rN` is a revision, its kind from `workout_chang
 minutes shown:
 
 ```
-A swap does not reset the tally:
+A move does not reset the tally:
 
-  r1 generate 90' ── r2 adapt 75' ── r3 adapt 65' ── r4 swap 65' (moved to Thu)
-  walk: r4 not an adapt, keep going → r3 counts → r2 counts → r1 generate, stop
+  r1 generate 90' ── r2 adapt 75' ── r3 adapt 65' ── r4 adapt void (left Tue)
+                                                   ── r5 adapt 65' (arrived Thu)
+  walk: r5 and r4 lowered nothing, keep going → r3 counts → r2 counts → r1 generate, stop
   adaptation_count = 2  — the §4 guard fires on Thursday
 
 A rollback skips the span it undid:
@@ -473,20 +478,18 @@ A generate starts a fresh tally:
   adaptation_count = 0  — easings of the old prescription do not describe the new one
 ```
 
-The remaining kinds are walked past without effect: `restore` and `reinstate` copies jump
-via `restored_from` exactly as rollback's do, and `swap`, `rm` voids and `stand-down`
-are not easings at all. `add` starts a new lineage (§4), so it never appears mid-walk.
+The remaining kinds are walked past without effect: `reinstate` copies jump via
+`restored_from` exactly as rollback's do, and `stand-down` voids are not easings at all.
 
 This deletes `AdaptProposal.stamp_adapted_at`. That flag existed so a load reduction driven
 by something other than fatigue would not count as an easing — and under this model the
 change kind decides that, with no flag to carry or forget.
 
 **The guard reads the tally, not the marker.** `coach/formatting.py::_easing_recency_tag`
-currently returns `""` unless the session's modification status is `adapted` — which works
-today only because of the `adapted`-beats-`swapped` precedence rule §12 retires. Under this
-model the marker reflects the *latest* change, so an adapted-then-swapped session reads
-`swapped`, and a status gate would silence the tag in exactly the §4 scenario that
-motivates the lineage. The gate becomes `adaptation_count > 0`: the tag renders whenever
+currently returns `""` unless the session's modification status is `adapted`. Under this
+model the marker reflects the *latest* change, so a session eased and then changed some
+other way reads as that later change, and a status gate would silence the tag while the
+easings still stand. The gate becomes `adaptation_count > 0`: the tag renders whenever
 the walk finds standing easings, whatever the last change kind was. §14 pins the rendered
 tag, not just the count.
 
@@ -557,7 +560,7 @@ rebuilds the entry from the live session and discards whatever else was attached
 
 The rendering both prompts share — identity, load, the already-eased tag, the change reason,
 the target — is `formatting.py::_planned_summary`; `format_planned_workouts_detailed` passes
-its own `[COMPLETED]`/`[athlete-added]`/`[BENCHMARK]` markers into it and appends the
+its own `[COMPLETED]`/`[BENCHMARK]` markers into it and appends the
 description below. The two prompts were drifting apart line by line, and the target was the
 line that made them differ in what they *knew*, not just in how much they said.
 
@@ -570,10 +573,6 @@ and the slot reverts to an ordinary write.
 
 **Deliberately not done**
 
-- **Carrying athlete-added (`source == 'manual'`) sessions.** The same mechanism reaches them
-  — one more clause in the filter, no change to `keep` — but the prompt is advisory, and an
-  athlete's own session is not the model's to overrule. That one wants the deterministic
-  post-pass `_drop_benchmark_collisions` has, and is a separate decision.
 - **Carrying the rest of the forward plan.** `DESIGN_mesocycle_boundary.md` §5 and
   `DESIGN_mesocycle_progress.md` §6 both decline a prompt-visible list of sessions the model may
   not touch. These are not that: they are sessions `generate` is being asked to decide about,
@@ -592,12 +591,10 @@ The kind is the change kind of the live revision:
 |---|---|
 | `generate` (and it is the lineage's first revision) | unmodified |
 | `adapt` | adapted |
-| `swap` | swapped |
-| `add` | replaced |
+| `tweak` | tweaked |
 
-No string prefixes, no `date != original_date`, no legacy catch-all. The two magic constants
-`SWAP_REASON_PREFIX` and `MANUAL_REPLACE_REASON_PREFIX`, the writer-side test that pins them,
-and the whole file go with it.
+No string prefixes, no `date != original_date`, no legacy catch-all. The two magic prefix
+constants, the writer-side test that pins them, and the whole file go with it.
 
 ## 8. Calendar state moves to a side table
 
@@ -641,7 +638,7 @@ the pass when it closes, so the only way to write workouts already schedules the
 reconcile.
 
 The pass is keyed on **the lineage's newest revision** — highest `id` anywhere in the
-lineage, not per slot. The distinction matters exactly once: a swap leaves the moved
+lineage, not per slot. The distinction matters exactly once: a move leaves the moved
 session's lineage with a live void at its source slot *and* a live copy at its
 destination (§4), and the copy must speak for the lineage or the pass would delete an
 event it should move. The handle keeps that true by construction: within one change,
@@ -650,12 +647,12 @@ session's newest revision is always the copy. Per lineage, then:
 
 - live non-void revision whose signature differs (or whose stored event id dangles) →
   push, creating or updating the event;
-- live void from `rm` / `stand-down` → retitle the event "[Deleted]" and keep it, as
+- live void from `stand-down` → retitle the event "[Deleted]" and keep it, as
   today, so `prune-calendar` still works;
-- live void from `generate` / `adapt` / `rollback` (the session is gone, not moved) →
-  delete the event and drop the `workout_calendar_state` row. A `swap` void never lands
-  here: its lineage's newest revision is the destination copy, so the first rule moves
-  the event instead.
+- live void from `generate` / `adapt` / `tweak` / `rollback` (the session is gone, not
+  moved) → delete the event and drop the `workout_calendar_state` row. A move's void never
+  lands here: its lineage's newest revision is the destination copy, so the first rule
+  moves the event instead.
 
 One batch-sized pass at the end of the command — an adapt touching five sessions pushes
 once — and the Calendar converges after every command instead of relying on each flow to
@@ -701,7 +698,7 @@ session.
 
 1. *What am I rewriting?* — every entry becomes a revision.
 2. *What does this date keep?* — a date the week planner touches keeps only the sports it names.
-   Anything else on that date is read as displaced and voided (§4, "Swap, in full").
+   Anything else on that date is read as displaced and voided (§4, "A move, in full").
 
 The adaptation prompt asks for changed sessions only, so a date carrying a ride and a lift
 where only the ride changes would silently lose the lift. The prompt's answer was to have
@@ -805,12 +802,12 @@ write is therefore a batch, and every batch is undoable by one mechanism:
 each lineage touched by N or by any later change, find that lineage's newest revision
 older than N and append a copy of it — stamped `restored_from` — under one new change of
 kind `rollback`. A lineage that did not exist before N (its first revision was appended by
-N — an `add`, say) gets a void instead.
+N — a session a tweak added, say) gets a void instead.
 
 Undoing one change *in isolation* is deliberately not offered. It looks finer-grained but
 is unsound the moment a later change touched the same lineage: undo Tuesday's adapt after
-Wednesday's swap moved the session to Thursday, and the "undo" would append the pre-adapt
-copy — dated Tuesday — into the Tuesday slot while the swapped copy stays live on
+Wednesday's tweak moved the session to Thursday, and the "undo" would append the pre-adapt
+copy — dated Tuesday — into the Tuesday slot while the moved copy stays live on
 Thursday. One session, live twice. Point-in-time has no such state: it restores exactly
 what was live the moment before N ran.
 
@@ -860,48 +857,39 @@ still has days ahead), and reports it exactly as today. Same comparison, new tim
 | Command | Change kind | What it appends |
 |---|---|---|
 | `workout generate` | `generate` | A revision per changed day in the horizon; a void for every live slot from the generation start onward that the new sessions do not fill — open-ended past the horizon, matching today's `archive_future_workouts`, which has no end bound. A slot the plan KEEPS (§7.1) gets neither: it is claimed, so no void, and left alone, so no revision. |
-| `workout adapt` | `adapt` | A revision per eased session; a void for a session it drops. A session it moves to another day or substitutes cross-sport: a void at the source and a revision at the destination carrying the session's lineage — the swap shape (§4). The move is named in the answer's `replaces`, the field `workout generate` already uses (DESIGN_plan_change_continuity.md §4.5); the day it empties gets a rest row written by the app. **No more `DELETE`.** |
-| `workout swap` | `swap` | Two revisions (same sport) or four (cross-sport), per §4. |
-| `workout add` | `add` | One revision; with `--replace-day`, a void per other session that day. **No more `DELETE`.** |
-| `workout rm` | `rm` | One void revision carrying the athlete's reason. |
-| `workout restore` | `restore` | A copy of the revision before the void, stamped `restored_from`. |
+| `workout adapt` | `adapt` | A revision per eased session; a void for a session it drops. A session it moves to another day or substitutes cross-sport: a void at the source and a revision at the destination carrying the session's lineage — the move shape (§4). The move is named in the answer's `replaces`, the field `workout generate` already uses (DESIGN_plan_change_continuity.md §4.5); the day it empties gets a rest row written by the app. **No more `DELETE`.** |
+| `workout tweak` | `tweak` | What `workout adapt` appends, on the days the athlete's request is about only (DESIGN_workout_tweak.md §3). |
 | `workout rollback` | `rollback` | A copy of each lineage's pre-target revision (§10). |
 | `plan rollback` | `rollback` | The same point-in-time primitive, targeted at the moment just after the restored version's newest change (§10); flipping the active version stays a plan-table write. |
 | goal archive / reinstate | `stand-down` / `reinstate` | Stand-down: one void per live session tagged with the goal's plan versions, from today on. Reinstate: one copy per lineage still live as such a void (§10). |
 | `workout push` | — | Writes only `workout_calendar_state`. Appends nothing. |
 | `workout compare --mark` | — | Writes only `workout_calendar_state`. Appends nothing. |
 
-The two hard-`DELETE` call sites (`coach/service/adaptation.py`,
-`coach/service/editing.py`) become voids. That is the single clearest correctness win here:
-those paths currently destroy sessions with no way back.
+The hard `DELETE` in `coach/service/adaptation.py` becomes a void. That is the single
+clearest correctness win here: that path currently destroys sessions with no way back.
 
 ## 12. Behaviour changes the athlete will notice
 
 Each of these is a deliberate change, not a side effect.
 
-**`original_*` after a cross-sport swap.** Today a cross-sport swap seeds the new session's
-`original_*` from the *displaced* session, so the Calendar event shows what was planned on
-that day. With lineage-derived values, `original_*` answers "what was **this session** first
-prescribed as". Both questions are now answerable — the day's original prescription is the
-first revision of the slot chain — but they are no longer the same field, and the Calendar
-footer changes accordingly.
+**`original_*` follows the session, not the day.** With lineage-derived values, `original_*`
+answers "what was **this session** first prescribed as", so a session moved to another day
+keeps its own first form. What was first planned on that day is still answerable — it is
+the first revision of the slot chain — but the two are no longer the same field, and the
+Calendar footer changes accordingly.
 
-**Modification markers stop having a precedence rule.** Today `adapted` beats `swapped`,
-because a session adapted and later swapped keeps its `adaptation_summary` and would
-otherwise be misread. That precedence is a workaround for shared columns. With revisions the
-marker reflects the latest change and the count comes from the lineage, so a session eased
-twice and then swapped renders `[SWAPPED, ADAPTED ×2]`. More information, no rule.
+**Modification markers stop having a precedence rule.** Today `adapted` beats every other
+status, because an eased session that later changed another way keeps its
+`adaptation_summary` and would otherwise be misread. That precedence is a workaround for
+shared columns. With revisions the marker reflects the latest change and the count comes
+from the lineage, so the two are separate facts: a session eased twice and then copied
+forward by a rollback renders `[ADAPTED ×2]`. More information, no rule.
 
 **Workout ids stop churning.** They were already stable in practice; they stay stable by
-construction, and `workout rm` / `swap` can no longer address a dead revision.
+construction, and a command given an id can no longer address a dead revision.
 
-**`workout batches` gets longer and more useful.** It lists every change, including adapts,
-swaps and manual edits, each undoable.
-
-**A regeneration may replace a manually added session, and says so.** Today the two paths
-collide silently. Under §4's lineage rules the generate proceeds, the manual session's
-lineage ends, and the command prints which manual session was replaced — with the change id
-to roll back if the athlete disagrees.
+**`workout batches` gets longer and more useful.** It lists every change, including adapts
+and tweaks, each undoable.
 
 ## 13. Migration
 
@@ -939,16 +927,13 @@ oldest rows (the `created_at` column was itself backfilled late and can be NULL)
 | `swapped` | `swap` |
 | `replaced` | `add` |
 
-One override runs before the table applies: **a row with `source = 'manual'` classifies
-as `add`, whatever `modification_status()` says.** The classifier keys on
-`modification_reason`, and a manual session added onto an empty day has none — it would
-read `unmodified`, root its lineage in a `generate`, and §5 would then derive its
-`source` as `'generated'`, erasing its athlete-added standing. Migration-script code
-only; the classifier itself is not touched before it is deleted.
+One override runs before the table applies: a row with `source = 'manual'` classifies as
+`add`, whatever `modification_status()` says. Migration-script code only; the classifier
+itself is not touched before it is deleted. The heuristic file's last act is to seed the
+data that replaces it; after the migration it is deleted.
 
-`replaced → add` is what roots a manual session's lineage in an `add`, so the §5 `source`
-derivation keeps reading it as manual. The heuristic file's last act is to seed the data
-that replaces it; after the migration it is deleted.
+Schema 18 later relabelled the `swap` and `add` rows this step wrote as `tweak`
+(DESIGN_workout_tweak.md §7).
 
 **Step 4 — insertion order.** Fill `workouts_new` slot by slot: archived rows in
 `(created_at, id)` order first, **the live row last**. This is load-bearing, not cosmetic:
@@ -962,7 +947,7 @@ generation as the live plan.
 `lineage_id`.
 
 This is exact for the common case — a slot's rows *are* one session's revisions — and wrong
-wherever a pre-migration swap moved a session between slots. That is accepted. Pre-migration
+wherever a session moved between slots before the migration. That is accepted. Pre-migration
 history is slot history; lineages are real from the migration forward. §16 records it.
 
 **Step 6 — column moves.** `removed` → `void`; `modification_reason` / `removed_reason` →
@@ -1013,22 +998,21 @@ migration function.
 
 **Behaviour tests, each pinning something this design claims:**
 
-- The DO NOT COMPOUND guard survives a swap **end to end**. Build the §4 example — two
-  adapts on Tuesday, a swap to Thursday — and assert the *rendered prompt tag* for the
-  Thursday session says `ALREADY EASED` with `2x`. Asserting only `adaptation_count == 2`
-  would pass at the db layer while a status-gated `_easing_recency_tag` still returned `""`
-  (§7); the tag is the behaviour this design exists to protect. This test fails on slot
-  chains alone, and it fails on a status-gated tag.
+- The DO NOT COMPOUND guard survives a move **end to end**. Build the §4 example — two
+  adapts on Tuesday, then an adapt that trades Tuesday and Thursday — and assert the
+  *rendered prompt tag* for the Thursday session says `ALREADY EASED` with `2x`. Asserting
+  only `adaptation_count == 2` would pass at the db layer while a status-gated
+  `_easing_recency_tag` still returned `""` (§7); the tag is the behaviour this design
+  exists to protect. This test fails on slot chains alone, and it fails on a status-gated
+  tag.
 - An adapt undone by rollback stops counting: adapt, roll it back, assert
   `adaptation_count == 0` and that no tag renders (the `restored_from` jump of §7).
-- Rollback is point-in-time: generate, adapt, then swap; undo the adapt's change and
-  assert the swap is reverted too — the pre-adapt session is live on its original day and
-  no lineage is live in two slots (§10).
-- A non-void appended over a void starts a new lineage: `rm` a session, generate into the
+- Rollback is point-in-time: generate, adapt, then a tweak that moves the session; undo
+  the adapt's change and assert the move is reverted too — the pre-adapt session is live
+  on its original day and no lineage is live in two slots (§10).
+- A non-void appended over a void starts a new lineage: void a session, generate into the
   slot, assert the new session has a fresh lineage, a zero tally, and no inherited
   Calendar event (§4).
-- A generate landing on a manual session replaces it under a new lineage, prints the
-  notice, and rolling the change back brings the manual session back (§4, §12).
 - Regenerating an unchanged horizon appends no revisions (§9).
 - A session named only to keep it survives the pass (§9.1) — both as a verbatim re-list and
   as a keep marker: no revision row, no bumped tally, and above all not a removal. Its
@@ -1045,8 +1029,9 @@ migration function.
   revision stays in the chain.
 - An adapt that drops a session leaves a void, and `workout rollback` on that change brings
   the session back. Today this case loses the row permanently.
-- A cross-sport swap voids both source slots and lands both sessions with their own lineages.
-- `workout rm <id>` addressed by lineage id acts on the live revision after an intervening
+- Two sessions of different sports trading days: both source slots are voided and both
+  sessions land with their own lineages.
+- A session addressed by its lineage id resolves to the live revision after an intervening
   adapt.
 
 ## 15. Alternatives considered
@@ -1057,13 +1042,13 @@ forget to maintain the columns this design deletes. A log that is a side effect 
 write is exactly the shape that goes stale.
 
 **Slot chains with no `lineage_id`.** Rejected for the reason in §4: it silently breaks the
-DO NOT COMPOUND guard at a swap, and it does not let you delete `adaptation_count` or
+DO NOT COMPOUND guard at a move, and it does not let you delete `adaptation_count` or
 `adapted_at`, which were two of the reasons for doing this at all.
 
 **Zero the adaptation tally whenever the live revision's kind is not `adapt`.** Considered
-as a cheaper stand-in for `restored_from`. Rejected: the tally's whole §4 justification is
-surviving a swap, and a swap makes the live kind `swap` — the rule would zero the count in
-exactly the scenario the lineage exists to protect. Undone spans are excluded by the
+as a cheaper stand-in for `restored_from`. Rejected: a rollback or a reinstate that brings
+an eased session back makes the live kind `rollback` or `reinstate`, and the rule would
+zero a count the copy has just brought back. Undone spans are excluded by the
 `restored_from` jump instead (§7).
 
 **Keep the calendar columns on the row, with an explicit carve-out.** Rejected: an
@@ -1082,8 +1067,8 @@ it is free and strictly more correct — but as tidying, not as a repair.
   today's upsert does. Worth noting that because the *spine* is `lineage_id` and not the
   slot key, relaxing this later means adding a slot ordinal to the uniqueness rule, not
   re-keying the history model.
-- **Accurate pre-migration lineages across swaps.** Step 5 assigns one lineage per slot,
-  which mis-joins any session a pre-migration swap moved. Reconstructing those from
+- **Accurate pre-migration lineages across moves.** Step 5 assigns one lineage per slot,
+  which mis-joins any session moved before the migration. Reconstructing those from
   `original_date` and a free-text prefix is guesswork over 372 rows of history that is about
   to be superseded by real data. Not worth the code.
 - **Reconstructing multi-adapt counts.** §13 step 2 rebuilds one synthetic original per

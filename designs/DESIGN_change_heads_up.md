@@ -280,11 +280,11 @@ row are legitimate: `workout generate` for next month, then `workout adapt` for 
 rain. Both messages go out, oldest first, and read as a story in order.
 
 The question is asked only about the newest change. If she changed something in her chat
-after change 7, or the operator edited a session by hand after it, the newest change is not a
-waiting one and nothing is asked: a rollback undoes everything after its target, and her own
-change must not disappear as a side effect. A run with `-y`, `--auto` or `--force` asks
-nothing and builds on top, as today. Once change 7 has been sent, a second run is a real
-second change, its line is written against a week she knows, and nothing is asked.
+after change 7, the newest change is not a waiting one and nothing is asked: a rollback
+undoes everything after its target, and her own change must not disappear as a side effect.
+A run with `-y`, `--auto` or `--force` asks nothing and builds on top, as today. Once
+change 7 has been sent, a second run is a real second change, its line is written against a
+week she knows, and nothing is asked.
 
 ## 6. What TrainMate records
 
@@ -336,9 +336,9 @@ A rollback writes its message in its own `note` when it is recorded. It looks at
 it undoes and keeps those that have a `told_at` and wrote a session dated today or later.
 With none, it writes no `note` and says nothing. Otherwise its `note` is "Your coach undid
 this change:" followed by the `note` of each, oldest first ("these changes:" for several). If
-none of them has a `note`, as with an adaptation made before this design or a session she
-moved by hand, the `note` is today's sentence, "The change to your week was undone." A
-rollback that is itself undone is not quoted.
+none of them has a `note`, as with an adaptation made before this design, the `note` is
+today's sentence, "The change to your week was undone." A rollback that is itself undone is
+not quoted.
 
 `bot changes` sends a rollback's line as it is, and puts "Your coach changed your week:" in
 front of a `workout generate` or `workout adapt` line.
@@ -384,11 +384,11 @@ today's sessions and the line would only go out tomorrow, the terminal says so i
 
 `workout batches` lists every change with its date, kind, size and span, and nothing about
 what the change was, although a description is already stored with most of them: the week
-planner's reasoning for a `workout generate`, its reason for a `workout adapt`, and the typed
-reason of a `workout rm`. It now prints that description under each row, cut at about 200
-characters. A rollback's row gets none. Its stored description is "Undo of change #6
-(generate).", which names the change by its internal number, and the list numbers its rows by
-position: the 6 would point at the wrong row. A change still waiting to be
+planner's reasoning for a `workout generate`, and its reason for a `workout adapt` or a
+`workout tweak`. It now prints that description under each row, cut at about 200 characters.
+A rollback's row gets none. Its stored description is "Undo of change #6 (generate).",
+which names the change by its internal number, and the list numbers its rows by position:
+the 6 would point at the wrong row. A change still waiting to be
 told also says "not sent yet", which is what the question of §5 refers to. No command gains
 an LLM call for this: the commands that have none are instant today and stay so.
 
@@ -486,8 +486,7 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
 
 ## 12. Deliberately not done
 
-- `workout swap`, `workout add`, `workout rm`, `workout restore`, and calling a goal off or
-  reinstating it. They change her week too, and stay silent for now.
+- Calling a goal off or reinstating it. It changes her week too, and stays silent for now.
 - A list of the changed days under the line. The line names what moved, and "🗓 My week"
   shows the whole week.
 - One message written at send time that sums up everything since she was last told. It would

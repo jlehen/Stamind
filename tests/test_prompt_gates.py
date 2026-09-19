@@ -434,18 +434,6 @@ class TestStandingSessionsGate(unittest.TestCase):
         )
         self.assertIn("Cut to easy Z2 to shed intensity.", user)
 
-    def test_the_committed_tag_follows_the_window(self):
-        """A session inside the window is committed; one past it is in the list because
-        the athlete added it, and must not claim to be committed (§4.6)."""
-        _system, user = build_generate_prompt(
-            standing_workouts=self.EASED, commitment_end="2026-06-05"
-        )
-        self.assertIn("[COMMITTED]", user)
-        _system, user = build_generate_prompt(
-            standing_workouts=self.EASED, commitment_end="2026-06-04"
-        )
-        self.assertNotIn("[COMMITTED]", user)
-
     def test_the_list_carries_the_intensity_target(self):
         """Duration and TSS fold intensity away — 40min steady and 12min hard inside 40min
         read the same, and whether a day still fits the week is a question about zones."""
@@ -458,19 +446,11 @@ class TestStandingSessionsGate(unittest.TestCase):
         system, _user = build_generate_prompt(standing_workouts=self.EASED)
         self.assertIn('carries no "planned_zone_sec"', system)
 
-    def test_a_committed_session_ships_its_description(self):
-        """A revision inside the window should be minimal rather than re-invented, which
-        needs the prose the session already carries (§4.6)."""
-        _system, user = build_generate_prompt(
-            standing_workouts=self.EASED, commitment_end="2026-06-05"
-        )
-        self.assertIn("ERG-locked, no surges.", user)
-
-    def test_a_session_past_the_window_does_not(self):
-        """Past the window the week planner answers for the session, it does not rewrite its
-        interval structure — so the prose is not paid for."""
+    def test_a_standing_session_ships_its_description(self):
+        """A revision should be minimal rather than re-invented, which needs the prose the
+        session already carries (§4.6)."""
         _system, user = build_generate_prompt(standing_workouts=self.EASED)
-        self.assertNotIn("ERG-locked, no surges.", user)
+        self.assertIn("ERG-locked, no surges.", user)
 
     def test_without_a_standing_session_none_of_them_appear(self):
         system, user = build_generate_prompt()
@@ -545,7 +525,7 @@ GATES_WITHOUT_A_TEST = {
     "signal_earliest_date",
     # generate
     "num_days", "start_str", "metrics", "completed_activities", "baseline",
-    "mesocycle_progress", "mesocycle_has_intensity", "anchor_history", "commitment_end",
+    "mesocycle_progress", "mesocycle_has_intensity", "anchor_history",
 }
 
 BUILDERS = ("_workout_adapt_logic", "_workout_generate_logic")

@@ -44,12 +44,14 @@ class TestDashlessOptionTranslator(unittest.TestCase):
         adapt = wsubs.add_parser("adapt", aliases=["a"])
         adapt.add_argument("-m", "--message", dest="message")
         adapt.add_argument("--no-pull", action="store_true", dest="no_pull")
-        add = wsubs.add_parser("add")
-        add.add_argument("--sport", nargs="+")
-        add.add_argument("--title")
         lst = wsubs.add_parser("list")
         lst.add_argument("--mesocycle", type=int, nargs="?", const=-1, dest="meso_id")
         lst.add_argument("--type", dest="sport_type")
+        g = subs.add_parser("goal")
+        gsubs = g.add_subparsers(dest="subcommand")
+        edit = gsubs.add_parser("edit")
+        edit.add_argument("--sport", nargs="+")
+        edit.add_argument("--title")
         return p
 
     def _xlate(self, tokens):
@@ -65,8 +67,8 @@ class TestDashlessOptionTranslator(unittest.TestCase):
 
     def test_multivalue_comma_split(self):
         self.assertEqual(
-            self._xlate(["workout", "add", "sport", "running,hiking", "title", "Big Day"]),
-            ["workout", "add", "--sport", "running", "hiking", "--title", "Big Day"],
+            self._xlate(["goal", "edit", "sport", "running,hiking", "title", "Big Day"]),
+            ["goal", "edit", "--sport", "running", "hiking", "--title", "Big Day"],
         )
 
     def test_optional_value_peek(self):
@@ -99,8 +101,8 @@ class TestDashlessOptionTranslator(unittest.TestCase):
         tokens = ["workout", "adapt", "--message", "hi", "--no-pull"]
         self.assertEqual(self._xlate(tokens), tokens)
         self.assertEqual(
-            self._xlate(["workout", "add", "--sport", "running", "hiking", "--title", "X"]),
-            ["workout", "add", "--sport", "running", "hiking", "--title", "X"],
+            self._xlate(["goal", "edit", "--sport", "running", "hiking", "--title", "X"]),
+            ["goal", "edit", "--sport", "running", "hiking", "--title", "X"],
         )
 
     def test_canonical_option_uses_longest_spelling(self):

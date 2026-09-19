@@ -299,18 +299,10 @@ The past and future halves must be in the same units or the seam is a lie.
   happened), the fold values today by this rule — the stored today-row never
   anchors the projection (§4).
 
-**Plan end.** The projection runs exactly to the last non-removed
-**generated** workout date (`workouts.source = 'generated'`) and stops — no
-zero-fill beyond it (a decaying ghost line would read as fitness collapse,
-which is a statement about missing data, not the plan). Manual rows
-(`workout add` / `POST /api/workouts`) count toward daily loads inside that
-range but never *extend* it: one manually-added race-day placeholder months
-out would otherwise drag plan end there and draw the projection over months
-of assumed rest — the exact ghost this rule forbids, through the front door.
-Non-removed workouts dated after plan end are counted into `warnings`
-("1 workout beyond plan end — not projected"). Fallback: a DB with no
-generated workouts at all (fully manual planning) uses the last non-removed
-workout of any source. A plan ending mid-week leaves the final future
+**Plan end.** The projection runs exactly to the last non-removed workout
+date, planned rest rows included, and stops — no zero-fill beyond it (a
+decaying ghost line would read as fitness collapse, which is a statement
+about missing data, not the plan). A plan ending mid-week leaves the final future
 week's planned total genuinely partial (Mon–Wed only); that week takes
 `partial_plan` and its `*` under the comparable-days rule above — rather than
 being resliced or hidden: the bar stays honest, the marker explains it.
@@ -657,7 +649,7 @@ ARCHITECTURE.md):
 - **No caching.** Recomputed and re-rendered per request — a few hundred
   rows of arithmetic plus one Agg figure. Deliberately *not* an
   `analysis_cache` slot: the projection must move the instant
-  `adapt`/`generate`/`swap`/`remove` rewrite future workouts, and a
+  `generate`/`adapt`/`tweak`/`rollback` rewrite future workouts, and a
   fingerprint scheme would just re-derive "did anything change" at higher
   complexity than recomputing.
 - Query param `?weeks=N` re-windows the past half exactly like the CLI's
@@ -731,7 +723,7 @@ silently dropped.
      "command": "data pull"},
     {"code": "zero_load_workouts",
      "text": "2 planned workouts lack TSS/RPE — count as 0"}
-    // codes: no_history, bootstrap_dates, zero_load_workouts, beyond_plan_end,
+    // codes: no_history, bootstrap_dates, zero_load_workouts,
     // pmc_warming (the §4 pmc_data_caveat flag on a young DB)
   ]
 }
@@ -1139,7 +1131,7 @@ additive:
 1. **ACWR projection ribbon.** Extend the *existing* rolling-sum
    acute/chronic/ACWR math (§12 semantics, unchanged) forward over the
    merged §3 series; shade the 0.8–1.3 band and flag future weeks the plan
-   pushes past 1.3. Actionable: the fix is one `adapt`/`swap` away.
+   pushes past 1.3. Actionable: the fix is one `adapt`/`tweak` away.
 2. **Plan-drift view.** Third bar layer from `original_tss` /
    `original_duration_minutes` + `adaptation_count`: original prescription vs
    adapted prescription vs actual — a visualization of the adaptation engine itself.
@@ -1222,10 +1214,9 @@ the §7.2 photo transport for free where they need a chart in chat.)*
   `tss=0` values to 0, not the sRPE fallback), Monday week bucketing,
   in-progress-week elapsed split (today counted only once synced), the
   part-week plan rule (a plan starting or ending mid-week takes
-  `partial_plan`; a week the plan spans whole does not), plan-end clamp incl. the
-  generated-only rule (a manual workout beyond plan end leaves it unchanged
-  and warns; no-generated-workouts fallback), the lapsed plan (plan_end <
-  today → no fold, window ends today), §6.1 majority-overlap labeling over
+  `partial_plan`; a week the plan spans whole does not), the plan-end clamp,
+  the lapsed plan (plan_end < today → no fold, window ends today), §6.1
+  majority-overlap labeling over
   fixture spans, the rev-7 label fallback (weeks covered only by a
   superseded version or a completed objective's plan fall to
   `~inferred`/`—` labels while their planned totals and percentages still

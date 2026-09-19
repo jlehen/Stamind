@@ -229,13 +229,11 @@ def format_planned_workouts(
     return "\n".join(_planned_summary(w, eval_date) for w in planned_workouts)
 
 
-def _standing_markers(w: Workout, window_end: Optional[str]) -> str:
+def _standing_markers(w: Workout) -> str:
     """The tags a standing session carries into the generate prompt (§4.6). Each says
     what kind of commitment the session is, so the model sees it once rather than in a
     section of its own."""
     markers = ""
-    if window_end and w['date'] <= window_end:
-        markers += " [COMMITTED]"
     if w.get('benchmark_type'):
         markers += f" [BENCHMARK: {w['benchmark_type']}]"
     if canonical_sport(w.get('sport_type', '')) == canonical_sport('rest'):
@@ -245,19 +243,16 @@ def _standing_markers(w: Workout, window_end: Optional[str]) -> str:
 
 def format_standing_workouts(
     standing: List[Workout], eval_date: Optional[str] = None,
-    window_end: Optional[str] = None,
 ) -> str:
     """The SESSIONS ALREADY STANDING section of the generate prompt
     (DESIGN_plan_change_continuity.md §4.6).
 
-    A committed session also carries its full description, so a revision can be minimal
-    rather than re-invented; one past the window is listed to be answered for, not
-    rewritten in detail, so its one-line form is enough."""
+    Each session also carries its full description, so a revision can be minimal rather
+    than re-invented."""
     sections = []
     for w in standing:
-        committed = bool(window_end and w['date'] <= window_end)
-        header = _planned_summary(w, eval_date, _standing_markers(w, window_end))
-        desc = _for_the_week_planner(w) if committed else ''
+        header = _planned_summary(w, eval_date, _standing_markers(w))
+        desc = _for_the_week_planner(w)
         if not desc:
             sections.append(header)
             continue

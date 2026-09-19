@@ -38,8 +38,8 @@ _KIND_LABELS = {
     "reinstate": "Reinstated",
 }
 
-# A void needs its own word: the same emptying reads as "cancelled" when the athlete asked
-# for it and as "dropped" when a regeneration stopped scheduling the day (§3).
+# A void needs its own word, which says who emptied the day: the plan, an adaptation, the
+# athlete's request, an undo or a goal stood down (§3).
 _VOID_LABELS = {
     "generate": "Dropped from the plan",
     "adapt": "Dropped by the adaptation",

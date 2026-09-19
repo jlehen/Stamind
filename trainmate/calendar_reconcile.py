@@ -55,9 +55,9 @@ def verbose_events() -> Iterator[None]:
 def reconcile(db, lineage_ids: Sequence[int]) -> None:
     """Pushes, moves or tears down the Calendar events of the given lineages.
 
-    Keyed on each lineage's newest revision, not on a slot: a swap leaves the moved
-    session with a void where it left and a copy where it landed, and the copy must speak
-    for the lineage or this would delete an event it should move (§8).
+    Keyed on each lineage's newest revision, not on a slot: a move leaves the session
+    with a void where it left and a copy where it landed, and the copy must speak for the
+    lineage or this would delete an event it should move (§8).
 
     Decided first and executed second, so one batch of Calendar round-trips renders as one
     summary line and a bar rather than a page of per-event chatter.

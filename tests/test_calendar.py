@@ -175,7 +175,7 @@ class TestCalendarSync(unittest.TestCase):
             "title": "Tempo Run",
             "description": "40 min tempo at threshold.",
             "original_description": "40 min tempo at threshold.",
-            "modification_reason": "Swapped from 2026-06-09 to 2026-06-11",
+            "modification_reason": "Moved from 2026-06-09 to 2026-06-11",
             "change_kind": "adapt",
             "duration_minutes": 40,
             "tss": 50,
@@ -183,7 +183,7 @@ class TestCalendarSync(unittest.TestCase):
         }
 
         mock_service = MagicMock()
-        mock_event_result = {"id": "evt-swap-1", "htmlLink": "http://calendar/event/2"}
+        mock_event_result = {"id": "evt-move-1", "htmlLink": "http://calendar/event/2"}
         mock_service.events().insert().execute.return_value = mock_event_result
 
         with patch.object(calendar_syncer, "service", mock_service), quiet_events():
@@ -201,7 +201,7 @@ class TestCalendarSync(unittest.TestCase):
         self.assertNotIn("Adapted:", desc)
         self.assertNotIn("Originally:", desc)
         self.assertIn("40 min tempo at threshold.", desc)
-        self.assertIn("Reason:\nSwapped from 2026-06-09 to 2026-06-11", desc)
+        self.assertIn("Reason:\nMoved from 2026-06-09 to 2026-06-11", desc)
         # The description text appears exactly once.
         self.assertEqual(desc.count("40 min tempo at threshold."), 1)
 

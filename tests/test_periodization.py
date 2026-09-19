@@ -2537,7 +2537,6 @@ class TestTheStandingSessionsReachGeneration(unittest.TestCase):
         _proposal, user = self._run()
         self.assertIn("## SESSIONS ALREADY STANDING", user)
         self.assertIn("Easy Z2 Spin", user)
-        self.assertIn("[COMMITTED]", user)
         self.assertIn("first prescribed as 90m, RPE 7, TSS 110", user)
         self.assertIn("Cut to easy Z2 to shed intensity.", user)
 

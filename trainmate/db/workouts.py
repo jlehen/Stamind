@@ -76,7 +76,7 @@ def _describing_revision(
 ) -> Dict[str, Any]:
     """The revision whose change describes the *form* this one holds.
 
-    A rollback/restore/reinstate copy re-establishes an earlier prescription, so it reads
+    A rollback/reinstate copy re-establishes an earlier prescription, so it reads
     as whatever that prescription was — the same `restored_from` jump the adaptation tally
     makes (§7). Every other revision describes itself. Both the change kind and the
     commitment window are read off it (DESIGN_plan_change_continuity.md §5.2)."""
@@ -96,7 +96,7 @@ def _adaptation_tally(
 ) -> Tuple[int, Optional[str]]:
     """Walks a lineage backwards from `head_id` and counts the easings still standing (§7).
 
-    Not a `COUNT(*)`: a rollback/restore copy jumps over the span it undid, and a
+    Not a `COUNT(*)`: a rollback/reinstate copy jumps over the span it undid, and a
     `generate` or a `tweak` re-prescribes the session so easings of the previous
     prescription stop describing it. Returns `(adaptation_count, adapted_at)`.
     """

@@ -397,7 +397,7 @@ class SeamTest(_HistoryCase):
         workout = test_db.get_workout("2026-09-17", "strength_training")
         for text in (
             format_planned_workouts_detailed([workout]),
-            format_standing_workouts([workout], window_end="2026-09-20"),
+            format_standing_workouts([workout]),
         ):
             self.assertIn("Heavy full-body.", text)
             self.assertNotIn("140", text)

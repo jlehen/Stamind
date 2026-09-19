@@ -53,7 +53,7 @@ class TestCliMisc(unittest.TestCase):
 
         exit_code, stdout, stderr = self.run_cli(["workout", "--help"])
         self.assertEqual(exit_code, 0)
-        self.assertIn("swap", stdout)          # everyday command is listed
+        self.assertIn("tweak", stdout)         # everyday command is listed
         self.assertNotIn("push", stdout)       # advanced command is hidden from -h
 
         exit_code, stdout, stderr = self.run_cli(["data", "--help"])

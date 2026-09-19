@@ -63,13 +63,13 @@ History · 3 earlier revisions, newest first
       2026-09-01 Tue · Long ride
       Duration: 120m | TSS: 150 | RPE: 7
       Target: ~30min recovery, ~60min aerobic, ~20min threshold
-      Reason: Eased from 180m — sleep debt across the week
+      Reason: Moved to Tuesday, eased from 180m — sleep debt across the week
       Change: HRV suppressed three mornings running
       2h steady endurance, last 20min at tempo.
 
-[2/4] Moved · 2026-08-25 09:40
+[2/4] Dropped by the adaptation · 2026-08-30 06:12
       2026-08-31 Mon · Long ride
-      Reason: Swapped with Tuesday's easy run
+      Reason: Moved to Tuesday, eased from 180m — sleep debt across the week
 
 [1/4] Planned · 2026-08-01 06:00
       2026-08-31 Mon · Long ride
@@ -97,10 +97,7 @@ session's life, not a category:
 |---|---|---|
 | `generate` | Planned | Dropped from the plan |
 | `adapt` | Adapted | Dropped by the adaptation |
-| `swap` | Moved | Moved away |
-| `add` | Added by hand | — |
-| `rm` | — | Cancelled |
-| `restore` | Restored | — |
+| `tweak` | Changed on request | Dropped on request |
 | `rollback` | Rolled back | Undone |
 | `stand-down` | — | Goal stood down |
 | `reinstate` | Reinstated | — |
@@ -110,19 +107,21 @@ copies the departing session's columns forward (DESIGN_workout_revisions.md §3)
 still *carries* a duration and a target; printing them would state a prescription for a day
 that holds no session.
 
-That is what makes a swap legible. A cross-sport swap leaves the moved session with a void
-where it left and a copy where it landed (DESIGN_workout_revisions.md §4), and both are
-revisions of one lineage, so the history reads `Moved` at the new date, then `Moved away`
-from the old one, then the form it had before the move.
+That is what makes a move legible. A move leaves the session with a void where it left and
+a copy where it landed (DESIGN_workout_revisions.md §4), and both are revisions of one
+lineage. So the history shows the new date, then the old one with the void's reason saying
+where the session went, then the form it had before the move. In the example above, the
+adaptation of 2026-08-30 moved the ride from Monday to Tuesday and eased it in one change:
+entry 2 is the void it left on Monday, entry 3 the eased ride on Tuesday.
 
 ## 4. Which revisions, and in what order
 
 Every revision of the lineage except the one the event is currently rendering, newest
 first. Not a filtered subset:
 
-- **voids are in.** A cancel-then-restore is a real thing that happened to the session and
-  the gap is exactly what an athlete would ask about.
-- **`restore` and `rollback` revisions are in**, as themselves. The §7 tally walk jumps
+- **voids are in.** A session dropped and then brought back by a rollback is a real thing
+  that happened to it, and the gap is exactly what an athlete would ask about.
+- **`rollback` and `reinstate` revisions are in**, as themselves. The §7 tally walk jumps
   over an undone span so it does not count easings that were taken back; the history is the
   opposite job — it is the record of what happened, and an undo happened.
 - **the first revision is in**, and it is the one carrying the load the footer used to call
@@ -223,7 +222,7 @@ one more entry gives way to it rather than the other way round.
   body, and the entries run newest first;
 - a session with one revision renders with no `History` section at all — the ordinary case
   is untouched;
-- a swapped session's history names both the destination and the vacated date;
+- a moved session's history names both the destination and the vacated date;
 - a void entry prints no `Duration:` and no `Target:`;
 - a `Change:` line appears only when the change summary differs from the revision's reason;
 - appending a revision marks the event stale — the rule spans `db/workouts.py` and

@@ -69,10 +69,9 @@ def _standing_sessions_task(standing_workouts: Optional[List[Workout]]) -> str:
     return """
 ### THE SESSIONS THE ATHLETE IS ALREADY LOOKING AT
 The user content includes a section titled "SESSIONS ALREADY STANDING": the sessions this
-span already holds that the athlete has already been told about. Each one carries its
-tags:
+span already holds inside the days the athlete has already read and planned around. A
+session may also carry a tag:
 
-- "[COMMITTED]" — inside the days the athlete has already read and planned around.
 - "[BENCHMARK: ...]" — a scheduled fitness test, and the strongest commitment on the
   calendar: the athlete arranges to be fresh for it, so moving or dropping one needs a
   reason that says why the test can wait.
@@ -691,7 +690,6 @@ class WorkoutLogicMixin:
         zone_currencies: Optional[Dict[str, str]] = None,
         anchor_history: Optional[str] = None,
         standing_workouts: Optional[List[Workout]] = None,
-        commitment_end: Optional[str] = None,
         past_constraints: Optional[List[Constraint]] = None
     ) -> Dict[str, Any]:
         """Queries LLM to generate workouts for a given number of days based on active strategy.
@@ -700,9 +698,8 @@ class WorkoutLogicMixin:
         today when the selectors opened the span there, or when today's session is already
         completed and must be preserved (DESIGN_cli_selectors.md §8).
 
-        `standing_workouts` are the sessions the athlete has already been told about that
-        this span would rewrite, and `commitment_end` the last day of the window they were
-        promised for (DESIGN_plan_change_continuity.md §4.2). `past_constraints` ended
+        `standing_workouts` are the sessions inside the commitment window that this span
+        would rewrite (DESIGN_plan_change_continuity.md §4.2). `past_constraints` ended
         earlier in the current mesocycle and explain its record (§6.1).
         """
         start_str = start_str or today_str
@@ -871,9 +868,7 @@ class WorkoutLogicMixin:
                 "You must answer for every session listed here — keep it, revise it, move "
                 "it or drop it.\nEvery date this list does not name is yours to write "
                 "from scratch.\n"
-                + format_standing_workouts(
-                    standing_workouts, eval_date=today_str, window_end=commitment_end,
-                )
+                + format_standing_workouts(standing_workouts, eval_date=today_str)
             )
 
         if history_text_parts:

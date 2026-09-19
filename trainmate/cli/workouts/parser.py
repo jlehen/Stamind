@@ -6,7 +6,7 @@ function that reads them are defined together.
 from trainmate.config import config
 from trainmate.util import green
 from trainmate.cli.selectors import add_selector_args, add_single_date_arg, parse_target
-from trainmate.cli.workouts.edit import (
+from trainmate.cli.workouts.calendar_sync import (
     run_workout_prune_calendar, run_workout_push, run_workout_wipe,
 )
 from trainmate.cli.workouts.generate import (

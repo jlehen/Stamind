@@ -57,35 +57,28 @@ contract: pure over rows the caller fetched, returning a small structured result
 surface words itself (DESIGN_progress_timeline.md §6.0 — computing once keeps surfaces
 from diverging on *when* it fires or *by how much*).
 
-Inputs: today, the **generated** workouts from today forward, the mesocycles of the active
-macrocycle, the active objectives, and `config.runway_warning_days` (§7). Two input rules,
-both following `progression.plan_end`'s precedent (progression.py):
-
-- **Manual rows don't count.** `workout add` needs no plan, so a hand-entered event —
-  the race itself, put on the calendar weeks out — must not make the detector believe
-  the schedule reaches it while the generated sessions end next Thursday. The hole is
-  the fact, and only generated rows testify to it.
-- **Rest rows do count.** A planned rest day is a row like any other (§2.1), so the last
-  covered date is read off the rows directly — no margin, no guessing whether a quiet
-  tail is a taper or a hole.
+Inputs: today, the workouts from today forward, the mesocycles of the active macrocycle,
+the active objectives, and `config.runway_warning_days` (§7). **Rest rows count**, as they
+do in `progression.plan_end` (progression.py): a planned rest day is a row like any other
+(§2.1), so the last covered date is read off the rows directly — no margin, no guessing
+whether a quiet tail is a taper or a hole.
 
 Output: `None` when nothing fires, else:
 
-- `last_covered_date` — the last date a generated row (rest included) covers, and
+- `last_covered_date` — the last date a row (rest included) covers, and
   `days_left` from today (negative once the cliff is behind the athlete);
 - `kind` — `mesocycle` | `span` | `plan_end_next_goal` | `plan_end_no_goal`;
 - for `mesocycle`: the next mesocycle's id, so every surface can name `-m ..<id>`;
 - for `span`: the periodization end date, so the wording can say how much plan is left;
 - for `plan_end_next_goal`: the objective — via `plan_gap`, **fed the mesocycle-derived
   plan end**, not `progression.plan_end`. The two differ exactly when the detector
-  fires: `progression.plan_end` is the last generated *row* (right for the progress
-  banner, which asks "do the workouts reach the goal?"), while classification here asks
-  "does the *periodization* reach a goal?" — a span cliff must not read as a goal gap.
-  (`plan_end` is itself a misnomer by the project vocabulary — the plan is the
-  periodization, never the sessions. Renaming it `schedule_end`, payload field and
-  `beyond_plan_end` warning code included, is companion work to this design; "schedule"
-  is the word every wording here already uses for the generated sessions. Not "horizon",
-  which elsewhere means the generation span.)
+  fires: `progression.plan_end` is the last *row* (right for the progress banner, which
+  asks "do the workouts reach the goal?"), while classification here asks "does the
+  *periodization* reach a goal?" — a span cliff must not read as a goal gap. (`plan_end` is
+  itself a misnomer by the project vocabulary — the plan is the periodization, never the
+  sessions. Renaming it `schedule_end`, payload field included, is companion work to this
+  design; "schedule" is the word every wording here already uses for the generated
+  sessions. Not "horizon", which elsewhere means the generation span.)
 
 ### 2.1 The coverage invariant
 
@@ -340,5 +333,4 @@ then quiet.
   honest reply above can one day become "passed on" and mean it.
 - **Predicting the cliff from the generation span.** The detector reads the workouts
   actually on the books, never `workout_generation_span_days` arithmetic — the athlete may
-  have generated with any selector, and the rows are the truth. (Generated rows: §2 says
-  why manual ones are excluded.)
+  have generated with any selector, and the rows are the truth.

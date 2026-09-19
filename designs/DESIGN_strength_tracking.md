@@ -51,14 +51,12 @@ written under (§9). The `strength_checks` rows are written when a proposal is a
 recorded as no change, never when it is proposed, and hold the stamp the history was built
 from (§9). The stamp moves only when a read stored sets, and when the pull's reconcile
 deletes a strength activity (§5, §9). And the sets follow the lineage: a session that
-arrives with its lineage keeps them, which a `workout swap`, a `replace` in `workout
-generate` and — since rev. 17 — a move in `workout adapt` all do (§9).
+arrives with its lineage keeps them, which a `replace` in `workout generate` and — since
+rev. 17 — a move in `workout adapt` both do (§9).
 
 Revision 13 takes the first fixes from a review of revision 12. `prescribed_sets` and
-`strength_checks` are schema 16, since main reached 15 in the meantime. A session the athlete
-added by hand is left out of the sessions to write and of what makes the strength planner
-run, until the week planner writes a brief over it (§9). And "brief", a word this design
-brought in and used without saying so, joins the names below.
+`strength_checks` are schema 16, since main reached 15 in the meantime. And "brief", a word
+this design brought in and used without saying so, joins the names below.
 
 Revision 12 fixes what a review of revision 11 found in phase 2. A session is written as a
 rep range at one load, "3×4–6 @ 140": the reps are the athlete's dial and the load the
@@ -71,9 +69,9 @@ history lists what was prescribed and not done, chin-ups never lifted and a Thur
 activity, since the strength planner would otherwise write them again blind (§8). The
 strength planner remembers per session which evidence it last weighed, so a "keep" is not
 asked again the next morning with a fresh draw of randomness (§9). A session the week
-planner revised or moved keeps its sets unless the brief or the evidence changed, the way
-`workout swap` keeps them (§9). A strength planner call that fails twice fails the proposal,
-as a failed week planner call does, so a session with a brief and no sets never exists, and
+planner revised or moved keeps its sets unless the brief or the evidence changed (§9). A
+strength planner call that fails twice fails the proposal, as a failed week planner call
+does, so a session with a brief and no sets never exists, and
 the one kept session without sets is one written before phase 2 (§9). And the smaller
 things: the brief is stored with its blank lines collapsed so the seam holds, the stamp lives
 in the settings table, the first question's drop says that the watch's names will not count,
@@ -121,14 +119,12 @@ these things, and "group" for consecutive unnamed sets at one load (§7).
 The review's other findings, each fixed where it lives: the watch-guess rules of §6 and §7
 are phase 2's first piece and are marked as such, since phase 1 as built freezes an activity
 whose only fault is a guess (§11.1); `prescribed_sets` is schema 15, not 14 (§11); the
-command that copies a session to another date is `workout swap`, not a `workout edit` that
-does not exist, and it copies the sets (§9); the history puts "prescribed" in one place, on
-the day, and lists the accessories like any other exercise (§8); the strength planner is
-shown each exercise's equipment class, which §4 promised it and §9 forgot (§9); a session
-the athlete added by hand is shown for context and never asked about (§9); the reason for
-changing a kept session lands in the revision's reason column, so the paths without a
-preview keep it (§9); a kept session changes only on new evidence, a stamp the history's
-writers bump, which also decides when the strength planner runs (§9); the shipped science
+history puts "prescribed" in one place, on the day, and lists the accessories like any other
+exercise (§8); the strength planner is shown each exercise's equipment class, which §4
+promised it and §9 forgot (§9); the reason for changing a kept session lands in the
+revision's reason column, so the paths without a preview keep it (§9); a kept session
+changes only on new evidence, a stamp the history's writers bump, which also decides when
+the strength planner runs (§9); the shipped science
 no longer schedules light weeks on its own, since the brief says when a week is light, and
 it says how reps in reserve become a load (§10); and the amendment to the queue design's
 list of kinds is withdrawn, because that list holds a pointer to §7 and nothing to amend
@@ -958,10 +954,9 @@ prints, is the strength planner's reasons, one sentence per session it changed, 
   whether the week planner kept or revised it or it arrived from another date with its
   lineage (below), with the brief it has now and those sets. One whose brief or duration is
   not the one its sets were written under says so on a line of its own (below).
-- There is no session of the athlete's own any more: `workout add` is gone, and every
-  strength session is written or checked (DESIGN_workout_tweak.md §5). A session the athlete
-  wants changed goes through `workout tweak`, and a request inside it reaches the strength
-  planner through the brief (DESIGN_workout_tweak.md §4).
+- Every strength session in the span is one of these two. A change the athlete asks for in
+  one, through `workout tweak`, reaches the strength planner through the brief
+  (DESIGN_workout_tweak.md §4).
 
 **What it returns.** For each session to write, its exercises in order: the name, the number
 of sets, the lowest and highest reps, and the load in kilograms, or no load for a bodyweight
@@ -1175,12 +1170,13 @@ wording alone never touches the kilograms.
 
 **The sets follow the lineage.** A session that arrives on a date with its lineage
 (DESIGN_workout_revisions.md §4) is the same session, so it is a session to check and keeps
-its sets and its `strength_checks` row. All three ways of moving a session do that: a
-`workout swap`, a `replace` in `workout generate`, and — since main taught it to name where
-a session came from — a move in `workout adapt`. A week planner that carries Thursday's gym
-to Friday for the rain returns one entry on Friday saying it replaces Thursday, and Friday
-opens with Thursday's kilograms rather than being written from scratch. The day it left is
-not checked at all: the session standing there is the one that moved away.
+its sets and its `strength_checks` row. Every way of moving a session does that: a
+`replace` in `workout generate`, and — since main taught `workout adapt` to name where a
+session came from — a move in `workout adapt` or `workout tweak`. A week planner that
+carries Thursday's gym to Friday for the rain returns one entry on Friday saying it
+replaces Thursday, and Friday opens with Thursday's kilograms rather than being written
+from scratch. The day it left is not checked at all: the session standing there is the one
+that moved away.
 
 **A session's sets change on new evidence only.** A kept session is one the week planner
 promised would not change, and inside the committed days the athlete has planned around it
@@ -1218,8 +1214,7 @@ reason, and so does a session that arrived with its lineage, which the row follo
 
 The same stamp says when the strength planner runs at all: when the week planner wrote or
 revised at least one strength session, when a strength session in the span has no prescribed
-sets and is not the athlete's own, or when the stamp is later than the row of a strength
-session in the span. Otherwise
+sets, or when the stamp is later than the row of a strength session in the span. Otherwise
 there is nothing new to write from, and a morning adapt in a week with no lifting costs no
 call. An adapt whose week planner changed nothing still becomes a proposal when the strength
 planner updates a kept session.
@@ -1238,7 +1233,7 @@ says so in the terminal, and the morning push renders the schedule as stored, th
 terminal aside (DESIGN_bot_simple_frontend.md), and tries again the next morning. A strength
 day with a brief and no exercises is worse than yesterday's schedule, so a session with a
 brief and no sets never exists. The kept sessions without prescribed sets are the ones
-written before phase 2 and the athlete's own.
+written before phase 2.
 
 With only sessions to check, the failure is a "keep" for all of them. Their sets stand, the
 week planner's changes are applied, and no `strength_checks` row is written, so the next
@@ -1277,14 +1272,13 @@ so they inherit that rule. `WorkoutChange.append` takes them and writes them in 
 transaction as the row. When the rule against no-op revisions suppresses the row, the sets
 are not written either, and the live row's sets stand. That is always right, because the
 description is rendered from the sets: different kilograms make a different description.
-`WorkoutChange.restore`, which `workout restore`, rollback and goal reinstate use to bring
-back an earlier revision, copies the sets of the revision it restores. It leaves the
-session's `strength_checks` row alone, so the restored kilograms stand until new lifting is
-on record: an athlete who brings back Sunday's 140 over Tuesday's 145 does not find 145
-again on Wednesday morning, from lifting already weighed. `workout swap`, which
-moves a session to another date by appending a copy of it, copies the sets with it, or the
-moved session would carry kilograms in its text with no rows behind them. `workout add`
-starts a new lineage and has none. A void has none. The cascade is there for the wipes, the
+`WorkoutChange.restore`, which rollback and goal reinstate use to bring back an earlier
+revision, copies the sets of the revision it restores. It leaves the session's
+`strength_checks` row alone, so the restored kilograms stand until new lifting is on record:
+an athlete who brings back Sunday's 140 over Tuesday's 145 does not find 145 again on
+Wednesday morning, from lifting already weighed. A move, which appends a copy of the session
+on another date, copies the sets with it, or the moved session would carry kilograms in its
+text with no rows behind them. A void has none. The cascade is there for the wipes, the
 only code that deletes planned sessions. Revision 7 also stored the pattern; the vocabulary
 gives it from the exercise, so the column is gone.
 
@@ -1411,9 +1405,9 @@ or not a session is planned today, then the set-reading step, then its walk.
    `strength name` confirms it; and the naming answers come from names a person gave.
 2. The strength history, `trainmate/strength/history.py`, accessories and the not-done
    lines included (§8), and the `strength.history_changed_at` stamp its writers bump (§5).
-3. `prescribed_sets` and `strength_checks` (schema 16), with `WorkoutChange.append`,
-   `restore` and `workout swap` carrying the sets, and the description split at its seam
-   when a strength session is shown to the week planner (§9).
+3. `prescribed_sets` and `strength_checks` (schema 16), with `WorkoutChange.append` and
+   `restore` carrying the sets, and the description split at its seam when a strength
+   session is shown to the week planner (§9).
 4. The strength science, `trainmate/strength/progression.md` (§10).
 5. The strength planner, `trainmate/strength/planner.py`: the brief instruction in the week
    planner's TASK, its own prompt, the checks on its output, the comparison and the evidence
@@ -1421,7 +1415,7 @@ or not a session is planned today, then the set-reading step, then its walk.
 6. The exercise lines in the `workout generate` preview (§9).
 
 Three implemented designs are amended when it lands. DESIGN_workout_revisions.md: a revision
-can carry prescribed sets, written with it and copied by a restore and a swap.
+can carry prescribed sets, written with it and copied by a restore and a move.
 DESIGN_plan_change_continuity.md: a standing strength session with prescribed sets is shown
 to the week planner as its title and brief, not its full description.
 DESIGN_bot_simple_frontend.md: the morning adapt's note includes a proposal's notice, even
@@ -1700,7 +1694,7 @@ Decided:
   the vocabulary with each name's class, and each day's equipment and constraints, and
   checks the kept sessions.
 - The strength planner's exercises land in `prescribed_sets`, one row per group of sets with
-  a rep range, keyed by the revision and copied by a restore and a swap. The description is
+  a rep range, keyed by the revision and copied by a restore and a move. The description is
   rendered from them, brief above the seam and session below. An unknown name drops that
   exercise, not the session. A call that fails twice fails the proposal when a session was
   to be written; when sessions were only to be checked they are kept, the week planner's
@@ -1708,8 +1702,7 @@ Decided:
   rechecked. A session's sets change only when the returned sets differ and only on new
   evidence, the `strength.history_changed_at` stamp being later than the session's last
   check in `strength_checks`, or when its brief or duration changed. The sets follow the
-  lineage: a swapped session keeps them, and one `workout adapt` moves across dates is
-  written anew until adapt can name where a session came from.
+  lineage: a session moved to another date keeps them.
 - The strength science ships beside the strength planner, read by that call only: double
   progression over a rep range at one load, the reps the athlete's dial and the load the
   strength planner's, with reps in reserve read as reps not done; every session of an

@@ -1032,4 +1032,3 @@ rule).
 - Backward evaluation in `workout adapt`.
 - Per-learning evidence provenance.
 - Pulling Garmin data directly (separate TODO).
-- Workout swapping (separate TODO).

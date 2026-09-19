@@ -130,7 +130,6 @@ periodization strategy. The phantom-boundary case stops existing instead of bein
 The cost is deliberate and worth naming: adapt used to degrade all the way down — it
 tolerates a missing *goal* too (`objective_id` is `None` when there is no active
 objective), so it kept answering "you slept badly, should today change?" in the gap between
-one goal ending and the next being set. It no longer does. Two consequences follow: a
-manually added workout (`workout add` needs no plan) cannot be adapted, and the engine's
-"no active mesocycle" branch — which dropped the intensity table and the drift instructions
-that reference it — is no longer reachable through this path.
+one goal ending and the next being set. It no longer does. One consequence follows: the
+engine's "no active mesocycle" branch — which dropped the intensity table and the drift
+instructions that reference it — is no longer reachable through this path.

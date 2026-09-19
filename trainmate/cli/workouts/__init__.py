@@ -3,6 +3,6 @@
 from trainmate.cli.workouts.generate import (run_workout_adapt, run_workout_tweak,
     run_workout_generate, run_workout_list, run_workout_show, run_workout_compare,
     run_workout_batches, run_workout_rollback)
-from trainmate.cli.workouts.edit import (run_workout_push, run_workout_wipe,
+from trainmate.cli.workouts.calendar_sync import (run_workout_push, run_workout_wipe,
     run_workout_prune_calendar)
 from trainmate.cli.workouts.parser import add_workout_parser

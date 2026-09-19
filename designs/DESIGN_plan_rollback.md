@@ -84,8 +84,7 @@ A workout created under v1 stays tagged v1 even after it is archived. Rolling ba
 v1 restores **v1's most-recently-archived batch** — the set that was live when v1 was
 last superseded — keyed by `MAX(archived_at)` among v1-tagged archived rows. This
 handles intra-version regenerations (an earlier v1 batch archived while v1 was still
-active is *not* restored) and manual sessions added under v1 (archived together with
-the generated batch, restored together).
+active is *not* restored).
 
 ## 5. Mechanics
 
@@ -96,7 +95,7 @@ then inserts the new version as `active`. No deletion.
 ### `workout_generate` (coach/service/workouts.py) — eager, once accepted
 0. If live upcoming workouts exist, the CLI confirms the LLM call first
    (`_confirm_regeneration`, `cli/workouts/generate.py`) — it names how many are at
-   stake, how many were added by hand, and that `workout rollback` brings them back;
+   stake and that `workout rollback` brings them back;
    `-f/--force/-y` skips it.
 0b. `workout_generate` writes nothing: it returns a `GenerateProposal`, which the CLI
    lists (as `workout list` renders it) and gates behind a second confirmation. Steps 1-4
@@ -307,8 +306,6 @@ reach and refuse a change that is wholly in the past instead of "restoring" noth
   `live` row had to explain was not the case.
 - **`workout rollback [--batch N] [-y]`** (registered alias `rb`) — undoes change `#N` and
   every change after it, default `#1`. Confirms interactively, naming what it undoes.
-- Not to be confused with **`workout restore <id>`**, which un-cancels a single session
-  (the void axis, ARCHITECTURE.md §5). Both help texts say so.
 - Web (read-only, like the plan panel above): `GET /api/workouts/batches` feeds a
   "Workout changes" panel under the schedule; undoing one is `tm workout rollback`, which
   the panel's footer names.

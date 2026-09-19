@@ -92,7 +92,7 @@ classes themselves.
 - **`trainmate/cli/`** — per-command-family handler modules (`run_*()`): `status`,
   `progress`, `goals`, `constraints`, `benchmarks`, `signals`, `learnings`,
   `plans`, `data`, `settings`, `journal`, `queue`, `bot`, the `workouts/` package
-  (`parser`/`generate`/`edit`/`revisions`/`heads_up`/`_helpers`), plus the shared modules:
+  (`parser`/`generate`/`calendar_sync`/`revisions`/`heads_up`/`_helpers`), plus the shared modules:
   `common` (renderers and the adherence pairing), `selectors` (the range grammar),
   `argparse_ext` (parser/help extensions), `render` (the two voices, [§6](#6-singletons)),
   `candidates` (the note-capture confirm loops), `staleness` (the changed-input wording)
@@ -578,7 +578,7 @@ three submodules:
   `trainmate.coach.engine.openrouter_client`.
 - `service/` — `CoachService` + the `coach_service` singleton (data I/O,
   caching, orchestration), assembled from mixins (`context`, `prompt`, `planning`,
-  `workouts`, `adaptation`, `editing`, `analysis`). Owns the `db` /
+  `workouts`, `adaptation`, `analysis`). Owns the `db` /
   `calendar_syncer` / `config` bindings — **patch targets:**
   `trainmate.coach.service.db`, etc. Both packages re-export everything from their
   `__init__.py`, so the patch targets and import paths are the flat ones above.
@@ -1347,7 +1347,7 @@ nothing, because an adapt that looked at the metrics and held is a real event.
 |-----------------|------------|---------------------------------------------------|
 | `id`            | INTEGER PK | The batch key. `workout rollback` undoes a change and everything after it. |
 | `created_at`    | TEXT       | UTC ISO, when the command ran.                    |
-| `kind`          | TEXT       | `generate` · `adapt` · `tweak` · `rollback` · `stand-down` · `reinstate`. Fixed at write time; one invocation has exactly one kind. Schema 18 relabelled the kinds of the four removed hand-edit commands (`add`, `rm`, `swap`, `restore`) as `tweak` (DESIGN_workout_tweak.md §7). |
+| `kind`          | TEXT       | `generate` · `adapt` · `tweak` · `rollback` · `stand-down` · `reinstate`. Fixed at write time; one invocation has exactly one kind. |
 | `summary`       | TEXT       | The batch rationale — what `adaptation_summary` used to copy onto every row. |
 | `macrocycle_id` | INTEGER    | The plan version in force when this ran: context for `workout batches`, distinct from the per-row tag. |
 | `note`          | TEXT       | The coach's one line to the athlete about this change. A `generate` writes it only when something they would notice changed (DESIGN_plan_change_continuity.md §6.3); an `adapt` that changed something stores its reason here too; a `rollback` writes its own line about what it undid. NULL on everything else (DESIGN_change_heads_up.md §6). |
@@ -2000,7 +2000,7 @@ DESIGN_bot_simple_frontend.md; `candidates.py` holds the confirm loops that turn
 note's extracted constraints and signals into rows, shared by `workout adapt -m` and
 `bot capture note` so both inboxes ask the same questions),
 plus the
-`workouts/` **package** — `parser`/`generate`/`edit`/`revisions`/`heads_up`/`_helpers`;
+`workouts/` **package** — `parser`/`generate`/`calendar_sync`/`revisions`/`heads_up`/`_helpers`;
 `selectors.py` holds the shared range grammar, `argparse_ext.py` the parser/help
 extensions, `render.py` the two voices ([§6](#6-singletons)) and `staleness.py` the
 changed-input wording). `help` is the one
@@ -2412,9 +2412,9 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    prompt is then byte-identical to before.
 3c. **The commitment window** (`commitment-days`, default 7, DESIGN_plan_change_continuity.md
    §4). The sessions already standing in the span that the athlete has read — today
-   through `today + N − 1` — reach the prompt as "SESSIONS ALREADY STANDING", each tagged
-   `[COMMITTED]`, `[BENCHMARK: …]` or `[REST DAY]`, with what it was first
-   prescribed as when an adaptation has eased it. Both bounds matter: a bare run extends
+   through `today + N − 1` — reach the prompt as "SESSIONS ALREADY STANDING", each with its
+   description, tagged `[BENCHMARK: …]` or `[REST DAY]` where that applies, and with what it
+   was first prescribed as when an adaptation has eased it. Both bounds matter: a bare run extends
    into empty days and sees no standing session, and a forward-selected run must not be asked
    about days it cannot write. `--fresh` empties the window for that run (§4.4). The week
    planner also gets the constraints that ended earlier in
@@ -2732,9 +2732,7 @@ The shared core then:
   (DESIGN_plan_rollback.md, DESIGN_workout_revisions.md §10).
 
 Every session is written by the coach. An athlete who has decided a change asks for it
-with `workout tweak` ([§10](#a-change-on-request-workout-tweak)); the four hand-edit
-commands (`workout add`, `rm`, `swap`, `restore`) are gone, and with them the "manual"
-session and its special cases (DESIGN_workout_tweak.md §5). A session changed on request
+with `workout tweak` ([§10](#a-change-on-request-workout-tweak)). A session changed on request
 carries the request in its `modification_reason` ("On request: …"), which the next
 `workout adapt` reads beside the session and leaves alone unless the metrics call for a
 change.
@@ -3012,8 +3010,8 @@ venv/bin/python -m unittest discover -s tests -p "test_*.py"
 |                                | labeling, part-week plan coverage, band trimming,             |
 |                                | `assemble_timeline` payload + coded warnings, `select_weeks`/`clip_payload`, empty states |
 | `tests/test_runway.py`         | End-of-runway nudges: `progression.runway`'s four kinds and its   |
-|                                | two windows (run-up + passed state), the manual-row and rest-row  |
-|                                | rules, the §4 wordings (day zero, past tense, the `-m ..<id>` the |
+|                                | two windows (run-up + passed state), the rest-row rule, the §4    |
+|                                | wordings (day zero, past tense, the `-m ..<id>` the |
 |                                | mesocycle cliff names), the surfaces — `status` outside its goal  |
 |                                | branch, `workout adapt`'s refusal over a finished plan, `workout  |
 |                                | list`'s marker, the morning push's line/button/silence — plus the |

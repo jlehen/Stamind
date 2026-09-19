@@ -291,7 +291,7 @@ class BaseDB:
                     tss INTEGER,
                     void INTEGER NOT NULL DEFAULT 0, -- 1 <=> this slot holds no session as of this revision
                     reason TEXT, -- per-revision note; why it changed, or why it was cancelled
-                    restored_from INTEGER, -- on a rollback/restore/reinstate copy: the revision copied (§7)
+                    restored_from INTEGER, -- on a rollback/reinstate copy: the revision copied (§7)
                     macrocycle_id INTEGER, -- plan version this session belongs to
                     created_at TEXT, -- when the SESSION entered the plan, carried across revisions
                     benchmark_type TEXT, -- set <=> a fitness test (DESIGN_benchmark_workouts.md §3.1)

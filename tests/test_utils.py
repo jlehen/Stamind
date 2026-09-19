@@ -304,11 +304,11 @@ class TestCommandsSurviveTheWrap(unittest.TestCase):
         # The prose between them must still wrap: a match that ran from the first
         # command's closing quote to the second's would glue the sentence into one line.
         lines = self._wrapped(
-            "Swap two dates (e.g. 'workout swap 2026-06-09 2026-06-11 'travelling'') "
-            "or two workout IDs (e.g. 'workout swap 5 8 'travelling'')."
+            "Name the day (e.g. 'workout tweak -d 2026-06-09 'a shorter ride'') "
+            "or let the coach find it (e.g. 'workout tweak 'no ride Friday'')."
         )
         self.assertGreater(len(lines), 2, lines)
-        self.assertTrue(any("'workout swap 5 8 'travelling''" in l for l in lines), lines)
+        self.assertTrue(any("'workout tweak 'no ride Friday''" in l for l in lines), lines)
 
     def test_an_apostrophe_does_not_open_a_command(self):
         lines = self._wrapped(

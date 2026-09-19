@@ -1,5 +1,5 @@
-"""Workout CLI: push / wipe / prune-calendar (the Calendar and the database, no session
-edits)."""
+"""Workout CLI: push / wipe / prune-calendar, the commands that keep Google Calendar in step
+with the database."""
 import argparse
 import sys
 from typing import Optional

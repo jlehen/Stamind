@@ -219,7 +219,7 @@ class TestRevisionBehaviour(unittest.TestCase):
     def test_rollback_is_point_in_time(self):
         """Undoing a change reverts it AND everything after it. Undoing one change in
         isolation is unsound the moment a later one touched the same session: the "undo"
-        would restore the pre-adapt copy on its old day while the swapped copy stayed
+        would restore the pre-adapt copy on its old day while the moved copy stayed
         live on the new one — one session, live twice (§10)."""
         self._generate(("2026-09-01", "cycling", "Long ride", 90),
                        ("2026-09-03", "cycling", "Easy spin", 45))
@@ -390,7 +390,7 @@ class TestRevisionBehaviour(unittest.TestCase):
         self.assertEqual(len(live), 2)
         self.assertEqual(len({w["id"] for w in live}), 2)
 
-    def test_rm_by_lineage_id_acts_on_the_live_revision_after_an_adapt(self):
+    def test_a_lineage_id_resolves_to_the_live_revision_after_an_adapt(self):
         """With raw revision ids, a command given id 42 after an adapt would act on a dead
         revision and report success — a lie. The id the athlete reads is the id the
         command needs (§5)."""

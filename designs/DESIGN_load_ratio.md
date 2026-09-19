@@ -160,6 +160,4 @@ DESIGN_pmc_fitness_fatigue.md and DESIGN_garmin_direct_pull.md both describe the
 era; each now carries a banner marking those passages superseded by this doc. Read them
 as history.
 
-`coach/service/editing.py`'s swap warning was labelled an "ACWR proxy" but never read
-ACWR — it is a pure weekly-TSS-delta heuristic, so only its wording changed. The analysis
-weekly digest key `max_acwr` becomes `max_load_ratio`.
+The analysis weekly digest key `max_acwr` becomes `max_load_ratio`.
