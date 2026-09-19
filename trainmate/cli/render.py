@@ -45,7 +45,8 @@ from trainmate.cli.workouts.generate import (
 )
 from trainmate.strength.prescription import exercise_lines
 from trainmate.cli.workouts.revisions import (
-    print_revision_preview, rewritten_text_only, wording_group_lines, wording_groups,
+    print_revision_preview, quotes_wording, rewritten_text_only, wording_group_lines,
+    wording_groups,
 )
 from trainmate.cli.common import print_strength_notes
 
@@ -591,7 +592,7 @@ def simple_revision_lines(proposal: RevisionProposal) -> List[str]:
         if why and why != (proposal.reason or '').strip():
             entry_lines.append(why)
         paragraphs = ["\n".join(entry_lines)]
-        if rewritten_text_only(pw, existing):
+        if quotes_wording(pw, existing):
             # A blank line between pairs, so each Was/Now pair reads as one passage.
             paragraphs.extend(
                 "\n".join(wording_group_lines(b)) for b in wording_groups(pw, existing)

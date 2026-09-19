@@ -958,6 +958,9 @@ Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §3.4): `learning-questions` 
 allowlist. "Stop asking me about that stuff" reads back as "I'll stop asking about what
 I've learned about you, and go by what I see instead. OK?"
 
+Amended 2026-09-19 (DESIGN_output_verbosity.md §9): `terse` joins the allowlist. "Your
+messages are too long" reads back as "When I change your week, I'll keep it short. OK?"
+
 ### 12.8 The intent table after this pass
 
 | Intent | Shape | Runs |

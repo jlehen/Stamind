@@ -1006,6 +1006,16 @@ class CaptureSettingTest(_CaptureCase):
         self._run({"key": "learning-questions", "value": "on"}, text="you can ask me again")
         self.assertTrue(settings.learning_questions())
 
+    def test_the_terse_switch_reads_back_as_its_effect(self):
+        """"Your messages are too long" (DESIGN_output_verbosity.md §9)."""
+        from trainmate import settings
+        code, _, prompt = self._run({"key": "terse", "value": "on"},
+                                    text="your messages are too long, keep it short")
+        self.assertEqual(code, 0)
+        self.assertTrue(settings.terse())
+        self.assertIn("When I change your week, I'll keep it short.", prompt.text)
+        self.assertNotIn("terse", prompt.text)
+
 
 class SimpleListRenderTest(unittest.TestCase):
     """`workout list` under TRAINMATE_RENDER=simple: companion prose, expert form

@@ -511,3 +511,72 @@ Three changes, each closing one part of that story:
 
 Not handled: pressing Enter during the wait leaves one stale spinner frame on the line
 above. `choose` keeps falling back to its default on an unrecognised answer.
+
+## 9. A shorter coach, on request
+
+Rev 4, 2026-09-19.
+
+### 9.1 The problem
+
+It is Friday 18 September, in the evening. The companion athlete has no time to train. She
+taps "Move it" under the morning message. That button runs `workout adapt -m "no time to
+train today - please move today's session to another day if that makes sense"`.
+
+She wanted one thing: Friday's 14-minute circuit on another day. The preview she got opened
+with a summary of three sentences. Only the last one was about her circuit: "Friday's
+circuit moves to Sunday as you asked." The first two were about her easy runs drifting into
+heart-rate zone 3, and about her HRV. Then came five sessions. Four of them were runs and a
+circuit she had not asked about, because the week planner also changed how her easy runs
+are paced. Two of those sessions kept their title and their load, so the preview printed
+their old and their new description in full, labelled "Was:" and "Now:". On a gym day the
+description holds the exercise lines and the strength planner's notes. That quote was by
+far the longest part of the message.
+
+Each part is right on its own. The week planner kept inside the caps of §5. The quote is
+there because a changed description is a real change (DESIGN_workout_revisions.md §9.1).
+But she reads all of it on a phone, to answer one yes/no question, and she found it too
+long.
+
+### 9.2 The setting
+
+`terse` is an on/off setting in the Coach group of `settings`. It is off by default. The
+athlete can switch it from chat: "your messages are too long" routes to `change_setting`,
+and the confirm reads back "When I change your week, I'll keep it short."
+
+When it is on, two things change. Both are about the words around a change.
+
+1. **The summary gets half the room.** The overall `reason` of `workout adapt` and
+   `workout tweak` goes from at most 3 sentences (about 60 words) to at most 2 short
+   sentences (about 30 words). When the note or the request drove a change, the summary
+   names that change first. `workout generate`'s `reasoning` goes from at most 4 sentences
+   to at most 2.
+2. **The preview stops quoting old and new wording.** A session whose words alone changed
+   shows as its line and its reason. The line still says "(same session, wording updated)"
+   in companion mode, or "[text revised]" in the expert table. The new text is on the
+   Calendar, and in the morning message on the day.
+
+Back to Friday 18 September, with `terse` on. The summary reads something like "Friday's
+circuit moves to Sunday; the easy runs now go by the talk test, because they kept drifting
+into zone 3." Each changed session is two lines. The "Was:" and "Now:" blocks are gone.
+
+The coach service reads `settings.terse()` and passes it to the two prompt builders as
+`terse`. Both previews ask `quotes_wording` in `cli/workouts/revisions.py` whether to quote.
+
+### 9.3 What stays as it is
+
+- **The reason on each session**, `change_reason`, keeps its cap of one sentence of 20
+  words. It is read again: the next week planner call sees it beside the session, and it
+  is how a later run knows that a session was asked for (DESIGN_workout_tweak.md §3.3).
+  §5.1's rule holds: cap the prose that is read once.
+- **The session descriptions.** They are what the athlete trains from (§5).
+- **What the week planner decides.** `terse` changes words, not decisions. On 18 September
+  the week planner would still re-pace the easy runs. A request that must touch only the
+  days it names is `workout tweak` (DESIGN_workout_tweak.md §3).
+- **`plan generate`'s `strategy`**, for the reason §5.1 gives.
+
+### 9.4 Not handled
+
+- A gym day whose kilograms changed while its title and load did not. With `terse` on, the
+  preview shows no kilograms for it. That is already true today of a gym day whose title
+  changed. The morning message on the day lists the exercises.
+- Levels between on and off.

@@ -194,11 +194,11 @@ classes themselves.
     several close candidates become a picker whose leaves re-enter the capture with
     `--id` pinned, and nothing anywhere executes without a confirm on a CLI-rendered
     preview. `change_setting` is bounded by the `ROUTABLE_SETTINGS` allowlist in
-    `cli/settings.py` (`morning-time`, `morning-deadline`, `push`), given to the
-    extraction *and* enforced after it; anything else earns a one-line refusal naming
-    the operator rather than the router's "unclear". Signals get no removal counterpart
-    on purpose: they are backward-looking evidence, not a rule that keeps shaping the
-    schedule (DESIGN_bot_simple_frontend.md §5.5). Subprocesses
+    `cli/settings.py` (`morning-time`, `morning-deadline`, `push`, `learning-questions`,
+    `terse`), given to the extraction *and* enforced after it; anything else earns a
+    one-line refusal naming the operator rather than the router's "unclear". Signals get
+    no removal counterpart on purpose: they are backward-looking evidence, not a rule
+    that keeps shaping the schedule (DESIGN_bot_simple_frontend.md §5.5). Subprocesses
     additionally get `TRAINMATE_RENDER=simple`, read once by
     `cli/render.make_renderer` and handed out as `runtime.render` — the voice axis,
     beside `runtime.prompt`'s transport axis. A command calls one method per thing it
@@ -545,7 +545,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Whether a line reaches the chat front-end | `util.aside` (side information, terminal only) vs `print` (the answer, warnings, errors). Building a list of lines rather than printing? gate on `util.asides_enabled()`. DESIGN_output_verbosity.md §3 |
 | Recording that something happened | Nothing new to call: `util.step` (what the app is doing), `util.warn`/`util.fail` (something outside the app did not work) print and journal in one go, and `run_once` already brackets the command. Reach for `trainmate/journal.py` directly only for a record with structured fields (`journal.record("garmin.pull", …)`) or for what must never reach the athlete (`journal.debug` — the tier that replaced `except Exception: pass`, pinned by `tests/test_journal.py`). The event name comes from the closed nine-word vocabulary in `journal.EVENTS`; severity is `lvl`, not a new name. Never copy something a table already holds — that is the domain record, and it outlives this one. What the athlete *answered* needs nothing at all: `runtime.prompt` journals every `confirm`/`choose` itself (§5.6). DESIGN_logging.md §2/§4.2/§5 |
 | Reading back what a command did  | `tm journal` (`trainmate/cli/journal.py`), or `logs/runs/*.jsonl` with `jq`. A run's prompts are `logs/llm_exchanges/*<run id>*` — the id in the filename is the join, not the timestamp, because those names come from the machine's local clock while the journal is UTC. DESIGN_logging.md §6/§7 |
-| How long the coach's prose is    | `coach/engine/prompt.py` (`## WRITING FOR THE ATHLETE`, shared by every command built on `_build_system_prompt`) + the per-field caps in each `## RESPONSE FORMAT`. Check `coach/formatting.py` first: a field re-injected into later prompts must not be capped (DESIGN_output_verbosity.md §5.1) |
+| How long the coach's prose is    | `coach/engine/prompt.py` (`## WRITING FOR THE ATHLETE`, shared by every command built on `_build_system_prompt`) + the per-field caps in each `## RESPONSE FORMAT`. Check `coach/formatting.py` first: a field re-injected into later prompts must not be capped (DESIGN_output_verbosity.md §5.1). The `terse` setting halves the two summary caps and, through `quotes_wording` in `cli/workouts/revisions.py`, drops the old/new wording from the revision preview (§9) |
 | A web *view* of existing data    | a GET in `trainmate_web.py` + a panel in `static/app.js` ([§8](#8-web-api-endpoints)) |
 | A web endpoint that would *write* | it does not go in the web app — add the CLI command instead ([§8](#8-web-api-endpoints)) |
 | The Telegram bot                 | `trainmate_bot.py` (runs the CLI as a subprocess) ([§2](#entry-points)) |
@@ -1634,7 +1634,9 @@ key is one entry in the `trainmate/settings.py` registry, written only by `setti
 identifiers; `timezone`, the IANA zone every date is computed in;
 `workout_commitment_days` (`commitment-days`), how many days from today the athlete is
 treated as already committed to; `push_enabled`, `push_morning_time`,
-`push_morning_deadline` and `push_adapt_first`, the morning-push window and its switches.
+`push_morning_deadline` and `push_adapt_first`, the morning-push window and its switches;
+`coach_terse` (`terse`), whether the coach keeps what it says about a change short
+(DESIGN_output_verbosity.md §9).
 Three internal markers are the exception, not preferences: `push_morning_last`, the
 per-day idempotency stamp (`DESIGN_bot_simple_frontend.md` §4.3);
 `changes_notify_upto`, the id of the newest change `workout notify` asked the bot to send
@@ -3150,7 +3152,10 @@ prints. The same reasoning already existed locally in `cli/progress.py`, which h
 eye to skip it"; this generalises it. The prompts got the matching half — a shared
 `## WRITING FOR THE ATHLETE` section plus per-field sentence caps on the rationale fields
 — with `plan generate`'s `strategy` deliberately exempt, because it is re-injected into
-every later prompt rather than read once. See DESIGN_output_verbosity.md.
+every later prompt rather than read once. See DESIGN_output_verbosity.md. An athlete who
+finds that still too long switches `terse` on: the summary of `workout adapt`,
+`workout tweak` and `workout generate` gets half the room, and the revision preview no
+longer quotes a session's old and new wording (§9).
 
 One thing the aside tier could not absorb: `plan generate` echoed its whole
 `PRIOR TRAINING REVIEW` prompt section, ~164 lines and 321 at Telegram's width. Too big to

@@ -881,6 +881,7 @@ class WorkoutGenMixin:
             anchor_history=self._anchor_history_text(gen_start_str),
             standing_workouts=standing_sessions,
             past_constraints=past_constraints,
+            terse=settings.terse(),
         )
 
         # NOTE: workout generation is read-only w.r.t. coach learnings (see

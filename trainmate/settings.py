@@ -29,6 +29,7 @@ ADAPT_FIRST = "adapt-first"
 COMMITMENT_DAYS = "commitment-days"
 STRENGTH_SETS_SINCE = "strength-sets-since"
 LEARNING_QUESTIONS = "learning-questions"
+TERSE = "terse"
 
 
 def parse_hhmm(token: Any) -> str:
@@ -169,6 +170,17 @@ SETTINGS: List[Setting] = [
         parse=parse_switch,
         # Off, the coach settles its doubts by itself (DESIGN_learning_doubt_nudge.md §3.4).
         fallback="on",
+        coerce=_is_on,
+    ),
+    Setting(
+        name=TERSE,
+        key="coach_terse",
+        group="Coach",
+        summary="Keep what the coach says about a change short",
+        value_hint="on|off",
+        parse=parse_switch,
+        # On, a shorter summary and no quoted wording (DESIGN_output_verbosity.md §9).
+        fallback="off",
         coerce=_is_on,
     ),
     Setting(
@@ -382,3 +394,9 @@ def strength_sets_since() -> Optional[str]:
 def learning_questions() -> bool:
     """Whether a doubt about a learning is asked (DESIGN_learning_doubt_nudge.md §3.4)."""
     return value(LEARNING_QUESTIONS)
+
+
+def terse() -> bool:
+    """Whether the coach keeps what it says about a change short
+    (DESIGN_output_verbosity.md §9)."""
+    return value(TERSE)

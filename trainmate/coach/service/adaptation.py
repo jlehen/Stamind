@@ -5,7 +5,7 @@ from trainmate.adherence import (
     analyze_adherence, format_discrepancies, performed_sessions,
 )
 from trainmate.sports import canonical_sport
-from trainmate import intensity, signals
+from trainmate import intensity, settings, signals
 from trainmate.util import cmd, fmt_date, notice
 from trainmate.coach.formatting import format_baseline
 from trainmate.coach import honoring
@@ -490,6 +490,7 @@ class AdaptationMixin:
             signal_earliest_date=start_date_str,
             tweak=tweak,
             tweak_dates=tweak_dates,
+            terse=settings.terse(),
         )
 
         # NOTE: daily adaptation is read-only w.r.t. coach learnings

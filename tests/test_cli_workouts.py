@@ -281,6 +281,44 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertNotIn("TEXT REVISED", stdout)
         self.assertIn("Okay — nothing changed.", stdout)
 
+    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.runtime.coach_service")
+    def test_terse_names_a_reworded_session_without_quoting_it(
+        self, mock_coach, _mock_ensure
+    ):
+        """With `terse` on, a session whose words alone changed is its line and its reason;
+        the old and new wording stay on the Calendar (DESIGN_output_verbosity.md §9)."""
+        from trainmate import settings
+        settings.write(settings.TERSE, "on")
+        original = {
+            "date": "2026-06-10", "sport_type": "cycling", "title": "Climb Threshold",
+            "description": "2x20 at threshold, seated. Even power beats a good average.",
+            "duration_minutes": 85, "rpe": 7, "tss": 84,
+        }
+        reworded = dict(original, description=(
+            "2x20 at threshold, seated. Wednesday's execution was exactly right."
+        ), modification_reason="Cue now references Wednesday.")
+        mock_coach.workout_adapt.return_value = RevisionProposal(
+            reason="Holding the mesocycle.", workouts=[reworded], new_constraints=[],
+            range_start="2026-06-10", range_end="2026-06-30",
+            pairs=(RevisionPair(proposal=reworded, original=original, is_swap=False),),
+        )
+
+        exit_code, expert, _stderr = self.run_cli(["workout", "adapt"])
+        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+            _code, simple, _stderr = self.run_cli(["workout", "adapt"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("[text revised]", expert)
+        self.assertNotIn("TEXT REVISED", expert)
+        self.assertIn(
+            "🚴 Wed Jun 10: Climb Threshold — 85 min (same session, wording updated)\n"
+            "Cue now references Wednesday.", simple,
+        )
+        for out in (expert, simple):
+            self.assertNotIn("Was: ", out)
+            self.assertNotIn("Now: ", out)
+
     @staticmethod
     def _moved_gym_proposal():
         """Thursday's gym, carried to Friday — the proposal both previews below draw."""

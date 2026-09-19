@@ -142,9 +142,10 @@ ROUTER_INTENTS = {
     ),
     "change_setting": (
         "the athlete asks to change how the app behaves in this chat — when it messages "
-        "in the morning, whether it does at all, or whether it asks about what it has "
-        "learned about them ('can you message me at 7 instead?', 'stop the morning "
-        "messages', 'stop asking me about that stuff')"
+        "in the morning, whether it does at all, whether it asks about what it has "
+        "learned about them, or how much it says ('can you message me at 7 instead?', "
+        "'stop the morning messages', 'stop asking me about that stuff', 'your messages "
+        "are too long, keep it short')"
     ),
     "help": "the athlete asks what they can say or how this works",
     "unclear": "anything else, or too ambiguous to route",
@@ -1047,6 +1048,10 @@ SETTING_DESCRIPTIONS = {
         "whether the app asks before it leans less on something it has learned about "
         'the athlete — "on" or "off"'
     ),
+    settings.TERSE: (
+        "whether the coach keeps what it says about a change to the week short — "
+        '"on" for short, "off" for the full explanation'
+    ),
 }
 
 
@@ -1083,6 +1088,10 @@ def _setting_effect(key: str, value: str) -> str:
             return "I'll ask you again before I lean less on something I've learned about you."
         return ("I'll stop asking about what I've learned about you, and go by what I see "
                 "instead.")
+    if key == settings.TERSE:
+        if value == "on":
+            return "When I change your week, I'll keep it short."
+        return "When I change your week, I'll explain it in full again."
     if value == "on":
         return "I'll start opening your day again in the morning."
     return "I'll stop opening the day — you can always ask me here whenever you like."

@@ -21,7 +21,7 @@ from trainmate.util import (
 # cost-shaped — a model role, adapt-first — is off it by construction.
 ROUTABLE_SETTINGS = (
     settings.MORNING_TIME, settings.MORNING_DEADLINE, settings.PUSH,
-    settings.LEARNING_QUESTIONS,
+    settings.LEARNING_QUESTIONS, settings.TERSE,
 )
 
 

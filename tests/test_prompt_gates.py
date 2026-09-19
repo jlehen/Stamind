@@ -313,6 +313,35 @@ class TestTheTweakGate(unittest.TestCase):
         self.assertNotIn("Read them off the request", system)
 
 
+class TestTheTerseSwitch(unittest.TestCase):
+    """`terse` halves the summary the athlete reads once, and leaves "change_reason" alone,
+    because later runs read it again (DESIGN_output_verbosity.md §9)."""
+
+    ADAPT_FULL = "AT MOST 3 SENTENCES"
+    ADAPT_TERSE = "MOST 2 SHORT SENTENCES"
+    CHANGE_REASON_CAP = "a single sentence of at most 20 words"
+
+    def test_off_asks_for_the_full_summary(self):
+        system, _user = build_prompt()
+        self.assertIn(self.ADAPT_FULL, system)
+        self.assertNotIn(self.ADAPT_TERSE, system)
+        system, _user = build_generate_prompt()
+        self.assertIn("MOST 4 SENTENCES", system)
+
+    def test_on_halves_the_summary_of_adapt_and_tweak(self):
+        for extra in ({}, {"tweak": True, "athlete_message": "swap Thursday and Friday"}):
+            with self.subTest(extra=list(extra)):
+                system, _user = build_prompt(terse=True, **extra)
+                self.assertIn(self.ADAPT_TERSE, system)
+                self.assertNotIn(self.ADAPT_FULL, system)
+                self.assertIn(self.CHANGE_REASON_CAP, system)
+
+    def test_on_halves_the_summary_of_generate(self):
+        system, _user = build_generate_prompt(terse=True)
+        self.assertIn("MOST 2 SENTENCES", system)
+        self.assertNotIn("MOST 4 SENTENCES", system)
+
+
 class TestTheGatesAreIndependent(unittest.TestCase):
     def test_one_feature_does_not_switch_the_other_on(self):
         system, user = build_prompt(athlete_message="sore knee")
@@ -512,7 +541,7 @@ class TestPastConstraintsGate(unittest.TestCase):
 # The optional inputs whose regions are asserted above.
 GATES_WITH_A_TEST = {
     "athlete_message", "intensity_context", "standing_workouts", "past_constraints",
-    "tweak", "tweak_dates",
+    "tweak", "tweak_dates", "terse",
 }
 
 # The rest of the two builders' optional inputs. Being here is not a claim that an input

@@ -690,7 +690,8 @@ class WorkoutLogicMixin:
         zone_currencies: Optional[Dict[str, str]] = None,
         anchor_history: Optional[str] = None,
         standing_workouts: Optional[List[Workout]] = None,
-        past_constraints: Optional[List[Constraint]] = None
+        past_constraints: Optional[List[Constraint]] = None,
+        terse: bool = False,
     ) -> Dict[str, Any]:
         """Queries LLM to generate workouts for a given number of days based on active strategy.
 
@@ -700,7 +701,8 @@ class WorkoutLogicMixin:
 
         `standing_workouts` are the sessions inside the commitment window that this span
         would rewrite (DESIGN_plan_change_continuity.md §4.2). `past_constraints` ended
-        earlier in the current mesocycle and explain its record (§6.1).
+        earlier in the current mesocycle and explain its record (§6.1). `terse` halves the
+        summary (DESIGN_output_verbosity.md §9).
         """
         start_str = start_str or today_str
         starting_phrase = "today" if start_str == today_str else start_str
@@ -727,6 +729,9 @@ class WorkoutLogicMixin:
                 "test there\n"
                 "competes with the effort it is meant to serve."
             )
+        # Half the summary for an athlete who asked for short answers
+        # (DESIGN_output_verbosity.md §9).
+        sentences = 2 if terse else 4
         custom_task = (
             "## TASK\n"
             f"Generate a training schedule for the next {duration_desc} starting from "
@@ -763,8 +768,9 @@ class WorkoutLogicMixin:
             "You MUST respond with a JSON object containing:\n"
             "{\n"
             '  "reasoning": "How this microcycle design serves the active mesocycle focus, in AT\n'
-            '    MOST 4 SENTENCES. The sessions themselves are listed below your prose — describe\n'
-            '    the shape of the microcycle and why, not each workout in turn.",\n'
+            f'    MOST {sentences} SENTENCES. The sessions themselves are listed below your\n'
+            '    prose — describe the shape of the microcycle and why, not each workout in\n'
+            '    turn.",\n'
             + _athlete_note_field(standing_workouts)
             # Workout generation is read-only w.r.t. coach learnings (see
             # DESIGN_backward_evaluation.md §11): it consumes the rendered learnings in the
@@ -900,6 +906,7 @@ class WorkoutLogicMixin:
         signal_earliest_date: Optional[str] = None,
         tweak: bool = False,
         tweak_dates: Sequence[str] = (),
+        terse: bool = False,
     ) -> Dict[str, Any]:
         """Queries LLM to evaluate metrics/activities and adapt workouts if needed.
 
@@ -912,6 +919,7 @@ class WorkoutLogicMixin:
         days it is about, `tweak_dates` when the caller already knows them, and the TASK
         asks for that and nothing else (DESIGN_workout_tweak.md §3.2). `removed_workouts`
         is then every cancelled session in the range, not only the athlete's (§3.1).
+        `terse` halves the summary (DESIGN_output_verbosity.md §9).
         """
         # has_message gates SIX regions that sit hundreds of lines apart: the clause
         # spliced into the change_reason wording, the note-handling instructions, the
@@ -1098,12 +1106,20 @@ evidence-backed observations are authored only by the weekly history analysis
 (`data bootstrap` / `data reflect`).
 """
 
-        # Each entry is one top-level member of the response object, without its trailing
-        # comma — the ",\n".join below places the separators, so no code hand-writes a
-        # comma and the has_message branch can't desync the punctuation.
-        schema_members = [
-            '  "change_needed": true | false',
-            (
+        # Half the summary for an athlete who asked for short answers. Only the summary:
+        # "change_reason" is read again by later runs (DESIGN_output_verbosity.md §9).
+        if terse:
+            reason_field = (
+                '  "reason": "What you changed and why, or why nothing needs to change, in AT\n'
+                '    MOST 2 SHORT SENTENCES (~30 words in all): the athlete prefers short\n'
+                '    answers. When the note or the request drove a change, name that change\n'
+                '    first. Name the signal you acted on, and leave out every reading that did\n'
+                '    NOT change your mind. This is the batch-level summary, shared by every\n'
+                '    adapted workout below — do NOT repeat it per workout; keep per-workout\n'
+                '    notes in "change_reason"."'
+            )
+        else:
+            reason_field = (
                 '  "reason": "Overall rationale for the whole adaptation: the readiness/load\n'
                 '    picture and the strategy applied to the mesocycle, in AT MOST 3 SENTENCES\n'
                 '    (~60 words). Adapt runs daily, so this is the line the athlete reads most\n'
@@ -1111,7 +1127,13 @@ evidence-backed observations are authored only by the weekly history analysis
                 '    out the readings that did NOT change your mind. This is the batch-level\n'
                 '    summary, shared by every adapted workout below — do NOT repeat it per\n'
                 '    workout; keep per-workout notes in "change_reason"."'
-            ),
+            )
+        # Each entry is one top-level member of the response object, without its trailing
+        # comma — the ",\n".join below places the separators, so no code hand-writes a
+        # comma and the has_message branch can't desync the punctuation.
+        schema_members = [
+            '  "change_needed": true | false',
+            reason_field,
             (
                 '  "adapted_workouts": [\n'
                 "    // Include ONLY sessions you are actually changing. Omit any session that\n"
