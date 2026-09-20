@@ -1,12 +1,15 @@
 """Shared resolvers/formatters for the workout CLI handlers."""
+import re
+import textwrap
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Set
 from trainmate import intensity, runtime
 from trainmate.calendar_state import calendar_status
 from trainmate.sports import is_strength_sport
 from trainmate.strength.prescription import exercise_lines
 from trainmate.util import (
-    bold, gray, green, red, yellow, cyan, blue, magenta, cmd, fmt_date, notice,
+    bold, gray, green, red, yellow, cyan, blue, magenta, cmd, display_width, fmt_date,
+    notice,
 )
 
 
@@ -141,3 +144,53 @@ def warn_stale_before(start_date: str) -> None:
         f"— their calendar events are out of date and this push did not cover them. "
         f"Run {cmd(f'workout push -d {earliest}..')} to update them.",
     )
+
+
+# Every bracket marker a `workout_line` can carry, in the order the line prints them, and
+# the one phrase that says what it means. `[STALE]` in particular names no subject on its
+# own: the word is about the session's Google Calendar event, not the session.
+_MARKER_GLOSS = (
+    ("DONE", "the session happened as asked"),
+    ("PARTIAL", "you trained, but not what was asked — -vv says what differed"),
+    ("MISSED", "no activity recorded against it"),
+    ("REST OK", "a rest day, and you rested"),
+    ("REST BROKEN", "a rest day you trained on"),
+    ("NOT YET", "today, and still ahead of you"),
+    ("BENCHMARK", "a repeatable test, comparable across the plan"),
+    ("ADAPTED", "'workout adapt' rewrote it; ×N is how many times"),
+    ("TWEAKED", "you rewrote it yourself"),
+    ("SYNCED", "its Google Calendar event matches this"),
+    ("STALE", "its Google Calendar event is out of date — 'workout push' updates it"),
+    ("REMOVED", "dropped from the schedule"),
+    ("KEPT", "left as it stands, not rewritten"),
+)
+
+# The vocabulary above, matched against a rendered line. Fixed words rather than a general
+# `[A-Z]+` pattern, so an all-caps sport type or title can never enter the legend.
+_MARKER_RE = re.compile("|".join(word for word, _gloss in _MARKER_GLOSS))
+
+
+def line_markers(line: str) -> Set[str]:
+    """The markers one rendered `workout_line` carries, for the legend to gloss.
+
+    Read back off the line rather than re-derived from the row, so the legend can never
+    name a marker the listing did not print."""
+    return set(_MARKER_RE.findall(line))
+
+
+def print_marker_legend(markers: Set[str]) -> None:
+    """Draws the gray footer saying what the markers on screen mean, after a blank line.
+
+    Glosses only the markers the listing actually printed, the way `journal` glosses only
+    the outcomes on screen (DESIGN_logging.md §7.2); a legend is answer-level output, not
+    an aside (DESIGN_output_verbosity.md §3.3)."""
+    text = " · ".join(
+        f"{word} = {gloss}" for word, gloss in _MARKER_GLOSS if word in markers
+    )
+    if not text:
+        return
+    print()
+    for line in textwrap.wrap(
+        text, width=display_width(), subsequent_indent="  ", break_on_hyphens=False
+    ):
+        print(gray(line))

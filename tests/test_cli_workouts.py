@@ -930,6 +930,89 @@ class TestCliWorkouts(unittest.TestCase):
         for marker in ("[DONE]", "[MISSED]", "[PARTIAL]", "[NOT YET]", "[REST OK]"):
             self.assertNotIn(marker, ahead)
 
+    def test_workout_list_glosses_only_the_markers_on_screen(self):
+        """The footer says what each bracket marker means, for the markers printed.
+
+        A legend naming [BENCHMARK] when no benchmark is listed is a paragraph the
+        eye learns to skip (DESIGN_logging.md §7.2)."""
+        day = self._adherence_fixture()
+        exit_code, stdout, _ = self.run_cli([
+            "workout", "list", "-d", f"{day(-2)}..{day(-1)}", "--no-pull",
+        ])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("DONE = ", stdout)
+        self.assertIn("PARTIAL = ", stdout)
+        self.assertIn("REST OK = ", stdout)
+        # The skipped run sits a day earlier and no session here is a benchmark, so
+        # neither word is glossed.
+        self.assertNotIn("MISSED = ", stdout)
+        self.assertNotIn("BENCHMARK = ", stdout)
+
+    def test_workout_list_says_what_stale_is_about(self):
+        """[STALE] names no subject on its own: the legend has to say Google Calendar,
+        and name the command that fixes it."""
+        from trainmate.calendar_state import calendar_signature
+        wid = save_workout(test_db,
+            date=PROPOSED_DATE, sport_type="running", title="Drifted Run",
+            description="easy",
+        )
+        test_db.mark_workout_pushed(
+            wid, "evt-drift", calendar_signature(test_db.get_workout_by_id(wid))
+        )
+        save_workout(test_db,
+            date=PROPOSED_DATE, sport_type="running", title="Drifted Run",
+            description="HARD",
+        )
+        exit_code, stdout, _ = self.run_cli([
+            "workout", "list", "-d", PROPOSED_DATE, "--no-pull",
+        ])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("[STALE]", _line_for(stdout, "Drifted Run"))
+        footer = " ".join(stdout.split())
+        self.assertIn("STALE = its Google Calendar event is out of date", footer)
+        self.assertIn("workout push", footer)
+
+    def test_generate_preview_glosses_its_own_markers(self):
+        """The preview draws the same lines as the listing, so it carries the same
+        footer — and `[KEPT]`, the one marker only a preview prints, has to be in it."""
+        import io
+        from contextlib import redirect_stdout
+        from trainmate.cli.workouts.generate import print_generate_preview
+        proposal = GenerateProposal(
+            reasoning="Reasoning",
+            workouts=(
+                {
+                    "date": PROPOSED_DATE, "sport_type": "running", "title": "Base Run",
+                    "description": "45 min easy", "duration_minutes": 45, "tss": 40,
+                    "rpe": 4,
+                },
+                {
+                    "date": PROPOSED_DATE, "sport_type": "rest", "title": "Rest Day",
+                    "description": "Complete rest.", "keep": True,
+                },
+            ),
+            displaced=(),
+            gen_start=PROPOSED_DATE, gen_end=PROPOSED_DATE,
+        )
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertTrue(print_generate_preview(proposal))
+        stdout = out.getvalue()
+        self.assertIn("[KEPT]", stdout)
+        self.assertIn("KEPT = left as it stands", " ".join(stdout.split()))
+
+    def test_every_marker_the_line_can_print_has_a_gloss(self):
+        """A new adherence status or a new change kind must not reach the listing with
+        no entry in the legend. Keyed on the two maps that produce the words, never on a
+        copy of them."""
+        from trainmate.adherence import STATUS_LABELS
+        from trainmate.cli.workouts._helpers import _KIND_MARKERS, _MARKER_GLOSS
+        glossed = {word for word, _gloss in _MARKER_GLOSS}
+        for label in STATUS_LABELS.values():
+            self.assertIn(label.upper(), glossed)
+        for word in _KIND_MARKERS.values():
+            self.assertIn(word, glossed)
+
     def test_workout_list_vv_names_the_effort_and_the_difference(self):
         """The marker says a session came in off-plan; -vv says by how much, and against
         which activity it was graded."""

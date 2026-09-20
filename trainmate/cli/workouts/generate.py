@@ -25,7 +25,9 @@ from trainmate.cli.runway import (
 from trainmate.coach.proposals import GenerateProposal
 
 from trainmate.cli.selectors import has_selector as _has_selector, resolve_window, split_targets
-from trainmate.cli.workouts._helpers import prescription_lines, workout_line
+from trainmate.cli.workouts._helpers import (
+    line_markers, prescription_lines, print_marker_legend, workout_line,
+)
 from trainmate.cli.workouts.heads_up import (
     generate_dates, print_send_notice, replacing_unsent, revision_dates,
 )
@@ -461,13 +463,17 @@ def print_generate_preview(proposal) -> bool:
     print_standing_report(proposal)
     # The same one-line rendering as `workout list`, so the plan the athlete is asked
     # to accept reads exactly like the plan they will be living with.
+    markers: set = set()
     for w in proposal.workouts:
-        print(workout_line(w))
+        head = workout_line(w)
+        markers |= line_markers(head)
+        print(head)
         # What the one-line form leaves out: the kilograms of a gym day, the zones of any
         # other session. The same lines `workout list -v` draws.
         for line in prescription_lines(w):
             print(f"      {gray(line)}")
     print_strength_notes(proposal)
+    print_marker_legend(markers)
     print()
     return True
 
@@ -752,9 +758,12 @@ def print_workout_table(
     # The long batch rationale is stamped on every workout of an adapt run; show each
     # distinct summary only once across the listing so it doesn't dominate the output.
     seen_summaries: set = set()
+    markers: set = set()
     for w in workouts:
         verdict = verdicts.get(w.get('id'))
-        print(workout_line(w, verdict))
+        head = workout_line(w, verdict)
+        markers |= line_markers(head)
+        print(head)
         # -l surfaces the Calendar event link (rebuilt from the stored event id) so it can
         # be opened without the sync commands having to print the URL every push.
         if getattr(args, "link", False):
@@ -807,6 +816,7 @@ def print_workout_table(
     end_marker = list_end_marker(end_date) if names_a_range else None
     if end_marker:
         print(end_marker)
+    print_marker_legend(markers)
 
 
 def run_workout_compare(args: argparse.Namespace) -> None:
