@@ -794,10 +794,10 @@ one-line summary (`N active, M dormant, K pending demotion`, archived left out) 
 **Cold-start nudge:** when there are no active learnings, `plan generate` and
 `status` suggest running `data bootstrap` (the only flow that authors learnings).
 
-**Migration:** learnings predating the evidence model are grandfathered with a
-synthetic supporting basis sized to sustain their stored level
-(`db._grandfather_learning_evidence()`, source `migration`), so the first
-recompute does not silently demote them (see [§15](#15-design-rationale--history)).
+**A learning added by hand** is seeded with a synthetic supporting basis sized to
+sustain the confidence it was given (`db._seed_synthetic_evidence()`, source `manual`),
+so the first recompute does not demote it for lack of evidence. The one-off that did the
+same for learnings predating the evidence model went with the schema squash.
 
 ### `CoachService`
 **Orchestrator — owns all DB and calendar access.** Exposes the public API
@@ -1225,18 +1225,18 @@ SQLite database at `trainmate.db` (path from `config.db_path`), in **WAL** mode 
 5-second busy timeout — CLI, web app and bot are concurrent surfaces over one file, so a
 pull overlapping a dashboard refresh is ordinary rather than exceptional.
 
-`_init_db` brings a database up to `SCHEMA_VERSION` (`db/base.py`) and records that in a
+`_init_db` creates every table at `SCHEMA_VERSION` (`db/base.py`) and records that in a
 `schema_version` table. Later starts see the stamp and do nothing, so `tm --help`
 performs no I/O; the DDL used to run in full — around 630 lines, writes included — on
-every process start. The migrations stay idempotent (`CREATE TABLE IF NOT EXISTS`,
-`_add_column` guarded by `PRAGMA table_info`), so the stamp is a way to skip work rather
-than a ledger to replay: clearing it re-runs everything. Bump `SCHEMA_VERSION` when the
+every process start. It is **CREATE TABLE IF NOT EXISTS only**: the in-place migrations
+are gone. Both instances were stamped at 18, so every one of them had already run, and a
+migration here is one-off by policy (AGENTS.md). What they built is folded into the
+CREATE statements, in the column order they produced. Clearing the stamp still rebuilds
+a database that is missing a table; a database older than the squash cannot be upgraded
+by this code at all, and needs a checkout from before it. Bump `SCHEMA_VERSION` when the
 DDL changes — reusing the number a previous commit already stamped is silent, since every
-existing database skips the new migration while fresh ones (and so the tests) look fine;
-`test_db_lifecycle.py` fingerprints the schema and fails on an unbumped change. Guarded
-ALTERs replaced `try: ALTER … except OperationalError: pass`,
-which also swallowed "database is locked" and let a locked database half-migrate in
-silence.
+existing database skips the change while fresh ones (and so the tests) look fine;
+`test_db_lifecycle.py` fingerprints the schema and fails on an unbumped change.
 
 `db.transaction()` runs several writes as one connection and one commit, and rolls the
 lot back on an exception. Methods called inside it join automatically — their own
@@ -1268,9 +1268,9 @@ no-benchmark carve-out does not apply. The planning prompt branches on it
 stored — a goal that is not archived and whose `target_date` has passed *is*
 completed, derived on every read by `db.objectives.goal_state()` →
 `upcoming | completed | archived`. That one function is what every surface (`goal
-list`, `status`, the web view) renders, so no two of them can disagree. A one-off
-migration in `db/base.py` rewrites any legacy `completed` row to `active`, and
-`goal edit --status` offers only `active`/`archived`. Rationale — and the two
+list`, `status`, the web view) renders, so no two of them can disagree. `goal edit
+--status` offers only `active`/`archived`; the one-off that rewrote legacy `completed`
+rows to `active` went with the schema squash. Rationale — and the two
 opposite failure modes the old three-value column produced — in
 DESIGN_backward_evaluation.md §12.
 
@@ -2967,7 +2967,7 @@ venv/bin/python -m unittest discover -s tests -p "test_*.py"
 |                                | kinds, `strength name`/`reset`/`discard`, the lines under the    |
 |                                | activity, `strength log`/`exercises` reading the record back,    |
 |                                | the morning push reading sets before its walk                    |
-| `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the warning for a change to today, who is watching, the replace question and its ways out, `workout notify`, `workout batches`, the migration. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.as_instance` pins the persona, which the operator's own config.yaml must not decide |
+| `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the warning for a change to today, who is watching, the replace question and its ways out, `workout notify`, `workout batches`. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.as_instance` pins the persona, which the operator's own config.yaml must not decide |
 | `tests/test_constraints.py`    | constraint DB windowing, hard-rest pre-pass, §7 magnitude, §8 message capture |
 | `tests/test_cli_*.py`          | One file per command family: output and argument handling, with |
 |                                | the service mocked. `test_dispatch.py` walks the parser tree     |
@@ -2978,11 +2978,11 @@ venv/bin/python -m unittest discover -s tests -p "test_*.py"
 |                                | `format_completed_activities` (HR/power-zone rendering) and      |
 |                                | `format_metrics_history` (None omission, warm-up suppression)    |
 | `tests/test_db.py`             | `Database` CRUD, evidence-based confidence (derivation, dedup,   |
-|                                | week validation, contradiction/demote/keep, staleness,          |
-|                                | grandfather migration), decay, `analysis_cache`                 |
+|                                | week validation, contradiction/demote/keep, staleness),         |
+|                                | decay, `analysis_cache`                                         |
 | `tests/test_feedback.py`       | The `plan feedback` log: capture/list/`--rm`, the `-m` atom      |
 |                                | (ID, date, name-infix, bare), the pending→consumed lifecycle,    |
-|                                | the regen gate + prompt section, the one-off slot migration      |
+|                                | the regen gate + prompt section                                  |
 | `tests/test_intensity.py`      | `intensity.py`: the completed-weeks divisor (first six days,    |
 |                                | partial tail excluded from both sides, finished mesocycle,      |
 |                                | weeks from the mesocycle start not Mondays), coverage with a    |
@@ -3279,10 +3279,11 @@ DESIGN_workout_revisions.md; the shape is in [§5](#workouts).
 Confidence is now a pure function of the per-learning evidence basis. Because
 re-citing a counted `(week, polarity)` is a `UNIQUE`-constrained `INSERT OR IGNORE`
 no-op, re-running / `--force` / overlapping windows cannot inflate confidence — so
-the old `suppress_reinforcement` flag became unnecessary and was removed. Learnings
-predating this model are grandfathered with a synthetic basis sized to sustain their
-stored level (`db._grandfather_learning_evidence()`, source `migration`) so the first
-recompute doesn't silently demote them. Full model:
+the old `suppress_reinforcement` flag became unnecessary and was removed. A learning
+added by hand is seeded with a synthetic basis sized to sustain the level it was given
+(`db._seed_synthetic_evidence()`, source `manual`) so the first recompute doesn't
+demote it; the same one-off for learnings predating the model went with the schema
+squash. Full model:
 [§3](#3-coach-package-architecture); DESIGN_evidence_based_confidence.md.
 
 ### Load model: single fallback, no additive blend
