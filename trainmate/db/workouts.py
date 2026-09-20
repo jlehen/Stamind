@@ -882,6 +882,29 @@ class WorkoutsMixin:
             ).fetchone()
             return dict(row) if row else None
 
+    def change_date_span(self, change_id: int) -> Optional[Tuple[str, str]]:
+        """The first and last day a change wrote, or None when it wrote none — the days a
+        later run has to reach for the replace question to be worth asking
+        (DESIGN_change_heads_up.md §5)."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT MIN(date) AS first, MAX(date) AS last FROM workouts "
+                "WHERE change_id = ?", (change_id,)
+            ).fetchone()
+        if row is None or row["first"] is None:
+            return None
+        return row["first"], row["last"]
+
+    def change_writes_day(self, change_id: int, day: str) -> bool:
+        """Whether a change wrote a session dated `day` — what makes it a change to today,
+        which cannot wait for tomorrow's morning (DESIGN_change_heads_up.md §4)."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM workouts WHERE change_id = ? AND date = ? LIMIT 1",
+                (change_id, day),
+            ).fetchone()
+        return row is not None
+
     def change_has_live_revisions(self, change_id: int) -> bool:
         """Whether anything this change wrote is still the live revision of its slot —
         that is, whether the change still stands (DESIGN_plan_change_continuity.md §6.4).

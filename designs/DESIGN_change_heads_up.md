@@ -1,11 +1,42 @@
 # Design: Telling the athlete when her week changes out of her sight
 
-**Status:** Implemented · **Date:** 2026-09-18 (rev. 8)
+**Status:** Implemented · **Date:** 2026-09-20 (rev. 9)
+
+Revision 9 fixes two things the first week of use showed. Both happened on the same evening,
+Sunday 20 September. It also rewords one question.
+
+**A change to today's sessions no longer waits for the next morning** (§4, §8). It goes out
+the same day, 20 minutes after the operator last touched the week.
+
+Here is the evening that showed it. It is Sunday 19:14. The athlete's lift did not happen,
+and the operator runs `workout adapt` to put rest in its place. Under revision 8 that message
+waited for Monday 08:00. So on Monday morning she would have read that her coach changed
+Sunday — a day that was over. The message is not late there, it is useless. For a change to
+today the choice is not "now or tomorrow morning". It is "now or never".
+
+The 20 minutes are the quiet wait revision 3 had at 15 minutes and revision 8 removed. It
+comes back because the operator usually gets to the right week by trial and error, and each
+attempt would otherwise be its own message. It is now the `change-delay` setting, so the
+operator can change it without touching the code. Setting it to 0 sends on the bot's next
+wake.
+
+**The replace question is asked only when the run is about days the unsent change wrote**
+(§5). Before, it was asked whenever the newest change was unsent, whatever days either one
+was about.
+
+The same evening showed that too. The 19:14 adapt changed Sunday, and nothing else. At 19:44
+the operator ran `workout generate -m 20` for a mesocycle that starts on Monday. The two have
+no day in common. The question was asked anyway, it offered to undo Sunday's adaptation, and
+answering "replace" undid it.
+
+**What "replace" undoes is written on the Replace option** (§5), instead of in the question
+above it. The operator reads the cost while looking at the answer it belongs to.
 
 Revision 8 drops the automatic same-day send. Every change now waits for her morning time,
 a change to today's sessions included. When a terminal run changes today's sessions, the
 terminal says so and tells the operator to run `workout notify` (§4, §8). The 15-minute wait
-that the same-day send needed goes with it.
+that the same-day send needed goes with it. Revision 9 puts the same-day send back for a
+change to today only, and without the wait.
 
 Revision 7 folds in a second review against the code:
 
@@ -79,10 +110,10 @@ sessions stay silent for now (§12).
 ## 2. The rule
 
 > When `workout generate` or `workout adapt` changes the athlete's week and she did not
-> watch it happen, TrainMate tells her on Telegram just before her next morning message. If
-> she opens her chat before that, she is told first. The operator can send what is waiting
-> at once with `workout notify`, and the terminal says to when the change touches today's
-> sessions.
+> watch it happen, TrainMate tells her on Telegram just before her next morning message —
+> or within minutes, when the change is to one of today's sessions. If she opens her chat
+> before that, she is told first. The operator can send what is waiting at once with
+> `workout notify`.
 
 She watched a run when it started from her chat: a button she tapped, a message she typed,
 or the morning message itself. The run's output is the reply she reads, so she already
@@ -182,20 +213,42 @@ Waiting also keeps the operator's work behind the scenes. The operator often get
 right week by trial and error: a run, a look at the result, another run. Nothing reaches her
 phone while that goes on, and §5 makes sure the attempt that survives reads correctly.
 
-**A change that touches today waits too, and the terminal says so.** The second gap of §1 is
-the case: at 12:30 the operator changes tonight's run, and 08:00 tomorrow is too late.
-TrainMate does not send it on its own, because it cannot tell a finished change from one
-the operator is still working out. The terminal says that the change touches today's
-sessions and that `workout notify` sends it now (§8), and the operator decides. A change
-touches today when one of the sessions it writes is dated today in her time zone, a session
-moved out of today included.
+**A change to today goes out the same day.** The second gap of §1 is the case: at 12:30 the
+operator changes tonight's run, and 08:00 tomorrow is too late. It is worse than late. By
+08:00 on Thursday, Wednesday evening's run is over, so a message about it describes a day she
+can no longer do anything about. For a change to today the choice is not "now or tomorrow
+morning", it is "now or never". A change touches today when one of the sessions it writes is
+dated today in her time zone, a session moved out of today included.
+
+**It waits for the operator to stop, and not for the morning.** The operator usually gets to
+the right week by trial and error: a run, a look at the result, another run. Sending on the
+spot would put one message on her phone per attempt. So the change goes out once no waiting
+change is younger than the `change-delay` setting, which is 20 minutes out of the box. A
+second run restarts those 20 minutes, because the wait is measured from the newest waiting
+change and not from the oldest.
+
+Here is the Wednesday. At 12:30 the operator cuts tonight's run. At 12:41 the operator looks
+again and shortens it differently. Nothing has reached her phone yet. At 13:01, twenty quiet
+minutes after the second run, she gets one message. If instead the operator had stopped at
+12:30, she would have had it at 12:50.
+
+§5 does most of this work already: the second run offers to replace the first, and the
+replaced attempt's message is dropped before it goes out. The wait covers what §5 does not —
+the operator answering "build on it", or changing a different day.
+
+Setting `change-delay` to 0 sends on the bot's next wake, which is within five minutes.
+`workout notify` still overrides the wait entirely, for the operator who is done and does not
+want to count minutes.
 
 Put together, the scheduler sends when it is between her morning time and 21:00 and at least
-one waiting change was made before today's morning time. A change made during the day waits
-for the next morning. The scheduler then sends every waiting change, oldest first, so that
-she reads them in the order they were made. The 21:00 is a constant. It matters only when
-the bot was down at her morning time: the changes go out when it comes back, but not after
-21:00.
+one of these holds: a waiting change was made before today's morning time, or a waiting
+change is to one of today's sessions and none of them is younger than `change-delay`. A
+change to another day made during the day waits for the next morning. The scheduler then
+sends every waiting change, oldest first, so that she reads them in the order they were made.
+The 21:00 is a constant. It matters in two places: when the bot was down at her morning time,
+the changes go out when it comes back but not after 21:00; and a change to today whose wait
+would end after 21:00 waits for the next morning like any other, because by then today is
+over anyway.
 
 **The operator can send it now.** TrainMate cannot know that the operator is done trying, or
 that a change matters before the next morning. The operator can. It is Wednesday 18:00 and the
@@ -248,14 +301,43 @@ sentence that survives is still written against a week she never saw. What repai
 running the second attempt against the week she knows.
 
 So a `workout generate` or `workout adapt` started in the terminal asks one question first,
-when the newest change that wrote sessions is one still waiting to be told:
+when the newest change that wrote sessions is one still waiting to be told **and this run is
+about days that change wrote**:
 
 > The newest change (adapt, Wed 22:00) has not been sent to the athlete yet.
-> Replace it, or build on it? Replace undoes it now.
+> Replace it, or build on it?
+>   [1] Build on it (default)
+>   [2] Replace it (undoes that adapt first)
 
 The question names the change by its kind and time. `workout batches` numbers its rows by
 position, newest first, so the change's internal number would match no number the operator
-can see.
+can see. What "replace" costs is written on the option itself rather than in the question, so
+the operator reads it while looking at the answer it belongs to.
+
+**The days have to meet.** The trouble above comes from change 8 rewriting the days change 7
+wrote. When the two runs share no day, there is no trouble at all. Both lines stand, both are
+true, and she reads them in the order they were made.
+
+Asking the question anyway does harm. "Replace" then undoes work the second run was never
+going to touch.
+
+Here is that case. It is Sunday 19:14. The operator runs `workout adapt` to record that the
+evening's lift did not happen. That change writes Sunday, and nothing else. At 19:44 the
+operator runs `workout generate -m 20` for the mesocycle that starts on Monday. The question
+is not asked, and Sunday's adaptation stands.
+
+So each command says which days it may write, and TrainMate compares that with the first and
+last day the unsent change wrote:
+
+- `workout generate` knows its span before it calls the week planner — `-d`, `-m`, `-M` and
+  `-g` all resolve to one, and a bare run opens after the days the schedule already covers.
+  So the span is resolved first and the question comes after it.
+- `workout adapt` does not: only the week planner's answer says which day it moved a session
+  onto. All it promises beforehand is that it changes nothing before the day it is evaluated
+  on, which is today unless `-d` says otherwise. So it counts as reaching every day from
+  there on, and asks as often as it does today.
+- `workout tweak -d` names the days outright, so those are its span. Without `-d` the week
+  planner reads the days off the message, and the tweak counts as open-ended like an adapt.
 
 **Replace** rolls change 7 back, exactly as `workout rollback` would, and then runs the
 command. The week planner sees the week she knows, so the line it writes is right for her.
@@ -377,10 +459,16 @@ its reason, both before the question that accepts the change. The line gives the
 > The athlete gets this line on Telegram at 08:00 tomorrow. `workout notify` sends it now.
 
 It says "today" when the run is made before her morning time. When the proposal touches
-today's sessions and the line would only go out tomorrow, the terminal says so instead:
+today's sessions, the line goes out the same day, so the terminal gives the hour instead of a
+morning time and says what puts that hour back:
 
-> This changes today's session, and the athlete gets this line on Telegram only at 08:00
-> tomorrow. Run `workout notify` to send it now.
+> This changes today's session, so the athlete gets this line on Telegram at 12:50 today,
+> not tomorrow morning. Changing their week again restarts those 20 minutes. `workout
+> notify` sends it now.
+
+With `change-delay` at 0 the sentence about restarting is left out: there is nothing to
+restart. A change to today whose wait would end after 21:00 waits for the next morning, so
+it gets the first line.
 
 `workout batches` lists every change with its date, kind, size and span, and nothing about
 what the change was, although a description is already stored with most of them: the week
@@ -438,6 +526,26 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   here: the week line is sent by the scheduler, not by the morning message, and the undone
   message quotes the change.
 
+Revision 9 adds to those:
+
+- `trainmate/db/workouts.py`: `change_date_span`, the first and last day a change wrote, for
+  the §5 comparison; `change_writes_day`, whether it wrote a session on a given day, for the
+  §4 rule.
+- `trainmate/heads_up.py`: `waiting()` hangs `touches_today` on each row it returns; `due`
+  sends on it once the wait is up, and `sends_at` returns the hour it goes out at.
+  `sends_after_delay` is the one place that says which of the two rules applies, so the
+  scheduler and the terminal notice cannot drift.
+- `trainmate/settings.py`: the `change-delay` setting, seeded by `telegram.change_delay_minutes`
+  in config.yaml, built-in default 20 minutes, read through `settings.change_delay_minutes()`.
+  It is not in `ROUTABLE_SETTINGS`: the athlete does not set how soon she hears from her
+  coach. `parse_minutes` joins `parse_days` over a shared `_parse_count`.
+- `trainmate/cli/workouts/heads_up.py`: `replacing_unsent` takes the days the run may write
+  and asks nothing when they miss the unsent change's days (§5).
+- `trainmate/cli/workouts/generate.py`: `run_workout_generate` resolves the span before
+  opening `replacing_unsent`, and hands it to `_generate`; `_adapt_window` gives the adapt
+  and tweak windows. `trainmate/cli/workouts/strength_only.py` takes its span from the
+  caller for the same reason.
+
 ## 11. Tests
 
 - A `workout adapt` run in the terminal on a companion instance leaves its change waiting.
@@ -456,10 +564,14 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
 - The scheduler sends waiting changes after due reminders and before the morning message on
   the same wake. It does not send while the chat is busy or in expert mode. It sends whether
   or not the morning message is switched on.
-- A change made during the day is not sent that day, even when it touches today. It goes out
-  at her next morning time, ahead of the morning message, together with any other waiting
-  change, oldest first, and also when the bot was down at that time and comes back later in
-  the day, before 21:00.
+- A change to another day made during the day is not sent that day. It goes out at her next
+  morning time, ahead of the morning message, together with any other waiting change, oldest
+  first, and also when the bot was down at that time and comes back later in the day, before
+  21:00.
+- A change to one of today's sessions is sent the same day, once no waiting change is
+  younger than `change-delay`; a second run restarts that wait. With the setting at 0 it goes
+  on the next wake. Made before her morning time it still waits for it, and it waits for the
+  next morning when its wait would end after 21:00.
 - A tap or a message from her while a change is waiting gets the change first, whatever the
   hour, and then its own reply.
 - `workout notify` lists the waiting changes and, once confirmed, makes the scheduler send them
@@ -470,13 +582,17 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   waiting. Replace rolls it back before the week planner is called and leaves one waiting
   change. Nothing is asked when her own change came after it, when the waiting change was
   already sent, with `-y`, or on an expert instance.
+- Nothing is asked when the run writes no day the unsent change wrote: `workout generate` for
+  a span that opens after it leaves it standing. The question comes back as soon as the span
+  reaches those days.
 - After a Replace, a run that is cancelled, declined or fails leaves the earlier attempt
   undone and says so. It never prints that the schedule is unchanged. A change that was sent
   while the question waited is not rolled back, and the run builds on it.
 - The terminal notice appears on a companion instance and not on an expert one. It names her
-  morning time. When the proposal touches today, a session moved out of today included, and
-  the line would only go out tomorrow, it says so and tells the operator to run `workout
-  notify`.
+  morning time. When the proposal touches today, a session moved out of today included, it
+  gives the hour the line goes out at and says that another change restarts the wait.
+- The replace question puts what "replace" undoes on the Replace option, naming the change's
+  kind, and no longer says it in the question.
 - `workout batches` prints each description, none under a rollback, and marks a waiting
   change.
 - A `workout generate` she starts from her chat is told as it is written, so its week line
@@ -501,10 +617,15 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   messages carry "Got it" and "Not now" and come back every morning until she taps one. A
   change is read once, like the briefing. The queue also does not record whether a message
   went out, which the undone message needs.
-- Telling her the same day, on its own, about any change, a change to today's sessions
-  included. She hears at her morning time, which is when she learns what any day holds.
-  When sooner matters — tonight's run changed, or a bag to pack for tomorrow — the operator
-  runs `workout notify`, and for a change to today the terminal says so (§4, §8).
+- Telling her the same day about a change to a day that is not today. She hears at her
+  morning time, which is when she learns what any day holds. When sooner matters — a bag to
+  pack for tomorrow — the operator runs `workout notify` (§4). A change to today does not
+  wait, because her next morning time is after the day it is about (§4).
+- A wait before a change to a day that is not today. Those go out at her morning time, which
+  is already hours away, so a quiet wait would change nothing.
+- A per-change wait. The wait is measured from the newest waiting change, so one message
+  going out drags the rest with it, as it always has (§4). Timing each change separately
+  would mean sending them in several bursts, and she would read one week in pieces.
 - Sending the morning's changes ahead of her morning time, for example an hour before. Her
   morning time is the hour she chose to hear from TrainMate, which is the same reason nothing
   is sent after 21:00.

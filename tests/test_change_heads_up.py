@@ -28,15 +28,18 @@ def _at(day: int, hour: int, minute: int = 0) -> datetime:
     return datetime(2026, 9, day, hour, minute).astimezone()
 
 
-def _waiting(change_id: int, made: datetime) -> dict:
-    return {"id": change_id, "created_at": made.isoformat()}
+def _waiting(change_id: int, made: datetime, touches_today: bool = False) -> dict:
+    return {
+        "id": change_id, "created_at": made.isoformat(), "touches_today": touches_today,
+    }
 
 
 class SendRuleTest(unittest.TestCase):
-    """When the scheduler sends the waiting changes (§4). Morning time 08:00."""
+    """When the scheduler sends the waiting changes (§4). Morning time 08:00, and a change
+    to today waits 20 minutes, the built-in default of the `change-delay` setting."""
 
-    def due(self, waiting, now, notify_upto=None):
-        return heads_up.due(waiting, now, "08:00", notify_upto)
+    def due(self, waiting, now, notify_upto=None, delay=20):
+        return heads_up.due(waiting, now, "08:00", notify_upto, delay)
 
     def test_nothing_waiting_sends_nothing(self):
         self.assertFalse(self.due([], _at(24, 8)))
@@ -57,10 +60,37 @@ class SendRuleTest(unittest.TestCase):
         self.assertFalse(self.due(change, _at(23, 21, 0)))
 
     def test_a_change_made_during_the_day_waits_for_the_next_morning(self):
-        """12:30, tonight's run changes: only `workout notify` sends it sooner."""
+        """12:30 Wednesday, Friday's session changes: only `workout notify` sends it
+        sooner."""
         change = [_waiting(7, _at(23, 12, 30))]
         self.assertFalse(self.due(change, _at(23, 12, 50)))
         self.assertFalse(self.due(change, _at(23, 20, 55)))
+        self.assertTrue(self.due(change, _at(24, 8, 0)))
+
+    def test_a_change_to_today_goes_out_once_the_wait_is_up(self):
+        """12:30 Wednesday, tonight's run is cut. Thursday 08:00 is after the run, so it
+        goes out at 12:50 instead."""
+        change = [_waiting(7, _at(23, 12, 30), touches_today=True)]
+        self.assertFalse(self.due(change, _at(23, 12, 35)))
+        self.assertTrue(self.due(change, _at(23, 12, 50)))
+
+    def test_a_second_change_restarts_the_wait(self):
+        """The operator is still working it out at 12:45, so nothing goes out at 12:50."""
+        changes = [
+            _waiting(7, _at(23, 12, 30), touches_today=True),
+            _waiting(8, _at(23, 12, 45), touches_today=True),
+        ]
+        self.assertFalse(self.due(changes, _at(23, 12, 50)))
+        self.assertTrue(self.due(changes, _at(23, 13, 5)))
+
+    def test_a_delay_of_zero_sends_on_the_next_wake(self):
+        change = [_waiting(7, _at(23, 12, 30), touches_today=True)]
+        self.assertTrue(self.due(change, _at(23, 12, 31), delay=0))
+
+    def test_a_change_to_today_still_stops_at_the_evening(self):
+        """Past the evening the day is over, so it waits like any other change."""
+        change = [_waiting(7, _at(23, 21, 30), touches_today=True)]
+        self.assertFalse(self.due(change, _at(23, 21, 55)))
         self.assertTrue(self.due(change, _at(24, 8, 0)))
 
     def test_a_change_made_before_the_morning_time_goes_at_it(self):
@@ -92,6 +122,17 @@ class NoticeTimingTest(unittest.TestCase):
 
     def test_before_the_morning_time_it_goes_this_morning(self):
         self.assertEqual(heads_up.sends_at(_at(23, 6, 0), "08:00"), _at(23, 8))
+
+    def test_a_change_to_today_goes_out_after_the_wait(self):
+        self.assertEqual(
+            heads_up.sends_at(_at(23, 12, 30), "08:00", True, 20), _at(23, 12, 50)
+        )
+
+    def test_a_change_to_today_whose_wait_runs_past_the_evening_waits_for_the_morning(self):
+        self.assertEqual(heads_up.sends_at(_at(23, 20, 50), "08:00", True, 20), _at(24, 8))
+
+    def test_a_change_to_today_before_the_morning_time_goes_at_it(self):
+        self.assertEqual(heads_up.sends_at(_at(23, 6, 0), "08:00", True, 20), _at(23, 8))
 
 
 class _DbCase(unittest.TestCase):
@@ -156,6 +197,19 @@ class WhoIsWatchingTest(_DbCase):
 
 
 
+class TouchesTodayTest(_DbCase):
+    """`waiting()` marks the change that wrote one of today's sessions, which is what makes
+    the scheduler send it without waiting for the next morning (§4)."""
+
+    def test_only_the_change_that_wrote_today_is_marked(self):
+        self.change(note="Tonight's lift is off.", day=today_str())
+        self.change(note="Friday moves to Saturday.", day="2026-09-25", title="Long ride")
+        marked = {c["note"]: c["touches_today"] for c in heads_up.waiting()}
+        self.assertEqual(marked, {
+            "Tonight's lift is off.": True, "Friday moves to Saturday.": False,
+        })
+
+
 class ReplaceQuestionTest(_DbCase):
     """A terminal run asks before building on an attempt the athlete never heard of (§5)."""
 
@@ -164,11 +218,15 @@ class ReplaceQuestionTest(_DbCase):
         self.choose = prompt.start()
         self.addCleanup(prompt.stop)
 
-    def _run(self, skip=False, write=None):
-        """A terminal run inside the question; `write` is what it writes, if anything."""
+    def _run(self, skip=False, write=None, window=None):
+        """A terminal run inside the question; `write` is what it writes, if anything.
+
+        `window` is the days the run may write, open-ended from today by default, which is
+        what `workout adapt` passes."""
         from trainmate.cli.workouts.heads_up import replacing_unsent
         out = StringIO()
-        with redirect_stdout(out), replacing_unsent(skip) as replaced:
+        window = window or (today_str(), None)
+        with redirect_stdout(out), replacing_unsent(skip, window) as replaced:
             if write:
                 write()
         return replaced, out.getvalue()
@@ -209,7 +267,7 @@ class ReplaceQuestionTest(_DbCase):
         out = StringIO()
         from trainmate.cli.workouts.heads_up import replacing_unsent
         with self.assertRaises(RuntimeError), redirect_stdout(out):
-            with replacing_unsent(False):
+            with replacing_unsent(False, (today_str(), None)):
                 raise RuntimeError("LLM down")
         self.assertIn("stays undone", out.getvalue())
 
@@ -256,6 +314,20 @@ class ReplaceQuestionTest(_DbCase):
         self._run()
         self.choose.assert_not_called()
 
+    def test_nothing_is_asked_when_the_run_leaves_the_unsent_days_alone(self):
+        """The unsent adapt changed today. This run writes the mesocycle that opens
+        tomorrow, so it overwrites nothing the adapt wrote and both lines are true."""
+        self.change(kind="adapt", note="Today's lift is off.", day="2026-09-23")
+        self._answer("replace")
+        self._run(window=("2026-09-24", "2026-10-21"))
+        self.choose.assert_not_called()
+
+    def test_the_question_comes_back_once_the_run_reaches_those_days(self):
+        self.change(kind="adapt", note="Today's lift is off.", day="2026-09-23")
+        self._answer("build")
+        self._run(window=("2026-09-23", "2026-10-21"))
+        self.choose.assert_called_once()
+
     def test_the_question_names_the_change_by_kind_and_time(self):
         self.change(kind="adapt")
         self._answer("build")
@@ -266,7 +338,7 @@ class ReplaceQuestionTest(_DbCase):
 
 
 class GenerateAfterReplaceTest(_DbCase):
-    """`workout generate` after a Replace, declined at the last question (§5)."""
+    """`workout generate` around the replace question (§5)."""
 
     def setUp(self):
         super().setUp()
@@ -301,6 +373,23 @@ class GenerateAfterReplaceTest(_DbCase):
         self.assertFalse(test_db.change_has_live_revisions(first))
         self.assertEqual(test_db.waiting_changes(), [])
 
+    def test_a_span_that_opens_after_the_unsent_change_asks_nothing(self):
+        """An unsent adapt changed today, and the operator then generates the sessions of
+        the days after it. Nothing the adapt wrote is rewritten, so today's adaptation is
+        never offered for undoing."""
+        adapt = self.change(kind="adapt", note="Today's lift is off.", day="2026-09-23")
+        reply = {"reasoning": "why", "workouts": [{
+            "date": "2026-09-25", "sport_type": "running", "title": "Easy run",
+            "description": "[Easy run]\n40 min easy.", "duration_minutes": 40,
+            "rpe": 3, "tss": 30,
+        }]}
+        choose = patch.object(runtime.prompt, "choose", return_value="replace")
+        with patch("trainmate.coach.engine.openrouter_client") as client, choose as ask:
+            client.complete.return_value = reply
+            run_cli(["workout", "generate", "-d", "2026-09-24..2026-09-27"])
+        ask.assert_not_called()
+        self.assertTrue(test_db.change_has_live_revisions(adapt))
+
 
 class SendNoticeTest(_DbCase):
     """The line under the one the athlete will get (§8). The clock is pinned at 12:00."""
@@ -312,11 +401,13 @@ class SendNoticeTest(_DbCase):
             print_send_notice(dates)
         return out.getvalue()
 
-    def test_a_change_to_today_says_so_and_points_at_notify(self):
+    def test_a_change_to_today_gives_the_hour_it_goes_out_at(self):
+        """The clock is pinned at 12:00 and the wait is the default 20 minutes."""
         out = " ".join(self._notice({today_str(), "2026-09-25"}).split())
         self.assertIn("This changes today's session", out)
-        self.assertIn("only at 08:00 tomorrow", out)
-        self.assertIn("Run 'workout notify' to send it now", out)
+        self.assertIn("at 12:20 today, not tomorrow morning", out)
+        self.assertIn("restarts those 20 minutes", out)
+        self.assertIn("workout notify", out)
 
     def test_a_change_to_another_day_names_the_morning_time(self):
         out = " ".join(self._notice({"2026-09-25"}).split())

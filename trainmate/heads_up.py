@@ -1,10 +1,12 @@
 """Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md).
 
 A change `workout generate` or `workout adapt` makes while the athlete is not watching waits
-in `workout_changes` until the bot tells them (§6): at their next morning time, unless the
-operator runs `workout notify`. This module holds the wording (§3), the one rule for when
-the bot's scheduler sends (§4), and when the terminal says the line will go out (§8), so the
-scheduler, `bot changes`, `workout notify` and the terminal notice read the same rule.
+in `workout_changes` until the bot tells them (§6): at their next morning time, or the same
+day once the operator has left the week alone for `change-delay` minutes when the change is
+to one of today's sessions, or at once when the operator runs `workout notify`.
+This module holds the wording (§3), the one rule for when the bot's scheduler sends
+(§4), and when the terminal says the line will go out (§8), so the scheduler, `bot changes`,
+`workout notify` and the terminal notice read the same rule.
 `trainmate.db` is reached through `runtime` at call time, so importing this module from the
 database layer opens nothing.
 """
@@ -65,13 +67,15 @@ def _made_at(change: Dict[str, Any]) -> datetime:
 
 def due(
     waiting: Sequence[Dict[str, Any]], now: datetime, morning: str,
-    notify_upto: Optional[int],
+    notify_upto: Optional[int], delay_minutes: int = 0,
 ) -> bool:
     """Whether the scheduler sends the waiting changes on this wake (§4).
 
     At once when `workout notify` asked for a change that is still waiting. Otherwise from
-    the morning time to the evening, once one of them was made before this morning's
-    morning time: a change made later in the day waits for the next morning."""
+    the morning time to the evening, once one of them was made before this morning's morning
+    time. A change that wrote a session dated today (`touches_today`) also goes out the same
+    day, once no waiting change is younger than `delay_minutes`: that wait is what keeps the
+    operator's trial and error off the athlete's phone, and a second run restarts it."""
     if not waiting:
         return False
     if notify_upto is not None and any(c["id"] <= notify_upto for c in waiting):
@@ -79,12 +83,34 @@ def due(
     morning_at = _at(now, morning)
     if not morning_at <= now < _at(now, EVENING):
         return False
-    return any(_made_at(c) < morning_at for c in waiting)
+    if any(_made_at(c) < morning_at for c in waiting):
+        return True
+    if not any(c.get("touches_today") for c in waiting):
+        return False
+    return now - max(_made_at(c) for c in waiting) >= timedelta(minutes=delay_minutes)
 
 
-def sends_at(now: datetime, morning: str) -> datetime:
-    """When a change made now reaches the athlete unless `workout notify` sends it sooner:
-    this morning's morning time while it is still ahead, else tomorrow's (§8)."""
+def sends_after_delay(
+    now: datetime, morning: str, touches_today: bool, delay_minutes: int
+) -> bool:
+    """Whether a change made now goes out `delay_minutes` from now rather than at a morning
+    time (§4). `sends_at` and the terminal notice both key on this, so they cannot drift.
+
+    Only a change to one of today's sessions does, and only when the wait ends before the
+    evening: past it the day the change is about is over, so it waits like any other."""
+    if now < _at(now, morning):
+        return False
+    return touches_today and now + timedelta(minutes=delay_minutes) < _at(now, EVENING)
+
+
+def sends_at(
+    now: datetime, morning: str, touches_today: bool = False, delay_minutes: int = 0,
+) -> datetime:
+    """When a change made now reaches the athlete, unless `workout notify` sends it sooner
+    (§8): `delay_minutes` from now for a change to today, else this morning's morning time
+    while it is still ahead, else tomorrow's."""
+    if sends_after_delay(now, morning, touches_today, delay_minutes):
+        return now + timedelta(minutes=delay_minutes)
     morning_at = _at(now, morning)
     if now < morning_at:
         return morning_at
@@ -92,11 +118,16 @@ def sends_at(now: datetime, morning: str) -> datetime:
 
 
 def waiting() -> List[Dict[str, Any]]:
-    """The changes waiting to be told, oldest first. None outside companion mode, where
-    the athlete is the operator (§2)."""
+    """The changes waiting to be told, oldest first, each carrying `touches_today`: whether
+    it wrote a session dated today, which is what stops it waiting for the next morning
+    (§4). None outside companion mode, where the athlete is the operator (§2)."""
     if config.telegram_ui != "simple":
         return []
-    return runtime.db.waiting_changes()
+    today = clock.now().strftime("%Y-%m-%d")
+    changes = runtime.db.waiting_changes()
+    for change in changes:
+        change["touches_today"] = runtime.db.change_writes_day(change["id"], today)
+    return changes
 
 
 def _notify_upto() -> Optional[int]:
@@ -108,4 +139,7 @@ def _notify_upto() -> Optional[int]:
 
 def changes_due() -> bool:
     """The check the bot's scheduler makes on each wake (§4)."""
-    return due(waiting(), clock.now(), settings.morning_time(), _notify_upto())
+    return due(
+        waiting(), clock.now(), settings.morning_time(), _notify_upto(),
+        settings.change_delay_minutes(),
+    )

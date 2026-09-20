@@ -41,6 +41,12 @@ Amended 2026-09-19 (DESIGN_output_verbosity.md §9): `terse`, in the Coach group
 the coach says about a change short. It is off by default, and the athlete can change it
 from chat.
 
+Amended 2026-09-20 (DESIGN_change_heads_up.md §4): `change-delay`, in a group of its own
+called Week changes, is how many minutes a change to one of today's sessions waits before
+the athlete is told. It is 20 by default. It is a row here because the operator retunes it
+by feel after living with it, not because the athlete would: like `commitment-days` and
+`strength-sets-since`, it stays off `ROUTABLE_SETTINGS`, so it cannot be changed from chat.
+
 Out, and staying in `config.yaml`: credentials (`llm.api_key`, `garmin.password`), file
 paths (`database`, `science_dir`, `service_account_file`), the web bind address, the
 Telegram plumbing (`bot_token`, `allowed_chat_ids`, timeouts, `wrap_width`), and every

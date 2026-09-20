@@ -27,6 +27,7 @@ MORNING_TIME = "morning-time"
 MORNING_DEADLINE = "morning-deadline"
 ADAPT_FIRST = "adapt-first"
 COMMITMENT_DAYS = "commitment-days"
+CHANGE_DELAY = "change-delay"
 STRENGTH_SETS_SINCE = "strength-sets-since"
 LEARNING_QUESTIONS = "learning-questions"
 TERSE = "terse"
@@ -44,14 +45,25 @@ def parse_hhmm(token: Any) -> str:
     return f"{hour:02d}:{minute:02d}"
 
 
-def parse_days(token: Any) -> str:
-    """A whole number of days, zero or more, stored as its decimal spelling."""
+def _parse_count(token: Any, unit: str, example: str) -> str:
+    """A whole number of `unit`, zero or more, stored as its decimal spelling."""
     raw = str(token if token is not None else "").strip()
     if not re.fullmatch(r"\d+", raw):
         raise ValueError(
-            f"'{raw}' is not a number of days — write a whole number, 0 or more, e.g. 7."
+            f"'{raw}' is not a number of {unit} — write a whole number, 0 or more, "
+            f"e.g. {example}."
         )
     return str(int(raw))
+
+
+def parse_days(token: Any) -> str:
+    """A whole number of days, zero or more, stored as its decimal spelling."""
+    return _parse_count(token, "days", "7")
+
+
+def parse_minutes(token: Any) -> str:
+    """A whole number of minutes, zero or more, stored as its decimal spelling."""
+    return _parse_count(token, "minutes", "20")
 
 
 def parse_date(token: Any) -> str:
@@ -249,6 +261,19 @@ SETTINGS: List[Setting] = [
         coerce=_is_on,
     ),
     Setting(
+        name=CHANGE_DELAY,
+        key="changes_delay_minutes",
+        group="Week changes",
+        # Measured from the newest waiting change, so a second run restarts it
+        # (DESIGN_change_heads_up.md §4).
+        summary="Minutes a change to today's sessions waits before the athlete is told",
+        value_hint="MINUTES",
+        parse=parse_minutes,
+        config_path=("telegram", "change_delay_minutes"),
+        fallback="20",
+        coerce=_as_int,
+    ),
+    Setting(
         name=STRENGTH_SETS_SINCE,
         key="strength_sets_since",
         group="Strength",
@@ -359,6 +384,13 @@ def commitment_days() -> int:
     """How many days from today the week planner must account for session by session
     (DESIGN_plan_change_continuity.md §4.1). Operator-only: not in ROUTABLE_SETTINGS."""
     return value(COMMITMENT_DAYS)
+
+
+def change_delay_minutes() -> int:
+    """How long a change to one of today's sessions waits before the bot tells the athlete,
+    so the operator's trial and error stays off their phone (DESIGN_change_heads_up.md §4).
+    Operator-only: not in ROUTABLE_SETTINGS."""
+    return value(CHANGE_DELAY)
 
 
 def push_enabled() -> bool:

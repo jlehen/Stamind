@@ -13,9 +13,12 @@ from trainmate.util import cmd, fmt_date, green, notice, red, step, today_str, w
 STRENGTH = canonical_sport("strength_training")
 
 
-def _span(args: argparse.Namespace) -> Optional[Tuple[str, str]]:
+def strength_span(args: argparse.Namespace) -> Optional[Tuple[str, str]]:
     """The days the selectors name, from today at the earliest. An end left open is the last
-    scheduled day, since the days after it hold no session to write again."""
+    scheduled day, since the days after it hold no session to write again.
+
+    `run_workout_generate` resolves it before the replace question, which needs the days
+    this run writes (DESIGN_change_heads_up.md §5)."""
     today = today_str()
     start, end = resolve_window(args)
     start = max(start or today, today)
@@ -26,12 +29,11 @@ def _span(args: argparse.Namespace) -> Optional[Tuple[str, str]]:
     return start, end
 
 
-def generate_strength_only(args: argparse.Namespace, force: bool, unchanged: str) -> None:
+def generate_strength_only(
+    args: argparse.Namespace, force: bool, unchanged: str, span: Tuple[str, str]
+) -> None:
     """Writes every strength session of the span again, and nothing else. The question
     before the call counts the strength sessions only, since no other session can change."""
-    span = _span(args)
-    if span is None:
-        return
     start, end = span
     sessions = [
         w for w in runtime.db.get_workouts(start_date=start, end_date=end)

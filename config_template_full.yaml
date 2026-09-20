@@ -208,6 +208,13 @@ llm:
 #  #  # Re-run the daily adaptation (workout adapt -y, no questions asked) before writing
 #  #  # the push, so it accounts for overnight signals. Costs one LLM call every morning.
 #  #  #adapt_first: false
+#  # A change you make to the athlete's week from the terminal reaches them at their next
+#  # morning time (DESIGN_change_heads_up.md §4). A change to one of today's sessions cannot
+#  # wait that long — by the next morning the day it is about is over — so it goes out the
+#  # same day, once you have left their week alone for this many minutes. Another change
+#  # restarts the wait, which is what keeps trial and error off their phone. 0 sends on the
+#  # bot's next wake. Seeds `settings set change-delay N`, which overrides it live.
+#  #change_delay_minutes: 20
 
 google:
   # Service-account JSON file used to authenticate to the Google APIs.

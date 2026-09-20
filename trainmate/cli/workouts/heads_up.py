@@ -11,7 +11,7 @@ import argparse
 import textwrap
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Dict, Iterable, Iterator, Optional
+from typing import Any, Dict, Iterable, Iterator, Optional, Tuple
 
 from trainmate import clock, heads_up, runtime, settings
 from trainmate.config import config
@@ -19,6 +19,10 @@ from trainmate.prompt import Choice, athlete_watching
 from trainmate.util import (
     bold, cmd, default_wrap_width, green, notice, today_str, wrap_text,
 )
+
+
+# The days a run may write: its first day, and its last one when the run knows it.
+Window = Tuple[str, Optional[str]]
 
 
 def _when(change: Dict[str, Any]) -> str:
@@ -36,7 +40,20 @@ def _newest_written() -> int:
     return newest["id"] if newest else 0
 
 
-def _replace_unsent() -> Optional[int]:
+def _reaches(change_id: int, window: Window) -> bool:
+    """Whether the run about to start writes any day the change wrote (§5).
+
+    `window` is (first day, last day) of the days the run may write, with None for a last
+    day it does not know — `workout adapt` learns its days only from the week planner's
+    answer, so it counts as reaching every day from the one it is evaluated on."""
+    span = runtime.db.change_date_span(change_id)
+    if span is None:
+        return False
+    first, last = window
+    return span[1] >= first and (last is None or span[0] <= last)
+
+
+def _replace_unsent(window: Window) -> Optional[int]:
     """Asks the §5 question and undoes the newest change on "replace".
 
     Returns the newest change that wrote a session right after the undo, the mark a later
@@ -46,10 +63,16 @@ def _replace_unsent() -> Optional[int]:
     newest = runtime.db.newest_change_with_sessions()
     if newest is None or not _is_waiting(newest["id"]):
         return None
+    # Days that never meet make two real changes, each with a line of its own (§5).
+    if not _reaches(newest["id"], window):
+        return None
     choice = runtime.prompt.choose(
         f"The newest change ({newest['kind']}, {_when(newest)}) has not been sent to the "
-        "athlete yet.\nReplace it, or build on it? Replace undoes it now.",
-        [Choice("build", "Build on it"), Choice("replace", "Replace it")],
+        "athlete yet.\nReplace it, or build on it?",
+        [
+            Choice("build", "Build on it"),
+            Choice("replace", f"Replace it (undoes that {newest['kind']} first)"),
+        ],
         default="build",
     )
     if choice != "replace":
@@ -64,14 +87,16 @@ def _replace_unsent() -> Optional[int]:
 
 
 @contextmanager
-def replacing_unsent(skip: bool) -> Iterator[bool]:
+def replacing_unsent(skip: bool, window: Window) -> Iterator[bool]:
     """Around a terminal `workout generate` or `workout adapt`: offers to undo the newest
     change when the athlete was never told about it, and yields whether it was undone (§5).
 
-    `skip` is the run's -y/--auto/--force, which asks nothing and builds on top. The undo
-    comes before the week planner is called, so a run that then writes nothing — cancelled,
-    declined or failed — leaves it undone, and says so on the way out."""
-    written_upto = None if skip else _replace_unsent()
+    `skip` is the run's -y/--auto/--force, which asks nothing and builds on top. `window`
+    is the days this run may write, so a run that leaves the unsent change's days alone
+    asks nothing. The undo comes before the week planner is called, so a run that then
+    writes nothing — cancelled, declined or failed — leaves it undone, and says so on the
+    way out."""
+    written_upto = None if skip else _replace_unsent(window)
     try:
         yield written_upto is not None
     finally:
@@ -103,22 +128,27 @@ def print_send_notice(dates: Iterable[str]) -> None:
     """Under the line a terminal run writes for the athlete: when it reaches them, by the
     rule the scheduler applies (§8). `dates` are the days the proposal writes.
 
-    A change to today's sessions that would only reach them tomorrow says so first, since
-    only `workout notify` gets it to them in time (§4)."""
+    A change to today's sessions goes out the same day, so its line gives the hour rather
+    than a morning time, and says what puts that hour back (§4)."""
     if athlete_watching():
         return
     now = clock.now()
-    at = heads_up.sends_at(now, settings.morning_time())
+    morning, delay = settings.morning_time(), settings.change_delay_minutes()
+    touches_today = today_str() in set(dates)
+    at = heads_up.sends_at(now, morning, touches_today, delay)
+    if heads_up.sends_after_delay(now, morning, touches_today, delay):
+        line = (
+            f"This changes today's session, so the athlete gets this line on Telegram at "
+            f"{at.strftime('%H:%M')} today, not tomorrow morning."
+        )
+        if delay:
+            line += f" Changing their week again restarts those {delay} minutes."
+        notice(f"{line} {cmd('workout notify')} sends it now.")
+        return
     if at.date() == now.date():
         when = f"at {at.strftime('%H:%M')} today"
     else:
         when = f"at {at.strftime('%H:%M')} tomorrow"
-    if today_str() in set(dates) and at.date() != now.date():
-        notice(
-            f"This changes today's session, and the athlete gets this line on Telegram "
-            f"only {when}. Run {cmd('workout notify')} to send it now."
-        )
-        return
     notice(
         f"The athlete gets this line on Telegram {when}. {cmd('workout notify')} "
         "sends it now."

@@ -145,6 +145,12 @@ coach:
 #    # Run `workout adapt -y` first, so the push accounts for overnight signals. Costs one
 #    # LLM call every morning.
 #    adapt_first: false
+#  # When you change the athlete's week from the terminal, they are told at their next
+#  # morning time. A change to one of today's sessions cannot wait that long, so it goes
+#  # out the same day, once you have left their week alone for this many minutes. Another
+#  # change restarts the wait; `settings set change-delay N` overrides it live, and 0 sends
+#  # on the bot's next wake.
+#  change_delay_minutes: 20
 
 # Second athlete, same checkout: give them their own config file and select it with
 # TRAINMATE_CONFIG=/path/to/other/config.yaml ./tm status. Their database, logs, science

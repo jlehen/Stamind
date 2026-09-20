@@ -1,7 +1,7 @@
 """Workout CLI: adapt / generate / list / compare (LLM- and read-heavy)."""
 import argparse
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 from trainmate import athlete_queue, intensity, runtime
 from trainmate.strength.sets import activity_lines
 from trainmate.config import config
@@ -29,9 +29,9 @@ from trainmate.cli.workouts._helpers import (
     line_markers, prescription_lines, print_marker_legend, workout_line,
 )
 from trainmate.cli.workouts.heads_up import (
-    generate_dates, print_send_notice, replacing_unsent, revision_dates,
+    Window, generate_dates, print_send_notice, replacing_unsent, revision_dates,
 )
-from trainmate.cli.workouts.strength_only import generate_strength_only
+from trainmate.cli.workouts.strength_only import generate_strength_only, strength_span
 
 
 def _resolve_ambiguous_matches(date_str: str, auto: bool) -> None:
@@ -73,25 +73,41 @@ def _resolve_ambiguous_matches(date_str: str, auto: bool) -> None:
             print(gray("  Discarded — the session reads as not done."))
 
 
+def _adapt_date(args: argparse.Namespace, tweak: bool) -> str:
+    """The day the run is evaluated on: `workout adapt`'s `--date`, else today. A tweak's
+    `--date` names the days to change, so the tweak itself is evaluated today."""
+    if tweak or not args.date:
+        return _today_str()
+    return args.date
+
+
+def _adapt_window(args: argparse.Namespace, tweak: bool) -> Window:
+    """The days this run may write, for the replace question (DESIGN_change_heads_up.md §5).
+
+    A tweak's `--date` names them outright. Every other run leaves its last day open: only
+    the week planner's answer says which day it moved a session onto, and all it promises
+    beforehand is that it changes nothing before the day it is evaluated on."""
+    if tweak and args.date:
+        return min(args.date), max(args.date)
+    return _adapt_date(args, tweak), None
+
+
 def run_workout_adapt(args: argparse.Namespace) -> None:
     # Executes the daily workout Garmin adaptation checks command.
-    with replacing_unsent(skip=args.auto):
+    with replacing_unsent(skip=args.auto, window=_adapt_window(args, tweak=False)):
         _adapt(args)
 
 
 def run_workout_tweak(args: argparse.Namespace) -> None:
     """Changes the days a request is about: `workout adapt`'s flow with a narrower job
     (DESIGN_workout_tweak.md §3)."""
-    with replacing_unsent(skip=args.auto):
+    with replacing_unsent(skip=args.auto, window=_adapt_window(args, tweak=True)):
         _adapt(args, tweak=True)
 
 
 def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
-    # A tweak's `--date` names the days to change; the run itself is evaluated today.
-    date_str = _today_str()
-    if not tweak and args.date:
-        date_str = args.date
-    elif not tweak:
+    date_str = _adapt_date(args, tweak)
+    if not tweak and not args.date:
         # Name the defaulted target so a bare `adapt` isn't silent (DESIGN_cli_noargs.md §b).
         step(f"No date given — adapting today ({fmt_date(date_str)}).")
 
@@ -479,26 +495,31 @@ def print_generate_preview(proposal) -> bool:
 
 
 def run_workout_generate(args: argparse.Namespace) -> None:
-    """Executes the AI workout generation command based on active strategy."""
+    """Executes the AI workout generation command based on active strategy.
+
+    The span comes first because the replace question needs it: it is only worth asking
+    when this run writes over days the unsent change wrote (DESIGN_change_heads_up.md §5)."""
     force = getattr(args, 'force', False)
-    with replacing_unsent(skip=force) as replaced:
-        _generate(args, force, replaced)
-
-
-def _generate(args: argparse.Namespace, force: bool, replaced: bool) -> None:
-    # Untrue once a Replace has undone the earlier attempt; the way out says so instead
-    # (DESIGN_change_heads_up.md §5).
-    unchanged = "." if replaced else " — your schedule is unchanged."
     ensure_recent_data(
         no_pull=args.no_pull, force_pull=getattr(args, 'force_pull', False)
     )
-    if getattr(args, 'strength_only', False):
-        generate_strength_only(args, force, unchanged)
-        return
-
-    span = _resolve_span(args)
+    strength_only = getattr(args, 'strength_only', False)
+    span = strength_span(args) if strength_only else _resolve_span(args)
     if span is None:
         return
+    with replacing_unsent(skip=force, window=span) as replaced:
+        # Untrue once a Replace has undone the earlier attempt; the way out says so
+        # instead (§5).
+        unchanged = "." if replaced else " — your schedule is unchanged."
+        if strength_only:
+            generate_strength_only(args, force, unchanged, span)
+            return
+        _generate(args, force, unchanged, span)
+
+
+def _generate(
+    args: argparse.Namespace, force: bool, unchanged: str, span: Tuple[str, str]
+) -> None:
     span_start, span_end = span
     prefer_macro_id = _preferred_macro_id(args)
     # Only for a span the athlete bounded: the transitional notice is about selectors
