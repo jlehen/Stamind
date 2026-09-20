@@ -190,7 +190,8 @@ def propose(text: str) -> List[str]:
     from trainmate.openrouter import openrouter_client
     system = PROPOSE_SYSTEM_PROMPT.format(names="\n".join(vocabulary.names()))
     result = openrouter_client.complete(
-        system, f"## WHAT THE ATHLETE TYPED\n{text}\n", label="strength_name"
+        system, f"## WHAT THE ATHLETE TYPED\n{text}\n", label="strength_name",
+        wait_notice="Looking up the exercise you typed",
     )
     proposed: List[str] = []
     for name in result.get("names") or []:

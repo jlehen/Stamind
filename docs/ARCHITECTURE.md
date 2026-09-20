@@ -125,13 +125,13 @@ classes themselves.
     `Application.run_polling()`, but only so `_pause_polling` can close the long-poll
     from inside the `/restart` handler before its hard exit. This reverses the
     mid-command pause of DESIGN_bot_restart.md §5.1 (DESIGN_bot_stop_button.md §5).
-  - **Stopping a coach call.** Every LLM command emits `TM-FLUSH` right after its
-    "Working on it — this usually takes about 40s." notice; the bot attaches a `✋ Stop`
-    inline button to the message that flush sends, with `callback_data` `stop:{nonce}`
-    naming the running command. Tapping it kills the subprocess (the same kill
-    `/cancel` does) and replies "Stopped."; the button is retired by the next output, by
-    the command ending, or by the tap itself, and a tap on a retired one is told the
-    command already finished (DESIGN_bot_stop_button.md).
+  - **Stopping a coach call.** Every model call emits `TM-FLUSH` right after its wait
+    notice ("Reviewing your coming sessions — this usually takes about 40 seconds.");
+    the bot attaches a `✋ Stop` inline button to the message that flush sends, with
+    `callback_data` `stop:{nonce}` naming the running command. Tapping it kills the
+    subprocess (the same kill `/cancel` does) and replies "Stopped."; the button is
+    retired by the next output, by the command ending, or by the tap itself, and a tap on
+    a retired one is told the command already finished (DESIGN_bot_stop_button.md).
   - **Self-restart.** `./tm-bot` is a **supervisor**, not just the venv bootstrap: it
     selects its mode from the `TM_BOT_SUPERVISED` env var it sets on itself — default
     invocation = a loop that relaunches a child of itself, `TM_BOT_SUPERVISED=1` = the
@@ -256,14 +256,15 @@ classes themselves.
     frame never reaches a terminal (DESIGN_output_verbosity.md §7.3).
   - **The wait notice:** the last line inside that flushed message. Chat suppresses every
     aside, so without it the athlete reads nothing at all for the tens of seconds an LLM
-    command spends silent. `openrouter._announce_wait` prints
-    `Working on it — this usually takes about 40s.`, where the number is the median `ms`
-    of recent successful `llm.call` records for the same label and model
-    (`journal.llm_durations`) — no new storage, and no estimate at all until two past
-    calls exist. A terminal gets the same number folded into the aside it already prints,
-    then `util.Spinner` ticks a clock on one self-erasing line until the reply lands (§8.5).
-    `complete(..., wait_notice=False)` suppresses it for `tm bot route`, whose output
-    nobody reads (DESIGN_output_verbosity.md §8).
+    command spends silent. `openrouter._announce_wait` prints one per model call, in the
+    call site's own words: `Reviewing your coming sessions — this usually takes about 40
+    seconds.` The number is the median `ms` of recent successful `llm.call` records with
+    the same label, made by the same command, on the same model (`journal.llm_durations`,
+    which joins each call to its run's `run.end`) — no new storage, and no estimate at
+    all until two past calls exist. A terminal gets the same number folded into the aside
+    it already prints, then `util.Spinner` ticks a clock on one self-erasing line until
+    the reply lands (§8.5). `complete(..., wait_notice=None)` suppresses it for
+    `tm bot route`, whose output nobody reads (DESIGN_output_verbosity.md §8, §8.6).
   - **The athlete queue:** a fifth one-way sentinel, `QUEUE_SENTINEL`/`emit_queue_item`
     (`\x1eTM-QUEUE {json}`), carries one queued question or message
     (`trainmate/athlete_queue.py`, DESIGN_athlete_queue.md). The bot sends it as a message
@@ -470,8 +471,9 @@ classes themselves.
 |                      |                      | operational record, as opposed to the domain     |
 |                      |                      | one the tables hold. Read back in exactly one    |
 |                      |                      | place: `llm_durations()` answers "how long does  |
-|                      |                      | this command usually take" from past `llm.call`  |
-|                      |                      | rows (DESIGN_output_verbosity.md §8). Owns the   |
+|                      |                      | this call usually take in this command" from     |
+|                      |                      | past `llm.call` rows joined to their `run.end`   |
+|                      |                      | (DESIGN_output_verbosity.md §8.3). Owns the      |
 |                      |                      | writer (one `os.write`                           |
 |                      |                      | on an O_APPEND fd, records bounded at 8 KB,      |
 |                      |                      | never raises), the module-level run stack, the   |

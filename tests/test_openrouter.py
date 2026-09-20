@@ -2,6 +2,7 @@ import io
 import os
 import unittest
 from unittest.mock import patch, MagicMock
+from trainmate import journal
 from trainmate.openrouter import OpenRouterClient, _human_wait
 from trainmate.prompt import FLUSH_SENTINEL
 
@@ -291,11 +292,18 @@ class TestWaitNotice(unittest.TestCase):
     """What the athlete is told before the call goes quiet
     (DESIGN_output_verbosity.md §8)."""
 
+    NOTICE = "Reviewing your coming sessions"
+
     def setUp(self):
         self.client = OpenRouterClient()
         self.client.model = "openai/gpt-5.4"
+        run = journal.Run(id="r1", argv=[], source="cli", parent=None, started=0.0,
+                          command="workout adapt")
+        current = patch("trainmate.openrouter.journal.current", return_value=run)
+        current.start()
+        self.addCleanup(current.stop)
 
-    def _announce(self, frontend: str, samples, *, notice: bool = True) -> str:
+    def _announce(self, frontend: str, samples, *, notice=NOTICE) -> str:
         """Everything `_announce_wait` printed, with `journal.llm_durations` answering
         `samples` (ms) for every lookup."""
         buf = io.StringIO()
@@ -307,28 +315,29 @@ class TestWaitNotice(unittest.TestCase):
             self.client._announce_wait("workout_adapt", notice)
         return buf.getvalue()
 
-    def test_chat_is_told_how_long_this_usually_takes(self):
-        # 40s and 44s -> a 42s median, rounded to the 40s bucket.
+    def test_chat_is_told_what_is_running_and_how_long_it_usually_takes(self):
+        # 40s and 44s -> a 42s median, rounded to the 40-second bucket.
         out = self._announce("json", [40000, 44000])
-        self.assertIn("Working on it", out)
-        self.assertIn("about 40s", out)
+        self.assertIn(
+            "Reviewing your coming sessions — this usually takes about 40 seconds.", out
+        )
 
     def test_chat_with_no_history_still_says_there_is_a_wait(self):
         out = self._announce("json", [])
-        self.assertIn("Working on it", out)
-        self.assertNotIn("about", out)
+        self.assertIn("Reviewing your coming sessions — this can take a while.", out)
 
     def test_a_terminal_carries_the_estimate_on_its_own_narration(self):
         # The terminal already narrates progress, so the number rides along there
         # rather than adding a second line saying the same thing.
         out = self._announce("", [40000, 44000])
         self.assertIn("Querying OpenRouter", out)
-        self.assertIn("~40s", out)
-        self.assertNotIn("Working on it", out)
+        self.assertIn("~40 seconds", out)
+        self.assertNotIn(self.NOTICE, out)
 
     def test_a_call_nobody_watches_says_nothing_to_the_chat(self):
-        out = self._announce("json", [40000, 44000], notice=False)
-        self.assertNotIn("Working on it", out)
+        out = self._announce("json", [40000, 44000], notice=None)
+        self.assertNotIn(self.NOTICE, out)
+        self.assertNotIn("this usually takes", out)
 
     def test_one_sample_is_not_history(self):
         # A single past call is as likely to be an outlier as a typical one.
@@ -342,16 +351,24 @@ class TestWaitNotice(unittest.TestCase):
     def test_the_median_ignores_the_one_call_that_crawled(self):
         self.assertEqual(self._wait_estimate([40000, 42000, 600000]), 42.0)
 
-    def test_a_model_with_no_history_falls_back_to_the_command(self):
+    def test_a_model_with_no_history_falls_back_to_the_command_on_any_model(self):
         calls = []
 
-        def _durations(label, model=None, **kwargs):
-            calls.append(model)
+        def _durations(label, command, model=None, **kwargs):
+            calls.append((command, model))
             return [] if model else [50000, 50000]
 
         with patch("trainmate.openrouter.journal.llm_durations", side_effect=_durations):
             self.assertEqual(self.client._wait_estimate("workout_adapt"), 50.0)
-        self.assertEqual(calls, ["openai/gpt-5.4", None])
+        self.assertEqual(
+            calls, [("workout adapt", "openai/gpt-5.4"), ("workout adapt", None)]
+        )
+
+    def test_a_call_outside_any_command_has_no_history(self):
+        with patch("trainmate.openrouter.journal.current", return_value=None), \
+                patch("trainmate.openrouter.journal.llm_durations") as durations:
+            self.assertIsNone(self.client._wait_estimate("workout_adapt"))
+        durations.assert_not_called()
 
     def test_an_unreadable_journal_costs_the_number_and_not_the_call(self):
         buf = io.StringIO()
@@ -359,19 +376,20 @@ class TestWaitNotice(unittest.TestCase):
                 patch("sys.stdout", buf), \
                 patch("trainmate.openrouter.journal.llm_durations",
                       side_effect=OSError("no logs")):
-            self.client._announce_wait("workout_adapt", True)
-        self.assertIn("Working on it", buf.getvalue())
+            self.client._announce_wait("workout_adapt", self.NOTICE)
+        self.assertIn("Reviewing your coming sessions — this can take a while.",
+                      buf.getvalue())
 
 
 class TestHumanWait(unittest.TestCase):
     """The rounding: a median of past runs is a "roughly", and must read as one."""
 
     def test_seconds_round_to_five(self):
-        self.assertEqual(_human_wait(37), "35s")
-        self.assertEqual(_human_wait(43), "45s")
+        self.assertEqual(_human_wait(37), "35 seconds")
+        self.assertEqual(_human_wait(43), "45 seconds")
 
     def test_a_very_fast_call_never_reads_as_zero(self):
-        self.assertEqual(_human_wait(1.2), "5s")
+        self.assertEqual(_human_wait(1.2), "5 seconds")
 
     def test_over_ninety_seconds_reads_in_minutes(self):
         self.assertEqual(_human_wait(100), "1.5 minutes")

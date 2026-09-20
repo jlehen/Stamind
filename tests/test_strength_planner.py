@@ -73,7 +73,7 @@ class _PlannerCase(unittest.TestCase):
         call.start()
         self.addCleanup(call.stop)
 
-    def _complete(self, system, user):
+    def _complete(self, system, user, notice):
         self.asked.append((system, user))
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
@@ -591,6 +591,20 @@ class PromptTest(_PlannerCase):
         self.assertIn("cable biceps curl (accessory, cable)", listed)
         self.assertIn("belt squat (squat, machine)", listed)
         self.assertNotIn("barbell biceps curl (accessory", listed)
+
+
+class WaitNoticeTest(unittest.TestCase):
+    """What the chat reads while the strength planner runs (DESIGN_output_verbosity.md
+    §8.2). Only the counts matter, so any object stands in for a session."""
+
+    def test_a_lone_check_names_one_session(self):
+        self.assertEqual(planner._wait_notice([], [object()]), "Checking 1 strength session")
+
+    def test_writing_and_checking_says_both(self):
+        self.assertEqual(
+            planner._wait_notice([object(), object()], [object()]),
+            "Writing 2 strength sessions and checking 1",
+        )
 
 
 if __name__ == "__main__":

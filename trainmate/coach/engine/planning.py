@@ -227,7 +227,8 @@ You MUST respond with a JSON object containing:
             "periodization strategy..."
         ), cyan)
         result = _eng.openrouter_client.complete(
-            system_prompt, user_content, label="plan_generate"
+            system_prompt, user_content, label="plan_generate",
+            wait_notice="Writing your plan",
         )
         return result
 
@@ -282,5 +283,6 @@ Mesocycles:
 """
         step("Asking the coach whether this change reshapes the plan...", cyan)
         return _eng.openrouter_client.complete(
-            system_prompt, user_content, label="plan_verdict"
+            system_prompt, user_content, label="plan_verdict",
+            wait_notice="Checking whether this change reshapes your plan",
         )

@@ -428,17 +428,21 @@ chat; this one passes it, so it prints at answer level on every front-end.
 ### 8.2 Where it lives, and why there is only one of them
 
 In `openrouter.complete()`, immediately before the flush of §7.3 and for the same
-reason: that is the single point where every LLM command is about to go quiet, so all
-six get the notice from one call site. Putting it beside each `step(...)` would mean six
-copies drifting apart, and a seventh command added later with none.
+reason: that is the single point where every LLM command is about to go quiet, so every
+model call gets the notice from one place. Putting it beside each `step(...)` would mean
+copies drifting apart, and a command added later with none.
+
+The words come from the call site, because only the call site knows what the call is
+doing: `complete(..., wait_notice="Reviewing your coming sessions")`. `complete()` adds
+the number. A call site that passes nothing gets "Working on it".
 
 The estimate replaces the aside that already stood there rather than adding a line
 beside it. A terminal narrates live and does not need to be told a wait is coming; what
 it gains is the number, so the number rides along on the aside it prints anyway:
 
 ```
-terminal   Querying OpenRouter with model: openai/gpt-5.4 (past runs: ~40s)
-chat       Working on it — this usually takes about 40s.
+terminal   Querying OpenRouter with model: openai/gpt-5.4 (past runs: ~40 seconds)
+chat       Reviewing your coming sessions — this usually takes about 40 seconds.
 ```
 
 One estimate, two renderings, and no front-end reads the same sentence twice.
@@ -448,25 +452,29 @@ One estimate, two renderings, and no front-end reads the same sentence twice.
 `llm.call` has recorded `label`, `model` and `ms` for every completion since
 `DESIGN_logging.md` §6, in `logs/runs/YYYY-MM-DD.jsonl` with 90 days of retention. The
 timing the athlete wants is already written down; nothing new is stored and nothing new
-is measured. `journal.llm_durations(label, model)` reads it back.
+is measured. `journal.llm_durations(label, command, model)` reads it back.
 
 Four choices inside it:
 
-- **Keyed on `label`.** The six labels — `plan_generate`, `workout_generate`,
-  `workout_adapt`, `data_bootstrap`, `data_reflect`, `bot_route` — are already one per
-  command, which is what makes "the time this *command* takes" answerable without a new
-  concept. A `label` names the command, not the call site, and must keep doing so.
+- **Keyed on the call and the command.** `label` names the call: `workout_adapt` is
+  the week planner inside `workout adapt`, `strength_planner` is the strength planner
+  wherever it runs. One call can do very different amounts of work depending on the
+  command that makes it (§8.6). So a past call counts only when its run's `run.end`
+  names the command running now (`DESIGN_logging.md` §7.1). A run still open, or one
+  that ended in the next day's file, gives no sample.
 - **Matched on the model too.** Model choice moves latency far more than prompt size
   does: on this athlete's own history `workout_generate` runs to 3.5 minutes where
-  `workout_adapt` runs to 70s, and swapping models moves either one by more than the
+  `workout_adapt` runs to 70 seconds, and swapping models moves either one by more than the
   gap between commands. A model with no history of its own falls back to the same
   command on whatever ran it before — the right order of magnitude, which is all
   "usually" claims.
 - **The median, not the mean.** One call that crawled behind a rate limit would drag a
   mean up for weeks. Two samples is the minimum; below that "a while" is the honest
   answer.
-- **Rounded hard** — five-second buckets under 90s, half-minutes above. `37s` promises;
-  `about 35s` says roughly, which is what a median of past runs actually supports.
+- **Rounded hard** — five-second buckets under 90 seconds, half-minutes above.
+  `37 seconds` promises; `about 35 seconds` says roughly, which is what a median of past
+  runs actually supports. Both units are spelled out, so two notices in a row never read
+  `70s` beside `4 minutes`.
 
 Reading is newest-file-first and stops at 20 samples, so the usual answer costs one file
 read of a few tens of KB rather than the whole retention window. The whole lookup is
@@ -478,7 +486,7 @@ the number and never the call.
 `tm bot route` classifies free text before the real command starts. Its stdout is
 captured by `trainmate_bot._route_intent` and discarded but for the last JSON line, so a
 notice there reaches nobody and the journal read is pure waste on the hot path of every
-chat message. `complete(..., wait_notice=False)` turns it off, and that flag is the
+chat message. `complete(..., wait_notice=None)` turns it off, and that value is the
 place to say "nobody is waiting on this output" if a second such call ever appears.
 
 ### 8.5 The terminal during the wait, and the keys pressed in it
@@ -511,6 +519,34 @@ Three changes, each closing one part of that story:
 
 Not handled: pressing Enter during the wait leaves one stale spinner frame on the line
 above. `choose` keeps falling back to its default on an unrecognised answer.
+
+### 8.6 A command that makes two calls
+
+§8.2 was written when every command made one model call. `workout adapt` now makes two
+when the week touches a strength day: the week planner reviews the coming sessions, then
+the strength planner writes or checks the strength session under the week planner's
+brief. Each call prints its own notice.
+
+On 19 September the athlete told the coach from the chat that Saturday's ride had run
+longer than planned. The bot ran `workout adapt`. The week planner kept Sunday's strength
+session, and the strength planner then checked it. The chat showed two messages a minute
+apart: "Working on it — this usually takes about 70s", then "Working on it — this
+usually takes about 4 minutes". The second read like the first starting over. Its
+number was also wrong: the check took 66 seconds. The strength planner's history was
+mostly `workout generate`, where it writes four sessions and takes four and a half
+minutes.
+
+Two changes close it:
+
+- **Each notice names its step.** The same evening now reads "Reviewing your coming
+  sessions — this usually takes about 70 seconds.", then "Checking 1 strength session —
+  this usually takes about 50 seconds." The second message tells the athlete the first
+  step is done and the work is still moving.
+- **The estimate is keyed on the command as well as the call** (§8.3). The check inside
+  `workout adapt` reads only past checks inside `workout adapt`.
+
+Not handled: the first notice does not warn that a second call will follow, so the
+athlete learns of the strength planner's wait only when it starts.
 
 ## 9. A shorter coach, on request
 

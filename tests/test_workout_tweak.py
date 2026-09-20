@@ -317,7 +317,7 @@ class StrengthRequestTest(_TweakCase):
     def test_a_brief_that_names_the_request_is_written_again(self):
         asked = []
 
-        def strength_planner_reply(system, user):
+        def strength_planner_reply(system, user, notice):
             asked.append(user)
             return {"sessions": [{
                 "date": FRIDAY, "keep": False, "light": False,

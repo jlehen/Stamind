@@ -882,7 +882,8 @@ class WorkoutLogicMixin:
 
         step("Querying OpenRouter to generate training workouts (microcycles)...", cyan)
         planner_reply = _eng.openrouter_client.complete(
-            system_prompt, user_content, label="workout_generate"
+            system_prompt, user_content, label="workout_generate",
+            wait_notice="Writing your sessions",
         )
         return planner_reply
 
@@ -1314,11 +1315,13 @@ session over largely as-is. {descriptions_note}
         if tweak:
             step("Querying OpenRouter to make the change asked for...", cyan)
             return _eng.openrouter_client.complete(
-                system_prompt, user_content, label="workout_tweak"
+                system_prompt, user_content, label="workout_tweak",
+                wait_notice="Making the change you asked for",
             )
         step(f"Querying OpenRouter to evaluate adaptation for the remainder of the mesocycle "
              f"({target_date_str} -> {meso_end_date_str})...", cyan)
         decision = _eng.openrouter_client.complete(
-            system_prompt, user_content, label="workout_adapt"
+            system_prompt, user_content, label="workout_adapt",
+            wait_notice="Reviewing your coming sessions",
         )
         return decision

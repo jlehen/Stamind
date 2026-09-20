@@ -869,8 +869,8 @@ def main() -> None:
         return True
 
     async def _offer_stop(session: "_Session") -> None:
-        """Hangs a ✋ Stop button off the message the flush just sent — the "Working on
-        it..." notice that precedes every coach call (DESIGN_bot_stop_button.md §4)."""
+        """Hangs a ✋ Stop button off the message the flush just sent — the wait notice
+        that precedes every coach call (DESIGN_bot_stop_button.md §4)."""
         stop = InlineKeyboardButton(
             STOP_LABEL, callback_data=stop_callback_data(session.nonce)
         )

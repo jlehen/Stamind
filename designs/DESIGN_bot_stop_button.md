@@ -6,8 +6,8 @@
 ## 1. The problem
 
 It is Wednesday evening. The athlete opens Telegram and types "knee is sore, move
-tomorrow's run to Friday". The bot answers "Working on it — this usually takes about
-40s." and goes quiet while the coach model writes the new session.
+tomorrow's run to Friday". The bot answers "Reviewing your coming sessions — this usually
+takes about 40 seconds." and goes quiet while the coach model writes the new session.
 
 Ten seconds in they realise they meant *Saturday*, not Friday. There is an answer they
 do not want on the way, and no way to stop it.
@@ -40,12 +40,15 @@ Two things are wrong today:
 
 ## 3. What the athlete sees
 
-The "Working on it…" message grows one inline button:
+The wait notice grows one inline button:
 
 ```
-Working on it — this usually takes about 40s.
+Reviewing your coming sessions — this usually takes about 40 seconds.
 [ ✋ Stop ]
 ```
+
+A command that makes two model calls sends two notices, one per call
+(`DESIGN_output_verbosity.md` §8.6). Each carries the button while its own call runs.
 
 Tapping it: the button disappears from that message, the bot replies "Stopped.", and
 the command is over. Nothing else arrives.
@@ -68,7 +71,7 @@ sync. The wait notice is printed *before* the flush (a test in `test_openrouter.
 locks that order), so the flushed message is never empty and there is always something
 to hang the button on.
 
-The two calls that pass `wait_notice=False` — `bot route` and `bot capture`
+The two calls that pass `wait_notice=None` — `bot route` and `bot capture`
 (`DESIGN_output_verbosity.md` §8.4) — run in subprocesses whose stdout the bot captures
 and throws away. They never reach this path, which is right: they take a second or two
 and nobody is watching them.

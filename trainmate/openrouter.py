@@ -28,12 +28,12 @@ _ESTIMATE_MIN_SAMPLES = 2
 
 
 def _human_wait(seconds: float) -> str:
-    """A duration the athlete reads at a glance: `40s`, `1.5 minutes`.
+    """A duration the athlete reads at a glance: `40 seconds`, `1.5 minutes`.
 
     Rounded hard on purpose. This is a median of past runs, and the next call will not
-    match it — a five-second bucket says "roughly", where `37s` would promise."""
+    match it — a five-second bucket says "roughly", where `37 seconds` would promise."""
     if seconds < 90:
-        return f"{max(5, int(round(seconds / 5.0)) * 5)}s"
+        return f"{max(5, int(round(seconds / 5.0)) * 5)} seconds"
     return f"{round(seconds / 30.0) / 2:g} minutes"
 
 
@@ -207,26 +207,28 @@ class OpenRouterClient:
         return ValueError(f"OpenRouter API error: {err_msg}")
 
     def _wait_estimate(self, label: str) -> Optional[float]:
-        """How long past calls of this kind took, in seconds, or None with no history.
+        """How long this call took in past runs of the running command, in seconds, or
+        None with no history (DESIGN_output_verbosity.md §8.3).
 
         The median, not the mean: one call that crawled behind a rate limit must not
-        move the number the athlete reads every day. Samples are matched on the model
-        first, because model choice dominates latency far more than the prompt does; a
-        model the athlete has only just switched to has no history of its own, so the
-        fallback answers from the same command on whatever model ran it before — the
-        right order of magnitude, which is all "usually" claims."""
+        move the number the athlete reads every day. A model the athlete has only just
+        switched to has no history of its own, so the fallback answers from whatever
+        model ran the command before."""
+        run = journal.current()
+        if run is None or run.command is None:
+            return None
         samples = journal.llm_durations(
-            label, self.model, days=_ESTIMATE_DAYS, limit=_ESTIMATE_SAMPLES
+            label, run.command, self.model, days=_ESTIMATE_DAYS, limit=_ESTIMATE_SAMPLES
         )
         if len(samples) < _ESTIMATE_MIN_SAMPLES:
             samples = journal.llm_durations(
-                label, days=_ESTIMATE_DAYS, limit=_ESTIMATE_SAMPLES
+                label, run.command, days=_ESTIMATE_DAYS, limit=_ESTIMATE_SAMPLES
             )
         if len(samples) < _ESTIMATE_MIN_SAMPLES:
             return None
         return statistics.median(samples) / 1000.0
 
-    def _announce_wait(self, label: str, notice: bool) -> None:
+    def _announce_wait(self, label: str, notice: Optional[str]) -> None:
         """Says the command is about to go quiet, and for roughly how long
         (DESIGN_output_verbosity.md §8).
 
@@ -245,9 +247,9 @@ class OpenRouterClient:
         if not notice or not is_json_frontend():
             return
         if seconds:
-            print(f"Working on it — this usually takes about {_human_wait(seconds)}.")
+            print(f"{notice} — this usually takes about {_human_wait(seconds)}.")
             return
-        print("Working on it — this can take a while.")
+        print(f"{notice} — this can take a while.")
 
     @staticmethod
     def _parse_json_content(content: str) -> dict[str, Any]:
@@ -304,17 +306,18 @@ class OpenRouterClient:
 
     def complete(
         self, system_content: str, user_content: str, label: str = "exchange",
-        wait_notice: bool = True,
+        wait_notice: Optional[str] = "Working on it",
     ) -> dict[str, Any]:
         """Sends a request to OpenRouter, expecting a structured JSON object back.
 
         Args:
             system_content: Large context / rules placed in system role prompt.
             user_content: Immediate instruction or data payload for the LLM.
-            label: Descriptive name of the action being logged. Also the key the wait
-                estimate groups past calls by, so it names the *command*, not the call.
-            wait_notice: Whether to tell the athlete how long this will take (§8). Off
-                for a call whose output nobody is watching.
+            label: Descriptive name of the action being logged. With the running
+                command, also the key the wait estimate groups past calls by (§8.3).
+            wait_notice: What the chat reads while this call runs, before the estimate:
+                "Writing your sessions" (DESIGN_output_verbosity.md §8.2). None for a
+                call whose output nobody is watching.
 
         Returns:
             The parsed JSON response dictionary from the model.

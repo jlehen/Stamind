@@ -195,7 +195,8 @@ class AnalysisLogicMixin:
 
         step("Querying OpenRouter to perform training history analysis...", cyan)
         result = _eng.openrouter_client.complete(
-            system_prompt, user_content, label=label
+            system_prompt, user_content, label=label,
+            wait_notice="Reading your training history",
         )
         return result
 
@@ -212,5 +213,5 @@ class AnalysisLogicMixin:
         )
         return _eng.openrouter_client.complete(
             LEARNING_QUESTION_SYSTEM_PROMPT, user_content, label="learning_question",
-            wait_notice=False,
+            wait_notice=None,
         )

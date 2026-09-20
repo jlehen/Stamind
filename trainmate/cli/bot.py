@@ -420,7 +420,7 @@ def run_bot_route(args: argparse.Namespace) -> None:
             # This process's stdout is captured by the bot and thrown away but for the
             # last JSON line; a wait notice would reach nobody
             # (DESIGN_output_verbosity.md §8).
-            wait_notice=False,
+            wait_notice=None,
         )
         candidate = str(data.get("intent", "")).strip()
         if candidate in ROUTER_INTENTS:
@@ -508,7 +508,7 @@ def _capture_call(system_prompt: str, text: str, label: str) -> Optional[dict]:
     try:
         return openrouter_client.complete(
             system_prompt, "## MESSAGE\n\n" + (text or ""), label=label,
-            wait_notice=False,
+            wait_notice=None,
         )
     except Exception as e:
         step(f"Capture failed: {e}")

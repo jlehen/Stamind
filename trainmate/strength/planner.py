@@ -596,15 +596,32 @@ def run(
     step(f"Querying OpenRouter to write {len(to_write)} strength session(s) and check "
          f"{len(to_check)}...", cyan)
 
-    asked = _ask(system, user, to_write)
+    asked = _ask(system, user, to_write, _wait_notice(to_write, to_check))
     if asked is None:
         return _all_kept(to_check)
     answers, dropped = asked
     return _fold_in(answers, dropped, to_write, to_check, stamp, checks, reason_key)
 
 
+def _wait_notice(to_write: Sequence[_Session], to_check: Sequence[_Session]) -> str:
+    """What the chat reads while the call runs: "Writing 2 strength sessions and checking
+    1" (DESIGN_output_verbosity.md §8.2)."""
+    written = _strength_sessions(len(to_write))
+    if to_write and to_check:
+        return f"Writing {written} and checking {len(to_check)}"
+    if to_write:
+        return f"Writing {written}"
+    return f"Checking {_strength_sessions(len(to_check))}"
+
+
+def _strength_sessions(count: int) -> str:
+    if count == 1:
+        return "1 strength session"
+    return f"{count} strength sessions"
+
+
 def _ask(
-    system: str, user: str, to_write: Sequence[_Session]
+    system: str, user: str, to_write: Sequence[_Session], notice: str
 ) -> Optional[Tuple[Dict[str, _Answer], List[str]]]:
     """The call, tried once more when it fails or comes back unusable — a session to write
     left unanswered, or one whose every exercise failed a check, is a failed call (§9).
@@ -616,7 +633,7 @@ def _ask(
     for _attempt in range(MAX_ATTEMPTS):
         dropped: List[str] = []
         try:
-            reply = _complete(system, user)
+            reply = _complete(system, user, notice)
         except Exception as e:
             last = e
             continue
@@ -635,9 +652,9 @@ def _ask(
     return None
 
 
-def _complete(system: str, user: str) -> Dict[str, Any]:
+def _complete(system: str, user: str, notice: str) -> Dict[str, Any]:
     from trainmate.openrouter import openrouter_client
-    return openrouter_client.complete(system, user, label=LABEL)
+    return openrouter_client.complete(system, user, label=LABEL, wait_notice=notice)
 
 
 def _all_kept(to_check: Sequence[_Session]) -> StrengthPass:
