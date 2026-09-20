@@ -20,7 +20,7 @@ test_db = bind_test_db(TEST_DB_PATH)
 
 from trainmate.coach.engine import CoachEngine
 from trainmate.config import config
-from trainmate.strength import history as strength_history, planner as strength_planner
+from trainmate.strength import history as strength_history, planner_prompt
 
 # Sentinels for each region a gate controls, matched against the built prompt.
 NOTE_INSTRUCTIONS = "### ATHLETE'S NOTE FOR TODAY"
@@ -197,7 +197,7 @@ class TestStrengthHabitsRegion(unittest.TestCase):
 
     def test_the_rule_names_what_the_history_prints_and_counts_to_the_configured_number(self):
         with patch.dict(config.data, {"strength": {"habit_after": 3}}):
-            system = strength_planner._system_prompt(set())
+            system = planner_prompt.system_prompt(set())
         self.assertIn("has happened 3 times", system)
         for printed in (
             strength_history.SESSIONS_HEADING.splitlines()[0].lstrip("# "),

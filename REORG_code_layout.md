@@ -874,21 +874,41 @@ holds only a docstring.
   - the refresh throttle (`garmin/sync.py:258–268` and `google_calendar.py:548–565`);
   - reading an event's date (`google_calendar.py:400–401` and `calendar_sync._event_day`).
 
-### 6.9 Strength
+### 6.9 Strength — **DONE in Phase D item 4**
 
-**`planner.py` (724 lines) becomes two files.**
-- `planner_prompt.py` (about 345 lines): `SYSTEM_PROMPT`, the prompt builders and the reply
-  checks.
-- `planner.py` (about 380 lines): the pass, the call, folding the answers in, and the write.
+**`planner.py` (737 lines, not 724) becomes two files.**
+- `planner_prompt.py` (365, not the ~345 estimated): `SYSTEM_PROMPT`, the prompt builders and
+  the reply checks.
+- `planner.py` (394, not ~380): the pass, the call, folding the answers in, and the write.
   - `_ask` and `_complete` stay here, because tests patch them.
   - Only a few references in `test_strength_planner.py` and `test_prompt_gates.py` change.
+    Seven and two.
+- **Two things the list above left out, and both halves read them.** The `Session` record —
+  one session the call was asked about — is what the pass builds and what the prompt's
+  session block is written from. And `_moved_on`, the rule saying a session's brief or
+  duration changed since its sets were written, is asked by the prompt (to tell the model to
+  write it again) and by the fold-in (to let that answer through). Both went to
+  `planner_prompt.py`, `_moved_on` as a `Session.moved_on` property so the rule sits on the
+  record it asks about rather than straddling the two files. Six names lost a leading
+  underscore because they now cross a file: `Session`, `Answer`, `system_prompt`,
+  `user_content`, `clean_session` and `same_rows`.
 
 **Other changes.**
-- `vocabulary.py` (86) and `prescription.py` (85) stay. Both are real concepts on their own, and
-  `prescription.py` also breaks a cycle between `history.py` and `planner.py`.
+- `vocabulary.py` (86) and `prescription.py` (84, not 85) stay. Both are real concepts on their
+  own, and `prescription.py` also breaks a cycle between `history.py` and `planner.py`. Left
+  alone.
 - The two OpenRouter imports hidden inside functions move to the top of their files.
-- `sets.py` is 384 lines. If it ever passes 400, cut it at line 290.
-- The `__init__.py` docstring is out of date and should list every file.
+  **One done, one declined.** `planner._complete` is hoisted: everything that reaches
+  `strength/planner.py` has loaded the model client already. `questions.propose` keeps its
+  import inside the function, and §7's "imports hidden inside functions" list is wrong to
+  leave it out. `athlete_queue.py` imports `strength/questions.py`, six CLI modules import
+  `athlete_queue`, so hoisting it put `requests` on every command's startup path and took
+  `import trainmate_cli` from 107 ms and 254 modules to 201 ms and 542. It also made the
+  three lazy OpenRouter imports §7 *does* exempt — `settings.py:133` and two flag-guarded
+  sites in `trainmate_cli.py` — buy nothing at all. The rule is in `ARCHITECTURE.md` §14
+  now, so it outlives this file.
+- `sets.py` is 380 lines, not 384. If it ever passes 400, cut it at line 290.
+- The `__init__.py` docstring is out of date and should list every file. **Done**, all seven.
 
 ### 6.10 Infrastructure
 

@@ -1412,9 +1412,10 @@ or not a session is planned today, then the set-reading step, then its walk.
    `restore` carrying the sets, and the description split at its seam when a strength
    session is shown to the week planner (§9).
 4. The strength science, `trainmate/strength/progression.md` (§10).
-5. The strength planner, `trainmate/strength/planner.py`: the brief instruction in the week
-   planner's TASK, its own prompt, the checks on its output, the comparison and the evidence
-   rule for a kept session, and its place in `workout_generate` and `workout_adapt` (§9).
+5. The strength planner, `trainmate/strength/planner.py` with its prompt and reply checks in
+   `trainmate/strength/planner_prompt.py`: the brief instruction in the week planner's TASK,
+   its own prompt, the checks on its output, the comparison and the evidence rule for a kept
+   session, and its place in `workout_generate` and `workout_adapt` (§9).
 6. The exercise lines in the `workout generate` preview (§9).
 
 Three implemented designs are amended when it lands. DESIGN_workout_revisions.md: a revision
@@ -1590,7 +1591,7 @@ build: every brief is new, so every session is written again (§9).
    a trio, a circuit, two exercises done one after the other, and an unnamed set inside a
    run. A test on the marks: a day with two activities marks the one that holds the most
    prescribed exercises and leaves the other bare.
-3. The strength planner's prompt in `planner.py` (§9). The sentence "Nothing else decides
+3. The strength planner's prompt in `planner_prompt.py` (§9). The sentence "Nothing else decides
    the content" goes. `### CHOOSING THE EXERCISES` opens with the rule: start from the most
    comparable session as done, change only what the brief, the duration, the equipment or
    the progression asks for, size the session to what the athlete fits in the time, and
@@ -1598,7 +1599,7 @@ build: every brief is new, so every session is written again (§9).
    sentence says that alternating two exercises keeps the rest between two sets of the same
    one. `### THE NOTES` gains the alternation and the sentence for a new exercise. The line
    under SESSIONS TO CHECK names the second and the third ground for a change, and a session
-   to check whose brief or duration moved, which `_moved_on` already knows, prints a line
+   to check whose brief or duration moved, which `Session.moved_on` already knows, prints a line
    that says so. One region more for `tests/test_prompt_gates.py`.
 4. docs/ARCHITECTURE.md: the history's second section and the two keys.
 

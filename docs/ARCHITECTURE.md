@@ -330,7 +330,7 @@ classes themselves.
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workout_change.py` imports it safely. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
 | `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
-| `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class and listing the Garmin names that mean it (Connect's catalog and the FIT SDK names). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the recent strength days (`strength.recent_days`, 8), what was prescribed beside what was done, then the days the prescription was not followed, then `## SESSIONS AS DONE` — the same days as whole sessions, each activity's length, set count and RPE over its exercises in order, the ones the athlete alternated joined by "+" (read from overlapping runs of sets), and a "(not prescribed)" mark on what the day's session did not hold. `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — the call that writes the exercises and kilograms — and `progression.md` the shipped science only it reads. Rows in `db/strength.py`; surgery in `cli/strength.py`. |
+| `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class and listing the Garmin names that mean it (Connect's catalog and the FIT SDK names). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the recent strength days (`strength.recent_days`, 8), what was prescribed beside what was done, then the days the prescription was not followed, then `## SESSIONS AS DONE` — the same days as whole sessions, each activity's length, set count and RPE over its exercises in order, the ones the athlete alternated joined by "+" (read from overlapping runs of sets), and a "(not prescribed)" mark on what the day's session did not hold. `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — which sessions the call is about, the call, and folding the answers back into the proposal — and `planner_prompt.py` is what that call tells the model and the checks a returned exercise passes before it becomes a prescribed set; `progression.md` is the shipped science only this call reads. Rows in `db/strength.py`; surgery in `cli/strength.py`. |
 | `db/`                | `db`                 | SQLite wrapper; `Database` composed from         |
 |                      |                      | per-domain mixins. Full CRUD for all tables.     |
 |                      |                      | The write path onto `workouts` is               |
@@ -634,7 +634,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A preference the athlete can change at runtime | `trainmate/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`trainmate/queue_kind.py`) added to `KINDS` in `trainmate/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
 | A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `activity_lines`, `logbook`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`, and `strength log`/`exercises` which read the record and the vocabulary back), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
-| What a strength session prescribes | `strength/planner.py` (the call), `strength/progression.md` (the science it reads), `strength/history.py` (what the athlete lifted), `strength/prescription.py` (the description and its seam), `prescribed_sets` + `strength_checks` in `db/schema.py`, the carry in `db/workout_change.py::WorkoutChange`, and the pass's place in `coach/service/workouts.py` and `coach/service/adaptation.py`. DESIGN_strength_tracking.md §9 |
+| What a strength session prescribes | `strength/planner.py` (the pass and the call), `strength/planner_prompt.py` (the prompt and the checks on the reply), `strength/progression.md` (the science it reads), `strength/history.py` (what the athlete lifted), `strength/prescription.py` (the description and its seam), `prescribed_sets` + `strength_checks` in `db/schema.py`, the carry in `db/workout_change.py::WorkoutChange`, and the pass's place in `coach/service/workouts.py` and `coach/service/adaptation.py`. DESIGN_strength_tracking.md §9 |
 | A CLI command                    | `trainmate/cli/<family>.py` (`run_*`), dispatcher in `trainmate_cli.py` ([§7](#7-cli-commands-reference)) |
 | A message telling the athlete to run something | wrap the command in `text.cmd()`, nested *inside* the line's colour call, so it renders as the bright shade of that colour — and emit it with `output.aside`, not `print`: a "you could now run X" hint is side information |
 | Whether a line reaches the chat front-end | `output.aside` (side information, terminal only) vs `print` (the answer, warnings, errors). Building a list of lines rather than printing? gate on `text.asides_enabled()`. DESIGN_output_verbosity.md §3 |
@@ -2547,7 +2547,9 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    own guidelines and the day's equipment. `strength/planner.py::run` sorts the proposal's
    strength sessions into the ones to write (no prescribed sets yet) and the ones to check
    (they have sets and the athlete has already been shown them),
-   calls once for all of them, and edits the proposal in place: a written session gets its
+   calls once for all of them (the prompt and the checks on the reply are
+   `strength/planner_prompt.py`, which is where `MOVED_ON` and `ASKED_AGAIN` below live),
+   and edits the proposal in place: a written session gets its
    description and its rows, a checked one keeps its sets unless the evidence, the brief or
    the duration moved. The call writes a session from the most comparable one the athlete
    did (the history's sessions as done), changing only what the brief, the duration, the
@@ -3050,10 +3052,11 @@ venv/bin/python -m unittest discover -s tests -p "test_*.py"
 
 ### Which layer may load which
 
-Two rules, both asserted in `tests/test_layering.py` by importing a module in a fresh
-subprocess and reading `sys.modules` afterwards — what actually got loaded, not what
-the file says it imports. Both are keyed on module-name prefixes, never on a list of
-files, so a module added tomorrow is covered the day it is written.
+Three rules. The first two are asserted in `tests/test_layering.py`, by importing a
+module in a fresh subprocess and reading `sys.modules` afterwards — what actually got
+loaded, not what the file says it imports. Both are keyed on module-name prefixes, never
+on a list of files, so a module added tomorrow is covered the day it is written. The
+third is written down here and nowhere else.
 
 **Nothing under `trainmate/analytics/` loads `trainmate.db`.** It is training maths
 over rows the caller fetched. A module there may still *take* a database handle —
@@ -3070,6 +3073,17 @@ web process starts without a service-account file or an OpenRouter key. This rep
 a grep over the web file's own text, which kept passing while the import happened one
 module deeper — `cli/workouts/_helpers` reached the CLI package, and the CLI package
 reached everything.
+
+**The model client stays off the CLI's startup path.** `trainmate/openrouter.py` imports
+`requests`, and `requests` costs about 290 modules and 90 milliseconds. Every command pays
+that at startup as soon as one module the dispatcher reaches imports the client at the top
+of a file. So a module on that path imports it inside the function that calls it instead.
+`strength/questions.py` is the one that catches people out: `athlete_queue.py` imports it,
+six CLI modules import `athlete_queue`, and one top-level import there took
+`import trainmate_cli` from 107 ms to 201 ms. A module the coach service owns —
+`coach/engine/`, `strength/planner.py` — imports the client at the top, because everything
+that reaches those has loaded it already. No test holds this rule: `tests/test_layering.py`
+covers the analytics package and the web app only.
 
 | File                           | What it tests                                                   |
 |--------------------------------|-----------------------------------------------------------------|

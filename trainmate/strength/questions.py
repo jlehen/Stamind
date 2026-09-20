@@ -184,6 +184,9 @@ def _apply_set_names(item: Dict[str, Any], index: int, text: Optional[str]) -> s
 def propose(text: str) -> List[str]:
     """Up to three vocabulary names for what the athlete typed: the one model call in the
     naming path, and every name it returns is checked against the vocabulary (§7)."""
+    # At call time, not at the top: `athlete_queue` imports this module and every CLI
+    # command imports `athlete_queue`, so a top-level import would put `requests` on
+    # every command's startup path (ARCHITECTURE.md §14, which layer may load which).
     from trainmate.openrouter import openrouter_client
     system = PROPOSE_SYSTEM_PROMPT.format(names="\n".join(vocabulary.names()))
     result = openrouter_client.complete(

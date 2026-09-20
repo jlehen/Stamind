@@ -427,7 +427,8 @@ That gives roughly 25 commits. Take the subsystems in this order, lowest in the 
    the small mergers. **DONE**, as one commit: the three splits and the mergers all land in
    `db/`, and three of the item's bullets turned out to be work earlier phases had already
    done.
-4. **strength** — `planner.py` into two.
+4. **strength** — `planner.py` into two. **DONE**, as one commit: the prompt and the
+   pass are two halves of one file and the second cannot be read without the first.
 5. **coach/engine** — `workouts.py` into four.
 6. **coach/service** — `workouts.py`, `adaptation.py`, `planning.py`, `context.py`, one commit
    each.
@@ -758,8 +759,87 @@ The lines above Phase A are one per item, from before §3 changed.
   §1's table is where that belongs: either the rationale moves to `ARCHITECTURE.md` §15
   before the end, or the pointers go.
 
-**Next up:** Phase D item 4 — **strength**: `planner.py` into two. Items 5 to 9 follow in
-§7's order, one commit per file split.
+- **Phase D item 4, the strength planner.** `strength/planner.py` was 737 lines holding
+  two jobs, and it is two files now. `planner_prompt.py` (365) is what the call says and
+  what it will accept back: the system prompt, the blocks the user message is built from,
+  and the checks a returned exercise passes before it becomes a prescribed set — one that
+  fails is left out with a line for the preview. `planner.py` (394) is the pass: which
+  sessions the call is about, the call itself, folding the answers into the proposal, and
+  writing them. `_ask` and `_complete` stayed there, because every case in
+  `tests/test_strength_planner.py` patches `_complete`. Six names lost a leading
+  underscore because they now cross a file — `Session`, `Answer`, `system_prompt`,
+  `user_content`, `clean_session`, `same_rows` — and nine test references moved with them,
+  seven in `test_strength_planner.py` and two in `test_prompt_gates.py`.
+  `Phase D item 4: the strength planner splits from its prompt`
+
+- **One shape change the split needed, which the plan did not name.** `_moved_on(session)`
+  answers whether the brief or the duration a session's sets were written under has changed
+  since. It is Wednesday. Thursday's gym was written for 70 minutes, and the week planner
+  cuts it to 40. Both halves of the file ask that question: the prompt puts a line under
+  Thursday telling the model to write it again, and the fold-in lets the answer through
+  even though Thursday's kilograms were weighed yesterday. A module function would
+  therefore have had to live in one file and be imported by the other, and the import goes
+  the wrong way — the prompt cannot import the pass. It is a property on the session record
+  now, `Session.moved_on`, beside the `lineage_id` property that was already there. The
+  `Session` record itself went to `planner_prompt.py` for the same reason: the prompt's
+  session block is written from it.
+
+- **§6.9's four "Other changes": three done, one declined.** `strength/__init__.py` is a
+  docstring listing all seven files. `sets.py` is 380 lines, under the 400 the plan named
+  as the line to cut at, so it was left alone, as were `vocabulary.py` and
+  `prescription.py`. Of the two OpenRouter imports hidden inside functions, only
+  `planner._complete` was hoisted — see the next entry.
+
+- **The other hoist was done, measured, and put back.** `strength/questions.py` calls the
+  model once, to propose vocabulary names for an exercise the athlete typed. Its import of
+  the client sat inside that function, and §6.9 asked for it at the top of the file. Hoisted,
+  it put `requests` on the startup path of every command. The chain is one line long:
+  `athlete_queue.py` imports `strength/questions.py`, and `cli/data.py`, `cli/queue.py`,
+  `cli/render.py`, `cli/status.py`, `cli/workouts/generate.py` and `trainmate_bot.py` all
+  import `athlete_queue`. `import trainmate_cli` went from 107 ms and 254 modules to 201 ms
+  and 542, so `tm status` — and every chat command, because the bot runs the CLI as a
+  subprocess — paid about 95 ms it had not paid before. It also cancelled the three lazy
+  OpenRouter imports §7 keeps on purpose, `settings.py:133` and two flag-guarded sites in
+  `trainmate_cli.py`: the client was already loaded before any of them ran. The import is
+  back inside `propose` with two lines saying why, and the rule now has a durable home in
+  `ARCHITECTURE.md` §14 beside the two the layering test asserts. No test holds it —
+  `tests/test_layering.py` covers the analytics package and the web app only, and both were
+  green while the CLI regressed.
+
+- **No test file was split, and not for want of size.** `tests/test_strength_planner.py` is
+  597 lines and `test_prompt_gates.py` is 581. Neither follows this commit's axis:
+  `test_strength_planner.py` is organized by what the pass does — checking, writing again,
+  going through generate, recording — and nearly every case runs the whole pass through
+  `planner.run`. Cutting either is size-only work, which §7 leaves to Phase E.
+
+- **The gate is unmoved at 439 patch sites naming 42 targets.** This split moved no patch
+  target: `tests/helpers.py` patches `trainmate.strength.planner.run` and
+  `test_strength_planner.py` patches `planner._complete`, and both stayed in `planner.py`.
+
+- **The review of Phase D item 4**, in the same commit. A read-only agent matched every
+  symbol across the split by name, applied the six renames, stripped the docstrings and
+  compared the unparsed bodies: exactly four differ, and all four are the intended edits —
+  the `moved_on` property, `_complete` losing its local import, and the two call sites now
+  reading `session.moved_on`. `SYSTEM_PROMPT` and the other five constants are byte-identical,
+  no symbol is defined in both files, and nothing in the repo still names an old path. It
+  confirmed the patch on `trainmate.openrouter.openrouter_client.complete` still bites rather
+  than assuming it: `openrouter_client` is an instance, so the patch replaces a method on the
+  one object both binding styles name. Its one blocking finding is the entry above; it
+  measured the module counts and timings in fresh interpreters and isolated the cause to that
+  single import line, which is more than the suite could have told anyone.
+
+- **One thing the review pushed back on, and it stays as it is.** `Session` — the record of
+  one session the call was asked about — lives in `planner_prompt.py`, which §6.9 described
+  as the prompt builders and the reply checks. It is neither. It is there because the
+  prompt's session block is written from it, so the import has to run that way. The clean
+  alternative is a third file holding `Session` and `Answer`, about 45 lines. That is a
+  two-file split turned into three for one dataclass, and it would separate `Answer` from
+  the reply checks it belongs beside. `AGENTS.md` asks a review pass to cut as readily as it
+  adds, so this one does not add.
+
+**Next up:** Phase D item 5 — **coach/engine**: `workouts.py` into four (`generate.py`,
+`adapt.py`, `sessions.py`, `notes.py`, §6.1). Items 6 to 9 follow in §7's order, one commit
+per file split.
 
 ---
 
