@@ -586,6 +586,34 @@ class TestCalendarSync(unittest.TestCase):
         self.assertIn("boom", failure_print.call_args.args[0])
         self.assertIn("evt-c", loud_print.call_args.args[0])
 
+    def test_sync_multiple_draws_one_bar_and_silences_the_per_event_lines(self):
+        """A batch push shows a bar stepped once per session, not a page of per-event
+        lines — the same framing the reconcile pass gives a workout change
+        (DESIGN_workout_revisions.md §8). `workout push` updates existing events, which
+        print nothing of their own, so without the bar it is silent for the whole batch."""
+        workouts = [
+            {
+                "date": f"2026-06-{day:02d}", "sport_type": "running",
+                "title": "Easy Run", "description": "20 min jog.",
+                "google_event_id": None,
+            }
+            for day in (12, 13, 14)
+        ]
+
+        mock_service = MagicMock()
+        mock_service.events().insert().execute.return_value = {"id": "evt-new"}
+        with patch.object(calendar_syncer, "service", mock_service), \
+                patch.object(calendar_syncer, "calendar_id", "cal-test"), \
+                patch("trainmate.google_calendar.Progress") as mock_progress, \
+                patch("builtins.print") as mock_print:
+            calendar_syncer.sync_multiple(workouts)
+
+        mock_progress.assert_called_once_with(3)
+        bar = mock_progress.return_value.__enter__.return_value
+        self.assertEqual(bar.step.call_count, 3)
+        printed = " ".join(str(c.args[0]) for c in mock_print.call_args_list if c.args)
+        self.assertNotIn("Created new calendar event", printed)
+
 
 class TestARemovalLeavesATrace(unittest.TestCase):
     """Which voids keep their Calendar event, and what the athlete reads on it

@@ -12,7 +12,7 @@ from trainmate.adherence import STATUS_LABELS
 from trainmate.calendar_state import calendar_signature
 from trainmate import calendar_lineage
 from trainmate import intensity
-from trainmate.util import fmt_date, fmt_timestamp, step, warn
+from trainmate.util import Progress, fmt_date, fmt_timestamp, step, warn
 
 # Events fetched per Calendar API page during a signal sync (the response is paged
 # through with pageToken regardless, so this only tunes round-trips vs payload size).
@@ -302,7 +302,12 @@ class CalendarSyncer:
             raise e
 
     def sync_multiple(self, workouts: List[Workout]) -> List[Optional[str]]:
-        """Syncs a list of workouts sequentially.
+        """Syncs a list of workouts sequentially, under one self-erasing progress bar.
+
+        The bar, and the per-event lines it replaces, are what a workout change already
+        gets from the reconcile pass (DESIGN_workout_revisions.md §8). `workout push` is
+        the same batch of round-trips, so it reads the same way: updating an existing
+        event prints nothing of its own, and without the bar a long push is silent.
 
         Args:
             workouts: List of Workout objects to sync.
@@ -311,9 +316,10 @@ class CalendarSyncer:
             A list of event IDs synced.
         """
         synced_ids = []
-        for w in workouts:
-            eid = self.sync_workout(w)
-            synced_ids.append(eid)
+        with quiet_events(), Progress(len(workouts)) as bar:
+            for w in workouts:
+                synced_ids.append(self.sync_workout(w))
+                bar.step()
         return synced_ids
 
     # ------------------------------------------------------------------

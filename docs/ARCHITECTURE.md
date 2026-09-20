@@ -1452,10 +1452,15 @@ no precedence rule — the kind was recorded when the change ran:
     `Planned: … · Last adapted: … · Adapted ×N` lifecycle line over the goal/macro/meso/
     workout ids. A session that has never been revised has no `History` section and renders
     exactly as before.
-  - **Stale is a retry marker, not a defect.** It persists only when the push could not
-    land (offline, API error) or was declined (`--no-sync`). `workout push` defaults
-    to **today onward**, so `warn_stale_before` (in `cli/workouts/_helpers.py`) reports
-    anything stranded stale in the past and the `-d START..` window to recover it.
+  - **Stale is a retry marker, not a defect.** It persists when the push could not
+    land (offline, API error) or was declined (`--no-sync`), and every pushed event reads
+    stale once after a change to `CALENDAR_FIELDS` — the stored hash was taken over the
+    old field list, so it cannot be reproduced and one re-push clears it. `workout push`
+    defaults to **today onward**, so `warn_stale_before` (in `cli/workouts/_helpers.py`)
+    reports anything stranded stale in the past and the `-d START..` window to recover it.
+    The batch runs under one self-erasing progress bar with the per-event lines silenced
+    (`sync_multiple`), the same framing the reconcile pass gives a workout change: an
+    event *update* prints nothing of its own, so a long push would otherwise be silent.
   - **Orphans** are the reverse direction: an event whose session is gone (fresh DB,
     restored backup, a wipe that skipped Calendar) can no longer be named locally, so
     `workout prune-calendar` sweeps from the calendar side — `list_workout_events` finds
