@@ -18,7 +18,7 @@ rebind_test_db(test_db)
 
 from trainmate.analytics import zone_tables
 from trainmate.coach.service import coach_service
-from trainmate.coach.engine.workouts import (
+from trainmate.coach.engine.generate import (
     _mesocycle_composition_task, _mesocycle_progress_task,
 )
 

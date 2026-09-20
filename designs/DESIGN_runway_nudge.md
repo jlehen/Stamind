@@ -86,7 +86,7 @@ Classification is an exact comparison, and it can be because generation covers e
 date of its span: a planned rest day is written as an explicit rest row, never a hole.
 This is already the model's behavior — the response schema names "Rest Day" as a title,
 `adapt` already has the rule ("an omitted date keeps the plan; an absent row and an
-explicit rest day mean different things", `coach/engine/workouts.py`), and the live data
+explicit rest day mean different things", `coach/engine/adapt.py`), and the live data
 confirms it (every date of the current plan holds a row, taper rest included). This
 design promotes the behavior to an invariant: one sentence in the generate task stating
 it, and a deterministic backstop that fills any hole the model leaves with the existing

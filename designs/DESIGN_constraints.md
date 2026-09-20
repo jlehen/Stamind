@@ -575,7 +575,7 @@ across every active goal is a reasonable, if occasionally redundant, default.
 channel. It becomes a **fast-capture inbox** classified by the *same* `adapt`
 LLM call that already evaluates the day — no separate classification pass, no
 extra LLM round-trip or cost. The response schema (the same JSON object that
-carries `adapted_workouts`, in `coach/engine/workouts.py`'s
+carries `adapted_workouts`, in `coach/engine/adapt.py`'s
 `_workout_adapt_logic`) gains a sibling field with its own formal shape, mirroring
 what `constraint add` itself accepts:
 

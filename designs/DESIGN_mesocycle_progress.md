@@ -162,7 +162,7 @@ gets no second line — there is nothing the split would add.
 
 ## 4. The prompt
 
-`coach/engine/workouts.py::_mesocycle_progress_task` appends a `CONTINUING A MESOCYCLE ALREADY UNDER
+`coach/engine/generate.py::_mesocycle_progress_task` appends a `CONTINUING A MESOCYCLE ALREADY UNDER
 WAY` section, gated on the data being present so a clean mesocycle start produces the prompt it
 always did. It names the data section, states that those days are history, and asks for three
 things: carry the ramp on rather than restarting it; treat a clear dip in an elapsed week as
@@ -195,7 +195,7 @@ down) and must not answer for sessions this run just replaced.
 `_mesocycle_progress_context` also calls `mesocycle_report.mesocycle_report` for the mesocycle it is
 reporting, with two arguments `adapt` never passes (`DESIGN_intensity_distribution.md` §9.2a):
 `previous=` for the mesocycle-over-mesocycle delta, and a new `fetch_workouts=` for what the plan
-prescribed over the same rate window. `coach/engine/workouts.py::_mesocycle_composition_task` then
+prescribed over the same rate window. `coach/engine/generate.py::_mesocycle_composition_task` then
 appends a `JUDGING THE MESOCYCLE'S COMPOSITION` section.
 
 Its core is an **attribution rule**, not a licence to cut. A mesocycle measuring off its focus has

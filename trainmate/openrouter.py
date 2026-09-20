@@ -44,6 +44,10 @@ class OpenRouterClient:
         """Initializes the API endpoint. The model resolves lazily — see `model`."""
         self.api_url: str = "https://openrouter.ai/api/v1/chat/completions"
         self._model: Optional[str] = None
+        # `--show-llm-prompt-only` sets this on the singleton: print the prompt the next
+        # call would send and stop, rather than spend the call. Declared here so the two
+        # readers ask an attribute that exists instead of guarding with a default.
+        self.show_prompt_only: bool = False
 
     @property
     def model(self) -> str:
@@ -323,7 +327,7 @@ class OpenRouterClient:
             ValueError: If the OpenRouter API Key is missing or response is empty.
             requests.exceptions.HTTPError: If HTTP error occurs during requests.
         """
-        if getattr(self, "show_prompt_only", False):
+        if self.show_prompt_only:
             import sys
             print("=== SYSTEM PROMPT ===")
             print(system_content)

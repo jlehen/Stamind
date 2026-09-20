@@ -429,7 +429,8 @@ That gives roughly 25 commits. Take the subsystems in this order, lowest in the 
    done.
 4. **strength** — `planner.py` into two. **DONE**, as one commit: the prompt and the
    pass are two halves of one file and the second cannot be read without the first.
-5. **coach/engine** — `workouts.py` into four.
+5. **coach/engine** — `workouts.py` into four. **DONE**, as one commit: the four are
+   one file's four jobs, and two of them exist only to be imported by the other two.
 6. **coach/service** — `workouts.py`, `adaptation.py`, `planning.py`, `context.py`, one commit
    each.
 7. **CLI command families** — `workouts/generate.py` into five; `data.py` and `journal.py` into
@@ -837,9 +838,100 @@ The lines above Phase A are one per item, from before §3 changed.
   the reply checks it belongs beside. `AGENTS.md` asks a review pass to cut as readily as it
   adds, so this one does not add.
 
-**Next up:** Phase D item 5 — **coach/engine**: `workouts.py` into four (`generate.py`,
-`adapt.py`, `sessions.py`, `notes.py`, §6.1). Items 6 to 9 follow in §7's order, one commit
-per file split.
+- **Phase D item 5, the week planner's prompts.** `coach/engine/workouts.py` was 1,304
+  lines holding four jobs, and it is four files now. `sessions.py` (229) is what the model
+  is told about one session entry rather than about the span: the sport enum both schemas
+  list, the intensity target, its two schema members, the `replaces` field, the strength
+  brief, what may not be rewritten, how a move is written, and what a benchmark entry must
+  keep. `notes.py` (217) is what is done with the athlete's words: the `workout tweak` TASK
+  head, the note section, and the constraint and signal extraction that `bot capture note`
+  asks for too. `generate.py` (428) is `WorkoutGenerateMixin` — the sessions already
+  standing and how to answer for each, the mesocycle already under way, the constraints
+  that ended inside it, and the builder. `adapt.py` (509) is `WorkoutAdaptMixin` — the
+  standing rules, how to read a depressed morning, the terminal window, the drift
+  correction, and the builder. `__init__.py` composes five mixins where it composed four.
+  Nine names lost a leading underscore because they now cross a file: `SPORT_TYPE_ENUM`,
+  `LOCKED_HISTORY_TASK`, `strength_brief_task`, `planned_zone_task`, `planned_zone_fields`,
+  `replaces_field`, `move_task`, `benchmark_task` and `tweak_task`. Test references moved
+  with them in `test_prompt_gates.py`, `test_sports.py` and `test_mesocycle_progress.py`,
+  and `cli/bot.py`'s function-local import now names `notes.py`.
+  `Phase D item 5: the week planner's prompts split into four`
+
+- **Two inline blocks of prompt text became named sections, and neither changes a
+  prompt.** The plan asked for one: the two ATHLETE'S NOTE FOR TODAY texts, one for a run
+  the athlete is watching and one for a note their human coach typed, are
+  `notes.py::note_for_today_task(watching)`. The call site went from
+  `if has_message and not tweak and athlete_watching(): … elif has_message and not tweak: …`
+  to one branch with the call inside it. The second was not asked for: CORRECTING
+  EXECUTION DRIFT is `adapt.py::_DRIFT_TASK`, a module constant eighteen lines below
+  `_FATIGUE_READING_TASK`, which is the same kind of thing and was already one. It also
+  gave the "adapt owns execution, generate owns periodization" comment a home beside the
+  text it explains, and named the design doc the old comment's bare `§9.2` left implicit.
+  It does not make the file shorter — the text moves within it — and this line says so
+  rather than claiming a size win.
+
+- **`adapt.py` is 509 lines, over the rule, and it is named rather than hidden.** 370 of
+  them are `_workout_adapt_logic`, the one method §6.1 defers as separate work. Every
+  section it appends already lives outside it, so there is nothing left to move; a fifth
+  file holding adapt's own constants would be about 110 lines and break the same rule from
+  the other side. `ARCHITECTURE.md` §15 carries that, because this file is deleted at the
+  end of the branch and the fact has to outlive it. It is not added to `AGENTS.md`'s three
+  standing exceptions: those are permanent, and this one is waiting for a specific cut.
+
+- **`tweak_task` sits in `notes.py`, and that is a judgement call.** It is the whole
+  `## TASK` head of `workout tweak` — find the days, change only those days, do what is
+  asked, it is the athlete's call, name the request — so by shape it looks like adapt's.
+  It is there because every line of it is about carrying out something the athlete wrote,
+  which is what the file is for, and because moving it and `note_for_today_task` into
+  `adapt.py` would take that file from 509 to about 610 and buy nothing.
+
+- **The gate is unmoved at 439 patch sites naming 42 targets.** No patch target named
+  `coach.engine.workouts`. The 132 that matter name
+  `trainmate.coach.engine.openrouter_client`, and both new builders were run under that
+  patch to prove it still bites rather than inferring it from a green suite.
+  `import trainmate_cli` is unchanged at 107 ms and 254 modules, with no `requests` on the
+  path.
+
+- **Byte-for-byte proof, not a green suite.** A harness built every subset of the two
+  builders' optional inputs — 8,192 variants each, and both values of `athlete_watching`
+  for adapt — against the pre-split file loaded from `git show HEAD:…/workouts.py`. The
+  system prompt, the user content and the call label came back identical every time.
+
+- **No test file was split.** None of the three that changed follows this commit's axis:
+  `test_prompt_gates.py` (581) is organized by which gate it asserts, across both
+  builders, and the other two only repoint an import. §7 leaves size-only test splits to
+  Phase E.
+
+- **§6.1's "Other changes": three were already done, one is done here, one is declined.**
+  The dead code went in Phase A and `engine/prompt.py` shrank in Phase C; §6.1 now says
+  so. `show_prompt_only` is declared in `OpenRouterClient.__init__`, so its two readers
+  ask a plain attribute instead of `getattr(…, False)`. Moving its check out of the
+  service was declined, and §6.1 records why: the check decides that a preliminary verdict
+  call is not the call the athlete asked to see the prompt for, and only the orchestrator
+  knows there are two calls.
+
+- **The review of Phase D item 5**, in the same commit. A read-only agent re-parsed both
+  trees with `ast`, applied the nine renames and compared the unparsed bodies: all 31 old
+  symbols present exactly once, none defined twice, none lost, and exactly one body
+  differing — `_workout_adapt_logic`, by precisely the two intended edits. It read the
+  source rather than the tests for the client trap and found nine `openrouter` lines under
+  `coach/engine/`, of which one is the seam in `__init__.py` and none is a by-value
+  import. It checked the five-mixin MRO for a hidden method and found none, and swept
+  `trainmate/`, `tests/`, `scripts/`, `docs/`, `designs/` and `AGENTS.md` for the old
+  names, finding hits only in this plan's own description of the before-state. Its
+  blocking findings were documentation: `DESIGN_runway_nudge.md` cites a rule it
+  attributes to `adapt`, and the sweep had pointed that line at `generate.py`; the
+  `show_prompt_only` bullets above were neither done nor accounted for; and these ledger
+  lines did not exist yet. It also found `engine/__init__.py` claiming every file in the
+  package reaches the model when two make no call, a sentence in `ARCHITECTURE.md` §15
+  saying the CLI still carries an older name for generate when `cli/workouts/generate.py`
+  does not, and four bare `§N` comments — two of which the split had made ambiguous, since
+  `adapt.py` and `generate.py` each now carry one `§5.2` with no doc named. All fixed here.
+
+**Next up:** Phase D item 6 — **coach/service**: `workouts.py`, `adaptation.py`,
+`planning.py` and `context.py`, one commit each (§6.2). Items 7 to 9 follow in §7's order,
+one commit per file split. Two traps wait there that this item never met: the service
+clock (§9), and the mixin count going from 6 to 13.
 
 ---
 

@@ -536,9 +536,15 @@ of the same parser tolerates one. The tolerant version becomes the only one, in 
 
 Sizes are approximate and include imports.
 
-### 6.1 coach/engine
+### 6.1 coach/engine — **DONE in Phase D item 5**
 
-**`engine/workouts.py` (1,302 lines) becomes four files:**
+**`engine/workouts.py` (1,304 lines, not 1,302) becomes four files.** The `~Lines`
+column below is the estimate; the actual is `generate.py` 428, `adapt.py` 509,
+`sessions.py` 229, `notes.py` 217. `sessions.py` lands within a line and
+`generate.py` within eight; `notes.py` is twelve over and `adapt.py` twenty-nine,
+which puts it over the 500 rule as well. The bullet at the end of this section is
+why, and `ARCHITECTURE.md` §15 now carries that reasoning where it will outlive
+this file.
 
 | New file | What it holds | ~Lines |
 |---|---|---|
@@ -549,18 +555,32 @@ Sizes are approximate and include imports.
 
 **Other changes.**
 - The new files must look up `_eng.openrouter_client` when they are called. A
-  `from … import openrouter_client` would silently defeat about 150 test patches.
-- `engine/prompt.py` drops to about 235 lines once the hashing half leaves (§4.4).
-- `engine/__init__.py` drops to about 15 lines: the patch seam and the class composition.
-- Dead code to delete: `coach/formatting.format_planned_workouts` (220–229) and
-  `llm_models.stored_model` (24–27).
-- `show_prompt_only`:
-  - declare it in `OpenRouterClient.__init__`;
-  - move its check from `service/planning.py:284` into the engine.
+  `from … import openrouter_client` would silently defeat about 150 test patches. **Done.
+  The real count is 132, and only `generate.py` and `adapt.py` need it: `sessions.py` and
+  `notes.py` are prompt text and call nothing.**
+- ~~`engine/prompt.py` drops to about 235 lines once the hashing half leaves (§4.4).~~
+  Phase C already did; it is 228.
+- ~~`engine/__init__.py` drops to about 15 lines: the patch seam and the class
+  composition.~~ It is 25. `AGENTS.md` asks a package `__init__` for a docstring as well,
+  and naming the package's seven files takes eleven of those lines.
+- ~~Dead code to delete: `coach/formatting.format_planned_workouts` (220–229) and
+  `llm_models.stored_model` (24–27).~~ Phase A already deleted both.
+- `show_prompt_only`: **one done, one declined.** It is declared in
+  `OpenRouterClient.__init__` now, and the two readers ask a plain attribute instead of
+  `getattr(…, False)`. Its check did **not** move into the engine. The doc's
+  `service/planning.py:284` was stale — Phase C moved it to
+  `coach/service/staleness.py:193` — and reading it there shows what it decides: `plan
+  show` makes a cheap verdict call *before* the call the flag is about, so without the
+  guard that preliminary would print its own prompt and exit first. "This is the
+  preliminary, not the call the athlete asked to see" is knowledge the orchestrator has
+  and the engine does not; a `_plan_reshape_verdict` that returned `None` there could not
+  say why. One function-local import in the service is the smaller cost.
 - These stay whole: `formatting.py`, `openrouter.py`, `honoring.py`, `proposals.py`,
-  `revisions.py`, `llm_models.py`, `engine/planning.py` and `engine/analysis.py`.
-- **Separate work.** `_workout_adapt_logic` is 420 lines with 27 parameters. That method is the
-  real problem, and cutting it into named steps is a separate job.
+  `revisions.py`, `llm_models.py`, `engine/planning.py` and `engine/analysis.py`. **All
+  eight untouched but for the one `__init__` line above.**
+- **Separate work, and still outstanding.** `_workout_adapt_logic` is 420 lines with 27
+  parameters — 370 after this split, which is what leaves `adapt.py` at 509. That method is
+  the real problem, and cutting it into named steps is a separate job.
 
 ### 6.2 coach/service
 

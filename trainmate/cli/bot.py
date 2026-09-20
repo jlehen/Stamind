@@ -540,7 +540,7 @@ def _note_capture_prompt(today: str, earliest: str) -> str:
     """The `bot capture note` system prompt: the same two candidate vocabularies the
     `workout adapt -m` inbox uses, with the coaching half removed (§12.10)."""
     from trainmate import runtime, signals
-    from trainmate.coach.engine.workouts import (
+    from trainmate.coach.engine.notes import (
         NEW_CONSTRAINTS_SCHEMA, NEW_SIGNALS_SCHEMA, constraint_extraction_task,
         signal_extraction_task,
     )

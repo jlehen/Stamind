@@ -123,7 +123,7 @@ design started from (ACWR-era, historical per the amendment banner).
 | Compute | `trainmate/garmin/derived.py` `recompute_derived()`, over the maths in `analytics/pmc.py` | full-sweep acute (7d sum), chronic (28d/4), ACWR per metrics day |
 | Store | `athlete_metrics_cache` (`db/schema.py`), `save_metric_cache()` (`db/activities.py`), `AthleteMetric` (`types.py`) | `acute_workload`, `chronic_workload`, `acwr` columns |
 | Wipe | `wipe_garmin_data()` (`db/wipes.py`) | deletes rows by range; **does not** recompute (see §4) |
-| Coach, per-day | `format_metrics_history()` (`coach/formatting.py`) → generate & adapt prompts (`coach/engine/workouts.py`) | `... ACWR=1.12` per day line — **unguarded** `:.2f`, see §5.1 |
+| Coach, per-day | `format_metrics_history()` (`coach/formatting.py`) → generate & adapt prompts (`coach/engine/generate.py`, `adapt.py`) | `... ACWR=1.12` per day line — **unguarded** `:.2f`, see §5.1 |
 | Coach, summary | data summary in `coach/service/context.py` → strategy/plan prompts | "Current ACWR: 1.12 (latest)" |
 | Coach, weekly | analysis weekly digest (`coach/service/analysis.py`) | `max_acwr` per week |
 | Cache key | evidence fingerprint (`coach/service/analysis.py` `met_digest`) | hashes 6-tuple incl. `m.get('acwr')` per metrics row |
@@ -141,7 +141,7 @@ packages after it merged, so the original paths no longer resolve. Current homes
 | `coach/service.py` — data summary, PMC/ramp/caveat lines | `trainmate/coach/service/context.py` |
 | `coach/service.py` — weekly digest | `trainmate/coach/service/analysis.py` |
 | `coach/engine.py` — `met_digest` fingerprint | `trainmate/coach/engine/prompt.py` |
-| `coach/engine.py` — generate/adapt prompt assembly | `trainmate/coach/engine/workouts.py` |
+| `coach/engine.py` — generate/adapt prompt assembly | `trainmate/coach/engine/generate.py`, `adapt.py` |
 | `cli/workouts.py` | `trainmate/cli/workouts/*.py` (but see §6.2b — that surface is gone) |
 
 Each row gets a PMC counterpart — no new subsystem. (Rev. 5 also listed plan-side
@@ -503,7 +503,7 @@ after — see §7.)
   the strategy/plan prompts, so plan generation can reason about sustainable build
   rates and current freshness.
 - The **ramp line** must reach the prompts that actually set weekly TSS —
-  generate and adapt (`coach/engine/workouts.py`) — *and* the strategy/plan
+  generate and adapt (`coach/engine/generate.py`, `adapt.py`) — *and* the strategy/plan
   prompts. So the same one-liner is emitted into **both** contexts: once in the
   data summary, and once in the generate/adapt metrics context (a single line
   beside the per-day lines, not repeated per day). It is computed from the **full

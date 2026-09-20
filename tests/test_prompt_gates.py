@@ -30,7 +30,8 @@ NOTE_DATA = "## ATHLETE'S NOTE FOR THIS ADAPTATION"
 NOTE_SIGNAL_INSTRUCTIONS = "### RECORDING A DAILY SIGNAL FROM THE NOTE"
 NOTE_SIGNAL_SCHEMA_MEMBER = '"new_signals"'
 
-import trainmate.coach.engine.workouts as wk
+from trainmate.coach.engine.adapt import RULE_MESOCYCLE_NOT_YOURS, RULE_MOVE_FIRST
+from trainmate.coach.engine.sessions import benchmark_task, replaces_field
 
 MOVE_SECTION = "### MOVING A SESSION TO ANOTHER DAY"
 MOVE_SCHEMA_MEMBER = '"replaces"'
@@ -365,7 +366,7 @@ class TestAlwaysOnSections(unittest.TestCase):
         # is never sent: a shared field that named the wrong section would send the model
         # looking for a list that is not there.
         system, _user = build_prompt()
-        self.assertIn(wk._replaces_field("PLANNED WORKOUTS"), system)
+        self.assertIn(replaces_field("PLANNED WORKOUTS"), system)
         self.assertNotIn("SESSIONS ALREADY STANDING", system)
 
 
@@ -376,8 +377,8 @@ class TestTheStandingRules(unittest.TestCase):
 
     def test_adapt_gets_five_standing_rules_including_the_two_named_ones(self):
         system, _user = build_prompt()
-        self.assertIn(wk.RULE_MOVE_FIRST, system)
-        self.assertIn(wk.RULE_MESOCYCLE_NOT_YOURS, system)
+        self.assertIn(RULE_MOVE_FIRST, system)
+        self.assertIn(RULE_MESOCYCLE_NOT_YOURS, system)
         # Adapt's other three are written inline at its call site — counted, not quoted,
         # so rewording one does not break a test about how many rules the model is given.
         rules = system.split("### STANDING RULES")[1].split("###")[0]
@@ -389,7 +390,7 @@ class TestTheStandingRules(unittest.TestCase):
         # makes `workout_revision_apply`'s `clear_benchmark` inference sound, so the
         # section must reach the prompt intact rather than paraphrased.
         system, _user = build_prompt()
-        self.assertIn(wk._benchmark_task(), system)
+        self.assertIn(benchmark_task(), system)
 
 
 class TestStandingSessionsGate(unittest.TestCase):

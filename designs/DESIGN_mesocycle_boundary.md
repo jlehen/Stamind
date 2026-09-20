@@ -55,7 +55,7 @@ of it.
 ## 3. Terminal-window guidance (prompt)
 
 When the evaluation date falls within `config.adapt_terminal_window_days` of the mesocycle's end,
-`coach/engine/workouts.py::_workout_adapt_logic` appends a `THIS MESOCYCLE IS ENDING` section to
+`coach/engine/adapt.py::_workout_adapt_logic` appends a `THIS MESOCYCLE IS ENDING` section to
 the task. It states the two consequences from §1 and biases the model toward holding planned
 load: an easing has no runway left to rebound, and a cut must not be deepened to "carry" the
 athlete into a mesocycle that will be planned against its own metrics when it is generated.

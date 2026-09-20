@@ -611,7 +611,7 @@ flow for each lives in [§10](#10-key-data-flows).
 
 | To change…                       | Edit these                                                                 |
 |----------------------------------|----------------------------------------------------------------------------|
-| Daily adaptation logic           | `coach/service/adaptation.py:workout_adapt*`, `coach/engine/workouts.py:_workout_adapt_logic`, prompt helpers in `coach/formatting.py` ([§10](#daily-adaptation-workout-adapt)) |
+| Daily adaptation logic           | `coach/service/adaptation.py:workout_adapt*`, `coach/engine/adapt.py:_workout_adapt_logic`, prompt helpers in `coach/formatting.py` ([§10](#daily-adaptation-workout-adapt)) |
 | Plan / strategy generation       | `coach/service/planning.py:plan_generate`, `coach/engine/planning.py:_plan_generate_strategy` ([§10](#plan-generation-plan-generate)) |
 | Plan version comparison / display | `trainmate/plan_versions.py` (the lineage walk, the comparison and the snapshot parsing), `cli/plans.py` (text rendering), `/api/plan/diff` in `trainmate_web.py`, `loadPlanDiff()`/`render*` in `static/app.js` |
 | Plan feedback (the athlete's notes on the plan) | `db/periodization.py` (`add_/list_/get_/rm_plan_feedback` over the `plan_feedback` table), `cli/plans.py:run_plan_feedback` + `cli/selectors.py:resolve_meso_atom` (the `-m` atom), `coach/service/planning.py` (the regen gate disjunct + prompt assembly), `coach/engine/planning.py` (the prompt section), DESIGN_plan_feedback.md |
@@ -619,14 +619,14 @@ flow for each lives in [§10](#10-key-data-flows).
 | Commitment window                | `settings.commitment_days`/`settings.commitment_end` (how long the window is and where it ends — one rule), `coach/service/workouts.py:_standing_sessions`/`_resolve_standing`, `coach/formatting.py:format_standing_workouts`, `gcal/reconcile.py:leaves_trace`, `workout_changes.commitment_end`   |
 | Telling the athlete a plan-shaping input changed since the plan was built | `plan_inputs.py` (**canonical** for what shapes a plan and how it is hashed: the partition `plan_profile`/`changed_plan_profile_fields`/`plan_config_hash`, the science files `athlete_science_documents`/`changed_science_documents`, the goal and constraint cleaners, and the diff text), `coach/service/staleness.py` (the judgment — every axis of `config_changed`, the diff, the verdict call, the one `plan_fingerprints()` builder and the `plan keep` stamp), **`cli/staleness.py`** (canonical for everything the athlete *reads*: the reason, the §2 test said out loud, and the four surfaces' shared wording), and the surfaces that draw it: `cli/plans.py` (`plan show` reports, `plan keep` dismisses, `plan generate` offers), `cli/workouts/generate.py`, `cli/status.py` (a pointer to `plan show`, nothing more), `trainmate_web.py` (a read-only banner off `plan_config_hash()`, deliberately not through the engine — §8). Built in **one** place for the same reason the runway nudge is: three call sites each phrasing a two-sentence explanation is how they drift (DESIGN_plan_staleness.md §9) |
 | Telling the athlete the schedule is running out | `analytics/runway.py` (`plan_end`, `runway` — the pure detector and its four kinds), `cli/runway.py` (the row fetch, every wording, the morning-push button), and the four surfaces that draw it: `cli/workouts/generate.py` (`workout adapt`'s hint and refusal, `workout list`'s marker), `cli/status.py`, `cli/bot.py:run_bot_morning`, `config.runway_warning_days`, DESIGN_runway_nudge.md. The wording is built in **one** place on purpose — the hint used to live on `workout adapt` alone, which is how `status` came to answer differently on the same morning (§3 of that doc) |
-| Generation covering every date of its span | `coach/engine/workouts.py` (the TASK sentence), `coach/service/workouts.py:_fill_coverage_gaps` (the deterministic backstop, over the same `_rest_workout` factory the rest-window pre-pass uses), DESIGN_runway_nudge.md §2.1. The invariant is what lets the end of the schedule be read straight off the rows, with no margin |
+| Generation covering every date of its span | `coach/engine/generate.py` (the TASK sentence), `coach/service/workouts.py:_fill_coverage_gaps` (the deterministic backstop, over the same `_rest_workout` factory the rest-window pre-pass uses), DESIGN_runway_nudge.md §2.1. The invariant is what lets the end of the schedule be read straight off the rows, with no margin |
 | Knowing whether the schedule reflects a constraint | `coach/honoring.py` (**canonical** for `honored_at`: what it means, who may stamp it, the write, and `needs_a_pass` — whether the schedule is missing a directive at all), `coach/proposals.py` (`covered_constraint_ids`, decided at proposal time on both proposal types so apply never re-derives it), `coach/service/adaptation.py` + `coach/service/workouts.py` (the two stamping commands), `cli/constraints.py:_maybe_point_at_honor` (the add-time message naming the mesocycle and the run that would build it in), `cli/status.py`, `cli/common.py:constraint_line`/`report_unhonored`, `db/constraints.py` (`mark_honored`, `clear_honored`, `clear_honored_after`), DESIGN_constraint_honoring.md. There is deliberately **no dedicated command** and no SQL half-copy of the predicate in `db/` — §5 of that doc records why |
 | Coach-learnings / confidence     | `db/learnings.py`, `coach/service/prompt.py` (`_apply_learning_updates`, `_review_learning_proposals`), `learning_doubts.py` (the athlete's question about a doubt), model is **canonical** in [§3](#3-coach-package-architecture) |
 | Backward analysis (bootstrap/reflect) | `coach/service/analysis.py:_run_workout_analysis`, `coach/engine/analysis.py:_data_analyze_logic` ([§10](#data-analysis-data-bootstrap--data-reflect)) |
 | Garmin pull / metrics / load model | `trainmate/garmin/sync.py` (`pull`, `ensure_data`), `garmin/derived.py` (`recompute_derived`, `backfill_tss`, `warmup_cutoff` — the database side), `analytics/load.py` (`activity_load`) and `analytics/pmc.py` (the PMC maths), see [§12](#12-sports-science--coaching-mathematics) |
 | Progress timeline / PMC projection | `analytics/progression.py` (the series), `analytics/timeline.py` (the payload), `trainmate/timeline_rows.py` (the shared row-fetch), `analytics/chart.py` (PNG), `cli/progress.py` (text), `/api/timeline.png` in `trainmate_web.py`, see [§12](#fitnessfatigueform-pmc-model), DESIGN_progress_timeline.md |
 | Intensity distribution / time in zone | `analytics/intensity.py` (aggregation + which sports qualify and in which currency), `analytics/zone_tables.py` (the prompt-width rendering) and `analytics/mesocycle_report.py` (the report itself) — `window_sport_stats`/`select_zone_sports`/`zone_currency` say which sports qualify, shared by the CLI tables and `/api/zones`, `coach/service/context.py` (`_intensity_mesocycle_context` for adapt, `_intensity_history_context` for the strategy prompt, `_mesocycle_progress_context` for workout generate — the only consumer passing `mesocycle_report`'s `previous=` and `fetch_workouts=`, since mesocycle-over-mesocycle creep and measured-vs-prescribed attribution are periodization questions (§9.2a), `_planning_zone_currencies` for §9.8), `cli/status.py`, `cli/progress.py` (the weekly grid — it shares the load table's week column and 48-column budget), `progression.weekly_aggregates` (where the rows join the payload), `cli/data.py` (`--zones`), `/api/zones` + the Progress tab's tables in `static/app.js`, DESIGN_intensity_distribution.md. Undercount markers are proportional: `intensity.judgeable` (`config.zone_min_activity_minutes`) withholds a too-short session's vote, and the coverage bar is per sport (`intensity.COVERAGE_MIN_BY_SPORT`, overridable via `config.zone_coverage_display_min_by_sport`) because rest between sets is not a failed recording. Both maps' keys must be **canonical** sports — `coverage_display_min()` canonicalizes before the lookup, so an alias key is dead and silently reverts to the global bar |
-| Planned time in zone (a session's intensity target) | `db/schema.py` (`planned_zone_currency`, `planned_zone1..7_sec` on `workouts`), `db/workout_change.py:WorkoutChange.append`, `intensity.parse_planned_zones` / `format_planned_zones`, `coach/engine/workouts.py` (`_planned_zone_task`, `_planned_zone_fields` — both prompts), `gcal/event.py` + `coach/formatting.py` + `cli/workouts/_helpers.py::prescription_lines` (`workout list -v`/`-vv` and the `workout generate` preview) — rendered from the columns, never stored; `planned_zone_seconds` also reads a proposal's unwritten `planned_zone_sec` list through `parse_planned_zones`, DESIGN_intensity_distribution.md §9.8 |
+| Planned time in zone (a session's intensity target) | `db/schema.py` (`planned_zone_currency`, `planned_zone1..7_sec` on `workouts`), `db/workout_change.py:WorkoutChange.append`, `intensity.parse_planned_zones` / `format_planned_zones`, `coach/engine/sessions.py` (`planned_zone_task`, `planned_zone_fields` — both prompts), `gcal/event.py` + `coach/formatting.py` + `cli/workouts/_helpers.py::prescription_lines` (`workout list -v`/`-vv` and the `workout generate` preview) — rendered from the columns, never stored; `planned_zone_seconds` also reads a proposal's unwritten `planned_zone_sec` list through `parse_planned_zones`, DESIGN_intensity_distribution.md §9.8 |
 | Calendar push / daily-signal ingest | `trainmate/gcal/`, see [§13](#13-daily-signal-calendar-ingest) |
 | Workout state (modified/calendar/removed) | `trainmate/workout_state.py` (`modification_markers` and `calendar_status` — two of the three axes, together because every surface that shows one shows the other, and because neither reads the database), `db/workouts.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
 | What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `analytics/compare.py` (`adherence_window` — the one pairing that reads the database, handed the handle — `adherence_verdicts` keyed by workout id, `compare_days` for the day-by-day walk, and `format_actual` for the effort it graded against), `analytics/adherence.py::unplanned_kind` (what an activity nothing planned turns out to be: minor, unplanned or off-plan), `gcal/reconcile.py` (`mark_adherence_range` — stamping the verdict onto the Calendar event), `cli/workouts/_helpers.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/generate.py::_list_verdicts` (which span the listing grades, and the pull it needs), `gcal/event.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/app.js` (the badge) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
@@ -670,9 +670,16 @@ The submodules:
   (renders the window's `daily_signals` rows into the adapt prompt),
   `format_baseline`, `_load_science_guidelines`.
 - `engine/` — `CoachEngine` (prompt construction, hashing, LLM calls), assembled
-  from mixins (`prompt`, `planning`, `workouts`, `analysis`). Owns the
+  from mixins (`prompt`, `planning`, `generate`, `adapt`, `analysis`). It owns the
   `openrouter_client` binding — **patch target for tests:**
-  `trainmate.coach.engine.openrouter_client`.
+  `trainmate.coach.engine.openrouter_client`. Two of its files hold no mixin.
+  `sessions.py` is the prompt sections about one session entry rather than about the
+  span: the sport enum, the intensity target and its two schema members, the `replaces`
+  field and the strength brief, which `workout generate` and `workout adapt` both send,
+  then the locked history, how a move is written and what a benchmark entry must keep,
+  which only adapt sends today. `notes.py` is what is done with the athlete's words: the
+  `workout tweak` TASK head, the note section, and the constraint and signal extraction
+  that `bot capture note` asks for too.
 - `service/` — `CoachService` + the `coach_service` singleton (data I/O,
   caching, orchestration), assembled from mixins (`context`, `prompt`, `staleness`,
   `planning`, `workouts`, `adaptation`, `analysis`). It holds no handles of its own: `_db` and
@@ -1165,7 +1172,7 @@ alone.
   the prescriptions differ. `CANONICAL_SPORTS` (declaration order of `SPORT_MAPPING`) is
   the single source of truth for the `goal add`/`goal edit` `--sport` choices
   (`trainmate/cli/goals.py`) and for the `sport_type` enum in the generate/adapt prompts
-  (`_SPORT_TYPE_ENUM` in `trainmate/coach/engine/workouts.py`, wrapped to match the
+  (`SPORT_TYPE_ENUM` in `trainmate/coach/engine/sessions.py`, wrapped to match the
   hand-written schema around it) — adding a sport to `SPORT_MAPPING` reaches all three.
 - **The canonical cycling name is `cycling`**, with `road_biking`, `road_cycling`,
   `gravel_cycling`, `mountain_biking`, `cyclocross`, `bmx`, `indoor_cycling`,
@@ -3653,7 +3660,20 @@ patch point.
 
 What the split does cost is that one subject is named twice, in two packages. The answer
 is to keep the names parallel rather than to merge the files:
-`engine/workouts.py` ↔ `service/workouts.py` ↔ `cli/workouts/`.
+`engine/generate.py` ↔ `service/workouts.py` ↔ `cli/workouts/generate.py`, and
+`engine/adapt.py` ↔ `service/adaptation.py` ↔ the adapt half of that same CLI file. The
+engine reached those names first. The service still carries the older ones, and so does
+the CLI for adapt, which has no file of its own yet.
+
+### `coach/engine/adapt.py` is over the 500-line rule, and the cut that fixes it is elsewhere
+The file is 509 lines and 370 of them are a single method, `_workout_adapt_logic`, which
+takes 27 parameters and assembles the whole adapt TASK, the response schema and the user
+content in one run. Every prompt section it appends already lives outside it — the shared
+ones in `sessions.py`, the ones about the athlete's words in `notes.py`, and adapt's own
+as constants beside it — so there is nothing left to move out. A fifth file holding those
+constants would be about 110 lines, which breaks the same rule from the other side. The
+change that brings the file under 500 is cutting that one method into named steps, and
+that is a refactor of the adapt prompt rather than a file move, so it is its own job.
 
 ### There is no `trainmate/queue/` package
 The athlete queue is spread over four files and that is where they belong.

@@ -164,7 +164,7 @@ field list, and a field missing from any list is silently dropped. The flag is
 therefore threaded through each enumeration:
 
 - the model's JSON output contract in **both** generate
-  (`coach/engine/workouts.py:187-190`) and adapt (`:503-505`), with a prompt
+  (`coach/engine/generate.py`) and adapt (`coach/engine/adapt.py`), with a prompt
   instruction to preserve the field when re-emitting a session. The model, not
   the app, owns the flag's survival across an adaptation — consistent with
   §4.2's no-guards stance;
@@ -384,7 +384,7 @@ snapshotted, prompted, trended and displayed like everything else.
 Benchmarks belong at mesocycle boundaries and on a ~4–6 week cadence
 (`benchmarks.md` §1). The split of labor plays to each side's strength:
 
-- **The LLM places.** The generation prompt (`coach/engine/workouts.py:155-167`)
+- **The LLM places.** The generation prompt (`coach/engine/generate.py`)
   instructs the week planner to schedule one benchmark of the appropriate kind in each
   mesocycle-boundary week the generated span covers — except the terminal mesocycle's —
   preceded by an opener/easy day so TSB is positive on test day, phrased
@@ -458,7 +458,7 @@ session cannot slip past a `cycling` benchmark on a spelling.
 
 ### 4.2 Adapt — "reschedule, don't dilute"
 
-**It is its own helper** (`coach/engine/workouts.py::_benchmark_task`) rather than prose
+**It is its own helper** (`coach/engine/sessions.py::benchmark_task`) rather than prose
 inline in the TASK, because of the closing line below: the two must not drift apart. Note
 that adapt's postponement escape — "the next generated mesocycle re-places the test when it is
 due" — is honest only because a mesocycle boundary really does bring a `workout generate`. A
@@ -481,7 +481,7 @@ legitimate move, leaving the test duplicated on both days.) That is precisely th
 judgement the model already has in front of it, so the model keeps it — the deletion
 there carries no benchmark exemption, as designed.
 
-**The prompt rule** (`coach/engine/workouts.py:373-381`): never reduce or soften a
+**The prompt rule** (`coach/engine/sessions.py::benchmark_task`): never reduce or soften a
 benchmark session; if the athlete
 will not be fresh (negative TSB), move it *intact* — same content,
 `benchmark_type` preserved — to a later day within the mesocycle and lighten the

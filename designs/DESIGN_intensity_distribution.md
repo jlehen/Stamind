@@ -285,7 +285,7 @@ discarding the original.
 
 **The rename is DONE — do not re-apply any of it (checklist kept for the record).** It touched
 six code sites that spelled `road_biking` out: the generate and adapt LLM response schemas
-(`coach/engine/workouts.py`), two CLI `choices` lists (`cli/goals.py`), the learnings-schema
+(`coach/engine/sessions.py`), two CLI `choices` lists (`cli/goals.py`), the learnings-schema
 example (`coach/engine/__init__.py`) and `workout add`'s help text
 (`cli/workouts/parser.py`). All six now say `cycling`; the only survivors of the old spelling
 are `SPORT_MAPPING`'s alias list and `benchmarks.SPORT_ANCHORS`, both of which keep it on
@@ -419,7 +419,7 @@ table grades it.
 **Pre-implementation motivation; the missing branch below now ships.** The adapt TASK carries a
 fourth branch (`drift_branch`, gated on `has_intensity`) beside the `CORRECTING EXECUTION
 DRIFT` guidance and the `MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE MESOCYCLE` data section
-(`coach/engine/workouts.py`). The argument is kept because it is what those three pieces of
+(`coach/engine/adapt.py`). The argument is kept because it is what those three pieces of
 prompt text answer to.
 
 `DESIGN_mesocycle_boundary.md` §2 constrains `adapt` in two ways that must not be confused. The
@@ -430,7 +430,7 @@ is tactical, eases transiently, does not reshape periodization — is prompt tex
 string, and it is the part in play.
 
 The obstacle was narrower than "the mandate forbids it". It was a missing branch. The adapt
-TASK (`coach/engine/workouts.py`) offered exactly three:
+TASK (`coach/engine/adapt.py`) offered exactly three:
 
 ```
 - If they are showing high fatigue or injury risk ... replace hard workouts with
@@ -537,7 +537,7 @@ to reveal.
 **Threading.** Follow `pmc_context` exactly — it already does this end to end. Compute in the
 service layer in `coach/service/adaptation.py`, beside the `_pmc_prompt_context(...)` call;
 pass as a new named argument into `self.engine._workout_adapt_logic(...)`; accept it in that
-function's signature in `coach/engine/workouts.py` (which already ends `pmc_context:
+function's signature in `coach/engine/adapt.py` (which already ends `pmc_context:
 Optional[str] = None`) and render it as its own section.
 
 **Not via `meso_text`.** That string is built by `_get_active_strategy_and_meso_text`
@@ -1235,7 +1235,7 @@ equivalent — that absence is `HR_LAG_NOTE`'s point restated — so collapsing 
 banding by the back door and §5 forbids it.
 
 **The fields are declared the way every other field is: a prose-annotated JSON example in the
-prompt** (`coach/engine/workouts.py`), exactly as `duration_minutes` and `tss` are today. That is
+prompt** (`coach/engine/sessions.py`), exactly as `duration_minutes` and `tss` are today. That is
 not in tension with §10's refusal to parse prose — §10 rejects reading intent back *out* of
 `description` after the fact. Here the model states the distribution as JSON while it still knows
 the intent, and the athlete-readable sentence is rendered back from the columns at display time.

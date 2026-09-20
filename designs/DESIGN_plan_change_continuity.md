@@ -93,7 +93,7 @@ reason (DESIGN_calendar_lineage.md §3). That reads as a change to something the
 recognises.
 
 **`workout adapt` already leaves the trace this design wants.** Its move rule leaves a
-replacement on any date it empties (`coach/engine/workouts.py::_move_task`), the
+replacement on any date it empties (`coach/engine/sessions.py::move_task`), the
 replacement carries the displaced session's lineage, and the event is retitled
 "[Adapted] Rest Day" with the reason and the old session in History. Nothing in this
 design changes adapt's behaviour except what §4.6 shows it about a session's earlier form.
@@ -540,7 +540,7 @@ Removed with the hand-edit commands (DESIGN_workout_tweak.md §5).
 
 Thursday's dropped ride becomes Thursday's "Rest Day" in the ride's lineage, the reason
 on it, the ride in its History. That is what `workout adapt`'s move rule already
-produces (`coach/engine/workouts.py::_move_task`), and the same event, retitled, is
+produces (`coach/engine/sessions.py::move_task`), and the same event, retitled, is
 what the athlete sees in both cases. The `[Cancelled]` word does not appear: nothing was
 left without a replacement. The rest row's body carries the coach's sentence — "Long ride
 cancelled — never two hard days in a row" — and not the coverage backstop's "no session
@@ -620,7 +620,7 @@ which diff. That is most of what rev. 3's §6 was.
 So `workout generate` reads what it reads today, with two additions and a rule:
 
 - **Today's profile, the plan and the current constraints**, as now. The plan's strategy
-  text and mesocycle list already reach the prompt (`coach/engine/workouts.py`,
+  text and mesocycle list already reach the prompt (`coach/engine/generate.py`,
   `strategy`, `meso_text`).
 - **The standing sessions** (§4.6).
 - **The current mesocycle's past constraints.** Today the prompt is given only the

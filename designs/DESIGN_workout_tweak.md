@@ -283,7 +283,7 @@ unrelated parts of the message into a brief, or drops the request.
 | `coach/revisions.py` | `carried_lineage`: a replacement always continues the session it replaces. |
 | `coach/service/workouts.py` | Manual sessions as standing sessions outside the commitment window. The manual clause of the voids. The notice "Replaced the session you added". |
 | `coach/formatting.py` | The `[ADDED BY THE ATHLETE]` and `[athlete-added]` tags. |
-| `coach/engine/workouts.py` | The "[athlete-added]" paragraph of the adapt TASK. |
+| `coach/engine/adapt.py` | The "[athlete-added]" paragraph of the adapt TASK. |
 | `strength/planner.py` | Sessions "shown as context": every strength session is written or checked. |
 | `gcal/reconcile.py` | The manual clause of `leaves_trace`. |
 | `gcal/event.py` | The `[Manual]` title tag. `add` as a reason to say `[Deleted]`. |

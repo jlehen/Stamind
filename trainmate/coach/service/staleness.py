@@ -190,7 +190,7 @@ class StalenessMixin:
         on purpose — the staleness question must never hang on the network, so any error
         or malformed reply leaves the athlete with the question and no verdict (§10)."""
         from trainmate.openrouter import openrouter_client
-        if getattr(openrouter_client, "show_prompt_only", False):
+        if openrouter_client.show_prompt_only:
             # That flag shows the command's own prompt; this preliminary would print
             # its prompt instead and exit before the one being asked for.
             return None

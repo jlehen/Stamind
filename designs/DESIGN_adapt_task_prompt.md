@@ -2,7 +2,7 @@
 
 ## 1. The problem
 
-`coach/engine/workouts.py::_workout_adapt_logic` assembles the adapt prompt's TASK from one
+`coach/engine/adapt.py::_workout_adapt_logic` assembles the adapt prompt's TASK from one
 always-on body plus five conditional sections (drift, planned zones, terminal window,
 athlete's note, and the note's schema member). Each section was written on its own, at its
 own time, against its own DESIGN doc — and each one independently re-derived the same few
@@ -104,7 +104,8 @@ The prose shrank by well under a fifth, and it is worth being plain about why th
 modest: the redundancy was never where most of the tokens were. The response schema and
 `PRESCRIBING INTENSITY` are the two largest sections and neither is redundant — the schema is
 a contract with the parser, and `PRESCRIBING INTENSITY` is shared verbatim with
-`workout generate` (`_planned_zone_task`), so it is out of scope here by construction.
+`workout generate` (`sessions.planned_zone_task`), so it is out of scope here by
+construction.
 
 **The TASK is not where the adapt prompt's weight is at all.** The science guidelines
 dominate the prompt, and much of what they carry is material `adapt` has no authority to act
@@ -131,7 +132,7 @@ the reasoning goes in the design doc, and neither is duplicated across files.
 
 ## 5. Deliberately not done
 
-- **Rewriting `PRESCRIBING INTENSITY`.** `_planned_zone_task` is shared with
+- **Rewriting `PRESCRIBING INTENSITY`.** `sessions.planned_zone_task` is shared with
   `workout generate`; compressing it changes two prompts and belongs with a review of the
   generate TASK, not this one.
 - **Turning prose rules into schema/code.** Several sections still *ask* the model not to do

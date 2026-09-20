@@ -63,13 +63,13 @@ class TestDownhillSkiing(unittest.TestCase):
 
 class TestPromptAndCliWiring(unittest.TestCase):
     def test_coach_prompt_enum_lists_every_canonical_sport_plus_rest(self):
-        from trainmate.coach.engine.workouts import _SPORT_TYPE_ENUM
+        from trainmate.coach.engine.sessions import SPORT_TYPE_ENUM
         for sport in CANONICAL_SPORTS + ["rest"]:
-            self.assertIn(f'"{sport}"', _SPORT_TYPE_ENUM)
-        for line in _SPORT_TYPE_ENUM.splitlines():
+            self.assertIn(f'"{sport}"', SPORT_TYPE_ENUM)
+        for line in SPORT_TYPE_ENUM.splitlines():
             self.assertLessEqual(len(line), 90)
-        self.assertTrue(_SPORT_TYPE_ENUM.startswith('      "sport_type": '))
-        self.assertTrue(_SPORT_TYPE_ENUM.endswith('"rest",\n'))
+        self.assertTrue(SPORT_TYPE_ENUM.startswith('      "sport_type": '))
+        self.assertTrue(SPORT_TYPE_ENUM.endswith('"rest",\n'))
 
     def test_goal_cli_accepts_every_canonical_sport(self):
         import trainmate_cli
