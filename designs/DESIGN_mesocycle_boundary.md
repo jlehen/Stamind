@@ -72,7 +72,7 @@ prompt to before.
 
 **Superseded (2026-08-31) by DESIGN_runway_nudge.md §3.** A mesocycle boundary with no fresh
 sessions after it is one of the four ways the schedule can run out, so this hint is now the
-`mesocycle` kind of `progression.runway`, printed by `cli/runway.py` on every daily surface —
+`mesocycle` kind of `runway.runway`, printed by `cli/runway.py` on every daily surface —
 `workout adapt`, `status` and the morning push — rather than on adapt alone, and from the
 first day of `config.runway_warning_days` rather than the terminal window. §3's prompt-side
 `THIS MESOCYCLE IS ENDING` section is untouched and stays on `adapt_terminal_window_days`. The

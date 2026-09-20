@@ -1,15 +1,20 @@
-"""Structural comparison of two periodization plan versions.
+"""Versions of the periodization: which ones there are, and what changed between two.
 
-No formatting: `diff_plans` takes two macrocycle rows with their mesocycles and returns
-what changed, which `cli/plans.py` renders as text and `trainmate_web.py` returns as JSON;
+Two questions about the same thing, so one file. `plan_lineage` walks a plan's mesocycles
+in the order the athlete trained them, by macrocycle id rather than by date, so a
+superseded version cannot sneak into the walk (DESIGN_plan_rollback.md §6.1).
+`diff_plans` takes two macrocycle rows with their mesocycles and returns what changed,
+which `cli/plans.py` renders as text and `trainmate_web.py` returns as JSON;
 `resolve_versions` picks which two versions those are, over a database handle the caller
 passes in. Also owns the parsing of a macrocycle's input snapshots (goals / constraints /
 threshold anchors), since the diff is defined over them.
+
+No training maths here, so it sits outside `trainmate/analytics/`.
 """
 import difflib
 import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # Abbreviations whose full stop does not end a sentence — the coach's prose is dense
 # with "e.g." / "approx.", and splitting there fragments the diff mid-clause.
@@ -299,3 +304,46 @@ def diff_plans(
         "constraints": diff_records(old_events, new_events),
         "thresholds": diff_thresholds(old_thresholds, new_thresholds),
     }
+
+
+
+def plan_lineage(
+    dbh, macros: Sequence[Optional[Dict[str, Any]]]
+) -> List[Dict[str, Any]]:
+    """The mesocycles of `macros`, flattened into the order the athlete trained them.
+
+    `macros` may hold Nones and repeats — callers assemble it from several single-plan
+    lookups — and both are dropped. Plans are ordered by their first mesocycle's start date,
+    not by argument position: the plan being replaced can be for a later goal than the
+    governing one. See DESIGN_plan_rollback.md §6.1 for why this walks by macrocycle id.
+    """
+    lineages: List[List[Dict[str, Any]]] = []
+    seen = set()
+    for macro in macros:
+        if not macro or macro['id'] in seen:
+            continue
+        seen.add(macro['id'])
+        mesocycles = dbh.get_mesocycles_for_macrocycle(macro['id'])
+        if mesocycles:
+            lineages.append(mesocycles)
+    lineages.sort(key=lambda mesocycles: mesocycles[0]['start_date'])
+    return [mesocycle for lineage in lineages for mesocycle in lineage]
+
+
+def delta_baseline(
+    mesocycles: Sequence[Dict[str, Any]], i: int
+) -> Optional[Dict[str, Any]]:
+    """What `mesocycles[i]` measures its change against: the mesocycle before it, unless that
+    one belongs to a different plan.
+
+    A delta across a plan boundary compares last season's taper with this season's base,
+    which is not the intensity-creep signal the delta carries — so the boundary mesocycle
+    simply reports no change. `tm progress --mesocycles` only: the strategy prompt wants the
+    cross-season comparison and indexes the list itself (DESIGN_plan_rollback.md §6.1).
+    """
+    if not i:
+        return None
+    previous = mesocycles[i - 1]
+    if previous.get('macrocycle_id') != mesocycles[i].get('macrocycle_id'):
+        return None
+    return previous

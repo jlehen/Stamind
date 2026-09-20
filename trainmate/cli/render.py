@@ -17,12 +17,15 @@ import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from trainmate import athlete_queue, progression, runtime
-from trainmate.adherence import MINOR, unplanned_kind
+from trainmate import athlete_queue, runtime
+from trainmate.analytics import timeline
+from trainmate.analytics.adherence import MINOR, unplanned_kind
 from trainmate.strength.sets import activity_lines
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.config import config
-from trainmate.progression import RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
+from trainmate.analytics.runway import (
+    RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN,
+)
 from trainmate.sports import canonical_sport
 from trainmate.sentinels import emit_buttons
 from trainmate.text import bold, capitalized, cmd, dim, green, wrap_text
@@ -1171,7 +1174,7 @@ class CompanionRenderer(ExpertRenderer):
         # it with the table's first row (DESIGN_bot_simple_frontend.md §6).
         emit_chart(
             chart_arg,
-            progression.clip_payload_for_weeks(
+            timeline.clip_payload_for_weeks(
                 payload, weeks_window, today, cap_future=True
             ),
             lines[0],

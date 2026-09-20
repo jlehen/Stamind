@@ -284,7 +284,7 @@ class TestCliMisc(unittest.TestCase):
         self.assertTrue(mock_coach.data_bootstrap.call_args[1].get("no_pull"))
 
     @patch("trainmate.runtime.garmin")
-    @patch("trainmate.timeline.build_timeline_payload")
+    @patch("trainmate.timeline_rows.build_timeline_payload")
     def test_progress_renders_end_to_end_from_the_payload(self, mock_build, mock_garmin):
         # Not an alias test — `pr` is prefix resolution, covered in test_cli_dashless.
         # What this pins is the only run_cli path through the progress renderer, which

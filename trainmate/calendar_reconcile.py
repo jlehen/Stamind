@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 from trainmate import runtime
-from trainmate.adherence import classify_adherence
+from trainmate.analytics.adherence import classify_adherence
 from trainmate.analytics.compare import adherence_window, format_actual
 from trainmate.workout_state import adherence_signature, calendar_status
 from trainmate.clock import fmt_date, today_str as _today_str

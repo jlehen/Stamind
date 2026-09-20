@@ -17,9 +17,12 @@ from datetime import datetime, timedelta
 from flask import Flask, jsonify, request, send_from_directory
 from typing import Any, Dict, List, Optional
 from trainmate import journal, runtime
-from trainmate import benchmarks, intensity, llm_models, plan_diff, progression
+from trainmate import benchmarks, llm_models
+from trainmate.plan_versions import diff_plans, resolve_versions
+from trainmate.analytics import timeline
+from trainmate.analytics import intensity
 from trainmate.analytics.load import activity_load, rpe_divergence
-from trainmate.adherence import classify_adherence, unplanned_kind
+from trainmate.analytics.adherence import classify_adherence, unplanned_kind
 from trainmate.analytics.compare import adherence_verdicts, adherence_window, compare_days
 from trainmate.workout_state import calendar_status, modification_markers
 from trainmate.config import config
@@ -344,12 +347,12 @@ def get_timeline_png() -> Any:
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
-    from trainmate import timeline
-    payload = timeline.build_timeline_payload(runtime.db)
-    clipped = progression.clip_payload_for_weeks(payload, weeks_arg, today)
+    from trainmate import timeline_rows
+    payload = timeline_rows.build_timeline_payload(runtime.db)
+    clipped = timeline.clip_payload_for_weeks(payload, weeks_arg, today)
 
     try:
-        from trainmate import chart
+        from trainmate.analytics import chart
         png = chart.render_timeline_png(clipped)
     except ImportError:
         return (
@@ -393,9 +396,9 @@ def get_zones() -> Any:
 
     explicit = [s for s in request.args.getlist("sport") if s]
 
-    from trainmate import timeline
-    payload = timeline.build_timeline_payload(runtime.db)
-    past, future, hidden = progression.select_weeks(payload["weeks"], weeks_arg, today)
+    from trainmate import timeline_rows
+    payload = timeline_rows.build_timeline_payload(runtime.db)
+    past, future, hidden = timeline.select_weeks(payload["weeks"], weeks_arg, today)
     weeks = past + future
 
     stats = intensity.window_sport_stats(weeks)
@@ -502,14 +505,14 @@ def plan_diff_versions() -> Any:
 
     Query: {goal_id?, from_version?, to_version?}. Defaults to the version before the
     active one vs the active one, for the next active goal. The comparison itself lives
-    in trainmate/plan_diff.py — the CLI renders the very same structure as text."""
+    in trainmate/plan_versions.py — the CLI renders the very same structure as text."""
     goal_id = _resolve_goal_id(request.args.get("goal_id"))
     if goal_id is None:
         return jsonify({"error": "No goal to compare plan versions for."}), 400
     goal = runtime.db.get_objective(goal_id)
     if not goal:
         return jsonify({"error": f"Goal with ID {goal_id} not found."}), 404
-    old, new, error = plan_diff.resolve_versions(
+    old, new, error = resolve_versions(
         runtime.db, goal,
         _version_arg(request.args.get("from_version")),
         _version_arg(request.args.get("to_version")),
@@ -517,7 +520,7 @@ def plan_diff_versions() -> Any:
     if error:
         code, message = error
         return jsonify({"error": message, "code": code}), 404 if code == "not_found" else 400
-    diff = plan_diff.diff_plans(
+    diff = diff_plans(
         old, new,
         runtime.db.get_mesocycles_for_macrocycle(old['id']),
         runtime.db.get_mesocycles_for_macrocycle(new['id']),

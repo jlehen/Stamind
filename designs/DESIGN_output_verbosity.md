@@ -128,18 +128,18 @@ Everything of the form "you could now run X" — `model set`, `plan rollback`,
 `workout rollback`, `benchmark record`, "if you applied the new plan, run workout
 generate" — became an aside. So did the standing explanatory notes that print every single
 time their table does and never change: `PMC_TSB_LAG_NOTE`, and the six measurement
-caveats `intensity.format_notes` emits under every zone table.
+caveats `zone_tables.format_notes` emits under every zone table.
 
 The argument is not new to this doc — `cli/progress.py` had already reached it locally and
 put `PMC_TSB_LAG_NOTE` behind `--explain`, with the comment *"a standing caveat, not news:
 printing it on every invocation trained the eye to skip it."* That line stays as it is;
 this generalises the rule it discovered.
 
-One care point: `intensity.format_notes` feeds **both** the CLI tables and the LLM prompt,
+One care point: `zone_tables.format_notes` feeds **both** the CLI tables and the LLM prompt,
 where the caveats are load-bearing ("the app aligns; the LLM reasons"). So the gate goes on
 the two CLI call sites — `cli/status.py` passes `notes=asides_enabled()` into the flag
 `mesocycle_report` already had, `cli/progress.py` skips its own once-per-section notes — and
-never inside `intensity.py`.
+never inside `analytics/zone_tables.py`.
 
 ### 3.3 What is deliberately still printed
 

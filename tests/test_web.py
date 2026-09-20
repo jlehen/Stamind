@@ -21,7 +21,7 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_trainmate_web.db")
 
 from trainmate.db import Database
-from trainmate import progression
+from trainmate.analytics import timeline
 
 import trainmate_web
 
@@ -337,7 +337,7 @@ class TestWorkoutBatchesEndpoint(unittest.TestCase):
 
 class TestPlanDiffEndpoint(unittest.TestCase):
     """GET /api/plan/diff — the web face of `plan diff`. Both front-ends render the same
-    trainmate/plan_diff.py structure, so this asserts the payload, not the wording."""
+    trainmate/plan_versions.py structure, so this asserts the payload, not the wording."""
 
     @classmethod
     def setUpClass(cls):
@@ -527,8 +527,8 @@ class TestTimelinePayload(unittest.TestCase):
         clear_all_tables(test_db)
 
     def _payload(self):
-        from trainmate import timeline
-        return timeline.build_timeline_payload(test_db)
+        from trainmate import timeline_rows
+        return timeline_rows.build_timeline_payload(test_db)
 
     def test_no_activity_at_all_warns_and_empty_days(self):
         data = self._payload()
@@ -572,8 +572,8 @@ class TestTimelinePayload(unittest.TestCase):
             d = (date(2026, 5, 1) + timedelta(days=i)).isoformat()
             _save_activity(test_db, f"a{i}", d, "running", 3600, 50.0)
         payload = self._payload()
-        full = progression.clip_payload(payload, "2026-05-01", "2026-06-29")
-        narrow = progression.clip_payload(payload, "2026-06-25", "2026-06-29")
+        full = timeline.clip_payload(payload, "2026-05-01", "2026-06-29")
+        narrow = timeline.clip_payload(payload, "2026-06-25", "2026-06-29")
         full_point = next(d for d in full["days"] if d["date"] == "2026-06-25")
         narrow_point = next(d for d in narrow["days"] if d["date"] == "2026-06-25")
         self.assertAlmostEqual(full_point["ctl"], narrow_point["ctl"])

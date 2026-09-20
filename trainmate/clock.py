@@ -147,9 +147,14 @@ def today_date() -> date:
     return now().date()
 
 
+def day_str(value: date) -> str:
+    """Returns a date as a YYYY-MM-DD string — the inverse of `parse_date`."""
+    return value.strftime("%Y-%m-%d")
+
+
 def today_str() -> str:
     """Returns today's local calendar date as a YYYY-MM-DD string."""
-    return today_date().strftime("%Y-%m-%d")
+    return day_str(today_date())
 
 
 def days_between(start: str, end: str) -> int:

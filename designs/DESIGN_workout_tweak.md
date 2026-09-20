@@ -290,7 +290,7 @@ unrelated parts of the message into a brief, or drops the request.
 | `calendar_lineage.py` | The labels "Added by hand", "Replaced by hand" and `rm`'s "Cancelled". |
 | `cli/workouts/_helpers.py` | The `[MANUAL]` and `[REPLACED]` markers. |
 | `cli/workouts/generate.py` | "N added by hand" in the question `workout generate` asks. |
-| `progression.py` | `coverage_end`. Without manual sessions it is the same function as `plan_end`. |
+| `analytics/runway.py` | `coverage_end`. Without manual sessions it is the same function as `plan_end`. |
 | `static/` | The manual badge and the two commands in the help text. |
 | `workout adapt` | Its alias `a`. With `add` gone, the prefix `a` already means `adapt`. |
 

@@ -108,7 +108,7 @@ def prescription_matches(proposed: Dict[str, Any], live: Dict[str, Any]) -> bool
     holding wraps the same sentence differently often enough, and a proposal that only
     re-wraps a line is not a change the athlete can see.
     """
-    from trainmate import intensity
+    from trainmate.analytics import intensity
 
     def _words(value: Any) -> str:
         return " ".join(str(value or "").split())

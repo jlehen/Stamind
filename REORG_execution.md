@@ -416,7 +416,10 @@ that when the suite goes red you are bisecting inside a commit, by hand.
 That gives roughly 25 commits. Take the subsystems in this order, lowest in the import graph first:
 
 1. **analytics** — `intensity.py` into three; `progression.py` with `timeline.py` into three;
-   `plan_diff.py` with `plan_lineage.py` into `plan_versions.py`.
+   `plan_diff.py` with `plan_lineage.py` into `plan_versions.py`. **DONE**, as one commit
+   rather than three: the owner asked for one commit per phase on the day it was done, and
+   the three splits are one subsystem. The rest of Phase D keeps the one-commit-per-split
+   rule unless the owner says otherwise.
 2. **integrations** — the `gcal/` package; the `garmin/` tidy-up and its two merged duplicates.
 3. **database** — `workouts.py` into three; `base.py` into two; `periodization.py` into two; the
    small mergers.
@@ -539,13 +542,61 @@ The lines above Phase A are one per item, from before §3 changed.
   and it reads the database twice, so extracting it is a refactor of
   `_run_workout_analysis`, which belongs with Phase D's split of that file.
 
-**Next up:** Phase D — the file splits, one commit per split, in the subsystem order §7
-gives. It opens with `analytics`: `intensity.py` into three, `progression.py` with
-`timeline.py` into three, and `plan_diff.py` with `plan_lineage.py` into
-`plan_versions.py`. Note that `adherence.py`, `intensity.py`, `progression.py`,
-`timeline.py`, `chart.py` and `baselines.py` have not yet *moved into* `trainmate/analytics/`
-— Phase C created the package and put the new modules in it; Phase D item 1 is where the
-existing ones follow, as they are split.
+- **Phase D item 1, the analytics package.** The training maths is one package now.
+  `intensity.py` is three files: `analytics/intensity.py` (452) the zone model,
+  `analytics/zone_tables.py` (211) the text tables and their caveats, and
+  `analytics/mesocycle_report.py` (377) the report plus the window helpers that decide what
+  a completed week is. `progression.py` with `timeline.py` is three more:
+  `analytics/progression.py` (381) the day series and weekly aggregates,
+  `analytics/timeline.py` (292) the bands, warnings, assembly and clipping, and
+  `analytics/runway.py` (137) the end-of-plan detector. `plan_diff.py` with
+  `plan_lineage.py` is the flat `plan_versions.py` (349). `adherence.py`, `chart.py` and
+  `baselines.py` moved in unchanged. `plan_dates(workouts)` is the one answer to "which
+  rows does the schedule cover", where four callers had built the list by hand, and
+  `clock.day_str` replaces the two private `strftime` copies the split would otherwise have
+  left in two new files. `tests/test_progression.py` split into itself and
+  `tests/test_timeline.py`, and `TestPlanEnd` moved to `tests/test_runway.py`.
+  `Phase D item 1: the training maths moves into analytics/`
+
+- **One instruction in the proposal was refused.** `REORG_code_layout.md` §6.7 put the
+  timeline's row fetch in `analytics/timeline.py`. It cannot go there: `build_timeline_payload`
+  imports `ARCHIVED` from `db/objectives.py` and calls `garmin.warmup_cutoff`, and §5.2's
+  layering rule — now `tests/test_layering.py` — forbids anything under `analytics/` from
+  loading `trainmate.db`. Being handed a handle is allowed; importing the package is not. So
+  the fetch is the flat `trainmate/timeline_rows.py`, and `ARCHITECTURE.md` §15 says why.
+
+- **Two defects found on the way, both fixed here.** `trainmate_web.py` has a route handler
+  named `plan_versions`, which shadowed the newly-named module and turned `/api/plan/diff`
+  into a 500; it imports the two symbols by name instead. And `analytics/weekly_evidence.py`
+  annotated a return as `Tuple[...]` without importing `Tuple` — Phase C's, invisible because
+  Python 3.14 evaluates annotations lazily.
+
+- **Two things deliberately left.** `clock.day_str` is used by the analytics files this commit
+  touched and nowhere else; about 65 other `strftime("%Y-%m-%d")` call sites across `db/`,
+  `coach/service/`, `cli/` and `journal.py` are a separate codemod, not a phase commit's
+  business. And `tests/test_intensity.py` (809 lines) was not split. It can be: sixteen of its
+  eighteen classes test only the model or only the report, and only `TestZonesAndRendering`
+  and `TestNotes` mix. It is left because §7 puts test-file size splits at lower priority and
+  Phase E owns them, not because the file resists cutting. `tests/test_runway.py` is 736 lines
+  for the same reason, and grew here by absorbing `TestPlanEnd`.
+
+- **The review of Phase D item 1**, in the same commit. A read-only agent re-parsed every old
+  and new file with `ast` and compared each function body byte for byte — no behaviour change
+  outside the ones named above. It confirmed the gate resolves 439 patch sites naming 42
+  targets, including the one this commit moved, and that importing `analytics.intensity` now
+  costs five `trainmate` modules where the flat file cost eight. It found the dedup had
+  stopped two sites short — `_s` survived in the new `mesocycle_report.py` and
+  `weekly_aggregates` still built the plan's dates by hand — an unused
+  `from trainmate.analytics import timeline` in `chart.py` that re-coupled the chart to the
+  timeline module at import time, three locals in `cli/runway.py` shadowing the newly imported
+  `plan_end`, a docstring there naming the assembly where it meant the fetch, and fourteen
+  stale symbol references across `ARCHITECTURE.md` and six design docs. All fixed before this
+  commit.
+
+**Next up:** Phase D item 2 — **integrations**: the `gcal/` package (§6.8), and the `garmin/`
+tidy-up with its two merged duplicates. §1's table says the `gcal/` naming rationale goes into
+`ARCHITECTURE.md` §15 with that package. Items 3 to 9 follow in §7's order, one commit per
+file split.
 
 ---
 

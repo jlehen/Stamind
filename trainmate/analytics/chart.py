@@ -1,7 +1,7 @@
 """The progress-timeline chart renderer — the single implementation of the §2
 two-panel picture (DESIGN_progress_timeline.md §7.2).
 
-`render_timeline_png(payload)` takes the `progression.assemble_timeline` payload
+`render_timeline_png(payload)` takes the `timeline.assemble_timeline` payload
 (§6.0) and returns PNG bytes. It is the one drawing shared by the Telegram
 `--chart` photo (§7.2) and the web `GET /api/timeline.png` endpoint (§6), so the
 picture has exactly one implementation.
@@ -15,7 +15,7 @@ photo recompression has little to smear.
 from datetime import datetime
 from typing import Any, Dict, List
 
-from trainmate.progression import week_plan_denom
+from trainmate.analytics.progression import week_plan_denom
 from trainmate.clock import fmt_date
 
 

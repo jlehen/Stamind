@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, List, Optional, Tuple, Dict
 from trainmate.config import config
 from trainmate.types import Constraint, Workout
-from trainmate.adherence import analyze_adherence
+from trainmate.analytics.adherence import analyze_adherence
 from trainmate.coach import honoring
 from trainmate.coach.proposals import GenerateProposal, RevisionProposal, StandingLine
 from trainmate.coach.revisions import (
@@ -14,7 +14,7 @@ from trainmate import settings
 from trainmate.sports import canonical_sport
 from trainmate.benchmarks import MIN_RETEST_DAYS
 from trainmate.calendar_reconcile import verbose_events
-from trainmate import intensity
+from trainmate.analytics import intensity
 from trainmate.strength import planner as strength_planner
 from trainmate.text import cmd, green, keep_whole
 from trainmate.output import notice

@@ -4,15 +4,16 @@
 the same rows and assemble the same §6.0 payload — the fix for the rev-4 divergence
 where each caller assembled its own and the copies drifted (CODE_REVIEW finding #5).
 
-Payload assembly itself lives in `progression.assemble_timeline` (pure, row-in);
+Payload assembly itself lives in `analytics/timeline.py` (pure, row-in);
 this module is only the thin db-reads-plus-config-plumbing wrapper around it, kept
 separate so the pure functions stay db-free and testable.
 """
 from typing import Any, Dict
 
-from trainmate import garmin, progression
+from trainmate import garmin
 from trainmate.config import config
 from trainmate.db.objectives import ARCHIVED
+from trainmate.analytics.timeline import assemble_timeline
 from trainmate.clock import today_str
 
 
@@ -41,7 +42,7 @@ def build_timeline_payload(dbh) -> Dict[str, Any]:
 
     warmup_cutoff = garmin.warmup_cutoff(dbh)
 
-    return progression.assemble_timeline(
+    return assemble_timeline(
         activities, workouts, metrics_rows, mesocycles, inferred, objectives,
         today, config.pmc_ctl_days, config.pmc_atl_days, warmup_cutoff,
     )

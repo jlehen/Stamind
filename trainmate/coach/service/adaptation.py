@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta
 from typing import Any, List, Optional, Dict, Sequence, Set, Tuple
 from trainmate.config import config
-from trainmate.adherence import (
+from trainmate.analytics.adherence import (
     analyze_adherence, format_discrepancies, performed_sessions,
 )
 from trainmate.sports import canonical_sport
-from trainmate import intensity, signals
+from trainmate import signals
+from trainmate.analytics import intensity
 from trainmate.text import cmd
 from trainmate.output import notice
 from trainmate.clock import fmt_date

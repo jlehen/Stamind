@@ -157,7 +157,7 @@ same filter:
   previous entry in the list.
 
 So the rule for any view that walks the plan retrospectively: **fix the lineage by
-macrocycle id first, then compare dates.** `trainmate/plan_lineage.py`'s `plan_lineage()`
+macrocycle id first, then compare dates.** `trainmate/plan_versions.py`'s `plan_lineage()`
 is that walk, shared by `tm progress --mesocycles` (`cli/progress.py`) and the strategy
 prompt's planned-vs-actual review (`coach/service/context.py`).
 
@@ -169,7 +169,7 @@ and whatever off-season followed.
 
 The two consumers want opposite things there, and the split is deliberate:
 
-- **`--mesocycles` suppresses it** (`plan_lineage.delta_baseline()`). The athlete is asking
+- **`--mesocycles` suppresses it** (`plan_versions.delta_baseline()`). The athlete is asking
   how the current training is going; a "change" that is really a season transition reads
   as a collapse in load and says nothing about intensity creep. The mesocycle is still
   *reported* — the coverage is what a long window asked for — it just reports no change.
@@ -213,7 +213,7 @@ doesn't require guessing ids):
 - **`plan diff [PLAN_ID_A] [PLAN_ID_B] [-g ID] [--full]`** (registered alias `df`) —
   compares two versions field by field (strategy/feedback prose, mesocycles added,
   removed, renamed or re-dated, snapshotted inputs), defaulting to previous-vs-active.
-  The comparison itself lives in `trainmate/plan_diff.py`; `plan versions`' footer points
+  The comparison itself lives in `trainmate/plan_versions.py`; `plan versions`' footer points
   at it.
 
 **Redo** is just a rollback to a *newer* version id: `set_active_macrocycle` swaps

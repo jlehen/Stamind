@@ -85,14 +85,14 @@ Build 1 — focus "threshold development" (2 completed weeks of 4, plus 2 days)
     - 2026-07-15: ftp_20min (cycling) — Functional Threshold Power (FTP) 271 W
 ```
 
-The intensity half is `intensity.mesocycle_report`, unchanged except for §5's added table. It
+The intensity half is `mesocycle_report.mesocycle_report`, unchanged except for §5's added table. It
 opens with the same `format_header` line the section would print for itself, so it **stands in
 for** that header rather than being stacked under a second copy.
 
 **Anchored on `gen_start`, not on today.** The elapsed part ends the day before the first day
 being written. On the run that preserves an already-completed session and starts tomorrow,
 today is history and must be counted as such — otherwise the header's completed-week count and
-the week lines below disagree by a day. The header itself is `intensity.format_header`,
+the week lines below disagree by a day. The header itself is `mesocycle_report.format_header`,
 unchanged, so it states what divided the numbers (§4 of the intensity design).
 
 **Returns None** — and the prompt is then byte-identical to before — when there is no fulfilled part
@@ -192,7 +192,7 @@ down) and must not answer for sessions this run just replaced.
 
 ## 5. The composition half
 
-`_mesocycle_progress_context` also calls `intensity.mesocycle_report` for the mesocycle it is
+`_mesocycle_progress_context` also calls `mesocycle_report.mesocycle_report` for the mesocycle it is
 reporting, with two arguments `adapt` never passes (`DESIGN_intensity_distribution.md` §9.2a):
 `previous=` for the mesocycle-over-mesocycle delta, and a new `fetch_workouts=` for what the plan
 prescribed over the same rate window. `coach/engine/workouts.py::_mesocycle_composition_task` then
@@ -216,7 +216,7 @@ it is gated on those tables *having rows*, not on the mesocycle-progress section
 an athlete with no HR or power recordings gets the volume half and none of the composition
 instructions. Otherwise the prompt would point at a table reading "no zone data recorded".
 
-The flag asks `intensity.measured_window` — factored out of `mesocycle_report` for this — so the
+The flag asks `mesocycle_report.measured_window` — factored out of `mesocycle_report` for this — so the
 gate and the table are decided from the same window. Asking `rate_window` directly instead
 would disagree with the table on a mesocycle too young to average, whose data all sits in the
 partial tail the rate window excludes.
@@ -250,7 +250,7 @@ from the last completed week describes a week that does not exist.
 ## 7. Surviving a replan: keeping the mesocycle under way
 
 Everything above keys off `meso['start_date']`. `_mesocycle_progress_context` returns None when
-`elapsed_end < meso['start_date']`, and `intensity.mesocycle_report` measures its window from the
+`elapsed_end < meso['start_date']`, and `mesocycle_report.mesocycle_report` measures its window from the
 same field. That is not incidental: **a mesocycle owns its sessions by date containment.** There is
 no column on `workouts` pointing at a mesocycle — `get_covering_mesocycle`,
 `get_governing_mesocycles` and `get_periodization_ids_for_date` all resolve by comparing the

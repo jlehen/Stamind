@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
 from trainmate import athlete_queue, runtime
-from trainmate import intensity
+from trainmate.analytics.mesocycle_report import mesocycle_report
 from trainmate.analytics.pmc import (
     PMC_TSB_LAG_NOTE, color_load_ratio, color_ramp, load_ratio, pmc_cells,
     pmc_data_caveat, pmc_display_values, pmc_ramp, pmc_warming_note,
 )
-from trainmate.baselines import classify_metric, is_anomalous, UNKNOWN
+from trainmate.analytics.baselines import classify_metric, is_anomalous, UNKNOWN
 from trainmate.config import config
 from trainmate.text import (
     asides_enabled, bold, cmd, cyan, default_wrap_width, dim, format_labeled_paragraph, gray,
@@ -140,7 +140,7 @@ def run_status(args) -> None:
                 # What the mesocycle ACTUALLY measured, beside what it was for
                 # (DESIGN_intensity_distribution.md §9). Already wrapped to the target
                 # width — never re-wrap it, the zone table is column-aligned.
-                report = intensity.mesocycle_report(
+                report = mesocycle_report(
                     active_meso, _today_str(), runtime.db.get_completed_activities,
                     current_week=True, benchmarks=runtime.db.get_benchmark_results(),
                     with_focus=False, indent="", width=default_wrap_width(),

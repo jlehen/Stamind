@@ -3,16 +3,17 @@
 
 One fetch, one detector, one command named — so `workout adapt`, `status` and the
 morning push cannot answer the same morning differently (§3). The detection itself is
-`progression.runway`, pure over rows; this module is the thin db-reads wrapper around it
-plus the expert wordings each surface asks for, the same split `timeline.py` makes around
-`progression.assemble_timeline`. The companion wordings of the same facts live in
+`analytics.runway.runway`, pure over rows; this module is the thin db-reads wrapper around
+it plus the expert wordings each surface asks for, the same split `timeline_rows.py` makes
+around `analytics/timeline.py`. The companion wordings of the same facts live in
 `cli/render.py` with the rest of that voice (DESIGN_render_persona.md §4).
 """
 from typing import Any, Dict, List, Optional, Tuple
 
-from trainmate import progression
 from trainmate.config import config
-from trainmate.progression import RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
+from trainmate.analytics.runway import (
+    RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN, plan_end, runway,
+)
 from trainmate.text import cmd, gray
 from trainmate.clock import days_between, fmt_date, today_str as _today_str
 
@@ -35,10 +36,10 @@ def _plan_mesocycles() -> List[Dict[str, Any]]:
 
 
 def current_runway(as_of: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """`progression.runway` over the rows this instance holds, or None when nothing
+    """`analytics.runway.runway` over the rows this instance holds, or None when nothing
     fires. `as_of` defaults to today; `workout adapt` passes its evaluation date."""
     from trainmate import runtime
-    return progression.runway(
+    return runway(
         runtime.db.get_workouts(),
         _plan_mesocycles(),
         runtime.db.get_objectives(),
@@ -53,7 +54,7 @@ def schedule_coverage() -> Tuple[Optional[str], Optional[str]]:
     from trainmate import runtime
     mesocycles = _plan_mesocycles()
     ends = [str(b["end_date"]) for b in mesocycles if b.get("end_date")]
-    return progression.plan_end(runtime.db.get_workouts()), max(ends) if ends else None
+    return plan_end(runtime.db.get_workouts()), max(ends) if ends else None
 
 
 def schedule_exhausted(as_of: str) -> bool:
@@ -81,10 +82,10 @@ def _when(days_left: int, date_str: str) -> str:
     return f"{-days_left} day(s) ago, on {fmt_date(date_str)}"
 
 
-def _plan_left(today: str, plan_end: str) -> str:
+def _plan_left(today: str, plan_end_date: str) -> str:
     """How much periodization is left, for the span wording: weeks once there is a week
     of it, days below that."""
-    days = days_between(today, plan_end)
+    days = days_between(today, plan_end_date)
     if days >= 7:
         weeks = round(days / 7)
         return f"covers {weeks} more week{'s' if weeks != 1 else ''}"
@@ -134,12 +135,12 @@ def runway_hint_lines(state: Dict[str, Any], today: str) -> List[str]:
 def crossing_the_end(end_date: Optional[str]) -> Optional[Tuple[str, Optional[str]]]:
     """`(last covered date, plan end)` when a listing ending on `end_date` runs past the
     end of the schedule, else None. An open-ended listing always crosses it."""
-    last_covered, plan_end = schedule_coverage()
+    last_covered, plan_end_date = schedule_coverage()
     if last_covered is None:
         return None
     if end_date is not None and end_date <= last_covered:
         return None
-    return last_covered, plan_end
+    return last_covered, plan_end_date
 
 
 def list_end_marker(end_date: Optional[str]) -> Optional[str]:
@@ -151,10 +152,10 @@ def list_end_marker(end_date: Optional[str]) -> Optional[str]:
     crossing = crossing_the_end(end_date)
     if crossing is None:
         return None
-    last_covered, plan_end = crossing
+    last_covered, plan_end_date = crossing
     tail = (
-        f"plan continues to {fmt_date(plan_end)}"
-        if plan_end and plan_end > last_covered else "end of plan"
+        f"plan continues to {fmt_date(plan_end_date)}"
+        if plan_end_date and plan_end_date > last_covered else "end of plan"
     )
     return gray(f"— end of scheduled workouts ({tail}) —")
 

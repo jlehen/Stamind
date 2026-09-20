@@ -8,9 +8,9 @@ os.environ.setdefault("NO_COLOR", "1")  # keep assertions ANSI-free
 
 from tests.helpers import _hr, _m, _pwr, _zweek
 
-from trainmate.plan_lineage import delta_baseline
+from trainmate.plan_versions import delta_baseline
 from trainmate.text import visible_len, wrap_text
-from trainmate import progression
+from trainmate.analytics import progression
 from trainmate.analytics.pmc import compute_pmc, pmc_cells, pmc_display_values
 from trainmate.cli.progress import (
     sparkline, render_bar, truncate_label, band_header, format_form_line,

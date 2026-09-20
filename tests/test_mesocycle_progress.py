@@ -17,7 +17,7 @@ test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 rebind_test_db(test_db)
 
-from trainmate import intensity
+from trainmate.analytics import zone_tables
 from trainmate.coach.service import coach_service
 from trainmate.coach.engine.workouts import (
     _mesocycle_composition_task, _mesocycle_progress_task,
@@ -123,7 +123,7 @@ class TestMesocycleProgressContext(unittest.TestCase):
         self._two_weeks_trained()
         text = self._context("2026-07-22", "2026-07-22")
         self.assertIsNotNone(text)
-        # The header states what divided the numbers, reusing intensity.format_header.
+        # The header states what divided the numbers, reusing mesocycle_report.format_header.
         self.assertIn("Build 1", text)
         self.assertIn('focus "threshold development"', text)
         self.assertIn("2 completed weeks of 4", text)
@@ -361,7 +361,7 @@ class TestMesocycleCompositionContext(unittest.TestCase):
         self._two_weeks_zoned()
         text, _ = coach_service._mesocycle_progress_context("2026-07-22", "2026-07-22")
         for line in text.splitlines():
-            self.assertLessEqual(len(line), intensity.PROMPT_WIDTH, msg=repr(line))
+            self.assertLessEqual(len(line), zone_tables.PROMPT_WIDTH, msg=repr(line))
 
 
 class TestMesocycleProgressReachesThePrompt(unittest.TestCase):

@@ -119,7 +119,7 @@ load model. They feed exactly two things:
 - the **plan-staleness check** (`config_changed()`, `coach/service/prompt.py:60`).
 
 A third reader arrived later and is worth naming: the intensity **mesocycle report** renders
-the anchor trend over the reported window (`intensity.py:710`, §6). It feeds the coaching
+the anchor trend over the reported window (`analytics/mesocycle_report.py`, §6). It feeds the coaching
 prompt too, so it does not widen the blast radius — but it is a consumer of the logbook.
 
 So updating an app-side threshold is a *forward-looking prescription* change, not
@@ -578,7 +578,7 @@ completion flag today) confirms the *planned* benchmark was done. The FTP
 the test happened."
 
 **What actually runs today.** The adherence matcher is benchmark-agnostic —
-`trainmate/adherence.py` contains no benchmark-aware code at all. For each day it sorts
+`trainmate/analytics/adherence.py` contains no benchmark-aware code at all. For each day it sorts
 that day's activities by **load descending** (`:165`) and matches the *first*
 sport-compatible one to each planned session (`:190-199`), consuming it so a second
 planned session cannot claim it again. On a test date with two same-sport activities, the
@@ -636,7 +636,7 @@ generic so an outdoor test just needs a preference edit.
 - `status` shows the current effective threshold per kind and its last-tested date,
   with `max_hr` labelled `(config)` (`cli/status.py:128-157`).
 - The intensity **mesocycle report** renders anchor movement across the reported window —
-  `_benchmark_lines()` (`intensity.py:710`), fed both into the coaching prompt
+  `_benchmark_lines()` (`analytics/mesocycle_report.py`), fed both into the coaching prompt
   (`coach/service/context.py:251, 295-300`) and into `progress`
   (`cli/progress.py:846-856`). This is the shipped "is overload working?" surface.
 - The read-only web dashboard has a **Benchmarks** view: `GET /api/benchmarks`
@@ -646,7 +646,7 @@ generic so an outdoor test just needs a preference edit.
   cannot disagree about what a row is compared against. Reads only — recording stays
   in the CLI (see the read-only demotion in ARCHITECTURE.md §"Web dashboard").
 - **Phase 3, not built:** the progress timeline (`DESIGN_progress_timeline.md`) plotting
-  the anchor trend beside CTL. `trainmate/chart.py` has no anchor series today; the mesocycle
+  the anchor trend beside CTL. `trainmate/analytics/chart.py` has no anchor series today; the mesocycle
   report above covers the need in text.
 
 ---

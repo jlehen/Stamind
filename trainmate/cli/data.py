@@ -3,11 +3,11 @@ import argparse
 import sys
 from typing import Optional
 from trainmate import athlete_queue, runtime
-from trainmate import intensity
+from trainmate.analytics import intensity, zone_tables
 from trainmate.analytics.load import activity_load, load_method
 from trainmate.analytics.pmc import color_load_ratio, load_ratio, pmc_cells, pmc_display_values
 from trainmate.sports import sport_aliases
-from trainmate.baselines import classify_metric, is_anomalous, UNKNOWN
+from trainmate.analytics.baselines import classify_metric, is_anomalous, UNKNOWN
 from trainmate.text import (
     bold, cmd, cyan, default_wrap_width, format_labeled_paragraph, format_labeled_text, gray,
     green, is_narrow_client, magenta, red, render_table, visible_len, wrap_text, yellow,
@@ -289,11 +289,11 @@ def _show_activities_zones(activities: list) -> None:
             ]
             if not any(secs):
                 continue
-            cells = [intensity.fmt_duration(s) if s else "—" for s in secs]
+            cells = [zone_tables.fmt_duration(s) if s else "—" for s in secs]
             cells += [""] * (7 - n)  # HR rows leave Z6/Z7 blank
             rows.append(
                 [fmt_date(act["date"]), act["activity_type"].upper(),
-                 intensity.fmt_duration(act.get("duration_sec") or 0.0), cur.tag]
+                 zone_tables.fmt_duration(act.get("duration_sec") or 0.0), cur.tag]
                 + cells
                 + [f"{_zone_coverage(act, cur.prefix, n) * 100:.0f}%", _load_cell(act)]
             )
@@ -301,7 +301,7 @@ def _show_activities_zones(activities: list) -> None:
         print("No zone data recorded for these activities.")
         return
     print(render_table(headers, rows))
-    aside(wrap_text(intensity.NEVER_SUM_NOTE), color_fn=gray)
+    aside(wrap_text(zone_tables.NEVER_SUM_NOTE), color_fn=gray)
 
 
 def run_data_show_activities(args: argparse.Namespace) -> None:

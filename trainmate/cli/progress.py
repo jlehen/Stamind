@@ -14,11 +14,12 @@ from trainmate.cli.argparse_ext import _weeks_arg
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from trainmate import progression, chart, intensity
-from trainmate.plan_lineage import delta_baseline, plan_lineage
+from trainmate.analytics import chart, intensity, progression, timeline, zone_tables
+from trainmate.analytics.mesocycle_report import mesocycle_report
+from trainmate.plan_versions import delta_baseline, plan_lineage
 # Which sports get a table, and in which currency: aggregation, not layout, so it lives
 # in `intensity` where the web dashboard reads it from too (ARCHITECTURE.md §8).
-from trainmate.intensity import (
+from trainmate.analytics.intensity import (
     ZONE_SPORT_MIN_SHARE, select_zone_sports, window_sport_stats, zone_currency,
 )
 from trainmate.analytics.pmc import PMC_TSB_LAG_NOTE, color_tsb
@@ -204,7 +205,7 @@ def format_plan_gap_banner(
     """The plan-end gap banner (§3): plan generated through X, N weeks before the next
     objective it doesn't yet reach; names the fix (`workout generate -g`, whose bare form
     is the active goal). The gap itself (which objective, how many weeks) is computed once
-    in `progression.plan_gap` and passed in — this is presentation only (§7.1)."""
+    in `analytics.runway.plan_gap` and passed in — this is presentation only (§7.1)."""
     return [
         yellow(
             f"⚠ plan generated through {_short_date(plan_end_date)} "
@@ -339,15 +340,16 @@ def format_weekly_table(
 
 # ------------------------------------------------------------------ zone tables
 # The intensity half of the screen (DESIGN_intensity_distribution.md §9.6). It lives here
-# rather than in `intensity.py` because it aligns row for row with the load table above
-# and shares that table's week column, band walk and 48-column budget; `intensity.py`
-# keeps the aggregation and the prompt-width table the coach reads.
+# rather than in `analytics/zone_tables.py` because it aligns row for row with the load
+# table above and shares that table's week column, band walk and 48-column budget.
+# `analytics/zone_tables.py` keeps the prompt-width table the coach reads, and
+# `analytics/intensity.py` the aggregation under both.
 
 
 def fmt_zone_cell(seconds: float) -> str:
     """A zone's time capped to four characters — `55m`, `5h00`, `12h`, `—` for none.
 
-    `intensity.fmt_duration` renders `12h30` at five characters, and a 7-zone power table
+    `zone_tables.fmt_duration` renders `12h30` at five characters, and a 7-zone power table
     of five-character cells is 55 columns — it overruns the budget precisely for the
     high-volume cyclist the power table exists to serve. Z3 and above never reach ten
     hours in a week, so nothing above tempo loses precision anywhere (§9.6).
@@ -435,8 +437,8 @@ def zone_table(
     tag = "pwr" if currency == "power" else "HR"
     lines = _legend(
         f"ZONES {sport} [{tag} {coverage * 100:.0f}%] — "
-        f"{intensity.fmt_duration(sport_seconds)} of "
-        f"{intensity.fmt_duration(window_seconds)} total"
+        f"{zone_tables.fmt_duration(sport_seconds)} of "
+        f"{zone_tables.fmt_duration(window_seconds)} total"
     )
     lines = [bold(lines[0])] + lines[1:]
     lines.append(_zone_cells_row(
@@ -626,7 +628,7 @@ def render_progress(
     warnings = payload["warnings"]
     by_date = {p["date"]: p for p in days}
 
-    past_weeks, future_weeks, hidden_weeks = progression.select_weeks(
+    past_weeks, future_weeks, hidden_weeks = timeline.select_weeks(
         payload["weeks"], weeks_window, today
     )
     display_weeks = past_weeks + future_weeks
@@ -805,7 +807,7 @@ def render_mesocycle_section(
     grain rather than the other way round — a single mesocycle runs about 25 lines at phone
     width — so the help text says so.
     """
-    weeks, _, _ = progression.select_weeks(payload["weeks"], weeks_window, today)
+    weeks, _, _ = timeline.select_weeks(payload["weeks"], weeks_window, today)
     if not weeks:
         return []
     window_start = weeks[0]["week_commencing"]
@@ -829,7 +831,7 @@ def render_mesocycle_section(
     for i, meso in enumerate(mesocycles):
         if meso["end_date"] < window_start or meso["start_date"] > today:
             continue
-        text = intensity.mesocycle_report(
+        text = mesocycle_report(
             meso, today, fetch,
             current_week=meso["start_date"] <= today <= meso["end_date"],
             previous=delta_baseline(mesocycles, i),
@@ -847,7 +849,7 @@ def render_mesocycle_section(
     # render the same two caveats three times over three mesocycles (§9.6). Standing
     # boilerplate, so terminal-only (DESIGN_output_verbosity.md §3.2).
     rows = intensity.zone_rows(fetch(window_start, today))
-    notes = intensity.format_notes(rows, width=TABLE_WIDTH) if asides_enabled() else []
+    notes = zone_tables.format_notes(rows, width=TABLE_WIDTH) if asides_enabled() else []
     if notes:
         lines.append("")
         lines.extend(gray(n) for n in notes)
@@ -899,14 +901,14 @@ def run_progress(args: argparse.Namespace) -> None:
     fresh Garmin data first (the seam would otherwise read yesterday's un-synced ride
     as a 0-load day)."""
     from trainmate import runtime
-    from trainmate import timeline
+    from trainmate import timeline_rows
     ensure_recent_data(
         no_pull=args.no_pull, force_pull=getattr(args, "force_pull", False)
     )
     today = _today_str()
     weeks_window = getattr(args, "weeks", None) or 8
 
-    payload = timeline.build_timeline_payload(runtime.db)
+    payload = timeline_rows.build_timeline_payload(runtime.db)
     runtime.render.progress(payload, args, today, weeks_window)
 
 
@@ -957,7 +959,7 @@ def print_progress_report(
     if chart_arg:
         emit_chart(
             chart_arg,
-            progression.clip_payload_for_weeks(
+            timeline.clip_payload_for_weeks(
                 payload, weeks_window, today, cap_future=True
             ),
             lines[0] if lines else "",

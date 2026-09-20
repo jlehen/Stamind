@@ -11,7 +11,7 @@ None of them touches a database or a model — they are the arithmetic under the
 and they belong with the rest of the training maths.
 """
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate.analytics.load import activity_load
 from trainmate.analytics.pmc import pmc_ramp

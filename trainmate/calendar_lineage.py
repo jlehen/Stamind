@@ -11,7 +11,7 @@ the one function that reaches for the database.
 """
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from trainmate import intensity
+from trainmate.analytics import intensity
 from trainmate import runtime
 from trainmate.clock import fmt_date, fmt_timestamp
 

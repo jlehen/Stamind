@@ -2,10 +2,11 @@
 import argparse
 from datetime import datetime, timedelta
 from typing import Optional
-from trainmate import athlete_queue, intensity, runtime
+from trainmate import athlete_queue, runtime
+from trainmate.analytics import intensity
 from trainmate.strength.sets import activity_lines
 from trainmate.config import config
-from trainmate.adherence import MINOR, UNPLANNED, format_discrepancies, unplanned_kind
+from trainmate.analytics.adherence import MINOR, UNPLANNED, format_discrepancies, unplanned_kind
 from trainmate.analytics.compare import (
     adherence_verdicts, adherence_window, compare_days, format_actual,
 )

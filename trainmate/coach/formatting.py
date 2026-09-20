@@ -4,8 +4,8 @@ from trainmate.types import Workout, CompletedActivity
 from trainmate.analytics.load import activity_load, rpe_divergence
 from trainmate.analytics.pmc import PMC_TSB_LAG_NOTE, load_ratio
 from trainmate.sports import canonical_sport
-from trainmate.adherence import Performed
-from trainmate import intensity
+from trainmate.analytics.adherence import Performed
+from trainmate.analytics import intensity
 from trainmate.plan_inputs import science_documents
 from trainmate.strength.prescription import brief_of
 

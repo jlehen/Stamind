@@ -7,10 +7,11 @@ import ast
 import inspect
 import unittest
 
-from trainmate import adherence, intensity
-from trainmate.adherence import STATUS_LABELS
+from trainmate.analytics import adherence
+from trainmate.analytics import intensity
+from trainmate.analytics.adherence import STATUS_LABELS
 from trainmate.cli.workouts._helpers import adherence_marker
-from trainmate.baselines import (
+from trainmate.analytics.baselines import (
     ELEVATED, NORMAL, SUPPRESSED, UNKNOWN, classify_metric, is_anomalous,
 )
 from trainmate.cli.progress import planned_week_cells, zone_week_cells

@@ -2,11 +2,15 @@ from datetime import datetime, timedelta
 from typing import Any, List, Optional, Tuple, Dict
 from trainmate.config import config
 from trainmate.types import Workout
-from trainmate import garmin, intensity, progression
+from trainmate import garmin
+from trainmate.analytics import intensity, progression, timeline, zone_tables
+from trainmate.analytics.mesocycle_report import (
+    format_header, measured_window, mesocycle_report,
+)
 from trainmate.analytics.pmc import (
     PMC_TSB_LAG_NOTE, load_ratio, pmc_data_caveat, pmc_ramp,
 )
-from trainmate.plan_lineage import plan_lineage
+from trainmate.plan_versions import plan_lineage
 from trainmate.sports import canonical_sport
 from trainmate.benchmarks import format_value, label_for_kind
 from trainmate.text import wrap_text
@@ -212,7 +216,7 @@ class PmcContextMixin:
         meso = self._db.get_covering_mesocycle(as_of)
         if not meso:
             return None
-        return intensity.mesocycle_report(
+        return mesocycle_report(
             meso, as_of, self._db.get_completed_activities,
             current_week=True, benchmarks=self._db.get_benchmark_results(),
         )
@@ -253,7 +257,7 @@ class PmcContextMixin:
         # first day being written, so the header's "N completed weeks", the week lines and
         # the zone windows all count the same days. The two differ by one on the run that
         # preserves an already-completed session and starts tomorrow.
-        report = intensity.mesocycle_report(
+        report = mesocycle_report(
             meso, gen_start, self._db.get_completed_activities,
             current_week=True, previous=self._preceding_mesocycle(meso),
             benchmarks=self._db.get_benchmark_results(),
@@ -268,7 +272,7 @@ class PmcContextMixin:
 
         # `mesocycle_report` opens with the same `format_header` line, so it stands in for the
         # header when present rather than being stacked under a second copy of it.
-        lines = [report] if report else [intensity.format_header(meso, gen_start)]
+        lines = [report] if report else [format_header(meso, gen_start)]
         if weeks:
             lines.append("  Weeks already trained (load the plan asked -> load produced):")
             lines.extend(weeks)
@@ -279,9 +283,9 @@ class PmcContextMixin:
 
     def _mesocycle_has_zone_rows(self, meso: Dict[str, Any], as_of: str) -> bool:
         """Whether the mesocycle's zone table will have rows — asked of the same window
-        `mesocycle_report` builds that table from, via `intensity.measured_window`, so the
+        `mesocycle_report` builds that table from, via `mesocycle_report.measured_window`, so the
         prompt's gate and the table can never disagree (§5.1)."""
-        win_start, win_end, _ = intensity.measured_window(
+        win_start, win_end, _ = measured_window(
             meso['start_date'], meso['end_date'], as_of
         )
         return bool(intensity.zone_rows(
@@ -320,7 +324,7 @@ class PmcContextMixin:
             start_date=meso['start_date'], end_date=elapsed_end
         )
         weeks = progression.weekly_aggregates(
-            activities, workouts, as_of, progression.meso_bands([meso], []),
+            activities, workouts, as_of, timeline.meso_bands([meso], []),
             window_end=elapsed_end,
         )
         out: List[str] = []
@@ -496,7 +500,7 @@ class PmcContextMixin:
 
     def _intensity_history_context(
         self, macros: List[Dict[str, Any]], today_str: str,
-        width: int = intensity.PROMPT_WIDTH,
+        width: int = zone_tables.PROMPT_WIDTH,
     ) -> List[str]:
         """One intensity report per elapsed mesocycle across `macros`, each carrying the
         delta against the mesocycle before it (§4.1) — the strategy prompt's view.
@@ -509,7 +513,7 @@ class PmcContextMixin:
         benchmarks = self._db.get_benchmark_results()
         reports = []
         for i, meso in enumerate(mesocycles):
-            text = intensity.mesocycle_report(
+            text = mesocycle_report(
                 meso, today_str, self._db.get_completed_activities,
                 previous=mesocycles[i - 1] if i else None, benchmarks=benchmarks,
                 fetch_workouts=self._db.get_workouts, width=width,
@@ -532,7 +536,7 @@ class PmcContextMixin:
 
     def _build_prior_training_context(
         self, prior_macros: List[Optional[Dict[str, Any]]], today_str: str,
-        width: int = intensity.PROMPT_WIDTH,
+        width: int = zone_tables.PROMPT_WIDTH,
     ) -> Optional[str]:
         """Builds a read-only "planned vs actual" review for the strategy prompt
         (DESIGN_backward_evaluation.md §6, Option A).

@@ -12,7 +12,7 @@ each surface then does with the pairing — a table, JSON, a Calendar write — 
 from datetime import timedelta
 from typing import Any, Dict, List, NamedTuple, Optional
 
-from trainmate.adherence import STATUS_LABELS, analyze_adherence, classify_adherence
+from trainmate.analytics.adherence import STATUS_LABELS, analyze_adherence, classify_adherence
 from trainmate.analytics.load import activity_load, rpe_divergence
 from trainmate.clock import parse_date
 from trainmate.config import config

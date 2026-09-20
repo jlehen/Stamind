@@ -805,7 +805,7 @@ Added since (pinning contracts §3.2 gained for the forward fold):
 > The section below is the *original* spec, kept verbatim for its rationale. Treating
 > it as a to-do list means re-deriving working code.
 >
-> **Shipped (`trainmate/progression.py`, DESIGN_progress_timeline.md §4):**
+> **Shipped (`trainmate/analytics/progression.py`, DESIGN_progress_timeline.md §4):**
 >
 > | Phase-2 element | As built |
 > |---|---|

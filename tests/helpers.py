@@ -13,13 +13,13 @@ def _m(minutes):
 def _hr(sport, mins, coverage=0.95, judged="same"):
     # `judged=None` is the unjudgeable row: every session that week was under the
     # `zone_min_activity_minutes` floor, so the recording can't be graded (§11).
-    from trainmate.intensity import ZoneRow
+    from trainmate.analytics.intensity import ZoneRow
     jc = coverage if judged == "same" else judged
     return ZoneRow(sport, "hr", tuple(_m(v) for v in mins), coverage, jc)
 
 
 def _pwr(sport, mins, coverage=0.9, judged="same"):
-    from trainmate.intensity import ZoneRow
+    from trainmate.analytics.intensity import ZoneRow
     jc = coverage if judged == "same" else judged
     return ZoneRow(sport, "power", tuple(_m(v) for v in mins), coverage, jc)
 

@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from trainmate import runtime
-from trainmate import plan_diff
+from trainmate import plan_versions
 from trainmate.analytics.load import planned_load
 from trainmate.text import (
     blue, bold, cmd, cyan, default_wrap_width, format_labeled_paragraph, gray, green, magenta,
@@ -425,7 +425,7 @@ def _print_constraint_entry(e: dict, width: int) -> None:
 
 def _print_considered_inputs(macrocycle: dict) -> None:
     """Prints the goals, constraints and threshold anchors the plan was generated from."""
-    goals, events, all_events, thresholds = plan_diff.input_snapshots(macrocycle)
+    goals, events, all_events, thresholds = plan_versions.input_snapshots(macrocycle)
     if goals is None and events is None and thresholds is None:
         print(gray("Inputs considered: not recorded (plan predates input snapshots)."))
         print()
@@ -773,7 +773,7 @@ def _print_change(marker: str, text: str, width: int, color_fn, indent: str = " 
 def _print_prose_diff(
     prose: dict, width: int, full: bool, indent: str = "  "
 ) -> None:
-    """Renders a `plan_diff.diff_prose` result. A strategy `plan generate` rewrote wholesale
+    """Renders a `plan_versions.diff_prose` result. A strategy `plan generate` rewrote wholesale
     collapses to a one-line note unless `full` — the sentence lists would otherwise just
     reprint both versions in their entirety."""
     if not prose['changed']:
@@ -793,7 +793,7 @@ def _print_prose_diff(
 
 
 def _print_mesocycles_diff(entries: list, width: int, full: bool) -> None:
-    """Renders a `plan_diff.diff_mesocycles` result, skipping untouched mesocycles."""
+    """Renders a `plan_versions.diff_mesocycles` result, skipping untouched mesocycles."""
     changed = [e for e in entries if e['change'] != 'unchanged']
     if not changed:
         print(f"  {gray('unchanged')}")
@@ -821,7 +821,7 @@ def _print_mesocycles_diff(entries: list, width: int, full: bool) -> None:
 
 
 def _print_feedback_diff(entry: dict, width: int) -> None:
-    """Renders a `plan_diff.diff_feedback` result: each version's own notes. Append-only
+    """Renders a `plan_versions.diff_feedback` result: each version's own notes. Append-only
     logs are not prose-diffed — for adjacent versions, A's notes are what drove B (§8)."""
     for tag, notes in (("A", entry['from']), ("B", entry['to'])):
         print(f"  {bold(tag)}:")
@@ -847,7 +847,7 @@ def _print_missing_snapshot(missing: str) -> None:
 
 
 def _print_records_diff(diff: dict, width: int, kind: str) -> None:
-    """Renders a `plan_diff.diff_records` result (snapshotted goals or constraints).
+    """Renders a `plan_versions.diff_records` result (snapshotted goals or constraints).
 
     `kind` names the entity in each ID tag — both kinds share one screen."""
     if diff['missing']:
@@ -871,7 +871,7 @@ def _print_records_diff(diff: dict, width: int, kind: str) -> None:
 
 
 def _print_thresholds_diff(diff: dict, width: int) -> None:
-    """Renders a `plan_diff.diff_thresholds` result."""
+    """Renders a `plan_versions.diff_thresholds` result."""
     if diff['missing']:
         _print_missing_snapshot(diff['missing'])
         return
@@ -913,7 +913,7 @@ def run_plan_diff(args: argparse.Namespace) -> None:
     goal = resolve_goal(getattr(args, 'goal_id', None))
     if not goal:
         return
-    old, new, error = plan_diff.resolve_versions(
+    old, new, error = plan_versions.resolve_versions(
         runtime.db, goal, args.version_a, args.version_b
     )
     if error:
@@ -938,7 +938,7 @@ def run_plan_diff(args: argparse.Namespace) -> None:
     print(_version_line("A", old))
     print(_version_line("B", new))
 
-    diff = plan_diff.diff_plans(
+    diff = plan_versions.diff_plans(
         old, new,
         runtime.db.get_mesocycles_for_macrocycle(old['id']),
         runtime.db.get_mesocycles_for_macrocycle(new['id']),

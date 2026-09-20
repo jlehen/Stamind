@@ -352,7 +352,7 @@ sitting at the moment worth recording.
 
 Three aside-tier decisions do not go through `aside()` at all and are untouched here:
 `cli/progress.py` and `cli/status.py` each call `asides_enabled()` directly to decide
-whether to build `intensity.format_notes`, and `data pull` returns its summary as a string
+whether to build `zone_tables.format_notes`, and `data pull` returns its summary as a string
 for the caller to print (§3.1 of the output design). All three are caveats or answers, not
 trace, so the trace tier loses nothing by not reaching them.
 

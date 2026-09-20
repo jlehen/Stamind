@@ -872,13 +872,13 @@ and lays one cell per line at phone width, so width is not its constraint.
 **The capped cell is a new formatter, and the grid lives with the load table.** `fmt_duration`
 is unchanged — `mesocycle_report` and both prompt paths want `12h30` — so the cap is its own
 function in `cli/progress.py`, beside `format_weekly_table`. The grid belongs there too, not in
-`intensity.py`: it has to align row for row with the load table and it shares that table's week
-column, band walk and 48-column budget. `intensity.py` keeps what it already owns, the
-aggregation (`zone_rows`) and the prompt-width table the coach reads.
+`analytics/`: it has to align row for row with the load table and it shares that table's week
+column, band walk and 48-column budget. `analytics/intensity.py` keeps the aggregation
+(`zone_rows`) and `analytics/zone_tables.py` the prompt-width table the coach reads.
 
 **Every glyph means one thing, and none of them overlap.** `~` is already taken: `meso_bands`
 prefixes it to the label of a mesocycle TrainMate *reconstructed from training history* rather
-than one a plan prescribed (`progression.py`), and the load table's legend reads `~ inferred`.
+than one a plan prescribed (`analytics/timeline.py`), and the load table's legend reads `~ inferred`.
 Reusing it for coverage would put two definitions of one character fifteen lines apart on one
 screen.
 
@@ -917,7 +917,7 @@ the power table needs one too, where coverage is structurally lower because a ri
 meter contributes its full duration and zero power seconds. A display threshold of its own,
 default 0.8, keeps `!` rare enough to still be read.
 
-**~~A module constant in `intensity.py`, not config~~ — retracted; see §11's rev note.** The
+**~~A module constant in `analytics/intensity.py`, not config~~ — retracted; see §11's rev note.** The
 argument was that `hr_zone_coverage_min` earns its config key by changing a computed load,
 while this one only decides whether a table admits it is incomplete, which is not a knob an
 athlete has a reason to turn. Real data disproved the second half: the flat 0.8 was an
@@ -1002,12 +1002,12 @@ renders these weeks — `progression._week_meso` returns a null label and `band_
 `unplanned` — so the zone table inherits the fix by reusing the band walk.
 
 **Where the numbers come from: `weekly_aggregates`, not a second fetch.** `render_progress` is
-handed one payload and reads no database, and that payload — `progression.assemble_timeline` —
+handed one payload and reads no database, and that payload — `timeline.assemble_timeline` —
 carries load only. The zone rows join it where the load figures are already computed:
 `weekly_aggregates` receives every activity row and already buckets them by week to sum
 `activity_load`, so a week's zone rows are that same list passed to `intensity.zone_rows`. No new
 query, no second fetch path, and the renderer stays pure and DB-free — which is the property the
-one-payload rule exists to protect (`timeline.py`, CODE_REVIEW #5). `clip_payload_for_weeks`
+one-payload rule exists to protect (`timeline_rows.py`, CODE_REVIEW #5). `clip_payload_for_weeks`
 returns weeks whole, so windowing needs no change. The chart endpoint then carries rows its PNG
 ignores; that is the price of one payload and it is a few hundred floats — and `/api/zones`
 turned out to want exactly those rows anyway.
@@ -1069,7 +1069,7 @@ read row against row.
 | `--chart [PATH]` | | Unchanged, and **unaffected by `[sport]`**: the PNG's two panels are PMC and whole-athlete weekly load. A per-sport zone stack is `DESIGN_progress_timeline.md` §8 follow-on 3. The web app's *chart* is the same PNG and gains nothing; its read-only `/api/zones` view is a separate surface (see §10). |
 | `--no-pull` / `--force-pull` | | The standard auto-ensure throttle, mutually exclusive. No effect on layout. |
 
-**What the option sweep exposes**, all of it in `intensity.py` and `cli/progress.py`:
+**What the option sweep exposes**, all of it in `analytics/intensity.py`, `analytics/zone_tables.py` and `cli/progress.py`:
 
 - **`mesocycle_report` must stop printing its own notes, which means it does change.** Today
   `format_notes` is called inside it, so three mesocycles render the same caveats three times —
@@ -1107,7 +1107,7 @@ read row against row.
   header are bare appends, measuring 57 and 84 characters at `width=48` — the 48-column
   contract this section claims is false under `--mesocycles` today. Both are prose; route them
   through `_wrap`. The zone *rows* must not be.
-- **`run_progress` re-wraps any line over 48 columns**, which is exactly what `intensity.py`'s
+- **`run_progress` re-wraps any line over 48 columns**, which is exactly what `analytics/zone_tables.py`'s
   module docstring forbids ("wrapped once here and never re-wrapped downstream — a
   screen-width re-wrap would shred the columns"). **As shipped, only the `--mesocycles` section is
   printed outside that loop** — `mesocycle_report` lays one zone cell per line at phone width and
@@ -1332,7 +1332,7 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
   serves a read-only `/api/zones` (per-sport time in zone, measured behind today and
   prescribed ahead, plus a stacked proportion bar per week in the Progress tab). It reuses
   `window_sport_stats`/`select_zone_sports`/`zone_currency`, so a sport the terminal omits is
-  omitted there for the same reason — the rules live in `intensity.py` and neither surface
+  omitted there for the same reason — the rules live in `analytics/intensity.py` and neither surface
   owns a second copy. `--chart` itself is still untouched.
 
 ## 11. Housekeeping this lands on

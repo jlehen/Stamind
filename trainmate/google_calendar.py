@@ -8,10 +8,10 @@ from googleapiclient.errors import HttpError
 from trainmate import runtime
 from trainmate.config import config
 from trainmate.types import Workout
-from trainmate.adherence import STATUS_LABELS
+from trainmate.analytics.adherence import STATUS_LABELS
 from trainmate.workout_state import calendar_signature
 from trainmate import calendar_lineage
-from trainmate import intensity
+from trainmate.analytics import intensity
 from trainmate.output import step, warn
 from trainmate.clock import fmt_date, fmt_timestamp
 

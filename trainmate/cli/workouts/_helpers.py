@@ -1,7 +1,7 @@
 """Shared resolvers/formatters for the workout CLI handlers."""
 from datetime import datetime
 from typing import List, Optional
-from trainmate import intensity
+from trainmate.analytics import intensity
 from trainmate.workout_state import calendar_status, modification_markers
 from trainmate.sports import is_strength_sport
 from trainmate.strength.prescription import exercise_lines

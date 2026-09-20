@@ -238,7 +238,7 @@ skip the plan is what `workout adapt -m` is for (§12 revisits).
   active and "(consumed by the successor version)" when superseded.
 - **`plan diff`**: the feedback panel stops prose-diffing a slot and lists each side's attached
   notes; for adjacent versions old→new that reads as "what drove the change".
-  `trainmate/plan_diff.py`, shared with `/api/plan/diff`.
+  `trainmate/plan_versions.py`, shared with `/api/plan/diff`.
 - **`status`**: when pending notes exist, one line near the plan section:
   `Plan feedback: 2 pending — plan generate will address them.`
 - **Web dashboard** (read-only, unchanged contract): the `strategy-feedback` and
@@ -259,7 +259,7 @@ is not restated in comments.
 | `trainmate/types.py` | Drop `feedback` fields; add `PlanFeedback` |
 | `trainmate/coach/service/planning.py` | Regen gate disjunct; pending-notes prompt assembly (§7) |
 | `trainmate/coach/engine/planning.py` | Section text (§7) |
-| `trainmate/plan_diff.py` | Feedback panel → note lists (§8) |
+| `trainmate/plan_versions.py` | Feedback panel → note lists (§8) |
 | `trainmate/cli/status.py` | Pending-count line (§8) |
 | `trainmate_web.py` + `static/app.js`/`index.html`/`style.css` | Render pending list (§8) |
 | `README.md` | Steering-channels table row + the `plan feedback` mentions |
