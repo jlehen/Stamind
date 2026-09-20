@@ -4,6 +4,7 @@ from trainmate.config import config
 from trainmate.types import Workout
 from trainmate import garmin, intensity, progression
 from trainmate.plan_lineage import plan_lineage
+from trainmate.sports import canonical_sport
 from trainmate.benchmarks import ANCHOR_KINDS, format_value
 from trainmate.util import wrap_text, days_between, PMC_TSB_LAG_NOTE
 
@@ -31,7 +32,10 @@ class PmcContextMixin:
             sport_durations: Dict[str, float] = {}
             sport_counts: Dict[str, int] = {}
             for act in completed_activities:
-                sport = act.get('activity_type', 'unknown').lower()
+                # The canonical sport, as every other surface counts it: road and indoor
+                # cycling are one sport, so the prompt cannot read them as two
+                # (trainmate/sports.py).
+                sport = canonical_sport(act.get('activity_type') or 'unknown')
                 dur_min = act.get('duration_sec', 0.0) / 60.0
                 sport_durations[sport] = sport_durations.get(sport, 0.0) + dur_min
                 sport_counts[sport] = sport_counts.get(sport, 0) + 1
