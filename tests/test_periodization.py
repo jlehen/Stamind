@@ -7,7 +7,9 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, save_workout
+from tests.helpers import (
+    clear_all_tables, clock_at, pin_clock, rebind_test_db, save_workout,
+)
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_periodization.db")
@@ -1625,10 +1627,9 @@ class TestPeriodization(unittest.TestCase):
         self.assertIsNone(test_db.get_macrocycle_for_objective(obj1_id))
         self.assertIsNotNone(test_db.get_macrocycle_for_objective(obj2_id))
 
-    @patch("trainmate.coach.service._today_str")
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_recent_history_summary_periodization_plan(self, mock_client, mock_today_str):
-        mock_today_str.return_value = "2026-06-18"
+    def test_recent_history_summary_periodization_plan(self, mock_client):
+        pin_clock(self, "2026-06-18")
         obj_id = test_db.add_objective(
             title="Zurich Marathon", target_date=GOAL_DATE,
             sport_type="running",
@@ -1660,11 +1661,10 @@ class TestPeriodization(unittest.TestCase):
         self.assertIn("running: 1 activity", system_prompt)
         self.assertIn("Resting Heart Rate: 55.0 bpm", system_prompt)
 
-    @patch("trainmate.coach.service._today_str")
     @patch("trainmate.runtime.calendar_syncer")
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_recent_history_workout_generation(self, mock_client, mock_calendar, mock_today_str):
-        mock_today_str.return_value = "2026-06-18"
+    def test_recent_history_workout_generation(self, mock_client, mock_calendar):
+        pin_clock(self, "2026-06-18")
         obj_id = test_db.add_objective(
             title="Zurich Marathon", target_date=GOAL_DATE,
             sport_type="running",
@@ -2794,7 +2794,7 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
         coach_service.goal_archive(oid)
 
         # The clock moves past the first session while the goal is archived.
-        with patch("trainmate.coach.service._today_str", return_value=_days_out(5)):
+        with clock_at(_days_out(5)):
             result = coach_service.goal_reinstate(oid)
 
         self.assertEqual(result["restored_workouts"], 1)

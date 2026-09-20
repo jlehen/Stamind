@@ -5,7 +5,7 @@
 A constraint dated outside the current mesocycle is stored, is never lost, and is eventually
 honored — but nothing acts on it now, and **nothing says so**.
 
-`coach/service/adaptation.py::workout_adapt` pins its forward range to the mesocycle containing
+`coach/service/adapt.py::workout_adapt` pins its forward range to the mesocycle containing
 the evaluation date:
 
 ```python

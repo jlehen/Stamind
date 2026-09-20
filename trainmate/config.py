@@ -255,9 +255,9 @@ class Config:
     def threshold_replan_pct(self) -> float:
         """Relative drift (percent) a physiological threshold (max_hr/lthr/ftp) may
         move from the value the active plan was generated with before the plan is
-        flagged stale (coach/service.config_changed). Small retest corrections flow
-        into workout targets without invalidating the periodization strategy; a
-        genuine fitness shift past this band suggests a replan (default 5)."""
+        flagged stale (`coach/service/staleness.py::config_changed`). Small retest
+        corrections flow into workout targets without invalidating the periodization
+        strategy; a genuine fitness shift past this band suggests a replan (default 5)."""
         return float(self.get("coach", {}).get("threshold_replan_pct", 5.0))
 
     @property

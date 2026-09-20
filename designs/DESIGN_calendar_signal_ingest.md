@@ -281,7 +281,7 @@ the daily metrics. The LLM reads "alcohol: 2 on 2026-06-13" beside the trashed
 2026-06-14 HRV/Body Battery and attributes the dip correctly. The meaning lives
 in the model, not in TrainMate.
 
-**Adaptation reads it too.** The daily adaptation (`coach/service/adaptation.py`)
+**Adaptation reads it too.** The daily adaptation (`coach/service/adapt.py`)
 pulls the same signals over its own window so it can tell a lifestyle-suppressed
 morning from genuine training fatigue and not cut load on an artifact. Its window
 starts **one day before** the metrics window: recovery lags the signal by a day,

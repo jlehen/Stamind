@@ -41,7 +41,7 @@ reopen.
 **No LLM at capture.** The understanding step belongs to the regeneration call, which happens
 anyway and is the only consumer of the result. This is the same-call folding that
 `workout adapt --message` already established (the note is "passed to the SAME LLM" doing the
-adaptation — trainmate/coach/service/adaptation.py). Capture itself is an INSERT: milliseconds,
+adaptation — trainmate/coach/service/adapt.py). Capture itself is an INSERT: milliseconds,
 offline, nothing to misroute. Consequence: the echo confirms the note was *recorded*, not
 *understood*; a misreading surfaces at the gate that already exists for it — `plan generate`'s
 preview-and-confirm.

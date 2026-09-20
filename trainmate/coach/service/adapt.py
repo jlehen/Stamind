@@ -1,26 +1,35 @@
+"""`workout adapt` and `workout tweak`: what today changes about the days ahead.
+
+It is Wednesday morning. HRV is down and yesterday's ride never happened. `workout adapt`
+reads the metrics and the activities over a rolling window, shows the week planner the
+sessions it may rewrite, and comes back with a proposal that has written nothing.
+`workout tweak` is the same call driven by a sentence the athlete typed, narrowed to the
+days that sentence names.
+
+Writing the proposal is `revision_apply.py`, and the rules its sessions pass on the way
+out are `guards.py`. It is one mixin of :class:`CoachService` — see
+coach/service/__init__.py.
+"""
 from datetime import datetime, timedelta
-from typing import Any, List, Optional, Dict, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+
 from trainmate.config import config
 from trainmate.analytics.adherence import (
     analyze_adherence, format_discrepancies, performed_sessions,
 )
 from trainmate.sports import canonical_sport
 from trainmate import signals
-from trainmate.analytics import intensity
 from trainmate.text import cmd
-from trainmate.output import notice
-from trainmate.clock import fmt_date
+from trainmate.clock import fmt_date, today_str as _today_str
 from trainmate.coach.formatting import format_baseline
 from trainmate.coach import honoring
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.coach.revisions import (
-    held_slots, normalize_load_fields, pair_revisions, prescription_matches,
-    replaces_source, rest_in_place_of, structure_revision,
+    normalize_load_fields, pair_revisions, prescription_matches, replaces_source,
+    structure_revision,
 )
 from trainmate.db.workout_change import ATHLETE_VOID_KINDS
 from trainmate.strength import planner as strength_planner
-from trainmate.types import Workout
-import trainmate.coach.service as _svc
 
 
 def _outside_tweak_reach(days: Sequence[str], meso_end: str) -> str:
@@ -32,130 +41,13 @@ def _outside_tweak_reach(days: Sequence[str], meso_end: str) -> str:
         f"To plan around a day further out, add a constraint with {cmd('constraint add')}."
     )
 
-
-class AdaptationMixin:
-    """Part of :class:`CoachService` — see coach/service/__init__.py."""
-
+class AdaptMixin:
     @staticmethod
     def _is_keep_marker(proposal: Dict[str, Any]) -> bool:
         """True for `{"date", "sport_type", "keep": true}` — hold this session, don't
         rewrite it. Carries no prescription, so it cannot drift into a spurious
         adaptation the way a verbatim re-list does (DESIGN_workout_revisions.md §9.1)."""
         return bool(proposal.get('keep'))
-
-    @staticmethod
-    def _vacated_rest(source: Workout, mover: Dict[str, Any]) -> Dict[str, Any]:
-        """The rest day left on the date a move carried a session out of.
-
-        Written here rather than asked of the week planner: the day it left is decided by
-        the move itself, and a planner that forgot to name it used to leave a hole
-        (DESIGN_workout_revisions.md §11)."""
-        return rest_in_place_of(
-            source, str(mover.get('change_reason') or ''),
-            f"{source['title']} moved to {mover['date']}.",
-        )
-
-    @staticmethod
-    def _move_source(
-        entry: Dict[str, Any], by_slot: Dict[Tuple[str, str], Workout],
-        completed_keys: set, claimed: set, leaving: set,
-    ) -> Optional[Workout]:
-        """The session an entry's `replaces` takes out of another slot, or None.
-
-        Four answers are refused, each with a notice, because honouring half of one loses
-        a session: a source no session stands in, a source the athlete has already
-        trained, a destination that already holds a same-sport session, and a second
-        entry claiming a source the first one took. A refused entry is still written
-        where it stands — only its claim on the other day is dropped.
-
-        A destination whose session is itself `leaving`, moved out by another entry, is
-        free: that is a swap of two sessions of the same sport (DESIGN_workout_tweak.md
-        §3.1).
-        """
-        source = replaces_source(entry)
-        if source is None:
-            return None
-        if source not in by_slot:
-            notice(
-                f"The coach says this {entry.get('date')} session came from "
-                f"{source[0]}, where no session of yours stands — writing it where it "
-                f"is and leaving {source[0]} alone.",
-            )
-            return None
-        if source in completed_keys:
-            notice(
-                f"The coach moved the {source[0]} session to {entry.get('date')}, but "
-                f"you have already trained it — writing the new session and leaving "
-                f"{source[0]} alone.",
-            )
-            return None
-        slot = (entry.get('date'), canonical_sport(entry.get('sport_type', '')))
-        if slot in by_slot and slot not in leaving:
-            notice(
-                f"The coach moved the {source[0]} session onto {entry.get('date')}, "
-                f"where a session of yours already stands — revising that one and "
-                f"leaving {source[0]} alone.",
-            )
-            return None
-        if source in claimed:
-            notice(f"Two sessions came back for the {source[0]} session — keeping the "
-                   f"first.")
-            return None
-        return by_slot[source]
-
-    def _resolve_moves(
-        self, adapted: List[Dict[str, Any]], window_workouts: List[Workout],
-        completed_keys: set,
-    ) -> List[Dict[str, Any]]:
-        """Turns each accepted `replaces` into the slot the session leaves and the
-        lineage it carries there, and fills the day it left
-        (DESIGN_workout_revisions.md §11).
-
-        A date a move empties gets a rest day, unless another entry already covers it or
-        another session still stands there.
-        """
-        by_slot = {
-            (w['date'], canonical_sport(w['sport_type'])): w for w in window_workouts
-        }
-        # The sessions some entry carries out of their slot, and could: the other half of
-        # a swap lands where one of them stood.
-        leaving = {
-            source for source in map(replaces_source, adapted)
-            if source in by_slot and source not in completed_keys
-        }
-        out: List[Dict[str, Any]] = []
-        movers: Dict[Tuple[str, str], Dict[str, Any]] = {}   # source slot -> its mover
-        for entry in adapted:
-            occupant = self._move_source(
-                entry, by_slot, completed_keys, set(movers), leaving
-            )
-            if occupant is None:
-                out.append(entry)
-                continue
-            entry = {
-                **entry,
-                'replaces_slot': (occupant['date'], occupant['sport_type']),
-                'replaces_lineage': occupant['id'],
-            }
-            movers[(occupant['date'], canonical_sport(occupant['sport_type']))] = entry
-            out.append(entry)
-
-        covered = {w.get('date') for w in out}
-        for source, mover in movers.items():
-            day = source[0]
-            if day in covered:
-                continue
-            # Another session still stands on the day it left, so the day is not empty
-            # and a rest row there would contradict it.
-            if any(
-                w['date'] == day
-                and (w['date'], canonical_sport(w['sport_type'])) not in movers
-                for w in window_workouts
-            ):
-                continue
-            out.append(self._vacated_rest(by_slot[source], mover))
-            covered.add(day)
-        return out
 
     def _revision_is_change(self, proposal: Dict[str, Any]) -> bool:
         """True unless `proposal` prescribes exactly what the live session already does.
@@ -173,78 +65,6 @@ class AdaptationMixin:
         if not live:
             return True
         return not prescription_matches(proposal, live)
-
-    def _rejected_matches(self) -> set:
-        """The `(activity_id, sport)` pairings the athlete has said are NOT that session."""
-        return {
-            key for key, accepted in self._db.get_match_decisions().items()
-            if not accepted
-        }
-
-    def pending_match_questions(
-        self, target_date_str: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """Pairings in the adapt window that are a guess and that the athlete has not yet
-        ruled on — `adherence.is_ambiguous_match` (ARCHITECTURE.md §15).
-
-        Asked BEFORE the LLM call, because a wrong pairing does not merely mislabel a row:
-        it tells the week planner a session was performed. Each entry carries the planned session
-        and the activity so the caller can render the question without re-deriving it.
-        """
-        if not target_date_str:
-            target_date_str = _svc._today_str()
-        target_date_obj = datetime.strptime(target_date_str, "%Y-%m-%d").date()
-        history_days = config.metrics_lookback_days
-        start_date_obj = target_date_obj - timedelta(days=history_days - 1)
-        start_date_str = start_date_obj.strftime("%Y-%m-%d")
-
-        active_meso = self._db.get_active_mesocycle(target_date_str)
-        end_date_str = active_meso['end_date'] if active_meso else target_date_str
-        planned = [
-            w for w in self._db.get_workouts(
-                start_date=start_date_str, end_date=end_date_str, include_removed=True
-            ) if not w.get('removed')
-        ]
-        activities = self._db.get_completed_activities(
-            start_date=start_date_str, end_date=target_date_str
-        )
-
-        # Pair with NO rejections applied: a pairing already answered "no" would other-
-        # wise vanish before we could tell it apart from one never asked about.
-        _d, matching_results, _i = analyze_adherence(
-            planned_workouts=planned,
-            completed_activities=activities,
-            start_date_obj=start_date_obj,
-            history_days=history_days,
-            minor_activity_load_threshold=config.minor_activity_load_threshold,
-            covered_ranges=self._db.get_mesocycle_ranges(start_date_str, target_date_str),
-            pending_from=target_date_str,
-        )
-
-        decided = self._db.get_match_decisions()
-        questions = []
-        for m in matching_results:
-            if not m.get("ambiguous"):
-                continue
-            act = m["completed"]
-            sport = canonical_sport(m["planned"]["sport_type"])
-            if (act["activity_id"], sport) in decided:
-                continue
-            questions.append({
-                "activity_id": act["activity_id"],
-                "sport": sport,
-                "date": m["date"],
-                "planned": m["planned"],
-                "completed": act,
-            })
-        return questions
-
-    def record_match_decision(
-        self, activity_id: str, sport: str, accepted: bool
-    ) -> None:
-        """Persists one answer, so the question is asked once rather than every run and
-        every adherence surface reads the same pairing."""
-        self._db.save_match_decision(activity_id, canonical_sport(sport), accepted)
 
     def workout_tweak(
         self, message: str, tweak_dates: Sequence[str] = (),
@@ -308,7 +128,7 @@ class AdaptationMixin:
         `tweak` narrows the job to the days a request is about; see `workout_tweak`.
         """
         if not target_date_str:
-            target_date_str = _svc._today_str()
+            target_date_str = _today_str()
 
         target_date_obj = datetime.strptime(target_date_str, "%Y-%m-%d").date()
 
@@ -632,184 +452,3 @@ class AdaptationMixin:
             covered_constraint_ids=covered,
             **strength_planner.proposal_fields(strength),
         )
-
-    @staticmethod
-    def _hold_around(
-        days: List[str], window_workouts: List[Dict[str, Any]]
-    ) -> List[Tuple[str, str]]:
-        """The other sessions of a date the strength planner named on its own.
-
-        Apply reads a date the proposal mentions as holding only the sessions named for it
-        and voids the rest (DESIGN_workout_revisions.md §9.1). The week planner knows that
-        and names what it keeps; a kilogram change arrives after it has spoken, on a day it
-        may never have mentioned, so Thursday's intervals would be removed because the belt
-        squat went up 5 kg (DESIGN_strength_tracking.md §9).
-        """
-        strength = canonical_sport('strength_training')
-        return [
-            (w['date'], canonical_sport(w['sport_type']))
-            for w in window_workouts
-            if w['date'] in days and canonical_sport(w['sport_type']) != strength
-        ]
-
-    def workout_revision_apply(
-        self, proposal: RevisionProposal
-    ) -> None:
-        """Appends a revision's sessions under one change, and lets Calendar follow.
-
-        Takes the whole proposal so the range and the displacement decisions are the ones
-        the week planner actually made, not a reconstruction.
-
-        A session the pass drops becomes a void revision rather than a `DELETE`, and one it
-        moves to another day or substitutes cross-sport becomes a void at the source plus a
-        revision at the destination carrying the same lineage — the swap shape, which is
-        what keeps the adaptation tally following the session
-        (DESIGN_workout_revisions.md §4/§11). The voids go first, so a moved session's
-        newest revision is always the copy (§8).
-        """
-        proposed_workouts = proposal.workouts
-        start_date, end_date = proposal.range_start, proposal.range_end
-        # Read before the change opens, so every decision below is made against the plan
-        # as it stood, not against rows this pass has already appended.
-        existing_workouts = self._db.get_workouts(
-            start_date=start_date, end_date=end_date
-        )
-        by_slot = {
-            (w['date'], canonical_sport(w['sport_type'])): w for w in existing_workouts
-        }
-
-        proposed_by_date: Dict[str, List[Dict[str, Any]]] = {}
-        for pw in proposed_workouts:
-            proposed_by_date.setdefault(pw['date'], []).append(pw)
-        # Sessions the week planner kept as planned. They append nothing, but they are spoken for,
-        # so the displacement rule below must not read them as sessions it wants gone
-        # (§9.1) — the same union the preview made in `pair_revisions`.
-        held_by_date = held_slots(proposal.held)
-
-        # The slots a move takes a session OUT of, each named by the entry that takes it
-        # there. Kept out of the displacement rule below: the session left, so whatever
-        # else lands on its date is not what replaced it and must not take its lineage.
-        moved_out: Dict[Tuple[str, str], Dict[str, Any]] = {}
-        for pw in proposed_workouts:
-            named = pw.get('replaces_slot')
-            if named:
-                moved_out[(named[0], canonical_sport(named[1]))] = pw
-
-        # The session displaced on each date, so a cross-sport substitution can carry its
-        # lineage to the sport it becomes.
-        displaced_by_date: Dict[str, Dict[str, Any]] = {}
-        for ew in existing_workouts:
-            if (ew['date'], canonical_sport(ew['sport_type'])) in moved_out:
-                continue
-            if ew['date'] not in proposed_by_date:
-                continue
-            # Compare canonically so a proposal for 'strength_training' is recognized as
-            # adapting an existing 'strength' session, not overriding it.
-            proposed_sports = {
-                canonical_sport(p['sport_type']) for p in proposed_by_date[ew['date']]
-            }
-            proposed_sports |= held_by_date.get(ew['date'], set())
-            if canonical_sport(ew['sport_type']) not in proposed_sports:
-                displaced_by_date.setdefault(ew['date'], ew)
-
-        # The reason is also the athlete's line about this change, in the one column both
-        # revision commands use (DESIGN_change_heads_up.md §6).
-        with self._db.workout_change(
-            kind=proposal.kind, summary=proposal.reason, note=proposal.reason
-        ) as change:
-            for (day, sport), mover in moved_out.items():
-                source = by_slot.get((day, sport))
-                if source is None:
-                    continue
-                notice(
-                    f"Moving {source['title']} ({source['sport_type']}) from {day} to "
-                    f"{mover['date']}",
-                )
-                change.void(
-                    date=source['date'], sport_type=source['sport_type'],
-                    reason=mover.get('modification_reason') or proposal.reason,
-                )
-
-            for ew in displaced_by_date.values():
-                notice(
-                    f"Removing overridden workout: {ew['title']} ({ew['sport_type']}) "
-                    f"on {ew['date']}",
-                )
-                change.void(
-                    date=ew['date'], sport_type=ew['sport_type'],
-                    reason=proposal.reason,
-                )
-
-            for w in proposed_workouts:
-                slot = (w['date'], canonical_sport(w['sport_type']))
-                existing = by_slot.get(slot)
-                # No same-sport session to revise: this proposal swapped in a new sport.
-                # It IS the displaced session, in a different sport, so it carries that
-                # session's lineage — which is what keeps its originals and its tally (§4).
-                # Popped, not read: a date's displaced session can only become ONE of the
-                # sessions replacing it, and handing its lineage to two would leave one
-                # session live in two slots (§10). A second new-sport proposal that day is
-                # a session in its own right and starts its own lineage.
-                #
-                # A move already named the session it carries, so it skips that rule
-                # entirely: its lineage is the one the source slot held (§11).
-                if w.get('replaces_slot'):
-                    lineage_id = w.get('replaces_lineage')
-                else:
-                    displaced = None if existing else displaced_by_date.pop(w['date'], None)
-                    lineage_id = displaced['id'] if displaced else None
-                zone_currency, zone_sec = intensity.parse_planned_zones(w)
-                # The flag belongs to the TEST, not to the slot: a returned change on a
-                # benchmark's date that does not re-emit benchmark_type is the model saying
-                # this session is no longer that test, so blank it rather than let the
-                # carry-forward resurrect it onto a replacement
-                # (DESIGN_benchmark_workouts.md §4.2).
-                clear_benchmark = bool(
-                    existing and existing['benchmark_type'] and not w.get('benchmark_type')
-                )
-                change.append(
-                    date=w['date'],
-                    sport_type=w['sport_type'],
-                    title=w['title'],
-                    description=w['description'],
-                    duration_minutes=w.get('duration_minutes'),
-                    rpe=w.get('rpe'),
-                    tss=w.get('tss'),
-                    reason=w.get('modification_reason'),
-                    benchmark_type=w.get('benchmark_type'),
-                    clear_benchmark=clear_benchmark,
-                    lineage_id=lineage_id,
-                    # The strength planner's exercises, written with the revision they
-                    # belong to (DESIGN_strength_tracking.md §9).
-                    prescribed_sets=w.get('prescribed_sets'),
-                    # A drift correction rewrites HOW a session is prescribed, so its zone
-                    # target moves with it; omitted, the carry-forward preserves what the
-                    # plan already held (DESIGN_intensity_distribution.md §9.8).
-                    planned_zone_currency=zone_currency,
-                    planned_zone_sec=zone_sec,
-                )
-
-        # Stamped on the athlete's `y`, never on a proposal they declined (§8).
-        honoring.stamp(self._db, proposal.covered_constraint_ids)
-        strength_planner.record_checks(self._db, proposal)
-
-    def workout_revision_record_no_change(self, proposal: RevisionProposal) -> None:
-        """Records a pass that proposed nothing. Every revision command's no-change branch
-        calls this, and it is the only write on that path.
-
-        Two writes, neither of them a workout. The change row is written even though it
-        appends nothing: an adapt that looked at the metrics and held is a real event, and
-        `workout batches` reads it back as `(held)` — a run of them then says what it is
-        rather than saying nothing (DESIGN_workout_revisions.md §3).
-
-        And the pass still had the constraints in scope with authority over them, which is
-        all `honored_at` claims — requiring a *change* would leave "no adaptation needed"
-        flagged forever (§8). Separate from `workout_revision_apply` because there is
-        nothing to apply, and outside the propose call because a propose writes nothing.
-        """
-        with self._db.workout_change(kind=proposal.kind, summary=proposal.reason):
-            pass
-        honoring.stamp(self._db, proposal.covered_constraint_ids)
-        # A pass that weighed a session's kilograms and kept them has still weighed them,
-        # which is what stops tomorrow asking again (DESIGN_strength_tracking.md §9).
-        strength_planner.record_checks(self._db, proposal)

@@ -1,13 +1,18 @@
-"""`PmcContextMixin._week_sport_gap_note`: the per-sport annotation on a mesocycle's
-"Weeks already trained" prompt lines (coach/service/context.py). Pure function —
-reads only its arguments, no `self._db` — so it is exercised directly here rather
-than through a full CoachService/DB fixture."""
+"""`MesocycleContextMixin._week_sport_gap_note`: the per-sport annotation on a
+mesocycle's "Weeks already trained" prompt lines (coach/service/mesocycle_context.py).
+Pure function — reads only its arguments, no `self._db` — so it is exercised directly
+here rather than through a full CoachService/DB fixture.
+
+The second class below covers how the 15-day summary counts sports, which is
+`HistoryContextMixin._get_recent_history_summary` (coach/service/history_context.py).
+It keeps a fake handle, because that one does read the database."""
 import unittest
 
-from trainmate.coach.service.context import PmcContextMixin
+from trainmate.coach.service.history_context import HistoryContextMixin
+from trainmate.coach.service.mesocycle_context import MesocycleContextMixin
 
 
-class _Ctx(PmcContextMixin):
+class _Ctx(MesocycleContextMixin):
     pass
 
 
@@ -93,7 +98,7 @@ class _FakeDB:
         return self._activities
 
 
-class _DbCtx(PmcContextMixin):
+class _DbCtx(HistoryContextMixin):
     def __init__(self, activities):
         self._db = _FakeDB(activities)
 

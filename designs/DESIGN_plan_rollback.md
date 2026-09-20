@@ -92,7 +92,7 @@ active is *not* restored).
 Marks the objective's current `active` version `superseded` (stamping `superseded_at`),
 then inserts the new version as `active`. No deletion.
 
-### `workout_generate` (coach/service/workouts.py) — eager, once accepted
+### `workout_generate` (coach/service/generate.py) — eager, once accepted
 0. If live upcoming workouts exist, the CLI confirms the LLM call first
    (`_confirm_regeneration`, `cli/workouts/generate.py`) — it names how many are at
    stake and that `workout rollback` brings them back;
@@ -159,7 +159,7 @@ same filter:
 So the rule for any view that walks the plan retrospectively: **fix the lineage by
 macrocycle id first, then compare dates.** `trainmate/plan_versions.py`'s `plan_lineage()`
 is that walk, shared by `tm progress --mesocycles` (`cli/progress.py`) and the strategy
-prompt's planned-vs-actual review (`coach/service/context.py`).
+prompt's planned-vs-actual review (`coach/service/history_context.py`).
 
 **`tm progress --mesocycles` stops the delta at the plan boundary; the strategy prompt does
 not.** Each mesocycle reports its change against the mesocycle before it, which within one plan is

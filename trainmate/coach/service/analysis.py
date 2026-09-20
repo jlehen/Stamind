@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional, Dict
 from trainmate.config import config
-from trainmate.types import CompletedActivity, Constraint, Workout
+from trainmate.types import CompletedActivity, Constraint
 from trainmate import garmin
 from trainmate.analytics import weekly_evidence
 from trainmate.analytics.load import activity_load
@@ -11,7 +11,9 @@ from trainmate.analytics.pmc import load_ratio
 from trainmate.text import cmd, cyan
 from trainmate.output import notice, step
 from trainmate.clock import today_date as _today_date
-import trainmate.coach.service as _svc
+
+# Fallback look-back for `reflect` when no watermark exists yet (bootstrap not run).
+DEFAULT_REFLECT_WEEKS = 4
 
 
 def _nonblank(value: Any) -> bool:
@@ -239,10 +241,10 @@ class DataAnalysisMixin:
             # No watermark yet (bootstrap not run). Reflect over a recent default window
             # rather than dead-ending, but nudge the user toward bootstrap.
             from_date = (
-                until_date - timedelta(weeks=_svc.DEFAULT_REFLECT_WEEKS) + timedelta(days=1)
+                until_date - timedelta(weeks=DEFAULT_REFLECT_WEEKS) + timedelta(days=1)
             )
             notice(
-                f"No reflect baseline found; reflecting over the last {_svc.DEFAULT_REFLECT_WEEKS} "
+                f"No reflect baseline found; reflecting over the last {DEFAULT_REFLECT_WEEKS} "
                 f"weeks. Run {cmd('data bootstrap')} to reconstruct your full training "
                 "history first.",
             )

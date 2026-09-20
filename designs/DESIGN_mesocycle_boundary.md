@@ -4,7 +4,7 @@
 
 `workout adapt` reads a backward window of recovery metrics (`config.metrics_lookback_days`)
 and adapts forward from the evaluation date to the end of the mesocycle containing it
-(`coach/service/adaptation.py::workout_adapt`). The backward window has a fixed size. The
+(`coach/service/adapt.py::workout_adapt`). The backward window has a fixed size. The
 forward range does not — it shrinks toward nothing as the evaluation date approaches the
 mesocycle's end.
 
@@ -102,8 +102,8 @@ it only once it was too late to act on.
   (DESIGN_constraint_honoring.md §1). This entry stands: nothing extends *adapt's* range.
 - **Feeding the next mesocycle's concrete sessions to the model as read-only context.** The system
   prompt already lists every mesocycle's name, date range and focus
-  (`coach/service/prompt.py::_get_active_strategy_and_meso_text`), which is enough to support
-  the "is easing cheap here?" judgement. Adding the sessions would introduce a new data path
+  (`coach/service/athlete_context.py::_get_active_strategy_and_meso_text`), which is enough to
+  support the "is easing cheap here?" judgement. Adding the sessions would introduce a new data path
   and a new class of prompt-visible-but-immutable workout for modest gain.
 
 ## 6. Known asymmetry

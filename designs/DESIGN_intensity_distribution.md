@@ -64,9 +64,9 @@ because the rest of the design argues against it, not because anything here is s
 
 Zone-seconds were already summed in two places, so this design was mostly consolidation:
 
-- **Per elapsed mesocycle** — `coach/service/context.py::_build_prior_training_context` emitted
-  HR `Z1-2/Z3/Z4-5` and power `Z1-2/Z3-4/Z5-7` minutes per mesocycle, for the strategy prompt. It
-  now delegates to `_intensity_history_context` and the old rollup is gone.
+- **Per elapsed mesocycle** — `coach/service/history_context.py::_build_prior_training_context`
+  emitted HR `Z1-2/Z3/Z4-5` and power `Z1-2/Z3-4/Z5-7` minutes per mesocycle, for the strategy
+  prompt. It now delegates to `_intensity_history_context` and the old rollup is gone.
 - **Per week** — `coach/service/analysis.py` puts `zone_distribution_sec` and
   `power_zone_distribution_sec` into every weekly summary fed to the analysis LLM.
 
@@ -535,13 +535,13 @@ Z3 allowance is correctable *now*, which the mesocycle-to-date average would tak
 to reveal.
 
 **Threading.** Follow `pmc_context` exactly — it already does this end to end. Compute in the
-service layer in `coach/service/adaptation.py`, beside the `_pmc_prompt_context(...)` call;
+service layer in `coach/service/adapt.py`, beside the `_pmc_prompt_context(...)` call;
 pass as a new named argument into `self.engine._workout_adapt_logic(...)`; accept it in that
 function's signature in `coach/engine/adapt.py` (which already ends `pmc_context:
 Optional[str] = None`) and render it as its own section.
 
 **Not via `meso_text`.** That string is built by `_get_active_strategy_and_meso_text`
-(`coach/service/prompt.py`) and handed to *both* plan generation and adaptation, so putting
+(`coach/service/athlete_context.py`) and handed to *both* plan generation and adaptation, so putting
 the table there would silently grow the generate prompt a section §9.2 says it should not
 have. It is the shortest path and nothing would fail; hence stating it.
 
@@ -614,7 +614,7 @@ generation."*
 ### 9.5 The one collision with existing machinery
 
 A drift correction saves through `save_workout`, which stores `adapted_at` and bumps
-`adaptation_count` whenever it is handed a timestamp — and `coach/service/adaptation.py`
+`adaptation_count` whenever it is handed a timestamp — and `coach/service/revision_apply.py`
 mints one per run and passes it to *every* session it saves. The session then carries
 `[ALREADY EASED by a prior adaptation …]`, and the `DO NOT COMPOUND` section instructs the
 model to default to holding it and to raise its bar with each prior easing.
@@ -640,7 +640,7 @@ feature does not wait on it.
 
 **Interim stopgap — decide per session in the save loop, not in `save_workout`.** The DB layer
 is a generic writer that stamps whatever it is told, and other callers rely on that; the caller
-is what must stop handing over the timestamp. The loop in `coach/service/adaptation.py` already
+is what must stop handing over the timestamp. The loop in `coach/service/revision_apply.py` already
 fetches the pre-save row on its first line (`existing = self._db.get_workout(...)`), so the
 comparison is free:
 
@@ -1029,8 +1029,8 @@ is the thing that cannot move. So `Z3 1h02 in w/c 06-22` and `Z3 45m/wk in Base 
 averages over different seven-day spans and will not reconcile. Related: `_week_meso` labels
 a week by majority overlap, so a week straddling two mesocycles sits under one band while its
 earlier days counted into the other mesocycle's numbers. Neither is a defect and neither is worth
-fixing — but the coach reads mesocycle grain (`coach/service/context.py`) while the athlete's
-default screen is week grain, so the mismatch can surface inside one conversation, and the
+fixing — but the coach reads mesocycle grain (`coach/service/mesocycle_context.py`) while the
+athlete's default screen is week grain, so the mismatch can surface inside one conversation, and the
 next reader of this code will otherwise try to "fix" it.
 
 **`--mesocycles` keeps the graded view.** Per-week rates over completed weeks, beside the
@@ -1075,8 +1075,9 @@ read row against row.
   `format_notes` is called inside it, so three mesocycles render the same caveats three times —
   nine lines saying two things. They belong once per section, under the last mesocycle. That needs
   a `notes: bool = True` parameter, defaulting true so `cli/status.py` and
-  `coach/service/context.py` are untouched, with `--mesocycles` passing `notes=False` and emitting
-  once itself. The prompt path keeps its per-mesocycle notes deliberately: it sends one mesocycle.
+  `coach/service/mesocycle_context.py` are untouched, with `--mesocycles` passing `notes=False` and
+  emitting once itself. The prompt path keeps its per-mesocycle notes deliberately: it sends one
+  mesocycle.
 - **`HR_REST_NOTE` has to be split in two, not re-keyed.** It reads "HR during strength *and
   interval-with-rest* work reflects rest intervals as much as effort", which is two claims
   with different scopes joined by an "and". Strength is a property of the sport and can be
@@ -1311,7 +1312,7 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
   has no per-exercise field and `latest_thresholds()` keys on `anchor_kind` alone, so a
   deadlift PR logged after a squat PR becomes one `e1rm` value jumping 70%. TrainMate does not
   plan progressive strength well enough yet to justify the schema. Two smaller fixes instead:
-  exclude `e1rm` from the drift check in `config_changed()` (`coach/service/prompt.py`, the
+  exclude `e1rm` from the drift check in `config_changed()` (`coach/service/staleness.py`, the
   loop over anchor kinds — a squat PR should never invalidate a periodization), and note in
   `benchmark record`'s help that one lift should be tracked for now. The §6 mockup drops the
   exercise name accordingly.

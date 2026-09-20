@@ -40,7 +40,7 @@ a chain. The chain is right. What comes out the other end of it is not.
    (`cli/workouts/generate.py::_resolve_span`), so without a selector the change does not
    reach the athlete for up to `workout_generation_span_days`.
 4. That selected run rewrites the span wholesale.
-   `coach/service/workouts.py::workout_generate_apply` voids every live session in the
+   `coach/service/generate.py::workout_generate_apply` voids every live session in the
    span the new proposal does not re-propose, then writes the new ones.
 
 Step 4 is where the surprise is made.
@@ -53,7 +53,8 @@ three sessions a week to four, and runs `workout generate -m`.
 
 **The rewrite is blind.** The `workout generate` prompt is shown nothing about the
 sessions currently standing in the horizon, except the handful an adaptation already
-eased (`adaptation_count > 0`, `coach/service/workouts.py::workout_generate`). So the
+eased (`adaptation_count > 0`, `coach/service/workouts.py::workout_generate`, the file
+`generate.py` was split out of). So the
 model rewrites the span with no idea what the athlete was told last week. Days the
 correction has nothing to do with are re-rolled along with the rest, because the model
 has nothing to hold them steady against.
@@ -73,7 +74,7 @@ session was planned, and a decision removed it.
 running", Thursday's run would become a ride. Same reasoning: different sport, different
 slot, new lineage. The run's event is deleted and a ride event appears with an empty
 History section. Compare `workout adapt`, which hands the displaced session's lineage to
-its new-sport replacement (`coach/service/adaptation.py::workout_adapt_apply`,
+its new-sport replacement (`coach/service/revision_apply.py::workout_revision_apply`,
 `lineage_id=displaced['id']`), so the event updates in place, retitled, with the run
 underneath it in History.
 
@@ -201,7 +202,7 @@ Both bounds of the standing sessions are load-bearing:
 a standing session and carries its tag. Past the window the week planner re-places tests
 itself, from the record it is already given: every anchor's latest value and last test
 date, every test on the calendar in the ninety days before the span, and the tests planned
-in the elapsed part of the mesocycle (`coach/service/context.py::_anchor_history_text`,
+in the elapsed part of the mesocycle (`coach/service/mesocycle_context.py::_anchor_history_text`,
 `_mesocycle_benchmark_lines`). The plan is the plan out there, and that includes its tests.
 
 One set, computed once, used by the prompt section (§4.6), the preview (§4.5) and the trace
@@ -238,9 +239,9 @@ accounted for and explained (§4.5).
 
 The codebase already holds both answers to "the model was asked, but did it?":
 
-- `coach/service/workouts.py::_enforce_rest_windows_generate` — deterministic. A `rest`
+- `coach/service/guards.py::_enforce_rest_windows_generate` — deterministic. A `rest`
   constraint bypasses the model for those dates entirely.
-- `coach/service/workouts.py::_warn_missing_boundary_benchmarks` — "warn, don't
+- `coach/service/guards.py::_warn_missing_boundary_benchmarks` — "warn, don't
   auto-insert".
 
 The window belongs in the second tier, because breaking it is sometimes correct. There is
@@ -476,7 +477,7 @@ above already are:
 ### 5.2 Which voids keep their event
 
 `ATHLETE_VOID_KINDS = ("stand-down",)` has three consumers.
-`coach/service/adaptation.py::workout_adapt` asks **who asked for this?** — so
+`coach/service/adapt.py::workout_adapt` asks **who asked for this?** — so
 the week planner is not told the athlete cancelled a day the plan merely stopped scheduling. That
 is about authorship, and the constant stays as it is for that job.
 `gcal/event.py::_void_label` asks **whose decision does the word report?**, which is
@@ -625,7 +626,7 @@ So `workout generate` reads what it reads today, with two additions and a rule:
 - **The standing sessions** (§4.6).
 - **The current mesocycle's past constraints.** Today the prompt is given only the
   constraints still active on or after the span's start
-  (`coach/service/workouts.py`, `get_constraints(gen_start)`). A constraint that ended
+  (`coach/service/generate.py`, `get_constraints(gen_start)`). A constraint that ended
   last week — "ill 1 to 5 September" — is not shown, so the week planner sees three missed
   sessions in the mesocycle-progress section and not why. The lower bound becomes the
   current mesocycle's start date, and constraints that ended before the span are rendered
@@ -747,7 +748,7 @@ These stood in rev. 3 as inputs to the diff. They stand now because `plan show` 
 without them, and they are useful whatever `workout generate` does.
 
 **A profile edit currently swallows a concurrent threshold move.** `config_changed`
-(`coach/service/prompt.py`) checks the profile hash first and **returns on the first
+(`coach/service/staleness.py`) checks the profile hash first and **returns on the first
 thing it finds**; thresholds are only examined when the profile is unchanged, and the
 threshold loop itself returns on the first key in alphabetical order rather than the
 largest move. So: the athlete retests, FTP 250 → 265, the plan flags it correctly. Before
@@ -828,7 +829,7 @@ holding the moment it does — "both questions stamp on 'keep', so the same chan
 about once" — and `plan show` stamps nothing. So the verdict is cached on the macrocycle
 against the snapshot it was asked about, and §10's "Where it is not asked" and
 "Deliberately not done" paragraphs are amended. The call fails open as it does today
-(`coach/service/planning.py::plan_reshape_verdict`): the plan prints whatever the network
+(`coach/service/staleness.py::plan_reshape_verdict`): the plan prints whatever the network
 does, with an aside where the verdict would have been.
 
 **Already landed.** `workout_generate_apply` carried a test's `benchmark_type` onto

@@ -90,7 +90,7 @@ explicit rest day mean different things", `coach/engine/adapt.py`), and the live
 confirms it (every date of the current plan holds a row, taper rest included). This
 design promotes the behavior to an invariant: one sentence in the generate task stating
 it, and a deterministic backstop that fills any hole the model leaves with the existing
-`_rest_workout` factory (`coach/service/workouts.py` — the same factory the rest-window
+`_rest_workout` factory (`coach/service/guards.py` — the same factory the rest-window
 pre-pass uses), so the invariant holds by construction, not by model compliance.
 
 The earlier draft carried a "rest-tail margin" here (reusing `adapt_terminal_window_days`

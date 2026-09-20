@@ -415,6 +415,14 @@ that when the suite goes red you are bisecting inside a commit, by hand.
 
 That gives roughly 25 commits. Take the subsystems in this order, lowest in the import graph first:
 
+**That revision has itself been overtaken, and items 1 to 6 say so one by one.** Each landed
+as a single commit for the item, not one per file split. Item 1 recorded the owner's "one
+commit per phase" as the reason and left the old rule standing for the rest; items 2 to 6 then
+each found their own — the files in a split need each other, or they are one file's several
+jobs. Six for six is a rule, not a run of exceptions. **Item 7 and after: one commit per
+numbered item below.** A session that finds an item whose pieces genuinely do not touch each
+other may still cut it into commits, and should say so in its ledger line.
+
 1. **analytics** — `intensity.py` into three; `progression.py` with `timeline.py` into three;
    `plan_diff.py` with `plan_lineage.py` into `plan_versions.py`. **DONE**, as one commit
    rather than three: the owner asked for one commit per phase on the day it was done, and
@@ -432,7 +440,12 @@ That gives roughly 25 commits. Take the subsystems in this order, lowest in the 
 5. **coach/engine** — `workouts.py` into four. **DONE**, as one commit: the four are
    one file's four jobs, and two of them exist only to be imported by the other two.
 6. **coach/service** — `workouts.py`, `adaptation.py`, `planning.py`, `context.py`, one commit
-   each.
+   each. **DONE**, as one commit: the owner asked for one commit per phase on the day
+   Phase D item 1 was done, and item 1 recorded the same decision. The four splits are one
+   package, and the first two need each other — the `workouts.py` split hands two methods
+   to files the `adaptation.py` split creates, and `adaptation.py` hands one back to a file
+   the `workouts.py` split creates. Committing them apart would leave a commit where
+   `CoachService` is missing three of its methods.
 7. **CLI command families** — `workouts/generate.py` into five; `data.py` and `journal.py` into
    packages.
 8. **CLI views** — `plans.py`, `progress.py`, `selectors.py`, then `render.py`. Render goes
@@ -928,10 +941,234 @@ The lines above Phase A are one per item, from before §3 changed.
   does not, and four bare `§N` comments — two of which the split had made ambiguous, since
   `adapt.py` and `generate.py` each now carry one `§5.2` with no doc named. All fixed here.
 
-**Next up:** Phase D item 6 — **coach/service**: `workouts.py`, `adaptation.py`,
-`planning.py` and `context.py`, one commit each (§6.2). Items 7 to 9 follow in §7's order,
-one commit per file split. Two traps wait there that this item never met: the service
-clock (§9), and the mixin count going from 6 to 13.
+- **Phase D item 6, the coach service.** Four files holding ten jobs became ten files,
+  one job each, and the package is thirteen files because `staleness.py`, `analysis.py`
+  and the renamed `athlete_context.py` were already files of their own.
+  `workouts.py` (1,124) is `generate.py` (438) — the
+  proposal, the write and the `--strength-only` pass — `standing.py` (334), the sessions
+  the athlete has already been told about and what the week planner's answers do to them,
+  and `guards.py` (329), the rules the app enforces whatever the week planner wrote: the
+  forced rest windows, the coverage backstop, the benchmark collisions and the boundary
+  warning. `adaptation.py` (815) is `adapt.py` (454) — what today's reading changes about
+  the days ahead — `revision_apply.py` (370), how a revision lands and how it is taken
+  back, and `matching.py` (123), which activity was which session and what the athlete
+  ruled. `planning.py` (637) keeps the periodization at 430 and gives up
+  `goals_constraints.py` (222): standing a goal down, sizing a constraint, and the two
+  message captures. `context.py` (663) is `history_context.py` (373), the training behind
+  the athlete, and `mesocycle_context.py` (319), the mesocycle under way. Three methods
+  crossed between the splits — `_today_workout_completed` to `matching.py`,
+  `workout_rollback` to `revision_apply.py`, and `_changed_inputs_text` from
+  `planning.py` to `staleness.py`, which is the staleness reason and its diff for the
+  plan being replaced. `_hold_around`, which §4.10 row j had tried to send to the
+  strength planner and Phase C declined, joined `revision_apply.py` too, beside the void
+  rule it exists to compensate for.
+  `Phase D item 6: the coach service splits into thirteen files`
+
+- **One commit, not four, and the ledger says so as item 1 did.** §7 asks a commit per
+  file split for Phase D; the owner asked for one commit per phase on the day item 1 was
+  done. Here the four splits also need each other: `workouts.py` hands two methods to
+  files the `adaptation.py` split creates, and `adaptation.py` hands one back to a file
+  the `workouts.py` split creates, so separate commits would leave one where
+  `CoachService` is missing three of its methods.
+
+- **The service clock trap is spent, and the fix was the one §9 preferred.** Five files
+  carried `import trainmate.coach.service as _svc` so that
+  `patch("trainmate.coach.service._today_str")` would reach them. None does now. Each file
+  that needs today reads `clock.today_str` by value, and `tests.helpers.pin_clock` patches
+  `clock.now`, which `today_str` calls — so one patch freezes the whole service at once
+  and nothing has to remember the back-import. It was four patches and five files, not the
+  seven and six §6.2 counted. Three became `pin_clock`. The fourth could not: it is
+  Wednesday, the athlete archives a goal, five days pass, and they reinstate it — pinning
+  the whole test would archive under the later clock and lose the session the test is
+  about. That one uses a new `tests.helpers.clock_at`, which is the patcher `pin_clock`
+  starts, handed back unstarted. `ARCHITECTURE.md` §3 carries the rule.
+
+- **`prompt.py` is `athlete_context.py`, which §7's four-file list did not name.** §6.2
+  asks for the rename — three files were called `prompt.py` and meant three different
+  things — and §4.10 row c sends `CoachContext` to `service/athlete_context.py`, which
+  Phase C recorded as waiting for the file to exist. Nothing else in the plan creates it,
+  so it landed here. `CoachContext` came across from `coach/proposals.py`, where it was
+  the one record that is not a proposal.
+
+- **The gate moved, downward, and that is the point.** 435 patch sites naming 41 targets,
+  from 439 and 42: the `coach.service._today_str` target and its four sites are gone.
+  One patch target moved — `trainmate.coach.service.workouts.notice` is
+  `…service.standing.notice`. (`test_runway.py` also repoints an import, to `GuardsMixin`
+  in `service.guards`, but that is a plain `import` line and the gate never sees it.)
+  The notice one was checked by driving `_resolve_standing` into its
+  conflict branch twice, once with the patch and once without: unpatched it prints "The
+  coach dropped cycling on …, but no session of yours stands there", patched it prints
+  nothing and the mock counts one call. `tests/test_workout_generate_window.py` was then
+  run on its own and no conflict notice reached stdout, which is how the four patches are
+  known to bite rather than merely resolve. `import trainmate_cli` still costs 254
+  modules with no `requests` on the path, and still runs in the same 110-to-150 ms band
+  the last three items measured.
+
+- **Byte-for-byte proof, not a green suite.** Every class, function and upper-case module
+  constant of the five old files plus `coach/proposals.py` is present in the new tree
+  exactly once — none lost, none defined twice. Docstrings stripped and bodies unparsed,
+  exactly 17 differ, and each differs by one of three named edits: `_svc._today_str()` →
+  `_today_str()` in fourteen of them, `_svc.DEFAULT_REFLECT_WEEKS` → the constant in
+  `data_reflect` (it moved into `analysis.py` beside its only reader), and the two "Not
+  established yet…" literals becoming `NO_STRATEGY` and `NO_MESOCYCLES`. No method name
+  is defined on two of the thirteen mixins: 105 definitions, 105 distinct names, and
+  every one of the 105 is named somewhere outside its own `def`.
+
+- **Three corrections to §6.2, found by doing it.** It counted the service at 6 mixins;
+  Phase C had already made it 7. It said `_revision_is_change` "goes (§5.1)" — §5.1 never
+  asked for that, and Phase B changed its body to ask `prescription_matches` rather than
+  deleting the method, so it stays in `adapt.py` with its one caller. And it listed "the
+  commitment window" as code to move into `standing.py`; that rule is
+  `settings.commitment_days`/`commitment_end` and has been for a while. The eleven size
+  estimates were good — the worst was `athlete_context.py` at 360 against 340, and it is
+  twenty over because `CoachContext` came into it from `coach/proposals.py`, which the
+  estimate did not count.
+
+- **`analysis.py` was not split, and the Phase C carry-over inside it is declined.** §6.2
+  said the file would drop to about 420 lines once the pure maths left. The maths left in
+  Phase C and it is 660. The difference is `_run_workout_analysis`, one 326-line method,
+  and about 150 of those lines are the inline weekly-summary builder Phase C left for
+  "Phase D's split of that file". There is no such split: §7 item 6 names four files and
+  this is not one of them, and lifting that loop out is a refactor of the method, the same
+  deferred job as `_workout_adapt_logic`. `ARCHITECTURE.md` §15 now records the size and
+  the cut that would fix it, beside the entry that says the same of
+  `coach/engine/adapt.py`, because this plan is deleted at the end of the branch.
+
+- **No test file was split, and one helper grew.** None of the five test files that
+  changed follows this commit's axis: `test_periodization.py` and `test_constraints.py`
+  only repoint a clock patch, `test_runway.py` and `test_context_sport_gap.py` repoint a
+  mixin import, and `test_workout_generate_window.py` repoints four `notice` patches.
+  `tests/helpers.py` gained `clock_at`, four lines, which `pin_clock` now builds its own
+  patcher from.
+
+- **The first review of Phase D item 6**, in the same commit. A read-only agent
+  re-derived every number rather than taking mine: it parsed both trees, stripped
+  docstrings,
+  unparsed every body and confirmed nothing is lost, nothing is defined twice and every
+  differing body differs by an edit this entry names. It wrote its own undefined-name
+  checker on `symtable`, validated it by deleting an import and watching it flag the
+  bug that import had already caused, and found the fourteen files clean. It read the
+  source rather than the tests for every patch seam into the service, and traced
+  `today_str` → `today_date` → `now` in `clock.py` to show that importing `today_str`
+  by value leaves `pin_clock` biting. It read all four clock switches and said, for
+  each, whether the test still asserts what its name claims.
+
+- **Its one blocking finding was a doc pointer, and it was mine.** `ARCHITECTURE.md`'s
+  constraint-honoring row named "the two stamping commands"; repointing it, I followed
+  the command names and wrote `adapt.py` + `generate.py`. `honoring.stamp` is called in
+  three places and none is `adapt.py` — it is `generate.py` once and `revision_apply.py`
+  twice. `adapt.py` only computes the ids, which the row already credits to
+  `coach/proposals.py`. The row names `generate.py` and `revision_apply.py` now. That is
+  the shape of mistake a split invites: the command did not move, but the code under it
+  did, and the two no longer share a file.
+
+- **Eight of its twelve other findings were taken.** `_hold_around` moved again, from
+  `guards.py` to `revision_apply.py`: the tell was that `guards.py`'s docstring had
+  needed a fourth sentence that did not belong to its paragraph, and the rule
+  `_hold_around` compensates for — a mentioned date holds only the sessions named for
+  it — is written in `workout_revision_apply`, so the two halves now sit together.
+  `matching.py`'s docstring said `workout_adapt` asks the athlete; it does not, it reads
+  an answer the adapt CLI collected. `revision_apply.py` called itself "the one write
+  path" while `workout_generate_apply` is the other. The "Not established yet…" fallback
+  §6.2 asked to be written once was still written twice, character for character; it is
+  two module constants now, and that is what takes the differing-body count from 15 to
+  17. Two bare section references the split had stranded now name their document, in
+  `history_context.py` and `staleness.py` — the second is the mirror of the one I caught
+  in `goals_constraints.py`, made by inserting `_changed_inputs_text` above it. Two
+  stale line numbers and a `workout_adapt_apply` that names no method in the tree went
+  from the design docs, and `_resolve_kept` — a name that has not existed for some time —
+  went from two more lines of `DESIGN_workout_revisions.md` than the one I had found.
+
+- **Two of them were the pass cutting rather than adding.** The thirteen-file roster was
+  written out in three places; `ARCHITECTURE.md` §3 now points at
+  `service/__init__.py` instead of repeating it. And every new module docstring ended
+  "It is one mixin of `CoachService` — see coach/service/__init__.py" one or two lines
+  above a class docstring saying the same; the twelve class docstrings are gone.
+  `analysis.py` keeps its, because it has no module docstring to say it.
+
+- **Two findings it left, both pre-existing, and the second session took both.**
+  `guards.py` said "The §1 interval floor wins" with no document named. It turned out not
+  to be a design doc at all: the floor is `MIN_RETEST_DAYS`, and `benchmarks.py` sources it
+  from `science/benchmarks.md` §1. The comment names that now. And `Workout` was an unused
+  import in `analysis.py` — unused at HEAD too, but this commit already edits that file, so
+  the line went.
+
+- **What it confirmed.** 105 method definitions across the thirteen mixins, 105 distinct
+  names, and all thirteen in the `CoachService` base list, so none is dead. 435 patch
+  sites naming 41 targets, gate passing. `import trainmate_cli` at 254 modules with no
+  `requests`. The suite at 1,989 tests failing exactly the four companion-mode ones, and
+  each changed test module clean on its own as well as in the whole run. It
+  agreed with all four decisions it was asked to challenge, and checked each rather than
+  deferring: it verified `coach/engine/generate.py` really does hold the
+  `WorkoutGenerateMixin` name, and it read §5.1 to confirm that section never asked for
+  `_revision_is_change` to be deleted.
+
+- **This item took two sessions, and the ledger entries above were drafted in the first
+  one.** That session did the split and its first review, and stopped before running the
+  suite or committing. Its work sat staged and untested. A second session picked it up,
+  treated it as a draft rather than as done, re-derived every number in these entries from
+  the code, ran the suite, took a second review, and committed. **Nothing above was
+  written from a test run when it was written** — the numbers that survive here survive
+  because the second session measured them again.
+
+- **The second review, and its four blocking findings, all documentation.** It re-derived
+  the symbol match, the body diffs, the mixin names and the gate independently, and read
+  every changed line of `ARCHITECTURE.md` and the design docs against the code.
+  Three findings were arithmetic in these very entries: they said "four files holding
+  thirteen jobs" when the four held ten and the other three files already existed; they
+  said the clock rewrite accounted for fifteen of the seventeen differing bodies when it
+  is fourteen, which made the parts add to eighteen against a stated total of seventeen;
+  and they said two methods crossed between the splits when three did — `_changed_inputs_text`
+  went from `planning.py` to `staleness.py`, which `REORG_code_layout.md` recorded and this
+  ledger did not. The fourth was a design doc: `DESIGN_benchmark_workouts.md` §3.1 lists
+  where `benchmark_type` has to be threaded, and the first session's sweep pointed the
+  adapt entry at `coach/service/adapt.py`, which never names that field. The rebuild dict
+  is `coach/revisions.py::structure_revision`, and the doc says so now.
+
+- **A rule the sweep needed and did not have: do not repoint a sentence that describes
+  code a design deleted.** Several design docs open by describing the state their design
+  changed — "the third one is unrecoverable data loss", "the prompt is shown nothing about
+  the standing sessions". Rewriting the file name in those to today's makes them read as
+  claims about code that exists, and a reader goes looking for a hard `DELETE` in
+  `revision_apply.py` that is not there. Four such lines were rewritten and are back to the
+  old file name, which reads as history: two in `DESIGN_workout_revisions.md`, one in
+  `DESIGN_plan_change_continuity.md`, one in `DESIGN_workout_tweak.md`'s "what goes away"
+  table, where the row beside it already names the long-deleted `coach/service/editing.py`.
+  **Item 7's sweep: repoint a sentence about code that exists, leave a sentence about code
+  that went.**
+
+- **Four smaller things the second review found, all taken.**
+  `revision_apply.py`'s docstring said `_hold_around` serves "both callers" without naming
+  them, and neither is in that file. The ledger counted `test_runway.py`'s repointed
+  `GuardsMixin` import as a moved patch target; it is a plain `import` and the gate never
+  sees it, so only one target moved. "All 102 symbols" said nothing about what it counted,
+  so it says what it counts now. And §6.2, stamped DONE, still carried the survey's
+  pre-split line counts for all five old files — 1,139 for a file that was 1,124, 830 for
+  one that was 815, 745 for one that was 637 — which reads as verified when it is not.
+
+- **One finding was left, and a first attempt at it was taken back.** `generate.py` and
+  `adapt.py` carry sixteen and fifteen comments citing a bare "§4.1" or "§8", with no
+  document named. Both are inherited: `workouts.py` and `adaptation.py` had no module
+  docstring at all, so the split did not make them worse, and `standing.py` — which names
+  one document and one only — made its share better. The attempted fix was a sentence in
+  each docstring mapping the numbers to documents. It does not work: the sites draw on at
+  least three documents each, and "§8" appears six times in `generate.py` meaning
+  different documents — `DESIGN_workout_revisions.md` §8 beside the Calendar write, and
+  something else entirely three hundred lines above it, where the comment is about where
+  a span may open. A file-wide map that is wrong at some sites is worse than no map.
+  These comments resolve from the paragraph they sit in, not
+  from a rule, so the real fix is to name the document at each of the thirty-one sites —
+  thirty-one judgements, each needing the surrounding code and two candidate documents
+  read. That is its own sweep, not a phase commit's business, and nothing here depends on
+  it.
+
+**Next up:** Phase D item 7 — **CLI command families**: `cli/workouts/generate.py` into
+five files, and `data.py` and `journal.py` into packages (§6.5). Items 8 and 9 follow in
+§7's order. The trap waiting there is named in §6.5 and §9: after the split
+`cli/workouts/generate.py` still imports `ensure_recent_data`, so all twelve
+`patch("…workouts.generate.ensure_recent_data")` sites keep resolving while reaching
+nothing, and the adapt tests would do a real Garmin pull. The gate catches a target that
+stops resolving; it cannot catch one that resolves and no longer bites.
 
 ---
 
@@ -948,12 +1185,18 @@ imports the same name, every `patch()` on the old path still resolves and still 
 `_eng.openrouter_client` when they are called. A `from … import openrouter_client` at the top of
 the file would silently defeat 132 test patches.
 
-**The service clock.** A new file in `coach/service/` that reads the clock needs the
-`import trainmate.coach.service as _svc` back-import, or the
-`patch("trainmate.coach.service._today_str")` sites miss it. The better fix is to switch those
-patches to `tests.helpers.pin_clock` and drop the back-import from all six files that carry it.
-There are 8 such patches on `cli.constraints._today_str`, 5 on `cli.render._today_str` and 4 on
-`coach.service._today_str`.
+**The service clock — spent in Phase D item 6, for `coach/service/` only.** It used to
+read: a new file there needed the `import trainmate.coach.service as _svc` back-import, or
+the `patch("trainmate.coach.service._today_str")` sites would miss it. Item 6 took the
+better fix instead. No file under `coach/service/` aliases the clock now; each reads
+`clock.today_str` by value, and `tests.helpers.pin_clock` patches `clock.now`, which
+`today_str` calls, so one patch reaches every one of them. The four patches on
+`coach.service._today_str` are gone and the gate is down to 435 sites naming 41 targets.
+`ARCHITECTURE.md` §3 carries the rule.
+
+The same trap is still live in the CLI: 8 patches on `cli.constraints._today_str` and 5 on
+`cli.render._today_str`. Phase D item 8 splits `render.py`, and §6.4 already says its five
+should move to `pin_clock` then.
 
 **`clock.now` must be called as `clock.now()`.** Binding it to a local name defeats `pin_clock`.
 This bites in `cli/bot.py`, whose 29 function-local imports all get hoisted. `trainmate_bot.py` is

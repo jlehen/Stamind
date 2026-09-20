@@ -638,9 +638,9 @@ class CoverageInvariantTest(unittest.TestCase):
         self.assertIn("Cover EVERY date of the span", system_prompt)
 
     def test_the_backstop_fills_the_dates_the_model_left_out(self):
-        from trainmate.coach.service.workouts import WorkoutGenMixin
+        from trainmate.coach.service.guards import GuardsMixin
         proposed = [{"date": _d(0), "sport_type": "running", "title": "Long run"}]
-        filled = WorkoutGenMixin._fill_coverage_gaps(proposed, _d(0), _d(3))
+        filled = GuardsMixin._fill_coverage_gaps(proposed, _d(0), _d(3))
         self.assertEqual(len(filled), 4)
         rest = [w for w in filled if w["sport_type"] == "rest"]
         self.assertEqual([w["date"] for w in rest], [_d(1), _d(2), _d(3)])
@@ -648,8 +648,8 @@ class CoverageInvariantTest(unittest.TestCase):
         self.assertNotIn("forced constraint", rest[0]["description"])
 
     def test_an_empty_proposal_is_not_salvaged_into_a_span_of_rest(self):
-        from trainmate.coach.service.workouts import WorkoutGenMixin
-        self.assertEqual(WorkoutGenMixin._fill_coverage_gaps([], _d(0), _d(3)), [])
+        from trainmate.coach.service.guards import GuardsMixin
+        self.assertEqual(GuardsMixin._fill_coverage_gaps([], _d(0), _d(3)), [])
 
 
 class SimpleGeneratePreviewTest(unittest.TestCase):

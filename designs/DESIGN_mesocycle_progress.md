@@ -3,7 +3,7 @@
 ## 1. The problem
 
 `workout generate` archives every workout from today onward and writes a fresh span
-(`coach/service/workouts.py::workout_generate`). Run mid-mesocycle — the ordinary case, since the
+(`coach/service/generate.py::workout_generate`). Run mid-mesocycle — the ordinary case, since the
 default span is `workout_generation_span_days` (28) from today while a mesocycle is typically
 four weeks — it is therefore writing the **remainder** of a mesocycle whose first weeks are
 already trained.
@@ -11,7 +11,7 @@ already trained.
 It was given nothing about those weeks. Its whole view of the athlete was
 `coach.metrics_lookback_days` (15) of raw activities and metrics, the CTL ramp line, the
 baseline, and `meso_text`: a flat list of `name (start to end): focus` built by
-`coach/service/prompt.py::_get_active_strategy_and_meso_text`. No planned workouts at all,
+`coach/service/athlete_context.py::_get_active_strategy_and_meso_text`. No planned workouts at all,
 so no adherence signal; nothing mesocycle-relative, so no sense of where in the mesocycle it stood.
 
 This made it the only one of the three coach prompts blind to the mesocycle's elapsed part:
@@ -56,8 +56,8 @@ generation also reads. Both halves are threaded as arguments of their own.
 
 ## 3. The context (data)
 
-`coach/service/context.py::_mesocycle_progress_context(as_of, gen_start)` renders the mesocycle's
-elapsed part, threaded exactly as `pmc_context` is: computed in the service layer beside
+`coach/service/mesocycle_context.py::_mesocycle_progress_context(as_of, gen_start)` renders the
+mesocycle's elapsed part, threaded exactly as `pmc_context` is: computed in the service layer beside
 `_pmc_prompt_context(...)`, passed as one new named argument into
 `engine._workout_generate_logic(...)`, rendered as its own user-content section.
 

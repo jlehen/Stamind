@@ -412,7 +412,7 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   new query.
 - The helper that says whether she is watching, beside `is_json_frontend` in
   `trainmate/prompt.py`.
-- `trainmate/coach/service/adaptation.py`: `workout_revision_apply` stores the reason in
+- `trainmate/coach/service/revision_apply.py`: `workout_revision_apply` stores the reason in
   `note`.
 - `trainmate/coach/engine/notes.py`: the adapt prompt presents the `-m` message as her
   coach's note when she is not watching (§3). Only the paragraph that tells the week planner

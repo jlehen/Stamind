@@ -37,6 +37,16 @@ def _zweek(mon, rows=(), seconds=None, label="Base 1", in_progress=False, judged
     }
 
 
+def clock_at(day: str):
+    """The patcher `pin_clock` starts, unstarted — for a test that moves the clock
+    part-way through, rather than freezing it for the whole case."""
+    as_date = date.fromisoformat(day)
+    return patch(
+        "trainmate.clock.now",
+        return_value=datetime.combine(as_date, time(12)).astimezone(),
+    )
+
+
 def pin_clock(testcase, day: str) -> None:
     """Freezes the clock at `day` for the life of one test.
 
@@ -46,11 +56,7 @@ def pin_clock(testcase, day: str) -> None:
     sites and had drifted to 6 of the 24 that exist, letting real time reach fixtures
     through the other 18.
     """
-    as_date = date.fromisoformat(day)
-    patcher = patch(
-        "trainmate.clock.now",
-        return_value=datetime.combine(as_date, time(12)).astimezone(),
-    )
+    patcher = clock_at(day)
     patcher.start()
     testcase.addCleanup(patcher.stop)
 

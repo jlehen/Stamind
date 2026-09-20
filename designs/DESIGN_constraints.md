@@ -331,7 +331,7 @@ For each directive in the fetched set:
   **post-hoc override of the model's output, not a prompt instruction** — the
   model still returns whatever it likes for that date, and the app rewrites it:
   - `generate` calls the LLM for the whole plan and then saves the returned list
-    (`coach/service/workouts.py`'s `workout_generate`, the `workouts =
+    (`coach/service/generate.py`'s `workout_generate`, the `workouts =
     planner_reply.get("workouts", [])` → `save_workout` loop). The pre-pass
     (`_enforce_rest_windows_generate`) runs **between** those two steps: drop any
     session the model placed on a rest date and splice in a forced
@@ -356,7 +356,7 @@ For each directive in the fetched set:
     explicit rest entry, with a `change_reason` naming the constraint (the
     change_reason footprint is now grounded in a durable row, not a smuggled
     ephemeral note). This reuses `adapt`'s existing displaced-session handling:
-    `workout_adapt_apply` already removes every session on a date that isn't
+    `workout_revision_apply` already removes every session on a date that isn't
     covered by a given day's proposal, so handing it a single synthesized `rest`
     proposal for that date correctly clears all of that day's sessions, not just
     the first one.

@@ -582,12 +582,33 @@ this file.
   parameters — 370 after this split, which is what leaves `adapt.py` at 509. That method is
   the real problem, and cutting it into named steps is a separate job.
 
-### 6.2 coach/service
+### 6.2 coach/service — **DONE in Phase D item 6**
 
 The service goes from 6 mixin files to 13. Each split adds one base class to `CoachService`.
-Callers keep calling `coach_service.x`, so very few tests change.
+Callers keep calling `coach_service.x`, so very few tests change. **The start was 7 files,
+not 6: Phase C had already taken the staleness half out of `prompt.py` into a file of its
+own. The end is 13 as predicted.** Six files under `tests/` changed: three that name a
+mixin or a module path, two that patched the clock, and `helpers.py`, which gained the
+scoped clock one of those two needed.
 
-**`workouts.py` (1,139 lines):**
+The `~Lines` estimates were good. The actual, against the estimate: `generate.py` 438
+(440), `standing.py` 334 (350), `guards.py` 329 (335), `adapt.py` 454 (470),
+`revision_apply.py` 370 (365), `matching.py` 123 (125), `planning.py` 430 (440),
+`goals_constraints.py` 222 (225), `history_context.py` 373 (365),
+`mesocycle_context.py` 319 (320), `athlete_context.py` 360 (340). `athlete_context.py`
+is the worst miss, twenty over, because `CoachContext` came into it from
+`coach/proposals.py` and the estimate did not count that.
+
+Three land above the 150-to-400 band a split's pieces are meant to land in:
+`planning.py` at 430, `generate.py` at 438 and `adapt.py` at 454. The 400-to-500 rule
+does not excuse them — that rule says when an existing file must be split, not where a
+split's pieces may land. What is true is that each of the three is one job, and each is
+thirty to fifty lines over because one long method dominates it: the three the "Separate
+work" note at the end of this section defers, `plan_generate` (256), `workout_generate`
+(263) and `workout_adapt` (341). Cutting any of those brings its file inside the band,
+and none of them is cut here.
+
+**`workouts.py` (1,124 lines, not the 1,139 the survey measured):**
 - It is renamed **`generate.py`** (about 440 lines) and keeps `workout_generate` (728–993),
   `workout_generate_apply` (995–1094) and `workout_generate_strength` (1096–1139).
 - **`standing.py`** (about 350 lines): the sessions the athlete was already told about.
@@ -603,11 +624,27 @@ Callers keep calling `coach_service.x`, so very few tests change.
   - `_event_date_for_macrocycle` (591–607) and `_warn_missing_boundary_benchmarks` (609–684).
 - `_today_workout_completed` (58–84) goes to `matching.py`.
 - `workout_rollback` (686–726) goes to `revision_apply.py`.
+- **The commitment window is not here to move.** §6.2 listed it beside
+  `_standing_sessions`; it is `settings.commitment_days`/`commitment_end` and has been for
+  a while. `_standing_sessions` — the intersection of the span with that window — is what
+  went to `standing.py`.
+- **`_hold_around` went to `revision_apply.py`**, which the plan did not say. §4.10 row j
+  wanted the strength planner to return it and Phase C declined that, leaving it in
+  `adaptation.py` with two callers, `workout_adapt` and `workout_generate_strength`. It
+  went to `guards.py` first, on the strength of that file's "shared by generate and adapt"
+  description, and the review moved it on: it fills the `held` field of a proposal that
+  `workout_revision_apply` consumes, and the rule it compensates for — a date the proposal
+  mentions holds only the sessions named for it — is written there. The tell was that
+  `guards.py`'s module docstring had needed a sentence that did not belong to its
+  paragraph.
 
-**`adaptation.py` (830 lines):**
+**`adaptation.py` (815 lines, not 830):**
 - It is renamed **`adapt.py`** (about 470 lines) and keeps `workout_adapt` (306–649),
   `workout_tweak` and its helpers (261–304), `_outside_tweak_reach` and `_is_keep_marker`.
-  `_revision_is_change` goes (§5.1).
+  ~~`_revision_is_change` goes (§5.1).~~ **It did not go, and §5.1 never asked it to.**
+  Phase B made its body ask `prescription_matches` instead of comparing five fields by
+  hand; the method itself stays, because it is what reads the live session off the
+  database before asking. It is in `adapt.py`, its only caller.
 - **`revision_apply.py`** (about 365 lines): how a revision lands.
   - Moves and swaps: `_vacated_rest`, `_move_source` and `_resolve_moves` (43–155).
   - `workout_revision_apply` (670–809) and `workout_revision_record_no_change` (811–830).
@@ -619,7 +656,7 @@ Callers keep calling `coach_service.x`, so very few tests change.
   - It is under 150 lines, but four callers share it: generate, `--strength-only`, adapt, and the
     adapt CLI.
 
-**`planning.py` (745 lines):**
+**`planning.py` (637 lines, not 745):**
 - **`planning.py`** keeps about 440 lines: `plan_rm`, `plan_generate` (302–582), `plan_apply`
   (584–641) and `plan_rollback` (643–713).
 - **`goals_constraints.py`** (about 225 lines):
@@ -631,16 +668,20 @@ Callers keep calling `coach_service.x`, so very few tests change.
 - `_changed_inputs_text` and `plan_reshape_verdict` (264–300) go to `staleness.py`.
 - `replan` (715–745) is only called by tests; see §7.
 
-**`prompt.py` (606 lines):**
-- **`staleness.py`** (about 370 lines), as described in §4.4.
-- It is renamed **`athlete_context.py`** (about 340 lines). Without the rename there would be three
-  files named `prompt.py` that mean three different things. It keeps:
+**`prompt.py` (323 lines, not 606):** — the staleness half left in Phase C; the rename is
+**DONE in Phase D item 6**, although §7 there lists only four files for that item. It is
+here because §4.10 row c sends `CoachContext` to `service/athlete_context.py`, and Phase C
+recorded that row as waiting for the file to exist. Nothing else creates it.
+- **`staleness.py`** (about 370 lines), as described in §4.4. It is 302, and gained
+  `_changed_inputs_text` from `planning.py` here.
+- It is renamed **`athlete_context.py`** (about 340 lines; it is 360). Without the rename
+  there would be three files named `prompt.py` that mean three different things. It keeps:
   - the effective thresholds and profile, and the science documents;
   - `_coach_context`, joined by `CoachContext`;
   - the strategy text (367–443), with the "Not established yet…" fallback written once;
   - the learnings text, the learning updates, `learning_question` and the three nudges.
 
-**`context.py` (684 lines):**
+**`context.py` (663 lines, not 684):**
 - **`history_context.py`** (about 365 lines): what the prompts are told about past training.
   - The 15-day summary (14–78), with the fix from §5.4.
   - The PMC lines (81–192).
@@ -651,19 +692,39 @@ Callers keep calling `coach_service.x`, so very few tests change.
 - `_pmc_week_summary` goes to `analytics/weekly_evidence.py`.
 
 **Other changes.**
-- `analysis.py` drops to about 420 lines once the pure maths leaves (§4.10). The evidence
-  fingerprint arrives in it.
+- ~~`analysis.py` drops to about 420 lines once the pure maths leaves (§4.10).~~ **The maths
+  left in Phase C and the file is 660 lines, not 420.** The estimate was simply wrong: 326
+  of those lines are `_run_workout_analysis`, and about 150 of those are the inline
+  weekly-summary builder Phase C's ledger left for "Phase D's split of that file". There is
+  no such split in this section — §7 item 6 names four files and this is not one of them —
+  and lifting that loop out is a refactor of a 326-line method, the same deferred job as
+  `_workout_adapt_logic`. It would also not be enough: the file would land at about 520
+  lines, still over the rule, so the commit would have carried a 150-line rewrite of a
+  live code path and bought nothing measurable. Left, and `ARCHITECTURE.md` §15 now
+  records the size and the cut that would fix it, beside the entry that says the same of
+  `coach/engine/adapt.py`.
 - `__init__.py` drops its unused imports, and `DEFAULT_REFLECT_WEEKS` moves to `analysis.py`.
+  **Both done.** `__init__.py` is 69 lines: a docstring naming all thirteen files, the
+  mixin imports and the class.
 
 **Tests.**
-- `test_runway.py:630,640` imports `GuardsMixin` from `service.guards`.
+- `test_runway.py` imports `GuardsMixin` from `service.guards` (at lines 641 and 651).
 - `test_context_sport_gap.py:7` imports `MesocycleContextMixin`.
 - The clock patch `patch("trainmate.coach.service._today_str")` only reaches a new file that keeps
   the `import trainmate.coach.service as _svc` back-import. Better: switch those seven patches to
   `tests.helpers.pin_clock`, and drop the back-import from all six files that carry it.
+  **Taken, and it was four patches and five files.** Every service file that needs today
+  now reads `clock.today_str`, imported by value. `pin_clock` patches `clock.now`, which
+  `today_str` calls, so it reaches all of them at once — the alias never had to exist. One
+  of the four had to stay scoped: `test_reinstating_recovers_only_what_is_still_ahead`
+  archives a goal, then moves the clock five days on and reinstates it, so a whole-test
+  pin would archive under the later clock and lose the session the test is about. That one
+  uses a new `tests.helpers.clock_at`, which is the patcher `pin_clock` starts, unstarted.
+  `ARCHITECTURE.md` §3 carries the rule now, so §9's trap here is spent.
 
-**Separate work.** The real size drivers are `workout_adapt` (344 lines) and `plan_generate`
-(281). Cutting them into named steps is a separate job.
+**Separate work.** The real size drivers are the three methods measured above:
+`workout_adapt`, `workout_generate` and `plan_generate`. Cutting them into named steps is a
+separate job.
 
 ### 6.3 Database
 

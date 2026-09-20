@@ -124,7 +124,7 @@ design started from (ACWR-era, historical per the amendment banner).
 | Store | `athlete_metrics_cache` (`db/schema.py`), `save_metric_cache()` (`db/activities.py`), `AthleteMetric` (`types.py`) | `acute_workload`, `chronic_workload`, `acwr` columns |
 | Wipe | `wipe_garmin_data()` (`db/wipes.py`) | deletes rows by range; **does not** recompute (see §4) |
 | Coach, per-day | `format_metrics_history()` (`coach/formatting.py`) → generate & adapt prompts (`coach/engine/generate.py`, `adapt.py`) | `... ACWR=1.12` per day line — **unguarded** `:.2f`, see §5.1 |
-| Coach, summary | data summary in `coach/service/context.py` → strategy/plan prompts | "Current ACWR: 1.12 (latest)" |
+| Coach, summary | data summary in `coach/service/history_context.py` → strategy/plan prompts | "Current ACWR: 1.12 (latest)" |
 | Coach, weekly | analysis weekly digest (`coach/service/analysis.py`) | `max_acwr` per week |
 | Cache key | evidence fingerprint (`coach/service/analysis.py` `met_digest`) | hashes 6-tuple incl. `m.get('acwr')` per metrics row |
 | User | `tm status` (`cli/status.py`), `tm data show-metrics` table/CSV (`cli/data.py`), `color_acwr` (was `util.py`) | ACWR + acute/chronic shown; `acwr or 0.0` zero-fill |
@@ -138,7 +138,7 @@ packages after it merged, so the original paths no longer resolve. Current homes
 | `garmin.py` — `compute_pmc`, `load_ratio`, `pmc_ramp`, `pmc_display_values`, `pmc_data_caveat` | `trainmate/analytics/pmc.py` (no database, no Garmin) |
 | `garmin.py` — `pull()`, `_warn_manual` | `trainmate/garmin/sync.py` |
 | `garmin.py` — the derivation pad | `trainmate/analytics/pmc.py` `derivation_pad_days()` |
-| `coach/service.py` — data summary, PMC/ramp/caveat lines | `trainmate/coach/service/context.py` |
+| `coach/service.py` — data summary, PMC/ramp/caveat lines | `trainmate/coach/service/history_context.py` |
 | `coach/service.py` — weekly digest | `trainmate/coach/service/analysis.py` |
 | `coach/engine.py` — `met_digest` fingerprint | `trainmate/coach/engine/prompt.py` |
 | `coach/engine.py` — generate/adapt prompt assembly | `trainmate/coach/engine/generate.py`, `adapt.py` |
@@ -273,7 +273,7 @@ Two invariants ride on this split and must survive any refactor:
 - **Fetch once, pass down.** The "surfaces can't derive it differently" guarantee is now
   enforced by threading `history_start` (or the cutoff derived from it) down through a
   command, not by there being one function. `cli/status.py` and
-  `coach/service/context.py::_pmc_prompt_context` both do exactly one lookup per command
+  `coach/service/history_context.py::_pmc_prompt_context` both do exactly one lookup per command
   and hand the result to every consumer.
 
 **(b) A plain "still warming up" flag when *today itself* is short on history.**
@@ -499,7 +499,7 @@ Two summary lines, added after the existing ACWR line:
 (The trailing `ATL:CTL` field replaced the separate ACWR line this design appended
 after — see §7.)
 
-- The **PMC line** goes into the data summary (`coach/service/context.py`) that feeds
+- The **PMC line** goes into the data summary (`coach/service/history_context.py`) that feeds
   the strategy/plan prompts, so plan generation can reason about sustainable build
   rates and current freshness.
 - The **ramp line** must reach the prompts that actually set weekly TSS —
@@ -712,7 +712,7 @@ retention.
   > | Surface (this doc) | Was | Now |
   > |---|---|---|
   > | per-day prompt line (§5.1) | `ACWR=1.12` | `ATL:CTL=1.15` (`coach/formatting.py`) |
-  > | data-summary line (§5.2) | "Current ACWR: 1.12 (latest)" | `ATL:CTL 1.15 (relative overload)`, folded into the PMC line (`coach/service/context.py`) |
+  > | data-summary line (§5.2) | "Current ACWR: 1.12 (latest)" | `ATL:CTL 1.15 (relative overload)`, folded into the PMC line (`coach/service/history_context.py`) |
   > | weekly digest key (§5.4) | `max_acwr` | `max_load_ratio` (`coach/service/analysis.py`) |
   > | `tm status` (§6.1) | ACWR line | `ATL:CTL` field on the Fitness line (`cli/status.py`) |
   > | `tm data show-metrics` (§6.2) | ACWR column / CSV field | `ATL:CTL` column / CSV field (`cli/data.py`) |
@@ -843,7 +843,7 @@ the "app computes" principle says the LLM should not do in its head. Best-effort
 full projection over the plan's own workouts (not a zero-training bound), with a
 warning when the plan doesn't yet reach the event.
 
-Computed **on demand at prompt-assembly time** (now `coach/service/context.py`), **not** in
+Computed **on demand at prompt-assembly time** (now `coach/service/history_context.py`), **not** in
 `recompute_derived()` and **not stored**: it depends on the plan and the event
 date and is forward-looking, so it stays out of the pure, plan-independent
 backward pass. This is the one place PMC reads the plan, read-only.

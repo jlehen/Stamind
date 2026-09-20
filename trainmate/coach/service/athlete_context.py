@@ -1,17 +1,56 @@
+"""What the coach knows before it is asked anything in particular.
+
+The athlete themselves, as every prompt builder is given them: the threshold anchors in
+force right now, the profile those anchors overlay, the science documents, the strategy
+and mesocycle text of the plan they are in, and the learnings the coach has accumulated
+about them. `_coach_context` gathers the seven into one :class:`CoachContext` so a new
+shared input is added in one place rather than in `plan generate`, `workout generate` and
+`workout adapt` each.
+
+It also holds what happens to a learning after a call proposes one, and the three nudges
+that fire when the coach is working without something it should have.
+
+It is one mixin of :class:`CoachService` — see coach/service/__init__.py.
+"""
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, List, Optional, Tuple, Dict
+
 from trainmate import learning_doubts, runtime
 from trainmate.config import config
 from trainmate.types import Objective, Constraint
 from trainmate.text import cmd
 from trainmate.output import notice
 from trainmate.coach.formatting import _load_science_guidelines
-from trainmate.coach.proposals import CoachContext
 
 
-class PromptConfigMixin:
-    """Part of :class:`CoachService` — see coach/service/__init__.py."""
+@dataclass(frozen=True)
+class CoachContext:
+    """The seven shared inputs, threaded as one value so no call site can omit one.
 
+    Everything here is shared. Per-command inputs — the target date, the athlete's note,
+    the window being planned — stay as arguments, because they are what distinguishes one
+    command from another.
+    """
+    objectives: List[Dict[str, Any]]
+    constraints: List[Dict[str, Any]]
+    guidelines: str
+    profile: Optional[Dict[str, Any]]
+    strategy: str
+    meso_text: str
+    learnings: str
+
+
+# What the strategy and mesocycle sections say when no plan governs the window. The
+# prompt still gets both sections, so the model is told there is nothing rather than
+# left to infer it from an absence (DESIGN_mesocycle_progress.md §2).
+NO_STRATEGY = (
+    "Not established yet. Establish an endurance-focused training strategy based on goals."
+)
+NO_MESOCYCLES = "  - Not established yet."
+
+
+class AthleteContextMixin:
     def effective_thresholds(self) -> Dict[str, float]:
         """The athlete's current threshold anchors — the single set both the coaching
         prompt and the plan-staleness check read through (DESIGN_benchmark_workouts.md
@@ -102,11 +141,8 @@ class PromptConfigMixin:
                         f"{m['end_date']}): {m['focus']}\n"
                     )
         if not strategy:
-            strategy = (
-                "Not established yet. Establish an endurance-focused training strategy "
-                "based on goals."
-            )
-            meso_text = "  - Not established yet."
+            strategy = NO_STRATEGY
+            meso_text = NO_MESOCYCLES
         return strategy, meso_text
 
     def strategy_text_for_mesocycles(self, mesocycles: List[Dict[str, Any]]) -> Tuple[str, str]:
@@ -122,11 +158,7 @@ class PromptConfigMixin:
             if b['macrocycle_id'] not in macro_ids:
                 macro_ids.append(b['macrocycle_id'])
         if not macro_ids:
-            return (
-                "Not established yet. Establish an endurance-focused training strategy "
-                "based on goals.",
-                "  - Not established yet.",
-            )
+            return NO_STRATEGY, NO_MESOCYCLES
 
         covered = {b['id'] for b in mesocycles}
         multi = len(macro_ids) > 1

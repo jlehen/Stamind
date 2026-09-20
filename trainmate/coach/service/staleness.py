@@ -22,12 +22,10 @@ from trainmate.plan_inputs import (
     science_diff_text,
 )
 from trainmate.coach.proposals import PlanFingerprints
-import trainmate.coach.service as _svc
+from trainmate.clock import today_str as _today_str
 
 
 class StalenessMixin:
-    """Part of :class:`CoachService` — see coach/service/__init__.py."""
-
     def _get_config_snapshot(self) -> str:
         """JSON of the current effective threshold anchors, persisted on the macrocycle
         so config_changed() can judge later drift against real values."""
@@ -131,7 +129,7 @@ class StalenessMixin:
         if stored_goals and stored_goals != plan_inputs.goals_hash(objectives):
             reasons.append("goals changed")
         replan_constraints = [
-            c for c in self._db.get_constraints(_svc._today_str())
+            c for c in self._db.get_constraints(_today_str())
             if c.get('replan')
         ]
         stored_constraints = macro.get('constraints_hash')
@@ -169,7 +167,7 @@ class StalenessMixin:
         old_constraints = _snapshot_records(macro.get('constraints_snapshot'))
         if old_constraints is not None:
             replan = [
-                c for c in self._db.get_constraints(_svc._today_str())
+                c for c in self._db.get_constraints(_today_str())
                 if c.get('replan')
             ]
             chunks.append(records_diff_text(
@@ -182,13 +180,27 @@ class StalenessMixin:
             chunks.append(science_diff_text(old_docs))
         return "\n\n".join(chunk for chunk in chunks if chunk)
 
+    def _changed_inputs_text(
+        self, macro: Optional[Dict[str, Any]]
+    ) -> Optional[str]:
+        """The staleness reason and its diff for the plan being replaced, or None when
+        there is no plan, or it was current (DESIGN_plan_change_continuity.md §6.2)."""
+        if not macro:
+            return None
+        change_reason = self.config_changed(macro)
+        if not change_reason:
+            return None
+        diff = self.staleness_diff(macro)
+        return f"{change_reason}\n\n{diff}" if diff else change_reason
+
     def plan_reshape_verdict(
         self, macro: Dict[str, Any], change_reason: str,
     ) -> Optional[Dict[str, Any]]:
         """The verdict call's read on whether `change_reason` would have reshaped `macro`:
         {"reshaping": bool, "why": str}, or None when no verdict could be had. Fails open
         on purpose — the staleness question must never hang on the network, so any error
-        or malformed reply leaves the athlete with the question and no verdict (§10)."""
+        or malformed reply leaves the athlete with the question and no verdict
+        (DESIGN_plan_staleness.md §10)."""
         from trainmate.openrouter import openrouter_client
         if openrouter_client.show_prompt_only:
             # That flag shows the command's own prompt; this preliminary would print
@@ -248,7 +260,7 @@ class StalenessMixin:
         constraints the strategy was shown, and keeping a plan does not rewrite its
         strategy — so refreshing that list would have `plan show` claim the coach
         considered a constraint added after it wrote the words."""
-        constraints = self._db.get_constraints(_svc._today_str())
+        constraints = self._db.get_constraints(_today_str())
         prints = self.plan_fingerprints(self._db.upcoming_objectives(), constraints)
         self._db.update_macrocycle_config_hash(
             macro['id'],

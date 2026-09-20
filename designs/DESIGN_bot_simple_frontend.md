@@ -20,7 +20,7 @@ progress. Three assets already in the code cover most of the machinery:
 - The structured-prompt protocol (`trainmate/prompt.py`, `TRAINMATE_FRONTEND=json`)
   already renders decisions as tappable inline buttons.
 - `workout adapt -m "…"` is already a free-text inbox: one LLM call classifies the
-  message and extracts constraint-shaped directives (`coach/service/adaptation.py`).
+  message and extracts constraint-shaped directives (`coach/service/adapt.py`).
 - Per-athlete instances already work: `TRAINMATE_CONFIG` selects a config file, and the
   instance's `database:` lives beside it (ARCHITECTURE.md §9). One checkout, two bots,
   two tokens, zero routing code.
@@ -772,7 +772,7 @@ CLI↔bot channel.
 `bot capture note` instead. Its extraction call returns the same candidate shapes the
 adapt inbox yields — `new_constraints` and `new_signals` — and persists them through
 the same confirmed-candidate paths (`capture_message_constraint`,
-`capture_message_signal` in `coach/service/planning.py`), so the trust boundary moves
+`capture_message_signal` in `coach/service/goals_constraints.py`), so the trust boundary moves
 not at all: still advisory-only, still no LLM-set `rest` or `replan`, still no
 fabricated numbers, still nothing stored without the athlete's yes. One capture call
 extracts *both* kinds, so a mixed note — "knee's acting up, no running for two weeks,
@@ -1006,7 +1006,7 @@ The §7 posture after this pass, in full:
 | `trainmate_bot.py` | new intent→argv and echo rows; text-carrying intents pass the message to `bot capture`; the §5.2 rescue window retargets from `adapt -m` to `bot capture note` (§12.3); the stale-tap path speaks ("That offer expired — just send it again.", §12.3) instead of silently stripping the row |
 | `trainmate/cli/workouts/generate.py` | the per-candidate confirm loops — the constraint confirm and `_confirm_new_signals` with its reuse-first category ladder — factor out into a shared helper `bot capture note` calls: one behavior, ladder included, on both paths |
 | `trainmate/coach/engine/notes.py` | the `new_constraints`/`new_signals` schema fragments and extraction-rule text become shared constants this prompt and the §12.2 capture prompts both include — one candidate vocabulary, no drift |
-| `trainmate/coach/service/planning.py` | `capture_message_constraint`/`_signal` reused as-is, but the plan-shaping notice renders per persona: under simple rendering its `constraint edit --replan` / `plan generate` suggestion becomes the §12.3 adjust-offer button, never expert command text in companion chat — a `runtime.render` method with a companion override, now that the render persona has landed (DESIGN_render_persona.md §4) |
+| `trainmate/coach/service/goals_constraints.py` | `capture_message_constraint`/`_signal` reused as-is, but the plan-shaping notice renders per persona: under simple rendering its `constraint edit --replan` / `plan generate` suggestion becomes the §12.3 adjust-offer button, never expert command text in companion chat — a `runtime.render` method with a companion override, now that the render persona has landed (DESIGN_render_persona.md §4) |
 | `trainmate/cli/settings.py` | routable-keys allowlist named beside the settings it guards |
 | `tests/` | `RouterTablesTest` reshaped (note intents share `bot capture note`; every capture intent maps to `bot capture <intent>`), mocked-extraction tests per capture kind (missing-field marker included, §12.2), nomination outcomes per §12.4 (clean, session hand-off, pinned re-capture, no-match), the shared confirm helper exercised from both adapt and capture |
 

@@ -208,9 +208,7 @@ class TestConstraintPlanImpact(unittest.TestCase):
         # window sits in the past displaces nothing. Pin the clock to the eve of these
         # dates rather than making them relative: the trailing-week arithmetic below is
         # only readable when the dates are literal.
-        patcher = patch("trainmate.coach.service._today_str", return_value="2026-07-31")
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        pin_clock(self, "2026-07-31")
 
     def test_displaced_load_trigger_fires_even_when_advisory(self):
         # Trailing week (2026-07-25..2026-07-31, the 7 days before the constraint

@@ -200,8 +200,8 @@ for.)
   rules) and the `new_signals` schema member; **`coach/engine/adapt.py`** takes the two
   new parameters that feed them. `has_message` now gates
   six regions, not four; `tests/test_prompt_gates.py` covers the two new ones.
-- **`coach/service/planning.py`** — `capture_message_signal`, `known_signal_metrics`.
-- **`coach/service/adaptation.py`** — renders the vocabulary, passes the backdate floor,
+- **`coach/service/goals_constraints.py`** — `capture_message_signal`, `known_signal_metrics`.
+- **`coach/service/adapt.py`** — renders the vocabulary, passes the backdate floor,
   reads `new_signals` off the decision onto the proposal.
 - **`coach/proposals.py`** — `RevisionProposal.new_signals`.
 - **`cli/workouts/generate.py`** — `_confirm_new_signals`, the step-1b ladder.
