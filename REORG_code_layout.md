@@ -22,28 +22,35 @@ already done on this branch.
   274 columns and indexes, in the same order, with the same types and defaults. Seven
   migration tests went with it. A database older than the squash now needs a checkout
   from before it.
+- **Difference 1 (§5.1): fixed**, and it uncovered a second, larger bug. The adapt
+  prompt asks the week planner for an intensity target and the model answers, but
+  `structure_revision` — the row shape both revision commands write — carried neither
+  zone field, so apply read the stripped row, found no target and carried the old one
+  forward. In `workout adapt` and `workout tweak` the target was asked for, answered and
+  then dropped. Both are fixed: the row carries the target, and adapt asks
+  `prescription_matches` instead of its own five-field check.
 - **Difference 4 (§5.4): fixed.** The 15-day summary groups activities by canonical sport,
   so the week planner no longer reads road and indoor cycling as two sports.
 - `docs/ARCHITECTURE.md` says the schema is CREATE-only now.
 
 **Decided, not yet done.**
-- **Difference 1 (§5.1): explained and agreed.** Fix it by deleting adapt's private
-  no-op check and calling `coach/revisions.prescription_matches`, which the preview
-  already uses. Adapt's whitespace normalisation moves into that function.
+- **Difference 3 (§5.3): retracted.** It is a designed difference, not two copies of
+  one rule: `DESIGN_cli_selectors.md` bounds `-g N` to that goal's own span on purpose,
+  and the service prints a notice when its own derivation disagrees. One narrow residue
+  is written up in §5.3 and is not proposed.
 - **Difference 2 (§5.2): superseded.** The owner wants e1RM dropped from the benchmark
   anchors entirely. The strength design deliberately kept it
   (DESIGN_strength_tracking.md, "The benchmark logbook is untouched … `e1rm` stays one
   lift"), so dropping it is a separate, undesigned change. Once e1RM is gone there is no
   anchor left for the two copies of the replan band to disagree about.
-- **Difference 3 (§5.3): needs one owner.** See the sharper statement in §5.3.
 - **`util.py` is deleted and split (§4.7): approved**, AGENTS.md line included.
 - **Package names (§9.5): approved.** `trainmate/chat/`, `gcal/`, `analytics/`.
-- **The bot's `main()` → `ChatBot` class (§6.6, question 4): recommended for later**, as
-  its own job after the pure parts have moved. Moving `routing`, `keyboards` and the
-  scheduler rules is a cut-and-paste with no logic change; the class conversion turns 30
-  closures over 12 shared names into attributes and moves about 250 test references. The
-  two carry very different risk, and the Telegram process is the surface with the least
-  test coverage, so they should not land in one commit.
+- **The bot's `main()` → `ChatBot` class (§6.6, question 4): separate commits, same
+  branch.** Moving `routing`, `keyboards` and the scheduler rules is a cut-and-paste with
+  no logic change; the class conversion turns 30 closures over 12 shared names into
+  attributes and moves about 250 test references. The two carry very different risk, and
+  the Telegram process is the surface with the least test coverage, so they get a commit
+  each — but both land on this branch, not a later one.
 
 ---
 
@@ -81,8 +88,9 @@ two CLI modules.
 - The code that pairs planned sessions with Garmin activities for a date range is written three
   times.
 
-**3. Four rules exist twice, and the two copies disagree.** Each disagreement changes what the
-athlete sees (§5).
+**3. Three rules exist twice, and the copies disagree.** Each disagreement changes what the
+athlete sees (§5). A fourth candidate turned out to be designed, and §5.3 records the
+retraction.
 
 ---
 
@@ -428,7 +436,7 @@ the byte `\x1e`. Each carries a tag and a JSON payload: `TM-PROMPT`, `TM-PHOTO`,
 
 ---
 
-## 5. Four rules that exist twice and disagree
+## 5. Rules that exist twice and disagree
 
 Merging each pair of copies changes what the athlete sees, so each needs your OK. I propose to
 fix them before the moves, so that a move never hides a change of behaviour.
@@ -466,52 +474,30 @@ says is not needed.
 **Fix.** One rule in `benchmarks.py` for "did this anchor move past the band?", with the e1RM
 exclusion. `cli/benchmarks.py` and `_threshold_reasons` both use it.
 
-### 5.3 A goal's span starts on different days for `plan generate` and for a constraint's replan
+### 5.3 A goal's span — RETRACTED, this one is designed
 
-The two copies differ in which earlier goal they count.
-- **`plan generate`** starts a goal's plan the day after the nearest earlier goal **that has a
-  plan**, and never before today (`coach/service/planning.py`, around lines 347–366).
-- **`cli/plans._goal_span_start`** starts it the day after the nearest earlier goal **of any
-  kind**. This is what `goal_range_for_window` uses. The constraint replan offer uses that function
-  to pick which plans a constraint disrupts (DESIGN_constraints.md §7).
+I reported this as a fourth rule with two disagreeing copies. It is not. The difference is
+deliberate and documented, and this section is kept only so the claim does not outlive its
+correction.
 
-The two rules are reached from two paths of the *same command*. `_plan_targets`
-(`cli/plans.py:103`) computes a start with the CLI rule and passes it to the service as
-`start_date`, which the service then uses instead of its own. So:
+`DESIGN_cli_selectors.md`, "A named goal is bounded to its own span", says the service's
+derivation is the thing being corrected: when the goal before has no plan, that derivation
+"quietly swallows the days belonging to a goal nobody has planned for". So `-g N` bounds
+the plan to N's own span, "whether or not that goal has a plan". The CLI owning that
+policy while the service takes `start_date` is deliberate as well, and the service prints
+a notice at exactly the moment the two readings disagree, ending "Plan that goal
+separately to cover them."
 
-- `plan generate` with no flag: the service's rule decides.
-- `plan generate -g B`: the CLI's rule decides.
+**What is left, and it is narrow.** A constraint's replan picks its goals by goal span
+(`goal_range_for_window`), while the rows in those days may belong to an older plan built
+before that goal existed. So the offer can rebuild a goal whose plan does not hold the
+disrupted days, and leave alone the plan that does.
 
-They agree whenever every earlier goal has a plan, which is the ordinary case. They part
-company when an earlier goal has none.
-
-It is 1 May.
-- Goal A is a 10 km race on 15 June. The athlete entered it but never built a plan for it.
-- Goal B is a marathon on 20 October.
-
-`plan generate -g B` opens B's plan on 16 June, the day after A. Nothing then covers May
-and early June at all. Had the service decided, B's plan would have opened on 1 May,
-because it defers only to an earlier goal that has a plan.
-
-The same CLI rule decides which goal a constraint's replan rebuilds
-(`goal_range_for_window`, called from `constraints.py:176`), so a constraint dated in May
-is matched against A's span rather than against whichever plan actually holds those days.
-
-**Fix, and you choose.**
-
-- **(a) One rule, the service's,** exposed as a method the CLI calls, and
-  `_goal_span_start` goes. A goal's plan opens the day after the previous goal *that has
-  a plan*, never before today. Consequence: with an unplanned race in front, `-g B` plans
-  from today, so B's plan covers A's race day too — and if A is planned later, the two
-  plans overlap. Overlap is already possible today, and `get_governing_mesocycles`
-  already resolves it.
-- **(b) Ask the data, for the replan question.** Which plan covers a day is a fact in the
-  rows: `db.get_periodization_ids_for_date`. The replan offer would rebuild the plan that
-  actually holds the disrupted days, and goal spans stay what they are for the `-g`
-  grammar.
-
-I lean to (a) now, because it gives the rule one owner, and (b) later as the more
-faithful answer to "which plan do these days belong to".
+It only bites when an unplanned goal sits in front of a planned one. The fix, if it is
+ever worth it, is to ask the data rather than derive from goals:
+`db.get_periodization_ids_for_date` already answers which plan covers a day. Goal spans
+would stay exactly as they are for the `-g` grammar. Not proposed for now — no athlete
+has hit it, and the notice already explains the case it comes from.
 
 ### 5.4 The week planner reads road cycling and indoor cycling as two sports
 
