@@ -1,7 +1,6 @@
 import os
 import yaml
-from typing import Any, Dict, List, Optional
-from trainmate.signals import DEFAULT_SIGNAL_METRICS, normalize_metric
+from typing import Any, Dict, Optional
 
 # Which config file this process runs against; TRAINMATE_CONFIG is how a second athlete
 # runs from the same checkout (ARCHITECTURE.md §9). Relative paths in the file resolve
@@ -38,7 +37,7 @@ class Config:
         except Exception as e:
             if explicit:
                 raise SystemExit(f"TRAINMATE_CONFIG file failed to load: {CONFIG_PATH} ({e})")
-            # Spelled out rather than `util.warn`: util imports the journal, the journal
+            # Spelled out rather than `output.warn`: output imports the journal, the journal
             # imports this module, and config load is what is running right now
             # (DESIGN_output_verbosity.md §3.5).
             print(f"Warning: failed to load config.yaml: {e}")
@@ -486,23 +485,6 @@ class Config:
         return int(self.get("coach", {}).get("signal_days_min_days", 1))
 
     @property
-    def signal_metrics(self) -> Dict[str, str]:
-        """Daily-signal categories offered to the coach, as `metric -> gloss`. Under
-        `coach:`. Augments `signals.DEFAULT_SIGNAL_METRICS` rather than replacing it, and
-        a config entry reusing a shipped name overrides that gloss
-        (DESIGN_signal_extraction.md §5). Keys are normalized, so `Heat` and `heat` are
-        one category. Suggested, never enforced: `signal add` and the coach may both use
-        a category outside this list."""
-        merged = dict(DEFAULT_SIGNAL_METRICS)
-        raw = self.get("coach", {}).get("signal_metrics") or {}
-        for name, gloss in raw.items():
-            key = normalize_metric(name)
-            if not key:
-                continue
-            merged[key] = str(gloss or "").strip()
-        return merged
-
-    @property
     def telegram_bot_token(self) -> Optional[str]:
         """Telegram bot token used by the chat front-end (trainmate_bot.py).
 
@@ -588,123 +570,3 @@ class Config:
 
 # Singleton instance
 config = Config()
-
-
-# Threshold anchors are excluded from the config fingerprint: they anchor per-workout zone
-# targets, not the phase structure. They are snapshotted on the macrocycle and only flag
-# the plan stale past a relative drift tolerance (`coach.threshold_replan_pct`) — see
-# service.config_changed(). Only `max_hr` still lives in config; lthr/ftp are named here so
-# a config still carrying them stays out of the hash (DESIGN_benchmark_workouts.md §3.4).
-PROFILE_THRESHOLD_FIELDS = ('max_hr', 'lthr', 'ftp')
-
-# Profile fields that reach every prompt but cannot shape the *periodization*, so editing
-# one must not flag the plan stale (DESIGN_plan_staleness.md §3). `preferences` is
-# session-level by contract: structure lives in the athlete's science documents, which
-# are fingerprinted on their own (§11).
-PROFILE_NON_PLAN_FIELDS = ('name', 'equipment', 'preferences')
-
-# Per-day `weekly_schedule` sub-keys that shape individual sessions but not the mesocycle
-# structure — swapping a day's kit changes what that day is, not the periodization
-# (DESIGN_plan_staleness.md §4). The day's hours/max_sessions/certainty_percent stay in.
-SCHEDULE_NON_PLAN_KEYS = ('equipment',)
-
-
-def plan_profile() -> Dict[str, Any]:
-    """The user_profile fields that shape the periodization strategy.
-
-    Single source of truth for the config_hash fingerprint. The partition and its
-    rationale are DESIGN_plan_staleness.md §3–§4: thresholds are tolerance-checked
-    separately (see above), `name`/`equipment` and each day's `equipment` are excluded as
-    not plan-shaping, and everything else — availability, target hours, preferences,
-    injuries, sports — is. The exclusions are a denylist so a profile field added later
-    counts as plan-shaping until someone decides otherwise (§6).
-
-    Deliberately NOT fingerprinted: prompt-context knobs such as
-    `coach.metrics_lookback_days`, which change what the coach *sees*, not what the plan
-    should be.
-    """
-    return plan_shaping(config.user_profile)
-
-
-def plan_shaping(user_profile: Dict[str, Any]) -> Dict[str, Any]:
-    """`plan_profile()`'s partition applied to any profile dict — the live one, or a
-    snapshot stored under an earlier partition (DESIGN_plan_staleness.md §7)."""
-    excluded = set(PROFILE_THRESHOLD_FIELDS) | set(PROFILE_NON_PLAN_FIELDS)
-    profile = {k: v for k, v in user_profile.items() if k not in excluded}
-    schedule = profile.get('weekly_schedule')
-    if isinstance(schedule, dict):
-        profile['weekly_schedule'] = {
-            day: (
-                {k: v for k, v in spec.items() if k not in SCHEDULE_NON_PLAN_KEYS}
-                if isinstance(spec, dict) else spec
-            )
-            for day, spec in schedule.items()
-        }
-    return profile
-
-
-def changed_plan_profile_fields(old_profile: Dict[str, Any]) -> List[str]:
-    """The plan-shaping profile fields that differ between `old_profile` (a snapshot taken
-    at plan generation) and the live config, so staleness can say *what* moved.
-
-    Names a field whether it was added, removed, or edited — the athlete needs to know
-    which input to look at, not which of the three happened to it (DESIGN_plan_staleness.md
-    §5)."""
-    # Read through the current partition: a field that stopped being plan-shaping after
-    # the snapshot was taken is not a deletion (§7).
-    old_profile = plan_shaping(old_profile)
-    current = plan_profile()
-    return sorted(
-        k for k in set(old_profile) | set(current)
-        if old_profile.get(k) != current.get(k)
-    )
-
-
-def science_documents(s_dir: str) -> Dict[str, str]:
-    """Every `*.md` under `s_dir` as {filename: text}, in name order; {} when the
-    directory is missing or holds none. One reader for the prompt and the fingerprint, so
-    the coach and the staleness check agree on what the athlete's guidelines are."""
-    if not os.path.isdir(s_dir):
-        return {}
-    docs: Dict[str, str] = {}
-    for filename in sorted(os.listdir(s_dir)):
-        if not filename.endswith(".md"):
-            continue
-        filepath = os.path.join(s_dir, filename)
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                docs[filename] = f.read()
-        except Exception as e:
-            print(f"Error reading science guideline {filename}: {e}")
-    return docs
-
-
-def athlete_science_documents() -> Dict[str, str]:
-    """The athlete's own guidelines (`science_dir`), the prescriptive input the plan is
-    generated from and the fifth staleness axis (DESIGN_plan_staleness.md §11)."""
-    return science_documents(config.science_dir)
-
-
-def changed_science_documents(old_docs: Dict[str, str]) -> List[str]:
-    """The athlete's science files that differ between `old_docs` (a snapshot taken at
-    plan generation) and the directory now — added, removed or edited, like
-    `changed_plan_profile_fields` (§11)."""
-    current = athlete_science_documents()
-    return sorted(
-        name for name in set(old_docs) | set(current)
-        if old_docs.get(name) != current.get(name)
-    )
-
-
-def plan_config_hash() -> str:
-    """Hash of the plan-shaping user config (see `plan_profile`).
-
-    Lives here, beside the config it fingerprints, rather than on the coaching engine:
-    the read-only web dashboard shows a "config changed since this plan" banner, and
-    reaching the engine for it would drag the LLM client and the Google Calendar
-    service-account credentials into a surface that writes to neither (ARCHITECTURE.md §8).
-    """
-    import hashlib
-    import json
-    serialized = json.dumps({'user_profile': plan_profile()}, sort_keys=True)
-    return hashlib.sha256(serialized.encode('utf-8')).hexdigest()

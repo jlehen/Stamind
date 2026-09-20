@@ -4,10 +4,12 @@ from typing import Optional
 
 from trainmate import runtime
 from trainmate.learning_doubts import contradiction_reasons
-from trainmate.util import (
-    bold, green, red, yellow, cyan, magenta, gray, cmd, fmt_timestamp, format_labeled_paragraph,
-    format_labeled_text, notice,
+from trainmate.text import (
+    bold, cmd, cyan, format_labeled_paragraph, format_labeled_text, gray, green, magenta, red,
+    yellow,
 )
+from trainmate.output import notice
+from trainmate.clock import fmt_timestamp
 
 
 def _confidence_color(conf: str):

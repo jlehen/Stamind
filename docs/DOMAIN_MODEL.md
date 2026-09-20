@@ -1066,13 +1066,13 @@ Nothing happens automatically.
 
 ### 9.2 `date_type` flips between `event` and `horizon`
 
-`_clean_goals` includes the field **only when it is `horizon`**. So an event goal — every
+`plan_inputs.clean_goals` includes the field **only when it is `horizon`**. So an event goal — every
 goal that predates the field — hashes exactly as it always did, and shipping the field did
 not flag existing plans stale. Flipping a goal either way adds or removes the key, changes
 `goals_hash`, and prompts the replan that change genuinely warrants.
 
 Removing `priority` (§2) was the opposite case, and deliberately so. Dropping the key from
-`_clean_goals` changed `goals_hash` for every plan generated before it, so every existing
+`plan_inputs.clean_goals` changed `goals_hash` for every plan generated before it, so every existing
 plan read stale once on upgrade. The alternative — keeping a vestigial `'priority': 1` in
 the fingerprint forever to preserve old hashes — buys one avoided replan at the cost of a
 constant nobody would dare delete later. One replan prompt was the cheaper side.

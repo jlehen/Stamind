@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from trainmate.types import Macrocycle, Mesocycle, PlanFeedback
-from trainmate.util import today_date
+from trainmate.clock import today_date
 from trainmate.db.objectives import ARCHIVED
 
 

@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 from trainmate import journal
 from trainmate.config import config
-from trainmate.prompt import emit_flush, is_json_frontend
-from trainmate.util import Spinner, aside, warn
+from trainmate.sentinels import emit_flush, is_json_frontend
+from trainmate.output import Spinner, aside, warn
 
 # A fenced reply may be one line (```{"a":1}```) or many, with or without a language
 # tag; the one-line form has no newline to split on. The `$` anchor deliberately

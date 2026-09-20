@@ -2,15 +2,40 @@
 with the database."""
 import argparse
 import sys
+from datetime import datetime, timedelta
 from typing import Optional
 from trainmate import runtime
-from trainmate.calendar_state import calendar_status
-from trainmate.util import (
-    step, dim, green, red, cyan, cmd, fmt_date, fmt_span, today_str as _today_str, notice,
-)
+from trainmate.workout_state import calendar_status
+from trainmate.text import cmd, cyan, dim, green, red
+from trainmate.output import notice, step
+from trainmate.clock import fmt_date, fmt_span, today_str as _today_str
 from trainmate.cli.selectors import resolve_window
 
-from trainmate.cli.workouts._helpers import warn_stale_before
+
+def warn_stale_before(start_date: str) -> None:
+    """Flags workouts left `stale` on days earlier than the window just pushed.
+
+    `workout push` defaults to today onward, so a row that went stale in the past —
+    realistically a push that failed while offline — has nothing that would ever
+    re-push it. Freshness is derived, not stored (see trainmate.workout_state), so
+    the marker is durable; this just makes it visible outside the pushed range."""
+    try:
+        cutoff = (
+            datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+    except ValueError:
+        return
+    earlier = runtime.db.get_workouts(end_date=cutoff, include_removed=True)
+    stale = [w for w in earlier if calendar_status(w) == 'stale']
+    if not stale:
+        return
+    label = "workout" if len(stale) == 1 else "workouts"
+    earliest = min(w['date'] for w in stale)
+    notice(
+        f"Note: {len(stale)} {label} before {fmt_date(start_date)} still read [STALE] "
+        f"— their calendar events are out of date and this push did not cover them. "
+        f"Run {cmd(f'workout push -d {earliest}..')} to update them.",
+    )
 
 
 def run_workout_push(args: argparse.Namespace) -> None:

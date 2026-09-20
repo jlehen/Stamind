@@ -25,9 +25,9 @@ import argparse
 import json
 import sys
 
+from trainmate import plan_inputs
 from trainmate.db import db
-from trainmate.coach.engine import CoachEngine
-from trainmate.util import today_str
+from trainmate.clock import today_str
 
 
 def main() -> int:
@@ -38,11 +38,10 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    engine = CoachEngine()
     today = today_str()
     replan_constraints = [c for c in db.get_constraints(today) if c.get("replan")]
-    cleaned = engine._clean_constraints(replan_constraints)
-    new_hash = engine._get_constraints_hash(replan_constraints)
+    cleaned = plan_inputs.clean_constraints(replan_constraints)
+    new_hash = plan_inputs.constraints_hash(replan_constraints)
     print(
         f"Recomputed constraints_hash over {len(replan_constraints)} plan-shaping "
         f"constraint(s): {new_hash}"

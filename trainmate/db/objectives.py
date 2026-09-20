@@ -1,6 +1,6 @@
 from typing import Any, List, Optional
 from trainmate.config import config
-from trainmate.util import today_date
+from trainmate.clock import today_date
 from trainmate.types import Objective
 
 

@@ -18,7 +18,7 @@ from unittest.mock import patch
 from trainmate import journal
 from trainmate.config import config
 from trainmate.prompt import PromptCancelled
-from trainmate.util import default_wrap_width, visible_len
+from trainmate.text import default_wrap_width, visible_len
 from tests.helpers import bind_test_db, run_cli
 from tests import test_db_path
 
@@ -667,7 +667,7 @@ class TestOutputVerbs(JournalTestCase):
     """step/warn/fail print where they always did, and record what they printed (§5.1)."""
 
     def test_step_prints_like_an_aside_and_journals_it(self):
-        from trainmate.util import step
+        from trainmate.output import step
         buffer = io.StringIO()
         with patch.object(sys, "stdout", buffer):
             step("Auto-syncing Garmin 2026-08-22..2026-08-24...")
@@ -677,7 +677,7 @@ class TestOutputVerbs(JournalTestCase):
         self.assertEqual(rec["lvl"], "info")
 
     def test_warn_and_fail_carry_their_prefix_and_level(self):
-        from trainmate.util import fail, warn
+        from trainmate.output import fail, warn
         buffer = io.StringIO()
         with patch.object(sys, "stdout", buffer):
             warn("Garmin sync failed. Continuing with cached data.")
@@ -688,8 +688,9 @@ class TestOutputVerbs(JournalTestCase):
         self.assertEqual([rec["lvl"] for rec in self.records()], ["warn", "error"])
 
     def test_a_journalled_message_carries_no_colour_codes(self):
-        from trainmate.util import cmd, warn
-        with patch("trainmate.util.is_color_enabled", return_value=True):
+        from trainmate.text import cmd
+        from trainmate.output import warn
+        with patch("trainmate.text.is_color_enabled", return_value=True):
             with patch.object(sys, "stdout", io.StringIO()):
                 warn("run " + cmd("data pull") + " in a terminal")
         self.assertEqual(self.records()[0]["msg"], "run 'data pull' in a terminal")
@@ -749,9 +750,9 @@ class TestPromptAnswers(JournalTestCase):
         self.assertNotIn("defaulted", self._answers()[0]["d"])
 
     def test_the_question_is_flattened_to_one_line_and_stripped_of_colour(self):
-        from trainmate.util import yellow
+        from trainmate.text import yellow
         journal.start_run(["workout", "generate"], source="cli")
-        with patch("trainmate.util.is_color_enabled", return_value=True):
+        with patch("trainmate.text.is_color_enabled", return_value=True):
             with patch("builtins.input", return_value="y"):
                 self.prompt.confirm(yellow("Proceed anyway?\nThis rebuilds  the week."))
         journal.end_run("ok")

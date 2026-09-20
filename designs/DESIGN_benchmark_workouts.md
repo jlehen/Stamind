@@ -110,7 +110,7 @@ The scary version of this feature is "a benchmark updates my FTP, which rewrites
 all my historical TSS and corrupts the PMC." **That cannot happen here**, and it
 is worth stating up front because it shapes everything below.
 
-TrainMate computes TSS from Garmin's *time-in-zone seconds* (`garmin/load.py`),
+TrainMate computes TSS from Garmin's *time-in-zone seconds* (`analytics/load.py`),
 where the zoning was already done inside the athlete's Garmin account. The
 app-side `ftp`/`lthr` values (the benchmark logbook, §3.2) are never read by the
 load model. They feed exactly two things:
@@ -486,7 +486,7 @@ benchmark session; if the athlete
 will not be fresh (negative TSB), move it *intact* — same content,
 `benchmark_type` preserved — to a later day within the mesocycle and lighten the
 days before it. Moving is necessarily the LLM's call: TSB is backward-looking
-only (`garmin/pmc.py:47` — computed from *completed* load), so no deterministic
+only (`analytics/pmc.py` — computed from *completed* load), so no deterministic
 pass can know which future day will be fresh; the model, which sees the TSB
 history and the planned load ahead, judges it. Fallback the model is told
 explicitly: when the benchmark sits on the last day of the mesocycle and no later
@@ -558,7 +558,7 @@ one will follow.
 
 FTP tests are done indoors on Zwift (ramp or 20-min protocol), which **computes
 and displays the FTP number on screen**. Meanwhile the app stores only Garmin's
-bucketed zone-seconds, **not** the raw power stream (`garmin/load.py`) — so it
+bucketed zone-seconds, **not** the raw power stream (`analytics/load.py`) — so it
 cannot recompute "20-min best power × 0.95" after the fact. The data simply isn't
 there. Therefore:
 

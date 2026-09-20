@@ -10,9 +10,21 @@ So a proposal carries the facts it was computed from, and the consumer renders r
 than recomputes. Records only: the logic that fills them in lives in `revisions.py`.
 """
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
-from trainmate.coach.revisions import RevisionPair
+from trainmate.types import Objective
+
+
+@dataclass(frozen=True)
+class RevisionPair:
+    """One proposed session and the planned session it stands in for.
+
+    `original` is the session being replaced — the same-sport session for an in-place
+    change, or the displaced one for a sport swap. None when nothing was planned that day.
+    """
+    proposal: Dict[str, Any]
+    original: Optional[Dict[str, Any]]
+    is_swap: bool
 
 
 @dataclass(frozen=True)
@@ -166,3 +178,21 @@ class PlanFingerprints:
     constraints_snapshot: Optional[str] = None
     all_constraints_snapshot: Optional[str] = None
     science_snapshot: Optional[str] = None
+
+
+class PlanProposal(TypedDict):
+    """What `plan generate` produced, before the athlete has accepted it.
+
+    `goal` is the objective the plan belongs to — the requested one, or the next active
+    goal when none was named. It is `None` only when there are no active goals at all.
+    """
+    strategy: str
+    mesocycles: List[Dict[str, Any]]
+    reused: bool
+    goal: Optional[Objective]
+    # The planned-vs-actual review the strategy was written against, laid out at the
+    # caller's width — only when the caller asked to see it (`--show-llm-context`).
+    prior_training_review: Optional[str]
+    # Whether one fed the prompt at all, so a caller that is not showing it can still
+    # name the flag that would.
+    has_prior_training: bool

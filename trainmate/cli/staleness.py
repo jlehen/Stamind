@@ -1,19 +1,19 @@
-"""One owner for "this plan was generated from inputs that have since changed".
+"""How "this plan was generated from inputs that have since changed" is worded.
 
 `plan show` reports it, `plan keep` dismisses it, `plan generate` and `workout generate`
-each offer to act on it. Wording and re-stamp live here once, closing design smell B-8
+each offer to act on it. The wording lives here once, closing design smell B-8
 (DESIGN_plan_staleness.md §9). What changed is shown as a diff, and the two questions
 carry the verdict call's read on whether it reshapes the plan (§10).
+
+Only the wording. Whether an input has moved, what the diff says and what the coach
+makes of it are `coach/service/staleness.py`; this module asks it and prints.
 """
 
-import hashlib
-import json
 from typing import Any, Dict, Optional
 
 from trainmate import runtime
-from trainmate.util import (
-    bold, cmd, gray, green, notice, red, today_str as _today_str, wrap_text, yellow,
-)
+from trainmate.text import bold, cmd, gray, green, red, wrap_text, yellow
+from trainmate.output import notice
 
 
 def reason(macro: dict) -> Optional[str]:
@@ -32,29 +32,6 @@ def guidance() -> str:
         "order or volume ramp. Wording, tone or how sessions are described: keep the "
         f"plan — {cmd('workout generate -d today..')} applies it to the days already "
         f"scheduled, and a bare {cmd('workout generate')} to the days after them."
-    )
-
-
-def stamp(macro: dict) -> None:
-    """Records the current inputs against `macro`, so the change stops being flagged.
-
-    Every axis `config_changed` reads, or a plan kept today flags again tomorrow
-    (DESIGN_plan_change_continuity.md §6.5)."""
-    service = runtime.coach_service
-    objectives = runtime.db.upcoming_objectives()
-    replan = [
-        c for c in runtime.db.get_constraints(_today_str()) if c.get('replan')
-    ]
-    runtime.db.update_macrocycle_config_hash(
-        macro['id'],
-        service._get_config_hash(),
-        service._get_config_snapshot(),
-        service._get_profile_snapshot(),
-        goals_hash=service._get_goals_hash(objectives),
-        goals_snapshot=json.dumps(service.engine._clean_goals(objectives)),
-        constraints_hash=service._get_constraints_hash(replan),
-        constraints_snapshot=json.dumps(service.engine._clean_constraints(replan)),
-        science_snapshot=service._get_science_snapshot(),
     )
 
 
@@ -94,35 +71,6 @@ def verdict_line(verdict: Optional[Dict[str, Any]]) -> Optional[str]:
     return f"{bold('Coach')}: {yellow(label) if verdict['reshaping'] else green(label)}.{why}"
 
 
-def _verdict_key(macro: dict, change_reason: str) -> str:
-    """What a cached verdict was asked about: the edit itself, not the plan. Two runs
-    over one unchanged edit ask once (DESIGN_plan_change_continuity.md §7)."""
-    diff = runtime.coach_service.staleness_diff(macro)
-    return hashlib.sha256(f"{change_reason}\n{diff}".encode()).hexdigest()[:16]
-
-
-def cached_verdict(macro: dict, change_reason: str) -> Optional[Dict[str, Any]]:
-    """The verdict call's read on this edit, asked once and cached against it (§7).
-
-    Fails open exactly as the uncached call does: a network error leaves the caller with
-    the question and no verdict, and nothing is cached, so the next run asks again."""
-    key = _verdict_key(macro, change_reason)
-    if macro.get('reshape_verdict_key') == key:
-        try:
-            cached = json.loads(macro.get('reshape_verdict') or "")
-        except (ValueError, TypeError):
-            cached = None
-        if isinstance(cached, dict) and isinstance(cached.get('reshaping'), bool):
-            return cached
-    verdict = runtime.coach_service.plan_reshape_verdict(macro, change_reason)
-    # Anything but the shape the caller renders is "no verdict": nothing is cached, so
-    # the next run asks again rather than serving a malformed reply forever.
-    if not isinstance(verdict, dict) or not isinstance(verdict.get('reshaping'), bool):
-        return None
-    runtime.db.save_reshape_verdict(macro['id'], key, json.dumps(verdict))
-    return verdict
-
-
 def explain(change_reason: str, macro: dict) -> Optional[bool]:
     """Everything the athlete gets before either question (§10): the fact, the diff, the
     §2 test, then the verdict call's read on it. Returns True when that call says
@@ -133,7 +81,7 @@ def explain(change_reason: str, macro: dict) -> Optional[bool]:
     ))
     print_diff(macro)
     print(wrap_text(guidance()))
-    verdict = cached_verdict(macro, change_reason)
+    verdict = runtime.coach_service.cached_verdict(macro, change_reason)
     line = verdict_line(verdict)
     if line:
         print()
@@ -165,7 +113,9 @@ def report(change_reason: str, macro: dict) -> None:
     notice(f"    {change_reason}")
     print_diff(macro, indent="    ")
     print(wrap_text(f"  {guidance()}"))
-    line = verdict_line(cached_verdict(macro, change_reason))
+    line = verdict_line(
+        runtime.coach_service.cached_verdict(macro, change_reason)
+    )
     if line:
         print()
         print(wrap_text(f"  {line}"))

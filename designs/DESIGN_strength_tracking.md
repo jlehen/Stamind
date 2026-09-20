@@ -257,7 +257,7 @@ last because body weight is not stored (§8).
 
 A shipped, static table maps every exercise TrainMate knows about to one **movement
 pattern** and one **equipment** class. It ships with the code, like the zone tables in
-`garmin/load.py`; nobody configures it. Garmin's category/name pairs are aliases into it,
+`analytics/load.py`; nobody configures it. Garmin's category/name pairs are aliases into it,
 and so are the plain-English names the athlete or the coach use.
 
 Garmin's exercise vocabulary is finite and public. The table maps **all of it** at

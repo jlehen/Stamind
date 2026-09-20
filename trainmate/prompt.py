@@ -20,127 +20,23 @@ Two transports ship here:
 Every answer is journalled here rather than at the ~29 call sites, with ``ask_text`` the
 deliberate exception (DESIGN_logging.md §5.6, §4.4).
 
-The module imports nothing beyond the stdlib so it stays unit-testable in isolation (feed
-``JsonPrompt`` a pair of ``io.StringIO``-like streams); the journal and colour helpers are
-imported inside ``_record_answer`` to keep that true.
+The wire framing ``JsonPrompt`` writes — the sentinel, the tags, the answer shape — is
+``trainmate/sentinels.py``, which the bot reads with the same module.
+
+Beyond that this module imports nothing outside the stdlib, so it stays unit-testable in
+isolation (feed ``JsonPrompt`` a pair of ``io.StringIO``-like streams); the journal and
+colour helpers are imported inside ``_record_answer`` to keep that true.
 """
 from __future__ import annotations
 
 import json
-import os
 import sys
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
-# Wire framing for JsonPrompt requests. A request is one line on stdout:
-#   \x1eTM-PROMPT {json}\n
-# The \x1e (ASCII record-separator) sentinel never appears in normal CLI output,
-# so a front-end can tell control traffic from prose regardless of what a command
-# prints. The matching answer comes back as one JSON line on the process's stdin.
-PROMPT_SENTINEL = "\x1eTM-PROMPT "
-PROMPT_PROTOCOL_VERSION = 1
-
-# Sibling one-way sentinel: a command that rendered a chart tells the front-end
-# where the PNG lives (no answer expected, unlike TM-PROMPT). Framing is the
-# same \x1e-prefixed single line, so a front-end that doesn't recognise it can
-# drop it instead of forwarding raw protocol bytes as chat text
-# (DESIGN_progress_timeline.md §7.2).
-PHOTO_SENTINEL = "\x1eTM-PHOTO "
-
-
-def emit_photo(path: str, caption: Optional[str] = None, out=None) -> None:
-    """Writes one sentinel-framed photo-ready line: ``\\x1eTM-PHOTO {json}``,
-    ``{"path": ..., "caption": ...}``. The caption travels in the payload
-    because the front-end has no other way to know it — it must not re-parse
-    forwarded chat text (§7.2)."""
-    if out is None:
-        out = sys.stdout
-    out.write(PHOTO_SENTINEL + json.dumps({"path": path, "caption": caption}) + "\n")
-    out.flush()
-
-
-# Third sentinel: a NON-blocking inline-button row attached to the output just
-# flushed. Prompts ask and wait; buttons offer and exit — the CLI keeps deciding
-# WHAT to offer, the front-end only renders (DESIGN_bot_simple_frontend.md §4.4).
-BUTTONS_SENTINEL = "\x1eTM-BUTTONS "
-
-
-def emit_buttons(buttons: Sequence[dict], out=None) -> None:
-    """Writes one sentinel-framed button-row line: ``\\x1eTM-BUTTONS {json}``,
-    ``{"buttons": [...]}``. Each button is ``{"label": ...}`` plus exactly one of:
-    ``send`` (a canned utterance the front-end feeds back through its normal command
-    pipeline when tapped), ``ack`` (a short reply text; nothing runs), or ``menu`` (a
-    nested list of send/ack buttons) — DESIGN_bot_simple_frontend.md §4.4."""
-    if out is None:
-        out = sys.stdout
-    out.write(BUTTONS_SENTINEL + json.dumps({"buttons": list(buttons)}) + "\n")
-    out.flush()
-
-
-# Fourth sentinel: a payload-free "send what you have buffered" marker. The other
-# three flush the chat as a side effect of doing something else; this one exists only
-# to flush, so a command about to go quiet for an LLM call can deliver its setup first
-# instead of letting it arrive glued to the answer (DESIGN_output_verbosity.md §7).
-# The empty JSON object keeps the frame identical to its siblings, leaving room for a
-# field later without changing the wire shape.
-FLUSH_SENTINEL = "\x1eTM-FLUSH "
-
-
-def emit_flush(out=None, wait: bool = True) -> None:
-    """Writes one sentinel-framed flush marker: ``\\x1eTM-FLUSH {}``.
-
-    Does nothing on a terminal, where output already reaches the screen line by line.
-    The front-end test lives here rather than at each call site because a flush has no
-    meaning outside a buffering front-end (DESIGN_output_verbosity.md §7).
-
-    `wait=False` writes ``{"wait": false}``: the marker only ends a message, no wait
-    follows it, so the bot hangs no Stop button on it (DESIGN_change_heads_up.md §4)."""
-    if not is_json_frontend():
-        return
-    if out is None:
-        out = sys.stdout
-    payload = {} if wait else {"wait": False}
-    out.write(FLUSH_SENTINEL + json.dumps(payload) + "\n")
-    out.flush()
-
-
-# Fifth sentinel: one item of the athlete queue, sent as a message of its own whose buttons
-# carry the item id. It replaces no TM-BUTTONS row and no row replaces it, so the bot
-# remembers nothing about it (DESIGN_athlete_queue.md §6.2).
-QUEUE_SENTINEL = "\x1eTM-QUEUE "
-
-
-def emit_queue_item(
-    item_id: int, text: str, buttons: Sequence[dict], since: str, out=None
-) -> None:
-    """Writes one sentinel-framed queued item: ``\\x1eTM-QUEUE {json}``, fields ``id``,
-    ``text``, ``buttons`` (each ``{"label", "action"}``) and ``since``, the walk's start in
-    epoch seconds, ``r``-prefixed for a walk of one (DESIGN_athlete_queue.md §6.2)."""
-    if out is None:
-        out = sys.stdout
-    payload = {"id": item_id, "text": text, "buttons": list(buttons), "since": since}
-    out.write(QUEUE_SENTINEL + json.dumps(payload) + "\n")
-    out.flush()
-
-
-# The "later" choices of a queued item: action code, words, and the emoji a chat button
-# adds. One definition for the terminal's chooser and the bot's "Not now" row, which the bot
-# swaps in from the tap itself (DESIGN_athlete_queue.md §6.4).
-QUEUE_LATER_HOUR = "h"
-QUEUE_LATER_DAY = "t"
-QUEUE_LATER_BACK = "b"
-QUEUE_NOT_NOW = "n"
-QUEUE_LATER_CHOICES = (
-    (QUEUE_LATER_HOUR, "in 1 hour", "⏰"),
-    (QUEUE_LATER_DAY, "in 1 day", "⏰"),
-    (QUEUE_LATER_BACK, "after the others", "↩️"),
+from trainmate.sentinels import (
+    PROMPT_PROTOCOL_VERSION, PROMPT_SENTINEL, is_json_frontend,
 )
-
-
-def queue_later_label(words: str, emoji: str) -> str:
-    """A "later" choice as a chat button: '⏰ In 1 hour'."""
-    return f"{emoji} {words[:1].upper()}{words[1:]}"
-
 
 class PromptCancelled(Exception):
     """Raised when the front-end cancels an in-flight prompt (``/cancel`` or idle
@@ -169,7 +65,7 @@ def _record_answer(message: str, shown: str, **fields: Any) -> None:
     question is flattened to one line and stripped of colour: it was written for a
     terminal, and the journal is not one."""
     from trainmate.journal import note
-    from trainmate.util import strip_ansi
+    from trainmate.text import strip_ansi
     note(" ".join(strip_ansi(message).split()) + f" → {shown}", **fields)
 
 
@@ -358,17 +254,6 @@ class JsonPrompt:
         if answer is None:
             return default if default is not None else ""
         return str(answer)
-
-
-def is_json_frontend(frontend: Optional[str] = None) -> bool:
-    """True when a structured front-end (the Telegram bot) is driving the CLI.
-
-    The one place the ``TRAINMATE_FRONTEND`` env var is interpreted, so the transport
-    choice below and the output shapes that vary by front-end (chart delivery, the
-    missing-argument error of DESIGN_cli_noargs.md §a) cannot drift apart."""
-    if frontend is None:
-        frontend = os.environ.get("TRAINMATE_FRONTEND", "")
-    return frontend.lower() == "json"
 
 
 def athlete_watching() -> bool:

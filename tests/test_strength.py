@@ -18,7 +18,7 @@ import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, befo
 from trainmate import athlete_queue, runtime, settings
 from trainmate.cli.render import simple_compare_lines
 from trainmate.garmin import sync
-from trainmate.prompt import QUEUE_SENTINEL
+from trainmate.sentinels import QUEUE_SENTINEL
 from trainmate.strength import questions, sets, vocabulary
 
 if os.path.exists(TEST_DB_PATH):

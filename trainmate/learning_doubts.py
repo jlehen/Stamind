@@ -8,10 +8,10 @@ the doubts it leaves pending: one question each while the questions are on, or t
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from trainmate import clock, runtime, settings
-from trainmate.db.learnings import RETIRE_PROPOSAL
+from trainmate.learning_confidence import RETIRE_PROPOSAL
 from trainmate.db.queue import queue_stamp
 from trainmate.queue_kind import QUESTION, STALE, Kind, queue
-from trainmate.util import step
+from trainmate.output import step
 
 KIND = "learning"
 STILL_FITS = 0

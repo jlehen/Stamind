@@ -31,7 +31,7 @@ The bottom row is what the coach sees today. The rows above it are what happened
 Two mechanisms hide this, and it is worth being precise about which:
 
 - **Projection.** hrTSS is a *weighted sum of the very table above* (`HR_ZONE_TSS_PER_SEC`,
-  `garmin/load.py`). It is not blind to intensity — it is a projection of a five-dimensional
+  `analytics/load.py`). It is not blind to intensity — it is a projection of a five-dimensional
   fact onto one axis. Many distributions map to the same scalar, and the shape is what is
   lost. Note what the table had to do to keep the bottom row flat: 81 minutes of Z2 had to
   disappear. That trade is the creep.
@@ -241,7 +241,7 @@ the rule belongs here and not in §10.
 
 Two vocabularies currently disagree, and they are different *kinds* of list. `SPORT_MAPPING`
 (`sports.py`) holds complete activity-type names, matched exactly by `canonical_sport`.
-`CYCLING_TERMS` (`garmin/load.py`) holds substring *fragments* — `"ride"` is not an activity
+`CYCLING_TERMS` (`analytics/load.py`) holds substring *fragments* — `"ride"` is not an activity
 type — matched loosely by `sync.py`. `SPORT_MAPPING` has no `gravel_cycling` or `cyclocross`;
 `CYCLING_TERMS` has both. So a gravel ride *does* get its power zones fetched, then falls
 through `canonical_sport` unchanged into a `gravel_cycling` row of its own — one athlete's
@@ -910,7 +910,7 @@ not run would assert that they trained without recording it, which is §7's mean
 exactly backwards. Not-trained, badly-recorded and genuinely-easy are three different facts.
 
 **Coverage gets its own threshold, per currency.** `hr_zone_coverage_min` (default 0.5) exists
-for one purpose: `garmin/load.py` uses it to decide whether to trust hrTSS or fall back to the
+for one purpose: `analytics/load.py` uses it to decide whether to trust hrTSS or fall back to the
 athlete's RPE. That is a "safe to compute load from" bar, not a "safe to show a human" bar — a
 week at 55% passes it while missing nearly half its recorded time. And it is HR-named while
 the power table needs one too, where coverage is structurally lower because a ride with no
@@ -966,7 +966,7 @@ for its own instrument.
 The `hr_sparse` case is worse and belongs to the *load* table, not this one: the athlete
 trained normally, the strap died, no RPE was entered, and the week reads as a genuine
 adherence miss that the week planner will then adapt the sessions around. `_measurement_is_load`
-(`garmin/load.py`) already implements the test; the load table should mark it. Filed in §11
+(`analytics/load.py`) already implements the test; the load table should mark it. Filed in §11
 because it is a `progress` defect that predates this design.
 
 **One currency per table, chosen by coverage.** An earlier draft chose power where *any*
@@ -1265,7 +1265,7 @@ generation. Sessions planned before this ships render no ghost row until the nex
 generate`, which is a gap of days and wants one note line, not a migration.
 
 **Nothing has to be done about the calendar hash, and one thing must not be done.**
-`CALENDAR_FIELDS` (`calendar_state.py`) is an allowlist, so new columns are excluded by
+`CALENDAR_FIELDS` (`workout_state.py`) is an allowlist, so new columns are excluded by
 default; `rpe` is already there as deliberate precedent. But `description` *is* in the
 allowlist, so the athlete-readable sentence — `Target: ~25min recovery, ~30min aerobic, ~10min
 threshold, ~18min VO2max+` — must be **rendered from the columns at display time and never

@@ -10,12 +10,13 @@ No DB access here (same rule as ``trainmate.sports``): callers pass activity row
 fetch callable, so one implementation serves `workout adapt`, the strategy prompt and
 the CLI mesocycle summary.
 """
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
-from trainmate.benchmarks import ANCHOR_KINDS, format_delta, format_value
+from trainmate.benchmarks import format_delta, format_value, label_for_kind
+from trainmate.clock import parse_date
 from trainmate.config import config
-from trainmate.garmin.load import _rpe_tss, activity_load
+from trainmate.analytics.load import activity_load, rpe_tss
 from trainmate.sports import canonical_sport, is_strength_sport
 
 
@@ -113,10 +114,6 @@ FetchWorkouts = Callable[[str, str], List[Dict[str, Any]]]
 
 # --------------------------------------------------------------------- dates
 
-def _d(value: str) -> date:
-    return datetime.strptime(value, "%Y-%m-%d").date()
-
-
 def _s(value: date) -> str:
     return value.strftime("%Y-%m-%d")
 
@@ -124,8 +121,8 @@ def _s(value: date) -> str:
 def counted_days(start: str, end: str, as_of: str) -> int:
     """Days of the mesocycle that are over: elapsed before `as_of`, capped at the mesocycle's
     own span. Zero or negative means the mesocycle has not started."""
-    span = (_d(end) - _d(start)).days + 1
-    return min((_d(as_of) - _d(start)).days, span)
+    span = (parse_date(end) - parse_date(start)).days + 1
+    return min((parse_date(as_of) - parse_date(start)).days, span)
 
 
 def rate_window(start: str, end: str, as_of: str) -> Optional[Tuple[str, str, int]]:
@@ -141,7 +138,7 @@ def rate_window(start: str, end: str, as_of: str) -> Optional[Tuple[str, str, in
     weeks = days // 7 if days > 0 else 0
     if weeks < 1:
         return None
-    return start, _s(_d(start) + timedelta(days=weeks * 7 - 1)), weeks
+    return start, _s(parse_date(start) + timedelta(days=weeks * 7 - 1)), weeks
 
 
 def current_week_window(start: str, end: str, as_of: str) -> Optional[Tuple[str, str, int]]:
@@ -149,10 +146,10 @@ def current_week_window(start: str, end: str, as_of: str) -> Optional[Tuple[str,
     `as_of` sits outside the mesocycle or exactly on a week boundary with nothing elapsed."""
     if not (start <= as_of <= end):
         return None
-    elapsed = (_d(as_of) - _d(start)).days
+    elapsed = (parse_date(as_of) - parse_date(start)).days
     if elapsed < 0:
         return None
-    week_start = _d(start) + timedelta(days=(elapsed // 7) * 7)
+    week_start = parse_date(start) + timedelta(days=(elapsed // 7) * 7)
     return _s(week_start), as_of, elapsed % 7 + 1
 
 
@@ -171,7 +168,7 @@ def measured_window(start: str, end: str, as_of: str) -> Tuple[str, str, int]:
 def mesocycle_weeks(start: str, end: str) -> int:
     """The mesocycle's planned length in weeks, rounded up — the denominator of
     '2 completed weeks of 4'."""
-    return max(1, ((_d(end) - _d(start)).days + 7) // 7)
+    return max(1, ((parse_date(end) - parse_date(start)).days + 7) // 7)
 
 
 # --------------------------------------------------------- zone aggregation
@@ -752,14 +749,14 @@ def format_structural(
         if rpe:
             agg["rpe_sum"] += float(rpe)
             agg["rpe_n"] += 1
-            agg["srpe"] += _rpe_tss(float(rpe), duration_sec)
+            agg["srpe"] += rpe_tss(float(rpe), duration_sec)
 
     lines: List[str] = []
     rows = [(s, by_sport[s]) for s in order if by_sport[s]["rpe_n"]]
     kinds = {r["anchor_kind"] for r in (benchmarks or []) if start <= r["date"] <= end}
     label_width = max(
         [len(s) for s, _ in rows]
-        + [len((ANCHOR_KINDS[k].label if k in ANCHOR_KINDS else k)) for k in kinds]
+        + [len(label_for_kind(k)) for k in kinds]
         + [4]
     )
     for sport, agg in rows:
@@ -790,8 +787,7 @@ def _benchmark_lines(
         if not inside:
             continue
         before = [r for r in rows if r["date"] < start]
-        anchor = ANCHOR_KINDS.get(kind)
-        label = (anchor.label if anchor else kind).ljust(label_width)
+        label = label_for_kind(kind).ljust(label_width)
         latest = float(inside[-1]["value"])
         if not before:
             out.append(f"{indent}{label}  {format_value(kind, latest)} (first on record)")
@@ -960,7 +956,7 @@ def mesocycle_report(
         # counted_days counts days that are OVER, not days that exist.
         prev_window = rate_window(
             previous["start_date"], previous["end_date"],
-            _s(_d(previous["end_date"]) + timedelta(days=1)),
+            _s(parse_date(previous["end_date"]) + timedelta(days=1)),
         )
         if prev_window:
             p_start, p_end, p_weeks = prev_window

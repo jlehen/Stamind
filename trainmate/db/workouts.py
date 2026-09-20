@@ -1083,7 +1083,7 @@ class WorkoutsMixin:
     ) -> None:
         """Records a successful Google Calendar push: the event handle and the signature
         of the content that was pushed. Freshness is derived by comparing that signature
-        against the live content (see trainmate.calendar_state), so this is the *only*
+        against the live content (see trainmate.workout_state), so this is the *only*
         method that marks a session `synced`. Keyed by lineage, because there is one
         event per session and it must follow it across edits and date moves (§8)."""
         with self._get_connection() as conn:
@@ -1099,7 +1099,7 @@ class WorkoutsMixin:
 
     def mark_workout_adherence_pushed(self, lineage_id: int, signature: str) -> None:
         """Records a successful `workout compare --mark` push: the adherence-inclusive
-        signature (see trainmate.calendar_state.adherence_signature), so a later compare
+        signature (see trainmate.workout_state.adherence_signature), so a later compare
         over the same range can skip a no-op Calendar update when the event already
         carries the same verdict. Orthogonal to `pushed_signature` — the underlying
         `sync_workout` already refreshed that (§8)."""

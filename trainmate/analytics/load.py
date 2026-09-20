@@ -1,4 +1,9 @@
-"""Training-load math: measured/HR/RPE TSS, per-activity load, RPE divergence."""
+"""Training-load math: measured/HR/RPE TSS, per-activity load, RPE divergence.
+
+`activity_load` values what Garmin recorded and `planned_load` values what the week
+planner asked for. They are the same question asked of the two sides of a day, so they
+live together (ARCHITECTURE §12, DESIGN_pmc_fitness_fatigue.md).
+"""
 from typing import Any, Dict, Optional, Tuple
 
 from trainmate.config import config
@@ -43,7 +48,7 @@ def _hr_zone_coverage(hr_zone_sec: Dict[str, Any], duration_sec: float) -> float
         return 0.0
     total = sum(float(hr_zone_sec.get(f"zone{i}_sec") or 0) for i in range(1, 6))
     return total / duration_sec
-def _rpe_tss(rpe: float, duration_sec: float) -> float:
+def rpe_tss(rpe: float, duration_sec: float) -> float:
     """Session-RPE (sRPE) TSS estimate. Foster (2001), "A new approach to
     monitoring exercise training", validated for resistance work by Sweet et
     al. (2004). Maps the Borg CR-10 1-10 scale to duration: (RPE*10) per hour."""
@@ -91,11 +96,11 @@ def compute_load(
         if _hr_zone_coverage(hr_zone_sec, duration_sec) >= config.hr_zone_coverage_min:
             return hr, "hr", None
         if rpe:
-            return _rpe_tss(float(rpe), duration_sec), "rpe", None
+            return rpe_tss(float(rpe), duration_sec), "rpe", None
         return hr, "hr_sparse", "low HR-zone coverage and no RPE entered"
 
     if rpe:
-        return _rpe_tss(float(rpe), duration_sec), "rpe", None
+        return rpe_tss(float(rpe), duration_sec), "rpe", None
     return 0.0, "none", "no power, HR, or RPE data"
 def _has_power_zones(act: Dict[str, Any]) -> bool:
     return any(act.get(f"power_zone{i}_sec") for i in range(1, 8))
@@ -119,7 +124,7 @@ def _divergence_ratio(act: Dict[str, Any], duration_sec: float) -> Optional[floa
         return None
     if not _measurement_is_load(act, duration_sec):
         return None  # measurement isn't the load; RPE already wins, no divergence
-    return _rpe_tss(float(rpe), duration_sec) / float(tss)
+    return rpe_tss(float(rpe), duration_sec) / float(tss)
 def _divergence_threshold() -> float:
     return config.rpe_divergence_ratio
 def activity_load(act: Dict[str, Any]) -> float:
@@ -139,13 +144,13 @@ def activity_load(act: Dict[str, Any]) -> float:
     duration_sec = act.get("duration_sec") or 0.0
     if tss is not None:
         if not _measurement_is_load(act, duration_sec):
-            return _rpe_tss(float(rpe), duration_sec) if rpe else float(tss)
+            return rpe_tss(float(rpe), duration_sec) if rpe else float(tss)
         ratio = _divergence_ratio(act, duration_sec)
         if ratio is not None and ratio >= _divergence_threshold():
-            return _rpe_tss(float(rpe), duration_sec)
+            return rpe_tss(float(rpe), duration_sec)
         return float(tss)
     if rpe:
-        return _rpe_tss(float(rpe), duration_sec)
+        return rpe_tss(float(rpe), duration_sec)
     return 0.0
 def load_method(act: Dict[str, Any]) -> str:
     """Where `activity_load` took this row's number from — the provenance that is
@@ -194,8 +199,20 @@ def rpe_divergence(act: Dict[str, Any]) -> Optional[float]:
     if ratio is None:
         return None
     return round(ratio, 2) if ratio >= _divergence_threshold() else None
-def _safe_round(value: Any, ndigits: int = 1) -> float:
-    try:
-        return round(float(value), ndigits)
-    except (ValueError, TypeError):
-        return 0.0
+
+
+def planned_load(w: Dict[str, Any]) -> float:
+    """Expected load of a planned workout as a single value (mirrors the actual
+    side): the week planner's planned TSS, or sRPE (RPE x 10 x hours) when no TSS was
+    assigned. Replaces the former `tss + rpe*hours` blend.
+
+    An explicit ``tss = 0`` means zero, not "unset" — it is a real planned load
+    and must not silently fall through to the sRPE estimate (that made the
+    timeline's weekly bars disagree with the adherence percentages beside them,
+    DESIGN_progress_timeline.md §3). Only a missing/None TSS triggers the fallback."""
+    tss = w.get("tss")
+    if tss is not None:
+        return float(tss)
+    rpe = w.get("rpe") or 0
+    duration_min = w.get("duration_minutes") or 0
+    return rpe_tss(float(rpe), duration_min * 60.0)

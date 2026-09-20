@@ -64,7 +64,7 @@ mock.patch("trainmate.garmin.sync._sync_calendar_signals", lambda *a, **k: None)
 
 # Every workout write reconciles the Calendar and prints "Google Calendar updated: 1
 # event(s) pushed." (DESIGN_workout_revisions.md §8), several hundred times a run. That
-# line is the module's only print; a failed push prints through `util.fail` and still shows.
+# line is the module's only print; a failed push prints through `output.fail` and still shows.
 mock.patch("trainmate.calendar_reconcile.print", create=True).start()
 
 # Third seam, same idea: every command a test runs opens a journal run

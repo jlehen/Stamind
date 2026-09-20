@@ -12,7 +12,7 @@ TEST_DB_PATH = test_db_path("test_trainmate_clock.db")
 
 from trainmate import clock, settings
 from trainmate.db import Database
-from trainmate.util import fmt_timestamp, today_date, today_str
+from trainmate.clock import fmt_timestamp, today_date, today_str
 
 
 def _set_zone(zone: str) -> str:

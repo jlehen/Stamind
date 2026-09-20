@@ -16,10 +16,11 @@ analysis layer can all import it. `write_signal_days` reaches the calendar throu
 """
 import difflib
 import textwrap
-from datetime import datetime, timedelta
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from trainmate import runtime
+from trainmate.config import config
+from trainmate.clock import date_range
 
 # Categories shipped with the app, each mapped to the gloss shown to the LLM. Config
 # augments and overrides this (`coach.signal_metrics`); situational categories that do not
@@ -117,6 +118,29 @@ def format_vocabulary(vocabulary: Dict[str, str], usage: List[dict]) -> str:
     return "\n".join(lines)
 
 
+def signal_metrics() -> Dict[str, str]:
+    """Daily-signal categories offered to the coach, as `metric -> gloss`.
+
+    Under `coach:` in the config. Augments `DEFAULT_SIGNAL_METRICS` above rather than
+    replacing it, and a config entry reusing a shipped name overrides that gloss
+    (DESIGN_signal_extraction.md §5). Keys are normalized, so `Heat` and `heat` are one
+    category. Suggested, never enforced: `signal add` and the coach may both use a
+    category outside this list.
+
+    A property of `Config` until the reorg, which made this the one app module
+    `config.py` had to import — and `config.py` is what every other module imports
+    first (REORG_code_layout.md §4.10).
+    """
+    merged = dict(DEFAULT_SIGNAL_METRICS)
+    raw = config.get("coach", {}).get("signal_metrics") or {}
+    for name, gloss in raw.items():
+        key = normalize_metric(name)
+        if not key:
+            continue
+        merged[key] = str(gloss or "").strip()
+    return merged
+
+
 def known_metrics(vocabulary: Dict[str, str], usage: List[dict]) -> List[str]:
     """Every category the athlete might reasonably reuse: the config-merged vocabulary plus
     anything already logged (DESIGN_signal_extraction.md §5).
@@ -144,15 +168,6 @@ def nearest_known(metric: str, known: List[str], cutoff: float = 0.6) -> Optiona
     others = [k for k in known if k != metric]
     matches = difflib.get_close_matches(metric, others, n=1, cutoff=cutoff)
     return matches[0] if matches else None
-
-
-def date_range(start: str, end: str) -> Iterator[str]:
-    """Yields each YYYY-MM-DD from start to end inclusive."""
-    day = datetime.strptime(start, "%Y-%m-%d").date()
-    last = datetime.strptime(end, "%Y-%m-%d").date()
-    while day <= last:
-        yield day.strftime("%Y-%m-%d")
-        day += timedelta(days=1)
 
 
 def signal_summary(metric: str, value: Optional[float], label: str) -> str:

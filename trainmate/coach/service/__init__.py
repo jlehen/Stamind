@@ -2,7 +2,7 @@ from typing import Optional
 from trainmate import runtime
 # Read as `_svc._today_str()` by the mixins, so `pin_clock` has one place to
 # freeze the clock for a whole service.
-from trainmate.util import today_str as _today_str
+from trainmate.clock import today_str as _today_str
 from trainmate.coach.engine import CoachEngine
 
 # Fallback look-back for `reflect` when no watermark exists yet (bootstrap not run).
@@ -11,14 +11,15 @@ DEFAULT_REFLECT_WEEKS = 4
 
 from trainmate.coach.service.context import PmcContextMixin
 from trainmate.coach.service.prompt import PromptConfigMixin
+from trainmate.coach.service.staleness import StalenessMixin
 from trainmate.coach.service.planning import PlanningMixin
 from trainmate.coach.service.workouts import WorkoutGenMixin
 from trainmate.coach.service.adaptation import AdaptationMixin
 from trainmate.coach.service.analysis import DataAnalysisMixin
 
 
-class CoachService(PmcContextMixin, PromptConfigMixin, PlanningMixin, WorkoutGenMixin,
-                   AdaptationMixin, DataAnalysisMixin):
+class CoachService(PmcContextMixin, PromptConfigMixin, StalenessMixin, PlanningMixin,
+                   WorkoutGenMixin, AdaptationMixin, DataAnalysisMixin):
     """Orchestrates sports science coaching by coordinating data I/O and business logic."""
 
     def __init__(

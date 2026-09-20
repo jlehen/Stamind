@@ -19,7 +19,7 @@ test_db = bind_test_db(test_db_path("test_change_heads_up.db"))
 
 from trainmate import heads_up, runtime
 from trainmate.coach.proposals import RevisionProposal
-from trainmate.util import today_str
+from trainmate.clock import today_str
 
 
 def _at(day: int, hour: int, minute: int = 0) -> datetime:

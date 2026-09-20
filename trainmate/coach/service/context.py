@@ -3,10 +3,14 @@ from typing import Any, List, Optional, Tuple, Dict
 from trainmate.config import config
 from trainmate.types import Workout
 from trainmate import garmin, intensity, progression
+from trainmate.analytics.pmc import (
+    PMC_TSB_LAG_NOTE, load_ratio, pmc_data_caveat, pmc_ramp,
+)
 from trainmate.plan_lineage import plan_lineage
 from trainmate.sports import canonical_sport
-from trainmate.benchmarks import ANCHOR_KINDS, format_value
-from trainmate.util import wrap_text, days_between, PMC_TSB_LAG_NOTE
+from trainmate.benchmarks import format_value, label_for_kind
+from trainmate.text import wrap_text
+from trainmate.clock import days_between
 
 
 class PmcContextMixin:
@@ -93,14 +97,14 @@ class PmcContextMixin:
         # History start (and the cutoff/caveat derived from it) is read ONCE here and
         # passed down — no helper below re-derives it.
         start = garmin.pmc_history_start(dbh=self._db)
-        cutoff = garmin.pmc_warmup_cutoff_for(start, config.pmc_ctl_days)
+        cutoff = garmin.warmup_cutoff(self._db, start)
         latest = self._pmc_latest_line(metrics, cutoff)
         if latest:
             out.append(latest)
         ramp = self._pmc_ramp_line(cutoff)
         if ramp:
             out.append(ramp)
-        caveat = self._pmc_caveat_line(garmin.pmc_data_caveat(start, as_of))
+        caveat = self._pmc_caveat_line(pmc_data_caveat(start, as_of))
         if caveat:
             out.append(caveat)
         # The footnote explains the TSB lag, so only a line actually showing TSB needs it.
@@ -126,7 +130,7 @@ class PmcContextMixin:
                 parts.append(f"ATL {atl:.1f} (fatigue)")
             if tsb is not None:
                 parts.append(f"TSB {tsb:.1f} (form)")
-            ratio = garmin.load_ratio(atl, ctl)
+            ratio = load_ratio(atl, ctl)
             if ratio is not None:
                 parts.append(f"ATL:CTL {ratio:.2f} (relative overload)")
             return "- Fitness/Fatigue (PMC): " + ", ".join(parts)
@@ -148,13 +152,13 @@ class PmcContextMixin:
             latest = m['date']
         if latest is None:
             return None
-        ramp = garmin.pmc_ramp(ctl_by_date, latest, warmup_cutoff=cutoff)
+        ramp = pmc_ramp(ctl_by_date, latest, warmup_cutoff=cutoff)
         if ramp is None:
             return None
         return f"- CTL ramp rate: {ramp:+.1f}/week (last 7 days)"
 
     def _pmc_caveat_line(self, cav: Optional[Dict[str, Any]]) -> Optional[str]:
-        """Renders the §3.3(b) static "still warming up" flag (a garmin.pmc_data_caveat
+        """Renders the §3.3(b) static "still warming up" flag (a pmc_data_caveat
         dict, or None) as a summary line, stated as a *condition* (not an assertion that
         fitness is understated — a genuine beginner's low CTL is correct).
 
@@ -185,47 +189,16 @@ class PmcContextMixin:
         ramp line and the still-warming-up flag — a single line each beside the per-day
         mesocycle, never repeated per day (§5.2). History start is read ONCE and passed down."""
         start = garmin.pmc_history_start(dbh=self._db)
-        cutoff = garmin.pmc_warmup_cutoff_for(start, config.pmc_ctl_days)
+        cutoff = garmin.warmup_cutoff(self._db, start)
         lines: List[str] = []
         ramp = self._pmc_ramp_line(cutoff)
         if ramp:
             lines.append(ramp)
-        caveat = self._pmc_caveat_line(garmin.pmc_data_caveat(start, as_of))
+        caveat = self._pmc_caveat_line(pmc_data_caveat(start, as_of))
         if caveat:
             lines.append(caveat)
         return cutoff, ("\n".join(lines) if lines else None)
 
-    @staticmethod
-    def _pmc_week_summary(
-        w_metrics: List[Dict[str, Any]],
-        ctl_by_date: Dict[str, Optional[float]],
-        warmup_cutoff: Optional[str],
-    ) -> Tuple[Optional[float], Optional[float], Optional[float]]:
-        """(end_ctl, week_ramp, min_tsb) for one week of the analysis digest (§5.4):
-        end_ctl = last day's CTL, min_tsb = deepest overload, week_ramp = end_ctl vs CTL
-        7 days earlier. Guards: a week entirely inside the warm-up window emits all None
-        (no phantom overreach from seeding artifacts); week_ramp comes from pmc_ramp,
-        which applies the §3.1 nearest-earlier interior-gap rule, the straddle guard
-        (a -7d lookback before the cutoff would ramp off a warm-up baseline), and the
-        first-week boundary omit (no baseline in the window slice)."""
-        end_ctl = week_ramp = min_tsb = None
-        past_warmup = [
-            m for m in w_metrics
-            if (warmup_cutoff is None or m['date'] >= warmup_cutoff)
-        ]
-        ctl_days = [m for m in past_warmup if m.get('ctl') is not None]
-        if ctl_days:
-            end_row = max(ctl_days, key=lambda m: m['date'])
-            end_ctl = end_row['ctl']
-            week_ramp = garmin.pmc_ramp(
-                ctl_by_date, end_row['date'], warmup_cutoff=warmup_cutoff
-            )
-        tsbs = [m['tsb'] for m in past_warmup if m.get('tsb') is not None]
-        if tsbs:
-            min_tsb = min(tsbs)
-        return end_ctl, week_ramp, min_tsb
-
-    # ------------------------------------------------------ intensity distribution
     def _intensity_mesocycle_context(self, as_of: str) -> Optional[str]:
         """The active mesocycle's measured intensity distribution for `adapt`
         (DESIGN_intensity_distribution.md §9.3): the mesocycle to date as a per-week rate
@@ -442,8 +415,7 @@ class PmcContextMixin:
         in_mesocycle = [r for r in results if start <= r['date'] <= elapsed_end]
 
         def measured(r: Dict[str, Any]) -> str:
-            anchor = ANCHOR_KINDS.get(r['anchor_kind'])
-            label = anchor.label if anchor else r['anchor_kind']
+            label = label_for_kind(r['anchor_kind'])
             return f"{label} {format_value(r['anchor_kind'], float(r['value']))}"
 
         out: List[str] = []
@@ -479,8 +451,7 @@ class PmcContextMixin:
             if r.get('source') == 'test':
                 tested.setdefault(r['anchor_kind'], r['date'])
         for kind, r in latest.items():
-            anchor = ANCHOR_KINDS.get(kind)
-            label = anchor.label if anchor else kind
+            label = label_for_kind(kind)
             when = (f"last tested {tested[kind]}" if kind in tested
                     else "never measured by a test")
             line = (

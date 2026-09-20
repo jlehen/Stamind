@@ -33,11 +33,11 @@ from trainmate.cli.bot import MORNING_MARKER  # noqa: E402
 from trainmate.config import config  # noqa: E402
 from trainmate.cli.render import SPORT_EMOJI, SIMPLE_PASSED_LINE  # noqa: E402
 from trainmate.cli.runway import RUNWAY_BUTTON_LABEL  # noqa: E402
-from trainmate.prompt import BUTTONS_SENTINEL  # noqa: E402
+from trainmate.sentinels import BUTTONS_SENTINEL
 from trainmate.progression import (  # noqa: E402
     RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_PLAN_END_NO_GOAL, RUNWAY_SPAN,
 )
-from trainmate.util import today_str  # noqa: E402
+from trainmate.clock import today_str
 
 TODAY = "2026-08-31"
 WARN = 7

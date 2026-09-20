@@ -18,19 +18,21 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import athlete_queue, progression, runtime
+from trainmate.adherence import MINOR, unplanned_kind
 from trainmate.strength.sets import activity_lines
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.config import config
 from trainmate.progression import RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
 from trainmate.sports import canonical_sport
-from trainmate.prompt import emit_buttons
-from trainmate.util import (
-    bold, cmd, days_between, dim, fmt_date, green, notice, wrap_text,
-    today_date as _today_date, today_str as _today_str,
+from trainmate.sentinels import emit_buttons
+from trainmate.text import bold, capitalized, cmd, dim, green, wrap_text
+from trainmate.output import notice
+from trainmate.clock import (
+    days_between, fmt_date, today_date as _today_date, today_str as _today_str,
 )
 from trainmate.cli.goals import print_goal_row, print_goal_table, report_archived_sessions
 from trainmate.cli.learnings import print_learning_demoted, print_learning_kept
-from trainmate.cli.plans import print_plan
+from trainmate.cli.plans import print_plan, print_plan_generate_preview
 from trainmate.cli.progress import emit_chart, print_progress_report
 from trainmate.cli.queue import (
     print_closed_queue_list, print_queue_acted, print_queue_list, queue_buttons,
@@ -441,7 +443,7 @@ def simple_focus_snippet(text: str, limit: int = 220) -> str:
     name, not a headline. The full prescription is a tap away (`bot mesocycle`, §11.2)."""
     text = " ".join(text.split())
     text = re.sub(r"^[A-Za-z]+:\s+", "", text)
-    text = text[:1].upper() + text[1:]
+    text = capitalized(text)
     cut = text.find(". ")
     if 0 <= cut < limit:
         return text[:cut + 1]
@@ -824,6 +826,10 @@ class ExpertRenderer:
             ids=ids, names_a_range=names_a_range,
         )
 
+    def plan_generate_preview(self, proposal: dict) -> None:
+        """Draws the periodization about to be applied, and the review behind it."""
+        print_plan_generate_preview(proposal)
+
     def workout_generate_preview(self, proposal) -> bool:
         """Draws the proposal; False when there is nothing to apply."""
         return print_generate_preview(proposal)
@@ -925,7 +931,7 @@ class ExpertRenderer:
         print(green(f"Constraint [{constraint_id}] removed."))
 
     def no_upcoming_goal(self) -> None:
-        """`plan show`'s empty state — the sentence `_resolve_goal` would print."""
+        """`plan show`'s empty state — the sentence `selectors.resolve_goal` would print."""
         notice("No active goals found. TrainMate needs at least one goal.")
 
     def no_plan_yet(self, goal: dict) -> None:
@@ -1119,12 +1125,15 @@ class CompanionRenderer(ExpertRenderer):
         # The discrepancy list, the load-from-RPE note and the in-mesocycle/off-plan
         # distinction are expert detail: the glyph on each line is the whole verdict here,
         # and an effort under the minor-load bar is not mentioned at all
-        # (DESIGN_bot_simple_frontend.md §6).
+        # (DESIGN_bot_simple_frontend.md §6). It asks the same question the expert view
+        # asks; it just keeps two of the three answers apart only on screen.
         kept = []
         for date_str, results, unplanned in days:
             worth_a_line = [
                 a for a in unplanned
-                if runtime.garmin.activity_load(a) >= config.minor_activity_load_threshold
+                if unplanned_kind(
+                    a, date_str, covered_ranges, config.minor_activity_load_threshold
+                ) != MINOR
             ]
             if results or worth_a_line:
                 kept.append((date_str, results, worth_a_line))

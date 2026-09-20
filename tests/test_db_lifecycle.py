@@ -167,7 +167,7 @@ class TestWipingOwnsItsRecompute(unittest.TestCase):
                 distance_km=10.0, elevation_gain_m=0.0, avg_hr=140, max_hr=160,
                 rpe=5, tss=50.0,
             )
-        from trainmate.garmin.pmc import recompute_derived
+        from trainmate.garmin.derived import recompute_derived
         recompute_derived(dbh=test_db)
 
     def test_wiping_the_window_walks_the_ewmas_again(self):

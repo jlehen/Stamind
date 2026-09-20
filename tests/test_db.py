@@ -9,8 +9,7 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_trainmate_db.db")
 
 from trainmate.db import (
-    Database, normalize_sports, valid_confidence, learning_is_dormant,
-    derive_confidence, confidence_rank, step_down, RETIRE_PROPOSAL,
+    Database,
 )
 import trainmate.db
 from trainmate.db.objectives import goal_state
@@ -213,20 +212,6 @@ class TestDatabase(unittest.TestCase):
 
     # Five distinct calendar weeks (each normalizes to its own Monday).
     WEEKS = ["2026-05-04", "2026-05-12", "2026-05-20", "2026-05-28", "2026-06-05"]
-
-    def test_derive_confidence_pure_function(self):
-        # Defaults: moderate at 3 net weeks, established at 5.
-        self.assertEqual(derive_confidence(0, 0), "tentative")   # no basis -> floor
-        self.assertEqual(derive_confidence(2, 0), "tentative")
-        self.assertEqual(derive_confidence(3, 0), "moderate")
-        self.assertEqual(derive_confidence(5, 0), "established")
-        self.assertEqual(derive_confidence(6, 1), "established")  # net 5
-        # Contradiction nets down; only contradiction (not an empty basis) proposes retire.
-        self.assertEqual(derive_confidence(2, 2), RETIRE_PROPOSAL)  # net 0, contradicted
-        self.assertEqual(derive_confidence(5, 3), "tentative")      # net 2
-        self.assertEqual(confidence_rank("tentative"), 1)
-        self.assertEqual(step_down("established"), "moderate")
-        self.assertEqual(step_down("tentative"), RETIRE_PROPOSAL)
 
     def test_add_derives_confidence_from_distinct_weeks(self):
         # Citing 3 distinct weeks -> moderate; the LLM sets no confidence.
@@ -582,24 +567,6 @@ class TestDatabase(unittest.TestCase):
                          "tok-456")
         self.assertEqual(test_db.get_sync_state(key="garmin")["through_date"], "2026-06-14")
 
-    def test_learning_helpers(self):
-        self.assertEqual(normalize_sports(None), "general")
-        self.assertEqual(normalize_sports(""), "general")
-        self.assertEqual(normalize_sports("Running, Cycling"), "running,cycling")
-        self.assertEqual(normalize_sports(["Running", " Hiking "]), "running,hiking")
-
-        self.assertEqual(valid_confidence("established"), "established")
-        self.assertIsNone(valid_confidence("bogus"))
-
-        base = datetime.now(timezone.utc)
-        # Higher confidence survives longer: established budget is 180 days.
-        fresh = {"confidence": "established",
-                 "last_reinforced_at": (base - timedelta(days=100)).isoformat()}
-        stale = {"confidence": "established",
-                 "last_reinforced_at": (base - timedelta(days=200)).isoformat()}
-        self.assertFalse(learning_is_dormant(fresh, base))
-        self.assertTrue(learning_is_dormant(stale, base))
-
 
 class TestPlannedZoneColumns(unittest.TestCase):
     """DESIGN_intensity_distribution.md §9.8 — the intensity target on `workouts`."""
@@ -669,7 +636,7 @@ class TestPlannedZoneColumns(unittest.TestCase):
         it, so a target-only change moves the hash all the same — the event renders a
         `Target:` line, and one that disagrees with the plan is a wrong event
         (DESIGN_calendar_lineage.md §6, amending DESIGN_intensity_distribution.md §9.8)."""
-        from trainmate.calendar_state import calendar_signature
+        from trainmate.workout_state import calendar_signature
         self._save(duration_minutes=60, planned_zone_sec=[300, 1800, 0, 0, 0],
                    planned_zone_currency="hr")
         before = calendar_signature(test_db.get_workout("2026-06-10", "running"))

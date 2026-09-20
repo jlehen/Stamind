@@ -11,7 +11,8 @@ import traceback
 
 from trainmate import clock, journal
 from trainmate.prompt import PromptCancelled
-from trainmate.util import bold, dim, red, cyan, aside, notice
+from trainmate.text import bold, cyan, dim, red
+from trainmate.output import aside, notice
 
 from trainmate.cli.argparse_ext import (
     UsageExit, WrapAwareArgumentParser,

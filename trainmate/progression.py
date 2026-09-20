@@ -7,23 +7,24 @@ endpoint); nothing here touches `db` directly, so the same computation is
 shared verbatim by every front-end (DESIGN_progress_timeline.md §5).
 
 The past half is **read, not recomputed** (§4): CTL/ATL/TSB for days before today come
-verbatim from the stored `athlete_metrics_cache` rows `garmin.compute_pmc` wrote, so
+verbatim from the stored `athlete_metrics_cache` rows `analytics.pmc.compute_pmc` wrote, so
 `tm progress` and `tm status` never disagree about the same day's fitness. The future
 half is an *anchored fold*: the same recurrence folded forward from the latest stored
 row over the merged daily loads — measured past → planned future.
 
-One purity caveat, same as `adherence.py`'s: `garmin.activity_load` reads
-`config` thresholds, and importing `trainmate.garmin` imports the `db`
-singleton, so tests follow the patch-before-import pattern
-(`tests/test_analysis.py` precedent) — the functions themselves are still
-deterministic given rows + config.
+One purity caveat, same as `adherence.py`'s: `analytics.load.activity_load` reads
+`config` thresholds, so these functions are deterministic given rows + config rather
+than rows alone. Nothing here opens a database: the load model moved out of
+`trainmate/garmin/` into `trainmate/analytics/`, so the patch-before-import dance the
+tests used to need is gone.
 """
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from trainmate import garmin, intensity
-from trainmate.garmin import activity_load
-from trainmate.adherence import planned_load
+from trainmate import intensity
+from trainmate.clock import days_between, parse_date
+from trainmate.analytics import pmc as pmc_math
+from trainmate.analytics.load import activity_load, load_method, planned_load
 from trainmate.sports import canonical_sport
 
 DayPoint = Dict[str, Any]  # {date, load, source: 'actual'|'planned',
@@ -31,10 +32,6 @@ DayPoint = Dict[str, Any]  # {date, load, source: 'actual'|'planned',
 #   ctl/atl/tsb are None inside the warm-up window, on days with no stored
 #   metrics row, and everywhere when there is no anchor (§4).
 #   tsb is day-ENTERING form: CTL_{d-1} - ATL_{d-1}
-
-
-def _to_date(date_str: str):
-    return datetime.strptime(date_str, "%Y-%m-%d").date()
 
 
 def _date_str(d) -> str:
@@ -47,12 +44,6 @@ def _monday(d):
 
 def _plural(n: int) -> str:
     return "s" if n != 1 else ""
-
-
-def _days_between(start: str, end: str) -> int:
-    """Whole days from `start` to `end`, negative when `end` precedes it. The same
-    arithmetic as `util.days_between`, kept here so this module stays import-light."""
-    return (_to_date(end) - _to_date(start)).days
 
 
 def plan_end(workouts: List[Dict[str, Any]]) -> Optional[str]:
@@ -113,8 +104,8 @@ def daily_loads(
     window_end: Optional[str] = None,
 ) -> List[DayPoint]:
     """Merged per-day load series (DESIGN_progress_timeline.md §3): past days are
-    measured load (`garmin.activity_load` over `completed_activities`), future days
-    are planned load (`adherence.planned_load` over non-removed `workouts`), today is
+    measured load (`analytics.load.activity_load` over `completed_activities`), future days
+    are planned load (`analytics.load.planned_load` over non-removed `workouts`), today is
     actual if any completed activity **with load > 0** exists, else planned. Runs from
     min(first activity, first planned workout) through plan end (or today, if there's
     no plan or it's already lapsed) with no gaps — zero-load days are included.
@@ -130,8 +121,8 @@ def daily_loads(
     workouts_by_date = _group_by_date([w for w in workouts if not w.get("removed")])
 
     points: List[DayPoint] = []
-    d = _to_date(start)
-    end_d = _to_date(end)
+    d = parse_date(start)
+    end_d = parse_date(end)
     while d <= end_d:
         date_str = _date_str(d)
         day_acts = acts_by_date.get(date_str, [])
@@ -181,10 +172,10 @@ def fitness_series(
 
     - Past days (`date < today`): `ctl`/`atl`/`tsb` copied verbatim from the stored
       metrics row for that date, blanked to None before `warmup_cutoff`
-      (`garmin.pmc_display_values` semantics). A past day with no stored row carries
+      (`analytics.pmc.pmc_display_values` semantics). A past day with no stored row carries
       no PMC point (renderers join the line across the gap).
     - From the anchor (latest stored row strictly before today with non-NULL PMC):
-      the same recurrence is folded forward via `garmin.compute_pmc(seed=(ctl_A,
+      the same recurrence is folded forward via `pmc_math.compute_pmc(seed=(ctl_A,
       atl_A))` over the merged loads — actual for anchor+1..yesterday, the §3 rule for
       today, planned beyond — through plan end. Full-precision storage makes this fold
       reproduce the stored series bit-exactly, so today's fold equals the stored
@@ -200,10 +191,10 @@ def fitness_series(
     if anchor and day_points:
         anchor_date, ctl_a, atl_a = anchor
         loads = {p["date"]: p["load"] for p in day_points}
-        fold_start = _date_str(_to_date(anchor_date) + timedelta(days=1))
+        fold_start = _date_str(parse_date(anchor_date) + timedelta(days=1))
         fold_end = day_points[-1]["date"]
         if fold_start <= fold_end:
-            folded = garmin.compute_pmc(
+            folded = pmc_math.compute_pmc(
                 loads, fold_start, fold_end, ctl_days, atl_days,
                 seed=(ctl_a, atl_a),
             )
@@ -221,7 +212,7 @@ def fitness_series(
             # Stored past, blanked inside the warm-up window; None if no row.
             m = metrics_by_date.get(date)
             if m is not None:
-                ctl, atl, tsb = garmin.pmc_display_values(m, warmup_cutoff)
+                ctl, atl, tsb = pmc_math.pmc_display_values(m, warmup_cutoff)
         out.append({**p, "ctl": ctl, "atl": atl, "tsb": tsb})
     return out
 
@@ -244,7 +235,7 @@ def _valid_span(start: Any, end: Any) -> bool:
     """Whether an inferred (LLM-authored) mesocycle has parseable dates with
     start <= end — the guard for §6.1's 'unparseable dates are skipped'."""
     try:
-        return bool(start) and bool(end) and _to_date(start) <= _to_date(end)
+        return bool(start) and bool(end) and parse_date(start) <= parse_date(end)
     except (ValueError, TypeError):
         return False
 
@@ -263,9 +254,9 @@ def _subtract_spans(
                 next_pieces.append((s, e))
                 continue
             if s < cs:  # left remainder, up to the day before the cutter
-                next_pieces.append((s, _date_str(_to_date(cs) - timedelta(days=1))))
+                next_pieces.append((s, _date_str(parse_date(cs) - timedelta(days=1))))
             if ce < e:  # right remainder, from the day after the cutter
-                next_pieces.append((_date_str(_to_date(ce) + timedelta(days=1)), e))
+                next_pieces.append((_date_str(parse_date(ce) + timedelta(days=1)), e))
         pieces = next_pieces
     return pieces
 
@@ -373,8 +364,8 @@ def weekly_aggregates(
     if start is None:
         return []
     end = window_end if window_end is not None else _window_end(workouts, today)
-    week_start = _monday(_to_date(start))
-    end_d = _to_date(end)
+    week_start = _monday(parse_date(start))
+    end_d = parse_date(end)
 
     # The span the plan speaks for. A week only partly inside it compares a partial
     # planned total against a whole week of training (§3).
@@ -424,7 +415,7 @@ def weekly_aggregates(
             # enough to hide material load count: a 5-minute mobility activity with a
             # cold strap lit this on two thirds of a real athlete's weeks.
             "load_sparse": any(
-                garmin.load_method(a) == "hr_sparse" for a in week_acts
+                load_method(a) == "hr_sparse" for a in week_acts
                 if intensity.judgeable(a)
             ),
             # The future half of the zone table: what the plan PRESCRIBES per zone, ghost
@@ -447,7 +438,7 @@ def weekly_aggregates(
                     activity_load(a) > 0 for a in acts_by_date.get(today, [])
                 )
                 elapsed_end = today if today_synced else (
-                    _date_str(_to_date(today) - timedelta(days=1))
+                    _date_str(parse_date(today) - timedelta(days=1))
                 )
                 elapsed_workouts = [w for w in week_workouts if w["date"] <= elapsed_end]
                 week["planned_load_elapsed"] = sum(
@@ -523,7 +514,7 @@ def plan_gap(
     if next_obj is None:
         return None
     weeks_before = max(
-        0, round((_to_date(next_obj["target_date"]) - _to_date(plan_end_date)).days / 7)
+        0, round((parse_date(next_obj["target_date"]) - parse_date(plan_end_date)).days / 7)
     )
     return next_obj, weeks_before
 
@@ -562,14 +553,14 @@ def runway(
     if last_covered is None or not ends:
         return None
     plan_end_date = max(ends)
-    days_left = _days_between(today, last_covered)
+    days_left = days_between(today, last_covered)
 
     # The run-up window, then the passed state — still worth saying for `warning_days`
     # after the plan's own end, which is the morning the wrap-up matters most (§2).
     if days_left > warning_days:
         return None
     if (days_left < 0
-            and _days_between(max(last_covered, plan_end_date), today) > warning_days):
+            and days_between(max(last_covered, plan_end_date), today) > warning_days):
         return None
 
     state: Dict[str, Any] = {
@@ -685,7 +676,7 @@ def assemble_timeline(
         gap = plan_gap(objectives, end)
 
     history_start = _history_start(activities, metrics_rows)
-    caveat = garmin.pmc_data_caveat(history_start, as_of=today)
+    caveat = pmc_math.pmc_data_caveat(history_start, as_of=today)
     if caveat:
         warnings.append(_warning(
             "pmc_warming",
@@ -725,7 +716,7 @@ def clip_payload(
     window."""
     def week_overlaps(w: Dict[str, Any]) -> bool:
         ws = w["week_commencing"]
-        we = _date_str(_to_date(ws) + timedelta(days=6))
+        we = _date_str(parse_date(ws) + timedelta(days=6))
         return ws <= end_date and we >= start_date
 
     return {
@@ -778,6 +769,6 @@ def clip_payload_for_weeks(
     if end_date < today:
         end_date = today
     if cap_future and future:
-        last_sunday = _to_date(future[-1]["week_commencing"]) + timedelta(days=6)
+        last_sunday = parse_date(future[-1]["week_commencing"]) + timedelta(days=6)
         end_date = min(end_date, _date_str(last_sunday))
     return clip_payload(payload, start_date, end_date)

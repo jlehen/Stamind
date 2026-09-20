@@ -4,15 +4,17 @@ import sys
 from typing import Optional
 from trainmate import athlete_queue, runtime
 from trainmate import intensity
-from trainmate.garmin.load import activity_load, load_method
+from trainmate.analytics.load import activity_load, load_method
+from trainmate.analytics.pmc import color_load_ratio, load_ratio, pmc_cells, pmc_display_values
 from trainmate.sports import sport_aliases
 from trainmate.baselines import classify_metric, is_anomalous, UNKNOWN
-from trainmate.util import (
-    aside, bold, green, red, yellow, cyan, magenta, gray, cmd, color_load_ratio, pmc_cells,
-    visible_len, wrap_text, format_labeled_text, format_labeled_paragraph, render_table,
-    is_narrow_client, default_wrap_width, fmt_date, fmt_span, notice, warn,
+from trainmate.text import (
+    bold, cmd, cyan, default_wrap_width, format_labeled_paragraph, format_labeled_text, gray,
+    green, is_narrow_client, magenta, red, render_table, visible_len, wrap_text, yellow,
 )
-from trainmate.cli.common import mark_adherence_range, pmc_warmup_cutoff
+from trainmate.output import aside, notice, warn
+from trainmate.clock import fmt_date, fmt_span
+from trainmate.calendar_reconcile import mark_adherence_range
 from trainmate.cli.selectors import add_selector_args, resolve_window
 
 
@@ -140,7 +142,7 @@ def run_data_show_metrics(args: argparse.Namespace) -> None:
     ]
     rows = []
 
-    warmup_cutoff = pmc_warmup_cutoff()
+    warmup_cutoff = runtime.garmin.warmup_cutoff(runtime.db)
 
     for m in metrics_history:
         base = runtime.db.get_baseline(m['date'])
@@ -157,9 +159,9 @@ def run_data_show_metrics(args: argparse.Namespace) -> None:
 
         # Ratio off the *display* values, so a warm-up-suppressed CTL can't surface as a
         # spurious spike (DESIGN_pmc_fitness_fatigue.md §6.2).
-        ctl_v, atl_v, tsb_v = runtime.garmin.pmc_display_values(m, warmup_cutoff)
+        ctl_v, atl_v, tsb_v = pmc_display_values(m, warmup_cutoff)
         ctl_str, atl_str, tsb_str = pmc_cells(ctl_v, atl_v, tsb_v)
-        ratio_val = runtime.garmin.load_ratio(atl_v, ctl_v)
+        ratio_val = load_ratio(atl_v, ctl_v)
         ratio_str = color_load_ratio(ratio_val) if ratio_val is not None else "N/A"
 
         hrv_base_str = "N/A"
@@ -214,7 +216,7 @@ def _show_metrics_csv(metrics_history: list) -> None:
     ])
     # Suppressed (warm-up) or NULL PMC values are emitted as empty cells, never 0, so
     # downstream parsing can't read a zero as data (DESIGN_pmc_fitness_fatigue.md §6.2).
-    warmup_cutoff = pmc_warmup_cutoff()
+    warmup_cutoff = runtime.garmin.warmup_cutoff(runtime.db)
     for m in metrics_history:
         base = runtime.db.get_baseline(m['date'])
         hrv_base = None
@@ -224,8 +226,8 @@ def _show_metrics_csv(metrics_history: list) -> None:
             hrv_base = base.get('hrv_baseline_mean')
             rhr_base = base.get('rhr_baseline_mean')
             sleep_base = base.get('sleep_baseline_mean')
-        ctl_v, atl_v, tsb_v = runtime.garmin.pmc_display_values(m, warmup_cutoff)
-        ratio_v = runtime.garmin.load_ratio(atl_v, ctl_v)
+        ctl_v, atl_v, tsb_v = pmc_display_values(m, warmup_cutoff)
+        ratio_v = load_ratio(atl_v, ctl_v)
         writer.writerow([
             m['date'], m['hrv'], hrv_base, m['rhr'], rhr_base,
             m['sleep_score'], sleep_base, m['stress'],

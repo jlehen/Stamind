@@ -463,7 +463,8 @@ and gains a hard consistency requirement instead:
   than owning a second copy of the recurrence.
 - **Stored values become full-precision** — the second (and last) change to
   the shipped core: `compute_pmc()` drops the 1-dp rounding of its outputs
-  (`trainmate/garmin/pmc.py` — `garmin` is a package now); values are stored
+  (the maths in `trainmate/analytics/pmc.py`, the sweep that stores it in
+  `trainmate/garmin/derived.py`); values are stored
   exact and rounded only at display —
   which every consumer already does (`:.1f` in status / show-metrics /
   prompt formatting), and which acute/chronic/ACWR storage already
@@ -524,10 +525,10 @@ the projection.)
 precedent). Takes rows as
 arguments, never touches `db` directly, so it is shared verbatim by all
 three front-ends (§7). One purity caveat, same as `adherence.py`'s:
-`garmin.activity_load` reads `config` thresholds and importing
-`trainmate.garmin` imports the `db` singleton, so tests follow the existing
-patch-before-import pattern (`tests/test_analysis.py` precedent) — the
-functions are still deterministic given rows + config.
+`analytics.load.activity_load` reads `config` thresholds, so the functions are
+deterministic given rows + config rather than rows alone. The second half of this
+caveat is gone: the load model left `trainmate/garmin/` for `trainmate/analytics/`,
+which imports no database, so no patch-before-import dance is needed any more.
 
 ```python
 DayPoint = dict  # {date, load, source: 'actual'|'planned',
@@ -551,7 +552,7 @@ def fitness_series(day_points, metrics_rows, today, ctl_days, atl_days,
     # garmin.compute_pmc(..., seed=(ctl_A, atl_A)) folded over the day_points
     # loads through plan end (§4). Never recomputes the past. The caller
     # fetches metrics_rows, the config τs, and the cutoff (via
-    # garmin.pmc_history_start / pmc_warmup_cutoff_for) so this stays
+    # garmin.warmup_cutoff) so this stays
     # row-in/row-out.
 
 def weekly_aggregates(activities, workouts, today, meso_spans, *,
@@ -612,7 +613,7 @@ def build_timeline_payload(dbh) -> dict
     # get_objectives(active) + get_objectives(completed) sorted by target_date,
     # get_governing_macrocycle() + its mesocycles (§6.1),
     # get_analysis_cache("long") for the bootstrap reconstruction,
-    # garmin.pmc_history_start/pmc_warmup_cutoff_for for the warm-up cutoff,
+    # garmin.warmup_cutoff for the warm-up cutoff,
     # config.pmc_ctl_days/pmc_atl_days — then one call to assemble_timeline.
     # `dbh` is passed explicitly so the CLI's rebindable db and the web's
     # singleton each resolve against the handle the rest of their command used.
@@ -629,7 +630,7 @@ The v1 web surface serves the picture, not the data. Thin handler in
 `timeline.build_timeline_payload(db)` (§5, which owns every read: activities,
 workouts, the stored PMC rows (§4), the governing macrocycle + its mesocycles
 for the §6.1 labels, active *and* completed objectives, the bootstrap
-reconstruction, and the `garmin.pmc_history_start`-derived warm-up cutoff), one
+reconstruction, and the `garmin.warmup_cutoff` warm-up cutoff), one
 `progression.clip_payload_for_weeks` for `?weeks`, one
 `chart.render_timeline_png` (§7.2), returned as `image/png`. The CLI handler is
 the same shape and calls the same builder, so the two surfaces cannot render
@@ -1042,7 +1043,7 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
     framing already guarantees prose never collides; the photo line is
     written alone on its line and flushed atomically).
     `trainmate_bot.py:_drive()` gains one branch beside
-    `parse_prompt_request`: flush the text buffer, `bot.send_photo` with the
+    `sentinels.parse_frame`: flush the text buffer, `bot.send_photo` with the
     payload's `caption`, and unlink the temp file in a `finally` (so a
     failed send, `/cancel` kill, or timeout doesn't orphan it).
     `parse_photo_request` joins the pure helpers unit-tested in
@@ -1257,7 +1258,7 @@ the §7.2 photo transport for free where they need a chart in chat.)*
 - `tests/test_bot.py`: `parse_photo_request` round-trip with `emit_photo`
   framing (sentinel/JSON incl. the `caption` field, non-photo lines return
   `None`, unknown-sentinel lines dropped) — same pattern as the existing
-  `parse_prompt_request` tests. The matplotlib rendering itself stays untested (visual output),
+  `sentinels.parse_frame` tests. The matplotlib rendering itself stays untested (visual output),
   matching the front-end stance below.
 - Endpoint test alongside the existing web tests: `GET /api/timeline.png`
   over a fixture DB returns 200, `image/png`, and a body starting with the

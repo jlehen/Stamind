@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
-from trainmate.util import fmt_date
+from trainmate.clock import fmt_date
 from trainmate.coach.proposals import RevisionProposal, GenerateProposal
 from trainmate.coach.revisions import RevisionPair
 from tests import test_db_path
@@ -411,7 +411,7 @@ class TestCliWorkouts(unittest.TestCase):
     def test_workout_push_warns_about_stale_past_workouts(self, mock_calendar):
         """`push` defaults to today onward, so a past row left stale by a failed push
         has nothing that would re-push it. It must at least be surfaced."""
-        from trainmate.calendar_state import calendar_signature
+        from trainmate.workout_state import calendar_signature
         today = datetime.now(timezone.utc).date()
         past = (today - timedelta(days=4)).strftime("%Y-%m-%d")
 
@@ -1080,7 +1080,7 @@ class TestCliWorkouts(unittest.TestCase):
 
     # Colour on: `informational` holds activity dicts, so a raw gray(dict) only blows
     # up on a terminal — piped output short-circuits colorize and hides the bug.
-    @patch("trainmate.util.is_color_enabled", return_value=True)
+    @patch("trainmate.text.is_color_enabled", return_value=True)
     def test_workout_compare_outside_any_plan(self, _color):
         """Activities on dates no mesocycle covers are rendered as formatted lines,
         not raw dicts."""

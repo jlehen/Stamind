@@ -10,8 +10,9 @@ import argparse
 import sys
 from trainmate import runtime, signals
 from trainmate.config import config
-from trainmate.util import bold, dim, green, red, cyan, magenta, fmt_date, fmt_span, notice
-from trainmate.util import today_str as _today_str
+from trainmate.text import bold, cyan, dim, green, magenta, red
+from trainmate.output import notice
+from trainmate.clock import date_range, fmt_date, fmt_span, today_str as _today_str
 from trainmate.cli.selectors import add_selector_args, has_selector, resolve_window
 
 
@@ -48,13 +49,13 @@ def run_signal_add(args: argparse.Namespace) -> None:
 
     # The vocabulary is a suggestion, never a whitelist (§5): an unlisted category is
     # written, with a nudge in case it is a misspelling of one already in use.
-    known = signals.known_metrics(config.signal_metrics, runtime.db.list_signal_metrics())
+    known = signals.known_metrics(signals.signal_metrics(), runtime.db.list_signal_metrics())
     if metric not in known:
         near = signals.nearest_known(metric, known)
         hint = f" Close to existing '{near}'." if near else ""
         notice(f"'{metric}' is a new signal category.{hint}")
 
-    days = list(signals.date_range(start, end))
+    days = date_range(start, end)
     written = signals.write_signal_days(start, end, metric, value, text)
     missing = sorted(set(days) - {row["date"] for row in written})
     if missing:

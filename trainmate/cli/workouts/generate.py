@@ -5,19 +5,26 @@ from typing import Optional
 from trainmate import athlete_queue, intensity, runtime
 from trainmate.strength.sets import activity_lines
 from trainmate.config import config
-from trainmate.adherence import analyze_adherence, date_covered, format_discrepancies
+from trainmate.adherence import MINOR, UNPLANNED, format_discrepancies, unplanned_kind
+from trainmate.analytics.compare import (
+    adherence_verdicts, adherence_window, compare_days, format_actual,
+)
+from trainmate.calendar_reconcile import mark_adherence_from_results
 from trainmate.google_calendar import event_url
-from trainmate.util import (
-    bold, green, red, yellow, cyan, magenta, gray, cmd, aside, step, pad_visible, wrap_text,
-    format_labeled_paragraph, today_str as _today_str, today_date as _today_date, days_between,
-    fmt_date, fmt_span, fmt_timestamp, notice, keep_whole, warn, truncate_visible,
+from trainmate.text import (
+    bold, cmd, cyan, format_labeled_paragraph, gray, green, keep_whole, magenta, pad_visible, red,
+    truncate_visible, wrap_text, yellow,
+)
+from trainmate.output import aside, notice, step, warn
+from trainmate.clock import (
+    fmt_date, fmt_timestamp, parse_date, shift, today_date as _today_date,
+    today_str as _today_str,
 )
 from trainmate import settings
 from trainmate.cli import staleness
 from trainmate.cli.candidates import confirm_new_constraints, confirm_new_signals
 from trainmate.cli.common import (
-    adherence_verdicts, ensure_recent_data, format_actual,
-    mark_adherence_from_results, print_strength_notes, report_unhonored,
+    ensure_recent_data, print_strength_notes, report_unhonored,
 )
 from trainmate.cli.runway import (
     current_runway, list_end_marker, plan_is_behind, schedule_coverage,
@@ -198,8 +205,10 @@ def _confirm_regeneration(span_start: str, span_end: str, fresh: bool) -> bool:
     # The week planner has to account for the near days one by one, so a rewrite of them is not
     # the blanket archive the rest of the span is (DESIGN_plan_change_continuity.md §4).
     # `--fresh` drops that hold, and a span that opens after the held days has none in it.
+    # Ask where the window ends rather than deriving that from its length a second time.
     days = 0 if fresh else settings.commitment_days()
-    if span_start > _shift(_today_str(), days - 1):
+    window_end = None if fresh else settings.commitment_end(_today_str())
+    if window_end is None or span_start > window_end:
         days = 0
     committed = (
         f" The next {days} day(s) are yours: the coach must answer for each session "
@@ -304,14 +313,8 @@ def _confirm_out_of_date_plans(
                 "Proceeding with the out-of-date plan. It is now recorded against your "
                 "current profile and thresholds, so this warning won't repeat."
             ))
-            staleness.stamp(macro)
+            runtime.coach_service.stamp(macro)
     return True
-
-
-def _shift(date_str: str, days: int) -> str:
-    return (
-        datetime.strptime(date_str, "%Y-%m-%d").date() + timedelta(days=days)
-    ).strftime("%Y-%m-%d")
 
 
 def _resolve_span(args: argparse.Namespace) -> Optional[tuple[str, str]]:
@@ -343,9 +346,9 @@ def _resolve_span(args: argparse.Namespace) -> Optional[tuple[str, str]]:
                     red,
                 )
                 return None
-            start_date = _shift(covered, 1)
+            start_date = shift(covered, 1)
     span_start = max(start_date or today, today)
-    span_end = end_date or _shift(
+    span_end = end_date or shift(
         span_start, config.workout_generation_span_days - 1
     )
     return span_start, span_end
@@ -359,7 +362,7 @@ def _warn_span_change(span_start: str, span_end: str) -> None:
     one differ. An unselected run opens after the covered days by rule, so its caller does
     not ask."""
     today = _today_str()
-    tail = runtime.db.get_workouts(start_date=_shift(span_end, 1))
+    tail = runtime.db.get_workouts(start_date=shift(span_end, 1))
     if span_start <= today and not tail:
         return
 
@@ -380,7 +383,7 @@ def _warn_span_change(span_start: str, span_end: str) -> None:
     notice(lead)
     if span_start > today:
         notice(
-            f"  - {fmt_date(today)} → {fmt_date(_shift(span_start, -1))} keeps the "
+            f"  - {fmt_date(today)} → {fmt_date(shift(span_start, -1))} keeps the "
             f"sessions it already has.",
         )
     if tail:
@@ -679,7 +682,7 @@ def _list_verdicts(workouts: list, args: argparse.Namespace) -> dict:
             )
         except Exception as e:
             warn(f"could not ensure recent data: {e}")
-    return adherence_verdicts(past[0], past[-1])
+    return adherence_verdicts(runtime.db, past[0], past[-1], _today_str())
 
 
 def run_workout_list(args: argparse.Namespace) -> None:
@@ -830,85 +833,26 @@ def run_workout_compare(args: argparse.Namespace) -> None:
         except Exception as e:
             warn(f"could not ensure recent data: {e}")
 
-    all_workouts = runtime.db.get_workouts(start_date=start_date, end_date=end_date)
-    activities = runtime.db.get_completed_activities(start_date=start_date, end_date=end_date)
-
-    start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
-    end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
-    history_days = (end_date_obj - start_date_obj).days + 1
-
-    # Planned mesocycles overlapping the window: an activity on a date outside every mesocycle
-    # is history no plan governed, shown as informational rather than "unplanned".
-    covered_ranges = runtime.db.get_mesocycle_ranges(start_date, end_date)
-
-    discrepancies, matching_results, informational = analyze_adherence(
-        planned_workouts=all_workouts,
-        completed_activities=activities,
-        start_date_obj=start_date_obj,
-        history_days=history_days,
-        minor_activity_load_threshold=config.minor_activity_load_threshold,
-        covered_ranges=covered_ranges,
-        pending_from=today_str,
-        rejected_matches=runtime.db.get_rejected_matches(),
-    )
+    window = adherence_window(runtime.db, start_date, end_date, today_str)
 
     sport_filter = (getattr(args, 'sport_type', None) or "").lower() or None
     days = compare_days(
-        start_date_obj, history_days, matching_results, activities, sport_filter
+        parse_date(start_date), window.history_days, window.results, window.activities,
+        sport_filter,
     )
 
     runtime.render.workout_compare(
         days, start_date=start_date, end_date=end_date, sport_filter=sport_filter,
-        discrepancies=discrepancies, informational=informational,
-        covered_ranges=covered_ranges,
+        discrepancies=window.discrepancies, informational=window.informational,
+        covered_ranges=window.covered_ranges,
     )
     if not days:
         return
     if getattr(args, 'no_mark', False) or not config.google_calendar_id:
         return
-    runtime.render.calendar_marked(mark_adherence_from_results(matching_results, today_str))
-
-
-def compare_days(
-    start_date_obj, history_days: int, results: list, activities: list,
-    sport_filter: Optional[str],
-) -> list:
-    """The window day by day, keeping only days with something to say: a list of
-    ``(date, matched results, unmatched activities)`` with the sport filter applied.
-    Both personas walk this list, so the pairing is decided once (DESIGN_render_persona.md §3)."""
-    matched_act_ids = {
-        r['completed']['activity_id'] for r in results if r['completed']
-    }
-
-    acts_by_date: dict = {}
-    for act in activities:
-        acts_by_date.setdefault(act['date'], []).append(act)
-
-    results_by_date: dict = {}
-    for r in results:
-        results_by_date.setdefault(r['date'], []).append(r)
-
-    days = []
-    for d in range(history_days):
-        date_curr = (start_date_obj + timedelta(days=d)).strftime("%Y-%m-%d")
-        day_results = results_by_date.get(date_curr, [])
-        day_acts = acts_by_date.get(date_curr, [])
-        unplanned = [a for a in day_acts if a['activity_id'] not in matched_act_ids]
-
-        if sport_filter:
-            day_results = [
-                r for r in day_results
-                if r['planned']['sport_type'].lower() == sport_filter
-            ]
-            unplanned = [
-                a for a in unplanned
-                if sport_filter in a['activity_type'].lower()
-            ]
-
-        if not day_results and not unplanned:
-            continue
-        days.append((date_curr, day_results, unplanned))
-    return days
+    runtime.render.calendar_marked(
+        mark_adherence_from_results(window.results, today_str)
+    )
 
 
 def print_workout_compare(
@@ -959,11 +903,13 @@ def print_workout_compare(
                 print(f"  ACTUAL:     {red('(none — missed)')}")
 
         for act in unplanned:
-            act_load = runtime.garmin.activity_load(act)
             act_str = format_actual(act, divergence=True)
-            if act_load < config.minor_activity_load_threshold:
+            kind = unplanned_kind(
+                act, date_curr, covered_ranges, config.minor_activity_load_threshold
+            )
+            if kind == MINOR:
                 print(gray(f"  (minor):    {act_str}"))
-            elif date_covered(date_curr, covered_ranges):
+            elif kind == UNPLANNED:
                 print(f"  UNPLANNED:  {yellow(act_str)}")
             else:
                 print(gray(f"  (off-plan): {act_str}"))

@@ -403,11 +403,9 @@ class TestFeedbackConsumption(FeedbackTestCase):
     def test_pending_feedback_regenerates_without_force(self):
         obj_id, macro_id, _ = self._plan()
         # Same inputs as the plan in place: without feedback this reuses.
-        with patch.object(
-            coach_service.engine, "_get_goals_hash", return_value="ghash"
-        ), patch.object(
-            coach_service.engine, "_get_constraints_hash", return_value="chash"
-        ), patch.object(coach_service, "config_changed", return_value=None):
+        with patch("trainmate.plan_inputs.goals_hash", return_value="ghash"), \
+                patch("trainmate.plan_inputs.constraints_hash", return_value="chash"), \
+                patch.object(coach_service, "config_changed", return_value=None):
             proposal, _ = self._generate()
             self.assertTrue(proposal["reused"])
 

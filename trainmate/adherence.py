@@ -1,15 +1,23 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import List, Dict, Any, Set, Tuple, Optional
 
 from trainmate.config import config
-from trainmate.garmin import activity_load, _rpe_tss
+from trainmate.analytics.load import activity_load, planned_load
 from trainmate.sports import canonical_sport
 
 REST_VIOLATION = "rest_violation"
 MISSED = "missed"
 PARTIAL = "partial"
+
+# What an activity nothing planned turns out to be. MINOR is a stroll or a warm-up
+# too light to count against the plan; UNPLANNED is real training on a day a
+# mesocycle governs; OFF_PLAN is real training on a day no mesocycle covers — before
+# the athlete adopted TrainMate, or an off-season stretch. The dashboard reads these
+# three strings, so they are the vocabulary, not internal names (static/app.js).
+MINOR = "minor"
 UNPLANNED = "unplanned"
+OFF_PLAN = "off_plan"
 
 # A planned session on a day that has not finished yet is not a miss — the athlete may
 # still train it. Withdrawing it is `workout remove`; saying so is the adapt note.
@@ -100,21 +108,24 @@ def date_covered(
     return any(start <= date_str <= end for start, end in covered_ranges)
 
 
-def planned_load(w: Dict[str, Any]) -> float:
-    """Expected load of a planned workout as a single value (mirrors the actual
-    side): the week planner's planned TSS, or sRPE (RPE x 10 x hours) when no TSS was
-    assigned. Replaces the former `tss + rpe*hours` blend.
+def unplanned_kind(
+    act: Dict[str, Any],
+    date_str: str,
+    covered_ranges: Optional[List[Tuple[str, str]]],
+    minor_activity_load_threshold: float,
+) -> str:
+    """What an activity that matched no planned session is: MINOR, UNPLANNED or OFF_PLAN.
 
-    An explicit ``tss = 0`` means zero, not "unset" — it is a real planned load
-    and must not silently fall through to the sRPE estimate (that made the
-    timeline's weekly bars disagree with the adherence percentages beside them,
-    DESIGN_progress_timeline.md §3). Only a missing/None TSS triggers the fallback."""
-    tss = w.get("tss")
-    if tss is not None:
-        return float(tss)
-    rpe = w.get("rpe") or 0
-    duration_min = w.get("duration_minutes") or 0
-    return _rpe_tss(float(rpe), duration_min * 60.0)
+    The twin of `classify_adherence`, which answers the same question from the planned
+    side. Three surfaces asked it independently — the analysis, the compare table and the
+    dashboard — and one of them would have been the one to drift.
+
+    The threshold is a parameter rather than read from config, because `analyze_adherence`
+    already takes it as one and its tests set it.
+    """
+    if activity_load(act) < minor_activity_load_threshold:
+        return MINOR
+    return UNPLANNED if date_covered(date_str, covered_ranges) else OFF_PLAN
 
 
 def _adherence_tolerance(exp_load: float) -> float:
@@ -424,17 +435,19 @@ def analyze_adherence(
         for act in day_acts:
             if act["activity_id"] in used_act_ids:
                 continue
-            act_load = activity_load(act)
-            if act_load < minor_activity_load_threshold:
+            kind = unplanned_kind(
+                act, date_curr, covered_ranges, minor_activity_load_threshold
+            )
+            if kind == MINOR:
                 continue
-            if date_covered(date_curr, covered_ranges):
-                discrepancies.append(Discrepancy(
-                    kind=UNPLANNED, date=date_curr, completed=act, load=act_load,
-                ))
-            else:
-                # No plan governs this date (e.g. before tool adoption, or an
-                # unplanned off-season stretch). The load still feeds the PMC
-                # via completed_activities — surface it as informational, not a deviation.
+            if kind == OFF_PLAN:
+                # The load still feeds the PMC via completed_activities, so an
+                # off-plan effort is reported rather than judged.
                 informational.append(act)
+                continue
+            discrepancies.append(Discrepancy(
+                kind=UNPLANNED, date=date_curr, completed=act,
+                load=activity_load(act),
+            ))
 
     return discrepancies, matching_results, informational

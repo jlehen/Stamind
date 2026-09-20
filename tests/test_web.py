@@ -13,7 +13,7 @@ def _goal_ahead(days: int = 100) -> str:
     These goals are scaffolding — nothing asserts the date — but a plan is only active
     while its goal is ahead, so a literal expired the tests the day it passed.
     """
-    from trainmate.util import today_date
+    from trainmate.clock import today_date
     return (today_date() + timedelta(days=days)).isoformat()
 
 from tests import test_db_path
@@ -637,13 +637,6 @@ class TestReadOnly(unittest.TestCase):
         self.assertEqual(kwargs["lvl"], "error")
         self.assertIn("boom", args[1])
         self.assertEqual(kwargs["path"], "/api/workouts")
-
-    def test_no_google_or_llm_import_at_module_scope(self):
-        # A reader needs no Calendar service-account credentials and no LLM client;
-        # importing either would put write capability one call away.
-        source = open(trainmate_web.__file__).read()
-        self.assertNotIn("google_calendar", source)
-        self.assertNotIn("coach_service", source)
 
 
 class TestNewReadEndpoints(unittest.TestCase):

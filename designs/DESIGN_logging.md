@@ -701,7 +701,7 @@ design.
 
 `warn` in the END column is a true statement and an unhelpful one. Three runs in a row
 ended `warn` for the same reason — Garmin returned one activity with sparse HR zones and no
-RPE, so its load is an underestimate — and nothing on screen said so. `util.warn` had
+RPE, so its load is an underestimate — and nothing on screen said so. `output.warn` had
 printed it at the time, hours earlier, inside a `bot morning` that scrolled past. Reading a
 coded column and then running a second command to learn what it was coding is the failure
 §7.2 fixed for the columns, in a different place: the listing knew and did not say.
@@ -880,7 +880,7 @@ The core is small and stands alone. The rest is optional and can be judged on wh
 core turns out to earn it.
 
 **Phase 1 — the spine.** `trainmate/journal.py`, the run bracket in `run_once`, `step` /
-`warn` / `fail` in `util.py`, the 29 aside reclassifications, the `llm.call` record, and
+`warn` / `fail` in `output.py`, the 29 aside reclassifications, the `llm.call` record, and
 `tm journal` with its list and detail views. This is what answers all three questions in
 §1. Roughly 150 lines of new code and a lot of one-word edits.
 

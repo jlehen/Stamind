@@ -12,6 +12,7 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_plan_stale.db")
 
+from trainmate import plan_inputs
 from trainmate.db import Database
 import trainmate_cli  # noqa: F401  (registers the command tree)
 
@@ -48,7 +49,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         """A goal with an active plan, generated either from the live profile or from a
         snapshot that no longer matches it."""
         from trainmate.coach.service import coach_service
-        from trainmate.config import plan_profile
+        from trainmate.plan_inputs import plan_profile
 
         oid = test_db.add_objective(
             title="Spring Race", target_date=self._days_out(60), sport_type="running"
@@ -59,15 +60,15 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             config_hash = "not-the-current-hash"
         else:
             snapshot = plan_profile()
-            config_hash = coach_service._get_config_hash()
+            config_hash = plan_inputs.plan_config_hash()
         mid = test_db.save_macrocycle(
             objective_id=oid,
             strategy="strategy",
             # Real fingerprints: goals and the plan-shaping constraints flag the plan too
             # (DESIGN_plan_change_continuity.md §6.5), so a placeholder would make every
             # seeded plan stale.
-            goals_hash=coach_service._get_goals_hash(test_db.upcoming_objectives()),
-            constraints_hash=coach_service._get_constraints_hash([]),
+            goals_hash=plan_inputs.goals_hash(test_db.upcoming_objectives()),
+            constraints_hash=plan_inputs.constraints_hash([]),
             mesocycles=[{
                 "name": "Base", "start_date": self._days_out(0),
                 "end_date": self._days_out(30), "focus": "aerobic",
@@ -76,10 +77,10 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             config_snapshot=coach_service._get_config_snapshot(),
             profile_snapshot=json.dumps(snapshot),
             goals_snapshot=json.dumps(
-                coach_service.engine._clean_goals(test_db.upcoming_objectives())
+                plan_inputs.clean_goals(test_db.upcoming_objectives())
             ),
             constraints_snapshot=json.dumps(
-                coach_service.engine._clean_constraints([])
+                plan_inputs.clean_constraints([])
             ),
         )
         return oid, mid

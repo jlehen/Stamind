@@ -9,9 +9,10 @@ import sys
 import textwrap
 from typing import Optional
 
-from trainmate.util import (
-    bold, dim, red, yellow, cmd, default_wrap_width, format_labeled_paragraph, wrap_text, warn,
+from trainmate.text import (
+    bold, cmd, default_wrap_width, dim, format_labeled_paragraph, red, wrap_text, yellow,
 )
+from trainmate.output import warn
 
 
 class UsageExit(SystemExit):
@@ -176,7 +177,7 @@ class WrapAwareArgumentParser(argparse.ArgumentParser):
         # then names what is missing last, where the eye lands — except in chat, where
         # a help dump costs a screenful (DESIGN_cli_noargs.md §a).
         if message.startswith("the following arguments are required"):
-            from trainmate.prompt import is_json_frontend
+            from trainmate.sentinels import is_json_frontend
             if is_json_frontend():
                 self.exit(2, red(f"{self.prog}: error: {message}\n")
                           + dim("Run " + cmd(f"{self.prog} -h") + " for usage.\n"))

@@ -26,7 +26,8 @@ from trainmate.strength.sets import read_new_activities
 from trainmate.cli.candidates import (
     confirm_new_constraints, confirm_new_signals, open_ended,
 )
-from trainmate.cli.common import adherence_verdicts, ensure_recent_data
+from trainmate.analytics.compare import adherence_verdicts
+from trainmate.cli.common import ensure_recent_data
 # The companion surfaces are companion-only by definition, so they call the line
 # builders directly rather than through `runtime.render` (DESIGN_render_persona.md §3).
 from trainmate.cli.render import (
@@ -39,9 +40,11 @@ from trainmate.cli.queue import run_bot_queue, send_walk_step
 from trainmate.cli.runway import current_runway, runway_buttons, schedule_exhausted
 from trainmate.cli.settings import ROUTABLE_SETTINGS, routable_setting
 from trainmate.config import config
-from trainmate.prompt import emit_buttons, emit_flush
+from trainmate.sentinels import emit_buttons, emit_flush
 from trainmate.sports import CANONICAL_SPORTS, canonical_sport
-from trainmate.util import step, today_str as _today_str, wrap_text
+from trainmate.text import wrap_text
+from trainmate.output import step
+from trainmate.clock import today_str as _today_str
 
 # Settings-table marker that makes `bot morning` idempotent per day: all push state
 # lives in the instance's database so the bot process stays stateless across restarts
@@ -313,7 +316,7 @@ def _trained_today(date_str: str) -> Dict[int, Dict[str, Any]]:
     from trainmate import runtime
     try:
         runtime.garmin.ensure_data(date_str, date_str)
-        return adherence_verdicts(date_str, date_str)
+        return adherence_verdicts(runtime.db, date_str, date_str, _today_str())
     except Exception as e:
         step(f"Could not check what was trained today, briefing the schedule: {e}")
         return {}
@@ -542,7 +545,7 @@ def _note_capture_prompt(today: str, earliest: str) -> str:
         signal_extraction_task,
     )
     vocabulary = signals.format_vocabulary(
-        config.signal_metrics, runtime.db.list_signal_metrics()
+        signals.signal_metrics(), runtime.db.list_signal_metrics()
     )
     return (
         CAPTURE_ROLE

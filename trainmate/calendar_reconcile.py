@@ -1,5 +1,10 @@
 """Making Google Calendar agree with the workouts log (DESIGN_workout_revisions.md §8).
 
+Two passes live here. The first pushes and tears down events so the Calendar shows
+the sessions the log holds. The second, at the bottom, stamps the adherence verdict
+onto the events of days already behind us — the same idea one step later, once the
+activity that answered a session is known.
+
 The event lifecycle used to piggyback on archival: archiving a plan cleared the event
 handles and the service tore the events down, and a restore re-pushed. An append-only
 table has no such hook, and nothing may creep into the append primitive to replace it — a
@@ -14,9 +19,14 @@ from contextlib import contextmanager
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 from trainmate import runtime
-from trainmate.calendar_state import calendar_status
+from trainmate.adherence import classify_adherence
+from trainmate.analytics.compare import adherence_window, format_actual
+from trainmate.workout_state import adherence_signature, calendar_status
+from trainmate.clock import fmt_date, today_str as _today_str
+from trainmate.config import config
 from trainmate.db.workouts import ATHLETE_VOID_KINDS
-from trainmate.util import Progress, fail, green
+from trainmate.text import green
+from trainmate.output import Progress, fail, warn
 
 # Whether a pass renders as one summary line and a bar, or as the per-event lines. The
 # commands that take `-v` flip this around their write.
@@ -168,3 +178,66 @@ def _tear_down(db, syncer, lineage_id: int, event_id: Optional[str]) -> None:
         except Exception as e:
             fail(f"Google Calendar event delete failed: {e}")
     db.clear_calendar_state(lineage_id)
+
+
+def mark_adherence_from_results(
+    matching_results: List[Dict[str, Any]], today_str: Optional[str] = None
+) -> int:
+    """Stamps the adherence verdict onto past and same-day planned workout Calendar
+    events (title tag + 'Adherence' header). Future events are always skipped.
+    Today's event is skipped only when no activity was matched — marking an
+    unmatched today's session would falsely read as missed. Workouts without an
+    existing Calendar event are skipped, as is any event already carrying this
+    exact verdict over unchanged content (matched via `adherence_pushed_signature`), so
+    re-running compare over a settled range issues no redundant Calendar writes.
+    Best-effort per event: a Calendar failure degrades to a warning. Returns the
+    number of events actually (re)marked; the caller owns any summary line."""
+    today_str = today_str or _today_str()
+    threshold = config.minor_activity_load_threshold
+    marked = 0
+    for r in matching_results:
+        w = r['planned']
+        if not w.get('google_event_id'):
+            continue
+        # Skip future dates always, and anything analyze_adherence flagged pending — a
+        # not-yet-done session would falsely read as missed. The date test behind
+        # `pending` is owned there; it is repeated here only for hand-built rows.
+        if r['date'] > today_str or r.get('pending'):
+            continue
+        if r['date'] == today_str and not r['completed']:
+            continue
+        verdict = classify_adherence(w, r['completed'], threshold)
+        actual = format_actual(r['completed']) if r['completed'] else None
+        adherence = {
+            "status": verdict["status"],
+            "actual": actual,
+            "reasons": verdict["reasons"],
+        }
+        # Skip a no-op Calendar write: if the event already carries this exact
+        # verdict over unchanged content, re-pushing would just re-issue an
+        # identical update. Re-running compare over a settled past range is the
+        # common case, so this avoids a burst of pointless API writes.
+        signature = adherence_signature(w, adherence)
+        if w.get('adherence_pushed_signature') == signature:
+            continue
+        try:
+            runtime.calendar_syncer.sync_workout(w, adherence=adherence)
+            if w.get('id') is not None:
+                runtime.db.mark_workout_adherence_pushed(w['id'], signature)
+            marked += 1
+        except Exception as e:
+            warn(f"could not mark {fmt_date(w['date'])} on Calendar: {e}")
+    return marked
+
+
+def mark_adherence_range(start_date: str, end_date: str) -> int:
+    """Computes adherence over [start_date, end_date] and marks strictly-past
+    Calendar events with the verdict. No-op (returns 0) when no calendar is
+    configured. Reads the shared `analytics.compare.adherence_window` pairing; the
+    `data pull` ride-along
+    calls this once fresh activity data has landed."""
+    if not config.google_calendar_id:
+        return 0
+    today = _today_str()
+    window = adherence_window(runtime.db, start_date, end_date, today)
+    return mark_adherence_from_results(window.results, today)

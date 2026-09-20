@@ -6,7 +6,9 @@ from trainmate.adherence import (
 )
 from trainmate.sports import canonical_sport
 from trainmate import intensity, signals
-from trainmate.util import cmd, fmt_date, notice
+from trainmate.text import cmd
+from trainmate.output import notice
+from trainmate.clock import fmt_date
 from trainmate.coach.formatting import format_baseline
 from trainmate.coach import honoring
 from trainmate.coach.proposals import RevisionProposal
@@ -470,7 +472,7 @@ class AdaptationMixin:
             # Config-merged categories annotated with what is actually logged, so the model
             # reuses a category rather than coining one (DESIGN_signal_extraction.md §5).
             signal_vocabulary=signals.format_vocabulary(
-                config.signal_metrics, self._db.list_signal_metrics()
+                signals.signal_metrics(), self._db.list_signal_metrics()
             ),
             signal_earliest_date=start_date_str,
             tweak=tweak,
@@ -627,10 +629,7 @@ class AdaptationMixin:
             removals=removals,
             held=tuple(held),
             covered_constraint_ids=covered,
-            strength_checks=tuple(strength.checked) if strength else (),
-            strength_stamp=strength.stamp if strength else "",
-            strength_notice=strength.notice if strength else None,
-            strength_dropped=tuple(strength.dropped) if strength else (),
+            **strength_planner.proposal_fields(strength),
         )
 
     @staticmethod

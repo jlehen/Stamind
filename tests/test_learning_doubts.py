@@ -19,7 +19,8 @@ from trainmate.cli import queue as queue_cli
 from trainmate.cli.render import simple_queue_message
 from trainmate.coach.service import coach_service
 from trainmate.coach.service import CoachService
-from trainmate.prompt import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR, QUEUE_SENTINEL
+from trainmate.sentinels import QUEUE_SENTINEL
+from trainmate.athlete_queue import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)

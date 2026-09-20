@@ -22,6 +22,7 @@ def _days_out(n: int) -> str:
 # (same rot 2a7cd71 fixed in test_constraints.py).
 GOAL_DATE = _days_out(71)
 
+from trainmate import plan_inputs
 from trainmate.cli.workouts import generate as generate_cli
 from trainmate.config import config
 from trainmate.cli.selectors import IdRange
@@ -76,9 +77,9 @@ class TestPeriodization(unittest.TestCase):
         clear_all_tables(test_db)
 
     def test_hashing_helpers(self):
-        hash1 = coach_service._get_goals_hash([])
-        hash2 = coach_service._get_constraints_hash([])
-        hash3 = coach_service._get_config_hash()
+        hash1 = plan_inputs.goals_hash([])
+        hash2 = plan_inputs.constraints_hash([])
+        hash3 = plan_inputs.plan_config_hash()
         self.assertIsNotNone(hash1)
         self.assertIsNotNone(hash2)
         self.assertIsNotNone(hash3)
@@ -87,17 +88,17 @@ class TestPeriodization(unittest.TestCase):
             "id": 1, "title": "Test Goal", "target_date": "2026-10-15",
             "sport_type": "running", "description": "sub 3hr", "status": "active",
         }
-        hash1_with_obj = coach_service._get_goals_hash([obj])
+        hash1_with_obj = plan_inputs.goals_hash([obj])
         self.assertNotEqual(hash1, hash1_with_obj)
 
         obj["description"] = "sub 2:50"
-        self.assertNotEqual(hash1_with_obj, coach_service._get_goals_hash([obj]))
+        self.assertNotEqual(hash1_with_obj, plan_inputs.goals_hash([obj]))
 
         c = {
             "id": 1, "title": "Spain Trip", "start_date": "2026-07-01",
             "end_date": "2026-07-08", "rest": 0, "description": "easy",
         }
-        self.assertNotEqual(hash2, coach_service._get_constraints_hash([c]))
+        self.assertNotEqual(hash2, plan_inputs.constraints_hash([c]))
 
     @patch("trainmate.runtime.calendar_syncer")
     @patch("trainmate.coach.engine.openrouter_client")
@@ -454,9 +455,9 @@ class TestPeriodization(unittest.TestCase):
         test_db.save_macrocycle(
             objective_id=obj_id,
             strategy="Keep heart rate low",
-            goals_hash=coach_service._get_goals_hash(test_db.upcoming_objectives()),
-            constraints_hash=coach_service._get_constraints_hash([]),
-            config_hash=coach_service._get_config_hash(),
+            goals_hash=plan_inputs.goals_hash(test_db.upcoming_objectives()),
+            constraints_hash=plan_inputs.constraints_hash([]),
+            config_hash=plan_inputs.plan_config_hash(),
             config_snapshot=coach_service._get_config_snapshot(),
             mesocycles=[{
                 "name": "Base Building", "start_date": "2026-06-01",
@@ -560,30 +561,24 @@ class TestPeriodization(unittest.TestCase):
         )
 
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_the_review_is_not_echoed_to_the_screen_by_default(self, mock_client):
-        # It is the longest thing this command prints, and it lands above the strategy
-        # the athlete actually asked for (DESIGN_output_verbosity.md §7). What the model
-        # is shown does not change — only what the screen is.
+    def test_the_review_is_withheld_from_the_caller_by_default(self, mock_client):
+        # It is the longest thing this command can print, and it would land above the
+        # strategy the athlete actually asked for (DESIGN_output_verbosity.md §7). What
+        # the model is shown does not change — only what the caller is handed.
         obj_id = self._prior_training_fixture(mock_client)
-        with patch("sys.stdout", new_callable=io.StringIO) as out:
-            coach_service.plan_generate(force=True, objective_id=obj_id)
-        printed = out.getvalue()
-        self.assertNotIn("PRIOR TRAINING REVIEW", printed)
-        self.assertIn("--show-llm-context", printed)
+        proposal = coach_service.plan_generate(force=True, objective_id=obj_id)
+        self.assertIsNone(proposal["prior_training_review"])
+        # But the caller is told one exists, so it can name the flag that reveals it.
+        self.assertTrue(proposal["has_prior_training"])
         self.assertIn("## PRIOR TRAINING REVIEW", mock_client.complete.call_args[0][0])
 
     @patch("trainmate.coach.engine.openrouter_client")
-    def test_show_context_echoes_the_review(self, mock_client):
+    def test_show_context_hands_the_review_back(self, mock_client):
         obj_id = self._prior_training_fixture(mock_client)
-        with patch("sys.stdout", new_callable=io.StringIO) as out:
-            coach_service.plan_generate(
-                force=True, objective_id=obj_id, show_context=True
-            )
-        printed = out.getvalue()
-        self.assertIn("PRIOR TRAINING REVIEW", printed)
-        self.assertIn("PLANNED vs ACTUAL", printed)
-        # Pointing at a flag the athlete just used is noise.
-        self.assertNotIn("--show-llm-context", printed)
+        proposal = coach_service.plan_generate(
+            force=True, objective_id=obj_id, show_context=True
+        )
+        self.assertIn("PLANNED vs ACTUAL", proposal["prior_training_review"])
 
     @patch("trainmate.coach.engine.openrouter_client")
     def test_the_display_copy_is_built_only_when_it_is_shown(self, mock_client):
@@ -703,10 +698,10 @@ class TestPeriodization(unittest.TestCase):
         # The snapshot must serialize exactly the data the hash fingerprints, so the
         # two never disagree about what the plan was built on.
         self.assertEqual(
-            coach_service._get_goals_hash(goals), macro["goals_hash"]
+            plan_inputs.goals_hash(goals), macro["goals_hash"]
         )
         self.assertEqual(
-            coach_service._get_constraints_hash(events), macro["constraints_hash"]
+            plan_inputs.constraints_hash(events), macro["constraints_hash"]
         )
 
     @patch("trainmate.runtime.calendar_syncer")
@@ -1171,26 +1166,26 @@ class TestPeriodization(unittest.TestCase):
             shutil.rmtree(temp_app_dir)
 
     def test_config_hash_logic(self):
-        initial_hash = coach_service._get_config_hash()
+        initial_hash = plan_inputs.plan_config_hash()
         self.assertIsNotNone(initial_hash)
 
         original_profile = dict(trainmate.config.config.data["user_profile"])
         original_coach = dict(trainmate.config.config.data.get("coach") or {})
         try:
             trainmate.config.config.data["user_profile"]["weekly_target_hours"] = 20.0
-            self.assertNotEqual(initial_hash, coach_service._get_config_hash())
+            self.assertNotEqual(initial_hash, plan_inputs.plan_config_hash())
             trainmate.config.config.data["user_profile"] = dict(original_profile)
 
             # Physiological thresholds are tolerance-checked via the snapshot, not
             # fingerprinted — editing one must not shift the hash.
             trainmate.config.config.data["user_profile"]["ftp"] = 999
-            self.assertEqual(initial_hash, coach_service._get_config_hash())
+            self.assertEqual(initial_hash, plan_inputs.plan_config_hash())
             trainmate.config.config.data["user_profile"] = dict(original_profile)
 
             # Prompt-context knobs are not plan-shaping.
             trainmate.config.config.data["coach"] = dict(original_coach)
             trainmate.config.config.data["coach"]["metrics_lookback_days"] = 99
-            self.assertEqual(initial_hash, coach_service._get_config_hash())
+            self.assertEqual(initial_hash, plan_inputs.plan_config_hash())
         finally:
             trainmate.config.config.data["user_profile"] = original_profile
             trainmate.config.config.data["coach"] = original_coach
@@ -1205,16 +1200,16 @@ class TestPeriodization(unittest.TestCase):
             profile["name"] = "Sam"
             profile["equipment"] = ["carbon road bike"]
             profile["preferences"] = "Zwift on weekdays"
-            baseline = coach_service._get_config_hash()
+            baseline = plan_inputs.plan_config_hash()
 
             profile["name"] = "Alex"
-            self.assertEqual(baseline, coach_service._get_config_hash())
+            self.assertEqual(baseline, plan_inputs.plan_config_hash())
 
             profile["equipment"] = ["carbon road bike", "rowing machine"]
-            self.assertEqual(baseline, coach_service._get_config_hash())
+            self.assertEqual(baseline, plan_inputs.plan_config_hash())
 
             profile["preferences"] = "Zwift on weekdays, gravel bike in winter"
-            self.assertEqual(baseline, coach_service._get_config_hash())
+            self.assertEqual(baseline, plan_inputs.plan_config_hash())
         finally:
             trainmate.config.config.data["user_profile"] = original_profile
 
@@ -1231,10 +1226,10 @@ class TestPeriodization(unittest.TestCase):
                 }
             }
             monday = profile["weekly_schedule"]["Monday"]
-            baseline = coach_service._get_config_hash()
+            baseline = plan_inputs.plan_config_hash()
 
             monday["equipment"] = ["rowing machine"]
-            self.assertEqual(baseline, coach_service._get_config_hash())
+            self.assertEqual(baseline, plan_inputs.plan_config_hash())
 
             for key, value in (("total_available_hours", 2.5),
                                ("max_sessions", 2),
@@ -1242,7 +1237,7 @@ class TestPeriodization(unittest.TestCase):
                 with self.subTest(sub_key=key):
                     restore = monday[key]
                     monday[key] = value
-                    self.assertNotEqual(baseline, coach_service._get_config_hash())
+                    self.assertNotEqual(baseline, plan_inputs.plan_config_hash())
                     monday[key] = restore
         finally:
             trainmate.config.config.data["user_profile"] = original_profile
@@ -1257,7 +1252,7 @@ class TestPeriodization(unittest.TestCase):
                 "birth_year": 1986, "weekly_target_hours": 8.0,
                 "sport_preferences": ["cycling"], "chronic_injuries": "none",
             })
-            baseline = coach_service._get_config_hash()
+            baseline = plan_inputs.plan_config_hash()
 
             for key, value in (("birth_year", 1956),
                                ("weekly_target_hours", 20.0),
@@ -1266,7 +1261,7 @@ class TestPeriodization(unittest.TestCase):
                 with self.subTest(field=key):
                     restore = profile[key]
                     profile[key] = value
-                    self.assertNotEqual(baseline, coach_service._get_config_hash())
+                    self.assertNotEqual(baseline, plan_inputs.plan_config_hash())
                     profile[key] = restore
         finally:
             trainmate.config.config.data["user_profile"] = original_profile
@@ -1281,7 +1276,7 @@ class TestPeriodization(unittest.TestCase):
             profile["chronic_injuries"] = "none"
             profile["weekly_target_hours"] = 8.0
             macro = {
-                "config_hash": coach_service._get_config_hash(),
+                "config_hash": plan_inputs.plan_config_hash(),
                 "config_snapshot": coach_service._get_config_snapshot(),
                 "profile_snapshot": coach_service._get_profile_snapshot(),
             }
@@ -1356,12 +1351,12 @@ class TestPeriodization(unittest.TestCase):
             # (DESIGN_plan_change_continuity.md §6.5).
             test_db.save_macrocycle(
                 objective_id=obj_id, strategy="Build",
-                goals_hash=coach_service._get_goals_hash(
+                goals_hash=plan_inputs.goals_hash(
                     test_db.upcoming_objectives()
                 ),
-                constraints_hash=coach_service._get_constraints_hash([]),
+                constraints_hash=plan_inputs.constraints_hash([]),
                 mesocycles=[],
-                config_hash=coach_service._get_config_hash(),
+                config_hash=plan_inputs.plan_config_hash(),
                 config_snapshot=coach_service._get_config_snapshot(),
                 profile_snapshot=coach_service._get_profile_snapshot(),
             )
@@ -1386,7 +1381,7 @@ class TestPeriodization(unittest.TestCase):
                 anchor_kind="ftp", value=220, unit="W",
             )
             macro = {
-                "config_hash": coach_service._get_config_hash(),
+                "config_hash": plan_inputs.plan_config_hash(),
                 "config_snapshot": coach_service._get_config_snapshot(),
             }
             self.assertIsNone(coach_service.config_changed(macro))
@@ -1427,7 +1422,7 @@ class TestPeriodization(unittest.TestCase):
 
             # Legacy macrocycle without a snapshot: fingerprint alone decides.
             trainmate.config.config.data["user_profile"] = dict(original_profile)
-            legacy = {"config_hash": coach_service._get_config_hash(),
+            legacy = {"config_hash": plan_inputs.plan_config_hash(),
                       "config_snapshot": None}
             self.assertIsNone(coach_service.config_changed(legacy))
         finally:
@@ -1442,7 +1437,7 @@ class TestPeriodization(unittest.TestCase):
             anchor_kind="e1rm", value=102, unit="kg",
         )
         macro = {
-            "config_hash": coach_service._get_config_hash(),
+            "config_hash": plan_inputs.plan_config_hash(),
             "config_snapshot": coach_service._get_config_snapshot(),
         }
         self.assertIsNone(coach_service.config_changed(macro))

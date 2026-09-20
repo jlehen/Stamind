@@ -7,19 +7,19 @@ due today, whether a session is behind or ahead, which day a Garmin metric belon
 where the planning window opens. Garmin itself keys daily metrics and activities on the
 athlete's local calendar date, so a UTC frontier would drift a day at the boundary hours.
 
-Before this, "somebody" was the machine: `util.today_date()` returned `date.today()`. That
+Before this, "somebody" was the machine: `clock.today_date()` returned `date.today()`. That
 is right on a laptop the athlete carries and wrong everywhere else — a server in UTC, a
 home box left on a different setting, an athlete who moved. TrainMate is a
 single-athlete-per-instance app, so the fix is one zone per instance, set by that athlete.
 
 `trainmate/clock.py` is the one place that answers "what time is it", and
-`util.today_date()` is its only caller for dates. Nothing else calls `date.today()`.
+`clock.today_date()` is where every date starts. Nothing else calls `date.today()`.
 
 ## 2. Which clocks follow it
 
 Two clocks are the athlete's and now read `clock.now()`:
 
-- **Every date computation**, through `util.today_date()` / `today_str()` — 240-odd call
+- **Every date computation**, through `clock.today_date()` / `clock.today_str()` — 240-odd call
   sites, all of which change together because they already funnelled through one helper.
 - **The bot's morning push window** (`telegram.push.morning_time` / `morning_deadline`,
   DESIGN_bot_simple_frontend.md §4.3). Those are the hours the athlete wakes up in, not
@@ -94,7 +94,7 @@ Timestamp columns (`created_at`, `updated_at`, `last_pull_utc`, …) stay UTC. T
 instants, not calendar days, and UTC is the precise value — this is the storage rule in
 AGENTS.md, and moving them would corrupt the comparison every one of them exists for.
 
-What changed is the *display*: `util.fmt_timestamp()` converts to the athlete's zone on
+What changed is the *display*: `clock.fmt_timestamp()` converts to the athlete's zone on
 the way to the screen, so "Planned: 2026-01-16 Fri 00:30" is the time they planned it,
 not the time in Greenwich. A naive stored value is read as UTC, which is what every one
 of those columns holds.

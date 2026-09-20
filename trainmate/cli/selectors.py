@@ -12,9 +12,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
-from trainmate.util import (
-    fmt_span, red, today_date as _today_date, today_str as _today_str, notice,
-)
+from trainmate import runtime
+from trainmate.text import red
+from trainmate.output import notice
+from trainmate.clock import fmt_span, today_date as _today_date, today_str as _today_str
 
 # `trainmate_cli` (the db facade) is imported lazily inside the resolvers: it imports the
 # CLI package, so a module-level import here is a cycle.
@@ -325,7 +326,6 @@ def _fail(message: str) -> None:
 
 
 def _meso_bounds(meso_id: int) -> tuple[str, str]:
-    from trainmate import runtime
     meso = runtime.db.get_mesocycle(meso_id)
     if not meso:
         _fail(f"Mesocycle with ID {meso_id} not found.")
@@ -333,7 +333,6 @@ def _meso_bounds(meso_id: int) -> tuple[str, str]:
 
 
 def _current_meso_bounds() -> tuple[str, str]:
-    from trainmate import runtime
     meso = runtime.db.get_active_mesocycle(_today_str())
     if not meso:
         _fail("No active mesocycle found.")
@@ -341,7 +340,6 @@ def _current_meso_bounds() -> tuple[str, str]:
 
 
 def _macro_bounds(macro_id: int) -> tuple[str, str]:
-    from trainmate import runtime
     macro = runtime.db.get_macrocycle(macro_id)
     if not macro:
         _fail(f"Macrocycle with ID {macro_id} not found. Run 'plan versions' to list them.")
@@ -354,7 +352,6 @@ def _macro_bounds(macro_id: int) -> tuple[str, str]:
 def _goal_bounds(goal_id: int) -> tuple[str, str]:
     """A goal's span: from the start of its plan to the goal's own target date — which is
     past the last mesocycle when the plan doesn't reach the event yet."""
-    from trainmate import runtime
     goal = runtime.db.get_objective(goal_id)
     if not goal:
         _fail(f"Goal with ID {goal_id} not found.")
@@ -362,7 +359,6 @@ def _goal_bounds(goal_id: int) -> tuple[str, str]:
 
 
 def _goal_macro_id(goal_id: int) -> int:
-    from trainmate import runtime
     macro = runtime.db.get_macrocycle_for_objective(goal_id)
     if not macro:
         _fail(f"No plan exists for goal ID {goal_id}.")
@@ -370,7 +366,6 @@ def _goal_macro_id(goal_id: int) -> int:
 
 
 def _active_goal_id() -> int:
-    from trainmate import runtime
     goal = runtime.db.get_active_objective()
     if not goal:
         _fail("No active goal found.")
@@ -473,3 +468,57 @@ def split_targets(targets) -> tuple[list, list]:
     ids = [value for kind, value in targets or () if kind == "id"]
     ranges = [value for kind, value in targets or () if kind == "date"]
     return ids, ranges
+
+
+def resolve_goal(goal_id: Optional[int]) -> Optional[dict]:
+    """The goal a plan command targets: the given ID (whatever its status, so archived
+    and completed goals stay reachable), else the next active goal by target date.
+    Prints the reason and returns None when there is none."""
+    if goal_id is not None:
+        goal = runtime.db.get_objective(goal_id)
+        if not goal:
+            notice(f"Goal with ID {goal_id} not found.", red)
+        return goal
+    objectives = runtime.db.upcoming_objectives()
+    if not objectives:
+        notice("No active goals found. TrainMate needs at least one goal.")
+        return None
+    objectives.sort(key=lambda x: str(x['target_date']))
+    return objectives[0]
+
+
+def goal_span_start(goal: Optional[dict]) -> Optional[str]:
+    """The first day of a goal's OWN span: the day after the goal before it, never
+    earlier than today (DESIGN_cli_selectors.md §9)."""
+    if not goal:
+        return None
+    today = _today_date().strftime("%Y-%m-%d")
+    preceding = runtime.db.get_preceding_objectives(goal['target_date'])
+    if not preceding:
+        return today
+    day_after = (
+        datetime.strptime(preceding[0]['target_date'], "%Y-%m-%d").date()
+        + timedelta(days=1)
+    ).strftime("%Y-%m-%d")
+    return max(day_after, today)
+
+
+def goal_range_for_window(start: str, end: str) -> Optional[IdRange]:
+    """The `-g` selector naming every upcoming goal whose own span overlaps [start, end].
+
+    What a constraint-triggered replan targets: the plans that actually cover the
+    disrupted days, never the next goal on the calendar (DESIGN_constraints.md §7).
+    None when no goal's span holds any of them — a window wholly behind us, or one
+    dated past the last goal — where there is no plan to reshape.
+
+    Goals partition the timeline, so the overlap is contiguous and an IdRange over its
+    two ends re-derives exactly this set through the shared grammar (§9).
+    """
+    overlapping = [
+        g for g in runtime.db.upcoming_objectives()
+        if str(g['target_date']) >= start and str(goal_span_start(g)) <= end
+    ]
+    if not overlapping:
+        return None
+    overlapping.sort(key=lambda g: (str(g['target_date']), g['id']))
+    return IdRange(start=overlapping[0]['id'], end=overlapping[-1]['id'])

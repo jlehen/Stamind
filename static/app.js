@@ -29,7 +29,7 @@ function parseLocalDate(dateStr) {
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
-/** 'YYYY-MM-DD' -> 'YYYY-MM-DD Ddd', the same form `util.fmt_date` renders in the CLI.
+/** 'YYYY-MM-DD' -> 'YYYY-MM-DD Ddd', the same form `clock.fmt_date` renders in the CLI.
  *  Anything unparseable comes back untouched, so a row's missing date stays blank. */
 function fmtDate(dateStr) {
     if (!dateStr) return "";

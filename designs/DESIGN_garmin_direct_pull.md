@@ -154,7 +154,7 @@ ACWR, 28-day baselines) is preserved but moves into the recompute pass (§10).
 **Changed:** `trainmate_cli.py` `data pull` subcommand and the auto-ensure call
 sites; `trainmate/db.py` (new `sync_state` table + helpers — now the `trainmate/db/`
 package, `db/base.py` + `db/activities.py`); `trainmate/config.py`
-(new knobs); `trainmate/util.py` (local-date helper, §12).
+(new knobs); `trainmate/clock.py` (local-date helper, §12).
 
 **Dependency:** add `garminconnect` to TrainMate's requirements.
 
@@ -472,7 +472,7 @@ Split the `datetime.now(timezone.utc)` uses:
 - **Calendar dates → machine-local.** "What day is it" via
   `.strftime("%Y-%m-%d")` / `.date()`: sync frontier, mutable-zone, missing-today
   warning, default `adapt`/`status` date, year inference. Route **all** such sites
-  through one shared helper (e.g. `util.today_str()` / `util.local_today()`) — not
+  through one shared helper (e.g. `clock.today_str()` / `clock.today_date()`) — not
   just the new frontier — so `adapt`/`status`/coach "today" stays consistent with
   the frontier.
 - **Instants → stay UTC.** Moments compared against "now": `created_at`, freshness
@@ -482,8 +482,8 @@ Split the `datetime.now(timezone.utc)` uses:
 Those pointers are all dead (`db` and `coach` became packages, `cli.py` split into
 `trainmate_cli.py` + `trainmate/cli/`, `google_sheets.py` was deleted), and enumerating
 them was never the invariant anyway. The invariant that actually holds, and is worth
-checking on review, is: **every calendar date goes through `util.today_date()` /
-`util.today_str()`; every surviving `datetime.now(timezone.utc)` is an instant
+checking on review, is: **every calendar date goes through `clock.today_date()` /
+`clock.today_str()`; every surviving `datetime.now(timezone.utc)` is an instant
 comparison, never a date.** That is true across the tree today.
 
 No configurable timezone override for now; it can be added later inside the one
@@ -553,7 +553,7 @@ Each gets a typed accessor on `Config` alongside the existing properties.
 
 **Open / to confirm during implementation** — *resolved (rev. 2):*
 - Exact helper name(s) in `util` (`today_str()` vs `local_today()`). → **both**:
-  `util.today_date()` returns a `date`, `util.today_str()` the `YYYY-MM-DD` string.
+  `clock.today_date()` returns a `date`, `clock.today_str()` the `YYYY-MM-DD` string.
 - Whether `ensure_data` lives in `trainmate/garmin.py` or a thin coordinator
   module called by the CLI. → it lives in the garmin package, `garmin/sync.py`,
   alongside `pull()`; the CLI calls it at command entry.

@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, rebind_test_db, save_workout
+from trainmate.analytics import weekly_evidence
 from trainmate.db import Database
 import trainmate.db
 from tests import test_db_path
@@ -608,7 +609,7 @@ class TestWeekResponseFeatures(unittest.TestCase):
             {"rhr": 54, "hrv": 70, "sleep_score": 66, "stress": 40},
             {"rhr": 58, "hrv": 70, "sleep_score": 66, "stress": 30},
         ]
-        f = coach_service._week_response_features(metrics, self.BASELINE)
+        f = weekly_evidence.week_response_features(metrics, self.BASELINE)
         self.assertEqual(f["avg_stress"], 35.0)
         self.assertEqual(f["avg_sleep_score"], 66.0)
         self.assertEqual(f["vs_baseline_z"]["rhr"], 1.5)    # ((54-50)+(58-50))/2 /4 = 1.5
@@ -619,15 +620,15 @@ class TestWeekResponseFeatures(unittest.TestCase):
         metrics = [{"rhr": 54, "hrv": 70, "sleep_score": 66}]
         flat = dict(self.BASELINE, rhr_baseline_std=0.0)  # undefined -> None
         self.assertIsNone(
-            coach_service._week_response_features(metrics, flat)["vs_baseline_z"]["rhr"]
+            weekly_evidence.week_response_features(metrics, flat)["vs_baseline_z"]["rhr"]
         )
         # No baseline at all: vs_baseline_z omitted entirely, means still computed.
-        f = coach_service._week_response_features(metrics, None)
+        f = weekly_evidence.week_response_features(metrics, None)
         self.assertNotIn("vs_baseline_z", f)
         self.assertEqual(f["avg_sleep_score"], 66.0)
 
     def test_no_metric_days_means_none(self):
-        f = coach_service._week_response_features([], self.BASELINE)
+        f = weekly_evidence.week_response_features([], self.BASELINE)
         self.assertIsNone(f["avg_sleep_score"])
         self.assertIsNone(f["avg_stress"])
         self.assertNotIn("vs_baseline_z", f)  # no values -> all None -> omitted
@@ -655,23 +656,23 @@ class TestSignalDays(unittest.TestCase):
                 "duration_sec": 3600}
 
     def test_day_response_z_sign_convention(self):
-        z = coach_service._day_response_z(
+        z = weekly_evidence.day_response_z(
             {"rhr": 54, "hrv": 70, "sleep_score": 66}, self.BASELINE
         )
         self.assertEqual(z["rhr"], 1.0)    # (54-50)/4 elevated -> +z (worse)
         self.assertEqual(z["hrv"], -1.0)   # (70-80)/10 suppressed -> -z (worse)
         self.assertEqual(z["sleep"], -0.5)
         # Missing value / zero std / no baseline -> None.
-        self.assertIsNone(coach_service._day_response_z({"hrv": 70}, self.BASELINE)["rhr"])
+        self.assertIsNone(weekly_evidence.day_response_z({"hrv": 70}, self.BASELINE)["rhr"])
         flat = dict(self.BASELINE, hrv_baseline_std=0.0)
-        self.assertIsNone(coach_service._day_response_z({"hrv": 70}, flat)["hrv"])
-        self.assertIsNone(coach_service._day_response_z({"hrv": 70}, None)["hrv"])
+        self.assertIsNone(weekly_evidence.day_response_z({"hrv": 70}, flat)["hrv"])
+        self.assertIsNone(weekly_evidence.day_response_z({"hrv": 70}, None)["hrv"])
 
     def test_single_signal_day_episode_shape(self):
         ctx = [{"date": "2026-05-10", "metric": "alcohol", "value": 4.0}]
         metrics = [{"date": "2026-05-11", "rhr": 58, "hrv": 70, "sleep_score": 62}]
         acts = [self._act("2026-05-10", 85)]
-        out = coach_service._signal_days(
+        out = weekly_evidence.signal_days(
             ctx, metrics, acts, self._baseline_for, k=3, min_signal_days=1
         )
         eps = out["alcohol"]
@@ -700,7 +701,7 @@ class TestSignalDays(unittest.TestCase):
             {"date": "2026-05-11", "metric": "alcohol", "value": 3},
             {"date": "2026-05-14", "metric": "alcohol", "value": 1},
         ]
-        out = coach_service._signal_days(
+        out = weekly_evidence.signal_days(
             ctx, [], [], self._baseline_for, k=3, min_signal_days=1
         )
         eps = out["alcohol"]
@@ -718,14 +719,14 @@ class TestSignalDays(unittest.TestCase):
             {"date": "2026-05-10", "metric": "alcohol", "value": 2},
             {"date": "2026-05-14", "metric": "alcohol", "value": 2},
         ]
-        out = coach_service._signal_days(
+        out = weekly_evidence.signal_days(
             ctx, [], [], self._baseline_for, k=3, min_signal_days=1
         )
         self.assertEqual(len(out["alcohol"]), 2)
 
     def test_min_signal_days_floor_omits_category(self):
         ctx = [{"date": "2026-05-10", "metric": "alcohol", "value": 2}]
-        out = coach_service._signal_days(
+        out = weekly_evidence.signal_days(
             ctx, [], [], self._baseline_for, k=3, min_signal_days=2
         )
         self.assertNotIn("alcohol", out)
@@ -733,7 +734,7 @@ class TestSignalDays(unittest.TestCase):
     def test_sleep_construct_excludes_sleep_channel(self):
         ctx = [{"date": "2026-05-10", "metric": "poor_sleep", "value": 1}]
         metrics = [{"date": "2026-05-11", "rhr": 58, "hrv": 70, "sleep_score": 62}]
-        out = coach_service._signal_days(
+        out = weekly_evidence.signal_days(
             ctx, metrics, [], self._baseline_for, k=3, min_signal_days=1
         )
         m11 = next(
@@ -746,7 +747,7 @@ class TestSignalDays(unittest.TestCase):
 
     def test_presence_only_value_stays_none(self):
         ctx = [{"date": "2026-05-10", "metric": "big_meal", "value": None}]
-        out = coach_service._signal_days(
+        out = weekly_evidence.signal_days(
             ctx, [], [], self._baseline_for, k=3, min_signal_days=1
         )
         self.assertIsNone(out["big_meal"][0]["days"][0]["value"])
@@ -756,7 +757,7 @@ class TestSignalDays(unittest.TestCase):
             {"date": "2026-05-10", "metric": "alcohol", "value": 2},
             {"date": "2026-05-10", "metric": "alcohol", "value": 3},
         ]
-        out = coach_service._signal_days(
+        out = weekly_evidence.signal_days(
             ctx, [], [], self._baseline_for, k=3, min_signal_days=1
         )
         self.assertEqual(out["alcohol"][0]["days"][0]["value"], 5)
@@ -778,7 +779,7 @@ class TestWeekLifeEvents(unittest.TestCase):
             {"title": "Later", "start_date": "2026-06-20", "end_date": "2026-06-21",
              "type": "stress", "description": ""},
         ]
-        out = coach_service._week_constraints(
+        out = weekly_evidence.week_constraints(
             constraints, self._d("2026-06-01"), self._d("2026-06-07")
         )
         titles = {e["title"]: e["coverage"] for e in out}
@@ -788,10 +789,10 @@ class TestWeekLifeEvents(unittest.TestCase):
     def test_multiweek_event_buckets_into_each_week(self):
         constraint = [{"title": "Long", "start_date": "2026-06-01", "end_date": "2026-06-14",
                        "type": "injury", "description": ""}]
-        wk1 = coach_service._week_constraints(
+        wk1 = weekly_evidence.week_constraints(
             constraint, self._d("2026-06-01"), self._d("2026-06-07")
         )
-        wk2 = coach_service._week_constraints(
+        wk2 = weekly_evidence.week_constraints(
             constraint, self._d("2026-06-08"), self._d("2026-06-14")
         )
         self.assertEqual([e["coverage"] for e in wk1], ["full"])

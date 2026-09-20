@@ -74,7 +74,7 @@ Same relative-overload signal, three improvements:
   construction. In the EWMAs a given day weighs ~14% in ATL but only ~2% in CTL.
 - **Nothing new to store.** It is a division of two columns already on every row.
 
-`garmin.pmc.load_ratio(atl, ctl)` is the single server-side implementation, returning
+`analytics.pmc.load_ratio(atl, ctl)` is the single server-side implementation, returning
 `None` when either EWMA is NULL or CTL has not warmed above zero (a ratio against ~0 is
 noise). It is derived at read time and never stored, so it cannot drift from the EWMAs it
 divides.

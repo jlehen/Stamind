@@ -17,7 +17,8 @@ from trainmate.coach.formatting import BANNER_RULE, science_section
 from trainmate.config import config
 from trainmate.sports import canonical_sport
 from trainmate.strength import history, prescription, vocabulary
-from trainmate.util import cyan, step
+from trainmate.text import cyan
+from trainmate.output import step
 
 STRENGTH = canonical_sport("strength_training")
 LABEL = "strength_planner"
@@ -196,6 +197,21 @@ class StrengthPass:
     notice: Optional[str] = None
     # Entries the checks dropped, one line each, for the preview.
     dropped: List[str] = field(default_factory=list)
+
+
+def proposal_fields(pass_: Optional["StrengthPass"]) -> Dict[str, Any]:
+    """What a proposal carries about the strength pass, as keyword arguments.
+
+    `workout generate`, `workout adapt` and the strength-only regenerate all end by
+    building a proposal, and all three wrote these four fields out by hand with the
+    same `if there was a pass` guard. `record_checks` below reads them back.
+    """
+    return {
+        "strength_checks": tuple(pass_.checked) if pass_ else (),
+        "strength_stamp": pass_.stamp if pass_ else "",
+        "strength_notice": pass_.notice if pass_ else None,
+        "strength_dropped": tuple(pass_.dropped) if pass_ else (),
+    }
 
 
 def record_checks(db: Any, proposal: Any) -> None:

@@ -4,7 +4,7 @@ import unittest
 
 from trainmate.coach.formatting import format_completed_activities
 from trainmate.coach.formatting import format_metrics_history
-from trainmate.util import PMC_TSB_LAG_NOTE
+from trainmate.analytics.pmc import PMC_TSB_LAG_NOTE
 from trainmate.coach.engine.prompt import PromptBuildMixin
 
 

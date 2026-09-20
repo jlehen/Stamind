@@ -1,56 +1,25 @@
 import textwrap
 import argparse
 import sys
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 from trainmate import runtime
 from trainmate import plan_diff
-from trainmate.adherence import planned_load
-from trainmate.util import (
-    aside, step, bold, green, red, yellow, cyan, blue, magenta, gray, cmd, visible_len,
-    pad_visible, wrap_text, format_labeled_paragraph, default_wrap_width, fmt_date, fmt_span,
-    today_date as _today_date, notice, warn,
+from trainmate.analytics.load import planned_load
+from trainmate.text import (
+    blue, bold, cmd, cyan, default_wrap_width, format_labeled_paragraph, gray, green, magenta,
+    pad_visible, red, visible_len, wrap_text, yellow,
 )
+from trainmate.output import aside, notice, step, warn
+from trainmate.clock import fmt_date, fmt_span, today_date as _today_date
 from trainmate.cli import staleness
 from trainmate.cli.common import (
     ensure_recent_data, print_plan_cascade, report_unhonored,
 )
 from trainmate.cli.selectors import (
-    CURRENT, IdRange, SelectorError, parse_id_range, resolve_meso_atom,
+    CURRENT, IdRange, SelectorError, goal_span_start, resolve_goal, parse_id_range,
+    resolve_meso_atom,
 )
-
-
-def _resolve_goal(goal_id: Optional[int]) -> Optional[dict]:
-    """The goal a plan command targets: the given ID (whatever its status, so archived
-    and completed goals stay reachable), else the next active goal by target date.
-    Prints the reason and returns None when there is none."""
-    if goal_id is not None:
-        goal = runtime.db.get_objective(goal_id)
-        if not goal:
-            notice(f"Goal with ID {goal_id} not found.", red)
-        return goal
-    objectives = runtime.db.upcoming_objectives()
-    if not objectives:
-        notice("No active goals found. TrainMate needs at least one goal.")
-        return None
-    objectives.sort(key=lambda x: str(x['target_date']))
-    return objectives[0]
-
-
-def _goal_span_start(goal: Optional[dict]) -> Optional[str]:
-    """The first day of a goal's OWN span: the day after the goal before it, never
-    earlier than today (DESIGN_cli_selectors.md §9)."""
-    if not goal:
-        return None
-    today = _today_date().strftime("%Y-%m-%d")
-    preceding = runtime.db.get_preceding_objectives(goal['target_date'])
-    if not preceding:
-        return today
-    day_after = (
-        datetime.strptime(preceding[0]['target_date'], "%Y-%m-%d").date()
-        + timedelta(days=1)
-    ).strftime("%Y-%m-%d")
-    return max(day_after, today)
 
 
 def _goals_in_range(rng) -> Optional[list]:
@@ -79,27 +48,6 @@ def _goals_in_range(rng) -> Optional[list]:
     return goals
 
 
-def goal_range_for_window(start: str, end: str) -> Optional[IdRange]:
-    """The `-g` selector naming every upcoming goal whose own span overlaps [start, end].
-
-    What a constraint-triggered replan targets: the plans that actually cover the
-    disrupted days, never the next goal on the calendar (DESIGN_constraints.md §7).
-    None when no goal's span holds any of them — a window wholly behind us, or one
-    dated past the last goal — where there is no plan to reshape.
-
-    Goals partition the timeline, so the overlap is contiguous and an IdRange over its
-    two ends re-derives exactly this set through the shared grammar (§9).
-    """
-    overlapping = [
-        g for g in runtime.db.upcoming_objectives()
-        if str(g['target_date']) >= start and str(_goal_span_start(g)) <= end
-    ]
-    if not overlapping:
-        return None
-    overlapping.sort(key=lambda g: (str(g['target_date']), g['id']))
-    return IdRange(start=overlapping[0]['id'], end=overlapping[-1]['id'])
-
-
 def _plan_targets(args: argparse.Namespace) -> Optional[list]:
     """The goals `plan generate` plans for, chronologically, each paired with the day its
     own plan window opens.
@@ -114,7 +62,7 @@ def _plan_targets(args: argparse.Namespace) -> Optional[list]:
         return [(None, None)]
     if rng.current:
         goal = runtime.db.get_active_objective()
-        return [((goal['id'] if goal else None), _goal_span_start(goal))]
+        return [((goal['id'] if goal else None), goal_span_start(goal))]
     if rng.start is not None and rng.start == rng.end:
         # One ID reaches any non-archived goal, a past one included, as it always did —
         # only a range is restricted to what is still ahead.
@@ -122,14 +70,14 @@ def _plan_targets(args: argparse.Namespace) -> Optional[list]:
         if not goal:
             notice(f"Goal with ID {rng.start} not found.", red)
             return None
-        return [(goal['id'], _goal_span_start(goal))]
+        return [(goal['id'], goal_span_start(goal))]
     goals = _goals_in_range(rng)
     if goals is None:
         return None
     if not goals:
         notice("No upcoming goal falls in that range — nothing to plan.")
         return None
-    return [(g['id'], _goal_span_start(g)) for g in goals]
+    return [(g['id'], goal_span_start(g)) for g in goals]
 
 
 def _announce_targets(targets: list) -> None:
@@ -156,7 +104,7 @@ def _file_generate_feedback(text: str, targets: list) -> bool:
     if len(targets) != 1:
         notice("Error: a note goes to one plan. Name one goal with -g, not a range.", red)
         return False
-    goal = _resolve_goal(targets[0][0])
+    goal = resolve_goal(targets[0][0])
     if not goal:
         return False
     macro = runtime.db.get_macrocycle_for_objective(goal['id'])
@@ -170,6 +118,64 @@ def _file_generate_feedback(text: str, targets: list) -> bool:
         return False
     _add_feedback_note(macro, text.strip())
     return True
+
+
+def _plan_banner(title: str, width: int) -> Tuple[str, str]:
+    """The '=== TITLE ===' head line and its matching closing rule, kept inside the
+    wrap width so a narrow client doesn't fold the rule onto a second line."""
+    head = f"=== {title} ===" if len(title) + 8 <= width else wrap_text(title, width)
+    return head, "=" * min(width, max(len(line) for line in head.split("\n")))
+
+
+def print_prior_training_review(text: str, width: int) -> None:
+    """Shows the planned-vs-actual review that goes to the model as prompt context.
+
+    Printed verbatim: the review now carries column-aligned zone tables already wrapped
+    to their own width, and re-wrapping would shred the alignment
+    (DESIGN_intensity_distribution.md §6)."""
+    head, rule = _plan_banner("PRIOR TRAINING REVIEW (planned vs actual)", width)
+    print(cyan(bold(f"\n{head}")))
+    print(text)
+    print(cyan(bold(f"{rule}\n")))
+
+
+def print_new_strategy(
+    strategy: str, mesocycles: List[Dict[str, Any]], width: int
+) -> None:
+    """Shows the freshly generated plan for the apply/discard decision.
+
+    Each mesocycle is a head line plus its focus indented underneath, matching
+    `plan show`, rather than one long line the terminal breaks where it likes."""
+    head, rule = _plan_banner("NEW PERIODIZATION STRATEGY (MACROCYCLE)", width)
+    print(cyan(bold(f"\n{head}")))
+    print(format_labeled_paragraph(bold("Overall Strategy:"), strategy, width))
+    print()
+    print(bold("Mesocycles:"))
+    for m in mesocycles:
+        mesocycle_head = wrap_text(
+            f"- {m['name']} ({m['start_date']} to {m['end_date']})", width
+        )
+        print(format_labeled_paragraph(bold(mesocycle_head), m['focus'], width))
+    print(cyan(bold(f"{rule}\n")))
+
+
+def print_plan_generate_preview(proposal: dict) -> None:
+    """The expert `plan generate` preview: the review the coach was shown, when the
+    athlete asked to see it, then the strategy they are being asked to apply.
+
+    It used to print from inside the coach service, which left the one command whose
+    whole output is a preview with no persona seam — `workout generate`'s preview has
+    gone through the renderer since DESIGN_render_persona.md §5."""
+    width = default_wrap_width()
+    if proposal.get('prior_training_review'):
+        print_prior_training_review(proposal['prior_training_review'], width)
+    elif proposal.get('has_prior_training'):
+        aside(wrap_text(
+            "A planned-vs-actual review of your past plans is feeding this "
+            f"strategy. Pass {cmd('--show-llm-context')} to read what the coach "
+            "is being shown."
+        ))
+    print_new_strategy(proposal['strategy'], proposal['mesocycles'], width)
 
 
 def run_plan_generate(args: argparse.Namespace) -> None:
@@ -257,7 +263,7 @@ def _generate_one_plan(
                         force = True
                     else:
                         print(wrap_text(staleness.kept_line()))
-                        staleness.stamp(macro)
+                        runtime.coach_service.stamp(macro)
 
     plan_kwargs = {'auto_apply': False}
     if goal_id is not None:
@@ -273,6 +279,17 @@ def _generate_one_plan(
     if proposal['reused']:
         print(green(f"\nActive plan is up to date ({len(mesocycles)} mesocycles)."))
         return
+
+    if proposal['goal'] is None and not mesocycles:
+        # The service found nothing to plan for, and put the reason where a strategy
+        # would go. Say it plainly: under a NEW PERIODIZATION STRATEGY banner it reads
+        # as though the coach had written one. Both halves are needed — a proposal
+        # that names no goal but does carry mesocycles is a real plan with nothing to
+        # attach it to, which the apply step below reports in its own words.
+        notice(proposal['strategy'])
+        return
+
+    runtime.render.plan_generate_preview(proposal)
 
     if getattr(args, 'auto', False):
         apply = True
@@ -519,7 +536,7 @@ def _print_mesocycle_workouts(
 
 def run_plan_show(args: argparse.Namespace) -> None:
     """Displays the training macrocycle(s) and mesocycles periodization timeline."""
-    # The empty state `plan show` alone owns. `_resolve_goal` below would say the same
+    # The empty state `plan show` alone owns. `resolve_goal` below would say the same
     # thing one line later, but it also serves `plan versions`, `plan diff`, `plan
     # rollback` and `plan feedback`, where the companion sentence is the wrong one
     # (DESIGN_render_persona.md §5).
@@ -542,7 +559,7 @@ def run_plan_show(args: argparse.Namespace) -> None:
             runtime.render.plan(goal, macrocycle, args)
         return
 
-    next_goal = _resolve_goal(args.goal_id)
+    next_goal = resolve_goal(args.goal_id)
     if not next_goal:
         return
 
@@ -677,7 +694,7 @@ def run_plan_keep(args: argparse.Namespace) -> None:
     """Records the current inputs against the active plan, without regenerating it: the
     "that was a wording tweak" answer, reachable without a strategy call
     (DESIGN_plan_staleness.md §9)."""
-    goal = _resolve_goal(getattr(args, 'goal_id', None))
+    goal = resolve_goal(getattr(args, 'goal_id', None))
     if not goal:
         return
 
@@ -694,7 +711,7 @@ def run_plan_keep(args: argparse.Namespace) -> None:
     print(f"\n{bold('Changed since this plan was generated')}: {change_reason}")
     staleness.print_diff(macrocycle)
     print(green(wrap_text(staleness.kept_line())))
-    staleness.stamp(macrocycle)
+    runtime.coach_service.stamp(macrocycle)
     print(gray(wrap_text(
         f"Your next {cmd('workout generate')} still picks the change up."
     )))
@@ -702,7 +719,7 @@ def run_plan_keep(args: argparse.Namespace) -> None:
 
 def run_plan_versions(args: argparse.Namespace) -> None:
     """Lists every periodization plan version (active + superseded) for a goal."""
-    goal = _resolve_goal(getattr(args, 'goal_id', None))
+    goal = resolve_goal(getattr(args, 'goal_id', None))
     if not goal:
         return
 
@@ -893,7 +910,7 @@ _DIFF_ERROR_HINTS = {
 
 def run_plan_diff(args: argparse.Namespace) -> None:
     """Compares two periodization plan versions field by field."""
-    goal = _resolve_goal(getattr(args, 'goal_id', None))
+    goal = resolve_goal(getattr(args, 'goal_id', None))
     if not goal:
         return
     old, new, error = plan_diff.resolve_versions(
@@ -1012,7 +1029,7 @@ def run_plan_wipe(args: argparse.Namespace) -> None:
 
 def run_plan_rollback(args: argparse.Namespace) -> None:
     """Restores a superseded periodization plan version (and its workouts)."""
-    goal = _resolve_goal(getattr(args, 'goal_id', None))
+    goal = resolve_goal(getattr(args, 'goal_id', None))
     if not goal:
         return
 
@@ -1164,7 +1181,7 @@ def run_plan_feedback(args: argparse.Namespace) -> None:
 
     No LLM anywhere here: capture is an INSERT, and the one consumer of the result is the
     regeneration, which reads the whole log and does the understanding there (§2)."""
-    goal = _resolve_goal(args.goal_id)
+    goal = resolve_goal(args.goal_id)
     if not goal:
         sys.exit(1)
     macro = runtime.db.get_macrocycle_for_objective(goal['id'])

@@ -1,6 +1,17 @@
-"""Derived calendar-sync state for workouts.
+"""Two of the three things that can be true of a planned session at once.
 
-The freshness of a workout's Google Calendar event is *derived*, not stored: on
+ARCHITECTURE §5 calls them orthogonal axes: what the athlete changed about a session
+(`modification_markers`), and how far its Calendar event has fallen behind
+(`calendar_status`). The third axis, what became of it, is the adherence verdict and
+lives with the maths that decides it.
+
+The two sit together because every surface that shows one shows the other, and
+because neither reads the database: both are derived from a workout row the caller
+already has. That is what lets the read-only web app import this module without
+pulling the CLI in behind it (REORG_code_layout.md §4.3).
+
+The calendar half works like this. The freshness of a workout's Google Calendar event is
+*derived*, not stored: on
 a successful push we record `pushed_signature` = a hash of exactly the fields
 that determine the rendered event. The current state then falls out of a compare
 against `calendar_signature(current_row)`:
@@ -74,3 +85,29 @@ def calendar_status(workout) -> CalendarStatus:
     if workout.get("pushed_signature") == calendar_signature(workout):
         return "synced"
     return "stale"
+
+
+# The change kind of a session's live revision, as the athlete reads it
+# (DESIGN_workout_revisions.md §7). A `generate` is the plan saying what it says, so it
+# gets no marker, and a void carries [REMOVED] instead.
+_KIND_MARKERS = {
+    'adapt': 'ADAPTED',
+    'tweak': 'TWEAKED',
+}
+
+
+def modification_markers(w: dict) -> list:
+    """What has happened to a session: the kind of its latest change, plus the easings
+    that still stand.
+
+    Two facts rather than one, which is why there is no precedence rule any more: a
+    session eased twice and then copied forward by a rollback still reads `[ADAPTED ×2]`
+    (§12)."""
+    kind = w.get('change_kind')
+    count = w.get('adaptation_count') or 0
+    eased = f"ADAPTED ×{count}" if count > 1 else ("ADAPTED" if count else "")
+    if kind == 'adapt':
+        # The tally is the whole story here; an adapt that eased nothing still reads
+        # [ADAPTED], because the prescription did change.
+        return [eased or "ADAPTED"]
+    return [m for m in (_KIND_MARKERS.get(kind), eased) if m]

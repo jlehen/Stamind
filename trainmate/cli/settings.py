@@ -8,10 +8,9 @@ import sys
 from datetime import datetime, timezone
 
 from trainmate import clock, llm_models, settings
-from trainmate.util import (
-    aside, bold, cmd, cyan, dim, fmt_timestamp, green, pad_visible, red, visible_len,
-    yellow, notice,
-)
+from trainmate.text import bold, cmd, cyan, dim, green, pad_visible, red, visible_len, yellow
+from trainmate.output import aside, notice
+from trainmate.clock import fmt_timestamp
 
 
 # The settings a chat message may change (DESIGN_bot_simple_frontend.md §12.7): the knobs

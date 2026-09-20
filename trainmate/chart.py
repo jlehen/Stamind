@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from trainmate.progression import week_plan_denom
-from trainmate.util import fmt_date
+from trainmate.clock import fmt_date
 
 
 def _dt(date_str: str) -> datetime:

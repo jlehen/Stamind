@@ -21,8 +21,8 @@ from trainmate.cli.bot import MORNING_MARKER, PUSH_ALL_DONE_LINE
 from trainmate.cli.render import SIMPLE_DONE_LINE
 from trainmate.config import config
 from trainmate.heads_up import CHANGE_LEAD, UNDONE_ONE, UNDONE_PLAIN, UNDONE_SEVERAL
-from trainmate.prompt import BUTTONS_SENTINEL, FLUSH_SENTINEL
-from trainmate.util import today_str
+from trainmate.sentinels import BUTTONS_SENTINEL, FLUSH_SENTINEL
+from trainmate.clock import today_str
 
 # One database for the whole module: the three test classes below share it and
 # clear its tables per test, so its lifecycle is module-level, not per-class.

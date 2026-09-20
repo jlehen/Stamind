@@ -107,7 +107,7 @@
         except Exception as e:
             print(f"Error reading science guideline {filename}: {e}")
 - When displaying prose from the LLM, always run it through `wrap_text` in
-  `trainmate/util.py`, so the words wrap nicely.
+  `trainmate/text.py`, so the words wrap nicely.
 - A Python file over 500 lines is split, and the pieces land between 150 and 400 lines. A
   file of 400 to 500 lines is split only when it holds two jobs that change for different
   reasons. A file under 100 lines is merged into a sibling, unless it is a concept on its

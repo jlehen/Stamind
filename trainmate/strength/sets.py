@@ -10,19 +10,16 @@ from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 from trainmate import clock, runtime, settings
 from trainmate.config import config
 from trainmate.db.queue import queue_stamp
-from trainmate.db.strength import ACTIVE, REST, STRENGTH_TYPE
+from trainmate.db.strength import ACTIVE, GARMIN, REST, STRENGTH_TYPE, WATCH
 from trainmate.queue_kind import queue
 from trainmate.strength import vocabulary
-from trainmate.util import Progress, step, today_str, warn
+from trainmate.output import Progress, step, warn
+from trainmate.clock import today_str
 
 # The two queue kinds (§7). Their wording, check and answers are in strength/questions.py.
 SETS_FINAL = "sets_final"
 SET_NAMES = "set_names"
 
-# Who named a set (§5). A person's pick in Garmin, on the watch or in Connect, comes back as
-# one candidate at 100%; the watch's own guess as candidates with lower probabilities.
-WATCH = "watch"
-GARMIN = "garmin"
 
 # An activity older than this when its sets are first read is frozen as read (§6).
 ASK_WITHIN_DAYS = 7

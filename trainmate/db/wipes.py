@@ -115,7 +115,7 @@ class WipesMixin:
         # call it. It lived in cli/data.py to dodge a garmin<->db import cycle; the
         # lazy runtime singletons dissolved that, so it can live here now, where every
         # caller gets it. Imported inside the method to keep module import order free.
-        from trainmate.garmin.pmc import recompute_derived
+        from trainmate.garmin.derived import recompute_derived
         recompute_derived(dbh=self)
 
     def wipe_calendar_signals(

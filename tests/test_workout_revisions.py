@@ -176,7 +176,7 @@ class TestTheGuardSurvivesAMove(unittest.TestCase):
     def test_the_move_is_not_counted_as_a_third_easing(self):
         """The move kept the ride's numbers, so the marker still counts the two easings
         and no more (§12)."""
-        from trainmate.cli.workouts._helpers import modification_markers
+        from trainmate.workout_state import modification_markers
         moved = self.db.get_workout("2026-09-03", "cycling")
         self.assertEqual(modification_markers(moved), ["ADAPTED ×2"])
 

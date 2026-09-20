@@ -8,8 +8,8 @@ import difflib
 import re
 from typing import List, Tuple
 
-from trainmate.util import (
-    bold, green, red, yellow, cyan, magenta, gray, render_table, format_labeled_text,
+from trainmate.text import (
+    bold, cyan, format_labeled_text, gray, green, magenta, red, render_table, yellow,
 )
 from trainmate.cli.common import print_strength_notes
 from trainmate.coach.proposals import RevisionProposal

@@ -1,43 +1,16 @@
-"""Garmin Connect client: login, metric/activity fetch, and date helpers."""
-import math
+"""Garmin Connect client: login, and the metric/activity fetch."""
 import sys
-from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from trainmate.config import config
 from trainmate import journal
-from trainmate.util import step
+from trainmate.output import step
 
-def _derivation_pad_days() -> int:
-    """Raw history needed *before* a displayed window so the baselines and the CTL EWMA
-    are warm for the earliest displayed day. Read live from config.
-
-    `max(28, ceil(1.5*pmc_ctl_days))` (= 63 at defaults): the 28 floor pins the pad to
-    the hardcoded 28-day baseline lookback in recompute_derived(); the 1.5*τ_ctl term
-    warms CTL to ~78% at the left edge (the §3.3(b) accuracy caveat carries the
-    residual). See DESIGN_pmc_fitness_fatigue.md §3.4."""
-    return max(
-        28,
-        math.ceil(1.5 * config.pmc_ctl_days),
-    )
 class GarminAuthRequired(Exception):
     """Raised when a fresh Garmin login (MFA) is needed but no TTY is available.
 
     Callers treat this as continue-with-warning: use cached data and tell the
     user to run `data pull` in a terminal to re-authenticate.
     """
-def _to_date(s: str):
-    return datetime.strptime(s, "%Y-%m-%d").date()
-def _date_range(start: str, end: str) -> List[str]:
-    """Inclusive list of YYYY-MM-DD strings from start to end."""
-    out: List[str] = []
-    cur, last = _to_date(start), _to_date(end)
-    while cur <= last:
-        out.append(cur.isoformat())
-        cur += timedelta(days=1)
-    return out
-def _shift(date_str: str, days: int) -> str:
-    return (_to_date(date_str) + timedelta(days=days)).isoformat()
 class GarminClient:
     """Thin wrapper over `garminconnect` with token persistence and TTY-gated MFA."""
 

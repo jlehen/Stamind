@@ -95,20 +95,10 @@ class FormatReplyTest(unittest.TestCase):
 
 
 class PromptProtocolTest(unittest.TestCase):
-    def test_parses_sentinel_framed_request(self):
-        from trainmate.prompt import PROMPT_SENTINEL
-        line = PROMPT_SENTINEL + '{"v":1,"id":"p1","type":"confirm","message":"go?"}\n'
-        req = bot.parse_prompt_request(line)
-        self.assertEqual(req["id"], "p1")
-        self.assertEqual(req["type"], "confirm")
+    """How a TM-PROMPT request becomes Telegram buttons, and a tap becomes an answer.
 
-    def test_plain_output_is_not_a_request(self):
-        self.assertIsNone(bot.parse_prompt_request("All workouts wiped.\n"))
-
-    def test_photo_line_is_not_a_prompt_request(self):
-        from trainmate.prompt import PHOTO_SENTINEL
-        line = PHOTO_SENTINEL + '{"path": "/tmp/x.png", "caption": "FORM today"}\n'
-        self.assertIsNone(bot.parse_prompt_request(line))
+    The frame it arrives in is tested in test_sentinels.py, with the writer beside it.
+    """
 
     def test_confirm_buttons_yes_no(self):
         rows = bot.prompt_buttons({"id": "p1", "type": "confirm"}, "ab12")
@@ -143,43 +133,6 @@ class PromptProtocolTest(unittest.TestCase):
     def test_format_prompt_message_strips_ansi(self):
         msg = bot.format_prompt_message({"message": "\033[33mProceed?\033[0m"})
         self.assertEqual(msg, "Proceed?")
-
-
-class PhotoProtocolTest(unittest.TestCase):
-    def test_roundtrips_through_emit_photo(self):
-        import io
-        from trainmate.prompt import emit_photo
-        out = io.StringIO()
-        emit_photo("/tmp/chart.png", caption="FORM today   CTL 55", out=out)
-        line = out.getvalue()
-        req = bot.parse_photo_request(line)
-        self.assertEqual(req["path"], "/tmp/chart.png")
-        self.assertEqual(req["caption"], "FORM today   CTL 55")
-
-    def test_emit_photo_without_caption(self):
-        import io
-        from trainmate.prompt import emit_photo
-        out = io.StringIO()
-        emit_photo("/tmp/chart.png", out=out)
-        req = bot.parse_photo_request(out.getvalue())
-        self.assertEqual(req["path"], "/tmp/chart.png")
-        self.assertIsNone(req["caption"])
-
-    def test_non_photo_line_returns_none(self):
-        self.assertIsNone(bot.parse_photo_request("All workouts wiped.\n"))
-
-    def test_prompt_line_is_not_a_photo_request(self):
-        from trainmate.prompt import PROMPT_SENTINEL
-        line = PROMPT_SENTINEL + '{"v":1,"id":"p1","type":"confirm","message":"go?"}\n'
-        self.assertIsNone(bot.parse_photo_request(line))
-
-    def test_unknown_sentinel_is_dropped_not_forwarded(self):
-        # A future CLI sentinel this bot build doesn't understand: both parsers
-        # must return None so _drive()'s catch-all drop rule applies (§7.2).
-        line = "\x1eTM-FUTURE-THING {\"x\": 1}\n"
-        self.assertIsNone(bot.parse_prompt_request(line))
-        self.assertIsNone(bot.parse_photo_request(line))
-        self.assertTrue(line.startswith(bot._SENTINEL_PREFIX))
 
 
 class _FakeProc:
@@ -549,62 +502,6 @@ class RouterTablesTest(unittest.TestCase):
             self.assertIn(intent, bot.ROUTER_ECHO, intent)
 
 
-class ButtonsProtocolTest(unittest.TestCase):
-    def test_roundtrips_through_emit_buttons(self):
-        import io
-        from trainmate.prompt import emit_buttons
-        buf = io.StringIO()
-        emit_buttons([{"label": "A", "send": "status"}], out=buf)
-        # split("\n"), not splitlines(): \x1e is itself a str.splitlines boundary,
-        # while the bot reads byte lines split on \n alone.
-        line = buf.getvalue().split("\n")[0]
-        req = bot.parse_buttons_request(line)
-        self.assertEqual(req["buttons"], [{"label": "A", "send": "status"}])
-
-    def test_plain_output_is_not_a_buttons_request(self):
-        self.assertIsNone(bot.parse_buttons_request("workout listed"))
-
-    def test_prompt_line_is_not_a_buttons_request(self):
-        self.assertIsNone(bot.parse_buttons_request('\x1eTM-PROMPT {"id": "p1"}'))
-
-    def test_buttons_line_is_not_a_prompt_or_photo(self):
-        line = '\x1eTM-BUTTONS {"buttons": []}'
-        self.assertIsNone(bot.parse_prompt_request(line))
-        self.assertIsNone(bot.parse_photo_request(line))
-
-
-class FlushProtocolTest(unittest.TestCase):
-    """The payload-free flush marker (DESIGN_output_verbosity.md §7)."""
-
-    def test_roundtrips_through_emit_flush(self):
-        import io
-        from trainmate.prompt import emit_flush
-        out = io.StringIO()
-        with mock.patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
-            emit_flush(out=out)
-        self.assertTrue(bot.is_flush_request(out.getvalue()))
-
-    def test_a_terminal_gets_nothing(self):
-        # Emitted unconditionally, the \x1e frame would land in the athlete's own
-        # scrollback as protocol bytes. The gate is inside emit_flush.
-        import io
-        from trainmate.prompt import emit_flush
-        out = io.StringIO()
-        with mock.patch.dict(os.environ, {"TRAINMATE_FRONTEND": ""}):
-            emit_flush(out=out)
-        self.assertEqual(out.getvalue(), "")
-
-    def test_ordinary_output_is_not_a_flush_request(self):
-        self.assertFalse(bot.is_flush_request("Plan discarded.\n"))
-
-    def test_a_sibling_sentinel_is_not_a_flush_request(self):
-        # Each sentinel has its own branch in _drive; matching a sibling here would
-        # swallow a prompt and hang the command waiting for an answer.
-        from trainmate.prompt import PROMPT_SENTINEL, PHOTO_SENTINEL, BUTTONS_SENTINEL
-        for sentinel in (PROMPT_SENTINEL, PHOTO_SENTINEL, BUTTONS_SENTINEL):
-            self.assertFalse(bot.is_flush_request(sentinel + '{"id": "p1"}\n'))
-
-
 class UiCallbackTest(unittest.TestCase):
     def test_roundtrips(self):
         data = bot.ui_callback_data("abc123", "2.1")
@@ -840,52 +737,42 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.ran, [])
 
 
-class FlushMarkerTest(unittest.TestCase):
-    """A flush that only ends a message hangs no Stop button (DESIGN_change_heads_up.md §4)."""
-
-    def _emitted(self, **kwargs):
-        import io
-        from trainmate.prompt import emit_flush
-        buf = io.StringIO()
-        with mock.patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
-            emit_flush(out=buf, **kwargs)
-        return buf.getvalue()
-
-    def test_an_ordinary_flush_announces_a_wait(self):
-        line = self._emitted()
-        self.assertTrue(bot.is_flush_request(line))
-        self.assertTrue(bot.flush_before_wait(line))
-
-    def test_a_message_break_does_not(self):
-        line = self._emitted(wait=False)
-        self.assertTrue(bot.is_flush_request(line))
-        self.assertFalse(bot.flush_before_wait(line))
-
-
 class QueueProtocolTest(unittest.TestCase):
-    """The TM-QUEUE sentinel and the `q:` buttons (DESIGN_athlete_queue.md §6.2)."""
+    """The `q:` buttons of a queued item (DESIGN_athlete_queue.md §6.2).
 
-    def test_roundtrips_through_emit_queue_item(self):
-        import io
-        from trainmate.prompt import emit_queue_item
-        buf = io.StringIO()
-        emit_queue_item(
-            12, "🙋 Quick question (1 left)\nWhat was it?",
-            [{"label": "Leg press", "action": "a2"}, {"label": "🕐 Not now", "action": "n"}],
-            "1789538400", out=buf,
-        )
-        req = bot.parse_queue_request(buf.getvalue().rstrip("\n"))
-        self.assertEqual(req["text"], "🙋 Quick question (1 left)\nWhat was it?")
+    They are their own namespace: no button token and no Stop nonce reads them, so a
+    tap on an item neither retires nor answers the morning row.
+    """
+
+    def test_an_items_buttons_become_rows_carrying_its_id_and_the_walk_start(self):
+        """Each button of a queued item becomes a `q:<id>:<action>:<since>` tap.
+
+        The item's id and the walk's start travel in the callback data rather than in
+        anything the bot remembers, which is what lets it forget the item entirely
+        (DESIGN_athlete_queue.md §6.2)."""
+        req = {
+            "id": 12,
+            "text": "🙋 Quick question (1 left)\nWhat was it?",
+            "buttons": [{"label": "Leg press", "action": "a2"},
+                        {"label": "🕐 Not now", "action": "n"}],
+            "since": "1789538400",
+        }
         self.assertEqual(bot.queue_button_rows(req), [[
-            ("Leg press", "q:12:a2:1789538400"), ("🕐 Not now", "q:12:n:1789538400"),
+            ("Leg press", "q:12:a2:1789538400"),
+            ("🕐 Not now", "q:12:n:1789538400"),
         ]])
 
-    def test_no_other_sentinel_parser_claims_a_queued_item(self):
-        line = bot.QUEUE_SENTINEL + '{"id": 1}'
-        self.assertIsNone(bot.parse_prompt_request(line))
-        self.assertIsNone(bot.parse_buttons_request(line))
-        self.assertFalse(bot.is_flush_request(line))
-        self.assertEqual(bot.parse_queue_request(line), {"id": 1})
+    def test_more_buttons_than_fit_are_chunked_into_rows(self):
+        """The same width the morning row uses, so an item does not read as a wall."""
+        req = {
+            "id": 3, "since": "1789538400",
+            "buttons": [{"label": f"a{i}", "action": f"a{i}"}
+                        for i in range(bot.UI_BUTTONS_PER_ROW + 1)],
+        }
+        rows = bot.queue_button_rows(req)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(len(rows[0]), bot.UI_BUTTONS_PER_ROW)
+        self.assertEqual(len(rows[1]), 1)
 
     def test_callback_roundtrips_inside_telegrams_64_bytes(self):
         data = bot.queue_callback_data(123456, "a12", "r1789538400")

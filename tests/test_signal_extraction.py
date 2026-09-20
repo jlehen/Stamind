@@ -29,7 +29,7 @@ class TestVocabulary(unittest.TestCase):
         with patch.object(
             config, "data", {"coach": {"signal_metrics": {"Altitude": "above 1500 m"}}}
         ):
-            merged = config.signal_metrics
+            merged = signals.signal_metrics()
         self.assertIn("alcohol", merged, "shipped categories must survive config")
         self.assertEqual(merged["altitude"], "above 1500 m", "config key is normalized")
 
@@ -38,7 +38,7 @@ class TestVocabulary(unittest.TestCase):
         with patch.object(
             config, "data", {"coach": {"signal_metrics": {"heat": "my own wording"}}}
         ):
-            self.assertEqual(config.signal_metrics["heat"], "my own wording")
+            self.assertEqual(signals.signal_metrics()["heat"], "my own wording")
 
     def test_every_shipped_sleep_category_trips_the_exclusion_guard(self):
         """The guard matches a substring, so a sleep category named without it would

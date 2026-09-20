@@ -114,8 +114,7 @@ _DB_BINDING_SITES = (
     ("trainmate_web", "db"),
     ("trainmate.garmin", "db"),
     ("trainmate.garmin.sync", "db"),
-    ("trainmate.garmin.pmc", "db"),
-    ("trainmate.garmin.load", "db"),
+    ("trainmate.garmin.derived", "db"),
     ("trainmate.garmin.client", "db"),
     ("trainmate.google_calendar", "db"),
 )

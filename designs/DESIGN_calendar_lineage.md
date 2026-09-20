@@ -159,7 +159,7 @@ off the end.
 ## 6. Freshness — the signature has to see the lineage
 
 `pushed_signature` is a hash of exactly the fields that determine the rendered event
-(`calendar_state.CALENDAR_FIELDS`), and an event is re-pushed when the hash moves. The
+(`workout_state.CALENDAR_FIELDS`), and an event is re-pushed when the hash moves. The
 description now depends on the whole lineage, so the hash has to move whenever the lineage
 grows.
 
@@ -226,7 +226,7 @@ one more entry gives way to it rather than the other way round.
 - a void entry prints no `Duration:` and no `Target:`;
 - a `Change:` line appears only when the change summary differs from the revision's reason;
 - appending a revision marks the event stale — the rule spans `db/workouts.py` and
-  `calendar_state.py`, so the test spans them too (AGENTS.md);
+  `workout_state.py`, so the test spans them too (AGENTS.md);
 - a lineage past the budget renders the newest entries plus the count of what was dropped,
   and stays inside the budget.
 

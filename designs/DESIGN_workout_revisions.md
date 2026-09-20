@@ -579,7 +579,7 @@ and the slot reverts to an ordinary write.
   and there is a handful of them rather than a horizon.
 - **Showing what the session was eased *from*.** The tag asserts the current form is the
   reduced plan without showing the original. `original_*` above is derived and reaches only
-  `calendar_state.py`. Until it is shown, "restore load as the athlete recovers" is an
+  `workout_state.py`. Until it is shown, "restore load as the athlete recovers" is an
   instruction the model has no target for — a real gap, but one that belongs to whichever
   command is asked to do the restoring.
 

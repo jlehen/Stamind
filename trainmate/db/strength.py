@@ -16,9 +16,15 @@ STRENGTH_TYPE = "strength_training"
 ACTIVE = "active"
 REST = "rest"
 
-# The `named_by` values that mean a person chose the name — in Garmin, or in TrainMate.
-# Only these reach the strength history and the naming answers (§5, §8).
-NAMED_BY_PERSON = ("garmin", "athlete")
+# Who named a set (§5). GARMIN is a person's pick in Garmin Connect or on the watch
+# face; ATHLETE is an answer they gave TrainMate; WATCH is the watch's own guess.
+# Only the two a person left reach the strength history and the naming answers
+# (§5, §8), which is what `NAMED_BY_PERSON` is for — it is built from them rather
+# than spelling the same two strings twice.
+GARMIN = "garmin"
+ATHLETE = "athlete"
+WATCH = "watch"
+NAMED_BY_PERSON = (GARMIN, ATHLETE)
 
 # When the strength history last changed, in the settings table: code writes it, the
 # athlete never edits it, and the strength planner reads it as its evidence (§5, §9).
@@ -120,7 +126,7 @@ class StrengthMixin:
     ) -> None:
         """Names the sets at `seqs` as a person's answer, or clears their name with None
         (§7). Nothing else sets `named_by = athlete`."""
-        named_by = "athlete" if exercise else None
+        named_by = ATHLETE if exercise else None
         with self._get_connection() as conn:
             conn.executemany(
                 "UPDATE exercise_sets SET exercise = ?, named_by = ? "
@@ -135,9 +141,9 @@ class StrengthMixin:
         is what "yes, final" and `strength reset` say about them (§6). Returns how many."""
         with self._get_connection() as conn:
             cursor = conn.execute(
-                "UPDATE exercise_sets SET named_by = 'athlete' "
-                "WHERE activity_id = ? AND named_by = 'watch'",
-                (activity_id,),
+                "UPDATE exercise_sets SET named_by = ? "
+                "WHERE activity_id = ? AND named_by = ?",
+                (ATHLETE, activity_id, WATCH),
             )
             conn.commit()
             confirmed = cursor.rowcount

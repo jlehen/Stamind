@@ -7,12 +7,12 @@ TEST_DB_PATH = test_db_path("test_trainmate_calstate.db")
 
 from trainmate.db import Database
 import trainmate.db
-from trainmate.calendar_state import calendar_signature, calendar_status
+from trainmate.workout_state import calendar_signature, calendar_status
 
 
 class TestCalendarState(unittest.TestCase):
     """Freshness (unpushed/synced/stale) is derived from `pushed_signature` vs the live
-    content hash — no hand-maintained flag. See trainmate.calendar_state."""
+    content hash — no hand-maintained flag. See trainmate.workout_state."""
 
     def setUp(self):
         if os.path.exists(TEST_DB_PATH):

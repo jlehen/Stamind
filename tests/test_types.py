@@ -36,8 +36,10 @@ TYPE_TABLES = {
 # accessor actually returns — see the two classes at the bottom of this file.
 HYDRATED_TYPES = {"Workout", "PlanFeedback"}
 
-# Not a database read at all: a proposal the coach hands back before anything is stored.
-NON_ROW_TYPES = {"PlanProposal"}
+# `trainmate.types` is table rows and the hydrated reads over them, and nothing else:
+# `PlanProposal` was the one exception and it lives with the coach's other records now
+# (`coach/proposals.py`). A TypedDict that is neither belongs there too, so the group
+# that used to hold it is gone rather than left open.
 
 
 def _typed_dict_names():
@@ -59,27 +61,25 @@ class TestEveryTypedDictIsClassified(unittest.TestCase):
     """
 
     def test_a_new_typed_dict_must_be_declared_a_row_a_hydrated_dict_or_neither(self):
-        classified = set(TYPE_TABLES) | HYDRATED_TYPES | NON_ROW_TYPES
+        classified = set(TYPE_TABLES) | HYDRATED_TYPES
         unclassified = [n for n in _typed_dict_names() if n not in classified]
         self.assertEqual(
             unclassified, [],
             "these TypedDicts are checked by nothing — add each to TYPE_TABLES (it "
-            "annotates a table), HYDRATED_TYPES (it describes what an accessor returns, "
-            f"and pin it against that read), or NON_ROW_TYPES: {unclassified}",
+            "annotates a table) or HYDRATED_TYPES (it describes what an accessor "
+            f"returns, and pin it against that read): {unclassified}",
         )
 
     def test_the_classifications_do_not_overlap_or_name_something_absent(self):
         every = set(_typed_dict_names())
         for label, group in (("TYPE_TABLES", set(TYPE_TABLES)),
-                             ("HYDRATED_TYPES", HYDRATED_TYPES),
-                             ("NON_ROW_TYPES", NON_ROW_TYPES)):
+                             ("HYDRATED_TYPES", HYDRATED_TYPES)):
             with self.subTest(group=label):
                 self.assertEqual(
                     group - every, set(),
                     f"{label} names types that no longer exist: {group - every}",
                 )
         self.assertEqual(set(TYPE_TABLES) & HYDRATED_TYPES, set())
-        self.assertEqual(HYDRATED_TYPES & NON_ROW_TYPES, set())
 
 
 class TestTypedDictsMatchSchema(unittest.TestCase):

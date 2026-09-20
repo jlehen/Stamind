@@ -241,7 +241,7 @@ class WhatItWritesTest(_TweakCase):
                       description="[Intervals]\n75 min, 5x5 at threshold.")
         self.apply(self.tweak(reply(longer), days=[THURSDAY]))
 
-        from trainmate.cli.workouts._helpers import modification_markers
+        from trainmate.workout_state import modification_markers
         thursday = test_db.get_workout(THURSDAY, "cycling")
         self.assertEqual(thursday["adaptation_count"], 0)
         self.assertEqual(modification_markers(thursday), ["TWEAKED"])

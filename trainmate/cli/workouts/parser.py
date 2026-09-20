@@ -4,7 +4,7 @@ Each sub-parser binds its handler with set_defaults(func=...), so the flags and 
 function that reads them are defined together.
 """
 from trainmate.config import config
-from trainmate.util import green
+from trainmate.text import green
 from trainmate.cli.selectors import add_selector_args, add_single_date_arg, parse_target
 from trainmate.cli.workouts.calendar_sync import (
     run_workout_prune_calendar, run_workout_push, run_workout_wipe,

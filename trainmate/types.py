@@ -69,7 +69,9 @@ class Workout(TypedDict):
     title: str
     description: Optional[str]
     original_description: Optional[str]  # the lineage's first revision
-    pushed_signature: Optional[str]  # hash of calendar fields at last push; freshness derived (trainmate.calendar_state)
+    # Hash of the calendar fields at the last push; freshness is derived from it, not
+    # stored (trainmate.workout_state).
+    pushed_signature: Optional[str]
     adherence_pushed_signature: Optional[str]  # calendar fields + verdict at the last `compare --mark`
     modification_reason: Optional[str]  # this revision's note; NULL on a void, where the note is removed_reason
     adaptation_summary: Optional[str]  # the batch rationale of the change that appended this revision
@@ -150,7 +152,7 @@ class AthleteMetric(TypedDict):
     # (42-day EWMA of load), ATL = fatigue (7-day EWMA), TSB = form = CTL(yesterday) -
     # ATL(yesterday). Suppressed at display inside the leading-edge warm-up window and
     # NULL on any pre-recompute row. The ATL/CTL load ratio derives from these at read
-    # time (garmin.pmc.load_ratio) rather than being stored.
+    # time (analytics.pmc.load_ratio) rather than being stored.
     ctl: Optional[float]
     atl: Optional[float]
     tsb: Optional[float]
@@ -215,14 +217,3 @@ class PlanFeedback(TypedDict):
     created_at: str  # ISO-8601 UTC, full precision
     text: str
     mesocycle_name: Optional[str]
-
-class PlanProposal(TypedDict):
-    """What `plan generate` produced, before the athlete has accepted it.
-
-    `goal` is the objective the plan belongs to — the requested one, or the next active
-    goal when none was named. It is `None` only when there are no active goals at all.
-    """
-    strategy: str
-    mesocycles: List[Dict[str, Any]]
-    reused: bool
-    goal: Optional[Objective]

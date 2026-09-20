@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 from tests.helpers import rebind_test_db, save_workout
 from trainmate import calendar_lineage
-from trainmate.calendar_state import calendar_signature, calendar_status
+from trainmate.workout_state import calendar_signature, calendar_status
 from trainmate.db import Database
 from trainmate.google_calendar import CalendarSyncer, quiet_events
 
@@ -290,7 +290,7 @@ class TestCalendarLineage(unittest.TestCase):
     def test_appending_a_revision_makes_the_event_stale(self):
         """The history is a function of the whole lineage, so the freshness hash has to
         move when the lineage grows — `revision_id` is what carries that (§6). Spans
-        db/workouts.py and calendar_state.py, so the test does too (AGENTS.md)."""
+        db/workouts.py and workout_state.py, so the test does too (AGENTS.md)."""
         lineage = self._plan()
         self.db.mark_workout_pushed(
             lineage, "evt-1", calendar_signature(self.db.get_workout_by_id(lineage))

@@ -11,7 +11,7 @@ import argparse
 import textwrap
 
 from trainmate.cli.argparse_ext import _weeks_arg
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from trainmate import progression, chart, intensity
@@ -21,12 +21,14 @@ from trainmate.plan_lineage import delta_baseline, plan_lineage
 from trainmate.intensity import (
     ZONE_SPORT_MIN_SHARE, select_zone_sports, window_sport_stats, zone_currency,
 )
+from trainmate.analytics.pmc import PMC_TSB_LAG_NOTE, color_tsb
 from trainmate.sports import SPORT_MAPPING, canonical_sport
-from trainmate.util import (
-    asides_enabled, bold, green, red, yellow, gray, dim, cmd, pad_visible, visible_len,
-    wrap_text, color_tsb, fmt_date, today_str as _today_str, PMC_TSB_LAG_NOTE,
-    notice, warn, keep_whole,
+from trainmate.text import (
+    asides_enabled, bold, cmd, dim, gray, green, keep_whole, pad_visible, red, visible_len,
+    wrap_text, yellow,
 )
+from trainmate.output import notice, warn
+from trainmate.clock import fmt_date, parse_date, today_str as _today_str
 from trainmate.cli.common import ensure_recent_data
 
 # `trainmate_cli` (the `db` facade) is imported lazily inside `run_progress`: it
@@ -66,13 +68,6 @@ CURRENCY_MISMATCH = "~mismatch"
 _NO_BAND = object()  # sentinel: no band emitted yet (a real meso_label may be None)
 
 
-def _to_date(date_str: str):
-    """'2026-07-31' -> date(2026, 7, 31). The one ISO-date parser for this module, so
-    the renderer doesn't sprinkle `datetime.strptime(...)` inline (mirrors
-    `progression._to_date`)."""
-    return datetime.strptime(date_str, "%Y-%m-%d").date()
-
-
 def _short_date(date_str: str) -> str:
     """'2026-07-31' -> '07-31'.
 
@@ -84,7 +79,7 @@ def _short_date(date_str: str) -> str:
 
 def _weekday(date_str: str) -> str:
     """'2026-07-31' -> 'Wed'."""
-    return _to_date(date_str).strftime("%a")
+    return parse_date(date_str).strftime("%a")
 
 
 def sparkline(values: List[Optional[float]]) -> str:
@@ -650,7 +645,7 @@ def render_progress(
     # Sparkline: one CTL sample per displayed past week (its last day <= today).
     ctl_samples: List[Optional[float]] = []
     for w in past_weeks:
-        w_start = _to_date(w["week_commencing"])
+        w_start = parse_date(w["week_commencing"])
         sample: Optional[float] = None
         for offset in range(6, -1, -1):
             d = (w_start + timedelta(days=offset)).strftime("%Y-%m-%d")
@@ -718,9 +713,9 @@ def render_progress(
     for verb, date, aligned in (
         ("starts", payload.get("plan_start"), 0), ("ends", plan_end, 6),
     ):
-        if not date or _to_date(date).weekday() == aligned:
+        if not date or parse_date(date).weekday() == aligned:
             continue  # a plan starting Monday / ending Sunday leaves no partial week
-        d = _to_date(date)
+        d = parse_date(date)
         if (d - timedelta(days=d.weekday())).strftime("%Y-%m-%d") in shown:
             notes.append(f"plan {verb} {_short_date(date)} ({_weekday(date)})")
     lines += format_weekly_table(
@@ -777,7 +772,7 @@ def _orphan_week_note(
     orphans = []
     for week in weeks:
         mon = week["week_commencing"]
-        sun = _to_date(mon) + timedelta(days=6)
+        sun = parse_date(mon) + timedelta(days=6)
         sun_s = sun.strftime("%Y-%m-%d")
         if not any(
             b["start_date"] <= sun_s and b["end_date"] >= mon for b in reported
@@ -884,7 +879,7 @@ def emit_chart(chart_arg: Any, payload: Dict[str, Any], caption: str) -> None:
         )
         return
 
-    from trainmate.prompt import emit_photo, is_json_frontend
+    from trainmate.sentinels import emit_photo, is_json_frontend
     if is_json_frontend():
         import tempfile
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:

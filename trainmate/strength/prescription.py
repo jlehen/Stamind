@@ -9,6 +9,7 @@ is above, so it never meets a kilogram and never copies one into a revision.
 from typing import Any, Dict, List, Optional, Sequence
 
 from trainmate.strength import sets
+from trainmate.text import capitalized
 
 
 def collapse_brief(description: Optional[str]) -> str:
@@ -46,7 +47,7 @@ def exercise_lines(rows: Sequence[Dict[str, Any]]) -> List[str]:
     for row in list(rows) + [None]:
         if run and (row is None or row["exercise"] != run[0]["exercise"]):
             unit = " kg" if any(r.get("load_kg") is not None for r in run) else ""
-            lines.append(f"{_capitalized(run[0]['exercise'])} {spec(run)}{unit}")
+            lines.append(f"{capitalized(run[0]['exercise'])} {spec(run)}{unit}")
             run = []
         if row is not None:
             run.append(row)
@@ -81,5 +82,3 @@ def spec(rows: Sequence[Dict[str, Any]]) -> str:
     return ", ".join(parts)
 
 
-def _capitalized(text: str) -> str:
-    return text[:1].upper() + text[1:]

@@ -1,14 +1,16 @@
+"""How text looks on the way out: colour, width, wrapping and tables.
+
+Nothing here decides *whether* a line is printed — that is `output.py` — and nothing
+here knows what a date is. The only app module it reaches for is `trainmate.sentinels`,
+deferred inside `asides_enabled`, because the verbosity default depends on which
+front-end is driving (DESIGN_output_verbosity.md §2).
+"""
 import os
 import re
 import shutil
 import sys
 import textwrap
-import threading
-import time
-from datetime import date, datetime
-from typing import Optional, Tuple
-
-from trainmate import journal
+from typing import Optional
 
 # ANSI escape codes for terminal coloring
 ANSI_ESCAPE = re.compile(r'(?:\033|\x1b)\[[0-9;]*m')
@@ -41,65 +43,6 @@ def display_width() -> int:
     if os.environ.get("TRAINMATE_WRAP_WIDTH") or not sys.stdout.isatty():
         return default_wrap_width()
     return max(40, shutil.get_terminal_size((80, 24)).columns)
-
-
-def today_date() -> date:
-    """Returns today's date in the athlete's timezone (DESIGN_user_timezone.md §1).
-
-    Garmin keys daily metrics and activities on the athlete's local calendar
-    date, so every "what day is it" computation must use local time rather than
-    UTC (a UTC frontier drifts a day at the boundary hours). Instants stored for
-    comparison (created_at, last-pull timestamps) stay in UTC elsewhere.
-    """
-    from trainmate.clock import now
-    return now().date()
-
-
-def today_str() -> str:
-    """Returns today's local calendar date as a YYYY-MM-DD string."""
-    return today_date().strftime("%Y-%m-%d")
-
-
-def days_between(start: str, end: str) -> int:
-    """Returns whole days from `start` to `end` (both YYYY-MM-DD), negative if end precedes it."""
-    fmt = "%Y-%m-%d"
-    return (datetime.strptime(end, fmt).date() - datetime.strptime(start, fmt).date()).days
-
-
-def fmt_date(date_str: Optional[str]) -> str:
-    """Renders a YYYY-MM-DD date as 'YYYY-MM-DD Ddd' (e.g. '2026-06-05 Fri').
-
-    The one date renderer for every surface with room for the weekday. Falls back to
-    the raw string when the value isn't a parseable date, so a caller can hand this
-    whatever a row happens to hold."""
-    if not date_str:
-        return "?"
-    try:
-        return datetime.strptime(str(date_str), "%Y-%m-%d").strftime("%Y-%m-%d %a")
-    except ValueError:
-        return str(date_str)
-
-
-def fmt_span(start: Optional[str], end: Optional[str], sep: str = " to ") -> str:
-    """Renders a date range with the weekday on both ends. A range that starts and
-    ends on the same day collapses to that one date."""
-    if start and end and start == end:
-        return fmt_date(start)
-    return f"{fmt_date(start)}{sep}{fmt_date(end)}"
-
-
-def fmt_timestamp(iso: Optional[str]) -> str:
-    """Renders a stored UTC ISO timestamp as 'YYYY-MM-DD Ddd HH:MM' in the athlete's
-    timezone — stored precise, converted only on display (DESIGN_user_timezone.md §5).
-
-    Falls back to the raw string if it isn't parseable (e.g. a date-only legacy value)."""
-    if not iso:
-        return "?"
-    from trainmate.clock import to_local
-    try:
-        return to_local(datetime.fromisoformat(iso)).strftime("%Y-%m-%d %a %H:%M")
-    except ValueError:
-        return iso
 
 
 def is_color_enabled() -> bool:
@@ -161,62 +104,8 @@ def asides_enabled() -> bool:
     raw = os.environ.get("TRAINMATE_VERBOSE")
     if raw:
         return raw.lower() not in ("0", "no", "false")
-    from trainmate.prompt import is_json_frontend
+    from trainmate.sentinels import is_json_frontend
     return not is_json_frontend()
-
-
-def aside(text: str, color_fn=None) -> None:
-    """Prints one piece of side information — progress, cache reuse, a next-step hint.
-    The answer, warnings and errors use `print` and reach every front-end
-    (DESIGN_output_verbosity.md §3)."""
-    if not asides_enabled():
-        return
-    print((color_fn or dim)(text))
-
-
-def step(text: str, color_fn=None) -> None:
-    """Prints what the app is doing right now, and records it (DESIGN_logging.md §5.1).
-
-    The trace half of the old aside tier: a decision or an action a post-mortem wants —
-    "Auto-syncing Garmin...", "reusing the cached reconstruction", "no date given,
-    adapting today". Prints through the same gate and the same dim styling `aside` uses,
-    so nothing on screen moves; the difference is that it survives the screen."""
-    aside(text, color_fn)
-    journal.note(strip_ansi(text))
-
-
-def warn(text: str) -> None:
-    """An operational warning: something outside the app did not work, and it changes
-    what the answer means (DESIGN_logging.md §5.3).
-
-    Always prints, and folds in the colour, the `Warning: ` prefix and the wrap that used
-    to be twenty independent decisions. A domain refusal — "no active plan", "nothing
-    scheduled for Thursday" — is the app correctly reporting the athlete's own data, so
-    it is an answer, and takes `notice` instead.
-
-    The prefix is wrapped with the text so the first line fits the budget too; the
-    journal keeps the unwrapped original, since a log is not read at 48 columns."""
-    print(yellow(wrap_text("Warning: " + text)))
-    journal.note(strip_ansi(text), lvl="warn")
-
-
-def fail(text: str) -> None:
-    """The command could not do its job, for a reason outside the app (§5.3). Prints in
-    red with an `Error: ` prefix, wrapped like `warn`, and lands in the journal at
-    `error`."""
-    print(red(wrap_text("Error: " + text)))
-    journal.note(strip_ansi(text), lvl="error")
-
-
-def notice(text: str, color_fn=None) -> None:
-    """The athlete's own data reported back: no plan yet, a version kept for rollback, a
-    selector that matched nothing, a hint that the answer needs a follow-up command.
-
-    Warning tier on screen (DESIGN_output_verbosity.md §3) — always printed, on every
-    front-end — but not an operational fault, so unlike `warn` it takes no prefix and
-    leaves no journal entry. It exists for the third thing they share, the wrap, which
-    every yellow and red line used to decide for itself (§3.5). `red` for a refusal."""
-    print((color_fn or yellow)(wrap_text(text)))
 
 
 def strip_ansi(text: str) -> str:
@@ -237,89 +126,6 @@ def cmd(text: str, *, quote: bool = True) -> str:
     keeps it. `quote=False` for a command printed alone on its own line, where the
     quotes are just noise."""
     return bold(f"'{text}'" if quote else text)
-
-
-def color_load_ratio(ratio: float) -> str:
-    """ATL/CTL (fatigue vs fitness) coloring — colors only the overload end, phase-blind
-    (training_load.md §3).
-
-    > 1.5 red (excessive relative spike), 1.3-1.5 yellow (caution). Everything at or
-    below 1.3 stays uncolored: a *low* ratio is phase-dependent, not a fault — an
-    intensity or realization mesocycle drives it to ~0.7 by design, and coloring that as
-    "under-training" is what made the old ACWR band fight block periodization. Bands are
-    half-open so no value is double-claimed."""
-    s = f"{ratio:.2f}"
-    if ratio > 1.5:
-        return red(s)
-    if ratio > 1.3:
-        return yellow(s)
-    return s
-
-
-# The printed CTL | ATL | TSB triple won't subtract to the shown TSB, because TSB is
-# CTL(yesterday) - ATL(yesterday) (training_load.md §1) while CTL/ATL are today's. This
-# lag is correct (matching TrainingPeaks) but reads as an arithmetic error, so this
-# one-line footnote rides wherever TSB is surfaced (per-day prompt lines, coach summary,
-# tm status). Lives here — not in coach.formatting — because both the CLI and the coach
-# layer render it.
-PMC_TSB_LAG_NOTE = (
-    "(Note: TSB is CTL(yesterday) - ATL(yesterday), so it won't equal the shown "
-    "same-day CTL - ATL; this ~1-day lag is expected, not an error.)"
-)
-
-
-def color_tsb(tsb: float) -> str:
-    """TSB (form) coloring — colors only the two risk ends, phase-blind
-    (DESIGN_pmc_fitness_fatigue.md §6.1).
-
-    < -30 red (excessive fatigue), > +25 yellow (detraining / over-tapered). The
-    -30..+25 middle stays uncolored: its meaning is phase-dependent (mid-build a +15
-    means fitness is decaying; peaking, it means race-ready), and that interpretive call
-    belongs to the coach reading the science file, not to a phase-blind color map. Bands
-    are half-open so no value is double-claimed."""
-    s = f"{tsb:.1f}"
-    if tsb < -30:
-        return red(s)
-    if tsb > 25:
-        return yellow(s)
-    return s
-
-
-def color_ramp(ramp: float) -> str:
-    """CTL ramp-rate coloring, bands touching so no value falls in an uncolored gap
-    (§6.1): >= 8 red (unsustainable), 5 <= ramp < 8 yellow (watch), else plain. No green
-    band — a low ramp is correct during a taper, so green would wrongly bless it."""
-    s = f"{ramp:+.1f}"
-    if ramp >= 8:
-        return red(s)
-    if 5 <= ramp < 8:
-        return yellow(s)
-    return s
-
-
-def pmc_cells(
-    ctl: Optional[float], atl: Optional[float], tsb: Optional[float]
-) -> Tuple[str, str, str]:
-    """The CTL/ATL/TSB triple as display strings, shared by every user surface that
-    renders it (tm status, data show-metrics, the workout-adapt trajectory).
-
-    Feed it the output of garmin.pmc_display_values(), which already blanks warm-up rows.
-    A missing value renders "—" and never "0.0": a printed "TSB 0.0" reads as a real
-    neutral balance rather than as absent data (DESIGN_pmc_fitness_fatigue.md §6.1)."""
-    return (
-        f"{ctl:.1f}" if ctl is not None else "—",
-        f"{atl:.1f}" if atl is not None else "—",
-        color_tsb(tsb) if tsb is not None else "—",
-    )
-
-
-def pmc_warming_note(n_days: int, ctl_days: int) -> str:
-    """The §3.3(b) "PMC still warming" caveat, parameterized by τ_ctl so it never
-    hardcodes a 42 that a non-default config would make a lie."""
-    return (
-        f"PMC still warming: CTL based on {n_days} days of history (a {ctl_days}-day "
-        f"average needs ~{3 * ctl_days} days to settle); fitness/freshness may read low."
-    )
 
 
 def visible_len(s: str) -> int:
@@ -362,90 +168,6 @@ def truncate_visible(s: str, width: int) -> str:
         if used >= width - 1:
             break
     return "".join(out) + "…" + (RESET if coloured else "")
-
-
-class Progress:
-    """A single self-erasing '[####....] 7/28' line for a loop of slow network round-trips:
-    the Calendar writes of generate/rollback, the days and activities of a Garmin pull.
-
-    Silent unless stdout is a terminal, so piped output, the bot and the tests keep just
-    the summary line that introduced it. Usable as a context manager, which erases the
-    line on the way out."""
-
-    BAR_WIDTH = 24
-
-    def __init__(self, total: int) -> None:
-        self.total = total
-        self.done_count = 0
-        self.active = total > 0 and sys.stdout.isatty()
-        self._draw()
-
-    def __enter__(self) -> "Progress":
-        return self
-
-    def __exit__(self, *exc) -> None:
-        self.close()
-
-    def step(self, n: int = 1) -> None:
-        self.done_count = min(self.total, self.done_count + n)
-        self._draw()
-
-    def close(self) -> None:
-        """Erases the bar, leaving the surrounding output as if it never drew."""
-        if self.active:
-            sys.stdout.write("\r\033[K")
-            sys.stdout.flush()
-            self.active = False
-
-    def _draw(self) -> None:
-        if not self.active:
-            return
-        filled = round(self.BAR_WIDTH * self.done_count / self.total)
-        bar = "#" * filled + "." * (self.BAR_WIDTH - filled)
-        sys.stdout.write(f"\r\033[K  [{bar}] {self.done_count}/{self.total}")
-        sys.stdout.flush()
-
-
-class Spinner:
-    """A self-erasing '⠹ 1:23 elapsed' line that ticks while one blocking call runs: the
-    LLM wait (DESIGN_output_verbosity.md §8.5).
-
-    Silent unless stdout is a terminal, like `Progress`. A daemon thread redraws it, so a
-    Ctrl-C in the wrapped call still exits; leaving the context erases the line."""
-
-    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-    INTERVAL = 0.1
-
-    def __init__(self) -> None:
-        self.active = sys.stdout.isatty()
-        self._stop = threading.Event()
-        self._thread: Optional[threading.Thread] = None
-        self._started = 0.0
-
-    def __enter__(self) -> "Spinner":
-        if self.active:
-            self._started = time.monotonic()
-            self._thread = threading.Thread(target=self._run, daemon=True)
-            self._thread.start()
-        return self
-
-    def __exit__(self, *exc) -> None:
-        if not self.active:
-            return
-        self._stop.set()
-        self._thread.join()
-        sys.stdout.write("\r\033[K")
-        sys.stdout.flush()
-
-    def _run(self) -> None:
-        frame = 0
-        while not self._stop.is_set():
-            elapsed = int(time.monotonic() - self._started)
-            glyph = self.FRAMES[frame % len(self.FRAMES)]
-            sys.stdout.write(f"\r\033[K  {glyph} {elapsed // 60}:{elapsed % 60:02d} elapsed")
-            sys.stdout.flush()
-            frame += 1
-            self._stop.wait(self.INTERVAL)
 
 
 def is_narrow_client() -> bool:
@@ -675,3 +397,10 @@ def format_labeled_paragraph(
     indented_text = paragraph_indent + wrapped_text.replace('\n', '\n' + paragraph_indent)
     return f"{label}\n{indented_text}"
 
+
+def capitalized(text: str) -> str:
+    """`text` with its first character upper-cased and the rest left alone.
+
+    Not `str.capitalize()`, which lower-cases the tail: an exercise called "RDL" or a
+    sport called "MTB" must survive being put at the head of a sentence."""
+    return text[:1].upper() + text[1:]

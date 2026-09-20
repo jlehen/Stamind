@@ -13,9 +13,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from trainmate import progression
 from trainmate.config import config
 from trainmate.progression import RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN
-from trainmate.util import (
-    cmd, days_between, fmt_date, gray, today_str as _today_str,
-)
+from trainmate.text import cmd, gray
+from trainmate.clock import days_between, fmt_date, today_str as _today_str
 
 # What the morning push offers on a span or mesocycle cliff (§6). The label is the athlete's;
 # the argv behind it comes from the detector, never from the free-text router.

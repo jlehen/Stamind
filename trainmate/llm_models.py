@@ -11,7 +11,7 @@ through it) never opens the DB.
 from typing import Any, Dict, List, Optional
 
 from trainmate.config import config
-from trainmate.util import cmd
+from trainmate.text import cmd
 
 LLM_MODEL_SETTING = "llm_model"
 

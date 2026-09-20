@@ -18,11 +18,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import journal
 from trainmate.cli.selectors import add_selector_args, resolve_window
-from trainmate.clock import to_local
-from trainmate.util import (
-    bold, cyan, dim, display_width, flex_width, fmt_timestamp, gray, green, pad_visible,
-    red, render_table, truncate_visible, visible_len, yellow, notice,
+from trainmate.clock import fmt_timestamp, to_local
+from trainmate.text import (
+    bold, cyan, dim, display_width, flex_width, gray, green, pad_visible, red, render_table,
+    truncate_visible, visible_len, yellow,
 )
+from trainmate.output import notice
 
 # How many runs the listing shows when nothing else is asked for.
 DEFAULT_LIMIT = 20

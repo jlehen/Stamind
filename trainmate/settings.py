@@ -16,7 +16,7 @@ from typing import Any, Callable, List, Optional, Tuple
 
 from trainmate import clock, llm_models
 from trainmate.config import config
-from trainmate.util import cmd
+from trainmate.text import cmd
 
 # Athlete-facing names — the vocabulary `settings set` accepts and every caller passes.
 COACH_MODEL = "coach-model"
@@ -347,6 +347,21 @@ def commitment_days() -> int:
     """How many days from today the week planner must account for session by session
     (DESIGN_plan_change_continuity.md §4.1). Operator-only: not in ROUTABLE_SETTINGS."""
     return value(COMMITMENT_DAYS)
+
+
+def commitment_end(today_str: str) -> Optional[str]:
+    """The last day of the commitment window, or None when it is empty (§4.1).
+
+    `N` days starting today, so `1` covers today alone and `0` covers nothing. The
+    window's length and where it ends are one rule, and `workout generate` was
+    deriving the end from the length itself.
+    """
+    days = commitment_days() or 0
+    if days <= 0:
+        return None
+    # `clock.parse_date`, not this module's own `parse_date`, which parses a setting
+    # token — `clock.shift` is that arithmetic already.
+    return clock.shift(today_str, days - 1)
 
 
 def push_enabled() -> bool:

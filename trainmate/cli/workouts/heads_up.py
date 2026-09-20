@@ -16,9 +16,9 @@ from typing import Any, Dict, Iterable, Iterator, Optional
 from trainmate import clock, heads_up, runtime, settings
 from trainmate.config import config
 from trainmate.prompt import Choice, athlete_watching
-from trainmate.util import (
-    bold, cmd, default_wrap_width, green, notice, today_str, wrap_text,
-)
+from trainmate.text import bold, cmd, default_wrap_width, green, wrap_text
+from trainmate.output import notice
+from trainmate.clock import today_str
 
 
 def _when(change: Dict[str, Any]) -> str:

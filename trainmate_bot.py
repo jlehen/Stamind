@@ -41,11 +41,13 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 from trainmate import athlete_queue, heads_up, journal, settings
 from trainmate.clock import now as athlete_now, reset_cache as forget_timezone
 from trainmate.config import config
-from trainmate.prompt import (
-    PROMPT_SENTINEL, PROMPT_PROTOCOL_VERSION, PHOTO_SENTINEL, BUTTONS_SENTINEL,
-    FLUSH_SENTINEL, QUEUE_LATER_CHOICES, QUEUE_NOT_NOW, QUEUE_SENTINEL, queue_later_label,
+from trainmate.sentinels import (
+    BUTTONS_SENTINEL, FLUSH_SENTINEL, PHOTO_SENTINEL, PROMPT_SENTINEL, QUEUE_SENTINEL,
+    SENTINEL_PREFIX, flush_wants_a_wait, parse_frame, prompt_answer,
 )
-from trainmate.util import cmd, strip_ansi, warn
+from trainmate.athlete_queue import QUEUE_LATER_CHOICES, QUEUE_NOT_NOW, queue_later_label
+from trainmate.text import cmd, strip_ansi
+from trainmate.output import warn
 
 # Telegram caps a message at 4096 chars; we wrap replies in <pre>…</pre> (7 chars
 # of overhead) and want headroom, so chunk the body well under the hard limit.
@@ -409,86 +411,6 @@ def is_authorized(chat_id: int, allowed_ids: List[int]) -> bool:
     return chat_id in allowed_ids
 
 
-def parse_prompt_request(line: str) -> Optional[dict]:
-    """Decodes a sentinel-framed prompt request line, or None if it isn't one.
-
-    The CLI's JsonPrompt writes ``\\x1eTM-PROMPT {json}`` on its own stdout line; any
-    other line is ordinary command output."""
-    if not line.startswith(PROMPT_SENTINEL):
-        return None
-    try:
-        return json.loads(line[len(PROMPT_SENTINEL):])
-    except json.JSONDecodeError:
-        return None
-
-
-def parse_photo_request(line: str) -> Optional[dict]:
-    """Decodes a sentinel-framed photo-ready line, or None if it isn't one.
-
-    `trainmate.prompt.emit_photo` writes ``\\x1eTM-PHOTO {json}`` (fields
-    ``path``/``caption``) on its own stdout line — the CLI's ``--chart`` path
-    (DESIGN_progress_timeline.md §7.2)."""
-    if not line.startswith(PHOTO_SENTINEL):
-        return None
-    try:
-        return json.loads(line[len(PHOTO_SENTINEL):])
-    except json.JSONDecodeError:
-        return None
-
-
-def parse_buttons_request(line: str) -> Optional[dict]:
-    """Decodes a sentinel-framed non-blocking button row, or None if it isn't one.
-
-    `trainmate.prompt.emit_buttons` writes ``\\x1eTM-BUTTONS {json}`` (field
-    ``buttons``) on its own stdout line — unlike TM-PROMPT the CLI exits without
-    waiting; each button carries a canned follow-up the bot feeds back through the
-    normal pipeline when tapped (DESIGN_bot_simple_frontend.md §4.4)."""
-    if not line.startswith(BUTTONS_SENTINEL):
-        return None
-    try:
-        return json.loads(line[len(BUTTONS_SENTINEL):])
-    except json.JSONDecodeError:
-        return None
-
-
-def is_flush_request(line: str) -> bool:
-    """True for a sentinel-framed flush marker, ``\\x1eTM-FLUSH {json}``.
-
-    Returns a bool rather than the payload its three siblings return: a flush carries
-    no fields, and an always-empty dict would read as falsy at every call site
-    (DESIGN_output_verbosity.md §7)."""
-    return line.startswith(FLUSH_SENTINEL)
-
-
-def flush_before_wait(line: str) -> bool:
-    """Whether a flush marker announces a wait, and so earns a Stop button. Only
-    ``{"wait": false}`` says no: it merely ends a message (DESIGN_change_heads_up.md §4)."""
-    try:
-        payload = json.loads(line[len(FLUSH_SENTINEL):])
-    except json.JSONDecodeError:
-        return True
-    return not isinstance(payload, dict) or payload.get("wait", True) is not False
-
-
-def parse_queue_request(line: str) -> Optional[dict]:
-    """Decodes a sentinel-framed queued item, or None if it isn't one.
-
-    `trainmate.prompt.emit_queue_item` writes ``\\x1eTM-QUEUE {json}`` (fields ``id``,
-    ``text``, ``buttons``, ``since``). The item goes out as a message of its own and its
-    buttons carry all a tap needs, so the bot stores nothing (DESIGN_athlete_queue.md §6.2)."""
-    if not line.startswith(QUEUE_SENTINEL):
-        return None
-    try:
-        return json.loads(line[len(QUEUE_SENTINEL):])
-    except json.JSONDecodeError:
-        return None
-
-
-# Any other \x1e-prefixed sentinel a future CLI version might emit: recognised
-# framing but not (yet) understood by this bot build. Dropped rather than
-# forwarded as chat text, so a stale bot degrades to a silently-missing
-# feature instead of leaking raw protocol bytes (§7.2).
-_SENTINEL_PREFIX = "\x1e"
 
 
 def ui_callback_data(token: str, path: str) -> str:
@@ -734,8 +656,9 @@ async def restart_teardown(session: Optional[_Session], stop_polling) -> None:
         fut = session.answer_future
         answered = session.awaiting is not None and fut is not None and not fut.done()
         if answered:
-            fut.set_result({"v": PROMPT_PROTOCOL_VERSION, "id": session.awaiting.get("id"),
-                            "cancelled": True})
+            fut.set_result(
+                prompt_answer(session.awaiting.get("id"), cancelled=True)
+            )
         if not answered or not await _exited_within_grace(session.proc):
             try:
                 session.proc.kill()
@@ -980,7 +903,7 @@ def main() -> None:
             await bot.send_message(
                 chat_id=session.chat_id, text="Prompt timed out — command cancelled."
             )
-            return {"v": PROMPT_PROTOCOL_VERSION, "id": req.get("id"), "cancelled": True}
+            return prompt_answer(req.get("id"), cancelled=True)
         finally:
             session.awaiting = None
             session.answer_future = None
@@ -1011,49 +934,42 @@ def main() -> None:
                 if not line:
                     break
                 raw = line.decode("utf-8", "replace")
-                photo_req = parse_photo_request(raw)
-                if photo_req is not None:
-                    await _flush_output(session, buf)
-                    buf = []
-                    await _send_photo(session, photo_req)
+                frame = parse_frame(raw)
+                if frame is None:
+                    if raw.rstrip("\n").startswith(SENTINEL_PREFIX):
+                        # Recognised framing but a tag this build does not know (a newer
+                        # CLI), or a payload that does not parse. Dropped rather than
+                        # forwarded as chat text.
+                        continue
+                    buf.append(strip_ansi(raw).rstrip("\n"))
                     continue
-                buttons_req = parse_buttons_request(raw)
-                if buttons_req is not None:
-                    await _flush_output(session, buf)
-                    buf = []
-                    await _send_ui_buttons(session, buttons_req)
-                    continue
-                queue_req = parse_queue_request(raw)
-                if queue_req is not None:
-                    await _flush_output(session, buf)
-                    buf = []
-                    await _send_queue_item(session, queue_req)
-                    continue
-                if is_flush_request(raw):
+                tag, payload = frame
+                if tag == FLUSH_SENTINEL:
                     # Nothing to render: the marker's whole job is to end the message
                     # here, before the CLI goes quiet for an LLM call (§7). That message
                     # is the wait notice, and it carries the Stop button
                     # (DESIGN_bot_stop_button.md §4) — no message, nothing to hang it on.
-                    if await _flush_output(session, buf) and flush_before_wait(raw):
+                    if await _flush_output(session, buf) and flush_wants_a_wait(payload):
                         await _offer_stop(session)
                     buf = []
                     continue
-                req = parse_prompt_request(raw)
-                if req is None and raw.rstrip("\n").startswith(_SENTINEL_PREFIX):
-                    # Recognised framing but an unknown sentinel (a future CLI
-                    # version) — drop rather than forward as chat text.
-                    continue
-                if req is not None:
-                    await _flush_output(session, buf)
-                    buf = []
-                    response = await _present_prompt(session, req)
+                # Every other frame renders something of its own, so whatever prose is
+                # buffered is a message that ends here.
+                await _flush_output(session, buf)
+                buf = []
+                if tag == PHOTO_SENTINEL:
+                    await _send_photo(session, payload)
+                elif tag == BUTTONS_SENTINEL:
+                    await _send_ui_buttons(session, payload)
+                elif tag == QUEUE_SENTINEL:
+                    await _send_queue_item(session, payload)
+                elif tag == PROMPT_SENTINEL:
+                    response = await _present_prompt(session, payload)
                     try:
                         session.proc.stdin.write((json.dumps(response) + "\n").encode())
                         await session.proc.stdin.drain()
                     except (BrokenPipeError, ConnectionResetError):
                         break
-                    continue
-                buf.append(strip_ansi(raw).rstrip("\n"))
             await _flush_output(session, buf)
             await session.proc.wait()
             # A scheduler-spawned run (`bot morning` already sent today) may
@@ -1186,8 +1102,9 @@ def main() -> None:
             return "Nothing to cancel."
         fut = session.answer_future
         if session.awaiting and fut is not None and not fut.done():
-            fut.set_result({"v": PROMPT_PROTOCOL_VERSION, "id": session.awaiting.get("id"),
-                            "cancelled": True})
+            fut.set_result(
+                prompt_answer(session.awaiting.get("id"), cancelled=True)
+            )
         else:  # mid-compute: kill the process; _drive cleans up
             try:
                 session.proc.kill()
@@ -1273,8 +1190,7 @@ def main() -> None:
             fut = session.answer_future
             if (awaiting and awaiting.get("type") == "text"
                     and fut is not None and not fut.done()):
-                fut.set_result({"v": PROMPT_PROTOCOL_VERSION, "id": awaiting.get("id"),
-                                "answer": text})
+                fut.set_result(prompt_answer(awaiting.get("id"), answer=text))
                 _log(chat.id, "  ", "text answer")
                 return
             await message.reply_text(
@@ -1482,11 +1398,11 @@ def main() -> None:
         if awaiting.get("type") == "confirm":
             answer = value == "y"
             chosen = "Yes" if answer else "No"
-            fut.set_result({"v": PROMPT_PROTOCOL_VERSION, "id": pid, "answer": answer})
+            fut.set_result(prompt_answer(pid, answer=answer))
         else:
             chosen = next((c["label"] for c in awaiting.get("choices", [])
                            if c["value"] == value), value)
-            fut.set_result({"v": PROMPT_PROTOCOL_VERSION, "id": pid, "answer": value})
+            fut.set_result(prompt_answer(pid, answer=value))
         _log(chat.id, "  ", f"answer: {chosen}")
         try:  # echo the choice in place of the buttons
             await query.edit_message_text(text=f"{format_prompt_message(awaiting)}\n\n→ {chosen}")

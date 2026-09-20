@@ -1,39 +1,12 @@
 """Shared resolvers/formatters for the workout CLI handlers."""
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
-from trainmate import intensity, runtime
-from trainmate.calendar_state import calendar_status
+from trainmate import intensity
+from trainmate.workout_state import calendar_status, modification_markers
 from trainmate.sports import is_strength_sport
 from trainmate.strength.prescription import exercise_lines
-from trainmate.util import (
-    bold, gray, green, red, yellow, cyan, blue, magenta, cmd, fmt_date, notice,
-)
-
-
-# The change kind of a session's live revision, as the athlete reads it
-# (DESIGN_workout_revisions.md §7). A `generate` is the plan saying what it says, so it
-# gets no marker, and a void carries [REMOVED] instead.
-_KIND_MARKERS = {
-    'adapt': 'ADAPTED',
-    'tweak': 'TWEAKED',
-}
-
-
-def modification_markers(w: dict) -> list:
-    """What has happened to a session: the kind of its latest change, plus the easings
-    that still stand.
-
-    Two facts rather than one, which is why there is no precedence rule any more: a
-    session eased twice and then copied forward by a rollback still reads `[ADAPTED ×2]`
-    (§12)."""
-    kind = w.get('change_kind')
-    count = w.get('adaptation_count') or 0
-    eased = f"ADAPTED ×{count}" if count > 1 else ("ADAPTED" if count else "")
-    if kind == 'adapt':
-        # The tally is the whole story here; an adapt that eased nothing still reads
-        # [ADAPTED], because the prescription did change.
-        return [eased or "ADAPTED"]
-    return [m for m in (_KIND_MARKERS.get(kind), eased) if m]
+from trainmate.text import blue, bold, cyan, gray, green, magenta, red, yellow
+from trainmate.clock import fmt_date
 
 
 # How each `adherence.classify_adherence` status is coloured. The word itself rides on
@@ -66,7 +39,7 @@ def workout_line(w: dict, adherence: Optional[dict] = None) -> str:
     Also renders a *proposed* session — a `workout generate` preview, which has no row and
     so no ID — so the plan being accepted reads exactly like the plan `list` will show.
 
-    `adherence` is `cli.common.adherence_verdicts`' entry for this session when the day is
+    `adherence` is `analytics.compare.adherence_verdicts`' entry for this session when the day is
     behind us; None leaves the line exactly as it was."""
     markers = modification_markers(w)
     mod_marker = bold(yellow(f" [{', '.join(markers)}]")) if markers else ""
@@ -115,29 +88,3 @@ def prescription_lines(w: dict) -> List[str]:
     if not target:
         return []
     return [target]
-
-
-def warn_stale_before(start_date: str) -> None:
-    """Flags workouts left `stale` on days earlier than the window just pushed.
-
-    `workout push` defaults to today onward, so a row that went stale in the past —
-    realistically a push that failed while offline — has nothing that would ever
-    re-push it. Freshness is derived, not stored (see trainmate.calendar_state), so
-    the marker is durable; this just makes it visible outside the pushed range."""
-    try:
-        cutoff = (
-            datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
-        ).strftime("%Y-%m-%d")
-    except ValueError:
-        return
-    earlier = runtime.db.get_workouts(end_date=cutoff, include_removed=True)
-    stale = [w for w in earlier if calendar_status(w) == 'stale']
-    if not stale:
-        return
-    label = "workout" if len(stale) == 1 else "workouts"
-    earliest = min(w['date'] for w in stale)
-    notice(
-        f"Note: {len(stale)} {label} before {fmt_date(start_date)} still read [STALE] "
-        f"— their calendar events are out of date and this push did not cover them. "
-        f"Run {cmd(f'workout push -d {earliest}..')} to update them.",
-    )

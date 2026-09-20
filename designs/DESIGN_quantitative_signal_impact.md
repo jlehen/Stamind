@@ -160,7 +160,7 @@ mornings at all.
 `athlete_metrics_cache` (`atl`) is an EWMA — it smears yesterday into today. The
 stimulus that drives a given morning is the *actual training done the day before it*,
 so every load shown (each day's `load_tss` in the dose sequence and each morning's
-`prev_day_load_tss`) is the **sum of that day's derived load** (`garmin.activity_load`,
+`prev_day_load_tss`) is the **sum of that day's derived load** (`analytics.load.activity_load`,
 the project-wide single load definition: trustworthy `tss` when available, sRPE
 otherwise, plus the RPE-divergence override), 0 on a rest day.
 
@@ -408,7 +408,7 @@ alignment on the reuse path — local SQLite, negligible against the LLM call it
 `signal_days_lookahead` and `signal_days_min_days` shape the section, so editing
 either changes the hash and forces a recompute on the next `data bootstrap` /
 `data reflect`. That is a deliberate exception to the project's general stance that
-config values are not hashed into this cache (`_get_config_hash` / `plan_config_hash`
+config values are not hashed into this cache (`plan_inputs.plan_config_hash`
 covers the plan-shaping profile, and gates *plan* staleness, not this reconstruction):
 the stance exists so that fiddling with a setting does not cost an
 LLM call, but here a different knob genuinely produces a different prompt, and reusing an

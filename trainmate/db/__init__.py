@@ -14,17 +14,7 @@ from trainmate.db.signals import DailySignalsMixin
 from trainmate.db.benchmarks import BenchmarksMixin
 from trainmate.db.workouts import WorkoutsMixin
 from trainmate.db.activities import ActivitiesMixin
-from trainmate.db.learnings import (
-    LearningsMixin,
-    normalize_sports,
-    valid_confidence,
-    confidence_rank,
-    step_down,
-    derive_confidence,
-    learning_is_dormant,
-    CONFIDENCE_LEVELS,
-    RETIRE_PROPOSAL,
-)
+from trainmate.db.learnings import LearningsMixin
 from trainmate.db.analysis import AnalysisCacheMixin
 from trainmate.db.periodization import PeriodizationMixin
 from trainmate.db.settings import SettingsMixin
@@ -70,12 +60,4 @@ def __getattr__(name):
 __all__ = [
     "Database",
     "db",
-    "normalize_sports",
-    "valid_confidence",
-    "confidence_rank",
-    "step_down",
-    "derive_confidence",
-    "learning_is_dormant",
-    "CONFIDENCE_LEVELS",
-    "RETIRE_PROPOSAL",
 ]

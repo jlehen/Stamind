@@ -46,7 +46,7 @@ not a document:
 | The size rule, and the files exempt from it (`REORG_code_layout.md` §2) | `AGENTS.md`, under Code style | Phase A | done |
 | The engine's call-time client lookup; no blanket re-export from a package `__init__` | `AGENTS.md`, under Code style | Phase A | done |
 | The four known test failures, and what green means | `AGENTS.md`, under Test | Phase A | done |
-| The layering rules — who may load whom | `tests/test_layering.py`, and `ARCHITECTURE.md` §14 | Phase C | moved, see §5.2 |
+| The layering rules — who may load whom | `tests/test_layering.py`, and `ARCHITECTURE.md` §14 | Phase C | done |
 | The new layout, package by package | `ARCHITECTURE.md` §2, Module Map | Each phase | ongoing |
 | Why the coach is engine/service, and why there is no `queue/` package (§4.11) | `ARCHITECTURE.md` §15, Design Rationale & History | Phase A | done |
 | Why the package is `gcal/` and not `calendar/` (§4.11) | `ARCHITECTURE.md` §15 | Phase D item 2 | with the package |
@@ -191,7 +191,8 @@ loop variable or an f-string: `test_athlete_queue.py` loops over three module pa
 arguments and skipped all four — including three that name
 `cli/workouts/generate.ensure_recent_data`, the seam §9 calls the worst case, and the one Phase D
 is about to move. The collector now reads a `for` over a literal tuple of strings and an f-string
-built from one. Resolved: 431 sites, 40 distinct targets.
+built from one. Resolved: 431 sites, 40 distinct targets at the time; Phase C's moves
+took it to 439 and 42.
 
 **Asking `trainmate.runtime` for an attribute builds the singleton.** `runtime.__getattr__`
 constructs a Database against the athlete's own file, or a live Google client off the credentials,
@@ -256,6 +257,12 @@ So `tests/test_layering.py` is created in Phase C item 4, the commit that makes 
 together with deleting the grep test below. It gains the analytics half in Phase C item 1. The
 prose about the layering rules in `ARCHITECTURE.md` §14 goes with them, for the same reason:
 ARCHITECTURE describes what is.
+
+**Both halves landed in Phase C, and both are true.** The web half turned out to be most of the
+way there already: Phase A's `coach/__init__.py` change and the Calendar client moving into
+`runtime` had cut the 33 leaked modules down to four, all under `trainmate.cli`, all reached
+through the one `modification_markers` import §4.3 names. Item 3 removed one of them as a side
+effect and item 4 removed the rest.
 
 When the web half lands, the grep-based `test_no_google_or_llm_import_at_module_scope` in
 `tests/test_web.py` is deleted in the same commit. It only reads the text of one file, so it
@@ -352,7 +359,7 @@ Already done, except one item that leaves this branch.
   behaviour change. Putting it here would break the §3 commit rule one level up, at the branch. It
   needs its own design and its own branch. Not part of this work.
 
-### Phase C — the moves between subsystems
+### Phase C — the moves between subsystems — **DONE**
 
 1. The load model and the fitness/fatigue maths leave `garmin/`, creating `analytics/` (§4.1).
    The analytics half of the layering test lands here (§5.2).
@@ -375,6 +382,31 @@ Already done, except one item that leaves this branch.
 After this phase the web app loads no CLI, no coach and no Google code, and the layering test says
 so.
 
+**What did not land, and why.** Three rows of §4.10 wait for the package that receives
+them: `CoachContext` → `service/athlete_context.py` (row c), `ROUTABLE_SETTINGS` →
+`cli/bot/capture.py` (row g), and the router intent table → `chat/routing.py` (row p).
+
+Row f — the four plan print helpers → `cli/common.py` — waits for a different reason:
+`cli/common.py` exists today, so the destination is not the obstacle. Its stated
+justification is that `plan show` and `plan diff` share them, and both of those are in
+`cli/plans.py`, so there is no cross-file caller to serve. Phase D item 8 cuts that file
+into a package and the helpers find their home then; moving them now would be work done
+twice.
+
+Row h — `warn_stale_before` → `cli/workouts/calendar_sync.py` — did land. It was missing
+from the first pass and the review caught it.
+
+**`cli/plans.py` got bigger, from 1493 lines to 1501.** It received the plan-preview
+printing §4.9 took out of the coach service, because it is the file that drives
+`plan generate` and the only other candidate — `cli/common.py` — would have held it
+for no caller. The file is already named in `AGENTS.md` as debt, and Phase D item 8
+cuts it into a package; the preview lands in `cli/plans/generate.py` there.
+
+Three more were declined outright, and §8 records why. Two of them are the same
+shape — a guarantee a write always makes, which the proposal wanted moved out to the
+caller — and that reasoning is now in `ARCHITECTURE.md` §15, because it will come up
+again.
+
 ### Phase D — the file splits
 
 *This is the first revision: the proposal said one commit per subsystem. **One commit per file
@@ -394,8 +426,12 @@ That gives roughly 25 commits. Take the subsystems in this order, lowest in the 
    each.
 7. **CLI command families** — `workouts/generate.py` into five; `data.py` and `journal.py` into
    packages.
-8. **CLI views** — `plans.py`, `progress.py`, then `render.py`. Render goes last, because it
-   imports from all of them.
+8. **CLI views** — `plans.py`, `progress.py`, `selectors.py`, then `render.py`. Render goes
+   last, because it imports from all of them.
+   `selectors.py` is on this list because Phase C put it there: it took the three goal
+   helpers from `cli/plans.py` and went 475 → 524 lines. It holds two jobs that change for
+   different reasons — the `A..B` grammar, which parses text and touches no database, and
+   the resolvers, which turn a parsed range into a window by reading one. Cut it there.
 9. **front-ends** — `cli/bot.py` into a package; `trainmate_bot.py` into `trainmate/chat/`, moves
    only.
 
@@ -466,9 +502,50 @@ The lines above Phase A are one per item, from before §3 changed.
   **Run the suite per-file as well as whole after a phase that moves imports.** The full run hid
   both of the above.
 
-**Next up:** Phase C item 1 — the load model and the fitness/fatigue maths leave `garmin/`,
-creating `analytics/`, with the analytics half of the layering test (§4.1, §5.2). Phase B is
-already done bar the item that left this branch.
+- **Phase C, all seven items.** `trainmate/analytics/` now holds the training maths:
+  `load.py` (the load model plus `planned_load`, which `adherence.py` had), `pmc.py` (the
+  fitness/fatigue series plus the bands that colour it), `compare.py` (one
+  `adherence_window` where three surfaces each had their own pairing) and
+  `weekly_evidence.py` (six pure statics off the coach service). `garmin/` is down to
+  `client`, `sync` and `derived`, and one `warmup_cutoff(dbh)` replaces five hand copies.
+  `util.py` is gone: `text.py` for how a line looks, `output.py` for which tier it is,
+  and `clock.py` grown to own the day as well as the zone — one `parse_date`/`date_range`/
+  `shift` for seven copies, one `capitalized` for five. The codemod touched 80 files.
+  `calendar_state.py` is `workout_state.py` and carries `modification_markers`, so
+  importing `trainmate_web` now loads no CLI, no coach, no OpenRouter and no Google code
+  at all. Plan staleness is three files with one role each: `plan_inputs.py` says what
+  the inputs are, `coach/service/staleness.py` judges them (one `plan_fingerprints()` for
+  three hand-built copies, five forwarding wrappers deleted, ~40 test references
+  repointed), and `cli/staleness.py` is 126 lines of wording. `sentinels.py` holds both
+  ends of the CLI↔bot line protocol: one `parse_frame` for four byte-identical readers,
+  one `prompt_answer` for six hand-built dicts. The plan preview prints from the CLI
+  through the renderer, as `workout generate`'s already did. Of §4.10: six copies of the
+  anchor label became `benchmarks.label_for_kind`, three copies of the strength proposal
+  fields became `planner.proposal_fields`, the learning confidence model left `db/` for
+  `learning_confidence.py`, and `config.py` imports no app module any more.
+  `tests/test_layering.py` is new and holds both rules; `test_utils.py` split into
+  `test_text.py` and `test_output.py`; `test_load.py`, `test_sentinels.py` and
+  `test_learning_confidence.py` followed the code they test.
+  `Phase C: the moves between subsystems`
+- **Three declines, recorded rather than silently skipped.** §4.1 wanted `db/wipes.py` to
+  stop recomputing and let `data wipe` do it; §4.10 row n wanted `rollback_to_change` to
+  take its note from the caller. Both take a guarantee the write always makes and hand it
+  to whoever remembers — and both were deliberate decisions with a comment and, in the
+  first case, a test pinning them. `ARCHITECTURE.md` §15 now carries the general rule.
+  §4.10 row j wanted `_hold_around` returned by the strength planner as
+  `StrengthPass.held`; the planner is handed only the strength sessions in the adapt
+  path, so it cannot see the other sports it would have to hold. The inline
+  weekly-summary builder in `service/analysis.py` stayed too: it is not a function today
+  and it reads the database twice, so extracting it is a refactor of
+  `_run_workout_analysis`, which belongs with Phase D's split of that file.
+
+**Next up:** Phase D — the file splits, one commit per split, in the subsystem order §7
+gives. It opens with `analytics`: `intensity.py` into three, `progression.py` with
+`timeline.py` into three, and `plan_diff.py` with `plan_lineage.py` into
+`plan_versions.py`. Note that `adherence.py`, `intensity.py`, `progression.py`,
+`timeline.py`, `chart.py` and `baselines.py` have not yet *moved into* `trainmate/analytics/`
+— Phase C created the package and put the new modules in it; Phase D item 1 is where the
+existing ones follow, as they are split.
 
 ---
 

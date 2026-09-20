@@ -3,22 +3,10 @@
 Kept apart from `proposals.py`, which holds only the frozen records the coach hands the
 CLI: this is the logic that fills them in.
 """
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from trainmate.coach.proposals import RevisionPair
 from trainmate.sports import canonical_sport
-
-
-@dataclass(frozen=True)
-class RevisionPair:
-    """One proposed session and the planned session it stands in for.
-
-    `original` is the session being replaced — the same-sport session for an in-place
-    change, or the displaced one for a sport swap. None when nothing was planned that day.
-    """
-    proposal: Dict[str, Any]
-    original: Optional[Dict[str, Any]]
-    is_swap: bool
 
 
 def replaces_source(entry: Dict[str, Any]) -> Optional[Tuple[str, str]]:

@@ -9,10 +9,11 @@ from trainmate import runtime
 from trainmate.config import config
 from trainmate.types import Workout
 from trainmate.adherence import STATUS_LABELS
-from trainmate.calendar_state import calendar_signature
+from trainmate.workout_state import calendar_signature
 from trainmate import calendar_lineage
 from trainmate import intensity
-from trainmate.util import fmt_date, fmt_timestamp, step, warn
+from trainmate.output import step, warn
+from trainmate.clock import fmt_date, fmt_timestamp
 
 # Events fetched per Calendar API page during a signal sync (the response is paged
 # through with pageToken regardless, so this only tunes round-trips vs payload size).

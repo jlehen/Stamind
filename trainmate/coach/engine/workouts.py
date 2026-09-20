@@ -2,7 +2,9 @@ from typing import Any, List, Optional, Dict, Sequence
 from trainmate.config import config
 from trainmate.prompt import athlete_watching
 from trainmate.types import Objective, Constraint, Workout, CompletedActivity
-from trainmate.util import cyan, days_between, step
+from trainmate.text import cyan
+from trainmate.output import step
+from trainmate.clock import days_between
 from trainmate.coach.formatting import (
     format_metrics_history, format_completed_activities, format_baseline,
     format_planned_workouts_detailed,

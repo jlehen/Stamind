@@ -6,10 +6,9 @@ with the rest of that voice (DESIGN_render_persona.md §7).
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from trainmate.config import config
-from trainmate.adherence import STATUS_LABELS, analyze_adherence, classify_adherence
-from trainmate.util import (
-    cyan, yellow, cmd, fmt_date, today_str as _today_str, notice, warn, wrap_text,
-)
+from trainmate.text import cmd, cyan, wrap_text, yellow
+from trainmate.output import notice
+from trainmate.clock import fmt_date, today_str as _today_str
 
 
 def print_strength_notes(proposal) -> None:
@@ -25,17 +24,6 @@ def print_strength_notes(proposal) -> None:
         notice(line)
     if getattr(proposal, 'strength_notice', None):
         print(wrap_text(proposal.strength_notice))
-
-
-def pmc_warmup_cutoff(history_start: Optional[str] = None) -> Optional[str]:
-    """The §3.3(a) leading-edge cutoff every CLI surface blanks PMC values against.
-
-    Pass `history_start` when the caller already fetched it (it needs a DB hit),
-    otherwise it is looked up here."""
-    from trainmate import runtime
-    if history_start is None:
-        history_start = runtime.garmin.pmc_history_start(dbh=runtime.db)
-    return runtime.garmin.pmc_warmup_cutoff_for(history_start, config.pmc_ctl_days)
 
 
 def ensure_recent_data(
@@ -66,142 +54,6 @@ def ensure_recent_data(
             notice(
                 f"Note: Garmin metrics for today ({fmt_date(today)}) are not available yet.",
             )
-
-
-def format_actual(act: Dict[str, Any], divergence: bool = False) -> str:
-    """Compact 'actual effort' line for one completed activity, e.g.
-    '[running] Morning Run (48min, load 62, TSS 58)'.
-
-    One renderer for every surface that names the effort a planned session matched: the
-    Calendar adherence header, `workout compare`'s ACTUAL row and `workout list -v`.
-    `divergence` adds the "load from RPE" note — compare shows it, the Calendar header
-    does not, and that is the only difference the three ever had."""
-    from trainmate import runtime
-    parts = [f"{act['duration_sec'] / 60:.0f}min", f"load {runtime.garmin.activity_load(act):.0f}"]
-    if act.get('tss'):
-        parts.append(f"TSS {act['tss']:.0f}")
-    if act.get('rpe'):
-        parts.append(f"RPE {act['rpe']}")
-    line = f"[{act['activity_type']}] {act['activity_name']} ({', '.join(parts)})"
-    if not divergence:
-        return line
-    div = runtime.garmin.rpe_divergence(act)
-    if div is None:
-        return line
-    return f"{line} [load from RPE: HR under-counted {div:.1f}x]"
-
-
-def adherence_results(start_date: str, end_date: str) -> List[Dict[str, Any]]:
-    """`analyze_adherence`'s planned-vs-actual pairing over [start_date, end_date],
-    read from the cache (this never pulls — the caller owns that).
-
-    The one place a window becomes a pairing, and it is fed **every** planned workout in
-    that window rather than the ones a caller means to show (ARCHITECTURE.md §5)."""
-    from trainmate import runtime
-    workouts = runtime.db.get_workouts(start_date=start_date, end_date=end_date)
-    activities = runtime.db.get_completed_activities(start_date=start_date, end_date=end_date)
-    start_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
-    end_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
-    covered_ranges = runtime.db.get_mesocycle_ranges(start_date, end_date)
-    _, matching_results, _ = analyze_adherence(
-        planned_workouts=workouts,
-        completed_activities=activities,
-        start_date_obj=start_obj,
-        history_days=(end_obj - start_obj).days + 1,
-        minor_activity_load_threshold=config.minor_activity_load_threshold,
-        covered_ranges=covered_ranges,
-        pending_from=_today_str(),
-        rejected_matches=runtime.db.get_rejected_matches(),
-    )
-    return matching_results
-
-
-def adherence_verdicts(start_date: str, end_date: str) -> Dict[int, Dict[str, Any]]:
-    """Per-workout-id verdict over [start_date, end_date], for the listings that show
-    what became of a planned session (ARCHITECTURE.md §5, "Backward adherence marking").
-
-    Each value is `classify_adherence`'s ``{"status", "reasons"}`` plus the athlete-facing
-    `label` and the `completed` activity it graded against — so a caller can name the
-    verdict and the effort without re-looking-up either."""
-    threshold = config.minor_activity_load_threshold
-    verdicts: Dict[int, Dict[str, Any]] = {}
-    for r in adherence_results(start_date, end_date):
-        w = r['planned']
-        if w.get('id') is None:
-            continue
-        verdict = classify_adherence(
-            w, r['completed'], threshold, pending=r.get('pending', False)
-        )
-        verdicts[w['id']] = {
-            **verdict,
-            "label": STATUS_LABELS.get(verdict["status"], verdict["status"]),
-            "completed": r['completed'],
-        }
-    return verdicts
-
-
-def mark_adherence_from_results(
-    matching_results: List[Dict[str, Any]], today_str: Optional[str] = None
-) -> int:
-    """Stamps the adherence verdict onto past and same-day planned workout Calendar
-    events (title tag + 'Adherence' header). Future events are always skipped.
-    Today's event is skipped only when no activity was matched — marking an
-    unmatched today's session would falsely read as missed. Workouts without an
-    existing Calendar event are skipped, as is any event already carrying this
-    exact verdict over unchanged content (matched via `adherence_pushed_signature`), so
-    re-running compare over a settled range issues no redundant Calendar writes.
-    Best-effort per event: a Calendar failure degrades to a warning. Returns the
-    number of events actually (re)marked; the caller owns any summary line."""
-    from trainmate.calendar_state import adherence_signature
-    from trainmate import runtime
-    today_str = today_str or _today_str()
-    threshold = config.minor_activity_load_threshold
-    marked = 0
-    for r in matching_results:
-        w = r['planned']
-        if not w.get('google_event_id'):
-            continue
-        # Skip future dates always, and anything analyze_adherence flagged pending — a
-        # not-yet-done session would falsely read as missed. The date test behind
-        # `pending` is owned there; it is repeated here only for hand-built rows.
-        if r['date'] > today_str or r.get('pending'):
-            continue
-        if r['date'] == today_str and not r['completed']:
-            continue
-        verdict = classify_adherence(w, r['completed'], threshold)
-        actual = format_actual(r['completed']) if r['completed'] else None
-        adherence = {
-            "status": verdict["status"],
-            "actual": actual,
-            "reasons": verdict["reasons"],
-        }
-        # Skip a no-op Calendar write: if the event already carries this exact
-        # verdict over unchanged content, re-pushing would just re-issue an
-        # identical update. Re-running compare over a settled past range is the
-        # common case, so this avoids a burst of pointless API writes.
-        signature = adherence_signature(w, adherence)
-        if w.get('adherence_pushed_signature') == signature:
-            continue
-        try:
-            runtime.calendar_syncer.sync_workout(w, adherence=adherence)
-            if w.get('id') is not None:
-                runtime.db.mark_workout_adherence_pushed(w['id'], signature)
-            marked += 1
-        except Exception as e:
-            warn(f"could not mark {fmt_date(w['date'])} on Calendar: {e}")
-    return marked
-
-
-def mark_adherence_range(start_date: str, end_date: str) -> int:
-    """Computes adherence over [start_date, end_date] and marks strictly-past
-    Calendar events with the verdict. No-op (returns 0) when no calendar is
-    configured. Reads the shared `adherence_results` pairing; the `data pull` ride-along
-    calls this once fresh activity data has landed."""
-    if not config.google_calendar_id:
-        return 0
-    return mark_adherence_from_results(
-        adherence_results(start_date, end_date), _today_str()
-    )
 
 
 def constraint_line(c: Dict[str, Any], needs_a_pass: bool = False) -> str:

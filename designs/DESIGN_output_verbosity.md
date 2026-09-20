@@ -83,7 +83,7 @@ write that failed, a domain refusal. Always printed, on every front-end. `print`
 
 **An aside.** Progress narration, cache-reuse notes, defaulting notices, next-step hints,
 standing caveats — side information. Printed on a terminal, suppressed in chat.
-`trainmate.util.aside`, or `asides_enabled()` where the caller is building a list of lines
+`trainmate.output.aside`, or `asides_enabled()` where the caller is building a list of lines
 rather than printing them.
 
 ```python

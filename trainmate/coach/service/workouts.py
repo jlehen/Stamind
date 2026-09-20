@@ -16,7 +16,9 @@ from trainmate.benchmarks import MIN_RETEST_DAYS
 from trainmate.calendar_reconcile import verbose_events
 from trainmate import intensity
 from trainmate.strength import planner as strength_planner
-from trainmate.util import green, cmd, fmt_date, notice, keep_whole
+from trainmate.text import cmd, green, keep_whole
+from trainmate.output import notice
+from trainmate.clock import fmt_date
 import trainmate.coach.service as _svc
 
 
@@ -28,17 +30,6 @@ REPLACED_DAY_REASON = "Your coach replaced this day."
 
 class WorkoutGenMixin:
     """Part of :class:`CoachService` — see coach/service/__init__.py."""
-
-    @staticmethod
-    def _commitment_window(today_str: str) -> Optional[str]:
-        """The last day of the commitment window, or None when it is empty (§4.1).
-
-        `N` days starting today, so `1` covers today alone and `0` covers nothing."""
-        days = settings.commitment_days() or 0
-        if days <= 0:
-            return None
-        opened = datetime.strptime(today_str, "%Y-%m-%d").date()
-        return (opened + timedelta(days=days - 1)).strftime("%Y-%m-%d")
 
     @staticmethod
     def _standing_sessions(
@@ -857,7 +848,7 @@ class WorkoutGenMixin:
         )
         window_end: Optional[str] = None
         if not fresh:
-            window_end = self._commitment_window(today_str)
+            window_end = settings.commitment_end(today_str)
         standing_sessions = self._standing_sessions(span_sessions, window_end)
         planner_reply = self.engine._workout_generate_logic(
             objectives=objectives,
@@ -986,10 +977,7 @@ class WorkoutGenMixin:
             standing=self._standing_lines(workouts, standing_sessions, voids),
             athlete_note=athlete_note,
             commitment_end=window_end,
-            strength_checks=tuple(strength.checked) if strength else (),
-            strength_stamp=strength.stamp if strength else "",
-            strength_notice=strength.notice if strength else None,
-            strength_dropped=tuple(strength.dropped) if strength else (),
+            **strength_planner.proposal_fields(strength),
         )
 
     def workout_generate_apply(
@@ -1132,8 +1120,5 @@ class WorkoutGenMixin:
         return RevisionProposal(
             reason=reason, workouts=written, range_start=start, range_end=end_date,
             kind="generate", pairs=pairs, removals=removals, held=tuple(held),
-            strength_checks=tuple(strength.checked) if strength else (),
-            strength_stamp=strength.stamp if strength else "",
-            strength_notice=strength.notice if strength else None,
-            strength_dropped=tuple(strength.dropped) if strength else (),
+            **strength_planner.proposal_fields(strength),
         )

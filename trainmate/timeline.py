@@ -13,7 +13,7 @@ from typing import Any, Dict
 from trainmate import garmin, progression
 from trainmate.config import config
 from trainmate.db.objectives import ARCHIVED
-from trainmate.util import today_str
+from trainmate.clock import today_str
 
 
 def build_timeline_payload(dbh) -> Dict[str, Any]:
@@ -39,8 +39,7 @@ def build_timeline_payload(dbh) -> Dict[str, Any]:
         if cache else []
     )
 
-    history_start = garmin.pmc_history_start(dbh=dbh)
-    warmup_cutoff = garmin.pmc_warmup_cutoff_for(history_start, config.pmc_ctl_days)
+    warmup_cutoff = garmin.warmup_cutoff(dbh)
 
     return progression.assemble_timeline(
         activities, workouts, metrics_rows, mesocycles, inferred, objectives,

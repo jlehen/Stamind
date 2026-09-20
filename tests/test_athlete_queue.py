@@ -18,10 +18,9 @@ import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, befo
 from trainmate import athlete_queue, clock, runtime
 from trainmate.cli import queue as queue_cli
 from trainmate.coach.proposals import RevisionProposal
-from trainmate.prompt import (
-    BUTTONS_SENTINEL, QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR, QUEUE_SENTINEL,
-)
-from trainmate.util import today_str
+from trainmate.sentinels import BUTTONS_SENTINEL, QUEUE_SENTINEL
+from trainmate.athlete_queue import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
+from trainmate.clock import today_str
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)

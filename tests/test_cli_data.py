@@ -198,7 +198,7 @@ class TestCliData(unittest.TestCase):
         # Every prose field in the bootstrap/reflect report comes from the LLM at
         # unbounded length; none may run past the client's wrap width (AGENTS.md).
         from trainmate.cli.data import _render_analysis_report
-        from trainmate.util import visible_len
+        from trainmate.text import visible_len
 
         learning_id = test_db.add_learning(
             "Long-run durability is the limiter: pace decays sharply beyond 90 minutes "
@@ -356,7 +356,7 @@ class TestCliData(unittest.TestCase):
 
         # The provenance and staleness lines are this command's own, outside the shared
         # renderer the wrap test covers, and must hold the client width too (AGENTS.md).
-        from trainmate.util import visible_len
+        from trainmate.text import visible_len
         os.environ["TRAINMATE_WRAP_WIDTH"] = "48"
         try:
             exit_code, stdout, stderr = self.run_cli(["data", "show-analysis"])
@@ -390,14 +390,10 @@ class TestCliData(unittest.TestCase):
 
     @patch("trainmate.runtime.garmin")
     def test_data_show_metrics_command(self, mock_garmin):
-        # garmin is mocked (to stub ensure_data); the PMC read helpers are pure DB reads,
-        # so give them real behavior (None history start = no warm-up suppression)
-        # instead of Mocks.
-        from trainmate import garmin as real_garmin
-        mock_garmin.pmc_history_start.return_value = None
-        mock_garmin.pmc_warmup_cutoff_for.side_effect = real_garmin.pmc_warmup_cutoff_for
-        mock_garmin.pmc_display_values.side_effect = real_garmin.pmc_display_values
-        mock_garmin.load_ratio.side_effect = real_garmin.load_ratio
+        # garmin is mocked to stub ensure_data. The only PMC helper still reached
+        # through it reads the database; the maths beside it is imported directly and
+        # runs for real. No warm-up cutoff means nothing is suppressed.
+        mock_garmin.warmup_cutoff.return_value = None
         test_db.save_metric_cache(
             date="2026-06-03", rhr=50, hrv=75, sleep_score=80, stress=20,
             ctl=60.0, atl=68.4, tsb=-8.4
@@ -582,11 +578,7 @@ class TestCliData(unittest.TestCase):
     def test_show_metrics_csv_empty_cells_for_null_pmc(self, mock_garmin):
         # §6.2: NULL/suppressed PMC values emit EMPTY CSV cells, never 0, so downstream
         # parsing can't read a zero as data.
-        from trainmate import garmin as real_garmin
-        mock_garmin.pmc_history_start.return_value = None
-        mock_garmin.pmc_warmup_cutoff_for.side_effect = real_garmin.pmc_warmup_cutoff_for
-        mock_garmin.pmc_display_values.side_effect = real_garmin.pmc_display_values
-        mock_garmin.load_ratio.side_effect = real_garmin.load_ratio
+        mock_garmin.warmup_cutoff.return_value = None
         test_db.save_metric_cache(
             date="2026-06-03", rhr=50, hrv=75, sleep_score=80, stress=20,
         )

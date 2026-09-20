@@ -285,7 +285,7 @@ class TestCalendarSync(unittest.TestCase):
     def test_mark_adherence_from_results_skips_today_and_eventless(self):
         # Only strictly-past planned workouts that already have a Calendar event
         # get marked: today/future and event-less rows are skipped.
-        from trainmate.cli.common import mark_adherence_from_results
+        from trainmate.calendar_reconcile import mark_adherence_from_results
 
         today = "2026-06-20"
         results = [
@@ -332,7 +332,7 @@ class TestCalendarSync(unittest.TestCase):
         # Re-marking a settled past event is a no-op: the first pass writes and
         # records the adherence signature; a second pass with that signature
         # stored on the row skips the Calendar update entirely.
-        from trainmate.cli.common import mark_adherence_from_results
+        from trainmate.calendar_reconcile import mark_adherence_from_results
 
         today = "2026-06-20"
 

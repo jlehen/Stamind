@@ -8,6 +8,7 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_goal_date_type.db")
 
+from trainmate import plan_inputs
 from trainmate.db import Database
 import trainmate.db
 import trainmate_cli
@@ -83,12 +84,12 @@ class TestGoalDateType(unittest.TestCase):
         event = dict(legacy, date_type="event")
         horizon = dict(legacy, date_type="horizon")
         self.assertEqual(
-            coach_service._get_goals_hash([legacy]),
-            coach_service._get_goals_hash([event]),
+            plan_inputs.goals_hash([legacy]),
+            plan_inputs.goals_hash([event]),
         )
         self.assertNotEqual(
-            coach_service._get_goals_hash([event]),
-            coach_service._get_goals_hash([horizon]),
+            plan_inputs.goals_hash([event]),
+            plan_inputs.goals_hash([horizon]),
         )
 
     @patch("trainmate.runtime.calendar_syncer")

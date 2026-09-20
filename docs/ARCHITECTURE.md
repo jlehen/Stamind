@@ -59,9 +59,18 @@ Calendar.
   |    │ pure logic: prompt building, hash, LLM calls │
   |  trainmate/coach/formatting.py (pure helpers)    |
   |  trainmate/openrouter.py  (OpenRouter LLM client) |
-  |  trainmate/adherence.py   (plan vs actual diff)   |
+  |  trainmate/plan_inputs.py (what shapes a plan)    |
   |  trainmate/plan_diff.py   (plan version vs version)|
   |  trainmate/plan_lineage.py (mesocycles, in trained order)|
+  +---------------------------+----------------------+
+                              |
+  +---------------------------v----------------------+
+  |              Training Maths Layer                |
+  |  trainmate/analytics/  load pmc compare          |
+  |                        weekly_evidence            |
+  |  trainmate/adherence.py   (plan vs actual diff)   |
+  |  trainmate/intensity.py  trainmate/progression.py |
+  |    rows in, numbers out: opens no database        |
   +---------------------------+----------------------+
                               |
   +---------------------------v----------------------+
@@ -147,13 +156,14 @@ classes themselves.
     Token + allowlist live under a `telegram:` section in `config.yaml` (or
     `TELEGRAM_BOT_TOKEN`).
   - **Pure helpers** (`parse_message_to_argv`, `chunk_text`, `format_reply`,
-    `is_authorized`, plus prompt-protocol helpers `parse_prompt_request`,
-    `prompt_buttons`, `decode_callback`) are import-safe without
-    `python-telegram-bot` (imported lazily in `main`) and unit-tested in
-    `tests/test_bot.py`.
-  - **Photo protocol:** a sibling one-way sentinel to `TM-PROMPT` — `trainmate.prompt.
+    `is_authorized`, and the button builders `prompt_buttons`, `queue_button_rows`,
+    `decode_callback`) are import-safe without `python-telegram-bot` (imported lazily
+    in `main`) and unit-tested in `tests/test_bot.py`. Reading a frame off the CLI's
+    stdout and building the answer sent back are `trainmate/sentinels.py`
+    (`parse_frame`, `prompt_answer`), tested in `tests/test_sentinels.py`.
+  - **Photo protocol:** a sibling one-way sentinel to `TM-PROMPT` — `trainmate.sentinels.
     PHOTO_SENTINEL`/`emit_photo(path, caption)` writes `\x1eTM-PHOTO {json}`; `_drive()`
-    recognises it (`parse_photo_request`) beside `parse_prompt_request`, sends the file
+    reads one `parse_frame` and branches on the tag it returns, sends the file
     via `bot.send_photo` with the payload's `caption`, and unlinks it in a `finally`.
     Any other unrecognised `\x1e`-prefixed line is dropped rather than forwarded as chat
     text, so a future sentinel degrades gracefully on a stale bot build. Currently used
@@ -242,7 +252,7 @@ classes themselves.
   - **Output is quieter here than on a terminal.** Because `_drive` buffers the whole
     run and flushes it as one message, progress narration arrives *after* the work it
     describes, ahead of the answer. So `TRAINMATE_FRONTEND=json` also switches off
-    "asides" — `trainmate.util.aside`, used for progress lines, cache-reuse notes,
+    "asides" — `trainmate.output.aside`, used for progress lines, cache-reuse notes,
     defaulting notices, next-step hints and standing caveats. Answers, warnings and
     errors are unaffected. `TRAINMATE_VERBOSE=1/0` overrides either way; there is no CLI
     flag, since `-v/--verbose` already means "more detail in this listing" on seven
@@ -261,7 +271,7 @@ classes themselves.
     of recent successful `llm.call` records for the same label and model
     (`journal.llm_durations`) — no new storage, and no estimate at all until two past
     calls exist. A terminal gets the same number folded into the aside it already prints,
-    then `util.Spinner` ticks a clock on one self-erasing line until the reply lands (§8.5).
+    then `output.Spinner` ticks a clock on one self-erasing line until the reply lands (§8.5).
     `complete(..., wait_notice=False)` suppresses it for `tm bot route`, whose output
     nobody reads (DESIGN_output_verbosity.md §8).
   - **The athlete queue:** a fifth one-way sentinel, `QUEUE_SENTINEL`/`emit_queue_item`
@@ -308,7 +318,11 @@ classes themselves.
 |----------------------|----------------------|--------------------------------------------------|
 | `types.py`           | —                    | TypedDicts: `Objective`, `Constraint`, `DailySignal`, `Workout` (the hydrated session, not a table row — §5), `CompletedActivity` (incl. `bike_avg_watts`, `zone1_sec`–`zone5_sec`, `power_zone1_sec`–`power_zone7_sec`, and the strength columns `sets_read_at`/`sets_final_at`/`discarded`), `AthleteMetric`, `AthleteBaseline`, `Macrocycle`, `Mesocycle`, `PlanFeedback`, `PlanProposal` |
 | `config.py`          | `config`             | Reads `config.yaml`; exposes typed properties.   |
-| `prompt.py`          | (`runtime.prompt`)   | Front-end-agnostic prompt broker: `confirm`/`choose`/`ask_text` over `TtyPrompt` (`input()`) or `JsonPrompt` (chat/web). Journals every answer on the asking run (DESIGN_logging.md §5.6). See [§6](#6-singletons). Also `athlete_watching()`: whether the athlete watches this run — always on an expert instance, and in companion mode only for a run the bot started (DESIGN_change_heads_up.md §6); `workout_change`, the adapt prompt and the terminal's replace question all ask it. |
+| `prompt.py`          | (`runtime.prompt`)   | Front-end-agnostic prompt broker (the wire framing it writes is `sentinels.py`): `confirm`/`choose`/`ask_text` over `TtyPrompt` (`input()`) or `JsonPrompt` (chat/web). Journals every answer on the asking run (DESIGN_logging.md §5.6). See [§6](#6-singletons). Also `athlete_watching()`: whether the athlete watches this run — always on an expert instance, and in companion mode only for a run the bot started (DESIGN_change_heads_up.md §6); `workout_change`, the adapt prompt and the terminal's replace question all ask it. |
+| `sentinels.py`       | —                    | The line protocol between the CLI and a chat front-end, both ends in one file: the `\x1e`-prefixed tags, the five writers (`emit_photo`/`emit_buttons`/`emit_flush`/`emit_queue_item` and the prompt frame), one `parse_frame` the bot reads them all back with, `is_json_frontend`, and `prompt_answer` for the reply. Standard library only. The writers used to live in `prompt.py` and the readers in `trainmate_bot.py`, which is how each frame's fields came to be documented twice (DESIGN_output_verbosity.md §7, DESIGN_bot_simple_frontend.md §4.4, DESIGN_athlete_queue.md §6.2). |
+| `plan_inputs.py`     | —                    | What shapes a periodization plan, how it is fingerprinted, and how it is diffed: the profile partition (`plan_profile`, `changed_plan_profile_fields`), the science documents (`athlete_science_documents`, `changed_science_documents`), the goal and constraint cleaners and their hashes, `plan_config_hash()`, and the unified-diff text a staleness reason is shown with. Flat and pure so the read-only dashboard can hash the config without importing the coach. The *judgment* over these inputs is `coach/service/staleness.py` (DESIGN_plan_staleness.md). |
+| `workout_state.py`   | —                    | Two of the three things that can be true of a planned session at once ([§5](#workout-state--three-orthogonal-axes-not-one-enum)): what the athlete changed about it (`modification_markers`) and how far its Calendar event has fallen behind (`calendar_status`, over `CALENDAR_FIELDS` and `calendar_signature`). Neither reads the database — both are derived from a workout row the caller already has — which is what lets the read-only web app import it without pulling the CLI in behind it. Was `calendar_state.py`. |
+| `learning_confidence.py` | —                | What a coach learning's confidence means and how its evidence sets it: the ordered levels, `derive_confidence` over supporting and contradicting weeks, `step_down`, and when a learning goes dormant. Pure rules; `db/learnings.py` keeps only the rows (DESIGN_evidence_based_confidence.md §3, DESIGN_learning_doubt_nudge.md §3.2). |
 | `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, and `learning` from `learning_doubts.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workouts.py` imports it safely. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
@@ -349,18 +363,34 @@ classes themselves.
 |                      |                      | registry (`list_models`, `active_model`,         |
 |                      |                      | `resolve_token` — the validator for both model   |
 |                      |                      | roles) — DESIGN_model_selection.md.              |
-| `garmin/`            | module functions     | A **package** (`client`/`load`/`pmc`/`sync`), all |
+| `analytics/`         | module functions     | Training maths over rows the caller fetched: it  |
+|                      |                      | opens no database and calls no model. `load.py` = |
+|                      |                      | the load model (`measured_tss`, `activity_load`,  |
+|                      |                      | `load_method`, `rpe_divergence`, `planned_load`); |
+|                      |                      | `pmc.py` = the fitness/fatigue series             |
+|                      |                      | (`compute_pmc`, `load_ratio`, `pmc_ramp`) and the |
+|                      |                      | bands that colour it; `compare.py` = the one      |
+|                      |                      | planned-vs-actual pairing (`adherence_window`,    |
+|                      |                      | handed a database handle rather than opening one),|
+|                      |                      | with `compare_days` and `format_actual`;          |
+|                      |                      | `weekly_evidence.py` = what one week looked like, |
+|                      |                      | for the backward evaluation. `__init__.py`        |
+|                      |                      | re-exports nothing, so importing the load model   |
+|                      |                      | does not drag the PMC series in behind it.        |
+|                      |                      | `tests/test_layering.py` holds the rule (§14).    |
+| `garmin/`            | module functions     | A **package** (`client`/`sync`/`derived`), all    |
 |                      |                      | re-exported from `__init__.py` so `from trainmate |
 |                      |                      | import garmin` and `patch.object(garmin, …)` are  |
-|                      |                      | unchanged. `client.py` = login/fetch +            |
-|                      |                      | `_derivation_pad_days`; `load.py` = the load model|
-|                      |                      | (`measured_tss`, `activity_load`, `load_method`,  |
-|                      |                      | `rpe_divergence`); `pmc.py` = `compute_pmc`,      |
-|                      |                      | `load_ratio`, `recompute_derived`, `backfill_tss` |
-|                      |                      | (see §12); `sync.py` = `pull`/`ensure_data`, the  |
+|                      |                      | unchanged — AGENTS.md calls that debt, not        |
+|                      |                      | precedent. `client.py` = login and fetch;         |
+|                      |                      | `sync.py` = `pull`/`ensure_data`, the             |
 |                      |                      | `sync_state` watermark, the per-process memo, and |
 |                      |                      | the bridge that rides a Calendar daily-signal    |
-|                      |                      | sync along with every pull (§13).                 |
+|                      |                      | sync along with every pull (§13); `derived.py` =  |
+|                      |                      | where a database handle meets the maths —         |
+|                      |                      | `recompute_derived`, `backfill_tss`,              |
+|                      |                      | `pmc_history_start`, and the one `warmup_cutoff`  |
+|                      |                      | every surface blanks warm-up rows against (§12).  |
 | `google_calendar.py` | `CalendarSyncer`     | Creates/updates/deletes all-day Google Calendar  |
 |                      |                      | events for workouts (outbound), and ingests       |
 |                      |                      | tagged signal events into `daily_signals` |
@@ -453,11 +483,21 @@ classes themselves.
 |                      |                      | callable, so `adapt`, the strategy prompt,       |
 |                      |                      | `status` and `progress` share one implementation |
 |                      |                      | (DESIGN_intensity_distribution.md).              |
-| `clock.py`           | —                    | The athlete's timezone: `now()`, `to_local()` and  |
-|                      |                      | the zone maths behind the `timezone` setting.      |
-|                      |                      | `util.today_date()` is its caller — no other       |
-|                      |                      | module calls `date.today()`                        |
-|                      |                      | (DESIGN_user_timezone.md).                        |
+| `clock.py`           | —                    | The athlete's time, and how a day is written.      |
+|                      |                      | `now()`, `to_local()` and the zone maths behind    |
+|                      |                      | the `timezone` setting (DESIGN_user_timezone.md);  |
+|                      |                      | `today_date()`/`today_str()`, which is why no      |
+|                      |                      | other module calls `date.today()`;                 |
+|                      |                      | `fmt_date`/`fmt_span`/`fmt_timestamp`, the one     |
+|                      |                      | date renderer for every surface, so a displayed    |
+|                      |                      | day carries its abbreviated weekday                |
+|                      |                      | (`2026-06-05 Fri`) — mirrored in the dashboard as  |
+|                      |                      | `fmtDate`/`fmtSpan` in `static/app.js`, with two   |
+|                      |                      | places left bare for want of room (`progress`'s    |
+|                      |                      | `MM-DD` week column and the `data bootstrap`       |
+|                      |                      | reconstruction windows); and the plain ISO         |
+|                      |                      | arithmetic `parse_date`/`date_range`/`shift`,      |
+|                      |                      | which seven modules used to keep a copy of each.   |
 | `settings.py`        | —                    | The preference registry: one `Setting` per knob    |
 |                      |                      | the athlete can change at runtime, its validator,  |
 |                      |                      | and the one resolver combining the stored row,     |
@@ -482,32 +522,28 @@ classes themselves.
 |                      |                      | migrate the database — on `tm help`, and inside  |
 |                      |                      | the one path that must survive the database      |
 |                      |                      | being unreachable (DESIGN_logging.md §4).        |
-| `util.py`            | —                    | ANSI color helpers (`bold`, `green`, `red`, …),  |
-|                      |                      | `cmd` (every "run X" call to action), `wrap_text`,|
-|                      |                      | `format_labeled_text`, `strip_ansi`, `Progress`  |
-|                      |                      | (self-erasing bar, silent off a terminal),       |
-|                      |                      | `Spinner` (self-erasing spinner and clock for    |
-|                      |                      | the LLM wait, silent off a terminal), and        |
-|                      |                      | the four output verbs: `print` (the answer),     |
-|                      |                      | `aside`/`asides_enabled` (a hint or standing     |
-|                      |                      | caveat, terminal only,                           |
+| `text.py`            | —                    | How a line looks: the ANSI colour helpers        |
+|                      |                      | (`bold`, `green`, `red`, …), `cmd` (every "run   |
+|                      |                      | X" call to action), `capitalized`, `strip_ansi`, |
+|                      |                      | `wrap_text`, `format_labeled_text`, the width    |
+|                      |                      | budgets and `render_table`. Nothing here decides |
+|                      |                      | *whether* a line prints.                         |
+| `output.py`          | —                    | Which tier a message belongs to, and so who sees |
+|                      |                      | it: `print` (the answer), `aside`/`asides_enabled`|
+|                      |                      | (a hint or standing caveat, terminal only,       |
 |                      |                      | DESIGN_output_verbosity.md), `step` (what the    |
 |                      |                      | app is doing right now — prints exactly where    |
 |                      |                      | `aside` prints, and journals it), `warn`/`fail`  |
 |                      |                      | (an operational warning or failure — always      |
 |                      |                      | prints, folds in the colour and the `Warning: `/ |
-|                      |                      | `Error: ` prefix, journals at `warn`/`error`).   |
-|                      |                      | A domain refusal ("no active plan") is an answer |
-|                      |                      | and keeps its own `print` (DESIGN_logging.md     |
-|                      |                      | §5.1/§5.3). Also                                 |
-|                      |                      | `fmt_date`/`fmt_span`/`fmt_timestamp` — the one  |
-|                      |                      | date renderer for every surface: a displayed day |
-|                      |                      | carries its abbreviated weekday                  |
-|                      |                      | (`2026-06-05 Fri`). Mirrored in the dashboard as |
-|                      |                      | `fmtDate`/`fmtSpan` in `static/app.js`. Two      |
-|                      |                      | places stay bare for want of room: `progress`'s  |
-|                      |                      | `MM-DD` week column (48-column budget) and the   |
-|                      |                      | `data bootstrap` reconstruction windows.         |
+|                      |                      | `Error: ` prefix, journals at `warn`/`error`),   |
+|                      |                      | and `notice` (the athlete's own data reported    |
+|                      |                      | back — always printed, never journalled: a       |
+|                      |                      | domain refusal like "no active plan" is an       |
+|                      |                      | answer, DESIGN_logging.md §5.1/§5.3). Plus       |
+|                      |                      | `Progress` (self-erasing bar) and `Spinner`      |
+|                      |                      | (self-erasing clock for the LLM wait), both      |
+|                      |                      | silent off a terminal.                           |
 
 ### Change recipes (where to edit for a given task)
 
@@ -521,29 +557,29 @@ flow for each lives in [§10](#10-key-data-flows).
 | Plan version comparison / display | `trainmate/plan_diff.py` (comparison + snapshot parsing), `cli/plans.py` (text rendering), `/api/plan/diff` in `trainmate_web.py`, `loadPlanDiff()`/`render*` in `static/app.js` |
 | Plan feedback (the athlete's notes on the plan) | `db/periodization.py` (`add_/list_/get_/rm_plan_feedback` over the `plan_feedback` table), `cli/plans.py:run_plan_feedback` + `cli/selectors.py:resolve_meso_atom` (the `-m` atom), `coach/service/planning.py` (the regen gate disjunct + prompt assembly), `coach/engine/planning.py` (the prompt section), DESIGN_plan_feedback.md |
 | Workout generation span          | `coach/service/workouts.py:workout_generate`, `cli/workouts/generate.py:_resolve_span`, `cli/workouts/strength_only.py:_span` (`--strength-only`: an open end runs to the last scheduled day), `cli/workouts/parser.py` (flag parsing), `config.workout_generation_span_days` |
-| Commitment window                | `settings.commitment_days`, `coach/service/workouts.py:_commitment_window`/`_standing_sessions`/`_resolve_standing`, `coach/formatting.py:format_standing_workouts`, `calendar_reconcile.py:leaves_trace`, `workout_changes.commitment_end`   |
-| Telling the athlete a plan-shaping input changed since the plan was built | `config.py` (`plan_profile`/`changed_plan_profile_fields`/`plan_config_hash` — the partition and the fields that moved; `athlete_science_documents`/`changed_science_documents` — the science files that moved), `coach/service/prompt.py:config_changed` (the judgment, every axis), **`cli/staleness.py`** (canonical for everything the athlete sees: the reason, the §2 test said out loud, the re-stamp, and the four surfaces' shared wording), and the surfaces that draw it: `cli/plans.py` (`plan show` reports, `plan keep` dismisses, `plan generate` offers), `cli/workouts/generate.py`, `cli/status.py` (a pointer to `plan show`, nothing more), `trainmate_web.py` (a read-only banner off `plan_config_hash()`, deliberately not through the engine — §8). Built in **one** place for the same reason the runway nudge is: three call sites each phrasing a two-sentence explanation is how they drift (DESIGN_plan_staleness.md §9) |
+| Commitment window                | `settings.commitment_days`/`settings.commitment_end` (how long the window is and where it ends — one rule), `coach/service/workouts.py:_standing_sessions`/`_resolve_standing`, `coach/formatting.py:format_standing_workouts`, `calendar_reconcile.py:leaves_trace`, `workout_changes.commitment_end`   |
+| Telling the athlete a plan-shaping input changed since the plan was built | `plan_inputs.py` (**canonical** for what shapes a plan and how it is hashed: the partition `plan_profile`/`changed_plan_profile_fields`/`plan_config_hash`, the science files `athlete_science_documents`/`changed_science_documents`, the goal and constraint cleaners, and the diff text), `coach/service/staleness.py` (the judgment — every axis of `config_changed`, the diff, the verdict call, the one `plan_fingerprints()` builder and the `plan keep` stamp), **`cli/staleness.py`** (canonical for everything the athlete *reads*: the reason, the §2 test said out loud, and the four surfaces' shared wording), and the surfaces that draw it: `cli/plans.py` (`plan show` reports, `plan keep` dismisses, `plan generate` offers), `cli/workouts/generate.py`, `cli/status.py` (a pointer to `plan show`, nothing more), `trainmate_web.py` (a read-only banner off `plan_config_hash()`, deliberately not through the engine — §8). Built in **one** place for the same reason the runway nudge is: three call sites each phrasing a two-sentence explanation is how they drift (DESIGN_plan_staleness.md §9) |
 | Telling the athlete the schedule is running out | `progression.py` (`plan_end`, `runway` — the pure detector and its four kinds), `cli/runway.py` (the row fetch, every wording, the morning-push button), and the four surfaces that draw it: `cli/workouts/generate.py` (`workout adapt`'s hint and refusal, `workout list`'s marker), `cli/status.py`, `cli/bot.py:run_bot_morning`, `config.runway_warning_days`, DESIGN_runway_nudge.md. The wording is built in **one** place on purpose — the hint used to live on `workout adapt` alone, which is how `status` came to answer differently on the same morning (§3 of that doc) |
 | Generation covering every date of its span | `coach/engine/workouts.py` (the TASK sentence), `coach/service/workouts.py:_fill_coverage_gaps` (the deterministic backstop, over the same `_rest_workout` factory the rest-window pre-pass uses), DESIGN_runway_nudge.md §2.1. The invariant is what lets the end of the schedule be read straight off the rows, with no margin |
 | Knowing whether the schedule reflects a constraint | `coach/honoring.py` (**canonical** for `honored_at`: what it means, who may stamp it, the write, and `needs_a_pass` — whether the schedule is missing a directive at all), `coach/proposals.py` (`covered_constraint_ids`, decided at proposal time on both proposal types so apply never re-derives it), `coach/service/adaptation.py` + `coach/service/workouts.py` (the two stamping commands), `cli/constraints.py:_maybe_point_at_honor` (the add-time message naming the mesocycle and the run that would build it in), `cli/status.py`, `cli/common.py:constraint_line`/`report_unhonored`, `db/constraints.py` (`mark_honored`, `clear_honored`, `clear_honored_after`), DESIGN_constraint_honoring.md. There is deliberately **no dedicated command** and no SQL half-copy of the predicate in `db/` — §5 of that doc records why |
 | Coach-learnings / confidence     | `db/learnings.py`, `coach/service/prompt.py` (`_apply_learning_updates`, `_review_learning_proposals`), `learning_doubts.py` (the athlete's question about a doubt), model is **canonical** in [§3](#3-coach-package-architecture) |
 | Backward analysis (bootstrap/reflect) | `coach/service/analysis.py:_run_workout_analysis`, `coach/engine/analysis.py:_data_analyze_logic` ([§10](#data-analysis-data-bootstrap--data-reflect)) |
-| Garmin pull / metrics / load model | `trainmate/garmin/sync.py` (`pull`, `ensure_data`), `garmin/load.py` (`activity_load`), `garmin/pmc.py` (PMC + `recompute_derived`), see [§12](#12-sports-science--coaching-mathematics) |
+| Garmin pull / metrics / load model | `trainmate/garmin/sync.py` (`pull`, `ensure_data`), `garmin/derived.py` (`recompute_derived`, `backfill_tss`, `warmup_cutoff` — the database side), `analytics/load.py` (`activity_load`) and `analytics/pmc.py` (the PMC maths), see [§12](#12-sports-science--coaching-mathematics) |
 | Progress timeline / PMC projection | `trainmate/progression.py` (pure math), `trainmate/timeline.py` (shared row-fetch), `trainmate/chart.py` (PNG), `cli/progress.py` (text), `/api/timeline.png` in `trainmate_web.py`, see [§12](#fitnessfatigueform-pmc-model), DESIGN_progress_timeline.md |
 | Intensity distribution / time in zone | `trainmate/intensity.py` (aggregation + prompt-width rendering + which sports qualify and in which currency — `window_sport_stats`/`select_zone_sports`/`zone_currency`, shared by the CLI tables and `/api/zones`), `coach/service/context.py` (`_intensity_mesocycle_context` for adapt, `_intensity_history_context` for the strategy prompt, `_mesocycle_progress_context` for workout generate — the only consumer passing `mesocycle_report`'s `previous=` and `fetch_workouts=`, since mesocycle-over-mesocycle creep and measured-vs-prescribed attribution are periodization questions (§9.2a), `_planning_zone_currencies` for §9.8), `cli/status.py`, `cli/progress.py` (the weekly grid — it shares the load table's week column and 48-column budget), `progression.weekly_aggregates` (where the rows join the payload), `cli/data.py` (`--zones`), `/api/zones` + the Progress tab's tables in `static/app.js`, DESIGN_intensity_distribution.md. Undercount markers are proportional: `intensity.judgeable` (`config.zone_min_activity_minutes`) withholds a too-short session's vote, and the coverage bar is per sport (`intensity.COVERAGE_MIN_BY_SPORT`, overridable via `config.zone_coverage_display_min_by_sport`) because rest between sets is not a failed recording. Both maps' keys must be **canonical** sports — `coverage_display_min()` canonicalizes before the lookup, so an alias key is dead and silently reverts to the global bar |
 | Planned time in zone (a session's intensity target) | `db/base.py` (`planned_zone_currency`, `planned_zone1..7_sec` on `workouts`), `db/workouts.py:WorkoutChange.append`, `intensity.parse_planned_zones` / `format_planned_zones`, `coach/engine/workouts.py` (`_planned_zone_task`, `_planned_zone_fields` — both prompts), `google_calendar.py` + `coach/formatting.py` + `cli/workouts/_helpers.py::prescription_lines` (`workout list -v`/`-vv` and the `workout generate` preview) — rendered from the columns, never stored; `planned_zone_seconds` also reads a proposal's unwritten `planned_zone_sec` list through `parse_planned_zones`, DESIGN_intensity_distribution.md §9.8 |
 | Calendar push / daily-signal ingest | `trainmate/google_calendar.py`, see [§13](#13-daily-signal-calendar-ingest) |
-| Workout state (modified/calendar/removed) | `trainmate/calendar_state.py`, `db/workouts.py`, `cli/workouts/_helpers.py::modification_markers` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
-| What became of a planned session (the adherence verdict) | `adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `cli/common.py` (`adherence_results` — the one DB-backed pairing — `adherence_verdicts` keyed by workout id, and `format_actual` for the effort it graded against), `cli/workouts/_helpers.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/generate.py::_list_verdicts` (which span the listing grades, and the pull it needs), `google_calendar.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/app.js` (the badge) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
-| Which timezone dates are read in | `trainmate/clock.py` (the zone, the cache, the fallback), `util.today_date`/`fmt_timestamp` (the only callers), the push loop in `trainmate_bot.py`, DESIGN_user_timezone.md. Changing it is one row of `settings` |
+| Workout state (modified/calendar/removed) | `trainmate/workout_state.py` (`modification_markers` and `calendar_status` — two of the three axes, together because every surface that shows one shows the other, and because neither reads the database), `db/workouts.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
+| What became of a planned session (the adherence verdict) | `adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `analytics/compare.py` (`adherence_window` — the one pairing that reads the database, handed the handle — `adherence_verdicts` keyed by workout id, `compare_days` for the day-by-day walk, and `format_actual` for the effort it graded against), `adherence.py::unplanned_kind` (what an activity nothing planned turns out to be: minor, unplanned or off-plan), `calendar_reconcile.py` (`calendar_reconcile.mark_adherence_range` — stamping the verdict onto the Calendar event), `cli/workouts/_helpers.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/generate.py::_list_verdicts` (which span the listing grades, and the pull it needs), `google_calendar.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/app.js` (the badge) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
+| Which timezone dates are read in | `trainmate/clock.py` (the zone, the cache, the fallback), `clock.today_date`/`clock.fmt_timestamp`, the push loop in `trainmate_bot.py`, DESIGN_user_timezone.md. Changing it is one row of `settings` |
 | A preference the athlete can change at runtime | `trainmate/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`trainmate/queue_kind.py`) added to `KINDS` in `trainmate/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
 | A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `activity_lines`, `logbook`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`, and `strength log`/`exercises` which read the record and the vocabulary back), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
 | What a strength session prescribes | `strength/planner.py` (the call), `strength/progression.md` (the science it reads), `strength/history.py` (what the athlete lifted), `strength/prescription.py` (the description and its seam), `prescribed_sets` + `strength_checks` in `db/base.py`, the carry in `db/workouts.py::WorkoutChange`, and the pass's place in `coach/service/workouts.py` and `coach/service/adaptation.py`. DESIGN_strength_tracking.md §9 |
 | A CLI command                    | `trainmate/cli/<family>.py` (`run_*`), dispatcher in `trainmate_cli.py` ([§7](#7-cli-commands-reference)) |
-| A message telling the athlete to run something | wrap the command in `util.cmd()`, nested *inside* the line's colour call, so it renders as the bright shade of that colour — and emit it with `util.aside`, not `print`: a "you could now run X" hint is side information |
-| Whether a line reaches the chat front-end | `util.aside` (side information, terminal only) vs `print` (the answer, warnings, errors). Building a list of lines rather than printing? gate on `util.asides_enabled()`. DESIGN_output_verbosity.md §3 |
-| Recording that something happened | Nothing new to call: `util.step` (what the app is doing), `util.warn`/`util.fail` (something outside the app did not work) print and journal in one go, and `run_once` already brackets the command. Reach for `trainmate/journal.py` directly only for a record with structured fields (`journal.record("garmin.pull", …)`) or for what must never reach the athlete (`journal.debug` — the tier that replaced `except Exception: pass`, pinned by `tests/test_journal.py`). The event name comes from the closed nine-word vocabulary in `journal.EVENTS`; severity is `lvl`, not a new name. Never copy something a table already holds — that is the domain record, and it outlives this one. What the athlete *answered* needs nothing at all: `runtime.prompt` journals every `confirm`/`choose` itself (§5.6). DESIGN_logging.md §2/§4.2/§5 |
+| A message telling the athlete to run something | wrap the command in `text.cmd()`, nested *inside* the line's colour call, so it renders as the bright shade of that colour — and emit it with `output.aside`, not `print`: a "you could now run X" hint is side information |
+| Whether a line reaches the chat front-end | `output.aside` (side information, terminal only) vs `print` (the answer, warnings, errors). Building a list of lines rather than printing? gate on `text.asides_enabled()`. DESIGN_output_verbosity.md §3 |
+| Recording that something happened | Nothing new to call: `output.step` (what the app is doing), `output.warn`/`output.fail` (something outside the app did not work) print and journal in one go, and `run_once` already brackets the command. Reach for `trainmate/journal.py` directly only for a record with structured fields (`journal.record("garmin.pull", …)`) or for what must never reach the athlete (`journal.debug` — the tier that replaced `except Exception: pass`, pinned by `tests/test_journal.py`). The event name comes from the closed nine-word vocabulary in `journal.EVENTS`; severity is `lvl`, not a new name. Never copy something a table already holds — that is the domain record, and it outlives this one. What the athlete *answered* needs nothing at all: `runtime.prompt` journals every `confirm`/`choose` itself (§5.6). DESIGN_logging.md §2/§4.2/§5 |
 | Reading back what a command did  | `tm journal` (`trainmate/cli/journal.py`), or `logs/runs/*.jsonl` with `jq`. A run's prompts are `logs/llm_exchanges/*<run id>*` — the id in the filename is the join, not the timestamp, because those names come from the machine's local clock while the journal is UTC. DESIGN_logging.md §6/§7 |
 | How long the coach's prose is    | `coach/engine/prompt.py` (`## WRITING FOR THE ATHLETE`, shared by every command built on `_build_system_prompt`) + the per-field caps in each `## RESPONSE FORMAT`. Check `coach/formatting.py` first: a field re-injected into later prompts must not be capped (DESIGN_output_verbosity.md §5.1) |
 | A web *view* of existing data    | a GET in `trainmate_web.py` + a panel in `static/app.js` ([§8](#8-web-api-endpoints)) |
@@ -579,8 +615,8 @@ The submodules:
   `openrouter_client` binding — **patch target for tests:**
   `trainmate.coach.engine.openrouter_client`.
 - `service/` — `CoachService` + the `coach_service` singleton (data I/O,
-  caching, orchestration), assembled from mixins (`context`, `prompt`, `planning`,
-  `workouts`, `adaptation`, `analysis`). It holds no handles of its own: `_db` and
+  caching, orchestration), assembled from mixins (`context`, `prompt`, `staleness`,
+  `planning`, `workouts`, `adaptation`, `analysis`). It holds no handles of its own: `_db` and
   `_prompt` are properties reading `runtime.db` and `runtime.prompt`, and it has no
   Calendar handle at all — the comment beside `_prompt` in `service/__init__.py` says why.
   The clock is the one module-level name a test patches here,
@@ -632,35 +668,12 @@ default the user layer overrides.
   readable prompt segment. Threshold anchors render generically from
   `trainmate.benchmarks.ANCHOR_KINDS` (label + unit), so a new anchor kind shows up with
   no prompt-code change (`DESIGN_benchmark_workouts.md` §3.5).
-- **`_clean_goals(objectives)` / `_clean_constraints(constraints)`** — the
-  planning-relevant fields, normalized and stably ordered. Single source of truth
-  shared by the hash functions and the snapshots persisted on the macrocycle.
-  `_clean_constraints` is fed only the plan-shaping (replan=1) constraints.
-  `date_type` is included only when `horizon`, so goals predating the field (all
-  `event`) keep their hash and no plan flags stale on upgrade; flipping a goal
-  either way still changes the hash ([§15](#goal-dates-event-vs-training-horizon)).
-- **`_get_goals_hash(objectives)`** — SHA-256 of the `_clean_goals` list.
-- **`_get_constraints_hash(constraints)`** — SHA-256 of the `_clean_constraints` list.
-- **`_get_config_hash()`** — SHA-256 of `_clean_profile()`: the `user_profile` section minus
-  the threshold anchors (`max_hr`/`lthr`/`ftp`) and minus the fields that reach the prompt
-  but cannot shape a periodization — `name`, top-level `equipment`, the free-text
-  `preferences` (session-level by contract, §11), and each day's `equipment` within
-  `weekly_schedule` (that day's hours, `max_sessions` and `certainty_percent` stay in).
-  The partition and its rationale are `DESIGN_plan_staleness.md` §3–§4 and §11; the
-  exclusions are a denylist so a profile field added later counts as plan-shaping until
-  someone decides otherwise (§6). Thresholds are instead
-  snapshotted raw on the macrocycle (via `CoachService.effective_thresholds()`) and only
-  flag the plan stale past `coach.threshold_replan_pct` relative drift (default 5%) — see
-  `CoachService.config_changed()`. Trainable thresholds now live in the `benchmark_results`
-  logbook, not config (`DESIGN_benchmark_workouts.md` §3.4); the service overlays them onto
-  the profile for prompts and the drift snapshot. Prompt-context knobs
-  (`metrics_lookback_days`) are not fingerprinted at all.
-  The macrocycle also stores `profile_snapshot` — the plan-shaping fields as JSON — so the
-  staleness reason can name what moved (`"athlete profile changed: sport_preferences"`)
-  rather than only that something did (`DESIGN_plan_staleness.md` §5), and
-  `science_snapshot` — the athlete's `science_dir` documents as `{filename: text}`
-  (`config.athlete_science_documents()`) — so an edited guideline flags the plan, names
-  the file and shows the edit (§11).
+- **The plan's input fingerprints are no longer the engine's.** They were five methods
+  here — `_clean_goals`, `_clean_constraints`, `_get_goals_hash`, `_get_constraints_hash`
+  and `_get_config_hash` — and the engine never called any of them; the service did. They
+  are module-level functions in `trainmate/plan_inputs.py` now, with the partition they
+  hash and the diff text that explains a change. See that file, and the paragraph under
+  §2's `plan_inputs.py` row.
 - **`_plan_generate_strategy(...)`** — LLM call → `{strategy, mesocycles}` covering the
   plan start through the goal date, whatever the horizon. Label `plan_generate`.
   Branches on the goal's `date_type`: a `horizon` goal's task forbids pinning a
@@ -1003,15 +1016,17 @@ called by the UIs.
   latest logbook row per kind (`db.latest_thresholds()`). `_effective_profile()` merges
   these onto `config.user_profile`, and every engine prompt call (generate/adapt/plan/
   analysis) passes that merged profile so zones are prescribed from live values.
-- **`_get_config_hash()`** — delegates to `CoachEngine._get_config_hash()`.
+- **The three snapshot builders** (on `StalenessMixin`, `coach/service/staleness.py`).
   **`_get_config_snapshot()`** — `effective_thresholds()` as JSON, snapshotted on the
-  macrocycle. **`_get_profile_snapshot()`** — `config.plan_profile()` as JSON, snapshotted
-  alongside it so staleness can name the field that moved. **`_get_science_snapshot()`** —
-  `config.athlete_science_documents()` as JSON, the text itself rather than a hash, so the
-  diff and the verdict call can read the edit (`DESIGN_plan_staleness.md` §11).
+  macrocycle. **`_get_profile_snapshot()`** — `plan_inputs.plan_profile()` as JSON,
+  snapshotted alongside it so staleness can name the field that moved.
+  **`_get_science_snapshot()`** — `plan_inputs.athlete_science_documents()` as JSON, the
+  text itself rather than a hash, so the diff and the verdict call can read the edit
+  (`DESIGN_plan_staleness.md` §11). The hash itself is `plan_inputs.plan_config_hash()`;
+  the service's forwarding wrapper is gone.
 - **`config_changed(macro)`** — the single staleness judgment, reached from the CLI only
-  through `cli/staleness.py` (which owns the wording, the four surfaces and the re-stamp)
-  and directly by the `plan_generate` reuse
+  through `cli/staleness.py` (which owns the wording and the four surfaces; the re-stamp
+  is `CoachService.stamp`, beside the judgment) and directly by the `plan_generate` reuse
   check. Returns a human-readable reason when the plan-shaping profile fingerprint
   mismatches or an effective threshold anchor drifted more than
   `coach.threshold_replan_pct` from the macrocycle's `config_snapshot`, else None. A kind
@@ -1092,7 +1107,7 @@ connection + schema setup), `objectives.py`, `constraints.py`,
   `virtual_ride` and `biking` as its aliases — they all share one set of Garmin cycling
   zone boundaries, which is the criterion for sharing a zone-table row
   (DESIGN_intensity_distribution.md §6.1). This replaced a second, disagreeing
-  vocabulary: `garmin/load.py::CYCLING_TERMS` held substring *fragments* matched loosely
+  vocabulary: `CYCLING_TERMS` (in the load model, since removed) held substring *fragments* matched loosely
   by `sync.py`, and had `gravel_cycling`/`cyclocross` that `SPORT_MAPPING` lacked, so a
   gravel ride got its power zones fetched and then fell through into a row of its own.
   `CYCLING_TERMS` is gone; `sync.py`'s power gate is now
@@ -1404,7 +1419,7 @@ no precedence rule — the kind was recorded when the change ran:
   - **Markers:** `workout list` renders the kind *and* the standing easings, so a session
     eased twice reads `[ADAPTED ×2]` and one changed on request `[TWEAKED]`. Two facts
     rather than one, which is why there is no longer a rule about which wins.
-    `modification_markers` in `cli/workouts/_helpers.py` is the single renderer; the web
+    `modification_markers` in `trainmate/workout_state.py` is the single renderer; the web
     API serves its output.
   - **The adaptation tally** (`adaptation_count` / `adapted_at`) is derived by walking the
     lineage backwards from the live revision: jump over any span a `restored_from` copy
@@ -1416,7 +1431,7 @@ no precedence rule — the kind was recorded when the change ran:
     as the `[ALREADY EASED …]` tag so a re-run holds an already-eased session instead of
     stacking another cut onto still-lagging recovery.
 
-**2. Calendar state** = derived by `trainmate.calendar_state.calendar_status(workout)`:
+**2. Calendar state** = derived by `trainmate.workout_state.calendar_status(workout)`:
 
 | Result | Condition |
 |--------|-----------|
@@ -1475,8 +1490,8 @@ no precedence rule — the kind was recorded when the change ran:
     still ahead of the athlete today, and `-v` names the activity it was graded against
     plus what a `[PARTIAL]` differed by. `/api/workouts` hands the dashboard the same
     verdict as each row's `adherence` (status, word, reasons, matched activity), rendered
-    as a badge. One pairing behind all three — `cli/common.py:adherence_verdicts` over
-    `adherence_results` — so a terminal line, a Calendar event and a web card cannot
+    as a badge. One pairing behind all three — `analytics/compare.py:adherence_verdicts`
+    over `adherence_window` — so a terminal line, a Calendar event and a web card cannot
     disagree about whether a session happened. The listing grades **the whole window**,
     never the rows it happens to be showing: matching is per-day and first-come, so a
     narrowed listing that graded only its own rows would hand an activity to whichever
@@ -1601,7 +1616,7 @@ surface, and a static "still warming up" flag is shown while total history is sh
 (< 3·τ_ctl).
 
 **ATL:CTL ratio.** Relative overload — fatigue against the athlete's own fitness base —
-is *derived at read time* by `garmin.pmc.load_ratio(atl, ctl)`, never stored: it is a
+is *derived at read time* by `analytics.pmc.load_ratio(atl, ctl)`, never stored: it is a
 division of two columns already on the row. It replaced the stored ACWR
 (`acute_workload`/`chronic_workload`/`acwr`, dropped by the guarded DDL in
 `db/base.py`); see DESIGN_load_ratio.md.
@@ -1933,15 +1948,16 @@ calls, since the REPL runs many commands in one process (DESIGN_model_selection.
 
 `clock.active_zone()` is the same shape for the athlete's timezone: the
 `settings.timezone` row is read on first use and cached for the process, since
-`util.today_date()` asks on every call. `clock.reset_cache()` drops it — the registry's
+`today_date()` asks on every call. `clock.reset_cache()` drops it — the registry's
 `on_change` hook for the `timezone` setting, and what the bot's push loop calls each tick
 because `settings set` runs in a CLI subprocess (DESIGN_user_timezone.md §2/§3).
 
 `trainmate/garmin/` exposes module-level functions rather than a singleton, all
 re-exported from its `__init__.py`: `pull()`, `ensure_data()`, `reset_memo()` (tests),
-`recompute_derived()`, `backfill_tss()`, `compute_pmc()`, `load_ratio()`,
-`activity_load()` / `load_method()` / `rpe_divergence()`, plus the `GarminClient` class
-and `GarminAuthRequired`.
+`connect()`, `recompute_derived()`, `backfill_tss()`, `pmc_history_start()` and
+`warmup_cutoff()`, plus the `GarminClient` class and `GarminAuthRequired`. The training
+maths it used to re-export — `activity_load`, `compute_pmc`, `load_ratio` and the rest —
+is `trainmate/analytics/`, imported by name.
 
 The **prompt broker** is `runtime.prompt`. `CoachService` takes it as a constructor
 argument (`prompt_instance=`, defaulting to `runtime.prompt`) so the service can ask a
@@ -2182,8 +2198,9 @@ put it in, so the app is safe to leave running and cannot race the CLI or the bo
 workout row; and it needs neither the Calendar service-account credentials nor an LLM key
 to start, because it imports neither `google_calendar` nor `coach_service`. The one thing
 it did need from the coaching engine — the plan-shaping config fingerprint behind the
-"config changed" banner — now lives in `config.plan_config_hash()`, which the engine
-delegates to, so the two cannot drift.
+"config changed" banner — is `plan_inputs.plan_config_hash()`, a flat pure module the
+coach reads too, so the two cannot drift. It used to be reached through a forwarding
+wrapper on the engine; that wrapper is gone and both callers name the function.
 
 The **front-end** (`static/index.html` + `static/app.js`) is organized into six
 top-level tabs, all lazy-loaded on first show:
@@ -2231,7 +2248,7 @@ exactly that reason.
 | GET    | `/api/status`                   | Active goal, latest metrics, coach learnings (under `coach_learnings.learnings` + `.summary`), macrocycle+mesocycles, `config_mismatch`, `sync_state` (data freshness) |
 | GET    | `/api/objectives`               | All objectives (`goal list`)                 |
 | GET    | `/api/constraints`              | Active + upcoming directives — the read view of `constraint list`. Its window is a rolling `metrics_lookback_days` plus everything upcoming, **not** the CLI's active-mesocycle anchor |
-| GET    | `/api/workouts`                 | List workouts (`?start_date=&end_date=&sport_type=&include_removed=`). Rows carry derived `calendar_status` + `modification_status`, plus `adherence` (`{status, label, reasons, completed}`, null for a row still ahead of us) from the CLI's own `adherence_verdicts`. No pull — §8. |
+| GET    | `/api/workouts`                 | List workouts (`?start_date=&end_date=&sport_type=&include_removed=`). Rows carry derived `calendar_status` + `modification_status`, plus `adherence` (`{status, label, reasons, completed}`, null for a row still ahead of us) from `analytics/compare.py::adherence_verdicts` — the same grader the CLI asks, and not through the CLI, which §14's layering rule forbids. No pull — §8. |
 | GET    | `/api/workouts/compare`         | Plan-vs-actual adherence (`workout compare`); no `ensure_data`. `?start_date=&end_date=&sport=` (default 14-day lookback, end capped at today) → `{filters, days[], discrepancies[], informational[]}` |
 | GET    | `/api/workouts/batches`         | Workout changes, newest first (`{batches:[{id, created_at, kind, summary, workouts, held, restorable, first_date, last_date, macrocycle_ids}]}`); undoing one is `workout rollback` |
 | GET    | `/api/plan`                     | Active plan for a goal (`plan show`): `?goal_id=` (default next active) → `{goal, macrocycle, mesocycles}` |
@@ -2664,7 +2681,7 @@ gated by the same `data_refresh_minutes` throttle. When that throttle keeps a re
 cached data (Garmin or Calendar), a one-line note says so. These commands support
 `--no-pull` to bypass the sync entirely (cache-only) and `--force-pull` to refresh even
 within the throttle window (the two are mutually exclusive). Calendar dates use the
-athlete's timezone (`util.today_str`/`today_date`, DESIGN_user_timezone.md §1);
+athlete's timezone (`clock.today_str`/`clock.today_date`, DESIGN_user_timezone.md §1);
 stored instants stay UTC. The web app never calls this — it is a pure reader (see §1).
 
 ### Data Analysis (`data bootstrap` / `data reflect`)
@@ -2777,7 +2794,7 @@ unattended path).
 
 ### Load model (per activity)
 The stored `tss` column is the **objective measurement only**; the training
-**load** is derived on the fly (`garmin.activity_load`) via a best-available
+**load** is derived on the fly (`analytics.load.activity_load`) via a best-available
 fallback — methods are never blended or max-ed:
 
 1. **Power TSS** (Coggan 7-zone, `POWER_ZONE_TSS_PER_SEC`) when a power meter
@@ -2799,7 +2816,7 @@ hybrid activities (e.g. kettlebell HIIT: hrTSS captures the cardio, divergence
 flags the muscular cost).
 
 ### RPE divergence (external vs internal load)
-`garmin.rpe_divergence` flags activities where the measurement came from power/HR but the
+`analytics.load.rpe_divergence` flags activities where the measurement came from power/HR but the
 user's RPE implies ≥ `rpe_divergence_ratio` (config, default 1.5) × the measured load —
 i.e. it felt harder than it measured (heat, sleep debt, muscular damage). For those rows
 `activity_load()` takes **the load from RPE instead**, and `load_method()` returns the
@@ -2812,9 +2829,9 @@ what explains the bump to the coach.
 
 ### ATL:CTL load ratio
 Relative overload — fatigue against the athlete's own fitness base.
-`garmin.pmc.load_ratio(atl, ctl)` = ATL ÷ CTL straight off the PMC EWMAs below, derived
+`analytics.pmc.load_ratio(atl, ctl)` = ATL ÷ CTL straight off the PMC EWMAs below, derived
 at **read time** and never stored; `None` when either is NULL or CTL ≤ 0 (no base to
-divide by). Colouring (`util.color_load_ratio`) is **overload-only**: > 1.5 red,
+divide by). Colouring (`analytics.pmc.color_load_ratio`) is **overload-only**: > 1.5 red,
 1.3–1.5 yellow, at or below 1.3 bare — a *low* ratio is phase-dependent, and
 `training_load.md` §4 judges the ratio against the planned mesocycle rather than a universal
 band. This replaced the rolling-sum acute/chronic/ACWR model (7/28-day sums with the
@@ -2826,7 +2843,7 @@ Two layers, one recurrence. The EWMAs are the whole stored load model, and the A
 ratio above is derived *from* them — different questions off one series: asymptotic
 fitness/form (CTL/ATL/TSB) and scale-invariant relative overload (the ratio).
 
-**Backward core** (`garmin/pmc.py`, DESIGN_pmc_fitness_fatigue.md): the classic
+**Backward core** (`analytics/pmc.py` for the maths, `garmin/derived.py` for the sweep that stores it, DESIGN_pmc_fitness_fatigue.md): the classic
 Coggan discrete `1/τ` EWMAs walked over every calendar day of history —
 `compute_pmc()`, with TSB = *yesterday's* CTL − ATL (day-entering form) —
 stored per day on `athlete_metrics_cache` (`ctl`/`atl`/`tsb`) by every
@@ -2836,8 +2853,8 @@ configuration). Leading-edge warm-up blanking (`pmc_warmup_cutoff_for`),
 the young-DB caveat (`pmc_data_caveat`), and the ramp rate (`pmc_ramp`)
 gate/derive display values. Consumers: coach prompts, `tm status` and
 `tm data show-metrics` — the last two render the triple through the shared
-`util.pmc_cells`, and derive the one warm-up cutoff through
-`cli/common.py:pmc_warmup_cutoff`. (`workout adapt` prints only a one-line day count;
+`analytics.pmc.pmc_cells`, and derive the one warm-up cutoff through
+`garmin/derived.py:warmup_cutoff(dbh, history_start=None)`. (`workout adapt` prints only a one-line day count;
 its metrics-trajectory table was removed.)
 
 **Projection layer** (`trainmate/progression.py`, DESIGN_progress_timeline.md):
@@ -2846,7 +2863,7 @@ stored series verbatim (never recomputed — `tm progress` and `tm status` must
 agree); the *anchor* is the latest stored row **strictly before today** with
 non-NULL PMC, and from it the same recurrence is folded forward
 (`compute_pmc(..., seed=(ctl, atl))`) over the merged actual-then-planned daily
-load series (past: `activity_load` above; future: `adherence.planned_load` over
+load series (past: `activity_load` above; future: `analytics.load.planned_load` over
 non-removed `workouts` — see DESIGN_progress_timeline.md §3 for the seam rule),
 stopping at the last generated workout. `compute_pmc` stores its outputs at
 **full precision** (rounding moved to display) so the fold reproduces the stored
@@ -2966,6 +2983,29 @@ Tests use `unittest`. Run with:
 venv/bin/python -m unittest discover -s tests -p "test_*.py"
 ```
 
+### Which layer may load which
+
+Two rules, both asserted in `tests/test_layering.py` by importing a module in a fresh
+subprocess and reading `sys.modules` afterwards — what actually got loaded, not what
+the file says it imports. Both are keyed on module-name prefixes, never on a list of
+files, so a module added tomorrow is covered the day it is written.
+
+**Nothing under `trainmate/analytics/` loads `trainmate.db`.** It is training maths
+over rows the caller fetched. A module there may still *take* a database handle —
+`adherence_window` does — because being handed one is not the same as importing the
+storage layer. The rule is what lets the coach, the CLI and the web app share one
+load model without three of them paying for a package they are not using.
+
+**Importing `trainmate_web` loads no `trainmate.cli`, no `trainmate.coach`, no
+`trainmate.openrouter`, no `trainmate.google_calendar` and no `googleapiclient`.**
+The dashboard reads and writes nothing (§8), and that is a claim about capability,
+not intent: a reader that has imported the coach service is one call away from
+writing, and the operator reading a chart did not ask for either. It also means the
+web process starts without a service-account file or an OpenRouter key. This replaced
+a grep over the web file's own text, which kept passing while the import happened one
+module deeper — `cli/workouts/_helpers` reached the CLI package, and the CLI package
+reached everything.
+
 | File                           | What it tests                                                   |
 |--------------------------------|-----------------------------------------------------------------|
 | `tests/test_adaptation_*.py`   | `_adapt` (`workout_adapt()` end-to-end) and `_adherence`         |
@@ -3050,8 +3090,24 @@ venv/bin/python -m unittest discover -s tests -p "test_*.py"
 |                                | (benchmarks, signal vocabulary, models, plan show, zones), and  |
 |                                | `GET /api/timeline.png`: PNG magic bytes, `?weeks` validation,   |
 |                                | matplotlib-absent 503, payload shape via the shared builder      |
-| `tests/test_utils.py`          | `util.py` helpers (text wrapping, ANSI width, `color_load_ratio`,|
-|                                | `default_wrap_width` and the TRAINMATE_WRAP_WIDTH override)      |
+| `tests/test_text.py`           | `text.py`: wrapping, ANSI width, `default_wrap_width` and the   |
+|                                | TRAINMATE_WRAP_WIDTH override, the flex column, and the rule    |
+|                                | that a quoted command survives the wrap unbroken                |
+| `tests/test_output.py`         | `output.py`: which tier prints where, the warning tier's wrap   |
+|                                | and prefix, `Progress`/`Spinner`, and the two source-reading    |
+|                                | invariants (no bare `print(yellow(...))`, no message spelling   |
+|                                | `Warning: ` itself)                                             |
+| `tests/test_load.py`           | `analytics/load.py`: the measured TSS, the power→HR→RPE         |
+|                                | fallback and the RPE-divergence rescue                          |
+| `tests/test_sentinels.py`      | `sentinels.py`: every frame the CLI writes and the bot reads    |
+|                                | back, what is and is not framing, and the answer shape          |
+| `tests/test_workout_state.py`  | the two derived axes: the calendar signature over exactly the   |
+|                                | rendered fields, and what `unpushed`/`synced`/`stale` mean      |
+| `tests/test_layering.py`       | who may load whom, by importing a module in a subprocess and    |
+|                                | reading `sys.modules`: `analytics/` loads no `trainmate.db`,    |
+|                                | and `trainmate_web` no CLI, coach, OpenRouter or Google code    |
+| `tests/test_learning_confidence.py` | the confidence a learning's evidence earns, and when it    |
+|                                | goes dormant — pure rules, no database                          |
 | `tests/test_cli_settings.py`   | the `settings` command and its registry: config vs stored row vs |
 |                                | `--llm-model` override (DESIGN_model_selection.md §3)            |
 | `tests/test_clock.py`          | the athlete timezone: how a name resolves, that `today_date`     |
@@ -3089,8 +3145,8 @@ in `tests/`, swept there by a glob — so a second concurrent run deleted the da
 first was still writing and both collapsed. `tests/test_isolation_guards.py` fails on any
 module that builds a database path beside the tests again.
 
-The same file resolves every `patch("trainmate…")` target in the suite — 431 sites
-naming 40 distinct targets — by importing the module half and reading the attribute half,
+The same file resolves every `patch("trainmate…")` target in the suite — 439 sites
+naming 42 distinct targets — by importing the module half and reading the attribute half,
 the way `mock.patch` does. A patch names its target by string, so nothing checks it until
 that line runs: move a symbol to another file and every test that does not happen to
 execute the line keeps passing while stubbing nothing. The guard turns that into one red
@@ -3115,7 +3171,7 @@ run, so `logging.dir` is redirected to a scratch directory (swept at exit) and
 It also silences the one line `calendar_reconcile.reconcile` prints, "Google Calendar
 updated: 1 event(s) pushed.": every workout write reconciles against the mock syncer, so
 the line otherwise shows up several hundred times in a run. A failed push still prints,
-through `util.fail`. The tests that drive `sync_workout` directly wrap it in
+through `output.fail`. The tests that drive `sync_workout` directly wrap it in
 `quiet_events()` for the same reason.
 
 Fixture dates ride on today (`_days_out(...)`/`GOAL_DATE`) rather than on fixed
@@ -3179,7 +3235,7 @@ whole run and delivers it as one message, so `Auto-syncing Garmin …` and
 `Querying OpenRouter …` land *after* the work is done, above the answer, on a 48-column
 phone screen. The split is therefore not verbose-vs-terse but **is this line still true
 when it arrives** — progress narration is information about the present, and history when
-it isn't. So `util.aside` prints only where output is live (terminal, or
+it isn't. So `output.aside` prints only where output is live (terminal, or
 `TRAINMATE_VERBOSE=1`), while answers, warnings and errors always print. `garmin.pull`
 shows why the line, not the content, is what moves: its step narration is an aside, but
 for `data pull` the sync *is* the answer, so `pull` returns a one-line summary the handler
@@ -3384,7 +3440,8 @@ the listing itself, today included: an untrained session on an unfinished day re
 `[NOT YET]` rather than `[MISSED]`, which is the `pending_from` rule
 ([§10](#10-key-data-flows)) surfacing where it is finally visible.
 
-Nothing new grades anything. `adherence_results` is the single DB-backed pairing —
+Nothing new grades anything. `analytics/compare.py::adherence_window` is the single
+DB-backed pairing, handed the handle rather than opening one —
 `analyze_adherence` over a window — and `adherence_verdicts` keys `classify_adherence`'s
 answer by workout id; the Calendar marker, the terminal marker and the web badge are three
 renderings of that one map. The wording is shared too (`adherence.STATUS_LABELS`): the
@@ -3518,3 +3575,74 @@ it is what breaks a real cycle: `strength/sets.py` imports `queue_kind`, and
 `athlete_queue` imports `strength/questions.py`, which imports `strength/sets.py`.
 Gathering the queue would therefore pull two files out of the layer they belong to and
 leave a package holding the other two. Two files do not earn a package.
+
+### The maths moved out of `garmin/`, and `garmin/` kept the database
+
+`activity_load` and the PMC series used to live in `trainmate/garmin/`, because Garmin is
+where the rows they run on come from. But only one file inside that package used them —
+`sync.py`, when it stores an activity. Every other caller was outside it: the coach, the
+CLI, the web app. So a module that wanted nothing but the load of one activity imported
+the Garmin package, and through it the database.
+
+They are `trainmate/analytics/` now, and the split runs along "does this open a
+database": `analytics/load.py` and `analytics/pmc.py` are handed rows and return numbers,
+and `garmin/derived.py` is where a database handle meets them.
+
+That line is why `adherence_window` takes a `dbh` argument rather than reaching for the
+singleton. It does read the database — pairing a window of days needs four queries — but
+it is handed the handle, so `trainmate/analytics/` still imports no storage.
+
+### A rule that holds a write together is not moved out to its caller
+
+Two moves the reorganization proposed were declined, both the same shape.
+
+`db.wipe_garmin_data` recomputes the PMC after it deletes. The proposal wanted the
+recompute moved to `data wipe`, so the database layer would stop importing Garmin. But
+the recompute was deliberately moved *into* the wipe earlier, with a comment saying why:
+deleted load stays baked into later days' CTL until the EWMAs are walked again, so the
+sweep belongs to the wipe rather than to whoever remembers to call it. A test pins that.
+Moving it back out re-opens exactly the gap the comment closed, and buys little: the
+import is function-local and reaches no cycle.
+
+`rollback_to_change` writes a note saying what it undid, built by `heads_up.undone_note`.
+The proposal wanted the two service callers to build it and pass it in, so `db/workouts.py`
+would stop importing `heads_up`. Same answer: the note is part of what a rollback *is*,
+a third caller would silently get none, and `heads_up` documents in its own docstring
+that importing it from the database layer opens nothing.
+
+The general rule: a guarantee the write always makes is worth more than the import graph
+it costs, when the import reaches no cycle and the module says so.
+
+### `util.py` split on "does this decide whether a line prints"
+
+`util.py` was 677 lines and 62 files imported it, which is the smell AGENTS.md warns
+about: a name that says nothing cannot tell you what belongs in it.
+
+The cut is not by size. `text.py` answers "what does this line look like" — colour,
+width, wrapping, tables — and decides nothing about whether it appears. `output.py`
+answers "who sees this" — the four tiers, `aside`/`step`/`warn`/`fail`/`notice`, and the
+two self-erasing terminal lines. The dates went to `clock.py`, which already owned the
+athlete's timezone and now owns the day written out as well.
+
+That axis is what dissolved the two import cycles. `output.py` needs the journal, so the
+journal cannot need `output.py` — and it does not: what `journal.py` reaches for when a
+write fails is `asides_enabled`, which is a *look* question and lives in `text.py`. And
+`clock.py` no longer has to defer an import of the module that was about to call it back.
+
+### The plan's inputs left `config.py`, and the three copies of them became one
+
+Three files used to know what shapes a periodization plan. The partition — which profile
+fields count, which are session-level, which thresholds are excluded — sat at the foot of
+`config.py`. The goal and constraint cleaners were methods on `CoachEngine` that the
+engine never called. The diff text that explains a change sat in the coach service. And
+the fingerprint itself was hand-built in three places: twice in `plan_generate`/`plan_apply`
+and once in `plan keep`, where the copy had already lost a field.
+
+They are `plan_inputs.py` now, and one `plan_fingerprints()` builds the record. The module
+is flat and pure on purpose: the read-only dashboard shows a "this plan was built from
+inputs that have since changed" banner, and it must be able to hash the config without
+importing the coach — §8's own claim, which until now rested on a forwarding wrapper.
+
+The judgment stayed separate, in `coach/service/staleness.py`. Knowing *what* the inputs
+are and deciding *whether a difference is worth telling the athlete about* change for
+different reasons, and the second one needs a database and a model call.

@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from trainmate.types import Workout, CompletedActivity
-from trainmate.garmin import activity_load, load_ratio, rpe_divergence
-from trainmate.util import PMC_TSB_LAG_NOTE
+from trainmate.analytics.load import activity_load, rpe_divergence
+from trainmate.analytics.pmc import PMC_TSB_LAG_NOTE, load_ratio
 from trainmate.sports import canonical_sport
 from trainmate.adherence import Performed
 from trainmate import intensity
-from trainmate.config import science_documents
+from trainmate.plan_inputs import science_documents
 from trainmate.strength.prescription import brief_of
 
 
@@ -92,7 +92,7 @@ def format_metrics_history(
     Stress, and the PMC triple CTL/ATL/TSB plus the ATL:CTL ratio) is emitted only when
     present, so a NULL value is silently dropped rather than crashing a `:.2f`/rendering
     `Nonebpm` (DESIGN_pmc_fitness_fatigue.md §5.1). The PMC lines are additionally
-    suppressed for rows dated before `warmup_cutoff` (garmin.pmc_warmup_cutoff_for),
+    suppressed for rows dated before `warmup_cutoff` (garmin.warmup_cutoff),
     where the EWMAs are still leading-edge warm-up artifacts (§3.3a) — the ratio rides
     inside that gate since it divides two of them. The TSB-lag footnote is appended once
     when any row showed TSB (it explains the TSB lag; a CTL/ATL-only history has no lag

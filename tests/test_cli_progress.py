@@ -9,9 +9,9 @@ os.environ.setdefault("NO_COLOR", "1")  # keep assertions ANSI-free
 from tests.helpers import _hr, _m, _pwr, _zweek
 
 from trainmate.plan_lineage import delta_baseline
-from trainmate.util import visible_len, wrap_text, pmc_cells
-from trainmate import garmin, progression
-from trainmate.garmin import pmc_display_values
+from trainmate.text import visible_len, wrap_text
+from trainmate import progression
+from trainmate.analytics.pmc import compute_pmc, pmc_cells, pmc_display_values
 from trainmate.cli.progress import (
     sparkline, render_bar, truncate_label, band_header, format_form_line,
     render_progress, format_weekly_table, table_rows, _week_row,
@@ -485,7 +485,7 @@ class TestStatusConsistencyContract(unittest.TestCase):
     """§7.1's contract with `tm status`, pinned rather than argued.
 
     `tm status` renders the latest stored metrics row through
-    `garmin.pmc_display_values` + `util.pmc_cells`; `tm progress` renders the §4 fold of
+    `pmc_display_values` + `pmc_cells`; `tm progress` renders the §4 fold of
     the same series through `format_form_line`. Both sides are built here from one set
     of loads so the two really are the same day's numbers.
     """
@@ -495,7 +495,7 @@ class TestStatusConsistencyContract(unittest.TestCase):
     def _stored_rows(self, today_load):
         """The rows `recompute_derived()` would write — the series `tm status` reads."""
         loads = dict(self.LOADS, **{self.TODAY: today_load})
-        pmc = garmin.compute_pmc(loads, "2026-06-01", self.TODAY, 42, 7)
+        pmc = compute_pmc(loads, "2026-06-01", self.TODAY, 42, 7)
         return [{"date": d, "ctl": c, "atl": a, "tsb": t}
                 for d, (c, a, t) in sorted(pmc.items())]
 

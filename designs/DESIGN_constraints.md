@@ -520,7 +520,7 @@ while a tactical directive plainly shaped the strategy text, which misleads
 exactly when someone is auditing why a plan reads the way it does. A second
 column, `all_constraints_snapshot`, therefore also records every active
 constraint at generation time, each tagged with its `replan` flag
-(`CoachEngine._clean_constraints_all`) — display only, never hashed. `plan show`
+(`plan_inputs.clean_constraints_all`) — display only, never hashed. `plan show`
 renders it as a second, explicitly-tactical list alongside the plan-shaping one,
 so the reader is never left inferring "no constraints" from an empty
 plan-shaping section. The staleness fingerprint moves with the first column: the

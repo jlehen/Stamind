@@ -341,7 +341,9 @@ class TestMessageCapture(unittest.TestCase):
             "title": "can't train Thursday", "start_date": "2026-07-09",
             "end_date": "2026-07-09", "rest": 1,  # must be ignored
         }
-        cid = coach_service.capture_message_constraint(candidate, "2026-07-02")
+        cid, _shaping = coach_service.capture_message_constraint(
+            candidate, "2026-07-02"
+        )
         self.assertIsNotNone(cid)
         rows = test_db.get_constraints()
         self.assertEqual(len(rows), 1)
@@ -351,14 +353,19 @@ class TestMessageCapture(unittest.TestCase):
 
     def test_capture_defaults_dates_to_default_date(self):
         candidate = {"title": "only 45 min today"}
-        cid = coach_service.capture_message_constraint(candidate, "2026-07-02")
+        cid, _shaping = coach_service.capture_message_constraint(
+            candidate, "2026-07-02"
+        )
         constraint = test_db.get_constraint(cid)
         self.assertEqual(constraint["start_date"], "2026-07-02")
         self.assertEqual(constraint["end_date"], "2026-07-02")
 
     def test_capture_returns_none_for_blank_title(self):
-        cid = coach_service.capture_message_constraint({"title": "  "}, "2026-07-02")
+        cid, shaping = coach_service.capture_message_constraint(
+            {"title": "  "}, "2026-07-02"
+        )
         self.assertIsNone(cid)
+        self.assertIsNone(shaping)
         self.assertEqual(test_db.get_constraints(), [])
 
 

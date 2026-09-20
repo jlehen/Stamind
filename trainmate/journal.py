@@ -248,9 +248,9 @@ def _report_write_failure(exc: Exception) -> None:
     that buffer into the chat, so an ungated warning about the log file would arrive on
     the athlete's phone (§4.3)."""
     try:
-        from trainmate.util import asides_enabled
+        from trainmate.text import asides_enabled
         if asides_enabled():
-            # Spelled out rather than `util.warn`, which would journal it: the journal
+            # Spelled out rather than `output.warn`, which would journal it: the journal
             # is what just failed (DESIGN_output_verbosity.md §3.5).
             print(f"Warning: journal write failed ({exc}).", file=sys.stderr)
     except Exception as inner:

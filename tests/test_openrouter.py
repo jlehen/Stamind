@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest.mock import patch, MagicMock
 from trainmate.openrouter import OpenRouterClient, _human_wait
-from trainmate.prompt import FLUSH_SENTINEL
+from trainmate.sentinels import FLUSH_SENTINEL
 
 
 def _ok_response(content: str) -> MagicMock:

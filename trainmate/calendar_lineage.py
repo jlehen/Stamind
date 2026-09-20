@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from trainmate import intensity
 from trainmate import runtime
-from trainmate.util import fmt_date, fmt_timestamp
+from trainmate.clock import fmt_date, fmt_timestamp
 
 # Google's hard ceiling on an event description. The history is rendered last, into
 # whatever the rest of the event leaves, so a long prescription is never what gets cut.
