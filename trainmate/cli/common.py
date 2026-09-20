@@ -1,12 +1,14 @@
 """Shared helpers used across the CLI command modules.
 
-The companion-voice line builders used to live here too; they moved to `cli/render.py`
+The companion-voice line builders used to live here too; they moved to `cli/render/`
 with the rest of that voice (DESIGN_render_persona.md §7).
 """
+import textwrap
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+from trainmate import runtime
 from trainmate.config import config
-from trainmate.text import cmd, cyan, wrap_text, yellow
+from trainmate.text import cmd, cyan, gray, green, magenta, visible_len, wrap_text, yellow
 from trainmate.output import notice
 from trainmate.clock import fmt_date, today_str as _today_str
 
@@ -33,7 +35,6 @@ def ensure_recent_data(
     auto-pulling small/recent gaps and surfacing large backfills as a command. Warns
     if today's metrics are still unavailable afterward. `force_pull` bypasses the
     refresh-minutes throttle."""
-    from trainmate import runtime
     if no_pull:
         return
     end_date = end_date or _today_str()
@@ -100,7 +101,6 @@ def print_plan_cascade(objective_id: int) -> None:
     """The blast radius `goal rm --purge` and `plan rm` both print before asking — one
     renderer, so two copies cannot drift into disagreeing about one cascade
     (DESIGN_cli_noargs.md §b1)."""
-    from trainmate import runtime
     versions = runtime.db.get_macrocycle_versions(objective_id)
     mesocycles = sum(
         len(runtime.db.get_mesocycles_for_macrocycle(m['id'])) for m in versions
@@ -117,3 +117,73 @@ def print_plan_cascade(objective_id: int) -> None:
             f"  and leaves {orphaned} upcoming session(s) with no plan to explain "
             "them.",
         )
+
+
+# --- The plan's hanging-indent block (DESIGN_plan_feedback.md §4, §8) ---
+# `plan show` draws a mesocycle as a head line with its prose and metadata aligned under
+# it; `plan diff` draws a changed field the same way. Here rather than in either, because
+# whichever defined it first would own the other's layout.
+
+def print_hanging(head: str, text: str, width: int, color_fn=None) -> str:
+    """Prints ``text`` after ``head``, wrapped with continuation lines aligned under it.
+
+    Returns the indent string so the caller can align the mesocycle's follow-up lines
+    (dates, progress bar, prose) to the same column. A narrow client gets a plain
+    2-space indent instead, since aligning under a long head leaves no usable width."""
+    pad_len = visible_len(head)
+    if width - pad_len < 24:
+        pad_len = 2
+    pad = " " * pad_len
+    lines = textwrap.wrap(text or "", width=max(20, width - pad_len)) or [""]
+    for i, line in enumerate(lines):
+        print((head if i == 0 else pad) + (color_fn(line) if color_fn else line))
+    return pad
+
+
+def print_indented(text: str, pad: str, width: int, color_fn=None) -> None:
+    """Prints wrapped prose at an existing mesocycle's indent."""
+    for line in textwrap.wrap(text, width=max(20, width - len(pad))):
+        print(pad + (color_fn(line) if color_fn else line))
+
+
+def print_segments(pad: str, segments: list, width: int) -> None:
+    """Prints already-coloured metadata segments joined by ' · ', breaking onto a new
+    indented line rather than letting the terminal wrap them mid-word."""
+    avail = max(20, width - len(pad))
+    line = ""
+    for seg in segments:
+        if not seg:
+            continue
+        candidate = f"{line} · {seg}" if line else seg
+        if line and visible_len(candidate) > avail:
+            print(pad + line)
+            line = seg
+        else:
+            line = candidate
+    if line:
+        print(pad + line)
+
+
+def print_feedback_notes(notes: List[dict], width: int, indent: str = "") -> None:
+    """The log's one rendering — '[id] date · plan-level|<mesocycle> · text', oldest first —
+    shared by the listing, `plan show` and `plan diff` (DESIGN_plan_feedback.md §4)."""
+    for n in notes:
+        filing = n.get('mesocycle_name') or 'plan-level'
+        date = str(n.get('created_at') or '')[:10]
+        print_hanging(
+            f"{indent}{gray('[' + str(n['id']) + ']')} {cyan(fmt_date(date))} "
+            f"· {magenta(filing)} · ",
+            n['text'], width,
+        )
+
+
+def add_feedback_note(macro: dict, text: str, meso: Optional[dict] = None) -> None:
+    """Appends one note to the plan's log and echoes it (DESIGN_plan_feedback.md §4).
+
+    Here rather than in `cli/plans/feedback.py` because `plan generate --feedback` files a
+    note too, and `plan feedback --replan` runs `plan generate`: each command file holding
+    the other's helper is the import cycle AGENTS.md says to move the shared code out of.
+    """
+    note_id = runtime.db.add_plan_feedback(macro['id'], text, meso['id'] if meso else None)
+    filing = f"filed: {meso['name']}" if meso else "plan-level"
+    print(green(f"Noted [id {note_id}, {filing}]: ") + f"\"{text}\"")

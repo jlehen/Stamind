@@ -185,19 +185,6 @@ class WrapAwareArgumentParser(argparse.ArgumentParser):
             self.exit(2, red(f"\n{self.prog}: error: {message}\n"))
         super().error(message)
 
-def _weeks_arg(raw: str):
-    """`--weeks N` must be a whole number >= 1, or the literal `all`
-    (DESIGN_progress_timeline.md §7.1) — rejected at argparse, so a `0` can't silently
-    fall through to the default. `all` matches the web endpoint's `?weeks=all`."""
-    if raw == "all":
-        return "all"
-    try:
-        n = int(raw)
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"invalid int value: '{raw}'")
-    if n < 1:
-        raise argparse.ArgumentTypeError("must be >= 1")
-    return n
 
 # A selector endpoint reaching back from today (`-7d`, `-2w..+1w`) starts with a dash, so
 # argparse reads it as an option and reports a missing value. It is glued to its flag as

@@ -10,7 +10,7 @@ from trainmate.gcal.reconcile import mark_adherence_range
 from trainmate.text import green, red
 from trainmate.output import notice, warn
 from trainmate.clock import fmt_date, fmt_span
-from trainmate.cli.selectors import resolve_window
+from trainmate.cli.windows import resolve_window
 
 
 def run_data_pull(args: argparse.Namespace) -> None:

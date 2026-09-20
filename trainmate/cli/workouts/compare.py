@@ -19,7 +19,7 @@ from trainmate.output import notice, warn
 from trainmate.clock import (
     fmt_date, parse_date, today_date as _today_date, today_str as _today_str,
 )
-from trainmate.cli.selectors import resolve_window
+from trainmate.cli.windows import resolve_window
 
 
 def run_workout_compare(args: argparse.Namespace) -> None:

@@ -30,11 +30,13 @@ from trainmate.analytics.compare import adherence_verdicts
 from trainmate.cli.common import ensure_recent_data
 # The companion surfaces are companion-only by definition, so they call the line
 # builders directly rather than through `runtime.render` (DESIGN_render_persona.md §3).
-from trainmate.cli.render import (
-    SIMPLE_DONE_STATUSES, SIMPLE_PASSED_LINE, picker_label, simple_mesocycle_lines,
-    simple_constraint_edit_lines, simple_constraint_lines, simple_day_lines,
-    simple_day_word, simple_goal_edit_lines, simple_goal_line, simple_goal_lines,
-    simple_runway_lines, simple_session_line,
+from trainmate.cli.render.plan_lines import (
+    SIMPLE_PASSED_LINE, picker_label, simple_constraint_edit_lines,
+    simple_constraint_lines, simple_goal_edit_lines, simple_goal_line, simple_goal_lines,
+    simple_mesocycle_lines, simple_runway_lines,
+)
+from trainmate.cli.render.session_lines import (
+    SIMPLE_DONE_STATUSES, simple_day_lines, simple_day_word, simple_session_line,
 )
 from trainmate.cli.queue import run_bot_queue, send_walk_step
 from trainmate.cli.runway import current_runway, runway_buttons, schedule_exhausted

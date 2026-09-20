@@ -1984,7 +1984,7 @@ class TestPlanLineage(unittest.TestCase):
     def test_regenerating_does_not_duplicate_the_mesocycles(self):
         """The regression: v1 and v2 span the same dates, so walking both reports every
         calendar period twice and counts each activity into two mesocycles."""
-        from trainmate.cli.progress import _mesocycles_in_window
+        from trainmate.cli.progress_zones import _mesocycles_in_window
 
         obj = self._goal("Autumn Marathon", "2026-09-20")
         self._plan(obj, "v1", [("V1 Base", "2026-06-01", "2026-06-28"),
@@ -1999,7 +1999,7 @@ class TestPlanLineage(unittest.TestCase):
     def test_the_previous_goals_plan_is_walked(self):
         """The other half: a window reaching back past the current plan's first mesocycle
         lands in the previous goal's plan, which nothing else supplies."""
-        from trainmate.cli.progress import _mesocycles_in_window
+        from trainmate.cli.progress_zones import _mesocycles_in_window
 
         spring = self._goal("Spring 10k", "2026-05-31")
         self._plan(spring, "spring", [("Spring Base", "2026-04-06", "2026-05-31")])

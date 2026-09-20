@@ -104,7 +104,7 @@ class TestPreviewsRenderTheProposal(unittest.TestCase):
 
     def test_no_preview_reads_the_database(self):
         # Keyed on every preview *function* under trainmate/cli/, not on the one file
-        # that happened to be the bug: `workouts/generate.py` and `render.py` draw
+        # that happened to be the bug: `workouts/generate.py` and `render/` draw
         # previews too, and the old `revisions*.py` glob matched neither.
         offenders, checked = [], set()
         for path in sorted(CLI_DIR.rglob("*.py")):

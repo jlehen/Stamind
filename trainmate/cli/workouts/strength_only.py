@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 
 from trainmate import runtime
 from trainmate.cli.runway import schedule_coverage
-from trainmate.cli.selectors import resolve_window
+from trainmate.cli.windows import resolve_window
 from trainmate.cli.workouts.heads_up import print_send_notice, revision_dates
 from trainmate.sports import canonical_sport
 from trainmate.text import cmd, green, red, wrap_text

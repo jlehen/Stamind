@@ -270,7 +270,7 @@ class TestCliWorkouts(unittest.TestCase):
         )
         # The wording diff puts blank lines inside a session's own entry, so the day
         # boundary needs a mark of its own (DESIGN_bot_simple_frontend.md §6).
-        from trainmate.cli.render import SIMPLE_SESSION_RULE
+        from trainmate.cli.render.session_lines import SIMPLE_SESSION_RULE
         before, after = stdout.split(SIMPLE_SESSION_RULE)
         self.assertIn("Rest Day (was Strength — Deload Volume", before)
         self.assertNotIn("Climb Threshold", before)

@@ -99,7 +99,8 @@ interpreted, so the transport decision is not re-derived here.
 
 It is called `aside` and not `note` because this app already spends "note" four ways: plan
 feedback notes, the athlete's `-m` note, daily-signal notes, and `PMC_TSB_LAG_NOTE`. One
-of those is even a local variable (`trainmate/cli/plans.py`, `_feedback_rm`) that would
+of those is even a local variable (`trainmate/cli/plans/feedback.py`, `_feedback_rm`) that
+would
 have shadowed the import.
 
 ### 3.1 When the narration *is* the answer
@@ -138,7 +139,7 @@ this generalises the rule it discovered.
 One care point: `zone_tables.format_notes` feeds **both** the CLI tables and the LLM prompt,
 where the caveats are load-bearing ("the app aligns; the LLM reasons"). So the gate goes on
 the two CLI call sites — `cli/status.py` passes `notes=asides_enabled()` into the flag
-`mesocycle_report` already had, `cli/progress.py` skips its own once-per-section notes — and
+`mesocycle_report` already had, `cli/progress_zones.py` skips its own once-per-section notes — and
 never inside `analytics/zone_tables.py`.
 
 ### 3.3 What is deliberately still printed

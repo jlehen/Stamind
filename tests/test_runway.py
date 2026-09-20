@@ -26,11 +26,13 @@ test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
 from trainmate import runtime  # noqa: E402
-from trainmate.cli import render as render_cli, runway as runway_cli  # noqa: E402
+from trainmate.cli import runway as runway_cli  # noqa: E402
+from trainmate.cli.render import plan_lines as render_plan  # noqa: E402
 from trainmate.cli.workouts import generate as generate_cli  # noqa: E402
 from trainmate.cli.bot import MORNING_MARKER  # noqa: E402
 from trainmate.config import config  # noqa: E402
-from trainmate.cli.render import SPORT_EMOJI, SIMPLE_PASSED_LINE  # noqa: E402
+from trainmate.cli.render.plan_lines import SIMPLE_PASSED_LINE  # noqa: E402
+from trainmate.cli.render.session_lines import SPORT_EMOJI  # noqa: E402
 from trainmate.cli.runway import RUNWAY_BUTTON_LABEL  # noqa: E402
 from trainmate.sentinels import BUTTONS_SENTINEL
 from trainmate.analytics.runway import (  # noqa: E402
@@ -249,13 +251,13 @@ class SimpleRunwayWordingTest(unittest.TestCase):
 
     def test_a_span_cliff_offers_to_plan_the_next_weeks(self):
         state = runway([_w(4)], [_meso(-30, 45)], [], TODAY, WARN)
-        line = render_cli.simple_runway_lines(state, TODAY)[0]
+        line = render_plan.simple_runway_lines(state, TODAY)[0]
         self.assertIn("your schedule runs out in 4 days", line)
         self.assertIn("Want me to plan the next few weeks?", line)
 
     def test_a_plan_cliff_celebrates_and_points_at_the_computer(self):
         state = runway([_w(5)], [_meso(-30, 5)], [], TODAY, WARN)
-        line = render_cli.simple_runway_lines(state, TODAY)[0]
+        line = render_plan.simple_runway_lines(state, TODAY)[0]
         self.assertIn("that's the goal you've been training toward", line)
         self.assertIn("happens from the computer", line)
 
@@ -722,7 +724,9 @@ class AddGoalIntentTest(unittest.TestCase):
         self.assertFalse(hasattr(trainmate_bot, "new_goal_reply"))
 
     def test_the_plan_for_it_is_still_named_as_the_operators_work(self):
-        from trainmate.cli.render import simple_plan_setup_line, simple_plan_wrapped_line
+        from trainmate.cli.render.plan_lines import (
+            simple_plan_setup_line, simple_plan_wrapped_line,
+        )
         for line in (simple_plan_setup_line(), simple_plan_wrapped_line()):
             self.assertIn("from the computer", line)
             # "coach" formally means the app, so the human who runs `plan generate` is

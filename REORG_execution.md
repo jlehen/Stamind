@@ -459,6 +459,10 @@ other may still cut it into commits, and should say so in its ledger line.
    helpers from `cli/plans.py` and went 475 → 524 lines. It holds two jobs that change for
    different reasons — the `A..B` grammar, which parses text and touches no database, and
    the resolvers, which turn a parsed range into a window by reading one. Cut it there.
+   **DONE**, as one commit. The four splits are not independent: `render.py` imports from
+   `plans.py` and `progress.py`, and `plans.py` imports from `selectors.py`, so cutting
+   them apart would leave three commits whose only content is repointing an import the
+   next commit moves again.
 9. **front-ends** — `cli/bot.py` into a package; `trainmate_bot.py` into `trainmate/chat/`, moves
    only.
 
@@ -1269,13 +1273,119 @@ The lines above Phase A are one per item, from before §3 changed.
   `test_isolation_guards.py` saying a loop covers three module paths when it covers two; and
   a 101-character line inherited byte-for-byte into `compare.py`.
 
-**Next up:** Phase D item 8 — **CLI views**: `plans.py`, `progress.py`, `selectors.py`,
-then `render.py`, in that order, because render imports from all of them (§6.4, and §7's
-note on why `selectors.py` joined the list). Item 9 follows. Two traps wait there and §9
-names both: `cli/render.py`'s five `patch("trainmate.cli.render._today_str")` sites should
-become `tests.helpers.pin_clock` in the same commit that splits the file, and
-`test_simple_render.py`'s `ALLOWED = {"render.py", "bot.py"}` is keyed on file names, so a
-`render/` package needs it keyed on the directory instead.
+- **Phase D item 8, the CLI views.** Four files that each held a whole surface are
+  fourteen now. `cli/plans.py` was 1,510 lines and is the package `cli/plans/`:
+  `generate.py` (312) for the strategy call, its preview and the `y`, `show.py` (366) for
+  `plan show` and `plan keep`, `versions.py` (385) for the five commands that read or
+  rewind the version history, `feedback.py` (162) for the note log, and `parser.py` (280)
+  for the argparse tree. `cli/progress.py` was 1,039 and is three flat modules:
+  `progress.py` (365) is the command, the chart and `render_progress`, which assembles one
+  page out of `progress_load.py` (298), the fitness line and the weekly load table, and
+  `progress_zones.py` (416), the time-in-zone grid by week and by mesocycle.
+  `cli/selectors.py` was 524 holding two jobs and is `selectors.py` (314), the `A..B`
+  grammar that opens no database, and `windows.py` (227), the resolvers that turn a parsed
+  range into dates by reading one. `cli/render.py` was 1,301 and is the package
+  `cli/render/`: `session_lines.py` (307) says what a day holds, `plan_lines.py` (388)
+  says what the schedule is built from, `expert.py` (302) and `companion.py` (332) are the
+  two voices, and `__init__.py` (25) is `make_renderer` and a docstring.
+  `Phase D item 8: the CLI views`
+
+- **Three shared helpers found a home, and one of them the plan had not counted.** §4.10
+  row f sent four plan print helpers to `cli/common.py` and they went, losing their
+  leading underscore: `print_hanging`, `print_indented`, `print_segments`,
+  `print_feedback_notes`. `add_feedback_note` had to go with them. `plan generate
+  --feedback` files a note, and `plan feedback --replan` runs `plan generate`, so leaving
+  the writer in either command file makes the two import each other — the cycle
+  `AGENTS.md` says to move the shared code out of rather than dodge with a deferred
+  import. `_weeks_arg` went the other way, out of `cli/argparse_ext.py` and into
+  `cli/progress.py`, its only CLI caller, as §6.4 asked. Six more names lost an underscore
+  because they now cross a file: `short_date`, `weekday`, `warning_line` and `NO_BAND` in
+  the progress split, `OFFSET_RE` and `offset_days` in the selectors one.
+
+- **One function-local import was hoisted, and it moved a patch target.**
+  `cli/constraints.py` imported `run_plan_generate` inside `_run_replan_flow`, with a
+  docstring saying it was "imported lazily to avoid a CLI import cycle". There is no
+  cycle — nothing in the plans package imports `cli/constraints.py` — so the import is at
+  the top of the file now. That turns it into a by-value binding, which is exactly the
+  seam §4 warns about: `patch("trainmate.cli.plans.generate.run_plan_generate")` resolves
+  and reaches nothing. Proven rather than assumed, with the recipe §9 carries: with
+  `run_plan_generate` made to raise on its first line, the old target left
+  `test_the_flow_hands_plan_generate_the_goals_and_not_a_dead_kwarg` failing; pointed at
+  `trainmate.cli.constraints.run_plan_generate` it passed with the sabotage still in. The
+  file's other test, which asserts `run_plan_generate` is *not* called, passes either way
+  and is not evidence.
+
+- **Two test files followed this split's axis, and were cut on it.**
+  `tests/test_cli_progress.py` (974 lines) is 561 for the load table and the page it fills
+  plus `tests/test_cli_progress_zones.py` (434) for the grid and the mesocycle report;
+  `tests/test_simple_render.py` (651) is 386 for the day-side builders, the two rules
+  about the package itself and the config knobs, plus `tests/test_simple_render_plan.py`
+  (292) for the plan-side ones. Both cuts keep the same 101 and 70 test methods. No other
+  test file follows this axis: `test_cli_plans.py` drives everything through
+  `trainmate_cli` and never names a module, and `test_cli_selectors.py` is 268 lines.
+
+- **The gate is at 430 sites naming 41 targets**, down from 435 and 42, and both numbers
+  are accounted for: the five `cli.render._today_str` sites became one `pin_clock`, which
+  retires that target, and the two `cli.plans.run_plan_generate` sites moved to
+  `cli.constraints` without changing the count. `import trainmate_cli` costs 277 modules
+  and 108 ms against 265 and 107 at HEAD; the twelve are exactly the new files, and
+  `requests` is still off the startup path.
+
+- **Two things were measured rather than read, and both came back clean.** Every symbol
+  was matched by name across each split, its docstring stripped and its body compared as
+  `ast.unparse` text against the old file rebuilt from HEAD with the twelve renames
+  applied: `selectors.py` and `render.py` (135 symbols) are byte-identical, and the only
+  six differences anywhere are the six intended edits — the five helpers that left
+  `plans.py` for `common.py`, `_weeks_arg` leaving `argparse_ext.py` for `progress.py`,
+  and four functions whose bodies lost a hoisted import line. Then the whole argparse
+  tree was dumped in a fresh interpreter at HEAD and again after the split — every
+  sub-command path, every option string with its `dest`, `nargs`, `const` type, default,
+  type and action class, and every `func=` handler name, 662 lines — and the two are
+  identical.
+
+- **A second by-value `run_plan_generate` exists and is not a live break.**
+  `cli/plans/feedback.py` imports it for `--replan`, exactly as `cli/constraints.py`
+  does, so a future `patch("trainmate.cli.plans.generate.run_plan_generate")` would miss
+  that path too. Nothing patches it today, because `plan feedback --replan` has no test
+  at all: `test_periodization.py` and `test_constraints.py` were read end to end and
+  neither names it. Left as a known trap rather than a fix, since the fix is the test
+  that does not exist yet.
+
+- **`tests/test_cli_progress.py` is 561 lines after the split, still over 500.** The zone
+  half came out at 434 and both render test files are under. Cutting the load half again
+  is size-only work along a different axis, which §7 leaves to Phase E.
+
+- **The review of Phase D item 8**, in the same commit. It had no shell — `Bash` failed
+  in that agent's environment — so it read every changed file instead, and the four
+  executable checks it could not run were run here: the symbol-by-symbol body comparison,
+  the argparse dump, the gate count and the import measurement, all above. What its
+  reading found was documentation, and all of it is fixed here. The worst was the gate's
+  own numbers in `ARCHITECTURE.md`, stale at 435/42 — the same sentence item 7's review
+  had to fix for the same reason, which is now twice in a row and worth watching. It also
+  found `plans._print_considered_inputs` cited in `DESIGN_constraints.md` as a dotted
+  name that resolves to nothing now that `plans` is a package with an empty `__init__`;
+  `DESIGN_render_persona.md` claiming in §2 that the companion voice "lives in one file"
+  while §4 on the same page describes a four-file package; a present-tense list of
+  `runtime.render.*` callers still naming `cli/plans.py`; `ARCHITECTURE.md`'s module map
+  describing `cli/common.py` as holding "the adherence pairing", which Phase C moved to
+  `analytics/compare.py`; and one sentence in the new §15 entry claiming the size rule
+  would ask a 120-line file to be merged back, when it only says that of a file under
+  100. It pushed back on three of its own subagents' findings and was right each time:
+  `DESIGN_render_persona.md`'s migration steps and its two "before" tables name
+  `cli/render.py` and `cli/plans.py` on purpose, because they narrate what those commits
+  did to files that have since moved, and markdown table rows over 100 characters are not
+  the line-width rule's business.
+
+**Next up:** Phase D item 9 — **front-ends**: `cli/bot.py` (1,287 lines) into the package
+`cli/bot/`, and `trainmate_bot.py` into `trainmate/chat/`, moves only (§6.6). Three traps
+wait there and §9 names all three: `cli/bot.py`'s 29 function-local imports all get
+hoisted, and hoisting one that binds `clock.now` to a local name would defeat `pin_clock`
+— `trainmate_bot.py`'s `clock.now as athlete_now` is the one deliberate exception and is
+left alone; `cli/bot.py` is the one module allowed to import `cli/render/` directly, so
+the `ALLOWED = {"bot.py"}` in `test_simple_render.py` has to keep naming whatever the
+package's files are called; and §4.10 row g still waits for `cli/bot/capture.py` to exist
+before `ROUTABLE_SETTINGS` can move there. Phase E owns the `ChatBot` class conversion,
+which `REORG_code_layout.md` §0 says is a separate commit on this branch.
 
 ---
 
@@ -1311,9 +1421,17 @@ better fix instead. No file under `coach/service/` aliases the clock now; each r
 `coach.service._today_str` are gone and the gate is down to 435 sites naming 41 targets.
 `ARCHITECTURE.md` §3 carries the rule.
 
-The same trap is still live in the CLI: 8 patches on `cli.constraints._today_str` and 5 on
-`cli.render._today_str`. Phase D item 8 splits `render.py`, and §6.4 already says its five
-should move to `pin_clock` then.
+**Spent again in Phase D item 8, for `cli/render.py` and `cli/selectors.py`.** The five
+`patch("trainmate.cli.render._today_str")` sites all wrapped a call to `simple_day_lines`,
+so they became one `pin_clock` in `DayLinesTest.setUp`; the four `patch.object(selectors,
+"_today_date"/"_today_str")` sites — which would have had to fan out across two modules —
+became `pin_clock` in the two `setUp`s that held them. Proven rather than assumed: with
+the `pin_clock` line replaced by `pass`, seven cases in `DayLinesTest` fail, because a day
+the test calls "Today" is not today. The gate is down to 430 sites naming 41 targets.
+
+The same trap is still live in one place: 8 patches on `cli.constraints._today_str`. That
+file is not split by this phase and nothing in item 9 touches it, so the fix is whoever
+next has reason to open it.
 
 **`clock.now` must be called as `clock.now()`.** Binding it to a local name defeats `pin_clock`.
 This bites in `cli/bot.py`, whose 29 function-local imports all get hoisted. `trainmate_bot.py` is
@@ -1323,7 +1441,10 @@ binding while `test_clock.py` asserts on it, so leave it alone.
 **Tests keyed on file names.** Re-key each on a shape — a directory or a name prefix — in the same
 commit as the move that breaks it:
 
-- the `ALLOWED` set in `test_simple_render.py`;
+- ~~the `ALLOWED` set in `test_simple_render.py`~~ — **done in item 8, and it was broken in
+  a second way the list did not see: the test also derives the directory it scans from
+  `render.__file__`, which for a package is `trainmate/cli/render/__init__.py`, so the scan
+  would have covered the render package alone and passed while saying nothing;**
 - `APPEND_PATH_MODULE` in `test_workout_revisions.py`;
 - the `workouts/revisions*.py` glob in `test_service_invariants.py`;
 - the `runway.py` exemption in `test_runway.py`;

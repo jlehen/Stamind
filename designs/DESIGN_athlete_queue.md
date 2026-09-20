@@ -566,7 +566,7 @@ item's place in the queue. `tm queue tell` is a terminal command, not a tap.
 - `trainmate/cli/bot.py`: `run_bot_morning` starts a walk at its end.
 - `trainmate/cli/status.py` and `workout adapt` (`cli/workouts/adapt.py`): the hint, beside
   the end-of-schedule hint.
-- `trainmate/cli/render.py`: the list, the item, reminder and hint renderers, expert and
+- `trainmate/cli/render/`: the list, the item, reminder and hint renderers, expert and
   companion (the companion's hint prints nothing).
 - Tests, with the `message` kind and a question kind defined in the tests: a subject queued
   once, including after a drop; queue order, and "after the others" moving an item to the

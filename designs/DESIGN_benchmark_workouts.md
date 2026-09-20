@@ -639,7 +639,8 @@ generic so an outdoor test just needs a preference edit.
 - The intensity **mesocycle report** renders anchor movement across the reported window —
   `_benchmark_lines()` (`analytics/mesocycle_report.py`), fed both into the coaching prompt
   (`coach/service/mesocycle_context.py`) and into `progress`
-  (`cli/progress.py:846-856`). This is the shipped "is overload working?" surface.
+  (`render_mesocycle_section` in `cli/progress_zones.py`). This is the shipped "is overload
+  working?" surface.
 - The read-only web dashboard has a **Benchmarks** view: `GET /api/benchmarks`
   (`trainmate_web.py:571-617`) returns the logbook plus the effective threshold set,
   each row carrying its `formatted` value and a direction-aware `delta`. It shares

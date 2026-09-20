@@ -12,7 +12,7 @@ from trainmate.text import (
     red, wrap_text, yellow,
 )
 from trainmate.output import notice
-from trainmate.cli.selectors import resolve_window
+from trainmate.cli.windows import resolve_window
 
 
 # The learning-delta ops db.apply_learning_deltas acts on; anything else was skipped there,

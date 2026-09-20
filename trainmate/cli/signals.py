@@ -13,7 +13,8 @@ from trainmate.config import config
 from trainmate.text import bold, cyan, dim, green, magenta, red
 from trainmate.output import notice
 from trainmate.clock import date_range, fmt_date, fmt_span, today_str as _today_str
-from trainmate.cli.selectors import add_selector_args, has_selector, resolve_window
+from trainmate.cli.selectors import add_selector_args
+from trainmate.cli.windows import has_selector, resolve_window
 
 
 def _signal_line(row: dict) -> str:

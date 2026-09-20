@@ -1389,9 +1389,9 @@ kinds with the model-backed "Something else…", `strength name`, `strength rese
 `workout compare` / "Done lately" with their name source and the "sets not read yet"
 line — both of which rendered a strength activity as duration, load and RPE only
 (`cli/common.py::format_actual`,
-`cli/render.py::simple_compare_lines`). At the end of it TrainMate knows what the athlete
-lifts and the coach does not use it yet. Deliberately boring, so it can be checked against
-reality before anything depends on it.
+`cli/render/session_lines.py::simple_compare_lines`). At the end of it TrainMate knows
+what the athlete lifts and the coach does not use it yet. Deliberately boring, so it can
+be checked against reality before anything depends on it.
 
 It amended two implemented designs. DESIGN_athlete_queue.md: its list of kinds (§8) gained
 `sets_final` and `set_names`, and its §4 the rule that an answer whose kind did not apply it

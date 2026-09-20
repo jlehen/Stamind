@@ -14,7 +14,7 @@ operator's name is config, so what the sketch wrote as a constant had to become 
   as a stutter. The wording with a name set is unaffected.
 - The three shared wording-diff helpers in `cli/workouts/revisions.py`
   (`rewritten_text_only`, `wording_groups`, `wording_group_lines`) lost their leading
-  underscore: the companion builder that moved to `render.py` in step 5 calls them, so
+  underscore: the companion builder that moved to `cli/render/` in step 5 calls them, so
   they are that module's interface now rather than its internals.
 
 Coverage went the other way too: `goal list`, `plan show` and `progress` had companion
@@ -57,8 +57,8 @@ deserves the same treatment.
 **Goals**
 - A command body contains no `is_simple_render()` branch. It calls one method on
   `runtime.render` per surface and does not know which persona answered.
-- The companion voice lives in one file. Every sentence the tone rule governs sits
-  next to its expert twin.
+- The companion voice lives in one place — the `cli/render/` package, and nowhere else.
+  Every sentence the tone rule governs sits next to its expert twin.
 - The opted-in surface list is structural, not a convention: it is the set of methods
   the companion class overrides. Anything not overridden *is* the expert form — the §6
   "fallback that cannot decay" becomes inheritance instead of discipline.
@@ -102,8 +102,10 @@ renderer, because for them there is nothing to choose.
 
 ## 4. The renderer
 
-One module, `trainmate/cli/render.py`, holding the pure line builders (moved from
-`cli/common.py`, `cli/runway.py` and `cli/plans.py` — see §7) and the two classes.
+One package, `trainmate/cli/render/`, holding the pure line builders — `session_lines.py`
+for a day and what was trained in it, `plan_lines.py` for the goals, constraints and plan
+it is built from, both moved from `cli/common.py`, `cli/runway.py` and `cli/plans.py`,
+see §7 — and the two classes, `expert.py` and `companion.py`.
 
 ```python
 class ExpertRenderer:
@@ -326,11 +328,11 @@ gets uncomfortable. Before them, one wording commit: the operator's name replace
    now read in `make_renderer` only. Update DESIGN_bot_simple_frontend.md §6 and §8 to
    point here.
 
-**Import direction.** `render.py` imports expert helpers from the command modules at
-module level, and the command modules never import `render.py`: they reach it through
+**Import direction.** `cli/render/` imports expert helpers from the command modules at
+module level, and the command modules never import it back: they reach it through
 `runtime.render`, whose builder defers the import exactly as `prompt`'s does. `bot.py`
-is the one module that imports `render.py` directly, and nothing in `render.py`
-imports `bot.py`. That graph has no cycle. A function-local import of `render.py`
+is the one module that imports the package directly, and nothing in the package
+imports `bot.py`. That graph has no cycle. A function-local import of `cli/render/`
 inside a command module would be the sign the graph has gone wrong, not a fix.
 
 The companion builders and six sentences relocate; the expert table renderers stay
@@ -353,12 +355,12 @@ what makes it cheap to add a third persona later. Not scheduled.
 
 ## 9. Touch points
 
-- `trainmate/cli/render.py` — new: line builders, `ExpertRenderer`,
+- `trainmate/cli/render/` — new: line builders, `ExpertRenderer`,
   `CompanionRenderer`, `make_renderer`.
 - `trainmate/runtime.py` — the `render` builder.
 - `trainmate/cli/common.py`, `cli/runway.py`, `cli/plans.py`,
   `cli/workouts/revisions.py` — lose the `simple_*` builders and constants (step 5).
-- `trainmate/cli/workouts/generate.py`, `cli/goals.py`, `cli/plans.py`,
+- `trainmate/cli/workouts/generate.py`, `cli/goals.py`, `cli/plans/`,
   `cli/progress.py`, `cli/workouts/revisions.py`, `cli/constraints.py`,
   `cli/runway.py`, `cli/status.py` — command bodies call `runtime.render.*`; inline
   expert code becomes named functions in place.
@@ -378,7 +380,7 @@ what makes it cheap to add a third persona later. Not scheduled.
 - Voice and transport stay separate objects (`runtime.render`, `runtime.prompt`);
   neither calls the other (§4).
 - Companion extends expert; the override set is the opt-in list (§2, §3).
-- Line builders stay pure functions and move into `render.py`; `bot morning` keeps
+- Line builders stay pure functions and move into `cli/render/`; `bot morning` keeps
   calling them directly (§3).
 - The renderer draws, the command asks: `preview_and_confirm_revision` splits into a
   render method and a `runtime.prompt.confirm` at the call site (§4).
@@ -388,7 +390,7 @@ what makes it cheap to add a third persona later. Not scheduled.
 - `_resolve_goal` is untouched; only the `plan show` guard goes through the renderer
   (§5).
 - `run_cli` rebuilds `runtime.render` per invocation; env patching in tests stays (§6).
-- Command modules never import `render.py`; only `bot.py` and the `runtime` builder do
+- Command modules never import `cli/render/`; only `bot.py` and the `runtime` builder do
   (§7).
 - The adapt plan-behind refusal gets a renderer method; the companion form reuses the
   morning push's plan-cliff wording rather than naming commands (§5).

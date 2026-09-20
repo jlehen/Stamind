@@ -11,7 +11,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import athlete_queue, clock, runtime
 from trainmate.athlete_queue import ANSWERED, DROP, DROPPED, MESSAGE, SKIP, STALE
-from trainmate.cli.selectors import add_selector_args, has_selector, resolve_window
+from trainmate.cli.selectors import add_selector_args
+from trainmate.cli.windows import has_selector, resolve_window
 from trainmate.prompt import Choice
 from trainmate.sentinels import emit_queue_item, is_json_frontend
 from trainmate.athlete_queue import (

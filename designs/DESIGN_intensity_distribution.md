@@ -871,10 +871,11 @@ and lays one cell per line at phone width, so width is not its constraint.
 
 **The capped cell is a new formatter, and the grid lives with the load table.** `fmt_duration`
 is unchanged — `mesocycle_report` and both prompt paths want `12h30` — so the cap is its own
-function in `cli/progress.py`, beside `format_weekly_table`. The grid belongs there too, not in
-`analytics/`: it has to align row for row with the load table and it shares that table's week
-column, band walk and 48-column budget. `analytics/intensity.py` keeps the aggregation
-(`zone_rows`) and `analytics/zone_tables.py` the prompt-width table the coach reads.
+function in `cli/progress_zones.py`, beside the grid. The grid belongs with the load table in
+`cli/progress_load.py`, not in `analytics/`: it has to align row for row with that table and
+it shares its week column, band walk and 48-column budget. `analytics/intensity.py` keeps
+the aggregation (`zone_rows`) and `analytics/zone_tables.py` the prompt-width table the
+coach reads.
 
 **Every glyph means one thing, and none of them overlap.** `~` is already taken: `meso_bands`
 prefixes it to the label of a mesocycle TrainMate *reconstructed from training history* rather
@@ -883,7 +884,8 @@ Reusing it for coverage would put two definitions of one character fifteen lines
 screen.
 
 The full set on this screen, kept here because this table is where a reader looks a marker up
-(`cli/progress.py`, `NOT_TRAINED`/`UNDERCOUNTED`/`LOAD_SPARSE`/`PLANNED`):
+(`cli/progress_zones.py` for `NOT_TRAINED`/`UNDERCOUNTED`/`PLANNED`, `cli/progress_load.py`
+for `LOAD_SPARSE`):
 
 | Glyph | Where | Means |
 |---|---|---|
@@ -1069,7 +1071,7 @@ read row against row.
 | `--chart [PATH]` | | Unchanged, and **unaffected by `[sport]`**: the PNG's two panels are PMC and whole-athlete weekly load. A per-sport zone stack is `DESIGN_progress_timeline.md` §8 follow-on 3. The web app's *chart* is the same PNG and gains nothing; its read-only `/api/zones` view is a separate surface (see §10). |
 | `--no-pull` / `--force-pull` | | The standard auto-ensure throttle, mutually exclusive. No effect on layout. |
 
-**What the option sweep exposes**, all of it in `analytics/intensity.py`, `analytics/zone_tables.py` and `cli/progress.py`:
+**What the option sweep exposes**, all of it in `analytics/intensity.py`, `analytics/zone_tables.py` and `cli/progress_zones.py`:
 
 - **`mesocycle_report` must stop printing its own notes, which means it does change.** Today
   `format_notes` is called inside it, so three mesocycles render the same caveats three times —

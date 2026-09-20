@@ -65,7 +65,7 @@ const SPORT_ICONS = {
     swimming: "fa-person-swimming", rest: "fa-bed",
 };
 
-/** A zone cell's time, capped to four characters exactly as `progress.fmt_zone_cell`
+/** A zone cell's time, capped to four characters exactly as `progress_zones.fmt_zone_cell`
  *  renders it in the terminal — `55m`, `5h00`, `12h`, `—` for none. */
 function fmtZoneCell(seconds) {
     const minutes = Math.round((seconds || 0) / 60);

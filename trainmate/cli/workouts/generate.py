@@ -16,7 +16,7 @@ from trainmate.coach.proposals import GenerateProposal
 from trainmate.cli import staleness
 from trainmate.cli.common import ensure_recent_data, print_strength_notes
 from trainmate.cli.runway import schedule_coverage
-from trainmate.cli.selectors import has_selector as _has_selector, resolve_window
+from trainmate.cli.windows import has_selector as _has_selector, resolve_window
 from trainmate.cli.workouts.heads_up import (
     generate_dates, print_send_notice, replacing_unsent,
 )

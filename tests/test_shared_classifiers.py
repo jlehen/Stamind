@@ -14,7 +14,7 @@ from trainmate.cli.workouts.session_line import adherence_marker
 from trainmate.analytics.baselines import (
     ELEVATED, NORMAL, SUPPRESSED, UNKNOWN, classify_metric, is_anomalous,
 )
-from trainmate.cli.progress import planned_week_cells, zone_week_cells
+from trainmate.cli.progress_zones import planned_week_cells, zone_week_cells
 
 
 class TestClassifyMetric(unittest.TestCase):

@@ -16,7 +16,7 @@ import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, befo
 
 from trainmate import athlete_queue, learning_doubts, runtime, settings
 from trainmate.cli import queue as queue_cli
-from trainmate.cli.render import simple_queue_message
+from trainmate.cli.render.plan_lines import simple_queue_message
 from trainmate.coach.service import coach_service
 from trainmate.coach.service import CoachService
 from trainmate.sentinels import QUEUE_SENTINEL

@@ -431,7 +431,7 @@ take — just constraint-triggered instead of pre-classified.
 **Which goals the replan rebuilds.** The ones whose **own span holds the disrupted
 days** — never "the next goal on the calendar". Goals partition the timeline (a goal
 owns from the day after the goal before it, clamped to today, through its target date),
-so the overlapping set is contiguous and `cli/plans.py`'s `goal_range_for_window` names
+so the overlapping set is contiguous and `cli/windows.py`'s `goal_range_for_window` names
 it as an `IdRange` over the shared `-g` grammar (DESIGN_cli_selectors.md §9). Three
 cases fall out:
 
@@ -513,7 +513,8 @@ load displacements trip it) and tune the two knobs from there.
 **Snapshotting & staleness.** `plan generate` records the active `replan = 1`
 constraints onto the macrocycle as a new `constraints_snapshot` (the successor
 to `lifeevents_snapshot`), so "inputs this plan was built on" stays inspectable
-(`plans._print_considered_inputs`). But the strategy prompt (§5) is built from
+(`_print_considered_inputs` in `cli/plans/show.py`). But the strategy prompt (§5) is
+built from
 *every* active constraint, not just the `replan = 1` subset — so a `plan show`
 reading `constraints_snapshot` alone could print "Constraints considered: None"
 while a tactical directive plainly shaped the strategy text, which misleads

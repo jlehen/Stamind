@@ -15,7 +15,9 @@ from trainmate.text import bold, cyan, format_labeled_paragraph, gray, yellow
 from trainmate.output import notice, warn
 from trainmate.clock import fmt_date, fmt_timestamp, today_str as _today_str
 from trainmate.cli.runway import list_end_marker
-from trainmate.cli.selectors import has_selector as _has_selector, resolve_window, split_targets
+from trainmate.cli.windows import (
+    has_selector as _has_selector, resolve_window, split_targets,
+)
 from trainmate.cli.workouts.session_line import prescription_lines, workout_line
 
 

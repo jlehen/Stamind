@@ -8,7 +8,7 @@ from trainmate.workout_state import calendar_status
 from trainmate.text import cmd, cyan, dim, green, red
 from trainmate.output import notice, step
 from trainmate.clock import fmt_date, fmt_span, today_str as _today_str
-from trainmate.cli.selectors import resolve_window
+from trainmate.cli.windows import resolve_window
 from trainmate.gcal.event import event_day
 
 

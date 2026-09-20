@@ -432,7 +432,7 @@ question then closes as stale.
 - `trainmate/cli/data/analysis.py`: the reason under a contradiction in the reflect report, and the
   queue hint at the end of `data reflect` and `data bootstrap`.
 - `trainmate/cli/status.py` and `trainmate_web.py`: archived learnings left out.
-- `trainmate/cli/render.py`: renderer methods for the two answers' replies, one rung down or
+- `trainmate/cli/render/`: renderer methods for the two answers' replies, one rung down or
   on the retirement rung, with expert and companion bodies. The question's own companion
   wording lives with the kind in `learning_doubts.py`, as the strength kinds' does.
 - Tests (`tests/test_bot.py`, `tests/test_athlete_queue.py`, `tests/test_learnings*.py`, a

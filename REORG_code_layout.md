@@ -780,52 +780,90 @@ should be keyed on `name.startswith("workout")` instead.
 - These stay as they are: `activities` (but for the one method it gained), `strength`,
   `objectives`, `constraints`, `wipes`, `queue`, `signals` and `benchmarks`.
 
-### 6.4 CLI views
+### 6.4 CLI views — **DONE in Phase D item 8**
 
-**`plans.py` (1,451 lines) becomes the package `cli/plans/`:**
+The estimates in this section were the best of the whole proposal: eleven of the twelve new
+files land within twenty-five lines of what it predicted, and four within two.
 
-| File | What it holds | ~Lines |
-|---|---|---|
-| `generate.py` | `plan generate`, plus the preview printing that comes from the service | 290 |
-| `show.py` | `plan show` and `plan keep` | 360 |
-| `versions.py` | `plan versions`, `diff`, `rollback`, `rm` and `wipe` | 385 |
-| `feedback.py` | `plan feedback` | 165 |
-| `parser.py` | the argparse tree | 270 |
+**`plans.py` (~~1,451~~ 1,510 lines by the time it was split) becomes the package
+`cli/plans/`:**
 
-**`render.py` (1,290 lines) becomes the package `cli/render/`.**
-- `__init__.py` holds `make_renderer`.
-- `expert.py` (about 300 lines): the terminal voice.
-- `companion.py` (about 320 lines): the simple-bot voice.
-- `session_lines.py` (about 310 lines): companion lines about sessions and days.
-- `plan_lines.py` (about 385 lines): companion lines about goals, constraints and the plan.
+| File | What it holds | ~Lines | Actual |
+|---|---|---|---|
+| `generate.py` | `plan generate`, plus the preview printing that comes from the service | 290 | 312 |
+| `show.py` | `plan show` and `plan keep` | 360 | 366 |
+| `versions.py` | `plan versions`, `diff`, `rollback`, `rm` and `wipe` | 385 | 385 |
+| `feedback.py` | `plan feedback` | 165 | 162 |
+| `parser.py` | the argparse tree | 270 | 280 |
+
+`__init__.py` is six lines of docstring. §4.10 row f sent "the four plan print helpers" to
+`cli/common.py` and they went, losing their leading underscore because they now cross a file:
+`print_hanging`, `print_indented`, `print_segments` and `print_feedback_notes`. **A fifth went
+with them, which the plan did not name: `add_feedback_note`.** Without it `generate.py` and
+`feedback.py` import each other — `plan generate --feedback` files a note, and
+`plan feedback --replan` runs `plan generate` — which is the cycle `AGENTS.md` says to move the
+shared code out of rather than dodge with a deferred import.
+
+**`render.py` (~~1,290~~ 1,301) becomes the package `cli/render/`.**
+- `__init__.py` holds `make_renderer` (25 lines with the docstring).
+- `expert.py` (about 300 lines; it is 302): the terminal voice.
+- `companion.py` (about 320 lines; it is 332): the simple-bot voice.
+- `session_lines.py` (about 310 lines; it is 307): companion lines about sessions and days.
+- `plan_lines.py` (about 385 lines; it is 388): companion lines about goals, constraints and
+  the plan.
 
 It is cut by voice and by topic, not by command. DESIGN_render_persona.md §3–4 keeps the companion
-voice in one place.
+voice in one place. **The date words — `simple_date_word`, `simple_day_word`, `simple_when`,
+`simple_span_words` — are read by both halves and live in `session_lines.py`, which
+`plan_lines.py` imports.** That is what the two line estimates above already assumed: put them the
+other way and `session_lines.py` is 270 and `plan_lines.py` 430.
 
 **Rules for the render split.**
 - No blanket re-export from `__init__.py`. A re-export is exactly what made the `_today_str` patch
-  miss.
-- `test_simple_render.py` has `ALLOWED = {"render.py", "bot.py"}`, keyed on file names. It should
-  be keyed on the directories instead.
-- Its five `_today_str` patches switch to `pin_clock`.
+  miss. **Held, with one unavoidable exception: `__init__.py` imports `ExpertRenderer` and
+  `CompanionRenderer` because `make_renderer` returns one of them.** Nothing else is imported
+  there, and `tests/test_simple_render.py` names each class from its own module.
+- ~~`test_simple_render.py` has `ALLOWED = {"render.py", "bot.py"}`, keyed on file names. It should
+  be keyed on the directories instead.~~ **Done, and it was broken twice over: `cli_dir =
+  Path(render_module.__file__).parent` re-roots from `trainmate/cli/` to `trainmate/cli/render/`
+  for a package, so the scan would have passed vacuously.** `ALLOWED` is `{"bot.py"}` now — the
+  one exception the design names — and the package's own files are exempt by
+  `render_dir not in path.parents`.
+- ~~Its five `_today_str` patches switch to `pin_clock`.~~ **Done.** All five wrapped a call to
+  `simple_day_lines`, so they became one `pin_clock(self, "2026-08-25")` in `DayLinesTest.setUp`.
 
-**`progress.py` (1,042 lines) becomes three files.**
-- `progress.py` (about 390 lines): the command, `render_progress`, the chart, the parser, and
-  `_weeks_arg`.
-- `progress_load.py` (about 305 lines): the fitness line and the weekly load table.
-- `progress_zones.py` (about 390 lines): the time-in-zone grid, by week and by mesocycle.
+**`progress.py` (~~1,042~~ 1,039) becomes three files.**
+- `progress.py` (about 390 lines; it is 365): the command, `render_progress`, the chart, the
+  parser, and `_weeks_arg` — which came in from `cli/argparse_ext.py`, whose only CLI caller it
+  was.
+- `progress_load.py` (about 305 lines; it is 298): the fitness line and the weekly load table.
+- `progress_zones.py` (about 390 lines; it is 416): the time-in-zone grid, by week and by
+  mesocycle. Sixteen over the band, and left there; `ARCHITECTURE.md` §15 says why.
+
+Four names lost their underscore because they now cross a file: `short_date`, `weekday`,
+`warning_line` and `NO_BAND`.
+
+**`selectors.py` (524) becomes two files** — it is on this list because Phase C grew it, and §7
+of `REORG_execution.md` says where to cut.
+- `selectors.py` (314): the `A..B` grammar. What an atom may be, what a range parses to, the `-m`
+  single-atom resolver, and how a command registers the flags. It opens no database.
+- `windows.py` (227): the resolvers. A mesocycle, macrocycle or goal ID has to be looked up to
+  learn the days it spans, so this is where `resolve_window` and the three goal helpers went.
+  `OFFSET_RE` and `offset_days` lost their underscore, crossing the other way.
 
 **Other changes.**
 - `argparse_ext.py` (468 lines): optionally, a new `dashless.py` (about 190 lines) takes the
-  command-line rewriting. Low priority.
-- `common.py` ends at about 250 lines.
+  command-line rewriting. Low priority. **Not done. It is 456 now, `_weeks_arg` having left.**
+- `common.py` ends at about 250 lines. **It is 189.**
   - It loses the adherence code and the Calendar marking (§4.2), the dead
     `resolve_cleanup_range`, and `pmc_warmup_cutoff` (which goes to `garmin/derived`).
-  - It gains the plan print helpers.
-- `trainmate_cli.py` drops about 70 unused imports.
+  - It gains the plan print helpers. **Five, not four; see above.** Its two function-local
+    `from trainmate import runtime` were hoisted at the same time: `runtime.py` imports nothing
+    heavy, so they dodged nothing.
+- `trainmate_cli.py` drops about 70 unused imports. **Phase A did.**
 - These stay as they are:
   - `status.py` (393 lines). `run_status` is one 320-line function, though.
-  - `selectors.py`, `staleness.py`, `runway.py` and `candidates.py`.
+  - ~~`selectors.py`,~~ `staleness.py`, `runway.py` and `candidates.py`.
 
 ### 6.5 CLI command families — **DONE in Phase D item 7**
 

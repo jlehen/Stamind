@@ -6,7 +6,7 @@ morning push cannot answer the same morning differently (§3). The detection its
 `analytics.runway.runway`, pure over rows; this module is the thin db-reads wrapper around
 it plus the expert wordings each surface asks for, the same split `timeline_rows.py` makes
 around `analytics/timeline.py`. The companion wordings of the same facts live in
-`cli/render.py` with the rest of that voice (DESIGN_render_persona.md §4).
+`cli/render/plan_lines.py` with the rest of that voice (DESIGN_render_persona.md §4).
 """
 from typing import Any, Dict, List, Optional, Tuple
 

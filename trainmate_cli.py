@@ -59,7 +59,7 @@ from trainmate.cli.constraints import add_constraint_parser
 from trainmate.cli.benchmarks import add_benchmark_parser
 from trainmate.cli.signals import add_signal_parser
 from trainmate.cli.learnings import add_learnings_parser
-from trainmate.cli.plans import add_plan_parser
+from trainmate.cli.plans.parser import add_plan_parser
 from trainmate.cli.workouts.parser import add_workout_parser
 from trainmate.cli.data.parser import add_data_parser
 from trainmate.cli.settings import add_settings_parser

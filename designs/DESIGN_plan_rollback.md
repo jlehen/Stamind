@@ -158,7 +158,7 @@ same filter:
 
 So the rule for any view that walks the plan retrospectively: **fix the lineage by
 macrocycle id first, then compare dates.** `trainmate/plan_versions.py`'s `plan_lineage()`
-is that walk, shared by `tm progress --mesocycles` (`cli/progress.py`) and the strategy
+is that walk, shared by `tm progress --mesocycles` (`cli/progress_zones.py`) and the strategy
 prompt's planned-vs-actual review (`coach/service/history_context.py`).
 
 **`tm progress --mesocycles` stops the delta at the plan boundary; the strategy prompt does

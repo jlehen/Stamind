@@ -21,7 +21,7 @@ from trainmate.text import (
 )
 from trainmate.output import aside, warn
 from trainmate.clock import fmt_date, fmt_span
-from trainmate.cli.selectors import resolve_window
+from trainmate.cli.windows import resolve_window
 
 
 def run_data_show_metrics(args: argparse.Namespace) -> None:

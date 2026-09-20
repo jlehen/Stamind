@@ -17,7 +17,7 @@ import trainmate_cli
 
 from trainmate import runtime
 from trainmate.cli.bot import MORNING_MARKER, PUSH_ALL_DONE_LINE
-from trainmate.cli.render import SIMPLE_DONE_LINE
+from trainmate.cli.render.session_lines import SIMPLE_DONE_LINE
 from trainmate.config import config
 from trainmate.heads_up import CHANGE_LEAD, UNDONE_ONE, UNDONE_PLAIN, UNDONE_SEVERAL
 from trainmate.sentinels import BUTTONS_SENTINEL, FLUSH_SENTINEL

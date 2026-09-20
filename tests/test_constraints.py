@@ -787,7 +787,7 @@ class TestConstraintReplanTarget(unittest.TestCase):
         no goal and fell back to the next one on the calendar."""
         from trainmate.cli.constraints import _run_replan_flow
         constraint = self._constraint("2026-11-03", "2026-11-10")
-        with patch("trainmate.cli.plans.run_plan_generate") as generate, \
+        with patch("trainmate.cli.constraints.run_plan_generate") as generate, \
                 patch("builtins.print"):
             _run_replan_flow("Family holiday", constraint)
         ns = generate.call_args[0][0]
@@ -799,7 +799,7 @@ class TestConstraintReplanTarget(unittest.TestCase):
         from trainmate.cli.constraints import _run_replan_flow
         constraint = self._constraint("2026-08-01", "2026-08-10")
         buf = io.StringIO()
-        with patch("trainmate.cli.plans.run_plan_generate") as generate, \
+        with patch("trainmate.cli.constraints.run_plan_generate") as generate, \
                 patch("trainmate.cli.constraints._today_str", return_value="2026-08-31"), \
                 redirect_stdout(buf):
             _run_replan_flow("Was ill", constraint)

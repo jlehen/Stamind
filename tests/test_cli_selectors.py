@@ -5,11 +5,14 @@ import unittest
 from datetime import date, timedelta
 from unittest.mock import patch
 
-from trainmate.cli import selectors
+from tests.helpers import pin_clock
+
+from trainmate.cli import windows
 from trainmate.cli.selectors import (
     CURRENT, DateRange, IdRange, SelectorError, add_selector_args, parse_date_range,
-    parse_id_range, parse_single_date, parse_target, resolve_window,
+    parse_id_range, parse_single_date, parse_target,
 )
+from trainmate.cli.windows import resolve_window
 
 TODAY = date(2026, 6, 15)
 
@@ -20,14 +23,7 @@ def _iso(offset_days: int) -> str:
 
 class TestDateGrammar(unittest.TestCase):
     def setUp(self):
-        patcher = patch.object(selectors, "_today_date", return_value=TODAY)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        patcher_str = patch.object(
-            selectors, "_today_str", return_value=TODAY.strftime("%Y-%m-%d")
-        )
-        patcher_str.start()
-        self.addCleanup(patcher_str.stop)
+        pin_clock(self, TODAY.strftime("%Y-%m-%d"))
 
     def test_single_date_is_one_day(self):
         self.assertEqual(
@@ -102,14 +98,7 @@ class TestResolveWindow(unittest.TestCase):
     """The command's own policy fills whichever side no selector bounded."""
 
     def setUp(self):
-        patcher = patch.object(selectors, "_today_date", return_value=TODAY)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        patcher_str = patch.object(
-            selectors, "_today_str", return_value=TODAY.strftime("%Y-%m-%d")
-        )
-        patcher_str.start()
-        self.addCleanup(patcher_str.stop)
+        pin_clock(self, TODAY.strftime("%Y-%m-%d"))
 
     def _parse(self, argv, **policy):
         parser = argparse.ArgumentParser()
@@ -158,14 +147,14 @@ class TestResolveWindow(unittest.TestCase):
         )
 
     def test_dimensions_intersect(self):
-        with patch.object(selectors, "_meso_bounds", return_value=("2026-06-01", "2026-06-28")):
+        with patch.object(windows, "_meso_bounds", return_value=("2026-06-01", "2026-06-28")):
             self.assertEqual(
                 self._parse(["-m", "3", "-d", "2026-06-10.."], meso=True, direction="none"),
                 ("2026-06-10", "2026-06-28"),
             )
 
     def test_an_empty_intersection_is_reported_not_silently_returned(self):
-        with patch.object(selectors, "_meso_bounds", return_value=("2026-06-01", "2026-06-28")):
+        with patch.object(windows, "_meso_bounds", return_value=("2026-06-01", "2026-06-28")):
             with self.assertRaises(SystemExit):
                 self._parse(["-m", "3", "-d", "2026-07-01.."], meso=True, direction="none")
 

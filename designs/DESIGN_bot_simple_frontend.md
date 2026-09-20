@@ -356,7 +356,7 @@ parity promise nobody re-checks.
 > commands call one method per thing they have to say, and the override set *is* the
 > opt-in list — so the fallback below is inheritance rather than discipline. Everything
 > this section says about the *words* still holds; only where they live has moved
-> (`cli/render.py`).
+> (`cli/render/`).
 
 Initial opt-in set: `workout list` (today/week), `progress` (chart caption + two-line
 summary), the adapt result, and `bot morning`. The §11 breadth pass added `goal list`
@@ -461,7 +461,7 @@ earns it is expert detail, and the chat surface does not audit.
 | `trainmate/prompt.py` | `BUTTONS_SENTINEL` + `emit_buttons()` (mirror of `emit_photo`) |
 | `trainmate/cli/bot.py` | new hidden family: `bot morning`, `bot route`, `bot constraints`, `bot mesocycle` (§11.2) |
 | `trainmate/config.py` | `telegram_ui`; the push knobs and the router role resolve through `trainmate/settings.py` |
-| `trainmate/cli/render.py` | the companion voice: line builders, `ExpertRenderer`/`CompanionRenderer`, `TRAINMATE_RENDER` interpretation (was a helper in `cli/common.py` — DESIGN_render_persona.md §7) |
+| `trainmate/cli/render/` | the companion voice: line builders (`session_lines.py`, `plan_lines.py`), `ExpertRenderer`/`CompanionRenderer`, `TRAINMATE_RENDER` interpretation (was a helper in `cli/common.py` — DESIGN_render_persona.md §7) |
 | `trainmate/cli/candidates.py` | the confirm loops a note's candidates pass through, shared by `workout adapt -m` and `bot capture note` (§12.10, §12.11) |
 | `docs/ARCHITECTURE.md` | §2 entry points, §9 config keys, bot section |
 | `tests/` | pure-helper tests (keyboard table, sentinel codec, router table→argv, tone renderer), `bot morning` idempotency against a temp DB, `bot route` with a mocked OpenRouter |

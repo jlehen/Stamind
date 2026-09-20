@@ -4,7 +4,7 @@ Two questions about the same thing, so one file. `plan_lineage` walks a plan's m
 in the order the athlete trained them, by macrocycle id rather than by date, so a
 superseded version cannot sneak into the walk (DESIGN_plan_rollback.md §6.1).
 `diff_plans` takes two macrocycle rows with their mesocycles and returns what changed,
-which `cli/plans.py` renders as text and `trainmate_web.py` returns as JSON;
+which `cli/plans/versions.py` renders as text and `trainmate_web.py` returns as JSON;
 `resolve_versions` picks which two versions those are, over a database handle the caller
 passes in. Also owns the parsing of a macrocycle's input snapshots (goals / constraints /
 threshold anchors), since the diff is defined over them.

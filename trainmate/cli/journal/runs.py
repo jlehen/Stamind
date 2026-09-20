@@ -13,7 +13,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import journal
-from trainmate.cli.selectors import resolve_window
+from trainmate.cli.windows import resolve_window
 from trainmate.clock import to_local
 
 
