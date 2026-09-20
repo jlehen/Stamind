@@ -5,7 +5,16 @@ has moved yet.
 
 How it was made: ten read-only agents each surveyed one subsystem. Each listed what its subsystem
 does and proposed splits inside it. A final pass compared those lists across subsystems and
-decided which code should change subsystem. Line numbers refer to main at `da9ec8f`.
+decided which code should change subsystem.
+
+**This file says what moves and where it lands. `REORG_execution.md` says how the work is cut into
+commits, how each one is checked, and what has landed so far.** Read that file before starting a
+session of this work. It revises §8 below in two places, and it holds the ledger.
+
+**The line numbers below are stale.** They refer to main at `da9ec8f`. Since then `cli/plans.py`
+has grown to 1493 lines, `coach/service/adaptation.py` has shrunk to 815, and `db/base.py` to 635.
+Find the code you are moving by its symbol name. Treat every line range quoted here as a hint about
+roughly where to look.
 
 ---
 
