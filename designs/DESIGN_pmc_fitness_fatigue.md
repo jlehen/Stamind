@@ -127,7 +127,7 @@ design started from (ACWR-era, historical per the amendment banner).
 | Coach, summary | data summary in `coach/service/history_context.py` → strategy/plan prompts | "Current ACWR: 1.12 (latest)" |
 | Coach, weekly | analysis weekly digest (`coach/service/analysis.py`) | `max_acwr` per week |
 | Cache key | evidence fingerprint (`coach/service/analysis.py` `met_digest`) | hashes 6-tuple incl. `m.get('acwr')` per metrics row |
-| User | `tm status` (`cli/status.py`), `tm data show-metrics` table/CSV (`cli/data.py`), `color_acwr` (was `util.py`) | ACWR + acute/chronic shown; `acwr or 0.0` zero-fill |
+| User | `tm status` (`cli/status.py`), `tm data show-metrics` table/CSV (`cli/data/show.py`), `color_acwr` (was `util.py`) | ACWR + acute/chronic shown; `acwr or 0.0` zero-fill |
 
 **Package split (post-ship).** The four modules this design names were split into
 packages after it merged, so the original paths no longer resolve. Current homes:
@@ -604,7 +604,7 @@ One line under ACWR (`cli/status.py`):
 ### 6.2 `tm data show-metrics`
 
 Three new table columns and CSV fields next to the existing ACWR/Acute/Chronic
-ones (`cli/data.py`). Same NULL → blank/`—` and warm-up omission as the status
+ones (`cli/data/show.py`). Same NULL → blank/`—` and warm-up omission as the status
 line; the CSV emits empty cells (not `0`) for suppressed/NULL values so
 downstream parsing doesn't read a zero as data.
 
@@ -613,7 +613,7 @@ downstream parsing doesn't read a zero as data.
 > **This surface does not exist. Do not go looking for it, and do not "restore" it
 > without revisiting the decision below.** It shipped in `613b47c` and was deliberately
 > deleted in `ce0b74d` (*"workout adapt: collapse metrics table to a one-line day
-> count"*). `trainmate/cli/workouts/generate.py` now prints only
+> count"*). `trainmate/cli/workouts/adapt.py` now prints only
 > `Using N days of recovery metrics (past N-day window).`
 >
 > **Why it went:** the reason for the table was "the athlete should see what the coach
@@ -715,7 +715,7 @@ retention.
   > | data-summary line (§5.2) | "Current ACWR: 1.12 (latest)" | `ATL:CTL 1.15 (relative overload)`, folded into the PMC line (`coach/service/history_context.py`) |
   > | weekly digest key (§5.4) | `max_acwr` | `max_load_ratio` (`coach/service/analysis.py`) |
   > | `tm status` (§6.1) | ACWR line | `ATL:CTL` field on the Fitness line (`cli/status.py`) |
-  > | `tm data show-metrics` (§6.2) | ACWR column / CSV field | `ATL:CTL` column / CSV field (`cli/data.py`) |
+  > | `tm data show-metrics` (§6.2) | ACWR column / CSV field | `ATL:CTL` column / CSV field (`cli/data/show.py`) |
   > | coloring | `color_acwr` (0.8–1.3 band) | `color_load_ratio` — overload end only: `> 1.5` red, `1.3–1.5` yellow, low uncolored (`analytics/pmc.py`) |
   >
   > Helpers: `load_ratio(atl, ctl)` (`analytics/pmc.py`) — `None` when either EWMA

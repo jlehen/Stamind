@@ -236,7 +236,8 @@ class TestCaptureMessageSignal(unittest.TestCase):
 
 
 class TestConfirmationLadder(unittest.TestCase):
-    """The two-question ladder in `cli/workouts/generate.py` (§6).
+    """The two-question ladder in `cli/candidates.py`, which `workout adapt -m`
+    reaches from `cli/workouts/adapt.py` (§6).
 
     Two y/N calls have to yield all three outcomes — reuse, coin, log nothing — because
     `runtime.prompt.confirm` is shared with the Telegram frontend and stays binary.

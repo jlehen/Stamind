@@ -827,41 +827,72 @@ voice in one place.
   - `status.py` (393 lines). `run_status` is one 320-line function, though.
   - `selectors.py`, `staleness.py`, `runway.py` and `candidates.py`.
 
-### 6.5 CLI command families
+### 6.5 CLI command families — **DONE in Phase D item 7**
 
-**`workouts/generate.py` (1,007 lines) holds five commands. It becomes one file per command:**
+**`workouts/generate.py` (~~1,007 lines~~ 954 by the time it was split — Phase C took the
+pairing, `compare_days`, `unplanned_kind` and `_shift` out of it) holds five commands. It
+becomes one file per command:**
 
-| File | What it holds | ~Lines |
-|---|---|---|
-| `adapt.py` | `workout adapt` and `workout tweak` | 175 |
-| `generate.py` | `workout generate` | 370 |
-| `rollback.py` | `workout batches` and `workout rollback`, the only undo | 125 |
-| `listing.py` | `workout list` and `workout show`; not named `list.py`, which would shadow the builtin | 180 |
-| `compare.py` | `workout compare`, once `compare_days` has left | 120 |
+| File | What it holds | ~Lines | Actual |
+|---|---|---|---|
+| `adapt.py` | `workout adapt` and `workout tweak` | 175 | 174 |
+| `generate.py` | `workout generate` | 370 | 369 |
+| `rollback.py` | `workout batches` and `workout rollback`, the only undo | 125 | 126 |
+| `listing.py` | `workout list` and `workout show`; not named `list.py`, which would shadow the builtin | 180 | 184 |
+| `compare.py` | `workout compare`, once `compare_days` has left | 120 | 162 |
+
+Four of the five land within four lines of the estimate. `compare.py` is 42 over because
+the estimate counted the handler alone: `print_workout_compare`, `print_set_lines` and
+`print_calendar_marked` are the expert report `ExpertRenderer` delegates to, and they
+belong with the command that asks for it.
 
 **Other changes.**
-- `workouts/_helpers.py` becomes **`session_line.py`** (about 95 lines): `workout_line`,
-  `adherence_marker` and `prescription_lines`. Three commands share it.
-- **`data.py` (899 lines)** becomes the package `cli/data/`:
-  - `cache.py` (about 105 lines): `pull`, `backfill-tss` and `wipe`.
-  - `show.py` (about 370 lines): `show-metrics` and `show-activities`.
-  - `analysis.py` (about 210 lines): `bootstrap`, `reflect` and `show-analysis`.
-  - `parser.py` (about 240 lines).
-- **`journal.py` (739 lines)** becomes the package `cli/journal/`:
-  - `runs.py` (about 230 lines): reads and filters the runs, and prints nothing.
-  - `views.py` (about 415 lines): the printers and the handlers.
-  - `parser.py` (about 95 lines).
+- `workouts/_helpers.py` becomes **`session_line.py`** (about 95 lines; it is 94):
+  `workout_line`, `adherence_marker` and `prescription_lines`. Three commands share it.
+  Its one dead import, `datetime`, went with the rename.
+- **`data.py` (~~899 lines~~ 901)** becomes the package `cli/data/`:
+  - `cache.py` (about 105 lines; it is 107): `pull`, `backfill-tss` and `wipe`.
+  - `show.py` (about 370 lines; it is 384): `show-metrics` and `show-activities`.
+  - `analysis.py` (about 210 lines; it is 215): `bootstrap`, `reflect` and `show-analysis`.
+    `_LEARNING_OPS` came with it, out from between the two CSV constants it sat among and
+    beside `_render_analysis_report`, its only reader.
+  - `parser.py` (about 240 lines; it is 243).
+  - The three handler files have no edge between them, so the cut needed no shared module.
+- **`journal.py` (~~739 lines~~ 740)** becomes the package `cli/journal/`:
+  - `runs.py` (about 230 lines; it is 223): reads and filters the runs, and prints nothing.
+  - `views.py` (about 415 lines; it is 440): the printers and the handlers. Forty over the
+    band, and left there. No method dominates it — the longest is `_print_cost` at sixty
+    lines — so the only cuts available are a file for the cost rollup and a file for the
+    `--follow` tail, at about sixty and about forty-five lines each, which the same rule
+    then asks to be merged back into a sibling.
+  - `parser.py` (about 95 lines; it is 102).
+  - Seven names now cross a file boundary and lost their leading underscore, as the
+    strength planner's six did in item 4: `collect`, `select_runs`, `date_window`,
+    `local_time`, `command_path`, `in_window` and `day_bounds`. Three were renamed further
+    than the underscore because the bare word was taken or vague — `path` is a local in
+    `_follow`, and `window` and `local` say nothing on their own.
+  - `DEFAULT_LIMIT` is in `views.py`, not `runs.py`: it is how many runs the listing
+    prints, which is a printing decision, and `parser.py` already imports from `views`.
 - These stay as they are:
   - `constraints.py` (486), `strength.py` (463) and `queue.py` (421). Each is one job.
   - `strength_only.py` (68). It is its own flow.
   - `heads_up.py`.
   - `revisions.py`. Its name is pinned by a glob in a test.
 
-**A trap in this split.** After the split, `generate.py` still imports `ensure_recent_data`. So an
-unchanged `patch("…workouts.generate.ensure_recent_data")` in an adapt test still succeeds, but it
+**A trap in this split — sprung, and the count was right.** After the split, `generate.py`
+still imports `ensure_recent_data`. So an unchanged
+`patch("…workouts.generate.ensure_recent_data")` in an adapt test still succeeds, but it
 patches nothing, and the test silently runs a real pull. All twelve targets must move to
 `…workouts.adapt.ensure_recent_data`: `test_cli_workouts` (×7), `test_runway` (×3),
-`test_athlete_queue` and `test_workout_tweak`.
+`test_athlete_queue` and `test_workout_tweak`. Of the 25 sites that named it — not the 23
+the gate's table in `REORG_execution.md` §5.1 records, which predates some of the tests —
+exactly those twelve moved and thirteen stayed with `workout generate`. Each was
+shown to bite rather than assumed to: with the twelve pointed at the old path and the body
+of `cli/common.ensure_recent_data` made to raise just past its `--no-pull` exit, those
+twelve tests failed and nothing else did. Pointed at `adapt`, with the same sabotage in
+place, all twelve passed again. The four sites in the same files that do not patch it at
+all fail under the sabotage either way: they neutralise the pull one level down, at
+`runtime.garmin`.
 
 ### 6.6 Front-ends
 

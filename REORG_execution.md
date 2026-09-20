@@ -29,7 +29,8 @@ splits and one commit each is what makes a red suite bisectable.
 
 ### Both REORG files are temporary, and they are tracked anyway
 
-They are committed from the start and **deleted in the last commit of the branch**. Tracked,
+They are committed from the start and **deleted in the last commit of the branch**, which is then
+followed by an untracked `REORG_DONE` flag file; §7 says what that flag is for. Tracked,
 because the ledger is how one session hands off to the next: left untracked it would die with the
 worktree, and it would be at risk in the rebase onto main. Deleted at the end, because a
 transition plan has no reason to outlive the transition.
@@ -447,7 +448,11 @@ other may still cut it into commits, and should say so in its ledger line.
    the `workouts.py` split creates. Committing them apart would leave a commit where
    `CoachService` is missing three of its methods.
 7. **CLI command families** — `workouts/generate.py` into five; `data.py` and `journal.py` into
-   packages.
+   packages. **DONE**, as one commit, which is the rule the paragraph above states. The
+   three splits are genuinely independent of each other — no file either package creates is
+   named by the `workouts/` split, and the two packages never meet — so this is the case
+   that paragraph allows to be cut into three. It was not, because the item is small: 954,
+   901 and 740 lines in, and the whole of it reads in one sitting.
 8. **CLI views** — `plans.py`, `progress.py`, `selectors.py`, then `render.py`. Render goes
    last, because it imports from all of them.
    `selectors.py` is on this list because Phase C put it there: it took the three goal
@@ -467,12 +472,30 @@ applies to them too, at lower priority.
 - `static/app.js` cut into four scripts by tab.
 - Splitting the largest test files on size alone.
 
-### The last commit
+### The last commit, and the flag after it
 
 `git rm REORG_code_layout.md REORG_execution.md`, and nothing else. Everything durable left these
 files in phase A or in the commit that made it true, so this commit is two deletions and is
 reviewable at a glance. If it wants to carry anything besides the deletions, something was missed
 earlier — put it where it belongs and keep this commit empty of content.
+
+**Two things close before that commit**, or they die with the documents.
+
+Six files cite a REORG section by number in a docstring, nine citations in all:
+`trainmate/signals.py`, `trainmate/workout_state.py`, `trainmate/clock.py`,
+`tests/test_layering.py` (three times), `tests/test_cli_plans.py` (twice) and
+`tests/test_isolation_guards.py`. Each pointer either moves its reasoning into
+`ARCHITECTURE.md` §15 and cites that instead, or goes away. A pointer into a deleted file is
+worse than no pointer at all.
+
+`REORG_code_layout.md` §5.2 left this branch unfinished: `benchmark record` tells the athlete to
+regenerate the plan after an e1RM, and dropping e1RM from the benchmark anchors needs a design of
+its own. It needs one durable line somewhere outside these two files, or the item disappears with
+the document that holds it.
+
+**Then create `REORG_DONE`, and do not commit it.** It is an untracked file in the worktree, and
+it is the flag another agent watches for to know this branch is finished. It is never added to
+git: the point of it is to live outside the history the branch lands.
 
 ---
 
@@ -765,13 +788,12 @@ The lines above Phase A are one per item, from before §3 changed.
   modules carried an `import trainmate.db` that nothing used; this commit removes the last
   reason for any of them, so they went with it.
 
-- **One thing found and left, for whoever writes the last commit.** Nine files under
+- **One thing found and left, for whoever writes the last commit.** Six files under
   `trainmate/` and `tests/` cite `REORG_code_layout.md` or `REORG_execution.md` by section
-  number in a docstring — `signals.py`, `clock.py`, `workout_state.py`,
-  `test_layering.py`, `test_cli_plans.py` and `test_isolation_guards.py`. Both files are
-  deleted in the branch's last commit, so those pointers will dangle. None was added here.
-  §1's table is where that belongs: either the rationale moves to `ARCHITECTURE.md` §15
-  before the end, or the pointers go.
+  number in a docstring, nine citations in all — `signals.py`, `clock.py`,
+  `workout_state.py`, `test_layering.py`, `test_cli_plans.py` and `test_isolation_guards.py`.
+  Both files are deleted in the branch's last commit, so those pointers will dangle. None was
+  added here. §7's last-commit section now carries the list and says what to do with it.
 
 - **Phase D item 4, the strength planner.** `strength/planner.py` was 737 lines holding
   two jobs, and it is two files now. `planner_prompt.py` (365) is what the call says and
@@ -1162,13 +1184,98 @@ The lines above Phase A are one per item, from before §3 changed.
   read. That is its own sweep, not a phase commit's business, and nothing here depends on
   it.
 
-**Next up:** Phase D item 7 — **CLI command families**: `cli/workouts/generate.py` into
-five files, and `data.py` and `journal.py` into packages (§6.5). Items 8 and 9 follow in
-§7's order. The trap waiting there is named in §6.5 and §9: after the split
-`cli/workouts/generate.py` still imports `ensure_recent_data`, so all twelve
-`patch("…workouts.generate.ensure_recent_data")` sites keep resolving while reaching
-nothing, and the adapt tests would do a real Garmin pull. The gate catches a target that
-stops resolving; it cannot catch one that resolves and no longer bites.
+- **Phase D item 7, the CLI command families.** Three files that each held a whole command
+  group are twelve now, plus two `__init__.py` docstrings, and a fourth file is renamed
+  alongside them. `cli/workouts/generate.py` was 954 lines running five commands that
+  share nothing but a runtime; it is one file per command now: `adapt.py` (174)
+  for `workout adapt` and `workout tweak`, which are one flow with a narrower job,
+  `generate.py` (369) for `workout generate`, `rollback.py` (126) for `workout batches` and
+  `workout rollback`, `listing.py` (184) for `workout list` and `workout show`, and
+  `compare.py` (162) for `workout compare`. The expert renderer each of them delegates to
+  went with its command, so `cli/render.py` now names three files where it named one.
+  `_helpers.py` is `session_line.py` (94): one session as one line, plus the short form
+  drawn under it, which `generate`, `listing` and the preview all draw. `cli/data.py` (901)
+  is the package `cli/data/`: `cache.py` (107) for the three commands that fetch, recompute
+  or throw away the local Garmin cache, `show.py` (384) for the two that print it,
+  `analysis.py` (215) for the three about what the model made of past training, and
+  `parser.py` (243). `cli/journal.py` (740) is the package `cli/journal/`, cut where the
+  file already had its own banner comment: `runs.py` (223) reads the record files into one
+  summary per run and applies the flags, `views.py` (440) turns those into columns and
+  prints them, `parser.py` (102) wires the sub-commands. Neither `__init__.py` re-exports
+  anything, so `trainmate_cli` imports each `add_*_parser` from its `parser` module.
+  Three of the twelve land under the 150-to-400 band and one over it, and §6.5 says why
+  each stays where it is: `rollback.py` at 126 and `cache.py` at 107 are each a verb
+  group of their own, `journal/parser.py` at 102 is the argparse wiring its package's
+  two other files must not import, and `views.py` at 440 has no method big enough to
+  cut out without leaving a file the same rule would merge back.
+  `Phase D item 7: the CLI command families`
+
+- **The trap §6.5 and §9 both warned about was real, and proving it took a sabotage.**
+  Twelve `patch("…workouts.generate.ensure_recent_data")` sites belong to `workout adapt`
+  and thirteen to `workout generate`. After the split `generate.py` still imports the name,
+  so every one of the 25 resolves either way and the gate stays green while twelve of them
+  patch a name nothing on the adapt path reads. What settles it is making the real
+  `cli/common.ensure_recent_data` raise, one line past its `--no-pull` exit: on the old
+  paths exactly those twelve tests failed, and repointed they all passed with the sabotage
+  still in place. §9 carries the recipe now.
+
+- **Seven names lost a leading underscore, as the strength planner's six did in item 4.**
+  `views.py` asks `runs.py` for eight names, and seven of them were module-private:
+  `collect`, `select_runs`, `date_window`, `local_time`, `command_path`, `in_window` and
+  `day_bounds`. Three could not simply drop the underscore — `path` is already a local in
+  `_follow`, and `window` and `local` say nothing standing alone — so they say what they
+  return instead. `DEFAULT_LIMIT` went to `views.py` rather than `runs.py`: it is how many
+  runs get printed, and `parser.py` was already importing from `views`.
+
+- **`import trainmate_cli` costs 265 modules now, not the 254 the last three ledger lines
+  record, and nothing is wrong.** That number counts modules, so cutting three files into
+  twelve adds exactly the eleven that appeared: six under `cli/workouts/`, five under
+  `cli/data/` and four under `cli/journal/`, against the four flat modules they replace.
+  What the number is really watched for is unchanged — no `requests` on the startup path,
+  and 107 ms, the same as before. No function-local import was hoisted here.
+
+- **Two stale claims were found on the way, neither of them this commit's doing.**
+  `ARCHITECTURE.md` still placed `warn_stale_before` in `cli/workouts/_helpers.py`, which
+  Phase C moved to `cli/workouts/calendar_sync.py`; and `garmin/derived.py`'s docstring
+  still said the post-wipe recompute is called from `cli/data.py` with the CLI's handle,
+  when Phase C's decline left that sweep inside `db/wipes.py`, which passes its own. Both
+  say what is true now. The gate's own numbers in `ARCHITECTURE.md` were stale too — 439
+  sites where item 6 had left 435 — and this commit takes it to 435 sites naming 42
+  targets, one more target than item 6 left because `ensure_recent_data` under
+  `cli/workouts/` is two names now.
+
+- **No test file was split, and, as in item 3, the reason is not size.**
+  `tests/test_cli_workouts.py` is 1,698 lines and `tests/test_cli_data.py` 590, and each is
+  a single grab-bag class — neither is organized by command, so cutting either follows a
+  different axis from this commit's. `tests/test_journal.py` (932) is half about
+  `trainmate/journal.py`, the writer this commit did not touch. All three are Phase E's
+  size-only work.
+
+- **The review of Phase D item 7**, in the same commit. A read-only agent rebuilt the four
+  old files from HEAD, applied the seven journal renames to them, stripped every docstring
+  and compared the unparsed bodies symbol by symbol: every one is byte-identical, nothing
+  lost, nothing defined twice. It then did something the earlier reviews did not — it
+  dumped the whole argparse tree in a fresh interpreter at HEAD and again after the split,
+  every sub-command path, every option string and the name of every `func=` handler, 1,430
+  lines, and they match exactly. It traced all 25 `ensure_recent_data` patch sites to the
+  command each test actually drives and found all 25 on the right module. Its three
+  blocking findings were all in words rather than code: a bullet in
+  `DESIGN_change_heads_up.md` rewritten to name three files but left 111 characters wide, a
+  test docstring this sweep repointed to `cli/workouts/adapt.py` when the ladder it names is
+  in `cli/candidates.py` and the same class says so twenty-five lines later, and the ledger
+  line above counting two files under the band when there are three. All fixed here, along
+  with three smaller ones it raised: the same design bullet's "because `generate.py` is past
+  the size limit", now false at 369 lines and put in the past tense; a docstring in
+  `test_isolation_guards.py` saying a loop covers three module paths when it covers two; and
+  a 101-character line inherited byte-for-byte into `compare.py`.
+
+**Next up:** Phase D item 8 — **CLI views**: `plans.py`, `progress.py`, `selectors.py`,
+then `render.py`, in that order, because render imports from all of them (§6.4, and §7's
+note on why `selectors.py` joined the list). Item 9 follows. Two traps wait there and §9
+names both: `cli/render.py`'s five `patch("trainmate.cli.render._today_str")` sites should
+become `tests.helpers.pin_clock` in the same commit that splits the file, and
+`test_simple_render.py`'s `ALLOWED = {"render.py", "bot.py"}` is keyed on file names, so a
+`render/` package needs it keyed on the directory instead.
 
 ---
 
@@ -1180,6 +1287,16 @@ Check each one against the item you are doing. Most phases touch several of them
 it, which is why the gate comes first. When a split moves a function out of a file that still
 imports the same name, every `patch()` on the old path still resolves and still reaches nothing.
 `cli/workouts/generate.ensure_recent_data` has 23 call sites and is the worst case.
+
+**Spent for that one seam in Phase D item 7, and the gate did not catch it.** It could not:
+`generate.py` still imports the name, so every site resolved before and after. There were
+25 of them, not the 23 the §5.1 table says — that count is older than the tests added
+since. Twelve moved to `adapt.py` and thirteen stayed, and the way that was checked is
+worth repeating on the next split of this shape. Make the real function raise — one line in
+`cli/common.ensure_recent_data`, just past its `--no-pull` early exit so a test that asks
+for no pull is unaffected — and run the affected files. With the patches still on the old
+path, exactly the twelve failed. Repointed, all twelve passed with the sabotage still in.
+That is the difference between a green suite and a seam proven live.
 
 **The engine must look up the client, not import it.** The new files in `coach/engine/` read
 `_eng.openrouter_client` when they are called. A `from … import openrouter_client` at the top of
@@ -1220,7 +1337,10 @@ mixins to 13, so check before adding a base class.
 **No blanket re-export from a new package's `__init__.py`.** A re-export is what made the
 `_today_str` patch miss. `analytics/__init__.py` stays empty; `gcal/__init__.py` holds only a
 docstring, as `coach/__init__.py` now does. `AGENTS.md` carries this rule since Phase A, and names
-`garmin/__init__.py` and `cli/workouts/__init__.py` as the two that still break it.
+`garmin/__init__.py` as the one that still breaks it. It named `cli/workouts/__init__.py` too when
+this line was written; Phase A had already deleted the eleven re-exports, so that half was stale
+and is gone. The two packages Phase D item 7 created, `cli/data/` and `cli/journal/`, are a
+docstring each, and `trainmate_cli` imports each one's `add_*_parser` from its `parser` module.
 
 **No re-export shims to spare the importers.** `AGENTS.md` prefers a one-off migration, and every
 instance of TrainMate is operated by the author.

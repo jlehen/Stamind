@@ -514,7 +514,7 @@ class HintTest(_QueueCase):
         self.addCleanup(env.stop)
         os.environ.pop("TRAINMATE_RENDER", None)
         for target in ("trainmate.cli.status.ensure_recent_data",
-                       "trainmate.cli.workouts.generate.ensure_recent_data"):
+                       "trainmate.cli.workouts.adapt.ensure_recent_data"):
             pull = patch(target)
             pull.start()
             self.addCleanup(pull.stop)

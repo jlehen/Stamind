@@ -204,7 +204,8 @@ for.)
 - **`coach/service/adapt.py`** — renders the vocabulary, passes the backdate floor,
   reads `new_signals` off the decision onto the proposal.
 - **`coach/proposals.py`** — `RevisionProposal.new_signals`.
-- **`cli/workouts/generate.py`** — `_confirm_new_signals`, the step-1b ladder.
+- **`cli/workouts/adapt.py`** — the step-1b ladder, which it asks through
+  `cli/candidates.py::confirm_new_signals`.
 - **`cli/signals.py`** — shares the writer; warns when `signal add` names an unlisted
   category.
 

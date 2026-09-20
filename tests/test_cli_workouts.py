@@ -140,7 +140,7 @@ class TestCliWorkouts(unittest.TestCase):
             "knee is sore, keep impact low",
         )
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_a_text_revision_shows_the_sentences_that_moved(
         self, mock_coach, _mock_ensure
@@ -184,7 +184,7 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertNotIn("\n    - ", stdout)
         self.assertNotIn("\n    + ", stdout)
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_a_text_revision_wraps_at_the_client_width(self, mock_coach, _mock_ensure):
         """Over the bot the CLI is told the phone's width; the wording diff used to wrap
@@ -220,7 +220,7 @@ class TestCliWorkouts(unittest.TestCase):
         passages = [line for line in revised.splitlines() if line.startswith("    ")]
         self.assertTrue(passages and all(len(line) <= 48 for line in passages), revised)
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_simple_render_previews_the_revision_as_prose(self, mock_coach, _mock_ensure):
         """Simple mode sends flowed text, not a <pre> message, so the preview is one
@@ -299,7 +299,7 @@ class TestCliWorkouts(unittest.TestCase):
             pairs=(RevisionPair(proposal=friday, original=thursday, is_swap=False),),
         )
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_the_table_says_which_day_a_moved_session_came_from(
         self, mock_coach, _mock_ensure
@@ -316,7 +316,7 @@ class TestCliWorkouts(unittest.TestCase):
         # Same sport on both days, so the sport column must not claim a swap.
         self.assertNotIn("->STRENGTH_TRAINING", stdout)
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_the_companion_says_a_session_moved_rather_than_appeared(
         self, mock_coach, _mock_ensure
@@ -332,7 +332,7 @@ class TestCliWorkouts(unittest.TestCase):
         self.assertIn("(moved from Thu Jun 11)", stdout)
         self.assertNotIn("(new)", stdout)
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_a_real_load_change_carries_no_text_revision_section(
         self, mock_coach, _mock_ensure
@@ -368,7 +368,7 @@ class TestCliWorkouts(unittest.TestCase):
                 ctl=62.4, atl=71.7, tsb=-8.9,
             )
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_adapt_reports_metric_day_count_not_values(self, mock_coach, _mock_ensure):
         # The week planner still reads the full trajectory; the CLI only tells the athlete how
@@ -1661,7 +1661,7 @@ class TestCliWorkouts(unittest.TestCase):
         Asides are suppressed on the chat front-end, so a `step()` premise left Telegram
         asking "Was that the session, cut short?" about nothing the athlete could see
         (DESIGN_output_verbosity.md §3, ARCHITECTURE.md §15)."""
-        from trainmate.cli.workouts.generate import _resolve_ambiguous_matches
+        from trainmate.cli.workouts.adapt import _resolve_ambiguous_matches
 
         mock_coach.pending_match_questions.return_value = [{
             "activity_id": "act_warmup",

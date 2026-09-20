@@ -44,10 +44,9 @@ from trainmate.cli.queue import (
 from trainmate.cli.runway import (
     crossing_the_end, current_runway, runway_buttons, runway_hint_lines,
 )
-from trainmate.cli.workouts.generate import (
-    print_calendar_marked, print_generate_preview, print_workout_compare,
-    print_workout_table,
-)
+from trainmate.cli.workouts.compare import print_calendar_marked, print_workout_compare
+from trainmate.cli.workouts.generate import print_generate_preview
+from trainmate.cli.workouts.listing import print_workout_table
 from trainmate.strength.prescription import exercise_lines
 from trainmate.cli.workouts.revisions import (
     print_revision_preview, rewritten_text_only, wording_group_lines, wording_groups,
@@ -729,7 +728,7 @@ class ExpertRenderer:
     command (§4). A method may read what the code it wraps reads; it may not judge —
     no coaching decision belongs in a formatter (DESIGN_bot_simple_frontend.md §10)."""
 
-    # -- workout adapt (cli/workouts/generate.py) --
+    # -- workout adapt (cli/workouts/adapt.py) --
 
     def adapt_reason(self, reason: str) -> None:
         print(f"\n{bold('Decision Summary')}:\n{wrap_text(reason)}")

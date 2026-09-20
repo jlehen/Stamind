@@ -1,5 +1,9 @@
-"""Shared resolvers/formatters for the workout CLI handlers."""
-from datetime import datetime
+"""One session, rendered as one line — and the short form drawn under it.
+
+`workout list`, `workout show` and the `workout generate` preview all draw a session this
+way, so the plan the athlete is asked to accept reads exactly like the plan they will live
+with.
+"""
 from typing import List, Optional
 from trainmate.analytics import intensity
 from trainmate.workout_state import calendar_status, modification_markers

@@ -418,13 +418,14 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   coach's note when she is not watching (§3). Only the paragraph that tells the week planner
   how to weigh the note is swapped, under the existing `has_message` gate. The section titles
   stay.
-- `trainmate/cli/workouts/generate.py`: the replace question at the start of
-  `run_workout_generate` and `run_workout_adapt`, before the LLM call (§5); the wording of
-  the exits that write nothing after a Replace (§5); the notice under the line (§8);
-  `_change_line` prints the description and "not sent yet"; the new `workout notify` (§4),
-  with its parser entry in `trainmate/cli/workouts/parser.py`. As built, the question, the
-  notice and `workout notify` live in `trainmate/cli/workouts/heads_up.py`, because
-  `generate.py` is past the size limit, and the send rule in `trainmate/heads_up.py`.
+- `trainmate/cli/workouts/` — `generate.py`, `adapt.py` and `rollback.py`: the replace
+  question at the start of `run_workout_generate` and `run_workout_adapt`, before the LLM
+  call (§5); the wording of the exits that write nothing after a Replace (§5); the notice
+  under the line (§8); `_change_line` prints the description and "not sent yet"; the
+  new `workout notify` (§4), with its parser entry in
+  `trainmate/cli/workouts/parser.py`. As built, the question, the notice and
+  `workout notify` live in `trainmate/cli/workouts/heads_up.py`, because `generate.py`
+  was past the size limit at the time, and the send rule in `trainmate/heads_up.py`.
 - `trainmate/cli/bot.py`: the hidden `bot changes`; `run_bot_morning` loses the week line.
 - `trainmate_bot.py`: `scheduler_wake` runs `bot changes` after the due reminders and before
   the morning message, in companion mode, when the chat is free and either the morning rule

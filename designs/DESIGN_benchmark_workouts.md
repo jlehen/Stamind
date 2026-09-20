@@ -620,7 +620,7 @@ generic so an outdoor test just needs a preference edit.
 ## 6. Surfacing
 
 - `workout list` carries a `[BENCHMARK]` marker (alongside `[ADAPTED]`) —
-  `cli/workouts/_helpers.py:60-62`.
+  `cli/workouts/session_line.py:66`.
 - CLI verb `benchmark`, mirroring `goal` / `constraint` (`cli/benchmarks.py`,
   dispatched at `trainmate_cli.py:325-337`):
   - `benchmark record <sport> --<kind> <value> [--date …] [--note …] [--source …]`

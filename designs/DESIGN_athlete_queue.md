@@ -564,7 +564,7 @@ item's place in the queue. `tm queue tell` is a terminal command, not a tap.
   the hidden `bot queue` with `--remind`, whose parser entry sits with the other `bot`
   commands in `cli/bot.py`.
 - `trainmate/cli/bot.py`: `run_bot_morning` starts a walk at its end.
-- `trainmate/cli/status.py` and `workout adapt` (`cli/workouts/generate.py`): the hint, beside
+- `trainmate/cli/status.py` and `workout adapt` (`cli/workouts/adapt.py`): the hint, beside
   the end-of-schedule hint.
 - `trainmate/cli/render.py`: the list, the item, reminder and hint renderers, expert and
   companion (the companion's hint prints nothing).

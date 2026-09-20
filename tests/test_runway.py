@@ -361,7 +361,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         self._sessions(-2)
         coach = MagicMock()
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.workouts.generate.ensure_recent_data"):
+                patch("trainmate.cli.workouts.adapt.ensure_recent_data"):
             code, out, _ = run_cli(["workout", "adapt", "-y"])
         self.assertEqual(code, 0)
         coach.workout_adapt.assert_not_called()
@@ -408,7 +408,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         coach.workout_adapt.return_value.new_constraints = ()
         coach.workout_adapt.return_value.reason = "All good."
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.workouts.generate.ensure_recent_data"), \
+                patch("trainmate.cli.workouts.adapt.ensure_recent_data"), \
                 patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "adapt", "-y"])
         self.assertEqual(code, 0)
@@ -424,7 +424,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         self._sessions(-2)
         coach = MagicMock()
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.workouts.generate.ensure_recent_data"), \
+                patch("trainmate.cli.workouts.adapt.ensure_recent_data"), \
                 patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "adapt", "-y"])
         self.assertEqual(code, 0)

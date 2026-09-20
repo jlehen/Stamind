@@ -825,7 +825,7 @@ the question that was open; a confirm inside `tm shell` lands on the typed line'
 not the shell's; and `ask_text` writes nothing at all, which is the §4.4 rule.
 
 **A structural test on the read-only verbs.** §7.1 hides a run by matching the last word of
-its command against a set of names, and that set lives in `cli/journal.py` while the names
+its command against a set of names, and that set lives in `cli/journal/runs.py` while the names
 live in the parser tree — two files, so the invariant needs a test that spans them.
 `TestReadOnlyVerbs` walks the real tree and fails on any verb that no longer names a
 command: a renamed or retired one would otherwise match nothing, silently, and its runs

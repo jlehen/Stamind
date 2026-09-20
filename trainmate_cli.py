@@ -61,9 +61,9 @@ from trainmate.cli.signals import add_signal_parser
 from trainmate.cli.learnings import add_learnings_parser
 from trainmate.cli.plans import add_plan_parser
 from trainmate.cli.workouts.parser import add_workout_parser
-from trainmate.cli.data import add_data_parser
+from trainmate.cli.data.parser import add_data_parser
 from trainmate.cli.settings import add_settings_parser
-from trainmate.cli.journal import add_journal_parser
+from trainmate.cli.journal.parser import add_journal_parser
 from trainmate.cli.queue import add_queue_parser
 from trainmate.cli.strength import add_strength_parser
 from trainmate.cli.bot import add_bot_parser

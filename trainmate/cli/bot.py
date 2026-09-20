@@ -527,7 +527,7 @@ def _no_find(text: str) -> None:
 def _hand_off_to_coach(text: str) -> None:
     """Runs `workout adapt -m` with the athlete's original words, in this process. The
     coach reads what she wrote, which is the whole point of this lane (§12.3, §12.4)."""
-    from trainmate.cli.workouts.generate import run_workout_adapt
+    from trainmate.cli.workouts.adapt import run_workout_adapt
     run_workout_adapt(argparse.Namespace(
         date=None, no_pull=False, force_pull=False, auto=False,
         message=text, lookback=None,

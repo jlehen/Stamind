@@ -248,7 +248,7 @@ def list_workouts() -> Any:
 @app.route("/api/workouts/compare", methods=["GET"])
 def compare_workouts() -> Any:
     """Plan-vs-actual adherence over a date range (mirrors `workout compare`,
-    trainmate/cli/workouts/generate.py). Unlike the CLI it never calls `garmin.ensure_data` —
+    trainmate/cli/workouts/compare.py). Unlike the CLI it never calls `garmin.ensure_data` —
     the dashboard consumes cached data only (§8). Reuses `analytics.compare`; returns a
     day-by-day structure so the frontend renders without re-deriving any logic.
 

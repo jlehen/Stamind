@@ -429,7 +429,7 @@ question then closes as stale.
   `_exists`.
 - `trainmate/cli/learnings.py`: `rm --purge`, `restore`, `list -a/--all`, `show` finding an
   archived learning and printing the reasons, keep/demote printing through the renderer.
-- `trainmate/cli/data.py`: the reason under a contradiction in the reflect report, and the
+- `trainmate/cli/data/analysis.py`: the reason under a contradiction in the reflect report, and the
   queue hint at the end of `data reflect` and `data bootstrap`.
 - `trainmate/cli/status.py` and `trainmate_web.py`: archived learnings left out.
 - `trainmate/cli/render.py`: renderer methods for the two answers' replies, one rung down or

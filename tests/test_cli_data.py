@@ -60,7 +60,7 @@ class TestCliData(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("Garmin 2026-06-01..2026-06-02: 3 activities, 2 days", stdout)
 
-    @patch("trainmate.cli.data.mark_adherence_range")
+    @patch("trainmate.cli.data.cache.mark_adherence_range")
     @patch("trainmate.runtime.garmin")
     def test_data_pull_marks_adherence(self, mock_garmin, mock_mark):
         # A successful pull rides along into the adherence Calendar marking over
@@ -72,7 +72,7 @@ class TestCliData(unittest.TestCase):
         mock_mark.assert_called_once()
         self.assertIn("Marked 2 past Calendar event(s)", stdout)
 
-    @patch("trainmate.cli.data.mark_adherence_range")
+    @patch("trainmate.cli.data.cache.mark_adherence_range")
     @patch("trainmate.runtime.garmin")
     def test_data_pull_no_mark_skips_marking(self, mock_garmin, mock_mark):
         # --no-mark suppresses the ride-along even on a successful pull.
@@ -81,7 +81,7 @@ class TestCliData(unittest.TestCase):
         mock_garmin.pull.assert_called_once()
         mock_mark.assert_not_called()
 
-    @patch("trainmate.cli.data.mark_adherence_range")
+    @patch("trainmate.cli.data.cache.mark_adherence_range")
     @patch("trainmate.runtime.garmin")
     def test_data_pull_skips_marking_on_failure(self, mock_garmin, mock_mark):
         # If the Garmin pull fails, the ride-along marking is not attempted.
@@ -196,7 +196,7 @@ class TestCliData(unittest.TestCase):
     def test_analysis_report_wraps_llm_prose_to_the_client_width(self):
         # Every prose field in the bootstrap/reflect report comes from the LLM at
         # unbounded length; none may run past the client's wrap width (AGENTS.md).
-        from trainmate.cli.data import _render_analysis_report
+        from trainmate.cli.data.analysis import _render_analysis_report
         from trainmate.text import visible_len
 
         learning_id = test_db.add_learning(
@@ -256,7 +256,7 @@ class TestCliData(unittest.TestCase):
         """The kimi-k3 shape: every delta key prefixed, so no op is recognized. The section
         must not render empty under a 'Saved to learnings' header
         (DESIGN_backward_evaluation.md §13)."""
-        from trainmate.cli.data import _render_analysis_report
+        from trainmate.cli.data.analysis import _render_analysis_report
 
         result = {
             "macrocycle_summary": "A real reconstruction.",
@@ -274,7 +274,7 @@ class TestCliData(unittest.TestCase):
         self.assertEqual(out.count("unreadable update"), 2)
 
     def test_a_readable_delta_still_reports_as_saved(self):
-        from trainmate.cli.data import _render_analysis_report
+        from trainmate.cli.data.analysis import _render_analysis_report
 
         result = {
             "macrocycle_summary": "A real reconstruction.",

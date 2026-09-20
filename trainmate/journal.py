@@ -11,7 +11,7 @@ Two properties hold this module together, and both are load-bearing:
   come from the system clock in UTC, never from ``trainmate.clock``: resolving the
   athlete's zone opens and migrates the database, which would happen on ``tm help`` and
   inside the one code path whose job is to survive the database being unreachable. The
-  athlete's day comes back at display time, in ``cli/journal.py``.
+  athlete's day comes back at display time, in ``cli/journal/``.
 """
 import json
 import os

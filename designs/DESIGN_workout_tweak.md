@@ -288,7 +288,7 @@ unrelated parts of the message into a brief, or drops the request.
 | `gcal/reconcile.py` | The manual clause of `leaves_trace`. |
 | `gcal/event.py` | The `[Manual]` title tag. `add` as a reason to say `[Deleted]`. |
 | `gcal/history.py` | The labels "Added by hand", "Replaced by hand" and `rm`'s "Cancelled". |
-| `cli/workouts/_helpers.py` | The `[MANUAL]` and `[REPLACED]` markers. |
+| `cli/workouts/session_line.py` | The `[MANUAL]` and `[REPLACED]` markers. |
 | `cli/workouts/generate.py` | "N added by hand" in the question `workout generate` asks. |
 | `analytics/runway.py` | `coverage_end`. Without manual sessions it is the same function as `plan_end`. |
 | `static/` | The manual badge and the two commands in the help text. |

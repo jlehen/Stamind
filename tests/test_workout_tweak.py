@@ -113,7 +113,7 @@ class _TweakCase(unittest.TestCase):
 
 
 class CommandTest(_TweakCase):
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_every_d_reaches_the_service_with_the_message(self, service, _pull):
         from trainmate.coach.proposals import RevisionProposal

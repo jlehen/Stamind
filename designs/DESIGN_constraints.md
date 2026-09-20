@@ -617,7 +617,7 @@ what `constraint add` itself accepts:
    ephemeral nudge — the message still influenced *this* run's adaptation via
    the advisory text, but nothing durable is written.
 2. **Then confirm the adaptation.** The existing adapt preview + `[y/N]` apply
-   prompt (`cli/workouts/generate.py`) runs as it does today. Declining the constraint in
+   prompt (`cli/workouts/adapt.py`) runs as it does today. Declining the constraint in
    step 1 does not stop step 2, and vice versa — they are independent
    commits.
 

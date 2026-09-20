@@ -858,7 +858,7 @@ class TestReadOnlyVerbs(unittest.TestCase):
     def test_every_read_only_verb_names_a_command_in_the_tree(self):
         import trainmate_cli
         from trainmate.cli.argparse_ext import _subparsers_action
-        from trainmate.cli.journal import READ_ONLY_VERBS
+        from trainmate.cli.journal.runs import READ_ONLY_VERBS
 
         parser, _named = trainmate_cli.build_parser()
 

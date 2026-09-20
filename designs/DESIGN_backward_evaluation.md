@@ -276,7 +276,7 @@ absent, else recompute and `save_analysis_cache(...)`.
    covers the span (`progress timeline` and the web dashboard's read-only view).
    Added later by DESIGN_progress_timeline.md §6.1; the sections below that call
    the strategy prompt the *only* consumer predate it.
-3. `data show-analysis` (`san`) → `cli/data.py:_render_analysis_report`, the same
+3. `data show-analysis` (`san`) → `cli/data/analysis.py:_render_analysis_report`, the same
    renderer `bootstrap`/`reflect` print through. It exists because the two ways to
    *read* a stored reconstruction before it were both indirect: the timeline shows
    mesocycle names only, and `bootstrap --inspect-only` — read-only as to writes — still

@@ -58,9 +58,9 @@ def recompute_derived(dbh=None) -> None:
     sweep is trivially cheap on a local DB and avoids windowed-recompute bugs (an
     activity affects 28 days of derived values).
 
-    `dbh` defaults to the module db; the post-wipe recompute (cli/data.py) passes the
-    CLI's own handle so it sweeps the same database the wipe just ran against, even
-    when the singleton has been rebound (tests, embeddings that inject a db)."""
+    `dbh` defaults to the module db; the post-wipe recompute (`db/wipes.py`) passes the
+    handle the wipe ran against, so it sweeps that same database even when the
+    singleton has been rebound (tests, embeddings that inject a db)."""
     dbh = dbh or runtime.db
     # One unified load per activity via the fallback hierarchy (power TSS ->
     # hrTSS -> sRPE), not the old `tss + rpe*hours` blend.
