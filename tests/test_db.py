@@ -409,29 +409,6 @@ class TestDatabase(unittest.TestCase):
         self.assertFalse(test_db.get_learning(lid)["archived"])
         self.assertEqual(len(test_db.get_learning_evidence(lid)), 3)
 
-    def test_grandfather_seeds_basis_to_sustain_level(self):
-        """A learning predating the evidence model keeps its level after recompute, because
-        the migration seeds a synthetic supporting basis sized to sustain it (§9)."""
-        # Simulate a pre-evidence row: insert directly with no basis, then run the migration.
-        now = datetime.now(timezone.utc).isoformat()
-        with test_db._get_connection() as conn:
-            conn.execute(
-                "INSERT INTO coach_learnings (text, sports, confidence, created_at, "
-                "updated_at, last_reinforced_at) VALUES "
-                "('Legacy established', 'general', 'established', ?, ?, ?)",
-                (now, now, now)
-            )
-            lid = conn.execute(
-                "SELECT id FROM coach_learnings WHERE text='Legacy established'"
-            ).fetchone()[0]
-        test_db._grandfather_learning_evidence()
-        # 5 distinct synthetic supporting weeks -> recompute keeps 'established'.
-        basis = test_db.get_learning_evidence(lid)
-        self.assertEqual(len({e["week_commencing"] for e in basis}), 5)
-        test_db.recompute_all_confidence()
-        learning = next(l for l in test_db.get_learnings() if l["id"] == lid)
-        self.assertEqual(learning["confidence"], "established")
-        self.assertIsNone(learning["proposed_confidence"])
 
     def test_analysis_cache_upsert_and_retention(self):
         """One row per horizon; saving again overwrites the slot. `reconstruction`
@@ -807,25 +784,6 @@ class TestGoalStateIsDerived(unittest.TestCase):
         self.assertEqual(
             test_db.get_governing_macrocycle()["objective_id"], latest
         )
-
-    def test_a_completed_goal_is_no_longer_stored(self):
-        """One-off migration: the state left the column when it became derivable."""
-        with test_db._get_connection() as conn:
-            conn.execute(
-                "INSERT INTO objectives (title, target_date, sport_type, status)"
-                " VALUES ('Legacy', '2026-07-04', 'cycling', 'completed')"
-            )
-            conn.commit()
-
-        # A database still holding this state predates the stamp, so clear it: an
-        # already-migrated database legitimately skips the migration.
-        unstamp_schema(test_db)
-        Database(db_path=TEST_DB_PATH)          # re-init runs the migration
-
-        row = test_db.get_objectives()[0]
-        self.assertEqual(row["status"], "active")
-        self.assertEqual(goal_state(row), "completed")     # unchanged where it counts
-
 
 if __name__ == "__main__":
     unittest.main()

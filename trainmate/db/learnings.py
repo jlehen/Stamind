@@ -281,24 +281,6 @@ class LearningsMixin:
         weeks = [(base - timedelta(weeks=i)).strftime("%Y-%m-%d") for i in range(need)]
         self._add_evidence_weeks(cursor, learning_id, weeks, +1, source, anchor_iso)
 
-    def _grandfather_learning_evidence(self) -> None:
-        """One-time seed of a synthetic basis for learnings predating the evidence model
-        (those with an empty basis). Idempotent: a learning gains ≥1 row here and is never
-        revisited. See DESIGN_evidence_based_confidence.md §9."""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT cl.id, cl.confidence, cl.created_at FROM coach_learnings cl "
-                "LEFT JOIN learning_evidence le ON le.learning_id = cl.id "
-                "WHERE le.id IS NULL"
-            )
-            rows = cursor.fetchall()
-            for row in rows:
-                self._seed_synthetic_evidence(
-                    cursor, row["id"], row["confidence"] or "tentative",
-                    row["created_at"], source="migration"
-                )
-
     def _recompute_confidence(self, cursor, learning_id: int, now: str) -> None:
         """Re-derives a learning's confidence from its basis and applies the upgrade/propose
         rule (§3, §7): an upgrade (or unchanged) is applied immediately; a downgrade is only

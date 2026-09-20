@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from tests import test_db_path
 from tests.helpers import (
-    clear_all_tables, pin_clock, rebind_test_db, save_workout, unstamp_schema,
+    clear_all_tables, pin_clock, rebind_test_db, save_workout,
 )
 
 TEST_DB_PATH = test_db_path("test_trainmate_constraints.db")
@@ -714,82 +714,6 @@ class TestHonoredAt(unittest.TestCase):
             mesocycles=[{"name": name, "start_date": start, "end_date": end,
                          "focus": "Aerobic base"} for name, start, end in mesocycles],
         )
-
-
-class TestConstraintMigration(unittest.TestCase):
-    """The rev-6 schema migration (db/base.py): a pre-rev-6 constraints table
-    (binding/sport/type, no `rest`) is upgraded in place — `hard` + no sport becomes
-    rest=1, every other row becomes advisory (rest=0), and the three legacy columns are
-    dropped. Idempotent DDL, so it runs automatically in _init_db."""
-
-    @classmethod
-    def setUpClass(cls):
-        global test_db
-        test_db = Database(db_path=TEST_DB_PATH)
-        rebind_test_db(test_db)
-
-    def setUp(self):
-        clear_all_tables(test_db)
-
-    def _install_legacy_table(self, rows):
-        with test_db._get_connection() as conn:
-            cur = conn.cursor()
-            cur.execute("DROP TABLE IF EXISTS constraints")
-            cur.execute("""
-                CREATE TABLE constraints (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    start_date TEXT NOT NULL, end_date TEXT NOT NULL,
-                    binding TEXT NOT NULL, sport TEXT, type TEXT,
-                    title TEXT NOT NULL, description TEXT,
-                    replan INTEGER NOT NULL DEFAULT 0, source TEXT, created TEXT
-                )
-            """)
-            for r in rows:
-                cur.execute(
-                    "INSERT INTO constraints "
-                    "(start_date, end_date, binding, sport, type, title, replan) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    r
-                )
-            conn.commit()
-        # A real pre-rev-6 database carries no schema stamp, so clear it here too —
-        # otherwise _init_db correctly skips the migrations it has already applied.
-        unstamp_schema(test_db)
-
-    def test_migration_maps_binding_sport_to_rest_and_drops_columns(self):
-        # (start, end, binding, sport, type, title, replan)
-        self._install_legacy_table([
-            ("2026-08-01", "2026-08-03", "hard", None, "injury", "broke ankle", 1),
-            ("2026-08-05", "2026-08-05", "hard", "running", "trip", "no run today", 0),
-            ("2026-08-06", "2026-08-06", "soft", None, None, "easy week", 0),
-        ])
-        # Re-run init (idempotent) to apply the rev-6 migration on the legacy table.
-        test_db._init_db()
-
-        rows = {r["title"]: r for r in test_db.get_constraints()}
-        self.assertEqual(rows["broke ankle"]["rest"], 1)     # hard + no sport -> rest
-        self.assertEqual(rows["no run today"]["rest"], 0)    # hard + sport   -> advisory
-        self.assertEqual(rows["easy week"]["rest"], 0)       # soft           -> advisory
-        # Other fields survive untouched.
-        self.assertEqual(rows["broke ankle"]["replan"], 1)
-
-        with test_db._get_connection() as conn:
-            cols = [r["name"] for r in
-                    conn.execute("PRAGMA table_info(constraints)").fetchall()]
-        self.assertIn("rest", cols)
-        for gone in ("binding", "sport", "type"):
-            self.assertNotIn(gone, cols)
-
-    def test_migration_is_idempotent(self):
-        self._install_legacy_table([
-            ("2026-08-01", "2026-08-03", "hard", None, None, "layoff", 0),
-        ])
-        test_db._init_db()
-        test_db._init_db()  # second pass must be a no-op, not an error
-        rows = test_db.get_constraints()
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["rest"], 1)
-
 
 
 class TestConstraintReplanTarget(unittest.TestCase):

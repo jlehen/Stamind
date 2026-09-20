@@ -115,36 +115,6 @@ class BaseDB:
             self._joined = None
             conn.close()
 
-    @staticmethod
-    def _table_has_column(cursor: sqlite3.Cursor, table: str, column: str) -> bool:
-        """Returns True if `table` currently has `column` (via PRAGMA table_info)."""
-        cursor.execute(f"PRAGMA table_info({table})")
-        return any(row[1] == column for row in cursor.fetchall())
-
-    @staticmethod
-    def _table_exists(cursor: sqlite3.Cursor, table: str) -> bool:
-        """Returns True if `table` is present in the database."""
-        cursor.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
-        )
-        return cursor.fetchone() is not None
-
-    @classmethod
-    def _add_column(
-        cls, cursor: sqlite3.Cursor, table: str, column: str, ddl: str
-    ) -> None:
-        """Adds `column` to `table` if it is missing.
-
-        Migrations used to be written `try: ALTER ... except OperationalError: pass`,
-        reading "the column is already there". But OperationalError is also how SQLite
-        reports "database is locked" and "disk I/O error", so a locked database at
-        startup half-migrated in silence and left no way to tell afterwards. Asking
-        first means the only errors that reach here are real ones.
-        """
-        if cls._table_has_column(cursor, table, column):
-            return
-        cursor.execute(ddl)
-
     def _schema_version(self, conn: sqlite3.Connection) -> int:
         """The version this database has been brought up to, 0 if never stamped."""
         conn.execute(
@@ -163,17 +133,19 @@ class BaseDB:
         )
 
     def _init_db(self) -> None:
-        """Brings the database up to SCHEMA_VERSION, then does nothing on later starts.
+        """Creates every table at SCHEMA_VERSION, then does nothing on later starts.
 
         This used to run unconditionally: ~630 lines of DDL and roughly thirty in-place
         migrations, on every process start, including `tm --help`. It also *wrote* to the
         file to do it. Now the work happens once and the result is stamped, so a startup
         against a current database is a single SELECT.
 
-        The migrations themselves are unchanged and remain idempotent (CREATE TABLE IF
-        NOT EXISTS, guarded ALTERs), so stamping is a shortcut rather than a new contract
-        — a database that somehow misses a column is still repaired by clearing its
-        schema_version row.
+        The in-place migrations are gone: both instances were stamped at 18, so every one
+        of them had already run (AGENTS.md — a migration is one-off, and the app carries
+        no backward compatibility). What they built is folded into the CREATE statements
+        below, in the column order they produced. A database older than that cannot be
+        upgraded by this code any more: migrate it with a checkout from before the squash.
+        Clearing the schema_version row still repairs a database that misses a table.
         """
         with self._get_connection() as conn:
             if self._schema_version(conn) >= SCHEMA_VERSION:
@@ -195,32 +167,6 @@ class BaseDB:
                 )
             """)
 
-            # Whether target_date is a scheduled event or just how far to train
-            # (ARCHITECTURE.md §15 "Goal dates"). Existing rows read 'event', which is
-            # what they meant.
-            self._add_column(
-                cursor, "objectives", "date_type",
-                "ALTER TABLE objectives ADD COLUMN date_type TEXT NOT NULL DEFAULT 'event'"
-            )
-
-            # `priority` was never read by any logic and never reached a prompt, so
-            # editing it only flagged the plan stale (DOMAIN_MODEL.md §2 "Goal").
-            if self._table_has_column(cursor, "objectives", "priority"):
-                cursor.execute("ALTER TABLE objectives DROP COLUMN priority")
-
-            # One-off (single-user app): 'completed' is no longer a stored state. A goal
-            # the athlete has not archived and whose target date has passed IS completed,
-            # derived by `db.objectives.goal_state()` — the column now records only
-            # whether the goal was called off (DESIGN_backward_evaluation.md §12).
-            cursor.execute(
-                "UPDATE objectives SET status = 'active' WHERE status = 'completed'"
-            )
-
-            # Dead tables, replaced by `constraints` (DESIGN_constraints.md §5); the row
-            # copy across has already run. Idempotent, so it stays in `_init_db`.
-            cursor.execute("DROP TABLE IF EXISTS lifeevents")
-            cursor.execute("DROP TABLE IF EXISTS life_events")
-
             # Unified directives — everything the athlete asks the coach to work around, at
             # any horizon (DESIGN_constraints.md §5). A constraint is advisory prose the coach
             # reads unless `rest = 1`, the single deterministic edge: a no-training window
@@ -236,40 +182,16 @@ class BaseDB:
                     description TEXT,
                     replan      INTEGER NOT NULL DEFAULT 0,
                     source      TEXT,
-                    created     TEXT
+                    created     TEXT,
+                    -- When a coach pass last had this constraint in scope with authority
+                    -- over every day of it still ahead (DESIGN_constraint_honoring.md §2).
+                    -- NULL = the schedule does not reflect it yet. Not "the schedule
+                    -- definitely changed".
+                    honored_at  TEXT
                 )
             """)
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_constraints_start ON constraints(start_date)"
-            )
-
-            # Collapse binding/sport/type onto the one `rest` flag (DESIGN_constraints.md §5).
-            # Every dropped row already behaved as advisory prose, so only hard+no-sport
-            # carries over. Changes the constraints_hash of a replan=1 constraint: run
-            # scripts/migrate_constraints_drop_binding.py once to avoid a spurious regen (§7).
-            cursor.execute("PRAGMA table_info(constraints)")
-            ccols = [row['name'] for row in cursor.fetchall()]
-            if 'rest' not in ccols:
-                cursor.execute(
-                    "ALTER TABLE constraints ADD COLUMN rest INTEGER NOT NULL DEFAULT 0"
-                )
-                cursor.execute(
-                    "UPDATE constraints SET rest = 1 "
-                    "WHERE binding = 'hard' AND sport IS NULL"
-                )
-            if 'binding' in ccols:
-                cursor.execute("ALTER TABLE constraints DROP COLUMN binding")
-            if 'sport' in ccols:
-                cursor.execute("ALTER TABLE constraints DROP COLUMN sport")
-            if 'type' in ccols:
-                cursor.execute("ALTER TABLE constraints DROP COLUMN type")
-
-            # When a coach pass last had this constraint in scope with authority over
-            # every day of it still ahead (DESIGN_constraint_honoring.md §2). NULL = the
-            # schedule does not reflect it yet. Not "the schedule definitely changed".
-            self._add_column(
-                cursor, "constraints", "honored_at",
-                "ALTER TABLE constraints ADD COLUMN honored_at TEXT"
             )
 
             # Workouts — an append-only revision log (DESIGN_workout_revisions.md §2).
@@ -316,39 +238,19 @@ class BaseDB:
                     created_at    TEXT    NOT NULL,
                     kind          TEXT    NOT NULL,
                     summary       TEXT,
-                    macrocycle_id INTEGER
+                    macrocycle_id INTEGER,
+                    -- The coach's one line to the athlete about this change, for the
+                    -- morning push (DESIGN_plan_change_continuity.md §6.3). NULL on a
+                    -- change with nothing the athlete would notice, which is most of them.
+                    note          TEXT,
+                    -- The last day of the commitment window in force when this change ran,
+                    -- so a void is judged by the window it was written under rather than by
+                    -- the one standing whenever the Calendar sync happens to run (§5.2).
+                    commitment_end TEXT,
+                    -- When the athlete was told about it (DESIGN_change_heads_up.md §6).
+                    told_at       TEXT
                 )
             """)
-
-            # The coach's one line to the athlete about this change, for the morning push
-            # (DESIGN_plan_change_continuity.md §6.3). NULL on a change with nothing the
-            # athlete would notice, which is most of them.
-            self._add_column(
-                cursor, "workout_changes", "note",
-                "ALTER TABLE workout_changes ADD COLUMN note TEXT"
-            )
-            # The last day of the commitment window in force when this change ran, so a
-            # void is judged by the window it was written under rather than by the one
-            # standing whenever the Calendar sync happens to run (§5.2).
-            self._add_column(
-                cursor, "workout_changes", "commitment_end",
-                "ALTER TABLE workout_changes ADD COLUMN commitment_end TEXT"
-            )
-            # When the athlete was told about this change (DESIGN_change_heads_up.md §6).
-            # One-off on the way in (§9): every existing change counts as told, so the first
-            # wake does not send every old line at once, and the morning push's own marker
-            # goes with the code that read it.
-            if not self._table_has_column(cursor, "workout_changes", "told_at"):
-                cursor.execute("ALTER TABLE workout_changes ADD COLUMN told_at TEXT")
-                cursor.execute("UPDATE workout_changes SET told_at = created_at")
-                if self._table_exists(cursor, "settings"):
-                    cursor.execute("DELETE FROM settings WHERE key = 'push_note_last'")
-            # One-off: the four hand-edit commands are gone, and what they wrote was the
-            # athlete's own request, which is what a tweak is (DESIGN_workout_tweak.md §7).
-            cursor.execute(
-                "UPDATE workout_changes SET kind = 'tweak' "
-                "WHERE kind IN ('add', 'rm', 'swap', 'restore')"
-            )
 
             # Calendar sync bookkeeping, keyed by lineage (§8). Off the row because a
             # successful push is not a prescription change: leaving it there would make
@@ -435,43 +337,29 @@ class BaseDB:
                     avg_hr INTEGER,
                     max_hr INTEGER,
                     rpe INTEGER,
-                    tss REAL
+                    tss REAL,
+                    bike_avg_watts INTEGER DEFAULT NULL,
+                    zone1_sec INTEGER DEFAULT NULL,
+                    zone2_sec INTEGER DEFAULT NULL,
+                    zone3_sec INTEGER DEFAULT NULL,
+                    zone4_sec INTEGER DEFAULT NULL,
+                    zone5_sec INTEGER DEFAULT NULL,
+                    -- Power zones use Garmin's 7-zone model (cycling with a power meter).
+                    power_zone1_sec INTEGER DEFAULT NULL,
+                    power_zone2_sec INTEGER DEFAULT NULL,
+                    power_zone3_sec INTEGER DEFAULT NULL,
+                    power_zone4_sec INTEGER DEFAULT NULL,
+                    power_zone5_sec INTEGER DEFAULT NULL,
+                    power_zone6_sec INTEGER DEFAULT NULL,
+                    power_zone7_sec INTEGER DEFAULT NULL,
+                    -- Whether a strength session's sets were read, frozen or discarded
+                    -- (DESIGN_strength_tracking.md §5). The summary upsert names its
+                    -- columns, so a pull never touches these three.
+                    sets_read_at TEXT DEFAULT NULL,
+                    sets_final_at TEXT DEFAULT NULL,
+                    discarded INTEGER NOT NULL DEFAULT 0
                 )
             """)
-
-            # Add new columns to completed_activities if they don't exist
-            for col in [
-                "bike_avg_watts INTEGER DEFAULT NULL",
-                "zone1_sec INTEGER DEFAULT NULL",
-                "zone2_sec INTEGER DEFAULT NULL",
-                "zone3_sec INTEGER DEFAULT NULL",
-                "zone4_sec INTEGER DEFAULT NULL",
-                "zone5_sec INTEGER DEFAULT NULL",
-                # Power zones use Garmin's 7-zone model (cycling with a power meter).
-                "power_zone1_sec INTEGER DEFAULT NULL",
-                "power_zone2_sec INTEGER DEFAULT NULL",
-                "power_zone3_sec INTEGER DEFAULT NULL",
-                "power_zone4_sec INTEGER DEFAULT NULL",
-                "power_zone5_sec INTEGER DEFAULT NULL",
-                "power_zone6_sec INTEGER DEFAULT NULL",
-                "power_zone7_sec INTEGER DEFAULT NULL",
-            ]:
-                self._add_column(
-                    cursor, "completed_activities", col.split()[0],
-                    f"ALTER TABLE completed_activities ADD COLUMN {col}"
-                )
-            # Whether a strength session's sets were read, frozen or discarded
-            # (DESIGN_strength_tracking.md §5). The summary upsert names its columns, so a
-            # pull never touches these three.
-            for col in [
-                "sets_read_at TEXT DEFAULT NULL",
-                "sets_final_at TEXT DEFAULT NULL",
-                "discarded INTEGER NOT NULL DEFAULT 0",
-            ]:
-                self._add_column(
-                    cursor, "completed_activities", col.split()[0],
-                    f"ALTER TABLE completed_activities ADD COLUMN {col}"
-                )
 
             # The athlete's answers to "is this activity that session?" — the pairing
             # questions `adherence.is_ambiguous_match` raises (ARCHITECTURE.md §15).
@@ -501,25 +389,6 @@ class BaseDB:
                     tsb REAL
                 )
             """)
-            # ACWR retired in favour of ATL/CTL, which reads off the PMC EWMAs already on
-            # this row (training_load.md §3). Pure DDL, guarded by column presence, so
-            # it is idempotent and needs no separate migration script.
-            cursor.execute("PRAGMA table_info(athlete_metrics_cache)")
-            mcols = [row['name'] for row in cursor.fetchall()]
-            for col in ("acute_workload", "chronic_workload", "acwr"):
-                if col in mcols:
-                    cursor.execute(
-                        f"ALTER TABLE athlete_metrics_cache DROP COLUMN {col}"
-                    )
-            # Performance Management Chart columns (DESIGN_pmc_fitness_fatigue.md §4):
-            # CTL/ATL/TSB, back-populated for the whole history by the next
-            # recompute_derived() sweep. NULL-tolerant on existing rows; no migration.
-            for col in ("ctl", "atl", "tsb"):
-                self._add_column(
-                    cursor, "athlete_metrics_cache", col,
-                    f"ALTER TABLE athlete_metrics_cache ADD COLUMN {col} REAL"
-                )
-
             # Athlete baselines table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS athlete_baselines (
@@ -553,26 +422,6 @@ class BaseDB:
                 )
             """)
 
-            # Phase 2 enrichment: add sport-scope, confidence, and recency columns to
-            # coach_learnings created before they existed; plus the evidence-confidence
-            # proposed_confidence column and the archive status.
-            for col in [
-                "sports TEXT NOT NULL DEFAULT 'general'",
-                "confidence TEXT NOT NULL DEFAULT 'tentative'",
-                "proposed_confidence TEXT",
-                "last_reinforced_at TEXT",
-                "status TEXT DEFAULT 'active'",
-            ]:
-                self._add_column(
-                    cursor, "coach_learnings", col.split()[0],
-                    f"ALTER TABLE coach_learnings ADD COLUMN {col}"
-                )  # Column already exists.
-            # Backfill recency for migrated rows: treat creation as the last reinforcement.
-            cursor.execute(
-                "UPDATE coach_learnings SET last_reinforced_at = created_at "
-                "WHERE last_reinforced_at IS NULL"
-            )
-
             # Evidence basis (DESIGN_evidence_based_confidence.md §5). The distinct training
             # WEEKS that back each learning, tagged +1 supporting / -1 contradicting. Confidence
             # is a pure function of this basis. UNIQUE(learning_id, week_commencing, polarity)
@@ -591,13 +440,6 @@ class BaseDB:
                     FOREIGN KEY (learning_id) REFERENCES coach_learnings(id) ON DELETE CASCADE
                 )
             """)
-            # What reflect said went against a learning (DESIGN_learning_doubt_nudge.md §4).
-            self._add_column(
-                cursor, "learning_evidence", "reason",
-                "ALTER TABLE learning_evidence ADD COLUMN reason TEXT"
-            )
-
-
             # Macrocycles table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS macrocycles (
@@ -614,100 +456,18 @@ class BaseDB:
                     all_constraints_snapshot TEXT,
                     science_snapshot TEXT,
                     created_at TEXT NOT NULL,
+                    -- The verdict call's re-shaping read, cached against the snapshot it
+                    -- was asked about (DESIGN_plan_change_continuity.md §7).
+                    reshape_verdict TEXT,
+                    reshape_verdict_key TEXT,
+                    -- Plan-version axis (DESIGN_plan_rollback.md): a regenerated plan keeps
+                    -- the prior macrocycle, marked 'superseded'. Exactly one is 'active'.
+                    status TEXT DEFAULT 'active',
+                    superseded_at TEXT,
                     FOREIGN KEY (objective_id) REFERENCES objectives(id) ON DELETE CASCADE
                 )
             """)
 
-            # Fold the plan's staleness fingerprint back to `constraints_hash` and its
-            # snapshot to `constraints_snapshot` (DESIGN_constraints.md §7/§9). The prior
-            # `lifeevents_hash`/`lifeevents_snapshot` names are renamed in place; existing
-            # snapshot VALUES are left untouched (the display code tolerates plans that
-            # predate a snapshot key).
-            cursor.execute("PRAGMA table_info(macrocycles)")
-            columns = [row['name'] for row in cursor.fetchall()]
-            if 'lifeevents_hash' in columns and 'constraints_hash' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles RENAME COLUMN lifeevents_hash TO constraints_hash"
-                )
-            if 'lifeevents_snapshot' in columns and 'constraints_snapshot' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles "
-                    "RENAME COLUMN lifeevents_snapshot TO constraints_snapshot"
-                )
-            # The verdict call's re-shaping read, cached against the snapshot it was asked
-            # about, so `plan show` asks once per edit rather than on every read
-            # (DESIGN_plan_change_continuity.md §7).
-            self._add_column(
-                cursor, "macrocycles", "reshape_verdict",
-                "ALTER TABLE macrocycles ADD COLUMN reshape_verdict TEXT"
-            )
-            self._add_column(
-                cursor, "macrocycles", "reshape_verdict_key",
-                "ALTER TABLE macrocycles ADD COLUMN reshape_verdict_key TEXT"
-            )
-
-            cursor.execute("PRAGMA table_info(macrocycles)")
-            columns = [row['name'] for row in cursor.fetchall()]
-            if 'config_hash' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles ADD COLUMN config_hash TEXT"
-                )
-            # Snapshots of the goals and constraints the plan was generated from, so they
-            # can be shown after the fact even once the live records have changed. Stored as
-            # the same cleaned JSON the goals_hash/constraints_hash fingerprint.
-            if 'goals_snapshot' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles ADD COLUMN goals_snapshot TEXT"
-                )
-            if 'constraints_snapshot' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles ADD COLUMN constraints_snapshot TEXT"
-                )
-            # Every constraint active at generation time, not just the `replan = 1` subset
-            # `constraints_snapshot` fingerprints, tagged per-entry with its `replan` flag.
-            # Display-only: the prompt sees every active constraint, so "Constraints
-            # considered" must too (DESIGN_constraints.md §7).
-            if 'all_constraints_snapshot' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles ADD COLUMN all_constraints_snapshot TEXT"
-                )
-            # Physiological thresholds (max_hr/lthr/ftp) the plan was generated with,
-            # as JSON. Unlike the profile fields folded into config_hash, thresholds
-            # only flag the plan stale past a relative drift tolerance, which needs the
-            # original values, not a hash (coach/service.config_changed). NULL is no drift.
-            if 'config_snapshot' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles ADD COLUMN config_snapshot TEXT"
-                )
-            # The plan-shaping profile fields (config.plan_profile) the plan was generated
-            # with, as JSON. config_hash alone answers "did something change" but not
-            # "what", so the staleness reason could not name the field that moved
-            # (DESIGN_plan_staleness.md §5). NULL falls back to the unnamed reason.
-            if 'profile_snapshot' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles ADD COLUMN profile_snapshot TEXT"
-                )
-            # The athlete's science documents the plan was generated with, as JSON
-            # {filename: text}: the prescriptive input, fingerprinted like the profile so
-            # an edited guideline flags the plan and shows the edit
-            # (DESIGN_plan_staleness.md §11). NULL is a plan that predates the column,
-            # and is never flagged on this axis.
-            if 'science_snapshot' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles ADD COLUMN science_snapshot TEXT"
-                )
-            # Plan-version axis (see DESIGN_plan_rollback.md). Regenerating a plan keeps the
-            # prior macrocycle, marked 'superseded' at `superseded_at`, so `plan rollback` can
-            # restore it. Exactly one macrocycle per objective is 'active'; readers filter
-            # on status='active'.
-            if 'status' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles ADD COLUMN status TEXT DEFAULT 'active'"
-                )
-            if 'superseded_at' not in columns:
-                cursor.execute(
-                    "ALTER TABLE macrocycles ADD COLUMN superseded_at TEXT"
-                )
 
             # Mesocycles table
             cursor.execute("""
@@ -743,27 +503,6 @@ class BaseDB:
                 "CREATE INDEX IF NOT EXISTS idx_plan_feedback_macro "
                 "ON plan_feedback(macrocycle_id)"
             )
-            # One-off (§6): each non-empty overwrite slot becomes one log row, then the
-            # slots go. A mesocycle carries no timestamp of its own, so its note inherits
-            # the parent macro's — the best available, and it only orders a backfill.
-            if self._table_has_column(cursor, "macrocycles", "feedback"):
-                cursor.execute(
-                    "INSERT INTO plan_feedback "
-                    "  (macrocycle_id, mesocycle_id, created_at, text) "
-                    "SELECT id, NULL, created_at, feedback FROM macrocycles "
-                    "WHERE feedback IS NOT NULL AND TRIM(feedback) != ''"
-                )
-                cursor.execute("ALTER TABLE macrocycles DROP COLUMN feedback")
-            if self._table_has_column(cursor, "mesocycles", "feedback"):
-                cursor.execute(
-                    "INSERT INTO plan_feedback "
-                    "  (macrocycle_id, mesocycle_id, created_at, text) "
-                    "SELECT m.macrocycle_id, m.id, mac.created_at, m.feedback "
-                    "FROM mesocycles m JOIN macrocycles mac ON m.macrocycle_id = mac.id "
-                    "WHERE m.feedback IS NOT NULL AND TRIM(m.feedback) != ''"
-                )
-                cursor.execute("ALTER TABLE mesocycles DROP COLUMN feedback")
-
             # Backward-evaluation reconstruction cache (DESIGN_backward_evaluation.md §5.1),
             # keyed by an *evidence fingerprint* so a re-run over unchanged data skips the
             # LLM pass. One row per `horizon` (UNIQUE): a new data pull shifts the
@@ -794,23 +533,6 @@ class BaseDB:
                     sync_token     TEXT
                 )
             """)
-            # Migration: pre-existing DBs created sync_state without sync_token.
-            cursor.execute("PRAGMA table_info(sync_state)")
-            sync_state_cols = {row[1] for row in cursor.fetchall()}
-            if "sync_token" not in sync_state_cols:
-                cursor.execute("ALTER TABLE sync_state ADD COLUMN sync_token TEXT")
-
-            # One-off: `daily_context` and its sync_state row are the pre-rename names of
-            # the daily-signal store (DESIGN_calendar_signal_ingest.md §5). Renaming the
-            # table keeps the rows and the Calendar sync token, so no re-pull is needed.
-            if self._table_exists(cursor, "daily_context"):
-                cursor.execute("ALTER TABLE daily_context RENAME TO daily_signals")
-                cursor.execute("DROP INDEX IF EXISTS idx_daily_context_date")
-                cursor.execute(
-                    "UPDATE sync_state SET key = 'calendar_signals' "
-                    "WHERE key = 'calendar_context'"
-                )
-
             # External daily signals (alcohol, sleep, stress, …) ingested from
             # tagged Google Calendar events. TrainMate stays domain-agnostic: metric is
             # an opaque category, value an optional numeric magnitude, text the human
@@ -911,9 +633,3 @@ class BaseDB:
 
             self._stamp_schema_version(conn, SCHEMA_VERSION)
             conn.commit()
-
-        # Grandfather pre-evidence learnings with a synthetic basis that sustains their
-        # stored confidence, so the first app-computed recompute does not silently demote
-        # everything (DESIGN_evidence_based_confidence.md §9). Runs after the schema is
-        # committed; idempotent (only acts on learnings with an empty basis).
-        self._grandfather_learning_evidence()

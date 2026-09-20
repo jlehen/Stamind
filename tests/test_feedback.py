@@ -4,7 +4,6 @@ Capture, filing, listing, removal, the pending→consumed lifecycle, the one-off
 migration off the two overwrite slots, and what the regeneration does with it all.
 """
 import os
-import sqlite3
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
@@ -22,7 +21,6 @@ def _days_out(n: int) -> str:
 GOAL_DATE = _days_out(71)
 
 TEST_DB_PATH = test_db_path("test_trainmate_feedback.db")
-LEGACY_DB_PATH = test_db_path("test_trainmate_fb_legacy.db")
 
 from trainmate.db import Database
 import trainmate.db
@@ -616,63 +614,6 @@ class TestFeedbackDisplay(FeedbackTestCase):
         # A: what drove the change; B: nothing pending on the new version yet.
         self.assertIn("drop the second FTP test", panel)
         self.assertIn("B:\n    none", panel)
-
-
-class TestFeedbackMigration(unittest.TestCase):
-    """The one-off move off the two overwrite slots (§6)."""
-
-    def setUp(self):
-        if os.path.exists(LEGACY_DB_PATH):
-            os.remove(LEGACY_DB_PATH)
-        self.addCleanup(
-            lambda: os.path.exists(LEGACY_DB_PATH) and os.remove(LEGACY_DB_PATH)
-        )
-
-    def test_both_slot_kinds_are_backfilled_and_the_columns_dropped(self):
-        conn = sqlite3.connect(LEGACY_DB_PATH)
-        conn.executescript("""
-            CREATE TABLE objectives (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
-                target_date TEXT NOT NULL, sport_type TEXT NOT NULL, description TEXT,
-                priority INTEGER DEFAULT 1, status TEXT DEFAULT 'active');
-            CREATE TABLE macrocycles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, objective_id INTEGER NOT NULL,
-                strategy TEXT NOT NULL, goals_hash TEXT NOT NULL,
-                constraints_hash TEXT NOT NULL, created_at TEXT NOT NULL,
-                feedback TEXT DEFAULT NULL);
-            CREATE TABLE mesocycles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, macrocycle_id INTEGER NOT NULL,
-                name TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT NOT NULL,
-                focus TEXT NOT NULL, feedback TEXT DEFAULT NULL);
-            INSERT INTO objectives (title, target_date, sport_type)
-                VALUES ('Zurich Marathon', '2026-12-01', 'running');
-            INSERT INTO macrocycles
-                (objective_id, strategy, goals_hash, constraints_hash, created_at, feedback)
-                VALUES (1, 'Keep it low', 'g', 'c', '2026-01-02T03:04:05+00:00',
-                        'overall too easy');
-            INSERT INTO mesocycles
-                (macrocycle_id, name, start_date, end_date, focus, feedback)
-                VALUES (1, 'Base', '2026-06-01', '2026-06-28', 'Z2', 'more speed');
-            INSERT INTO mesocycles (macrocycle_id, name, start_date, end_date, focus)
-                VALUES (1, 'Build', '2026-06-29', '2026-07-26', 'Threshold');
-        """)
-        conn.commit()
-        conn.close()
-
-        legacy = Database(db_path=LEGACY_DB_PATH)
-
-        notes = legacy.list_plan_feedback(1)
-        self.assertEqual(
-            [(n["text"], n["mesocycle_name"]) for n in notes],
-            [("overall too easy", None), ("more speed", "Base")],
-        )
-        # A mesocycle carries no timestamp; the parent macro's is the best available.
-        self.assertTrue(all(n["created_at"] == "2026-01-02T03:04:05+00:00" for n in notes))
-
-        with legacy._get_connection() as conn:
-            for table in ("macrocycles", "mesocycles"):
-                cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
-                self.assertNotIn("feedback", cols, table)
 
 
 if __name__ == "__main__":
