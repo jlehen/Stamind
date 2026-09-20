@@ -432,7 +432,7 @@ week) so `# distinct supporting weeks` matches the grandfathered level. `source 
 seeded evidence.
 
 Schema is additive (new table + nullable column), consistent with the in-place
-`ALTER TABLE ... ADD COLUMN` idiom already in `db/base.py`.
+`ALTER TABLE ... ADD COLUMN` idiom already in `db/schema.py`.
 
 ---
 

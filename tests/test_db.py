@@ -11,7 +11,6 @@ TEST_DB_PATH = test_db_path("test_trainmate_db.db")
 from trainmate.db import (
     Database,
 )
-import trainmate.db
 from trainmate.db.objectives import goal_state
 
 test_db = Database(db_path=TEST_DB_PATH)

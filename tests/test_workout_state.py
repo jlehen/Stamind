@@ -1,4 +1,4 @@
-from tests.helpers import restore_db_handles, save_workout
+from tests.helpers import rebind_test_db, restore_db_handles, save_workout
 import os
 import unittest
 from tests import test_db_path
@@ -6,7 +6,6 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_trainmate_calstate.db")
 
 from trainmate.db import Database
-import trainmate.db
 from trainmate.workout_state import calendar_signature, calendar_status
 
 
@@ -17,12 +16,15 @@ class TestCalendarState(unittest.TestCase):
     def setUp(self):
         if os.path.exists(TEST_DB_PATH):
             os.remove(TEST_DB_PATH)
-        # Put the singleton back afterwards: other modules resolve the db through the
-        # live `trainmate.db.db` (or capture it lazily), so leaving it pointed at this
-        # test's Database — whose file we delete below — breaks later tests.
+        # Put the singleton back afterwards: other modules read the db through the live
+        # `runtime.db`, so leaving it pointed at this test's Database — whose file we
+        # delete below — breaks later tests.
         restore_db_handles(self)
         self.db = Database(db_path=TEST_DB_PATH)
-        trainmate.db.db = self.db
+        rebind_test_db(self.db)
+        # This module reads the calendar-state columns directly; letting the §8
+        # reconcile run on close would clear the rows it is asserting on.
+        self.db.calendar_hook = None
 
     def tearDown(self):
         if os.path.exists(TEST_DB_PATH):

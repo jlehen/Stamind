@@ -24,11 +24,11 @@ GOAL_DATE = _days_out(71)
 
 from trainmate import plan_inputs
 from trainmate.cli.workouts import generate as generate_cli
+import trainmate.config
 from trainmate.config import config
 from trainmate.cli.selectors import IdRange
 from trainmate.db import Database
 from trainmate.db.periodization import repair_mesocycle_contiguity
-import trainmate.db
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -1955,7 +1955,7 @@ class TestPlanLineage(unittest.TestCase):
             os.remove(TEST_DB_PATH)
         global test_db
         test_db = Database(db_path=TEST_DB_PATH)
-        trainmate.db.db = test_db
+        rebind_test_db(test_db)
 
     @classmethod
     def tearDownClass(cls):

@@ -255,7 +255,7 @@ is not restated in comments.
 | `trainmate/cli/plans.py` | Parser rebuilt (§4); `run_plan_feedback` rewritten around append/list/rm/replan; `plan show` + versions rendering (§8); `_FEEDBACK_REGEN_NOTE` removed |
 | `trainmate/cli/selectors.py` | Single-target mesocycle atom resolver (§5) |
 | `trainmate/db/periodization.py` | `update_macrocycle_feedback`/`update_mesocycle_feedback` replaced by `add_plan_feedback` / `list_plan_feedback(macrocycle_id)` (joined with meso names) / `rm_plan_feedback` |
-| `trainmate/db/base.py` | Migration §6 |
+| `trainmate/db/schema.py` | Migration §6 |
 | `trainmate/types.py` | Drop `feedback` fields; add `PlanFeedback` |
 | `trainmate/coach/service/planning.py` | Regen gate disjunct; pending-notes prompt assembly (§7) |
 | `trainmate/coach/engine/planning.py` | Section text (§7) |

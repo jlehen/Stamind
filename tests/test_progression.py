@@ -4,7 +4,6 @@ from datetime import date, timedelta
 
 from tests.helpers import rebind_test_db
 from trainmate.db import Database
-import trainmate.db
 import trainmate.garmin as garmin
 from tests import test_db_path
 

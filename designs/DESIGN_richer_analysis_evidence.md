@@ -7,7 +7,7 @@
 > Two later refactors renamed things without changing this feature's mechanism, and the
 > document has been updated in place to match the code:
 > - `DESIGN_constraints.md` rev 6 (2026-07-10) superseded `lifeevent` with **`constraint`**.
->   The `lifeevents` table is dropped in `db/base.py`; the per-week key is `constraints`;
+>   The `lifeevents` table is dropped in `db/schema.py`; the per-week key is `constraints`;
 >   the authoring-time `type` taxonomy is gone (§2).
 > - `coach/service.py` and `coach/engine.py` are now **packages**, and the prompt builder
 >   `_analyze_workouts_logic` is now `CoachEngine._data_analyze_logic`

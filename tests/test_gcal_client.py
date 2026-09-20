@@ -15,7 +15,6 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_trainmate_gcal_client.db")
 
 from trainmate.db import Database
-import trainmate.db
 import trainmate.gcal.client
 from trainmate.gcal.client import CalendarSyncer, quiet_events
 

@@ -423,8 +423,10 @@ That gives roughly 25 commits. Take the subsystems in this order, lowest in the 
 2. **integrations** — the `gcal/` package, and three merged duplicates rather than the two
    named here. The `garmin/` tidy-up turned out to be already done. **DONE**, as one commit:
    `event.py` and `client.py` are two halves of one file and land together.
-3. **database** — `workouts.py` into three; `base.py` into two; `periodization.py` into two; the
-   small mergers.
+3. **database** — `workouts.py` into three; `base.py` into two; `periodization.py` into two;
+   the small mergers. **DONE**, as one commit: the three splits and the mergers all land in
+   `db/`, and three of the item's bullets turned out to be work earlier phases had already
+   done.
 4. **strength** — `planner.py` into two.
 5. **coach/engine** — `workouts.py` into four.
 6. **coach/service** — `workouts.py`, `adaptation.py`, `planning.py`, `context.py`, one commit
@@ -662,9 +664,102 @@ The lines above Phase A are one per item, from before §3 changed.
   change, not a phase commit's. And `garmin/sync.py` had a `"recently pulled"` fallback
   that was unreachable before this commit and obviously so after it; that one was cut.
 
-**Next up:** Phase D item 3 — **database**: `workouts.py` into three, `base.py` into two,
-`periodization.py` into two, and the small mergers. Items 4 to 9 follow in §7's order, one
-commit per file split.
+- **Phase D item 3, the database package.** `db/workouts.py` was 1,122 lines holding three
+  jobs a caller never mixes, and it is three files now. `workout_change.py` (412) is the
+  write path — the `WorkoutChange` handle, the `workout_change` context manager, the
+  macrocycle tag, the Calendar reconcile on close, and `rollback_to_change`, the one undo
+  every rollback command reduces to. `workouts.py` (426) answers "what is on Thursday":
+  the live revision of a slot and the hydration that turns it into a `Workout`.
+  `workout_history.py` (319) answers "what happened to Thursday": every form the session
+  has had, the change log, and which Calendar event holds it. The three are mixins on one
+  `Database`, so they reach each other through `self` and exactly one name crosses —
+  `workouts.py` imports `_ZONE_COLUMNS`, which lives with the two constants built from it.
+  `db/base.py` is 158 lines about connections, with `SettingsMixin` merged in from the
+  46-line `settings.py`; the DDL is `schema.py` (534) on a new `SchemaMixin`, and
+  `_init_db` keeps its name. `periodization.py` is 374 for plan versions, feedback and the
+  writes, and `mesocycles.py` (217) owns every read of the mesocycles table.
+  `get_completed_activity` moved from `strength.py` to `activities.py`, and
+  `prescribed_sets_for_revisions` is four lines wrapping `_prescribed_set_rows` where it
+  was a byte-identical copy of its SQL. `db/__init__.py` is 48 lines: a docstring and the
+  class, nothing else.
+  `Phase D item 3: the database package`
+
+- **The `trainmate.db.db` accessor is gone, which was the largest part of this by reach.**
+  §6.3 asked for it once `settings.py`, `clock.py` and `llm_models.py` read `runtime.db`.
+  They do now — seven call sites, not the six §6.10 counted, and three `scripts/` did the
+  same import at module scope, which neither section mentioned. `runtime.db` is the one way
+  to the singleton. Four test modules were leaning on the accessor: `test_web.py` saved and
+  restored a handle that `/api/models` no longer reads, `test_periodization.py` and
+  `test_workout_state.py` each bound `trainmate.db.db` by hand instead of calling
+  `rebind_test_db`, and `tests/helpers.py` carried a `_DB_BINDING_SITES` entry and half of
+  `restore_db_handles` for it.
+
+- **Two decisions the proposal did not make, both written into `ARCHITECTURE.md` §15.**
+  `db/schema.py` is 534 lines, over the rule. §2 of the proposal had retracted the exception
+  for it on the strength of a ~470-line estimate made before the squash landed; the real
+  number is 534 and the retraction's premise fails. It stays one file for the reason
+  `trainmate_web.py` does, and more so — the CREATE statements are not independent, they run
+  in one order inside one method under one `SCHEMA_VERSION`, so cutting the file lets a
+  schema change touch two files while the version describing it lives in one. `AGENTS.md`
+  names it as the third standing exception. And `analysis.py` did **not** merge into
+  `activities.py`: the size rule's own escape hatch applies, and the merge would have
+  produced a 405-line file holding two jobs that change for different reasons — the shape
+  the 400-to-500 rule then asks to split again.
+
+- **Three of the item's bullets were already done, and the plan now says so.**
+  `get_next_mesocycle` and `get_prescribed_sets` went in Phase A; the learnings re-exports
+  and the `learnings.py` slimming went in Phase C. §6.3 asked for all four again. Two more
+  corrections: `strength.py:37–42` for `get_completed_activity` was stale (43–48), and the
+  "one read of prescribed sets instead of three" lands at two, not one —
+  `WorkoutChange.prescribed_sets` is a genuinely different read, six named columns inside
+  the change's own transaction, and it stays.
+
+- **No test file was split, and the reason is not size.** §7 says test files follow the code
+  in the same commit. None of these three splits has a test file that follows it: the db
+  tests are organized by behaviour, not by module. The mesocycle-reader assertions sit
+  inside `TestDateKeyedGeneration` in `tests/test_periodization.py` (2,884 lines) among
+  tests about generation, and `tests/test_db.py` (756) is one `TestDatabase` grab-bag.
+  Cutting either follows a different axis from this commit's, which is Phase E's
+  size-only work. `test_workout_revisions.py` did change: `APPEND_PATH_MODULE =
+  "workouts.py"` is `APPEND_PATH_PREFIX = "workout"`, keyed on a shape as §9 asks.
+
+- **The review of Phase D item 3**, in the same commit. A read-only agent matched every
+  moved function by name across the split, stripped the docstrings and compared the
+  unparsed bodies: over a hundred came back byte-identical and exactly three differ, which
+  are the three intended edits. It did not take the trigger merge on reading — it built a
+  scratch database and ran five scenarios, including two `wipe_workouts()` calls back to
+  back and one nested inside an outer `transaction()`, and confirmed the `IF NOT EXISTS`
+  the merged text adds is seen by the `DROP TRIGGER` three statements above it. It ran
+  `prescribed_sets_for_revisions` against a real strength session beside
+  `_prescribed_set_rows` and got the same keys, the same rows and the same nine columns.
+  It found no behaviour change, no lost symbol, no method-name clash across the eighteen
+  mixins, no import cycle, and 439 patch sites naming 42 targets — unchanged, because this
+  commit moved none.
+
+- **What the review found, all of it documentation, and all of it fixed here.** The worst
+  was mine: rewriting the comment over `_DB_BINDING_SITES` in `tests/helpers.py`, I
+  restated its claim that eight modules bind the handle by value. Not one of the other
+  seven has since Phase C, so `rebind_test_db` was walking a list that did nothing. The
+  tuple is gone and the function is one assignment, `runtime.db = test_db`. Two design
+  docs still described the deleted accessor: `DESIGN_model_selection.md` said
+  `llm_models` "imports `trainmate.db.db` inside the functions", and
+  `DESIGN_constraints.md` had one line still naming `base.py` three lines below one the
+  sweep had corrected to `schema.py`. `ATHLETE_VOID_KINDS` had been left in
+  `db/workouts.py`, which never reads it, away from `CHANGE_KINDS` — of which it is a
+  subset; it sits beside it now, and its three importers name the new path. And 24 test
+  modules carried an `import trainmate.db` that nothing used; this commit removes the last
+  reason for any of them, so they went with it.
+
+- **One thing found and left, for whoever writes the last commit.** Nine files under
+  `trainmate/` and `tests/` cite `REORG_code_layout.md` or `REORG_execution.md` by section
+  number in a docstring — `signals.py`, `clock.py`, `workout_state.py`,
+  `test_layering.py`, `test_cli_plans.py` and `test_isolation_guards.py`. Both files are
+  deleted in the branch's last commit, so those pointers will dangle. None was added here.
+  §1's table is where that belongs: either the rationale moves to `ARCHITECTURE.md` §15
+  before the end, or the pointers go.
+
+**Next up:** Phase D item 4 — **strength**: `planner.py` into two. Items 5 to 9 follow in
+§7's order, one commit per file split.
 
 ---
 

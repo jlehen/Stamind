@@ -6,7 +6,7 @@ API call is what lets a test assert on an event's description without a service 
 
 It is not a leaf module, though: the identifier footer reads the database for the plan a
 date belongs to, `history.for_workout` reads the session's earlier revisions, and
-`_void_label` imports the athlete's void kinds from `db.workouts`. Nothing here writes.
+`_void_label` imports the athlete's void kinds from `db.workout_change`. Nothing here writes.
 """
 import base64
 from datetime import datetime, timedelta
@@ -39,7 +39,7 @@ _REVISION_LABELS = {"adapt": "[Adapted]"}
 def _void_label(change_kind: Optional[str]) -> str:
     """`[Deleted]` when the athlete ended the session, `[Cancelled]` when the coach did
     (DESIGN_plan_change_continuity.md §5.1)."""
-    from trainmate.db.workouts import ATHLETE_VOID_KINDS
+    from trainmate.db.workout_change import ATHLETE_VOID_KINDS
     return "[Deleted]" if change_kind in ATHLETE_VOID_KINDS else "[Cancelled]"
 
 

@@ -290,7 +290,7 @@ class TestCalendarLineage(unittest.TestCase):
     def test_appending_a_revision_makes_the_event_stale(self):
         """The history is a function of the whole lineage, so the freshness hash has to
         move when the lineage grows — `revision_id` is what carries that (§6). Spans
-        db/workouts.py and workout_state.py, so the test does too (AGENTS.md)."""
+        db/workout_change.py and workout_state.py, so the test does too (AGENTS.md)."""
         lineage = self._plan()
         self.db.mark_workout_pushed(
             lineage, "evt-1", calendar_signature(self.db.get_workout_by_id(lineage))

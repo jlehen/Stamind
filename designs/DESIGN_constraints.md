@@ -244,7 +244,7 @@ an ordinary unambiguous prefix, so the group needs no registered alias at all an
 
 ## 5. Data model
 
-This is the **rev-6 schema, inlined** — it is what `db/base.py` creates and what the
+This is the **rev-6 schema, inlined** — it is what `db/schema.py` creates and what the
 live database holds. (Rev 6 dropped `binding`/`sport`/`type` and added `rest`; the
 migration is pure idempotent DDL in `_init_db`, see the preamble and §9.)
 
@@ -533,7 +533,7 @@ and fight the magnitude flow above; plan-level staleness is exactly what `replan
 escalation is for.
 
 Both columns are **renamed in place** (`lifeevents_hash` → `constraints_hash`,
-`lifeevents_snapshot` → `constraints_snapshot`, `db/base.py`), so legacy snapshot
+`lifeevents_snapshot` → `constraints_snapshot`, `db/schema.py`), so legacy snapshot
 *values* survive under the new column name rather than being stranded under the old
 one. An earlier draft said `lifeevents_snapshot` was left untouched; renaming is
 simpler and keeps one read path, and the display code already tolerates both the
@@ -661,9 +661,9 @@ lived: it could propose a regen at add time, §7 step 3.)
 script has run and has since been deleted** (`scripts/` holds only
 `migrate_constraints_drop_binding.py` and `migrate_cycling_sport_rename.py`), and
 the `lifeevents` table it read is dropped unconditionally by `_init_db` (§10 step 8,
-`db/base.py`'s `DROP TABLE IF EXISTS lifeevents`). The reasoning is kept because it
+`db/schema.py`'s `DROP TABLE IF EXISTS lifeevents`). The reasoning is kept because it
 is the standing rule for *any* future row-copy migration here. Every other migration
-in `base.py` is idempotent *by construction*: `CREATE TABLE IF NOT
+in `schema.py` is idempotent *by construction*: `CREATE TABLE IF NOT
 EXISTS`, `ADD COLUMN` guarded by `except OperationalError`, and renames
 guarded by column/table presence all self-terminate, because their guard
 condition stops being true after the first run. A *row copy* between two
@@ -755,7 +755,7 @@ through the one current read path rather than stranding them.
    `context` → `signal` rename, which drops the alias entirely).
 8. ~~Later release: remove the `lifeevent` forwarder; drop the `lifeevents` table.~~
    **Done** — the forwarder is gone and `_init_db` unconditionally drops `lifeevents`
-   (and its older `life_events` name), `db/base.py`.
+   (and its older `life_events` name), `db/schema.py`.
 
 **All eight steps have shipped**, plus rev 6's collapse to a single `rest` flag on
 top of them. Steps 1–3 were shippable on their own (new object usable, existing life

@@ -171,10 +171,9 @@ is not this app's usual answer, and the first draft of this design said the athl
 calendar day, from `clock.active_zone()`, because every other date is resolved that way
 (`DESIGN_user_timezone.md` §1).
 
-It cannot be. `active_zone()` reads the `timezone` setting, which reaches
-`from trainmate.db import db`, which builds a `Database`, which runs all twenty schema
-migrations. Naming a log file would create and migrate the database on `tm help` — the
-exact thing `runtime.py` and `trainmate/db/__init__.py` both carry docstrings forbidding.
+It cannot be. `active_zone()` reads the `timezone` setting, which reaches `runtime.db`,
+which builds a `Database`, which creates every table. Naming a log file would create the
+database on `tm help` — the exact thing `runtime.py` carries a docstring forbidding.
 Worse, it would put a database dependency in the one code path whose job is to survive the
 database being unreachable, which is most of §4.1's argument.
 

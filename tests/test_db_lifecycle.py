@@ -11,7 +11,7 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_db_lifecycle.db")
 
 from trainmate.db import Database
-from trainmate.db.base import SCHEMA_VERSION
+from trainmate.db.schema import SCHEMA_VERSION
 
 test_db = bind_test_db(TEST_DB_PATH)
 

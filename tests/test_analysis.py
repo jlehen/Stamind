@@ -6,7 +6,6 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, rebind_test_db, save_workout
 from trainmate.analytics import weekly_evidence
 from trainmate.db import Database
-import trainmate.db
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_analysis.db")

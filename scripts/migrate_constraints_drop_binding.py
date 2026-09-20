@@ -3,7 +3,7 @@
 simplification (DESIGN_constraints.md rev 6).
 
 The schema change itself — add a `rest` flag, drop `binding`/`sport`/`type` — is pure,
-idempotent DDL and runs automatically in `db/base.py::_init_db`. This script handles the
+idempotent DDL and runs automatically in `db/schema.py::_init_db`. This script handles the
 one thing that can't: the plan staleness fingerprint.
 
 `constraints_hash` is computed over the cleaned `replan = 1` constraints, and the clean
@@ -26,7 +26,7 @@ import json
 import sys
 
 from trainmate import plan_inputs
-from trainmate.db import db
+from trainmate import runtime
 from trainmate.clock import today_str
 
 
@@ -39,7 +39,7 @@ def main() -> int:
     args = parser.parse_args()
 
     today = today_str()
-    replan_constraints = [c for c in db.get_constraints(today) if c.get("replan")]
+    replan_constraints = [c for c in runtime.db.get_constraints(today) if c.get("replan")]
     cleaned = plan_inputs.clean_constraints(replan_constraints)
     new_hash = plan_inputs.constraints_hash(replan_constraints)
     print(
@@ -58,7 +58,7 @@ def main() -> int:
             print("Aborted.")
             return 1
 
-    with db._get_connection() as conn:
+    with runtime.db._get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id FROM macrocycles WHERE COALESCE(status, 'active') = 'active'"

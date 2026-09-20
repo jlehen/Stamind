@@ -19,7 +19,6 @@ def _days_out(n: int) -> str:
     return (today_date() + timedelta(days=n)).isoformat()
 
 from trainmate.db import Database
-import trainmate.db
 import trainmate_cli
 
 test_db = Database(db_path=TEST_DB_PATH)

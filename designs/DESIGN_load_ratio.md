@@ -145,7 +145,7 @@ enforces it.
 
 ## 6. Migration
 
-Single-user, so a one-off guarded DDL in `db/base.py` (AGENTS.md) drops
+Single-user, so a one-off guarded DDL in `db/schema.py` (AGENTS.md) drops
 `acute_workload`, `chronic_workload`, and `acwr` from `athlete_metrics_cache`. No
 separate script and no backward compatibility: `save_metric_cache()` loses the three
 parameters, `AthleteMetric` loses the three fields, and `recompute_derived()` loses the

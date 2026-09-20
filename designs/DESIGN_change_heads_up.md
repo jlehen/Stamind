@@ -401,8 +401,8 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
 
 ## 10. Touch points
 
-- `trainmate/db/base.py`: the `told_at` column on `workout_changes`, with the migration of §9.
-- `trainmate/db/workouts.py`: `workout_change` stamps `told_at` when she is watching;
+- `trainmate/db/schema.py`: the `told_at` column on `workout_changes`, with the migration of §9.
+- `trainmate/db/workout_change.py`: `workout_change` stamps `told_at` when she is watching;
   `rollback_to_change` builds the rollback's `note` from the told changes it undoes (§6); a
   query for the changes waiting to be told, and a write that marks them told;
   `get_workout_changes` also says which changes are waiting. `change_has_live_revisions`

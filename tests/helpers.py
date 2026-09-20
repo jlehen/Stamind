@@ -102,29 +102,16 @@ def clear_all_tables(db) -> None:
         conn.commit()
 
 
-# Every module that binds the database handle by value at import time. There is one
-# entry per convention the app currently uses; a test that rebinds only some of them
-# leaves the rest pointing at the real database, so they are bound together or not at
-# all. Modules absent from sys.modules are skipped — a CLI test should not have to
-# import the web app to isolate itself.
-_DB_BINDING_SITES = (
-    ("trainmate.runtime", "db"),
-    ("trainmate.db", "db"),
-    ("trainmate_cli", "db"),
-    ("trainmate_web", "db"),
-    ("trainmate.garmin", "db"),
-    ("trainmate.garmin.sync", "db"),
-    ("trainmate.garmin.derived", "db"),
-    ("trainmate.garmin.client", "db"),
-    ("trainmate.gcal.client", "db"),
-)
-
-
 def rebind_test_db(test_db) -> None:
-    """Points every imported handle at `test_db`, and the Calendar at a mock.
+    """Points the database handle at `test_db`, and the Calendar at a mock.
 
     Call after replacing the Database instance (setUpClass), not only at import: a
     module imported later in the run would otherwise keep the handle it captured.
+
+    One assignment is enough because `runtime.db` is the only handle left — this used to
+    walk a list of eight modules that each bound `db` by value at import, and none of them
+    does any more. Assigning shadows `runtime`'s accessor rather than reading it, which
+    matters: reading it would build the real Database against the production file.
 
     Writing workouts now reaches Google Calendar on its own — the change handle
     reconciles the lineages it touched (DESIGN_workout_revisions.md §8) — so isolating
@@ -141,16 +128,7 @@ def rebind_test_db(test_db) -> None:
         runtime.calendar_syncer = MagicMock()
     from trainmate.gcal.reconcile import reconcile
     test_db.calendar_hook = reconcile
-    for module_name, attr in _DB_BINDING_SITES:
-        module = sys.modules.get(module_name)
-        if module is None:
-            continue
-        # `vars()`, not hasattr(): trainmate.runtime resolves singletons through a
-        # module __getattr__, so asking whether it "has" db would build the real one
-        # against the production file — the very thing being avoided here. Assigning
-        # shadows the accessor, which is what we want in either case.
-        if module_name == "trainmate.runtime" or attr in vars(module):
-            setattr(module, attr, test_db)
+    runtime.db = test_db
 
 
 def unstamp_schema(db) -> None:
@@ -173,23 +151,21 @@ def restore_db_handles(testcase) -> None:
     """Puts the process-wide db handles back the way they were once `testcase` ends.
 
     Call it *before* binding, in a module that must not leave its own Database behind for
-    whatever runs next. Saving them is the whole difficulty: both resolve through a module
-    `__getattr__`, so simply reading one in order to remember it BUILDS the real Database
-    against the production file — which `tests/__init__.py`'s guard then refuses. Two test
-    modules each wrote that by hand and each hit it, but only when run on their own: inside
-    the full suite an earlier module had already bound a handle, so the read found one
-    cached and the bug stayed invisible. Hence one copy, here, next to `rebind_test_db`,
-    which dodges the same trap for the same reason.
+    whatever runs next. Saving it is the whole difficulty: `runtime.db` resolves through a
+    module `__getattr__`, so simply reading it in order to remember it BUILDS the real
+    Database against the production file — which `tests/__init__.py`'s guard then refuses.
+    Two test modules each wrote that by hand and each hit it, but only when run on their
+    own: inside the full suite an earlier module had already bound a handle, so the read
+    found one cached and the bug stayed invisible. Hence one copy, here, next to
+    `rebind_test_db`, which dodges the same trap for the same reason.
 
     A handle nothing had built is restored to *absent*, not to some value: leaving a
     concrete singleton where the lazy accessor used to be would hand the next module a
     stale database instead of one it can still bind.
     """
     from trainmate import runtime
-    import trainmate.db
 
-    saved = [(runtime, vars(runtime).get("db", _UNBOUND)),
-             (trainmate.db, vars(trainmate.db).get("db", _UNBOUND))]
+    saved = [(runtime, vars(runtime).get("db", _UNBOUND))]
 
     def _restore():
         for module, previous in saved:

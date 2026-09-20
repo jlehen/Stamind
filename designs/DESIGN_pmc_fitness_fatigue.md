@@ -121,7 +121,7 @@ design started from (ACWR-era, historical per the amendment banner).
 | Layer | Where (current) | Then (pre-PMC) |
 |---|---|---|
 | Compute | `trainmate/garmin/derived.py` `recompute_derived()`, over the maths in `analytics/pmc.py` | full-sweep acute (7d sum), chronic (28d/4), ACWR per metrics day |
-| Store | `athlete_metrics_cache` (`db/base.py`), `save_metric_cache()` (`db/activities.py`), `AthleteMetric` (`types.py`) | `acute_workload`, `chronic_workload`, `acwr` columns |
+| Store | `athlete_metrics_cache` (`db/schema.py`), `save_metric_cache()` (`db/activities.py`), `AthleteMetric` (`types.py`) | `acute_workload`, `chronic_workload`, `acwr` columns |
 | Wipe | `wipe_garmin_data()` (`db/wipes.py`) | deletes rows by range; **does not** recompute (see §4) |
 | Coach, per-day | `format_metrics_history()` (`coach/formatting.py`) → generate & adapt prompts (`coach/engine/workouts.py`) | `... ACWR=1.12` per day line — **unguarded** `:.2f`, see §5.1 |
 | Coach, summary | data summary in `coach/service/context.py` → strategy/plan prompts | "Current ACWR: 1.12 (latest)" |
@@ -407,7 +407,7 @@ params exist for deliberate experimentation, not casual tuning.
 
 ## 4. Storage & wipe
 
-- `db/base.py`: `ALTER TABLE athlete_metrics_cache ADD COLUMN {ctl,atl,tsb} REAL`
+- `db/schema.py`: `ALTER TABLE athlete_metrics_cache ADD COLUMN {ctl,atl,tsb} REAL`
   using the same `try/except sqlite3.OperationalError` idempotent-migration
   pattern already used for the `completed_activities` zone columns. (The
   `CREATE TABLE IF NOT EXISTS` also gains the columns for fresh DBs.)
@@ -704,7 +704,7 @@ retention.
   > `color_acwr` is historical — most of that text is in §§1–6, i.e. **above** this
   > note. (An earlier revision of this note said "everything below", which pointed at
   > roughly the one paragraph that isn't affected.) In live code the only ACWR residue
-  > is the idempotent `DROP COLUMN` migration in `db/base.py`.
+  > is the idempotent `DROP COLUMN` migration in `db/schema.py`.
   >
   > **What took its slot, surface by surface** — `ATL:CTL` is not merely ACWR deleted;
   > it is ACWR *replaced*, on every line this design specifies:

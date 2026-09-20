@@ -840,7 +840,7 @@ the handover from leaving a hole.
 
 ### 12.5 Migration and surface
 
-Single-user app, so the migration is a one-off `UPDATE` in `db/base.py` rather than
+Single-user app, so the migration is a one-off `UPDATE` in `db/schema.py` rather than
 a compatibility shim: any row still reading `completed` is rewritten to `active`,
 after which the column's remaining meaning — called off or not — is true of every
 row. The `objectives` schema comment records the narrowed vocabulary.

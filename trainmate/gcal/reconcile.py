@@ -24,7 +24,7 @@ from trainmate.analytics.compare import adherence_window, format_actual
 from trainmate.workout_state import adherence_signature, calendar_status
 from trainmate.clock import fmt_date, today_str as _today_str
 from trainmate.config import config
-from trainmate.db.workouts import ATHLETE_VOID_KINDS
+from trainmate.db.workout_change import ATHLETE_VOID_KINDS
 from trainmate.text import green
 from trainmate.output import Progress, fail, warn
 

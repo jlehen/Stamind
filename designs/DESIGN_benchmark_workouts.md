@@ -152,7 +152,7 @@ workout, and a separate logbook for results.
 ### 3.1 `benchmark_type` on `Workout`
 
 A nullable `benchmark_type` lives on the `Workout` TypedDict (`types.py:47`, the field at
-`:66`) and the `workouts` table (`db/base.py:112`, migrated at `:286-296`). When set, the
+`:66`) and the `workouts` table (`db/schema.py`). When set, the
 session is a test:
 
     ftp_20min | ftp_ramp | run_threshold_30min | run_5k_tt |
@@ -168,7 +168,7 @@ therefore threaded through each enumeration:
   instruction to preserve the field when re-emitting a session. The model, not
   the app, owns the flag's survival across an adaptation — consistent with
   §4.2's no-guards stance;
-- `save_workout` (signature + SQL, `db/workouts.py:21, 105, 137, 156`) on the
+- `save_workout` (signature + SQL, `db/workout_change.py`) on the
   generate save path (`coach/service/workouts.py:429`);
 - the adapt rebuild dict (`coach/service/adaptation.py:251-276`) and
   `workout_adapt_apply` (`:384`) — the spot a first pass misses. Without it, the
@@ -179,7 +179,7 @@ therefore threaded through each enumeration:
 **One app-side guard, deliberately.** "The model owns survival" is the rule for the
 *proposal*; the SQL keeps a belt-and-braces default underneath it. The UPDATE branch of
 `save_workout` writes `benchmark_type = COALESCE(?, benchmark_type)`
-(`db/workouts.py:105`), exactly like `tss` and the other optional columns — so a
+(`db/workout_change.py`), exactly like `tss` and the other optional columns — so a
 same-`(date, sport)` re-save that simply omits the field preserves the stored value
 instead of nulling it. This is not the kind of guard §4.2 argues against: it reverses no
 model intent and reads no proposal batch, it only stops an omission from being read as a
@@ -187,7 +187,7 @@ deletion.
 
 Preserving an omission must not mean the flag is *unclearable*, though — §4.2's POSTPONE
 fallback needs to strip it, and for one revision could not. `save_workout` therefore takes
-a `clear_benchmark` flag (`db/workouts.py:21, 105`) that blanks the column in place; the
+a `clear_benchmark` flag (`db/workout_change.py`) that blanks the column in place; the
 UPDATE reads `CASE WHEN ? THEN NULL ELSE COALESCE(?, benchmark_type) END`. It is off for
 every caller but adapt (§4.2), so the default behaviour — omission preserves — is
 unchanged.

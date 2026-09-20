@@ -7,14 +7,16 @@ into seven modules that each wanted a date a week ago.
 
 See DESIGN_user_timezone.md. The `settings.timezone` row holds an IANA zone name and is
 written by `tm settings set timezone`; with no row the machine's own zone rules (§3).
-`today_date()` sits on every code path, so `trainmate.db` is imported lazily inside each
-function that needs it — importing this module must never open the database.
+`today_date()` sits on every code path, so the handle is read as `runtime.db` at call
+time — importing this module must never open the database.
 """
 
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 from zoneinfo import ZoneInfo, available_timezones
+
+from trainmate import runtime
 
 TIMEZONE_SETTING = "timezone"
 
@@ -26,14 +28,12 @@ _zone: object = _UNRESOLVED
 
 def stored_name() -> Optional[str]:
     """The zone name stored in the database, or None when the machine's zone rules."""
-    from trainmate.db import db
-    return db.get_setting(TIMEZONE_SETTING)
+    return runtime.db.get_setting(TIMEZONE_SETTING)
 
 
 def stored_at() -> Optional[str]:
     """UTC ISO instant the stored zone was last written, or None if nothing is stored."""
-    from trainmate.db import db
-    row = db.get_setting_row(TIMEZONE_SETTING)
+    row = runtime.db.get_setting_row(TIMEZONE_SETTING)
     return row["updated_at"] if row else None
 
 

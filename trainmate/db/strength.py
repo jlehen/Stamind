@@ -40,13 +40,6 @@ class StrengthMixin:
     """Exercise sets hanging off a Garmin activity, and the three columns that say whether
     they were read, frozen or discarded."""
 
-    def get_completed_activity(self, activity_id: str) -> Optional[Dict[str, Any]]:
-        with self._get_connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM completed_activities WHERE activity_id = ?", (activity_id,)
-            ).fetchone()
-            return dict(row) if row else None
-
     def strength_activities(
         self, since: str, before: Optional[str] = None, date: Optional[str] = None,
         unread: bool = False,
@@ -225,20 +218,14 @@ class StrengthMixin:
     def prescribed_sets_for_revisions(
         self, revision_ids: Sequence[int]
     ) -> Dict[int, List[Dict[str, Any]]]:
-        """The prescribed exercises of several revisions at once, keyed by revision."""
+        """The prescribed exercises of several revisions at once, keyed by revision.
+
+        The same read hydration does, with a connection of its own rather than one it was
+        handed (`db/workouts.py::_prescribed_set_rows`)."""
         if not revision_ids:
             return {}
-        placeholders = ",".join("?" * len(revision_ids))
         with self._get_connection() as conn:
-            rows = conn.execute(
-                f"SELECT * FROM prescribed_sets WHERE workout_id IN ({placeholders}) "
-                "ORDER BY workout_id, position",
-                tuple(revision_ids),
-            ).fetchall()
-        grouped: Dict[int, List[Dict[str, Any]]] = {}
-        for row in rows:
-            grouped.setdefault(row["workout_id"], []).append(dict(row))
-        return grouped
+            return self._prescribed_set_rows(conn, revision_ids)
 
     def get_strength_check(self, lineage_id: int) -> Optional[str]:
         """The stamp this session's kilograms were last weighed against, or None."""

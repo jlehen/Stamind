@@ -153,7 +153,7 @@ ACWR, 28-day baselines) is preserved but moves into the recompute pass (§10).
 
 **Changed:** `trainmate_cli.py` `data pull` subcommand and the auto-ensure call
 sites; `trainmate/db.py` (new `sync_state` table + helpers — now the `trainmate/db/`
-package, `db/base.py` + `db/activities.py`); `trainmate/config.py`
+package, `db/schema.py` + `db/activities.py`); `trainmate/config.py`
 (new knobs); `trainmate/clock.py` (local-date helper, §12).
 
 **Dependency:** add `garminconnect` to TrainMate's requirements.

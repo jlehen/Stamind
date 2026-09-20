@@ -650,18 +650,10 @@ class TestNewReadEndpoints(unittest.TestCase):
         global test_db
         test_db = Database(db_path=TEST_DB_PATH)
         rebind_test_db(test_db)
-        # `/api/models` delegates to `llm_models`, which resolves `trainmate.db.db`
-        # lazily rather than taking the web app's handle — so that one has to be bound
-        # too, and restored afterwards so it does not leak into later test modules.
-        import trainmate.db
-        cls._saved_db = trainmate.db.db
-        rebind_test_db(test_db)
         cls.client = trainmate_web.app.test_client()
 
     @classmethod
     def tearDownClass(cls):
-        import trainmate.db
-        trainmate.db.db = cls._saved_db
         if os.path.exists(TEST_DB_PATH):
             try:
                 os.remove(TEST_DB_PATH)

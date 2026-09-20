@@ -86,9 +86,9 @@ CREATE TABLE IF NOT EXISTS settings (
 )
 ```
 
-First and only key: `llm_model`. Created in `trainmate/db/base.py` alongside the other tables;
+First and only key: `llm_model`. Created in `trainmate/db/schema.py` alongside the other tables;
 accessors `get_setting(key)` / `get_setting_row(key)` / `set_setting(key, value)` /
-`clear_setting(key)` land in a new `trainmate/db/settings.py` mixin, following the `sync_state`
+`clear_setting(key)` land in a `SettingsMixin` (in `trainmate/db/base.py`), following the `sync_state`
 upsert pattern (`INSERT … ON CONFLICT(key) DO UPDATE`). `get_setting_row` returns the whole row
 (`{key, value, updated_at}`) rather than just the value, because the "set 3d ago" annotation §4.1
 asks for needs the timestamp — a value-only getter cannot answer *when*.
@@ -116,7 +116,7 @@ time. It can't read the DB there without dragging a database connection into eve
 @property
 def model(self) -> str:
     if self._model is None:
-        self._model = active_model()      # trainmate/llm_models.py, imports db lazily
+        self._model = active_model()      # trainmate/llm_models.py, reads runtime.db at call time
     return self._model
 
 @model.setter
@@ -150,8 +150,8 @@ New `trainmate/llm_models.py`, the single place that knows how config and DB com
 | `set_active_model(token)` | `resolve_token` then write; nothing is written when it raises |
 | `clear_active_model()` | Deletes the row, falling back to the config default |
 
-Imports `trainmate.db.db` inside the functions, not at module top, to keep
-`trainmate.openrouter` importable without touching the database.
+Reads the handle as `runtime.db` at call time, so importing it — and
+`trainmate.openrouter` through it — touches no database.
 
 ### §3.3 — A stored model that left the config list
 

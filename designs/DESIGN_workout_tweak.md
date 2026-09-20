@@ -278,7 +278,7 @@ unrelated parts of the message into a brief, or drops the request.
 |---|---|
 | `cli/workouts/parser.py`, `edit.py` | The two sub-commands and their handlers. |
 | `coach/service/editing.py` | `workout_add` and `_replaced_header`. |
-| `db/workouts.py` | The `add` and `rm` change kinds. `_lineage_is_manual`. The two lineage rules "an `add` starts a new lineage" and "a `generate` over a manual session starts a new lineage". `replaced_manual`. The hydrated `source` field. |
+| `db/workout_change.py` | The `add` and `rm` change kinds. `_lineage_is_manual`. The two lineage rules "an `add` starts a new lineage" and "a `generate` over a manual session starts a new lineage". `replaced_manual`. The hydrated `source` field. |
 | `types.py` | `Workout.source`. |
 | `coach/revisions.py` | `carried_lineage`: a replacement always continues the session it replaces. |
 | `coach/service/workouts.py` | Manual sessions as standing sessions outside the commitment window. The manual clause of the voids. The notice "Replaced the session you added". |
@@ -300,7 +300,7 @@ unrelated parts of the message into a brief, or drops the request.
 |---|---|
 | `cli/workouts/parser.py`, `edit.py`, `_helpers.py` | The sub-command, its handler and `_resolve_swap_ops`. |
 | `coach/service/editing.py` | The whole file: `workout_swap_validate`, `workout_swap_apply` and their helpers. `WorkoutEditMixin` leaves `CoachService`. |
-| `db/workouts.py` | The `swap` change kind. |
+| `db/workout_change.py` | The `swap` change kind. |
 | `gcal/history.py`, `_helpers.py`, `static/` | The labels "Moved" and "Moved away", the `[SWAPPED]` marker and its badge. |
 
 What stays: a session can still stand in a slot other than the one it started in, because
@@ -312,7 +312,7 @@ read that hides the stale half of a moved session, both stay.
 | Where | What is removed |
 |---|---|
 | `cli/workouts/parser.py`, `edit.py` | The sub-command and its handler. |
-| `db/workouts.py` | The `restore` change kind and `revision_before_live_void`. |
+| `db/workout_change.py` | The `restore` change kind and `revision_before_live_void`. |
 | `workout rollback`'s help | The sentence saying it is not `workout restore`. |
 | `workout list --removed` | The flag. Its help says it exists "to find their ID for restoring". |
 

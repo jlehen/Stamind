@@ -98,7 +98,7 @@ def structure_revision(
 def prescription_matches(proposed: Dict[str, Any], live: Dict[str, Any]) -> bool:
     """Whether appending `proposed` over `live` would be suppressed as a no-op.
 
-    The §9 no-op rule lives in the write path (`db.workouts.WorkoutChange._write`), so a
+    The §9 no-op rule lives in the write path (`db.workout_change.WorkoutChange._write`), so a
     preview built from the week planner's answers would report a wording-only revision as a
     change to the day. The proposal step asks this instead, against the standing rows it
     already loaded (DESIGN_plan_change_continuity.md §4.5). It mirrors `append`'s merge:

@@ -7,7 +7,6 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, rebind_test_db
 from trainmate import runtime
 from trainmate.db import Database
-import trainmate.db
 import trainmate.garmin as garmin
 from tests import test_db_path
 

@@ -19,7 +19,6 @@ def _days_out(n: int) -> str:
 GOAL_DATE = _days_out(120)
 
 from trainmate.db import Database
-import trainmate.db
 import trainmate_cli
 
 test_db = Database(db_path=TEST_DB_PATH)

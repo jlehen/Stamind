@@ -127,9 +127,12 @@ Three exceptions stay over 500 lines, each for a stated reason:
 - **`trainmate_web.py`** (about 680 lines after §4.2). It is a flat list of independent GET
   handlers. Splitting it needs Flask blueprints and a fix to the static-folder path, and it buys
   no separation.
-- ~~`db/schema.py`, if the old migrations are kept (815 lines).~~ No longer an exception:
-  the migrations were squashed (§0), so the schema half of `db/base.py` is about 470 lines
-  and splits within the rule.
+- **`db/schema.py`** (534 lines). The retraction below was wrong, and Phase D item 3
+  measured it: ~~No longer an exception: the migrations were squashed (§0), so the schema
+  half of `db/base.py` is about 470 lines and splits within the rule.~~ The squash left a
+  485-line `_init_db`, not a ~440-line one. It stays one file for the reason
+  `trainmate_web.py` does — a flat run of CREATE statements navigated by table name — and
+  more so, since they run in one order under one `SCHEMA_VERSION`. `AGENTS.md` names it.
 - **`static/app.js` and `static/style.css`.** They are not Python. An optional cut per tab is in
   §6.6.
 
@@ -655,29 +658,46 @@ Callers keep calling `coach_service.x`, so very few tests change.
 `test_workout_revisions.py:34` exempts one file by name (`APPEND_PATH_MODULE = "workouts.py"`). It
 should be keyed on `name.startswith("workout")` instead.
 
-**`base.py` (919 lines) becomes two files.**
-- `base.py` (about 165 lines, plus the settings methods).
-- `schema.py`: about 815 lines, or about 470 if the old migrations are squashed (question 1 in §9).
-  - `_init_db` keeps its name.
-  - The two `workouts` triggers become one constant. `wipes.py:57–66` has a copy of them.
+**`base.py` (635 lines after the squash, not 919) becomes two files.** — **DONE**
+- `base.py` is 158 lines with the settings methods merged in, as below.
+- `schema.py` is 534, not the ~470 predicted; §2 above now carries the corrected number and
+  the reason it stays one file.
+  - `_init_db` keeps its name, on a new `SchemaMixin`.
+  - The two `workouts` triggers are one `WORKOUTS_APPEND_ONLY_TRIGGERS` constant, a tuple of
+    two statements because `execute` takes one and `executescript` would commit inside
+    `wipe_workouts`'s open transaction. The `wipes.py` copy lacked `IF NOT EXISTS`; the
+    merged text has it, which is harmless there because the wipe drops both first.
 
-**`periodization.py` (592 lines) becomes two files.**
-- `periodization.py` (about 375 lines): plan versions, feedback, writes, and the contiguity repair.
-- `mesocycles.py` (about 205 lines): which mesocycle covers a date, lines 200–402.
-- Delete `get_next_mesocycle` (404–420). Nothing calls it.
+**`periodization.py` (574 lines) becomes two files.** — **DONE**
+- `periodization.py` (374): plan versions, feedback, writes, and the contiguity repair.
+- `mesocycles.py` (217): which mesocycle covers a date. `get_mesocycles_for_macrocycle` went
+  with them, so one file owns every read of the table; `save_macrocycle` still writes it.
+- ~~Delete `get_next_mesocycle`.~~ Phase A already did.
 
-**Other changes.**
-- `learnings.py` drops to about 485 lines once the confidence model leaves (§4.10).
-- `settings.py` (46 lines) merges into `base.py`.
-- `analysis.py` (60 lines) merges into `activities.py`, which then has about 405 lines.
-- `get_completed_activity` (`strength.py:37–42`) moves to `activities.py`.
+**Other changes.** — **DONE, with one decline**
+- ~~`learnings.py` drops to about 485 lines once the confidence model leaves (§4.10).~~
+  Phase C already did; it is 476.
+- `settings.py` (46 lines) merged into `base.py`, keeping `SettingsMixin` as its own class
+  there. It is also what lands `base.py` inside the 150–400 range: alone it was 110.
+- **`analysis.py` does NOT merge into `activities.py`. Declined.** The size rule's own escape
+  hatch applies — a backward-evaluation reconstruction cache keyed by an evidence
+  fingerprint is a concept on its own, not an activity, and the only tie is that one wipe
+  clears both. The merge would also have made a 405-line file holding two jobs that change
+  for different reasons, which the 400-to-500 rule then asks to split again.
+  `ARCHITECTURE.md` §15 records it.
+- `get_completed_activity` moved from `strength.py` to `activities.py`, beside the plural
+  read of the same table. (The doc's `37–42` was stale; it was at 43–48.)
 - One read of prescribed sets instead of three:
-  - delete `get_prescribed_sets`;
-  - `prescribed_sets_for_revisions` wraps `_prescribed_set_rows`.
-- `db/__init__.py` drops the learnings re-exports. It also drops its old-style `__getattr__` once
-  `settings.py`, `clock.py` and `llm_models.py` read `runtime.db` (§6.10).
-- These stay as they are: `activities`, `strength`, `objectives`, `constraints`, `wipes`, `queue`,
-  `signals` and `benchmarks`.
+  - ~~delete `get_prescribed_sets`~~ — Phase A already did;
+  - `prescribed_sets_for_revisions` wraps `_prescribed_set_rows`. Note the end state is two
+    reads, not one: `WorkoutChange.prescribed_sets` is a third and stays, because it names
+    six columns rather than `SELECT *` and reads inside the change's own transaction.
+- ~~`db/__init__.py` drops the learnings re-exports.~~ Phase C already did. It drops its
+  old-style `__getattr__` here: `trainmate/settings.py` (4 sites), `clock.py` (2) and
+  `llm_models.py` (1) read `runtime.db` now, and so do the three `scripts/` the plan did not
+  count. `runtime.db` is the only way to the singleton.
+- These stay as they are: `activities` (but for the one method it gained), `strength`,
+  `objectives`, `constraints`, `wipes`, `queue`, `signals` and `benchmarks`.
 
 ### 6.4 CLI views
 
@@ -885,7 +905,8 @@ afterwards, split it into the writer (about 430 lines) and the day files (about 
 
 **Other changes.**
 - `settings.py` and `clock.py` read `runtime.db` instead of doing `from trainmate.db import db`
-  inside functions (six places).
+  inside functions (six places). **Done in Phase D item 3, and it was seven places, not six:
+  `llm_models.py` has one too. Three `scripts/` did it at module scope as well.**
 - These stay flat: `queue_kind` (the cycle breaker), `athlete_queue`, `heads_up`,
   `learning_doubts` and `runtime`.
 - Pick one way to reach the config: 42 files import `config` directly, and 3 use `runtime.config`.
@@ -897,7 +918,7 @@ afterwards, split it into the writer (about 430 lines) and the day files (about 
 **Dead code.** Nothing in production calls any of these.
 - `coach/formatting.format_planned_workouts`.
 - `llm_models.stored_model`.
-- `db.get_next_mesocycle` and `db.get_prescribed_sets`.
+- `db.get_next_mesocycle` and `db.get_prescribed_sets`. Both gone; §6.3 no longer asks again.
 - `cli/common.resolve_cleanup_range`.
 - ~~The `delete_workout_event` alias.~~ **Wrong: it has two production callers**,
   `calendar_reconcile.py:169` and `cli/workouts/calendar_sync.py:79`. Kept.

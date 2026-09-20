@@ -17,7 +17,7 @@ from trainmate.coach.revisions import (
     held_slots, normalize_load_fields, pair_revisions, prescription_matches,
     replaces_source, rest_in_place_of, structure_revision,
 )
-from trainmate.db.workouts import ATHLETE_VOID_KINDS
+from trainmate.db.workout_change import ATHLETE_VOID_KINDS
 from trainmate.strength import planner as strength_planner
 from trainmate.types import Workout
 import trainmate.coach.service as _svc

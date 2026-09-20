@@ -9,7 +9,6 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_adaptation_adherence.db")
 
 from trainmate.db import Database
-import trainmate.db
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)

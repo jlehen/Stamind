@@ -64,7 +64,7 @@ carry a row, and `_fill_coverage_gaps` adds a "Rest Day" for any the model leave
 rest row. That row is a session in a different slot — slots are `(date, sport)`, and
 `rest` is a sport — so it starts its own lineage and gets its own Calendar event. The
 ride's void carries the change kind `generate`, which is not in `ATHLETE_VOID_KINDS`
-(`db/workouts.py`), so `gcal/reconcile.py::_plan` tears the ride's event down.
+(`db/workout_change.py`), so `gcal/reconcile.py::_plan` tears the ride's event down.
 Thursday now reads "Rest Day", with nothing to say a ride was there yesterday or why it
 went. The "Rest Day" body says "no session planned for this day", which is not true: a
 session was planned, and a decision removed it.
@@ -301,7 +301,7 @@ today. That is what puts it on the Calendar `Reason:` line and on the `[Cancelle
 **The lineage rules.** `_lineage_for` already answers explicit-lineage appends (adapt's
 sport change) and appends over a void (new session). `replaces` maps onto the
 explicit case: apply voids the named slot first, then appends the new entry with
-`lineage_id` of the session it replaces. Nothing new in `db/workouts.py`.
+`lineage_id` of the session it replaces. Nothing new in `db/workout_change.py`.
 
 **Resolving the answers.** `_resolve_kept` already carries the conflict rules for one
 answer — a KEEP naming an unoccupied slot is dropped, an explicit session for a slot beats
@@ -330,7 +330,7 @@ a KEEP of it. `_resolve_standing` needs the rest of them, and they are as flat:
 because DESIGN_workout_revisions.md §9's no-op rule silently suppresses a revision whose
 prescription is unchanged, and because §5.5's deterministic passes remove sessions the
 model never spoke about. The no-op comparison lives in the write path today
-(`db/workouts.py::WorkoutChange._write`, `_same_prescription` against the live row), and
+(`db/workout_change.py::WorkoutChange._write`, `_same_prescription` against the live row), and
 apply calls `append` unconditionally, so the proposal step runs the same comparison
 against the standing rows it already loads and marks the equal ones `kept` before the
 table is drawn. Reporting the answers instead would tell the operator a wording-only
@@ -578,7 +578,7 @@ claims.
 written. So the keep-list comes from `workout_calendar_state`
 instead, which is the ownership record: the reconcile clears a lineage's row when it
 tears that lineage's event down, so a row still standing means the event is still
-claimed. `db/workouts.py::claimed_calendar_event_ids` reads it.
+claimed. `db/workout_history.py::claimed_calendar_event_ids` reads it.
 
 Repeated `workout generate` runs on the same day do not stack markers: every answer but
 `keep` lands on the session's own lineage (§4.5), so a day re-decided in a later run is

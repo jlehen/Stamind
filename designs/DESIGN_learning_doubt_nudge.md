@@ -421,7 +421,7 @@ question then closes as stale.
   questions (or, with the switch off, applies the proposals).
 - `trainmate/coach/engine/__init__.py`: `reason` on the `contradict` op in
   `LEARNING_UPDATES_FIELD`.
-- `trainmate/db/learnings.py` and `db/base.py`: the `status` column on `coach_learnings` and
+- `trainmate/db/learnings.py` and `db/schema.py`: the `status` column on `coach_learnings` and
   a `reason` column on `learning_evidence`, with their migrations; `apply_learning_deltas`
   storing a contradiction's reason; the `archived` flag in `get_learnings`; archive in place
   of the four deletes; `restore_learning`; the staleness sweep without its proposing branch;

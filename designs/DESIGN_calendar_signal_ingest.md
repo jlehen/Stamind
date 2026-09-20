@@ -179,7 +179,7 @@ As built it carries `upsert_daily_signal_by_event`, `get_daily_signals(start, en
 metric)` and `delete_daily_signal_by_event` for the sync path, plus
 `get_daily_signal_by_id`, `delete_daily_signal` and `list_signal_metrics` added
 later for the `signal` CLI (`DESIGN_signal_authoring.md`). Table creation goes in
-`db/base.py` alongside the others.
+`db/schema.py` alongside the others.
 
 `delete_daily_signal_by_event` returns whether a row actually went away. That
 matters because a cancelled event reaches us stripped of its

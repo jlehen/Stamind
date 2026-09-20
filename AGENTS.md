@@ -114,9 +114,11 @@
   own or it exists to break an import cycle. A split follows what the code does — one
   command, one concept, one step of a pipeline — and never "helpers". Some files are over
   the limit only because their docstrings restate rationale the design doc already holds;
-  trim the docstring before reaching for a split. Two things stay over 500 lines on
+  trim the docstring before reaching for a split. Three things stay over 500 lines on
   purpose: `trainmate_web.py`, a flat list of independent GET handlers that splitting
-  would not separate, and `static/app.js` with `static/style.css`, which are not Python.
+  would not separate; `db/schema.py`, one ordered run of CREATE statements that
+  `SCHEMA_VERSION` versions as a unit; and `static/app.js` with `static/style.css`,
+  which are not Python.
 - A package `__init__.py` holds a docstring, and at most the class the package assembles
   from its submodules. It does not re-export the submodules' names. A re-export gives one
   name two homes, and a test that patches the home it knows about reaches code that reads

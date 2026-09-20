@@ -28,7 +28,7 @@ class _DBBackedTest(unittest.TestCase):
     file's test DB for the duration of each test, then restore them.
 
     Done per-test with restore (not at import) so this module never leaves the shared
-    `runtime.db` / `trainmate.db.db` singletons rebound for whatever test module runs next
+    `runtime.db` singleton rebound for whatever test module runs next
     — the suite rebinds them per file at import (see test_garmin.py), and a lingering
     rebind here would break another file regardless of collection order."""
 

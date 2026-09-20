@@ -548,7 +548,7 @@ item's place in the queue. `tm queue tell` is a terminal command, not a tap.
 
 ## 12. Touch points
 
-- `trainmate/db/base.py`: the `athlete_queue` table. `trainmate/db/queue.py`: queue once per
+- `trainmate/db/schema.py`: the `athlete_queue` table. `trainmate/db/queue.py`: queue once per
   subject, the next item of a walk, close, move to the back, hide until a time, the items
   whose reminder time has passed.
 - `trainmate/athlete_queue.py`: the list of kinds with the `message` kind, the walk (the next

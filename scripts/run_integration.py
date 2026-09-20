@@ -1,7 +1,6 @@
 import os
 import sys
 from datetime import datetime, timedelta, timezone
-from trainmate.db import db
 from trainmate import runtime
 
 def main() -> None:
@@ -9,26 +8,26 @@ def main() -> None:
     print("=== STARTING INTEGRATION TESTS ===")
     
     # 1. Reset/Add mock objectives
-    db.add_objective(
+    runtime.db.add_objective(
         title="Zurich Marathon",
         target_date="2026-10-15",
         sport_type="running",
         description="Target time: under 3:30:00",
     )
-    goals = db.get_objectives()
+    goals = runtime.db.get_objectives()
     print(f"Goal database test: Found {len(goals)} objectives.")
     for g in goals:
         print(f"- Objective: {g['title']} on {g['target_date']}")
 
     # 2. Add mock constraint (a plan-shaping directive)
-    db.add_constraint(
+    runtime.db.add_constraint(
         title="Ibiza Vacation",
         start_date="2026-07-01",
         end_date="2026-07-08",
         description="Reduce volume by 50%",
         replan=1,
     )
-    constraints = db.get_constraints()
+    constraints = runtime.db.get_constraints()
     print(f"Constraints test: Found {len(constraints)} constraints.")
 
     # 3. Create simulated workouts (one normal, one adapted)
@@ -36,7 +35,7 @@ def main() -> None:
     tomorrow_str = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
     
     # Workout 1: Standard Planned session
-    with db.workout_change(kind="generate", summary="Integration fixture.") as change:
+    with runtime.db.workout_change(kind="generate", summary="Integration fixture.") as change:
         change.append(
             date=today_str,
             sport_type="running",
@@ -51,7 +50,7 @@ def main() -> None:
         )
 
     # Workout 2: the same session, eased — a second revision of the same lineage.
-    with db.workout_change(
+    with runtime.db.workout_change(
         kind="adapt", summary="HRV average dropped 1.2 SD below chronic baseline."
     ) as change:
         change.append(
@@ -67,7 +66,7 @@ def main() -> None:
 
     # 4. Sync workouts to Google Calendar
     print("Attempting to sync workouts to Google Calendar...")
-    workouts_to_sync = db.get_workouts(start_date=today_str, end_date=tomorrow_str)
+    workouts_to_sync = runtime.db.get_workouts(start_date=today_str, end_date=tomorrow_str)
     
     try:
         synced_ids = runtime.calendar_syncer.sync_multiple(workouts_to_sync)
@@ -75,7 +74,7 @@ def main() -> None:
         print(f"Event IDs: {synced_ids}")
         
         # Verify sync status in local database
-        synced_workouts = db.get_workouts(start_date=today_str, end_date=tomorrow_str)
+        synced_workouts = runtime.db.get_workouts(start_date=today_str, end_date=tomorrow_str)
         print("Database verify sync status:")
         for w in synced_workouts:
             print(

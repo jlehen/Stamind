@@ -53,19 +53,18 @@ class TestProductionDatabaseIsUnreachable(unittest.TestCase):
         self.assertTrue(os.path.exists(path))
 
 
-class TestSavingTheHandlesDoesNotBuildThem(unittest.TestCase):
+class TestSavingTheHandleDoesNotBuildIt(unittest.TestCase):
     """`helpers.restore_db_handles` is what a module calls before binding its own
-    Database. Remembering the handles must not *create* one — reading either of them as
-    an attribute resolves a module `__getattr__` that builds the real database against
-    the production file, and the guard above then refuses it. Two modules wrote that by
-    hand and both hit it, but only when run alone: inside the full suite an earlier
-    module had already bound a handle, so the read found one cached.
+    Database. Remembering the handle must not *create* one — reading `runtime.db` as an
+    attribute resolves a module `__getattr__` that builds the real database against the
+    production file, and the guard above then refuses it. Two modules wrote that by hand
+    and both hit it, but only when run alone: inside the full suite an earlier module had
+    already bound a handle, so the read found one cached.
     """
 
     def setUp(self):
         from trainmate import runtime
-        import trainmate.db
-        self.modules = (runtime, trainmate.db)
+        self.modules = (runtime,)
         # Whatever the suite has bound so far goes back untouched, however this ends.
         saved = [(m, vars(m).get("db", _UNSET)) for m in self.modules]
 

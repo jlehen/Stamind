@@ -225,7 +225,7 @@ one more entry gives way to it rather than the other way round.
 - a moved session's history names both the destination and the vacated date;
 - a void entry prints no `Duration:` and no `Target:`;
 - a `Change:` line appears only when the change summary differs from the revision's reason;
-- appending a revision marks the event stale — the rule spans `db/workouts.py` and
+- appending a revision marks the event stale — the rule spans `db/workout_change.py` and
   `workout_state.py`, so the test spans them too (AGENTS.md);
 - a lineage past the budget renders the newest entries plus the count of what was dropped,
   and stays inside the budget.
