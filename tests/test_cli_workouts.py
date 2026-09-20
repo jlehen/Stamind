@@ -462,13 +462,13 @@ class TestCliWorkouts(unittest.TestCase):
         exit_code, stdout, stderr = self.run_cli(["workout", "wipe"], input_value="n")
         self.assertEqual(exit_code, 0)
         self.assertEqual(len(test_db.get_workouts()), 2)
-        mock_calendar.delete_workout_event.assert_not_called()
+        mock_calendar.delete_event.assert_not_called()
 
         exit_code, stdout, stderr = self.run_cli(["workout", "wipe"], input_value="y")
         self.assertEqual(exit_code, 0)
         self.assertIn("All workouts wiped successfully.", stdout)
         self.assertEqual(len(test_db.get_workouts()), 0)
-        mock_calendar.delete_workout_event.assert_called_once_with("ge_1")
+        mock_calendar.delete_event.assert_called_once_with("ge_1")
 
         mock_calendar.reset_mock()
         save_workout(test_db,
@@ -478,7 +478,7 @@ class TestCliWorkouts(unittest.TestCase):
         exit_code, stdout, stderr = self.run_cli(["workout", "wipe", "-y"])
         self.assertEqual(exit_code, 0)
         self.assertEqual(len(test_db.get_workouts()), 0)
-        mock_calendar.delete_workout_event.assert_called_once_with("ge_2")
+        mock_calendar.delete_event.assert_called_once_with("ge_2")
 
     @patch("trainmate.runtime.calendar_syncer")
     def test_workout_prune_calendar(self, mock_calendar):
@@ -555,7 +555,7 @@ class TestCliWorkouts(unittest.TestCase):
     def test_workout_prune_calendar_keeps_a_marker_covered_in_its_slot(self, mock_calendar):
         """A marker is not an orphan just because a session took its slot
         (DESIGN_plan_change_continuity.md §5.6)."""
-        from trainmate.calendar_reconcile import no_calendar_sync
+        from trainmate.gcal.reconcile import no_calendar_sync
         # The reconcile is suppressed so the ownership rows stay as written: this test
         # asks what `prune-calendar` reads, not what the sync would have done first.
         with no_calendar_sync():

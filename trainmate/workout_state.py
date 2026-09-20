@@ -30,7 +30,7 @@ import hashlib
 import json
 from typing import Literal
 
-# Exactly the fields `google_calendar.sync_workout` renders into the event's
+# Exactly the fields `gcal.event.event_body` renders into the event's
 # summary/description. Deliberately EXCLUDES the periodization footer, which
 # derives deterministically from the date and effectively never changes.
 #

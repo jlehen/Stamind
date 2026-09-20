@@ -79,7 +79,7 @@ class TestTheWebAppIsAReader(unittest.TestCase):
         "trainmate.cli",              # a front-end; the web app is another one
         "trainmate.coach",            # the model call and everything it orchestrates
         "trainmate.openrouter",       # the model client itself
-        "trainmate.google_calendar",  # writes events, and reads the credentials file
+        "trainmate.gcal",             # writes events, and reads the credentials file
         "googleapiclient",
     )
 

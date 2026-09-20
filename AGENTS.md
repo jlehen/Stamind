@@ -167,8 +167,8 @@
 - You can run the tests without asking the user.
 - A fresh worktree fails at test collection until `config.yaml` and `venv` are symlinked
   in from the main checkout. `service_account.json` is needed by two test modules only,
-  `test_calendar.py` and `test_calendar_lineage.py`, which build a real `CalendarSyncer`;
-  without it the other 1944 tests still collect and run. Do not symlink `trainmate.db`:
+  `test_gcal_client.py` and `test_gcal_history.py`, which build a real `CalendarSyncer`;
+  without it the other 1959 tests still collect and run. Do not symlink `trainmate.db`:
   the worktree's own empty database is what keeps a stray run off the athlete's data.
 - An invariant that spans files ("a propose method never writes") gets a test that reads
   the source and names the offender. Key it on a shape (a return annotation, a directory

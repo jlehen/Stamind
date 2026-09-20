@@ -64,7 +64,7 @@ carry a row, and `_fill_coverage_gaps` adds a "Rest Day" for any the model leave
 rest row. That row is a session in a different slot — slots are `(date, sport)`, and
 `rest` is a sport — so it starts its own lineage and gets its own Calendar event. The
 ride's void carries the change kind `generate`, which is not in `ATHLETE_VOID_KINDS`
-(`db/workouts.py`), so `calendar_reconcile.py::_plan` tears the ride's event down.
+(`db/workouts.py`), so `gcal/reconcile.py::_plan` tears the ride's event down.
 Thursday now reads "Rest Day", with nothing to say a ride was there yesterday or why it
 went. The "Rest Day" body says "no session planned for this day", which is not true: a
 session was planned, and a decision removed it.
@@ -447,7 +447,7 @@ carries the kind of the change that made it:
 A session `workout adapt` or `workout tweak` moves leaves a void where it left and a copy on
 its own lineage where it landed. No word is drawn: the event moves.
 
-`[Deleted]` is what `google_calendar.py::sync_workout` draws today for a goal called off,
+`[Deleted]` is what `gcal/event.py::event_body` draws today for a goal called off,
 and it keeps meaning "you did this". `[Cancelled]` is new and means "your coach did this".
 Both carry the void's `reason` as a `Reason:` line, which §4.5 now fills with the coach's
 own words instead of "Not in the regenerated plan".
@@ -479,8 +479,8 @@ above already are:
 `coach/service/adaptation.py::workout_adapt` asks **who asked for this?** — so
 the week planner is not told the athlete cancelled a day the plan merely stopped scheduling. That
 is about authorship, and the constant stays as it is for that job.
-`google_calendar.py::_void_label` asks **whose decision does the word report?**, which is
-the same question. `calendar_reconcile.py::_plan` asks **should this day leave a trace?**,
+`gcal/event.py::_void_label` asks **whose decision does the word report?**, which is
+the same question. `gcal/reconcile.py::_plan` asks **should this day leave a trace?**,
 and borrowed the authorship set because the questions happened to coincide. They no longer
 do:
 
@@ -691,7 +691,7 @@ it having run.
 **Into the preview.** The per-session sentences are the right-hand column of §4.5's table;
 the week line prints above it. The operator can reject the proposal.
 
-**Onto the Calendar, as `Reason:`, once.** Today `calendar_lineage.py::_entry` prints a
+**Onto the Calendar, as `Reason:`, once.** Today `gcal/history.py::_entry` prints a
 revision's own `reason` as `Reason:` and the change's `summary` as `Change:` when the two
 differ. For an adaptation the summary is the batch's overall rationale — "HRV suppressed
 three mornings running" — which is a second *why*, not a *what*, so the label misleads
@@ -876,7 +876,7 @@ mesocycle has a constraint that ended before the span, and not otherwise.
 - The mesocycle's past constraints are fetched from the mesocycle start; one that ended
   before the span renders under the past heading; one still active does not.
 
-`tests/test_calendar.py` — `leaves_trace` for each clause: athlete kind outside the
+`tests/test_gcal_reconcile.py` — `leaves_trace` for each clause: athlete kind outside the
 window, coach kind inside, coach kind outside (torn down), `N=0`. The window is read from
 the change, so a void reconciled a fortnight later gets the answer it had when written; a
 rollback's restored copy reads the original change's stamp. `_plan` reads a void from its
@@ -888,7 +888,7 @@ the day. A trace-keeping void with no event gets one. `[Deleted]` for `stand-dow
 `[Cancelled]` for `generate`/`adapt`/`tweak`; a `generate` or `tweak` revision with a reason
 is **not** titled `[Adapted]`, an `adapt` revision is.
 
-`tests/test_calendar_lineage.py` — a History entry prints `Reason:` from the revision, the
+`tests/test_gcal_history.py` — a History entry prints `Reason:` from the revision, the
 batch summary under the same label only when the revision has none, and `Change:` never.
 
 `tests/test_cli_plan_staleness.py` — `config_changed` reports a profile edit and a

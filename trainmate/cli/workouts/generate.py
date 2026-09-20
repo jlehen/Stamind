@@ -10,8 +10,8 @@ from trainmate.analytics.adherence import MINOR, UNPLANNED, format_discrepancies
 from trainmate.analytics.compare import (
     adherence_verdicts, adherence_window, compare_days, format_actual,
 )
-from trainmate.calendar_reconcile import mark_adherence_from_results
-from trainmate.google_calendar import event_url
+from trainmate.gcal.reconcile import mark_adherence_from_results
+from trainmate.gcal.event import event_url
 from trainmate.text import (
     bold, cmd, cyan, format_labeled_paragraph, gray, green, keep_whole, magenta, pad_visible, red,
     truncate_visible, wrap_text, yellow,

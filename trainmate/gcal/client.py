@@ -1,42 +1,34 @@
-import base64
+"""The only file that talks to the Google Calendar API.
+
+Outbound, `CalendarSyncer` puts a workout's event on the calendar, lists the events it
+owns and deletes them; what those events *say* is `event.py`, which this file asks for a
+body and then pushes. Inbound, the same class pulls tagged signal events into
+`daily_signals` (DESIGN_calendar_signal_ingest.md).
+
+No instance is built here. The constructor reads the service-account credentials file, so
+building one at import made every CLI command and the web app need that file even on an
+instance with no Calendar configured. `runtime.calendar_syncer` builds it on first use
+instead (ARCHITECTURE.md §6).
+"""
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterator, List, Optional
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from trainmate import runtime
+
+from trainmate import freshness, runtime
+from trainmate.clock import fmt_date
 from trainmate.config import config
+from trainmate.gcal.event import WORKOUT_EVENT_TAG, event_body, event_day
+from trainmate.output import warn
 from trainmate.types import Workout
-from trainmate.analytics.adherence import STATUS_LABELS
 from trainmate.workout_state import calendar_signature
-from trainmate import calendar_lineage
-from trainmate.analytics import intensity
-from trainmate.output import step, warn
-from trainmate.clock import fmt_date, fmt_timestamp
 
 # Events fetched per Calendar API page during a signal sync (the response is paged
 # through with pageToken regardless, so this only tunes round-trips vs payload size).
 CALENDAR_SYNC_PAGE_SIZE = 250
-
-# Tag stamped on every workout event we write, and the only handle on ownership left
-# once the rows that referenced the events are gone (see `list_workout_events`).
-WORKOUT_EVENT_TAG = "TrainMate"
-
-# The bracketed word a changed session's title carries, read off the change kind rather
-# than off "does it have a reason" (DESIGN_plan_change_continuity.md §5.1). A `generate`
-# revision is absent on purpose: it is the plan being written, not a decision about the
-# athlete's state, so it renders plainly. So is a `tweak`, which the athlete asked for
-# (DESIGN_workout_tweak.md §3.3).
-_REVISION_LABELS = {"adapt": "[Adapted]"}
-
-
-def _void_label(change_kind: Optional[str]) -> str:
-    """`[Deleted]` when the athlete ended the session, `[Cancelled]` when the coach did
-    (DESIGN_plan_change_continuity.md §5.1)."""
-    from trainmate.db.workouts import ATHLETE_VOID_KINDS
-    return "[Deleted]" if change_kind in ATHLETE_VOID_KINDS else "[Cancelled]"
-
 
 # Whether each event write announces itself. Callers that push a whole batch render a
 # count and a progress bar instead, and silence the per-event lines with `quiet_events()`.
@@ -54,14 +46,6 @@ def quiet_events() -> Iterator[None]:
         _event_log = was
 
 
-def event_url(event_id: Optional[str], calendar_id: Optional[str]) -> Optional[str]:
-    """Rebuild an event's Google Calendar htmlLink from its stored id (eid = base64 of "<id> <cal>")."""
-    if not event_id or not calendar_id:
-        return None
-    eid = base64.b64encode(f"{event_id} {calendar_id}".encode()).decode().rstrip("=")
-    return f"https://www.google.com/calendar/event?eid={eid}"
-
-
 class CalendarSyncer:
     """Synchronizes planned and adapted workouts to Google Calendar as all-day events."""
 
@@ -76,11 +60,6 @@ class CalendarSyncer:
         self.service: Any = build('calendar', 'v3', credentials=self.creds)
         self.calendar_id: Optional[str] = config.google_calendar_id
 
-    # Past-event adherence verdict -> title tag, shared rather than copied
-    # (adherence.STATUS_LABELS). "Not yet" is in the map but unreachable here:
-    # `mark_adherence_from_results` skips pending rows before rendering a verdict.
-    _ADHERENCE_TAGS = STATUS_LABELS
-
     def sync_workout(
         self, workout: Workout, adherence: Optional[dict] = None
     ) -> Optional[str]:
@@ -88,11 +67,8 @@ class CalendarSyncer:
 
         Args:
             workout: The Workout details to synchronize.
-            adherence: Optional backward-looking verdict for a *past* event,
-                ``{"status": str, "actual": Optional[str], "reasons": [str]}``
-                (built by `workout compare --mark`). When present, a status tag
-                is prepended to the title and an "Adherence" header is prepended
-                to the description.
+            adherence: Optional backward-looking verdict for a *past* event, passed
+                straight through to `event.event_body`.
 
         Returns:
             The Google Calendar event ID if sync was successful, or None.
@@ -100,162 +76,16 @@ class CalendarSyncer:
         Raises:
             HttpError: If API call fails.
         """
-        date_str = workout['date']
-        sport_type = workout['sport_type']
-        title = workout['title']
-        description = workout['description']
-        mod_reason = workout.get('modification_reason')
         google_event_id = workout.get('google_event_id')
-
-        # Calculate end date (exclusive for all-day events: start_date + 1 day)
-        start_date = datetime.strptime(date_str, "%Y-%m-%d")
-        end_date = start_date + timedelta(days=1)
-        end_date_str = end_date.strftime("%Y-%m-%d")
-
-        # Format Summary and Description. The body is the session's CURRENT form only;
-        # every earlier form is rendered by the `History` section below
-        # (DESIGN_calendar_lineage.md §5).
-        change_kind = workout.get('change_kind')
-        if workout.get('removed'):
-            summary = f"{_void_label(change_kind)} {title}"
-            event_description = description or ""
-            removed_reason = workout.get('removed_reason')
-            if removed_reason:
-                event_description = f"{event_description}\n\nReason:\n{removed_reason}"
-        elif mod_reason:
-            # The word comes off the change kind, not off the presence of a reason: a
-            # `workout generate` revision now carries one too, and "[Adapted]" means the
-            # coach eased this because of how the athlete was doing
-            # (DESIGN_plan_change_continuity.md §5.1).
-            label = _REVISION_LABELS.get(change_kind)
-            summary = f"{label} {title}" if label else title
-            event_description = f"{description or ''}\n\nReason:\n{mod_reason}"
-        else:
-            summary = title
-            event_description = description or ""
-
-        # Backward-looking adherence tag for a past event (Done/Missed/Partial/…).
-        # Prepended so it reads first — for a finished session the verdict is the
-        # salient state — and composes with any [Adapted] tag above.
-        if adherence:
-            tag = self._ADHERENCE_TAGS.get(adherence.get("status"))
-            if tag:
-                summary = f"[{tag}] {summary}"
-
-        # Prepend the session's current load to the description if available.
-        duration = workout.get('duration_minutes')
-        tss = workout.get('tss')
-        rpe = workout.get('rpe')
-        prefix_parts = []
-        if duration is not None:
-            prefix_parts.append(f"Duration: {duration}m")
-        if tss is not None:
-            prefix_parts.append(f"TSS: {tss}")
-        if rpe is not None:
-            prefix_parts.append(f"RPE: {rpe}")
-        prefix = " | ".join(prefix_parts)
-        if prefix:
-            if event_description:
-                event_description = f"{prefix}\n\n{event_description}"
-            else:
-                event_description = prefix
-
-        # The intensity target, rendered FROM the planned-zone columns here and never
-        # stored, so the sentence cannot drift from the columns it describes
-        # (DESIGN_intensity_distribution.md §9.8).
-        target = intensity.format_planned_zones(workout)
-        if target:
-            event_description = (
-                f"{event_description}\n\n{target}" if event_description else target
-            )
-
-        # Lifecycle footer: before the history, because it describes this form of the
-        # session, not the earlier ones (DESIGN_calendar_lineage.md §5). The load it was
-        # planned with is not repeated here — the oldest history entry carries it.
-        footer_lines: List[str] = []
-        lifecycle_parts = []
-        created_at = workout.get('created_at')
-        adapted_at = workout.get('adapted_at')
-        adaptation_count = workout.get('adaptation_count') or 0
-        if created_at:
-            lifecycle_parts.append(f"Planned: {fmt_timestamp(created_at)}")
-        if adapted_at:
-            lifecycle_parts.append(f"Last adapted: {fmt_timestamp(adapted_at)}")
-        if adaptation_count:
-            lifecycle_parts.append(f"Adapted ×{adaptation_count}")
-        if lifecycle_parts:
-            footer_lines.append(" · ".join(lifecycle_parts))
-
-        # Append an identifier footer so each event stays traceable back to the plan
-        # that produced it: goal/macro/meso are resolved from the workout's date, the
-        # workout id comes from the row itself.
-        id_parts = []
-        ids = runtime.db.get_periodization_ids_for_date(date_str)
-        if ids:
-            objective_id, macrocycle_id, mesocycle_id = ids
-            id_parts.append(f"Goal: {objective_id}")
-            id_parts.append(f"Macro: {macrocycle_id}")
-            id_parts.append(f"Meso: {mesocycle_id}")
-        workout_id = workout.get('id')
-        if workout_id is not None:
-            id_parts.append(f"Workout: {workout_id}")
-        if id_parts:
-            footer_lines.append(" | ".join(id_parts))
-
-        footer = "\n".join(footer_lines)
-
-        # Prepend the adherence header so the verdict + actual effort sit at the top
-        # of a past event's description, above the planned Duration/TSS and body.
-        header = ""
-        if adherence:
-            status = adherence.get("status")
-            tag = self._ADHERENCE_TAGS.get(status, status)
-            header_lines = [f"Adherence: {tag}"]
-            actual = adherence.get("actual")
-            if actual:
-                header_lines.append(f"Actual: {actual}")
-            reasons = adherence.get("reasons") or []
-            if reasons:
-                header_lines.append(f"Notes: {', '.join(reasons)}")
-            header = "\n".join(header_lines)
-
-        # Every earlier form of this session, newest first — the event is the only place
-        # the athlete can ask "what was this before?" without a terminal
-        # (DESIGN_calendar_lineage.md §2). Placed last and sized last because it is the
-        # part that yields: it takes the space the rest of the event does not need, so a
-        # long prescription is never the thing that gets cut (§7).
-        spare = calendar_lineage.MAX_DESCRIPTION - len(header) - len(event_description)
-        history = calendar_lineage.for_workout(workout, budget=spare - len(footer) - 8)
-
-        event_description = "\n\n".join(
-            part for part in (header, event_description, footer, history) if part
-        )
-
-        event_body = {
-            'summary': summary,
-            'description': event_description,
-            'start': {
-                'date': date_str,
-            },
-            'end': {
-                'date': end_date_str,
-            },
-            # Add metadata tag to identify TrainMate events
-            'extendedProperties': {
-                'private': {
-                    'source': WORKOUT_EVENT_TAG,
-                    'sport_type': sport_type
-                }
-            }
-        }
+        body = event_body(workout, adherence)
 
         # If we have a saved google_event_id, try updating it
         if google_event_id:
             try:
-                updated_event = self.service.events().update(
+                self.service.events().update(
                     calendarId=self.calendar_id,
                     eventId=google_event_id,
-                    body=event_body
+                    body=body
                 ).execute()
 
                 # Record the push: store the event handle + the signature of what we
@@ -283,14 +113,15 @@ class CalendarSyncer:
         try:
             created_event = self.service.events().insert(
                 calendarId=self.calendar_id,
-                body=event_body
+                body=body
             ).execute()
             new_event_id = created_event.get('id')
             if _event_log:
                 print(
-                    f"Created new calendar event for {fmt_date(date_str)} ({sport_type})."
+                    f"Created new calendar event for {fmt_date(workout['date'])} "
+                    f"({workout['sport_type']})."
                 )
-            
+
             # Record the push: store the new event handle + the signature of what we
             # just pushed, so the row derives as `synced` until edited again.
             if workout.get('id') is not None:
@@ -398,8 +229,7 @@ class CalendarSyncer:
         if private.get('source') != config.calendar_signal_tag:
             return 0
 
-        start = event.get('start', {}) or {}
-        date = start.get('date') or (start.get('dateTime') or "")[:10]
+        date = event_day(event)
         if not date:
             return 0
 
@@ -452,7 +282,7 @@ class CalendarSyncer:
         private = {'source': config.calendar_signal_tag, 'metric': metric}
         if value is not None:
             private['value'] = str(value)
-        event_body = {
+        body = {
             'summary': text or metric,
             'start': {'date': date},
             'end': {'date': end_date_str},
@@ -461,11 +291,11 @@ class CalendarSyncer:
 
         if existing_event_id:
             updated = self.service.events().update(
-                calendarId=self.calendar_id, eventId=existing_event_id, body=event_body
+                calendarId=self.calendar_id, eventId=existing_event_id, body=body
             ).execute()
             return updated.get('id')
         created = self.service.events().insert(
-            calendarId=self.calendar_id, body=event_body
+            calendarId=self.calendar_id, body=body
         ).execute()
         return created.get('id')
 
@@ -518,16 +348,6 @@ class CalendarSyncer:
             warn(f"failed to delete Google Calendar event {google_event_id}: {e}")
             return False
 
-    # Back-compat alias: workout teardown paths call this name.
-    def delete_workout_event(self, google_event_id: str) -> bool:
-        """Deletes a workout event from Google Calendar (see `delete_event`)."""
-        return self.delete_event(google_event_id)
-
-# No instance is built here. The constructor reads the service-account credentials file,
-# so building one at import made every CLI command and the web app need that file even on
-# an instance with no Calendar configured. `runtime.calendar_syncer` builds it on first
-# use instead (ARCHITECTURE §6).
-
 
 # Per-process memo: a single CLI command syncs signals at most once.
 _signals_synced: bool = False
@@ -548,24 +368,17 @@ def sync_calendar_signals(force: bool = False) -> None:
     if not force:
         if _signals_synced:
             return
-        # Skip if a recent sync already covers the freshness window (shared with the
-        # Garmin metric-refresh cadence — "how fresh is fresh enough").
-        state = runtime.db.get_sync_state(key="calendar_signals")
-        if state and state.get("last_pull_utc"):
-            try:
-                age = datetime.now(timezone.utc) - datetime.fromisoformat(
-                    state["last_pull_utc"]
-                )
-                if age <= timedelta(minutes=config.data_refresh_minutes):
-                    step(
-                        f"Calendar signals is fresh (last sync "
-                        f"{int(age.total_seconds() // 60)}m ago); using cache. "
-                        "Pass --force-pull to refresh now."
-                    )
-                    _signals_synced = True
-                    return
-            except (ValueError, TypeError):
-                pass
+        # Skip while a recent sync still covers the freshness window — the same window
+        # the Garmin pull uses (trainmate/freshness.py).
+        age = freshness.last_pull_age(
+            runtime.db.get_sync_state(key="calendar_signals")
+        )
+        if age is not None and age <= timedelta(minutes=config.data_refresh_minutes):
+            freshness.fresh_notice(
+                "Calendar signals", f"last sync {freshness.age_minutes(age)}m ago"
+            )
+            _signals_synced = True
+            return
     try:
         runtime.calendar_syncer.sync_signals()
         _signals_synced = True

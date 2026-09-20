@@ -9,7 +9,7 @@ The renderer is pure text over raw revision dicts — what `db.get_lineage_revis
 returns, with the change's `kind`, `created_at` and `summary` joined on. `for_workout` is
 the one function that reaches for the database.
 """
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from trainmate.analytics import intensity
 from trainmate import runtime
@@ -55,14 +55,18 @@ def _label(revision: Dict[str, Any]) -> str:
     return table.get(kind, kind)
 
 
-def _load(revision: Dict[str, Any]) -> Optional[str]:
-    """The load line, in the same shape as the one at the top of the event, so the two
-    compare by eye."""
+def load_line(row: Mapping[str, Any]) -> Optional[str]:
+    """What a session asks of the athlete, as one line: `Duration: 60m | TSS: 55 | RPE: 6`.
+
+    Written once and used twice — at the top of the event for the session as it stands
+    now, and inside each history entry for the form it had then — so the two compare by
+    eye (DESIGN_calendar_lineage.md §3). None when the row carries none of the three.
+    """
     parts = []
     for field, label, suffix in (
         ("duration_minutes", "Duration", "m"), ("tss", "TSS", ""), ("rpe", "RPE", ""),
     ):
-        value = revision.get(field)
+        value = row.get(field)
         if value is not None:
             parts.append(f"{label}: {value}{suffix}")
     return " | ".join(parts) if parts else None
@@ -81,7 +85,7 @@ def _entry(revision: Dict[str, Any], position: int, total: int) -> str:
     )
     lines: List[str] = [f"{fmt_date(revision.get('date'))} · {revision.get('title') or ''}"]
     if not void:
-        for line in (_load(revision), intensity.format_planned_zones(revision)):
+        for line in (load_line(revision), intensity.format_planned_zones(revision)):
             if line:
                 lines.append(line)
     # One label, one meaning (DESIGN_plan_change_continuity.md §6.4): the batch summary

@@ -26,7 +26,7 @@ specific signal: that's too narrow and would repeat for sleep, stress, meals,
 etc. Instead we want **one generic channel** through which any external source
 can hand TrainMate a dated, optionally-quantified signal.
 
-Google Calendar is already wired in (`google_calendar.py`, service account) and
+Google Calendar is already wired in (`gcal/client.py`, service account) and
 is human-visible and editable from a phone, which makes it a natural generic
 inbox. An external syncer (a separate repo, mirroring how `GarminScraper` feeds
 Garmin data — see `DESIGN_garmin_direct_pull.md`) drops one event per
@@ -95,7 +95,7 @@ We use `extendedProperties.private` rather than a title convention (e.g.
 **Privacy: what the tag actually guarantees.** The server-side filter is *not*
 available on the steady-state path. Google Calendar makes `privateExtendedProperty`
 and `syncToken` mutually exclusive, so the code drops the filter whenever a sync
-token is set (`google_calendar.py`, `sync_signals`). Concretely:
+token is set (`gcal/client.py`, `sync_signals`). Concretely:
 
 - **Full pull** (first run, or 410 token expiry) — filter applied; only tagged
   signal events are fetched.

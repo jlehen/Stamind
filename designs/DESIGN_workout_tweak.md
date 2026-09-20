@@ -285,9 +285,9 @@ unrelated parts of the message into a brief, or drops the request.
 | `coach/formatting.py` | The `[ADDED BY THE ATHLETE]` and `[athlete-added]` tags. |
 | `coach/engine/workouts.py` | The "[athlete-added]" paragraph of the adapt TASK. |
 | `strength/planner.py` | Sessions "shown as context": every strength session is written or checked. |
-| `calendar_reconcile.py` | The manual clause of `leaves_trace`. |
-| `google_calendar.py` | The `[Manual]` title tag. `add` as a reason to say `[Deleted]`. |
-| `calendar_lineage.py` | The labels "Added by hand", "Replaced by hand" and `rm`'s "Cancelled". |
+| `gcal/reconcile.py` | The manual clause of `leaves_trace`. |
+| `gcal/event.py` | The `[Manual]` title tag. `add` as a reason to say `[Deleted]`. |
+| `gcal/history.py` | The labels "Added by hand", "Replaced by hand" and `rm`'s "Cancelled". |
 | `cli/workouts/_helpers.py` | The `[MANUAL]` and `[REPLACED]` markers. |
 | `cli/workouts/generate.py` | "N added by hand" in the question `workout generate` asks. |
 | `analytics/runway.py` | `coverage_end`. Without manual sessions it is the same function as `plan_end`. |
@@ -301,7 +301,7 @@ unrelated parts of the message into a brief, or drops the request.
 | `cli/workouts/parser.py`, `edit.py`, `_helpers.py` | The sub-command, its handler and `_resolve_swap_ops`. |
 | `coach/service/editing.py` | The whole file: `workout_swap_validate`, `workout_swap_apply` and their helpers. `WorkoutEditMixin` leaves `CoachService`. |
 | `db/workouts.py` | The `swap` change kind. |
-| `calendar_lineage.py`, `_helpers.py`, `static/` | The labels "Moved" and "Moved away", the `[SWAPPED]` marker and its badge. |
+| `gcal/history.py`, `_helpers.py`, `static/` | The labels "Moved" and "Moved away", the `[SWAPPED]` marker and its badge. |
 
 What stays: a session can still stand in a slot other than the one it started in, because
 `workout adapt` and `workout tweak` move sessions. So the lineage rule for a move, and the

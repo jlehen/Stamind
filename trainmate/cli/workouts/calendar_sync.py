@@ -3,13 +3,13 @@ with the database."""
 import argparse
 import sys
 from datetime import datetime, timedelta
-from typing import Optional
 from trainmate import runtime
 from trainmate.workout_state import calendar_status
 from trainmate.text import cmd, cyan, dim, green, red
 from trainmate.output import notice, step
 from trainmate.clock import fmt_date, fmt_span, today_str as _today_str
 from trainmate.cli.selectors import resolve_window
+from trainmate.gcal.event import event_day
 
 
 def warn_stale_before(start_date: str) -> None:
@@ -101,17 +101,10 @@ def run_workout_wipe(args: argparse.Namespace) -> None:
         for w in synced_workouts:
             ge_id = w['google_event_id']
             if ge_id:
-                runtime.calendar_syncer.delete_workout_event(ge_id)
+                runtime.calendar_syncer.delete_event(ge_id)
 
     runtime.db.wipe_workouts()
     print(green("All workouts wiped successfully."))
-
-
-def _event_day(event: dict) -> Optional[str]:
-    """The day an event sits on. Workout events are all-day (`start.date`); a timed
-    start is tolerated in case one was hand-edited in Google Calendar."""
-    start = event.get('start') or {}
-    return start.get('date') or (start.get('dateTime') or "")[:10] or None
 
 
 def run_workout_prune_calendar(args: argparse.Namespace) -> None:
@@ -140,7 +133,7 @@ def run_workout_prune_calendar(args: argparse.Namespace) -> None:
     for event in events:
         if event.get('id') in known:
             continue
-        day = _event_day(event)
+        day = event_day(event)
         if start_date and (day is None or day < start_date):
             continue
         if end_date and (day is None or day > end_date):

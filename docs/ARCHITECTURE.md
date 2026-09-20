@@ -80,7 +80,7 @@ Calendar.
   |              Data & Integration Layer            |
   |  trainmate/db/              (SQLite CRUD)        |
   |  trainmate/garmin/          (Garmin direct pull) |
-  |  trainmate/google_calendar.py (Calendar sync)    |
+  |  trainmate/gcal/            (Calendar sync)      |
   +--------------------------------------------------+
 ```
 
@@ -386,6 +386,12 @@ classes themselves.
 |                      |                      | re-exports nothing, so importing the load model   |
 |                      |                      | does not drag the PMC series in behind it.        |
 |                      |                      | `tests/test_layering.py` holds the rule (§14).    |
+| `freshness.py`       | —                    | How fresh is fresh enough, for the two things     |
+|                      |                      | TrainMate pulls from elsewhere. `last_pull_age`   |
+|                      |                      | reads a `sync_state` row, `fresh_notice` writes   |
+|                      |                      | the "using cache" line. One rule rather than one  |
+|                      |                      | per integration, and flat because `garmin/` and   |
+|                      |                      | `gcal/` must not import each other.               |
 | `garmin/`            | module functions     | A **package** (`client`/`sync`/`derived`), all    |
 |                      |                      | re-exported from `__init__.py` so `from trainmate |
 |                      |                      | import garmin` and `patch.object(garmin, …)` are  |
@@ -399,23 +405,34 @@ classes themselves.
 |                      |                      | `recompute_derived`, `backfill_tss`,              |
 |                      |                      | `pmc_history_start`, and the one `warmup_cutoff`  |
 |                      |                      | every surface blanks warm-up rows against (§12).  |
-| `google_calendar.py` | `CalendarSyncer`     | Creates/updates/deletes all-day Google Calendar  |
-|                      |                      | events for workouts (outbound), and ingests       |
-|                      |                      | tagged signal events into `daily_signals` |
-|                      |                      | (inbound — `sync_calendar_signals`, see §13).    |
-| `calendar_reconcile.py` | —                 | The pass that makes Calendar agree with the      |
-|                      |                      | workouts log after a change commits: per lineage, |
-|                      |                      | push, retitle `[Deleted]`/`[Cancelled]`, or tear  |
-|                      |                      | the event down (DESIGN_workout_revisions.md §8).  |
+| `gcal/`              | `CalendarSyncer`     | Google Calendar, in and out. A **package**, named |
+|                      |                      | `gcal` because the standard library owns          |
+|                      |                      | `calendar` ([§15](#15-design-rationale--history)).|
+|                      |                      | `event.py` = what a workout's event says — the    |
+|                      |                      | title tags (`[Adapted]`, `[Deleted]` vs           |
+|                      |                      | `[Cancelled]`), `event_body`, `event_url`, and    |
+|                      |                      | `event_day` for reading one back. No Google       |
+|                      |                      | import in it, so a test can assert on an event    |
+|                      |                      | without a service account. `history.py` = the     |
+|                      |                      | `History` section that body ends with: every      |
+|                      |                      | earlier form of the session, newest first, with   |
+|                      |                      | its date, load, target, reason and body           |
+|                      |                      | (DESIGN_calendar_lineage.md); its `load_line` is  |
+|                      |                      | the one place `Duration \| TSS \| RPE` is written,|
+|                      |                      | used by the event top as well. `client.py` = the  |
+|                      |                      | only file that calls the API: `CalendarSyncer`    |
+|                      |                      | creates/updates/deletes the events (outbound) and |
+|                      |                      | ingests tagged signal events into `daily_signals` |
+|                      |                      | (inbound — `sync_calendar_signals`, see §13).     |
+|                      |                      | `reconcile.py` = the pass that makes Calendar     |
+|                      |                      | agree with the workouts log after a change        |
+|                      |                      | commits: per lineage, push, retitle, or tear the  |
+|                      |                      | event down (DESIGN_workout_revisions.md §8);      |
 |                      |                      | `leaves_trace` is which removals keep their event |
 |                      |                      | (DESIGN_plan_change_continuity.md §5.2). Scheduled|
 |                      |                      | by the change handle, attached in `runtime`, so no|
-|                      |                      | command carries Calendar code.                    |
-| `calendar_lineage.py` | —                   | Renders a session's revision history as the      |
-|                      |                      | `History` section of its Calendar event: every    |
-|                      |                      | earlier form, newest first, with its date, load,  |
-|                      |                      | target, reason and body                           |
-|                      |                      | (DESIGN_calendar_lineage.md).                     |
+|                      |                      | command carries Calendar code. `__init__.py`      |
+|                      |                      | re-exports nothing.                               |
 | `analytics/adherence.py` | —                | `analyze_adherence()` + `classify_adherence()`   |
 |                      |                      | pure functions; compare planned vs completed     |
 |                      |                      | (the latter yields a per-workout verdict). The   |
@@ -594,7 +611,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Plan version comparison / display | `trainmate/plan_versions.py` (the lineage walk, the comparison and the snapshot parsing), `cli/plans.py` (text rendering), `/api/plan/diff` in `trainmate_web.py`, `loadPlanDiff()`/`render*` in `static/app.js` |
 | Plan feedback (the athlete's notes on the plan) | `db/periodization.py` (`add_/list_/get_/rm_plan_feedback` over the `plan_feedback` table), `cli/plans.py:run_plan_feedback` + `cli/selectors.py:resolve_meso_atom` (the `-m` atom), `coach/service/planning.py` (the regen gate disjunct + prompt assembly), `coach/engine/planning.py` (the prompt section), DESIGN_plan_feedback.md |
 | Workout generation span          | `coach/service/workouts.py:workout_generate`, `cli/workouts/generate.py:_resolve_span`, `cli/workouts/strength_only.py:_span` (`--strength-only`: an open end runs to the last scheduled day), `cli/workouts/parser.py` (flag parsing), `config.workout_generation_span_days` |
-| Commitment window                | `settings.commitment_days`/`settings.commitment_end` (how long the window is and where it ends — one rule), `coach/service/workouts.py:_standing_sessions`/`_resolve_standing`, `coach/formatting.py:format_standing_workouts`, `calendar_reconcile.py:leaves_trace`, `workout_changes.commitment_end`   |
+| Commitment window                | `settings.commitment_days`/`settings.commitment_end` (how long the window is and where it ends — one rule), `coach/service/workouts.py:_standing_sessions`/`_resolve_standing`, `coach/formatting.py:format_standing_workouts`, `gcal/reconcile.py:leaves_trace`, `workout_changes.commitment_end`   |
 | Telling the athlete a plan-shaping input changed since the plan was built | `plan_inputs.py` (**canonical** for what shapes a plan and how it is hashed: the partition `plan_profile`/`changed_plan_profile_fields`/`plan_config_hash`, the science files `athlete_science_documents`/`changed_science_documents`, the goal and constraint cleaners, and the diff text), `coach/service/staleness.py` (the judgment — every axis of `config_changed`, the diff, the verdict call, the one `plan_fingerprints()` builder and the `plan keep` stamp), **`cli/staleness.py`** (canonical for everything the athlete *reads*: the reason, the §2 test said out loud, and the four surfaces' shared wording), and the surfaces that draw it: `cli/plans.py` (`plan show` reports, `plan keep` dismisses, `plan generate` offers), `cli/workouts/generate.py`, `cli/status.py` (a pointer to `plan show`, nothing more), `trainmate_web.py` (a read-only banner off `plan_config_hash()`, deliberately not through the engine — §8). Built in **one** place for the same reason the runway nudge is: three call sites each phrasing a two-sentence explanation is how they drift (DESIGN_plan_staleness.md §9) |
 | Telling the athlete the schedule is running out | `analytics/runway.py` (`plan_end`, `runway` — the pure detector and its four kinds), `cli/runway.py` (the row fetch, every wording, the morning-push button), and the four surfaces that draw it: `cli/workouts/generate.py` (`workout adapt`'s hint and refusal, `workout list`'s marker), `cli/status.py`, `cli/bot.py:run_bot_morning`, `config.runway_warning_days`, DESIGN_runway_nudge.md. The wording is built in **one** place on purpose — the hint used to live on `workout adapt` alone, which is how `status` came to answer differently on the same morning (§3 of that doc) |
 | Generation covering every date of its span | `coach/engine/workouts.py` (the TASK sentence), `coach/service/workouts.py:_fill_coverage_gaps` (the deterministic backstop, over the same `_rest_workout` factory the rest-window pre-pass uses), DESIGN_runway_nudge.md §2.1. The invariant is what lets the end of the schedule be read straight off the rows, with no margin |
@@ -604,10 +621,10 @@ flow for each lives in [§10](#10-key-data-flows).
 | Garmin pull / metrics / load model | `trainmate/garmin/sync.py` (`pull`, `ensure_data`), `garmin/derived.py` (`recompute_derived`, `backfill_tss`, `warmup_cutoff` — the database side), `analytics/load.py` (`activity_load`) and `analytics/pmc.py` (the PMC maths), see [§12](#12-sports-science--coaching-mathematics) |
 | Progress timeline / PMC projection | `analytics/progression.py` (the series), `analytics/timeline.py` (the payload), `trainmate/timeline_rows.py` (the shared row-fetch), `analytics/chart.py` (PNG), `cli/progress.py` (text), `/api/timeline.png` in `trainmate_web.py`, see [§12](#fitnessfatigueform-pmc-model), DESIGN_progress_timeline.md |
 | Intensity distribution / time in zone | `analytics/intensity.py` (aggregation + which sports qualify and in which currency), `analytics/zone_tables.py` (the prompt-width rendering) and `analytics/mesocycle_report.py` (the report itself) — `window_sport_stats`/`select_zone_sports`/`zone_currency` say which sports qualify, shared by the CLI tables and `/api/zones`, `coach/service/context.py` (`_intensity_mesocycle_context` for adapt, `_intensity_history_context` for the strategy prompt, `_mesocycle_progress_context` for workout generate — the only consumer passing `mesocycle_report`'s `previous=` and `fetch_workouts=`, since mesocycle-over-mesocycle creep and measured-vs-prescribed attribution are periodization questions (§9.2a), `_planning_zone_currencies` for §9.8), `cli/status.py`, `cli/progress.py` (the weekly grid — it shares the load table's week column and 48-column budget), `progression.weekly_aggregates` (where the rows join the payload), `cli/data.py` (`--zones`), `/api/zones` + the Progress tab's tables in `static/app.js`, DESIGN_intensity_distribution.md. Undercount markers are proportional: `intensity.judgeable` (`config.zone_min_activity_minutes`) withholds a too-short session's vote, and the coverage bar is per sport (`intensity.COVERAGE_MIN_BY_SPORT`, overridable via `config.zone_coverage_display_min_by_sport`) because rest between sets is not a failed recording. Both maps' keys must be **canonical** sports — `coverage_display_min()` canonicalizes before the lookup, so an alias key is dead and silently reverts to the global bar |
-| Planned time in zone (a session's intensity target) | `db/base.py` (`planned_zone_currency`, `planned_zone1..7_sec` on `workouts`), `db/workouts.py:WorkoutChange.append`, `intensity.parse_planned_zones` / `format_planned_zones`, `coach/engine/workouts.py` (`_planned_zone_task`, `_planned_zone_fields` — both prompts), `google_calendar.py` + `coach/formatting.py` + `cli/workouts/_helpers.py::prescription_lines` (`workout list -v`/`-vv` and the `workout generate` preview) — rendered from the columns, never stored; `planned_zone_seconds` also reads a proposal's unwritten `planned_zone_sec` list through `parse_planned_zones`, DESIGN_intensity_distribution.md §9.8 |
-| Calendar push / daily-signal ingest | `trainmate/google_calendar.py`, see [§13](#13-daily-signal-calendar-ingest) |
+| Planned time in zone (a session's intensity target) | `db/base.py` (`planned_zone_currency`, `planned_zone1..7_sec` on `workouts`), `db/workouts.py:WorkoutChange.append`, `intensity.parse_planned_zones` / `format_planned_zones`, `coach/engine/workouts.py` (`_planned_zone_task`, `_planned_zone_fields` — both prompts), `gcal/event.py` + `coach/formatting.py` + `cli/workouts/_helpers.py::prescription_lines` (`workout list -v`/`-vv` and the `workout generate` preview) — rendered from the columns, never stored; `planned_zone_seconds` also reads a proposal's unwritten `planned_zone_sec` list through `parse_planned_zones`, DESIGN_intensity_distribution.md §9.8 |
+| Calendar push / daily-signal ingest | `trainmate/gcal/`, see [§13](#13-daily-signal-calendar-ingest) |
 | Workout state (modified/calendar/removed) | `trainmate/workout_state.py` (`modification_markers` and `calendar_status` — two of the three axes, together because every surface that shows one shows the other, and because neither reads the database), `db/workouts.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
-| What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `analytics/compare.py` (`adherence_window` — the one pairing that reads the database, handed the handle — `adherence_verdicts` keyed by workout id, `compare_days` for the day-by-day walk, and `format_actual` for the effort it graded against), `analytics/adherence.py::unplanned_kind` (what an activity nothing planned turns out to be: minor, unplanned or off-plan), `calendar_reconcile.py` (`calendar_reconcile.mark_adherence_range` — stamping the verdict onto the Calendar event), `cli/workouts/_helpers.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/generate.py::_list_verdicts` (which span the listing grades, and the pull it needs), `google_calendar.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/app.js` (the badge) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
+| What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `analytics/compare.py` (`adherence_window` — the one pairing that reads the database, handed the handle — `adherence_verdicts` keyed by workout id, `compare_days` for the day-by-day walk, and `format_actual` for the effort it graded against), `analytics/adherence.py::unplanned_kind` (what an activity nothing planned turns out to be: minor, unplanned or off-plan), `gcal/reconcile.py` (`mark_adherence_range` — stamping the verdict onto the Calendar event), `cli/workouts/_helpers.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/generate.py::_list_verdicts` (which span the listing grades, and the pull it needs), `gcal/event.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/app.js` (the badge) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
 | Which timezone dates are read in | `trainmate/clock.py` (the zone, the cache, the fallback), `clock.today_date`/`clock.fmt_timestamp`, the push loop in `trainmate_bot.py`, DESIGN_user_timezone.md. Changing it is one row of `settings` |
 | A preference the athlete can change at runtime | `trainmate/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`trainmate/queue_kind.py`) added to `KINDS` in `trainmate/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
@@ -1483,7 +1500,7 @@ no precedence rule — the kind was recorded when the change ran:
     move the hash — the event renders the whole lineage as its history, so a lineage that
     grew is an event that changed (DESIGN_calendar_lineage.md §6).
   - **Who keeps the Calendar true.** Every workout change ends with one **reconcile pass**
-    over the lineages it touched, after commit (`trainmate/calendar_reconcile.py`). The
+    over the lineages it touched, after commit (`trainmate/gcal/reconcile.py`). The
     change handle schedules it, so the only way to write workouts already schedules the
     reconcile, and no command carries Calendar code. Per lineage, keyed on its **newest
     revision**, live in its slot or not (`get_lineage_head`): a session that still owns
@@ -1499,7 +1516,7 @@ no precedence rule — the kind was recorded when the change ran:
     the body: the current load line, the current
     description, its `Reason:`, the intensity target, the **`History` section** — every
     earlier revision of the lineage, newest first, each with its date, load, target,
-    reason and body (`calendar_lineage.py`, DESIGN_calendar_lineage.md) — and last the
+    reason and body (`gcal/history.py`, DESIGN_calendar_lineage.md) — and last the
     `Planned: … · Last adapted: … · Adapted ×N` lifecycle line over the goal/macro/meso/
     workout ids. A session that has never been revised has no `History` section and renders
     exactly as before.
@@ -1959,7 +1976,7 @@ never builds a Database or opens the file**; `--help` does no I/O. Assigning
 (`runtime.db = fake`) shadows the accessor for the process, which is the single
 override point for tests.
 
-The same applies to the Calendar. `google_calendar.py` used to build a `CalendarSyncer`
+The same applies to the Calendar. The Calendar module used to build a `CalendarSyncer`
 at module scope, and that constructor reads the service-account credentials file — so
 every CLI command and the web app needed that file on disk even on an instance with no
 Calendar configured, and a fresh worktree could not collect a single test without it.
@@ -2233,7 +2250,7 @@ worth looking at, and cost nothing when it is not.
 Consequences worth having: no request can leave the database in a state the CLI did not
 put it in, so the app is safe to leave running and cannot race the CLI or the bot over a
 workout row; and it needs neither the Calendar service-account credentials nor an LLM key
-to start, because it imports neither `google_calendar` nor `coach_service`. The one thing
+to start, because it imports neither `trainmate.gcal` nor `coach_service`. The one thing
 it did need from the coaching engine — the plan-shaping config fingerprint behind the
 "config changed" banner — is `plan_inputs.plan_config_hash()`, a flat pure module the
 coach reads too, so the two cannot drift. It used to be reached through a forwarding
@@ -2713,7 +2730,7 @@ large backfills** (cold start, big forward/backward gaps), always continuing wit
 cached data. Gaps lying entirely *before* the requested window — derivation-pad
 warm-up data the user never asked to view, bounded by the pad itself — always pull
 automatically, so widening the pad in an upgrade self-heals instead of nagging. The same entry point also
-rides along a best-effort Calendar daily-signal sync (`google_calendar.sync_calendar_signals`),
+rides along a best-effort Calendar daily-signal sync (`gcal.client.sync_calendar_signals`),
 gated by the same `data_refresh_minutes` throttle. When that throttle keeps a read on
 cached data (Garmin or Calendar), a one-line note says so. These commands support
 `--no-pull` to bypass the sync entirely (cache-only) and `--force-pull` to refresh even
@@ -2952,7 +2969,7 @@ command (outbound, below) for ad-hoc signals. Full specs:
 **Inbound flow:**
 
 ```
-Calendar (tagged events) ──► google_calendar.sync_calendar_signals
+Calendar (tagged events) ──► gcal.client.sync_calendar_signals
    ──► calendar_syncer.sync_signals (syncToken; server-side filtered on the full
                                      pull only, client-side otherwise)
    ──► db.upsert/delete_daily_signal_by_event ──► daily_signals table
@@ -2978,7 +2995,7 @@ Calendar (tagged events) ──► google_calendar.sync_calendar_signals
   path (`garmin.ensure_data` → bridge `_sync_calendar_signals`, throttled to the
   Garmin refresh window and memoized once per process). Best-effort: a missing
   calendar config or any Calendar error is swallowed with a warning. The gating
-  and error handling live in `google_calendar.sync_calendar_signals`; `garmin/sync.py`
+  and error handling live in `gcal/client.py::sync_calendar_signals`; `garmin/sync.py`
   only bridges to it via a guarded lazy import.
 - **Coach use:** two complementary paths. (1) *Qualitative* — each week's summary
   carries a `daily_signals` list (all rows, no collapsing) the LLM reads beside the
@@ -3034,7 +3051,7 @@ storage layer. The rule is what lets the coach, the CLI and the web app share on
 load model without three of them paying for a package they are not using.
 
 **Importing `trainmate_web` loads no `trainmate.cli`, no `trainmate.coach`, no
-`trainmate.openrouter`, no `trainmate.google_calendar` and no `googleapiclient`.**
+`trainmate.openrouter`, no `trainmate.gcal` and no `googleapiclient`.**
 The dashboard reads and writes nothing (§8), and that is a claim about capability,
 not intent: a reader that has imported the coach service is one call away from
 writing, and the operator reading a chart did not ask for either. It also means the
@@ -3069,8 +3086,12 @@ reached everything.
 | `tests/test_cli_*.py`          | One file per command family: output and argument handling, with |
 |                                | the service mocked. `test_dispatch.py` walks the parser tree     |
 |                                | itself (every leaf binds a handler, every bare group self-helps) |
-| `tests/test_calendar.py`       | `calendar_syncer.sync_workout` event description formatting      |
-| `tests/test_calendar_lineage.py` | The `History` section an event carries: which revisions, in what order, and when the event goes stale |
+| `tests/test_gcal_client.py`    | The push and its 404/410 retry, the signal ingest and its token  |
+|                                | expiry, the event listing, and `quiet_events`                    |
+| `tests/test_gcal_reconcile.py` | Which voids keep their event and the title it then carries, and  |
+|                                | which past events the adherence verdict is stamped onto          |
+| `tests/test_gcal_history.py`   | The `History` section an event carries: which revisions, in what |
+|                                | order, and when the event goes stale                             |
 | `tests/test_coach_format.py`   | `coach/formatting.py` — the coach-prompt renderers:              |
 |                                | `format_completed_activities` (HR/power-zone rendering) and      |
 |                                | `format_metrics_history` (None omission, warm-up suppression)    |
@@ -3210,7 +3231,7 @@ run, so `logging.dir` is redirected to a scratch directory (swept at exit) and
 `TRAINMATE_SOURCE=test` is set. Without it a suite run appends several hundred KB of
 `test` runs to the operator's own journal.
 
-It also silences the one line `calendar_reconcile.reconcile` prints, "Google Calendar
+It also silences the one line `gcal.reconcile.reconcile` prints, "Google Calendar
 updated: 1 event(s) pushed.": every workout write reconciles against the mock syncer, so
 the line otherwise shows up several hundred times in a run. A failed push still prints,
 through `output.fail`. The tests that drive `sync_workout` directly wrap it in
@@ -3702,3 +3723,54 @@ importing the coach — §8's own claim, which until now rested on a forwarding 
 The judgment stayed separate, in `coach/service/staleness.py`. Knowing *what* the inputs
 are and deciding *whether a difference is worth telling the athlete about* change for
 different reasons, and the second one needs a database and a model call.
+
+### The Calendar package is `gcal/`, and its wording is apart from its API calls
+
+`calendar/` was the obvious name and it is not usable. The standard library owns
+`calendar`, and this codebase also has local variables called `calendar` in several
+places, so a package by that name would sometimes shadow the module and sometimes be
+shadowed by the variable. `gcal/` is unambiguous everywhere and says whose calendar it is.
+
+Inside it, the cut is between what an event *says* and the call that puts it there.
+`event.py` builds the whole event body — the title tags, the load line, the intensity
+target, the two footers, the adherence header — from a workout row, and imports no Google
+code at all. `client.py` asks it for a body and pushes that. The reason is what a test
+then costs: asking "does a session the athlete cancelled read `[Deleted]` rather than
+`[Cancelled]`?" used to mean building a `CalendarSyncer`, which reads the service-account
+credentials file, then patching `.service` with a mock and digging the body back out of
+the mock's call list. It is now one call to `event_body`. `tests/test_gcal_reconcile.py`
+builds no client at all because of it.
+
+The same cut is what keeps the read-only web app clear of `googleapiclient`. Every
+workout write reconciles the Calendar afterwards, so `runtime._build_db` reaches
+`gcal/reconcile.py` — and that module imports `client.py` inside the one function that
+needs it rather than at the top, so a command that opens the database and pushes nothing
+costs no Google import. `gcal/__init__.py` re-exports nothing for the same reason: a
+re-export from `client` would put `googleapiclient` and the credentials read back into
+every importer of `reconcile`.
+
+No test guards that deferred import. `tests/test_layering.py` only imports the web app,
+which builds its database handle inside a request rather than at import, so it never
+reaches `reconcile` at all — hoisting the import to the top of the file would keep the
+suite green. The rule is written here because that is the only place it is written.
+
+### One answer to "is what we already have fresh enough?"
+
+Garmin and the Calendar both keep a `sync_state` row saying when they last pulled, both
+compare its age against `config.data_refresh_minutes`, and both print a line saying they
+reused the cache. That was written twice, in `garmin/sync.py` and in the Calendar's signal
+sync, in opposite idioms for the same decision: one computed `stale = age > window`, the
+other `fresh = age <= window`, and an unparseable timestamp meant `stale = True` in one
+and a bare `pass` in the other. Both re-fetched, so the copies agreed — but a reader had
+to prove that twice, and the sentence they both print was written out twice as well.
+
+`trainmate/freshness.py` holds the shared half: the age of the last pull, and the sentence
+that announces a cache hit. It is a file of its own rather than two more functions on an
+existing module because neither `garmin/` nor `gcal/` may import the other, and no third
+module both already depend on was about this. Being under 100 lines, it rests on the size
+rule's exception for a real concept on its own.
+
+What it deliberately does *not* hold is the decision. Garmin sets a flag and carries on,
+because a day with no row is fetched however recent the last pull was, while the Calendar
+signal sync returns on the spot. Those differ for a reason, so they stayed with their
+callers.

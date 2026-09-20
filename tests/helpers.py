@@ -116,7 +116,7 @@ _DB_BINDING_SITES = (
     ("trainmate.garmin.sync", "db"),
     ("trainmate.garmin.derived", "db"),
     ("trainmate.garmin.client", "db"),
-    ("trainmate.google_calendar", "db"),
+    ("trainmate.gcal.client", "db"),
 )
 
 
@@ -139,7 +139,7 @@ def rebind_test_db(test_db) -> None:
     forget_timezone()
     if "calendar_syncer" not in vars(runtime):
         runtime.calendar_syncer = MagicMock()
-    from trainmate.calendar_reconcile import reconcile
+    from trainmate.gcal.reconcile import reconcile
     test_db.calendar_hook = reconcile
     for module_name, attr in _DB_BINDING_SITES:
         module = sys.modules.get(module_name)

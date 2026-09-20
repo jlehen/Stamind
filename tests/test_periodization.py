@@ -790,7 +790,7 @@ class TestPeriodization(unittest.TestCase):
         titles = _session_titles(test_db.get_workouts(start_date=today))
         self.assertEqual(titles, ["Today Done", "Tomorrow Run"])
         # Today's Calendar event was left untouched (only future days are torn down).
-        for call in mock_calendar.delete_workout_event.call_args_list:
+        for call in mock_calendar.delete_event.call_args_list:
             self.assertNotEqual(call.args[0], "evt-today")
 
     @patch("trainmate.runtime.calendar_syncer")
@@ -839,7 +839,7 @@ class TestPeriodization(unittest.TestCase):
         self.assertNotIn("Old Plan Run", titles)
         self.assertEqual(titles, ["New Run"])
         # Its Google Calendar event was deleted.
-        mock_calendar.delete_workout_event.assert_called_once_with("evt-old-123")
+        mock_calendar.delete_event.assert_called_once_with("evt-old-123")
 
     @patch("trainmate.runtime.calendar_syncer")
     @patch("trainmate.coach.engine.openrouter_client")
@@ -882,7 +882,7 @@ class TestPeriodization(unittest.TestCase):
 
         remaining = test_db.get_workouts(start_date=today)
         self.assertEqual(_session_titles(remaining), ["New Run"])
-        mock_calendar.delete_workout_event.assert_called_once_with("evt-stale-456")
+        mock_calendar.delete_event.assert_called_once_with("evt-stale-456")
 
     @patch("trainmate.coach.engine.openrouter_client")
     def test_plan_regenerate_supersedes_prior_version(self, mock_client):

@@ -93,9 +93,10 @@ def _framing(total: int) -> Iterator[Progress]:
     if _verbose:
         yield Progress(0)
         return
-    # Imported here, not at module load: importing google_calendar builds the syncer
-    # singleton, which needs credentials (see runtime._build_calendar_syncer).
-    from trainmate.google_calendar import quiet_events
+    # Imported here, not at module load: `runtime._build_db` imports this module, so a
+    # module-scope import would make every command that opens the database pay for
+    # googleapiclient whether or not it has an event to push (ARCHITECTURE.md §15).
+    from trainmate.gcal.client import quiet_events
     with quiet_events(), Progress(total) as bar:
         yield bar
 
@@ -174,7 +175,7 @@ def _push(syncer, workout) -> None:
 def _tear_down(db, syncer, lineage_id: int, event_id: Optional[str]) -> None:
     if event_id:
         try:
-            syncer.delete_workout_event(event_id)
+            syncer.delete_event(event_id)
         except Exception as e:
             fail(f"Google Calendar event delete failed: {e}")
     db.clear_calendar_state(lineage_id)

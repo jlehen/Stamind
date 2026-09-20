@@ -420,7 +420,9 @@ That gives roughly 25 commits. Take the subsystems in this order, lowest in the 
    rather than three: the owner asked for one commit per phase on the day it was done, and
    the three splits are one subsystem. The rest of Phase D keeps the one-commit-per-split
    rule unless the owner says otherwise.
-2. **integrations** — the `gcal/` package; the `garmin/` tidy-up and its two merged duplicates.
+2. **integrations** — the `gcal/` package, and three merged duplicates rather than the two
+   named here. The `garmin/` tidy-up turned out to be already done. **DONE**, as one commit:
+   `event.py` and `client.py` are two halves of one file and land together.
 3. **database** — `workouts.py` into three; `base.py` into two; `periodization.py` into two; the
    small mergers.
 4. **strength** — `planner.py` into two.
@@ -593,10 +595,76 @@ The lines above Phase A are one per item, from before §3 changed.
   stale symbol references across `ARCHITECTURE.md` and six design docs. All fixed before this
   commit.
 
-**Next up:** Phase D item 2 — **integrations**: the `gcal/` package (§6.8), and the `garmin/`
-tidy-up with its two merged duplicates. §1's table says the `gcal/` naming rationale goes into
-`ARCHITECTURE.md` §15 with that package. Items 3 to 9 follow in §7's order, one commit per
-file split.
+- **Phase D item 2, the integrations.** `trainmate/gcal/` is the Calendar package now:
+  `history.py` (173) the revision list an event's description ends with, `event.py` (204)
+  what the event says — the title tags, the whole description, `event_url`, and
+  `event_day` — with no Google import in it, `client.py` (386) the only file that calls
+  the API, and `reconcile.py` (245) the pass that makes the calendar agree with the log.
+  `__init__.py` is 17 lines of docstring. Three rules that were written twice are written
+  once: `freshness.py` holds the age of the last pull and the "using cache" line that
+  Garmin and the Calendar each had their own copy of, `event.event_day` replaces the
+  inline date read in the signal ingest and `_event_day` in `cli/workouts/calendar_sync.py`,
+  and `history.load_line` is the one writer of `Duration | TSS | RPE`, which the top of
+  the event and every history entry had each rendered for themselves. The
+  `delete_workout_event` alias is gone. `tests/test_calendar.py` split into
+  `test_gcal_client.py` and `test_gcal_reconcile.py`, and `test_calendar_lineage.py`
+  became `test_gcal_history.py`.
+  `Phase D item 2: the Calendar code becomes the gcal/ package`
+
+- **What the split bought immediately.** The title-tag tests used to build a real
+  `CalendarSyncer` — which reads the service-account credentials file — patch a mock
+  service onto it, run `sync_workout`, and dig the event body back out of the mock's call
+  list, all to check one word in a title. They call `event_body(workout)["summary"]` now,
+  so `test_gcal_reconcile.py` builds no client at all. Two test modules still need the
+  credentials file rather than three; `AGENTS.md` says which, and the count of tests that
+  collect without it is 1959 of 1989.
+
+- **Four corrections to the proposal, found by doing it.** §6.8 said "nine test assertions
+  change to `delete_event`": six did, plus two production call sites and the definition.
+  §6.8 and §7 said "two merged duplicates": three landed, because the `gcal/history.py`
+  bullet asks for the load line separately from the "Other changes" list that names the
+  other two. §7's "`garmin/` tidy-up" had nothing left in it — §6.8 asks that `garmin/`
+  keep `client`, `sync` and `derived` and that `_safe_round` sit in `sync.py`, and both
+  were already true; the only garmin work here is the throttle merge. And §6.8 put
+  `event.py` at "about 270 lines"; it is 204, because the load line went to `history.py`
+  instead. The other three estimates were good to within five lines.
+
+- **One decision the proposal did not make.** §6.8 said the refresh throttle was a
+  duplicate to merge but not where the merged copy should live, and a new top-level
+  module is a layout decision. `trainmate/freshness.py` is that decision, taken here:
+  neither `garmin/` nor `gcal/` may import the other, and no module they both already
+  depend on was about freshness. `ARCHITECTURE.md` §15 carries the reasoning.
+
+- **The review of Phase D item 2**, in the same commit. A read-only agent re-derived every
+  moved function against its old text, ran the suite whole and per file, and probed the
+  import graph in fresh interpreters. It found no behaviour change — the throttle still
+  compares timedeltas rather than truncated minutes (5.9 minutes against a 5-minute window
+  is still stale), both "is fresh" sentences are byte-identical to the two they replace,
+  and the `""`-to-`None` change in `event_day` and `load_line` is invisible behind guards
+  that were already truthiness tests. What it did find was documentation: a comment in
+  `reconcile.py` claimed `tests/test_layering.py` guards its deferred import, and it does
+  not — importing `trainmate_web` never reaches `reconcile`, because the web app builds
+  its database handle inside a request. The rule now lives in `ARCHITECTURE.md` §15, which
+  says plainly that no test holds it. It also found the same caveat written in four
+  places, a `freshness.py` docstring that restated §15 nearly verbatim without citing it,
+  a `gcal/__init__.py` that listed its submodules in the wrong dependency order, an
+  `event.py` docstring that miscounted its own database reads, one stale
+  `calendar_lineage.py` path in `ARCHITECTURE.md` that the sweep's own grep filter had
+  hidden, and a §15 sentence that invented a disagreement between the two throttle copies
+  to justify merging them — they had in fact always agreed. All fixed before this commit.
+
+- **Three things it found and left.** Two `mark_adherence_from_results` tests had been
+  sitting in the Calendar client's test file; they moved to `test_gcal_reconcile.py`, and
+  `test_gcal_client.py` is 512 lines rather than 807. Still over 500, and §7 leaves test
+  sizes to Phase E. `tests/helpers.py`'s `_DB_BINDING_SITES` is dead: Phase C moved every
+  module in it to `runtime.db`, so none of the nine binds `db` by value any more and only
+  the special-cased `trainmate.runtime` entry does anything. Deleting the tuple is its own
+  change, not a phase commit's. And `garmin/sync.py` had a `"recently pulled"` fallback
+  that was unreachable before this commit and obviously so after it; that one was cut.
+
+**Next up:** Phase D item 3 — **database**: `workouts.py` into three, `base.py` into two,
+`periodization.py` into two, and the small mergers. Items 4 to 9 follow in §7's order, one
+commit per file split.
 
 ---
 

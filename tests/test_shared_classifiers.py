@@ -188,8 +188,8 @@ class TestAdherenceVocabulary(unittest.TestCase):
         self.assertEqual(_statuses_the_classifier_can_return(), set(STATUS_LABELS))
 
     def test_the_calendar_tag_map_is_the_shared_one_not_a_copy(self):
-        from trainmate.google_calendar import CalendarSyncer
-        self.assertIs(CalendarSyncer._ADHERENCE_TAGS, STATUS_LABELS)
+        from trainmate.gcal.event import ADHERENCE_TAGS
+        self.assertIs(ADHERENCE_TAGS, STATUS_LABELS)
 
     def test_the_marker_prints_the_word_the_verdict_carries(self):
         for status, label in STATUS_LABELS.items():

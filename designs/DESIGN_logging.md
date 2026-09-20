@@ -375,7 +375,7 @@ data", "Calendar event was deleted on Google", "stored timezone is unknown on th
 machine". Something outside the app did not work.
 
 By that line, only about **13 sites** convert — nine in `garmin/` (eight in `sync.py`, one
-in `pmc.py`), two in `calendar_reconcile.py`, one in `google_calendar.py`, one in
+in `pmc.py`), two in `gcal/reconcile.py`, one in `gcal/client.py`, one in
 `clock.py` — plus the `Warning: Failed to log LLM exchange` in `openrouter.py`, which is
 the log failing to log and belongs in the journal more than anywhere. Everything else keeps
 its `print`.

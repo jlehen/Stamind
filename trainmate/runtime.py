@@ -45,7 +45,7 @@ def _build_db():
     Calendar.
     """
     from trainmate.db import Database
-    from trainmate.calendar_reconcile import reconcile
+    from trainmate.gcal.reconcile import reconcile
     return Database(calendar_hook=reconcile)
 
 
@@ -59,7 +59,7 @@ def _build_garmin():
 def _build_calendar_syncer():
     """Reads the service-account credentials file, so it is built on first use and not at
     import: an instance with no Calendar configured never touches the file."""
-    from trainmate.google_calendar import CalendarSyncer
+    from trainmate.gcal.client import CalendarSyncer
     return CalendarSyncer()
 
 

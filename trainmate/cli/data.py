@@ -14,7 +14,7 @@ from trainmate.text import (
 )
 from trainmate.output import aside, notice, warn
 from trainmate.clock import fmt_date, fmt_span
-from trainmate.calendar_reconcile import mark_adherence_range
+from trainmate.gcal.reconcile import mark_adherence_range
 from trainmate.cli.selectors import add_selector_args, resolve_window
 
 

@@ -10,17 +10,17 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from tests.helpers import rebind_test_db, save_workout
-from trainmate import calendar_lineage
+from trainmate.gcal import history
 from trainmate.workout_state import calendar_signature, calendar_status
 from trainmate.db import Database
-from trainmate.google_calendar import CalendarSyncer, quiet_events
+from trainmate.gcal.client import CalendarSyncer, quiet_events
 
 # Its own client, since nothing builds one at import any more. The tests below patch
 # `.service` on it, so the real Google connection is never used.
 calendar_syncer = CalendarSyncer()
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cal_lineage.db")
+TEST_DB_PATH = test_db_path("test_trainmate_gcal_history.db")
 
 ZONES = [None, 40 * 60, 90 * 60, None, None, None, None]
 
@@ -154,7 +154,7 @@ class TestCalendarLineage(unittest.TestCase):
     def test_a_session_that_never_changed_has_no_history(self):
         desc = self._description(self._plan())
         self.assertNotIn("History", desc)
-        self.assertNotIn(calendar_lineage.SEPARATOR, desc)
+        self.assertNotIn(history.SEPARATOR, desc)
 
     def test_a_moved_session_names_the_date_it_left(self):
         lineage = self._plan()
@@ -258,8 +258,8 @@ class TestCalendarLineage(unittest.TestCase):
                 )
 
         desc = self._description(lineage)
-        history = calendar_lineage.SEPARATOR + desc.split(calendar_lineage.SEPARATOR, 1)[1]
-        self.assertLess(len(history), calendar_lineage.HISTORY_BUDGET + 1000)
+        section = history.SEPARATOR + desc.split(history.SEPARATOR, 1)[1]
+        self.assertLess(len(section), history.HISTORY_BUDGET + 1000)
         self.assertIn("earlier revisions not shown.", desc)
         # What survives is the newest end of the lineage, and the oldest is what went.
         self.assertIn("[30/31]", desc)
@@ -280,7 +280,7 @@ class TestCalendarLineage(unittest.TestCase):
                 )
 
         desc = self._description(lineage)
-        self.assertLessEqual(len(desc), calendar_lineage.MAX_DESCRIPTION)
+        self.assertLessEqual(len(desc), history.MAX_DESCRIPTION)
         # The current prescription survives whole...
         self.assertIn(f"90min. {prescription}".strip(), desc)
         # ...and the footer with it, because the history yielded first.
@@ -313,8 +313,8 @@ class TestCalendarLineage(unittest.TestCase):
     def test_a_session_outside_the_log_renders_without_history(self):
         """`sync_workout` is also handed dicts that never came from a lineage — the
         Calendar must not fall over on one."""
-        self.assertIsNone(calendar_lineage.for_workout({"date": "2026-08-31"}))
-        self.assertIsNone(calendar_lineage.for_workout({"id": 999, "revision_id": None}))
+        self.assertIsNone(history.for_workout({"date": "2026-08-31"}))
+        self.assertIsNone(history.for_workout({"id": 999, "revision_id": None}))
 
 
 class TestHistorySection(unittest.TestCase):
@@ -332,16 +332,16 @@ class TestHistorySection(unittest.TestCase):
         return row
 
     def test_a_lone_revision_has_no_history(self):
-        self.assertIsNone(calendar_lineage.history_section([self._revision(1)], 1))
+        self.assertIsNone(history.history_section([self._revision(1)], 1))
 
     def test_the_rendered_revision_is_not_repeated_in_its_own_history(self):
         rows = [self._revision(1), self._revision(2, kind="adapt")]
-        section = calendar_lineage.history_section(rows, 2)
+        section = history.history_section(rows, 2)
         self.assertIn("[1/2]", section)
         self.assertNotIn("[2/2]", section)
 
     def test_an_unknown_kind_renders_as_itself(self):
-        section = calendar_lineage.history_section(
+        section = history.history_section(
             [self._revision(1, kind="teleport"), self._revision(2)], 2
         )
         self.assertIn("teleport", section)
@@ -351,9 +351,9 @@ class TestHistorySection(unittest.TestCase):
             self._revision(1, description="Warm up.\nMain set.\nCool down."),
             self._revision(2),
         ]
-        section = calendar_lineage.history_section(rows, 2)
+        section = history.history_section(rows, 2)
         for line in ("Warm up.", "Main set.", "Cool down."):
-            self.assertIn(calendar_lineage._INDENT + line, section)
+            self.assertIn(history._INDENT + line, section)
 
 
 if __name__ == "__main__":

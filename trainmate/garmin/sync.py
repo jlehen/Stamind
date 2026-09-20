@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional, Tuple
 
-from trainmate import runtime
+from trainmate import freshness, runtime
 from trainmate.analytics.load import compute_load, measured_tss
 from trainmate.analytics.pmc import derivation_pad_days
 from trainmate.clock import date_range, parse_date, shift, today_str
@@ -201,14 +201,14 @@ def pull(
 # we never log into Garmin twice per command.
 _ensured: Optional[Tuple[str, str]] = None
 def _sync_calendar_signals(force: bool) -> None:
-    """Bridge to the calendar module's signal sync, lazily imported so a missing
+    """Bridge to the Calendar's signal sync, lazily imported so a missing
     service-account file (calendar unconfigured) can never break a Garmin read. The
-    gating, throttling, and error handling all live in google_calendar."""
+    gating, throttling, and error handling all live in `gcal/client.py`."""
     try:
-        from trainmate import google_calendar
+        from trainmate.gcal import client as gcal_client
     except Exception:
         return  # Calendar not importable/configured — nothing to sync.
-    google_calendar.sync_calendar_signals(force=force)
+    gcal_client.sync_calendar_signals(force=force)
 def _pull_command(start: str, end: str) -> str:
     return f"python trainmate_cli.py data pull -d {start}..{end}"
 def _contiguous_regions(missing: List[str]) -> List[Tuple[str, str]]:
@@ -266,17 +266,10 @@ def ensure_data(start_date: str, end_date: str, force: bool = False) -> None:
         return
 
     # Is the recent (mutable) zone stale? --force-pull treats it as stale unconditionally.
-    stale = True
-    last_pull_age_min: Optional[int] = None
-    if state and state.get("last_pull_utc"):
-        try:
-            age = datetime.now(timezone.utc) - datetime.fromisoformat(state["last_pull_utc"])
-            last_pull_age_min = int(age.total_seconds() // 60)
-            stale = age > timedelta(minutes=refresh_minutes)
-        except (ValueError, TypeError):
-            stale = True
-    if force:
-        stale = True
+    # The window is the shared one; `trainmate/freshness.py` says why it is not two rules.
+    age = freshness.last_pull_age(state)
+    last_pull_age_min = freshness.age_minutes(age) if age is not None else None
+    stale = force or age is None or age > timedelta(minutes=refresh_minutes)
     mutable_start = shift(today, -(mutable_days - 1))
 
     # A needed day must be fetched if it has no row, or it's in the (stale) mutable
@@ -289,13 +282,9 @@ def ensure_data(start_date: str, end_date: str, force: bool = False) -> None:
         # Nothing to do. If the only reason we're not re-fetching the recent mutable zone
         # is the refresh-minutes throttle, say so — otherwise this silent reuse is opaque.
         if not stale and req_end >= mutable_start:
-            age_note = (
-                f"last pull {last_pull_age_min}m ago, < {refresh_minutes}m"
-                if last_pull_age_min is not None else "recently pulled"
-            )
-            step(
-                f"Garmin data is fresh ({age_note}); using cache. "
-                "Pass --force-pull to refresh now."
+            # `not stale` means the age parsed, so there is always a number to quote.
+            freshness.fresh_notice(
+                "Garmin data", f"last pull {last_pull_age_min}m ago, < {refresh_minutes}m"
             )
         _remember(pad_start, req_end)
         return

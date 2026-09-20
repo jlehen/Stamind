@@ -13,7 +13,7 @@ from trainmate.coach.revisions import (
 from trainmate import settings
 from trainmate.sports import canonical_sport
 from trainmate.benchmarks import MIN_RETEST_DAYS
-from trainmate.calendar_reconcile import verbose_events
+from trainmate.gcal.reconcile import verbose_events
 from trainmate.analytics import intensity
 from trainmate.strength import planner as strength_planner
 from trainmate.text import cmd, green, keep_whole
