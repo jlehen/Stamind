@@ -97,6 +97,12 @@ def structure_revision(
             # §11). None on a session that is not going anywhere.
             'replaces_slot': w.get('replaces_slot'),
             'replaces_lineage': w.get('replaces_lineage'),
+            # The intensity target, in the shape the week planner wrote it: apply reads it
+            # back through `intensity.parse_planned_zones`, and omitting it here is how an
+            # eased target used to be asked for, returned, and then dropped on the way to
+            # the row (DESIGN_intensity_distribution.md §9.8).
+            'planned_zone_currency': w.get('planned_zone_currency'),
+            'planned_zone_sec': w.get('planned_zone_sec'),
         } for w in revised
     ]
 
@@ -109,12 +115,23 @@ def prescription_matches(proposed: Dict[str, Any], live: Dict[str, Any]) -> bool
     change to the day. The proposal step asks this instead, against the standing rows it
     already loaded (DESIGN_plan_change_continuity.md §4.5). It mirrors `append`'s merge:
     a field the proposal omits carries forward and is therefore not a change.
+
+    Prose is compared on its words, not its spacing: a model that re-lists a session it is
+    holding wraps the same sentence differently often enough, and a proposal that only
+    re-wraps a line is not a change the athlete can see.
     """
     from trainmate import intensity
+
+    def _words(value: Any) -> str:
+        return " ".join(str(value or "").split())
+
     if live.get('removed'):
         return False
-    for field in ('date', 'sport_type', 'title', 'description'):
+    for field in ('date', 'sport_type'):
         if proposed.get(field) != live.get(field):
+            return False
+    for field in ('title', 'description'):
+        if _words(proposed.get(field)) != _words(live.get(field)):
             return False
     for field in ('duration_minutes', 'rpe', 'tss'):
         value = proposed.get(field)
