@@ -593,6 +593,44 @@ class PromptTest(_PlannerCase):
         self.assertNotIn("barbell biceps curl (accessory", listed)
 
 
+class MesocycleLineTest(_PlannerCase):
+    """The plan's mesocycle reaches the call as its own line, read from the mesocycles
+    table rather than from the brief's prose (§9)."""
+
+    @staticmethod
+    def _plan(name, start, end):
+        objective = test_db.add_objective(
+            title="Ski mountaineering", target_date="2027-04-15", sport_type="cycling",
+        )
+        test_db.save_macrocycle(
+            objective_id=objective, strategy="Build.", goals_hash="h", constraints_hash="h",
+            mesocycles=[{"name": name, "start_date": start, "end_date": end,
+                         "focus": "Strength"}],
+        )
+
+    def _ask_about(self, day):
+        self.gym(day)
+        self.replies = [{"sessions": [answer(day, row("belt squat", 3, 4, 6, 140.0))]}]
+        self.strength_pass([])
+        return self.asked[0][1]
+
+    def test_the_block_names_the_mesocycle_its_span_and_the_week(self):
+        """October 1 is the 18th day of a mesocycle that opened on September 14, so it is
+        the third of its four weeks."""
+        self._plan("Base 2", "2026-09-14", "2026-10-11")
+        self.assertIn(
+            "Mesocycle: Base 2 (2026-09-14 to 2026-10-11), week 3 of 4",
+            self._ask_about("2026-10-01"),
+        )
+
+    def test_the_first_session_of_a_mesocycle_reads_week_1(self):
+        self._plan("Base 2", "2026-09-14", "2026-10-11")
+        self.assertIn("week 1 of 4", self._ask_about("2026-09-17"))
+
+    def test_a_day_no_mesocycle_covers_gets_no_line(self):
+        self.assertNotIn("Mesocycle:", self._ask_about("2026-09-17"))
+
+
 class WaitNoticeTest(unittest.TestCase):
     """What the chat reads while the strength planner runs (DESIGN_output_verbosity.md
     §8.2). Only the counts matter, so any object stands in for a session."""

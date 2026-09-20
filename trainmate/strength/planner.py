@@ -48,7 +48,9 @@ For each session under SESSIONS TO WRITE, write the whole session: every exercis
 order it is done, how many sets, the rep range, and the load in kilograms. Accessory work is
 part of the session — write it too. The brief says what the session is for and what the plan
 asks of it; the duration says how long it lasts; the equipment says what the athlete can
-reach that day. The athlete's habits decide the rest (CHOOSING THE EXERCISES).
+reach that day. The mesocycle names the phase of the plan the session falls in, its span and
+which week of it the session is; week 1 opens a new mesocycle, where the plan's character
+changes. The athlete's habits decide the rest (CHOOSING THE EXERCISES).
 
 For each session under SESSIONS TO CHECK, the athlete has already been shown it. Answer
 "keep" unless one of these three is true:
@@ -291,6 +293,30 @@ def _constraints_for(day: str, constraints: Sequence[Dict[str, Any]]) -> str:
     )
 
 
+def _mesocycle_for(day: str, mesocycles: Dict[str, Any]) -> str:
+    """Which mesocycle the day falls in, its span, and which week of it the day is.
+
+    Read from the plan's own table rather than from the brief's prose, so a boundary the
+    week planner did not spell out is still exact (§9)."""
+    meso = mesocycles.get(day)
+    if not meso:
+        return ""
+    start = date.fromisoformat(meso["start_date"])
+    end = date.fromisoformat(meso["end_date"])
+    week = (date.fromisoformat(day) - start).days // 7 + 1
+    total = (end - start).days // 7 + 1
+    return (f"{meso['name']} ({meso['start_date']} to {meso['end_date']}), "
+            f"week {week} of {total}")
+
+
+def _mesocycles_for(sessions: Sequence[_Session]) -> Dict[str, Any]:
+    """The mesocycle covering each date the call was asked about, one lookup per date."""
+    return {
+        day: runtime.db.get_covering_mesocycle(day)
+        for day in sorted({session.date for session in sessions})
+    }
+
+
 def _system_prompt(done: Set[str]) -> str:
     """The strength planner's system prompt, with the vocabulary's accessories limited to
     the ones in `done` (§9)."""
@@ -302,7 +328,7 @@ def _system_prompt(done: Set[str]) -> str:
 
 def _session_block(
     session: _Session, profile: Optional[Dict[str, Any]],
-    constraints: Sequence[Dict[str, Any]],
+    constraints: Sequence[Dict[str, Any]], mesocycles: Dict[str, Any],
 ) -> str:
     duration = f"{session.duration} min" if session.duration else "duration not stated"
     lines = [f"- {session.date} ({duration}) \"{session.title}\""]
@@ -310,6 +336,9 @@ def _session_block(
         lines.append(f"  {MOVED_ON}")
     elif session.asked_again:
         lines.append(f"  {ASKED_AGAIN}")
+    mesocycle = _mesocycle_for(session.date, mesocycles)
+    if mesocycle:
+        lines.append(f"  Mesocycle: {mesocycle}")
     lines.append(f"  Equipment that day: {_equipment_for(session.date, profile)}")
     active = _constraints_for(session.date, constraints)
     if active:
@@ -326,6 +355,7 @@ def _session_block(
 def _user_content(
     to_write: Sequence[_Session], to_check: Sequence[_Session], history_text: str,
     today: str, profile: Optional[Dict[str, Any]], constraints: Sequence[Dict[str, Any]],
+    mesocycles: Dict[str, Any],
 ) -> str:
     parts = [f"Today's date is {today}."]
     parts.append(history_text or "## STRENGTH HISTORY\nNo sets on record yet.")
@@ -333,7 +363,7 @@ def _user_content(
         parts.append(
             "## SESSIONS TO WRITE\n"
             "Write each of these in full.\n"
-            + "\n\n".join(_session_block(s, profile, constraints) for s in to_write)
+            + "\n\n".join(_session_block(s, profile, constraints, mesocycles) for s in to_write)
         )
     if to_check:
         parts.append(
@@ -341,7 +371,7 @@ def _user_content(
             "The athlete has already been shown these. Keep each unless the sets on record say "
             "a load\nshould move, the athlete has made a habit of doing something else, or it "
             "says to write it\nagain.\n"
-            + "\n\n".join(_session_block(s, profile, constraints) for s in to_check)
+            + "\n\n".join(_session_block(s, profile, constraints, mesocycles) for s in to_check)
         )
     return "\n\n".join(parts)
 
@@ -592,7 +622,10 @@ def run(
 
     built = history.build(today)
     system = _system_prompt(built.exercises)
-    user = _user_content(to_write, to_check, built.text, today, profile, constraints)
+    mesocycles = _mesocycles_for(to_write + to_check)
+    user = _user_content(
+        to_write, to_check, built.text, today, profile, constraints, mesocycles
+    )
     step(f"Querying OpenRouter to write {len(to_write)} strength session(s) and check "
          f"{len(to_check)}...", cyan)
 

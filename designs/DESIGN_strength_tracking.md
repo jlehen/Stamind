@@ -946,6 +946,15 @@ prints, is the strength planner's reasons, one sentence per session it changed, 
   general, two lists in the profile, and the prose of the constraints active that day, which
   is where "hotel gym, dumbbells only" would be written. Equipment is not a constraint type,
   so these two places are all there is.
+- For each date it writes: the mesocycle covering that date, its span, and which week of it
+  the date is — `Mesocycle: Base 2 (2026-09-14 to 2026-10-11), week 3 of 4`, omitted on a
+  date no mesocycle covers. It is read from the mesocycles table through
+  `get_covering_mesocycle`, not from the brief's prose. The week planner already names the
+  phase in the brief when it feels like it, and that prose is what the athlete reads; this
+  line is the fact the call acts on, so a boundary the brief left out is still exact and a
+  reword of the week planner's prompt cannot move it. The strength planner is the reader
+  that needs it: the athlete's own guidelines are where a rule keyed on the boundary lives,
+  such as changing which exercise fills a movement pattern when a new mesocycle opens (§10).
 - The sessions to write: every strength session in the span that has no prescribed sets,
   with its title, duration, RPE and brief. That is every new session the week planner
   wrote in this proposal, and a kept session written before phase 2, whose old prose
