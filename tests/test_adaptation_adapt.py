@@ -846,6 +846,60 @@ class TestAdaptationAdapt(unittest.TestCase):
             self.assertEqual(len(proposed), 1)
             self.assertEqual(proposed[0]["title"], "Eased Tempo")
 
+    @patch("trainmate.coach.engine.openrouter_client")
+    def test_adapt_keeps_a_revision_that_only_moves_the_intensity_target(self, mock_client):
+        """A softened zone target is a change, even when the words and the load hold.
+
+        The backstop used to compare five fields — title, description, duration, RPE and
+        TSS — so a session re-written with the same prose and the same 60 minutes, and
+        only its Z2 minutes moved down into Z1, was read as a verbatim re-list and
+        dropped. The athlete's day then kept the target the coach had just eased. The
+        write path and the preview both count the target, and now so does this
+        (DESIGN_intensity_distribution.md §9.8)."""
+        with patch.dict(trainmate.coach.config.data, {
+            "user_profile": {"lthr": 165, "max_hr": 185},
+            "coach": {"metrics_lookback_days": 3, "minor_activity_load_threshold": 10.0},
+        }):
+            mock_client.complete.return_value = {
+                "change_needed": True,
+                "reason": "HRV is down, so the aerobic work goes easier.",
+                "adapted_workouts": [
+                    {
+                        "date": "2026-06-04",
+                        "sport_type": "running",
+                        "title": "Easy Run",
+                        "description": "60 mins easy",
+                        "duration_minutes": 60,
+                        "rpe": 4,
+                        "tss": 40.0,
+                        "planned_zone_currency": "hr",
+                        "planned_zone_sec": [1800, 1800, 0, 0, 0],
+                    },
+                ],
+            }
+
+            test_db.save_metric_cache("2026-06-03", 50, 60, 80, 20, 10.0, 8.0, 1.1)
+            test_db.save_baseline("2026-06-03", 50.0, 2.0, 60.0, 5.0, 80.0, 5.0)
+            save_workout(test_db,
+                "2026-06-04", "running", "Easy Run", "60 mins easy",
+                duration_minutes=60, rpe=4, tss=40,
+                planned_zone_currency="hr", planned_zone_sec=[0, 2400, 0, 0, 0],
+            )
+
+            proposal = coach_service.workout_adapt("2026-06-03")
+            proposed = proposal.workouts
+
+            self.assertEqual([p["date"] for p in proposed], ["2026-06-04"])
+            self.assertEqual(proposed[0]["planned_zone_sec"][:2], [1800, 1800])
+
+            # And it reaches the row: the target used to be asked for, returned, and then
+            # dropped by the proposal's row shape, so the day kept its old one.
+            coach_service.workout_revision_apply(proposal)
+            live = test_db.get_workout("2026-06-04", "running")
+            self.assertEqual(live["planned_zone_currency"], "hr")
+            self.assertEqual(
+                (live["planned_zone1_sec"], live["planned_zone2_sec"]), (1800, 1800)
+            )
 
     @patch("trainmate.coach.engine.openrouter_client")
     def test_adapt_holds_a_relisted_session_instead_of_deleting_it(self, mock_client):

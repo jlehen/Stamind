@@ -11,8 +11,8 @@ from trainmate.coach.formatting import format_baseline
 from trainmate.coach import honoring
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.coach.revisions import (
-    held_slots, normalize_load_fields, pair_revisions, replaces_source,
-    rest_in_place_of, structure_revision,
+    held_slots, normalize_load_fields, pair_revisions, prescription_matches,
+    replaces_source, rest_in_place_of, structure_revision,
 )
 from trainmate.db.workouts import ATHLETE_VOID_KINDS
 from trainmate.strength import planner as strength_planner
@@ -155,36 +155,21 @@ class AdaptationMixin:
         return out
 
     def _revision_is_change(self, proposal: Dict[str, Any]) -> bool:
-        """True unless `proposal` exactly reproduces an existing same-sport session.
+        """True unless `proposal` prescribes exactly what the live session already does.
 
         Backstops the adaptation prompt's "return only changed sessions" rule: a verbatim
         (or cosmetic-only) re-list of an unchanged session is treated as a no-op so it is
-        not re-stamped as adapted or re-synced. A sport swap (no same-sport original) or a
-        proposal on a date with no current session is always a real change.
+        not re-stamped as adapted or re-synced. A proposal on a date with no current
+        session is always a real change.
+
+        Asks `prescription_matches`, the §9 no-op rule the preview already uses. Its own
+        copy compared five fields and so could not see a change to the intensity target or
+        the benchmark flag, which the write path and the preview both count.
         """
-        existing = self._db.get_workout(proposal['date'], proposal['sport_type'])
-        if not existing:
+        live = self._db.get_workout(proposal['date'], proposal['sport_type'])
+        if not live:
             return True
-        if canonical_sport(existing['sport_type']) != canonical_sport(proposal['sport_type']):
-            return True
-
-        def _norm_text(v: Any) -> str:
-            return " ".join(str(v or "").split())
-
-        def _norm_num(v: Any) -> Optional[float]:
-            try:
-                return float(v) if v is not None else None
-            except (TypeError, ValueError):
-                return None
-
-        if _norm_text(proposal.get('title')) != _norm_text(existing.get('title')):
-            return True
-        if _norm_text(proposal.get('description')) != _norm_text(existing.get('description')):
-            return True
-        for field in ('duration_minutes', 'rpe', 'tss'):
-            if _norm_num(proposal.get(field)) != _norm_num(existing.get(field)):
-                return True
-        return False
+        return not prescription_matches(proposal, live)
 
     def _rejected_matches(self) -> set:
         """The `(activity_id, sport)` pairings the athlete has said are NOT that session."""
