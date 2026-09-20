@@ -527,7 +527,6 @@ recently created plan wins — so no two commands name different mesocycles for 
 |---|---|
 | `get_covering_mesocycle(date)` | **Strict.** The active mesocycle containing that date, or `None`. |
 | `get_active_mesocycle(date)` | **Lenient.** Covering mesocycle → first mesocycle ending in the future → the absolute first mesocycle. |
-| `get_next_mesocycle(after)` | The earliest mesocycle starting strictly after a date. **Never falls back**: no mesocycle ahead means `None`. |
 | `get_periodization_ids_for_date(date)` | `(objective_id, macrocycle_id, mesocycle_id)`, for stamping a session with its provenance. |
 
 ### The mesocycle boundary is a firewall

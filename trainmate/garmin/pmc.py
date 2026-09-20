@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from trainmate import runtime
 from trainmate.config import config
 from trainmate.util import today_str, warn
-import trainmate.garmin as _g
 from trainmate.garmin.client import _to_date
 from trainmate.garmin.load import _hr_zone_coverage, activity_load, compute_load, measured_tss
 

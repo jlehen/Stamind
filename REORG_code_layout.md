@@ -1,7 +1,7 @@
 # Re-organizing the TrainMate code
 
-Status: proposal, 2026-09-19. Decisions taken 2026-09-20 (§0). Apart from those, no code
-has moved yet.
+Status: proposal, 2026-09-19. Decisions taken 2026-09-20 (§0), and Phase A of
+`REORG_execution.md` §7 landed the same day. Nothing has moved between subsystems yet.
 
 How it was made: ten read-only agents each surveyed one subsystem. Each listed what its subsystem
 does and proposed splits inside it. A final pass compared those lists across subsystems and
@@ -41,6 +41,10 @@ already done on this branch.
 - **Difference 4 (§5.4): fixed.** The 15-day summary groups activities by canonical sport,
   so the week planner no longer reads road and indoor cycling as two sports.
 - `docs/ARCHITECTURE.md` says the schema is CREATE-only now.
+- **Phase A of `REORG_execution.md` §7: done.** The gate test (§5.1 there), the durable
+  conventions into `AGENTS.md` and `ARCHITECTURE.md`, the §7 deletions below,
+  `coach/__init__.py` as a docstring (§4.5) and the Calendar client built by
+  `runtime` (§4.6). Two of §7's claims were wrong and §7 now says which.
 
 **Decided, not yet done.**
 - **Difference 3 (§5.3): retracted.** It is a designed difference, not two copies of
@@ -290,7 +294,7 @@ no bug yet.
   `_get_config_hash`, and the service's `_get_config_hash`, `_get_goals_hash` and
   `_get_constraints_hash`. About 40 test references change to point at `plan_inputs`.
 
-### 4.5 `coach/__init__.py` becomes a docstring
+### 4.5 `coach/__init__.py` becomes a docstring — **DONE**
 
 **The problem.** Today `coach/__init__.py` imports the engine and the service, to re-export them.
 So importing a light module such as `coach/honoring.py` (as `cli/status.py` does) loads:
@@ -315,7 +319,7 @@ line-for-line copy of `formatting._science_section`.
 - The docstring's list of patch targets is stale. `trainmate.coach.service.db` and
   `.calendar_syncer` no longer exist. Fix it here and in ARCHITECTURE §3.
 
-### 4.6 `runtime` builds the Calendar client, not the import
+### 4.6 `runtime` builds the Calendar client, not the import — **DONE**
 
 **What happens today.**
 - `google_calendar.py:526` builds `calendar_syncer = CalendarSyncer()` when the module is imported.
@@ -888,17 +892,22 @@ afterwards, split it into the writer (about 430 lines) and the day files (about 
 
 ---
 
-## 7. Delete first
+## 7. Delete first — **DONE in Phase A, with two corrections**
 
 **Dead code.** Nothing in production calls any of these.
 - `coach/formatting.format_planned_workouts`.
 - `llm_models.stored_model`.
 - `db.get_next_mesocycle` and `db.get_prescribed_sets`.
 - `cli/common.resolve_cleanup_range`.
-- The `delete_workout_event` alias.
-- `calendar_reconcile.no_calendar_sync`. Its docstring cites a `--no-sync` flag that no longer
-  exists.
-- `strength/sets.ATHLETE`, and the `history.SETS_NOT_READ` alias.
+- ~~The `delete_workout_event` alias.~~ **Wrong: it has two production callers**,
+  `calendar_reconcile.py:169` and `cli/workouts/calendar_sync.py:79`. Kept.
+- ~~`calendar_reconcile.no_calendar_sync`.~~ **Kept.** No production path enters it and the
+  `--no-sync` flag its docstring cited is gone, but twelve test lines in `test_calendar.py` and
+  `test_cli_workouts.py` use it to write fixture state without the write path reconciling first —
+  which is what lets those tests ask `_plan` a question it has not already answered. The
+  docstring now says that instead.
+- `strength/sets.ATHLETE`, and the `history.SETS_NOT_READ` alias. The alias had one reader, in
+  its own module; that read names `sets.SETS_NOT_READ` now.
 - Unused imports:
   - `math` and `time` in `garmin/load.py`;
   - `import trainmate.garmin as _g` in `garmin/pmc.py`;
@@ -912,9 +921,11 @@ afterwards, split it into the writer (about 430 lines) and the day files (about 
 - `_get_coach_system_prompt`, `recompute_all_confidence`, `get_workout_revision`,
   `get_strength_check` and `wipe_metrics`.
 
-**Imports hidden inside functions.** About 84 of the 102 can go. They either dodge no cycle, and
-the surveys checked each file, or a move in §4 removes their reason. Move them to the top of the
-file. These stay where they are:
+**Imports hidden inside functions. Not done, and deliberately left for the phase that moves the
+code.** About 84 of the 102 can go. They either dodge no cycle, and the surveys checked each file,
+or a move in §4 removes their reason — and hoisting one now, then moving the file in Phase C or D,
+is the same edit twice. Move them to the top of the file, in the phase that moves the file. These
+stay where they are:
 - the eight builders in `runtime.py`, which is the one sanctioned lazy place;
 - the four imports in the pair between `llm_models` and `settings`, and `settings.py:133`
   (OpenRouter, on the coach-model hook);
@@ -924,23 +935,30 @@ file. These stay where they are:
   matplotlib). The count of 102 does not include these two, because they are not `trainmate`
   imports.
 
-**Stale docs.**
-- The patch targets in the `coach/__init__.py` docstring.
-- The `cli/__init__.py` docstring.
-- The `prompt.py` docstring, which says `cli.prompt`.
-- The path at `trainmate_web.py:245`.
-- ARCHITECTURE §3, §6 and §7, where they say `trainmate_cli` owns the singletons.
+**Stale docs.** All fixed in Phase A.
+- The patch targets in the `coach/__init__.py` docstring — the whole docstring was rewritten
+  with §4.5.
+- The `cli/__init__.py` docstring, and the `prompt.py` one, which said `cli.prompt`. Both name
+  `trainmate.runtime` now.
+- The path at `trainmate_web.py:245`, which named a file that became a package.
+- ARCHITECTURE §7, where it said `trainmate_cli` owns the singletons. §2 and §6 were already
+  correct; §3 was rewritten with §4.5.
 
 ---
 
 ## 8. Order of work
 
-Each phase is one or a few commits. After each one, the full suite passes under the memory cap.
+**`REORG_execution.md` §7 is the live version of this list, and its §8 is the ledger.** It revises
+what follows in three places — `util.py` moves earlier, Phase D is one commit per file split, and
+a phase is one commit — and it records what has landed. Read it, not this section, before starting.
+
+Each phase is one commit. After it, the full suite passes under the memory cap.
 ARCHITECTURE.md is updated in the same commit as the code it describes. Implemented DESIGN files
 get their paths amended. Designs still in progress are left alone, so their paths go stale until
 they are implemented.
 
-1. **Clean-up with no moves.**
+1. **Clean-up with no moves. DONE**, as Phase A there, with the gate test and the conventions
+   ahead of it.
    - The deletions in §7.
    - Empty `coach/__init__.py` (§4.5).
    - Stop building the Calendar client at import (§4.6).
@@ -999,8 +1017,9 @@ file per workout command. The same 500-line rule applies, at lower priority.
   - the read-only grep in `test_web`.
 - **Mixin method names.** A method name must stay unique across a class's mixins, or one method
   silently hides the other. No name clashes today.
-- **Per-file test runs.** A run of one test file falsely fails `test_isolation_guards` and
-  `test_dispatch`. Run the full suite.
+- **Per-file test runs.** A module that binds no test database of its own fails alone, because
+  it relies on an earlier module in the full run having bound one. `test_dispatch` is the
+  example. Run the full suite.
 
 ---
 

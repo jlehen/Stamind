@@ -145,7 +145,7 @@ New `trainmate/llm_models.py`, the single place that knows how config and DB com
 | `list_models()` | Display rows `{number, model, active}`, 1-based, config order |
 | `active_model()` | The effective id per §3 (the `--llm-model` override is applied by the client) |
 | `active_source()` | `"db"` or `"config"` — what the listing annotates |
-| `stored_model()` / `stored_at()` | The raw stored choice and when it was written |
+| `stored_at()` | When the stored choice was last written |
 | `resolve_token(token)` | Number *or* id → id; raises `ValueError` with a printable message |
 | `set_active_model(token)` | `resolve_token` then write; nothing is written when it raises |
 | `clear_active_model()` | Deletes the row, falling back to the config default |

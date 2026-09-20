@@ -522,8 +522,10 @@ class CalendarSyncer:
         """Deletes a workout event from Google Calendar (see `delete_event`)."""
         return self.delete_event(google_event_id)
 
-# Singleton instance
-calendar_syncer = CalendarSyncer()
+# No instance is built here. The constructor reads the service-account credentials file,
+# so building one at import made every CLI command and the web app need that file even on
+# an instance with no Calendar configured. `runtime.calendar_syncer` builds it on first
+# use instead (ARCHITECTURE §6).
 
 
 # Per-process memo: a single CLI command syncs signals at most once.
@@ -564,7 +566,7 @@ def sync_calendar_signals(force: bool = False) -> None:
             except (ValueError, TypeError):
                 pass
     try:
-        calendar_syncer.sync_signals()
+        runtime.calendar_syncer.sync_signals()
         _signals_synced = True
     except Exception as e:
         warn(f"calendar signal sync skipped: {e}")

@@ -36,7 +36,6 @@ SESSIONS_HEADING = (
     "session planned for that day did not hold."
 )
 NOT_PRESCRIBED = " (not prescribed)"
-SETS_NOT_READ = sets.SETS_NOT_READ
 
 
 @dataclass
@@ -190,7 +189,7 @@ def _not_done_lines(
         if prescribed is None:
             continue
         if this_day in unread:
-            lines.append(f"  {_day_words(this_day)}: {SETS_NOT_READ}")
+            lines.append(f"  {_day_words(this_day)}: {sets.SETS_NOT_READ}")
             continue
         activities = by_day.get(this_day, [])
         whole = ", ".join(

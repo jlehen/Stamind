@@ -216,15 +216,6 @@ class StrengthMixin:
 
     # --- what the strength planner prescribed (§9) ---
 
-    def get_prescribed_sets(self, workout_id: int) -> List[Dict[str, Any]]:
-        """One revision's prescribed exercises, in the order they are done."""
-        with self._get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM prescribed_sets WHERE workout_id = ? ORDER BY position",
-                (workout_id,),
-            ).fetchall()
-            return [dict(row) for row in rows]
-
     def prescribed_sets_for_revisions(
         self, revision_ids: Sequence[int]
     ) -> Dict[int, List[Dict[str, Any]]]:

@@ -19,6 +19,7 @@ import unittest
 
 from tests.helpers import rebind_test_db, save_workout
 from trainmate.coach.formatting import format_planned_workouts_detailed
+from trainmate.coach.service import CoachService
 from trainmate.db import Database
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -334,7 +335,6 @@ class TestRevisionBehaviour(unittest.TestCase):
         insertion: the destination carries the source's lineage, so the tally follows
         it (§4/§11)."""
         from trainmate.coach.proposals import RevisionProposal
-        import trainmate.coach
 
         self._generate(("2026-09-01", "strength_training", "Heavy lift", 60))
         with self.db.workout_change(kind="adapt", summary="Sore") as change:
@@ -344,7 +344,7 @@ class TestRevisionBehaviour(unittest.TestCase):
         lift = self.db.get_workout("2026-09-01", "strength_training")
         self.assertEqual(lift["adaptation_count"], 1)
 
-        service = trainmate.coach.CoachService(db_instance=self.db)
+        service = CoachService(db_instance=self.db)
         service.workout_revision_apply(RevisionProposal(
             reason="Swap the lift for mobility.",
             # Same load, so the substitution is not itself an easing and the assertion
@@ -369,10 +369,9 @@ class TestRevisionBehaviour(unittest.TestCase):
         """A displaced session can become ONE of the sessions replacing it. Handing its
         lineage to both would leave one session live in two slots (§10)."""
         from trainmate.coach.proposals import RevisionProposal
-        import trainmate.coach
 
         self._generate(("2026-09-01", "strength_training", "Heavy lift", 60))
-        service = trainmate.coach.CoachService(db_instance=self.db)
+        service = CoachService(db_instance=self.db)
         service.workout_revision_apply(RevisionProposal(
             reason="Two easy sessions instead.",
             workouts=[

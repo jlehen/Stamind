@@ -11,10 +11,6 @@ from trainmate.util import (
     cyan, yellow, cmd, fmt_date, today_str as _today_str, notice, warn, wrap_text,
 )
 
-# `trainmate_cli` (the `db`/`garmin`/`calendar_syncer` facade) is imported lazily
-# inside the functions below: it imports this module, so a module-level import here
-# is a cycle that breaks whenever `common` is imported first (e.g. in isolation).
-
 
 def print_strength_notes(proposal) -> None:
     """What the strength planner could not do, under every preview that shows its work
@@ -29,29 +25,6 @@ def print_strength_notes(proposal) -> None:
         notice(line)
     if getattr(proposal, 'strength_notice', None):
         print(wrap_text(proposal.strength_notice))
-
-
-def resolve_cleanup_range(args) -> tuple[Optional[str], Optional[str]]:
-    """Resolves the optional [start, end] window shared by the cleanup commands
-    (`data wipe`, `workout prune-calendar`) from --from/--until/--days. No date flag
-    at all -> (None, None), meaning the whole scope.
-
-    Mirrors `data pull`: --days N anchors a trailing N-day window on --until (default
-    today); --from / --until each bound their side, either open-ended on its own.
-    Unlike the planning resolver, a lone --until does *not* imply a start of today —
-    a cleanup reaches backwards by nature.
-    """
-    if not (args.from_date or args.until_date or args.days):
-        return None, None
-    start = args.from_date
-    end = args.until_date
-    if args.days and start is None:
-        base = end or _today_str()
-        start = (
-            datetime.strptime(base, "%Y-%m-%d").date() - timedelta(days=args.days - 1)
-        ).strftime("%Y-%m-%d")
-        end = end or base
-    return start, end
 
 
 def pmc_warmup_cutoff(history_start: Optional[str] = None) -> Optional[str]:

@@ -57,13 +57,15 @@ def _build_garmin():
 
 @_builder("calendar_syncer")
 def _build_calendar_syncer():
-    from trainmate.google_calendar import calendar_syncer
-    return calendar_syncer
+    """Reads the service-account credentials file, so it is built on first use and not at
+    import: an instance with no Calendar configured never touches the file."""
+    from trainmate.google_calendar import CalendarSyncer
+    return CalendarSyncer()
 
 
 @_builder("coach_service")
 def _build_coach_service():
-    from trainmate.coach import coach_service
+    from trainmate.coach.service import coach_service
     return coach_service
 
 

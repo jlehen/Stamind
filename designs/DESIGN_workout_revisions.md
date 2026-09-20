@@ -509,7 +509,7 @@ regeneration rather than a second `adapt`. The section header says exactly that,
 sparse list of four sessions out of twenty-four is otherwise read as a plan to build around.
 
 **Metadata only, plus a `keep` action.** Each session is rendered by
-`format_planned_workouts` — date, sport, title, load, the `[ALREADY EASED ...]` tag, the
+`format_standing_workouts` — date, sport, title, load, the `[ALREADY EASED ...]` tag, the
 prior run's reason and the session's intensity target, ~360 characters — and the model
 answers with one of two things:
 

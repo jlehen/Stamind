@@ -193,8 +193,8 @@ versions arrived later with DESIGN_plan_rollback.md. `-g` was the pre-`-M` spell
 ### Even the macrocycle is the wrong key
 
 What shapes a generated week is the **mesocycle covering those dates**. The rest of the
-app already knew this: `get_active_mesocycle(date)`, `get_next_mesocycle(date)` and
-`get_mesocycle_ranges(start, end)` are all date-keyed, and `workout adapt`, the mesocycle
+app already knew this: `get_active_mesocycle(date)` and `get_mesocycle_ranges(start, end)`
+are both date-keyed, and `workout adapt`, the mesocycle
 progress context, the mesocycle-boundary hint and `workout compare` reach their mesocycles that
 way without naming a goal. Generation was the one command routing through an objective to
 reach mesocycles a date lookup finds directly.

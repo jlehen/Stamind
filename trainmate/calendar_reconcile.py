@@ -22,17 +22,15 @@ from trainmate.util import Progress, fail, green
 # commands that take `-v` flip this around their write.
 _verbose: bool = False
 
-# Set by `no_sync()` while a command the athlete asked not to sync is writing.
+# Set by `no_calendar_sync()` while a write that must not reach the Calendar is running.
 _suppressed: bool = False
 
 
 @contextmanager
 def no_calendar_sync() -> Iterator[None]:
-    """Makes the pass a no-op, for the commands that offer `--no-sync`.
-
-    The athlete asked for the local change only. Nothing is lost: freshness is derived
-    from the stored signature, so the sessions read `[STALE]` and the next
-    `workout push` sends them (§8)."""
+    """Makes the pass a no-op for the writes inside it, leaving them `[STALE]` for the next
+    `workout push` (§8). No command reaches it; it is how a test writes fixture state
+    without the write path reconciling it first."""
     global _suppressed
     was, _suppressed = _suppressed, True
     try:

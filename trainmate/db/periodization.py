@@ -401,24 +401,6 @@ class PeriodizationMixin:
             row = cursor.fetchone()
             return dict(row) if row else None # type: ignore
 
-    def get_next_mesocycle(self, after_date: str) -> Optional[Mesocycle]:
-        """Finds the earliest active mesocycle starting strictly after `after_date`.
-
-        Unlike get_active_mesocycle this never falls back: no mesocycle ahead means None.
-        """
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT m.* FROM mesocycles m
-                JOIN macrocycles mac ON m.macrocycle_id = mac.id
-                JOIN objectives o ON mac.objective_id = o.id
-                WHERE o.status = 'active' AND COALESCE(mac.status, 'active') = 'active'
-                  AND m.start_date > ?
-                ORDER BY m.start_date ASC, mac.id DESC LIMIT 1
-            """, (after_date,))
-            row = cursor.fetchone()
-            return dict(row) if row else None # type: ignore
-
     def add_plan_feedback(
         self, macrocycle_id: int, text: str, mesocycle_id: Optional[int] = None
     ) -> int:

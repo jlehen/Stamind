@@ -24,13 +24,12 @@ TEST_DB_PATH = test_db_path("test_trainmate_feedback.db")
 
 from trainmate.db import Database
 import trainmate.db
-import trainmate.coach
 import trainmate_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach import coach_service
+from trainmate.coach.service import coach_service
 
 # Three mesocycles around today, so a bare `-m`, a date atom and a name infix all have
 # something to resolve to — and 'build' deliberately matches two of them.

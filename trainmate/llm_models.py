@@ -21,12 +21,6 @@ def configured_models() -> List[str]:
     return config.llm_models
 
 
-def stored_model() -> Optional[str]:
-    """The model identifier stored in the database, or None if the config default rules."""
-    from trainmate.db import db
-    return db.get_setting(LLM_MODEL_SETTING)
-
-
 def stored_at() -> Optional[str]:
     """UTC ISO instant the stored choice was last written, or None if nothing is stored."""
     from trainmate.db import db

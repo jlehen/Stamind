@@ -2,7 +2,7 @@
 prompt. Exact strings are the contract here: the string IS what the model reads."""
 import unittest
 
-from trainmate.coach import format_completed_activities
+from trainmate.coach.formatting import format_completed_activities
 from trainmate.coach.formatting import format_metrics_history
 from trainmate.util import PMC_TSB_LAG_NOTE
 from trainmate.coach.engine.prompt import PromptBuildMixin

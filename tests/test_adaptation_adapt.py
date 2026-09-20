@@ -15,13 +15,13 @@ TEST_DB_PATH = test_db_path("test_adaptation_adapt.db")
 from trainmate import runtime
 from trainmate.db import Database
 import trainmate.db
-import trainmate.coach
+import trainmate.config
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
 from trainmate.adherence import REST_VIOLATION, analyze_adherence
-from trainmate.coach import coach_service
+from trainmate.coach.service import CoachService, coach_service
 from trainmate.coach.proposals import RevisionProposal
 from trainmate.sports import canonical_sport
 
@@ -81,7 +81,7 @@ class TestAdaptationAdapt(unittest.TestCase):
     def test_adaptation_matching_and_discrepancies(self, mock_client):
         test_profile = {"lthr": 165, "max_hr": 185}
 
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -164,7 +164,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         evidence-backed observations are written only by the weekly history analysis
         (DESIGN_evidence_based_confidence.md §2/§11)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -208,7 +208,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         """An athlete message for the run is rendered as a bounded section of the adapt
         prompt (advisory, ephemeral) and omitted entirely when no message is given."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -274,7 +274,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         the next mesocycle is out of reach; mid-mesocycle that section is absent entirely
         (DESIGN_mesocycle_boundary.md §3)."""
         self._save_two_mesocycle_plan()
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
                 "metrics_lookback_days": 3,
@@ -310,7 +310,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         """The benchmark and vacate sections are built by helpers rather than written
         inline, so what has to hold here is that adapt gets their wording in full
         (DESIGN_adapt_task_prompt.md §2)."""
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {"metrics_lookback_days": 3, "minor_activity_load_threshold": 10.0},
         }):
@@ -340,7 +340,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         past the mesocycle's end is dropped, so the applied range can never stretch into the next
         mesocycle (DESIGN_mesocycle_boundary.md §1)."""
         self._save_two_mesocycle_plan()
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
                 "metrics_lookback_days": 3,
@@ -380,7 +380,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         the guard drops any proposal targeting it, even if the model returns one — you cannot
         adapt a workout you have already finished today."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -462,7 +462,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         (DESIGN_workout_revisions.md §9.2).
         """
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -513,7 +513,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             self.assertEqual(len(swaps), 1)
             self.assertEqual(swaps[0].original["sport_type"], "strength_training")
 
-            service = trainmate.coach.CoachService(db_instance=test_db)
+            service = CoachService(db_instance=test_db)
             with redirect_stdout(io.StringIO()):
                 service.workout_revision_apply(proposal)
 
@@ -544,7 +544,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         """A `rest` constraint outranks a hold (§6 over §9.1) but not history: the day's
         remaining session is forced to rest while the finished one stands (§9.2)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -580,7 +580,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             proposal = coach_service.workout_adapt("2026-06-03")
             self.assertIn(("2026-06-03", "cycling"), proposal.held)
 
-            service = trainmate.coach.CoachService(db_instance=test_db)
+            service = CoachService(db_instance=test_db)
             with redirect_stdout(io.StringIO()):
                 service.workout_revision_apply(proposal)
 
@@ -599,7 +599,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         touching it, so the week planner was told a session the athlete never did was in the bank
         and forbidden from salvaging the rest of the day (ARCHITECTURE.md §15)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -666,7 +666,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         fact, and it used to reach the week planner as "this session was performed"
         (ARCHITECTURE.md §15)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -713,7 +713,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         is either the session cut short or a warm-up to discard, and only the athlete
         knows which (ARCHITECTURE.md §15)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -741,7 +741,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         planned length is the session, whether its type is the planned sport's own name or
         one of its aliases — a 62-minute virtual_ride IS the 60-minute cycling session."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -777,7 +777,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         cosmetic whitespace-only variant), it is dropped so an untouched session is never
         re-stamped as adapted. A genuinely changed session on the same run is kept."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -856,7 +856,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         dropped. The athlete's day then kept the target the coach had just eased. The
         write path and the preview both count the target, and now so does this
         (DESIGN_intensity_distribution.md §9.8)."""
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {"metrics_lookback_days": 3, "minor_activity_load_threshold": 10.0},
         }):
@@ -906,7 +906,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         """A verbatim re-list is the model protecting a same-day session of another sport
         from the displacement rule. Dropping it as a no-op used to delete the very session
         it was protecting, because the same list decides what a date keeps (§9.1)."""
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
                 "metrics_lookback_days": 3,
@@ -959,7 +959,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             self.assertEqual(proposal.removals, ())
             self.assertEqual(proposal.held, (("2026-06-05", "strength_training"),))
 
-            service = trainmate.coach.CoachService(db_instance=test_db)
+            service = CoachService(db_instance=test_db)
             with redirect_stdout(io.StringIO()):
                 service.workout_revision_apply(proposal)
 
@@ -975,7 +975,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         """`{"keep": true}` says "hold this, I am only naming it so it is not displaced".
         It costs no prose, so it cannot drift into a spurious adaptation the way a
         verbatim re-list does (§9.1)."""
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
                 "metrics_lookback_days": 3,
@@ -1022,7 +1022,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             self.assertEqual(proposal.removals, ())
             self.assertEqual(proposal.held, (("2026-06-05", "strength_training"),))
 
-            service = trainmate.coach.CoachService(db_instance=test_db)
+            service = CoachService(db_instance=test_db)
             with redirect_stdout(io.StringIO()):
                 service.workout_revision_apply(proposal)
 
@@ -1037,7 +1037,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         the athlete reads it — so it is applied, not suppressed. And it is cheap: `_eased`
         counts a revision only when duration or TSS FELL, so a reworded session never
         renders the `ALREADY EASED` tag that raises the bar for the next adapt (§9.1)."""
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
                 "metrics_lookback_days": 3,
@@ -1073,7 +1073,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             self.assertEqual(len(proposal.workouts), 1)
             self.assertEqual(proposal.held, ())
 
-            service = trainmate.coach.CoachService(db_instance=test_db)
+            service = CoachService(db_instance=test_db)
             with redirect_stdout(io.StringIO()):
                 service.workout_revision_apply(proposal)
 
@@ -1096,7 +1096,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         self.assertIsNone(row["adapted_at"])
         self.assertEqual(row["adaptation_count"], 0)
 
-        service = trainmate.coach.CoachService(db_instance=test_db)
+        service = CoachService(db_instance=test_db)
         proposed = [{
             "date": "2026-06-20", "sport_type": "running", "title": "Easy Tempo",
             "description": "Cut to Z2", "modification_reason": "Eased for fatigue",
@@ -1188,7 +1188,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             "2026-06-21", "running", "Easy Hour", "60 min conversational.",
             duration_minutes=60, rpe=4, tss=40,
         )
-        service = trainmate.coach.CoachService(db_instance=test_db)
+        service = CoachService(db_instance=test_db)
         # Same duration, same TSS (as a float against a stored int) — only the
         # prescription's wording sharpens, with an explicit HR guard rail.
         proposed = [{
@@ -1226,7 +1226,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             "2026-06-24", "cycling", "FTP Test", "[FTP Test]\n20-min test or ramp.",
             duration_minutes=75, rpe=9, tss=90, benchmark_type="ftp_20min",
         )
-        service = trainmate.coach.CoachService(db_instance=test_db)
+        service = CoachService(db_instance=test_db)
         proposed = [{
             "date": "2026-06-24", "sport_type": "cycling", "title": "Friends Group Ride",
             "description": "[Friends Group Ride]\n90 min social pace.",
@@ -1249,7 +1249,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             "2026-06-24", "cycling", "FTP Test", "[FTP Test]\n20-min test or ramp.",
             duration_minutes=75, rpe=9, tss=90, benchmark_type="ftp_20min",
         )
-        service = trainmate.coach.CoachService(db_instance=test_db)
+        service = CoachService(db_instance=test_db)
         proposed = [
             {
                 "date": "2026-06-24", "sport_type": "cycling", "title": "Easy Spin",
@@ -1285,7 +1285,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             duration_minutes=60, rpe=7, tss=70,
         )
 
-        service = trainmate.coach.CoachService(db_instance=test_db)
+        service = CoachService(db_instance=test_db)
         proposed = [{
             "date": "2026-07-02", "sport_type": "yoga", "title": "Easy Mobility",
             "description": "20 min easy mobility flow.",
@@ -1346,7 +1346,7 @@ class TestAdaptationAdapt(unittest.TestCase):
             duration_minutes=65, rpe=7, tss=55,
             google_event_id="evt-gym",
         )
-        service = trainmate.coach.CoachService(db_instance=test_db)
+        service = CoachService(db_instance=test_db)
         for minutes, load in ((55, 45), (45, 35)):
             with redirect_stdout(io.StringIO()):
                 service.workout_revision_apply(RevisionProposal(
@@ -1366,7 +1366,7 @@ class TestAdaptationAdapt(unittest.TestCase):
 
     def _adapt_returning(self, mock_client, reason, adapted, on="2026-06-10"):
         """Runs `workout adapt` on `on` against a canned week-planner answer."""
-        with patch.dict(trainmate.coach.config.data, {
+        with patch.dict(trainmate.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {"metrics_lookback_days": 3,
                       "minor_activity_load_threshold": 10.0},
@@ -1411,7 +1411,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         )
         self.assertEqual(proposal.removals, ())
 
-        service = trainmate.coach.CoachService(db_instance=test_db)
+        service = CoachService(db_instance=test_db)
         with redirect_stdout(io.StringIO()):
             service.workout_revision_apply(proposal)
 
@@ -1490,7 +1490,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         )
         self.assertIsNone(proposal.workouts[0]["replaces_slot"])
 
-        service = trainmate.coach.CoachService(db_instance=test_db)
+        service = CoachService(db_instance=test_db)
         with redirect_stdout(io.StringIO()):
             service.workout_revision_apply(proposal)
 
@@ -1550,7 +1550,7 @@ class TestAdaptationAdapt(unittest.TestCase):
         )
         self.assertIsNone(proposal.workouts[0]["replaces_slot"])
 
-        service = trainmate.coach.CoachService(db_instance=test_db)
+        service = CoachService(db_instance=test_db)
         with redirect_stdout(io.StringIO()):
             service.workout_revision_apply(proposal)
 

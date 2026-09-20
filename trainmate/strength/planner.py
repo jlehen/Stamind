@@ -13,7 +13,8 @@ from datetime import date
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from trainmate import runtime
-from trainmate.config import config, science_documents
+from trainmate.coach.formatting import BANNER_RULE, science_section
+from trainmate.config import config
 from trainmate.sports import canonical_sport
 from trainmate.strength import history, prescription, vocabulary
 from trainmate.util import cyan, step
@@ -27,7 +28,6 @@ MAX_ATTEMPTS = 2
 
 SCIENCE_PATH = os.path.join(os.path.dirname(__file__), "progression.md")
 
-_RULE = "=" * 80
 
 # The line on a session to check whose sets were written under another brief or duration:
 # the third ground for changing a kept session (§9).
@@ -226,29 +226,26 @@ def _shipped_science() -> str:
     with open(SCIENCE_PATH, encoding="utf-8") as science:
         text = science.read()
     return "\n".join([
-        _RULE, "START OF HOW TO PROGRESS", _RULE,
+        BANNER_RULE, "START OF HOW TO PROGRESS", BANNER_RULE,
         "TrainMate's own progression rules, shipped with the app. The athlete's own "
         "guidelines\nbelow win wherever the two disagree.",
-        "", text, _RULE, "END OF HOW TO PROGRESS", _RULE,
+        "", text, BANNER_RULE, "END OF HOW TO PROGRESS", BANNER_RULE,
     ])
 
 
 def _athlete_science() -> str:
     """The athlete's own guidelines, whole, the way every coaching call gets them. The
-    science trim's tags are what will cut this to the strength ones (§10)."""
-    docs = [
-        f"--- {filename} ---\n{text}"
-        for filename, text in science_documents(runtime.config.science_dir).items()
-    ]
-    if not docs:
-        return ""
-    return "\n".join([
-        _RULE, "START OF ATHLETE-PROVIDED SPORTS SCIENCE GUIDELINES", _RULE,
+    science trim's tags are what will cut this to the strength ones (§10).
+
+    Same banner as the coach's own prompts, built by the same function — the wording of
+    the line under it is this call's, because a strength session is what it asks about.
+    """
+    return science_section(
+        runtime.config.science_dir,
+        "ATHLETE-PROVIDED SPORTS SCIENCE GUIDELINES",
         "The athlete's own material. It governs what is prescribed and how a session is "
         "built.",
-        "", "\n\n".join(docs), _RULE,
-        "END OF ATHLETE-PROVIDED SPORTS SCIENCE GUIDELINES", _RULE,
-    ])
+    )
 
 
 def _exercise_list(done: Set[str]) -> str:

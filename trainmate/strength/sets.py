@@ -23,7 +23,6 @@ SET_NAMES = "set_names"
 # one candidate at 100%; the watch's own guess as candidates with lower probabilities.
 WATCH = "watch"
 GARMIN = "garmin"
-ATHLETE = "athlete"
 
 # An activity older than this when its sets are first read is frozen as read (§6).
 ASK_WITHIN_DAYS = 7

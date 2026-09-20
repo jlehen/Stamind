@@ -19,7 +19,7 @@ from trainmate.db import Database
 import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
 from trainmate import runtime, settings
-from trainmate.coach import coach_service
+from trainmate.coach.service import coach_service
 from trainmate.strength import planner, prescription, sets
 
 if os.path.exists(TEST_DB_PATH):

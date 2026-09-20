@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from trainmate.types import Workout, CompletedActivity
 from trainmate.garmin import activity_load, load_ratio, rpe_divergence
 from trainmate.util import PMC_TSB_LAG_NOTE
@@ -217,18 +217,6 @@ def _planned_summary(
     return line
 
 
-def format_planned_workouts(
-    planned_workouts: List[Workout], eval_date: Optional[str] = None,
-) -> str:
-    """Formats planned workouts to readable text for LLM prompts.
-
-    `eval_date` dates the easing tag. Used where the model is asked to weigh a session
-    rather than rewrite it, so it carries the intensity target but not the description
-    :func:`format_planned_workouts_detailed` adds.
-    """
-    return "\n".join(_planned_summary(w, eval_date) for w in planned_workouts)
-
-
 def _standing_markers(w: Workout) -> str:
     """The tags a standing session carries into the generate prompt (§4.6). Each says
     what kind of commitment the session is, so the model sees it once rather than in a
@@ -286,7 +274,7 @@ def format_planned_workouts_detailed(
     performed: Optional[Dict[Tuple[str, str], Performed]] = None,
     eval_date: Optional[str] = None,
 ) -> str:
-    """Like format_planned_workouts but includes each session's full description.
+    """Like `format_standing_workouts` but includes each session's full description.
 
     Used by the adaptation prompt so the model can preserve interval structure,
     heart-rate zones, and rest/recovery durations it is not deliberately changing.
@@ -355,10 +343,10 @@ def format_baseline(baseline: Optional[Dict[str, Any]]) -> str:
     )
 
 
-_RULE = "=" * 80
+BANNER_RULE = "=" * 80
 
 
-def _science_section(s_dir: str, title: str, provenance: str) -> str:
+def science_section(s_dir: str, title: str, provenance: str) -> str:
     """One bannered section of quoted science documents, or "" when the directory holds none.
 
     The banner is the prompt's third marker (DESIGN_prompt_structure.md §3): everything
@@ -372,11 +360,11 @@ def _science_section(s_dir: str, title: str, provenance: str) -> str:
     if not docs:
         return ""
     return "\n".join([
-        _RULE, f"START OF {title}", _RULE,
+        BANNER_RULE, f"START OF {title}", BANNER_RULE,
         provenance,
         "",
         "\n\n".join(docs),
-        _RULE, f"END OF {title}", _RULE,
+        BANNER_RULE, f"END OF {title}", BANNER_RULE,
     ])
 
 
@@ -389,7 +377,7 @@ def _load_science_guidelines(app_science_dir: str, science_dir: str) -> str:
     empty banner.
     """
     sections = [
-        _science_section(
+        science_section(
             app_science_dir,
             "TRAINMATE SPORTS SCIENCE GUIDELINES",
             "TrainMate's own reference material, shipped with the app. It defines how to\n"
@@ -397,7 +385,7 @@ def _load_science_guidelines(app_science_dir: str, science_dir: str) -> str:
             "what to prescribe. Where the two disagree, these yield — except for the rules\n"
             "each document marks as a floor, which never yield.",
         ),
-        _science_section(
+        science_section(
             science_dir,
             "ATHLETE-PROVIDED SPORTS SCIENCE GUIDELINES",
             "Reference material the athlete supplied themselves — the training philosophy\n"

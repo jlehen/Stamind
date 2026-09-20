@@ -1,6 +1,4 @@
 """Training-load math: measured/HR/RPE TSS, per-activity load, RPE divergence."""
-import math
-import time
 from typing import Any, Dict, Optional, Tuple
 
 from trainmate.config import config

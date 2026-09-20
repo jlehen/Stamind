@@ -3,8 +3,8 @@
 Commands ask the athlete yes/no, one-of-N, or free-text questions through a ``Prompt``
 rather than calling ``input()`` directly, so the same handler works on a TTY, over the
 Telegram bot, or any future front-end. The active implementation is chosen at startup by
-``make_prompt()`` from the ``TRAINMATE_FRONTEND`` env var and exposed as the patchable
-``trainmate_cli.prompt`` singleton; handlers reach it as ``cli.prompt``.
+``make_prompt()`` from the ``TRAINMATE_FRONTEND`` env var and held as the patchable
+``trainmate.runtime.prompt`` singleton, which is how a handler reaches it.
 
 Two transports ship here:
 

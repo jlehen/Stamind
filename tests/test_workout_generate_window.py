@@ -348,7 +348,7 @@ class TestTheConflictRules(WindowTestCase):
 
     def test_two_entries_naming_one_target_keep_the_first(self):
         self.ride(_days_out(2))
-        with patch("trainmate.util.notice"):
+        with patch("trainmate.coach.service.workouts.notice"):
             self.generate(
                 self.session(_days_out(4), sport="cycling", title="First",
                              replaces={"date": _days_out(2), "sport_type": "cycling"},
@@ -365,7 +365,7 @@ class TestTheConflictRules(WindowTestCase):
     def test_a_destination_outside_the_span_is_refused_and_the_source_stands(self):
         self.ride(_days_out(2))
         before = test_db.get_workout(_days_out(2), "cycling")
-        with patch("trainmate.util.notice"):
+        with patch("trainmate.coach.service.workouts.notice"):
             self.generate(
                 self.session(_days_out(40), sport="cycling", title="Long ride",
                              replaces={"date": _days_out(2), "sport_type": "cycling"},
@@ -380,7 +380,7 @@ class TestTheConflictRules(WindowTestCase):
         where it stands."""
         self.window(2)
         self.ride(_days_out(15))
-        with patch("trainmate.util.notice"):
+        with patch("trainmate.coach.service.workouts.notice"):
             self.generate(
                 self.session(_days_out(16), sport="cycling", title="Moved ride",
                              replaces={"date": _days_out(15), "sport_type": "cycling"},
@@ -391,7 +391,7 @@ class TestTheConflictRules(WindowTestCase):
     def test_a_destination_whose_occupant_is_kept_is_refused_and_both_stand(self):
         self.ride(_days_out(2))
         self.long_run(_days_out(4))
-        with patch("trainmate.util.notice"):
+        with patch("trainmate.coach.service.workouts.notice"):
             self.generate(
                 self.session(_days_out(4), sport="running", title="Moved run",
                              replaces={"date": _days_out(2), "sport_type": "cycling"},

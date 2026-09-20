@@ -510,8 +510,8 @@ slot's live row, the lineage was superseded and the event is torn down as today.
 
 **The window is stamped on the change, not re-read at sync time.** Rev. 2 had
 `window_end` reach `_plan()` as a settings read. That makes the answer depend on *when the
-sync runs*: write with `--no-sync` (`calendar_reconcile.no_calendar_sync`), push a
-fortnight later, and a void that was outside the window when it was written is inside it
+sync runs*: write without reconciling, push a fortnight later, and a void that was
+outside the window when it was written is inside it
 by the time it is reconciled, because the window has moved forward. So each
 `workout_change` records the `window_end` in force when it ran, and the rule reads it
 back. The decision is a property of the removal, not of the clock. No lower bound is

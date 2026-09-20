@@ -30,7 +30,7 @@ from trainmate.coach.revisions import normalize_load_fields, pair_revisions
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach import coach_service
+from trainmate.coach.service import coach_service
 
 
 class TestPairAdaptations(unittest.TestCase):

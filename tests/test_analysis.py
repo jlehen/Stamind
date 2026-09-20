@@ -6,14 +6,13 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, rebind_test_db, save_workout
 from trainmate.db import Database
 import trainmate.db
-import trainmate.coach
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_analysis.db")
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach import coach_service
+from trainmate.coach.service import coach_service
 
 
 class TestWorkoutAnalysis(unittest.TestCase):

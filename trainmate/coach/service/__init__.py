@@ -1,9 +1,8 @@
 from typing import Optional
 from trainmate import runtime
-from trainmate.config import config
 # Read as `_svc._today_str()` by the mixins, so `pin_clock` has one place to
 # freeze the clock for a whole service.
-from trainmate.util import today_str as _today_str, today_date as _today_date
+from trainmate.util import today_str as _today_str
 from trainmate.coach.engine import CoachEngine
 
 # Fallback look-back for `reflect` when no watermark exists yet (bootstrap not run).

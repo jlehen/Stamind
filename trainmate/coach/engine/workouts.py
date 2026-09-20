@@ -5,7 +5,7 @@ from trainmate.types import Objective, Constraint, Workout, CompletedActivity
 from trainmate.util import cyan, days_between, step
 from trainmate.coach.formatting import (
     format_metrics_history, format_completed_activities, format_baseline,
-    format_planned_workouts, format_planned_workouts_detailed,
+    format_planned_workouts_detailed,
     format_removed_workouts, format_daily_signals, format_standing_workouts,
 )
 import trainmate.coach.engine as _eng

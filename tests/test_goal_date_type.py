@@ -10,13 +10,12 @@ TEST_DB_PATH = test_db_path("test_trainmate_goal_date_type.db")
 
 from trainmate.db import Database
 import trainmate.db
-import trainmate.coach
 import trainmate_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach import coach_service
+from trainmate.coach.service import coach_service
 
 GOAL_DATE = "2026-09-27"
 

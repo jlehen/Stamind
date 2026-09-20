@@ -308,7 +308,7 @@ classes themselves.
 |----------------------|----------------------|--------------------------------------------------|
 | `types.py`           | —                    | TypedDicts: `Objective`, `Constraint`, `DailySignal`, `Workout` (the hydrated session, not a table row — §5), `CompletedActivity` (incl. `bike_avg_watts`, `zone1_sec`–`zone5_sec`, `power_zone1_sec`–`power_zone7_sec`, and the strength columns `sets_read_at`/`sets_final_at`/`discarded`), `AthleteMetric`, `AthleteBaseline`, `Macrocycle`, `Mesocycle`, `PlanFeedback`, `PlanProposal` |
 | `config.py`          | `config`             | Reads `config.yaml`; exposes typed properties.   |
-| `prompt.py`          | (`cli.prompt`)       | Front-end-agnostic prompt broker: `confirm`/`choose`/`ask_text` over `TtyPrompt` (`input()`) or `JsonPrompt` (chat/web). Journals every answer on the asking run (DESIGN_logging.md §5.6). See [§6](#6-singletons). Also `athlete_watching()`: whether the athlete watches this run — always on an expert instance, and in companion mode only for a run the bot started (DESIGN_change_heads_up.md §6); `workout_change`, the adapt prompt and the terminal's replace question all ask it. |
+| `prompt.py`          | (`runtime.prompt`)   | Front-end-agnostic prompt broker: `confirm`/`choose`/`ask_text` over `TtyPrompt` (`input()`) or `JsonPrompt` (chat/web). Journals every answer on the asking run (DESIGN_logging.md §5.6). See [§6](#6-singletons). Also `athlete_watching()`: whether the athlete watches this run — always on an expert instance, and in companion mode only for a run the bot started (DESIGN_change_heads_up.md §6); `workout_change`, the adapt prompt and the terminal's replace question all ask it. |
 | `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, and `learning` from `learning_doubts.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workouts.py` imports it safely. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
@@ -361,7 +361,7 @@ classes themselves.
 |                      |                      | `sync_state` watermark, the per-process memo, and |
 |                      |                      | the bridge that rides a Calendar daily-signal    |
 |                      |                      | sync along with every pull (§13).                 |
-| `google_calendar.py` | `calendar_syncer`    | Creates/updates/deletes all-day Google Calendar  |
+| `google_calendar.py` | `CalendarSyncer`     | Creates/updates/deletes all-day Google Calendar  |
 |                      |                      | events for workouts (outbound), and ingests       |
 |                      |                      | tagged signal events into `daily_signals` |
 |                      |                      | (inbound — `sync_calendar_signals`, see §13).    |
@@ -555,13 +555,15 @@ flow for each lives in [§10](#10-key-data-flows).
 
 ## 3. coach Package Architecture
 
-The `trainmate/coach/` package re-exports its public API from `__init__.py` (so
-`from trainmate.coach import coach_service` keeps working) and is split into
-three submodules:
+The `trainmate/coach/` package's `__init__.py` is a docstring. Each name is imported
+from the submodule that defines it — `from trainmate.coach.service import coach_service`,
+`from trainmate.coach.formatting import format_baseline` — so a light submodule costs only
+itself: `from trainmate.coach import honoring` used to load 506 modules and now loads 59.
+The submodules:
 
 - `formatting.py` — pure prompt-formatting helpers (no I/O, no LLM):
   `format_metrics_history`, `format_completed_activities`,
-  `format_planned_workouts`, `format_planned_workouts_detailed` (adapt-only
+  `format_planned_workouts_detailed` (adapt-only
   variant that includes each session's full description so the model preserves
   interval/rest detail it isn't deliberately changing, tags a session already
   trained `[COMPLETED — locked history, not adaptable]` or `[PARTIAL — …]` with
@@ -578,10 +580,14 @@ three submodules:
   `trainmate.coach.engine.openrouter_client`.
 - `service/` — `CoachService` + the `coach_service` singleton (data I/O,
   caching, orchestration), assembled from mixins (`context`, `prompt`, `planning`,
-  `workouts`, `adaptation`, `analysis`). Owns the `db` /
-  `calendar_syncer` / `config` bindings — **patch targets:**
-  `trainmate.coach.service.db`, etc. Both packages re-export everything from their
-  `__init__.py`, so the patch targets and import paths are the flat ones above.
+  `workouts`, `adaptation`, `analysis`). It holds no handles of its own: `_db` and
+  `_prompt` are properties reading `runtime.db` and `runtime.prompt`, and it has no
+  Calendar handle at all — the comment beside `_prompt` in `service/__init__.py` says why.
+  The clock is the one module-level name a test patches here,
+  `trainmate.coach.service._today_str`, which the mixins read as `_svc._today_str()`.
+- `honoring.py`, `proposals.py` and `revisions.py` sit beside them: whether the schedule
+  reflects a constraint yet, the frozen records the coach hands the CLI before the athlete
+  has accepted anything, and the pure helpers that fill one in.
 
 ### `_load_science_guidelines(app_science_dir, science_dir) → str`
 Module-level function in `formatting.py`. Concatenates all `*.md` files from
@@ -1030,10 +1036,14 @@ called by the UIs.
   prompt without making an LLM call (used by tests).
 
 **Singleton:** `coach_service = CoachService()` at the bottom of `coach/service/__init__.py`.
-Import as:
+Read it off `runtime`, which is the handle a test patches:
 ```python
-from trainmate.coach import coach_service
+from trainmate import runtime
+runtime.coach_service
 ```
+`from trainmate.coach.service import coach_service` reaches the same object directly, for a
+caller that wants its own handle. `from trainmate.coach import coach_service` does not work:
+the package re-exports nothing ([§15](#the-coach-splits-into-engine-and-service-not-by-domain)).
 
 ---
 
@@ -1167,8 +1177,9 @@ methods whose behavior is *not* obvious from that convention are called out belo
   activity's start, length and RPE. The sets cascade with their activity, so the
   pull's deletion reconcile and `wipe_garmin_data` take them along. Every write that changes
   what the history shows calls `bump_strength_history`, which is the evidence a kept
-  session's kilograms may move on; `get_prescribed_sets` / `record_strength_check` read and
-  write the planned side (DESIGN_strength_tracking.md §5, §9).
+  session's kilograms may move on; `prescribed_sets_for_revisions` and
+  `record_strength_check` read and write the planned side
+  (DESIGN_strength_tracking.md §5, §9).
 - **Metrics & Baselines** (`activities.py`) — `get_baseline(date)` returns the
   *closest prior* baseline. The scoped wipes (in `wipes.py`) are the non-obvious part:
   `wipe_garmin_data(start, end)` also clears the evidence-derived `analysis_cache`
@@ -1896,6 +1907,13 @@ never builds a Database or opens the file**; `--help` does no I/O. Assigning
 (`runtime.db = fake`) shadows the accessor for the process, which is the single
 override point for tests.
 
+The same applies to the Calendar. `google_calendar.py` used to build a `CalendarSyncer`
+at module scope, and that constructor reads the service-account credentials file — so
+every CLI command and the web app needed that file on disk even on an instance with no
+Calendar configured, and a fresh worktree could not collect a single test without it.
+The builder constructs it now, so nothing reads the credentials until something asks for
+`runtime.calendar_syncer`.
+
 Reading at use time is what makes one assignment authoritative. Binding by value
 (`from trainmate.db import db`) captures whatever existed at import and is invisible to
 a later override — that mismatch is why replacements used to "take" for some modules
@@ -1993,8 +2011,9 @@ the 24 that exist, which is how real dates reached fixtures and expired them.
 ## 7. CLI Commands Reference
 
 Invoked as `python trainmate_cli.py [--llm-model MODEL] <command> [subcommand] [args]`.
-`trainmate_cli.py` holds only `main()` (the argparse dispatcher) and the
-patchable singletons; the handler functions, named
+`trainmate_cli.py` holds only `main()` (the argparse dispatcher) and its helpers; the
+patchable singletons belong to `trainmate/runtime.py` ([§6](#6-singletons)). The handler
+functions, named
 `run_<command>_<subcommand>()`, live in the `trainmate/cli/` package
 (one module per command family: `status`, `progress`, `goals`, `constraints`,
 `benchmarks`, `signals`, `learnings`, `plans`, `data`, `settings`, `journal`, `queue`, `bot`
@@ -2004,7 +2023,8 @@ DESIGN_bot_simple_frontend.md; `candidates.py` holds the confirm loops that turn
 note's extracted constraints and signals into rows, shared by `workout adapt -m` and
 `bot capture note` so both inboxes ask the same questions),
 plus the
-`workouts/` **package** — `parser`/`generate`/`calendar_sync`/`revisions`/`heads_up`/`_helpers`;
+`workouts/` **package** —
+`parser`/`generate`/`calendar_sync`/`revisions`/`heads_up`/`strength_only`/`_helpers`;
 `selectors.py` holds the shared range grammar, `argparse_ext.py` the parser/help
 extensions, `render.py` the two voices ([§6](#6-singletons)) and `staleness.py` the
 changed-input wording). `help` is the one
@@ -3069,6 +3089,24 @@ in `tests/`, swept there by a glob — so a second concurrent run deleted the da
 first was still writing and both collapsed. `tests/test_isolation_guards.py` fails on any
 module that builds a database path beside the tests again.
 
+The same file resolves every `patch("trainmate…")` target in the suite — 431 sites
+naming 40 distinct targets — by importing the module half and reading the attribute half,
+the way `mock.patch` does. A patch names its target by string, so nothing checks it until
+that line runs: move a symbol to another file and every test that does not happen to
+execute the line keeps passing while stubbing nothing. The guard turns that into one red
+test naming the target and the test file it is written in.
+
+It reads a target a loop builds as well as a literal one — a `for` over a tuple of strings,
+and an f-string made from one — because four of those sites name
+`cli/workouts/generate.ensure_recent_data`, the seam with the most call sites in the suite.
+A target passed `create=True` is skipped, because that keyword is mock's own way of saying
+the attribute may not exist yet. `patch.object` and `patch.dict` need no guard: they are
+handed the object, so a name that has moved raises `AttributeError` where it is used.
+
+Asking `trainmate.runtime` for an attribute would *build* the singleton — a Database
+against the athlete's own file, a live Google client off the credentials — so the guard
+asks its builder registry instead, and builds nothing ([§6](#6-singletons)).
+
 It installs a third seam for the same reason: every command a test runs opens a journal
 run, so `logging.dir` is redirected to a scratch directory (swept at exit) and
 `TRAINMATE_SOURCE=test` is set. Without it a suite run appends several hundred KB of
@@ -3457,3 +3495,26 @@ them exactly, which is the rule the zone vocabulary already settled on for the s
 unrecognised, visible as its own row, and is repaired by adding an alias — not by a net
 that guesses. `e_bike_fitness` is deliberately left unmapped; a motor-assisted ride is not
 a cycling activity, and its load still reaches the PMC through `completed_activities`.
+
+### The coach splits into engine and service, not by domain
+`coach/engine/` writes the prompts and makes the model call. `coach/service/` reads the
+database, orchestrates and prints. Splitting the coach by domain instead — one file for
+workouts, one for planning, one for analysis — was considered and rejected. The
+engine/service line gives two things a domain split would not. There is one place to
+patch the model call, which about 150 tests do. And the prompt tests run without a
+database, because the engine has no database in it. A domain split would still need two
+files inside each domain to get either of those, so it buys nothing and costs the single
+patch point.
+
+What the split does cost is that one subject is named twice, in two packages. The answer
+is to keep the names parallel rather than to merge the files:
+`engine/workouts.py` ↔ `service/workouts.py` ↔ `cli/workouts/`.
+
+### There is no `trainmate/queue/` package
+The athlete queue is spread over four files and that is where they belong.
+`db/queue.py` is a database module and `cli/queue.py` is a command family, so neither
+leaves its layer. `queue_kind.py` has to stay separate from `athlete_queue.py`, because
+it is what breaks a real cycle: `strength/sets.py` imports `queue_kind`, and
+`athlete_queue` imports `strength/questions.py`, which imports `strength/sets.py`.
+Gathering the queue would therefore pull two files out of the layer they belong to and
+leave a package holding the other two. Two files do not earn a package.

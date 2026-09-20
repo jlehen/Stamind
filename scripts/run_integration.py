@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from trainmate.db import db
-from trainmate.google_calendar import calendar_syncer
+from trainmate import runtime
 
 def main() -> None:
     """Manually runs the calendar sync integration test with mocked/simulated database workouts."""
@@ -70,7 +70,7 @@ def main() -> None:
     workouts_to_sync = db.get_workouts(start_date=today_str, end_date=tomorrow_str)
     
     try:
-        synced_ids = calendar_syncer.sync_multiple(workouts_to_sync)
+        synced_ids = runtime.calendar_syncer.sync_multiple(workouts_to_sync)
         print(f"Successfully synced {len(synced_ids)} events to Google Calendar.")
         print(f"Event IDs: {synced_ids}")
         
