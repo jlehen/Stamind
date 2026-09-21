@@ -7,7 +7,7 @@ an open text prompt. Everything past that is a command to run.
 Which command depends on the persona. In expert mode the message is a CLI command line
 and `parse_message_to_argv` turns it into argv. In companion mode a keyboard label runs
 its fixed argv, and anything else goes through the intent router: `_simple_route` asks
-`tm bot route` what the message means and maps the answer onto either the coach lane,
+`sm bot route` what the message means and maps the answer onto either the coach lane,
 which carries the athlete's own words, or the capture inbox, which asks before it stores
 (DESIGN_bot_simple_frontend.md §5, §12.3).
 """
@@ -120,7 +120,7 @@ class MessagesMixin:
         self._log(chat_id, "  ", f"ui: {'simple' if target else 'expert'}")
 
     async def _restart(self, chat_id: int) -> None:
-        """Tears down, replies, then hard-exits with RESTART_EXIT_CODE for the tm-bot
+        """Tears down, replies, then hard-exits with RESTART_EXIT_CODE for the sm-bot
         supervisor to relaunch us. See DESIGN_bot_restart.md §5.2."""
         await runner.restart_teardown(self.sessions.get(chat_id), self._pause_polling)
         await self.bot.send_message(chat_id=chat_id, text="Restarting…")

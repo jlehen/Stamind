@@ -1,4 +1,4 @@
-"""Pure formatting-helper tests for the zone half of `tm progress`
+"""Pure formatting-helper tests for the zone half of `sm progress`
 (stamind/cli/progress_zones.py): the weekly time-in-zone grid and the per-mesocycle
 report. No DB, no CLI dispatch — `_StubDb` below stands in for the five accessors the
 mesocycle walk reads.

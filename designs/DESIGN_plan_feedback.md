@@ -59,7 +59,7 @@ Where this sits among the real-world-context channels (the boundary lines do not
 
 Goals:
 
-- Capture with no selector, no flags, no IDs: `tm plan feedback "…"` and you have your prompt back.
+- Capture with no selector, no flags, no IDs: `sm plan feedback "…"` and you have your prompt back.
 - Optional explicit filing addressed the way the athlete thinks: mesocycle name, date, or bare `-m`
   for the current mesocycle. IDs keep working.
 - Append semantics with visible history and per-note removal.
@@ -70,7 +70,7 @@ Goals:
 Non-goals:
 
 - **No LLM routing at capture** (§11: latency it can't pay for, buying a label the regen ignores).
-- **No unified inbox** (`tm coach "…"` classifying nudge/constraint/feedback in one place). That
+- **No unified inbox** (`sm coach "…"` classifying nudge/constraint/feedback in one place). That
   is the plausible end-state and this log is its natural substrate, but it reorganizes the channel
   taxonomy and deserves its own design (DESIGN_capture_inbox.md, unwritten).
 - **No range-grammar extension across the CLI.** The new `-m` atoms (§5) are defined in the shared
@@ -295,7 +295,7 @@ is not restated in comments.
   `--rm` + re-add covers rewording.
 - **A `next` keyword atom.** Collides with plausible mesocycle names; `+2w` says it
   deterministically.
-- **Unified inbox (`tm coach`).** The right end-state; out of scope here (§3). This table is its
+- **Unified inbox (`sm coach`).** The right end-state; out of scope here (§3). This table is its
   substrate.
 
 ## 12. Open questions

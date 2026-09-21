@@ -27,7 +27,7 @@ rebind_test_db(test_db)
 class TestPlanLineage(unittest.TestCase):
     """The retrospective mesocycle walk takes the previous *goal's* plan and never an earlier
     *version* of this goal's own (DESIGN_plan_rollback.md §6.1). `_mesocycles_in_window` used
-    to call the version accessor, so `tm progress --mesocycles` reported every mesocycle twice
+    to call the version accessor, so `sm progress --mesocycles` reported every mesocycle twice
     after any regeneration — the two plans cover the same dates."""
 
     TODAY = "2026-08-05"

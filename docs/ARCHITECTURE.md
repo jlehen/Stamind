@@ -125,7 +125,7 @@ classes themselves.
 - **`stamind_web.py`** — Flask REST API behind the dashboard. **Read-only**: GET
   handlers over `db` and the shared pure modules, no writes, no Garmin, no LLM, no
   Calendar ([§8](#8-web-api-endpoints)).
-- **`stamind_bot.py`** — Telegram chat front-end. Launch with `./tm-bot`. The script
+- **`stamind_bot.py`** — Telegram chat front-end. Launch with `./sm-bot`. The script
   itself is 38 lines: it builds `stamind.chat.app.ChatBot` and calls `run()`. Each
   fact below:
   - **Model:** a message is treated as a CLI command line (leading `/` optional) and
@@ -161,12 +161,12 @@ classes themselves.
     subprocess (the same kill `/cancel` does) and replies "Stopped."; the button is
     retired by the next output, by the command ending, or by the tap itself, and a tap on
     a retired one is told the command already finished (DESIGN_bot_stop_button.md).
-  - **Self-restart.** `./tm-bot` is a **supervisor**, not just the venv bootstrap: it
-    selects its mode from the `TM_BOT_SUPERVISED` env var it sets on itself — default
-    invocation = a loop that relaunches a child of itself, `TM_BOT_SUPERVISED=1` = the
+  - **Self-restart.** `./sm-bot` is a **supervisor**, not just the venv bootstrap: it
+    selects its mode from the `SM_BOT_SUPERVISED` env var it sets on itself — default
+    invocation = a loop that relaunches a child of itself, `SM_BOT_SUPERVISED=1` = the
     `exec stamind_bot.py` worker — and traps SIGINT/SIGTERM to TERM-then-KILL the
     child rather than orphan it. `RESTART_EXIT_CODE = 75` is a **cross-file contract**
-    (`tm-bot` and `stamind/chat/runner.py` must stay in sync): only 75 relaunches,
+    (`sm-bot` and `stamind/chat/runner.py` must stay in sync): only 75 relaunches,
     every other exit (crash included) ends the supervisor too — no backoff, no crash
     recovery, by design. `/restart` is a bot command beside `/cancel` and `/start`, under
     the same allowlist: it kills any running command's subprocess and stops the Updater
@@ -178,7 +178,7 @@ classes themselves.
   - **The whole front-end is the `stamind/chat/` package**, and no module in it imports
     `python-telegram-bot`. `telegram_api` is the one file that names the library, and it
     imports it inside each function, so importing any of the rest costs nothing and needs
-    no install — which is what lets `tm bot route` read the router's intent table without
+    no install — which is what lets `sm bot route` read the router's intent table without
     a chat front-end appearing on a command line, and what lets a test drive a real
     `ChatBot` against stand-ins (`tests/chat_harness.py`). `tests/test_layering.py` holds
     that rule. The files:
@@ -193,7 +193,7 @@ classes themselves.
       retire.
     - `messages` is what an arriving message does; `callbacks` is what a tap does.
     - `routing` is what one chat message means — both halves of the router's intent table
-      (`ROUTER_INTENTS`, which `tm bot route` builds its prompt from, and the intent→argv,
+      (`ROUTER_INTENTS`, which `sm bot route` builds its prompt from, and the intent→argv,
       intent→capture and echo tables the bot maps a returned name onto), plus
       `parse_message_to_argv` and the `/ui` switch.
     - `keyboards` is every button the bot draws and every tap it decodes — the reply
@@ -215,14 +215,14 @@ classes themselves.
     via `bot.send_photo` with the payload's `caption`, and unlinks it in a `finally`.
     Any other unrecognised `\x1e`-prefixed line is dropped rather than forwarded as chat
     text, so a future sentinel degrades gracefully on a stale bot build. Currently used
-    by `tm progress --chart` (DESIGN_progress_timeline.md §7.2); any future CLI command
+    by `sm progress --chart` (DESIGN_progress_timeline.md §7.2); any future CLI command
     can reuse the same transport.
   - **Simple ("companion") mode** — `telegram.ui: simple`, DESIGN_bot_simple_frontend.md.
     The same pipeline gains a persona for a non-technical athlete; expert mode is
     untouched. A persistent reply keyboard (two labels per row) maps labels onto fixed
     argv (`SIMPLE_KEYBOARD`): today, the week, goals, the periodization plan, progress
     (DESIGN_bot_simple_frontend.md §5.1, §11); "💬 Talk to me" only shows the capture
-    prompt — every non-label message, tapped or not, is classified by `tm bot route`
+    prompt — every non-label message, tapped or not, is classified by `sm bot route`
     (a hidden CLI command calling `llm.router_model`) and mapped to argv from the bot's
     own `ROUTER_INTENT_ARGV` table — the model picks an intent, never argv. Two intents
     carry the athlete's words to the coach instead (`ROUTER_MESSAGE_ARGV`): how the
@@ -233,11 +233,11 @@ classes themselves.
     redirects a message, only rescues one (§5.2, §12.3).
   - **Writes reach chat through three shapes, and no fourth**
     (DESIGN_bot_simple_frontend.md §12). A **view** runs fixed argv. A **picker** —
-    `tm bot constraints`, `tm bot goals` — renders the list in companion prose and
+    `sm bot constraints`, `sm bot goals` — renders the list in companion prose and
     attaches a button row whose leaves carry a deterministic single-ID command
     (`constraint rm <id>`, `goal rm <id>`, which archives); the model picks *that*
     something should change, the athlete's tap picks *which*. A **capture** —
-    `tm bot capture <intent> "<text>" [--id N]` — is a second, domain-focused LLM call on
+    `sm bot capture <intent> "<text>" [--id N]` — is a second, domain-focused LLM call on
     the same router role: it extracts typed fields, the CLI previews them in companion
     prose *rendered from real rows*, and a `TM-PROMPT` confirm makes it real. An
     operation fitting none of the three belongs to the expert vocabulary, which is why
@@ -277,7 +277,7 @@ classes themselves.
     `emit_buttons` (`\x1eTM-BUTTONS {json}`), attaches a *non-blocking* inline button
     row (`ui:` callback namespace, token-invalidated) whose taps feed a canned
     utterance back through the normal pipeline. An asyncio scheduler (`_push_loop`)
-    spawns `tm bot morning` inside the `telegram.push.morning_time`→`morning_deadline`
+    spawns `sm bot morning` inside the `telegram.push.morning_time`→`morning_deadline`
     window; idempotency lives in the `settings` row `push_morning_last`, so the bot
     process stays stateless. That window runs into the afternoon, so the push grades
     today's sessions (§5) before briefing them: a day already trained gets a
@@ -322,13 +322,13 @@ classes themselves.
     all until two past calls exist. A terminal gets the same number folded into the aside
     it already prints, then `output.Spinner` ticks a clock on one self-erasing line until
     the reply lands (§8.5). `complete(..., wait_notice=None)` suppresses it for
-    `tm bot route`, whose output nobody reads (DESIGN_output_verbosity.md §8, §8.6).
+    `sm bot route`, whose output nobody reads (DESIGN_output_verbosity.md §8, §8.6).
   - **The athlete queue:** a fifth one-way sentinel, `QUEUE_SENTINEL`/`emit_queue_item`
     (`\x1eTM-QUEUE {json}`), carries one queued question or message
     (`stamind/athlete_queue.py`, DESIGN_athlete_queue.md). The bot sends it as a message
     of its own whose buttons carry all a tap needs — `q:<item id>:<action>:<walk start>` —
     so it stores nothing, replaces no `TM-BUTTONS` row and loses nothing on a restart. A
-    tap runs the hidden `tm bot queue <id> <action> --since <walk start>`, which checks the
+    tap runs the hidden `sm bot queue <id> <action> --since <walk start>`, which checks the
     item is still waiting and still worth asking, applies the action and sends the next
     item of the walk; "🕐 Not now" swaps in the three later choices from the tap itself.
     `bot morning` ends by starting a walk, and first refreshes Garmin and reads new strength
@@ -543,7 +543,7 @@ classes themselves.
 |                      |                      | kinds. The detector is here and every wording is  |
 |                      |                      | in `cli/runway.py` (DESIGN_runway_nudge.md §2/§3).|
 | `timeline_rows.py`   | —                    | The one row-fetching path (`build_timeline_payload`) |
-|                      |                      | behind `tm progress` and `/api/timeline.png`, so  |
+|                      |                      | behind `sm progress` and `/api/timeline.png`, so  |
 |                      |                      | both surfaces assemble one identical payload. It  |
 |                      |                      | sits outside `analytics/` because it reads the    |
 |                      |                      | database, which §14's rule forbids in there.      |
@@ -588,8 +588,8 @@ classes themselves.
 |                      |                      | share one implementation.                        |
 | `analytics/baselines.py` | —                | `classify_metric` / `is_anomalous` — where an    |
 |                      |                      | overnight metric sits against the athlete's own  |
-|                      |                      | recent baseline, shared by `tm status` and       |
-|                      |                      | `tm data`.                                       |
+|                      |                      | recent baseline, shared by `sm status` and       |
+|                      |                      | `sm data`.                                       |
 | `clock.py`           | —                    | The athlete's time, and how a day is written.      |
 |                      |                      | `now()`, `to_local()` and the zone maths behind    |
 |                      |                      | the `timezone` setting (DESIGN_user_timezone.md);  |
@@ -628,7 +628,7 @@ classes themselves.
 |                      |                      | `config`: the file name and every `ts` come from |
 |                      |                      | the system clock in **UTC**, because asking      |
 |                      |                      | `clock` for the athlete's day would open and     |
-|                      |                      | migrate the database — on `tm help`, and inside  |
+|                      |                      | migrate the database — on `sm help`, and inside  |
 |                      |                      | the one path that must survive the database      |
 |                      |                      | being unreachable (DESIGN_logging.md §4).        |
 | `text.py`            | —                    | How a line looks: the ANSI colour helpers        |
@@ -689,7 +689,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A message telling the athlete to run something | wrap the command in `text.cmd()`, nested *inside* the line's colour call, so it renders as the bright shade of that colour — and emit it with `output.aside`, not `print`: a "you could now run X" hint is side information |
 | Whether a line reaches the chat front-end | `output.aside` (side information, terminal only) vs `print` (the answer, warnings, errors). Building a list of lines rather than printing? gate on `text.asides_enabled()`. DESIGN_output_verbosity.md §3 |
 | Recording that something happened | Nothing new to call: `output.step` (what the app is doing), `output.warn`/`output.fail` (something outside the app did not work) print and journal in one go, and `run_once` already brackets the command. Reach for `stamind/journal.py` directly only for a record with structured fields (`journal.record("garmin.pull", …)`) or for what must never reach the athlete (`journal.debug` — the tier that replaced `except Exception: pass`, pinned by `tests/test_journal.py`). The event name comes from the closed nine-word vocabulary in `journal.EVENTS`; severity is `lvl`, not a new name. Never copy something a table already holds — that is the domain record, and it outlives this one. What the athlete *answered* needs nothing at all: `runtime.prompt` journals every `confirm`/`choose` itself (§5.6). DESIGN_logging.md §2/§4.2/§5 |
-| Reading back what a command did  | `tm journal` (`stamind/cli/journal/`), or `logs/runs/*.jsonl` with `jq`. A run's prompts are `logs/llm_exchanges/*<run id>*` — the id in the filename is the join, not the timestamp, because those names come from the machine's local clock while the journal is UTC. DESIGN_logging.md §6/§7 |
+| Reading back what a command did  | `sm journal` (`stamind/cli/journal/`), or `logs/runs/*.jsonl` with `jq`. A run's prompts are `logs/llm_exchanges/*<run id>*` — the id in the filename is the join, not the timestamp, because those names come from the machine's local clock while the journal is UTC. DESIGN_logging.md §6/§7 |
 | How long the coach's prose is    | `coach/engine/prompt.py` (`## WRITING FOR THE ATHLETE`, shared by every command built on `_build_system_prompt`) + the per-field caps in each `## RESPONSE FORMAT`. Check `coach/formatting.py` first: a field re-injected into later prompts must not be capped (DESIGN_output_verbosity.md §5.1). The `terse` setting halves the two summary caps and, through `quotes_wording` in `cli/workouts/revisions.py`, drops the old/new wording from the revision preview (§9) |
 | A web *view* of existing data    | a GET in `stamind_web.py` + a panel in that tab's script under `static/` ([§8](#8-web-api-endpoints)) |
 | A web endpoint that would *write* | it does not go in the web app — add the CLI command instead ([§8](#8-web-api-endpoints)) |
@@ -1377,7 +1377,7 @@ SQLite database at `stamind.db` (path from `config.db_path`), in **WAL** mode wi
 pull overlapping a dashboard refresh is ordinary rather than exceptional.
 
 `_init_db` creates every table at `SCHEMA_VERSION` (`db/schema.py`) and records that in a
-`schema_version` table. Later starts see the stamp and do nothing, so `tm --help`
+`schema_version` table. Later starts see the stamp and do nothing, so `sm --help`
 performs no I/O; the DDL used to run in full — around 630 lines, writes included — on
 every process start. It is **CREATE TABLE IF NOT EXISTS only**: the in-place migrations
 are gone. Both instances were stamped at 18, so every one of them had already run, and a
@@ -1876,7 +1876,7 @@ row per measurement; "latest" is newest by `date`, `id` as tiebreak. The latest 
 `anchor_kind` is what `CoachService.effective_thresholds()` feeds the coaching prompt and
 the plan-staleness snapshot. Two further consumers read the logbook **rows** rather than
 the effective set — the intensity mesocycle report (`mesocycle_report._benchmark_lines`, into the
-coaching prompt and `tm progress`) and the read-only `GET /api/benchmarks` — both via
+coaching prompt and `sm progress`) and the read-only `GET /api/benchmarks` — both via
 `benchmarks.with_previous()`, which supplies the per-row delta against the previous row of
 the same kind. No privileged kinds — cycling FTP and a first swim CSS flow
 identically (§3.5). Vocabulary (kind → label, unit, better-direction) lives in
@@ -2405,7 +2405,7 @@ The six **top-level tabs** are all lazy-loaded on first show:
   compare/adherence view, and the archived-batch listing.
 - **Progress** — an `<img>` framing the server-rendered `/api/timeline.png` chart with
   `8w`/`26w`/`all` quick ranges (DESIGN_progress_timeline.md §7.3/§8.5), plus the **time
-  in zone** tables: the web form of `tm progress -z`, one table per qualifying sport,
+  in zone** tables: the web form of `sm progress -z`, one table per qualifying sport,
   measured behind today and prescribed ahead of it, each week also drawn as a stacked
   proportion bar (DESIGN_intensity_distribution.md §9.6/§9.8).
 - **Benchmarks** — the current effective threshold set and the logbook, newest first,
@@ -2417,7 +2417,7 @@ The six **top-level tabs** are all lazy-loaded on first show:
   calendar strip per metric shaded within that metric's own range, over the raw rows.
 
 Panels that used to carry a button now name the command that does the job
-(`tm plan generate`, `tm workout tweak`, `tm learnings demote`, …), including the
+(`sm plan generate`, `sm workout tweak`, `sm learnings demote`, …), including the
 long-standing CLI-only flows `data pull`/`bootstrap`/`reflect` (interactive / MFA-bound,
 DESIGN_garmin_direct_pull.md §11). Sport filter dropdowns are built from the sports
 actually present in the data rather than a hardcoded `<option>` list — the old list had
@@ -2499,10 +2499,10 @@ but the credentials is optional and falls back to the default shown:
 | `data_dir`             | str  | Directory every relative path key below resolves against, replacing the config file's directory as the base; itself config-file-relative. Absent → the config file's directory (the pre-`data_dir` rule) |
 | `database`             | str  | SQLite file this instance operates on; a relative value resolves against the config file's directory / `data_dir:` (default: `stamind.db`) |
 | `science_dir`          | str  | Directory whose `*.md` files become the ATHLETE-PROVIDED science section in every coaching prompt (`coach/formatting.py:_load_science_guidelines`); a relative value resolves against the config file's directory (default: `science`). The app's own `stamind/science/` is not configurable |
-| `logging.dir`          | str  | Root of the two operator log directories — `runs/` (the journal, read with `tm journal`) and `llm_exchanges/` (the full prompts). Relative to the config file's directory, like `database:` (default: `logs`). DESIGN_logging.md §6 |
+| `logging.dir`          | str  | Root of the two operator log directories — `runs/` (the journal, read with `sm journal`) and `llm_exchanges/` (the full prompts). Relative to the config file's directory, like `database:` (default: `logs`). DESIGN_logging.md §6 |
 | `logging.level`        | str  | Lowest level that reaches the journal file: `debug`\|`info`\|`warn`\|`error` (default `info`). `debug` turns on the records for exceptions the app deliberately swallows on screen |
-| `logging.retain_days` / `logging.retain_exchange_days` | int | Days each directory keeps (default 90 each). The sweep runs at most once a UTC day, off the first command to finish; `tm journal prune` forces one |
-| `llm.router_model`     | str  | Cheaper model the bot's free-text router (`tm bot route`) and its capture extractions (`tm bot capture`) use; a role, not a `settings list coach-model` entry. Absent → the active coaching model (DESIGN_bot_simple_frontend.md §5.4, §12.2) |
+| `logging.retain_days` / `logging.retain_exchange_days` | int | Days each directory keeps (default 90 each). The sweep runs at most once a UTC day, off the first command to finish; `sm journal prune` forces one |
+| `llm.router_model`     | str  | Cheaper model the bot's free-text router (`sm bot route`) and its capture extractions (`sm bot capture`) use; a role, not a `settings list coach-model` entry. Absent → the active coaching model (DESIGN_bot_simple_frontend.md §5.4, §12.2) |
 | `telegram.ui`          | str  | Bot persona: `simple` (default) — the companion mode — or `expert` (DESIGN_bot_simple_frontend.md §3) |
 | `telegram.operator_name` | str | What the companion calls the human who runs the CLI. "Coach" is already the app in the athlete's vocabulary, so the operator gets a word of their own; absent → "the person who set this up for you" (DESIGN_render_persona.md §5) |
 | `telegram.push.*`      | —    | Morning push (simple ui only): `enabled` (default true), `morning_time` (`08:00`), `morning_deadline` (`15:00`), `adapt_first` (default false → run `workout adapt -y` before rendering) |
@@ -2625,7 +2625,7 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
 3b. `_mesocycle_progress_context(today, gen_start)` builds the elapsed part of the mesocycle whose
    remainder this run is writing (DESIGN_mesocycle_progress.md). Two halves in one section:
    **volume/adherence** — each already-trained Monday-week's planned-vs-actual load via
-   `progression.weekly_aggregates`, the same maths `tm progress` renders, so coach and
+   `progression.weekly_aggregates`, the same maths `sm progress` renders, so coach and
    athlete never read different numbers — plus the fitness tests the mesocycle has already run;
    and **composition** — `mesocycle_report.mesocycle_report` with two arguments adapt never passes:
    `previous=` for the mesocycle-over-mesocycle delta, and `fetch_workouts=` for what the plan
@@ -3043,15 +3043,15 @@ stored per day on `athlete_metrics_cache` (`ctl`/`atl`/`tsb`) by every
 (`pmc_ctl_days`/`pmc_atl_days`, default 42/7; the defaults are the supported
 configuration). Leading-edge warm-up blanking (`pmc_warmup_cutoff_for`),
 the young-DB caveat (`pmc_data_caveat`), and the ramp rate (`pmc_ramp`)
-gate/derive display values. Consumers: coach prompts, `tm status` and
-`tm data show-metrics` — the last two render the triple through the shared
+gate/derive display values. Consumers: coach prompts, `sm status` and
+`sm data show-metrics` — the last two render the triple through the shared
 `analytics.pmc.pmc_cells`, and derive the one warm-up cutoff through
 `garmin/derived.py:warmup_cutoff(dbh, history_start=None)`. (`workout adapt` prints only a one-line day count;
 its metrics-trajectory table was removed.)
 
 **Projection layer** (`stamind/analytics/progression.py` and `analytics/timeline.py`, DESIGN_progress_timeline.md):
 this is PMC Phase 2, generalized to the full daily series. Past days read the
-stored series verbatim (never recomputed — `tm progress` and `tm status` must
+stored series verbatim (never recomputed — `sm progress` and `sm status` must
 agree); the *anchor* is the latest stored row **strictly before today** with
 non-NULL PMC, and from it the same recurrence is folded forward
 (`compute_pmc(..., seed=(ctl, atl))`) over the merged actual-then-planned daily
@@ -3061,7 +3061,7 @@ stopping at the last generated workout. `compute_pmc` stores its outputs at
 **full precision** (rounding moved to display) so the fold reproduces the stored
 series bit-exactly. `assemble_timeline` builds the whole payload; `timeline.
 build_timeline_payload` is the one row-fetching path behind both surfaces.
-Consumers: `tm progress` (CLI, numbers-first + optional `--chart` PNG), the
+Consumers: `sm progress` (CLI, numbers-first + optional `--chart` PNG), the
 Telegram bot (text for free via CLI parity, plus the photo transport for the
 chart), and `GET /api/timeline.png` (the web **Progress** tab, framing the same
 `chart.render_timeline_png` PNG). One computation and one chart renderer feed
@@ -3372,14 +3372,14 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | holds `JournalTestCase`, which the other three import;          |
 |                                | `_run` is the bracket and the model calls inside it; `_records` |
 |                                | the output verbs and the prompt answers; `_command` is          |
-|                                | `tm journal`. Together: the writer (one line                    |
+|                                | `sm journal`. Together: the writer (one line                    |
 |                                | per record, the 8 KB bound, a traceback elided in the middle, an |
 |                                | unwritable directory that neither raises nor repeats itself),    |
 |                                | the reader skipping a torn line, the run bracket (every start    |
 |                                | has an end; a raising command records its traceback and          |
-|                                | `failed`; a cancel is `cancelled`; three lines in `tm shell`     |
+|                                | `failed`; a cancel is `cancelled`; three lines in `sm shell`     |
 |                                | make four runs with one parent), retention and its once-a-day    |
-|                                | stamp, `tm journal`'s three views, the `step`/`warn`/`fail`      |
+|                                | stamp, `sm journal`'s three views, the `step`/`warn`/`fail`      |
 |                                | verbs, the prompt answers (a declined confirm on the asking      |
 |                                | run, EOF marked `defaulted`, a cancel naming the open question,  |
 |                                | `ask_text` never journalled) — and two structural passes, one    |
@@ -3541,7 +3541,7 @@ one place all 29 questions pass through, rather than beside each of them.
 
 Two consequences are worth knowing before editing any of it. The journal's day file is the
 one date in this app that is **not** the athlete's, because resolving their zone reads a
-setting, which builds the database, which migrates it — on `tm help`, and inside the code
+setting, which builds the database, which migrates it — on `sm help`, and inside the code
 path whose job is to survive the database being unreachable. Display converts back through
 their zone like every other stored instant. And the tier the output design had no name for
 is the one that matters most: things the app must not *say* but must not *forget* —
@@ -3656,7 +3656,7 @@ path is gone. See DESIGN_garmin_direct_pull.md.
 ### Progress timeline: one computation, three renderers
 Past load (measured) and future load (planned) previously lived in disconnected
 views — `workout compare` (per-day adherence, no accumulation) and the workout/
-mesocycle listings (periodization visible in the data but never drawn). `tm
+mesocycle listings (periodization visible in the data but never drawn). `sm
 progress` / the bot photo / the web **Progress** tab draw them as one continuous
 timeline instead, with the stored CTL/ATL/TSB series folded forward across the seam
 so the projection visibly moves the instant `adapt`/`tweak`/`generate`
@@ -3858,7 +3858,7 @@ paying for another model call.
 ### `cli/progress_zones.py` is sixteen lines over the band, and the cut is not worth it
 The 150-to-400 band a split's pieces land in exists so a file reads in one sitting. This
 one is 416. What is in it is the zone grid by week and the same numbers by mesocycle,
-which the athlete reads one under the other on `tm progress --mesocycles`, and neither
+which the athlete reads one under the other on `sm progress --mesocycles`, and neither
 half has a method big enough to lift out: the longest are `zone_section` at 96 lines and
 `render_mesocycle_section` at 67. The only available cut is a third file for the
 mesocycle report, about 120 lines, which is under the band's floor. Left as it is.
@@ -3898,7 +3898,7 @@ being handed a database handle — the distinction the entry above draws, and th
 
 So the two halves are two files. `analytics/timeline.py` holds the assembly: bands, warnings,
 the payload, the clipping, all row-in and row-out. `stamind/timeline_rows.py` holds the
-fetch that feeds it. `tm progress` and `/api/timeline.png` still go through one path and
+fetch that feeds it. `sm progress` and `/api/timeline.png` still go through one path and
 still assemble one identical payload, which was the reason the fetch was pulled into a
 module of its own in the first place.
 
@@ -4089,7 +4089,7 @@ names are attributes on the one object, so the mixins reach them and each other 
 
 The library is the reason the package was worth keeping importable. `tests/test_layering.py`
 has said since the front-ends moved that nothing under `stamind/chat/` may load
-`python-telegram-bot`: that is what lets `tm bot route` — which the bot spawns once per
+`python-telegram-bot`: that is what lets `sm bot route` — which the bot spawns once per
 free-text message — read the router's intent table without a chat front-end turning up on
 a command line, and what makes the routing tables and keyboards unit-testable. Moving the
 process into the package would have broken it, so `chat/telegram_api.py` is the one module

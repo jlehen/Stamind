@@ -1,4 +1,4 @@
-"""`tm journal` reads the files back in the athlete's terms
+"""`sm journal` reads the files back in the athlete's terms
 (DESIGN_logging.md §7): what the default listing leaves out and what the
 footer says about it (§7.1), and why a row that is not `ok` says so on the
 same screen (§7.3).
@@ -22,7 +22,7 @@ def setUpModule():
 
 
 class TestJournalCommand(JournalTestCase):
-    """`tm journal` reads the files back in the athlete's terms (§7)."""
+    """`sm journal` reads the files back in the athlete's terms (§7)."""
 
     def test_the_listing_shows_one_row_per_run_with_its_outcome(self):
         self._seed_runs()

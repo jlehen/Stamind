@@ -216,7 +216,7 @@ class HistoryContextMixin:
         the strategy prompt's view.
 
         Each mesocycle's delta baseline is the mesocycle before it in the flattened lineage —
-        across plan boundaries too, unlike `tm progress --mesocycles`: reviewing one season
+        across plan boundaries too, unlike `sm progress --mesocycles`: reviewing one season
         against the last is what this prompt is for (DESIGN_plan_rollback.md §6.1).
         """
         mesocycles = plan_lineage(self._db, macros)

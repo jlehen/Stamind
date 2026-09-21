@@ -9,7 +9,7 @@ prompt and the raw response. Three months of use has produced 218 of those files
 
 None of them can answer any of the three questions I actually ask.
 
-**"What happened at 6:15 this morning?"** The Telegram bot fires `tm bot morning` on a
+**"What happened at 6:15 this morning?"** The Telegram bot fires `sm bot morning` on a
 timer. Nobody is watching. The command's output goes to a phone, gets read once, and
 scrolls away. If it did something odd — briefed the wrong day, silently skipped the
 Garmin pull, took ninety seconds — there is nothing left to look at. There is an
@@ -104,9 +104,9 @@ finished, *including* a domain refusal ("no active plan"). `cancelled` is
 is explicitly not a failure. `failed` is an unhandled exception. Without this, `--failed`
 would list every command that correctly answered no.
 
-**A line that never became a command is not a run.** `tm benchmark record` is missing a
+**A line that never became a command is not a run.** `sm benchmark record` is missing a
 required argument, so argparse prints that command's help and exits 2. Nothing happened.
-The same goes for `tm goal` with no sub-command, for bare `tm`, and for every `-h`. Those
+The same goes for `sm goal` with no sub-command, for bare `sm`, and for every `-h`. Those
 were a fifth of the runs in the journal's first ten days, and they answer no question
 anyone asks of a log — worse, the parse never reached `name_run`, so they are exactly the
 runs §7.1 cannot classify and therefore refuses to hide.
@@ -132,15 +132,15 @@ write — a `SIGKILL` from the bot's watchdog, a reboot mid-`plan generate`. Tho
 `?`, which is the row you most want to see and the one a `run.end`-only listing would
 have hidden.
 
-**Where the bracket goes: `run_once`, not `main`.** `tm shell` runs many commands in one
+**Where the bracket goes: `run_once`, not `main`.** `sm shell` runs many commands in one
 process, so a run is a command, not a process. `run_once` in `stamind_cli.py` is the one
 function both `main` and the REPL call, so bracketing there covers both surfaces with a
 single edit and leaves the two existing error boundaries exactly as they are — the bracket
 records the exception and re-raises it.
 
-**Runs have parents, and `tm shell` is one.** `run_once` is re-entrant: it handles the
+**Runs have parents, and `sm shell` is one.** `run_once` is re-entrant: it handles the
 `shell` command by calling `_repl`, which calls `run_once` for every line typed. So three
-lines typed into `tm shell` produce four runs — the shell, and one per line naming the shell
+lines typed into `sm shell` produce four runs — the shell, and one per line naming the shell
 as its parent. That is the right reading of what happened, and it is the same shape as
 the bot: the bot spawns the CLI as a subprocess and passes its own run id down in
 `STAMIND_PARENT_RUN`, which the child records on `run.start`. The morning push — the bot
@@ -149,7 +149,7 @@ as one story instead of two disconnected halves.
 
 **How a deep call site knows its run.** `journal.py` keeps the open runs in a module-level
 list; the current run is the last entry, pushed at `run.start` and popped at `run.end`.
-Nesting only ever happens in `tm shell`, and every surface that writes is single-threaded
+Nesting only ever happens in `sm shell`, and every surface that writes is single-threaded
 by construction (the CLI, the REPL, the bot's event loop), so a plain list is enough and a
 `contextvar` is not needed. The web app never opens a run at all (§13, Phase 3).
 
@@ -173,7 +173,7 @@ calendar day, from `clock.active_zone()`, because every other date is resolved t
 
 It cannot be. `active_zone()` reads the `timezone` setting, which reaches `runtime.db`,
 which builds a `Database`, which creates every table. Naming a log file would create the
-database on `tm help` — the exact thing `runtime.py` carries a docstring forbidding.
+database on `sm help` — the exact thing `runtime.py` carries a docstring forbidding.
 Worse, it would put a database dependency in the one code path whose job is to survive the
 database being unreachable, which is most of §4.1's argument.
 
@@ -182,7 +182,7 @@ system clock and nothing else. Writing a journal line reads the config and touch
 filesystem, and does nothing else at all.
 
 The athlete's day comes back at display time, where every stored timestamp already gets it
-(§5 of the timezone design): `tm journal` converts each record's `ts` through the athlete's
+(§5 of the timezone design): `sm journal` converts each record's `ts` through the athlete's
 zone, so "what happened on Tuesday" is still answered in local terms. A local Tuesday can
 straddle two UTC files, so the reader opens the window it needs plus one file either side
 and filters on the converted timestamps. At a few thousand lines a month that costs
@@ -476,7 +476,7 @@ already covered, because that note is in `run.start` verbatim.
 **Why `note` and not a tenth `ev`.** §4.2 says a name is earned by turning out to be worth
 filtering on repeatedly, and `d.answer` is queryable today. The honest counter-argument is
 that every other `note` is the app deciding for itself and this is the only record of the
-athlete deciding, which is a real difference in kind. If `tm journal --declined` ever wants
+athlete deciding, which is a real difference in kind. If `sm journal --declined` ever wants
 to be a flag, that is the moment it earns `prompt.answer`.
 
 **Which run it lands on.** `record()` reads the innermost open run of the process that
@@ -540,18 +540,18 @@ which is what the code-relative path already resolves to. The 218 existing files
 exactly where they are and no migration is needed. Only a `STAMIND_CONFIG` instance
 moves, which is the point.
 
-## 7. `tm journal`
+## 7. `sm journal`
 
 A log nobody can read is a directory that fills up. The command is what makes this a
 feature rather than a side effect.
 
-It is `journal` and not `log` for the reason §5.2 gives: `tm log` would read as "my
+It is `journal` and not `log` for the reason §5.2 gives: `sm log` would read as "my
 training log", which is what the workouts already are. It needs an entry in
 `COMMAND_ORDER` in `stamind_cli.py` like every other top-level command
 (`DESIGN_cli_noargs.md` §c).
 
 ```
-$ tm journal
+$ sm journal
 RUN       WHEN                  SRC   COMMAND                          TIME   LLM       END
 a3f91c2e  2026-08-26 Wed 06:15  push  bot morning                     24.1s   1 · 41k   ok
 7d20b8a4  2026-08-25 Tue 21:03  bot   workout adapt -m "legs heavy…   31.7s   1 · 38k   ok
@@ -574,7 +574,7 @@ or killed before it could write one (§3). `0b4a7712` above is a `plan generate`
 watchdog killed; without the `?` row it would simply not be in this listing.
 
 ```
-$ tm journal 5a0e
+$ sm journal 5a0e
 run 5a0e1d99 · plan generate -g 2
   cli · pid 48213 · config.yaml · stamind.db
   2026-08-24 Mon 19:22 → 19:23 · 96.4s · failed (exit 1)
@@ -593,7 +593,7 @@ run 5a0e1d99 · plan generate -g 2
 An ambiguous id prefix lists the runs it matched rather than guessing, git-style.
 
 ```
-$ tm journal --cost --since 2026-08-01
+$ sm journal --cost --since 2026-08-01
 MODEL                       RUNS  CALLS      TOKENS
 anthropic/claude-opus-4       18     22   1,940,220
 google/gemini-3.5-flash       61     61     412,880
@@ -610,7 +610,7 @@ The flags: `-n` for how many, `-d` for a window (the shared range grammar,
 that failed, were killed, or logged an error, `--command "workout adapt"` for one command's
 history, `-a` for the read-only views the listing leaves out (§7.1), `-v` for command lines
 and warnings in full rather than clipped (§7.2, §7.3), `--cost` for the rollup above, and
-`--follow` to tail the file while the bot runs. `tm journal prune` is a real sub-command, not a positional, so
+`--follow` to tail the file while the bot runs. `sm journal prune` is a real sub-command, not a positional, so
 it cannot be confused with a run id.
 
 Timestamps display in the athlete's timezone through the existing `fmt_timestamp`, which
@@ -621,7 +621,7 @@ record layout on a phone like every other table.
 
 ### 7.1 The listing is what the app *did*
 
-`tm workout list` changes nothing. Neither does `plan show`, `status`, `journal` itself, or
+`sm workout list` changes nothing. Neither does `plan show`, `status`, `journal` itself, or
 any `-h`. Left in, they **are** the listing: on an ordinary day the athlete looks at things
 far more often than the app writes anything, and the two runs worth reading — the adapt that
 reshaped the week, the morning push that warned — sit under a screenful of views. The
@@ -737,16 +737,16 @@ was clipped, so `-v` is never something to guess at.
 The Telegram front-end already has a private logger: `ChatBot._log(chat_id, direction,
 msg)` in `stamind/chat/app.py`,
 called from every send, tap and command start, `print()` to the process's stdout. Where
-that stdout goes depends entirely on how `./tm-bot` was launched, which means in practice
+that stdout goes depends entirely on how `./sm-bot` was launched, which means in practice
 it goes nowhere.
 
 Those calls also become `bot.event` records — *also*, not instead: they keep printing, so
-an operator watching `./tm-bot` in a terminal keeps the live view they have today. The
+an operator watching `./sm-bot` in a terminal keeps the live view they have today. The
 bot process opens one long-lived run at startup, so its own lifetime — a `/restart`, a
 prompt that timed out, a Stop button raised over a coach call and the tap that took it, a
 command killed by the watchdog, the morning push firing — is a readable timeline. Each
 spawned CLI subprocess is a run of its own with the bot's run id as its parent, and
-`tm journal <bot-run>` walks into the children.
+`sm journal <bot-run>` walks into the children.
 
 That long-lived run is why §3 needs the `?` outcome and §10 needs its own trigger. It has
 no `run.end` for as long as it is up, and none at all if the supervisor kills it — which
@@ -785,7 +785,7 @@ call it 100 KB a month against the exchanges' 5.6 MB.
 **The trigger is a stamp file, at most one sweep per UTC day.** `logs/runs/.pruned` holds
 the date of the last sweep; a run whose `run.end` finds anything other than today's date
 rewrites it and prunes. No cron, no daemon, no separate command in the normal path.
-`tm journal prune` forces a sweep.
+`sm journal prune` forces a sweep.
 
 The obvious trigger — the run that had to *create* today's file — does not work here, and
 it is worth saying why so it does not come back. The bot polls continuously, so the run
@@ -813,7 +813,7 @@ unwritable directory neither raises nor prints more than once.
 **A behavioural test on the bracket.** Run a handful of commands in-process against a
 temporary journal directory: every `run.start` has a matching `run.end`; a command that
 raises records the traceback and `outcome: failed`; a cancelled command records
-`outcome: cancelled` and not `failed`; and three lines typed into `tm shell` produce four
+`outcome: cancelled` and not `failed`; and three lines typed into `sm shell` produce four
 runs — one for the shell and one per line, each naming the shell as its parent (§3). Then
 the deferred half: a line that only printed usage or help writes nothing at all, a run is
 on disk the moment it is named, and a drop that arrives after the run has spoken closes it
@@ -822,7 +822,7 @@ rather than abandoning it (§3).
 **A behavioural test on the answers.** §5.6 turns on a record nothing else writes, so it
 is pinned directly: a declined confirm lands on the run that asked it and the run still
 ends `ok`; EOF is marked `defaulted` rather than read as a no; a cancelled prompt names
-the question that was open; a confirm inside `tm shell` lands on the typed line's run and
+the question that was open; a confirm inside `sm shell` lands on the typed line's run and
 not the shell's; and `ask_text` writes nothing at all, which is the §4.4 rule.
 
 **A structural test on the read-only verbs.** §7.1 hides a run by matching the last word of
@@ -881,7 +881,7 @@ core turns out to earn it.
 
 **Phase 1 — the spine.** `stamind/journal.py`, the run bracket in `run_once`, `step` /
 `warn` / `fail` in `output.py`, the 29 aside reclassifications, the `llm.call` record, and
-`tm journal` with its list and detail views. This is what answers all three questions in
+`sm journal` with its list and detail views. This is what answers all three questions in
 §1. Roughly 150 lines of new code and a lot of one-word edits.
 
 **Phase 2 — the corners.** The bot's eighteen `_log` calls, the `source` parameter on

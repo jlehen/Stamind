@@ -47,7 +47,7 @@
         <!-- CONFIG WARNING BANNER -->
         <div id="config-warning-banner" style="display: none; margin-bottom: 1.5rem; padding: 0.75rem 1rem; border-radius: 12px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); font-size: 0.85rem; color: #fde047; align-items: center; gap: 0.75rem;">
             <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.1rem; color: var(--accent-gold);"></i>
-            <span><strong>Configuration Changed:</strong> config.yaml has been updated since your periodization strategy was generated. Run <code>tm plan generate</code> to apply it.</span>
+            <span><strong>Configuration Changed:</strong> config.yaml has been updated since your periodization strategy was generated. Run <code>sm plan generate</code> to apply it.</span>
         </div>
 
         <!-- ============ DASHBOARD VIEW ============ -->
@@ -125,7 +125,7 @@
                         <div class="list-container" id="goals-list"></div>
                         <div class="cli-guidance">
                             <i class="fa-solid fa-terminal"></i>
-                            Manage with <code>tm goal add</code>, <code>tm goal edit</code>, <code>tm goal rm</code>.
+                            Manage with <code>sm goal add</code>, <code>sm goal edit</code>, <code>sm goal rm</code>.
                         </div>
                     </div>
 
@@ -133,7 +133,7 @@
                         <div class="list-container" id="events-list"></div>
                         <div class="cli-guidance">
                             <i class="fa-solid fa-terminal"></i>
-                            Manage with <code>tm constraint add</code>, <code>tm constraint edit</code>, <code>tm constraint rm</code>.
+                            Manage with <code>sm constraint add</code>, <code>sm constraint edit</code>, <code>sm constraint rm</code>.
                         </div>
                     </div>
                 </div>
@@ -144,7 +144,7 @@
                     <div id="models-list"></div>
                     <div class="cli-guidance">
                         <i class="fa-solid fa-terminal"></i>
-                        Switch with <code>tm model set &lt;n&gt;</code>, reset with <code>tm model reset</code>.
+                        Switch with <code>sm model set &lt;n&gt;</code>, reset with <code>sm model reset</code>.
                     </div>
                 </div>
 
@@ -190,15 +190,15 @@
                     </div>
                     <div class="cli-guidance">
                         <i class="fa-solid fa-terminal"></i>
-                        Generate, roll back or comment on a plan with <code>tm plan generate</code>,
-                        <code>tm plan rollback</code>, <code>tm plan feedback</code>.
+                        Generate, roll back or comment on a plan with <code>sm plan generate</code>,
+                        <code>sm plan rollback</code>, <code>sm plan feedback</code>.
                     </div>
                 </div>
 
                 <div class="card" id="no-strategy-card">
                     <h2><i class="fa-solid fa-route"></i> Training Cycles & Strategy</h2>
-                    <p class="empty-note">No periodization plan yet. Add a goal with <code>tm goal add</code>,
-                        then run <code>tm plan generate</code>.</p>
+                    <p class="empty-note">No periodization plan yet. Add a goal with <code>sm goal add</code>,
+                        then run <code>sm plan generate</code>.</p>
                 </div>
 
             </section>
@@ -230,8 +230,8 @@
                 </details>
                 <div class="cli-guidance">
                     <i class="fa-solid fa-terminal"></i>
-                    Reshape sessions with <code>tm workout tweak</code>, <code>tm workout adapt</code>,
-                    <code>tm workout push</code>.
+                    Reshape sessions with <code>sm workout tweak</code>, <code>sm workout adapt</code>,
+                    <code>sm workout push</code>.
                 </div>
             </div>
 
@@ -255,7 +255,7 @@
         <!-- ============ PROGRESS VIEW ============ -->
         <!-- The PNG frames the same chart the Telegram bot sends
              (DESIGN_progress_timeline.md §7.3); the zone tables below are the web form of
-             `tm progress -z` (DESIGN_intensity_distribution.md §9.6). -->
+             `sm progress -z` (DESIGN_intensity_distribution.md §9.6). -->
         <div id="view-progress" class="main-view">
             <div class="card">
                 <h2><i class="fa-solid fa-chart-line"></i> Progress Timeline</h2>
@@ -310,8 +310,8 @@
                 <div id="benchmarks-list"></div>
                 <div class="cli-guidance">
                     <i class="fa-solid fa-terminal"></i>
-                    Record a test with <code>tm benchmark record &lt;sport&gt; --ftp 250</code>;
-                    correct one with <code>tm benchmark rm &lt;id&gt;</code>.
+                    Record a test with <code>sm benchmark record &lt;sport&gt; --ftp 250</code>;
+                    correct one with <code>sm benchmark rm &lt;id&gt;</code>.
                 </div>
             </div>
         </div>
@@ -339,8 +339,8 @@
                 <div id="learnings-list-container"></div>
                 <div class="cli-guidance">
                     <i class="fa-solid fa-terminal"></i>
-                    Curate with <code>tm learnings edit</code>, <code>tm learnings demote</code>,
-                    <code>tm learnings keep</code>, <code>tm learnings rm</code>.
+                    Curate with <code>sm learnings edit</code>, <code>sm learnings demote</code>,
+                    <code>sm learnings keep</code>, <code>sm learnings rm</code>.
                 </div>
             </div>
         </div>
@@ -357,7 +357,7 @@
                 <div class="cli-guidance">
                     <i class="fa-solid fa-terminal"></i>
                     Garmin sync and history analysis run from the CLI:
-                    <code>tm data pull</code>, <code>tm data bootstrap</code>, <code>tm data reflect</code>.
+                    <code>sm data pull</code>, <code>sm data bootstrap</code>, <code>sm data reflect</code>.
                 </div>
             </div>
 
@@ -375,7 +375,7 @@
                 </details>
                 <div class="cli-guidance">
                     <i class="fa-solid fa-terminal"></i>
-                    Author a signal with <code>tm signal add</code>; remove one with <code>tm signal rm</code>.
+                    Author a signal with <code>sm signal add</code>; remove one with <code>sm signal rm</code>.
                 </div>
             </div>
 

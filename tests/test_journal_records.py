@@ -155,7 +155,7 @@ class TestPromptAnswers(JournalTestCase):
         self.assertIs(self._answers()[0]["d"]["defaulted"], True)
 
     def test_the_answer_lands_on_the_innermost_run_not_the_shell_around_it(self):
-        """A decision belongs to the command that asked, not to `tm shell` (§3)."""
+        """A decision belongs to the command that asked, not to `sm shell` (§3)."""
         journal.start_run(["shell"], source="cli")
         inner = journal.start_run(["plan", "generate"], source="shell")
         with patch("builtins.input", return_value="y"):

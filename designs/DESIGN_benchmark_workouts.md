@@ -334,8 +334,8 @@ config has no *documented* threshold field, not that the loader refuses one.
 **Seeding is a one-off, not machinery.** By the time seeding is possible,
 `benchmark record` exists — and two invocations of it *are* the migration:
 
-    tm benchmark record cycling --ftp 220 --note "seeded from config"
-    tm benchmark record running --lthr 165 --note "seeded from config"
+    sm benchmark record cycling --ftp 220 --note "seeded from config"
+    sm benchmark record running --lthr 165 --note "seeded from config"
 
 Two rules make the cutover seamless:
 
@@ -563,7 +563,7 @@ bucketed zone-seconds, **not** the raw power stream (`analytics/load.py`) — so
 cannot recompute "20-min best power × 0.95" after the fact. The data simply isn't
 there. Therefore:
 
-    tm benchmark record cycling --ftp 250
+    sm benchmark record cycling --ftp 250
 
 is the primary capture path — reliable, one line, using Zwift's authoritative
 value. Auto-extraction from the activity stream is explicitly **not** built first

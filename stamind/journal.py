@@ -9,7 +9,7 @@ Two properties hold this module together, and both are load-bearing:
   written, so every write is wrapped and a failure warns at most once per process.
 * **It asks the database for nothing** (§4). The day in the file name and every ``ts``
   come from the system clock in UTC, never from ``stamind.clock``: resolving the
-  athlete's zone opens and migrates the database, which would happen on ``tm help`` and
+  athlete's zone opens and migrates the database, which would happen on ``sm help`` and
   inside the one code path whose job is to survive the database being unreachable. The
   athlete's day comes back at display time, in ``cli/journal/``.
 """
@@ -81,7 +81,7 @@ class Run:
     pending: Optional[Tuple[Dict[str, Any], datetime]] = None
 
 
-# The open runs, innermost last. Nesting only ever happens in `tm shell`, and every
+# The open runs, innermost last. Nesting only ever happens in `sm shell`, and every
 # surface that writes is single-threaded by construction — the CLI, the REPL, the bot's
 # event loop — so a plain list is enough and a contextvar is not (§3).
 _stack: List[Run] = []
@@ -342,7 +342,7 @@ def start_run(
 ) -> str:
     """Opens a run and writes its ``run.start``. Returns the new run id.
 
-    The parent is the run enclosing this one in this process (`tm shell` running a typed
+    The parent is the run enclosing this one in this process (`sm shell` running a typed
     line), falling back to the id the spawning process passed down in
     STAMIND_PARENT_RUN — which is how the bot's morning push and the subprocess it
     launched read as one story (§3).

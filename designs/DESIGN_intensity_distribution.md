@@ -402,9 +402,9 @@ Two views, because two different questions:
   macrocycle today — gap 2 of §3). No *prompt* other than this one carries the delta; §9.6
   puts it in front of a human too, which is a different constraint and not in tension with
   §4.1.
-- **`tm status` — the mesocycle you are in.** Rendered in the mesocycle summary display, beside
+- **`sm status` — the mesocycle you are in.** Rendered in the mesocycle summary display, beside
   `Cycle Focus`. The snapshot: current mesocycle, all sports, no history.
-- **`tm progress -z [sport ...]` — the trend (§9.6).** *Where did it change?* One table per
+- **`sm progress -z [sport ...]` — the trend (§9.6).** *Where did it change?* One table per
   sport, weekly grain, the whole displayed window. The only view that survives a mesocycle
   boundary moving.
 - **`data show-activities` — the receipt (§9.7).** *Which activity, and is the recording
@@ -675,9 +675,9 @@ cross-sport substitution, now keeps its lineage and so has a predecessor to be c
 against. Five of the six denormalizations named above are derived; `original_date` is derived
 too, from the lineage's first revision.
 
-### 9.6 `tm progress -z [sport ...]` — per sport, weekly grain
+### 9.6 `sm progress -z [sport ...]` — per sport, weekly grain
 
-`tm progress` (`DESIGN_progress_timeline.md`) is the fullest rendering anywhere of the
+`sm progress` (`DESIGN_progress_timeline.md`) is the fullest rendering anywhere of the
 picture §1 calls a lie: a CTL sparkline, a weekly TSS column, an adherence percentage and a
 forward projection, every one of them computed from load alone. An athlete whose easy days
 have drifted to tempo reads that screen as seven flat weeks at 97–101% adherence. So this is
@@ -692,7 +692,7 @@ Fix the sport and a week collapses to one line. The argument buys the grain.
 
 But fixing it to *one* sport buys the grain at the price of a new lie, and it is the mirror
 image of §1's. An athlete who swapped two planned runs for two rides of equal TSS reads
-`tm progress running` as whole-athlete load held flat beside a collapsed aerobic base —
+`sm progress running` as whole-athlete load held flat beside a collapsed aerobic base —
 which is the exact signature of intensity creep, on a week where nothing went wrong. So the
 grain is per *table*, not per *screen*: the default stacks one zone table per sport, and the
 cycling table rising as the running table falls makes "they rode instead" self-evident.
@@ -709,15 +709,15 @@ Which sports, in order:
   `+N more (--weeks all)`:
 
   ```
-  yoga, ski_touring omitted (under 10% of volume) — name them to see: tm progress yoga
+  yoga, ski_touring omitted (under 10% of volume) — name them to see: sm progress yoga
   ```
 
-Naming sports explicitly overrides all three filters: `tm progress running cycling` renders
+Naming sports explicitly overrides all three filters: `sm progress running cycling` renders
 exactly those two, in that order, however little of the window they cover.
 
 **Two failures the argument has to handle, and only one of them is the typo.** An
 unrecognised name is the rare case; the common one is a name that resolves fine and has no
-rows — `tm progress yoga` on an athlete who does yoga without a strap. Both must key on *no
+rows — `sm progress yoga` on an athlete who does yoga without a strap. Both must key on *no
 rows in the window*, not on *not a known sport*, and both list the sports that do have data.
 Note `canonical_sport` passes unknown values through stripped and lowercased (`sports.py`),
 so nothing is "unrecognised" at that layer and the list must come from the data.
@@ -738,13 +738,13 @@ Warning: sport_preferences: 'Road cycling' is
 
 **"At config load" means at the point of use, not in `Config.__init__`.** `config.py` has no
 validation pass — every setting is a lazy property, and the only thing that happens at load is
-`yaml.safe_load`, at import time, in every process there is. A warning there greets `tm --help`,
+`yaml.safe_load`, at import time, in every process there is. A warning there greets `sm --help`,
 the Telegram bot and the web app alike, none of which read this list. It belongs where the list
 is consumed: `progress` resolving its default sports, once per invocation that uses them.
 
 **It scopes the intensity content only.** CTL, ATL, TSB, the projection and the WEEKLY LOAD
 table stay whole-athlete. A running-only CTL is not a quantity — the fitness model integrates
-every activity the body paid for — and adherence is measured against the whole plan. `tm
+every activity the body paid for — and adherence is measured against the whole plan. `sm
 progress cycling` therefore shows whole-athlete form beside cycling-only intensity, and the
 help text must say so, because the command shape invites the opposite reading. The multi-sport
 default largely dissolves the false-creep reading above, but an explicitly narrowed
@@ -753,10 +753,10 @@ window: `5h42 of 9h10 total`. One number, and the collapsed week reads as a spor
 instead of a collapse.
 
 (An optional argument with a default is `--sport`'s case by the convention in `cli/`;
-positional is the call taken, for `tm progress cycling` over `tm progress --sport cycling`.
+positional is the call taken, for `sm progress cycling` over `sm progress --sport cycling`.
 `nargs="*"` carries the multi-sport form, and `_build_keyword_spec` skips positionals
 (`cli/argparse_ext.py`) so bare tokens still pass the dashless translator — worth a test, since
-this is the first positional on `progress` and `tm progress weeks 4` must keep working.)
+this is the first positional on `progress` and `sm progress weeks 4` must keep working.)
 
 **When the tables are shown, they are the per-zone tables themselves — every zone, no rollup.**
 An earlier draft put a single `easy` column (the selected sport's Z1-2 share) beside `adh` and
@@ -772,7 +772,7 @@ nothing renders it here.
 **The tables are opt-in, behind `-z/--zones`.** An earlier draft of this section put them on
 every invocation, arguing that intensity drift is the failure an athlete cannot know to ask
 about. Measured on the shipped layout that price is too high to charge unconditionally: the
-tables roughly triple the length of `tm progress` (~23 lines to ~38 for one sport, ~13 more
+tables roughly triple the length of `sm progress` (~23 lines to ~38 for one sport, ~13 more
 per additional sport), and they answer a different question from the load table above them —
 *where did the intensity go*, not *how much work was done*. So the load table, the PMC and the
 projection stay the default screen and `-z` adds the intensity half. **Naming a sport implies
@@ -1051,7 +1051,7 @@ reader reaching for a coarser grain expects, so the help text says so.
 
 **Width and length.** The HR zone table runs 38 columns, the 7-zone power table 48, the load
 row 40 — all inside the 48-column budget, so Telegram and a TTY render identically, the §7.1
-contract the load table already holds. The cost is vertical: `tm progress -z` over 8
+contract the load table already holds. The cost is vertical: `sm progress -z` over 8
 weeks goes from ~23 lines to ~38 for one sport, and roughly 13 more per additional sport,
 which is what the 10% volume floor exists to bound. That price is what put the tables behind
 `-z` rather than on every invocation. `--weeks` windows them for anyone who wants it shorter.
@@ -1218,7 +1218,7 @@ never renders.
 
 **§9.6's rule needs a window, and authoring has none, so it borrows the display default.** The
 rule reads coverage over the window it is shown; at generation time there is no window, only
-twelve weeks of forward plan. Take the trailing 8 weeks — the same span a bare `tm progress`
+twelve weeks of forward plan. Take the trailing 8 weeks — the same span a bare `sm progress`
 uses — so the ordinary case agrees by construction. When it does not agree the failure is
 declared, not silent: the comparison is withheld and says why (below). The transient worth
 naming is the athlete who has just bought a power meter, whose trailing coverage still says HR
@@ -1425,4 +1425,4 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
   week rendering `—` rather than zeros; `w/c 07-06*!` fitting the week column; the 7-zone
   power table at exactly 48 columns with a 10h+ Z2; an orphaned week appearing in the weekly
   table and in no mesocycle; `--mesocycles` naming both the orphaned weeks and the excluded partial
-  tails; `tm progress weeks 4` still reaching the dashless translator past the new positional.
+  tails; `sm progress weeks 4` still reaching the dashless translator past the new positional.

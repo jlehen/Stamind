@@ -120,7 +120,7 @@
   `SCHEMA_VERSION` versions as a unit; and `static/style.css`, which is not Python. One
   file stays under the 100-line floor for a reason the rule does not list:
   `stamind_bot.py` is 38 lines that build `stamind.chat.app.ChatBot` and run it, and
-  it cannot be merged into a sibling because the `tm-bot` supervisor execs it by path.
+  it cannot be merged into a sibling because the `sm-bot` supervisor execs it by path.
 - A package `__init__.py` holds a docstring, and at most the class the package assembles
   from its submodules. It does not re-export the submodules' names. A re-export gives one
   name two homes, and a test that patches the home it knows about reaches code that reads

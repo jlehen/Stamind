@@ -1,6 +1,6 @@
 """What one chat message means: the router's intent table, both halves of it.
 
-The model — through `tm bot route` — only ever picks a name out of `ROUTER_INTENTS`. The
+The model — through `sm bot route` — only ever picks a name out of `ROUTER_INTENTS`. The
 three tables under it say what that name runs: fixed argv for a view or a picker, an argv
 the athlete's words are appended to for the two coach lanes, or a `bot capture <intent>`
 for the intents that need values read out of the message
@@ -8,13 +8,13 @@ for the intents that need values read out of the message
 
 They are one table in one file because they have to agree name for name, and a test
 checks that they do. Pure data and pure parsing: nothing here imports the telegram
-library, and `tm bot route` reads `ROUTER_INTENTS` from here to build its prompt.
+library, and `sm bot route` reads `ROUTER_INTENTS` from here to build its prompt.
 """
 import shlex
 from typing import List, Optional
 
 # The names the model may pick from, and what each one means to it (§5.3, widened by the
-# writes pass — §12.8 is the authoritative table). `tm bot route` builds its prompt from
+# writes pass — §12.8 is the authoritative table). `sm bot route` builds its prompt from
 # this dict; the three tables under it say what each name runs.
 ROUTER_INTENTS = {
     "show_today": "the athlete wants to see today's session or what to do today",

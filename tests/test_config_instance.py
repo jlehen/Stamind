@@ -2,7 +2,7 @@
 
 The env var is read once, at import of stamind.config, so every case here runs a fresh
 interpreter via subprocess instead of reaching into module state. That is the honest
-shape: each case exercises exactly what `STAMIND_CONFIG=... ./tm` does. The invariant
+shape: each case exercises exactly what `STAMIND_CONFIG=... ./sm` does. The invariant
 under test is the isolation rule — an instance's paths resolve beside its config file,
 and an explicitly named config that cannot load aborts rather than falling back to
 defaults that point at the primary athlete's database.

@@ -1,5 +1,5 @@
 """The one row-fetching path behind the progress timeline (DESIGN_progress_timeline.md
-§5/§6). Both the CLI handler (`tm progress`) and the web endpoint
+§5/§6). Both the CLI handler (`sm progress`) and the web endpoint
 (`GET /api/timeline.png`) call `build_timeline_payload`, so the two surfaces fetch
 the same rows and assemble the same §6.0 payload — the fix for the rev-4 divergence
 where each caller assembled its own and the copies drifted (CODE_REVIEW finding #5).

@@ -104,7 +104,7 @@ elapsed part holding no rows at all.
 ### 3.1 Reusing the weekly maths
 
 The week lines come from `progression.weekly_aggregates` — the same planned-vs-actual weekly
-computation `tm progress` renders — so the week planner and the athlete can never read different
+computation `sm progress` renders — so the week planner and the athlete can never read different
 numbers for the same week. `progression.week_plan_denom` supplies the comparable denominator,
 which for the in-progress week is its elapsed slice.
 

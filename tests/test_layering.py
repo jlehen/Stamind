@@ -100,7 +100,7 @@ class TestTheChatPackageNeedsNoTelegram(unittest.TestCase):
     imports the library inside each function rather than at module scope, so importing
     anything under `stamind/chat/` loads none of it. That is what makes the whole
     front-end — the routing tables, the keyboards, the scheduler and `ChatBot` itself —
-    unit-testable without the library, and what lets `tm bot route` read the router's
+    unit-testable without the library, and what lets `sm bot route` read the router's
     intent table out of `chat/routing.py` without a chat front-end turning up on a
     command line.
     """

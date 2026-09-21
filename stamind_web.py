@@ -193,7 +193,7 @@ def get_status() -> Any:
         "macrocycle": macrocycle,
         "mesocycles": mesocycles,
         # The pending feedback log, read-only like everything here — it is written with
-        # `tm plan feedback` (DESIGN_plan_feedback.md §8).
+        # `sm plan feedback` (DESIGN_plan_feedback.md §8).
         "plan_feedback": plan_feedback,
         "config_mismatch": config_mismatch,
         "sync_state": sync_state
@@ -369,7 +369,7 @@ def get_timeline_png() -> Any:
 @app.route("/api/zones", methods=["GET"])
 def get_zones() -> Any:
     """Per-sport, per-zone time in zone over the displayed window — the structured form
-    of the `tm progress -z` tables (DESIGN_intensity_distribution.md §9.6/§9.8).
+    of the `sm progress -z` tables (DESIGN_intensity_distribution.md §9.6/§9.8).
 
     Which sports qualify, and the currency each is drawn in, come from
     `intensity.window_sport_stats`/`select_zone_sports`/`zone_currency` — the same three

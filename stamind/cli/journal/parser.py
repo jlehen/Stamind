@@ -29,7 +29,7 @@ def add_journal_parser(subparsers):
     # Read-only at the top level, so a bare `journal` lists rather than printing help
     # (DESIGN_cli_noargs.md §a3).
     journal_parser.set_defaults(func=run_journal)
-    # `tm journal 5a0e` is the short form of `tm journal show 5a0e`: `prune` stays a
+    # `sm journal 5a0e` is the short form of `sm journal show 5a0e`: `prune` stays a
     # real sub-command, which is what keeps it from being read as a run id (§7).
     journal_parser.set_defaults(_fallback_subcommand="show")
     journal_parser.add_argument(

@@ -142,7 +142,7 @@ class Setting:
 
 def _reset_model_cache() -> None:
     """Drops the model the OpenRouter client resolved on first use — one process serves
-    many commands in `tm shell` and in the bot (DESIGN_model_selection.md §3.1)."""
+    many commands in `sm shell` and in the bot (DESIGN_model_selection.md §3.1)."""
     from stamind.openrouter import openrouter_client
     openrouter_client.reset_model()
 

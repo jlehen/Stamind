@@ -1,4 +1,4 @@
-"""The intensity half of `tm progress`: time in zone, by week and by mesocycle
+"""The intensity half of `sm progress`: time in zone, by week and by mesocycle
 (DESIGN_intensity_distribution.md §9.6).
 
 It lives here rather than in `analytics/zone_tables.py` because it aligns row for row
@@ -270,7 +270,7 @@ def zone_section(
     if low:
         footer.extend(_legend(
             f"{', '.join(low)} omitted (under {ZONE_SPORT_MIN_SHARE * 100:.0f}% of "
-            f"volume) — name them to see: tm progress {low[0]}"
+            f"volume) — name them to see: sm progress {low[0]}"
         ))
     if hidden_weeks:
         footer.append(f"+{hidden_weeks} more weeks (--weeks all)")
@@ -284,7 +284,7 @@ def unknown_sport_preferences(preferences: Sequence[str]) -> List[str]:
     A warning and not an error: `SPORT_MAPPING` has no `swimming` or `rowing` entry and a
     genuinely new sport must still round-trip. Emitted here, where the list is consumed,
     and not in `Config.__init__` — `config.py` has no validation pass and is imported in
-    every process, so a warning there would greet `tm --help`, the Telegram bot and the
+    every process, so a warning there would greet `sm --help`, the Telegram bot and the
     web app alike, none of which read this list.
     """
     import difflib

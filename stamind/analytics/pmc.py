@@ -180,7 +180,7 @@ def color_load_ratio(ratio: float) -> str:
 # CTL(yesterday) - ATL(yesterday) (training_load.md §1) while CTL/ATL are today's. This
 # lag is correct (matching TrainingPeaks) but reads as an arithmetic error, so this
 # one-line footnote rides wherever TSB is surfaced (per-day prompt lines, coach summary,
-# tm status). Lives here — not in coach.formatting — because both the CLI and the coach
+# sm status). Lives here — not in coach.formatting — because both the CLI and the coach
 # layer render it.
 PMC_TSB_LAG_NOTE = (
     "(Note: TSB is CTL(yesterday) - ATL(yesterday), so it won't equal the shown "
@@ -221,7 +221,7 @@ def pmc_cells(
     ctl: Optional[float], atl: Optional[float], tsb: Optional[float]
 ) -> Tuple[str, str, str]:
     """The CTL/ATL/TSB triple as display strings, shared by every user surface that
-    renders it (tm status, data show-metrics, the workout-adapt trajectory).
+    renders it (sm status, data show-metrics, the workout-adapt trajectory).
 
     Feed it the output of `pmc_display_values`, which already blanks warm-up rows.
     A missing value renders "—" and never "0.0": a printed "TSB 0.0" reads as a real

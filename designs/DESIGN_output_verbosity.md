@@ -485,7 +485,7 @@ the number and never the call.
 
 ### 8.4 The one call with no notice
 
-`tm bot route` classifies free text before the real command starts. Its stdout is
+`sm bot route` classifies free text before the real command starts. Its stdout is
 captured by `chat/runner.py`'s `_route_intent` and discarded but for the last JSON line, so a
 notice there reaches nobody and the journal read is pure waste on the hot path of every
 chat message. `complete(..., wait_notice=None)` turns it off, and that value is the
@@ -513,7 +513,7 @@ Three changes, each closing one part of that story:
 - **Keys pressed before the question are dropped.** `TtyPrompt` flushes the terminal's
   pending input before each question. A key pressed before the question was on screen
   cannot be an answer to it. Piped stdin is not a terminal and is left alone, so a
-  scripted `yes | tm ...` still works.
+  scripted `yes | sm ...` still works.
 - **An unclear answer is asked again.** A confirm accepts `y`, `yes`, `n`, `no`, or a blank
   line for the default. Anything else prints "Please answer y or n." and asks again. A
   stray key typed *after* the question, which the flush cannot catch, now costs one

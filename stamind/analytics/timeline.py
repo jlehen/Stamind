@@ -1,7 +1,7 @@
 """The progress payload: mesocycle bands, the warnings, the assembly and the clipping.
 
 `progression.py` computes the series; this module turns them into the one §6.0 payload
-every front-end draws, so `tm progress`, the chart and `/api/timeline.png` cannot
+every front-end draws, so `sm progress`, the chart and `/api/timeline.png` cannot
 disagree about the same day (DESIGN_progress_timeline.md §6.0). Row-in, row-out: the
 fetch that feeds it is `stamind/timeline_rows.py`, which is outside
 `stamind/analytics/` because it reads the database.

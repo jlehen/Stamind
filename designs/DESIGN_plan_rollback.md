@@ -158,10 +158,10 @@ same filter:
 
 So the rule for any view that walks the plan retrospectively: **fix the lineage by
 macrocycle id first, then compare dates.** `stamind/plan_versions.py`'s `plan_lineage()`
-is that walk, shared by `tm progress --mesocycles` (`cli/progress_zones.py`) and the strategy
+is that walk, shared by `sm progress --mesocycles` (`cli/progress_zones.py`) and the strategy
 prompt's planned-vs-actual review (`coach/service/history_context.py`).
 
-**`tm progress --mesocycles` stops the delta at the plan boundary; the strategy prompt does
+**`sm progress --mesocycles` stops the delta at the plan boundary; the strategy prompt does
 not.** Each mesocycle reports its change against the mesocycle before it, which within one plan is
 the periodization signal proper (DESIGN_intensity_distribution.md §4.1). Across a boundary
 the mesocycle before is the *previous goal's* last one, so the comparison spans a taper, a race
@@ -190,7 +190,7 @@ of them and they mean opposite things:
 | `get_preceding_macrocycle(objective_id)` | the **active** plan of the *previous goal* — what actually governed the earlier dates | retrospective views |
 
 `_mesocycles_in_window` originally called the first while its own docstring warned against
-exactly what the first returns, so `tm progress --mesocycles` reported every mesocycle twice after
+exactly what the first returns, so `sm progress --mesocycles` reported every mesocycle twice after
 any plan regeneration. The rename is the fix that keeps it fixed.
 
 ## 7. CLI & Web
@@ -227,7 +227,7 @@ read-only (ARCHITECTURE.md §8) and 405s every mutating verb, so the `POST /api/
 this design originally shipped is gone — rolling back is a CLI action. What remains is
 `GET /api/plan/versions` and `GET /api/plan/diff`, behind a "Plan versions & compare" panel
 on the strategy card: each kept version with a per-version **Compare** button, and a footer
-pointing at `tm plan rollback --macrocycle <id>`.
+pointing at `sm plan rollback --macrocycle <id>`.
 
 ## 8. Limitations / non-goals
 
@@ -307,5 +307,5 @@ reach and refuse a change that is wholly in the past instead of "restoring" noth
 - **`workout rollback [--batch N] [-y]`** (registered alias `rb`) — undoes change `#N` and
   every change after it, default `#1`. Confirms interactively, naming what it undoes.
 - Web (read-only, like the plan panel above): `GET /api/workouts/batches` feeds a
-  "Workout changes" panel under the schedule; undoing one is `tm workout rollback`, which
+  "Workout changes" panel under the schedule; undoing one is `sm workout rollback`, which
   the panel's footer names.

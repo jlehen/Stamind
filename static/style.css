@@ -1541,7 +1541,7 @@ header {
 .sig-cell.lvl5 { background: rgba(56,189,248,0.95); }
 .sig-axis { margin-top: 0.4rem; }
 
-/* --- PLAN / BLOCK FEEDBACK (read-only log; written with `tm plan feedback`) --- */
+/* --- PLAN / BLOCK FEEDBACK (read-only log; written with `sm plan feedback`) --- */
 .strategy-feedback { margin: 0.5rem 0 0.75rem 0; }
 .cycle-details-feedback { margin-top: 0.75rem; }
 .pf-note { margin-bottom: 0.4rem; }

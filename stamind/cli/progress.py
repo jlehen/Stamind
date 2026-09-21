@@ -1,4 +1,4 @@
-"""`tm progress` — the projected Performance Management Chart, numbers-first
+"""`sm progress` — the projected Performance Management Chart, numbers-first
 (DESIGN_progress_timeline.md §7.1).
 
 This file is the command: the argparse tree, the handler, the chart delivery, and
@@ -38,7 +38,7 @@ def render_progress(
     payload: Dict[str, Any], weeks_window: Any, explain: bool = False,
     zone_opts: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
-    """The complete `tm progress` text output (§7.1) as a list of lines, built purely
+    """The complete `sm progress` text output (§7.1) as a list of lines, built purely
     from the `assemble_timeline` payload — no DB, unit-testable. Width-agnostic here;
     `run_progress` wraps prose lines through `wrap_text` and the table is already
     fixed-width. `weeks_window` is a positive int or `'all'` and windows *both*
@@ -313,7 +313,7 @@ def add_progress_parser(subparsers, pull_bypass_parser):
     progress_parser.add_argument(
         "sports", nargs="*", metavar="SPORT",
         help="Canonical sports to report intensity for, one table each in the order "
-             "given (e.g. 'tm progress running cycling'). Implies --zones. Without "
+             "given (e.g. 'sm progress running cycling'). Implies --zones. Without "
              "them, --zones covers every sport preference with zone data in the window "
              "that holds at least 10%% of its duration, in config order; the rest are "
              "named in the footer."

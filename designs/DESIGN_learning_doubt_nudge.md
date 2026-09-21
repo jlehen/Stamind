@@ -357,7 +357,7 @@ With §6, no answer loses anything for good, so the guardrail holds without a co
 There is no push in expert mode, and the question is queued all the same. The operator
 meets it in the queue hint that `status` and `workout adapt` print while something waits,
 and at the end of the reflect or bootstrap run that queued it, which prints the same
-two-line hint where the end-of-run prompt used to be. `tm queue answer` goes through it at a
+two-line hint where the end-of-run prompt used to be. `sm queue answer` goes through it at a
 terminal, and the expert chat types `queue answer`.
 
 The expert wording is the learning as the coach stores it, with the step the proposal asks
@@ -370,7 +370,7 @@ Week of 2026-09-07: HRV fell after both doubles and the second session was cut s
 Still fits keeps it and overrules those weeks. Not really demotes it.
 ```
 
-The first line is what `tm queue` lists. A retirement's first line ends in "→ retire", and
+The first line is what `sm queue` lists. A retirement's first line ends in "→ retire", and
 its last line says not really archives it. `learnings list` keeps its `⚠` line, and
 `learnings keep` and `learnings demote` still settle a proposal by hand; the waiting
 question then closes as stale.

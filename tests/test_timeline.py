@@ -194,7 +194,7 @@ class TestClipPayload(unittest.TestCase):
 
 
 class TestClipPayloadForWeeks(unittest.TestCase):
-    """`cap_future` is what keeps `tm progress --chart` framing the same span its
+    """`cap_future` is what keeps `sm progress --chart` framing the same span its
     text table does (DESIGN_progress_timeline.md §7.1)."""
 
     def _payload(self, plan_end):

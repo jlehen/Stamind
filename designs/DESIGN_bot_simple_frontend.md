@@ -95,9 +95,9 @@ them. Tapping:
 
 ### 4.2 Where the content comes from
 
-A new hidden CLI family (`tm bot ...`, hidden like other maintenance commands):
+A new hidden CLI family (`sm bot ...`, hidden like other maintenance commands):
 
-- `tm bot morning` — renders the morning message for today (reusing the `workout list
+- `sm bot morning` — renders the morning message for today (reusing the `workout list
   -d today` data path and the §6 renderer) and emits the button row via a new sentinel
   (§4.4). **Idempotent:** it records `push_morning_last = YYYY-MM-DD` in the `settings`
   table and exits silently when already sent today. All push state therefore lives in
@@ -111,7 +111,7 @@ trained" cannot mean one thing in the day view and another in the push. `done` a
 surfaces read them. A grading failure degrades exactly like the adaptation below: an
 aside on the terminal, the schedule briefed as stored, never a sunk push.
 
-When `adapt-first` is on (default **off**), `tm bot morning` first runs
+When `adapt-first` is on (default **off**), `sm bot morning` first runs
 the daily adaptation non-interactively (`workout adapt -y`, so no prompt can strand a
 scheduled run) and then renders the result — the push reflects overnight signals, and
 an applied change surfaces as its one reason line ("Eased today — rough night."). Off,
@@ -128,7 +128,7 @@ a morning.
 
 An asyncio task inside the bot (`python-telegram-bot` is installed without the
 job-queue extra, and a sleep-until-next-fire loop needs no dependency): compute the next
-`morning-time` (default `08:00`), sleep, spawn `tm bot morning` through
+`morning-time` (default `08:00`), sleep, spawn `sm bot morning` through
 the ordinary `_start_command` path, repeat. Missed fires (machine asleep, bot down) are
 caught up on startup/wake by the same rule: run it if the time is past but before the
 deadline (default `15:00`), otherwise skip the day — a workout briefing at 9 PM is noise.
@@ -144,19 +144,19 @@ one-session-per-chat gate as typed commands (`sessions` dict) and simply retries
 minutes later if the chat is busy.
 
 Amended 2026-09-14 (DESIGN_strength_tracking.md §11): after deciding it is not a silent
-morning, `tm bot morning` runs the recent-data refresh a read command runs, whatever
+morning, `sm bot morning` runs the recent-data refresh a read command runs, whatever
 `adapt-first` says and whether or not a session is planned today, then reads the new strength
 sets. A question about yesterday's sets is queued before the walk the push opens at its end.
 A failure briefs what is stored.
 
 Amended 2026-09-14 (DESIGN_athlete_queue.md §6.5): every wake first asks the database
-whether a queued item's reminder time has passed. If one has, it runs `tm bot queue
+whether a queued item's reminder time has passed. If one has, it runs `sm bot queue
 --remind` and waits for it to finish before it considers the push, so a reminder due at
 07:58 arrives just ahead of the 08:00 briefing. Reminders go out whatever the persona and
 whether or not the push is on, and wait for the next wake while the chat is busy.
 
 Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §3.1): in companion mode, from Wednesday
-to Sunday, the first wake after 03:00 on the athlete's clock also starts `tm data reflect
+to Sunday, the first wake after 03:00 on the athlete's clock also starts `sm data reflect
 --auto`, once a day. It runs as a process of its own outside the chat, like the router:
 nothing is posted, the chat is not busy, the scheduler does not wait for it, and its output
 goes to the journal. The expert persona has no nightly reflect.
@@ -236,7 +236,7 @@ not a documentation gap. Collapse the behaviours instead of writing better copy.
 ### 5.3 The free-text router
 
 Free text (anything that isn't a button label) goes to a small intent router
-instead of today's "Couldn't parse that". A new hidden command `tm bot route "<text>"`
+instead of today's "Couldn't parse that". A new hidden command `sm bot route "<text>"`
 calls the router model with a fixed intent table and returns structured JSON; the bot
 maps the intent back to argv **from its own table** and runs it. The model picks an
 intent and slots; it never authors argv, so a hostile or confused message cannot reach
@@ -268,7 +268,7 @@ and keeps the bot importable without LLM plumbing.
 
 ### 5.4 The router model
 
-A *role*, read by `tm bot route` only: the `router-model` setting, seeded by
+A *role*, read by `sm bot route` only: the `router-model` setting, seeded by
 `llm.router_model` in config.yaml (DESIGN_settings.md). Unset → the active coaching model,
 so an install that never configured one gets no surprise second model.
 
@@ -279,7 +279,7 @@ holds which role.
 
 ### 5.5 Constraints and signals in chat
 
-"Show my rules" / "I can run again" route to a hidden `tm bot constraints`: the
+"Show my rules" / "I can run again" route to a hidden `sm bot constraints`: the
 current-and-upcoming directives in companion prose (day words, no IDs or tier tags)
 plus a §4.4 button picker whose leaves each send the deterministic `constraint rm
 <id>`. The model only ever picks the *intent*; which row is removed is decided by the
@@ -330,7 +330,7 @@ and the confirmation lines teach the way back.
 a persistent reply keyboard on the client until a `ReplyKeyboardRemove` tells it
 otherwise, so a bot restarted into `telegram.ui: expert` leaves six live companion
 buttons on a phone whose bot no longer understands them: the label reached the expert
-path, was shlex-split into argv, and came back as `tm: error: argument <command>:
+path, was shlex-split into argv, and came back as `sm: error: argument <command>:
 invalid choice: '🗓'` (observed 2026-09-02, all six buttons). A label arriving in expert
 mode is therefore read as what it is — the athlete is looking at the companion — and
 switches the persona back, silently, before the tap runs. Silently because the switch is
@@ -517,7 +517,7 @@ Each phase ships alone; her onboarding starts at phase 1.
   their object against CLI-given rows, previewed from the real row, tap-confirmed;
   goal delete means archive (`goal rm`, `--purge` unreachable from chat); settings
   are routable only over the §12.7 key allowlist. The capture family stays hidden
-  under `tm bot` (option A) — promoting free-text authoring to public CLI flags
+  under `sm bot` (option A) — promoting free-text authoring to public CLI flags
   (`constraint add -m`) is a possible later, purely additive step.
 - Review amendments (2026-09-02, §12): every persisted capture ends with the adjust
   offer — signals included, because the athlete reporting one expects forward notice;
@@ -740,7 +740,7 @@ anything plan-shaping, expensive, or irreversible.
 `bot route` stays exactly as dumb as it is — one intent, no slots (it reads the goal
 and rule titles beside the message since 2026-09-09, §5.3, and still answers with one
 intent). A write intent then
-runs a second hidden command, `tm bot capture <intent> "<text>"`, whose one LLM call is
+runs a second hidden command, `sm bot capture <intent> "<text>"`, whose one LLM call is
 domain-focused: it sees only the fields its intent can fill, plus today's date and
 weekday so "next Friday" resolves, plus (for edits, §12.4) the current rows to nominate
 from. Two small calls instead of one do-everything prompt, because the classifier's job
@@ -919,7 +919,7 @@ is neither, and stays behind the §7 line.
 
 ### 12.6 Calling a goal off: the goals picker
 
-`remove_goal` mirrors `remove_constraint`: a hidden `tm bot goals` renders the active
+`remove_goal` mirrors `remove_constraint`: a hidden `sm bot goals` renders the active
 goals in companion prose and attaches a picker whose leaves send `goal rm <id>`. Since
 `goal rm` archives (the reversible-deletes pass; the hard cascade lives behind
 `--purge`, which neither the router nor any button can reach — the typed `/` expert

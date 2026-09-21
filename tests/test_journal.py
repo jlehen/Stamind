@@ -4,7 +4,7 @@ rather than run it.
 
 `JournalTestCase` below is the harness the whole family shares; the other
 three modules import it. What one run records is `test_journal_run.py` and
-`test_journal_records.py`; `tm journal` reading it back is
+`test_journal_records.py`; `sm journal` reading it back is
 `test_journal_command.py`.
 """
 import ast
@@ -106,7 +106,7 @@ class TestWriter(JournalTestCase):
 
     def test_the_day_file_is_named_for_the_utc_day_not_the_athletes(self):
         # §4: naming the file from the athlete's zone would build and migrate the
-        # database, on `tm help` and in the path that must survive it being unreachable.
+        # database, on `sm help` and in the path that must survive it being unreachable.
         journal.record("note", "x")
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         self.assertEqual(

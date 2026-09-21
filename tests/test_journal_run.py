@@ -277,7 +277,7 @@ class TestRunBracket(JournalTestCase):
         self.assertEqual(journal.current(), None)
 
     def test_a_spawned_process_inherits_the_parent_run_and_its_own_source(self):
-        journal.start_run(["tm-bot"], source="bot")
+        journal.start_run(["sm-bot"], source="bot")
         env = journal.child_env({"STAMIND_PARENT_RUN": "stale"}, "push")
         self.assertEqual(env["STAMIND_PARENT_RUN"], journal.current_id())
         self.assertEqual(env["STAMIND_SOURCE"], "push")

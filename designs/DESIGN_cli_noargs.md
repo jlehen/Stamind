@@ -287,7 +287,7 @@ wrapping here goes through `_fill`, which turns that off.
 name, which at chat width leaves a handful of columns per line — narrow mode
 re-flows the whole line at a flat two-space indent instead. And the program name
 itself was `sys.argv[0]`: nobody types `stamind_cli.py`, so the parser is built
-with `prog="tm"`, the launcher's real name and 14 columns shorter.
+with `prog="sm"`, the launcher's real name and 12 columns shorter.
 
 `test_help_wraps_to_the_client_width` (tests/test_cli_misc.py) asserts the whole
 message — usage, description, options — fits at both 80 and 48 columns.

@@ -624,7 +624,7 @@ So the concept lives in exactly three places:
 2. **The science guidelines**, as the defaults above.
 3. **`progression.weekly_aggregates`**, the one place the app makes weeks concrete. It
    aggregates planned-vs-actual load into **Monday-commencing** weeks and labels each week
-   with the mesocycle that has the majority overlap. `tm progress` and the mesocycle-progress
+   with the mesocycle that has the majority overlap. `sm progress` and the mesocycle-progress
    prompt section both read it, so the week planner and the athlete can never read different
    numbers.
 
@@ -929,7 +929,7 @@ An athlete has a marathon on 2026-11-15.
 **1. The goal.**
 
 ```
-./tm goal add "Autumn Marathon" 2026-11-15 running
+./sm goal add "Autumn Marathon" 2026-11-15 running
 ```
 
 One row in `objectives`. `date_type` defaults to `event`, so the plan will peak and taper
@@ -938,7 +938,7 @@ into that date. `goal_state()` reports `upcoming`. Nothing else exists yet.
 **2. The plan.**
 
 ```
-./tm plan generate
+./sm plan generate
 ```
 
 The plan window runs from today to 2026-11-15. Stamind assembles the science guidelines,
@@ -960,7 +960,7 @@ repaired for contiguity if the model left a gap. **No workouts yet.**
 **3. The sessions.**
 
 ```
-./tm workout generate
+./sm workout generate
 ```
 
 Nothing is scheduled yet, so the span opens today and runs 28 days — that lands entirely
@@ -976,7 +976,7 @@ described in the model's `reasoning` prose. It is stored as neither.
 **4. A bad morning.**
 
 ```
-./tm workout adapt
+./sm workout adapt
 ```
 
 HRV is down, sleep was poor. Adapt reads the backward metrics window and may rewrite
@@ -991,7 +991,7 @@ decides nothing needs to change, the change row is still written, flagged `held`
 **5. Three weeks later, the schedule runs out.**
 
 ```
-./tm workout generate
+./sm workout generate
 ```
 
 The last scheduled session is 2026-09-18, so this run opens on 2026-09-19 and runs 28
@@ -1004,8 +1004,8 @@ the mesocycle.)
 **6. A trip in October.**
 
 ```
-./tm constraint add "Work trip, no bike" --start 2026-10-12 --end 2026-10-16
-./tm workout generate -m 7
+./sm constraint add "Work trip, no bike" --start 2026-10-12 --end 2026-10-16
+./sm workout generate -m 7
 ```
 
 The constraint is dated inside Specific Preparation — too far off for adapt to reach, too
@@ -1019,8 +1019,8 @@ because its whole remaining window sat inside what was written.
 **7. Second thoughts about the plan.**
 
 ```
-./tm plan feedback -m "Base Building" "This mesocycle is too long — I plateau after four weeks"
-./tm plan generate
+./sm plan feedback -m "Base Building" "This mesocycle is too long — I plateau after four weeks"
+./sm plan generate
 ```
 
 The note goes into the append-only log against the active version. Because a note is
@@ -1034,7 +1034,7 @@ They only change when `workout generate` runs again.
 **8. Regret.**
 
 ```
-./tm plan rollback
+./sm plan rollback
 ```
 
 Version 1 becomes active again. Every workout change made after version 1's newest write
@@ -1045,7 +1045,7 @@ follows. Version 1's feedback notes are pending once more.
 **9. The race is cancelled.**
 
 ```
-./tm goal rm 3
+./sm goal rm 3
 ```
 
 The goal is called off. One `stand-down` change voids every upcoming session tagged with

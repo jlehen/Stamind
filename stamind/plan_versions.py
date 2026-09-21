@@ -338,7 +338,7 @@ def delta_baseline(
 
     A delta across a plan boundary compares last season's taper with this season's base,
     which is not the intensity-creep signal the delta carries — so the boundary mesocycle
-    simply reports no change. `tm progress --mesocycles` only: the strategy prompt wants the
+    simply reports no change. `sm progress --mesocycles` only: the strategy prompt wants the
     cross-season comparison and indexes the list itself (DESIGN_plan_rollback.md §6.1).
     """
     if not i:

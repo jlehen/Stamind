@@ -2,7 +2,7 @@
 
 Each function imports the library when it is called, never at module scope. That is what
 keeps every other module under `stamind/chat/` importable — and unit-testable — without
-the library installed, and what keeps `tm bot route` from dragging a chat front-end onto a
+the library installed, and what keeps `sm bot route` from dragging a chat front-end onto a
 command line. `tests/test_layering.py` holds the rule.
 
 The inline-keyboard builder is also the one copy of an expression the front-end used to

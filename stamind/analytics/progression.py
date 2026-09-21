@@ -8,7 +8,7 @@ into the payload a front-end draws.
 
 The past half is **read, not recomputed** (§4): CTL/ATL/TSB for days before today come
 verbatim from the stored `athlete_metrics_cache` rows `analytics.pmc.compute_pmc` wrote, so
-`tm progress` and `tm status` never disagree about the same day's fitness. The future
+`sm progress` and `sm status` never disagree about the same day's fitness. The future
 half is an *anchored fold*: the same recurrence folded forward from the latest stored
 row over the merged daily loads — measured past → planned future.
 

@@ -2,7 +2,7 @@
 
 The list of kinds, the walk and the actions. The queue knows nothing about what an item
 asks: each kind brings its wording, its check and what its answers do (§8). `message`, the
-operator's note from `tm queue tell`, is the first kind and the smallest one.
+operator's note from `sm queue tell`, is the first kind and the smallest one.
 """
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple

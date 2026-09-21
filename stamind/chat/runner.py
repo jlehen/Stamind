@@ -31,10 +31,10 @@ CLI_PATH = os.path.join(
     "stamind_cli.py",
 )
 
-# Exit code that tells the tm-bot supervisor to relaunch us (rather than exit for
+# Exit code that tells the sm-bot supervisor to relaunch us (rather than exit for
 # good). Arbitrary, borrowed from EX_TEMPFAIL in sysexits.h — just needs to not
 # collide with Python's own exit code for uncaught exceptions (1). Must match the
-# supervisor's RESTART_EXIT_CODE in tm-bot.
+# supervisor's RESTART_EXIT_CODE in sm-bot.
 RESTART_EXIT_CODE = 75
 
 # Bounds every blocking step of a /restart teardown (an open prompt's subprocess
@@ -225,7 +225,7 @@ class RunnerMixin:
         return session
 
     async def _route_intent(self, text: str) -> str:
-        """Runs `tm bot route` silently — output captured here, never streamed to the
+        """Runs `sm bot route` silently — output captured here, never streamed to the
         chat — and returns the intent, 'unclear' on any failure or timeout (§5.3)."""
         proc = None
         try:

@@ -132,7 +132,7 @@ meaningful. Resolution happens on first use — after the DB exists, and after a
 Because the resolved value is cached, the registry's `on_change` hook for `coach-model`
 calls `openrouter_client.reset_model()` to drop it — a set and a reset both change what the
 next call should resolve to. One CLI invocation is one process, so this matters only in the
-REPL (`tm shell`), where many commands share a process and the athlete reasonably expects a
+REPL (`sm shell`), where many commands share a process and the athlete reasonably expects a
 model change to take effect on the very next line.
 
 ### §3.2 — The resolver module

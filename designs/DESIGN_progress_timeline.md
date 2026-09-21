@@ -50,7 +50,7 @@ the *presentation*-side view of past **and future**)
 > answer a different question from the load table.
 > (7) Leftovers: `zero_load_workout_count` is dated from today, so a past row
 > nobody can fix no longer keeps the banner permanently lit; the FORM line prints
-> CTL/ATL at one decimal to match the TSB beside it and `tm status`; the config
+> CTL/ATL at one decimal to match the TSB beside it and `sm status`; the config
 > `sport_preferences` check only runs when zone tables are asked for; and
 > `--mesocycles` no longer crashes on `get_previous_macrocycle()` (its hand-rolled
 > test stub had the wrong signature, so the suite passed while the flag died on
@@ -100,7 +100,7 @@ the *presentation*-side view of past **and future**)
 > rule, which keeps the `created_at` pin (§6.1) — that half is load-bearing.
 > (3) **Branch-state inventory** (§10.1): the rev-4 snapshot on this branch
 > already implements parts of §10 in older form (public `planned_load`, the
-> photo transport, `tm progress` + menu entry, the `p`-alias removal,
+> photo transport, `sm progress` + menu entry, the `p`-alias removal,
 > matplotlib in requirements, `--chart`); the rollout now says per step what
 > is done, what is reworked, and what is new — so nobody hunts for a
 > `_planned_load` that is already public. Stale references fixed (rounding
@@ -114,7 +114,7 @@ the *presentation*-side view of past **and future**)
 > anchoring the fold on it silently dropped today's planned session from the
 > projection (~12 TSB too optimistic per 100-TSS session) and made the CLI
 > (which pulls) disagree with the pure-reader endpoint. Today is now always
-> fold territory per the §3 today-rule; the `tm status` ≡ `tm progress`
+> fold territory per the §3 today-rule; the `sm status` ≡ `sm progress`
 > invariant is correspondingly restated: TSB always identical, CTL/ATL
 > identical once today's load has synced, and the FORM line tags today's
 > source (§7.1). (2) **Full-precision storage.** `compute_pmc()` stops
@@ -150,10 +150,10 @@ the *presentation*-side view of past **and future**)
 > (`DESIGN_pmc_fitness_fatigue.md`, merge `ca8591b`): `garmin.compute_pmc()` now
 > computes CTL/ATL/TSB over full history on every `recompute_derived()` sweep,
 > stores them on `athlete_metrics_cache`, and surfaces them in the coach prompts,
-> `tm status`, and `tm data show-metrics`. That obsoletes rev 4's §4 ("new math,
+> `sm status`, and `sm data show-metrics`. That obsoletes rev 4's §4 ("new math,
 > additive"): this feature no longer computes anything about the *past* — it
 > reads the stored series (recomputing under different conventions would make
-> `tm progress` disagree with `tm status` on the same day's CTL, a variant of
+> `sm progress` disagree with `sm status` on the same day's CTL, a variant of
 > the very seam-lie §3 exists to prevent) — and its projection becomes a forward
 > fold of the same recurrence seeded from the last stored row, which is exactly
 > the PMC design's deferred **Phase 2**, generalized from one event-day number
@@ -187,7 +187,7 @@ positive form on race day*. Below it, weekly planned-vs-actual load bars
 labeled by mesocycle make the periodization wave and adherence visible at a
 glance.
 
-V1 ships on **all three front-ends**: `tm progress` (text, numbers-first),
+V1 ships on **all three front-ends**: `sm progress` (text, numbers-first),
 Telegram (same text for free via CLI parity, plus the full chart as a PNG
 photo), and a web **Progress** tab that frames the **same PNG** (the
 interactive rendering is a follow-on, §8.5). One computation (§5) and one
@@ -201,9 +201,9 @@ Stamind holds both halves of the progression story but never draws them in
 one place:
 
 - The **past** is visible as tables (`workout compare`, the History tab) and —
-  since the PMC merge — as *today's* CTL/ATL/TSB numbers (`tm status`, the
+  since the PMC merge — as *today's* CTL/ATL/TSB numbers (`sm status`, the
   coach prompts). But there is still no trend: "am I fitter than in April?"
-  means scanning `tm data show-metrics` rows and integrating by eye.
+  means scanning `sm data show-metrics` rows and integrating by eye.
 - The **future** is visible only as a list of workouts and a mesocycle
   strategy blob — the periodization wave (build/recover, volume ramp) exists
   in the data (every planned workout carries `tss`) but the user cannot *see*
@@ -346,7 +346,7 @@ the row is partial and the footnote says *why*.
 - *No completed activities at all* (fresh install — a plan may already be
   generated) → no past series and no PMC (no anchor, §4), but the planned
   future still renders: weekly bars for planned weeks, PMC panel suppressed,
-  and the warning "no activity history yet — run `tm data pull` first" on
+  and the warning "no activity history yet — run `sm data pull` first" on
   every surface. A blank tab would be strictly less useful than showing the
   plan about to start. (Rev 5 said "empty `days`/`weeks`", contradicting
   §4's "the weekly bars don't depend on PMC and render regardless" — the §4
@@ -415,13 +415,13 @@ TSB_d = CTL_{d-1} − ATL_{d-1}          (form going *into* day d)
 
 and `recompute_derived()` stores the result on `athlete_metrics_cache`
 (`ctl`/`atl`/`tsb` columns, full-sweep on every pull/backfill/wipe path). Those
-stored numbers already reach the coach prompts, `tm status`, and `tm data
+stored numbers already reach the coach prompts, `sm status`, and `sm data
 show-metrics`. This feature therefore computes **nothing new about the past**
 and gains a hard consistency requirement instead:
 
 - **Past half: read, don't recompute.** Past DayPoints — dates strictly
   before today; today belongs to the fold below — take `ctl`/`atl`/`tsb`
-  verbatim from the stored metrics rows. `tm progress` and `tm status` must
+  verbatim from the stored metrics rows. `sm progress` and `sm status` must
   show the *same* CTL for the same past day — two implementations of
   "fitness on day d" disagreeing across commands would be a variant of the
   seam-lie §3 exists to prevent. (For *today*, where the fold deliberately
@@ -835,7 +835,7 @@ order follows usage:
 CLI first (§10), which also honours the existing convention that the web API
 *tracks* the CLI feature set (ARCHITECTURE §8), rather than inverting it.
 
-### 7.1 CLI: `tm progress`
+### 7.1 CLI: `sm progress`
 
 New command family `stamind/cli/progress.py` (`run_progress`) + dispatcher
 entry in `stamind_cli.py`. **No registered alias**: `progress` is reachable by
@@ -886,20 +886,20 @@ objective line, wrapped inside the same width budget:
 - **The FORM line shows today per the §4 fold** — and tags where today's
   load came from: `FORM today (actual)` once today's activity has synced,
   `FORM today (planned)` while the fold is counting the planned session in
-  its place. Presentation conventions are `tm status`'s, reused not
+  its place. Presentation conventions are `sm status`'s, reused not
   reimplemented: same `color_tsb`, same one-decimal CTL/ATL, same
   `PMC_TSB_LAG_NOTE` footnote wherever TSB is printed (the PMC design's §6.1
-  conventions). **No ramp figure**, though `tm status` prints one: the 48-column
+  conventions). **No ramp figure**, though `sm status` prints one: the 48-column
   line has no room for a fourth number, and the CTL trend it would summarise is
   already the sparkline directly below it. The consistency contract with
-  `tm status` (pinned by tests, §9): **TSB today is always identical** (it is
+  `sm status` (pinned by tests, §9): **TSB today is always identical** (it is
   day-entering — computed from yesterday's values, which both commands read
   from the same stored rows); **CTL/ATL today are identical whenever today's
   load has synced** (full-precision storage + the same recurrence make the
   fold reproduce the stored row bit-exactly, §4) and differ *deliberately*
   while a planned session is pending — progress includes it, status shows
   the stored load-0 snapshot; the `(planned)` tag is what keeps that honest
-  rather than confusing. `tm status` stays the snapshot; `tm progress` adds
+  rather than confusing. `sm status` stays the snapshot; `sm progress` adds
   the trajectory and the projection.
 - **Warm-up states** (§4): on a young DB the FORM line and projection are
   replaced by the still-warming message (mirroring the status line), and the
@@ -1017,7 +1017,7 @@ objective line, wrapped inside the same width budget:
 No bot-native command; both paths ride the CLI-as-subprocess parity model
 (ARCHITECTURE §2), which is what makes them cheap:
 
-- **Text:** `/progress` in chat just runs `tm progress`; the width-aware
+- **Text:** `/progress` in chat just runs `sm progress`; the width-aware
   renderer (§7.1) is the whole story. `MENU_COMMANDS` in
   `stamind/chat/keyboards.py` (hand-synced by design) gains a `progress` entry.
 - **Chart:** `/progress --chart` renders the full §2 two-panel picture to
@@ -1143,7 +1143,7 @@ additive:
    each, not just the first), a per-zone weekly table stacked under the
    WEEKLY LOAD table, and `--mesocycles` for the graded per-mesocycle view.
    **Behind `-z`/`--zones` since rev 9** (naming a sport implies it): on real
-   data the tables took `tm progress` from 27 lines to 96 at phone width, and
+   data the tables took `sm progress` from 27 lines to 96 at phone width, and
    they answer a different question from the load table they sit under — the
    command's own answer to "am I on track" must stay readable without them. It
    scopes only the intensity content: CTL/ATL/TSB, the projection and the
@@ -1289,7 +1289,7 @@ implementing §10.2 from scratch — several steps are already partly done.
   `stamind/prompt.py`; the frame reader, the `_drive()` photo branch and the
   unknown-sentinel drop, now `stamind/sentinels.py` and `stamind/chat/runner.py`;
   the bot tests.
-- `tm progress` dispatcher entry in `stamind_cli.py` (no alias — the
+- `sm progress` dispatcher entry in `stamind_cli.py` (no alias — the
   prefix mechanism covers it, §7.1); the
   `p` alias for `plan` is **already removed** (rev 6 cited its pre-snapshot
   line 708 — stale; nothing left to do); the `MENU_COMMANDS` `progress`
@@ -1334,7 +1334,7 @@ Ordered by usage (CLI/bot before web), each step independently shippable:
    `tests/test_pmc.py` updates, §9); rework `stamind/analytics/progression.py` +
    `tests/test_progression.py` per §10.1 (incl. `assemble_timeline`, §5);
    the `tss is not None` fix in `adherence.planned_load` (§3).
-2. Rework `tm progress` text mode to this rev (`stamind/cli/progress.py`
+2. Rework `sm progress` text mode to this rev (`stamind/cli/progress.py`
    + formatting-helper tests, §9). Telegram text follows via parity; the
    dispatcher/alias/menu work is already done (§10.1).
 3. Extract `stamind/analytics/chart.py` from the snapshot's `_render_chart_png`

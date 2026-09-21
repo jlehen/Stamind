@@ -150,7 +150,7 @@ def callback_update(query: _FakeQuery, chat_id: int = 42):
 
 
 def routes_to(chat_bot: ChatBot, intent: str):
-    """Makes `tm bot route` answer `intent`, without running the CLI to ask it."""
+    """Makes `sm bot route` answer `intent`, without running the CLI to ask it."""
     async def route(_text):
         return intent
 

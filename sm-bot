@@ -7,7 +7,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Must match RESTART_EXIT_CODE in stamind/chat/runner.py.
 RESTART_EXIT_CODE=75
 
-if [ "$TM_BOT_SUPERVISED" = "1" ]; then
+if [ "$SM_BOT_SUPERVISED" = "1" ]; then
     # Worker: today's venv-check-and-exec, untouched.
     if [ ! -d "$SCRIPT_DIR/venv" ]; then
         echo "Initializing virtual environment..."
@@ -29,7 +29,7 @@ child_pid=""
 
 _on_signal() {
     sig="$1"
-    echo "tm-bot: supervisor got SIG$sig, stopping worker..."
+    echo "sm-bot: supervisor got SIG$sig, stopping worker..."
     if [ -n "$child_pid" ]; then
         kill -TERM "$child_pid" 2>/dev/null || true
         for _ in 1 2 3 4 5; do
@@ -46,18 +46,18 @@ _on_signal() {
 trap '_on_signal INT' INT
 trap '_on_signal TERM' TERM
 
-echo "tm-bot: supervisor starting (pid $$)"
+echo "sm-bot: supervisor starting (pid $$)"
 while true; do
-    echo "tm-bot: launching worker..."
-    TM_BOT_SUPERVISED=1 "$0" "$@" &
+    echo "sm-bot: launching worker..."
+    SM_BOT_SUPERVISED=1 "$0" "$@" &
     child_pid=$!
     rc=0
     wait "$child_pid" || rc=$?
     child_pid=""
     if [ "$rc" -eq "$RESTART_EXIT_CODE" ]; then
-        echo "tm-bot: worker requested restart (exit $rc), relaunching..."
+        echo "sm-bot: worker requested restart (exit $rc), relaunching..."
         continue
     fi
-    echo "tm-bot: worker exited (code $rc); supervisor stopping."
+    echo "sm-bot: worker exited (code $rc); supervisor stopping."
     exit "$rc"
 done

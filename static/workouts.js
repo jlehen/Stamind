@@ -32,7 +32,7 @@ async function fetchWorkouts() {
 
         if (workouts.length === 0) {
             container.innerHTML = `<div class="item-meta" style="text-align:center; padding: 2rem;">`
-                + `No workouts in range. Generate some with 'tm workout generate'.</div>`;
+                + `No workouts in range. Generate some with 'sm workout generate'.</div>`;
             return;
         }
         workouts.forEach(w => container.appendChild(renderWorkoutCard(w)));
@@ -216,7 +216,7 @@ function renderCompare(data) {
 }
 
 // --- Workout changes (see DESIGN_workout_revisions.md §10; undoing one is
-//     `tm workout rollback`) ---
+//     `sm workout rollback`) ---
 
 async function loadWorkoutBatches() {
     const listEl = document.getElementById("workout-batches-list");
@@ -256,7 +256,7 @@ async function loadWorkoutBatches() {
         }).join("");
         listEl.insertAdjacentHTML("beforeend",
             `<div class="cli-guidance"><i class="fa-solid fa-terminal"></i> `
-            + `Undo a change with <code>tm workout rollback</code>.</div>`);
+            + `Undo a change with <code>sm workout rollback</code>.</div>`);
     } catch (e) {
         listEl.innerHTML = `<div class="item-meta">Failed to load batches: ${escapeHtml(e.message)}</div>`;
     }

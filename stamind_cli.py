@@ -79,7 +79,7 @@ def build_parser():
     parser = WrapAwareArgumentParser(
         # Not sys.argv[0]: nobody types 'stamind_cli.py', and every wrapped usage line
         # is indented under it (DESIGN_cli_noargs.md §e).
-        prog="tm",
+        prog="sm",
         description="Stamind - Local Training Coach CLI",
         epilog=PREFIX_HINT,
     )
@@ -158,7 +158,7 @@ def build_parser():
     add_bot_parser(subparsers)
 
     # Read off the tree rather than hand-listed: this was a literal dict and `bot` was
-    # never added to it, so bare `tm bot` printed the top-level help instead of its own.
+    # never added to it, so bare `sm bot` printed the top-level help instead of its own.
     named_subparsers = dict(subparsers.choices)
     sort_command_tree(parser, COMMAND_ORDER)
     return parser, named_subparsers
@@ -168,7 +168,7 @@ def run_once(argv, parser, named_subparsers, source=None) -> None:
     """Parse one command line and dispatch it, bracketed by a journal run.
 
     Shared by ``main`` and the REPL, which is why the bracket lives here rather than in
-    ``main``: ``tm shell`` runs many commands in one process, so a run is a command, not
+    ``main``: ``sm shell`` runs many commands in one process, so a run is a command, not
     a process (DESIGN_logging.md §3). It sits just inside the two existing error
     boundaries, so every failed command records its own traceback with no new handler
     anywhere — the bracket notes the exception and re-raises it unchanged (§5.4).
@@ -233,7 +233,7 @@ def _dispatch(argv, parser, named_subparsers) -> None:
     # fell through simply did nothing.
     handler = getattr(args, "func", None)
     if handler is None and cmd not in TREE_COMMANDS:
-        # A command group invoked bare (`tm goal`): show what it offers. Asked before
+        # A command group invoked bare (`sm goal`): show what it offers. Asked before
         # the run is named, so it drops with the other help-only lines
         # (DESIGN_logging.md §3).
         group = named_subparsers.get(cmd)
@@ -273,7 +273,7 @@ def _repl(parser, named_subparsers) -> None:
           dim(" — type a command, 'help' for the list, 'exit' or Ctrl-D to quit."))
     while True:
         try:
-            line = input(cyan("tm> "))
+            line = input(cyan("sm> "))
         except EOFError:  # Ctrl-D
             print()
             break

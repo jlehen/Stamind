@@ -30,7 +30,7 @@ async function fetchBenchmarks() {
                 + `<div class="threshold-kind">${escapeHtml(t.label)}</div>`
                 + `<div class="threshold-value">${escapeHtml(t.formatted)}</div></div>`).join("") + `</div>`
             : `<div class="item-meta">No thresholds on record. `
-              + `Record a test with 'tm benchmark record'.</div>`;
+              + `Record a test with 'sm benchmark record'.</div>`;
 
         const rows = data.results || [];
         document.getElementById("benchmarks-count").innerText =
@@ -83,7 +83,7 @@ async function fetchLearningsFull() {
         const learnings = data.learnings || [];
         if (!learnings.length) {
             container.innerHTML = `<div class="item-meta" style="padding:1rem;">No learnings match. `
-                + `Run 'tm data bootstrap' (CLI) to seed observations.</div>`;
+                + `Run 'sm data bootstrap' (CLI) to seed observations.</div>`;
             return;
         }
         learnings.forEach(l => container.appendChild(renderLearningRow(l)));
@@ -102,8 +102,8 @@ function renderLearningRow(l) {
     if (l.proposed_confidence) {
         const tgt = l.proposed_confidence === "retire" ? "retire" : l.proposed_confidence;
         proposed = `<div class="learning-proposed">⚠ proposed demotion → ${escapeHtml(tgt)} `
-            + `<span class="item-meta">— resolve with 'tm learnings demote ${l.id}' or `
-            + `'tm learnings keep ${l.id}'</span></div>`;
+            + `<span class="item-meta">— resolve with 'sm learnings demote ${l.id}' or `
+            + `'sm learnings keep ${l.id}'</span></div>`;
     }
     row.innerHTML = `
         <div class="learning-main">
@@ -217,7 +217,7 @@ function renderSignalVocab(metrics) {
     if (!el) return;
     if (!metrics.length) {
         el.innerHTML = `<div class="item-meta">No signals recorded. `
-            + `Add one with 'tm signal add'.</div>`;
+            + `Add one with 'sm signal add'.</div>`;
         return;
     }
     el.innerHTML = metrics.map(m =>

@@ -344,10 +344,10 @@ bug this design would otherwise introduce. `get_workout_by_id` runs
 would happen:
 
 ```
-$ tm workout list
+$ sm workout list
   [42] 2026-08-25  cycling  Long ride (90 min, TSS 110)
-$ tm workout adapt            # row 42 superseded; live ride is now row 87
-$ tm workout show 42
+$ sm workout adapt            # row 42 superseded; live ride is now row 87
+$ sm workout show 42
   [42] 2026-08-25  cycling  Long ride (90 min, TSS 110)
 ```
 
@@ -619,9 +619,9 @@ about which of the two pushes it belongs to, and does not even match its own wri
 | `pushed_signature` | what the last ordinary push sent to Calendar |
 | `adherence_pushed_signature` | what the last `compare --mark` adherence push sent |
 
-Both are skip-the-redundant-write memos. The second one earns its keep on `tm data pull`,
+Both are skip-the-redundant-write memos. The second one earns its keep on `sm data pull`,
 which stamps adherence verdicts onto past events as a ride-along on every pull; without it a
-`tm data pull -d 30d` over a settled range issues thirty identical Calendar writes.
+`sm data pull -d 30d` over a settled range issues thirty identical Calendar writes.
 
 One property that is currently hand-rolled now falls out. `save_workout` deliberately never
 touches `pushed_signature`, so that any content change reads as `stale`. Under revisions the

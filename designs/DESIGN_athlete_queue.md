@@ -2,8 +2,8 @@
 
 **Status:** Implemented · **Date:** 2026-09-14 (rev. 3)
 
-Revision 3 settles the terminal command: a bare `tm queue` lists, `tm queue answer` goes
-through the items, and `tm queue tell` leaves a message, which is also the first thing that
+Revision 3 settles the terminal command: a bare `sm queue` lists, `sm queue answer` goes
+through the items, and `sm queue tell` leaves a message, which is also the first thing that
 can put an item in the queue (§5). It says when the terminal reads the queue (§5.2). "In 1
 day" comes back two minutes before the time of day the item was shown (§4), and the
 scheduler sends reminders before the morning push (§6.5). The check that closes an item is
@@ -177,7 +177,7 @@ would show A again. With A alone in the queue, it would come straight back, fore
 ends with "That's all for now — thanks!". A walk that finds nothing to show sends nothing.
 
 "Next time" means the next walk. The morning push starts one every day it runs (§6.1), and
-`tm queue answer` starts one (§5.1).
+`sm queue answer` starts one (§5.1).
 
 **A reminder brings back one item on its own.** Acting on it ends there: it does not
 continue into the rest of the queue, which waits for the next walk. For "in 1 day", a
@@ -191,14 +191,14 @@ has passed.
 
 ### 5.1 The command
 
-`tm queue` is a command group with three sub-commands. A bare `tm queue` runs `tm queue
+`sm queue` is a command group with three sub-commands. A bare `sm queue` runs `sm queue
 list`. That is the exception DESIGN_cli_noargs.md §a3 already makes for `settings`: a group
 may act bare when it has one read-only view that shows its whole state, and its other
-sub-commands are addressed through that view. `tm queue answer <id>` takes its id from the
+sub-commands are addressed through that view. `sm queue answer <id>` takes its id from the
 list, as `settings set` takes a name from `settings list`.
 
 ```
-$ tm queue
+$ sm queue
 === QUEUE ===
 
   #13  question  Wed Sep 16 08:00  Tue Sep 15 18:10 gym session, sets 1–4: 10, 10, 10, 9 reps @ 100 kg
@@ -213,7 +213,7 @@ $ tm queue
 The questions in these examples come from features that do not exist yet; they show the
 shape. Hidden items are listed after the waiting ones, with the time they come back.
 
-`tm queue list --closed` lists the closed items instead, in the order they closed. Each line
+`sm queue list --closed` lists the closed items instead, in the order they closed. Each line
 shows when the item closed and, at its end, how: answered, dropped, or stale. `-d` picks the
 days they closed on, in the athlete's timezone and in the range grammar every filtering
 command shares (DESIGN_cli_selectors.md §1). With no `-d` it shows the last 7 days. `-d`
@@ -222,7 +222,7 @@ queue and has no days to pick. The queue records when an item closed, not when t
 it: a message sent on Tuesday morning and acknowledged that evening shows the evening.
 
 ```
-$ tm queue list --closed
+$ sm queue list --closed
 === QUEUE · CLOSED 2026-09-10 Thu .. 2026-09-16 Wed ===
 
   #13  question  2026-09-16 Wed 08:04  Tue Sep 15 18:10 gym session, sets 1–4: …  · answered
@@ -232,10 +232,10 @@ $ tm queue list --closed
 3 closed: 2 answered, 1 dropped.
 ```
 
-`tm queue answer` walks the waiting items with the blocking chooser, one at a time:
+`sm queue answer` walks the waiting items with the blocking chooser, one at a time:
 
 ```
-$ tm queue answer
+$ sm queue answer
 
 Question 1 of 4 · #13 · queued Wed Sep 16 08:00
 Tue Sep 15 18:10 gym session, sets 1–4: 10, 10, 10, 9 reps @ 100 kg. What was it?
@@ -276,14 +276,14 @@ is Thursday 21:10.
 
 Enter skips. To leave a walk, press Enter through it or Ctrl-C; every answer already given is
 already written. On piped input or under cron, the chooser's end-of-input rule picks the
-default, so a walk there skips everything and writes nothing. `tm queue answer 19` shows item
+default, so a walk there skips everything and writes nothing. `sm queue answer 19` shows item
 19 alone, whatever its place, and ends after it. An answer can be typed text, like
 "something else…": the chooser asks for the text on the spot, and the kind applies it.
 
-`tm queue tell "<text>"` queues a message:
+`sm queue tell "<text>"` queues a message:
 
 ```
-$ tm queue tell "Charge your watch tonight — long ride tomorrow."
+$ sm queue tell "Charge your watch tonight — long ride tomorrow."
 Queued #19. It goes out with the next morning message, or with 'queue answer'.
 ```
 
@@ -291,7 +291,7 @@ On an instance run for a companion athlete, this is how the operator leaves her 
 it is the only kind in this change: the `message` kind, whose subject is the time it was
 queued (so the same words told twice are two messages), whose payload is the text, and
 which is never stale. It is also what makes the queue checkable by hand before any feature
-adopts it. A message the operator regrets is closed with `tm queue answer <id>` and "got
+adopts it. A message the operator regrets is closed with `sm queue answer <id>` and "got
 it".
 
 In Telegram, the expert persona types the same commands. `queue list` and `queue tell`
@@ -302,7 +302,7 @@ than waiting on a chooser.
 
 The terminal shows the queue in four places and never starts a walk on its own.
 
-`tm queue` and `tm queue list` show everything. `tm queue answer` goes through it.
+`sm queue` and `sm queue list` show everything. `sm queue answer` goes through it.
 
 `status` and `workout adapt` print a two-line hint whenever something is waiting, in the
 same place and the same yellow as the end-of-schedule hint of DESIGN_runway_nudge.md §4.
@@ -346,7 +346,7 @@ Nothing waits. The command that sent the question has already exited. She can ta
 tired" on the briefing, type a message to the router, or leave the question until the
 evening. The question's buttons keep working for as long as the item is waiting.
 
-A message from `tm queue tell` arrives the same way:
+A message from `sm queue tell` arrives the same way:
 
 > 📬 Charge your watch tonight — long ride tomorrow.
 >
@@ -375,7 +375,7 @@ the answers stored with the item, never the answer itself, so it always fits in 
 The bot stores nothing about these buttons. They do not replace the briefing's row, the
 briefing's row does not replace them, and a bot restart loses nothing.
 
-A tap runs `tm bot queue 12 a2 --since 1789538400`, a hidden command beside `bot morning`. It
+A tap runs `sm bot queue 12 a2 --since 1789538400`, a hidden command beside `bot morning`. It
 checks that item 12 is still waiting and still worth asking, applies the action, and sends
 the next item of the walk or the closing line. After a reminder's tap it sends nothing more.
 The walk start is also what "in 1 day" is measured from (§4). A tap while another command is
@@ -519,7 +519,7 @@ text of an item inside fixed wording, and nothing more.
 What an answer writes must be reversible, the same condition DESIGN_bot_simple_frontend.md
 §7 sets for anything a tap can change; each feature shows how its answers are undone. A drop
 writes nothing except that the question is not asked again, and later and skip write only the
-item's place in the queue. `tm queue tell` is a terminal command, not a tap.
+item's place in the queue. `sm queue tell` is a terminal command, not a tap.
 
 ## 10. Deliberately not done
 
@@ -562,7 +562,7 @@ item's place in the queue. `tm queue tell` is a terminal command, not a tap.
   buttons on a busy chat and shows the chosen answer; "Not now" swaps in the three choices;
   each scheduler wake runs `bot queue --remind` when a reminder is due and waits for it
   before the push.
-- `stamind/cli/queue.py`: `tm queue` (bare runs `list`), `list`, `answer [id]`, `tell`, and
+- `stamind/cli/queue.py`: `sm queue` (bare runs `list`), `list`, `answer [id]`, `tell`, and
   the hidden `bot queue` with `--remind`, whose parser entry sits with the other `bot`
   commands in `cli/bot/parser.py`.
 - `stamind/cli/bot/views.py`: `run_bot_morning` starts a walk at its end.

@@ -342,7 +342,7 @@ Diff output has a natural home in existing fields: macro diff →
 >   like a completed one and the next macrocycle ramped from a load the athlete
 >   never reached. Each elapsed mesocycle therefore also carries **one line per week —
 >   planned load beside produced load** — from `progression.weekly_aggregates`, the
->   same computation `tm progress` renders, so the `plan generate` prompt and the athlete can never
+>   same computation `sm progress` renders, so the `plan generate` prompt and the athlete can never
 >   read different numbers for the same week. The in-progress week states raw load
 >   beside its elapsed day count and is never extrapolated
 >   (DESIGN_intensity_distribution.md §9.3).

@@ -1,7 +1,7 @@
 """When the schedule runs out, as a fact the surfaces word themselves.
 
 `plan_end` is the last day the sessions cover, `plan_gap` how far short of the next goal
-the periodization stops, and `runway` the single end-of-schedule answer `tm status`,
+the periodization stops, and `runway` the single end-of-schedule answer `sm status`,
 `workout adapt` and the morning push all dispatch on (DESIGN_runway_nudge.md §2/§3).
 The detector is here and every wording is in `cli/runway.py`, so two surfaces cannot
 disagree about the morning the plan runs out.

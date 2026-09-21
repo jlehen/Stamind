@@ -1,4 +1,4 @@
-"""The load half of `tm progress`: the fitness line and the weekly load table
+"""The load half of `sm progress`: the fitness line and the weekly load table
 (DESIGN_progress_timeline.md §7.1).
 
 Pure formatting over the `assemble_timeline` payload — no database, no dispatch — laid
@@ -118,10 +118,10 @@ def format_form_line(
     """'FORM today (actual)  CTL 55  ATL 61  TSB -6' — the numbers-first answer to
     'am I on track', tagging where today's load came from (§7.1): `(actual)` once
     today's session has synced, `(planned)` while the fold counts the planned session
-    in its place. TSB is coloured by `color_tsb`, reusing `tm status`'s conventions.
+    in its place. TSB is coloured by `color_tsb`, reusing `sm status`'s conventions.
     Returns the still-warming message when today has no PMC value (§4).
 
-    One decimal on all three, matching `tm status` — `color_tsb` has always printed
+    One decimal on all three, matching `sm status` — `color_tsb` has always printed
     TSB to 1 dp, so rounding CTL/ATL to whole numbers beside it made one line carry
     two precisions. Single-space separation keeps the trio inside the 48-col budget."""
     if ctl is None or atl is None or tsb is None:

@@ -12,7 +12,7 @@ as an inline keyboard and writes the answer back to stdin. One in-flight command
 chat, state in ``stamind.chat.runner.Session``, a per-prompt ``nonce`` against stale
 taps.
 
-This file is only the entry point ``tm-bot`` runs. The bot itself is ``ChatBot`` in
+This file is only the entry point ``sm-bot`` runs. The bot itself is ``ChatBot`` in
 ``stamind/chat/app.py``, and the rest of ``stamind/chat/`` holds what one message
 means, what the bot draws, what it sends back, and when the scheduler fires. The telegram
 library is named in one file there, ``chat/telegram_api.py``, and imported only when it is
@@ -20,10 +20,10 @@ called.
 
 ``telegram.ui: simple`` (the default) is the companion persona — reply keyboard, intent
 router, morning scheduler, prose replies; ``expert`` is the raw CLI; ``/ui`` flips it per-process
-(DESIGN_bot_simple_frontend.md). ``tm-bot`` supervises this process and relaunches it on
+(DESIGN_bot_simple_frontend.md). ``sm-bot`` supervises this process and relaunches it on
 ``stamind.chat.runner.RESTART_EXIT_CODE``, which is what ``/restart`` exits with.
 
-Run with: ``./tm-bot`` (or ``venv/bin/python stamind_bot.py``). Configure the token +
+Run with: ``./sm-bot`` (or ``venv/bin/python stamind_bot.py``). Configure the token +
 allowlist under a ``telegram:`` section in config.yaml (see config_template.yaml).
 """
 from stamind.chat.app import ChatBot

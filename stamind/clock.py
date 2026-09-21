@@ -6,7 +6,7 @@ arithmetic on an ISO date — one parser, one range, one shift — which used to
 into seven modules that each wanted a date a week ago.
 
 See DESIGN_user_timezone.md. The `settings.timezone` row holds an IANA zone name and is
-written by `tm settings set timezone`; with no row the machine's own zone rules (§3).
+written by `sm settings set timezone`; with no row the machine's own zone rules (§3).
 `today_date()` sits on every code path, so the handle is read as `runtime.db` at call
 time — importing this module must never open the database.
 """

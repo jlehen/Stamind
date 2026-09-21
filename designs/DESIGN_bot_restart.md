@@ -5,12 +5,12 @@
 
 ## 1. Motivation
 
-`tm-bot` is a thin wrapper that `exec`s `stamind_bot.py`, a single long-polling
+`sm-bot` is a thin wrapper that `exec`s `stamind_bot.py`, a single long-polling
 process with no supervisor. Today, picking up a new deploy, or nudging a bot
 that's gone unresponsive without it having actually died, means someone with
 shell access has to kill and relaunch it by hand. The athlete wants to trigger
 that from Telegram itself with a `/restart` command, without adding a second
-binary/script to keep in sync with `tm-bot`.
+binary/script to keep in sync with `sm-bot`.
 
 Note the scope this implies: `/restart` only helps when the bot is still
 responsive enough to *receive* it. A genuine hang (deadlocked, not polling at
@@ -23,7 +23,7 @@ design doesn't attempt to change that (§2 Non-Goals).
 **Goals**
 - An authorized chat can send `/restart` and get a fresh bot process back within a
   few seconds, no shell access required.
-- Reuse `tm-bot` as the only file that changes shape — no new script to deploy.
+- Reuse `sm-bot` as the only file that changes shape — no new script to deploy.
 
 **Non-goals**
 - Zero-downtime / hot code reload. A brief gap while polling tears down and
@@ -31,13 +31,13 @@ design doesn't attempt to change that (§2 Non-Goals).
 - Automatic crash recovery. A worker that exits for any reason other than the
   deliberate restart signal (unhandled exception, OOM-kill, a stray SIGTERM,
   whatever) is **not** relaunched — the supervisor exits right along with it,
-  exactly like unsupervised `tm-bot` behaves today (§4). Recovering from a real
+  exactly like unsupervised `sm-bot` behaves today (§4). Recovering from a real
   crash still means a human notices and restarts it (shell access, or whatever
   the deployment layer provides) — `/restart` can't help, since a crashed process
   isn't around to receive it. Traded away for a much simpler supervisor: no
   backoff schedule, no crash-loop, no "was that a deliberate stop or a crash?"
   judgment call.
-- Supervision across host reboots (systemd/tmux/whatever runs `tm-bot` today) —
+- Supervision across host reboots (systemd/tmux/whatever runs `sm-bot` today) —
   unchanged.
 - Restarting other Stamind processes (`stamind_web.py`, cron jobs) from
   Telegram — `/restart` only targets the bot.
@@ -47,18 +47,18 @@ design doesn't attempt to change that (§2 Non-Goals).
 
 ## 3. Architecture: supervisor loop + child sentinel
 
-`tm-bot` gains two modes, selected by an env var it sets on itself rather than a
+`sm-bot` gains two modes, selected by an env var it sets on itself rather than a
 CLI arg — a positional/flag arg would risk colliding with args meant to be passed
 through, and env vars naturally aren't inherited by anything that isn't this
 script's own child.
 
-- **Default invocation** (`./tm-bot ...`, e.g. from a terminal, tmux pane, or
-  systemd unit): `tm-bot` is the **supervisor**. It loops forever, each iteration
-  launching a child of itself with `TM_BOT_SUPERVISED=1` set and `"$@"` forwarded,
+- **Default invocation** (`./sm-bot ...`, e.g. from a terminal, tmux pane, or
+  systemd unit): `sm-bot` is the **supervisor**. It loops forever, each iteration
+  launching a child of itself with `SM_BOT_SUPERVISED=1` set and `"$@"` forwarded,
   then waits for it to exit and decides whether to relaunch (§4).
-- **`TM_BOT_SUPERVISED=1` already set**: `tm-bot` is the **worker** — it skips
+- **`SM_BOT_SUPERVISED=1` already set**: `sm-bot` is the **worker** — it skips
   straight to today's venv-check-and-`exec` of `stamind_bot.py`. This path is
-  byte-for-byte what `tm-bot` does today.
+  byte-for-byte what `sm-bot` does today.
 
 `stamind_bot.py` doesn't need to know any of this exists — it only needs to
 exit with the right code when a restart is wanted (§5).
@@ -82,7 +82,7 @@ Concretely:
   need to classify a child's exit as "deliberate stop" vs. "crash" — every
   non-75 exit gets the same treatment (the supervisor also exits). This is what
   makes automatic crash recovery explicitly out of scope (§2): a crash now
-  behaves exactly like it does in today's unsupervised `tm-bot`.
+  behaves exactly like it does in today's unsupervised `sm-bot`.
 - The supervisor still **traps SIGINT/SIGTERM sent to itself**, but only to
   avoid orphaning the child — not to decide whether to relaunch (the exit-code
   check already does that). Two cases matter differently:
@@ -95,16 +95,16 @@ Concretely:
     `systemctl stop` under `KillMode=process`) does **not** automatically reach
     the child. Without a trap, the supervisor would die and leave the worker
     running, unsupervised and undiscoverable by name (see the open question in
-    §7 on how `tm-bot` is actually run). The trap should signal the child, wait
+    §7 on how `sm-bot` is actually run). The trap should signal the child, wait
     briefly, `SIGKILL` if it's still alive, then let the supervisor exit.
-- Implementation note: `tm-bot` currently has `set -e` at the top. Capturing the
+- Implementation note: `sm-bot` currently has `set -e` at the top. Capturing the
   child's exit status with a bare `wait "$pid"` trips `errexit` on any non-zero
   status — which is every relaunch-worthy exit, including 75 — and would abort
   the supervisor before it ever checks the code. Capture it as
   `wait "$pid" || rc=$?` (or inside an `if`) so `set -e` doesn't short-circuit
   the loop.
 - Supervisor lifecycle events (start / stop / relaunch + reason) get logged to
-  stdout, same stream `tm-bot` already writes to today.
+  stdout, same stream `sm-bot` already writes to today.
 
 ## 5. Command surface
 
@@ -116,7 +116,7 @@ Concretely:
 > explicit Updater lifecycle in `_serve()`, which `/restart` still needs (§5.2, §7).
 > The rest of this section is kept as the record of why the pause existed.
 
-To keep this simple with a single authorized chat (§2), `tm-bot` only polls
+To keep this simple with a single authorized chat (§2), `sm-bot` only polls
 Telegram (`getUpdates`) while there's nothing to compute: idle, or blocked on
 the athlete's answer to an open prompt. It stops polling for the span where a
 CLI subprocess is silently churning with no prompt open.
@@ -197,13 +197,13 @@ logged and stepped over, never allowed to prevent the exit.
 
 ## 6. Touch points
 
-- **`tm-bot`**: add the supervisor loop, the `TM_BOT_SUPERVISED` branch, and the
+- **`sm-bot`**: add the supervisor loop, the `SM_BOT_SUPERVISED` branch, and the
   signal trap (§4). No backoff logic needed. The existing venv-bootstrap + exec
   becomes the worker body, untouched.
 - **`stamind_bot.py`** (the Telegram front-end is `stamind/chat/` now, and the list
   below says where each piece went):
   - `RESTART_EXIT_CODE = 75` and `RESTART_GRACE_SECONDS = 2.0` constants — in
-    `chat/runner.py`, which is what `tm-bot`'s own comment points at.
+    `chat/runner.py`, which is what `sm-bot`'s own comment points at.
   - `on_message()`: new `token_low == "restart"` branch, dispatching to `_restart`
     and the module-level `restart_teardown()` (§5.2) — `chat/messages.py` and
     `chat/runner.py`.
@@ -241,7 +241,7 @@ logged and stepped over, never allowed to prevent the exit.
   mid-compute. The original design said "an open prompt's subprocess only,
   because polling is paused during compute" — true in the steady state, but a
   single `getUpdates` batch can deliver a command and a `/restart` together, and
-  the "can't happen" case then orphans a running `tm` (§5.2 steps 1-2).
+  the "can't happen" case then orphans a running `sm` (§5.2 steps 1-2).
 - **`/restart` stops the Updater before `os._exit()`.** This answers the original
   open question about updates crossing the restart gap, checked against the
   installed python-telegram-bot 22.8. PTB keeps the `getUpdates` offset in memory
@@ -263,7 +263,7 @@ logged and stepped over, never allowed to prevent the exit.
   back. A mis-tap costs a reconnect, not work — so there is no reason to make the
   command harder to find than any other. (`/start` remains absent, as Telegram
   sends it automatically on first contact.)
-- **Open:** how is `tm-bot` actually run in production right now (bare
+- **Open:** how is `sm-bot` actually run in production right now (bare
   foreground, `nohup`, `tmux`, a systemd unit)? Determines whether a plain
   `kill <supervisor-pid>` reaches the child automatically (process-group
   delivery) or needs the supervisor's trap to relay it (§4), and whether the

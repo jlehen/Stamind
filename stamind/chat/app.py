@@ -107,7 +107,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
     def _log(self, chat_id: int, direction: str, msg: str) -> None:
         """The bot's own timeline: printed live, and journalled (DESIGN_logging.md §8).
 
-        Also journalled, not instead: an operator watching ./tm-bot in a terminal keeps
+        Also journalled, not instead: an operator watching ./sm-bot in a terminal keeps
         the view they have today. Where that stdout goes depends entirely on how the
         supervisor was launched, which in practice means nowhere."""
         ts = datetime.datetime.now().strftime("%H:%M:%S")
@@ -164,6 +164,6 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         # (DESIGN_logging.md §8). It gets a `run.end` only on a clean shutdown: a /restart
         # hard-exits and a supervisor kill takes it with no warning, which is the normal way
         # it ends and the reason the `?` outcome exists (§3).
-        journal.start_run(["tm-bot"], source="bot")
+        journal.start_run(["sm-bot"], source="bot")
         asyncio.run(self._serve())
         journal.end_run("ok")

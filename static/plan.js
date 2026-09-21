@@ -15,7 +15,7 @@ function feedbackNote(n) {
 }
 
 /** The notes the athlete addressed to the next plan version. Read-only here: they are
- *  written with `tm plan feedback` and are consumed by the next generation
+ *  written with `sm plan feedback` and are consumed by the next generation
  *  (DESIGN_plan_feedback.md §8). */
 function renderPlanFeedback(notes) {
     const el = document.getElementById("strategy-feedback");
@@ -173,7 +173,7 @@ function renderTimeline(mesocycles, planFeedback) {
 }
 
 // --- Plan versions & comparison (see DESIGN_plan_rollback.md; rolling back is
-//     `tm plan rollback`, a CLI action) ---
+//     `sm plan rollback`, a CLI action) ---
 
 async function loadPlanVersions() {
     const listEl = document.getElementById("plan-versions-list");
@@ -217,7 +217,7 @@ async function loadPlanVersions() {
         });
         listEl.insertAdjacentHTML("beforeend",
             `<div class="cli-guidance"><i class="fa-solid fa-terminal"></i> `
-            + `Restore one with <code>tm plan rollback --version &lt;id&gt;</code>.</div>`);
+            + `Restore one with <code>sm plan rollback --version &lt;id&gt;</code>.</div>`);
         hidePlanDiff();
     } catch (e) {
         listEl.innerHTML = `<div class="item-meta">Failed to load versions: ${escapeHtml(e.message)}</div>`;

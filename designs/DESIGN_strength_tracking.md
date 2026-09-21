@@ -573,7 +573,7 @@ Three sources of names, in order of preference, and nothing else:
    Where the athlete meets the questions is the queue design's business, not this one's.
    In Telegram they arrive after the morning briefing, one at a time with their buttons,
    and nothing waits: the athlete can answer at breakfast or in the evening, and "Not now"
-   puts one off. In the terminal `tm queue` lists them, `tm queue answer` goes through
+   puts one off. In the terminal `sm queue` lists them, `sm queue answer` goes through
    them, and `status` and `workout adapt` say how many are waiting. This feature adds no
    surface of its own. The week of §1 of that design, seen from this side: Tuesday's
    machine activity leaves six unnamed groups. Wednesday's 08:00 push refreshes the last
@@ -1486,7 +1486,7 @@ activity has any, share one line listing their positions.
 **`strength name` on an activity still waiting for "are the sets final?" freezes it first.**
 Otherwise a later "yes, final" would read the sets again and drop the names just given.
 
-**`tm st` is still `status`.** `strength` shares the prefix, so `st` became an alias, the
+**`sm st` is still `status`.** `strength` shares the prefix, so `st` became an alias, the
 way `s` already was.
 
 **The watch's guesses are stored and shown, and nothing else yet.** A set the watch named on

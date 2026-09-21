@@ -635,7 +635,7 @@ Revision 9 adds to those:
 - Sending the morning's changes ahead of her morning time, for example an hour before. Her
   morning time is the hour she chose to hear from Stamind, which is the same reason nothing
   is sent after 21:00.
-- `workout notify` as a `queue` command. `tm queue` lists the group's whole state and its
+- `workout notify` as a `queue` command. `sm queue` lists the group's whole state and its
   other commands act on what that list shows (DESIGN_athlete_queue.md §5.1). A waiting change
   is not a queue item, so the list would not show what the command sends. Listing the changes
   there too would give "waiting" two meanings in one list: received and not yet answered for

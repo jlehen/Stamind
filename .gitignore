@@ -24,7 +24,7 @@ stamind.db-shm
 # Logs
 logs
 
-# Chart output (tm progress --chart)
+# Chart output (sm progress --chart)
 progress.png
 
 # Python caches

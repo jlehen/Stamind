@@ -198,7 +198,7 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
              "'data bootstrap' (read-only: no LLM call, no Garmin pull)",
         description=(
             "Print the reconstruction cached by the last 'data bootstrap': the inferred "
-            "macro focus, the mesocycles 'tm progress' draws as '~' bands, and the "
+            "macro focus, the mesocycles 'sm progress' draws as '~' bands, and the "
             "physiological insights. Read-only in the strict sense — it renders what is "
             "stored and never calls the LLM, unlike 'data bootstrap --inspect-only' which "
             "recomputes as soon as the evidence has moved. --short shows the last "

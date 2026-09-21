@@ -131,7 +131,7 @@ class MesocycleContextMixin:
         """One planned-vs-actual line per Monday-week of the mesocycle's elapsed part.
 
         Reuses `progression.weekly_aggregates`, the same planned-vs-actual weekly maths
-        `tm progress` renders, so the week planner and the athlete never read different numbers
+        `sm progress` renders, so the week planner and the athlete never read different numbers
         for the same week (§3.1). The in-progress week states raw load beside the elapsed
         day count and is never extrapolated, following
         DESIGN_intensity_distribution.md §9.3.
