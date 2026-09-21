@@ -20,13 +20,13 @@ def _days_out(n: int) -> str:
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 GOAL_DATE = _days_out(71)
 
-from trainmate import plan_inputs
-from trainmate.db import Database
+from stamind import plan_inputs
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 def _session_titles(rows) -> list:
@@ -62,8 +62,8 @@ class TestReplan(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_replan_logic_and_caching(self, mock_client, mock_calendar):
         # Every clock, not just the service's: whether a goal is still ahead is now a date
         # question the DB answers, so a half-pinned clock reads real "today" there and the
@@ -143,7 +143,7 @@ class TestReplan(unittest.TestCase):
         )
         return obj_id
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_replan_offers_to_keep_the_mesocycle_under_way(self, mock_client):
         """Mid-mesocycle, the replan may let that mesocycle finish — which means repeating its
         ORIGINAL start date, since mesocycles own their sessions by date containment
@@ -171,7 +171,7 @@ class TestReplan(unittest.TestCase):
         # ...and the unconditional "start today" sentence is withdrawn while it applies.
         self.assertNotIn("The first mesocycle must start on the start date", prompt)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_mesocycle_starting_today_is_not_offered(self, mock_client):
         """Nothing is under way yet, so there is nothing to let finish."""
         pin_clock(self, "2026-08-03")
@@ -186,7 +186,7 @@ class TestReplan(unittest.TestCase):
             "The first mesocycle must start on the start date (2026-08-03).", prompt
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_fresh_withholds_the_mesocycle_under_way(self, mock_client):
         """A clean slate is not asked to finish the mesocycle it is departing from."""
         pin_clock(self, "2026-08-23")
@@ -201,7 +201,7 @@ class TestReplan(unittest.TestCase):
             "The first mesocycle must start on the start date (2026-08-23).", prompt
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_mesocycle_not_offered_when_plan_start_is_pinned_past_today(self, mock_client):
         """A preceding goal's plan pins the start after today; reaching back past that
         would overlap that goal's season, so the keep option is withheld."""
@@ -230,7 +230,7 @@ class TestReplan(unittest.TestCase):
             "The first mesocycle must start on the start date (2026-09-16).", prompt
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_fresh_withholds_the_plan_in_place(self, mock_client):
         """`--fresh`: the intent is withheld, the evidence is not
         (DESIGN_backward_evaluation.md §6.1)."""
@@ -272,7 +272,7 @@ class TestReplan(unittest.TestCase):
         self.assertIn("PLANNED vs ACTUAL", system_prompt)
         self.assertIn("Aerobic conditioning", system_prompt)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_fresh_implies_force(self, mock_client):
         """A clean slate is a regeneration: an up-to-date plan is not reused."""
         obj_id = test_db.add_objective(

@@ -1,7 +1,7 @@
 """The companion voice on goals, constraints, the plan and the fitness summary
 (DESIGN_bot_simple_frontend.md §6, §11).
 
-`trainmate/cli/render/plan_lines.py`. The day-side line builders, and the rules about
+`stamind/cli/render/plan_lines.py`. The day-side line builders, and the rules about
 the render package itself, are tests/test_simple_render.py.
 """
 import os
@@ -10,7 +10,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from trainmate.cli.render import plan_lines
+from stamind.cli.render import plan_lines
 
 
 class GoalLinesTest(unittest.TestCase):

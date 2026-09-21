@@ -148,7 +148,7 @@ rebuild (§7). §5 makes every removal inside the window visible, and §6 answer
 
 `workout_commitment_days`, default 7. `coach.workout_commitment_days` in `config.yaml`,
 beside `workout_generation_span_days`, and a `Setting(...)` row in
-`trainmate/settings.py` under a new `Schedule` group, so the athlete-facing name is
+`stamind/settings.py` under a new `Schedule` group, so the athlete-facing name is
 `commitment-days`. `parse` is a non-negative integer — the first integer setting in the
 registry, whose other rows are models, zones, switches and times.
 

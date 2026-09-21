@@ -8,18 +8,18 @@ from tests.helpers import (
 )
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_goals.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_goals.db")
 
 
 def _days_out(n: int) -> str:
     """Fixtures ride on today: a plan window needs its goal in the future, so a
     hardcoded date expires the test the day it passes. Reads the app's clock, so a
     pinned test and the command it runs agree on which day it is."""
-    from trainmate.clock import today_date
+    from stamind.clock import today_date
     return (today_date() + timedelta(days=n)).isoformat()
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -302,7 +302,7 @@ class TestCliGoalArchival(unittest.TestCase):
                              macrocycle_id=mid)
         return oid, mid
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_calling_a_goal_off_stands_its_sessions_down_and_back_up(self, _cal):
         """`goal edit --status archived` is the reversible way to drop a goal: the
         sessions go with it, and reinstating offers them back
@@ -328,7 +328,7 @@ class TestCliGoalArchival(unittest.TestCase):
             ["Long run"],
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_declining_the_restore_leaves_the_sessions_archived(self, _cal):
         """Reinstating asks first: a goal picked back up months later should not silently
         re-push sessions from a plan that no longer suits the athlete (§14)."""
@@ -342,7 +342,7 @@ class TestCliGoalArchival(unittest.TestCase):
         self.assertIn("Sessions left archived", stdout)
         self.assertEqual(test_db.get_workouts(start_date=_days_out(0)), [])
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_goal_rm_calls_the_goal_off_and_is_reversible(self, _cal):
         """`goal rm` is the same action as `goal edit --status archived` under the verb
         people reach for: sessions stand down, the plan survives, and reinstating brings
@@ -367,7 +367,7 @@ class TestCliGoalArchival(unittest.TestCase):
             ["Long run"],
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_goal_rm_purge_inventories_what_the_cascade_will_take(self, _cal):
         """`--purge` names the plan history it destroys and points at plain `goal rm` as
         the reversible alternative before asking (§14.5)."""
@@ -383,7 +383,7 @@ class TestCliGoalArchival(unittest.TestCase):
         self.assertIn(f"goal rm {oid}", stdout)
         self.assertIsNotNone(test_db.get_objective(oid))
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_goal_list_hides_called_off_goals_but_keeps_the_others(self, _cal):
         """Hiding is what makes calling a goal off leave no tombstone worth deleting, so
         it must not swallow a completed goal — that is history the athlete earned

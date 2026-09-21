@@ -2,10 +2,10 @@
 
 **Status:** Implemented · **Date:** 2026-06-14 · **Branch:** `richer-analysis-evidence-claude`
 
-This document captures the agreed design for letting TrainMate ingest **external
+This document captures the agreed design for letting Stamind ingest **external
 daily signals** (alcohol intake, sleep quality, stress, big meals, …)
-without TrainMate understanding any of those domains specifically. Signals arrive
-on the **existing Google Calendar** as tagged all-day events; TrainMate reads
+without Stamind understanding any of those domains specifically. Signals arrive
+on the **existing Google Calendar** as tagged all-day events; Stamind reads
 them, persists them locally, and feeds them to the coach.
 
 Implemented on this branch (schema, `db/signals.py`, calendar `sync_signals`,
@@ -16,35 +16,35 @@ ARCHITECTURE.md §13 for the as-built summary.
 
 ## 1. Motivation
 
-The user already tracks things outside TrainMate (alcohol in a spreadsheet) that
+The user already tracks things outside Stamind (alcohol in a spreadsheet) that
 demonstrably move Garmin recovery metrics — e.g. 2 drinks after a hard day tanks
 the next morning's numbers. The coach currently can't see this, so it
 misattributes the dip to training load.
 
-We do **not** want TrainMate to learn about alcohol, spreadsheets, or any
+We do **not** want Stamind to learn about alcohol, spreadsheets, or any
 specific signal: that's too narrow and would repeat for sleep, stress, meals,
 etc. Instead we want **one generic channel** through which any external source
-can hand TrainMate a dated, optionally-quantified signal.
+can hand Stamind a dated, optionally-quantified signal.
 
 Google Calendar is already wired in (`gcal/client.py`, service account) and
 is human-visible and editable from a phone, which makes it a natural generic
 inbox. An external syncer (a separate repo, mirroring how `GarminScraper` feeds
 Garmin data — see `DESIGN_garmin_direct_pull.md`) drops one event per
-signal-day; TrainMate ingests them.
+signal-day; Stamind ingests them.
 
 ---
 
 ## 2. Goals / Non-Goals
 
 **Goals**
-- A **single** calendar carries both TrainMate's workouts and external signals
+- A **single** calendar carries both Stamind's workouts and external signals
   events; the two are unambiguously distinguishable.
-- TrainMate ingests signal events into its **own DB** so the coach reads
+- Stamind ingests signal events into its **own DB** so the coach reads
   locally and doesn't hit Google on every run.
 - Ingestion is a **sync, not an append**: edits and deletions of a signal event
   are reflected (a corrected "2 drinks" → "3 drinks" updates in place; a deleted
   event removes the row).
-- TrainMate stays **domain-agnostic**: it knows "there is a signal of category X
+- Stamind stays **domain-agnostic**: it knows "there is a signal of category X
   on day D, optionally with numeric value V and some free text." It never
   hardcodes what any category *means*.
 - The coach uses signals **qualitatively today** (the LLM connects "alcohol: 2"
@@ -54,10 +54,10 @@ signal-day; TrainMate ingests them.
 
 **Non-Goals**
 - The external syncer itself is **out of scope** — separate repo. This doc only
-  fixes the *contract* (the calendar tag) it must honor. (TrainMate later became a
+  fixes the *contract* (the calendar tag) it must honor. (Stamind later became a
   *first-party* producer of the same tagged events for ad-hoc signals via the
   `signal` command — see `DESIGN_signal_authoring.md`.)
-- No per-signal logic in TrainMate (no "alcohol is bad" rule).
+- No per-signal logic in Stamind (no "alcohol is bad" rule).
 - No correlation / quantitative analysis built now — only the storage that would
   permit it later (§7). (**Superseded:** the generic, still category-agnostic
   quantitative path was built afterwards — see
@@ -74,9 +74,9 @@ signal-day; TrainMate ingests them.
 
 With one shared calendar there are **three** classes of events, not two:
 
-| Class | Origin | TrainMate action |
+| Class | Origin | Stamind action |
 |-------|--------|------------------|
-| Workouts | TrainMate (`extendedProperties.private.source = "TrainMate"`) | written by us; ignore on read |
+| Workouts | Stamind (`extendedProperties.private.source = "TrainMate"`) | written by us; ignore on read |
 | Signals | external syncer (tagged, see §4) | **ingest** |
 | Ordinary life events | the user, by hand (dentist, a flight) | ignore |
 
@@ -119,20 +119,20 @@ reasons; the privacy argument is a bonus that only holds on the full pull.
 One **all-day** event per signal-day per metric, on the configured calendar:
 
 - `start.date` / `end.date`: the day the signal applies to (all-day, end
-  exclusive = start + 1 day, matching how TrainMate writes workouts).
+  exclusive = start + 1 day, matching how Stamind writes workouts).
 - `summary` / `description`: human-readable text, shown to the user and fed to
   the LLM verbatim (e.g. summary `"Alcohol: 2 drinks"`).
 - `extendedProperties.private`:
   - `source = "trainmate-context"` — **required** positive marker. The string is
     configurable (`google.calendar_signal_tag` in YAML, `config.calendar_signal_tag`
     in code); `"trainmate-context"` is the default and the contract above assumes it.
-    Both the read filter and TrainMate's own authoring path use the configured value,
+    Both the read filter and Stamind's own authoring path use the configured value,
     so changing it orphans previously-written events until they are re-tagged. That is
     why the `context` → `signal` rename left this **string** alone while renaming the
     config key around it: the tag is a contract with the external syncer and with every
     event already on the calendar, not internal vocabulary.
   - `metric = "<category>"` — **required** free-form category string, e.g.
-    `"alcohol"`, `"sleep_quality"`, `"stress"`. TrainMate treats it as opaque.
+    `"alcohol"`, `"sleep_quality"`, `"stress"`. Stamind treats it as opaque.
     "Required" is a contract on the syncer, not an ingest-time validation: an event
     that is correctly `source`-tagged but carries no `metric` is **not** rejected —
     it lands under the literal metric `'signal'`. Deliberate, so a syncer bug
@@ -279,7 +279,7 @@ and constraints (`coach/service/analysis.py` — `service.py` is a package now),
 also pull `get_daily_signals(from, until)` and render it into the prompt next to
 the daily metrics. The LLM reads "alcohol: 2 on 2026-06-13" beside the trashed
 2026-06-14 HRV/Body Battery and attributes the dip correctly. The meaning lives
-in the model, not in TrainMate.
+in the model, not in Stamind.
 
 **Adaptation reads it too.** The daily adaptation (`coach/service/adapt.py`)
 pulls the same signals over its own window so it can tell a lifestyle-suppressed
@@ -301,7 +301,7 @@ prompt without changing the fingerprint. See
 **Quantitative — built, see `DESIGN_quantitative_signal_impact.md`.** This
 section originally deferred the quantitative use of `value` ("not built now"); it
 has since been built, and this paragraph supersedes that. Because each row carries
-a category and an optional number, TrainMate asks a **category-agnostic** question
+a category and an optional number, Stamind asks a **category-agnostic** question
 — "for metric X, does a higher `value` on day D precede worse recovery on D+1?" —
 and runs it identically for `alcohol`, `sleep`, `stress`. `_signal_days`
 (`coach/service/analysis.py`) clusters signal-days into per-category episodes,
@@ -327,13 +327,13 @@ was the `value` column existing from day one.
   dedicated sync command. (**Superseded for authoring/inspection:** the thin
   `signal list` this section left as an option was built, and more — the
   `signal` command now carries `add`, `list`, `list-metrics` and
-  `rm`, with TrainMate writing the same tagged events itself. See
+  `rm`, with Stamind writing the same tagged events itself. See
   `DESIGN_signal_authoring.md`. The web UI adds read-only views:
   `GET /api/daily-signals` and `GET /api/daily-signals/metrics`, behind a
   per-metric calendar heat strip.)
 
 **Doc-mandated implementation task:**
-- **Update command help.** `d_pull`'s description (`trainmate_cli.py`, currently
+- **Update command help.** `d_pull`'s description (`stamind_cli.py`, currently
   "...directly from Garmin Connect ... 2 days ending today") must state it also
   syncs tagged calendar signals. Touch any other help text that describes the
   pull/ensure path.
@@ -346,12 +346,12 @@ was the `value` column existing from day one.
 ## 9. Summary
 
 External sources drop **tagged all-day events** (`source=trainmate-context`,
-`metric`, optional `value`) on the **single existing calendar**. TrainMate
+`metric`, optional `value`) on the **single existing calendar**. Stamind
 **incrementally syncs** them via `syncToken` into a new **`daily_signals`** table,
 reconciling edits and deletions by event id. The server-side tag filter applies to
 the full pull only — the incremental stream is filtered **client-side**, which is
 what keeps untagged events out of the database (§3). The coach reads the signals
 **qualitatively**, and the optional `value` column carries the **generic
 quantitative** path that was later built on top
-(`DESIGN_quantitative_signal_impact.md`) with no migration — and TrainMate still
+(`DESIGN_quantitative_signal_impact.md`) with no migration — and Stamind still
 never learns what any single signal *means*.

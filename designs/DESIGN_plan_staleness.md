@@ -119,7 +119,7 @@ not recoverable, and writing the *current* profile would erase a genuine pending
   The snapshot is there and a version
   diff could render it beside goals/constraints/thresholds, but that is display surface
   (CLI renderer + web JSON + their tests) and independent of staleness. Natural follow-up.
-- **The web dashboard banner still does not name fields.** `trainmate_web.py` compares
+- **The web dashboard banner still does not name fields.** `stamind_web.py` compares
   `plan_config_hash()` directly to avoid importing the engine (ARCHITECTURE.md §8); the
   helpers it would need (`changed_plan_profile_fields`) live in `config.py` and are
   reachable, but the banner is read-only and was left alone.
@@ -265,7 +265,7 @@ one level up.
   `training guidelines changed: sustainable_training.md`, names added and removed files
   the same way, and the diff and the verdict call get the edit like any profile field.
   The text is stored rather than a hash because the verdict needs the old lines, and the
-  prompt already carries these files on every call. The app's own `trainmate/science/` is
+  prompt already carries these files on every call. The app's own `stamind/science/` is
   not fingerprinted: it changes with the code and yields to the athlete's files.
 - A plan without a snapshot is not held to one — the rule the goals hash already follows
   — so nothing flags on upgrade; the first stamp or `plan generate` records it.

@@ -225,7 +225,7 @@ async function loadPlanVersions() {
 }
 
 // --- Plan version comparison (GET /api/plan/diff; same structure the CLI's
-// `plan diff` renders as text — see trainmate/plan_versions.py) ---
+// `plan diff` renders as text — see stamind/plan_versions.py) ---
 
 function hidePlanDiff() {
     const panel = document.getElementById("plan-diff-panel");

@@ -5,7 +5,7 @@ a handle rebinding that misses a site would otherwise read the athlete's real tr
 data, and a live network call would hit Garmin/OpenRouter for real. A guard that stopped
 working would be invisible, so it is asserted here rather than trusted.
 
-The `patch("trainmate…")` targets are checked here for the same reason: a target that has
+The `patch("stamind…")` targets are checked here for the same reason: a target that has
 stopped pointing at anything is a stub that no longer stubs.
 """
 import ast
@@ -25,7 +25,7 @@ import unittest
 # that were never installed.
 import tests        # noqa: F401
 
-PRODUCTION_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "trainmate.db")
+PRODUCTION_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamind.db")
 
 _UNSET = object()   # "nothing was bound", as opposed to "bound to None"
 
@@ -42,7 +42,7 @@ class TestProductionDatabaseIsUnreachable(unittest.TestCase):
         os.chdir(os.path.dirname(PRODUCTION_DB))
         try:
             with self.assertRaises(RuntimeError):
-                sqlite3.connect("trainmate.db")
+                sqlite3.connect("stamind.db")
         finally:
             os.chdir(cwd)
 
@@ -66,7 +66,7 @@ class TestSavingTheHandleDoesNotBuildIt(unittest.TestCase):
     """
 
     def setUp(self):
-        from trainmate import runtime
+        from stamind import runtime
         self.modules = (runtime,)
         # Whatever the suite has bound so far goes back untouched, however this ends.
         saved = [(m, vars(m).get("db", _UNSET)) for m in self.modules]
@@ -219,7 +219,7 @@ def _collect(node, bound: dict, where: str, found: list) -> None:
         if isinstance(child, ast.Call) and child.args and _called_name(child) == "patch" \
                 and not _says_create(child):
             for target in _possible_strings(child.args[0], bound):
-                if target.startswith("trainmate."):
+                if target.startswith("stamind."):
                     found.append((target, f"{where}:{child.lineno}"))
         inner = bound
         if isinstance(child, ast.For):
@@ -228,7 +228,7 @@ def _collect(node, bound: dict, where: str, found: list) -> None:
 
 
 def _patch_targets():
-    """Every `patch("trainmate…")` target in tests/, as (target, "file:line") pairs."""
+    """Every `patch("stamind…")` target in tests/, as (target, "file:line") pairs."""
     found = []
     for path in sorted(glob.glob(os.path.join(os.path.dirname(__file__), "**", "*.py"),
                                  recursive=True)):
@@ -261,20 +261,20 @@ def _walk_to_the_owner(target: str):
 def _has(owner, attribute: str) -> bool:
     """Whether `mock.patch` would find `attribute` on `owner`, without building it.
 
-    `trainmate.runtime` answers an unknown attribute through a module `__getattr__` that
+    `stamind.runtime` answers an unknown attribute through a module `__getattr__` that
     *constructs* the singleton — a Database against the athlete's own file, a live Google
     client off the credentials — and caches it for the rest of the process. So it is asked
     the question its own accessor asks, off the builder registry, rather than by reading
     the attribute (ARCHITECTURE §6).
     """
-    from trainmate import runtime
+    from stamind import runtime
     if owner is runtime:
         return attribute in vars(runtime) or attribute in runtime._BUILDERS
     return hasattr(owner, attribute)
 
 
 class TestEveryPatchTargetStillResolves(unittest.TestCase):
-    """A `patch("trainmate.a.b.c")` names a module and an attribute by string, so nothing
+    """A `patch("stamind.a.b.c")` names a module and an attribute by string, so nothing
     checks it until the line runs. Move `c` out of `b` and every test that does not happen
     to execute that line keeps passing, while the ones that do fail somewhere unrelated.
 

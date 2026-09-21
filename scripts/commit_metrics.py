@@ -4,9 +4,9 @@
 Columns emitted:
 - date: Commit date in ISO 8601 format.
 - commit id: Full or short commit hash.
-- number of code files (trainmate): Total Python files in trainmate/ at that commit.
-- total python code lines (trainmate/): Total lines of Python code in trainmate/ at that commit.
-- added python code lines (trainmate/): Net Python lines added (insertions - deletions).
+- number of code files (stamind): Total Python files in stamind/ at that commit.
+- total python code lines (stamind/): Total lines of Python code in stamind/ at that commit.
+- added python code lines (stamind/): Net Python lines added (insertions - deletions).
 - total test code lines (tests/): Total lines of test code in tests/ at that commit.
 - added test code lines (tests/): Net test code lines added (insertions - deletions).
 - total tests (tests/): Total test method definitions (def test_*) in tests/ at that commit.
@@ -71,14 +71,14 @@ def inspect_blob(sha: str, cache: Dict[str, Tuple[int, int]]) -> Tuple[int, int]
 def get_tree_snapshot_metrics(
     commit: str, blob_cache: Dict[str, Tuple[int, int]]
 ) -> Tuple[int, int, int, int]:
-    """Return snapshot totals: (code_files_count, trainmate_lines, test_lines, total_tests)."""
+    """Return snapshot totals: (code_files_count, stamind_lines, test_lines, total_tests)."""
     cmd = ["git", "ls-tree", "-r", commit]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     if proc.returncode != 0:
         return 0, 0, 0, 0
 
     code_files_count = 0
-    total_trainmate_lines = 0
+    total_stamind_lines = 0
     total_test_lines = 0
     total_tests = 0
 
@@ -90,23 +90,23 @@ def get_tree_snapshot_metrics(
         if not path.endswith(".py"):
             continue
 
-        if path.startswith("trainmate/"):
+        if path.startswith("stamind/"):
             code_files_count += 1
             n_lines, _ = inspect_blob(blob_sha, blob_cache)
-            total_trainmate_lines += n_lines
+            total_stamind_lines += n_lines
         elif path.startswith("tests/"):
             n_lines, n_tests = inspect_blob(blob_sha, blob_cache)
             total_test_lines += n_lines
             total_tests += n_tests
 
-    return code_files_count, total_trainmate_lines, total_test_lines, total_tests
+    return code_files_count, total_stamind_lines, total_test_lines, total_tests
 
 
 def get_net_added_code_lines(commit: str) -> Tuple[int, int]:
-    """Return net code lines added (insertions - deletions) for trainmate/ and tests/."""
+    """Return net code lines added (insertions - deletions) for stamind/ and tests/."""
     cmd = ["git", "show", "--numstat", "--format=", commit]
     output = subprocess.check_output(cmd).decode("utf-8", errors="replace")
-    trainmate_net = 0
+    stamind_net = 0
     tests_net = 0
 
     for line in output.splitlines():
@@ -122,12 +122,12 @@ def get_net_added_code_lines(commit: str) -> Tuple[int, int]:
 
         if not target.endswith(".py"):
             continue
-        if target.startswith("trainmate/"):
-            trainmate_net += delta
+        if target.startswith("stamind/"):
+            stamind_net += delta
         elif target.startswith("tests/"):
             tests_net += delta
 
-    return trainmate_net, tests_net
+    return stamind_net, tests_net
 
 
 def get_net_added_tests_count(commit: str) -> int:
@@ -167,9 +167,9 @@ def generate_commit_metrics(
         rows.append({
             "date": cdate,
             "commit id": cid,
-            "number of code files (trainmate)": files_count,
-            "total python code lines (trainmate/)": total_tm_lines,
-            "added python code lines (trainmate/)": added_tm_lines,
+            "number of code files (stamind)": files_count,
+            "total python code lines (stamind/)": total_tm_lines,
+            "added python code lines (stamind/)": added_tm_lines,
             "total test code lines (tests/)": total_test_lines,
             "added test code lines (tests/)": added_test_lines,
             "total tests (tests/)": total_tests,
@@ -184,9 +184,9 @@ def write_csv(rows: List[dict], output_file: Optional[str] = None) -> None:
     fieldnames = [
         "date",
         "commit id",
-        "number of code files (trainmate)",
-        "total python code lines (trainmate/)",
-        "added python code lines (trainmate/)",
+        "number of code files (stamind)",
+        "total python code lines (stamind/)",
+        "added python code lines (stamind/)",
         "total test code lines (tests/)",
         "added test code lines (tests/)",
         "total tests (tests/)",

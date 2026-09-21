@@ -985,7 +985,7 @@ place.
 **A rule that spans files needs a test that spans files** (AGENTS.md). The trigger stops the
 write at runtime; a source-level test names the offender at review time:
 
-- `test_workouts_table_is_append_only` — parses every module under `trainmate/db/` and fails
+- `test_workouts_table_is_append_only` — parses every module under `stamind/db/` and fails
   on any `UPDATE workouts` or `DELETE FROM workouts` outside the migration function and the
   `data wipe` reset (below). Keyed on the shape (a glob over the directory), not on a list of
   filenames, so a module written tomorrow is covered tomorrow.
@@ -1095,8 +1095,8 @@ To be made when this is implemented, not before:
 | `docs/DOMAIN_MODEL.md` §10 | Invariant 11 is replaced by the immutability trigger; a new invariant covers the lineage. **Done.** |
 | `DESIGN_plan_rollback.md` §9 | The batch key moves from `archived_at` to `change_id`. |
 | `DESIGN_benchmark_workouts.md` | `benchmark_results.workout_id` names a lineage. |
-| `trainmate/coach/formatting.py` | `_easing_recency_tag` gates on the derived tally (`adaptation_count > 0`), not on the modification marker (§7). `_planned_summary` is the rendering both planned-workout formatters share (§7.1). |
-| `trainmate/modification_state.py` | Deleted, with its test and the two prefix constants. |
-| `trainmate/db/wipes.py` | `wipe_workouts` drops the triggers, wipes the three workout tables, recreates the triggers (§14). |
-| `trainmate/db/constraints.py` | `clear_honored_after` keyed on the target change's `created_at`, not `archived_at` (§10). |
+| `stamind/coach/formatting.py` | `_easing_recency_tag` gates on the derived tally (`adaptation_count > 0`), not on the modification marker (§7). `_planned_summary` is the rendering both planned-workout formatters share (§7.1). |
+| `stamind/modification_state.py` | Deleted, with its test and the two prefix constants. |
+| `stamind/db/wipes.py` | `wipe_workouts` drops the triggers, wipes the three workout tables, recreates the triggers (§14). |
+| `stamind/db/constraints.py` | `clear_honored_after` keyed on the target change's `created_at`, not `archived_at` (§10). |
 | `tests/test_types.py` | `workouts` leaves `TYPE_TABLES`; a hydrated-dict key check replaces it (§5). |

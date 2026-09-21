@@ -14,14 +14,14 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_adaptation_moves.db")
 
-from trainmate.db import Database
-import trainmate.config
+from stamind.db import Database
+import stamind.config
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import CoachService, coach_service
-from trainmate.coach.proposals import RevisionProposal
+from stamind.coach.service import CoachService, coach_service
+from stamind.coach.proposals import RevisionProposal
 
 
 class TestAdaptMoves(unittest.TestCase):
@@ -193,7 +193,7 @@ class TestAdaptMoves(unittest.TestCase):
 
     def _adapt_returning(self, mock_client, reason, adapted, on="2026-06-10"):
         """Runs `workout adapt` on `on` against a canned week-planner answer."""
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {"metrics_lookback_days": 3,
                       "minor_activity_load_threshold": 10.0},
@@ -206,7 +206,7 @@ class TestAdaptMoves(unittest.TestCase):
             with redirect_stdout(io.StringIO()):
                 return coach_service.workout_adapt(on)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_moved_session_keeps_its_history_and_its_easing_tally(self, mock_client):
         """It is Wednesday 10 June. Thursday's gym session has already been eased twice.
         The athlete is away Thursday evening, so the coach moves it to Friday and names
@@ -217,7 +217,7 @@ class TestAdaptMoves(unittest.TestCase):
         the next morning's adapt reads before deciding whether to cut it again, and
         without the move being said out loud Friday would start over at zero
         (DESIGN_workout_revisions.md §4/§11)."""
-        from trainmate.coach.formatting import format_planned_workouts_detailed
+        from stamind.coach.formatting import format_planned_workouts_detailed
 
         thursday = self._eased_thursday_gym()
         proposal = self._adapt_returning(
@@ -261,7 +261,7 @@ class TestAdaptMoves(unittest.TestCase):
         self.assertIn("first prescribed as 65m", tag)
         self.assertIn("eased 2x", tag)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_move_leaves_the_day_it_emptied_carrying_the_coach_s_sentence(
         self, mock_client
     ):
@@ -288,7 +288,7 @@ class TestAdaptMoves(unittest.TestCase):
             "Gym moved to Friday — you are away Thursday evening.",
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_move_onto_a_day_that_already_carries_work_keeps_that_day(
         self, mock_client
     ):
@@ -327,7 +327,7 @@ class TestAdaptMoves(unittest.TestCase):
         self.assertEqual(friday["title"], "Gym: Full Body")
         self.assertEqual(friday["original_duration_minutes"], 50, "Friday's own lineage")
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_move_from_a_day_with_no_session_writes_the_new_one_and_nothing_else(
         self, mock_client
     ):
@@ -350,7 +350,7 @@ class TestAdaptMoves(unittest.TestCase):
         )
         self.assertIsNone(proposal.workouts[0]["replaces_slot"])
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_session_already_trained_cannot_be_moved_off_its_day(self, mock_client):
         """The athlete lifted on Wednesday morning and the coach then tries to carry
         Wednesday's session to Friday. History is not movable: the completed session

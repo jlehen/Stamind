@@ -11,8 +11,8 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_db_lifecycle.db")
 
-from trainmate.db import Database
-from trainmate.db.schema import SCHEMA_VERSION
+from stamind.db import Database
+from stamind.db.schema import SCHEMA_VERSION
 
 test_db = bind_test_db(TEST_DB_PATH)
 
@@ -169,7 +169,7 @@ class TestWipingOwnsItsRecompute(unittest.TestCase):
                 distance_km=10.0, elevation_gain_m=0.0, avg_hr=140, max_hr=160,
                 rpe=5, tss=50.0,
             )
-        from trainmate.garmin.derived import recompute_derived
+        from stamind.garmin.derived import recompute_derived
         recompute_derived(dbh=test_db)
 
     def test_wiping_the_window_walks_the_ewmas_again(self):

@@ -10,7 +10,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from trainmate.chat import keyboards, replies, routing, scheduler
+from stamind.chat import keyboards, replies, routing, scheduler
 
 
 class ParseMessageTest(unittest.TestCase):
@@ -34,7 +34,7 @@ class ParseMessageTest(unittest.TestCase):
 
     def test_strips_matching_bot_username_suffix(self):
         self.assertEqual(
-            routing.parse_message_to_argv("/status@TrainMateBot", bot_username="TrainMateBot"),
+            routing.parse_message_to_argv("/status@StamindBot", bot_username="StamindBot"),
             ["status"],
         )
 
@@ -247,7 +247,7 @@ class GuardrailTest(unittest.TestCase):
     def test_the_captures_own_offers_stay_inside_the_guardrail(self):
         """The two buttons a capture emits, and the picker leaf that re-enters it: none
         may reach a command the router itself could not (§12.9)."""
-        from trainmate.cli.bot.extraction import (
+        from stamind.cli.bot.extraction import (
             adjust_week_button, send_to_coach_button,
         )
         adjust = routing.parse_message_to_argv(adjust_week_button()["send"])
@@ -278,7 +278,7 @@ class GuardrailTest(unittest.TestCase):
             self.assertIn(tuple(argv[:2]), self.ALLOWED_PREFIXES, intent)
 
     def test_morning_button_utterances_reach_only_adapt_m(self):
-        from trainmate.cli.bot.views import MORNING_BUTTONS
+        from stamind.cli.bot.views import MORNING_BUTTONS
 
         def leaves(buttons):
             for b in buttons:
@@ -297,7 +297,7 @@ class GuardrailTest(unittest.TestCase):
 
 
 class RouterTablesTest(unittest.TestCase):
-    """`trainmate/chat/routing.py` holds both halves: the names the model may pick, and
+    """`stamind/chat/routing.py` holds both halves: the names the model may pick, and
     what each name runs. They have to agree name for name, so this pins the one file
     against itself (§5.3, reshaped by the writes pass §12.10)."""
 
@@ -323,7 +323,7 @@ class RouterTablesTest(unittest.TestCase):
             self.assertIn(intent, routing.ROUTER_INTENTS)
 
     def test_every_capture_intent_reaches_the_capture_command(self):
-        from trainmate.cli.bot.capture import CAPTURE_INTENTS
+        from stamind.cli.bot.capture import CAPTURE_INTENTS
         for intent, captured_as in routing.ROUTER_CAPTURE_INTENTS.items():
             self.assertIn(intent, routing.ROUTER_INTENTS, intent)
             self.assertIn(captured_as, CAPTURE_INTENTS, intent)
@@ -379,7 +379,7 @@ class UiCallbackTest(unittest.TestCase):
         self.assertIsNone(keyboards.resolve_ui_action(buttons, "x"))
 
     def test_morning_buttons_fit_telegrams_64_byte_callback_cap(self):
-        from trainmate.cli.bot.views import MORNING_BUTTONS
+        from stamind.cli.bot.views import MORNING_BUTTONS
         token = "aabbcc"  # secrets.token_hex(3) width
         rows = keyboards.ui_button_rows(MORNING_BUTTONS, token)
         for i, button in enumerate(MORNING_BUTTONS):

@@ -8,7 +8,7 @@ keeps it honest.
 """
 import unittest
 
-import trainmate_cli
+import stamind_cli
 
 
 def leaf_parsers(parser, path=()):
@@ -61,7 +61,7 @@ class TestEveryCommandHasAHandler(unittest.TestCase):
     ANSWERED_BY_THE_DISPATCHER = {("help",), ("shell",)}
 
     def setUp(self):
-        self.parser, self.named = trainmate_cli.build_parser()
+        self.parser, self.named = stamind_cli.build_parser()
 
     def test_every_leaf_command_binds_a_callable(self):
         missing = []

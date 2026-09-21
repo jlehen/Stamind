@@ -20,7 +20,7 @@ back onto the author — the exact friction §1 set out to remove. So: which spo
 structured knob. Schema drops `binding`/`sport`/`type`, adds `rest`; the migration
 is pure idempotent DDL (`hard` + no sport → `rest = 1`, everything else advisory)
 that runs in `_init_db`, with a one-off `constraints_hash` backfill script
-(`scripts/migrate_constraints_drop_binding.py`) so existing plans aren't spuriously
+(since run and deleted) so existing plans aren't spuriously
 invalidated (§7). The §7 hard-window floor becomes a rest-window floor
 (`replan_rest_span_days`); message extraction (§8) drops the `sport`/`type` fields
 and can only ever create advisory (`rest = 0`) rows. §4 (command surface), §5 (DDL
@@ -49,7 +49,7 @@ instruction (§6). `constraint edit` does **not** prompt interactively — every
 field is passed on the command line; only `add` prompts (§4). Migrated life
 events become **`hard`**, not `soft` (§9), resolving that open question. The
 migration **backfills `constraints_hash` on active macrocycles** so it does not
-spuriously invalidate existing plans (§7, §9). `trainmate_web.py`'s life-event
+spuriously invalidate existing plans (§7, §9). `stamind_web.py`'s life-event
 REST surface is added to the repoint list (§6, §10). `--replan` and `--hard`
 are confirmed independent — neither implies the other (§5, §7).*
 
@@ -82,7 +82,7 @@ Observations (`signal`, daily signals) are deliberately **not** merged in — se
 
 ## 1. Motivation
 
-TrainMate accreted three ways for the world to touch the plan, and they feel
+Stamind accreted three ways for the world to touch the plan, and they feel
 disparate because each is "special" for a *different, non-semantic* reason:
 
 - **Life events** are special by **horizon** (they reshape the plan).
@@ -155,7 +155,7 @@ directives; `signal` is untouched.
 - Decoupling `daily_signals` from Google Calendar storage — a separate refactor.
 - Per-type intelligence. `type` is an **opaque, user-vocabulary label** (like
   `daily_signals.metric` — `DESIGN_signal_authoring.md` §1); no code ever
-  branches on a specific value. The free-text fields carry specifics; TrainMate
+  branches on a specific value. The free-text fields carry specifics; Stamind
   stays domain-agnostic (§5).
 - Auto-triggering a regen without a human `y` (§7).
 
@@ -387,7 +387,7 @@ anomaly away, never support a learning") and points back here for why — the tw
 stay in step.
 
 **Other consumers repointed in the same change:** the `status` overview's
-life-events section (`cli/status.py`), the **web surface** (`trainmate_web.py`),
+life-events section (`cli/status.py`), the **web surface** (`stamind_web.py`),
 `wipe` plumbing (`db/wipes.py`), and the `LifeEvent` TypedDict (`types.py`) get
 `Constraint` successors. On the web the repoint landed as `manage_constraints` /
 `single_constraint`; both have since been **removed** by the dashboard's read-only
@@ -398,7 +398,7 @@ is deliberately *not* `constraint list`'s: a rolling `metrics_lookback_days` plu
 everything upcoming, because the dashboard has no mesocycle context in which the
 mesocycle anchor would read. The
 Telegram touch is only a one-line command label in `MENU_COMMANDS`
-(`("lifeevent", "Manage life events")`, `trainmate/chat/keyboards.py`) and is handled
+(`("lifeevent", "Manage life events")`, `stamind/chat/keyboards.py`) and is handled
 by the §9 forwarder — no
 special work.
 
@@ -504,7 +504,7 @@ Three choices make that formula reproducible (`coach/service/planning.py`'s
   simply cannot fire, and only the rest-window floor can propose a replan. That is
   the conservative direction: no reference week means no honest sense of scale.
 
-There is deliberately **no** per-session "importance" term: TrainMate has no
+There is deliberately **no** per-session "importance" term: Stamind has no
 importance/priority field anywhere — not on sessions, and (since it was removed)
 not on goals either — so a heuristic that leaned on "key sessions" would be
 inventing data the schema doesn't carry. Displaced load is the honest proxy. Start with the
@@ -655,13 +655,12 @@ than needing separate enforcement.
 `lifeevent` / `le` / `e` were retained for one release as thin **forwarders** to
 `constraint … --replan` (a life event was, by definition, plan-shaping), emitting a
 deprecation notice. That release has passed: no `lifeevent` command exists anywhere
-today — `trainmate_cli.py` dispatches only `constraint`, and `MENU_COMMANDS`
-(`trainmate/chat/keyboards.py`) lists only `("constraint", …)`. (Behavior change the
+today — `stamind_cli.py` dispatches only `constraint`, and `MENU_COMMANDS`
+(`stamind/chat/keyboards.py`) lists only `("constraint", …)`. (Behavior change the
 forwarder carried while it lived: it could propose a regen at add time, §7 step 3.)
 
 **Data migration — a one-off operation, not part of `_init_db`. Historical: this
-script has run and has since been deleted** (`scripts/` holds only
-`migrate_constraints_drop_binding.py` and `migrate_cycling_sport_rename.py`), and
+script has run and has since been deleted**, and
 the `lifeevents` table it read is dropped unconditionally by `_init_db` (§10 step 8,
 `db/schema.py`'s `DROP TABLE IF EXISTS lifeevents`). The reasoning is kept because it
 is the standing rule for *any* future row-copy migration here. Every other migration
@@ -703,8 +702,7 @@ refinement could still be run after the fact without re-migrating.
 was `soft`, and rev 6 maps `soft` → advisory `rest = 0` — so the carry-over above
 survived the collapse untouched, which is the outcome the `soft` decision was
 protecting. Rev 6's own DDL migration is idempotent and *does* live in `_init_db`;
-only its `constraints_hash` backfill needed the one-off script,
-`scripts/migrate_constraints_drop_binding.py`.)
+only its `constraints_hash` backfill needed a one-off script, since run and deleted.)
 
 **Backfill `constraints_hash` on active macrocycles (must run inside the same
 one-off script, after the row copy).** Per §7, recompute each active
@@ -744,7 +742,7 @@ through the one current read path rather than stranding them.
    `constraints_hash` on active macrocycles (§7/§9)**, and, in the same release,
    repoint every consumer: `generate`/`adapt` (§6, incl. the deterministic
    rest post-hoc override), the weekly-analysis discounting feed, `status`,
-   the **web surface** (`trainmate_web.py`), wipes, and the
+   the **web surface** (`stamind_web.py`), wipes, and the
    `constraints_hash`/`constraints_snapshot` successors (§7). The migration must
    land *with* the repoint, not after it — otherwise existing life events are
    silently ignored in between.
@@ -787,7 +785,7 @@ the vision; 8 was cleanup.
   for the adherence path to special-case; leave the row out and the guarantee inverts.
   The one caveat: an already-planned date is only converted once `adapt` actually runs
   on it — `constraint add`/`edit` do nothing synchronously. That's expected, not a
-  gap: `adapt` is meant to run daily, and like everything else in TrainMate, a
+  gap: `adapt` is meant to run daily, and like everything else in Stamind, a
   constraint has no effect until the command that consumes it runs.
 - **`--message` classifier reliability.** Extraction is easy; the risk is a
   durable-looking sentence mis-filed as ephemeral (or vice versa). Mitigation:

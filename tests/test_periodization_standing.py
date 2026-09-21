@@ -18,12 +18,12 @@ def _days_out(n: int) -> str:
 
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestTheStandingSessionsReachGeneration(unittest.TestCase):
@@ -103,8 +103,8 @@ class TestTheStandingSessionsReachGeneration(unittest.TestCase):
     def _run(self, *entries, **response):
         """`workout generate` end to end against a fixed model response, as the CLI does
         on a `y`. Returns the proposal and the user content the model was sent."""
-        with patch("trainmate.runtime.calendar_syncer"), \
-                patch("trainmate.coach.engine.openrouter_client") as client:
+        with patch("stamind.runtime.calendar_syncer"), \
+                patch("stamind.coach.engine.openrouter_client") as client:
             client.complete.return_value = {
                 "reasoning": "why", "workouts": list(entries), **response,
             }

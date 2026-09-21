@@ -8,11 +8,11 @@ from zoneinfo import ZoneInfo
 from tests.helpers import clear_all_tables, rebind_test_db, run_cli
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_clock.db")
+TEST_DB_PATH = test_db_path("test_stamind_clock.db")
 
-from trainmate import clock, settings
-from trainmate.db import Database
-from trainmate.clock import fmt_timestamp, today_date, today_str
+from stamind import clock, settings
+from stamind.db import Database
+from stamind.clock import fmt_timestamp, today_date, today_str
 
 
 def _set_zone(zone: str) -> str:
@@ -226,13 +226,13 @@ class TestPushWindowFollowsTheAthlete(ClockTestCase):
     machine's (§2)."""
 
     def test_the_scheduler_reads_the_stored_zone(self):
-        from trainmate.chat import scheduler
+        from stamind.chat import scheduler
         _set_zone(FAR_EAST)
         self.assertEqual(scheduler.athlete_now().date(),
                          datetime.now(ZoneInfo(FAR_EAST)).date())
 
     def test_the_window_is_computed_in_wall_clock_terms(self):
-        from trainmate.chat import scheduler
+        from stamind.chat import scheduler
         # 07:00 local, whatever zone that is: the 08:00 push is an hour out.
         now = datetime(2026, 6, 10, 7, 0, tzinfo=ZoneInfo("Europe/Paris"))
         self.assertEqual(scheduler.next_push_delay(now, "08:00", "15:00"), 3600.0)

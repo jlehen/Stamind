@@ -16,8 +16,8 @@ import shutil
 import tempfile
 import unittest
 
-from trainmate import types
-from trainmate.db import Database
+from stamind import types
+from stamind.db import Database
 
 # TypedDict -> the table whose rows it annotates. Tables with no TypedDict (settings,
 # sync_state, ...) are deliberately absent; a TypedDict missing from here has to appear
@@ -37,14 +37,14 @@ TYPE_TABLES = {
 # accessor actually returns — see the two classes at the bottom of this file.
 HYDRATED_TYPES = {"Workout", "PlanFeedback"}
 
-# `trainmate.types` is table rows and the hydrated reads over them, and nothing else:
+# `stamind.types` is table rows and the hydrated reads over them, and nothing else:
 # `PlanProposal` was the one exception and it lives with the coach's other records now
 # (`coach/proposals.py`). A TypedDict that is neither belongs there too, so the group
 # that used to hold it is gone rather than left open.
 
 
 def _typed_dict_names():
-    """Every TypedDict `trainmate.types` declares, by the shape rather than by a list."""
+    """Every TypedDict `stamind.types` declares, by the shape rather than by a list."""
     found = []
     for name in dir(types):
         member = getattr(types, name)

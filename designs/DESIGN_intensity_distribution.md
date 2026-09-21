@@ -44,7 +44,7 @@ Three quantities this codebase does not consistently name apart. The rest of the
 and §9's split of responsibility between `adapt` and `generate`, depends on the distinction:
 
 - **Volume** — time. `duration_sec` on an activity, `duration_minutes` on a planned workout.
-- **Intensity** — effort relative to threshold. In TrainMate this is *only* ever observable as
+- **Intensity** — effort relative to threshold. In Stamind this is *only* ever observable as
   the zone distribution. There is no other intensity signal in the schema.
 - **Load** — TSS. One scalar folding the other two together (`compute_load`), structurally
   `duration × IF²`, and for HR-derived activities literally `Σ(zone_seconds × weight)`.
@@ -336,7 +336,7 @@ would mislead a model reading the numbers naively is stated as a fact beside the
 ### 7.1 Threshold drift is prevented, not detected
 
 Garmin bucketed each activity using the zones in force *at the time*, derived from Garmin's
-own FTP and lactate-threshold values — not TrainMate's benchmark logbook. An auto-detected FTP
+own FTP and lactate-threshold values — not Stamind's benchmark logbook. An auto-detected FTP
 bump moves the Z4/Z5 boundary, and the same effort then lands one zone lower: a mesocycle looks
 easier when nothing changed. Per-zone reporting surfaces this at every boundary rather than
 two, and §4.1's delta is precisely the view it contaminates.
@@ -346,7 +346,7 @@ An earlier draft proposed detecting these moves by reading Garmin's threshold hi
 
 **Prerequisite — Garmin's automatic FTP and lactate-threshold detection must be off.** They
 are two independent settings (cycling FTP, running lactate threshold); disabling one leaves
-the other drifting. TrainMate treats the athlete's recorded benchmarks as authoritative, and
+the other drifting. Stamind treats the athlete's recorded benchmarks as authoritative, and
 Garmin's auto-updates silently redefine the zone boundaries in the activity history underneath
 them.
 
@@ -725,7 +725,7 @@ so nothing is "unrecognised" at that layer and the list must come from the data.
 That leaves the default itself as the one unguarded input. `sport_preferences` is free-text
 config whose only current consumer joins it into a prompt string
 (`coach/engine/prompt.py`), so `"Road cycling"` normalises to `"road cycling"` and matches
-nothing. **TrainMate should warn at config load on any preference that is not a canonical
+nothing. **Stamind should warn at config load on any preference that is not a canonical
 sport** — a warning and not an error, because `SPORT_MAPPING` has no `swimming` or `rowing`
 entry and a genuinely new sport must still round-trip:
 
@@ -878,7 +878,7 @@ the aggregation (`zone_rows`) and `analytics/zone_tables.py` the prompt-width ta
 coach reads.
 
 **Every glyph means one thing, and none of them overlap.** `~` is already taken: `meso_bands`
-prefixes it to the label of a mesocycle TrainMate *reconstructed from training history* rather
+prefixes it to the label of a mesocycle Stamind *reconstructed from training history* rather
 than one a plan prescribed (`analytics/timeline.py`), and the load table's legend reads `~ inferred`.
 Reusing it for coverage would put two definitions of one character fifteen lines apart on one
 screen.
@@ -1289,7 +1289,7 @@ athlete can act on, and it survives the ruler shift below in a way `30 min Z2` d
 index is the join key, the name is the prescription.
 
 **§7.1 stops being advice and becomes a dependency.** Garmin bucketed each activity using
-Garmin's own FTP and lactate-threshold values, not TrainMate's logbook — so TrainMate does not
+Garmin's own FTP and lactate-threshold values, not Stamind's logbook — so Stamind does not
 own the definition of Z2. For *measurement* §7.1 states that residual risk once and accepts
 it, because a delta compares like with like. A *prescription* outlives the moment it was
 written: with auto-detection left on, two sessions planned identically six months apart mean
@@ -1312,7 +1312,7 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
   is fake precision. Revisit only if per-set data is ever logged.
 - **A `movement` column on `benchmark_results`.** `e1rm` collides across lifts — the logbook
   has no per-exercise field and `latest_thresholds()` keys on `anchor_kind` alone, so a
-  deadlift PR logged after a squat PR becomes one `e1rm` value jumping 70%. TrainMate does not
+  deadlift PR logged after a squat PR becomes one `e1rm` value jumping 70%. Stamind does not
   plan progressive strength well enough yet to justify the schema. Two smaller fixes instead:
   exclude `e1rm` from the drift check in `config_changed()` (`coach/service/staleness.py`, the
   loop over anchor kinds — a squat PR should never invalidate a periodization), and note in

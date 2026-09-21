@@ -12,13 +12,13 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_adaptation_matching.db")
 
-from trainmate.db import Database
-import trainmate.config
+from stamind.db import Database
+import stamind.config
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestAdaptAsksAboutAGuessedPairing(unittest.TestCase):
@@ -64,7 +64,7 @@ class TestAdaptAsksAboutAGuessedPairing(unittest.TestCase):
             }],
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_ambiguous_match_is_asked_about_and_the_answer_sticks(self, mock_client):
         """A pairing the matcher had to GUESS at is raised as a question before the LLM
         call, and answering "no" keeps the activity out of the session.
@@ -74,7 +74,7 @@ class TestAdaptAsksAboutAGuessedPairing(unittest.TestCase):
         fact, and it used to reach the week planner as "this session was performed"
         (ARCHITECTURE.md §15)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -113,7 +113,7 @@ class TestAdaptAsksAboutAGuessedPairing(unittest.TestCase):
             self.assertNotIn("[PARTIAL", prompt_user_content)
             self.assertNotIn("[COMPLETED", prompt_user_content)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_same_sport_but_far_too_short_is_also_asked_about(self, mock_client):
         """The sport check has already done its work by the time a pairing exists, so the
         question turns on DURATION alone — an exact sport match that ran far short is as
@@ -121,7 +121,7 @@ class TestAdaptAsksAboutAGuessedPairing(unittest.TestCase):
         is either the session cut short or a warm-up to discard, and only the athlete
         knows which (ARCHITECTURE.md §15)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -143,13 +143,13 @@ class TestAdaptAsksAboutAGuessedPairing(unittest.TestCase):
             self.assertEqual(len(questions), 1)
             self.assertEqual(questions[0]["activity_id"], "act_short_lift")
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_session_that_ran_its_length_is_never_questioned(self, mock_client):
         """The question costs nothing on an ordinary day. An activity that ran roughly the
         planned length is the session, whether its type is the planned sport's own name or
         one of its aliases — a 62-minute virtual_ride IS the 60-minute cycling session."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,

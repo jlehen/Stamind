@@ -5,12 +5,12 @@ from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, rebind_test_db
-from trainmate import runtime
-from trainmate.db import Database
-import trainmate.garmin as garmin
+from stamind import runtime
+from stamind.db import Database
+import stamind.garmin as garmin
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_garmin.db")
+TEST_DB_PATH = test_db_path("test_stamind_garmin.db")
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
@@ -23,7 +23,7 @@ def _bind_test_db(tc):
     theirs. There is now one place to save and restore: the garmin functions resolve
     the handle through ``runtime.db`` rather than their own package attribute.
     """
-    import trainmate.runtime as runtime
+    import stamind.runtime as runtime
 
     prev_db = vars(runtime).get("db")
     rebind_test_db(test_db)

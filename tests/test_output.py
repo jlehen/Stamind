@@ -1,13 +1,13 @@
-"""`trainmate/output.py`: which tier a message belongs to, and who therefore sees it."""
+"""`stamind/output.py`: which tier a message belongs to, and who therefore sees it."""
 import ast
 import io
 import os
 import unittest
 from unittest.mock import patch
 
-from trainmate import output as output_module
-from trainmate.output import Progress, Spinner
-from trainmate.text import visible_len
+from stamind import output as output_module
+from stamind.output import Progress, Spinner
+from stamind.text import visible_len
 
 
 class TestProgress(unittest.TestCase):
@@ -52,7 +52,7 @@ class TestSpinner(unittest.TestCase):
         import itertools
         import time
         out = self._Tty()
-        with patch("sys.stdout", out), patch("trainmate.output.time") as clock:
+        with patch("sys.stdout", out), patch("stamind.output.time") as clock:
             # Started at t=1000, every later reading is 83 seconds on.
             clock.monotonic.side_effect = itertools.chain([1000.0], itertools.repeat(1083.0))
             with Spinner():
@@ -77,9 +77,9 @@ class TestAsides(unittest.TestCase):
 
     def setUp(self):
         self._saved = {
-            k: os.environ.pop(k, None) for k in ("TRAINMATE_VERBOSE", "TRAINMATE_FRONTEND")
+            k: os.environ.pop(k, None) for k in ("STAMIND_VERBOSE", "STAMIND_FRONTEND")
         }
-        from trainmate import output, text
+        from stamind import output, text
         self.text = text
         self.output = output
 
@@ -101,17 +101,17 @@ class TestAsides(unittest.TestCase):
         self.assertIn("side information", self._emit())
 
     def test_silent_under_the_chat_frontend(self):
-        os.environ["TRAINMATE_FRONTEND"] = "json"
+        os.environ["STAMIND_FRONTEND"] = "json"
         self.assertFalse(self.text.asides_enabled())
         self.assertEqual(self._emit(), "")
 
     def test_env_forces_them_back_on_in_chat(self):
-        os.environ["TRAINMATE_FRONTEND"] = "json"
-        os.environ["TRAINMATE_VERBOSE"] = "1"
+        os.environ["STAMIND_FRONTEND"] = "json"
+        os.environ["STAMIND_VERBOSE"] = "1"
         self.assertIn("side information", self._emit())
 
     def test_env_forces_them_off_on_a_terminal(self):
-        os.environ["TRAINMATE_VERBOSE"] = "0"
+        os.environ["STAMIND_VERBOSE"] = "0"
         self.assertEqual(self._emit(), "")
 
 
@@ -124,17 +124,17 @@ class TestWarningTierWraps(unittest.TestCase):
             "the periodization first.")
 
     def setUp(self):
-        self._saved = os.environ.pop("TRAINMATE_WRAP_WIDTH", None)
-        os.environ["TRAINMATE_WRAP_WIDTH"] = "48"
-        from trainmate import output, text
+        self._saved = os.environ.pop("STAMIND_WRAP_WIDTH", None)
+        os.environ["STAMIND_WRAP_WIDTH"] = "48"
+        from stamind import output, text
         self.text = text
         self.output = output
 
     def tearDown(self):
         if self._saved is None:
-            os.environ.pop("TRAINMATE_WRAP_WIDTH", None)
+            os.environ.pop("STAMIND_WRAP_WIDTH", None)
         else:
-            os.environ["TRAINMATE_WRAP_WIDTH"] = self._saved
+            os.environ["STAMIND_WRAP_WIDTH"] = self._saved
 
     def _emit(self, fn, *args) -> str:
         buf = io.StringIO()
@@ -174,7 +174,7 @@ class TestWarningTierWraps(unittest.TestCase):
         message, and wrapping it would break the layout it sits in."""
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         offenders = []
-        for dirpath, dirnames, filenames in os.walk(os.path.join(root, "trainmate")):
+        for dirpath, dirnames, filenames in os.walk(os.path.join(root, "stamind")):
             dirnames[:] = [d for d in dirnames if d != "__pycache__"]
             for name in filenames:
                 if not name.endswith(".py"):
@@ -219,7 +219,7 @@ class TestWarningTierWraps(unittest.TestCase):
                 return node.value.lstrip("\n")
             return ""
 
-        for dirpath, dirnames, filenames in os.walk(os.path.join(root, "trainmate")):
+        for dirpath, dirnames, filenames in os.walk(os.path.join(root, "stamind")):
             dirnames[:] = [d for d in dirnames if d != "__pycache__"]
             for name in filenames:
                 if not name.endswith(".py") or name in exempt:
@@ -236,7 +236,7 @@ class TestWarningTierWraps(unittest.TestCase):
 
     def test_the_journal_keeps_the_unwrapped_line(self):
         # A log is not read at 48 columns (DESIGN_logging.md §5.3).
-        with patch("trainmate.journal.note") as note:
+        with patch("stamind.journal.note") as note:
             self._emit(self.output.warn, self.LONG)
         self.assertEqual(note.call_args.args[0], self.LONG)
 

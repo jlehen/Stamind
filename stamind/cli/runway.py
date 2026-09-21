@@ -1,0 +1,183 @@
+"""The end-of-schedule nudge, shared by every surface that draws it
+(DESIGN_runway_nudge.md).
+
+One fetch, one detector, one command named — so `workout adapt`, `status` and the
+morning push cannot answer the same morning differently (§3). The detection itself is
+`analytics.runway.runway`, pure over rows; this module is the thin db-reads wrapper around
+it plus the expert wordings each surface asks for, the same split `timeline_rows.py` makes
+around `analytics/timeline.py`. The companion wordings of the same facts live in
+`cli/render/plan_lines.py` with the rest of that voice (DESIGN_render_persona.md §4).
+"""
+from typing import Any, Dict, List, Optional, Tuple
+
+from stamind.config import config
+from stamind.analytics.runway import (
+    RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN, plan_end, runway,
+)
+from stamind.text import cmd, gray
+from stamind.clock import days_between, fmt_date, today_str as _today_str
+
+# What the morning push offers on a span or mesocycle cliff (§6). The label is the athlete's;
+# the argv behind it comes from the detector, never from the free-text router.
+RUNWAY_BUTTON_LABEL = "📅 Plan my next weeks"
+
+
+def _plan_mesocycles() -> List[Dict[str, Any]]:
+    """The mesocycles of the plan the current workouts implement.
+
+    `get_governing_macrocycle`, deliberately not `upcoming_objectives`: that filter drops
+    a goal the day after its target date, which is exactly the morning the wrap-up
+    message matters most (DESIGN_runway_nudge.md §2)."""
+    from stamind import runtime
+    macro = runtime.db.get_governing_macrocycle()
+    if not macro:
+        return []
+    return runtime.db.get_mesocycles_for_macrocycle(macro["id"])
+
+
+def current_runway(as_of: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """`analytics.runway.runway` over the rows this instance holds, or None when nothing
+    fires. `as_of` defaults to today; `workout adapt` passes its evaluation date."""
+    from stamind import runtime
+    return runway(
+        runtime.db.get_workouts(),
+        _plan_mesocycles(),
+        runtime.db.get_objectives(),
+        as_of or _today_str(),
+        config.runway_warning_days,
+    )
+
+
+def schedule_coverage() -> Tuple[Optional[str], Optional[str]]:
+    """`(last covered date, plan end)` — the raw facts behind the detector, for the
+    listing marker that draws them whether or not the nudge is firing (§4)."""
+    from stamind import runtime
+    mesocycles = _plan_mesocycles()
+    ends = [str(b["end_date"]) for b in mesocycles if b.get("end_date")]
+    return plan_end(runtime.db.get_workouts()), max(ends) if ends else None
+
+
+def schedule_exhausted(as_of: str) -> bool:
+    """Whether the generated schedule has already run out on `as_of`. Distinct from the
+    detector firing: a schedule that ran out months ago is exhausted and silent (§6)."""
+    last_covered, _ = schedule_coverage()
+    return last_covered is not None and last_covered < as_of
+
+
+def plan_is_behind(as_of: str) -> bool:
+    """Whether every mesocycle of the governing plan ended before `as_of` — the state in
+    which `workout adapt` has nothing to adapt towards and refuses (§4)."""
+    mesocycles = _plan_mesocycles()
+    ends = [str(b["end_date"]) for b in mesocycles if b.get("end_date")]
+    return bool(ends) and max(ends) < as_of
+
+
+def _when(days_left: int, date_str: str) -> str:
+    """'today' / 'in 4 day(s), on <date>' / '3 day(s) ago, on <date>' — the old mesocycle
+    hint's idiom, extended to the passed state. Day zero never reads 'in 0 day(s)' (§4)."""
+    if days_left == 0:
+        return "today"
+    if days_left > 0:
+        return f"in {days_left} day(s), on {fmt_date(date_str)}"
+    return f"{-days_left} day(s) ago, on {fmt_date(date_str)}"
+
+
+def _plan_left(today: str, plan_end_date: str) -> str:
+    """How much periodization is left, for the span wording: weeks once there is a week
+    of it, days below that."""
+    days = days_between(today, plan_end_date)
+    if days >= 7:
+        weeks = round(days / 7)
+        return f"covers {weeks} more week{'s' if weeks != 1 else ''}"
+    if days >= 1:
+        return f"covers {days} more day{'s' if days != 1 else ''}"
+    return "ends today"
+
+
+def runway_hint_lines(state: Dict[str, Any], today: str) -> List[str]:
+    """The §4 hint: the fact, then the exact command. Two lines whatever the cliff, so
+    every surface prints the same shape and the athlete learns one place to look."""
+    days_left = state["days_left"]
+    when = _when(days_left, state["last_covered_date"])
+    kind = state["kind"]
+
+    if kind == RUNWAY_MESOCYCLE:
+        meso_id = state["next_mesocycle"]["id"]
+        return [
+            f"This mesocycle {'ends' if days_left >= 0 else 'ended'} {when}, and the next "
+            f"one has no fresh sessions.",
+            "Run " + cmd(f"workout generate -m ..{meso_id}")
+            + " to plan it against current metrics.",
+        ]
+    if kind == RUNWAY_SPAN:
+        return [
+            f"Scheduled workouts {'run' if days_left >= 0 else 'ran'} out {when}.",
+            f"Your plan {_plan_left(today, state['plan_end'])} — run "
+            + cmd("workout generate") + " to schedule the next span.",
+        ]
+
+    verb = "ends" if days_left >= 0 else "ended"
+    last = "today" if days_left == 0 else f"on {fmt_date(state['last_covered_date'])}"
+    if kind == RUNWAY_PLAN_END_NEXT_GOAL:
+        obj = state["objective"]
+        return [
+            f"Your plan {verb} with its last session {last}.",
+            f"Next up: {obj['title']} ({fmt_date(str(obj['target_date']))}) — run "
+            + cmd("workout generate -g") + " to build toward it.",
+        ]
+    # RUNWAY_PLAN_END_NO_GOAL — the last of the four kinds.
+    return [
+        f"Your plan {verb} with its last session {last} — nothing is planned beyond it.",
+        "Set what's next with " + cmd("goal add") + ", then " + cmd("plan generate") + ".",
+    ]
+
+
+def crossing_the_end(end_date: Optional[str]) -> Optional[Tuple[str, Optional[str]]]:
+    """`(last covered date, plan end)` when a listing ending on `end_date` runs past the
+    end of the schedule, else None. An open-ended listing always crosses it."""
+    last_covered, plan_end_date = schedule_coverage()
+    if last_covered is None:
+        return None
+    if end_date is not None and end_date <= last_covered:
+        return None
+    return last_covered, plan_end_date
+
+
+def list_end_marker(end_date: Optional[str]) -> Optional[str]:
+    """The one gray line `workout list` draws after the last session when the listed
+    range crosses the end of the schedule (§4).
+
+    Unconditional — a fact of the listing, not a warning, so it ignores the runway
+    window entirely."""
+    crossing = crossing_the_end(end_date)
+    if crossing is None:
+        return None
+    last_covered, plan_end_date = crossing
+    tail = (
+        f"plan continues to {fmt_date(plan_end_date)}"
+        if plan_end_date and plan_end_date > last_covered else "end of plan"
+    )
+    return gray(f"— end of scheduled workouts ({tail}) —")
+
+
+def runway_argv(state: Optional[Dict[str, Any]]) -> Optional[str]:
+    """The command the §6 button sends, or None for the cliffs that offer no button.
+
+    The narrow amendment to DESIGN_bot_simple_frontend.md §7's guardrail: `workout
+    generate` becomes tappable here and only here, with argv the detector chose."""
+    if not state:
+        return None
+    if state["kind"] == RUNWAY_MESOCYCLE:
+        return f"workout generate -m ..{state['next_mesocycle']['id']}"
+    if state["kind"] == RUNWAY_SPAN:
+        return "workout generate"
+    return None
+
+
+def runway_buttons(state: Optional[Dict[str, Any]]) -> List[dict]:
+    """The push's runway row: one button, or none at all. Its own gate, independent of
+    the session rows' `if ahead:` — each condition answers its own question (§6)."""
+    utterance = runway_argv(state)
+    if not utterance:
+        return []
+    return [{"label": RUNWAY_BUTTON_LABEL, "send": utterance}]

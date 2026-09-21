@@ -7,14 +7,14 @@ import ast
 import inspect
 import unittest
 
-from trainmate.analytics import adherence
-from trainmate.analytics import intensity
-from trainmate.analytics.adherence import STATUS_LABELS
-from trainmate.cli.workouts.session_line import adherence_marker
-from trainmate.analytics.baselines import (
+from stamind.analytics import adherence
+from stamind.analytics import intensity
+from stamind.analytics.adherence import STATUS_LABELS
+from stamind.cli.workouts.session_line import adherence_marker
+from stamind.analytics.baselines import (
     ELEVATED, NORMAL, SUPPRESSED, UNKNOWN, classify_metric, is_anomalous,
 )
-from trainmate.cli.progress_zones import planned_week_cells, zone_week_cells
+from stamind.cli.progress_zones import planned_week_cells, zone_week_cells
 
 
 class TestClassifyMetric(unittest.TestCase):
@@ -188,7 +188,7 @@ class TestAdherenceVocabulary(unittest.TestCase):
         self.assertEqual(_statuses_the_classifier_can_return(), set(STATUS_LABELS))
 
     def test_the_calendar_tag_map_is_the_shared_one_not_a_copy(self):
-        from trainmate.gcal.event import ADHERENCE_TAGS
+        from stamind.gcal.event import ADHERENCE_TAGS
         self.assertIs(ADHERENCE_TAGS, STATUS_LABELS)
 
     def test_the_marker_prints_the_word_the_verdict_carries(self):

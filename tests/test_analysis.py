@@ -11,14 +11,14 @@ import unittest
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, rebind_test_db
-from trainmate.db import Database
+from stamind.db import Database
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_analysis.db")
+TEST_DB_PATH = test_db_path("test_stamind_analysis.db")
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestWorkoutAnalysis(unittest.TestCase):
@@ -41,7 +41,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_date_resolution_with_preceding_goal(self, mock_client):
         # Earliest objective: 2026-07-01
         test_db.add_objective(
@@ -71,7 +71,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
         self.assertIn("2026-06-01", summaries) # Monday of that week is 2026-06-01 (Tuesday 2026-06-02 is in it)
 
     @patch("builtins.input", return_value="y")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_date_resolution_explicit_window(self, mock_client, _mock_input):
         """The service takes a resolved window; turning '10d'/'4w' into one is the CLI
         selector's job (tests/test_cli_selectors.py)."""
@@ -95,7 +95,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
         summaries = mock_client.complete.call_args[0][1]
         self.assertIn("2026-05-18", summaries)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_weekly_aggregation_logic(self, mock_client):
         # Setup completed activities in different weeks
         # Week commencing 2026-06-01
@@ -143,7 +143,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
         self.assertIn("FTP Race Test", user_payload)
         self.assertIn("avg_hrv\": 75.0", user_payload)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_bootstrap_derives_confidence_and_validates_weeks(self, mock_client):
         """The analysis flow passes the window's weeks to the merge layer: an observation
         cited across enough distinct in-window weeks is derived 'established', while a cited
@@ -176,7 +176,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
         )
 
     @patch("builtins.input", return_value="y")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_reuse_skips_llm_when_evidence_unchanged(self, mock_client, _mock_input):
         """A second bootstrap over unchanged evidence reuses the cached reconstruction
         instead of calling the LLM again (DESIGN_backward_evaluation.md §5). The repeat
@@ -197,7 +197,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
         self.assertEqual(reused["macrocycle_summary"], "summary")
 
     @patch("builtins.input", return_value="n")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_repeat_bootstrap_declined_is_a_noop(self, mock_client, _mock_input):
         """A second bootstrap detects the prior run and prompts; declining skips entirely —
         no extra LLM pass, no reflect-watermark reset."""
@@ -218,7 +218,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
         self.assertEqual(test_db.get_sync_state("reflect"), reflect_wm)
 
     @patch("builtins.input")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_repeat_bootstrap_under_auto_skips_without_prompting(self, mock_client, mock_input):
         """Under --auto (non-interactive) a repeat bootstrap skips silently rather than
         blocking on a prompt that can never be answered."""
@@ -236,7 +236,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
         self.assertEqual(mock_client.complete.call_count, 1)
         mock_input.assert_not_called()
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     @patch("builtins.input", return_value="s")
     def test_force_recompute_cannot_inflate_via_evidence_dedup(self, mock_input, mock_client):
         """--force recomputes over unchanged evidence, but re-citing an already-counted week
@@ -274,7 +274,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
         self.assertEqual(learning["last_reinforced_at"], sentinel)  # no new week -> no refresh
         self.assertEqual(learning["confidence"], "tentative")        # still one week
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_inspect_only_writes_nothing(self, mock_client):
         """--inspect-only renders but writes neither learnings nor the cache (§9)."""
         self._seed_activity()
@@ -288,7 +288,7 @@ class TestWorkoutAnalysis(unittest.TestCase):
         self.assertEqual(len(test_db.get_learnings()), 0)
         self.assertIsNone(test_db.get_analysis_cache("long"))
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_existing_learnings_injected_into_prompt(self, mock_client):
         # Existing observations must appear in the analysis prompt (with ids) so the
         # model can revise/reinforce them instead of only re-adding duplicates.

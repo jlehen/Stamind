@@ -1,4 +1,4 @@
-# TrainMate — the short template: the settings you have to fill in.
+# Stamind — the short template: the settings you have to fill in.
 #
 # Copy this to config.yaml (gitignored) and replace the placeholders. Everything not
 # listed here has a working default, so this file is a complete, runnable config once
@@ -124,7 +124,7 @@ coach:
     altitude: "sleeping or training above ~1500 m; value = altitude in metres"
     medication: "a drug that moves recovery — antihistamine, steroid, decongestant"
 
-# Optional: drive TrainMate from your phone (./tm-bot). Omit the whole section to disable
+# Optional: drive Stamind from your phone (./tm-bot). Omit the whole section to disable
 # it. Create a bot with @BotFather for the token; message it once and use @userinfobot
 # to find your numeric chat id. The bot starts in companion mode: a reply keyboard, plain
 # prose and a morning message. See config_template_full.yaml for the timeouts and the
@@ -153,6 +153,6 @@ coach:
 #  change_delay_minutes: 20
 
 # Second athlete, same checkout: give them their own config file and select it with
-# TRAINMATE_CONFIG=/path/to/other/config.yaml ./tm status. Their database, logs, science
+# STAMIND_CONFIG=/path/to/other/config.yaml ./tm status. Their database, logs, science
 # guidelines and Garmin token store all land beside that file. See `data_dir:` in
 # config_template_full.yaml for keeping two instances side by side in one directory.

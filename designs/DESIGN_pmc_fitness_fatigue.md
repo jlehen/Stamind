@@ -61,7 +61,7 @@
 > instead of caveating numbers that aren't shown — and `tm status` shows it even
 > then. (4) The TSB-lag footnote appears only where TSB itself is shown.
 
-`trainmate/science/training_load.md` (f0bb707) documents the full Performance Management
+`stamind/science/training_load.md` (f0bb707) documents the full Performance Management
 Chart model — CTL (fitness), ATL (fatigue), TSB (form), and the CTL ramp rate —
 and its §5 coaching directives tell the coach things like *"when TSB falls below
 −30, default to recovery"* and *"taper so TSB rises into +5..+25 by event day"*.
@@ -120,7 +120,7 @@ design started from (ACWR-era, historical per the amendment banner).
 
 | Layer | Where (current) | Then (pre-PMC) |
 |---|---|---|
-| Compute | `trainmate/garmin/derived.py` `recompute_derived()`, over the maths in `analytics/pmc.py` | full-sweep acute (7d sum), chronic (28d/4), ACWR per metrics day |
+| Compute | `stamind/garmin/derived.py` `recompute_derived()`, over the maths in `analytics/pmc.py` | full-sweep acute (7d sum), chronic (28d/4), ACWR per metrics day |
 | Store | `athlete_metrics_cache` (`db/schema.py`), `save_metric_cache()` (`db/activities.py`), `AthleteMetric` (`types.py`) | `acute_workload`, `chronic_workload`, `acwr` columns |
 | Wipe | `wipe_garmin_data()` (`db/wipes.py`) | deletes rows by range; **does not** recompute (see §4) |
 | Coach, per-day | `format_metrics_history()` (`coach/formatting.py`) → generate & adapt prompts (`coach/engine/generate.py`, `adapt.py`) | `... ACWR=1.12` per day line — **unguarded** `:.2f`, see §5.1 |
@@ -134,15 +134,15 @@ packages after it merged, so the original paths no longer resolve. Current homes
 
 | Design says | Actually lives in |
 |---|---|
-| `garmin.py` — `recompute_derived`, `backfill_tss`, `pmc_history_start` | `trainmate/garmin/derived.py` |
-| `garmin.py` — `compute_pmc`, `load_ratio`, `pmc_ramp`, `pmc_display_values`, `pmc_data_caveat` | `trainmate/analytics/pmc.py` (no database, no Garmin) |
-| `garmin.py` — `pull()`, `_warn_manual` | `trainmate/garmin/sync.py` |
-| `garmin.py` — the derivation pad | `trainmate/analytics/pmc.py` `derivation_pad_days()` |
-| `coach/service.py` — data summary, PMC/ramp/caveat lines | `trainmate/coach/service/history_context.py` |
-| `coach/service.py` — weekly digest | `trainmate/coach/service/analysis.py` |
-| `coach/engine.py` — `met_digest` fingerprint | `trainmate/coach/engine/prompt.py` |
-| `coach/engine.py` — generate/adapt prompt assembly | `trainmate/coach/engine/generate.py`, `adapt.py` |
-| `cli/workouts.py` | `trainmate/cli/workouts/*.py` (but see §6.2b — that surface is gone) |
+| `garmin.py` — `recompute_derived`, `backfill_tss`, `pmc_history_start` | `stamind/garmin/derived.py` |
+| `garmin.py` — `compute_pmc`, `load_ratio`, `pmc_ramp`, `pmc_display_values`, `pmc_data_caveat` | `stamind/analytics/pmc.py` (no database, no Garmin) |
+| `garmin.py` — `pull()`, `_warn_manual` | `stamind/garmin/sync.py` |
+| `garmin.py` — the derivation pad | `stamind/analytics/pmc.py` `derivation_pad_days()` |
+| `coach/service.py` — data summary, PMC/ramp/caveat lines | `stamind/coach/service/history_context.py` |
+| `coach/service.py` — weekly digest | `stamind/coach/service/analysis.py` |
+| `coach/engine.py` — `met_digest` fingerprint | `stamind/coach/engine/prompt.py` |
+| `coach/engine.py` — generate/adapt prompt assembly | `stamind/coach/engine/generate.py`, `adapt.py` |
+| `cli/workouts.py` | `stamind/cli/workouts/*.py` (but see §6.2b — that surface is gone) |
 
 Each row gets a PMC counterpart — no new subsystem. (Rev. 5 also listed plan-side
 `Mesocycle`/`Workout.tss` rows for the phase color and taper projection; those are
@@ -613,7 +613,7 @@ downstream parsing doesn't read a zero as data.
 > **This surface does not exist. Do not go looking for it, and do not "restore" it
 > without revisiting the decision below.** It shipped in `613b47c` and was deliberately
 > deleted in `ce0b74d` (*"workout adapt: collapse metrics table to a one-line day
-> count"*). `trainmate/cli/workouts/adapt.py` now prints only
+> count"*). `stamind/cli/workouts/adapt.py` now prints only
 > `Using N days of recovery metrics (past N-day window).`
 >
 > **Why it went:** the reason for the table was "the athlete should see what the coach
@@ -635,7 +635,7 @@ Nothing bespoke *for this design* — the bot and web tab render what the shared
 status/summary code produces.
 
 > **Superseded: the web PMC chart shipped.** §7 lists it as a non-goal ("nice, not
-> now"); that is no longer true. `GET /api/timeline.png` (`trainmate_web.py`) serves
+> now"); that is no longer true. `GET /api/timeline.png` (`stamind_web.py`) serves
 > the web **Progress** tab a PNG of merged past/planned load *plus the projected
 > CTL/ATL/TSB series*, rendered by `chart.render_timeline_png`; the Telegram bot posts
 > the identical image and `tm progress` prints the same triple as text. That work is
@@ -805,7 +805,7 @@ Added since (pinning contracts §3.2 gained for the forward fold):
 > The section below is the *original* spec, kept verbatim for its rationale. Treating
 > it as a to-do list means re-deriving working code.
 >
-> **Shipped (`trainmate/analytics/progression.py`, DESIGN_progress_timeline.md §4):**
+> **Shipped (`stamind/analytics/progression.py`, DESIGN_progress_timeline.md §4):**
 >
 > | Phase-2 element | As built |
 > |---|---|

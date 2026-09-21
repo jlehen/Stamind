@@ -13,18 +13,18 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_signal_extraction.db")
 
-from trainmate import runtime, signals
-from trainmate.db import Database
+from stamind import runtime, signals
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestVocabulary(unittest.TestCase):
     def test_config_augments_the_shipped_set(self):
-        from trainmate.config import config
+        from stamind.config import config
         with patch.object(
             config, "data", {"coach": {"signal_metrics": {"Altitude": "above 1500 m"}}}
         ):
@@ -33,7 +33,7 @@ class TestVocabulary(unittest.TestCase):
         self.assertEqual(merged["altitude"], "above 1500 m", "config key is normalized")
 
     def test_config_can_reword_a_shipped_gloss(self):
-        from trainmate.config import config
+        from stamind.config import config
         with patch.object(
             config, "data", {"coach": {"signal_metrics": {"heat": "my own wording"}}}
         ):
@@ -274,7 +274,7 @@ class TestConfirmationLadder(unittest.TestCase):
         The ladder now lives in cli/candidates.py, where `workout adapt -m` and `bot
         capture note` both reach it (DESIGN_bot_simple_frontend.md §12.10), and the
         questions come from the active renderer — so the voice is pinned here too."""
-        from trainmate.cli.candidates import confirm_new_signals
+        from stamind.cli.candidates import confirm_new_signals
         asked = []
         replies = iter(answers)
 
@@ -289,10 +289,10 @@ class TestConfirmationLadder(unittest.TestCase):
         self.addCleanup(runtime.reset, "prompt", "render")
         runtime.reset("render")
         with patch("builtins.print"), patch.dict(
-            os.environ, {"TRAINMATE_RENDER": render} if render else {}, clear=False
+            os.environ, {"STAMIND_RENDER": render} if render else {}, clear=False
         ):
             if not render:
-                os.environ.pop("TRAINMATE_RENDER", None)
+                os.environ.pop("STAMIND_RENDER", None)
             confirm_new_signals([candidate], "2026-08-30")
         return asked
 

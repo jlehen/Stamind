@@ -5,7 +5,7 @@ feeds it rows is tested in test_garmin.py (ARCHITECTURE §12).
 """
 import unittest
 
-from trainmate.analytics import load as load_math
+from stamind.analytics import load as load_math
 
 
 class TestTheLoadModel(unittest.TestCase):

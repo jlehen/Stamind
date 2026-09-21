@@ -7,13 +7,13 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
-from trainmate.clock import fmt_date
-from trainmate.coach.proposals import GenerateProposal
+from stamind.clock import fmt_date
+from stamind.coach.proposals import GenerateProposal
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_generate_span.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -85,9 +85,9 @@ class TestCliWorkoutsGenerateSpan(unittest.TestCase):
         )
         return goal_id, macro_id
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_g_is_the_span_not_a_plan_selector(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -148,9 +148,9 @@ class TestCliWorkoutsGenerateSpan(unittest.TestCase):
         )
         return {b["name"]: b for b in mesocycles}
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_m_writes_the_mesocycle_from_its_own_first_day(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -180,9 +180,9 @@ class TestCliWorkoutsGenerateSpan(unittest.TestCase):
         self.assertEqual(kwargs["start_date"], build["start_date"])
         self.assertEqual(kwargs["end_date"], build["end_date"])
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_warns_only_when_the_old_reading_would_differ(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -218,9 +218,9 @@ class TestCliWorkoutsGenerateSpan(unittest.TestCase):
         said = _said(["workout", "generate", "-g", "-f"])
         self.assertNotIn("now rebuilds a bounded span", said)
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_refuses_a_span_that_is_entirely_behind_us(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -249,9 +249,9 @@ class TestCliWorkoutsGenerateSpan(unittest.TestCase):
         self.assertIn("before today", " ".join(stdout.split()))
         mock_coach.workout_generate.assert_not_called()
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_passes_a_named_plan_through_as_the_tiebreaker(
         self, mock_coach, mock_prompt, _ensure
     ):

@@ -33,7 +33,7 @@ always win — a one-way ratchet toward flattening the plan.
 Structurally, ACWR won regardless of which model was better: it was a live number in the
 daily prompt context backed by imperative directives ("Reduce load immediately"), while
 block periodization was one static paragraph. A concrete number with an imperative beats
-an abstract philosophy. TrainMate could label a macrocycle "Mesocycle" and silently execute a
+an abstract philosophy. Stamind could label a macrocycle "Mesocycle" and silently execute a
 linear ramp.
 
 ## 2. Why not just drop ACWR

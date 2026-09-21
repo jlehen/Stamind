@@ -1,4 +1,4 @@
-"""The confidence model behind a coach learning (trainmate/learning_confidence.py).
+"""The confidence model behind a coach learning (stamind/learning_confidence.py).
 
 Pure rules over an evidence count and a timestamp: no database, no model. They lived
 in `db/learnings.py` and were tested there, which is how the storage layer came to be
@@ -7,7 +7,7 @@ the place that decided what "established" means.
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from trainmate.learning_confidence import (
+from stamind.learning_confidence import (
     RETIRE_PROPOSAL, confidence_rank, derive_confidence, learning_is_dormant,
     normalize_sports, step_down, valid_confidence,
 )

@@ -1,4 +1,4 @@
-# TrainMate — the complete configuration reference.
+# Stamind — the complete configuration reference.
 #
 # Every key the application reads appears below. The ones a working install must fill in
 # carry values; every tuning knob is commented out at the value the code already uses, so
@@ -14,7 +14,7 @@
 # Two secrets can come from the environment instead of being written to disk:
 #   OPENROUTER_API_KEY    overrides `llm.api_key`.
 #   TELEGRAM_BOT_TOKEN    overrides `telegram.bot_token`.
-# A third variable, TRAINMATE_CONFIG, picks which config file a command runs against —
+# A third variable, STAMIND_CONFIG, picks which config file a command runs against —
 # that is how one checkout serves two athletes. See "Two athletes, one checkout" below.
 
 
@@ -77,8 +77,8 @@ llm:
 #data_dir: "athlete2"
 
 # The SQLite database this install operates on. A relative path resolves against this
-# config file's directory (or `data_dir:` when set); default trainmate.db beside it.
-#database: "trainmate.db"
+# config file's directory (or `data_dir:` when set); default stamind.db beside it.
+#database: "stamind.db"
 
 # Your own sports-science guidelines: a directory of *.md files pasted into every coaching
 # prompt as the ATHLETE-PROVIDED section, so you can tell the coach how you want to be
@@ -86,7 +86,7 @@ llm:
 # file's directory; default science/ beside it. Point a second athlete at their own
 # directory to give them their own training philosophy, or point two instances at the same
 # absolute path to share one. Either way the guidelines the app itself ships
-# (trainmate/science/) are still applied.
+# (stamind/science/) are still applied.
 #science_dir: "science"
 
 # Two trails the app writes for whoever runs it: the run journal (runs/YYYY-MM-DD.jsonl,
@@ -110,13 +110,13 @@ llm:
 # Two athletes, one checkout
 # ---------------------------------------------------------------------------
 # Give the second athlete a config file of their own and point every command at it:
-#   TRAINMATE_CONFIG=/path/to/other/config.yaml ./tm status     (and likewise ./tm-bot)
+#   STAMIND_CONFIG=/path/to/other/config.yaml ./tm status     (and likewise ./tm-bot)
 # Put that file in its own directory and the database and other relative paths land there
 # too; or keep both configs side by side and give the second one a `data_dir:` (above).
 # Either way the two instances must not share state: each needs its own Telegram bot token,
 # its own Garmin credentials and token_dir (see the warning there), its own Google
 # calendar_id, its own logs/, and — unless `science_dir:` says otherwise — its own science/
-# guidelines beside it. A file named in TRAINMATE_CONFIG must exist: a typo aborts the
+# guidelines beside it. A file named in STAMIND_CONFIG must exist: a typo aborts the
 # command rather than quietly falling back to the first athlete's database.
 
 # How fresh cached data must be before a command re-pulls it. Within this many minutes of
@@ -151,7 +151,7 @@ llm:
 #  moderate: 3
 #  established: 5
 
-# Flask web front-end (run trainmate_web.py directly). Optional — omit to use defaults.
+# Flask web front-end (run stamind_web.py directly). Optional — omit to use defaults.
 #web:
 #  # Interface to bind. Loopback by default so the dev server isn't exposed on every
 #  # interface; set to 0.0.0.0 to serve the LAN.
@@ -268,7 +268,7 @@ garmin:
   # Per-sport overrides of that bar, keyed by canonical sport name. Uncovered time is not
   # always a recording failure — it is also the rest between sets, the chairlift back up,
   # the flat walking on a hike, the held pose, all of which sit below zone 1 where no zone
-  # claims them. trainmate/intensity.py already ships lower bars for the sports where that
+  # claims them. stamind/intensity.py already ships lower bars for the sports where that
   # is structural (strength_training 0.45, downhill_skiing and indoor_climbing 0.15, hiking
   # 0.10, yoga 0.05); every other sport uses the bar above. Add an entry here to override
   # either.

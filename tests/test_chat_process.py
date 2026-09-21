@@ -20,9 +20,9 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.chat_harness import _FakeProc, build_chat_bot
-from trainmate.chat import keyboards, replies, runner
-from trainmate.chat.app import ChatBot
-from trainmate.config import config
+from stamind.chat import keyboards, replies, runner
+from stamind.chat.app import ChatBot
+from stamind.config import config
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -153,12 +153,12 @@ class CliPathTest(unittest.TestCase):
 
     def test_it_names_the_cli_beside_the_launcher(self):
         self.assertEqual(
-            runner.CLI_PATH, os.path.join(REPO, "trainmate_cli.py")
+            runner.CLI_PATH, os.path.join(REPO, "stamind_cli.py")
         )
         self.assertTrue(os.path.isfile(runner.CLI_PATH))
 
     def test_the_child_runs_from_the_repo_root(self):
-        # `trainmate_cli.py` resolves config.yaml and the database relative to itself, so
+        # `stamind_cli.py` resolves config.yaml and the database relative to itself, so
         # the working directory the child inherits has to be the repo, not the bot's.
         self.assertEqual(os.path.dirname(runner.CLI_PATH), REPO)
 
@@ -304,10 +304,10 @@ def front_end_functions() -> dict:
     """Every function the Telegram front-end defines, name → source text.
 
     Keyed on the directory rather than a list of files, so a module written into
-    `trainmate/chat/` tomorrow is read tomorrow. Some invariants about the command loop
+    `stamind/chat/` tomorrow is read tomorrow. Some invariants about the command loop
     are read from the source because reaching them needs a live Telegram connection."""
-    paths = sorted(glob.glob(os.path.join(REPO, "trainmate", "chat", "*.py")))
-    paths.append(os.path.join(REPO, "trainmate_bot.py"))
+    paths = sorted(glob.glob(os.path.join(REPO, "stamind", "chat", "*.py")))
+    paths.append(os.path.join(REPO, "stamind_bot.py"))
     found = {}
     for path in paths:
         source = pathlib.Path(path).read_text()

@@ -7,12 +7,12 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
-from trainmate.clock import fmt_date
+from stamind.clock import fmt_date
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_compare.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -132,7 +132,7 @@ class TestCliWorkoutsCompare(unittest.TestCase):
             tss=20.0,
         )
 
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             exit_code, stdout, _ = self.run_cli(
                 ["workout", "compare", "-d", "3d", "--no-pull", "--no-mark"]
             )
@@ -147,7 +147,7 @@ class TestCliWorkoutsCompare(unittest.TestCase):
 
     # Colour on: `informational` holds activity dicts, so a raw gray(dict) only blows
     # up on a terminal — piped output short-circuits colorize and hides the bug.
-    @patch("trainmate.text.is_color_enabled", return_value=True)
+    @patch("stamind.text.is_color_enabled", return_value=True)
     def test_workout_compare_outside_any_plan(self, _color):
         """Activities on dates no mesocycle covers are rendered as formatted lines,
         not raw dicts."""

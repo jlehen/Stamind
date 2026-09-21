@@ -19,7 +19,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 test_db = bind_test_db(TEST_DB_PATH)
 
-from trainmate.prompt import PromptCancelled
+from stamind.prompt import PromptCancelled
 
 
 class TestFailuresReachTheBoundary(unittest.TestCase):
@@ -36,8 +36,8 @@ class TestFailuresReachTheBoundary(unittest.TestCase):
             except OSError:
                 pass
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_a_failing_command_exits_non_zero(self, mock_coach, _garmin):
         mock_coach.plan_generate.side_effect = RuntimeError("the model refused")
 
@@ -47,22 +47,22 @@ class TestFailuresReachTheBoundary(unittest.TestCase):
         self.assertIn("the model refused", stdout)
         self.assertIn("--debug", stdout)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_debug_reraises_so_the_traceback_survives(self, mock_coach, _garmin):
         mock_coach.plan_generate.side_effect = RuntimeError("the model refused")
 
         import io
-        import trainmate_cli
+        import stamind_cli
         with self.assertRaises(RuntimeError):
             with (
                 patch("builtins.input", return_value="n"),
                 patch("sys.stdout", io.StringIO()),
             ):
-                trainmate_cli.main(["--debug", "plan", "generate"])
+                stamind_cli.main(["--debug", "plan", "generate"])
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_a_cancelled_prompt_is_not_a_failure(self, mock_coach, _garmin):
         mock_coach.plan_generate.side_effect = PromptCancelled()
 
@@ -71,8 +71,8 @@ class TestFailuresReachTheBoundary(unittest.TestCase):
         self.assertEqual(exit_code, 130)
         self.assertIn("Cancelled.", stdout)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_a_successful_command_still_exits_zero(self, mock_coach, _garmin):
         mock_coach.plan_generate.return_value = {
             "strategy": "s", "mesocycles": [], "reused": True, "goal": None,
@@ -91,7 +91,7 @@ class TestNoNetEnclosesAPrompt(unittest.TestCase):
 
     def test_no_except_exception_clause_wraps_a_prompt_call(self):
         offenders = []
-        for root, _, files in os.walk(os.path.join(REPO, "trainmate")):
+        for root, _, files in os.walk(os.path.join(REPO, "stamind")):
             for name in sorted(files):
                 if not name.endswith(".py"):
                     continue

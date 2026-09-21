@@ -1,8 +1,8 @@
-"""TRAINMATE_CONFIG + `database:` / `science_dir:` resolution (ARCHITECTURE.md §9).
+"""STAMIND_CONFIG + `database:` / `science_dir:` resolution (ARCHITECTURE.md §9).
 
-The env var is read once, at import of trainmate.config, so every case here runs a fresh
+The env var is read once, at import of stamind.config, so every case here runs a fresh
 interpreter via subprocess instead of reaching into module state. That is the honest
-shape: each case exercises exactly what `TRAINMATE_CONFIG=... ./tm` does. The invariant
+shape: each case exercises exactly what `STAMIND_CONFIG=... ./tm` does. The invariant
 under test is the isolation rule — an instance's paths resolve beside its config file,
 and an explicitly named config that cannot load aborts rather than falling back to
 defaults that point at the primary athlete's database.
@@ -13,24 +13,24 @@ import sys
 import tempfile
 import unittest
 
-import trainmate.config
+import stamind.config
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(trainmate.config.__file__)))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(stamind.config.__file__)))
 
 # Prints the six resolved paths, one per line, from a fresh interpreter.
 _PRINT_PATHS = (
-    "from trainmate.config import config, CONFIG_PATH; "
+    "from stamind.config import config, CONFIG_PATH; "
     "print(CONFIG_PATH); print(config.db_path); print(config.service_account_file); "
     "print(config.science_dir); print(config.logging_dir); print(config.garmin_token_dir)"
 )
 
 
 def _run(env_config):
-    """Runs _PRINT_PATHS in a fresh interpreter with TRAINMATE_CONFIG set (None = unset)."""
+    """Runs _PRINT_PATHS in a fresh interpreter with STAMIND_CONFIG set (None = unset)."""
     env = dict(os.environ)
-    env.pop("TRAINMATE_CONFIG", None)
+    env.pop("STAMIND_CONFIG", None)
     if env_config is not None:
-        env["TRAINMATE_CONFIG"] = env_config
+        env["STAMIND_CONFIG"] = env_config
     return subprocess.run([sys.executable, "-c", _PRINT_PATHS], capture_output=True,
                           text=True, cwd=REPO_ROOT, env=env)
 
@@ -42,7 +42,7 @@ class TestInstanceSelection(unittest.TestCase):
         return proc.stdout.strip().splitlines()
 
     def test_env_selects_config_and_paths_resolve_beside_it(self):
-        # No `database:` key: the default trainmate.db lands beside the named config, not
+        # No `database:` key: the default stamind.db lands beside the named config, not
         # beside the code — a bare second-instance config can never open the primary DB.
         with tempfile.TemporaryDirectory() as d:
             cfg = os.path.join(d, "config.yaml")
@@ -51,7 +51,7 @@ class TestInstanceSelection(unittest.TestCase):
             config_path, db_path, sa_path, science_dir, logging_dir, token_dir = \
                 self._paths(cfg)
             self.assertEqual(config_path, cfg)
-            self.assertEqual(db_path, os.path.join(d, "trainmate.db"))
+            self.assertEqual(db_path, os.path.join(d, "stamind.db"))
             self.assertEqual(sa_path, os.path.join(d, "service_account.json"))
             # Guidelines follow the same rule as the database: a second athlete inherits
             # the primary's training philosophy only by asking for it (§9).
@@ -124,7 +124,7 @@ class TestInstanceSelection(unittest.TestCase):
     def test_missing_explicit_config_aborts(self):
         proc = _run("/nonexistent/nowhere/config.yaml")
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("TRAINMATE_CONFIG", proc.stderr)
+        self.assertIn("STAMIND_CONFIG", proc.stderr)
 
     def test_unparseable_explicit_config_aborts(self):
         with tempfile.TemporaryDirectory() as d:
@@ -133,7 +133,7 @@ class TestInstanceSelection(unittest.TestCase):
                 f.write("database: [unclosed\n")
             proc = _run(cfg)
             self.assertNotEqual(proc.returncode, 0)
-            self.assertIn("TRAINMATE_CONFIG", proc.stderr)
+            self.assertIn("STAMIND_CONFIG", proc.stderr)
 
     def test_unset_env_keeps_the_repo_default(self):
         # Asserts only on the config *path* — the primary install's config content (and
@@ -162,7 +162,7 @@ class TestDataDirPrefix(unittest.TestCase):
                 f.write("data_dir: athlete2\n")
             base = os.path.join(d, "athlete2")
             _, db_path, sa_path, science_dir, logging_dir, token_dir = self._paths(cfg)
-            self.assertEqual(db_path, os.path.join(base, "trainmate.db"))
+            self.assertEqual(db_path, os.path.join(base, "stamind.db"))
             self.assertEqual(sa_path, os.path.join(base, "service_account.json"))
             self.assertEqual(science_dir, os.path.join(base, "science"))
             self.assertEqual(logging_dir, os.path.join(base, "logs"))
@@ -174,9 +174,9 @@ class TestDataDirPrefix(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             cfg = os.path.join(d, "config.yaml")
             with open(cfg, "w") as f:
-                f.write("data_dir: /var/lib/trainmate\n")
+                f.write("data_dir: /var/lib/stamind\n")
             _, db_path, _, _, _, _ = self._paths(cfg)
-            self.assertEqual(db_path, "/var/lib/trainmate/trainmate.db")
+            self.assertEqual(db_path, "/var/lib/stamind/stamind.db")
 
     def test_relative_path_keys_resolve_under_data_dir(self):
         with tempfile.TemporaryDirectory() as d:

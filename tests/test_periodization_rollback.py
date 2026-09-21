@@ -20,12 +20,12 @@ def _days_out(n: int) -> str:
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 GOAL_DATE = _days_out(71)
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 def _generate_workouts(**kwargs):
@@ -72,7 +72,7 @@ class TestPlanAndWorkoutRollback(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_plan_regenerate_supersedes_prior_version(self, mock_client):
         """Regenerating a plan keeps the prior macrocycle as a superseded version
         rather than deleting it (see DESIGN_plan_rollback.md)."""
@@ -100,8 +100,8 @@ class TestPlanAndWorkoutRollback(unittest.TestCase):
         superseded = [v for v in versions if v["status"] == "superseded"]
         self.assertEqual([v["id"] for v in superseded], [v1["id"]])
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_plan_rollback_restores_plan_and_workouts(self, mock_client, mock_calendar):
         """`plan rollback` restores the previous plan version, resurrects its workouts,
         archives the current plan's, and reconciles Google Calendar symmetrically."""
@@ -158,7 +158,7 @@ class TestPlanAndWorkoutRollback(unittest.TestCase):
         # The restored workout was re-pushed to Calendar.
         self.assertTrue(mock_calendar.sync_workout.called)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_plan_rollback_without_history_raises(self, mock_client):
         """Rolling back a plan with no earlier version is rejected."""
         test_db.add_objective(
@@ -197,8 +197,8 @@ class TestPlanAndWorkoutRollback(unittest.TestCase):
         }
         _generate_workouts()
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_workout_rollback_restores_batch_leaving_plan_active(
         self, mock_client, mock_calendar
     ):
@@ -226,8 +226,8 @@ class TestPlanAndWorkoutRollback(unittest.TestCase):
         self.assertEqual(result["restored_workouts"], 1)
         self.assertTrue(mock_calendar.sync_workout.called)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_workout_rollback_within_one_plan_version(self, mock_client, mock_calendar):
         """Two regenerations under the same plan are separate changes, so a rollback
         undoes the second one (the case `plan rollback`'s version-keyed target cannot

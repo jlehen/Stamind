@@ -12,18 +12,18 @@ from tests.helpers import (
 )
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_bot.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_bot.db")
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
-from trainmate import runtime
-from trainmate.cli.bot.views import MORNING_MARKER, PUSH_ALL_DONE_LINE
-from trainmate.cli.render.session_lines import SIMPLE_DONE_LINE
-from trainmate.config import config
-from trainmate.heads_up import CHANGE_LEAD, UNDONE_ONE, UNDONE_PLAIN, UNDONE_SEVERAL
-from trainmate.sentinels import BUTTONS_SENTINEL, FLUSH_SENTINEL
-from trainmate.clock import today_str
+from stamind import runtime
+from stamind.cli.bot.views import MORNING_MARKER, PUSH_ALL_DONE_LINE
+from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
+from stamind.config import config
+from stamind.heads_up import CHANGE_LEAD, UNDONE_ONE, UNDONE_PLAIN, UNDONE_SEVERAL
+from stamind.sentinels import BUTTONS_SENTINEL, FLUSH_SENTINEL
+from stamind.clock import today_str
 
 # One database for the whole module: the three test classes below share it and
 # clear its tables per test, so its lifecycle is module-level, not per-class.
@@ -50,7 +50,7 @@ class ChangesCommandTest(unittest.TestCase):
         garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
         garmin.start()
         self.addCleanup(garmin.stop)
-        calendar = patch("trainmate.runtime.calendar_syncer")
+        calendar = patch("stamind.runtime.calendar_syncer")
         calendar.start()
         self.addCleanup(calendar.stop)
         # A companion instance, run from the terminal: the athlete watches nothing here.
@@ -84,7 +84,7 @@ class ChangesCommandTest(unittest.TestCase):
     def test_one_message_per_change_in_the_chat(self):
         self._change(note="First.")
         self._change(note="Second.", sport="running")
-        with patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
             _code, out, _ = run_cli(["bot", "changes"])
         first, second = out.split(FLUSH_SENTINEL)
         self.assertIn("First.", first)
@@ -233,7 +233,7 @@ class MorningPushTest(unittest.TestCase):
         save_workout(test_db, today_str(), "running", "Easy run", duration_minutes=40)
         self._trained()
         runtime.garmin.ensure_data.side_effect = RuntimeError("Garmin down")
-        with patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertIn("Easy run", out)
@@ -263,7 +263,7 @@ class MorningPushTest(unittest.TestCase):
         return (
             patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}),
             patch.object(runtime, "coach_service", coach, create=True),
-            patch("trainmate.cli.bot.views.ensure_recent_data"),
+            patch("stamind.cli.bot.views.ensure_recent_data"),
         )
 
     def test_adapt_first_applies_and_surfaces_the_reason(self):
@@ -300,7 +300,7 @@ class MorningPushTest(unittest.TestCase):
         cfg, svc, pull = self._adapt_first_env(coach)
         # The failure surfaces only as a terminal aside; under the bot's json
         # frontend (asides off) it must never reach the athlete's chat.
-        with cfg, svc, pull, patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
+        with cfg, svc, pull, patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertIn("Easy run", out)
@@ -314,7 +314,7 @@ class RouteCommandTest(unittest.TestCase):
 
     def setUp(self):
         rebind_test_db(test_db)  # an earlier module may have rebound the handles
-        from trainmate.openrouter import openrouter_client
+        from stamind.openrouter import openrouter_client
         clear_all_tables(test_db)
         openrouter_client.reset_model()
         self.addCleanup(openrouter_client.reset_model)
@@ -324,7 +324,7 @@ class RouteCommandTest(unittest.TestCase):
 
     def test_valid_intent_passes_through(self):
         with patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             return_value={"intent": "show_week"},
         ):
             code, out, _ = run_cli(["bot", "route", "what's on this week?"])
@@ -333,7 +333,7 @@ class RouteCommandTest(unittest.TestCase):
 
     def test_unknown_intent_degrades_to_unclear(self):
         with patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             return_value={"intent": "rm -rf"},
         ):
             _, out, _ = run_cli(["bot", "route", "hello"])
@@ -341,7 +341,7 @@ class RouteCommandTest(unittest.TestCase):
 
     def test_llm_failure_degrades_to_unclear(self):
         with patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             side_effect=ValueError("no api key"),
         ):
             code, out, _ = run_cli(["bot", "route", "hello"])
@@ -359,7 +359,7 @@ class RouteCommandTest(unittest.TestCase):
             description="Riding both passes in a day",
         )
         with patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             return_value={"intent": "coach_message"},
         ) as complete:
             run_cli(["bot", "route", "the Klausen ride got bigger"])
@@ -374,7 +374,7 @@ class RouteCommandTest(unittest.TestCase):
 
     def test_an_empty_database_still_routes(self):
         with patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             return_value={"intent": "show_week"},
         ) as complete:
             _, out, _ = run_cli(["bot", "route", "what's on?"])
@@ -382,7 +382,7 @@ class RouteCommandTest(unittest.TestCase):
         self.assertIn("(none)", complete.call_args.args[1])
 
     def test_router_model_role_pins_the_client(self):
-        from trainmate.openrouter import openrouter_client
+        from stamind.openrouter import openrouter_client
         # The router picks from the same menu the coach model does — one allowlist
         # (DESIGN_settings.md §4), so the cheap model is listed under `llm.models` too.
         with patch.dict(
@@ -390,30 +390,30 @@ class RouteCommandTest(unittest.TestCase):
             {"llm": {"models": ["main/model", "cheap/model"],
                      "router_model": "cheap/model"}},
         ), patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             return_value={"intent": "help"},
         ):
             run_cli(["bot", "route", "hello"])
             self.assertEqual(openrouter_client.model, "cheap/model")
 
     def test_an_off_menu_role_is_ignored_and_the_coach_model_routes(self):
-        from trainmate.openrouter import openrouter_client
+        from stamind.openrouter import openrouter_client
         with patch.dict(
             config.data,
             {"llm": {"models": ["main/model"], "router_model": "cheap/model"}},
         ), patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             return_value={"intent": "help"},
         ):
             run_cli(["bot", "route", "hello"])
             self.assertEqual(openrouter_client.model, "main/model")
 
     def test_absent_role_leaves_the_active_model(self):
-        from trainmate.openrouter import openrouter_client
+        from stamind.openrouter import openrouter_client
         with patch.dict(
             config.data, {"llm": {"models": ["main/model"]}}
         ), patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             return_value={"intent": "help"},
         ):
             run_cli(["bot", "route", "hello"])
@@ -457,7 +457,7 @@ class ConstraintsViewTest(unittest.TestCase):
         self.assertIn("Nothing on the list", out)
 
     def test_picker_leaves_reach_only_single_id_rm(self):
-        from trainmate.cli.bot.views import constraint_rm_buttons
+        from stamind.cli.bot.views import constraint_rm_buttons
 
         def leaves(buttons):
             for b in buttons:
@@ -478,7 +478,7 @@ class ConstraintsViewTest(unittest.TestCase):
 
     def test_rm_in_simple_render_stays_companion_prose(self):
         cid = self._add("no run Thursday")
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(["constraint", "rm", str(cid)])
         self.assertEqual(code, 0)
         self.assertIn("dropped", out)
@@ -522,7 +522,7 @@ class GoalsViewTest(unittest.TestCase):
         self.assertNotIn(BUTTONS_SENTINEL, out)
 
     def test_picker_leaves_reach_only_the_archiving_rm(self):
-        from trainmate.cli.bot.views import goal_rm_buttons
+        from stamind.cli.bot.views import goal_rm_buttons
 
         def leaves(buttons):
             for b in buttons:
@@ -540,7 +540,7 @@ class GoalsViewTest(unittest.TestCase):
 
     def test_calling_a_goal_off_reads_as_prose_and_names_no_command(self):
         gid = self._goal("Spring 10k")
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(["goal", "rm", str(gid)])
         self.assertEqual(code, 0)
         self.assertIn("Spring 10k is off the list", out)
@@ -590,13 +590,13 @@ class MesocycleViewTest(unittest.TestCase):
 
 
 class SimpleListRenderTest(unittest.TestCase):
-    """`workout list` under TRAINMATE_RENDER=simple: companion prose, expert form
+    """`workout list` under STAMIND_RENDER=simple: companion prose, expert form
     untouched otherwise (§6)."""
 
     def setUp(self):
         rebind_test_db(test_db)  # an earlier module may have rebound the handles
         clear_all_tables(test_db)
-        patcher = patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"})
+        patcher = patch.dict(os.environ, {"STAMIND_RENDER": "simple"})
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -619,7 +619,7 @@ class SimpleListRenderTest(unittest.TestCase):
         self.assertIn("1 session planned", out)
 
     def test_expert_form_is_untouched_without_the_env(self):
-        os.environ.pop("TRAINMATE_RENDER", None)
+        os.environ.pop("STAMIND_RENDER", None)
         save_workout(test_db, today_str(), "running", "Easy run")
         _, out, _ = run_cli(["workout", "list", "-d", "today"])
         self.assertIn("WORKOUT SCHEDULE", out)
@@ -636,7 +636,7 @@ class CompanionSurfaceRoutingTest(unittest.TestCase):
     def setUp(self):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
-        patcher = patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"})
+        patcher = patch.dict(os.environ, {"STAMIND_RENDER": "simple"})
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -699,7 +699,7 @@ class CompanionSurfaceRoutingTest(unittest.TestCase):
 
     def test_the_expert_voice_is_what_the_same_commands_speak_without_the_env(self):
         """The other half of the switch: nothing above may leak into the default voice."""
-        os.environ.pop("TRAINMATE_RENDER", None)
+        os.environ.pop("STAMIND_RENDER", None)
         self._goal_with_plan()
         _, goals_out, _ = run_cli(["goal", "list"])
         _, plan_out, _ = run_cli(["plan", "show"])

@@ -6,8 +6,8 @@ same screen (§7.3).
 import unittest
 from unittest.mock import patch
 
-from trainmate import journal
-from trainmate.text import default_wrap_width, visible_len
+from stamind import journal
+from stamind.text import default_wrap_width, visible_len
 from tests.helpers import bind_test_db, run_cli
 from tests import test_db_path
 from tests.test_journal import JournalTestCase
@@ -51,7 +51,7 @@ class TestJournalCommand(JournalTestCase):
         self.assertIn("Traceback (most recent call last):", out)
 
     def test_an_ambiguous_prefix_lists_what_it_matched_rather_than_guessing(self):
-        with patch("trainmate.journal.secrets.token_hex",
+        with patch("stamind.journal.secrets.token_hex",
                    side_effect=["ab121234", "ab125678"]):
             for argv in (["status"], ["help"]):
                 journal.start_run(argv)

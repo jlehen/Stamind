@@ -229,7 +229,7 @@ The artifact lives in its own SQLite table (chosen over attaching to
 `macrocycles`, an inferred-cycle discriminator, a generic blob, or on-disk JSON;
 see §11 for why). The deciding constraint: `data analyze` can run **standalone —
 no plan, possibly no objective** — so the store cannot hang off the plan. Keeping
-it in `trainmate.db` honours the single-source-of-truth convention and gives
+it in `stamind.db` honours the single-source-of-truth convention and gives
 transactional consistency with the learnings written in the same flow.
 
 The whole reconstruction is stored as one JSON TEXT blob (like macrocycle
@@ -271,7 +271,7 @@ absent, else recompute and `save_analysis_cache(...)`.
 **Forward consumers of the `long` slot** (all read-only, none recomputes):
 
 1. `CoachService._build_prior_training_context()` → the strategy prompt (§6).
-2. `trainmate/timeline.py` → `progression.assemble_timeline()`, which draws the
+2. `stamind/timeline.py` → `progression.assemble_timeline()`, which draws the
    inferred mesocycles as `~`-prefixed bands wherever no planned mesocycle
    covers the span (`progress timeline` and the web dashboard's read-only view).
    Added later by DESIGN_progress_timeline.md §6.1; the sections below that call
@@ -733,7 +733,7 @@ the case that recurs on every run; this one happens once per bootstrap.
 - **Cache storage → dedicated `analysis_cache` table.** See §5.1 for the schema,
   the `db.py` methods, and the one-row-per-horizon retention policy. Chosen
   because `data analyze` runs standalone (no plan to hang the cache off), it keeps
-  everything in `trainmate.db`, stays typed/inspectable, and makes retention
+  everything in `stamind.db`, stays typed/inspectable, and makes retention
   trivial. Rejected: columns on `macrocycles` (no home for standalone runs),
   inferred-cycle rows with a `kind` discriminator (two-concepts-one-table; no home
   for insights), a generic blob table (junk-drawer), on-disk JSON (breaks

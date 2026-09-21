@@ -18,9 +18,9 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_prompt_gates.db")
 test_db = bind_test_db(TEST_DB_PATH)
 
-from trainmate.coach.engine import CoachEngine
-from trainmate.config import config
-from trainmate.strength import history as strength_history, planner_prompt
+from stamind.coach.engine import CoachEngine
+from stamind.config import config
+from stamind.strength import history as strength_history, planner_prompt
 
 # Sentinels for each region a gate controls, matched against the built prompt.
 NOTE_INSTRUCTIONS = "### ATHLETE'S NOTE FOR TODAY"
@@ -30,8 +30,8 @@ NOTE_DATA = "## ATHLETE'S NOTE FOR THIS ADAPTATION"
 NOTE_SIGNAL_INSTRUCTIONS = "### RECORDING A DAILY SIGNAL FROM THE NOTE"
 NOTE_SIGNAL_SCHEMA_MEMBER = '"new_signals"'
 
-from trainmate.coach.engine.adapt import RULE_MESOCYCLE_NOT_YOURS, RULE_MOVE_FIRST
-from trainmate.coach.engine.sessions import benchmark_task, replaces_field
+from stamind.coach.engine.adapt import RULE_MESOCYCLE_NOT_YOURS, RULE_MOVE_FIRST
+from stamind.coach.engine.sessions import benchmark_task, replaces_field
 
 MOVE_SECTION = "### MOVING A SESSION TO ANOTHER DAY"
 MOVE_SCHEMA_MEMBER = '"replaces"'
@@ -92,7 +92,7 @@ BASE = dict(
 def build_prompt(**extra):
     """The (system, user) pair the adapt call would send."""
     engine = CoachEngine()
-    with patch("trainmate.coach.engine.openrouter_client") as client:
+    with patch("stamind.coach.engine.openrouter_client") as client:
         client.complete.return_value = {
             "change_needed": False, "reason": "ok", "adapted_workouts": [],
         }
@@ -118,7 +118,7 @@ GENERATE_BASE = dict(
 def build_generate_prompt(**extra):
     """The (system, user) pair the generate call would send."""
     engine = CoachEngine()
-    with patch("trainmate.coach.engine.openrouter_client") as client:
+    with patch("stamind.coach.engine.openrouter_client") as client:
         client.complete.return_value = {"reasoning": "ok", "workouts": []}
         with patch("builtins.print"):
             engine._workout_generate_logic(**GENERATE_BASE, **extra)

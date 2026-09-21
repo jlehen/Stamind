@@ -21,13 +21,13 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_adaptation.db")
 
-from trainmate.db import Database
-import trainmate.config
+from stamind.db import Database
+import stamind.config
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestAdaptPrompt(unittest.TestCase):
@@ -84,11 +84,11 @@ class TestAdaptPrompt(unittest.TestCase):
                 conn.execute(f"DELETE FROM {table}")
             conn.commit()
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adaptation_matching_and_discrepancies(self, mock_client):
         test_profile = {"lthr": 165, "max_hr": 185}
 
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -165,13 +165,13 @@ class TestAdaptPrompt(unittest.TestCase):
             self.assertIn("Interval Session", prompt_user_content)
             self.assertIn("duration mismatch", prompt_user_content)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_is_read_only_for_learnings(self, mock_client):
         """Daily adaptation consumes coach learnings as context but authors none — durable,
         evidence-backed observations are written only by the weekly history analysis
         (DESIGN_evidence_based_confidence.md §2/§11)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -210,12 +210,12 @@ class TestAdaptPrompt(unittest.TestCase):
             self.assertEqual(len(learnings), 1)
             self.assertIn(lid, learnings)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_message_surfaced_in_prompt(self, mock_client):
         """An athlete message for the run is rendered as a bounded section of the adapt
         prompt (advisory, ephemeral) and omitted entirely when no message is given."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -275,13 +275,13 @@ class TestAdaptPrompt(unittest.TestCase):
             ],
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_terminal_window_section_in_prompt(self, mock_client):
         """Near the mesocycle's end the prompt warns the model that an easing cannot rebound and
         the next mesocycle is out of reach; mid-mesocycle that section is absent entirely
         (DESIGN_mesocycle_boundary.md §3)."""
         self._save_two_mesocycle_plan()
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
                 "metrics_lookback_days": 3,
@@ -312,12 +312,12 @@ class TestAdaptPrompt(unittest.TestCase):
             coach_service.workout_adapt("2026-06-10")
             self.assertNotIn("THIS MESOCYCLE IS ENDING", mock_client.complete.call_args[0][0])
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_the_shared_revision_sections_render_adapts_scope(self, mock_client):
         """The benchmark and vacate sections are built by helpers rather than written
         inline, so what has to hold here is that adapt gets their wording in full
         (DESIGN_adapt_task_prompt.md §2)."""
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {"metrics_lookback_days": 3, "minor_activity_load_threshold": 10.0},
         }):
@@ -363,7 +363,7 @@ class TestAdaptPrompt(unittest.TestCase):
                 zone5_sec=0,
             )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_prompt_carries_the_measured_distribution_and_drift_branch(
         self, mock_client
     ):
@@ -389,7 +389,7 @@ class TestAdaptPrompt(unittest.TestCase):
         # §4.1: the mesocycle-over-mesocycle delta is a generate view; adapt must not see it.
         self.assertNotIn("Change vs", user_content)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_refuses_without_a_plan(self, mock_client):
         """Every judgement adapt makes is relative to the mesocycle, so with no plan there is
         nothing to adapt towards: refuse rather than invent a bare 7-day range

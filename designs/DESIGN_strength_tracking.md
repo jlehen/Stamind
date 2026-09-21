@@ -112,7 +112,7 @@ word is this
 design's own, and AGENTS.md gains it when phase 2 lands (§11). A **session** is a planned
 workout and an
 **activity** is what Garmin recorded, the way the tables already split them; a **strength
-activity** is one that returned sets (§3). "The coach" is TrainMate speaking to the
+activity** is one that returned sets (§3). "The coach" is Stamind speaking to the
 athlete, whichever call wrote the words. The design uses these names and no others for
 these things, and "group" for consecutive unnamed sets at one load (§7).
 
@@ -134,7 +134,7 @@ Revisions 1–9 are in the branch history.
 
 ## 1. Motivation
 
-TrainMate plans strength sessions but has no idea what happens in them. A completed
+Stamind plans strength sessions but has no idea what happens in them. A completed
 strength activity is stored as duration, average heart rate and an RPE for the whole of it
 — the same shape as a ride, and about as informative as "went to the gym". The coach
 therefore prescribes in relative terms, because relative terms are all it can defend:
@@ -146,12 +146,12 @@ therefore prescribes in relative terms, because relative terms are all it can de
 short: the athlete's September 7 held twelve exercises and forty-two sets where the prose
 named four movements and "core". Today the athlete fills the gap by hand: a log of past
 gym days (exercise, reps, weight — nothing else), pasted into a general-purpose LLM together
-with TrainMate's prescription, to get a session with kilograms in it, which then gets
+with Stamind's prescription, to get a session with kilograms in it, which then gets
 tweaked anyway. That is the athlete doing the coach's job because the coach cannot see the
 logbook.
 
-The logbook already exists in a place TrainMate can reach. The Garmin watch records
-lifting set by set, Garmin Connect exposes them through the same API TrainMate
+The logbook already exists in a place Stamind can reach. The Garmin watch records
+lifting set by set, Garmin Connect exposes them through the same API Stamind
 already logs into, and the athlete already opens Garmin Connect after training to fix
 the numbers the watch got wrong. What is missing is the reading, a vocabulary to read it
 into, and a coach that uses it.
@@ -164,7 +164,7 @@ Goals:
   activity Garmin holds from a configured date on, so that `workout compare` can show
   what was lifted and the coach can see an exercise's recent sets.
 - Resolve exercise names with **no guessing**: a name counts only if a person gave it, on
-  the watch, in Garmin Connect or in TrainMate. The watch's own guesses are shown, and
+  the watch, in Garmin Connect or in Stamind. The watch's own guesses are shown, and
   count once the athlete has looked at them (§6).
 - Show the strength planner, with no per-athlete configuration, what the athlete recently
   lifted on every exercise.
@@ -176,7 +176,7 @@ Goals:
 
 Non-goals:
 
-- Writing back to Garmin. Garmin Connect is where the athlete edits; TrainMate reads.
+- Writing back to Garmin. Garmin Connect is where the athlete edits; Stamind reads.
 - Activities from anywhere but Garmin. Every athlete on an instance wears the watch; a
   hand-typed activity or an import from an old log would need a second writer of the
   activities table and a way to keep the pull's deletion reconcile off it, and nobody
@@ -206,7 +206,7 @@ That day is a setting: `strength.sets_since`, a date. Sets are read for strength
 activities on or after it and never for earlier ones, which keep their summary row only.
 Before that date the athlete did not correct the watch, so a 140 kg "row" that was a
 deadlift sits in the record with a confident name, and nothing downstream can tell. The
-one sentence for the athlete: "TrainMate reads your sets from this date on, because before
+one sentence for the athlete: "Stamind reads your sets from this date on, because before
 it the names were not checked."
 
 The names are not as good as the numbers. Over the athlete's last 15 strength activities
@@ -234,7 +234,7 @@ lift. Nothing in this design ranks lifts by load.
 
 A gym visit is not one activity. Garmin has no warm-up activity type, so the athlete
 records the warm-up under a copied profile — this athlete picked cardio, another might
-pick strength — and TrainMate's sport normalisation folds Garmin's `fitness` and
+pick strength — and Stamind's sport normalisation folds Garmin's `fitness` and
 `indoor_cardio` types into `strength_training`, so a Tuesday at the gym can be two or
 three "strength activities". **A strength activity is an activity whose raw Garmin type is
 `strength_training` and that returned at least one set.** Sets are fetched for every
@@ -255,7 +255,7 @@ last because body weight is not stored (§8).
 
 ## 4. Vocabulary: movement patterns and equipment
 
-A shipped, static table maps every exercise TrainMate knows about to one **movement
+A shipped, static table maps every exercise Stamind knows about to one **movement
 pattern** and one **equipment** class. It ships with the code, like the zone tables in
 `analytics/load.py`; nobody configures it. Garmin's category/name pairs are aliases into it,
 and so are the plain-English names the athlete or the coach use.
@@ -349,7 +349,7 @@ none is stored as no load (§11.1). Nothing is rewritten when an unnamed set get
 
 `named_by` is the no-guessing rule made auditable. `watch` means the watch guessed the name
 and nobody has confirmed it. `garmin` means a person picked it, on the watch or in Connect.
-`athlete` means the athlete gave or confirmed it in TrainMate. Only a name marked `garmin`
+`athlete` means the athlete gave or confirmed it in Stamind. Only a name marked `garmin`
 or `athlete` reaches the strength history (§8).
 
 Three columns join `completed_activities`, and the summary upsert, which names its
@@ -426,7 +426,7 @@ without a question, and their guesses count for nothing until `strength name 202
 After the freeze no pull touches the activity's sets again, whatever window it is given:
 the athlete's answers live in those rows, and a re-read that shifted one set would put
 every answer after it one position off. A name fixed in Connect after the freeze reaches
-TrainMate one way, `strength reset <date>` (§7). It reads the sets again, drops the answers
+Stamind one way, `strength reset <date>` (§7). It reads the sets again, drops the answers
 on them and freezes anew. The guesses still standing become the athlete's, for the same
 reason as with "yes": the athlete runs it right after fixing names in Connect. Then it asks
 about what is still unnamed. There is no re-fetch window, no carrying of answers by position
@@ -446,7 +446,7 @@ bodyweight names on purpose (§4).
 
 The rule, and the one sentence that explains the feature to an athlete:
 
-> TrainMate reads your sets from Garmin. Anything it can't name, it asks you about.
+> Stamind reads your sets from Garmin. Anything it can't name, it asks you about.
 
 Three sources of names, in order of preference, and nothing else:
 
@@ -456,7 +456,7 @@ Three sources of names, in order of preference, and nothing else:
    reset`, after it (§6). A name the watch guessed on its own counts once the athlete
    answers "yes, final" (§6).
 2. **The athlete, through the queue.** Two questions, both queue kinds, neither asked on
-   the spot: an unnamed group changes what TrainMate knows and holds nothing up, the sets
+   the spot: an unnamed group changes what Stamind knows and holds nothing up, the sets
    already count as volume, and that is the case DESIGN_athlete_queue.md §2 sends to the
    queue even when the athlete is watching.
 
@@ -592,7 +592,7 @@ Three sources of names, in order of preference, and nothing else:
 3. **Nothing.** An unnamed group is a legitimate state. It contributes to the activity's
    volume and fatigue and to nothing else.
 
-What is explicitly *not* a source: inference. TrainMate does not conclude "the plan said
+What is explicitly *not* a source: inference. Stamind does not conclude "the plan said
 squat 4×4 and here are four sets of four, so this is squat", nor "most of this activity
 matched the machine template so the rest is cable". Garmin's record is too unreliable and
 the athlete too free-form (extra exercises, reordered machines) for a partial match to be
@@ -640,7 +640,7 @@ September 3 (§6): the athlete fixes a name in Connect on the 09:43 activity and
 day. Acting on every activity of the date would also read the 20:45 activity again and drop
 the names given to it, and discarding a warm-up recorded under the strength profile would
 discard the activity beside it. The date stays the argument, because it is what the athlete
-remembers: Garmin's activity number is eleven digits that no TrainMate screen shows.
+remembers: Garmin's activity number is eleven digits that no Stamind screen shows.
 `strength name` does not ask: it goes through every activity of the day, each under its
 start time, and "keep it as it is" leaves a group alone.
 
@@ -879,7 +879,7 @@ Two things revision 7 put in the entries are left out:
   about the gym. An activity done on other equipment shows it in its loads, and one not
   worth reading is discarded (§7).
 
-The history lives in `trainmate/strength/history.py`.
+The history lives in `stamind/strength/history.py`.
 
 ## 9. The strength planner
 
@@ -1213,7 +1213,7 @@ Writing a session's sets and checking them both set its row, to the value the st
 when the history shown to the strength planner was built and not to the clock: sets read
 while a preview waits were not weighed. The rows are written when the proposal is applied,
 and when it is recorded as no change, in the same transaction. Proposing writes nothing, as
-everywhere in TrainMate, so a proposal declined at the preview leaves no row and the next
+everywhere in Stamind, so a proposal declined at the preview leaves no row and the next
 adapt asks again. A change to a session to check is applied when the stamp is later than its
 row, or when the brief or the duration is not the one its sets were written under: a
 Thursday the week planner cut from 70 to 40 minutes gets its four exercises in place of
@@ -1234,7 +1234,7 @@ planner updates a kept session.
 **Checking the output.** Every exercise name is looked up in the vocabulary. Sets and reps
 must be whole numbers above zero, with the lowest reps not above the highest, and a load
 must not be negative. An entry that fails is dropped with a line in the preview — "Mon Sep
-21: 'Nordic curl' is not an exercise TrainMate knows, left out" — and the rest of the
+21: 'Nordic curl' is not an exercise Stamind knows, left out" — and the rest of the
 session is written. A session to write whose every entry fails counts as a failed call, and
 a session to check whose every entry fails is a "keep". When the strength planner's call
 fails it is tried once more. What a second failure costs depends on what was asked.
@@ -1304,7 +1304,7 @@ done, 1,000 of shipped science, the athlete's own science files, 7,000 for this 
 nothing for one without them, and 200 to 300 per session. A `workout generate` over a
 five-week mesocycle with ten strength sessions sends about 18,500 tokens and gets about
 2,500 back, more when the sessions are as long as the athlete's own: a third of one
-`workout adapt` prompt. It uses the same model as every other call, since TrainMate picks one
+`workout adapt` prompt. It uses the same model as every other call, since Stamind picks one
 model per process.
 
 **What adherence becomes.** Revision 7 compared prescribed and done sets in code. It had
@@ -1323,8 +1323,8 @@ the athlete departs from a session it wrote itself is the habit rule above.
 ## 10. The strength science
 
 The strength planner is told how to progress by a file that ships with the app,
-`trainmate/strength/progression.md`, and only the strength planner reads it. It does not go
-in `trainmate/science/`: the science loader sends every file there, whole, to every coaching
+`stamind/strength/progression.md`, and only the strength planner reads it. It does not go
+in `stamind/science/`: the science loader sends every file there, whole, to every coaching
 prompt, and will until the science trim lands (TODO §PROMPT). A progression rule is of no
 use to the week planner, whose adapt prompt is already about 50,000 tokens. When the trim
 lands, the file can move there with a tag for this call, and the same tags are what will
@@ -1398,7 +1398,7 @@ kinds with the model-backed "Something else…", `strength name`, `strength rese
 `workout compare` / "Done lately" with their name source and the "sets not read yet"
 line — both of which rendered a strength activity as duration, load and RPE only
 (`cli/common.py::format_actual`,
-`cli/render/session_lines.py::simple_compare_lines`). At the end of it TrainMate knows
+`cli/render/session_lines.py::simple_compare_lines`). At the end of it Stamind knows
 what the athlete lifts and the coach does not use it yet. Deliberately boring, so it can
 be checked against reality before anything depends on it.
 
@@ -1415,14 +1415,14 @@ or not a session is planned today, then the set-reading step, then its walk.
    count"; "yes, final" and
    `strength reset` make the guesses still standing the athlete's; keeping a guess in
    `strength name` confirms it; and the naming answers come from names a person gave.
-2. The strength history, `trainmate/strength/history.py`, accessories and the not-done
+2. The strength history, `stamind/strength/history.py`, accessories and the not-done
    lines included (§8), and the `strength.history_changed_at` stamp its writers bump (§5).
 3. `prescribed_sets` and `strength_checks` (schema 16), with `WorkoutChange.append` and
    `restore` carrying the sets, and the description split at its seam when a strength
    session is shown to the week planner (§9).
-4. The strength science, `trainmate/strength/progression.md` (§10).
-5. The strength planner, `trainmate/strength/planner.py` with its prompt and reply checks in
-   `trainmate/strength/planner_prompt.py`: the brief instruction in the week planner's TASK,
+4. The strength science, `stamind/strength/progression.md` (§10).
+5. The strength planner, `stamind/strength/planner.py` with its prompt and reply checks in
+   `stamind/strength/planner_prompt.py`: the brief instruction in the week planner's TASK,
    its own prompt, the checks on its output, the comparison and the evidence rule for a kept
    session, and its place in `workout_generate` and `workout_adapt` (§9).
 6. The exercise lines in the `workout generate` preview (§9).
@@ -1453,7 +1453,7 @@ weight. Pull-ups come back at 0, a dead bug at -1, an ab twist with no weight at
 in Connect, comes back as one candidate at 100%. A name the watch guessed comes back as up to
 three candidates with their probabilities: barbell deadlift 69%, unknown 30%. So `named_by`
 has three values: `watch`, `garmin` for a person's pick in Garmin, and `athlete` for an
-answer given in TrainMate. The lines under the activity mark the watch's guesses with
+answer given in Stamind. The lines under the activity mark the watch's guesses with
 `(watch)`, and nothing else is marked: a name a person picked is as good as an answer.
 
 **The 50 kg check applies to the watch's guesses only.** The athlete picks the nearest name
@@ -1473,7 +1473,7 @@ its exercise catalog with a bodyweight flag per exercise
 (`connect.garmin.com/web-data/exercises/Exercises.json`, 1,531 names). The shipped table is
 that catalog, the FIT SDK names it lacks (mostly yoga, Pilates and wheelchair variants), and
 seven gym machines neither has, such as the pec deck and the machine chest press: 1,493
-exercises and 1,934 Garmin names in `trainmate/strength/exercises.tsv`. A weighted variant
+exercises and 1,934 Garmin names in `stamind/strength/exercises.tsv`. A weighted variant
 of a bodyweight exercise is the same exercise, so a weighted pull-up adds to the pull-up's
 history, its load read as the added load.
 

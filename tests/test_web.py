@@ -18,14 +18,14 @@ from tests.helpers import clear_all_tables, rebind_test_db
 
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_web.db")
+TEST_DB_PATH = test_db_path("test_stamind_web.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
-import trainmate_web
+import stamind_web
 
 # Point the web app's db singleton at an isolated test database. The handlers
-# reference the module-level `trainmate_web.db`, so patching it here is enough
+# reference the module-level `stamind_web.db`, so patching it here is enough
 # for the read-only endpoints exercised below (the web app never pulls from
 # Garmin — it is a pure reader, ARCHITECTURE.md §8).
 test_db = Database(db_path=TEST_DB_PATH)
@@ -39,10 +39,10 @@ class TestReadOnly(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.client = trainmate_web.app.test_client()
+        cls.client = stamind_web.app.test_client()
 
     def test_every_route_is_get_only(self):
-        for rule in trainmate_web.app.url_map.iter_rules():
+        for rule in stamind_web.app.url_map.iter_rules():
             verbs = rule.methods - {"HEAD", "OPTIONS"}
             self.assertEqual(
                 verbs, {"GET"},
@@ -68,22 +68,22 @@ class TestReadOnly(unittest.TestCase):
         module-level run stack away from Flask's threading. Only failures are recorded,
         and with no run id at all (DESIGN_logging.md §13)."""
         from werkzeug.exceptions import NotFound
-        from trainmate import journal
+        from stamind import journal
 
-        with open(trainmate_web.__file__) as handle:
+        with open(stamind_web.__file__) as handle:
             self.assertNotIn("start_run", handle.read())
 
         recorded = []
         with unittest.mock.patch.object(
             journal, "record", side_effect=lambda *a, **k: recorded.append((a, k))
         ):
-            with trainmate_web.app.test_request_context("/api/workouts"):
+            with stamind_web.app.test_request_context("/api/workouts"):
                 # An HTTPException is Flask's own to render, and not an event.
                 not_found = NotFound()
-                self.assertIs(trainmate_web._journal_failure(not_found), not_found)
+                self.assertIs(stamind_web._journal_failure(not_found), not_found)
                 self.assertEqual(recorded, [])
                 with self.assertRaises(RuntimeError):        # re-raised, not swallowed
-                    trainmate_web._journal_failure(RuntimeError("boom"))
+                    stamind_web._journal_failure(RuntimeError("boom"))
         (args, kwargs), = recorded
         self.assertEqual(args[0], "internal")
         self.assertEqual(kwargs["lvl"], "error")
@@ -102,7 +102,7 @@ class TestNewReadEndpoints(unittest.TestCase):
         global test_db
         test_db = Database(db_path=TEST_DB_PATH)
         rebind_test_db(test_db)
-        cls.client = trainmate_web.app.test_client()
+        cls.client = stamind_web.app.test_client()
 
     @classmethod
     def tearDownClass(cls):
@@ -229,7 +229,7 @@ class TestNewReadEndpoints(unittest.TestCase):
 
     def test_zones_report_measured_seconds_for_a_recorded_sport(self):
         # One run with its HR zone seconds recorded, inside the default 8-week window.
-        today = date.fromisoformat(trainmate_web.today_str())
+        today = date.fromisoformat(stamind_web.today_str())
         when = (today - timedelta(days=7)).isoformat()
         test_db.save_completed_activity(
             activity_id="z1", date=when, start_time=f"{when} 08:00:00",

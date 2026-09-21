@@ -14,4 +14,4 @@ if [ ! -d "$SCRIPT_DIR/venv" ]; then
 fi
 
 # Run the python script with the passed arguments
-exec "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/trainmate_cli.py" "$@"
+exec "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/stamind_cli.py" "$@"

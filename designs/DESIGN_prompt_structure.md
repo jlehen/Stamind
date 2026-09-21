@@ -2,7 +2,7 @@
 
 ## 1. The problem
 
-Every prompt TrainMate sends is assembled from parts written at different times, in
+Every prompt Stamind sends is assembled from parts written at different times, in
 different files, by whoever needed the next section. Each part invented its own way of
 announcing itself, and the result read — to a human and to the model — as one flat list of
 shouting.
@@ -10,7 +10,7 @@ shouting.
 Rendered, a `workout generate` system prompt looked like this:
 
 ```
-You are TrainMate Coach, ...
+You are Stamind Coach, ...
 
 COACHING ROLE AND OBJECTIVES:
 ...
@@ -22,7 +22,7 @@ BENCHMARK (FITNESS TEST) GUIDELINES
 ===================================
 ...
 === Guidelines from periodization.md ===
-# TrainMate Engine Architecture: Periodization & Training Structure Guide
+# Stamind Engine Architecture: Periodization & Training Structure Guide
 ## 1. Core Architectural Overview
 ...
 === Guidelines from sustainable_training.md ===
@@ -48,7 +48,7 @@ Three problems, in increasing order of how much they cost:
    the page says the second is *part of* the first. They are: everything from `TASK:` to the
    response schema is one `custom_task` string. The model has to infer nesting from meaning
    alone, and a reader has to do the same work.
-2. **One banner over two authorities.** TrainMate's own science files and the athlete's
+2. **One banner over two authorities.** Stamind's own science files and the athlete's
    supplied material were concatenated inside a single `START OF SPORTS SCIENCE
    GUIDELINES` banner, distinguishable only by a filename the model has no reason to read
    as provenance. Whose claim is whose became guesswork.
@@ -107,14 +107,14 @@ Two banners, not one — one per source, each stating its provenance:
 
 ```
 ================================================================================
-START OF TRAINMATE SPORTS SCIENCE GUIDELINES
+START OF STAMIND SPORTS SCIENCE GUIDELINES
 ================================================================================
-TrainMate's own reference material, shipped with the app.
+Stamind's own reference material, shipped with the app.
 
 --- benchmarks.md ---
 ...
 ================================================================================
-END OF TRAINMATE SPORTS SCIENCE GUIDELINES
+END OF STAMIND SPORTS SCIENCE GUIDELINES
 ================================================================================
 
 ================================================================================
@@ -138,7 +138,7 @@ with no documents produces no banner at all instead of an empty one.
 **Open question — precedence.** Splitting the banners tells the coach *whose* material each
 claim comes from. It deliberately does not say what to do when the two disagree, because
 nothing in the app has ever said. If a precedence rule is wanted ("the athlete's material
-governs where it is specific; TrainMate's where it is silent", or the reverse), it belongs
+governs where it is specific; Stamind's where it is silent", or the reverse), it belongs
 in the provenance line, and it is a coaching decision rather than a formatting one.
 
 ## 4. What is a sub-section, concretely

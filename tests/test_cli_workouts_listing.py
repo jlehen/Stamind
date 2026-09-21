@@ -13,7 +13,7 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_listing.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)

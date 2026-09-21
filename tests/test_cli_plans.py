@@ -7,13 +7,13 @@ from unittest.mock import patch
 from tests.helpers import (
     clear_all_tables, pin_clock, rebind_test_db, run_cli, save_workout,
 )
-from trainmate.coach.proposals import GenerateProposal
+from stamind.coach.proposals import GenerateProposal
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_plans.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_plans.db")
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -45,8 +45,8 @@ class TestCliPlans(unittest.TestCase):
     def run_cli(self, args, input_value="n"):
         return run_cli(args, input_value)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_plan_generate_applies_to_the_goal_the_service_planned_for(
         self, mock_coach, mock_garmin
     ):
@@ -70,15 +70,15 @@ class TestCliPlans(unittest.TestCase):
         args, kwargs = mock_coach.plan_apply.call_args
         self.assertEqual(args[0], far_id)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_plan_generate_g_takes_the_shared_range_grammar(self, mock_coach, _garmin):
         """One goal named plans that goal, bounded to its OWN span; a range plans every
         goal it covers, in date order, one strategy call each
         (DESIGN_cli_selectors.md §9)."""
         # The app's clock, not the machine's: the two must agree or the expected spans
         # are computed against a different day than the command reads.
-        from trainmate.clock import today_date
+        from stamind.clock import today_date
         today = today_date()
 
         def out(n):
@@ -132,8 +132,8 @@ class TestCliPlans(unittest.TestCase):
         calls, _ = _planned(["plan", "generate", "-g"])
         self.assertEqual([c["objective_id"] for c in calls], [first])
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_the_preview_is_drawn_by_the_cli_not_the_service(self, mock_coach, _garmin):
         """`plan generate` shows the strategy before asking to apply it, and the review
         behind it when the athlete passed the flag.
@@ -160,8 +160,8 @@ class TestCliPlans(unittest.TestCase):
         # Pointing at a flag the athlete just used is noise.
         self.assertNotIn("--show-llm-context", stdout)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_with_no_goal_the_reason_is_said_not_framed_as_a_strategy(
         self, mock_coach, _garmin
     ):
@@ -172,7 +172,7 @@ class TestCliPlans(unittest.TestCase):
         coach had written one, which is what happened for a moment when the printing moved
         out of the service."""
         mock_coach.plan_generate.return_value = {
-            "strategy": "No active goals found. TrainMate needs at least one objective.",
+            "strategy": "No active goals found. Stamind needs at least one objective.",
             "mesocycles": [], "reused": False, "goal": None,
             "prior_training_review": None, "has_prior_training": False,
         }
@@ -183,8 +183,8 @@ class TestCliPlans(unittest.TestCase):
         # And it never gets as far as asking whether to apply it.
         self.assertNotIn("Apply this new periodization strategy?", stdout)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_without_the_flag_the_review_is_named_not_printed(self, mock_coach, _garmin):
         mock_coach.plan_generate.return_value = {
             "strategy": "s",
@@ -197,8 +197,8 @@ class TestCliPlans(unittest.TestCase):
         self.assertNotIn("PRIOR TRAINING REVIEW", stdout)
         self.assertIn("--show-llm-context", stdout)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_plan_commands(self, mock_coach, mock_garmin):
         mock_coach.plan_generate.return_value = {
             "strategy": "Mock Strategy",
@@ -313,8 +313,8 @@ class TestCliPlans(unittest.TestCase):
         self.assertIn("removed successfully", stdout)
         mock_coach.plan_rm.assert_called_once_with(obj_to_rm)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.runtime.coach_service")
     def test_plan_rm_inventories_the_cascade_before_deleting(self, mock_coach, _cal):
         """`plan rm` deletes every version a goal owns, superseded ones included, so it
         names the cascade and asks first (DESIGN_cli_noargs.md §b1)."""
@@ -356,7 +356,7 @@ class TestCliPlans(unittest.TestCase):
         self.assertIn("removed successfully", stdout)
         mock_coach.plan_rm.assert_called_once_with(oid)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_show_never_pulls(self, mock_garmin):
         # `plan show` is a pure read: it must never prompt or trigger a Garmin pull,
         # whether or not metrics exist (auto-ensure lives on the generating/adapting
@@ -600,8 +600,8 @@ class TestCliPlans(unittest.TestCase):
         self.assertIn("Also active (tactical", stdout)
         self.assertIn("no run Thursday", stdout)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_accepting_a_plan_with_no_goal_reports_instead_of_crashing(
         self, mock_coach, mock_garmin
     ):

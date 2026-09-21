@@ -1,4 +1,4 @@
-"""The line protocol between the CLI and a chat front-end (trainmate/sentinels.py).
+"""The line protocol between the CLI and a chat front-end (stamind/sentinels.py).
 
 Both ends are here, because a frame only works if the writer and the reader agree: each
 test writes with the `emit_*` the CLI calls and reads with the `parse_frame` the bot
@@ -10,7 +10,7 @@ import os
 import unittest
 from unittest import mock
 
-from trainmate.sentinels import (
+from stamind.sentinels import (
     BUTTONS_SENTINEL, FLUSH_SENTINEL, PHOTO_SENTINEL, PROMPT_PROTOCOL_VERSION,
     PROMPT_SENTINEL, QUEUE_SENTINEL, SENTINEL_PREFIX, emit_buttons, emit_flush,
     emit_photo, emit_queue_item, flush_wants_a_wait, parse_frame, prompt_answer,
@@ -66,7 +66,7 @@ class TestEachFrameRoundTrips(unittest.TestCase):
         ])
 
     def test_a_flush_marker_round_trips_under_a_chat_front_end(self):
-        with mock.patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
+        with mock.patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
             line = _emitted(emit_flush)
         tag, payload = parse_frame(line)
         self.assertEqual(tag, FLUSH_SENTINEL)
@@ -76,7 +76,7 @@ class TestEachFrameRoundTrips(unittest.TestCase):
         """Emitted unconditionally, the frame would land in the athlete's own scrollback
         as protocol bytes. The gate is inside `emit_flush`, not at its call sites."""
         out = io.StringIO()
-        with mock.patch.dict(os.environ, {"TRAINMATE_FRONTEND": ""}):
+        with mock.patch.dict(os.environ, {"STAMIND_FRONTEND": ""}):
             emit_flush(out=out)
         self.assertEqual(out.getvalue(), "")
 
@@ -123,12 +123,12 @@ class TestTheFlushWaitFlag(unittest.TestCase):
     (DESIGN_change_heads_up.md §4)."""
 
     def test_an_ordinary_flush_announces_a_wait(self):
-        with mock.patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
+        with mock.patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
             _tag, payload = parse_frame(_emitted(emit_flush))
         self.assertTrue(flush_wants_a_wait(payload))
 
     def test_a_message_break_does_not(self):
-        with mock.patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
+        with mock.patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
             _tag, payload = parse_frame(_emitted(emit_flush, wait=False))
         self.assertFalse(flush_wants_a_wait(payload))
 

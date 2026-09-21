@@ -12,11 +12,11 @@ from unittest.mock import patch, MagicMock
 from tests.helpers import rebind_test_db
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_gcal_client.db")
+TEST_DB_PATH = test_db_path("test_stamind_gcal_client.db")
 
-from trainmate.db import Database
-import trainmate.gcal.client
-from trainmate.gcal.client import CalendarSyncer, quiet_events
+from stamind.db import Database
+import stamind.gcal.client
+from stamind.gcal.client import CalendarSyncer, quiet_events
 
 # Its own client, since nothing builds one at import any more. The tests below patch
 # `.service` on it, so the real Google connection is never used.
@@ -524,7 +524,7 @@ class TestCalendarSync(unittest.TestCase):
         mock_service.events().insert().execute.return_value = {"id": "evt-new"}
         with patch.object(calendar_syncer, "service", mock_service), \
                 patch.object(calendar_syncer, "calendar_id", "cal-test"), \
-                patch("trainmate.gcal.client.Progress") as mock_progress, \
+                patch("stamind.gcal.client.Progress") as mock_progress, \
                 patch("builtins.print") as mock_print:
             calendar_syncer.sync_multiple(workouts)
 

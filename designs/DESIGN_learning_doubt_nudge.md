@@ -46,7 +46,7 @@ Even the interactive moment asks the wrong person on a companion instance. When 
 operator runs reflect by hand for her, the end-of-run prompt asks the operator whether
 something the coach learned about her still holds.
 
-TrainMate now has a place for a question that nobody is waiting on: the athlete queue. It
+Stamind now has a place for a question that nobody is waiting on: the athlete queue. It
 holds a question until the athlete is there, sends it with the morning push, and keeps its
 buttons working until she taps one. This design queues the doubt there.
 
@@ -400,40 +400,40 @@ question then closes as stale.
 
 ## 10. Touch points
 
-- `trainmate/chat/scheduler.py`: `scheduler_wake` starts `data reflect --auto` once a
+- `stamind/chat/scheduler.py`: `scheduler_wake` starts `data reflect --auto` once a
   day after 03:00, from Wednesday to Sunday, in companion mode, as a process outside the
   chat whose output goes to the journal.
-- `trainmate/settings.py`: the `learning-questions` switch, on by default.
-  `trainmate/cli/bot/capture.py`: it joins `ROUTABLE_SETTINGS`, and it gains its line in
+- `stamind/settings.py`: the `learning-questions` switch, on by default.
+  `stamind/cli/bot/capture.py`: it joins `ROUTABLE_SETTINGS`, and it gains its line in
   `SETTING_DESCRIPTIONS` and its two sentences in `_setting_effect`.
-  `trainmate/chat/routing.py`: the router's description of `change_setting`, so
+  `stamind/chat/routing.py`: the router's description of `change_setting`, so
   "stop asking me about that stuff" reaches it.
-- `trainmate/learning_doubts.py` (new): the `learning` kind (expert and companion wording,
+- `stamind/learning_doubts.py` (new): the `learning` kind (expert and companion wording,
   the check of §5, the two answers, no drop), registered in `athlete_queue.KINDS`; and the
   queuing of §5, which skips a learning with a question still waiting or a dormant learning,
   and asks the coach for the sentences of each new question.
-- `trainmate/athlete_queue.py` and `trainmate/cli/queue.py`: a question kind without a drop
+- `stamind/athlete_queue.py` and `stamind/cli/queue.py`: a question kind without a drop
   label offers no drop, in `queue_buttons` and `terminal_choices`, and `act` refuses a drop
   on it.
-- `trainmate/coach/service/`: `learning_question(learning, reasons)` and its prompt (the
+- `stamind/coach/service/`: `learning_question(learning, reasons)` and its prompt (the
   statement and what the coach saw, plain and discreet; the call is
   `CoachEngine._learning_question_logic`). In `prompt.py`, `_review_learning_proposals` runs
   the staleness sweep in its applying form on every run, loses its prompt, and queues the
   questions (or, with the switch off, applies the proposals).
-- `trainmate/coach/engine/__init__.py`: `reason` on the `contradict` op in
+- `stamind/coach/engine/__init__.py`: `reason` on the `contradict` op in
   `LEARNING_UPDATES_FIELD`.
-- `trainmate/db/learnings.py` and `db/schema.py`: the `status` column on `coach_learnings` and
+- `stamind/db/learnings.py` and `db/schema.py`: the `status` column on `coach_learnings` and
   a `reason` column on `learning_evidence`, with their migrations; `apply_learning_deltas`
   storing a contradiction's reason; the `archived` flag in `get_learnings`; archive in place
   of the four deletes; `restore_learning`; the staleness sweep without its proposing branch;
   `keep_learning` without its staleness branch; archived rows skipped by the sweep and by
   `_exists`.
-- `trainmate/cli/learnings.py`: `rm --purge`, `restore`, `list -a/--all`, `show` finding an
+- `stamind/cli/learnings.py`: `rm --purge`, `restore`, `list -a/--all`, `show` finding an
   archived learning and printing the reasons, keep/demote printing through the renderer.
-- `trainmate/cli/data/analysis.py`: the reason under a contradiction in the reflect report, and the
+- `stamind/cli/data/analysis.py`: the reason under a contradiction in the reflect report, and the
   queue hint at the end of `data reflect` and `data bootstrap`.
-- `trainmate/cli/status.py` and `trainmate_web.py`: archived learnings left out.
-- `trainmate/cli/render/`: renderer methods for the two answers' replies, one rung down or
+- `stamind/cli/status.py` and `stamind_web.py`: archived learnings left out.
+- `stamind/cli/render/`: renderer methods for the two answers' replies, one rung down or
   on the retirement rung, with expert and companion bodies. The question's own companion
   wording lives with the kind in `learning_doubts.py`, as the strength kinds' does.
 - Tests (`tests/test_bot.py`, `tests/test_athlete_queue.py`, `tests/test_learnings*.py`, a

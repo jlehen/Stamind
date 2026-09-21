@@ -12,11 +12,11 @@ mesocycle report that assembles them is `test_mesocycle_report.py`.
 import unittest
 
 from tests.helpers import _hr, _m, _pwr, _zweek
-from trainmate.analytics import intensity
-from trainmate.analytics.intensity import (
+from stamind.analytics import intensity
+from stamind.analytics.intensity import (
     select_zone_sports, window_sport_stats, zone_currency,
 )
-from trainmate.sports import canonical_sport
+from stamind.sports import canonical_sport
 
 
 def act(date, sport, duration_sec, hr=None, power=None, rpe=None):
@@ -99,7 +99,7 @@ class TestJudgeableCoverage(unittest.TestCase):
 
     def test_config_overrides_the_shipped_per_sport_table(self):
         import unittest.mock
-        from trainmate.config import config
+        from stamind.config import config
         with unittest.mock.patch.object(
             type(config), "zone_coverage_display_min_by_sport",
             new_callable=unittest.mock.PropertyMock,

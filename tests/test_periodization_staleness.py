@@ -15,14 +15,14 @@ TEST_DB_PATH = test_db_path("test_periodization_staleness.db")
 
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 
-from trainmate import plan_inputs
-import trainmate.config
-from trainmate.db import Database
+from stamind import plan_inputs
+import stamind.config
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestPlanStaleness(unittest.TestCase):
@@ -52,9 +52,9 @@ class TestPlanStaleness(unittest.TestCase):
         """`name`, `equipment` and `preferences` reach every prompt but cannot shape the
         periodization, so editing one must not propose a replan (DESIGN_plan_staleness.md
         §3, §11: structure lives in the science documents, which flag on their own)."""
-        original_profile = dict(trainmate.config.config.data["user_profile"])
+        original_profile = dict(stamind.config.config.data["user_profile"])
         try:
-            profile = trainmate.config.config.data["user_profile"]
+            profile = stamind.config.config.data["user_profile"]
             profile["name"] = "Sam"
             profile["equipment"] = ["carbon road bike"]
             profile["preferences"] = "Zwift on weekdays"
@@ -69,14 +69,14 @@ class TestPlanStaleness(unittest.TestCase):
             profile["preferences"] = "Zwift on weekdays, gravel bike in winter"
             self.assertEqual(baseline, plan_inputs.plan_config_hash())
         finally:
-            trainmate.config.config.data["user_profile"] = original_profile
+            stamind.config.config.data["user_profile"] = original_profile
 
     def test_weekly_schedule_is_fingerprinted_per_sub_key(self):
         """A day's kit shapes that day's session; its hours, session cap and certainty
         are load structure (DESIGN_plan_staleness.md §4)."""
-        original_profile = dict(trainmate.config.config.data["user_profile"])
+        original_profile = dict(stamind.config.config.data["user_profile"])
         try:
-            profile = trainmate.config.config.data["user_profile"]
+            profile = stamind.config.config.data["user_profile"]
             profile["weekly_schedule"] = {
                 "Monday": {
                     "total_available_hours": 1.5, "max_sessions": 1,
@@ -98,14 +98,14 @@ class TestPlanStaleness(unittest.TestCase):
                     self.assertNotEqual(baseline, plan_inputs.plan_config_hash())
                     monday[key] = restore
         finally:
-            trainmate.config.config.data["user_profile"] = original_profile
+            stamind.config.config.data["user_profile"] = original_profile
 
     def test_plan_shaping_profile_fields_still_flag_the_plan_stale(self):
         """The other side of the partition — narrowing what triggers a replan must not
         have cost us the fields that genuinely reshape a periodization (§3)."""
-        original_profile = dict(trainmate.config.config.data["user_profile"])
+        original_profile = dict(stamind.config.config.data["user_profile"])
         try:
-            profile = trainmate.config.config.data["user_profile"]
+            profile = stamind.config.config.data["user_profile"]
             profile.update({
                 "birth_year": 1986, "weekly_target_hours": 8.0,
                 "sport_preferences": ["cycling"], "chronic_injuries": "none",
@@ -122,14 +122,14 @@ class TestPlanStaleness(unittest.TestCase):
                     self.assertNotEqual(baseline, plan_inputs.plan_config_hash())
                     profile[key] = restore
         finally:
-            trainmate.config.config.data["user_profile"] = original_profile
+            stamind.config.config.data["user_profile"] = original_profile
 
     def test_stale_reason_names_the_profile_fields_that_moved(self):
         """config_hash answers "did something change", the snapshot answers "what" — so
         the athlete can judge the proposal without diffing config.yaml by hand (§5)."""
-        original_profile = dict(trainmate.config.config.data["user_profile"])
+        original_profile = dict(stamind.config.config.data["user_profile"])
         try:
-            profile = trainmate.config.config.data["user_profile"]
+            profile = stamind.config.config.data["user_profile"]
             profile["sport_preferences"] = ["cycling"]
             profile["chronic_injuries"] = "none"
             profile["weekly_target_hours"] = 8.0
@@ -192,12 +192,12 @@ class TestPlanStaleness(unittest.TestCase):
                         "athlete profile changed",
                     )
         finally:
-            trainmate.config.config.data["user_profile"] = original_profile
+            stamind.config.config.data["user_profile"] = original_profile
 
     def test_config_changed_threshold_tolerance(self):
         # FTP now lives in the benchmark logbook, not config (DESIGN_benchmark_workouts
         # §3.4); drift is driven by recording newer results (latest row wins).
-        original_profile = dict(trainmate.config.config.data["user_profile"])
+        original_profile = dict(stamind.config.config.data["user_profile"])
         try:
             test_db.add_benchmark_result(
                 date="2026-06-01", sport_type="cycling",
@@ -238,18 +238,18 @@ class TestPlanStaleness(unittest.TestCase):
             self.assertIsNone(coach_service.config_changed(macro))
 
             # Non-threshold profile edits still trip the fingerprint.
-            trainmate.config.config.data["user_profile"]["weekly_target_hours"] = 20.0
+            stamind.config.config.data["user_profile"]["weekly_target_hours"] = 20.0
             self.assertEqual(
                 coach_service.config_changed(macro), "athlete profile changed"
             )
 
             # Legacy macrocycle without a snapshot: fingerprint alone decides.
-            trainmate.config.config.data["user_profile"] = dict(original_profile)
+            stamind.config.config.data["user_profile"] = dict(original_profile)
             legacy = {"config_hash": plan_inputs.plan_config_hash(),
                       "config_snapshot": None}
             self.assertIsNone(coach_service.config_changed(legacy))
         finally:
-            trainmate.config.config.data["user_profile"] = original_profile
+            stamind.config.config.data["user_profile"] = original_profile
 
     def test_e1rm_never_invalidates_a_periodization(self):
         """e1rm collides across lifts — the logbook has no per-exercise field, so a

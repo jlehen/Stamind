@@ -1,4 +1,4 @@
-# Design: The queue of things TrainMate wants to tell or ask the athlete
+# Design: The queue of things Stamind wants to tell or ask the athlete
 
 **Status:** Implemented · **Date:** 2026-09-14 (rev. 3)
 
@@ -51,7 +51,7 @@ next rest day.
 
 So one question holds up the chat at the one moment of the day she most needs it. The other
 waits days for a free slot and keeps its own record of what it asked. Both problems have
-the same cause: TrainMate has no place to put a question that can wait.
+the same cause: Stamind has no place to put a question that can wait.
 
 ## 2. The rule: what goes in the queue
 
@@ -143,7 +143,7 @@ For a **question**:
   next time. The next item is shown now.
 - **Later**, with a choice of when it comes back. The next item is shown now.
   - **In 1 hour.** The item keeps its place in the line but is hidden until an hour after
-    the tap. Then TrainMate sends it again on its own, as a reminder (§6.5).
+    the tap. Then Stamind sends it again on its own, as a reminder (§6.5).
   - **In 1 day.** The same, but hidden until tomorrow, two minutes before the time the walk
     that showed it started. A walk starts when the command that began it starts, so the
     morning push's walk starts at 08:00, and anything put off from it comes back at 07:58
@@ -501,12 +501,12 @@ or any other feature. The `message` kind of §5.1 is the first entry in that lis
 smallest example of one.
 
 Amended 2026-09-14 (DESIGN_strength_tracking.md §7): `sets_final` and `set_names` are the next
-two entries. A feature takes what it needs from `trainmate/queue_kind.py` (the `Kind` shape,
+two entries. A feature takes what it needs from `stamind/queue_kind.py` (the `Kind` shape,
 `queue` and `NotApplied`), so the list of kinds can import the feature without the feature
 importing the list.
 
 Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §5): `learning`, from
-`trainmate/learning_doubts.py`, is the next entry.
+`stamind/learning_doubts.py`, is the next entry.
 
 ## 9. Guardrails
 
@@ -548,27 +548,27 @@ item's place in the queue. `tm queue tell` is a terminal command, not a tap.
 
 ## 12. Touch points
 
-- `trainmate/db/schema.py`: the `athlete_queue` table. `trainmate/db/queue.py`: queue once per
+- `stamind/db/schema.py`: the `athlete_queue` table. `stamind/db/queue.py`: queue once per
   subject, the next item of a walk, close, move to the back, hide until a time, the items
   whose reminder time has passed.
-- `trainmate/athlete_queue.py`: the list of kinds with the `message` kind, the walk (the next
+- `stamind/athlete_queue.py`: the list of kinds with the `message` kind, the walk (the next
   waiting item, closing stale ones on the way), the actions with the "in 1 day" time, and
   sending due reminders.
-- `trainmate/prompt.py`: `emit_queue_item` with the `TM-QUEUE` sentinel, the hint in its
+- `stamind/prompt.py`: `emit_queue_item` with the `TM-QUEUE` sentinel, the hint in its
   place on a terminal, and the labels of the three later choices.
-- `trainmate/chat/callbacks.py` and `replies.py`, with the `q:` callback namespace in
-  `trainmate/chat/keyboards.py`:
+- `stamind/chat/callbacks.py` and `replies.py`, with the `q:` callback namespace in
+  `stamind/chat/keyboards.py`:
   the sentinel sends a new message; a `q:` tap runs `bot queue`, keeps its
   buttons on a busy chat and shows the chosen answer; "Not now" swaps in the three choices;
   each scheduler wake runs `bot queue --remind` when a reminder is due and waits for it
   before the push.
-- `trainmate/cli/queue.py`: `tm queue` (bare runs `list`), `list`, `answer [id]`, `tell`, and
+- `stamind/cli/queue.py`: `tm queue` (bare runs `list`), `list`, `answer [id]`, `tell`, and
   the hidden `bot queue` with `--remind`, whose parser entry sits with the other `bot`
   commands in `cli/bot/parser.py`.
-- `trainmate/cli/bot/views.py`: `run_bot_morning` starts a walk at its end.
-- `trainmate/cli/status.py` and `workout adapt` (`cli/workouts/adapt.py`): the hint, beside
+- `stamind/cli/bot/views.py`: `run_bot_morning` starts a walk at its end.
+- `stamind/cli/status.py` and `workout adapt` (`cli/workouts/adapt.py`): the hint, beside
   the end-of-schedule hint.
-- `trainmate/cli/render/`: the list, the item, reminder and hint renderers, expert and
+- `stamind/cli/render/`: the list, the item, reminder and hint renderers, expert and
   companion (the companion's hint prints nothing).
 - Tests, with the `message` kind and a question kind defined in the tests: a subject queued
   once, including after a drop; queue order, and "after the others" moving an item to the

@@ -1,4 +1,4 @@
-# TrainMate model comparison — 2026-08-18
+# Stamind model comparison — 2026-08-18
 
 > Run on 2026-08-18 against the author's real install. This is a snapshot of the
 > experiment's report, kept in the repo for reference: the run directories it mentions
@@ -6,7 +6,7 @@
 > tree, not here. Location and identity details are fictionalized for publication
 > (matching `config.sample.yaml`); every measured number is as run.
 
-One isolated TrainMate install per model, each with its own database, code copy and
+One isolated Stamind install per model, each with its own database, code copy and
 pinned clock, so the fifteen runs are directly comparable. The test is a **two-goal
 season** with a constraint known before planning and two constraints dropped on the
 schedule afterwards.
@@ -419,7 +419,7 @@ session after adaptation — an unchanged easy spin means the model left a frien
   around it? [y/N]") and the harness declined by design. A follow-up scenario could
   answer "y" and compare the replans.
 
-## App findings (bugs the benchmark surfaced in TrainMate itself)
+## App findings (bugs the benchmark surfaced in Stamind itself)
 
 All four have since been fixed in the app; the descriptions below record the behavior
 as measured on 2026-08-18.

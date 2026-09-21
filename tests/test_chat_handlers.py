@@ -19,7 +19,7 @@ from tests.chat_harness import (
     _FakeProc, _FakeQuery, build_chat_bot, callback_update, message_update,
     record_commands, routes_to,
 )
-from trainmate.chat import keyboards, runner, scheduler
+from stamind.chat import keyboards, runner, scheduler
 
 
 class MessageHandlerTest(unittest.IsolatedAsyncioTestCase):

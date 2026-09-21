@@ -4,7 +4,7 @@ set -e
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Must match RESTART_EXIT_CODE in trainmate/chat/runner.py.
+# Must match RESTART_EXIT_CODE in stamind/chat/runner.py.
 RESTART_EXIT_CODE=75
 
 if [ "$TM_BOT_SUPERVISED" = "1" ]; then
@@ -17,7 +17,7 @@ if [ "$TM_BOT_SUPERVISED" = "1" ]; then
         exit 0
     fi
 
-    exec "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/trainmate_bot.py" "$@"
+    exec "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/stamind_bot.py" "$@"
 fi
 
 # Supervisor: relaunch the worker only when it exits with RESTART_EXIT_CODE

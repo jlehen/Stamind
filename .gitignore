@@ -1,6 +1,6 @@
 .claude
 TODO
-# Top-level only: a bare "science" would also swallow trainmate/science/, the tracked built-ins
+# Top-level only: a bare "science" would also swallow stamind/science/, the tracked built-ins
 /science/
 
 # Virtual environment
@@ -14,12 +14,12 @@ service_account.json
 .garminconnect/
 
 # Local database, and the hand-made snapshots taken before risky migrations
-trainmate.db
-trainmate.db.bak*
-trainmate.db.freshstart
-trainmate.db-journal
-trainmate.db-wal
-trainmate.db-shm
+stamind.db
+stamind.db.bak*
+stamind.db.freshstart
+stamind.db-journal
+stamind.db-wal
+stamind.db-shm
 
 # Logs
 logs

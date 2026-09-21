@@ -157,7 +157,7 @@ same filter:
   previous entry in the list.
 
 So the rule for any view that walks the plan retrospectively: **fix the lineage by
-macrocycle id first, then compare dates.** `trainmate/plan_versions.py`'s `plan_lineage()`
+macrocycle id first, then compare dates.** `stamind/plan_versions.py`'s `plan_lineage()`
 is that walk, shared by `tm progress --mesocycles` (`cli/progress_zones.py`) and the strategy
 prompt's planned-vs-actual review (`coach/service/history_context.py`).
 
@@ -213,7 +213,7 @@ doesn't require guessing ids):
 - **`plan diff [PLAN_ID_A] [PLAN_ID_B] [-g ID] [--full]`** (registered alias `df`) —
   compares two versions field by field (strategy/feedback prose, mesocycles added,
   removed, renamed or re-dated, snapshotted inputs), defaulting to previous-vs-active.
-  The comparison itself lives in `trainmate/plan_versions.py`; `plan versions`' footer points
+  The comparison itself lives in `stamind/plan_versions.py`; `plan versions`' footer points
   at it.
 
 **Redo** is just a rollback to a *newer* version id: `set_active_macrocycle` swaps

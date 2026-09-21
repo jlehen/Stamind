@@ -11,16 +11,16 @@ from tests.helpers import clear_all_tables, rebind_test_db, run_cli
 
 TEST_DB_PATH = test_db_path("test_learning_doubts.db")
 
-from trainmate.db import Database
-import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
+from stamind.db import Database
+import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
-from trainmate import athlete_queue, learning_doubts, runtime, settings
-from trainmate.cli import queue as queue_cli
-from trainmate.cli.render.plan_lines import simple_queue_message
-from trainmate.coach.service import coach_service
-from trainmate.coach.service import CoachService
-from trainmate.sentinels import QUEUE_SENTINEL
-from trainmate.athlete_queue import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
+from stamind import athlete_queue, learning_doubts, runtime, settings
+from stamind.cli import queue as queue_cli
+from stamind.cli.render.plan_lines import simple_queue_message
+from stamind.coach.service import coach_service
+from stamind.coach.service import CoachService
+from stamind.sentinels import QUEUE_SENTINEL
+from stamind.athlete_queue import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)
@@ -70,7 +70,7 @@ class _DoubtCase(unittest.TestCase):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
         self.now = datetime(2026, 9, 16, 3, 0).astimezone()
-        moving_clock = patch("trainmate.clock.now", side_effect=lambda: self.now)
+        moving_clock = patch("stamind.clock.now", side_effect=lambda: self.now)
         moving_clock.start()
         self.addCleanup(moving_clock.stop)
         self.asked = []
@@ -127,7 +127,7 @@ class QueuingTest(_DoubtCase):
         self.assertEqual((first["statement"], first["saw"]), (STATEMENT, SAW))
         self.assertEqual(items[1]["payload"]["step"], "retire")
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_reflect_run_files_the_reason_and_queues_the_question(self, client):
         lid = test_db.add_learning(TEXT, sports="cycling", confidence="moderate")
         test_db.set_sync_state(
@@ -190,8 +190,8 @@ class QueuingTest(_DoubtCase):
             through_date="2026-09-13", last_pull_utc="2026-09-14T00:00:00+00:00", key="reflect"
         )
         with patch.dict(os.environ, {}):
-            os.environ.pop("TRAINMATE_FRONTEND", None)
-            os.environ.pop("TRAINMATE_RENDER", None)
+            os.environ.pop("STAMIND_FRONTEND", None)
+            os.environ.pop("STAMIND_RENDER", None)
             code, out, _ = run_cli(["data", "reflect", "--auto", "--no-pull"])
         self.assertEqual(code, 0)
         self.assertIn("1 question is waiting for you.", out)
@@ -290,7 +290,7 @@ class AnswerTest(_DoubtCase):
 
     def setUp(self):
         super().setUp()
-        env = patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json", "TRAINMATE_RENDER": "simple"})
+        env = patch.dict(os.environ, {"STAMIND_FRONTEND": "json", "STAMIND_RENDER": "simple"})
         env.start()
         self.addCleanup(env.stop)
 
@@ -348,8 +348,8 @@ class TerminalAnswerTest(_DoubtCase):
         env = patch.dict(os.environ, {})
         env.start()
         self.addCleanup(env.stop)
-        os.environ.pop("TRAINMATE_FRONTEND", None)
-        os.environ.pop("TRAINMATE_RENDER", None)
+        os.environ.pop("STAMIND_FRONTEND", None)
+        os.environ.pop("STAMIND_RENDER", None)
 
     def test_the_operator_answers_with_queue_answer(self):
         lid = self.doubt()
@@ -371,7 +371,7 @@ class SwitchTest(_DoubtCase):
         test_db.set_sync_state(
             through_date="2026-09-13", last_pull_utc="2026-09-14T00:00:00+00:00", key="reflect"
         )
-        with patch("trainmate.coach.engine.openrouter_client") as client:
+        with patch("stamind.coach.engine.openrouter_client") as client:
             result = coach_service.data_reflect(until_date_str="2026-09-13", no_pull=True)
             client.complete.assert_not_called()
         self.assertEqual(result, {})
@@ -393,7 +393,7 @@ class SentenceCallTest(unittest.TestCase):
 
     LEARNING = {"text": TEXT, "sports": "cycling"}
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_the_coach_writes_the_statement_and_what_it_saw(self, client):
         client.complete.return_value = {"statement": f" {STATEMENT} ", "saw": SAW}
         got = CoachService().learning_question(
@@ -406,12 +406,12 @@ class SentenceCallTest(unittest.TestCase):
         self.assertIn(f"- {REASON}", user)
         self.assertEqual(client.complete.call_args[1]["label"], "learning_question")
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_without_a_reason_what_it_saw_is_dropped(self, client):
         client.complete.return_value = {"statement": STATEMENT, "saw": "But it invented this."}
         self.assertEqual(CoachService().learning_question(self.LEARNING, []), (STATEMENT, None))
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_an_answer_without_a_statement_is_a_failure(self, client):
         client.complete.return_value = {"macrocycle_summary": "not what was asked"}
         with self.assertRaises(ValueError):

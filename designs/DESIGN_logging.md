@@ -2,7 +2,7 @@
 
 ## 1. The problem
 
-TrainMate already logs one thing very well. Every call to the model is written to
+Stamind already logs one thing very well. Every call to the model is written to
 `logs/llm_exchanges/<timestamp>_<label>.md` with the full system prompt, the full user
 prompt and the raw response. Three months of use has produced 218 of those files and
 17 MB on disk.
@@ -42,7 +42,7 @@ failure of a logging system is that it logs the wrong things thoroughly.
 
 > If the athlete would miss it in a year, it is a database row, not a log line.
 
-TrainMate already records a great deal of history: `workout_changes` says how a session
+Stamind already records a great deal of history: `workout_changes` says how a session
 was modified and why, `plan_feedback` holds the athlete's notes, `coach_learnings` and
 `learning_evidence` hold what the coach concluded and from what, `macrocycles` keeps every
 plan version. That is the **domain record**. It is permanent, it is backed up with the
@@ -76,7 +76,7 @@ and §5 below reuses it rather than inventing a second scheme.
 The tier the output design has no name for is the one that matters most here: **things the
 app must not say to the athlete but must not forget either.** There are ten of them today,
 written as `except Exception: pass` — three in `garmin/client.py`, seven in
-`trainmate_bot.py`. A failed `edit_message_reply_markup` is genuinely not the athlete's
+`stamind_bot.py`. A failed `edit_message_reply_markup` is genuinely not the athlete's
 problem, so staying silent on screen is correct. Staying silent on disk is not.
 
 ## 3. The unit is the run, not the line
@@ -133,7 +133,7 @@ write — a `SIGKILL` from the bot's watchdog, a reboot mid-`plan generate`. Tho
 have hidden.
 
 **Where the bracket goes: `run_once`, not `main`.** `tm shell` runs many commands in one
-process, so a run is a command, not a process. `run_once` in `trainmate_cli.py` is the one
+process, so a run is a command, not a process. `run_once` in `stamind_cli.py` is the one
 function both `main` and the REPL call, so bracketing there covers both surfaces with a
 single edit and leaves the two existing error boundaries exactly as they are — the bracket
 records the exception and re-raises it.
@@ -143,7 +143,7 @@ records the exception and re-raises it.
 lines typed into `tm shell` produce four runs — the shell, and one per line naming the shell
 as its parent. That is the right reading of what happened, and it is the same shape as
 the bot: the bot spawns the CLI as a subprocess and passes its own run id down in
-`TRAINMATE_PARENT_RUN`, which the child records on `run.start`. The morning push — the bot
+`STAMIND_PARENT_RUN`, which the child records on `run.start`. The morning push — the bot
 deciding to fire, the subprocess it launched, and everything that subprocess did — reads
 as one story instead of two disconnected halves.
 
@@ -155,9 +155,9 @@ by construction (the CLI, the REPL, the bot's event loop), so a plain list is en
 
 **`source`** says who started it: `cli`, `repl`, `shell`, `bot`, `push`, `route`, `web`,
 `test`. This is the field that makes "show me only what ran while I was asleep" a one-flag
-query. The bot passes it in `TRAINMATE_SOURCE` — but note that `cli_env` is one function
+query. The bot passes it in `STAMIND_SOURCE` — but note that `cli_env` is one function
 shared by three callers with three different answers, so it takes the value as a
-parameter rather than setting a constant beside `TRAINMATE_FRONTEND`: `_start_command` for
+parameter rather than setting a constant beside `STAMIND_FRONTEND`: `_start_command` for
 a chat message is `bot`, the same function firing the morning push is `push`, and
 `_route_intent` is `route`. Keeping the router separate matters because it runs once per
 free-text message and is pure noise in every other view.
@@ -388,7 +388,7 @@ it. `_resolve_stored` warns when the stored zone is unknown, and it does so whil
 `active_zone()`'s cache is still unset, so anything it calls that asks for the zone again
 recurses until the stack runs out. It does not here, because §4 takes the journal's day and
 its timestamps from the system clock and `journal.py` imports nothing from
-`trainmate.clock`. That is the third reason for the UTC file name.
+`stamind.clock`. That is the third reason for the UTC file name.
 
 `warn()` and `fail()` also fold the colouring in, so the twenty hand-written `Warning: `
 prefixes stop being twenty independent decisions about capitalisation and colour.
@@ -437,7 +437,7 @@ A single keystroke permanently silences a future warning and leaves no trace any
 That is exactly the "what it decided to skip" of §2.1.
 
 **The record goes in the broker, not at the call sites.** All 29 questions in the tree —
-28 `confirm`, one `choose` — go through `trainmate/prompt.py`, and nothing else asks. One
+28 `confirm`, one `choose` — go through `stamind/prompt.py`, and nothing else asks. One
 edit there covers every command on both transports, and a question added next year is
 covered the day it lands. Twenty-nine `journal.note(...)` calls beside twenty-nine
 prompts is the drift §5 opens by warning about.
@@ -529,7 +529,7 @@ return os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs", "llm_exc
 
 Every other path in `Config` — `db_path`, `science_dir`, `service_account_file` — resolves
 against `CONFIG_DIR`, deliberately, so that a second athlete running the same checkout
-under `TRAINMATE_CONFIG` keeps their state beside their own config. This one does not, so
+under `STAMIND_CONFIG` keeps their state beside their own config. This one does not, so
 the second instance writes its exchanges into the first athlete's log directory and the
 two are interleaved with no way to tell them apart. It is a small bug and it is live —
 the companion instance shipped in `318b528`. Both log directories move under a single
@@ -537,7 +537,7 @@ the companion instance shipped in `318b528`. Both log directories move under a s
 
 For the primary instance this is a **no-op on disk**: its `CONFIG_DIR` *is* the repo root,
 which is what the code-relative path already resolves to. The 218 existing files stay
-exactly where they are and no migration is needed. Only a `TRAINMATE_CONFIG` instance
+exactly where they are and no migration is needed. Only a `STAMIND_CONFIG` instance
 moves, which is the point.
 
 ## 7. `tm journal`
@@ -547,7 +547,7 @@ feature rather than a side effect.
 
 It is `journal` and not `log` for the reason §5.2 gives: `tm log` would read as "my
 training log", which is what the workouts already are. It needs an entry in
-`COMMAND_ORDER` in `trainmate_cli.py` like every other top-level command
+`COMMAND_ORDER` in `stamind_cli.py` like every other top-level command
 (`DESIGN_cli_noargs.md` §c).
 
 ```
@@ -576,7 +576,7 @@ watchdog killed; without the `?` row it would simply not be in this listing.
 ```
 $ tm journal 5a0e
 run 5a0e1d99 · plan generate -g 2
-  cli · pid 48213 · config.yaml · trainmate.db
+  cli · pid 48213 · config.yaml · stamind.db
   2026-08-24 Mon 19:22 → 19:23 · 96.4s · failed (exit 1)
 
    +0.0s  info   run.start
@@ -676,7 +676,7 @@ ends the cell in `…`. `-v` prints the line in full instead and lets the termin
 likes with it — the run id and `journal <id>` are the better way to read a long one anyway.
 
 "The screen" is `util.display_width`: the real terminal's width when there is one, and
-`default_wrap_width` (80, or whatever TRAINMATE_WRAP_WIDTH says) when there is not. Piped
+`default_wrap_width` (80, or whatever STAMIND_WRAP_WIDTH says) when there is not. Piped
 output, the tests and the bot therefore stay deterministic, and a wide terminal is used
 rather than wasted. This is the one table that asks for the window, because it is the one
 whose content has no natural width — everywhere else 80 columns is a deliberate budget.
@@ -735,7 +735,7 @@ was clipped, so `-v` is never something to guess at.
 ## 8. The bot
 
 The Telegram front-end already has a private logger: `ChatBot._log(chat_id, direction,
-msg)` in `trainmate/chat/app.py`,
+msg)` in `stamind/chat/app.py`,
 called from every send, tap and command start, `print()` to the process's stdout. Where
 that stdout goes depends entirely on how `./tm-bot` was launched, which means in practice
 it goes nowhere.
@@ -769,7 +769,7 @@ Every key has a working default, so an install with no `logging:` section behave
 as described. `level: debug` is the switch that turns the swallowed-exception tier on; it
 is off by default because those records are noise until the day they are not.
 
-There is no CLI flag and no env var for verbosity. `TRAINMATE_VERBOSE` governs what
+There is no CLI flag and no env var for verbosity. `STAMIND_VERBOSE` governs what
 *prints*, which is a different question, and `-v` is spoken for on seven sub-commands
 (`DESIGN_output_verbosity.md` §4).
 
@@ -834,14 +834,14 @@ would drift back into the listing with no symptom to notice.
 
 **A structural test on where questions are asked.** The broker records every answer in one
 place (§5.6), which only holds while it is the only thing that asks. So walk the AST of
-`trainmate/cli/` and `trainmate/coach/` and fail on any call to `input`. Keyed on the
+`stamind/cli/` and `stamind/coach/` and fail on any call to `input`. Keyed on the
 shape, so a handler written tomorrow is covered tomorrow. The REPL's line reader and the
 Garmin MFA code sit outside both trees, and neither is a question about training.
 
 **A structural test on the swallows.** `AGENTS.md` asks for a test that spans files when
 the rule does, keyed on a shape rather than a list of names. The shape here is
 `except Exception:` whose body is exactly `pass` — ten sites today — so walk the AST of
-every file under `trainmate/` and the three entry points, and name the offender. A handler
+every file under `stamind/` and the three entry points, and name the offender. A handler
 that means to stay quiet says so with `journal.debug(...)`; one that says `pass` is an
 accident, and the test cannot tell the difference from outside, which is the point.
 
@@ -879,7 +879,7 @@ the lines that matter. Not done.
 The core is small and stands alone. The rest is optional and can be judged on whether the
 core turns out to earn it.
 
-**Phase 1 — the spine.** `trainmate/journal.py`, the run bracket in `run_once`, `step` /
+**Phase 1 — the spine.** `stamind/journal.py`, the run bracket in `run_once`, `step` /
 `warn` / `fail` in `output.py`, the 29 aside reclassifications, the `llm.call` record, and
 `tm journal` with its list and detail views. This is what answers all three questions in
 §1. Roughly 150 lines of new code and a lot of one-word edits.

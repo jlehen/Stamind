@@ -17,29 +17,29 @@ from unittest.mock import MagicMock, patch
 from tests.helpers import clear_all_tables, rebind_test_db, run_cli, save_workout
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_runway.db")
+TEST_DB_PATH = test_db_path("test_stamind_runway.db")
 
-from trainmate.db import Database
-import trainmate_cli  # noqa: F401  (re-exports the workout handlers)
+from stamind.db import Database
+import stamind_cli  # noqa: F401  (re-exports the workout handlers)
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate import runtime  # noqa: E402
-from trainmate.cli import runway as runway_cli  # noqa: E402
-from trainmate.cli.render import plan_lines as render_plan  # noqa: E402
-from trainmate.cli.workouts import generate as generate_cli  # noqa: E402
-from trainmate.cli.bot.views import MORNING_MARKER  # noqa: E402
-from trainmate.config import config  # noqa: E402
-from trainmate.cli.render.plan_lines import SIMPLE_PASSED_LINE  # noqa: E402
-from trainmate.cli.render.session_lines import SPORT_EMOJI  # noqa: E402
-from trainmate.cli.runway import RUNWAY_BUTTON_LABEL  # noqa: E402
-from trainmate.sentinels import BUTTONS_SENTINEL
-from trainmate.analytics.runway import (  # noqa: E402
+from stamind import runtime  # noqa: E402
+from stamind.cli import runway as runway_cli  # noqa: E402
+from stamind.cli.render import plan_lines as render_plan  # noqa: E402
+from stamind.cli.workouts import generate as generate_cli  # noqa: E402
+from stamind.cli.bot.views import MORNING_MARKER  # noqa: E402
+from stamind.config import config  # noqa: E402
+from stamind.cli.render.plan_lines import SIMPLE_PASSED_LINE  # noqa: E402
+from stamind.cli.render.session_lines import SPORT_EMOJI  # noqa: E402
+from stamind.cli.runway import RUNWAY_BUTTON_LABEL  # noqa: E402
+from stamind.sentinels import BUTTONS_SENTINEL
+from stamind.analytics.runway import (  # noqa: E402
     RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_PLAN_END_NO_GOAL, RUNWAY_SPAN,
     plan_end, runway,
 )
-from trainmate.clock import today_str
+from stamind.clock import today_str
 
 TODAY = "2026-08-31"
 WARN = 7
@@ -337,7 +337,7 @@ class RunwaySurfaceTest(unittest.TestCase):
     def test_status_names_the_cliff_and_the_command(self):
         self._plan([(-30, 45)])
         self._sessions(0, 3)
-        with patch("trainmate.cli.status.ensure_recent_data"):
+        with patch("stamind.cli.status.ensure_recent_data"):
             code, out, _ = run_cli(["status"])
         self.assertEqual(code, 0)
         self.assertIn("Scheduled workouts run out in 3 day(s)", out)
@@ -348,7 +348,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         print outside `status`'s `if objectives:` branch (§4)."""
         self._plan([(-30, -1)], goal_offset=-1)
         self._sessions(-1)
-        with patch("trainmate.cli.status.ensure_recent_data"):
+        with patch("stamind.cli.status.ensure_recent_data"):
             code, out, _ = run_cli(["status"])
         self.assertEqual(code, 0)
         flat = " ".join(out.split())
@@ -363,7 +363,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         self._sessions(-2)
         coach = MagicMock()
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.workouts.adapt.ensure_recent_data"):
+                patch("stamind.cli.workouts.adapt.ensure_recent_data"):
             code, out, _ = run_cli(["workout", "adapt", "-y"])
         self.assertEqual(code, 0)
         coach.workout_adapt.assert_not_called()
@@ -410,8 +410,8 @@ class RunwaySurfaceTest(unittest.TestCase):
         coach.workout_adapt.return_value.new_constraints = ()
         coach.workout_adapt.return_value.reason = "All good."
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.workouts.adapt.ensure_recent_data"), \
-                patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+                patch("stamind.cli.workouts.adapt.ensure_recent_data"), \
+                patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "adapt", "-y"])
         self.assertEqual(code, 0)
         coach.workout_adapt.assert_called_once()
@@ -426,8 +426,8 @@ class RunwaySurfaceTest(unittest.TestCase):
         self._sessions(-2)
         coach = MagicMock()
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.workouts.adapt.ensure_recent_data"), \
-                patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+                patch("stamind.cli.workouts.adapt.ensure_recent_data"), \
+                patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "adapt", "-y"])
         self.assertEqual(code, 0)
         coach.workout_adapt.assert_not_called()
@@ -448,7 +448,7 @@ class RunwaySurfaceTest(unittest.TestCase):
     def test_the_companion_week_view_names_the_end_of_the_schedule(self):
         self._plan([(-30, 45)])
         self._sessions(0, 2)
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "list"])
         self.assertEqual(code, 0)
         self.assertIn("That's the end of the current schedule", out)
@@ -458,7 +458,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         it stops should turn into acting on it — the push's offer, without the wait."""
         self._plan([(-30, 45)])
         self._sessions(0, 2)
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "list"])
         self.assertEqual(code, 0)
         self.assertIn(RUNWAY_BUTTON_LABEL.split(" ", 1)[1], out)
@@ -467,7 +467,7 @@ class RunwaySurfaceTest(unittest.TestCase):
     def test_the_week_view_button_carries_the_mesocycle_flagged_command(self):
         self._plan([(-30, 2), (3, 45)])
         self._sessions(0, 2)
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "list"])
         self.assertEqual(code, 0)
         self.assertRegex(out, r"workout generate -m \.\.\d+")
@@ -477,7 +477,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         named and no button follows it."""
         self._plan([(-30, 2)], goal_offset=2)
         self._sessions(0, 2)
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "list"])
         self.assertEqual(code, 0)
         self.assertIn("That's the end of the current schedule", out)
@@ -488,7 +488,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         schedule that stops next month names its end without pressing for action."""
         self._plan([(-30, 45)])
         self._sessions(0, 20)
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(
                 ["workout", "list", "-d", f"{_out(0)}..{_out(30)}"])
         self.assertEqual(code, 0)
@@ -500,7 +500,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         reaches the end of the schedule, so there is nothing for a button to sit under."""
         self._plan([(-30, 45)])
         self._sessions(0, 2, 5)
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "list", "-d", f"{_out(0)}..{_out(2)}"])
         self.assertEqual(code, 0)
         self.assertNotIn(RUNWAY_BUTTON_LABEL.split(" ", 1)[1], out)
@@ -593,13 +593,13 @@ class MorningPushRunwayTest(unittest.TestCase):
     def test_a_silent_morning_spends_no_adaptation(self):
         """The silence is decided before `adapt-first` runs, so a dead plan does not burn
         an LLM call every morning for a message nobody sends."""
-        from trainmate.config import config
+        from stamind.config import config
         self._plan([(-60, -20)], goal_offset=-20)
         self._sessions(-20)
         coach = MagicMock()
         with patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}), \
                 patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.bot.views.ensure_recent_data"):
+                patch("stamind.cli.bot.views.ensure_recent_data"):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")
@@ -625,8 +625,8 @@ class CoverageInvariantTest(unittest.TestCase):
     """§2.1 — generation covers every date of its span, by construction."""
 
     def test_the_task_tells_the_model_to_cover_every_date(self):
-        from trainmate.coach.engine import CoachEngine
-        with patch("trainmate.coach.engine.openrouter_client") as client:
+        from stamind.coach.engine import CoachEngine
+        with patch("stamind.coach.engine.openrouter_client") as client:
             client.complete.return_value = {"reasoning": "r", "workouts": []}
             CoachEngine()._workout_generate_logic(
                 objectives=[], constraints=[], today_str=TODAY, start_str=TODAY,
@@ -640,7 +640,7 @@ class CoverageInvariantTest(unittest.TestCase):
         self.assertIn("Cover EVERY date of the span", system_prompt)
 
     def test_the_backstop_fills_the_dates_the_model_left_out(self):
-        from trainmate.coach.service.guards import GuardsMixin
+        from stamind.coach.service.guards import GuardsMixin
         proposed = [{"date": _d(0), "sport_type": "running", "title": "Long run"}]
         filled = GuardsMixin._fill_coverage_gaps(proposed, _d(0), _d(3))
         self.assertEqual(len(filled), 4)
@@ -650,7 +650,7 @@ class CoverageInvariantTest(unittest.TestCase):
         self.assertNotIn("forced constraint", rest[0]["description"])
 
     def test_an_empty_proposal_is_not_salvaged_into_a_span_of_rest(self):
-        from trainmate.coach.service.guards import GuardsMixin
+        from stamind.coach.service.guards import GuardsMixin
         self.assertEqual(GuardsMixin._fill_coverage_gaps([], _d(0), _d(3)), [])
 
 
@@ -672,7 +672,7 @@ class SimpleGeneratePreviewTest(unittest.TestCase):
         garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
         garmin.start()
         self.addCleanup(garmin.stop)
-        env = patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"})
+        env = patch.dict(os.environ, {"STAMIND_RENDER": "simple"})
         env.start()
         self.addCleanup(env.stop)
 
@@ -685,7 +685,7 @@ class SimpleGeneratePreviewTest(unittest.TestCase):
             mesocycles=[{"name": "Base", "start_date": _out(-30), "end_date": _out(45),
                          "focus": "Endurance"}],
         )
-        with patch("trainmate.coach.engine.openrouter_client") as client:
+        with patch("stamind.coach.engine.openrouter_client") as client:
             client.complete.return_value = {
                 "reasoning": "A steady week to open the mesocycle.",
                 "workouts": [
@@ -714,7 +714,7 @@ class AddGoalIntentTest(unittest.TestCase):
     what stays behind the §7 line is the periodization built on it."""
 
     def test_the_intent_reaches_the_capture_and_not_a_reply(self):
-        from trainmate.chat import messages, routing
+        from stamind.chat import messages, routing
         self.assertIn("add_goal", routing.ROUTER_INTENTS)
         self.assertNotIn("new_goal", routing.ROUTER_INTENTS)
         # A capture, so it carries the athlete's text rather than running fixed argv.
@@ -725,7 +725,7 @@ class AddGoalIntentTest(unittest.TestCase):
         self.assertFalse(hasattr(messages, "new_goal_reply"))
 
     def test_the_plan_for_it_is_still_named_as_the_operators_work(self):
-        from trainmate.cli.render.plan_lines import (
+        from stamind.cli.render.plan_lines import (
             simple_plan_setup_line, simple_plan_wrapped_line,
         )
         for line in (simple_plan_setup_line(), simple_plan_wrapped_line()):

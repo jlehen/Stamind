@@ -10,11 +10,11 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_plan_stale.db")
+TEST_DB_PATH = test_db_path("test_stamind_plan_stale.db")
 
-from trainmate import plan_inputs
-from trainmate.db import Database
-import trainmate_cli  # noqa: F401  (registers the command tree)
+from stamind import plan_inputs
+from stamind.db import Database
+import stamind_cli  # noqa: F401  (registers the command tree)
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -48,8 +48,8 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
     def _seed(self, *, stale: bool) -> tuple:
         """A goal with an active plan, generated either from the live profile or from a
         snapshot that no longer matches it."""
-        from trainmate.coach.service import coach_service
-        from trainmate.plan_inputs import plan_profile
+        from stamind.coach.service import coach_service
+        from stamind.plan_inputs import plan_profile
 
         oid = test_db.add_objective(
             title="Spring Race", target_date=self._days_out(60), sport_type="running"
@@ -85,7 +85,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         )
         return oid, mid
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_show_reports_the_change_and_both_routes_out(self, _mock_garmin):
         self._seed(stale=True)
 
@@ -105,7 +105,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self.assertIn("plan generate", stdout)
         self.assertIn("plan keep", stdout)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_show_says_nothing_when_the_plan_is_current(self, _mock_garmin):
         self._seed(stale=False)
 
@@ -115,7 +115,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self.assertNotIn("An input has changed", stdout)
         self.assertNotIn("plan keep", stdout)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_a_superseded_version_is_not_flagged(self, _mock_garmin):
         """A past version is out of date by definition; saying so is noise (§9)."""
         oid, first = self._seed(stale=True)
@@ -133,7 +133,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self.assertIn("SUPERSEDED", stdout)
         self.assertNotIn("An input has changed", stdout)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_keep_clears_the_flag_without_regenerating(self, _mock_garmin):
         _oid, mid = self._seed(stale=True)
 
@@ -156,13 +156,13 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
 
     # --- §10: the diff, and the verdict call's read ---
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_show_prints_the_edit_itself(self, _mock_garmin):
         """Naming the field is not enough to judge a prose field like `chronic_injuries`:
         the old and new text are shown, old struck, new added (§10)."""
         self._seed(stale=True)
 
-        with patch("trainmate.coach.engine.openrouter_client") as client:
+        with patch("stamind.coach.engine.openrouter_client") as client:
             client.complete.return_value = {"reshaping": False, "why": "wording only"}
             exit_code, stdout, _ = run_cli(["plan", "show"])
 
@@ -171,14 +171,14 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self.assertIn("chronic_injuries (now)", stdout)
         self.assertIn("-a sentence that has since been reworded", stdout)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_show_asks_the_coach_once_per_edit(self, _mock_garmin):
         """`plan show` is the command whose job is to help the operator decide, so it
         asks — and it stamps nothing, so the answer is cached against the edit rather
         than re-bought on every read (DESIGN_plan_change_continuity.md §7)."""
         self._seed(stale=True)
 
-        with patch("trainmate.coach.engine.openrouter_client") as client:
+        with patch("stamind.coach.engine.openrouter_client") as client:
             client.complete.return_value = {"reshaping": False, "why": "wording only"}
             _code, first, _ = run_cli(["plan", "show"])
             _code, second, _ = run_cli(["plan", "show"])
@@ -188,12 +188,12 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             self.assertIn("keep the plan", " ".join(stdout.split()))
             self.assertIn("wording only", stdout)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_show_prints_the_plan_when_the_verdict_call_fails(self, _mock_garmin):
         """Fail open, and cache nothing: the plan prints, with no coach line (§7)."""
         self._seed(stale=True)
 
-        with patch("trainmate.coach.engine.openrouter_client") as client:
+        with patch("stamind.coach.engine.openrouter_client") as client:
             client.complete.side_effect = RuntimeError("down")
             exit_code, stdout, _ = run_cli(["plan", "show"])
 
@@ -201,7 +201,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self.assertIn("An input has changed", stdout)
         self.assertNotIn("Coach:", stdout)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_keep_prints_the_edit_it_is_keeping(self, _mock_garmin):
         self._seed(stale=True)
 
@@ -211,7 +211,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self.assertIn("chronic_injuries (now)", stdout)
 
     def _macro(self):
-        from trainmate import runtime
+        from stamind import runtime
         goal = runtime.db.upcoming_objectives()[0]
         return runtime.db.get_macrocycle_for_objective(goal['id'])
 
@@ -220,13 +220,13 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         (default the question was asked with, what was printed, the verdict call)."""
         import io
         from contextlib import redirect_stdout
-        from trainmate.cli import staleness
+        from stamind.cli import staleness
 
         self._seed(stale=True)
         macro = self._macro()
         out = io.StringIO()
-        with patch("trainmate.coach.engine.openrouter_client") as client, \
-                patch("trainmate.runtime.prompt") as prompt, redirect_stdout(out):
+        with patch("stamind.coach.engine.openrouter_client") as client, \
+                patch("stamind.runtime.prompt") as prompt, redirect_stdout(out):
             if raises is not None:
                 client.complete.side_effect = raises
             else:
@@ -290,7 +290,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         the verdict call's read the other way round from `plan generate` (§10)."""
         import io
         from contextlib import redirect_stdout
-        from trainmate.cli.workouts.generate import _confirm_out_of_date_plans
+        from stamind.cli.workouts.generate import _confirm_out_of_date_plans
 
         self._seed(stale=True)
         defaults = {}
@@ -298,8 +298,8 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             # The verdict is cached against the edit, and the edit does not change
             # between these two runs — so the cache is cleared to ask again (§7).
             test_db.save_reshape_verdict(self._macro()["id"], "", None)
-            with patch("trainmate.coach.engine.openrouter_client") as client, \
-                    patch("trainmate.runtime.prompt") as prompt, \
+            with patch("stamind.coach.engine.openrouter_client") as client, \
+                    patch("stamind.runtime.prompt") as prompt, \
                     redirect_stdout(io.StringIO()):
                 client.complete.return_value = {"reshaping": reshaping, "why": "x"}
                 prompt.confirm.return_value = False
@@ -315,7 +315,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         """Returning on the first reason let one edit swallow the other: `plan show`
         named one, the verdict never learned of the other, and `plan keep` stamped both
         away (DESIGN_plan_change_continuity.md §6.5)."""
-        from trainmate.coach.service import coach_service
+        from stamind.coach.service import coach_service
 
         # An FTP on record BEFORE the plan, so the plan's snapshot has one to drift from:
         # a newly recorded anchor is not drift (DESIGN_benchmark_workouts.md §3.5).
@@ -340,7 +340,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         config pointed at it for the duration of the returned context."""
         import contextlib
         import tempfile
-        from trainmate.config import config
+        from stamind.config import config
 
         @contextlib.contextmanager
         def ctx():
@@ -363,7 +363,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         """The athlete's science documents set the structure, so an edit to one is the
         most plan-shaping input there is; the reason names the file and the diff shows
         the line (DESIGN_plan_staleness.md §11)."""
-        from trainmate.coach.service import coach_service
+        from stamind.coach.service import coach_service
 
         template = "# Template\n\n- 1/week Resistance Training\n- 0-2/week HIIT\n"
         with self._with_science_dir({"template.md": template, "notes.md": "# Notes\n"}) as d:
@@ -400,7 +400,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
     def test_a_plan_without_a_science_snapshot_is_not_held_to_one(self):
         """A plan generated before the column existed cannot say what it was built
         against, so it is not flagged on this axis until its next stamp (§11)."""
-        from trainmate.coach.service import coach_service
+        from stamind.coach.service import coach_service
 
         with self._with_science_dir({"template.md": "# Template\n"}):
             self._seed(stale=False)
@@ -408,10 +408,10 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             self.assertIsNone(macro.get("science_snapshot"))
             self.assertIsNone(coach_service.config_changed(macro))
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_keep_stamps_the_science_documents_too(self, _mock_garmin):
         """The stamp has to clear every axis, or a kept plan flags again tomorrow."""
-        from trainmate.coach.service import coach_service
+        from stamind.coach.service import coach_service
 
         with self._with_science_dir({"template.md": "# Template\n"}) as d:
             self._seed(stale=True)
@@ -423,7 +423,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             self.assertIsNone(coach_service.config_changed(self._macro()))
 
     def test_two_threshold_moves_are_reported_together(self):
-        from trainmate.coach.service import coach_service
+        from stamind.coach.service import coach_service
 
         self._seed(stale=False)
         for kind, value, unit in (("ftp", 265.0, "W"), ("lthr", 172.0, "bpm")):
@@ -437,27 +437,27 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self.assertIn("ftp changed", reason)
         self.assertIn("lthr changed", reason)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_a_moved_goal_flags_the_plan_and_renders_a_diff(self, _mock_garmin):
         """A moved race date is the largest reshaper there is, and was fingerprinted for
         `plan generate`'s reuse check alone (§6.5)."""
-        from trainmate import runtime
+        from stamind import runtime
 
         oid, _mid = self._seed(stale=False)
         runtime.db.update_objective(oid, target_date=self._days_out(90))
 
-        with patch("trainmate.coach.engine.openrouter_client") as client:
+        with patch("stamind.coach.engine.openrouter_client") as client:
             client.complete.return_value = {"reshaping": True, "why": "later peak"}
             _code, stdout, _ = run_cli(["plan", "show"])
 
         self.assertIn("goals changed", stdout)
         self.assertIn("goals (when the plan was generated)", stdout)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_a_plan_shaping_constraint_flags_the_plan_and_a_tactical_one_does_not(
         self, _mock_garmin
     ):
-        from trainmate import runtime
+        from stamind import runtime
 
         self._seed(stale=False)
         runtime.db.add_constraint(
@@ -471,16 +471,16 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             title="Three weeks away", start_date=self._days_out(10),
             end_date=self._days_out(31), replan=1,
         )
-        with patch("trainmate.coach.engine.openrouter_client") as client:
+        with patch("stamind.coach.engine.openrouter_client") as client:
             client.complete.return_value = {"reshaping": True, "why": "a lost mesocycle"}
             _code, shaping, _ = run_cli(["plan", "show"])
         self.assertIn("plan-shaping constraints changed", shaping)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_keep_clears_a_goal_flagged_plan(self, _mock_garmin):
         """The stamp has to clear everything it flags, or a kept plan flags again
         tomorrow (§6.5)."""
-        from trainmate import runtime
+        from stamind import runtime
 
         oid, _mid = self._seed(stale=False)
         runtime.db.update_objective(oid, target_date=self._days_out(90))
@@ -492,7 +492,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         _code, shown, _ = run_cli(["plan", "show"])
         self.assertNotIn("An input has changed", shown)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_plan_keep_reports_when_there_is_no_plan(self, _mock_garmin):
         test_db.add_objective(
             title="Unplanned", target_date=self._days_out(40), sport_type="running"

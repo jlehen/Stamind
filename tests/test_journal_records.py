@@ -8,8 +8,8 @@ import sys
 import unittest
 from unittest.mock import patch
 
-from trainmate import journal
-from trainmate.prompt import PromptCancelled
+from stamind import journal
+from stamind.prompt import PromptCancelled
 from tests.helpers import bind_test_db
 from tests import test_db_path
 from tests.test_journal import JournalTestCase
@@ -27,7 +27,7 @@ class TestOutputVerbs(JournalTestCase):
     """step/warn/fail print where they always did, and record what they printed (§5.1)."""
 
     def test_step_prints_like_an_aside_and_journals_it(self):
-        from trainmate.output import step
+        from stamind.output import step
         buffer = io.StringIO()
         with patch.object(sys, "stdout", buffer):
             step("Auto-syncing Garmin 2026-08-22..2026-08-24...")
@@ -37,7 +37,7 @@ class TestOutputVerbs(JournalTestCase):
         self.assertEqual(rec["lvl"], "info")
 
     def test_warn_and_fail_carry_their_prefix_and_level(self):
-        from trainmate.output import fail, warn
+        from stamind.output import fail, warn
         buffer = io.StringIO()
         with patch.object(sys, "stdout", buffer):
             warn("Garmin sync failed. Continuing with cached data.")
@@ -48,9 +48,9 @@ class TestOutputVerbs(JournalTestCase):
         self.assertEqual([rec["lvl"] for rec in self.records()], ["warn", "error"])
 
     def test_a_journalled_message_carries_no_colour_codes(self):
-        from trainmate.text import cmd
-        from trainmate.output import warn
-        with patch("trainmate.text.is_color_enabled", return_value=True):
+        from stamind.text import cmd
+        from stamind.output import warn
+        with patch("stamind.text.is_color_enabled", return_value=True):
             with patch.object(sys, "stdout", io.StringIO()):
                 warn("run " + cmd("data pull") + " in a terminal")
         self.assertEqual(self.records()[0]["msg"], "run 'data pull' in a terminal")
@@ -64,7 +64,7 @@ class TestPromptAnswers(JournalTestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        from trainmate.prompt import TtyPrompt
+        from stamind.prompt import TtyPrompt
         self.prompt = TtyPrompt()
 
     def _answers(self):
@@ -110,9 +110,9 @@ class TestPromptAnswers(JournalTestCase):
         self.assertNotIn("defaulted", self._answers()[0]["d"])
 
     def test_the_question_is_flattened_to_one_line_and_stripped_of_colour(self):
-        from trainmate.text import yellow
+        from stamind.text import yellow
         journal.start_run(["workout", "generate"], source="cli")
-        with patch("trainmate.text.is_color_enabled", return_value=True):
+        with patch("stamind.text.is_color_enabled", return_value=True):
             with patch("builtins.input", return_value="y"):
                 self.prompt.confirm(yellow("Proceed anyway?\nThis rebuilds  the week."))
         journal.end_run("ok")
@@ -121,7 +121,7 @@ class TestPromptAnswers(JournalTestCase):
         )
 
     def test_a_choice_records_the_value_it_resolved_to(self):
-        from trainmate.prompt import Choice
+        from stamind.prompt import Choice
         choices = [Choice("demote", "Demote it"), Choice("keep", "Keep it")]
         journal.start_run(["data", "reflect"], source="cli")
         with patch.object(sys, "stdout", io.StringIO()):
@@ -133,7 +133,7 @@ class TestPromptAnswers(JournalTestCase):
 
     def test_a_cancelled_prompt_names_the_question_that_was_still_open(self):
         """`cancelled` says a run stopped; this says what it stopped on (§5.6)."""
-        from trainmate.prompt import JsonPrompt, PromptCancelled
+        from stamind.prompt import JsonPrompt, PromptCancelled
         answer = json.dumps({"v": 1, "id": "p1", "cancelled": True}) + "\n"
         prompt = JsonPrompt(out=io.StringIO(), inp=io.StringIO(answer))
         journal.start_run(["plan", "generate"], source="bot")
@@ -146,7 +146,7 @@ class TestPromptAnswers(JournalTestCase):
         self.assertNotIn("answer", rec["d"])
 
     def test_a_front_end_that_sends_no_answer_is_defaulted_not_a_no(self):
-        from trainmate.prompt import JsonPrompt
+        from stamind.prompt import JsonPrompt
         answer = json.dumps({"v": 1, "id": "p1"}) + "\n"
         prompt = JsonPrompt(out=io.StringIO(), inp=io.StringIO(answer))
         journal.start_run(["plan", "generate"], source="bot")

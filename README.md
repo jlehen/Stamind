@@ -1,9 +1,9 @@
-# TrainMate
+# Stamind
 
 **A local AI coach that plans your season, writes your workouts, and adjusts
 them every morning from your Garmin data.**
 
-You tell TrainMate what you are training for and what life is doing to your
+You tell Stamind what you are training for and what life is doing to your
 week. It builds a periodized plan, turns it into day-by-day sessions, puts them
 in your Google Calendar, and then re-reads your recovery every morning to ease,
 move or hold the day's workout. It runs on your own machine against a local
@@ -17,7 +17,7 @@ disagree with.
 
 ```
 $ ./tm status
-=== TRAINMATE ATHLETE STATUS ===
+=== STAMIND ATHLETE STATUS ===
 
 Next Goal: Hillcrest hill-climb (CYCLING)
 Target Date: 2027-06-13 Sun (34 days remaining)
@@ -41,8 +41,8 @@ a coach so an athlete who never wants to learn a command can still use it.
 
 - [Who it is for](#who-it-is-for)
 - [Quick start](#quick-start)
-- [The words TrainMate uses](#the-words-trainmate-uses)
-- [A week with TrainMate](#a-week-with-trainmate)
+- [The words Stamind uses](#the-words-stamind-uses)
+- [A week with Stamind](#a-week-with-stamind)
 - [Features](#features)
 - [The three interfaces](#the-three-interfaces)
 - [Setup in detail](#setup-in-detail)
@@ -63,9 +63,9 @@ wants a coach on their phone, not a command language.
 You need:
 
 - Python 3.10 or newer.
-- An [OpenRouter](https://openrouter.ai/) API key. TrainMate uses OpenRouter so
+- An [OpenRouter](https://openrouter.ai/) API key. Stamind uses OpenRouter so
   you can pick the model. See [Choosing a model](#choosing-a-model).
-- A Garmin Connect account. TrainMate reads daily metrics and activities
+- A Garmin Connect account. Stamind reads daily metrics and activities
   directly from it.
 - A Google service account with access to one Google Calendar. The
   [setup section](#google-calendar-and-the-service-account) walks through it.
@@ -120,7 +120,7 @@ Any unambiguous prefix works as a command: `./tm wo li` is `workout list`.
 `./tm help` prints every command and sub-command on one page, and `./tm shell`
 opens an interactive prompt if you prefer not to retype `./tm`.
 
-## The words TrainMate uses
+## The words Stamind uses
 
 A handful of words come back in every command, message and document. Each one
 means one thing.
@@ -150,11 +150,11 @@ means one thing.
   and what the plan asks of it, with no exercise, set, rep or load in it. It is
   the first paragraph of the session's description, and the strength planner
   writes the rest underneath it.
-- **The coach.** TrainMate talking to you, whichever model call wrote the words.
+- **The coach.** Stamind talking to you, whichever model call wrote the words.
   Every one of those calls runs on the coach model, see
   [Choosing a model](#choosing-a-model).
 
-## A week with TrainMate
+## A week with Stamind
 
 Here is what the daily rhythm looks like once a plan is in place. The athlete
 and the numbers are fictional, and the transcripts are abridged, but the
@@ -207,8 +207,8 @@ Constraint added successfully.
 ```
 
 An advisory constraint is honored by the coach's judgement. Add `--rest` for a
-hard no-training window, and TrainMate rests those dates without asking the
-model. If a constraint is big enough to reshape the plan, TrainMate derives
+hard no-training window, and Stamind rests those dates without asking the
+model. If a constraint is big enough to reshape the plan, Stamind derives
 that from its size and asks whether to regenerate.
 
 **Saturday.** You look at how the week went and what is coming:
@@ -296,7 +296,7 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
   `science/` say how you want to be coached, and `science.samples/` ships two
   worked sets to copy. See
   [The science directory](#the-science-directory-your-coaching-philosophy).
-- **Periodized plans.** From your goals, constraints and profile, TrainMate
+- **Periodized plans.** From your goals, constraints and profile, Stamind
   builds a macrocycle (the whole arc to your goal), its mesocycles (a few
   weeks with one focus each) and the microcycles (your actual weeks). How a
   short run-in or a multi-season build should be structured comes from the
@@ -334,7 +334,7 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
   ride"` asks the coach for a change you have already decided: a session made
   shorter, another sport, other exercises, a day dropped, two days swapped. The
   coach writes it, and only the days you name change.
-- **A coach that learns, with evidence.** TrainMate keeps durable learnings
+- **A coach that learns, with evidence.** Stamind keeps durable learnings
   about you, such as how you respond to back-to-back hard days. Each learning's
   confidence is computed from the training weeks that support or contradict it,
   not asserted by the model. Learnings decay if unreinforced. When recent
@@ -390,7 +390,7 @@ All three sit on the same coaching logic and the same database.
 lists the everyday commands; `./tm help --all` also shows the rarely-used
 maintenance ones such as `wipe`, `workout push` and `data backfill-tss`.
 
-**The web dashboard** (`venv/bin/python trainmate_web.py`, then
+**The web dashboard** (`venv/bin/python stamind_web.py`, then
 `http://127.0.0.1:5000`) is read-only. It never writes a row, pulls from Garmin,
 calls the LLM or touches your calendar, so it is safe to leave running beside
 the CLI and the bot. Six tabs: Dashboard, Workouts, Progress, Benchmarks,
@@ -518,7 +518,7 @@ If you do not have a Google service account yet, it is a one-time setup:
 
 Garmin buckets every activity into heart-rate and power zones the moment it is
 recorded, using whatever thresholds your profile holds at the time. There is no
-raw stream to re-bucket later, and TrainMate reads those buckets as they are.
+raw stream to re-bucket later, and Stamind reads those buckets as they are.
 So pin four settings in Garmin Connect before your first pull:
 
 1. Disable **automatic FTP detection**.
@@ -531,7 +531,7 @@ Then one habit: whenever `./tm benchmark record` establishes a new FTP or LTHR,
 enter the same value in Garmin Connect. Change the anchor values, never the
 percentage bands.
 
-Why: TrainMate treats your benchmark logbook as the truth about your
+Why: Stamind treats your benchmark logbook as the truth about your
 thresholds, and its zone vocabulary and load math assume Garmin's default bands
 sit on those anchors. If Garmin silently bumps your FTP, the same effort starts
 landing one zone lower, and two sessions prescribed identically six months
@@ -554,8 +554,8 @@ gets a complete, separate instance by putting their `config.yaml` in a directory
 of its own and pointing every command at it:
 
 ```bash
-TRAINMATE_CONFIG=/path/to/other/config.yaml ./tm status
-TRAINMATE_CONFIG=/path/to/other/config.yaml ./tm-bot
+STAMIND_CONFIG=/path/to/other/config.yaml ./tm status
+STAMIND_CONFIG=/path/to/other/config.yaml ./tm-bot
 ```
 
 Their database, logs, science guidelines and Garmin token store all land beside
@@ -585,7 +585,7 @@ health, described at the end of this section. Copy the files you like into
 `science/` and edit them, or imitate their shape for your own.
 
 Every `.md` file in `science/` (gitignored, empty by default) is injected into
-the coaching prompts alongside the built-in guidelines in `trainmate/science/`.
+the coaching prompts alongside the built-in guidelines in `stamind/science/`.
 The built-ins teach mainstream sports science: zones, load math, periodization
 theory, benchmarking, recovery metrics. They deliberately do not pick a
 methodology. A file in `science/` is where you say which approach the coach
@@ -644,7 +644,7 @@ have to be about performance at all.
 
 When life gets in the way, the tool you reach for depends on whether the change
 is strategic (it should reshape the plan) or tactical (it affects a day or a
-few). TrainMate keeps two kinds of record apart: **observations** are things
+few). Stamind keeps two kinds of record apart: **observations** are things
 that happened to you, **directives** are things you ask the coach to work
 around.
 
@@ -695,7 +695,7 @@ Three things to know when you regenerate:
 
 ## Choosing a model
 
-TrainMate uses two model roles, both picked from the `llm.models` list in your
+Stamind uses two model roles, both picked from the `llm.models` list in your
 config.
 
 - **The coach model** answers every call that coaches: it writes the plan, it is
@@ -761,4 +761,4 @@ athlete.
 
 ## License
 
-TrainMate is released under the [BSD 3-Clause License](LICENSE).
+Stamind is released under the [BSD 3-Clause License](LICENSE).

@@ -8,13 +8,13 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
-from trainmate.coach.proposals import RevisionProposal
-from trainmate.coach.revisions import RevisionPair
+from stamind.coach.proposals import RevisionProposal
+from stamind.coach.revisions import RevisionPair
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_adapt.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -47,8 +47,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
     def run_cli(self, args, input_value="n"):
         return run_cli(args, input_value)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_adapt_message_open_ended_rule_is_named_not_stored(self, mock_coach, _garmin):
         """A note with no time bound is not a dated constraint: the terminal says where it
         belongs and asks nothing (DESIGN_bot_simple_frontend.md §12.3, 2026-09-16)."""
@@ -67,8 +67,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         self.assertIn("user_profile.preferences", stdout)
         mock_coach.capture_message_constraint.assert_not_called()
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_workout_commands(self, mock_coach, mock_garmin):
         adapted = {
             "date": "2026-06-03",
@@ -112,8 +112,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
             "knee is sore, keep impact low",
         )
 
-    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_a_text_revision_shows_the_sentences_that_moved(
         self, mock_coach, _mock_ensure
     ):
@@ -156,8 +156,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         self.assertNotIn("\n    - ", stdout)
         self.assertNotIn("\n    + ", stdout)
 
-    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_a_text_revision_wraps_at_the_client_width(self, mock_coach, _mock_ensure):
         """Over the bot the CLI is told the phone's width; the wording diff used to wrap
         at a fixed 88 columns regardless, so the phone re-wrapped every line and the
@@ -182,7 +182,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
             pairs=(RevisionPair(proposal=adapted, original=original, is_swap=False),),
         )
 
-        with patch.dict(os.environ, {"TRAINMATE_WRAP_WIDTH": "48"}):
+        with patch.dict(os.environ, {"STAMIND_WRAP_WIDTH": "48"}):
             exit_code, stdout, _stderr = self.run_cli(["workout", "adapt"])
 
         self.assertEqual(exit_code, 0)
@@ -192,8 +192,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         passages = [line for line in revised.splitlines() if line.startswith("    ")]
         self.assertTrue(passages and all(len(line) <= 48 for line in passages), revised)
 
-    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_simple_render_previews_the_revision_as_prose(self, mock_coach, _mock_ensure):
         """Simple mode sends flowed text, not a <pre> message, so the preview is one
         paragraph per touched day — no table, no diff signs — and the ask is in
@@ -225,7 +225,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
             ),
         )
 
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             exit_code, stdout, _stderr = self.run_cli(["workout", "adapt"])
 
         self.assertEqual(exit_code, 0)
@@ -242,7 +242,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         )
         # The wording diff puts blank lines inside a session's own entry, so the day
         # boundary needs a mark of its own (DESIGN_bot_simple_frontend.md §6).
-        from trainmate.cli.render.session_lines import SIMPLE_SESSION_RULE
+        from stamind.cli.render.session_lines import SIMPLE_SESSION_RULE
         before, after = stdout.split(SIMPLE_SESSION_RULE)
         self.assertIn("Rest Day (was Strength — Deload Volume", before)
         self.assertNotIn("Climb Threshold", before)
@@ -252,14 +252,14 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         self.assertNotIn("TEXT REVISED", stdout)
         self.assertIn("Okay — nothing changed.", stdout)
 
-    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_terse_names_a_reworded_session_without_quoting_it(
         self, mock_coach, _mock_ensure
     ):
         """With `terse` on, a session whose words alone changed is its line and its reason;
         the old and new wording stay on the Calendar (DESIGN_output_verbosity.md §9)."""
-        from trainmate import settings
+        from stamind import settings
         settings.write(settings.TERSE, "on")
         original = {
             "date": "2026-06-10", "sport_type": "cycling", "title": "Climb Threshold",
@@ -276,7 +276,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         )
 
         exit_code, expert, _stderr = self.run_cli(["workout", "adapt"])
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             _code, simple, _stderr = self.run_cli(["workout", "adapt"])
 
         self.assertEqual(exit_code, 0)
@@ -309,8 +309,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
             pairs=(RevisionPair(proposal=friday, original=thursday, is_swap=False),),
         )
 
-    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_the_table_says_which_day_a_moved_session_came_from(
         self, mock_coach, _mock_ensure
     ):
@@ -326,8 +326,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         # Same sport on both days, so the sport column must not claim a swap.
         self.assertNotIn("->STRENGTH_TRAINING", stdout)
 
-    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_the_companion_says_a_session_moved_rather_than_appeared(
         self, mock_coach, _mock_ensure
     ):
@@ -335,15 +335,15 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         which is what the athlete reads when a move is told as two unrelated changes."""
         mock_coach.workout_adapt.return_value = self._moved_gym_proposal()
 
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             exit_code, stdout, _stderr = self.run_cli(["workout", "adapt"])
 
         self.assertEqual(exit_code, 0)
         self.assertIn("(moved from Thu Jun 11)", stdout)
         self.assertNotIn("(new)", stdout)
 
-    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_a_real_load_change_carries_no_text_revision_section(
         self, mock_coach, _mock_ensure
     ):
@@ -378,8 +378,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
                 ctl=62.4, atl=71.7, tsb=-8.9,
             )
 
-    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_adapt_reports_metric_day_count_not_values(self, mock_coach, _mock_ensure):
         # The week planner still reads the full trajectory; the CLI only tells the athlete how
         # many days fed the decision and never prints the raw per-day numbers.
@@ -398,8 +398,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         for value in ("62.4", "71.7", "-8.9"):
             self.assertNotIn(value, stdout)
 
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_the_ambiguous_match_question_carries_its_own_pairing(
         self, mock_coach, mock_prompt
     ):
@@ -408,7 +408,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         Asides are suppressed on the chat front-end, so a `step()` premise left Telegram
         asking "Was that the session, cut short?" about nothing the athlete could see
         (DESIGN_output_verbosity.md §3, ARCHITECTURE.md §15)."""
-        from trainmate.cli.workouts.adapt import _resolve_ambiguous_matches
+        from stamind.cli.workouts.adapt import _resolve_ambiguous_matches
 
         mock_coach.pending_match_questions.return_value = [{
             "activity_id": "act_warmup",
@@ -426,7 +426,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         mock_prompt.confirm.return_value = False
 
         # Asides off is the chat front-end's own setting; the question must survive it.
-        with patch.dict(os.environ, {"TRAINMATE_VERBOSE": "0"}):
+        with patch.dict(os.environ, {"STAMIND_VERBOSE": "0"}):
             _resolve_ambiguous_matches("2026-06-03", auto=False)
 
         asked = " ".join(mock_prompt.confirm.call_args[0][0].split())

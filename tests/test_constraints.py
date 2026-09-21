@@ -14,14 +14,14 @@ from unittest.mock import patch
 from tests import test_db_path
 from tests.helpers import clear_all_tables, rebind_test_db
 
-TEST_DB_PATH = test_db_path("test_trainmate_constraints.db")
+TEST_DB_PATH = test_db_path("test_stamind_constraints.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 def tearDownModule():
@@ -105,7 +105,7 @@ class TestMessageCapture(unittest.TestCase):
             }],
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_new_constraints_returned_raw_and_unconfirmed(self, mock_client):
         """The single adapt LLM call may extract constraint candidates alongside the
         adaptation; workout_adapt returns them as-is without writing anything."""
@@ -131,7 +131,7 @@ class TestMessageCapture(unittest.TestCase):
         # athlete (two-confirmation flow, §8).
         self.assertEqual(test_db.get_constraints(), [])
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_no_message_means_no_new_constraints(self, mock_client):
         mock_client.complete.return_value = {
             "change_needed": False,
@@ -282,7 +282,7 @@ class TestRestWindowPrePass(unittest.TestCase):
         self.assertEqual(out, proposed)
 
     def test_adapt_skips_completed_and_past_sessions(self):
-        from trainmate.sports import canonical_sport
+        from stamind.sports import canonical_sport
         planned = [
             {"date": "2026-07-01", "sport_type": "running", "title": "Past"},   # before from
             {"date": "2026-07-02", "sport_type": "running", "title": "Done"},   # completed

@@ -2,7 +2,7 @@
 
 Not a test module: `unittest discover` skips it, and the files that are import it.
 
-`trainmate/chat/telegram_api.py` is the only module that names the library, so standing
+`stamind/chat/telegram_api.py` is the only module that names the library, so standing
 the library in is patching eight functions. Each stand-in here returns what it was handed
 — `inline_keyboard(rows)` gives back `rows` — so a test reads the rows the front-end
 built rather than a library object it would have to take apart again.
@@ -12,15 +12,15 @@ import os
 from types import SimpleNamespace
 from unittest import mock
 
-from trainmate.chat import scheduler, telegram_api
-from trainmate.chat.app import ChatBot
-from trainmate.config import config
+from stamind.chat import scheduler, telegram_api
+from stamind.chat.app import ChatBot
+from stamind.config import config
 
 
 class _FakeBot:
     """Stands in for `telegram.Bot`: records every call instead of making one."""
 
-    username = "trainmate_bot"
+    username = "stamind_bot"
 
     def __init__(self) -> None:
         self.sent = []           # (chat_id, text, kwargs)
@@ -118,7 +118,7 @@ def build_chat_bot(testcase, ui: str = "simple", allowed=(42,)) -> ChatBot:
         mock.patch.object(telegram_api, "command_menu", lambda commands: list(commands)),
         mock.patch.object(telegram_api, "html_parse_mode", lambda: "HTML"),
         # The bot's own timeline goes to stdout; a suite does not need it.
-        mock.patch("trainmate.chat.app.print", create=True),
+        mock.patch("stamind.chat.app.print", create=True),
         # `_tell_changes_first` reads the database before acting on the athlete's own
         # message; these cases are about the handler, not about what is waiting.
         mock.patch.object(scheduler.heads_up, "waiting", return_value=False),

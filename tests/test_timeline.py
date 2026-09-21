@@ -3,15 +3,15 @@ import unittest
 from datetime import date, timedelta
 
 from tests.helpers import rebind_test_db
-from trainmate.db import Database
-import trainmate.garmin as garmin
+from stamind.db import Database
+import stamind.garmin as garmin
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_timeline.db")
+TEST_DB_PATH = test_db_path("test_stamind_timeline.db")
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.analytics import timeline  # noqa: E402
+from stamind.analytics import timeline  # noqa: E402
 
 
 def tearDownModule():

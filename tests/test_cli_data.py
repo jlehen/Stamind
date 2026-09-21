@@ -8,10 +8,10 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_data.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_data.db")
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -40,28 +40,28 @@ class TestCliData(unittest.TestCase):
     def run_cli(self, args, input_value="n"):
         return run_cli(args, input_value)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_data_pull_command(self, mock_garmin):
         exit_code, stdout, stderr = self.run_cli(["data", "pull"])
         self.assertEqual(exit_code, 0)
         mock_garmin.pull.assert_called_once()
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_data_pull_reports_what_landed_even_in_chat(self, mock_garmin):
         # `pull`'s step narration is a terminal-only aside, so the summary it RETURNS is
         # the whole answer here — without it a chat front-end would render "(no output)"
         # (DESIGN_output_verbosity.md §3.1).
         mock_garmin.pull.return_value = "Garmin 2026-06-01..2026-06-02: 3 activities, 2 days"
-        os.environ["TRAINMATE_FRONTEND"] = "json"
+        os.environ["STAMIND_FRONTEND"] = "json"
         try:
             exit_code, stdout, stderr = self.run_cli(["data", "pull", "--no-mark"])
         finally:
-            os.environ.pop("TRAINMATE_FRONTEND", None)
+            os.environ.pop("STAMIND_FRONTEND", None)
         self.assertEqual(exit_code, 0)
         self.assertIn("Garmin 2026-06-01..2026-06-02: 3 activities, 2 days", stdout)
 
-    @patch("trainmate.cli.data.cache.mark_adherence_range")
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.cli.data.cache.mark_adherence_range")
+    @patch("stamind.runtime.garmin")
     def test_data_pull_marks_adherence(self, mock_garmin, mock_mark):
         # A successful pull rides along into the adherence Calendar marking over
         # the pulled range, and reports how many past events were marked.
@@ -72,8 +72,8 @@ class TestCliData(unittest.TestCase):
         mock_mark.assert_called_once()
         self.assertIn("Marked 2 past Calendar event(s)", stdout)
 
-    @patch("trainmate.cli.data.cache.mark_adherence_range")
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.cli.data.cache.mark_adherence_range")
+    @patch("stamind.runtime.garmin")
     def test_data_pull_no_mark_skips_marking(self, mock_garmin, mock_mark):
         # --no-mark suppresses the ride-along even on a successful pull.
         exit_code, stdout, stderr = self.run_cli(["data", "pull", "--no-mark"])
@@ -81,11 +81,11 @@ class TestCliData(unittest.TestCase):
         mock_garmin.pull.assert_called_once()
         mock_mark.assert_not_called()
 
-    @patch("trainmate.cli.data.cache.mark_adherence_range")
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.cli.data.cache.mark_adherence_range")
+    @patch("stamind.runtime.garmin")
     def test_data_pull_skips_marking_on_failure(self, mock_garmin, mock_mark):
         # If the Garmin pull fails, the ride-along marking is not attempted.
-        from trainmate.garmin import GarminAuthRequired
+        from stamind.garmin import GarminAuthRequired
         mock_garmin.GarminAuthRequired = GarminAuthRequired
         mock_garmin.pull.side_effect = RuntimeError("boom")
         exit_code, stdout, stderr = self.run_cli(["data", "pull"])
@@ -116,7 +116,7 @@ class TestCliData(unittest.TestCase):
         self.assertIsNone(test_db.get_baseline("2026-05-31"))
         self.assertEqual(len(test_db.get_completed_activities()), 0)
 
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.coach_service")
     def test_data_bootstrap_command(self, mock_coach):
         learning_id = test_db.add_learning("Athlete responds well to high sleep score")
 
@@ -196,8 +196,8 @@ class TestCliData(unittest.TestCase):
     def test_analysis_report_wraps_llm_prose_to_the_client_width(self):
         # Every prose field in the bootstrap/reflect report comes from the LLM at
         # unbounded length; none may run past the client's wrap width (AGENTS.md).
-        from trainmate.cli.data.analysis import _render_analysis_report
-        from trainmate.text import visible_len
+        from stamind.cli.data.analysis import _render_analysis_report
+        from stamind.text import visible_len
 
         learning_id = test_db.add_learning(
             "Long-run durability is the limiter: pace decays sharply beyond 90 minutes "
@@ -240,14 +240,14 @@ class TestCliData(unittest.TestCase):
         }
 
         for width in ("48", "80"):
-            os.environ["TRAINMATE_WRAP_WIDTH"] = width
+            os.environ["STAMIND_WRAP_WIDTH"] = width
             try:
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     _render_analysis_report(result, False)
                 out = buf.getvalue()
             finally:
-                del os.environ["TRAINMATE_WRAP_WIDTH"]
+                del os.environ["STAMIND_WRAP_WIDTH"]
             self.assertNotIn("Error rendering workout analysis", out)
             for line in out.split("\n"):
                 self.assertLessEqual(visible_len(line), int(width), msg=repr(line))
@@ -256,7 +256,7 @@ class TestCliData(unittest.TestCase):
         """The kimi-k3 shape: every delta key prefixed, so no op is recognized. The section
         must not render empty under a 'Saved to learnings' header
         (DESIGN_backward_evaluation.md §13)."""
-        from trainmate.cli.data.analysis import _render_analysis_report
+        from stamind.cli.data.analysis import _render_analysis_report
 
         result = {
             "macrocycle_summary": "A real reconstruction.",
@@ -274,7 +274,7 @@ class TestCliData(unittest.TestCase):
         self.assertEqual(out.count("unreadable update"), 2)
 
     def test_a_readable_delta_still_reports_as_saved(self):
-        from trainmate.cli.data.analysis import _render_analysis_report
+        from stamind.cli.data.analysis import _render_analysis_report
 
         result = {
             "macrocycle_summary": "A real reconstruction.",
@@ -309,7 +309,7 @@ class TestCliData(unittest.TestCase):
         # Read-only: renders the stored slot, names where it came from, and never
         # reaches the coach service (no LLM call, unlike bootstrap --inspect-only).
         self._seed_reconstruction("long", "Base Mesocycle", "2026-01-01", "2026-03-31")
-        with patch("trainmate.runtime.coach_service") as mock_coach:
+        with patch("stamind.runtime.coach_service") as mock_coach:
             exit_code, stdout, stderr = self.run_cli(["data", "show-analysis"])
         self.assertEqual(exit_code, 0)
         self.assertIn("data bootstrap", stdout)
@@ -355,12 +355,12 @@ class TestCliData(unittest.TestCase):
 
         # The provenance and staleness lines are this command's own, outside the shared
         # renderer the wrap test covers, and must hold the client width too (AGENTS.md).
-        from trainmate.text import visible_len
-        os.environ["TRAINMATE_WRAP_WIDTH"] = "48"
+        from stamind.text import visible_len
+        os.environ["STAMIND_WRAP_WIDTH"] = "48"
         try:
             exit_code, stdout, stderr = self.run_cli(["data", "show-analysis"])
         finally:
-            del os.environ["TRAINMATE_WRAP_WIDTH"]
+            del os.environ["STAMIND_WRAP_WIDTH"]
         for line in stdout.split("\n"):
             self.assertLessEqual(visible_len(line), 48, msg=repr(line))
 
@@ -387,7 +387,7 @@ class TestCliData(unittest.TestCase):
         self.assertIn("No long-horizon reconstruction stored", stdout)
         self.assertIn("data bootstrap", stdout)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_data_show_metrics_command(self, mock_garmin):
         # garmin is mocked to stub ensure_data. The only PMC helper still reached
         # through it reads the database; the maths beside it is imported directly and
@@ -432,7 +432,7 @@ class TestCliData(unittest.TestCase):
         # §4: a dated Garmin wipe must be followed by recompute_derived() at the command
         # layer — deleted load otherwise stays baked into every later day's CTL forever.
         # Exercises the real `data wipe` command, not the db method + recompute directly.
-        from trainmate import garmin as real_garmin
+        from stamind import garmin as real_garmin
         base = datetime(2026, 3, 1).date()
         for i in range(60):
             ds = (base + timedelta(days=i)).isoformat()
@@ -465,7 +465,7 @@ class TestCliData(unittest.TestCase):
         self.assertIsNotNone(row["ctl"])
         self.assertLess(row["ctl"], ctl_before)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_data_show_activities_command(self, mock_garmin):
         test_db.save_completed_activity(
             activity_id="act_show_1", date="2026-06-03", start_time="09:00",
@@ -530,7 +530,7 @@ class TestCliData(unittest.TestCase):
             zone1_sec=200, zone2_sec=1300, zone3_sec=200, zone4_sec=0, zone5_sec=0,
         )
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_load_column_carries_its_provenance(self, mock_garmin):
         """The highest-value fact missing from this view was not the breakdown, it was
         where the TSS came from — §9.6's `!` explained at source."""
@@ -539,7 +539,7 @@ class TestCliData(unittest.TestCase):
         self.assertIn("(pwr)", stdout)   # the ride: power zones win
         self.assertIn("(hr)", stdout)    # the run: hrTSS, coverage adequate
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_type_filter_is_alias_aware(self, mock_garmin):
         """`--type cycling` used to miss every alias, so the athlete filtered for their
         cycling and saw a fraction of it."""
@@ -550,7 +550,7 @@ class TestCliData(unittest.TestCase):
         self.assertIn("Gravel Ride", stdout)
         self.assertNotIn("Morning Run", stdout)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_zones_renders_one_row_per_activity_and_currency(self, mock_garmin):
         """§6's prohibition kept structural: the two views of the same time are separate
         rows, never adjacent columns inviting addition."""
@@ -564,7 +564,7 @@ class TestCliData(unittest.TestCase):
         self.assertIn("two views of the SAME time", stdout)  # NEVER_SUM_NOTE
         self.assertNotIn("Avg Watts", stdout)                # swapped, not widened
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_csv_carries_every_zone_column_with_no_flag(self, mock_garmin):
         self._zoned_activities()
         _, stdout, _ = self.run_cli(["data", "show-activities", "-a", "--csv"])
@@ -573,7 +573,7 @@ class TestCliData(unittest.TestCase):
                     "hr_coverage", "power_coverage", "load", "load_method", "tss"]:
             self.assertIn(col, header)
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_show_metrics_csv_empty_cells_for_null_pmc(self, mock_garmin):
         # §6.2: NULL/suppressed PMC values emit EMPTY CSV cells, never 0, so downstream
         # parsing can't read a zero as data.

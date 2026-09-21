@@ -1,4 +1,4 @@
-# The TrainMate domain model
+# The Stamind domain model
 
 **Goals, macrocycles, mesocycles, microcycles and workouts — what each one is, how they
 fit together, what must always be true about them, and how each one is born, changes and
@@ -12,7 +12,7 @@ is written down elsewhere, the pointer is given (`ARCHITECTURE.md §N`,
 
 ## 1. The five levels in one page
 
-TrainMate organises training time as nested containers. Each level answers exactly one
+Stamind organises training time as nested containers. Each level answers exactly one
 question, and each level is written by a different command.
 
 | Level | The question it answers | Where it is stored | Who writes it |
@@ -29,7 +29,7 @@ explain most of the design.
 **The microcycle has no table.** It is a vocabulary word, not an entity. Section 5
 explains why, and what stands in for it.
 
-**"Plan" means the top two rows only.** In TrainMate, *the plan* is the periodization —
+**"Plan" means the top two rows only.** In Stamind, *the plan* is the periodization —
 one macrocycle plus its mesocycles. The scheduled sessions are *workouts*, never
 "the plan". The `plan` and `workout` command families are split on exactly that line
 (`ARCHITECTURE.md §11`).
@@ -352,7 +352,7 @@ and a `plan rollback` makes an earlier version's notes pending again.
 2. **Regenerating never deletes.** The old version and its mesocycles survive so
    `plan rollback` can restore them (`DESIGN_plan_rollback.md`).
 3. **The plan window must be non-empty** (above).
-4. **TrainMate never invents intermediate goals.** An athlete who wants a tune-up race as
+4. **Stamind never invents intermediate goals.** An athlete who wants a tune-up race as
    a milestone adds it as a goal; `plan generate` then plans to whichever goal comes first.
 5. **Fingerprints are computed when the strategy is generated and carried verbatim to
    apply.** They are never recomputed at accept time — a goal edited between generating
@@ -590,7 +590,7 @@ codebase for the word turns up prompt text, CLI help strings (`workout` is descr
 
 ### What a microcycle is, conceptually
 
-From `trainmate/science/periodization.md`, which is the vocabulary authority:
+From `stamind/science/periodization.md`, which is the vocabulary authority:
 
 > The repeating work/rest unit from which daily workouts are allocated. **Where a plan
 > document expresses doses per week ("2/week", "75% of the previous week"), the microcycle
@@ -941,7 +941,7 @@ into that date. `goal_state()` reports `upcoming`. Nothing else exists yet.
 ./tm plan generate
 ```
 
-The plan window runs from today to 2026-11-15. TrainMate assembles the science guidelines,
+The plan window runs from today to 2026-11-15. Stamind assembles the science guidelines,
 the athlete profile, every upcoming goal, every active constraint, a 15-day training and
 metrics summary with the current CTL/ATL/TSB, a planned-vs-actual review of any earlier
 plan, and the coach learnings — one LLM call — and shows a `strategy` plus a list of
@@ -964,7 +964,7 @@ repaired for contiguity if the model left a gap. **No workouts yet.**
 ```
 
 Nothing is scheduled yet, so the span opens today and runs 28 days — that lands entirely
-in Base Building. TrainMate resolves the governing mesocycles, reads the metrics window,
+in Base Building. Stamind resolves the governing mesocycles, reads the metrics window,
 builds the mesocycle-progress context, and asks the model for a schedule. It prints the
 proposed sessions and asks. On `y`, it opens one `generate` change, appends one revision
 per session (each a first revision, `lineage_id = id`, tagged with the active
@@ -1207,7 +1207,7 @@ Worth knowing, because each of these is a decision rather than an oversight:
 
 | Topic | Document |
 |---|---|
-| Periodization vocabulary and defaults | `trainmate/science/periodization.md` |
+| Periodization vocabulary and defaults | `stamind/science/periodization.md` |
 | Full schema and module map | `ARCHITECTURE.md` §5, §2 |
 | Plan vs workout terminology | `ARCHITECTURE.md` §11 |
 | Plan versioning and rollback | `designs/DESIGN_plan_rollback.md` |

@@ -10,8 +10,8 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from trainmate import journal
-from trainmate.prompt import PromptCancelled
+from stamind import journal
+from stamind.prompt import PromptCancelled
 from tests.helpers import bind_test_db, run_cli
 from tests import test_db_path
 from tests.test_journal import JournalTestCase
@@ -167,8 +167,8 @@ class TestRunBracket(JournalTestCase):
         self.assertEqual(end["d"]["cmd"], "journal")
 
     def test_a_command_that_raises_records_its_traceback_and_fails(self):
-        import trainmate_cli
-        with patch.object(trainmate_cli, "_dispatch", side_effect=KeyError("mesocycles")):
+        import stamind_cli
+        with patch.object(stamind_cli, "_dispatch", side_effect=KeyError("mesocycles")):
             run_cli(["status"])
         (end,) = self._ends()
         self.assertEqual(end["d"]["outcome"], "failed")
@@ -177,8 +177,8 @@ class TestRunBracket(JournalTestCase):
         self.assertIn("KeyError", end["d"]["traceback"])
 
     def test_a_cancelled_command_is_cancelled_and_not_failed(self):
-        import trainmate_cli
-        with patch.object(trainmate_cli, "_dispatch", side_effect=PromptCancelled()):
+        import stamind_cli
+        with patch.object(stamind_cli, "_dispatch", side_effect=PromptCancelled()):
             run_cli(["status"])
         (end,) = self._ends()
         self.assertEqual(end["d"]["outcome"], "cancelled")
@@ -187,8 +187,8 @@ class TestRunBracket(JournalTestCase):
     def test_a_domain_refusal_reads_as_ok(self):
         # A handler that says no exits 1. That is an answer about the athlete's own data,
         # not a failure (§3).
-        import trainmate_cli
-        with patch.object(trainmate_cli, "_dispatch", side_effect=SystemExit(1)):
+        import stamind_cli
+        with patch.object(stamind_cli, "_dispatch", side_effect=SystemExit(1)):
             run_cli(["status"])
         (end,) = self._ends()
         self.assertEqual(end["d"]["outcome"], "ok")
@@ -235,7 +235,7 @@ class TestRunBracket(JournalTestCase):
         )
 
     def test_three_lines_in_a_shell_make_four_runs_with_one_parent(self):
-        import trainmate_cli
+        import stamind_cli
         typed = iter(["help", "help", "help"])
 
         def _input(_prompt=""):
@@ -247,7 +247,7 @@ class TestRunBracket(JournalTestCase):
         # main() directly rather than helpers.run_cli: that helper pins input() to one
         # constant answer, which the REPL would read as the same line forever.
         with patch("builtins.input", _input), patch.object(sys, "stdout", io.StringIO()):
-            trainmate_cli.main(["shell"])
+            stamind_cli.main(["shell"])
         starts = [r for r in journal.iter_records() if r["ev"] == "run.start"]
         self.assertEqual(len(starts), 4)
         (shell,) = [s for s in starts if s["msg"] == "shell"]
@@ -260,7 +260,7 @@ class TestRunBracket(JournalTestCase):
     def test_a_mistyped_line_in_a_shell_leaves_the_shell_run_alone(self):
         # The drop pops one run off a stack that has the shell under it (§3): the shell
         # keeps its own bracket, and the lines that never parsed leave nothing.
-        import trainmate_cli
+        import stamind_cli
         typed = iter(["benchmark record", "goal", "help"])
 
         def _input(_prompt=""):
@@ -271,19 +271,19 @@ class TestRunBracket(JournalTestCase):
 
         with patch("builtins.input", _input), patch.object(sys, "stdout", io.StringIO()), \
                 patch.object(sys, "stderr", io.StringIO()):
-            trainmate_cli.main(["shell"])
+            stamind_cli.main(["shell"])
         starts = [r["msg"] for r in journal.iter_records() if r["ev"] == "run.start"]
         self.assertEqual(sorted(starts), ["help", "shell"])
         self.assertEqual(journal.current(), None)
 
     def test_a_spawned_process_inherits_the_parent_run_and_its_own_source(self):
         journal.start_run(["tm-bot"], source="bot")
-        env = journal.child_env({"TRAINMATE_PARENT_RUN": "stale"}, "push")
-        self.assertEqual(env["TRAINMATE_PARENT_RUN"], journal.current_id())
-        self.assertEqual(env["TRAINMATE_SOURCE"], "push")
+        env = journal.child_env({"STAMIND_PARENT_RUN": "stale"}, "push")
+        self.assertEqual(env["STAMIND_PARENT_RUN"], journal.current_id())
+        self.assertEqual(env["STAMIND_SOURCE"], "push")
         journal.end_run("ok")
         # With no run open, an inherited parent is dropped rather than passed on.
-        self.assertNotIn("TRAINMATE_PARENT_RUN", journal.child_env(dict(env), "cli"))
+        self.assertNotIn("STAMIND_PARENT_RUN", journal.child_env(dict(env), "cli"))
 
     def test_the_rollup_counts_what_the_run_wrote(self):
         journal.start_run(["plan", "generate"])

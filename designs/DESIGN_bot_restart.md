@@ -5,7 +5,7 @@
 
 ## 1. Motivation
 
-`tm-bot` is a thin wrapper that `exec`s `trainmate_bot.py`, a single long-polling
+`tm-bot` is a thin wrapper that `exec`s `stamind_bot.py`, a single long-polling
 process with no supervisor. Today, picking up a new deploy, or nudging a bot
 that's gone unresponsive without it having actually died, means someone with
 shell access has to kill and relaunch it by hand. The athlete wants to trigger
@@ -39,9 +39,9 @@ design doesn't attempt to change that (§2 Non-Goals).
   judgment call.
 - Supervision across host reboots (systemd/tmux/whatever runs `tm-bot` today) —
   unchanged.
-- Restarting other TrainMate processes (`trainmate_web.py`, cron jobs) from
+- Restarting other Stamind processes (`stamind_web.py`, cron jobs) from
   Telegram — `/restart` only targets the bot.
-- Multi-chat considerations. TrainMate's config only supports one athlete /
+- Multi-chat considerations. Stamind's config only supports one athlete /
   one allowlisted chat right now, so this design doesn't reason about
   concurrent sessions across chats.
 
@@ -57,10 +57,10 @@ script's own child.
   launching a child of itself with `TM_BOT_SUPERVISED=1` set and `"$@"` forwarded,
   then waits for it to exit and decides whether to relaunch (§4).
 - **`TM_BOT_SUPERVISED=1` already set**: `tm-bot` is the **worker** — it skips
-  straight to today's venv-check-and-`exec` of `trainmate_bot.py`. This path is
+  straight to today's venv-check-and-`exec` of `stamind_bot.py`. This path is
   byte-for-byte what `tm-bot` does today.
 
-`trainmate_bot.py` doesn't need to know any of this exists — it only needs to
+`stamind_bot.py` doesn't need to know any of this exists — it only needs to
 exit with the right code when a restart is wanted (§5).
 
 ## 4. Exit-code contract
@@ -123,7 +123,7 @@ CLI subprocess is silently churning with no prompt open.
 
 This has to be scoped to the *silent-compute* phase specifically, not the whole
 session — the existing interactive-prompt protocol (`_present_prompt`, now
-`trainmate/chat/replies.py`) depends on live polling to receive the athlete's
+`stamind/chat/replies.py`) depends on live polling to receive the athlete's
 button tap or text reply while the subprocess is blocked on stdin. Pausing
 polling for the entire session lifetime would silently break every confirm/choose
 prompt (plan apply, destructive-command confirmation, etc.) — the bot would never
@@ -149,7 +149,7 @@ into (§7); the `command_timeout` watchdog still bounds a genuinely stuck run.
 Implementation-wise this means replacing `application.run_polling()`'s always-on
 background fetch loop with an explicit start/stop around the compute phase —
 `run_polling()` doesn't expose a "pause between messages" toggle. Shipped as
-`_serve()` (`ChatBot`, `trainmate/chat/app.py`), which drives the Application and Updater
+`_serve()` (`ChatBot`, `stamind/chat/app.py`), which drives the Application and Updater
 lifecycle by hand so `_pause_polling`/`_resume_polling` can stop and start
 `getUpdates` mid-session. This is a real touch point in the bot's core loop, not a
 side effect of adding `/restart`.
@@ -157,7 +157,7 @@ side effect of adding `/restart`.
 ### 5.2 `/restart`
 
 Handled the same way `/cancel` and `/start` already are in `on_message()`
-(`trainmate/chat/messages.py`) — matched on `token_low == "restart"`, gated by the
+(`stamind/chat/messages.py`) — matched on `token_low == "restart"`, gated by the
 same allowlist check (`ChatBot._authorized`) every other message passes. No new auth mechanism: the
 Telegram allowlist is already the access control, so there's no need for a
 shared secret at this layer (that idea only makes sense at the process layer in
@@ -171,9 +171,9 @@ can carry a command *and* a `/restart` sent right behind it, and both are handle
 before `_drive` has paused polling. So the teardown deals with a live session in
 whatever state it happens to be in, not just a prompt-blocked one.
 
-Behavior — `restart_teardown()` (a module function in `trainmate/chat/runner.py`, so it
+Behavior — `restart_teardown()` (a module function in `stamind/chat/runner.py`, so it
 can be driven without a Telegram client), then the handler `_restart`
-(`trainmate/chat/messages.py`):
+(`stamind/chat/messages.py`):
 
 1. If a prompt is open for this chat, resolve its answer future as `cancelled`.
    That is what `_cancel` does mid-prompt — note it does *not* kill; the point is
@@ -200,7 +200,7 @@ logged and stepped over, never allowed to prevent the exit.
 - **`tm-bot`**: add the supervisor loop, the `TM_BOT_SUPERVISED` branch, and the
   signal trap (§4). No backoff logic needed. The existing venv-bootstrap + exec
   becomes the worker body, untouched.
-- **`trainmate_bot.py`** (the Telegram front-end is `trainmate/chat/` now, and the list
+- **`stamind_bot.py`** (the Telegram front-end is `stamind/chat/` now, and the list
   below says where each piece went):
   - `RESTART_EXIT_CODE = 75` and `RESTART_GRACE_SECONDS = 2.0` constants — in
     `chat/runner.py`, which is what `tm-bot`'s own comment points at.
@@ -208,7 +208,7 @@ logged and stepped over, never allowed to prevent the exit.
     and the module-level `restart_teardown()` (§5.2) — `chat/messages.py` and
     `chat/runner.py`.
   - Polling loop rework to pause/resume `getUpdates` around the silent-compute
-    phase (§5.1) — the larger of the two `trainmate_bot.py` changes, and one
+    phase (§5.1) — the larger of the two `stamind_bot.py` changes, and one
     that touches existing `/cancel` behavior, not just new code. Concretely:
     `run_polling()` is replaced by `_serve()`, plus `_pause_polling` /
     `_resume_polling` and the `restarting` latch they honour. `_serve` and
@@ -273,6 +273,6 @@ logged and stepped over, never allowed to prevent the exit.
 
 - Hot-reloading code without a process restart.
 - Automatic crash recovery / crash-loop backoff (§2).
-- Restarting `trainmate_web.py` or other services from Telegram.
+- Restarting `stamind_web.py` or other services from Telegram.
 - Multi-instance / highly-available bot deployment.
 - Multi-chat / concurrent-session handling (§2).

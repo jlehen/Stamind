@@ -20,14 +20,14 @@ def _days_out(n: int) -> str:
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 GOAL_DATE = _days_out(71)
 
-from trainmate import plan_inputs
-import trainmate.config
-from trainmate.db import Database
+from stamind import plan_inputs
+import stamind.config
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestPlanFingerprint(unittest.TestCase):
@@ -77,7 +77,7 @@ class TestPlanFingerprint(unittest.TestCase):
         }
         self.assertNotEqual(hash2, plan_inputs.constraints_hash([c]))
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_plan_snapshots_goals_and_constraints(self, mock_client):
         import json
         obj_id = test_db.add_objective(
@@ -136,32 +136,32 @@ class TestPlanFingerprint(unittest.TestCase):
         initial_hash = plan_inputs.plan_config_hash()
         self.assertIsNotNone(initial_hash)
 
-        original_profile = dict(trainmate.config.config.data["user_profile"])
-        original_coach = dict(trainmate.config.config.data.get("coach") or {})
+        original_profile = dict(stamind.config.config.data["user_profile"])
+        original_coach = dict(stamind.config.config.data.get("coach") or {})
         try:
-            trainmate.config.config.data["user_profile"]["weekly_target_hours"] = 20.0
+            stamind.config.config.data["user_profile"]["weekly_target_hours"] = 20.0
             self.assertNotEqual(initial_hash, plan_inputs.plan_config_hash())
-            trainmate.config.config.data["user_profile"] = dict(original_profile)
+            stamind.config.config.data["user_profile"] = dict(original_profile)
 
             # Physiological thresholds are tolerance-checked via the snapshot, not
             # fingerprinted — editing one must not shift the hash.
-            trainmate.config.config.data["user_profile"]["ftp"] = 999
+            stamind.config.config.data["user_profile"]["ftp"] = 999
             self.assertEqual(initial_hash, plan_inputs.plan_config_hash())
-            trainmate.config.config.data["user_profile"] = dict(original_profile)
+            stamind.config.config.data["user_profile"] = dict(original_profile)
 
             # Prompt-context knobs are not plan-shaping.
-            trainmate.config.config.data["coach"] = dict(original_coach)
-            trainmate.config.config.data["coach"]["metrics_lookback_days"] = 99
+            stamind.config.config.data["coach"] = dict(original_coach)
+            stamind.config.config.data["coach"]["metrics_lookback_days"] = 99
             self.assertEqual(initial_hash, plan_inputs.plan_config_hash())
         finally:
-            trainmate.config.config.data["user_profile"] = original_profile
-            trainmate.config.config.data["coach"] = original_coach
+            stamind.config.config.data["user_profile"] = original_profile
+            stamind.config.config.data["coach"] = original_coach
 
     def test_profile_snapshot_round_trips_through_the_database(self):
         """The reason can only name fields if the snapshot survives save and reload."""
-        original_profile = dict(trainmate.config.config.data["user_profile"])
+        original_profile = dict(stamind.config.config.data["user_profile"])
         try:
-            profile = trainmate.config.config.data["user_profile"]
+            profile = stamind.config.config.data["user_profile"]
             profile["sport_preferences"] = ["cycling"]
             obj_id = test_db.add_objective(
                 title="Snapshot round trip", target_date=GOAL_DATE,
@@ -190,7 +190,7 @@ class TestPlanFingerprint(unittest.TestCase):
                 "athlete profile changed: sport_preferences",
             )
         finally:
-            trainmate.config.config.data["user_profile"] = original_profile
+            stamind.config.config.data["user_profile"] = original_profile
 
     def test_db_config_hash_operations(self):
         obj_id = test_db.add_objective(

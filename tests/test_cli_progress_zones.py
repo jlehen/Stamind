@@ -1,5 +1,5 @@
 """Pure formatting-helper tests for the zone half of `tm progress`
-(trainmate/cli/progress_zones.py): the weekly time-in-zone grid and the per-mesocycle
+(stamind/cli/progress_zones.py): the weekly time-in-zone grid and the per-mesocycle
 report. No DB, no CLI dispatch — `_StubDb` below stands in for the five accessors the
 mesocycle walk reads.
 
@@ -12,11 +12,11 @@ os.environ.setdefault("NO_COLOR", "1")  # keep assertions ANSI-free
 
 from tests.helpers import _hr, _m, _pwr, _zweek
 
-from trainmate.plan_versions import delta_baseline
-from trainmate.text import visible_len
-from trainmate.analytics.intensity import window_sport_stats, zone_currency
-from trainmate.cli.progress_load import TABLE_WIDTH, WEEK_COL_WIDTH
-from trainmate.cli.progress_zones import (
+from stamind.plan_versions import delta_baseline
+from stamind.text import visible_len
+from stamind.analytics.intensity import window_sport_stats, zone_currency
+from stamind.cli.progress_load import TABLE_WIDTH, WEEK_COL_WIDTH
+from stamind.cli.progress_zones import (
     _orphan_week_note, fmt_zone_cell, render_mesocycle_section, unknown_sport_preferences,
     zone_section, zone_table, zone_week_cells,
 )

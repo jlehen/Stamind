@@ -14,14 +14,14 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_adaptation_easing.db")
 
-from trainmate.db import Database
-import trainmate.config
+from stamind.db import Database
+import stamind.config
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import CoachService, coach_service
-from trainmate.coach.proposals import RevisionProposal
+from stamind.coach.service import CoachService, coach_service
+from stamind.coach.proposals import RevisionProposal
 
 
 class TestAdaptEasing(unittest.TestCase):
@@ -67,13 +67,13 @@ class TestAdaptEasing(unittest.TestCase):
             }],
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_applies_a_text_only_revision_and_it_costs_no_easing(self, mock_client):
         """Rewriting only the description is a real change the week planner makes deliberately —
         the athlete reads it — so it is applied, not suppressed. And it is cheap: `_eased`
         counts a revision only when duration or TSS FELL, so a reworded session never
         renders the `ALREADY EASED` tag that raises the bar for the next adapt (§9.1)."""
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
                 "metrics_lookback_days": 3,
@@ -197,7 +197,7 @@ class TestAdaptEasing(unittest.TestCase):
     def test_already_eased_tag_in_planned_prompt(self):
         """An already-eased session is tagged with its count + recency for the adapt
         prompt; an unadapted session is not."""
-        from trainmate.coach.formatting import format_planned_workouts_detailed
+        from stamind.coach.formatting import format_planned_workouts_detailed
 
         eased = {
             "date": "2026-06-18", "sport_type": "running", "title": "Easy Tempo",

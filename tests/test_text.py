@@ -1,10 +1,10 @@
-"""`trainmate/text.py`: how a line looks — colour, width, wrapping and tables."""
+"""`stamind/text.py`: how a line looks — colour, width, wrapping and tables."""
 import os
 import unittest
 from unittest.mock import patch
 
-from trainmate.analytics.pmc import color_load_ratio
-from trainmate.text import (
+from stamind.analytics.pmc import color_load_ratio
+from stamind.text import (
     RESET, format_labeled_text, pad_visible, render_table, truncate_visible,
     visible_len, wrap_text, yellow,
 )
@@ -52,7 +52,7 @@ class TestUtils(unittest.TestCase):
     def test_color_load_ratio(self):
         # Force colour on: off a TTY colorize() is a no-op, which would make every
         # band render bare and the assertions below pass without testing anything.
-        with patch("trainmate.text.is_color_enabled", return_value=True):
+        with patch("stamind.text.is_color_enabled", return_value=True):
             # Only the overload end is coloured. A LOW ratio is phase-dependent
             # (taper, deload, intensity mesocycle), so it must render bare — see
             # training_load.md §3/§4.
@@ -66,7 +66,7 @@ class TestUtils(unittest.TestCase):
             self.assertIn("\033[31m", color_load_ratio(1.60))
 
     def test_format_labeled_text(self):
-        from trainmate.text import yellow
+        from stamind.text import yellow
         label = "  Reason: "
         text = "This is a daily adaptation decision because the HRV values are drop."
         formatted = format_labeled_text(label, text, width=40)
@@ -78,51 +78,51 @@ class TestUtils(unittest.TestCase):
         )
 
         # Test with color function
-        with patch("trainmate.text.is_color_enabled", return_value=True):
+        with patch("stamind.text.is_color_enabled", return_value=True):
             formatted_colored = format_labeled_text(label, text, width=40, color_fn=yellow)
         self.assertIn("\033[33mThis is a daily adaptation", formatted_colored)
         self.assertIn("values are drop.\033[0m", formatted_colored)
 
 
 class TestWrapWidth(unittest.TestCase):
-    """`default_wrap_width()` and the TRAINMATE_WRAP_WIDTH override the Telegram
+    """`default_wrap_width()` and the STAMIND_WRAP_WIDTH override the Telegram
     front-end sets so output fits a chat bubble."""
 
     def setUp(self):
-        self._saved = os.environ.pop("TRAINMATE_WRAP_WIDTH", None)
-        from trainmate import output, text
+        self._saved = os.environ.pop("STAMIND_WRAP_WIDTH", None)
+        from stamind import output, text
         self.text = text
         self.output = output
 
     def tearDown(self):
         if self._saved is None:
-            os.environ.pop("TRAINMATE_WRAP_WIDTH", None)
+            os.environ.pop("STAMIND_WRAP_WIDTH", None)
         else:
-            os.environ["TRAINMATE_WRAP_WIDTH"] = self._saved
+            os.environ["STAMIND_WRAP_WIDTH"] = self._saved
 
     def test_default_is_80(self):
         self.assertEqual(self.text.default_wrap_width(), 80)
 
     def test_env_override(self):
-        os.environ["TRAINMATE_WRAP_WIDTH"] = "40"
+        os.environ["STAMIND_WRAP_WIDTH"] = "40"
         self.assertEqual(self.text.default_wrap_width(), 40)
 
     def test_invalid_env_falls_back_to_80(self):
-        os.environ["TRAINMATE_WRAP_WIDTH"] = "not-a-number"
+        os.environ["STAMIND_WRAP_WIDTH"] = "not-a-number"
         self.assertEqual(self.text.default_wrap_width(), 80)
 
     def test_env_is_floored_at_20(self):
-        os.environ["TRAINMATE_WRAP_WIDTH"] = "5"
+        os.environ["STAMIND_WRAP_WIDTH"] = "5"
         self.assertEqual(self.text.default_wrap_width(), 20)
 
     def test_wrap_text_honors_env_when_width_unset(self):
-        os.environ["TRAINMATE_WRAP_WIDTH"] = "30"
+        os.environ["STAMIND_WRAP_WIDTH"] = "30"
         long = "word " * 40
         wrapped = self.text.wrap_text(long)
         self.assertTrue(all(len(line) <= 30 for line in wrapped.splitlines()))
 
     def test_explicit_width_still_wins_over_env(self):
-        os.environ["TRAINMATE_WRAP_WIDTH"] = "30"
+        os.environ["STAMIND_WRAP_WIDTH"] = "30"
         long = "word " * 40
         wrapped = self.text.wrap_text(long, width=60)
         lines = wrapped.splitlines()
@@ -139,15 +139,15 @@ class TestFlexColumn(unittest.TestCase):
     HEADERS = ["RUN", "COMMAND", "END"]
 
     def setUp(self):
-        self._saved = os.environ.get("TRAINMATE_WRAP_WIDTH")
+        self._saved = os.environ.get("STAMIND_WRAP_WIDTH")
         # Not a terminal under test, so `display_width` is the wrap width: pin it.
-        os.environ["TRAINMATE_WRAP_WIDTH"] = "80"
+        os.environ["STAMIND_WRAP_WIDTH"] = "80"
 
     def tearDown(self):
         if self._saved is None:
-            os.environ.pop("TRAINMATE_WRAP_WIDTH", None)
+            os.environ.pop("STAMIND_WRAP_WIDTH", None)
         else:
-            os.environ["TRAINMATE_WRAP_WIDTH"] = self._saved
+            os.environ["STAMIND_WRAP_WIDTH"] = self._saved
 
     def test_a_short_cell_is_left_alone(self):
         rows = [["5a0e", "plan generate", "ok"]]
@@ -174,7 +174,7 @@ class TestFlexColumn(unittest.TestCase):
         self.assertEqual(truncate_visible("abcdef", 4), "abc…")
         # Forced on: off a TTY colorize() is a no-op and there would be no escapes left
         # to measure — which is the whole point of the assertion.
-        with patch("trainmate.text.is_color_enabled", return_value=True):
+        with patch("stamind.text.is_color_enabled", return_value=True):
             clipped = truncate_visible(yellow("abcdef"), 4)
         self.assertEqual(visible_len(clipped), 4)
         self.assertTrue(clipped.endswith(RESET))
@@ -185,7 +185,7 @@ class TestCommandsSurviveTheWrap(unittest.TestCase):
     splits one across two lines (DESIGN_output_verbosity.md §3.6)."""
 
     def _wrapped(self, text: str, width: int = 48) -> list:
-        from trainmate.text import wrap_text
+        from stamind.text import wrap_text
         return wrap_text(text, width=width).split("\n")
 
     def test_a_quoted_command_lands_on_one_line(self):
@@ -217,17 +217,17 @@ class TestCommandsSurviveTheWrap(unittest.TestCase):
             self.assertLessEqual(len(line), 48, lines)
 
     def test_a_bare_command_is_marked_by_its_caller(self):
-        from trainmate.text import keep_whole
+        from stamind.text import keep_whole
         text = "To backfill, run:\n  " + keep_whole(
-            "python trainmate_cli.py data pull 2026-01-01 2026-08-31"
+            "python stamind_cli.py data pull 2026-01-01 2026-08-31"
         )
         lines = self._wrapped(text)
         # Whole, still indented, and over the budget: a command longer than the width
         # cannot both fit and stay in one piece, and staying in one piece wins.
-        self.assertIn("  python trainmate_cli.py data pull 2026-01-01 2026-08-31", lines)
+        self.assertIn("  python stamind_cli.py data pull 2026-01-01 2026-08-31", lines)
 
     def test_the_marks_never_reach_a_log(self):
-        from trainmate.text import keep_whole, strip_ansi
+        from stamind.text import keep_whole, strip_ansi
         self.assertEqual(strip_ansi(keep_whole("data pull -d 2026-01-01")),
                          "data pull -d 2026-01-01")
 

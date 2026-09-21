@@ -18,7 +18,7 @@ pair and its own help text for what is, every time, the same three operations.
 | --- | --- |
 | `config.yaml` | The **install default** — what a fresh instance ships with |
 | DB → `settings` table | The **athlete's override** — what they changed, from anywhere |
-| `trainmate/settings.py` | The **registry** — what a setting is, how it is validated, how the two combine |
+| `stamind/settings.py` | The **registry** — what a setting is, how it is validated, how the two combine |
 | `settings` command | Show them, change one, forget one |
 
 The registry is the single list. Adding a preference is one `Setting(...)` entry: it
@@ -60,7 +60,7 @@ restart returns to what `config.yaml` says — that ephemerality is the design
 
 ## §2 — The registry
 
-`trainmate/settings.py`. One `Setting` per knob:
+`stamind/settings.py`. One `Setting` per knob:
 
 ```python
 Setting(
@@ -155,7 +155,7 @@ Morning push
 `settings list <name>` adds what the generic listing cannot say: for `coach-model` the
 numbered menu, marked with which entry coaches and which one routes; for `timezone` the
 local date and time the zone produces, so it can be checked against a watch rather than
-trusted by name. Those renderers live in `trainmate/cli/settings.py`, keyed by name, so
+trusted by name. Those renderers live in `stamind/cli/settings.py`, keyed by name, so
 the registry stays free of display code.
 
 ### §4.1 — One allowlist for both model roles
@@ -179,7 +179,7 @@ way a `/ui` flip already did.
 ## §6 — What this replaced
 
 `model` and `timezone` are gone as top-level commands; their behaviour is intact under
-`settings`. `trainmate/cli/models.py` and `trainmate/cli/timezone.py` are deleted.
+`settings`. `stamind/cli/models.py` and `stamind/cli/timezone.py` are deleted.
 `llm_models.py` and `clock.py` keep the domain logic — the menu, the zone maths — and lose
 their writers: one writer (`settings.write`) validates, stores and drops the cache for
 every setting. `Config` loses the five accessors that only wrapped a key path

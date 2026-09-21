@@ -49,7 +49,7 @@ one (§6 is the narrow exception that survives). `..` also makes signed offsets 
 
 The `-m` atom has since grown past "a mesocycle ID": `plan feedback -m` also takes a
 date (the mesocycle covering that day) and a case-insensitive infix of a mesocycle *name*
-(DESIGN_plan_feedback.md §5, `resolve_meso_atom` in trainmate/cli/selectors.py). It is
+(DESIGN_plan_feedback.md §5, `resolve_meso_atom` in stamind/cli/selectors.py). It is
 defined there as a **single-target** resolver, beside this range machinery rather than
 inside it — the day a filtering command wants `workout list -m climb`, the range grammar
 lifts it rather than reinventing it.
@@ -61,7 +61,7 @@ which way it runs.
 
 ## §2 — Dimensions intersect, and each resolves to a window
 
-`resolve_window` (trainmate/cli/windows.py) turns every selector given into a
+`resolve_window` (stamind/cli/windows.py) turns every selector given into a
 (start, end) pair and **intersects** them: `-m 3 -d 2026-06-10..` is the part of mesocycle 3
 from the 10th onward. Nothing is silently dropped, which the old precedence chain did.
 
@@ -146,7 +146,7 @@ zoom rather than a range, and `--weeks` no longer exists anywhere else to collid
 
 `-d -7d..+2w` cannot reach argparse as two tokens: `-7d..+2w` starts with a dash, does not
 match argparse's negative-number pattern, and is therefore read as an unknown option.
-`translate_dashless_argv` (trainmate/cli/argparse_ext.py) — which already rewrites the
+`translate_dashless_argv` (stamind/cli/argparse_ext.py) — which already rewrites the
 dashless bot syntax against the same tree — glues the pair into `-d=-7d..+2w`, the one form
 argparse takes verbatim. The rewrite is deliberately narrow: it fires only for a value
 matching `-N[dw]` optionally followed by `..`, so a mistyped flag after another flag is
@@ -159,7 +159,7 @@ Four resolvers became one (`resolve_window`); `_resolve_workout_date_range`,
 `_resolve_historical_date_range`, `resolve_cleanup_range` and (with §8)
 `_resolve_workout_end_date` are all gone. The `basic_date_parser` / `plan_date_parser` /
 `sport_type_parser` parent
-parsers in trainmate_cli.py are gone too: a parent parser cannot carry a per-command
+parsers in stamind_cli.py are gone too: a parent parser cannot carry a per-command
 default, which is exactly what each command needed.
 
 `coach_service.data_bootstrap`/`data_reflect` lost their `days=`/`weeks=` parameters. A
@@ -323,7 +323,7 @@ quietly swallows the days belonging to a goal nobody has planned for. `-g N` now
 to N's own span: the day after the goal before it, whether or not that goal has a plan.
 
 The CLI resolves the goal and the start (`_plan_targets`/`_goal_span_start` in
-trainmate/cli/windows.py) and the service takes `start_date` as a parameter, so the selector
+stamind/cli/windows.py) and the service takes `start_date` as a parameter, so the selector
 policy stays on the CLI side (§3). The service owns the notice, because only it holds both
 readings: it prints one when the caller's bound and its own derivation disagree, which is
 exactly when the days before the goal were about to be absorbed.

@@ -7,12 +7,12 @@ from unittest.mock import patch
 
 from tests.helpers import pin_clock
 
-from trainmate.cli import windows
-from trainmate.cli.selectors import (
+from stamind.cli import windows
+from stamind.cli.selectors import (
     CURRENT, DateRange, IdRange, SelectorError, add_selector_args, parse_date_range,
     parse_id_range, parse_single_date, parse_target,
 )
-from trainmate.cli.windows import resolve_window
+from stamind.cli.windows import resolve_window
 
 TODAY = date(2026, 6, 15)
 
@@ -193,8 +193,8 @@ class TestSelectorVocabularyInvariants(unittest.TestCase):
             yield path, action
 
     def test_short_letters_keep_their_meaning(self):
-        import trainmate_cli
-        parser, _ = trainmate_cli.build_parser()
+        import stamind_cli
+        parser, _ = stamind_cli.build_parser()
         for path, action in self._walk(parser):
             shorts = [o for o in action.option_strings if len(o) == 2]
             longs = set(o for o in action.option_strings if len(o) > 2)
@@ -208,8 +208,8 @@ class TestSelectorVocabularyInvariants(unittest.TestCase):
                 )
 
     def test_the_retired_range_flags_are_gone(self):
-        import trainmate_cli
-        parser, _ = trainmate_cli.build_parser()
+        import stamind_cli
+        parser, _ = stamind_cli.build_parser()
         # `--until-goal` retired with the rest: `workout generate -g` now IS the horizon,
         # so a goal's target date reaches generation through the shared grammar rather
         # than through a flag of its own (DESIGN_cli_selectors.md §8).
@@ -220,8 +220,8 @@ class TestSelectorVocabularyInvariants(unittest.TestCase):
             self.assertFalse(clash, f"'{path}' still registers {sorted(clash)}")
 
     def test_every_range_command_declares_a_policy(self):
-        import trainmate_cli
-        parser, _ = trainmate_cli.build_parser()
+        import stamind_cli
+        parser, _ = stamind_cli.build_parser()
         for path, action in self._walk(parser):
             if "--date" not in action.option_strings or path in self.SINGLE_DAY:
                 continue

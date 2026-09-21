@@ -32,7 +32,7 @@ Parts of this already exist, scattered by surface rather than by fact:
 
 - The **mesocycle cliff** has a hint — but only on one surface: `workout adapt` prints two
   lines inside `config.adapt_terminal_window_days`
-  (`trainmate/cli/workouts/generate.py::_print_block_boundary_hint`). `status` and the
+  (`stamind/cli/workouts/generate.py::_print_block_boundary_hint`). `status` and the
   bot never see it, so the same morning can already answer differently depending on
   which command was typed. §3 folds it into the detector rather than adding a second
   hint beside it.
@@ -211,8 +211,8 @@ the §4 hints arrive the moment the CLI prints them. Byte-parity preserved, noth
 
 The athlete never types commands, so the suggestion must become a button or prose — and
 per the standing split, the CLI owns *what* to offer, the bot only renders
-(`trainmate/cli/bot/views.py::MORNING_BUTTONS` defines the rows;
-`trainmate/chat/keyboards.py` renders them and maps the taps — the offer spans
+(`stamind/cli/bot/views.py::MORNING_BUTTONS` defines the rows;
+`stamind/chat/keyboards.py` renders them and maps the taps — the offer spans
 both files). `bot morning` grows one conditional
 line, inside its existing per-day idempotent push.
 
@@ -224,7 +224,7 @@ exactly one place — the morning push's runway button, whose argv comes from th
 (`workout generate`, or `workout generate -m ..<id>` for a mesocycle cliff) — and never from
 the free-text router. It is safe to offer because the button feeds the normal command
 pipeline like every `send` entry, and the structured-prompt protocol
-(`TRAINMATE_FRONTEND=json`) renders its preview/confirm as tappable buttons — she sees
+(`STAMIND_FRONTEND=json`) renders its preview/confirm as tappable buttons — she sees
 the proposed weeks and confirms with taps, as with any decision.
 
 Two mechanics the earlier draft hand-waved:
@@ -286,7 +286,7 @@ morning a schedule exists again.
 
 **Dedup with `adapt-first`.** When `adapt-first` is on, the push renders `workout adapt
 -y`'s output — which now carries §4's hint lines. The CLI suppresses the runway hint
-under `TRAINMATE_RENDER=simple`: on the simple surface the bot words the fact itself, and
+under `STAMIND_RENDER=simple`: on the simple surface the bot words the fact itself, and
 one fact gets one wording per message.
 
 **Free text about the next goal.** The router gains a `new_goal` intent ("the athlete says

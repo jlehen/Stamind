@@ -18,7 +18,7 @@
 > 3. **ACWR is retired and the modules were split into packages.** ACWR went away on 2026-07-31
 >    (DESIGN_load_ratio.md); findings 4(b), 6 and 7 quote ACWR code that no longer exists, and
 >    those quotes are marked in place. Every module and line reference in this file also
->    predates the package split (`garmin.py` → `trainmate/garmin/*`, `coach/engine.py` and
+>    predates the package split (`garmin.py` → `stamind/garmin/*`, `coach/engine.py` and
 >    `coach/service.py` → packages), and is left as written: read all file/line pointers below
 >    as *where the code lived in July 2026*, not as a map of the tree today.
 

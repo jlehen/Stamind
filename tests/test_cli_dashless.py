@@ -6,11 +6,11 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_dashless.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_dashless.db")
 
-from trainmate.coach.proposals import RevisionProposal
-from trainmate.db import Database
-import trainmate_cli
+from stamind.coach.proposals import RevisionProposal
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -54,8 +54,8 @@ class TestDashlessOptionTranslator(unittest.TestCase):
         return p
 
     def _xlate(self, tokens):
-        import trainmate_cli
-        return trainmate_cli.translate_dashless_argv(self._parser(), tokens)
+        import stamind_cli
+        return stamind_cli.translate_dashless_argv(self._parser(), tokens)
 
     def test_flag_and_value_keywords(self):
         # `w a message "..." no-pull` → recurse aliases, expand value + boolean.
@@ -120,10 +120,10 @@ class TestCommandPrefixResolution(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.parser, _ = trainmate_cli.build_parser()
+        cls.parser, _ = stamind_cli.build_parser()
 
     def _xlate(self, line):
-        return trainmate_cli.translate_dashless_argv(self.parser, line.split())
+        return stamind_cli.translate_dashless_argv(self.parser, line.split())
 
     def test_prefix_resolves_at_every_level(self):
         self.assertEqual(self._xlate("st"), ["status"])
@@ -192,11 +192,11 @@ class TestCommandTreeInvariants(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.parser, _ = trainmate_cli.build_parser()
+        cls.parser, _ = stamind_cli.build_parser()
 
     def _levels(self):
         """Yield (path, sub-parsers action, parser) for every level that has commands."""
-        from trainmate.cli.argparse_ext import _subparsers_action
+        from stamind.cli.argparse_ext import _subparsers_action
 
         def walk(parser, path):
             action = _subparsers_action(parser)
@@ -222,7 +222,7 @@ class TestCommandTreeInvariants(unittest.TestCase):
         # A dashless keyword that also names or abbreviates a command at the same level
         # makes one of the two unreachable: exact commands are resolved before keywords,
         # keywords before prefixes. Rename the option, or give it no dashless spelling.
-        from trainmate.cli.argparse_ext import _build_keyword_spec
+        from stamind.cli.argparse_ext import _build_keyword_spec
 
         for path, action, parser in self._levels():
             for keyword in _build_keyword_spec(parser):
@@ -275,8 +275,8 @@ class TestDashlessEndToEnd(unittest.TestCase):
     def run_cli(self, args, input_value="n"):
         return run_cli(args, input_value)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_workout_adapt_message_and_no_pull(self, mock_coach, mock_garmin):
         mock_coach.workout_adapt.return_value = RevisionProposal(
             reason="ok", workouts=[], new_constraints=[],

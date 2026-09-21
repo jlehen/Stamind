@@ -11,11 +11,11 @@ from tests.helpers import clear_all_tables, rebind_test_db, save_workout
 
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_web_workouts.db")
+TEST_DB_PATH = test_db_path("test_stamind_web_workouts.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
-import trainmate_web
+import stamind_web
 
 # An isolated database for the web app's singleton; test_web.py says why.
 test_db = Database(db_path=TEST_DB_PATH)
@@ -50,7 +50,7 @@ class TestWorkoutListingCarriesTheVerdict(unittest.TestCase):
         global test_db
         test_db = Database(db_path=TEST_DB_PATH)
         rebind_test_db(test_db)
-        cls.client = trainmate_web.app.test_client()
+        cls.client = stamind_web.app.test_client()
 
     @classmethod
     def tearDownClass(cls):
@@ -104,7 +104,7 @@ class TestCompareEndpoint(unittest.TestCase):
         global test_db
         test_db = Database(db_path=TEST_DB_PATH)
         rebind_test_db(test_db)
-        cls.client = trainmate_web.app.test_client()
+        cls.client = stamind_web.app.test_client()
 
     @classmethod
     def tearDownClass(cls):
@@ -234,7 +234,7 @@ class TestWorkoutBatchesEndpoint(unittest.TestCase):
         global test_db
         test_db = Database(db_path=TEST_DB_PATH)
         rebind_test_db(test_db)
-        cls.client = trainmate_web.app.test_client()
+        cls.client = stamind_web.app.test_client()
 
     @classmethod
     def tearDownClass(cls):

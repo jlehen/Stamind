@@ -2,17 +2,17 @@
 
 ## 1. What the timezone decides
 
-Every date TrainMate computes is a *calendar* date in somebody's day: which workout is
+Every date Stamind computes is a *calendar* date in somebody's day: which workout is
 due today, whether a session is behind or ahead, which day a Garmin metric belongs to,
 where the planning window opens. Garmin itself keys daily metrics and activities on the
 athlete's local calendar date, so a UTC frontier would drift a day at the boundary hours.
 
 Before this, "somebody" was the machine: `clock.today_date()` returned `date.today()`. That
 is right on a laptop the athlete carries and wrong everywhere else — a server in UTC, a
-home box left on a different setting, an athlete who moved. TrainMate is a
+home box left on a different setting, an athlete who moved. Stamind is a
 single-athlete-per-instance app, so the fix is one zone per instance, set by that athlete.
 
-`trainmate/clock.py` is the one place that answers "what time is it", and
+`stamind/clock.py` is the one place that answers "what time is it", and
 `clock.today_date()` is where every date starts. Nothing else calls `date.today()`.
 
 ## 2. Which clocks follow it
