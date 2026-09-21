@@ -243,7 +243,7 @@ skip the plan is what `workout adapt -m` is for (§12 revisits).
   `Plan feedback: 2 pending — plan generate will address them.`
 - **Web dashboard** (read-only, unchanged contract): the `strategy-feedback` and
   `cycle-details-feedback` panels render the pending list (date, filing, text) from the same DB
-  helper; the `app.js` explanatory note updates.
+  helper; the explanatory note in `static/plan.js` updates.
 
 ## 9. Code touch points
 
@@ -261,7 +261,7 @@ is not restated in comments.
 | `trainmate/coach/engine/planning.py` | Section text (§7) |
 | `trainmate/plan_versions.py` | Feedback panel → note lists (§8) |
 | `trainmate/cli/status.py` | Pending-count line (§8) |
-| `trainmate_web.py` + `static/app.js`/`index.html`/`style.css` | Render pending list (§8) |
+| `trainmate_web.py` + `static/plan.js`/`index.html`/`style.css` | Render pending list (§8) |
 | `README.md` | Steering-channels table row + the `plan feedback` mentions |
 | `ARCHITECTURE.md` | Schema tables (macrocycles/mesocycles rows → `plan_feedback` table), command table rows for `plan feedback`/`plan diff`, prose mentions of the feedback flow |
 | `tests/test_feedback.py` | Rewritten (§10) |

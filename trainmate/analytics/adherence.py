@@ -14,7 +14,7 @@ PARTIAL = "partial"
 # too light to count against the plan; UNPLANNED is real training on a day a
 # mesocycle governs; OFF_PLAN is real training on a day no mesocycle covers — before
 # the athlete adopted TrainMate, or an off-season stretch. The dashboard reads these
-# three strings, so they are the vocabulary, not internal names (static/app.js).
+# three strings, so they are the vocabulary, not internal names (static/workouts.js).
 MINOR = "minor"
 UNPLANNED = "unplanned"
 OFF_PLAN = "off_plan"

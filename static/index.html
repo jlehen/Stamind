@@ -402,7 +402,14 @@
         </div>
     </div>
 
-    <!-- Script assets -->
-    <script src="app.js"></script>
+    <!-- Script assets: six scripts cut along the tabs, sharing one global scope, with no
+         module system and no bundler. common.js goes first because it declares the names
+         the other five read. ARCHITECTURE.md §8 has the two rules this order must keep. -->
+    <script src="common.js"></script>
+    <script src="dashboard.js"></script>
+    <script src="plan.js"></script>
+    <script src="workouts.js"></script>
+    <script src="progress.js"></script>
+    <script src="records.js"></script>
 </body>
 </html>

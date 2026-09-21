@@ -475,7 +475,8 @@ applies to them too, at lower priority.
 
 1. The bot's `main()` becomes a `ChatBot` class. Decided for this branch, as its own commit
    after the moves-only step (`REORG_code_layout.md` §0). **DONE**, as one commit.
-2. `static/app.js` cut into four scripts by tab.
+2. `static/app.js` cut into four scripts by tab. **DONE**, as one commit, and it is six
+   scripts rather than four — `REORG_code_layout.md` §6.6 says which and why.
 3. Splitting the largest test files on size alone. `tests/test_bot.py` is 630 lines after
    item 1 took the process tests out of it, and `tests/test_cli_bot.py` is 711.
 
@@ -1616,11 +1617,63 @@ The lines above Phase A are one per item, from before §3 changed.
 - **The gate is unchanged at 430 sites naming 41 targets.** This item moved no string patch
   target: every seam it touched is a `patch.object`, which fails loudly on its own.
 
-**Next up:** Phase E items 2 and 3, both optional and both their own commit: `static/app.js`
-cut into four scripts by tab, and the largest test files split on size alone
-(`tests/test_bot.py` at 630, `tests/test_cli_bot.py` at 711, `tests/test_periodization.py`
-at 2,884). Before the branch's last commit, the two things §7 says must close: the REORG
-citations in six files, and a durable home for §5.2's unfinished e1RM item.
+- **Phase E item 2, the dashboard's scripts.** `static/app.js` was 1,501 lines holding
+  every panel of every tab, and it is six files now: `common.js` (103) is the API base,
+  the date and sport formatting, the console log and the tab switch; `dashboard.js` (286)
+  is today's recovery numbers, the goal and constraint listings and the active model;
+  `plan.js` (374) is the strategy card, the mesocycle timeline, the feedback notes and
+  the version comparison; `workouts.js` (307) is the session cards, compare and the
+  change log; `progress.js` (174) is the time-in-zone tables and the timeline PNG; and
+  `records.js` (290) is Benchmarks, Learnings and History together, none of which fills a
+  file alone. `index.html` lists six `<script>` tags where it listed one, and there is no
+  build step, as `REORG_code_layout.md` §6.6 promised. That section says why six rather
+  than the four it named. `AGENTS.md` no longer names `static/app.js` among the standing
+  size exceptions — only `static/style.css` is left there — and `ARCHITECTURE.md` §8
+  carries the two load-order rules with §15 the reasoning.
+  `Phase E item 2: the dashboard's one script becomes six`
+
+- **A green suite proves nothing about this item, so the page was actually run.** No
+  Python test executes JavaScript, so a split that breaks the page leaves all 2034 tests
+  passing. Three checks instead of the suite. First, every line of the old file appears
+  exactly once across the six, counted in both directions as §9 asks — the only content
+  line that differs is the one-token bug fix below. Second, all 59 globals are declared in
+  exactly one file each, and no code that runs at load time reads a name a later file
+  declares; the five files after `common.js` are order-independent, because each registers
+  its own buttons and its own `DOMContentLoaded` work instead of one init block at the end
+  naming functions from every file. Third, the page was loaded twice against the same
+  Flask server — once from the old single script, once from the six — with a scratch
+  database seeded so every render path had something to draw. Every tab was clicked, both
+  disclosures opened, every refresh button pressed, the quick ranges switched, a mesocycle
+  picked and a plan version compared. The rendered HTML of 37 panels came back byte for
+  byte identical but for the panel the fix below repairs, with no uncaught exception and
+  no console error on either run. The gate is unchanged at 430 sites naming 41 targets;
+  this item moved no Python at all.
+
+- **One bug found by doing that, and fixed here.** It is the morning after `plan generate`
+  ran for the second time. The athlete opens the dashboard, expands "Plan versions &
+  compare" and clicks Compare on the superseded version. The panel says "Comparison
+  error:" and stops. `renderProse` reads `prose.blocks`; `/api/plan/diff` returns
+  `groups`, and has since the vocabulary sweep (`0fd2112`) renamed `blocks` to `groups` in
+  `plan_versions.py`. The Python moved and so did the CLI reader; the JavaScript did not,
+  so the whole comparison panel has been dead since that commit. It is `prose.groups` now.
+  This is the second defect on that one endpoint the reorg has turned up — Phase D item 1
+  found the route handler that shadowed the module and made it a 500.
+
+- **The same sweep left two words behind in the same file, and they go here too.** A
+  mesocycle's own notes are headed "Block feedback" on the dashboard, which `AGENTS.md`
+  forbids in so many words; it reads "Mesocycle feedback" now. And `renderProse`'s
+  docstring called a run of changed sentences "a block", which is the word the payload
+  key stopped using. Neither is this split's doing — both were carried over verbatim — but
+  the file is being written now, and the heading is the one of the three the athlete
+  actually reads. The third survivor is left: the local `activeBlockEl` is named after the
+  `cycle-block` CSS class, so renaming it means touching `style.css`, which is not this
+  item's.
+
+**Next up:** Phase E item 3, optional and its own commit: the largest test files split on
+size alone (`tests/test_bot.py` at 630, `tests/test_cli_bot.py` at 711,
+`tests/test_periodization.py` at 2,884). Before the branch's last commit, the two things
+§7 says must close: the REORG citations in six files, and a durable home for §5.2's
+unfinished e1RM item.
 
 ---
 

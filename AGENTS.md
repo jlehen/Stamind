@@ -117,11 +117,10 @@
   trim the docstring before reaching for a split. Three things stay over 500 lines on
   purpose: `trainmate_web.py`, a flat list of independent GET handlers that splitting
   would not separate; `db/schema.py`, one ordered run of CREATE statements that
-  `SCHEMA_VERSION` versions as a unit; and `static/app.js` with `static/style.css`,
-  which are not Python. One file stays under the 100-line floor for a reason the rule does
-  not list: `trainmate_bot.py` is 38 lines that build `trainmate.chat.app.ChatBot` and run
-  it, and it cannot be merged into a sibling because the `tm-bot` supervisor execs it by
-  path.
+  `SCHEMA_VERSION` versions as a unit; and `static/style.css`, which is not Python. One
+  file stays under the 100-line floor for a reason the rule does not list:
+  `trainmate_bot.py` is 38 lines that build `trainmate.chat.app.ChatBot` and run it, and
+  it cannot be merged into a sibling because the `tm-bot` supervisor execs it by path.
 - A package `__init__.py` holds a docstring, and at most the class the package assembles
   from its submodules. It does not re-export the submodules' names. A re-export gives one
   name two homes, and a test that patches the home it knows about reaches code that reads

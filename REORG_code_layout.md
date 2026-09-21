@@ -133,8 +133,9 @@ Three exceptions stay over 500 lines, each for a stated reason:
   485-line `_init_db`, not a ~440-line one. It stays one file for the reason
   `trainmate_web.py` does — a flat run of CREATE statements navigated by table name — and
   more so, since they run in one order under one `SCHEMA_VERSION`. `AGENTS.md` names it.
-- **`static/app.js` and `static/style.css`.** They are not Python. An optional cut per tab is in
-  §6.6.
+- **`static/style.css`.** It is not Python. ~~`static/app.js` too; an optional cut per tab
+  is in §6.6.~~ **Phase E item 2 took that cut**, so only the stylesheet is left here.
+  `AGENTS.md` says the same.
 
 ---
 
@@ -1019,8 +1020,18 @@ a launcher, because `tm-bot` runs it directly.
 **Other changes.**
 - `trainmate/sentinels.py`, as described in §4.8. `prompt.py` drops to about 275 lines.
 - `trainmate_web.py` stays whole, as an exception (§2). It drops to about 680 lines with §4.2.
-- `static/app.js`: optionally, cut it into four scripts by tab: common, dashboard, records and
-  plan. No build step is needed.
+- ~~`static/app.js`: optionally, cut it into four scripts by tab: common, dashboard, records and
+  plan. No build step is needed.~~ **DONE in Phase E item 2, and it is six scripts, not
+  four.** No build step was needed, as this line said. The four names were close but two
+  of them do not exist as files: `dashboard.js` (286) is the Dashboard tab's own panels
+  only, because the strategy card, the mesocycle timeline, the feedback notes and the
+  version comparison are one subject and make `plan.js` (374) on their own — leaving them
+  in would have put `dashboard.js` past 650. `records.js` (290) is Benchmarks, Learnings
+  and History, none of which is big enough for a file (57, 80 and 142 lines). The two the
+  list did not name are `workouts.js` (307), the session cards with compare and the change
+  log, and `progress.js` (174), the time-in-zone tables with the timeline PNG.
+  `common.js` (103) is what they share. `ARCHITECTURE.md` §8 carries the load-order
+  rules and §15 the reasoning.
 
 ### 6.7 Training analytics: a new package `trainmate/analytics/`
 

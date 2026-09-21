@@ -80,10 +80,11 @@ noise). It is derived at read time and never stored, so it cannot drift from the
 divides.
 
 One deliberate mirror: `/api/metrics` serves raw `ctl`/`atl` and no ratio, so the web
-dashboard repeats the division and the same `ctl > 0` / NULL guard in `static/app.js`
-(the status card and the metrics table). Every consumer that runs Python — CLI, coach,
-analysis — goes through `load_ratio`. Serving the ratio from the endpoint would remove
-the mirror; that is a separate change, not a defect here.
+dashboard repeats the division and the same `ctl > 0` / NULL guard in
+`static/dashboard.js` (the status card) and `static/records.js` (the metrics table).
+Every consumer that runs Python — CLI, coach, analysis — goes through `load_ratio`.
+Serving the ratio from the endpoint would remove the mirror; that is a separate
+change, not a defect here.
 
 ### Job assignment after the change
 

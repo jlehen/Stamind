@@ -596,12 +596,13 @@ classes themselves.
 |                      |                      | date renderer for every surface, so a displayed    |
 |                      |                      | day carries its abbreviated weekday                |
 |                      |                      | (`2026-06-05 Fri`) — mirrored in the dashboard as  |
-|                      |                      | `fmtDate`/`fmtSpan` in `static/app.js`, with two   |
-|                      |                      | places left bare for want of room (`progress`'s    |
-|                      |                      | `MM-DD` week column and the `data bootstrap`       |
-|                      |                      | reconstruction windows); and the plain ISO         |
-|                      |                      | arithmetic `parse_date`/`date_range`/`shift`,      |
-|                      |                      | which seven modules used to keep a copy of each.   |
+|                      |                      | `fmtDate`/`fmtSpan` in `static/common.js`, with    |
+|                      |                      | two places left bare for want of room              |
+|                      |                      | (`progress`'s `MM-DD` week column and the          |
+|                      |                      | `data bootstrap` reconstruction windows); and the  |
+|                      |                      | plain ISO arithmetic                               |
+|                      |                      | `parse_date`/`date_range`/`shift`, which seven     |
+|                      |                      | modules used to keep a copy of each.               |
 | `settings.py`        | —                    | The preference registry: one `Setting` per knob    |
 |                      |                      | the athlete can change at runtime, its validator,  |
 |                      |                      | and the one resolver combining the stored row,     |
@@ -658,7 +659,7 @@ flow for each lives in [§10](#10-key-data-flows).
 |----------------------------------|----------------------------------------------------------------------------|
 | Daily adaptation logic           | `coach/service/adapt.py:workout_adapt*`, `coach/engine/adapt.py:_workout_adapt_logic`, prompt helpers in `coach/formatting.py` ([§10](#daily-adaptation-workout-adapt)) |
 | Plan / strategy generation       | `coach/service/planning.py:plan_generate`, `coach/engine/planning.py:_plan_generate_strategy` ([§10](#plan-generation-plan-generate)) |
-| Plan version comparison / display | `trainmate/plan_versions.py` (the lineage walk, the comparison and the snapshot parsing), `cli/plans/versions.py` (text rendering), `/api/plan/diff` in `trainmate_web.py`, `loadPlanDiff()`/`render*` in `static/app.js` |
+| Plan version comparison / display | `trainmate/plan_versions.py` (the lineage walk, the comparison and the snapshot parsing), `cli/plans/versions.py` (text rendering), `/api/plan/diff` in `trainmate_web.py`, `loadPlanDiff()`/`render*` in `static/plan.js` |
 | Plan feedback (the athlete's notes on the plan) | `db/periodization.py` (`add_/list_/get_/rm_plan_feedback` over the `plan_feedback` table), `cli/plans/feedback.py:run_plan_feedback` + `cli/selectors.py:resolve_meso_atom` (the `-m` atom), `coach/service/planning.py` (the regen gate disjunct + prompt assembly), `coach/engine/planning.py` (the prompt section), DESIGN_plan_feedback.md |
 | Workout generation span          | `coach/service/generate.py:workout_generate`, `cli/workouts/generate.py:_resolve_span`, `cli/workouts/strength_only.py:_span` (`--strength-only`: an open end runs to the last scheduled day), `cli/workouts/parser.py` (flag parsing), `config.workout_generation_span_days` |
 | Commitment window                | `settings.commitment_days`/`settings.commitment_end` (how long the window is and where it ends — one rule), `coach/service/standing.py:_standing_sessions`/`_resolve_standing`, `coach/formatting.py:format_standing_workouts`, `gcal/reconcile.py:leaves_trace`, `workout_changes.commitment_end`   |
@@ -670,11 +671,11 @@ flow for each lives in [§10](#10-key-data-flows).
 | Backward analysis (bootstrap/reflect) | `coach/service/analysis.py:_run_workout_analysis`, `coach/engine/analysis.py:_data_analyze_logic` ([§10](#data-analysis-data-bootstrap--data-reflect)) |
 | Garmin pull / metrics / load model | `trainmate/garmin/sync.py` (`pull`, `ensure_data`), `garmin/derived.py` (`recompute_derived`, `backfill_tss`, `warmup_cutoff` — the database side), `analytics/load.py` (`activity_load`) and `analytics/pmc.py` (the PMC maths), see [§12](#12-sports-science--coaching-mathematics) |
 | Progress timeline / PMC projection | `analytics/progression.py` (the series), `analytics/timeline.py` (the payload), `trainmate/timeline_rows.py` (the shared row-fetch), `analytics/chart.py` (PNG), `cli/progress.py` with `cli/progress_load.py` (text), `/api/timeline.png` in `trainmate_web.py`, see [§12](#fitnessfatigueform-pmc-model), DESIGN_progress_timeline.md |
-| Intensity distribution / time in zone | `analytics/intensity.py` (aggregation + which sports qualify and in which currency), `analytics/zone_tables.py` (the prompt-width rendering) and `analytics/mesocycle_report.py` (the report itself) — `window_sport_stats`/`select_zone_sports`/`zone_currency` say which sports qualify, shared by the CLI tables and `/api/zones`, `coach/service/mesocycle_context.py` (`_intensity_mesocycle_context` for adapt, `_mesocycle_progress_context` for workout generate — the only consumer passing `mesocycle_report`'s `previous=` and `fetch_workouts=`, since mesocycle-over-mesocycle creep and measured-vs-prescribed attribution are periodization questions (§9.2a) — and `_planning_zone_currencies` for §9.8), `coach/service/history_context.py` (`_intensity_history_context` for the strategy prompt), `cli/status.py`, `cli/progress_zones.py` (the weekly grid — it shares the load table's week column and 48-column budget), `progression.weekly_aggregates` (where the rows join the payload), `cli/data/show.py` (`--zones`), `/api/zones` + the Progress tab's tables in `static/app.js`, DESIGN_intensity_distribution.md. Undercount markers are proportional: `intensity.judgeable` (`config.zone_min_activity_minutes`) withholds a too-short session's vote, and the coverage bar is per sport (`intensity.COVERAGE_MIN_BY_SPORT`, overridable via `config.zone_coverage_display_min_by_sport`) because rest between sets is not a failed recording. Both maps' keys must be **canonical** sports — `coverage_display_min()` canonicalizes before the lookup, so an alias key is dead and silently reverts to the global bar |
+| Intensity distribution / time in zone | `analytics/intensity.py` (aggregation + which sports qualify and in which currency), `analytics/zone_tables.py` (the prompt-width rendering) and `analytics/mesocycle_report.py` (the report itself) — `window_sport_stats`/`select_zone_sports`/`zone_currency` say which sports qualify, shared by the CLI tables and `/api/zones`, `coach/service/mesocycle_context.py` (`_intensity_mesocycle_context` for adapt, `_mesocycle_progress_context` for workout generate — the only consumer passing `mesocycle_report`'s `previous=` and `fetch_workouts=`, since mesocycle-over-mesocycle creep and measured-vs-prescribed attribution are periodization questions (§9.2a) — and `_planning_zone_currencies` for §9.8), `coach/service/history_context.py` (`_intensity_history_context` for the strategy prompt), `cli/status.py`, `cli/progress_zones.py` (the weekly grid — it shares the load table's week column and 48-column budget), `progression.weekly_aggregates` (where the rows join the payload), `cli/data/show.py` (`--zones`), `/api/zones` + the Progress tab's tables in `static/progress.js`, DESIGN_intensity_distribution.md. Undercount markers are proportional: `intensity.judgeable` (`config.zone_min_activity_minutes`) withholds a too-short session's vote, and the coverage bar is per sport (`intensity.COVERAGE_MIN_BY_SPORT`, overridable via `config.zone_coverage_display_min_by_sport`) because rest between sets is not a failed recording. Both maps' keys must be **canonical** sports — `coverage_display_min()` canonicalizes before the lookup, so an alias key is dead and silently reverts to the global bar |
 | Planned time in zone (a session's intensity target) | `db/schema.py` (`planned_zone_currency`, `planned_zone1..7_sec` on `workouts`), `db/workout_change.py:WorkoutChange.append`, `intensity.parse_planned_zones` / `format_planned_zones`, `coach/engine/sessions.py` (`planned_zone_task`, `planned_zone_fields` — both prompts), `gcal/event.py` + `coach/formatting.py` + `cli/workouts/session_line.py::prescription_lines` (`workout list -v`/`-vv` and the `workout generate` preview) — rendered from the columns, never stored; `planned_zone_seconds` also reads a proposal's unwritten `planned_zone_sec` list through `parse_planned_zones`, DESIGN_intensity_distribution.md §9.8 |
 | Calendar push / daily-signal ingest | `trainmate/gcal/`, see [§13](#13-daily-signal-calendar-ingest) |
 | Workout state (modified/calendar/removed) | `trainmate/workout_state.py` (`modification_markers` and `calendar_status` — two of the three axes, together because every surface that shows one shows the other, and because neither reads the database), `db/workouts.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
-| What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `analytics/compare.py` (`adherence_window` — the one pairing that reads the database, handed the handle — `adherence_verdicts` keyed by workout id, `compare_days` for the day-by-day walk, and `format_actual` for the effort it graded against), `analytics/adherence.py::unplanned_kind` (what an activity nothing planned turns out to be: minor, unplanned or off-plan), `gcal/reconcile.py` (`mark_adherence_range` — stamping the verdict onto the Calendar event), `cli/workouts/session_line.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/listing.py::_list_verdicts` (which span the listing grades, and the pull it needs), `gcal/event.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/app.js` (the badge) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
+| What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `analytics/compare.py` (`adherence_window` — the one pairing that reads the database, handed the handle — `adherence_verdicts` keyed by workout id, `compare_days` for the day-by-day walk, and `format_actual` for the effort it graded against), `analytics/adherence.py::unplanned_kind` (what an activity nothing planned turns out to be: minor, unplanned or off-plan), `gcal/reconcile.py` (`mark_adherence_range` — stamping the verdict onto the Calendar event), `cli/workouts/session_line.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/listing.py::_list_verdicts` (which span the listing grades, and the pull it needs), `gcal/event.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/workouts.js` (the badge) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
 | Which timezone dates are read in | `trainmate/clock.py` (the zone, the cache, the fallback), `clock.today_date`/`clock.fmt_timestamp`, the push window in `trainmate/chat/scheduler.py`, DESIGN_user_timezone.md. Changing it is one row of `settings` |
 | A preference the athlete can change at runtime | `trainmate/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`trainmate/queue_kind.py`) added to `KINDS` in `trainmate/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
@@ -686,7 +687,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Recording that something happened | Nothing new to call: `output.step` (what the app is doing), `output.warn`/`output.fail` (something outside the app did not work) print and journal in one go, and `run_once` already brackets the command. Reach for `trainmate/journal.py` directly only for a record with structured fields (`journal.record("garmin.pull", …)`) or for what must never reach the athlete (`journal.debug` — the tier that replaced `except Exception: pass`, pinned by `tests/test_journal.py`). The event name comes from the closed nine-word vocabulary in `journal.EVENTS`; severity is `lvl`, not a new name. Never copy something a table already holds — that is the domain record, and it outlives this one. What the athlete *answered* needs nothing at all: `runtime.prompt` journals every `confirm`/`choose` itself (§5.6). DESIGN_logging.md §2/§4.2/§5 |
 | Reading back what a command did  | `tm journal` (`trainmate/cli/journal/`), or `logs/runs/*.jsonl` with `jq`. A run's prompts are `logs/llm_exchanges/*<run id>*` — the id in the filename is the join, not the timestamp, because those names come from the machine's local clock while the journal is UTC. DESIGN_logging.md §6/§7 |
 | How long the coach's prose is    | `coach/engine/prompt.py` (`## WRITING FOR THE ATHLETE`, shared by every command built on `_build_system_prompt`) + the per-field caps in each `## RESPONSE FORMAT`. Check `coach/formatting.py` first: a field re-injected into later prompts must not be capped (DESIGN_output_verbosity.md §5.1) |
-| A web *view* of existing data    | a GET in `trainmate_web.py` + a panel in `static/app.js` ([§8](#8-web-api-endpoints)) |
+| A web *view* of existing data    | a GET in `trainmate_web.py` + a panel in that tab's script under `static/` ([§8](#8-web-api-endpoints)) |
 | A web endpoint that would *write* | it does not go in the web app — add the CLI command instead ([§8](#8-web-api-endpoints)) |
 | The Telegram bot                 | `trainmate/chat/` — `ChatBot` in `app.py`, the handlers in `messages.py`/`callbacks.py`. `trainmate_bot.py` only launches it, and the CLI it runs as a subprocess is unchanged ([§2](#entry-points)) |
 | DB schema / a new column         | the relevant `db/*.py` mixin + the table in [§5](#5-database-schema) |
@@ -2336,8 +2337,39 @@ it did need from the coaching engine — the plan-shaping config fingerprint beh
 coach reads too, so the two cannot drift. It used to be reached through a forwarding
 wrapper on the engine; that wrapper is gone and both callers name the function.
 
-The **front-end** (`static/index.html` + `static/app.js`) is organized into six
-top-level tabs, all lazy-loaded on first show:
+The **front-end** is `static/index.html` plus six scripts, cut along the tabs:
+
+- `common.js` — the API base, the date and sport formatting, the console log, the tab
+  switch. Everything more than one of the others reads, plus `todayStr`, which only
+  `workouts.js` calls but belongs beside `parseLocalDate`, `fmtDate` and `fmtSpan`.
+- `dashboard.js` — the Dashboard tab's own panels: today's recovery and load numbers, the
+  sync freshness line, the coach-memory summary, the goal and constraint listings, the
+  active model.
+- `plan.js` — the strategy card, the mesocycle timeline, the feedback notes and the
+  version comparison. Drawn inside the Dashboard tab, which is why `fetchStatus` in
+  `dashboard.js` calls into it, but about the periodization rather than about today.
+- `workouts.js` — the Workouts tab.
+- `progress.js` — the Progress tab.
+- `records.js` — Benchmarks, Learnings and History, the three tabs that read the record
+  back. None of them fills a file on its own.
+
+There is no module system and no bundler: `index.html` lists them as six plain `<script>`
+tags and they share one global scope, so a name defined in one is visible to all. Two
+rules follow, and a new panel has to keep both.
+
+- **`common.js` loads first.** It declares `API_BASE`, `activeGoalId` and `loadedTabs`
+  with `const`/`let`. Those live in the global lexical scope rather than on `window`, so a
+  script that ran before `common.js` and read one would raise a `ReferenceError` — not
+  read `undefined` and carry on.
+- **A script may only reach another script's name from inside a function.** Function
+  bodies run after every tag has loaded, so any of them may call any other. Code at the
+  top of a file runs the moment that file loads, so it may only name what its own file or
+  an earlier one has already defined. Today no file breaks this: each registers its own
+  buttons, and the two that have start-up work to do — `dashboard.js` and
+  `workouts.js` — each register their own `DOMContentLoaded` block rather than sharing
+  one. So the six are independent of each other's order beyond `common.js` going first.
+
+The six **top-level tabs** are all lazy-loaded on first show:
 
 - **Dashboard** — status, recovery/load metrics, sync freshness, coach-memory summary,
   objective and constraint listings, the active LLM (`settings list coach-model`), and the
@@ -4021,3 +4053,30 @@ and `_offer_stop` wrote the single-button form. They are one `inline_keyboard(ro
 And standing the library in is now patching eight functions, so
 `tests/chat_harness.py` can build a real `ChatBot` with nothing to connect to, and
 `tests/test_chat_handlers.py` drives `on_message` and `on_callback` for the first time.
+
+### The dashboard's one script became six, and it is six rather than four
+
+`static/app.js` was 1,501 lines holding every panel of every tab. It is six files now,
+listed in §8 with the two load-order rules they have to keep.
+
+The cut follows the tabs, because that is what the file was already organized by: its
+section banners read `--- WORKOUTS ---`, `--- BENCHMARKS ---`, `--- HISTORY ---`. What it
+does not follow is one file per tab. Two of the six tabs are far too small to earn a file
+— Benchmarks is 57 lines and Learnings 80 — so they sit with History in `records.js`,
+the three tabs that read the record back. And one file is not a tab at all: `plan.js`
+holds the strategy card, the mesocycle timeline, the feedback notes and the version
+comparison, which are drawn inside the Dashboard tab but are about the periodization
+rather than about today. Leaving them in `dashboard.js` would have made it a file of
+over 650 lines, which is the size the split exists to remove.
+
+§8 states the load-order rules; what is a decision rather than a fact is that only
+`common.js` is pinned and the other five are free. The old file ended with one
+`DOMContentLoaded` block and one run of button bindings that between them named functions
+from every part of the file. Kept whole in a seventh script, that block would have forced
+an order on all six and made "which file may I put this in?" a question with a wrong
+answer. So it was distributed instead: each file registers its own buttons, and the two
+with start-up work register a `DOMContentLoaded` block each. Those two fire in script
+order and make the same five calls the one block made, in the same order.
+
+There is no build step, no bundler and no module system, and none was added. Against one
+script, six cost five more round trips on a page served from localhost.

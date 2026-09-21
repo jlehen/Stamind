@@ -1096,7 +1096,7 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
 
 ### 7.3 Web: **Progress** tab — the PNG, framed
 
-Fifth top-level tab in `static/index.html` / `static/app.js`, loaded lazily
+Fifth top-level tab in `static/index.html` / `static/progress.js`, loaded lazily
 via the existing `loadedTabs` mechanism. V1 is deliberately minimal — the
 picture, not an app:
 

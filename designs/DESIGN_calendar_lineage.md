@@ -232,9 +232,9 @@ one more entry gives way to it rather than the other way round.
 
 ## 9. Deliberately not done
 
-- **The web UI keeps its one-line `Originally:`.** `static/app.js` renders a card, not a
-  document, and the terminal already has `workout batches` for history. If the card should
-  grow a history it should grow a collapsible one, which is its own change.
+- **The web UI keeps its one-line `Originally:`.** `static/workouts.js` renders a card,
+  not a document, and the terminal already has `workout batches` for history. If the
+  card should grow a history it should grow a collapsible one, which is its own change.
 - **No per-entry diff.** An entry states what the session *was*, not what changed against
   its predecessor. A diff would need a vocabulary for every field, and reading two adjacent
   entries answers the same question.
