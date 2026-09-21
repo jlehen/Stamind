@@ -13,6 +13,7 @@ all, and it fails on slot chains alone.
 import ast
 import os
 import pathlib
+import shutil
 import sqlite3
 import tempfile
 import unittest
@@ -117,6 +118,7 @@ class TestWorkoutsTableIsAppendOnly(unittest.TestCase):
 
 def _fresh_db(testcase) -> Database:
     directory = tempfile.mkdtemp()
+    testcase.addCleanup(shutil.rmtree, directory, True)
     db = Database(db_path=os.path.join(directory, "revisions.db"))
     rebind_test_db(db)
     return db

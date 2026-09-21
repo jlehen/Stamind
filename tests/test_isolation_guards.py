@@ -12,6 +12,7 @@ import ast
 import glob
 import importlib
 import os
+import shutil
 import socket
 import sqlite3
 import tempfile
@@ -46,7 +47,9 @@ class TestProductionDatabaseIsUnreachable(unittest.TestCase):
             os.chdir(cwd)
 
     def test_other_databases_still_open_normally(self):
-        path = os.path.join(tempfile.mkdtemp(), "scratch.db")
+        directory = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, directory, True)
+        path = os.path.join(directory, "scratch.db")
         conn = sqlite3.connect(path)
         conn.execute("CREATE TABLE t (a INTEGER)")
         conn.close()
@@ -297,6 +300,64 @@ class TestEveryPatchTargetStillResolves(unittest.TestCase):
             orphans, [],
             "these patch targets no longer resolve, so they stub nothing — point each at "
             f"where the name lives now: {orphans}",
+        )
+
+
+def _enclosing_scope(tree, node, parents):
+    """The function a node sits in, or the module when it sits at the top level."""
+    while node in parents:
+        node = parents[node]
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return node
+    return tree
+
+
+def _removes_a_directory(scope) -> bool:
+    """Whether this scope's own statements name `rmtree`, however it is registered.
+
+    A module is read without its functions and classes, so a cleanup written inside one
+    of them does not excuse a directory made at import time.
+    """
+    body = scope.body
+    if isinstance(scope, ast.Module):
+        nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        body = [statement for statement in body if not isinstance(statement, nested)]
+    return "rmtree" in "\n".join(ast.dump(statement) for statement in body)
+
+
+class TestEveryTemporaryDirectoryIsRemoved(unittest.TestCase):
+    """A test that makes a temporary directory must delete it again.
+
+    `tempfile.mkdtemp()` leaves the directory on disk, and nothing fails when it is never
+    removed. The suite once left 22,600 of them under `/tmp`, which filled the partition
+    and cost every process on the machine its scratch space. Keyed on the call itself, so
+    a new test file is covered the day it is written.
+    """
+
+    def test_every_mkdtemp_in_the_suite_registers_a_removal(self):
+        offenders = []
+        for path in sorted(glob.glob(os.path.join(os.path.dirname(__file__), "*.py"))):
+            with open(path, encoding="utf-8") as handle:
+                tree = ast.parse(handle.read())
+            parents = {}
+            for node in ast.walk(tree):
+                for child in ast.iter_child_nodes(node):
+                    parents[child] = node
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                if not isinstance(node.func, ast.Attribute) or node.func.attr != "mkdtemp":
+                    continue
+                scope = _enclosing_scope(tree, node, parents)
+                if _removes_a_directory(scope):
+                    continue
+                where = getattr(scope, "name", "<module>")
+                offenders.append(f"{os.path.basename(path)}:{node.lineno} in {where}")
+        self.assertEqual(
+            offenders, [],
+            "these make a temporary directory and never delete it, so each run leaks one "
+            "— register `shutil.rmtree` with `addCleanup`, `addClassCleanup` or "
+            f"`atexit.register` beside the `mkdtemp`: {offenders}",
         )
 
 

@@ -12,6 +12,7 @@ written and read back instead. Same honesty property, checked against the thing 
 TypedDict now claims to describe.
 """
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -86,6 +87,7 @@ class TestTypedDictsMatchSchema(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._dir = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls._dir, True)
         cls.db = Database(db_path=os.path.join(cls._dir, "schema_check.db"))
 
     def _columns(self, table):
@@ -128,6 +130,7 @@ class TestWorkoutMatchesTheHydratedDict(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._dir = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls._dir, True)
         cls.db = Database(db_path=os.path.join(cls._dir, "hydrated_check.db"))
         with cls.db.workout_change(kind="generate", summary="pin") as change:
             change.append(
@@ -153,6 +156,7 @@ class TestPlanFeedbackMatchesTheHydratedDict(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._dir = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls._dir, True)
         cls.db = Database(db_path=os.path.join(cls._dir, "feedback_check.db"))
         objective_id = cls.db.add_objective(
             title="Zurich Marathon", target_date="2027-04-18", sport_type="running",

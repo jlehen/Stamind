@@ -1,6 +1,7 @@
 """Schema stamping, transactions, and the invariants that used to live at the CLI."""
 import hashlib
 import os
+import shutil
 import sqlite3
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ test_db = bind_test_db(TEST_DB_PATH)
 class TestSchemaStamping(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
         self.path = os.path.join(self.dir, "stamp.db")
 
     def test_a_fresh_database_is_stamped_at_the_current_version(self):

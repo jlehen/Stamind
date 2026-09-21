@@ -6,6 +6,7 @@ fed, the calendar handles — are pinned here against a hand-built pre-migration
 """
 import importlib.util
 import os
+import shutil
 import sqlite3
 import tempfile
 import unittest
@@ -75,6 +76,7 @@ def _insert(conn, **fields):
 class TestMigrateWorkoutRevisions(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
         self.path = os.path.join(self.dir, "legacy.db")
         self.conn = sqlite3.connect(self.path)
         self.conn.row_factory = sqlite3.Row

@@ -2116,6 +2116,9 @@ handle than its neighbours. `tests/__init__.py` installs two backstops before an
 imports the app — `sqlite3.connect` refuses the production database and `socket.connect`
 refuses remote hosts — because both seams otherwise fail silently and leave a green
 test that measured nothing. `tests/test_isolation_guards.py` asserts they still fire.
+That file also fails when a test calls `tempfile.mkdtemp()` without registering an
+`shutil.rmtree`, which is the same shape of silent failure: the suite once left 22,600
+directories under `/tmp`, filled the partition and cost every process its scratch space.
 
 Names still patched where they are *used* rather than through `runtime`:
 `trainmate.coach.engine.openrouter_client` (the LLM seam). The clock is patched at its
