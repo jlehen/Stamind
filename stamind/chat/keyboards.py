@@ -2,7 +2,7 @@
 
 The reply keyboard the companion persona attaches to the chat and what each of its labels
 runs (DESIGN_bot_simple_frontend.md §5.1), and the inline rows raised over a command: a
-TM-BUTTONS offer, a prompt's choices, a queued item's answers, and the ✋ Stop button over
+SM-BUTTONS offer, a prompt's choices, a queued item's answers, and the ✋ Stop button over
 an LLM wait (DESIGN_athlete_queue.md §6.2, DESIGN_bot_stop_button.md §3).
 
 The cards `/start` and `/help` answer with, and Telegram's own command menu, are here too:
@@ -157,7 +157,7 @@ def stale_keyboard_tap(text: str, simple_now: bool) -> bool:
 
 
 def ui_callback_data(token: str, path: str) -> str:
-    """callback_data for a TM-BUTTONS button: ``"ui:{token}:{path}"``. The ``ui:``
+    """callback_data for a SM-BUTTONS button: ``"ui:{token}:{path}"``. The ``ui:``
     namespace keeps these taps apart from prompt answers; the token invalidates rows
     replaced by a newer push; the path indexes into the stored payload ("2", "2.1")."""
     return f"ui:{token}:{path}"
@@ -230,7 +230,7 @@ UI_BUTTONS_PER_ROW = 3
 
 
 def ui_button_rows(buttons: List[dict], token: str) -> List[List[Tuple[str, str]]]:
-    """Top-level TM-BUTTONS layout: across, like the §4.1 mock, wrapping every
+    """Top-level SM-BUTTONS layout: across, like the §4.1 mock, wrapping every
     `UI_BUTTONS_PER_ROW`. Positions stay flat — a callback path indexes the payload, not
     the row it landed on."""
     cells = [(b.get("label", ""), ui_callback_data(token, str(i)))

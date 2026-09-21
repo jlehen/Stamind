@@ -343,7 +343,7 @@ def run_bot_capture_change_setting(text: str) -> None:
 
 def run_bot_capture(args: argparse.Namespace) -> None:
     """Dispatches one capture intent (§12.2). Runs as an ordinary routed command: its
-    questions are TM-PROMPT confirms, its offers are TM-BUTTONS rows, its output is
+    questions are SM-PROMPT confirms, its offers are SM-BUTTONS rows, its output is
     simple-rendered — nothing new crosses the CLI↔bot channel."""
     use_router_model(args)
     text = args.text or ""

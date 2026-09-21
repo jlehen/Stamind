@@ -96,7 +96,7 @@ class TestWhatIsAndIsNotAFrame(unittest.TestCase):
     def test_a_tag_this_build_does_not_know_is_not_a_frame_but_is_framing(self):
         """A newer CLI's tag: not a frame this build can act on, so the bot drops the
         line rather than posting raw protocol bytes as chat text."""
-        line = '\x1eTM-FUTURE-THING {"x": 1}\n'
+        line = '\x1eSM-FUTURE-THING {"x": 1}\n'
         self.assertIsNone(parse_frame(line))
         self.assertTrue(line.startswith(SENTINEL_PREFIX))
 

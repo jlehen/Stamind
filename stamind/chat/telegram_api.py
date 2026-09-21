@@ -7,7 +7,7 @@ command line. `tests/test_layering.py` holds the rule.
 
 The inline-keyboard builder is also the one copy of an expression the front-end used to
 write out five times, plus a sixth spelled slightly differently. A prompt's choices, a
-TM-BUTTONS offer, a sub-menu, a queued item's answers, its "not now" choices and the
+SM-BUTTONS offer, a sub-menu, a queued item's answers, its "not now" choices and the
 ✋ Stop button are all rows of (label, callback_data).
 """
 import sys

@@ -163,9 +163,9 @@ goes to the journal. The expert persona has no nightly reflect.
 
 ### 4.4 Bot-level buttons: a third sentinel
 
-The CLI↔bot channel already carries `\x1eTM-PROMPT` (blocking question) and
-`\x1eTM-PHOTO` (chart hand-off), and the bot drops unknown `\x1e` sentinels rather than
-leaking them — the forward-compatible slot this design uses. A new `\x1eTM-BUTTONS
+The CLI↔bot channel already carries `\x1eSM-PROMPT` (blocking question) and
+`\x1eSM-PHOTO` (chart hand-off), and the bot drops unknown `\x1e` sentinels rather than
+leaking them — the forward-compatible slot this design uses. A new `\x1eSM-BUTTONS
 {json}` line attaches a **non-blocking** inline-button row to the message just flushed:
 the CLI exits without waiting, and each button carries a canned follow-up utterance the
 bot feeds back through the normal pipeline when tapped (callback namespace `ui:`,
@@ -175,7 +175,7 @@ chat, a lifetime §12.3 has to own now that rows multiply).
 Prompts ask and wait; buttons offer and exit. Keeping WHAT to offer in the CLI keeps
 the parity principle: the bot renders, it does not decide.
 
-Amended 2026-09-14 (DESIGN_athlete_queue.md §6.2): a fifth sentinel, `\x1eTM-QUEUE
+Amended 2026-09-14 (DESIGN_athlete_queue.md §6.2): a fifth sentinel, `\x1eSM-QUEUE
 {json}`, carries one item of the athlete queue. Unlike this row it is sent as a message of
 its own, and each of its buttons carries its whole meaning (`q:<item id>:<action>:<walk
 start>`), so it neither replaces the live row nor is replaced by it, and the bot stores
@@ -458,7 +458,7 @@ earns it is expert detail, and the chat surface does not audit.
 
 | File | Change |
 |---|---|
-| `stamind/chat/` | ui-mode switch (config at start, `/ui` flips it live, §5.6, on `ChatBot.simple_ui`), reply keyboard + label→argv table (`keyboards.py`), capture-tap chat state (§5.2, `ChatBot.armed`), `ui:` callback namespace (`callbacks.py`), `TM-BUTTONS` parsing (`runner.py`/`replies.py`), push scheduler task (`scheduler.py`) |
+| `stamind/chat/` | ui-mode switch (config at start, `/ui` flips it live, §5.6, on `ChatBot.simple_ui`), reply keyboard + label→argv table (`keyboards.py`), capture-tap chat state (§5.2, `ChatBot.armed`), `ui:` callback namespace (`callbacks.py`), `SM-BUTTONS` parsing (`runner.py`/`replies.py`), push scheduler task (`scheduler.py`) |
 | `stamind/prompt.py` | `BUTTONS_SENTINEL` + `emit_buttons()` (mirror of `emit_photo`) |
 | `stamind/cli/bot.py` | new hidden family: `bot morning`, `bot route`, `bot constraints`, `bot mesocycle` (§11.2) |
 | `stamind/config.py` | `telegram_ui`; the push knobs and the router role resolve through `stamind/settings.py` |
@@ -763,8 +763,8 @@ given today, an underspecified "May 10" to its nearest future occurrence — and
 preview always shows the resolved absolute date, so a wrong year lands in front of
 her eyes, not in the database.
 
-Capture runs as an ordinary routed command: its questions are `TM-PROMPT` confirms, its
-offers are `TM-BUTTONS` rows, its output is simple-rendered. Nothing new crosses the
+Capture runs as an ordinary routed command: its questions are `SM-PROMPT` confirms, its
+offers are `SM-BUTTONS` rows, its output is simple-rendered. Nothing new crosses the
 CLI↔bot channel.
 
 ### 12.3 Notes move off the coach: `bot capture note`

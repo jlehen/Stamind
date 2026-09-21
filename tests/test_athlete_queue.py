@@ -39,7 +39,7 @@ WEDNESDAY_8AM = datetime(2026, 9, 16, 8, 0).astimezone()
 
 
 def queue_lines(out):
-    """The TM-QUEUE payloads a run wrote, in order. Split on newlines only:
+    """The SM-QUEUE payloads a run wrote, in order. Split on newlines only:
     `str.splitlines` also breaks on the sentinel's own \\x1e."""
     return [json.loads(line[len(QUEUE_SENTINEL):]) for line in out.split("\n")
             if line.startswith(QUEUE_SENTINEL)]
@@ -258,7 +258,7 @@ class ReminderTest(_QueueCase):
 
 
 class ChatTest(_QueueCase):
-    """Under the bot every item goes out as a TM-QUEUE line, and a tap runs `bot queue`."""
+    """Under the bot every item goes out as a SM-QUEUE line, and a tap runs `bot queue`."""
 
     def setUp(self):
         super().setUp()

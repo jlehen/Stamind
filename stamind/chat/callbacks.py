@@ -2,7 +2,7 @@
 
 Every inline button in the chat comes back through `on_callback`, which reads the
 namespace the tap's callback data opens with and hands it on: `q:` is a queued item's
-answer, `ui:` is a TM-BUTTONS offer, `stop:` ends the command being waited on, and a bare
+answer, `ui:` is a SM-BUTTONS offer, `stop:` ends the command being waited on, and a bare
 `nonce:id:value` is the answer to the prompt a running command is parked on. The four
 namespaces share one Telegram channel, so each decoder rejects the other three — a stale
 tap must never turn into an action meant for something else (DESIGN_bot_stop_button.md §7,
@@ -27,7 +27,7 @@ class CallbacksMixin:
     """`ChatBot`'s half that answers a tap on one of the four button namespaces."""
 
     async def _handle_ui_callback(self, query, chat_id: int, data: str) -> None:
-        """A tap on a non-blocking TM-BUTTONS row (§4.4): a stale token drops the dead
+        """A tap on a non-blocking SM-BUTTONS row (§4.4): a stale token drops the dead
         buttons; a `menu` button swaps the row for its sub-choices; `send` feeds the
         canned utterance through the normal command pipeline; `ack` just replies."""
         decoded = decode_ui_callback(data)
@@ -84,7 +84,7 @@ class CallbacksMixin:
         """A tap on a queued item's button (DESIGN_athlete_queue.md §6.2). "Not now" swaps
         in the three later choices; any other tap leaves the choice under the item's text
         and runs `bot queue`, which checks the item and sends the next one. The chat's live
-        TM-BUTTONS row is not touched."""
+        SM-BUTTONS row is not touched."""
         decoded = decode_queue_callback(data)
         if decoded is None:
             return

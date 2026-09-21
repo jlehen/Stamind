@@ -56,7 +56,7 @@ class Session:
         self.task: Optional["asyncio.Task"] = None
         self.sent = False                         # whether anything was sent to the chat
         self.quiet = quiet                        # scheduler-run: silence "(no output)"
-        self.last_message_id: Optional[int] = None  # anchor for a TM-BUTTONS row
+        self.last_message_id: Optional[int] = None  # anchor for a SM-BUTTONS row
         # The message carrying this command's live ✋ Stop button, if any: one at a
         # time, retired when the next wait starts or the command ends
         # (DESIGN_bot_stop_button.md §7).

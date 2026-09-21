@@ -166,7 +166,7 @@ the *presentation*-side view of past **and future**)
 > implementation snapshot on this branch predates the PMC merge (see
 > `CODE_REVIEW_progress_timeline.md`) and is reworked to this rev before merge.
 >
-> Rev 4 (implementability review): photo caption carried in the TM-PHOTO
+> Rev 4 (implementability review): photo caption carried in the SM-PHOTO
 > payload, CLI weekly bars as absolute load on a shared max-anchored scale,
 > table fixed-width at the 48-col budget, sparkline sampling pinned, endpoint
 > returns all active objectives with renderers clipping. Rev 3: projection
@@ -1034,7 +1034,7 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
     prints the path. `progress.png` joins `.gitignore`.
   - Under `STAMIND_FRONTEND=json` (how the bot launches the CLI): writes a
     `tempfile.NamedTemporaryFile(delete=False)` PNG and emits a **photo
-    line** on stdout — `\x1eTM-PHOTO {"path": ..., "caption": ...}` — a
+    line** on stdout — `\x1eSM-PHOTO {"path": ..., "caption": ...}` — a
     sibling of the existing `PROMPT_SENTINEL` protocol. The CLI supplies the
     §7.1 FORM line as `caption`; the payload carries it because the bot
     process has no other way to know it (it must not re-parse forwarded chat

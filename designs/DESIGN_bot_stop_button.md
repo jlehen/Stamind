@@ -59,7 +59,7 @@ happened.
 
 ## 4. Where the button hangs, and why there is exactly one place
 
-`openrouter.complete()` prints the wait notice and then emits the `TM-FLUSH` marker,
+`openrouter.complete()` prints the wait notice and then emits the `SM-FLUSH` marker,
 which is the bot's signal to close the current chat message
 (`DESIGN_output_verbosity.md` §7.3 and §8.2). That marker is, by construction, the one
 moment in the whole system where a command is about to go quiet for the coach: every

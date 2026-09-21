@@ -57,7 +57,7 @@ class ParseMessageTest(unittest.TestCase):
 
 
 class PromptProtocolTest(unittest.TestCase):
-    """How a TM-PROMPT request becomes Telegram buttons, and a tap becomes an answer.
+    """How a SM-PROMPT request becomes Telegram buttons, and a tap becomes an answer.
 
     The frame it arrives in is tested in test_sentinels.py, with the writer beside it.
     """
@@ -607,7 +607,7 @@ class QueueProtocolTest(unittest.TestCase):
             self.assertIsNone(keyboards.decode_queue_callback(data), data)
 
     def test_a_queue_tap_leaves_the_live_button_row_alone(self):
-        """The item's buttons are their own namespace: no TM-BUTTONS token or Stop nonce
+        """The item's buttons are their own namespace: no SM-BUTTONS token or Stop nonce
         reads them, so a tap neither retires nor answers the morning row (§6.2)."""
         data = keyboards.queue_callback_data(12, "a1", "1789538400")
         self.assertIsNone(keyboards.decode_ui_callback(data))

@@ -70,7 +70,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         # Simple-mode chat state: chats that just tapped "💬 Talk to me" (chat_id →
         # monotonic arm time, cleared after one message, /cancel or the prompt timeout);
         # the tap only keeps an unroutable message from bouncing (§5.2). Plus the live
-        # TM-BUTTONS payload per chat (chat_id → (token, buttons), valid until replaced
+        # SM-BUTTONS payload per chat (chat_id → (token, buttons), valid until replaced
         # by the next push, §4.4).
         self.armed: Dict[int, float] = {}
         self.ui_actions: Dict[int, Tuple[str, List[dict]]] = {}

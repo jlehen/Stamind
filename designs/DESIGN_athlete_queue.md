@@ -357,13 +357,13 @@ A message from `sm queue tell` arrives the same way:
 This is the main change to the bot. It needs a new sentinel, meaning a new kind of line the
 CLI prints with a special marker so the bot reads it as an instruction instead of as text.
 
-Today's non-blocking buttons, the `TM-BUTTONS` row, are remembered by the bot, one row per
+Today's non-blocking buttons, the `SM-BUTTONS` row, are remembered by the bot, one row per
 chat, and a new row makes the previous one dead. That is deliberate: "an offer left
 overnight is gone by breakfast" (DESIGN_bot_simple_frontend.md §12.3). A question cannot
 live like that. If the question's row replaced the briefing's row, the push would lose
 "Feeling tired" every morning there is a question.
 
-So a queued item travels on its own line, `\x1eTM-QUEUE {json}`. It carries the item id, the
+So a queued item travels on its own line, `\x1eSM-QUEUE {json}`. It carries the item id, the
 text, the buttons (a label and an action code each) and the time the walk started. The bot
 sends the text as a new message and writes the whole meaning of each button into the button
 itself: `q:<item id>:<action>:<walk start>`. For example, `q:12:a2:1789538400` is the second
@@ -554,7 +554,7 @@ item's place in the queue. `sm queue tell` is a terminal command, not a tap.
 - `stamind/athlete_queue.py`: the list of kinds with the `message` kind, the walk (the next
   waiting item, closing stale ones on the way), the actions with the "in 1 day" time, and
   sending due reminders.
-- `stamind/prompt.py`: `emit_queue_item` with the `TM-QUEUE` sentinel, the hint in its
+- `stamind/prompt.py`: `emit_queue_item` with the `SM-QUEUE` sentinel, the hint in its
   place on a terminal, and the labels of the three later choices.
 - `stamind/chat/callbacks.py` and `replies.py`, with the `q:` callback namespace in
   `stamind/chat/keyboards.py`:

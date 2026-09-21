@@ -154,7 +154,7 @@ classes themselves.
     fires — the library calls it only from `run_polling()`/`run_webhook()` — so `_serve`
     makes the opening `set_my_commands` call itself, through `_set_command_menu`, which
     `/ui` uses too.
-  - **Stopping a coach call.** Every model call emits `TM-FLUSH` right after its wait
+  - **Stopping a coach call.** Every model call emits `SM-FLUSH` right after its wait
     notice ("Reviewing your coming sessions — this usually takes about 40 seconds.");
     the bot attaches a `✋ Stop` inline button to the message that flush sends, with
     `callback_data` `stop:{nonce}` naming the running command. Tapping it kills the
@@ -209,8 +209,8 @@ classes themselves.
     Reading a frame off the CLI's stdout and building the answer sent back are
     `stamind/sentinels.py` (`parse_frame`, `prompt_answer`), tested in
     `tests/test_sentinels.py`.
-  - **Photo protocol:** a sibling one-way sentinel to `TM-PROMPT` — `stamind.sentinels.
-    PHOTO_SENTINEL`/`emit_photo(path, caption)` writes `\x1eTM-PHOTO {json}`; `_drive()`
+  - **Photo protocol:** a sibling one-way sentinel to `SM-PROMPT` — `stamind.sentinels.
+    PHOTO_SENTINEL`/`emit_photo(path, caption)` writes `\x1eSM-PHOTO {json}`; `_drive()`
     reads one `parse_frame` and branches on the tag it returns, sends the file
     via `bot.send_photo` with the payload's `caption`, and unlinks it in a `finally`.
     Any other unrecognised `\x1e`-prefixed line is dropped rather than forwarded as chat
@@ -239,7 +239,7 @@ classes themselves.
     something should change, the athlete's tap picks *which*. A **capture** —
     `sm bot capture <intent> "<text>" [--id N]` — is a second, domain-focused LLM call on
     the same router role: it extracts typed fields, the CLI previews them in companion
-    prose *rendered from real rows*, and a `TM-PROMPT` confirm makes it real. An
+    prose *rendered from real rows*, and a `SM-PROMPT` confirm makes it real. An
     operation fitting none of the three belongs to the expert vocabulary, which is why
     `plan generate`, wipes, `--purge`, model roles and `restart` stay typed. Notes
     (`add_constraint`/`add_signal`) share one `bot capture note` inbox instead of riding
@@ -274,7 +274,7 @@ classes themselves.
     `bot mesocycle` and the `bot capture` family are companion-only by definition and call the line
     builders in `cli/render/` directly. Companion output is prose,
     sent plain instead of `<pre>`. A third one-way sentinel, `BUTTONS_SENTINEL`/
-    `emit_buttons` (`\x1eTM-BUTTONS {json}`), attaches a *non-blocking* inline button
+    `emit_buttons` (`\x1eSM-BUTTONS {json}`), attaches a *non-blocking* inline button
     row (`ui:` callback namespace, token-invalidated) whose taps feed a canned
     utterance back through the normal pipeline. An asyncio scheduler (`_push_loop`)
     spawns `sm bot morning` inside the `telegram.push.morning_time`→`morning_deadline`
@@ -306,7 +306,7 @@ classes themselves.
     flag, since `-v/--verbose` already means "more detail in this listing" on seven
     sub-commands (DESIGN_output_verbosity.md).
   - **Flush protocol:** a fourth one-way sentinel, `FLUSH_SENTINEL`/`emit_flush()`
-    (`\x1eTM-FLUSH {}`), recognised by `is_flush_request()` — it carries no payload and
+    (`\x1eSM-FLUSH {}`), recognised by `is_flush_request()` — it carries no payload and
     its only effect is to end the buffered message where it stands. `openrouter.complete`
     emits one immediately before the POST, so the setup an LLM command printed is
     delivered *before* the tens of seconds it then spends silent, instead of arriving
@@ -324,10 +324,10 @@ classes themselves.
     the reply lands (§8.5). `complete(..., wait_notice=None)` suppresses it for
     `sm bot route`, whose output nobody reads (DESIGN_output_verbosity.md §8, §8.6).
   - **The athlete queue:** a fifth one-way sentinel, `QUEUE_SENTINEL`/`emit_queue_item`
-    (`\x1eTM-QUEUE {json}`), carries one queued question or message
+    (`\x1eSM-QUEUE {json}`), carries one queued question or message
     (`stamind/athlete_queue.py`, DESIGN_athlete_queue.md). The bot sends it as a message
     of its own whose buttons carry all a tap needs — `q:<item id>:<action>:<walk start>` —
-    so it stores nothing, replaces no `TM-BUTTONS` row and loses nothing on a restart. A
+    so it stores nothing, replaces no `SM-BUTTONS` row and loses nothing on a restart. A
     tap runs the hidden `sm bot queue <id> <action> --since <walk start>`, which checks the
     item is still waiting and still worth asking, applies the action and sends the next
     item of the walk; "🕐 Not now" swaps in the three later choices from the tap itself.
@@ -354,7 +354,7 @@ classes themselves.
     switch does not stop it, and the config file's `telegram.ui` decides, not `/ui`. A tap
     on an offer or a message from the athlete first runs `bot changes` whenever a change
     waits (`_tell_changes_first`). `bot changes` sends one message per change, split by a
-    `TM-FLUSH` carrying `{"wait": false}`, which the bot does not hang a Stop button on
+    `SM-FLUSH` carrying `{"wait": false}`, which the bot does not hang a Stop button on
     (`flush_before_wait`).
   - **The nightly reflect:** in companion mode, from Wednesday to Sunday, the scheduler's
     first wake after 03:00 on the athlete's clock also starts `data reflect --auto`, once a
@@ -2114,7 +2114,7 @@ yes/no/blank, DESIGN_output_verbosity.md §8.5) or `JsonPrompt` (`json` — the 
 bot). Every interactive `input()` site routes
 through `cli.prompt.confirm(message, danger=…)` / `cli.prompt.choose(message, [Choice…],
 default=…)` / `cli.prompt.ask_text(...)`. `JsonPrompt` writes one sentinel-framed
-request line (`\x1eTM-PROMPT {json}`, fields `v/id/type/message/default/danger/choices`)
+request line (`\x1eSM-PROMPT {json}`, fields `v/id/type/message/default/danger/choices`)
 to stdout and waits to read one JSON answer line (`{v,id,answer}` or `{v,id,cancelled}`)
 from stdin. A cancellation raises `PromptCancelled`, an ordinary `Exception`. It once
 subclassed `BaseException` so the handlers' broad `except Exception` nets could not
@@ -3513,7 +3513,7 @@ One thing the aside tier could not absorb: `plan generate` echoed its whole
 `PRIOR TRAINING REVIEW` prompt section, ~164 lines and 321 at Telegram's width. Too big to
 skim past on *either* front-end, so it is off by default on both — `--show-llm-context`
 asks for it — which no aside is. And because the wait is the other half of the problem,
-`openrouter.complete` emits a `\x1eTM-FLUSH` marker just before the POST, so whatever a
+`openrouter.complete` emits a `\x1eSM-FLUSH` marker just before the POST, so whatever a
 command printed on its way in is delivered before it goes silent rather than after
 (DESIGN_output_verbosity.md §7).
 

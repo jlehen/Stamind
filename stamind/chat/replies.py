@@ -125,7 +125,7 @@ class RepliesMixin:
         self._log(session.chat_id, "<<", "stop button")
 
     async def _send_ui_buttons(self, session: Session, req: dict) -> None:
-        """Attaches a TM-BUTTONS row to the output just flushed (§4.4). Non-blocking:
+        """Attaches a SM-BUTTONS row to the output just flushed (§4.4). Non-blocking:
         the CLI has already moved on; the payload is stored per chat and taps feed the
         canned utterance back through the normal pipeline. Falls back to its own
         message when there is nothing to anchor to."""
@@ -155,7 +155,7 @@ class RepliesMixin:
 
     async def _send_queue_item(self, session: Session, req: dict) -> None:
         """Sends a queued item as a message of its own (DESIGN_athlete_queue.md §6.2). Its
-        buttons carry the item, so it neither replaces the chat's TM-BUTTONS row nor
+        buttons carry the item, so it neither replaces the chat's SM-BUTTONS row nor
         anchors to the output above it."""
         keyboard = telegram_api.inline_keyboard(queue_button_rows(req))
         session.sent = True
