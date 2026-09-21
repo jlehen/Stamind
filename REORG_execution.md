@@ -477,8 +477,13 @@ applies to them too, at lower priority.
    after the moves-only step (`REORG_code_layout.md` §0). **DONE**, as one commit.
 2. `static/app.js` cut into four scripts by tab. **DONE**, as one commit, and it is six
    scripts rather than four — `REORG_code_layout.md` §6.6 says which and why.
-3. Splitting the largest test files on size alone. `tests/test_bot.py` is 630 lines after
-   item 1 took the process tests out of it, and `tests/test_cli_bot.py` is 711.
+3. Splitting the largest test files on size alone. **DONE**, as one commit, and for the
+   eight files over 800 lines only. Twenty-six test files were over 500; cutting all
+   twenty-six in one commit would not have been reviewable, and this item's own wording is
+   "the largest test files", not "every file over the rule". So the eight over 800 were
+   cut and the eighteen between 500 and 800 were left, listed in the ledger so the
+   decision is visible rather than forgotten. `tests/test_bot.py` (630) and
+   `tests/test_cli_bot.py` (711) are two of those eighteen.
 
 ### The last commit, and the flag after it
 
@@ -1669,11 +1674,165 @@ The lines above Phase A are one per item, from before §3 changed.
   `cycle-block` CSS class, so renaming it means touching `style.css`, which is not this
   item's.
 
-**Next up:** Phase E item 3, optional and its own commit: the largest test files split on
-size alone (`tests/test_bot.py` at 630, `tests/test_cli_bot.py` at 711,
-`tests/test_periodization.py` at 2,884). Before the branch's last commit, the two things
-§7 says must close: the REORG citations in six files, and a durable home for §5.2's
-unfinished e1RM item.
+- **Phase E item 3, the largest test files.** Eight test files were over 800 lines and
+  they are forty-five now. `test_periodization.py` (2,884) is thirteen files: the strategy
+  prompt's own sections keep the name, and beside it sit the prior-training review, what
+  the plan's inputs hash over, which changed input makes a plan stale, what a replan
+  reuses, which goal a plan is for, what a regeneration clears, the two rollbacks, and the
+  five that hold what `workout generate` reads off a plan — the lineage walk, the
+  date-keyed reads, the span, the sessions already told about, and standing a goal down.
+  `test_cli_workouts.py` (1,698) is seven files, one per command, which is the axis
+  `cli/workouts/` itself was cut on in Phase D item 7: adapt and the revision preview,
+  push/wipe/prune-calendar, list and show, what the listing says became of a past day,
+  compare, what generate asks before it writes, and which days it writes.
+  `test_adaptation_adapt.py` (1,559) is six: the prompt, the history adapt may not
+  rewrite, the pairing it had to guess at, which answers are real changes, what an easing
+  costs, and a session carried to another day. `test_analysis.py` (1,144) is five, by
+  stage of a `data reflect` run. `test_journal.py` (932) is four: the file, the run
+  bracket, what a running command records, and `tm journal` reading it back.
+  `test_constraints.py` (838) is three: the constraint object, whether it rebuilds the
+  plan, and whether the schedule honored it. `test_intensity.py` (809) is three, matching
+  the three modules Phase D item 1 cut `intensity.py` into — `test_intensity.py`,
+  `test_zone_tables.py` and `test_mesocycle_report.py`. `test_web.py` (803) is four, by
+  dashboard tab, which is the axis Phase E item 2 had just given `static/`.
+  `Phase E item 3: the eight largest test files split`
+
+- **Three of the eight were one class each, and the class had to be cut with the file.**
+  `TestPeriodization` was 1,639 lines of the 2,884, `TestCliWorkouts` 1,644 of the 1,698
+  and `TestAdaptationAdapt` 1,528 of the 1,559. Cutting only at class boundaries would
+  have left the class, and therefore most of the file, exactly where it was — Phase D item
+  3 had already noticed that about `test_periodization.py`. So those three classes became
+  twenty-one named classes with docstrings — eight out of `TestPeriodization`, seven out
+  of `TestCliWorkouts` and six out of `TestAdaptationAdapt` — which is what every other
+  class in those same files already looked like. Every test method keeps its name and its
+  body byte for byte; 122 of them answer to a new class name, and the proof below is keyed
+  on the method name for exactly that reason.
+
+- **Nothing was lost, and that was proved rather than asserted.** The sorted list of test
+  ids unittest discovers was captured before and after: 2,034 both times, with no
+  collection error either time. The multiset of test method names is identical — nothing
+  lost, nothing gained, nothing renamed. Exactly eight modules lost ids and only the new
+  or kept modules gained them; no third module moved. On top of that, each of the eight
+  splits was checked with `ast`: for every test method, the name, the decorator list and
+  `ast.unparse` of the body were compared against the file as it stands in HEAD, and all
+  eight came back 0 missing, 0 added, 0 changed. A green suite could not have said any of
+  this, because a smaller suite still passes.
+
+- **The trap this item exists to fall into.** A module carved out of another inherits the
+  tests but not the module-level `bind_test_db`, and then it passes only because an
+  earlier module in the full run bound one — the `test_dispatch.py` shape. Every new
+  module got the source module's whole preamble, with its own `TEST_DB_PATH` filename, and
+  every one of the forty-five was run **alone** as well as in the full suite. The one
+  deliberate exception is the journal family: `JournalTestCase` carries the scratch log
+  directory and the two seeding fixtures, and the other three modules import it from
+  `tests/test_journal.py` rather than carrying a fourth copy. Each of the four still has
+  its own database path and its own `setUpModule`.
+
+- **The cost of cutting a grab-bag class, stated rather than hidden.** `setUpClass`,
+  `tearDownClass`, `setUp` and one or two fixture methods are duplicated into each class
+  carved out of one — about 45 lines per class in the adaptation family, 20 in the CLI one
+  and 17 in the periodization one. That is why those three families total more lines than
+  the files they replace. It is also already the house style: before this commit
+  `test_web.py` carried eight copies of the same `setUpClass`/`tearDownClass`/`setUp`
+  block in one file. The alternative — a shared base class — needs the module-global
+  `test_db` that its `setUpClass` rebinds, so it can only live in one module and the
+  others would silently share that module's database file. The journal family is the one
+  place where a shared base is safe, because its fixture is a directory rather than a
+  database.
+
+- **Five of the forty-five land outside the 150-to-400 band, and each is named here.**
+  `test_adaptation_history.py` (423), `test_periodization_review.py` (420),
+  `test_cli_workouts_adapt.py` (408) and `test_adaptation.py` (404) are each one job whose
+  duplicated fixture block is what carries them over; splitting any of them again would
+  mean a second copy of that block and two files of about 200. `test_zone_tables.py` (137)
+  is under the band and over the 100-line floor: it is the tests for
+  `analytics/zone_tables.py`, a module of its own, so it is a concept on its own by the
+  rule's own exception. No new file is over 500.
+
+- **Eighteen test files between 500 and 800 lines were left, deliberately.** Twenty-six
+  were over 500, and cutting all twenty-six in one commit would not have been reviewable,
+  so the owner set the line at 800. Left: `test_strength.py` (793), `test_db.py` (755),
+  `test_runway.py` (740), `test_cli_bot.py` (711), `test_bot.py` (630),
+  `test_cli_plans.py` (627), `test_benchmarks.py` (627), `test_feedback.py` (616),
+  `test_strength_planner.py` (597), `test_cli_data.py` (590),
+  `test_workout_generate_window.py` (585), `test_prompt_gates.py` (582),
+  `test_cli_progress.py` (561), `test_athlete_queue.py` (552),
+  `test_adaptation_adherence.py` (523), `test_gcal_client.py` (511), `test_pmc.py` (508)
+  and `test_cli_plan_staleness.py` (508). They are written down here so the decision is
+  visible rather than forgotten.
+
+- **The gate is unchanged at 430 sites naming 41 targets, and `ARCHITECTURE.md` says so.**
+  Splitting a test file moves `patch()` call sites between modules without adding or
+  removing any, and the count was re-derived from this working tree rather than copied
+  from the last ledger line. No production file was touched by this item at all. The tests
+  keyed on file names — `test_simple_render.py`'s `ALLOWED` and
+  `test_workout_revisions.py`'s `APPEND_PATH_PREFIX` — are keyed on files under
+  `trainmate/`, so moving a test file does not reach them.
+  `tests/test_isolation_guards.py` globs `tests/` as a directory, which is the shape §9
+  asks for.
+
+- **The documentation that went stale with the moves, fixed here.** `ARCHITECTURE.md`'s
+  test-file table now has one row per family rather than one per old file, and says what
+  each member holds. Six design docs named a test file that no longer holds the test they
+  were pointing at: `DESIGN_adapt_task_prompt.md`, `DESIGN_richer_analysis_evidence.md`,
+  `DESIGN_constraint_honoring.md`, `DESIGN_render_persona.md`,
+  `DESIGN_progress_timeline.md` and `DESIGN_plan_change_continuity.md`. Two comments
+  inside the tests did too, in `test_chart.py` and `test_tty_prompt.py`. `AGENTS.md`
+  claimed 1959 tests collect without `service_account.json`; the real number is 2006, and
+  that one went stale in Phase E item 1 rather than here. No new REORG citation was added,
+  so the nine the last commit has to clean up are still nine.
+
+- **The review of Phase E item 3**, in the same commit. A read-only agent bound every one
+  of the thirty-nine new modules on its own, checked every `test_db_path` string in the
+  tree for a collision, unparsed every duplicated fixture method and compared it to the
+  pre-split original, ran a symbol-table pass over all forty-nine changed modules looking
+  for a global that is read somewhere and bound nowhere — the case a rarely-taken branch
+  would hide from a green suite — and ran the suite itself. No collision, no drift in a
+  copied fixture, no unbound name, 2,034 tests and the four known failures. Its one
+  blocking finding was about git rather than code: the index had gone stale under it while
+  the working tree moved on, so a plain commit would have landed the rougher first cut of
+  eleven files. Everything was re-staged.
+
+- **What the review corrected, and the worst of it was mine.** `ARCHITECTURE.md`'s new web
+  row and the four web docstrings called the split "one file per tab" and said
+  `test_web.py` holds the Records tab. Both are false. The dashboard has six tabs and there
+  are four files; the plan versions and the diff are not a tab at all, they are a panel
+  inside the Dashboard view; and `test_web.py` tests no learnings view and no history view
+  while it does test the signal vocabulary and `plan show`, neither of which the row named.
+  The real grouping is the three dashboard scripts Phase E item 2 created —
+  `static/workouts.js`, `plan.js`, `progress.js` — with `test_web.py` holding the read-only
+  rule and the five views those three do not draw. All five descriptions say that now.
+
+- **Two caveats had been copied into four files and thirteen.** `AGENTS.md` says the same
+  caveat never appears in two files: pick its one home and point at it from elsewhere. The
+  preamble duplication a grab-bag split needs is mechanical — each module needs its own
+  `TEST_DB_PATH`, its own handle, its own bind — but the paragraph explaining why does not
+  travel with it. The web app's db-singleton note keeps its full text in `test_web.py` and
+  the goal-dates-ride-on-today note in `test_periodization.py`; the other fifteen files
+  carry one line pointing at them.
+
+- **`import trainmate_cli` was dead in thirteen of the new files, and now in none.** It
+  came over verbatim, under a comment saying the module "re-exports names from
+  `trainmate.cli.workouts`, so it must be imported first" — a claim Phase A made false when
+  it deleted those seventy-one re-exports. `tests/helpers.run_cli` imports `trainmate_cli`
+  inside the function that needs it. Proven rather than assumed: with the line gone, each of
+  the thirteen passes alone and the full suite is green. `test_benchmarks.py` has the same
+  dead import and was left alone, because this item does not split that file.
+
+- **Three smaller things.** `TestRunBracket._runs` was a helper nothing had ever called,
+  dead in `test_journal.py` before the split too; the move was the moment to drop it.
+  `test_mesocycle_report.py`'s docstring listed five of its seven classes. And four of the
+  design-doc path corrections had left a dangling short line where the paragraph was not
+  reflowed. One suggestion was declined: `JournalTestCase._seed_runs` is used by one of the
+  four journal modules rather than all four, and moving it out needs a second base class
+  holding one method, which is more structure than the duplication it would remove.
+
+**Next up:** the branch's last commit: the two REORG files deleted, and nothing else.
+Two things close before it, per §7. The REORG citations in six files — `signals.py`,
+`clock.py`, `workout_state.py`, `test_layering.py`, `test_cli_plans.py` and
+`test_isolation_guards.py`, nine citations in all — each move their reasoning into
+`ARCHITECTURE.md` §15 or go away. And §5.2's unfinished e1RM item needs a durable home
+outside these two files.
 
 ---
 

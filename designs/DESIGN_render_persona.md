@@ -289,9 +289,10 @@ between tests today.
 The fix is in the harness, not the tests. `run_cli` in `tests/helpers.py` drops the
 cached renderer (`runtime.reset("render")`) before invoking `main()`, so each run builds
 its voice from the environment exactly as a real CLI process does. The twelve
-env-patching sites (`test_runway.py`, `test_cli_bot.py`, `test_cli_workouts.py`,
-`test_simple_render.py`) keep working unchanged. The three in `test_simple_render.py`
-that exercise `is_simple_render()` itself become tests of `make_renderer()`. Tests of
+env-patching sites (`test_runway.py`, `test_cli_bot.py`, `test_cli_workouts_adapt.py`,
+`test_cli_workouts_compare.py`, `test_simple_render.py`) keep working unchanged. The three
+in `test_simple_render.py` that exercise `is_simple_render()` itself become tests of
+`make_renderer()`. Tests of
 the pure line builders (`simple_goal_lines` and friends) need nothing; they call the
 function and check the lines, as they do today.
 

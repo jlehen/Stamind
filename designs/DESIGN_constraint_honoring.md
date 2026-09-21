@@ -138,8 +138,8 @@ nudge, a date comparison in each of the two renderers — and the renderers were
 the `replan` term, so `constraint show` flagged exactly the directives the others deliberately
 skip. The predicate has one owner in `coach/honoring.py`; there is deliberately no SQL half-copy
 of it in `db/constraints.py`, since that layer cannot see `coach` and a partial copy is what went
-wrong. `tests/test_constraints.py` drives all four surfaces over the same three constraints and
-asserts they agree — a rule that spans files, tested across them.
+wrong. `tests/test_constraints_honored.py` drives all four surfaces over the same three
+constraints and asserts they agree — a rule that spans files, tested across them.
 
 ### 4.1 The add-time message
 

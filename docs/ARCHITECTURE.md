@@ -3200,14 +3200,22 @@ top-level import would put all five `garmin/` modules on every command's startup
 
 | File                           | What it tests                                                   |
 |--------------------------------|-----------------------------------------------------------------|
-| `tests/test_adaptation_*.py`   | `_adapt` (`workout_adapt()` end-to-end) and `_adherence`         |
-|                                | (`analyze_adherence()` — misses, tolerances, violations)        |
+| `tests/test_adaptation*.py`    | `workout adapt` end to end, one file per question it answers:   |
+|                                | what the prompt is told (`test_adaptation.py`, which also holds |
+|                                | the fixture the family shares), the history it may not rewrite, |
+|                                | the pairing it had to guess at, which answers are real changes, |
+|                                | what an easing costs, and a session carried to another day.     |
+|                                | `test_adaptation_adherence.py` is `analyze_adherence()` —       |
+|                                | misses, tolerances, violations                                  |
 | `tests/test_workout_tweak.py`  | `workout tweak` end to end: which days, what it writes, the     |
 |                                | cancelled sessions it is shown, the request in a strength brief |
-| `tests/test_analysis.py`       | `data_bootstrap`/`data_reflect`: date resolution, weekly |
-|                                | aggregation, cache reuse/force/inspect_only, learnings           |
-|                                | injection, reflect watermark advance/skip, bootstrap re-run      |
-|                                | guard, per-week constraints + body-response z-scores             |
+| `tests/test_analysis*.py`      | `data bootstrap`/`data reflect`, one file per stage: the run    |
+|                                | itself and its learnings (`test_analysis.py`), the window it    |
+|                                | reads (`_window`: watermark advance/skip, horizon, week snap),  |
+|                                | a reply that parses but carries nothing (`_degenerate`), the    |
+|                                | weekly evidence (`_evidence`: per-week constraints and          |
+|                                | body-response z-scores, pure and in the prompt), and the cached |
+|                                | reconstruction `plan generate` reads (`_prior_training`)        |
 | `tests/test_athlete_queue.py`  | the athlete queue (DESIGN_athlete_queue.md): a subject queued once, |
 |                                | the order and "after the others", a walk showing each item once, |
 |                                | stale items, "in 1 day" from the walk start, reminders sent once, |
@@ -3220,7 +3228,10 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | activity, `strength log`/`exercises` reading the record back,    |
 |                                | the morning push reading sets before its walk                    |
 | `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the warning for a change to today, who is watching, the replace question and its ways out, `workout notify`, `workout batches`. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.as_instance` pins the persona, which the operator's own config.yaml must not decide |
-| `tests/test_constraints.py`    | constraint DB windowing, hard-rest pre-pass, §7 magnitude, §8 message capture |
+| `tests/test_constraints*.py`   | the constraint object: DB windowing, the §8 message capture and |
+|                                | the hard-rest pre-pass (`test_constraints.py`); the §7          |
+|                                | magnitude heuristic and the goals a replan covers (`_replan`);  |
+|                                | and `honored_at` across its four surfaces (`_honored`)          |
 | `tests/test_cli_*.py`          | One file per command family: output and argument handling, with |
 |                                | the service mocked. `test_dispatch.py` walks the parser tree     |
 |                                | itself (every leaf binds a handler, every bare group self-helps) |
@@ -3239,16 +3250,18 @@ top-level import would put all five `garmin/` modules on every command's startup
 | `tests/test_feedback.py`       | The `plan feedback` log: capture/list/`--rm`, the `-m` atom      |
 |                                | (ID, date, name-infix, bare), the pending→consumed lifecycle,    |
 |                                | the regen gate + prompt section                                  |
-| `tests/test_intensity.py`      | `analytics/` intensity trio — the model, the tables and the     |
-|                                | report: the completed-weeks divisor (first six days,            |
-|                                | partial tail excluded from both sides, finished mesocycle,      |
-|                                | weeks from the mesocycle start not Mondays), coverage with a    |
-|                                | meterless ride, canonical `cycling` folding, every-zone-named   |
-|                                | rendering inside the prompt width, the raw non-extrapolated     |
-|                                | current week, per-sport delta suppression, the structural row   |
-|                                | keeping a HIIT strength activity's hard minutes in the zone     |
-|                                | table, the strength/interval note split, the coverage-based     |
+| `tests/test_intensity.py`      | the zone model: coverage with a meterless ride, the judgeable-  |
+|                                | coverage floor, canonical `cycling` folding, the coverage-based |
 |                                | currency choice, and §9.8's planned-zone parse/render           |
+| `tests/test_zone_tables.py`    | the text tables and their caveats: every zone named inside the  |
+|                                | prompt width, and the strength/interval note split              |
+| `tests/test_mesocycle_report.py` | the report for one mesocycle: the completed-weeks divisor     |
+|                                | (first six days, partial tail excluded from both sides,         |
+|                                | finished mesocycle, weeks from the mesocycle start not          |
+|                                | Mondays), the raw non-extrapolated current week, per-sport      |
+|                                | delta suppression, the structural row keeping a HIIT strength   |
+|                                | activity's hard minutes in the zone table, and the prescribed   |
+|                                | table beside the produced one                                   |
 | `tests/test_cli_progress.py`   | `cli/progress_load.py` formatting and the `render_progress` page |
 |                                | it fills: sparkline/bar scaling, label truncation, weekly-row    |
 |                                | rendering (past/in-progress/future/uncovered), plan-gap vs       |
@@ -3261,8 +3274,16 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | `hr_zone_coverage_min`, sport selection in config order, the     |
 |                                | orphan-week note, and the per-mesocycle report with its delta    |
 |                                | stopping at the plan boundary                                    |
-| `tests/test_periodization.py`  | `plan_generate`, `workout_generate`, hash logic, |
-|                                | system-prompt building                                          |
+| `tests/test_periodization*.py` | `plan generate` and what `workout generate` reads off its plan, |
+|                                | one file per question: the strategy prompt's sections           |
+|                                | (`test_periodization.py`), the prior-training review            |
+|                                | (`_review`), what the inputs hash over (`_fingerprint`) and     |
+|                                | which change makes a plan stale (`_staleness`), which days a    |
+|                                | plan covers (`_replan`, `_goal_window`), what a regeneration    |
+|                                | clears and the two rollbacks (`_regeneration`, `_rollback`),    |
+|                                | and which plan a generated day reads (`_lineage`,               |
+|                                | `_date_keyed`, `_generation_span`, `_standing`,                 |
+|                                | `_goal_archival`)                                               |
 | `tests/test_garmin.py`         | Garmin transforms (load model), zone parsing, watermark/         |
 |                                | auto-ensure policy, recompute, `backfill_tss`                    |
 | `tests/test_progression.py`    | `analytics/progression.py` pure functions: merged-load seam rule  |
@@ -3287,11 +3308,17 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | outside `cli/runway.py` builds the wording again                  |
 | `tests/test_pmc.py`            | `compute_pmc` (also): `seed=(0,0)` reproduces from-zero, split/re- |
 |                                | fold reproduces the unsplit series exactly, full-precision output |
-| `tests/test_web.py`            | (also) the read-only invariant (every route GET-only, mutating   |
-|                                | verbs 405, no Calendar/LLM import), the read views added with it |
-|                                | (benchmarks, signal vocabulary, models, plan show, zones), and  |
-|                                | `GET /api/timeline.png`: PNG magic bytes, `?weeks` validation,   |
-|                                | matplotlib-absent 503, payload shape via the shared builder      |
+| `tests/test_web*.py`           | the dashboard's endpoints, grouped by the script that calls     |
+|                                | them (§8): `_workouts` is `static/workouts.js` — the listing's  |
+|                                | verdict, compare and batches; `_plan` is `static/plan.js` — the |
+|                                | versions and the diff; `_progress` is `static/progress.js` —    |
+|                                | `GET /api/timeline.png` (PNG magic bytes, `?weeks` validation,  |
+|                                | matplotlib-absent 503) and the payload behind it. `test_web.py` |
+|                                | holds the read-only invariant — every route GET-only, mutating  |
+|                                | verbs 405, no Calendar/LLM import — beside the five views the   |
+|                                | CLI demotion brought over, which three different scripts draw:  |
+|                                | benchmarks, the signal vocabulary and one metric's history, the |
+|                                | active model, plan show, and the zone tables                    |
 | `tests/test_text.py`           | `text.py`: wrapping, ANSI width, `default_wrap_width` and the   |
 |                                | TRAINMATE_WRAP_WIDTH override, the flex column, and the rule    |
 |                                | that a quoted command survives the wrap unbroken                |
@@ -3316,7 +3343,12 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | reads the stored zone (two zones 26h apart never share a         |
 |                                | calendar date), that stored UTC instants render local, and the   |
 |                                | `settings set timezone` path (DESIGN_user_timezone.md)           |
-| `tests/test_journal.py`        | the run journal (DESIGN_logging.md §11): the writer (one line    |
+| `tests/test_journal*.py`       | the run journal (DESIGN_logging.md §11), split four ways:        |
+|                                | `test_journal.py` is the file and the structural passes and     |
+|                                | holds `JournalTestCase`, which the other three import;          |
+|                                | `_run` is the bracket and the model calls inside it; `_records` |
+|                                | the output verbs and the prompt answers; `_command` is          |
+|                                | `tm journal`. Together: the writer (one line                    |
 |                                | per record, the 8 KB bound, a traceback elided in the middle, an |
 |                                | unwritable directory that neither raises nor repeats itself),    |
 |                                | the reader skipping a torn line, the run bracket (every start    |

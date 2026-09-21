@@ -1,6 +1,6 @@
 """Pure-helper tests for the timeline chart (trainmate/analytics/chart.py).
 
-Full rendering is exercised through `GET /api/timeline.png` in test_web.py; here we
+Full rendering is exercised through `GET /api/timeline.png` in test_web_progress.py; here we
 pin the label-fitting rules that keep mesocycle names from overprinting each other
 (DESIGN_progress_timeline.md §6.1/§7.2).
 """

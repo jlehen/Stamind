@@ -157,7 +157,7 @@ the reasoning goes in the design doc, and neither is duplicated across files.
 
 `tests/test_prompt_gates.py` pins the conditional regions: each gated feature must appear in
 every place it belongs or in none, and the schema must stay well-formed across the gated
-member. `tests/test_adaptation_adapt.py` pins the section headers and the phrases the
+member. `tests/test_adaptation.py` pins the section headers and the phrases the
 handoffs depend on — `THIS MESOCYCLE IS ENDING` with its rendered day count,
 `CORRECTING EXECUTION DRIFT:`, the drift branch's "even when recovery metrics are fine", and
 the escalation "belongs to the next `workout generate`". A rewrite that dissolves one of

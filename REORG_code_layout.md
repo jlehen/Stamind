@@ -1252,13 +1252,25 @@ they are implemented.
    - The `app.js` split.
    - Splitting the test files.
 
-**The test files follow the code.** The biggest ones are each a single class:
-- `test_periodization.py`: 2,891 lines. `TestPeriodization` alone is about 1,650.
-- `test_cli_workouts.py`: 1,699 lines.
-- `test_adaptation_adapt.py`: 1,505 lines.
+**The test files follow the code.** — **DONE for the eight largest, in Phase E item 3.**
+The biggest ones were each a single class, and the line counts here were taken before
+Phase C and D grew them:
+- ~~`test_periodization.py`: 2,891 lines. `TestPeriodization` alone is about 1,650.~~ 2,884
+  by the time it was cut, and `TestPeriodization` was 1,639. It is thirteen files.
+- ~~`test_cli_workouts.py`: 1,699 lines.~~ 1,698, and it is seven files, one per workout
+  command, which is exactly the example below.
+- ~~`test_adaptation_adapt.py`: 1,505 lines.~~ 1,559, and it is six files.
 
 Split a test file when the code it covers splits. For example, `test_cli_workouts.py` becomes one
 file per workout command. The same 500-line rule applies, at lower priority.
+
+**A grab-bag class has to be cut with the file.** Those three files were each one class
+holding thirty to fifty unrelated tests, so cutting the file at class boundaries would
+have left the class — and therefore most of the file — where it was. The classes were cut
+too, into named classes with docstrings, which is what the other classes in those same
+files already looked like. Every test method keeps its name and its body byte for byte;
+122 of them answer to a new class name. `REORG_execution.md` §8 records how that was
+proved.
 
 **Traps the surveys found.**
 - **Patches that silently miss.** A patch on a name the old module still imports patches nothing.

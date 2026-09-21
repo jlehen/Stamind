@@ -904,11 +904,11 @@ silence it; a forced second push the same day does not repeat it; a push that re
 silently does not consume it; it says "undone" after a rollback; it says nothing when the
 rollback preceded the first push.
 
-`tests/test_periodization.py` — an easy run written over a scheduled test is not a test
-(landed, `c2d11f9`).
+`tests/test_periodization_generation_span.py` — an easy run written over a scheduled
+test is not a test (landed, `c2d11f9`).
 
-`tests/test_cli_workouts.py` — `prune-calendar` keeps a marker whose slot a later session
-has taken, and still deletes an event no lineage claims (§5.6).
+`tests/test_cli_workouts_calendar.py` — `prune-calendar` keeps a marker whose slot a
+later session has taken, and still deletes an event no lineage claims (§5.6).
 
 ## 9. Worked example
 

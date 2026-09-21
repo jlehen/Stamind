@@ -277,7 +277,7 @@ unit-testable in isolation:
 
 ## 8. Tests
 
-In `tests/test_analysis.py`:
+In `tests/test_analysis_evidence.py`:
 
 - `_week_response_features` (`TestWeekResponseFeatures`): z-sign correctness;
   `std==0`/missing baseline → `None`; whole `vs_baseline_z` omitted when all three

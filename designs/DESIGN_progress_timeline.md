@@ -1312,7 +1312,7 @@ implementing §10.2 from scratch — several steps are already partly done.
   `GET /api/timeline.png` (§6); JSON is deferred to §8.5.
 - `static/`: the uPlot tab (CDN include, `app.js` chart code, styles) is
   replaced by the `<img>` tab (§7.3).
-- `tests/test_progression.py`, `test_cli_progress.py`, `test_web.py`:
+- `tests/test_progression.py`, `test_cli_progress.py`, `test_web_progress.py`:
   rewritten to the §9 list.
 
 **New — no snapshot counterpart:**
