@@ -66,7 +66,7 @@ from trainmate.cli.settings import add_settings_parser
 from trainmate.cli.journal.parser import add_journal_parser
 from trainmate.cli.queue import add_queue_parser
 from trainmate.cli.strength import add_strength_parser
-from trainmate.cli.bot import add_bot_parser
+from trainmate.cli.bot.parser import add_bot_parser
 
 
 def build_parser():

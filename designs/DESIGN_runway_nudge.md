@@ -211,8 +211,9 @@ the §4 hints arrive the moment the CLI prints them. Byte-parity preserved, noth
 
 The athlete never types commands, so the suggestion must become a button or prose — and
 per the standing split, the CLI owns *what* to offer, the bot only renders
-(`trainmate/cli/bot.py::MORNING_BUTTONS` defines the rows; `trainmate_bot.py` renders
-them and maps the taps — the offer spans both files). `bot morning` grows one conditional
+(`trainmate/cli/bot/views.py::MORNING_BUTTONS` defines the rows;
+`trainmate/chat/keyboards.py` renders them and maps the taps — the offer spans
+both files). `bot morning` grows one conditional
 line, inside its existing per-day idempotent push.
 
 **Span and mesocycle cliffs — a line and a one-tap fix.** This **amends

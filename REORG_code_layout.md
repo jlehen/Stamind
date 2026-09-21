@@ -932,26 +932,57 @@ place, all twelve passed again. The four sites in the same files that do not pat
 all fail under the sabotage either way: they neutralise the pull one level down, at
 `runtime.garmin`.
 
-### 6.6 Front-ends
+### 6.6 Front-ends — **step 1 DONE in Phase D item 9; step 2 is Phase E**
 
-**`cli/bot.py` (1,282 lines) becomes the package `cli/bot/`:**
-- `views.py` (about 255 lines): the morning push, the week's changes, the pickers and the
-  mesocycle page.
-- `route.py` (about 105 lines).
-- `capture.py` (about 420 lines, including `ROUTABLE_SETTINGS`). To stay strictly under 400, split
-  the change_setting capture into its own file.
-- `edit.py` (about 330 lines).
-- `parser.py` (about 170 lines).
+**`cli/bot.py` (~~1,282~~ 1,287 lines) becomes the package `cli/bot/`:**
+- `views.py` (about 255 lines; it is 258): the morning push, the week's changes, the
+  pickers and the mesocycle page.
+- `route.py` (about 105 lines; it is 91, because `ROUTER_INTENTS` left for
+  `chat/routing.py` under §4.10 row p and only `ROUTER_SYSTEM_PROMPT` stayed). Under the
+  100 line floor and staying there: it is one command, and the only sibling it could merge
+  into is `capture.py`, which reads `use_router_model` from it and would land at 442.
+- ~~`capture.py` (about 420 lines, including `ROUTABLE_SETTINGS`). To stay strictly under
+  400, split the change_setting capture into its own file.~~ **It is 351 and holds the
+  change_setting capture, because a different file came out of it instead — see
+  `extraction.py` below. `ROUTABLE_SETTINGS` did land here, with `routable_setting`,
+  which reads it and had nowhere else to go.**
+- `edit.py` (about 330 lines; it is 331).
+- `parser.py` (about 170 lines; it is 151). Under the band, as `cli/journal/parser.py` at
+  102 already is: it is the argparse wiring its package's other files must not import.
+- **`extraction.py` (125), which this section did not name.** What every capture's model
+  call shares: the role it opens with, the rows the athlete could mean, the call, and the
+  two lanes out of a miss. It is separate because `capture.py` dispatches the five intents
+  and therefore imports `edit.py`, while `edit.py` needs those same names — folding them
+  into `capture.py` is an import cycle, and `AGENTS.md` says to move the shared code out
+  rather than defer an import. Under the 150 line floor, on the rule's own two exceptions:
+  it is a concept of its own and it is what breaks that cycle.
+- `__init__.py` is 21 lines of docstring.
 
 Its 29 imports hidden inside functions are all hoisted: none of them dodges a cycle. One exception:
 `clock.now` should be called as `clock.now()`, so that the `pin_clock` patch still reaches it.
+**Four were not hoisted, for a reason this section did not have: three
+`from trainmate.openrouter import openrouter_client` and one
+`from trainmate.coach.engine.notes import …`. `trainmate_cli` imports this package's
+parser, so hoisting any of them puts `requests` on every command's startup path — the
+regression Phase D item 4 measured and put back (`ARCHITECTURE.md` §14). Measured again
+here: 285 modules and about 105 ms, against 277 and 108 before, and no `requests`. The
+other 25 are at the top of their files, and the one `clock.now` among them is called as
+`clock.now()`.**
 
-**`trainmate_bot.py` (1,613 lines) moves into `trainmate/chat/`.** The script stays at its path as
+**`trainmate_bot.py` (~~1,613~~ 1,529 lines — Phase C's `sentinels.py` took the four frame
+readers out of it) moves into `trainmate/chat/`.** The script stays at its path as
 a launcher, because `tm-bot` runs it directly.
-- **Step 1, moves only.** The script drops to about 900 lines.
-  - `routing.py` (about 275 lines, plus the intent table from §4.10).
-  - `keyboards.py` (about 195 lines).
-  - The pure part of the scheduler.
+- **Step 1, moves only. DONE.** ~~The script drops to about 900 lines.~~ **It drops to
+  1,135. The estimate assumed more than the three modules below would leave; what stays is
+  `main()` and its closures (about 830 lines), plus `_Session`, the restart teardown, the
+  subprocess environment, the reply chunking, the allowlist and the welcome and menu
+  cards the handlers print. Step 2 is what takes the rest.**
+  - `routing.py` (about 275 lines; it is 232, with the intent table from §4.10 row p).
+  - `keyboards.py` (about 195 lines; it is 206). It holds the reply keyboard and what each
+    of its labels runs, and the four inline-callback namespaces with their decoders.
+  - The pure part of the scheduler: `scheduler.py` (97). Under the floor, and a concept of
+    its own — when the push and the nightly reflect are due.
+  - `__init__.py` is 11 lines of docstring.
 - **Step 2, a real refactor (question 4 in §9).** `main()` is 852 lines made of 30 closures over 12
   shared names.
   - It would become a `ChatBot` class, with `runner`, `handlers` and `scheduler` mixins, plus

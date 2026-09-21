@@ -92,5 +92,30 @@ class TestTheWebAppIsAReader(unittest.TestCase):
         )
 
 
+class TestTheChatPackageNeedsNoTelegram(unittest.TestCase):
+    """`trainmate/chat/` is the Telegram front-end's own code, apart from the process.
+
+    `trainmate_bot.py` imports `python-telegram-bot` lazily inside `main()`, and nothing
+    under `trainmate/chat/` imports it at all. That is what makes the routing tables, the
+    keyboards and the scheduler unit-testable without the library, and what lets
+    `tm bot route` read the router's intent table out of `chat/routing.py` without a chat
+    front-end turning up on a command line.
+    """
+
+    def test_no_chat_module_loads_the_telegram_library(self):
+        offenders = {}
+        for path in sorted(glob.glob(os.path.join(REPO, "trainmate", "chat", "*.py"))):
+            name = os.path.basename(path)[:-3]
+            module = "trainmate.chat" if name == "__init__" else f"trainmate.chat.{name}"
+            loaded = _modules_loaded_by(f"import {module}", ("telegram",))
+            if loaded:
+                offenders[module] = loaded
+        self.assertEqual(
+            offenders, {},
+            "these chat modules load python-telegram-bot; the library belongs inside "
+            f"trainmate_bot.main(), not here: {offenders}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -426,13 +426,17 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   `trainmate/cli/workouts/parser.py`. As built, the question, the notice and
   `workout notify` live in `trainmate/cli/workouts/heads_up.py`, because `generate.py`
   was past the size limit at the time, and the send rule in `trainmate/heads_up.py`.
-- `trainmate/cli/bot.py`: the hidden `bot changes`; `run_bot_morning` loses the week line.
-- `trainmate_bot.py`: `scheduler_wake` runs `bot changes` after the due reminders and before
-  the morning message, in companion mode, when the chat is free and either the morning rule
-  of §4 holds or a waiting change is no newer than `changes_notify_upto`. One helper runs `bot
-  changes` ahead of her input, called where `on_message` and `on_callback` accept a tap or a
-  message, before anything is routed or started. Both checks are a database read inside the
-  bot, like the one for reminders. The 21:00 is a constant beside them.
+- `trainmate/cli/bot/views.py`: the hidden `bot changes`; `run_bot_morning` loses the
+  week line.
+- `trainmate/chat/scheduler.py`: `scheduler_wake` runs `bot changes` after the due
+  reminders and before the morning message, in companion mode, when the chat is free and
+  either the morning rule of §4 holds or a waiting change is no newer than
+  `changes_notify_upto`.
+- `trainmate_bot.py`: one helper inside `main()`, `_tell_changes_first`, runs `bot changes`
+  ahead of her input, called where `on_message` and `on_callback` accept a tap or a
+  message, before anything is routed or started. Both checks are a database read inside
+  the bot, like the one for reminders. The 21:00 is a constant beside the send rule in
+  `trainmate/heads_up.py`.
 - `docs/ARCHITECTURE.md`: the `workout_changes` table (`note`, `told_at`), the scheduler, and
   the internal settings markers.
 - DESIGN_plan_change_continuity.md §6.4 is implemented, so it gets a dated amendment pointing

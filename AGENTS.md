@@ -118,7 +118,10 @@
   purpose: `trainmate_web.py`, a flat list of independent GET handlers that splitting
   would not separate; `db/schema.py`, one ordered run of CREATE statements that
   `SCHEMA_VERSION` versions as a unit; and `static/app.js` with `static/style.css`,
-  which are not Python.
+  which are not Python. `trainmate_bot.py` is over the limit as well and is **not** an
+  exception: what the Telegram process can be read without has moved to `trainmate/chat/`,
+  and what is left is `main()` — thirty closures over twelve shared names, waiting to
+  become a class. It is debt, not precedent.
 - A package `__init__.py` holds a docstring, and at most the class the package assembles
   from its submodules. It does not re-export the submodules' names. A re-export gives one
   name two homes, and a test that patches the home it knows about reaches code that reads
@@ -131,11 +134,11 @@
   `trainmate.coach.engine.openrouter_client` would then replace a name nothing reads, so
   every one of those tests would reach OpenRouter for real.
 - One command family per file under `trainmate/cli/`, and split a family into a file per
-  command once it outgrows roughly 400 lines. `bot.py` is over the limit; it is debt, not
-  precedent. Code shared by two commands goes in a module of its own — `cli/common.py` for
-  renderers, otherwise its own file — never in whichever command file happened to define
-  it first. A function-local import added to dodge a cycle between two CLI modules is the
-  signal that shared code is in the wrong place; move it rather than deferring the import.
+  command once it outgrows roughly 400 lines. Code shared by two commands goes in a module
+  of its own — `cli/common.py` for renderers, otherwise its own file — never in whichever
+  command file happened to define it first. A function-local import added to dodge a cycle
+  between two CLI modules is the signal that shared code is in the wrong place; move it
+  rather than deferring the import.
 - Comments and docstrings say what the code does and name the design section
   that says why (`DESIGN_x.md §N`). Do not restate the rationale: it is already
   written down once, and a paraphrase beside the code is the copy that goes

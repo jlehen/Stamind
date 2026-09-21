@@ -199,8 +199,9 @@ of six buttons (two per row, in table order), each mapping to fixed argv:
 | 💬 Talk to me    | shows the capture prompt (§5.2)|
 
 The `/start` welcome and `set_my_commands` menu get simple-mode variants to match.
-Labels live in one table in `trainmate_bot.py` beside `MENU_COMMANDS`, import-safe and
-unit-testable like the existing pure helpers.
+Labels live in one table in `trainmate/chat/keyboards.py`, import-safe and
+unit-testable like everything else in that package; the welcome and menu cards stay
+beside `main()` in `trainmate_bot.py`.
 
 ### 5.2 "Talk to me"
 
@@ -561,7 +562,7 @@ Each phase ships alone; her onboarding starts at phase 1.
 **Open**
 1. Router echo: always show "→ …", or only when confidence is low? Draft: always;
    applies unless objected to before phase 3 (rollout §9). Implemented as: always
-   (`ROUTER_ECHO` in trainmate_bot.py); trivially revisitable.
+   (`ROUTER_ECHO` in `trainmate/chat/routing.py`); trivially revisitable.
 2. Whether the router model is enough for §12.2's extraction calls — transcription,
    not judgment, says yes; watched in practice, and the role is already a setting.
 3. Multi-intent messages and slotted views (§12.8): deferred until a real message

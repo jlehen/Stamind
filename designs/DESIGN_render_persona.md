@@ -364,7 +364,7 @@ what makes it cheap to add a third persona later. Not scheduled.
   `cli/progress.py`, `cli/workouts/revisions.py`, `cli/constraints.py`,
   `cli/runway.py`, `cli/status.py` — command bodies call `runtime.render.*`; inline
   expert code becomes named functions in place.
-- `trainmate/cli/bot.py` — import path of the line builders only.
+- `trainmate/cli/bot/` — import path of the line builders only.
 - `tests/helpers.py` — `run_cli` resets the renderer per invocation; the env-patching
   tests are untouched.
 - `tests/test_simple_render.py` — the three `is_simple_render()` tests become

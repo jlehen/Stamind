@@ -62,11 +62,14 @@ class RenderImportDirectionTest(unittest.TestCase):
     anywhere in the file. Keyed on a directory glob, so a CLI module written tomorrow is
     covered tomorrow rather than whenever someone remembers the rule."""
 
-    # `bot.py` is the exception the design names: the companion-only surfaces call the
-    # line builders directly, because for them there is nothing to choose (§3). The
-    # render package's own files are exempt by directory, not by name, so cutting it
-    # into more files never quietly widens the exemption.
-    ALLOWED = {"bot.py"}
+    # The `bot` package is the exception the design names: the companion-only surfaces
+    # call the line builders directly, because for them there is nothing to choose (§3).
+    # Each exempt file is listed by its path under `cli/`, not by its bare name, so a
+    # `views.py` in another command package is still covered — and not by the directory
+    # either, so a new file under `cli/bot/` has to be added here deliberately. The
+    # render package's own files are exempt by directory, so cutting it into more files
+    # never quietly widens the exemption.
+    ALLOWED = {"bot/views.py", "bot/capture.py", "bot/edit.py"}
 
     def test_no_command_module_imports_the_renderer(self):
         from pathlib import Path
@@ -76,7 +79,7 @@ class RenderImportDirectionTest(unittest.TestCase):
         offenders = [
             path.relative_to(cli_dir.parent).as_posix()
             for path in sorted(cli_dir.rglob("*.py"))
-            if path.name not in self.ALLOWED
+            if path.relative_to(cli_dir).as_posix() not in self.ALLOWED
             and render_dir not in path.parents
             and "cli.render" in path.read_text()
         ]

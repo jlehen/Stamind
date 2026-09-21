@@ -400,13 +400,14 @@ question then closes as stale.
 
 ## 10. Touch points
 
-- `trainmate_bot.py`: `scheduler_wake` starts `data reflect --auto` once a day after 03:00,
-  from Wednesday to Sunday, in companion mode, as a process outside the chat whose output
-  goes to the journal.
+- `trainmate/chat/scheduler.py`: `scheduler_wake` starts `data reflect --auto` once a
+  day after 03:00, from Wednesday to Sunday, in companion mode, as a process outside the
+  chat whose output goes to the journal.
 - `trainmate/settings.py`: the `learning-questions` switch, on by default.
-  `trainmate/cli/settings.py`: it joins `ROUTABLE_SETTINGS`. `trainmate/cli/bot.py`: its line
-  in `SETTING_DESCRIPTIONS`, its two sentences in `_setting_effect`, and the router's
-  description of `change_setting`, so "stop asking me about that stuff" reaches it.
+  `trainmate/cli/bot/capture.py`: it joins `ROUTABLE_SETTINGS`, and it gains its line in
+  `SETTING_DESCRIPTIONS` and its two sentences in `_setting_effect`.
+  `trainmate/chat/routing.py`: the router's description of `change_setting`, so
+  "stop asking me about that stuff" reaches it.
 - `trainmate/learning_doubts.py` (new): the `learning` kind (expert and companion wording,
   the check of §5, the two answers, no drop), registered in `athlete_queue.KINDS`; and the
   queuing of §5, which skips a learning with a question still waiting or a dormant learning,

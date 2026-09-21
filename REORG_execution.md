@@ -464,7 +464,9 @@ other may still cut it into commits, and should say so in its ledger line.
    them apart would leave three commits whose only content is repointing an import the
    next commit moves again.
 9. **front-ends** — `cli/bot.py` into a package; `trainmate_bot.py` into `trainmate/chat/`, moves
-   only.
+   only. **DONE**, as one commit. The two halves are not independent: §4.10 row p moves
+   `ROUTER_INTENTS` out of `cli/bot.py` and into `trainmate/chat/routing.py`, so the CLI
+   package cannot be cut without the chat package existing to receive that table.
 
 **Test files follow the code, in the same commit as the split they follow.** The 500-line rule
 applies to them too, at lower priority.
@@ -1376,16 +1378,156 @@ The lines above Phase A are one per item, from before §3 changed.
   did to files that have since moved, and markdown table rows over 100 characters are not
   the line-width rule's business.
 
-**Next up:** Phase D item 9 — **front-ends**: `cli/bot.py` (1,287 lines) into the package
-`cli/bot/`, and `trainmate_bot.py` into `trainmate/chat/`, moves only (§6.6). Three traps
-wait there and §9 names all three: `cli/bot.py`'s 29 function-local imports all get
-hoisted, and hoisting one that binds `clock.now` to a local name would defeat `pin_clock`
-— `trainmate_bot.py`'s `clock.now as athlete_now` is the one deliberate exception and is
-left alone; `cli/bot.py` is the one module allowed to import `cli/render/` directly, so
-the `ALLOWED = {"bot.py"}` in `test_simple_render.py` has to keep naming whatever the
-package's files are called; and §4.10 row g still waits for `cli/bot/capture.py` to exist
-before `ROUTABLE_SETTINGS` can move there. Phase E owns the `ChatBot` class conversion,
-which `REORG_code_layout.md` §0 says is a separate commit on this branch.
+- **Phase D item 9, the front-ends.** The two chat surfaces are packages now.
+  `trainmate/cli/bot.py` was 1,287 lines running seven hidden commands the Telegram bot
+  spawns, and it is the package `cli/bot/`: `views.py` (258) holds the three companion
+  lists and the two messages the bot sends unasked — the morning push and the changes to
+  the athlete's week; `route.py` (91) is the classifier call; `extraction.py` (125) is what
+  every `bot capture` model call shares; `capture.py` (351) is the note inbox, the new goal
+  and the setting change, plus the dispatch between the five intents; `edit.py` (331) is
+  the two intents that change a row the athlete already has; `parser.py` (151) is the
+  argparse tree. `trainmate_bot.py` was 1,529 lines and is 1,135: `trainmate/chat/` now
+  holds `routing.py` (232), what one chat message means, `keyboards.py` (206), every button
+  the bot draws and every tap it decodes, and `scheduler.py` (97), when the push and the
+  nightly reflect are due. Neither `__init__.py` re-exports anything, and nothing in
+  `trainmate/chat/` imports the telegram library — `import trainmate.chat.routing` costs
+  three modules.
+  `Phase D item 9: the front-ends`
+
+- **The router's intent table is one file, which is what made this one item.** §4.10 row p
+  said the two halves are one table. `ROUTER_INTENTS` — the names the model may pick, and
+  what each means to it — was in `cli/bot.py`, and the three tables that say what a
+  returned name runs were in `trainmate_bot.py`. Both are in `trainmate/chat/routing.py`
+  now, so `tm bot route` reads its prompt out of the chat package. That is the one edge
+  from the CLI to `chat/`, and it is cheap because `routing.py` is data and two pure
+  parsers. `RouterTablesTest` in `test_bot.py` used to check one file against the other;
+  it pins the one file against itself now.
+
+- **One module the plan did not name, and the cycle that forced it.** §6.6 wanted
+  `capture.py` to hold the skeleton every capture shares *and* the five intents, with the
+  change_setting capture split off to keep it under 400. That cannot be built:
+  `capture.py` dispatches the intents, so it imports `edit.py`, and `edit.py` needs the
+  same skeleton. `extraction.py` is that skeleton — the role the prompt opens with, the
+  rows the athlete could mean, the call, and the two lanes out of a miss. It is 124 lines,
+  under the band's floor, on both of the rule's own exceptions: a concept of its own, and
+  the thing that breaks an import cycle. With it out, `capture.py` lands at 351 and keeps
+  change_setting, so the extra file the plan asked for is not needed after all.
+
+- **§4.10 row g landed, and `routable_setting` had to go with it.** `ROUTABLE_SETTINGS` —
+  the four chat knobs a message may change — moved from `cli/settings.py` to
+  `cli/bot/capture.py`, beside `SETTING_DESCRIPTIONS`, which is keyed on the same names.
+  The row named only the tuple, but `routable_setting` is its only reader and
+  `cli/bot/capture.py` imports `run_settings_set` from `cli/settings.py`, so leaving the
+  reader behind would have been a cycle. Both moved. The comment on the tuple said it sat
+  "beside the registry it guards", which was never quite true — the registry is
+  `trainmate/settings.py` — so it now says what the allowlist is for instead.
+
+- **Four function-local imports were left deferred, against §6.6's "all hoisted".** Three
+  `from trainmate.openrouter import openrouter_client` and one
+  `from trainmate.coach.engine.notes import …`. `trainmate_cli` imports this package's
+  parser, so hoisting any of them puts `requests` — and in the last case the whole coach
+  engine — on the startup path of every command, including every chat command, because the
+  bot runs the CLI as a subprocess. That is the regression Phase D item 4 measured and put
+  back, and `ARCHITECTURE.md` §14 carries the rule. The other 25 are at the top of their
+  files. Measured after: `import trainmate_cli` costs 285 modules and about 105 ms against
+  277 and 108 before — the eight new files and nothing else — and `requests` is still off
+  the path.
+
+- **Four patch seams moved, and each was proven rather than assumed.**
+  `patch("trainmate.cli.bot.ensure_recent_data")` is `…bot.views.ensure_recent_data`: with
+  `cli/common.ensure_recent_data` made to raise one line past its `--no-pull` exit, the two
+  adapt-first tests in `test_cli_bot.py` pass at the new target and fail when it names
+  `trainmate.cli.common` instead, which is the by-value seam §4 warns about. Its third
+  site, in `test_runway.py`, is inert either way — that test's push exits before the
+  adaptation — and it was repointed anyway so the gate keeps resolving it.
+  `…bot.edit._hand_off_to_coach` was proven the same way, with the function itself made to
+  raise. `…bot.views._auto_adapt_note` needs no sabotage: its test is one of the four known
+  failures and it fails on `assertFalse(note.called)`, which can only happen if the mock is
+  reached. And `mock.patch.object(scheduler, "athlete_now")` in `SchedulerWakeTest`:
+  replacing that line with an unrelated patch fails five cases. The gate is unchanged at
+  430 sites naming 41 targets, because this item moved three of them without changing the
+  count.
+
+- **`trainmate_bot.py` is 1,135 lines, not the ~900 §6.6 predicted, and that is Phase E's
+  to fix.** The estimate assumed more than three modules would leave. What stays is
+  `main()` and its thirty closures — about 830 lines — plus `_Session`, the restart
+  teardown, the subprocess environment, the reply chunking, the allowlist and the
+  welcome and menu cards its handlers print. Moving any of those now would be guessing at the cut
+  the `ChatBot` conversion makes; `REORG_code_layout.md` §0 says that conversion is its own
+  commit on this branch.
+
+- **One test file followed this split's axis and was cut on it.** `tests/test_cli_bot.py`
+  was 1,128 lines and its classes already group by command, so the read/write line the
+  package draws is the line it draws: it is 711 lines for the views, the pickers and the
+  router, plus `tests/test_cli_bot_capture.py` (458) for the four `bot capture` intents,
+  their scripted-prompt rig and the shared case class. Both halves keep the same 79 test
+  methods between them. The read half is still over 500; cutting it again would separate
+  `bot morning` from `bot changes`, which the same two mornings exercise, so that is
+  size-only work and §7 leaves it to Phase E. `tests/test_bot.py` (811) also follows this
+  axis — its classes group by routing, keyboards and the scheduler — but a cut there has to
+  decide where the tests of the process itself go, the ones that read `main()`'s closures
+  out of the source, and that is the question Phase E's `ChatBot` commit answers.
+
+- **`trainmate/chat/` gained the third rule in `tests/test_layering.py`.** The package's
+  docstring claims nothing in it imports the telegram library, and `AGENTS.md` says an
+  invariant that spans files gets a test keyed on a shape. It is ten lines beside the
+  other two, over the same `_modules_loaded_by` probe and the same directory glob, so a
+  fourth module there is covered the day it is written. Proven the way the others were:
+  point the prefix at `shlex` instead and all three modules are named as offenders.
+
+- **Five new by-value bindings are latent dead-patch seams, recorded and not fixed.**
+  Hoisting the function-local imports moved `run_goal_edit`, `run_constraint_edit` and
+  `run_workout_adapt` into `edit.py`'s module scope, and `run_goal_add` and
+  `run_settings_set` into `capture.py`'s. A future `patch("trainmate.cli.goals.
+  run_goal_edit")` would resolve and reach nothing on the bot path, which the gate cannot
+  see. Nothing patches any of the five today — every test was grepped — so this is the
+  same shape item 8 recorded for the second `run_plan_generate`: a known trap, not a
+  break, and the fix is the test that does not exist yet.
+
+- **One thing the review asked for and did not get.** The five welcome and menu cards in
+  `trainmate_bot.py` name the buttons `chat/keyboards.SIMPLE_KEYBOARD` draws, so this
+  commit had to add a comment saying the two are edited together — and
+  `tests/test_bot.py` already pins one against the other across the package boundary.
+  That is the shape §4.10 row p just collapsed for the router table. Moving the ~55 lines
+  into `keyboards.py` would delete the comment and take the script to about 1,080. It was
+  left because §6.6 did not ask for it and this item is moves only; Phase E's `ChatBot`
+  commit is opening that file anyway and can take it then.
+
+- **The review of Phase D item 9**, in the same commit. A read-only agent matched every
+  top-level symbol across both splits and compared each body as `ast.unparse` text with
+  docstrings and imports stripped: 63 symbols out of `cli/bot.py`, of which the only 19
+  that differ are the eight intended renames and the one `clock.now()` edit; 60 out of
+  `trainmate_bot.py`, `main()` included, of which **none** differ; 15 out of
+  `cli/settings.py`, none. It re-derived the import graph in fresh interpreters, confirmed
+  the four deferred imports are the only four left and that the hoisted ones put nothing
+  new on the startup path, and re-ran the gate, `test_simple_render.py`'s exemption and
+  every design-section citation in the new docstrings.
+
+- **What the review found, and the check of mine that missed the worst of it.**
+  `cli/bot/route.py` had ended with a five-line truncated copy of the capture banner
+  comment, which belongs in `capture.py` and is there in full — a dangling comment about
+  code that is not in the file, and the same text in two files, which `AGENTS.md` forbids.
+  My own verification could not see it: I compared the new files' lines against HEAD's in
+  one direction only, and every one of those five lines does trace back to HEAD. **Count
+  each line in both directions, or a duplicate passes.** §9 carries that now. Two more, both
+  in words: `cli/bot/views.py`'s new docstring said a view "writes nothing itself", while
+  `bot morning` stamps its marker and `bot changes` marks each line told, and with
+  `adapt-first` on the push runs the adaptation as well — a sentence that reads as a
+  guardrail and is false. And the repointed bullet in `DESIGN_change_heads_up.md` gave
+  `chat/scheduler.py` a helper that never left `main()`: `_tell_changes_first` is a closure
+  in `trainmate_bot.py`, so the bullet is two bullets now. All fixed here, along with
+  `extraction.py`'s line count, the `cli/bot/` repoint in `DESIGN_render_persona.md`'s
+  touch points, and one sentence in `cli/bot/__init__.py` giving the four deferred imports
+  their single home.
+
+**Next up:** Phase E, and its first item is the one `REORG_code_layout.md` §0 decided for
+this branch: the bot's `main()` becomes a `ChatBot` class, as its own commit. §6.6 step 2
+describes it — 852 lines of 30 closures over 12 shared names, becoming a class with
+`runner`, `handlers` and `scheduler` mixins plus an `app.py`, and about 250 test references
+moving with them. `trainmate/chat/` exists now and is where they land. The other two Phase E
+items are optional: `static/app.js` cut into four scripts by tab, and the largest test files
+split on size alone. Before the branch's last commit, the two things §7 says must close:
+the nine REORG citations in six files, and a durable home for §5.2's unfinished e1RM item.
 
 ---
 
@@ -1438,13 +1580,29 @@ This bites in `cli/bot.py`, whose 29 function-local imports all get hoisted. `tr
 the one deliberate exception: it binds `clock.now as athlete_now`, and `test_bot.py` patches that
 binding while `test_clock.py` asserts on it, so leave it alone.
 
+**Spent in Phase D item 9, and it bit exactly once.** `_push_lands_today` was the only
+site: `from trainmate.clock import now as athlete_now` inside the function, which is
+evaluated per call and so reached by `pin_clock`. Hoisted it would not be, so
+`cli/bot/capture.py` calls `clock.now()`. The exception stood, but it moved with its code —
+`athlete_now` and `forget_timezone` were read by `scheduler_wake` and by nothing else in
+the script, so they went to `trainmate/chat/scheduler.py` with it. `test_bot.py` patches
+`scheduler.athlete_now` now and `test_clock.py` asserts on `scheduler.athlete_now`; the
+binding itself is untouched. Proven rather than assumed: with that patch replaced by an
+unrelated one, five cases in `SchedulerWakeTest` fail.
+
 **Tests keyed on file names.** Re-key each on a shape — a directory or a name prefix — in the same
 commit as the move that breaks it:
 
 - ~~the `ALLOWED` set in `test_simple_render.py`~~ — **done in item 8, and it was broken in
   a second way the list did not see: the test also derives the directory it scans from
   `render.__file__`, which for a package is `trainmate/cli/render/__init__.py`, so the scan
-  would have covered the render package alone and passed while saying nothing;**
+  would have covered the render package alone and passed while saying nothing. Item 9
+  re-keyed it again, because `bot.py` became a package: it is
+  `{"bot/views.py", "bot/capture.py", "bot/edit.py"}`, matched against each file's path
+  under `cli/`. Not the bare name, which would have exempted `cli/journal/views.py` too,
+  and not the directory, so a new file under `cli/bot/` has to be added deliberately.
+  Proven: dropping `# cli.render` into `cli/journal/views.py` fails the test and names
+  it;**
 - `APPEND_PATH_MODULE` in `test_workout_revisions.py`;
 - the `workouts/revisions*.py` glob in `test_service_invariants.py`;
 - the `runway.py` exemption in `test_runway.py`;
@@ -1462,6 +1620,16 @@ docstring, as `coach/__init__.py` now does. `AGENTS.md` carries this rule since 
 this line was written; Phase A had already deleted the eleven re-exports, so that half was stale
 and is gone. The two packages Phase D item 7 created, `cli/data/` and `cli/journal/`, are a
 docstring each, and `trainmate_cli` imports each one's `add_*_parser` from its `parser` module.
+The two Phase D item 9 created, `cli/bot/` and `trainmate/chat/`, are a docstring each as
+well, and `trainmate_cli` imports `add_bot_parser` from `cli/bot/parser.py`.
 
 **No re-export shims to spare the importers.** `AGENTS.md` prefers a one-off migration, and every
 instance of TrainMate is operated by the author.
+
+**Check the moved lines in both directions, not one.** A split is easy to verify by
+asking "does every line of the new files come from the old one?" — and that question
+passes on a line the split copied twice. Item 9 sliced a span three lines too long and
+left five lines of one file's comment at the end of another; the one-directional check
+said nothing, because each of those five lines does come from the old file. Count how
+many times each line appears on both sides and compare the counts. Item 9's review caught
+it by reading.

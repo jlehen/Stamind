@@ -11,9 +11,12 @@ sentinel-framed JSON request instead of blocking on ``input()``, and the bot ren
 as an inline keyboard and writes the answer back to stdin. One in-flight command per
 chat, state in ``_Session``, a per-prompt ``nonce`` against stale taps.
 
-The pure helpers (parse/format/auth/prompt-encoding) are import-safe without
-``python-telegram-bot`` so they can be unit-tested; the library is imported lazily
-inside ``main``.
+This file is the process: ``main`` and the closures that drive one command per chat.
+What the process can be read without lives in ``trainmate/chat/`` — ``routing`` for what
+a message means, ``keyboards`` for what the bot draws and how it reads a tap back, and
+``scheduler`` for when the push and the nightly reflect are due. None of that imports
+``python-telegram-bot``, so all of it is unit-testable; here the library is imported
+lazily inside ``main``.
 
 ``telegram.ui: simple`` (the default) is the companion persona — reply keyboard, intent
 router, morning scheduler, prose replies; ``expert`` is the raw CLI; ``/ui`` flips it per-process
@@ -30,22 +33,33 @@ import datetime
 import html
 import json
 import os
-import re
 import secrets
 import shlex
 import signal
 import sys
 import time
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from trainmate import athlete_queue, heads_up, journal, settings
-from trainmate.clock import now as athlete_now, reset_cache as forget_timezone
+from trainmate import heads_up, journal
+from trainmate.chat.keyboards import (
+    BUSY_TAP, SIMPLE_KEYBOARD, STOP_ALREADY_DONE, STOP_DONE, STOP_LABEL, UI_STALE_TAP,
+    decode_callback, decode_queue_callback, decode_stop_callback, decode_ui_callback,
+    keyboard_action, prompt_buttons, queue_button_rows, queue_later_rows,
+    resolve_ui_action, stale_keyboard_tap, stop_callback_data, tapped_label,
+    ui_button_rows, ui_menu_rows,
+)
+from trainmate.chat.routing import (
+    CAPTURE_PROMPT, CAPTURE_RESCUE_ECHO, ROUTER_CAPTURE_INTENTS, ROUTER_ECHO,
+    ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, ROUTER_TIMEOUT_SECONDS,
+    UI_EXPERT_ON, UI_SIMPLE_ON, UI_USAGE, parse_message_to_argv, parse_ui_switch,
+)
+from trainmate.chat.scheduler import scheduler_wake
 from trainmate.config import config
 from trainmate.sentinels import (
     BUTTONS_SENTINEL, FLUSH_SENTINEL, PHOTO_SENTINEL, PROMPT_SENTINEL, QUEUE_SENTINEL,
     SENTINEL_PREFIX, flush_wants_a_wait, parse_frame, prompt_answer,
 )
-from trainmate.athlete_queue import QUEUE_LATER_CHOICES, QUEUE_NOT_NOW, queue_later_label
+from trainmate.athlete_queue import QUEUE_NOT_NOW
 from trainmate.text import cmd, strip_ansi
 from trainmate.output import warn
 
@@ -101,9 +115,9 @@ MENU_COMMANDS = [
     ("help", "Show command help"),
 ]
 
-# --- Simple mode ("companion") tables — DESIGN_bot_simple_frontend.md §5 ---
-# Pure data beside MENU_COMMANDS: import-safe and unit-testable without the
-# telegram library, like the helpers below.
+# --- Simple mode ("companion") cards — DESIGN_bot_simple_frontend.md §5 ---
+# What /start and /help say, beside MENU_COMMANDS. They name the buttons
+# `trainmate.chat.keyboards.SIMPLE_KEYBOARD` draws, so the two are edited together.
 
 SIMPLE_WELCOME = (
     "Hi! I'm your training coach 🏃\n\n"
@@ -132,108 +146,6 @@ SIMPLE_HELP = SIMPLE_WELCOME + (
     "adjusted."
 )
 
-CAPTURE_PROMPT = "I'm listening — what should I know? (or /cancel)"
-
-ROUTER_FALLBACK = (
-    "I didn't quite get that 🤔 — try one of the buttons below, or say it another way."
-)
-
-# Reply-keyboard label → fixed argv; None arms free-text capture (§5.1/§5.2).
-# Buttons never reach beyond this table; the keyboard renders it two per row, in order.
-SIMPLE_KEYBOARD = [
-    ("📅 Today", ["workout", "list", "-d", "today"]),
-    ("🗓 My week", ["workout", "list"]),
-    # A look back is a read: --no-mark keeps the Calendar stamping out of a tap (§5.1).
-    ("✅ Done lately", ["workout", "compare", "-d", "7d", "--no-mark"]),
-    ("🎯 Goals", ["goal", "list"]),
-    ("🧭 My plan", ["plan", "show"]),
-    ("📈 Progress", ["progress", "--chart"]),
-    ("💬 Talk to me", None),
-]
-
-# The router's intent → argv table (§5.3): the model (via `tm bot route`) only picks
-# an intent from trainmate.cli.bot.ROUTER_INTENTS; this table owns the argv, so a
-# hostile or confused message cannot reach flags it doesn't expose. Views and pickers
-# live here — fixed argv, no slots; help/unclear are answered by the bot itself.
-ROUTER_INTENT_ARGV = {
-    "show_today": ["workout", "list", "-d", "today"],
-    "show_week": ["workout", "list"],
-    "show_done": ["workout", "compare", "-d", "7d", "--no-mark"],
-    "show_goals": ["goal", "list"],
-    "show_plan": ["plan", "show"],
-    "show_progress": ["progress", "--chart"],
-    "show_constraints": ["bot", "constraints"],
-    "remove_constraint": ["bot", "constraints"],
-    "remove_goal": ["bot", "goals"],
-}
-
-# The two intents that carry the athlete's words to the coach, and the argv the text is
-# appended to: how the athlete is goes to `workout adapt`, a change they decided goes to
-# `workout tweak` (DESIGN_workout_tweak.md §3.4).
-ROUTER_MESSAGE_ARGV = {
-    "coach_message": ["workout", "adapt", "-m"],
-    "tweak_session": ["workout", "tweak"],
-}
-
-# The intents that need values out of the message: each runs `bot capture <intent>` with
-# the athlete's text, and that second, domain-focused call extracts, previews and asks
-# (§12.2). The two note intents share one inbox — they differ only in the echo, so a
-# misroute between them changes what she is told, never what is stored (§12.3).
-ROUTER_CAPTURE_INTENTS = {
-    "add_constraint": "note",
-    "add_signal": "note",
-    "add_goal": "add_goal",
-    "edit_goal": "edit_goal",
-    "edit_constraint": "edit_constraint",
-    "change_setting": "change_setting",
-}
-
-# One short italic echo per routed intent, so the athlete learns the vocabulary and a
-# misroute is visible immediately (§5.3, open question 1: always shown). They are also
-# the per-message half of teaching the two lanes: "noting that rule for your coach" and
-# "passing that on to your coach" say which inbox took the message (§12.3).
-ROUTER_ECHO = {
-    "show_today": "showing today",
-    "show_week": "showing your week",
-    "show_done": "showing what you've done lately",
-    "show_goals": "showing your goals",
-    "show_plan": "showing your plan",
-    "show_progress": "showing your progress",
-    "coach_message": "passing that on to your coach",
-    "tweak_session": "asking your coach to change that",
-    "add_constraint": "noting that rule for your coach",
-    "add_signal": "logging that for your coach",
-    "show_constraints": "showing what I'm working around",
-    # The two edit echoes are readings, not actions: the capture call that follows may
-    # find the name is a session and hand it to the coach instead (§12.4).
-    "edit_constraint": "sounds like a change to a rule — checking",
-    "remove_constraint": "showing your rules — tap the one to drop",
-    "add_goal": "setting up a new goal",
-    "edit_goal": "sounds like a change to a goal — checking",
-    "remove_goal": "showing your goals — tap the one to call off",
-    "change_setting": "changing that for you",
-}
-
-# What the §5.2 rescue window echoes. Text the router could not place, sent while a
-# "💬 Talk to me" tap is live, rides the capture inbox rather than bouncing — she was
-# just asked what the coach should know, so an unreadable answer is likelier a note the
-# router failed. The inbox that asks before storing is the right landing (§12.3).
-CAPTURE_RESCUE_ECHO = "noting that for your coach"
-
-# What a tap on a row a newer one replaced gets back (§12.3).
-UI_STALE_TAP = "That offer expired — just send it again."
-
-# What a tap gets while another command runs in the chat; its buttons stay alive for a retry.
-BUSY_TAP = "One moment — still finishing the last thing. Tap again shortly."
-
-# --- The Stop button raised over an LLM wait (DESIGN_bot_stop_button.md §3) ---
-# One button, one meaning, the same in both personas: end the command the athlete is
-# watching wait. "Stopped." is all the reply claims, because a command that already
-# wrote something before this call keeps what it wrote (§6).
-STOP_LABEL = "✋ Stop"
-STOP_DONE = "Stopped."
-STOP_ALREADY_DONE = "That's already finished — nothing to stop."
-
 # Simple mode trims the Telegram command menu to what the athlete needs; every CLI
 # command still works when typed with a leading slash.
 SIMPLE_MENU_COMMANDS = [
@@ -241,316 +153,10 @@ SIMPLE_MENU_COMMANDS = [
     ("help", "What can I ask?"),
 ]
 
-# Seconds a `bot route` classification may take before the tap falls back to
-# 'unclear' — a router that hangs must not wedge the chat.
-ROUTER_TIMEOUT_SECONDS = 30
-
-
-def keyboard_action(text: str) -> Optional[Tuple[str, Optional[List[str]]]]:
-    """What a simple-keyboard tap maps to: ("run", argv), ("capture", None), or None
-    when the text isn't a keyboard label."""
-    stripped = (text or "").strip()
-    for label, argv in SIMPLE_KEYBOARD:
-        if stripped == label:
-            return ("run", list(argv)) if argv else ("capture", None)
-    return None
-
-
-def stale_keyboard_tap(text: str, simple_now: bool) -> bool:
-    """A companion label arriving while the persona is expert: the §5.1 keyboard lives
-    on the phone and outlives the process that attached it (§5.6)."""
-    return (
-        not simple_now
-        and not (text or "").startswith("/")
-        and keyboard_action(text) is not None
-    )
-
-
-# --- The /ui runtime persona switch (§5.6) ---
-# Advertised in the expert menu only; the confirmation lines teach the way back, so
-# the switch stays reachable from simple mode without cluttering the athlete's menu.
-
-UI_USAGE = "Usage: /ui [simple|expert] — bare /ui flips the mode."
-UI_SIMPLE_ON = (
-    "Simple mode on 🙌 — buttons below, free text goes through the router.\n"
-    "Send /ui to switch back; a restart returns to what config.yaml says."
-)
-UI_EXPERT_ON = (
-    "Expert mode on — full command vocabulary, monospace output, keyboard removed.\n"
-    "Send /ui to switch back; a restart returns to what config.yaml says."
-)
-
-
-def parse_ui_switch(text: str, simple_now: bool) -> Optional[bool]:
-    """The /ui argument → target persona: True = simple, False = expert, None = show
-    usage. Bare /ui flips the current mode (§5.6)."""
-    parts = text.split()
-    if len(parts) == 1:
-        return not simple_now
-    if len(parts) > 2:
-        return None
-    return {"simple": True, "on": True, "expert": False, "off": False}.get(
-        parts[1].lower()
-    )
-
-
-def next_push_delay(
-    now: "datetime.datetime", morning: str = "08:00", deadline: str = "15:00"
-) -> float:
-    """Seconds until `bot morning` should next run: 0 inside today's
-    [morning, deadline] window, else the wait to the window's next opening
-    (DESIGN_bot_simple_frontend.md §4.3). Unparseable times fall back to the
-    defaults; a deadline before the send time means no catch-up window."""
-    def _parse(raw: str, fallback: Tuple[int, int]) -> Tuple[int, int]:
-        try:
-            hours, minutes = settings.parse_hhmm(raw).split(":")
-        except ValueError:
-            return fallback
-        return int(hours), int(minutes)
-
-    send_h, send_m = _parse(morning, (8, 0))
-    dead_h, dead_m = _parse(deadline, (15, 0))
-    start = now.replace(hour=send_h, minute=send_m, second=0, microsecond=0)
-    end = now.replace(hour=dead_h, minute=dead_m, second=0, microsecond=0)
-    if end < start:
-        end = start
-    if now < start:
-        return (start - now).total_seconds()
-    if now <= end:
-        return 0.0
-    return (start + datetime.timedelta(days=1) - now).total_seconds()
-
-
-# The nightly reflect reads the week that ended on Sunday from the night into Wednesday on,
-# once late syncs and weekend edits have landed (DESIGN_learning_doubt_nudge.md §3.1).
-REFLECT_FROM_WEEKDAY = 2  # Wednesday
-REFLECT_FROM_HOUR = 3
-
-
-def reflect_due(now: "datetime.datetime") -> bool:
-    """Whether the nightly `data reflect` may start: Wednesday to Sunday, from 03:00 on the
-    athlete's clock (DESIGN_learning_doubt_nudge.md §3.1)."""
-    return now.weekday() >= REFLECT_FROM_WEEKDAY and now.hour >= REFLECT_FROM_HOUR
-
-
-async def scheduler_wake(
-    last_run: Dict[str, str], simple: bool, busy: Callable[[], bool],
-    run: Callable[[List[str], bool], Awaitable[None]], reflect: Callable[[], None],
-) -> float:
-    """One wake of the bot's scheduler. `last_run` holds the day the push and the nightly
-    reflect last started, and the return is how long to sleep before the next wake: at most
-    5 minutes, so a laptop suspend (which stalls the monotonic clock asyncio sleeps on) can't
-    oversleep the window.
-
-    Reminders that are due go first, and `run` waits for them: a push due on the same wake
-    would otherwise find the chat busy. They go out whatever the persona and whether or not
-    the push is on (DESIGN_athlete_queue.md §6.5). The changes to the athlete's week that
-    are due go next, waited for too, so they come before the push; the config file's
-    persona decides, and the `push` switch does not (DESIGN_change_heads_up.md §4). In
-    companion mode `reflect` starts `data reflect --auto` outside the chat once a day, and
-    nothing waits for it (DESIGN_learning_doubt_nudge.md §3.1). The push fires inside the
-    [morning_time, deadline] window once per bot-day (DESIGN_bot_simple_frontend.md §4.3)."""
-    # The athlete's wall clock, not the machine's: morning-time/morning-deadline are the
-    # hours they wake up in (DESIGN_user_timezone.md §2). Every knob here is re-read each
-    # wake — `settings set` runs in a CLI subprocess, so this long-lived process would
-    # otherwise hold its first answer until a restart (DESIGN_settings.md §5).
-    forget_timezone()
-    if not busy() and athlete_queue.reminders_due():
-        await run(["bot", "queue", "--remind"], True)
-    if not busy() and heads_up.changes_due():
-        await run(["bot", "changes"], True)
-    now = athlete_now()
-    today = now.date().isoformat()
-    if simple and reflect_due(now) and last_run.get("reflect") != today:
-        last_run["reflect"] = today
-        reflect()
-    delay = next_push_delay(now, settings.morning_time(), settings.morning_deadline())
-    pushed = last_run.get("push") == today
-    if delay > 0 or not simple or not settings.push_enabled() or pushed:
-        return min(max(delay, 60), 300)
-    if busy():
-        # §4.3: never collide with an in-flight command — retry shortly.
-        return 180
-    await run(["bot", "morning"], False)
-    last_run["push"] = today
-    return 0
-
-
-def parse_message_to_argv(text: str, bot_username: Optional[str] = None) -> Optional[List[str]]:
-    """Turns a raw chat message into a CLI argv list, or None if there's nothing to run.
-
-    The leading ``/`` Telegram puts on commands is stripped, as is the ``@botname``
-    suffix it appends in group chats. Bare ``help`` is passed through to the CLI's own
-    ``help`` command (the full command/sub-command tree); ``help <cmd>`` is rewritten to
-    the argparse-native ``<cmd> --help`` for that command's options. Raises
-    ``ValueError`` on unbalanced quotes (so the caller can report it)."""
-    text = (text or "").strip()
-    if not text:
-        return None
-    if text.startswith("/"):
-        text = text[1:]
-    argv = shlex.split(text)
-    if not argv:
-        return None
-    # Strip a '@botname' suffix Telegram adds to the command token in groups.
-    head = argv[0]
-    if "@" in head:
-        name, _, suffix = head.partition("@")
-        if bot_username is None or suffix.lower() == bot_username.lower():
-            argv[0] = name
-    # Bare 'help' runs the CLI's own help command (full tree); 'help <cmd>' maps
-    # onto argparse's --help for that one command.
-    if argv[0].lower() == "help":
-        rest = argv[1:]
-        return rest + ["--help"] if rest else ["help"]
-    return argv
-
 
 def is_authorized(chat_id: int, allowed_ids: List[int]) -> bool:
     """True only when chat_id is on the allowlist. Empty allowlist authorizes no one."""
     return chat_id in allowed_ids
-
-
-
-
-def ui_callback_data(token: str, path: str) -> str:
-    """callback_data for a TM-BUTTONS button: ``"ui:{token}:{path}"``. The ``ui:``
-    namespace keeps these taps apart from prompt answers; the token invalidates rows
-    replaced by a newer push; the path indexes into the stored payload ("2", "2.1")."""
-    return f"ui:{token}:{path}"
-
-
-def decode_ui_callback(data: str) -> Optional[Tuple[str, str]]:
-    """Splits ``"ui:{token}:{path}"`` back into (token, path), or None if it isn't a
-    ui-namespace callback or is malformed."""
-    parts = (data or "").split(":", 2)
-    if len(parts) != 3 or parts[0] != "ui" or not parts[1] or not parts[2]:
-        return None
-    return parts[1], parts[2]
-
-
-def stop_callback_data(nonce: str) -> str:
-    """callback_data for the §3 Stop button: ``"stop:{nonce}"``. The nonce is the
-    running command's own token, so a tap that arrives after it ended cannot stop
-    whatever started since (DESIGN_bot_stop_button.md §7)."""
-    return f"stop:{nonce}"
-
-
-def decode_stop_callback(data: str) -> Optional[str]:
-    """The nonce inside ``"stop:{nonce}"``, or None if it isn't a stop-namespace
-    callback or is malformed."""
-    parts = (data or "").split(":")
-    if len(parts) != 2 or parts[0] != "stop" or not parts[1]:
-        return None
-    return parts[1]
-
-
-def queue_callback_data(item_id: Any, action: str, since: str) -> str:
-    """callback_data for a queued item's button: ``"q:{item id}:{action}:{walk start}"``.
-    The action names a position among the answers stored with the item, never the answer
-    itself, so it stays inside Telegram's 64 bytes (DESIGN_athlete_queue.md §6.2)."""
-    return f"q:{item_id}:{action}:{since}"
-
-
-def decode_queue_callback(data: str) -> Optional[Tuple[str, str, str]]:
-    """Splits ``"q:{item id}:{action}:{walk start}"`` back into its parts, or None when it
-    is not one. Each part becomes a word of `bot queue`'s argv, so each is held to its
-    shape."""
-    parts = (data or "").split(":")
-    if len(parts) != 4 or parts[0] != "q":
-        return None
-    _, item_id, action, since = parts
-    if not (item_id.isdigit() and action.isalnum() and re.fullmatch(r"r?\d+", since)):
-        return None
-    return item_id, action, since
-
-
-def resolve_ui_action(buttons: List[Any], path: str) -> Optional[dict]:
-    """The button dict a callback path names: "2" is buttons[2], "2.1" entry 1 of its
-    menu. None when the path doesn't resolve (malformed, stale, or hostile data)."""
-    steps = path.split(".")
-    if len(steps) > 2:
-        return None
-    try:
-        node = buttons[int(steps[0])]
-        if len(steps) == 2:
-            node = (node.get("menu") or [])[int(steps[1])]
-    except (ValueError, IndexError, AttributeError, TypeError):
-        return None
-    return node if isinstance(node, dict) else None
-
-
-# Telegram divides a row's width between its buttons, so a fourth one shrinks all four
-# past reading. The morning push is exactly that case once the runway button joins its
-# three session buttons (DESIGN_runway_nudge.md §6), and the wrap puts it on its own line.
-UI_BUTTONS_PER_ROW = 3
-
-
-def ui_button_rows(buttons: List[dict], token: str) -> List[List[Tuple[str, str]]]:
-    """Top-level TM-BUTTONS layout: across, like the §4.1 mock, wrapping every
-    `UI_BUTTONS_PER_ROW`. Positions stay flat — a callback path indexes the payload, not
-    the row it landed on."""
-    cells = [(b.get("label", ""), ui_callback_data(token, str(i)))
-             for i, b in enumerate(buttons)]
-    return [cells[i:i + UI_BUTTONS_PER_ROW]
-            for i in range(0, len(cells), UI_BUTTONS_PER_ROW)] or [[]]
-
-
-def ui_menu_rows(menu: List[dict], token: str, parent: str) -> List[List[Tuple[str, str]]]:
-    """A tapped `menu` button's sub-choices: one per row, like a choose prompt."""
-    return [[(b.get("label", ""), ui_callback_data(token, f"{parent}.{i}"))]
-            for i, b in enumerate(menu)]
-
-
-def queue_button_rows(req: dict) -> List[List[Tuple[str, str]]]:
-    """A queued item's buttons, laid out like the morning row they arrive under (§6.1)."""
-    cells = [
-        (b.get("label", ""),
-         queue_callback_data(req.get("id"), b.get("action", ""), req.get("since", "")))
-        for b in req.get("buttons") or [] if isinstance(b, dict)
-    ]
-    return [cells[i:i + UI_BUTTONS_PER_ROW] for i in range(0, len(cells), UI_BUTTONS_PER_ROW)]
-
-
-def queue_later_rows(item_id: str, since: str) -> List[List[Tuple[str, str]]]:
-    """What "Not now" swaps in: the three later choices, built from the tap itself, so the
-    bot still remembers nothing (DESIGN_athlete_queue.md §6.4)."""
-    return [[(queue_later_label(words, emoji), queue_callback_data(item_id, code, since))
-             for code, words, emoji in QUEUE_LATER_CHOICES]]
-
-
-def tapped_label(rows: List[List[Tuple[str, str]]], data: str) -> Optional[str]:
-    """The label of the button a tap came from, for the "→ …" line left under the item."""
-    for row in rows:
-        for label, callback in row:
-            if callback == data:
-                return label
-    return None
-
-
-def prompt_buttons(req: dict, nonce: str) -> List[List[Tuple[str, str]]]:
-    """Inline-keyboard layout for a prompt request: rows of ``(label, callback_data)``.
-
-    callback_data is ``"{nonce}:{prompt_id}:{value}"`` — well under Telegram's 64-byte
-    cap, with the nonce letting the bot reject taps from a stale/replaced session. A
-    ``text`` prompt has no buttons (the athlete just replies), so this returns []."""
-    pid = req.get("id", "")
-    ptype = req.get("type")
-    if ptype == "confirm":
-        yes = "⚠️ Confirm" if req.get("danger") else "✅ Yes"
-        return [[(yes, f"{nonce}:{pid}:y"), ("✖️ No", f"{nonce}:{pid}:n")]]
-    if ptype == "choose":
-        return [[(c["label"], f"{nonce}:{pid}:{c['value']}")]
-                for c in req.get("choices", [])]
-    return []
-
-
-def decode_callback(data: str) -> Optional[Tuple[str, str, str]]:
-    """Splits ``"{nonce}:{prompt_id}:{value}"`` back into its parts, or None if malformed."""
-    parts = (data or "").split(":", 2)
-    if len(parts) != 3:
-        return None
-    return parts[0], parts[1], parts[2]
 
 
 def format_prompt_message(req: dict) -> str:

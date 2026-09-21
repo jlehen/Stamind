@@ -29,7 +29,7 @@ from trainmate import runtime  # noqa: E402
 from trainmate.cli import runway as runway_cli  # noqa: E402
 from trainmate.cli.render import plan_lines as render_plan  # noqa: E402
 from trainmate.cli.workouts import generate as generate_cli  # noqa: E402
-from trainmate.cli.bot import MORNING_MARKER  # noqa: E402
+from trainmate.cli.bot.views import MORNING_MARKER  # noqa: E402
 from trainmate.config import config  # noqa: E402
 from trainmate.cli.render.plan_lines import SIMPLE_PASSED_LINE  # noqa: E402
 from trainmate.cli.render.session_lines import SPORT_EMOJI  # noqa: E402
@@ -599,7 +599,7 @@ class MorningPushRunwayTest(unittest.TestCase):
         coach = MagicMock()
         with patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}), \
                 patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.bot.ensure_recent_data"):
+                patch("trainmate.cli.bot.views.ensure_recent_data"):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")
@@ -714,13 +714,13 @@ class AddGoalIntentTest(unittest.TestCase):
     what stays behind the §7 line is the periodization built on it."""
 
     def test_the_intent_reaches_the_capture_and_not_a_reply(self):
-        from trainmate.cli.bot import ROUTER_INTENTS
+        from trainmate.chat import routing
         import trainmate_bot
-        self.assertIn("add_goal", ROUTER_INTENTS)
-        self.assertNotIn("new_goal", ROUTER_INTENTS)
+        self.assertIn("add_goal", routing.ROUTER_INTENTS)
+        self.assertNotIn("new_goal", routing.ROUTER_INTENTS)
         # A capture, so it carries the athlete's text rather than running fixed argv.
-        self.assertNotIn("add_goal", trainmate_bot.ROUTER_INTENT_ARGV)
-        self.assertEqual(trainmate_bot.ROUTER_CAPTURE_INTENTS["add_goal"], "add_goal")
+        self.assertNotIn("add_goal", routing.ROUTER_INTENT_ARGV)
+        self.assertEqual(routing.ROUTER_CAPTURE_INTENTS["add_goal"], "add_goal")
         self.assertFalse(hasattr(trainmate_bot, "new_goal_reply"))
 
     def test_the_plan_for_it_is_still_named_as_the_operators_work(self):
