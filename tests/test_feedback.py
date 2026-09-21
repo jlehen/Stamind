@@ -467,6 +467,35 @@ class TestFeedbackReplan(FeedbackTestCase):
         # --force is neither passed nor needed: pending feedback opens the gate (§7).
         self.assertFalse(mock_coach.plan_generate.call_args.kwargs["force"])
 
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
+    def test_a_yes_applies_the_plan_and_names_what_to_run_next(self, mock_coach,
+                                                               mock_garmin):
+        """The far side of the gate: a `y` saves the new periodization, and the athlete is
+        told the schedule is still the old one until `workout generate` runs."""
+        obj_id, macro_id, _ = self._plan()
+        # A bootstrapped athlete, so the first-run `data bootstrap` nudge in
+        # `plan generate` does not eat the `y` meant for the proposal.
+        test_db.set_sync_state(None, "2026-09-01T00:00:00Z", key="reflect")
+        mock_coach.config_changed.return_value = None
+        mock_coach.plan_generate.return_value = {
+            "strategy": "Proposed", "mesocycles": [], "reused": False,
+            "goal": test_db.get_objective(obj_id),
+        }
+
+        exit_code, stdout, _ = self.run_cli(
+            ["plan", "feedback", "ease the Fridays", "--replan"], input_value="y"
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            [n["text"] for n in test_db.list_plan_feedback(macro_id)],
+            ["ease the Fridays"],
+        )
+        mock_coach.data_bootstrap.assert_not_called()
+        mock_coach.plan_apply.assert_called_once()
+        self.assertIn("If you applied the new plan", stdout)
+
 
 class TestFeedbackFromGenerate(FeedbackTestCase):
     """`plan generate --feedback TEXT` files the note as `plan feedback` does, then generates."""

@@ -2168,6 +2168,12 @@ test that measured nothing. `tests/test_isolation_guards.py` asserts they still 
 That file also fails when a test calls `tempfile.mkdtemp()` without registering an
 `shutil.rmtree`, which is the same shape of silent failure: the suite once left 22,600
 directories under `/tmp`, filled the partition and cost every process its scratch space.
+The same file fails when one command calls another's `run_*` handler through a name it
+imported by value: a `patch` aimed at the handler's own module then stubs a name the
+caller never reads, so the real handler runs and a test that believed it had mocked the
+coach reaches OpenRouter. A command reaches another through its module —
+`import stamind.cli.plans.generate as _generate`, then `_generate.run_plan_generate(…)`
+— exactly as `coach/engine/` reaches `_eng.openrouter_client`.
 
 Names still patched where they are *used* rather than through `runtime`:
 `stamind.coach.engine.openrouter_client` (the LLM seam). The clock is patched at its

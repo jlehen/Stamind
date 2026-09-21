@@ -24,14 +24,14 @@ from stamind.cli.bot.views import MORNING_MARKER
 from stamind.cli.candidates import (
     confirm_new_constraints, confirm_new_signals, open_ended,
 )
-from stamind.cli.goals import run_goal_add
 from stamind.cli.render.plan_lines import simple_goal_line
-from stamind.cli.settings import run_settings_set
 from stamind.config import config
 from stamind.sentinels import emit_buttons
 from stamind.sports import CANONICAL_SPORTS, canonical_sport
 from stamind.text import wrap_text
 from stamind.clock import today_str as _today_str
+import stamind.cli.goals as _goals
+import stamind.cli.settings as _settings
 
 # `bot route` stays exactly as dumb as it is — one intent, no slots. A write intent then
 # runs one of these: a second, domain-focused call that sees only the fields its intent
@@ -197,7 +197,7 @@ def run_bot_capture_add_goal(text: str) -> None:
         print("Okay — nothing set up.")
         return
 
-    run_goal_add(argparse.Namespace(
+    _goals.run_goal_add(argparse.Namespace(
         title=title, date=target_date, sport=sports, desc=description,
         date_type=date_type,
     ))
@@ -338,7 +338,7 @@ def run_bot_capture_change_setting(text: str) -> None:
     if not runtime.prompt.confirm(f"{_setting_effect(setting.name, value)} OK?"):
         print("Okay — I've left it as it was.")
         return
-    run_settings_set(argparse.Namespace(name=setting.name, value=value))
+    _settings.run_settings_set(argparse.Namespace(name=setting.name, value=value))
 
 
 def run_bot_capture(args: argparse.Namespace) -> None:

@@ -168,7 +168,7 @@ class TestConstraintReplanTarget(unittest.TestCase):
         no goal and fell back to the next one on the calendar."""
         from stamind.cli.constraints import _run_replan_flow
         constraint = self._constraint("2026-11-03", "2026-11-10")
-        with patch("stamind.cli.constraints.run_plan_generate") as generate, \
+        with patch("stamind.cli.plans.generate.run_plan_generate") as generate, \
                 patch("builtins.print"):
             _run_replan_flow("Family holiday", constraint)
         ns = generate.call_args[0][0]
@@ -180,7 +180,7 @@ class TestConstraintReplanTarget(unittest.TestCase):
         from stamind.cli.constraints import _run_replan_flow
         constraint = self._constraint("2026-08-01", "2026-08-10")
         buf = io.StringIO()
-        with patch("stamind.cli.constraints.run_plan_generate") as generate, \
+        with patch("stamind.cli.plans.generate.run_plan_generate") as generate, \
                 patch("stamind.cli.constraints._today_str", return_value="2026-08-31"), \
                 redirect_stdout(buf):
             _run_replan_flow("Was ill", constraint)

@@ -19,22 +19,22 @@ from stamind.cli.bot.extraction import (
     CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find, nominate_rows,
     upcoming_sessions, valid_date,
 )
-from stamind.cli.constraints import run_constraint_edit
-from stamind.cli.goals import run_goal_edit
 from stamind.cli.render.plan_lines import (
     picker_label, simple_constraint_edit_lines, simple_goal_edit_lines, simple_goal_line,
 )
 from stamind.cli.render.session_lines import simple_day_word, simple_session_line
-from stamind.cli.workouts.adapt import run_workout_adapt
 from stamind.sentinels import emit_buttons
 from stamind.text import wrap_text
 from stamind.clock import today_str as _today_str
+import stamind.cli.constraints as _constraints
+import stamind.cli.goals as _goals
+import stamind.cli.workouts.adapt as _adapt
 
 
 def _hand_off_to_coach(text: str) -> None:
     """Runs `workout adapt -m` with the athlete's original words, in this process. The
     coach reads what she wrote, which is the whole point of this lane (§12.3, §12.4)."""
-    run_workout_adapt(argparse.Namespace(
+    _adapt.run_workout_adapt(argparse.Namespace(
         date=None, no_pull=False, force_pull=False, auto=False,
         message=text, lookback=None,
     ))
@@ -318,13 +318,13 @@ def _apply_edit(domain: str, row_id: int, kwargs: Dict[str, Any]) -> None:
     """Runs the real command, with argv the CLI assembled from the confirmed proposal —
     never authored by the model (§12.9)."""
     if domain == "goal":
-        run_goal_edit(argparse.Namespace(
+        _goals.run_goal_edit(argparse.Namespace(
             id=row_id, title=kwargs.get("title"),
             target_date=kwargs.get("target_date"), sport=None,
             desc=kwargs.get("description"), status=None, date_type=None,
         ))
         return
-    run_constraint_edit(argparse.Namespace(
+    _constraints.run_constraint_edit(argparse.Namespace(
         id=row_id, title=kwargs.get("title"), start=kwargs.get("start_date"),
         end=kwargs.get("end_date"), rest=None, desc=kwargs.get("description"),
         replan=None,

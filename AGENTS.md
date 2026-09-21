@@ -132,6 +132,14 @@
   openrouter_client` — binds a copy, and the 132 `patch` calls on
   `stamind.coach.engine.openrouter_client` would then replace a name nothing reads, so
   every one of those tests would reach OpenRouter for real.
+- A command that runs another command calls its handler through the module, as
+  `_generate.run_plan_generate(...)` after `import stamind.cli.plans.generate as
+  _generate`, for the reason above: `from … import run_plan_generate` binds a copy, so a
+  test patching the handler where it is defined stubs a name the caller never reads, the
+  real handler runs, and the test reaches OpenRouter believing it mocked the coach.
+  Wiring a handler into argparse with `set_defaults(func=run_plan_generate)` is a
+  reference and not a call, so the parsers keep their plain imports.
+  `tests/test_isolation_guards.py` fails on a new one and names the file and line.
 - One command family per file under `stamind/cli/`, and split a family into a file per
   command once it outgrows roughly 400 lines. Code shared by two commands goes in a module
   of its own — `cli/common.py` for renderers, otherwise its own file — never in whichever

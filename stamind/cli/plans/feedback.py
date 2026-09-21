@@ -11,9 +11,9 @@ from stamind import runtime
 from stamind.text import bold, cmd, default_wrap_width, gray, green, red
 from stamind.output import aside, notice
 from stamind.cli.common import add_feedback_note, print_feedback_notes
-from stamind.cli.plans.generate import run_plan_generate
 from stamind.cli.selectors import IdRange, SelectorError, resolve_meso_atom
 from stamind.cli.windows import resolve_goal
+import stamind.cli.plans.generate as _generate
 
 
 # `--rm` given without an ID: argparse hands the const through untouched, so the handler
@@ -92,7 +92,7 @@ def _feedback_replan(goal: dict) -> None:
     input, so the gate lets the regeneration through (§7). The preview and its human `y`
     still stand, per the constraints precedent (stamind/cli/constraints.py)."""
     print(green("Regenerating the periodization plan around your feedback..."))
-    run_plan_generate(argparse.Namespace(
+    _generate.run_plan_generate(argparse.Namespace(
         no_pull=False, force_pull=False, auto=False,
         goal_range=IdRange(start=goal['id'], end=goal['id']), force=False, fresh=False,
     ))

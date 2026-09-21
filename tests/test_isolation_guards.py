@@ -25,7 +25,8 @@ import unittest
 # that were never installed.
 import tests        # noqa: F401
 
-PRODUCTION_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamind.db")
+SOURCE_ROOT = os.path.dirname(os.path.dirname(__file__))
+PRODUCTION_DB = os.path.join(SOURCE_ROOT, "stamind.db")
 
 _UNSET = object()   # "nothing was bound", as opposed to "bound to None"
 
@@ -358,6 +359,70 @@ class TestEveryTemporaryDirectoryIsRemoved(unittest.TestCase):
             "these make a temporary directory and never delete it, so each run leaks one "
             "— register `shutil.rmtree` with `addCleanup`, `addClassCleanup` or "
             f"`atexit.register` beside the `mkdtemp`: {offenders}",
+        )
+
+
+def _by_value_command_imports(tree) -> dict:
+    """`{name: lineno}` for every `run_*` handler this module imported by value.
+
+    `from x import run_y` copies the object into this module, so from that line on the
+    name here and `x.run_y` are two separate references to it. It is the handler's own
+    name that says it is a handler, so `run_y as z` is recorded under `z`.
+    """
+    bound = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        if not (node.module or "").startswith("stamind"):
+            continue
+        for alias in node.names:
+            if not alias.name.startswith("run_"):
+                continue
+            bound[alias.asname or alias.name] = node.lineno
+    return bound
+
+
+def _shipped_modules():
+    """Every module the app ships: the package, plus the entry-point scripts beside it."""
+    paths = glob.glob(os.path.join(SOURCE_ROOT, "stamind", "**", "*.py"), recursive=True)
+    return sorted(paths + glob.glob(os.path.join(SOURCE_ROOT, "stamind_*.py")))
+
+
+class TestOneCommandReachesAnotherThroughItsModule(unittest.TestCase):
+    """A command that runs another command looks the handler up on its module, at call
+    time, exactly as `_eng.openrouter_client` does under coach/engine/.
+
+    `from stamind.cli.plans.generate import run_plan_generate` binds a copy, so
+    `patch("stamind.cli.plans.generate.run_plan_generate")` replaces a name the caller
+    never reads. The patch resolves, the test passes, and the real handler runs anyway —
+    a test that believes it stubbed the coach reaches OpenRouter for real.
+
+    Wiring a handler into argparse, `set_defaults(func=run_plan_generate)`, is a reference
+    and not a call, so the parsers keep their plain imports.
+    """
+
+    def test_no_handler_is_called_through_a_by_value_import(self):
+        offenders = []
+        for path in _shipped_modules():
+            with open(path, encoding="utf-8") as handle:
+                tree = ast.parse(handle.read())
+            bound = _by_value_command_imports(tree)
+            if not bound:
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                    continue
+                if node.func.id not in bound:
+                    continue
+                offenders.append(
+                    f"{os.path.relpath(path, SOURCE_ROOT)}:{node.lineno} calls "
+                    f"{node.func.id}(), imported by value at line {bound[node.func.id]}"
+                )
+        self.assertEqual(
+            offenders, [],
+            "each of these calls a handler through its own copy of the name, so a patch on "
+            "the handler's home module stubs nothing — `import x.y as _y` at the top and "
+            f"call `_y.run_...()` instead: {offenders}",
         )
 
 

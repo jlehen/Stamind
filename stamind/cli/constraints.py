@@ -18,8 +18,8 @@ from stamind.clock import fmt_date, fmt_span, today_str as _today_str
 from stamind.cli.selectors import IdRange, add_selector_args
 from stamind.cli.windows import goal_range_for_window, has_selector, resolve_window
 from stamind.cli.common import constraint_line
-from stamind.cli.plans.generate import run_plan_generate
 from stamind.coach import honoring
+import stamind.cli.plans.generate as _generate
 
 
 def _needs_a_pass(c: dict) -> bool:
@@ -211,7 +211,7 @@ def _run_replan_flow(title: str, constraint: dict) -> None:
         no_pull=False, force_pull=False, auto=False, goal_range=targets,
         force=False, fresh=False,
     )
-    run_plan_generate(ns)
+    _generate.run_plan_generate(ns)
     aside("If you applied the new plan, run " + cmd("workout generate")
           + " to schedule it.")
 
