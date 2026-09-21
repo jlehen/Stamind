@@ -714,14 +714,15 @@ class AddGoalIntentTest(unittest.TestCase):
     what stays behind the §7 line is the periodization built on it."""
 
     def test_the_intent_reaches_the_capture_and_not_a_reply(self):
-        from trainmate.chat import routing
-        import trainmate_bot
+        from trainmate.chat import messages, routing
         self.assertIn("add_goal", routing.ROUTER_INTENTS)
         self.assertNotIn("new_goal", routing.ROUTER_INTENTS)
         # A capture, so it carries the athlete's text rather than running fixed argv.
         self.assertNotIn("add_goal", routing.ROUTER_INTENT_ARGV)
         self.assertEqual(routing.ROUTER_CAPTURE_INTENTS["add_goal"], "add_goal")
-        self.assertFalse(hasattr(trainmate_bot, "new_goal_reply"))
+        # `messages` is where a canned reply for an intent would sit, beside the one
+        # that answers `help`; there is none, because the goal is captured for real.
+        self.assertFalse(hasattr(messages, "new_goal_reply"))
 
     def test_the_plan_for_it_is_still_named_as_the_operators_work(self):
         from trainmate.cli.render.plan_lines import (

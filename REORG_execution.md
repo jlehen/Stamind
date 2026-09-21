@@ -473,10 +473,11 @@ applies to them too, at lower priority.
 
 ### Phase E — optional, and each one is its own decision
 
-- The bot's `main()` becomes a `ChatBot` class. Decided for this branch, as its own commit after
-  the moves-only step (`REORG_code_layout.md` §0).
-- `static/app.js` cut into four scripts by tab.
-- Splitting the largest test files on size alone.
+1. The bot's `main()` becomes a `ChatBot` class. Decided for this branch, as its own commit
+   after the moves-only step (`REORG_code_layout.md` §0). **DONE**, as one commit.
+2. `static/app.js` cut into four scripts by tab.
+3. Splitting the largest test files on size alone. `tests/test_bot.py` is 630 lines after
+   item 1 took the process tests out of it, and `tests/test_cli_bot.py` is 711.
 
 ### The last commit, and the flag after it
 
@@ -1520,14 +1521,106 @@ The lines above Phase A are one per item, from before §3 changed.
   touch points, and one sentence in `cli/bot/__init__.py` giving the four deferred imports
   their single home.
 
-**Next up:** Phase E, and its first item is the one `REORG_code_layout.md` §0 decided for
-this branch: the bot's `main()` becomes a `ChatBot` class, as its own commit. §6.6 step 2
-describes it — 852 lines of 30 closures over 12 shared names, becoming a class with
-`runner`, `handlers` and `scheduler` mixins plus an `app.py`, and about 250 test references
-moving with them. `trainmate/chat/` exists now and is where they land. The other two Phase E
-items are optional: `static/app.js` cut into four scripts by tab, and the largest test files
-split on size alone. Before the branch's last commit, the two things §7 says must close:
-the nine REORG citations in six files, and a durable home for §5.2's unfinished e1RM item.
+- **Phase E item 1, the bot becomes a class.** `trainmate_bot.py` was 1,135 lines, 845 of
+  them a `main()` made of 30 closures over 14 shared names. It is 38 lines now: it builds
+  `ChatBot` and calls `run()`. The class lives in `trainmate/chat/app.py` (169) with the
+  configuration, the client, the shared state and the Application/Updater lifetime, and is
+  assembled from five mixins. `runner.py` (262) is one CLI subprocess per chat from launch
+  to exit — `Session`, `cli_env`, `_drive`, `_route_intent`, `restart_teardown`.
+  `replies.py` (222) is what goes back into the chat for that command: prose, a chart, an
+  offer row, a queued item, a question, and the ✋ Stop button the same flushes raise and
+  retire. `messages.py` (232) answers what the athlete typed and `callbacks.py` (189) what
+  they tapped. `scheduler.py` went 97 → 175, its mixin beside the arithmetic it drives.
+  The five welcome and menu cards went to `keyboards.py` (296), which is what item 9 left
+  for whoever opened this file next: they name the reply keyboard's labels one by one, so
+  the comment telling a reader to edit two files together is gone.
+  `Phase E item 1: the bot's main() becomes a ChatBot class`
+
+- **One module the plan did not name, and the rule that forced it.** `tests/test_layering.py`
+  says nothing under `trainmate/chat/` may load the telegram library — that is what keeps
+  `tm bot route`, which the bot spawns once per free-text message, from dragging the whole
+  front-end onto a command line, and what makes the routing tables testable. Moving the
+  process into the package would have broken it. So `telegram_api.py` (92) is the one file
+  that names python-telegram-bot, and every function imports it when it is called. It is
+  under the 100-line floor on both of the rule's own exceptions: a concept of its own, and
+  the thing that holds a layering rule true. `import trainmate.chat.routing` still costs
+  three modules and `import trainmate_cli` still 285 and about 105 ms, unchanged.
+
+- **What that bought, beyond the rule.** Six places built an inline keyboard out of rows
+  of (label, callback_data). Five wrote the same `InlineKeyboardMarkup([[InlineKeyboard
+  Button(…) …]])` comprehension — two of them spelling the loop variable `cb` rather than
+  `data` — and `_offer_stop` wrote the single-button form. They are one
+  `inline_keyboard(rows)`.
+  And standing the library in is now patching eight functions, so `tests/chat_harness.py`
+  builds a real `ChatBot` with nothing to connect to. That is why this commit is the first
+  time `on_message` and `on_callback` have ever been driven by a test.
+
+- **A second defect, older than this commit, found by checking a docstring.** The method
+  that used to be `_post_init` claimed to set Telegram's own command menu when the
+  connection opens. It did not: python-telegram-bot calls a builder's `post_init` hook only
+  from `run_polling()` and `run_webhook()`, and `_serve()` replaced `run_polling()` back
+  when `/restart` was designed (DESIGN_bot_restart.md §5.2). So the hook had been dead ever
+  since, and the menu was set only when `/ui` swapped it. `_serve` makes the opening call
+  itself now, through one `_set_command_menu(simple)` that `/ui` uses too — which also
+  means the "the menu is cosmetic, never let a failure stop the caller" guard lives in one
+  place instead of two. `build_application` no longer takes a hook nothing would run.
+  `CommandMenuTest` pins all three: the opening call, both personas' lists, and the guard.
+
+- **One real regression, this commit's own, found by asking what a broken install sees.**
+  `ChatBot.__init__` built the reply keyboard before it built the Application, so on a
+  checkout with no `pip install` the athlete got an `ImportError` traceback out of
+  `telegram_api.reply_keyboard` instead of `main()`'s old "python-telegram-bot is not
+  installed. Run: …". The Application is built first now, where the old
+  `from telegram import …` sat, and `StartupTest` pins all three startup answers in order:
+  no token wins over everything, then the empty-allowlist warning, then the install line.
+  The suite never saw it — every test has the library installed.
+
+- **The seams were proven, not assumed.** Fourteen sabotages, each applied to the real code
+  or the real test and reverted: `RESTART_GRACE_SECONDS` raised to 5.0 with the patch at
+  the new `chat/runner.py` target (the file's tests still ran in 0.26s, so the patch bites)
+  and the same patch pointed at a module that does not hold it (10.3s, so it does not);
+  `_drive` made to call `_pause_polling`; the silent persona re-arm made to announce
+  itself; the `patch.object(scheduler, "athlete_now")` binding — the one deliberate
+  `clock.now` alias — pointed elsewhere; `_keyboard` made to ignore the persona; `_set_ui`
+  made to assign a local instead of `self.simple_ui`, which is the `nonlocal` the
+  conversion removed; the armed-chat tap never recorded; the live button row never
+  remembered; the reply keyboard drawn before the library check; the opening
+  `_set_command_menu` dropped out of `_serve`; the menu swap left to raise instead of
+  journalling; the allowlist check taken out of `on_callback`; the changes-first call
+  taken out of `on_message`; one `dirname` taken off `CLI_PATH`. Every one failed a named
+  test. The shared-name ones matter most: a green suite could not have caught any of them
+  before this commit, and the last three are the ones the review found untested — a helper
+  covered on its own proves the helper, not that anything calls it.
+
+- **The moved lines were counted in both directions.** A line multiset of the old files
+  against the new is useless here — the `self.` prefix rewrites almost every line — so the
+  check is an AST one: every function of HEAD's `trainmate_bot.py` against its new home,
+  normalizing away `self.`, the `self` parameter and three renames (`_Session` → `Session`,
+  `_cli_env` → `cli_env`, `is_authorized` → `_authorized`). Sixty functions in, none lost,
+  **none appearing twice**, and 23 differing for reasons each of which is named above or is
+  the `telegram_api` indirection. Ten functions are new: the eight adapter functions, `run`,
+  and `keyboards.simple_keyboard_rows`.
+
+- **Test files followed this commit's axis, which is the question item 9 left open.**
+  `tests/test_bot.py` is 630 lines for the pure modules — what a message means, what the
+  bot draws, when the scheduler fires. The process tests it used to carry are
+  `tests/test_chat_process.py` (371): startup, the shared state, `/restart`'s teardown, the
+  senders, the command menu, where the CLI it runs is, and the three invariants still read
+  out of the source because reaching them needs a live connection.
+  `tests/test_chat_handlers.py` (295) drives `on_message` and `on_callback`.
+  `tests/chat_harness.py` (173) holds the stand-ins and is not a test module, so discovery
+  ignores it. The suite is 2034 tests, up 43. `test_bot.py`
+  at 630 is still over 500 and that is Phase E item 3's, not this commit's: cutting it
+  again follows size, not this axis.
+
+- **The gate is unchanged at 430 sites naming 41 targets.** This item moved no string patch
+  target: every seam it touched is a `patch.object`, which fails loudly on its own.
+
+**Next up:** Phase E items 2 and 3, both optional and both their own commit: `static/app.js`
+cut into four scripts by tab, and the largest test files split on size alone
+(`tests/test_bot.py` at 630, `tests/test_cli_bot.py` at 711, `tests/test_periodization.py`
+at 2,884). Before the branch's last commit, the two things §7 says must close: the REORG
+citations in six files, and a durable home for §5.2's unfinished e1RM item.
 
 ---
 

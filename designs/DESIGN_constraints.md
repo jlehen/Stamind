@@ -397,8 +397,9 @@ Authoring is CLI-only, so §4 is the whole mutating surface. That endpoint's win
 is deliberately *not* `constraint list`'s: a rolling `metrics_lookback_days` plus
 everything upcoming, because the dashboard has no mesocycle context in which the
 mesocycle anchor would read. The
-`trainmate_bot.py` touch is only a one-line command label
-(`("lifeevent", "Manage life events")`) and is handled by the §9 forwarder — no
+Telegram touch is only a one-line command label in `MENU_COMMANDS`
+(`("lifeevent", "Manage life events")`, `trainmate/chat/keyboards.py`) and is handled
+by the §9 forwarder — no
 special work.
 
 ---
@@ -654,9 +655,9 @@ than needing separate enforcement.
 `lifeevent` / `le` / `e` were retained for one release as thin **forwarders** to
 `constraint … --replan` (a life event was, by definition, plan-shaping), emitting a
 deprecation notice. That release has passed: no `lifeevent` command exists anywhere
-today — `trainmate_cli.py` dispatches only `constraint`, and `trainmate_bot.py`
-lists only `("constraint", …)`. (Behavior change the forwarder carried while it
-lived: it could propose a regen at add time, §7 step 3.)
+today — `trainmate_cli.py` dispatches only `constraint`, and `MENU_COMMANDS`
+(`trainmate/chat/keyboards.py`) lists only `("constraint", …)`. (Behavior change the
+forwarder carried while it lived: it could propose a regen at add time, §7 step 3.)
 
 **Data migration — a one-off operation, not part of `_init_db`. Historical: this
 script has run and has since been deleted** (`scripts/` holds only

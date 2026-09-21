@@ -200,8 +200,8 @@ of six buttons (two per row, in table order), each mapping to fixed argv:
 
 The `/start` welcome and `set_my_commands` menu get simple-mode variants to match.
 Labels live in one table in `trainmate/chat/keyboards.py`, import-safe and
-unit-testable like everything else in that package; the welcome and menu cards stay
-beside `main()` in `trainmate_bot.py`.
+unit-testable like everything else in that package; the welcome and menu cards sit in
+that same file, because they name the labels one by one.
 
 ### 5.2 "Talk to me"
 
@@ -458,7 +458,7 @@ earns it is expert detail, and the chat surface does not audit.
 
 | File | Change |
 |---|---|
-| `trainmate_bot.py` | ui-mode switch (config at start, `/ui` flips it live, §5.6), reply keyboard + label→argv table, capture-tap chat state (§5.2), `ui:` callback namespace, `TM-BUTTONS` parsing, push scheduler task |
+| `trainmate/chat/` | ui-mode switch (config at start, `/ui` flips it live, §5.6, on `ChatBot.simple_ui`), reply keyboard + label→argv table (`keyboards.py`), capture-tap chat state (§5.2, `ChatBot.armed`), `ui:` callback namespace (`callbacks.py`), `TM-BUTTONS` parsing (`runner.py`/`replies.py`), push scheduler task (`scheduler.py`) |
 | `trainmate/prompt.py` | `BUTTONS_SENTINEL` + `emit_buttons()` (mirror of `emit_photo`) |
 | `trainmate/cli/bot.py` | new hidden family: `bot morning`, `bot route`, `bot constraints`, `bot mesocycle` (§11.2) |
 | `trainmate/config.py` | `telegram_ui`; the push knobs and the router role resolve through `trainmate/settings.py` |
@@ -1004,7 +1004,7 @@ The §7 posture after this pass, in full:
 | File | Change |
 |---|---|
 | `trainmate/cli/bot.py` | `bot capture <intent>` family (extraction prompts beside `ROUTER_SYSTEM_PROMPT`), `bot goals` picker, new `ROUTER_INTENTS` rows (`new_goal` → `add_goal`, §12.5) |
-| `trainmate_bot.py` | new intent→argv and echo rows; text-carrying intents pass the message to `bot capture`; the §5.2 rescue window retargets from `adapt -m` to `bot capture note` (§12.3); the stale-tap path speaks ("That offer expired — just send it again.", §12.3) instead of silently stripping the row |
+| `trainmate/chat/` | new intent→argv and echo rows (`routing.py`); text-carrying intents pass the message to `bot capture`; the §5.2 rescue window retargets from `adapt -m` to `bot capture note` (§12.3); the stale-tap path speaks ("That offer expired — just send it again.", §12.3) instead of silently stripping the row |
 | `trainmate/cli/workouts/generate.py` | the per-candidate confirm loops — the constraint confirm and `_confirm_new_signals` with its reuse-first category ladder — factor out into a shared helper `bot capture note` calls: one behavior, ladder included, on both paths |
 | `trainmate/coach/engine/notes.py` | the `new_constraints`/`new_signals` schema fragments and extraction-rule text become shared constants this prompt and the §12.2 capture prompts both include — one candidate vocabulary, no drift |
 | `trainmate/coach/service/goals_constraints.py` | `capture_message_constraint`/`_signal` reused as-is, but the plan-shaping notice renders per persona: under simple rendering its `constraint edit --replan` / `plan generate` suggestion becomes the §12.3 adjust-offer button, never expert command text in companion chat — a `runtime.render` method with a companion override, now that the render persona has landed (DESIGN_render_persona.md §4) |

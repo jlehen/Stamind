@@ -125,7 +125,8 @@ classes themselves.
 - **`trainmate_web.py`** — Flask REST API behind the dashboard. **Read-only**: GET
   handlers over `db` and the shared pure modules, no writes, no Garmin, no LLM, no
   Calendar ([§8](#8-web-api-endpoints)).
-- **`trainmate_bot.py`** — Telegram chat front-end. Launch with `./tm-bot`. Each
+- **`trainmate_bot.py`** — Telegram chat front-end. Launch with `./tm-bot`. The script
+  itself is 38 lines: it builds `trainmate.chat.app.ChatBot` and calls `run()`. Each
   fact below:
   - **Model:** a message is treated as a CLI command line (leading `/` optional) and
     run through `trainmate_cli.py` *as a subprocess*; stdout+stderr are ANSI-stripped
@@ -138,7 +139,7 @@ classes themselves.
     as an inline keyboard (confirm → Yes/No, ⚠️ for `danger`; choose → one button per
     option) or an awaited text reply, then writes the answer back to the child's stdin
     so the command resumes.
-  - **State / safety:** one in-flight `_Session` per chat holds the process +
+  - **State / safety:** one in-flight `chat.runner.Session` per chat holds the process +
     pending-prompt state; a per-prompt `nonce` (in the button `callback_data`) rejects
     stale taps. `/cancel` and an idle `telegram.prompt_timeout_seconds` send a
     cancellation the CLI turns into a clean abort; a between-output
@@ -149,6 +150,10 @@ classes themselves.
     `Application.run_polling()`, but only so `_pause_polling` can close the long-poll
     from inside the `/restart` handler before its hard exit. This reverses the
     mid-command pause of DESIGN_bot_restart.md §5.1 (DESIGN_bot_stop_button.md §5).
+    Driving the lifetime by hand also means python-telegram-bot's `post_init` hook never
+    fires — the library calls it only from `run_polling()`/`run_webhook()` — so `_serve`
+    makes the opening `set_my_commands` call itself, through `_set_command_menu`, which
+    `/ui` uses too.
   - **Stopping a coach call.** Every LLM command emits `TM-FLUSH` right after its
     "Working on it — this usually takes about 40s." notice; the bot attaches a `✋ Stop`
     inline button to the message that flush sends, with `callback_data` `stop:{nonce}`
@@ -161,29 +166,49 @@ classes themselves.
     invocation = a loop that relaunches a child of itself, `TM_BOT_SUPERVISED=1` = the
     `exec trainmate_bot.py` worker — and traps SIGINT/SIGTERM to TERM-then-KILL the
     child rather than orphan it. `RESTART_EXIT_CODE = 75` is a **cross-file contract**
-    (`tm-bot` and `trainmate_bot.py` must stay in sync): only 75 relaunches, every other
-    exit (crash included) ends the supervisor too — no backoff, no crash recovery, by
-    design. `/restart` is a bot command beside `/cancel` and `/start`, under the same
-    allowlist: it kills any running command's subprocess and stops the Updater
-    (module-level `restart_teardown`), replies, then `os._exit(75)`
-    (DESIGN_bot_restart.md §4/§5.2).
+    (`tm-bot` and `trainmate/chat/runner.py` must stay in sync): only 75 relaunches,
+    every other exit (crash included) ends the supervisor too — no backoff, no crash
+    recovery, by design. `/restart` is a bot command beside `/cancel` and `/start`, under
+    the same allowlist: it kills any running command's subprocess and stops the Updater
+    (`runner.restart_teardown`, a module function so it can be driven without a client),
+    replies, then `os._exit(75)` (DESIGN_bot_restart.md §4/§5.2).
   - **Access** is gated by a numeric chat-id allowlist (`telegram.allowed_chat_ids`).
     Token + allowlist live under a `telegram:` section in `config.yaml` (or
     `TELEGRAM_BOT_TOKEN`).
-  - **What the process can be read without** is the `trainmate/chat/` package, and none
-    of it imports `python-telegram-bot` (the library is imported lazily in `main`):
-    `routing` is what one chat message means — both halves of the router's intent table
-    (`ROUTER_INTENTS`, which `tm bot route` builds its prompt from, and the intent→argv,
-    intent→capture and echo tables the bot maps a returned name onto), plus
-    `parse_message_to_argv` and the `/ui` switch; `keyboards` is every button the bot
-    draws and every tap it decodes — the reply keyboard with what each label runs, the
-    inline rows, and the four callback-data namespaces (`ui:`, `stop:`, `q:`, and a bare
-    prompt answer), each decoder rejecting the other three; `scheduler` is when the push
-    and the nightly reflect are due. All of it is unit-tested in `tests/test_bot.py`,
-    which also covers what stays in the script: `chunk_text`, `format_reply`,
-    `is_authorized` and the `main()` closures it reads out of the source. Reading a frame
-    off the CLI's stdout and building the answer sent back are `trainmate/sentinels.py`
-    (`parse_frame`, `prompt_answer`), tested in `tests/test_sentinels.py`.
+  - **The whole front-end is the `trainmate/chat/` package**, and no module in it imports
+    `python-telegram-bot`. `telegram_api` is the one file that names the library, and it
+    imports it inside each function, so importing any of the rest costs nothing and needs
+    no install — which is what lets `tm bot route` read the router's intent table without
+    a chat front-end appearing on a command line, and what lets a test drive a real
+    `ChatBot` against stand-ins (`tests/chat_harness.py`). `tests/test_layering.py` holds
+    that rule. The files:
+    - `app` is `ChatBot` itself: the configuration it reads, the client it builds, the
+      state the rest reaches through `self` (the live sessions, the persona `/ui` flips,
+      the allowlist, the armed chats, the button row a chat was last offered), and
+      `_serve`, the Application/Updater lifetime.
+    - `runner` is one CLI subprocess per chat: `Session`, the environment the child gets,
+      `_drive` reading its stdout to the end, `_route_intent`, and `restart_teardown`.
+    - `replies` is what goes back into the chat for that command: prose, a chart, an
+      offer row, a queued item, a question — and the ✋ Stop button the flushes raise and
+      retire.
+    - `messages` is what an arriving message does; `callbacks` is what a tap does.
+    - `routing` is what one chat message means — both halves of the router's intent table
+      (`ROUTER_INTENTS`, which `tm bot route` builds its prompt from, and the intent→argv,
+      intent→capture and echo tables the bot maps a returned name onto), plus
+      `parse_message_to_argv` and the `/ui` switch.
+    - `keyboards` is every button the bot draws and every tap it decodes — the reply
+      keyboard with what each label runs, the inline rows, the four callback-data
+      namespaces (`ui:`, `stop:`, `q:`, and a bare prompt answer) with each decoder
+      rejecting the other three, and the `/start` and `/help` cards, which name the
+      keyboard's labels one by one.
+    - `scheduler` is when the push and the nightly reflect are due, and the mixin that
+      drives them.
+
+    The pure modules are unit-tested in `tests/test_bot.py`, the process in
+    `tests/test_chat_process.py` and the handlers in `tests/test_chat_handlers.py`.
+    Reading a frame off the CLI's stdout and building the answer sent back are
+    `trainmate/sentinels.py` (`parse_frame`, `prompt_answer`), tested in
+    `tests/test_sentinels.py`.
   - **Photo protocol:** a sibling one-way sentinel to `TM-PROMPT` — `trainmate.sentinels.
     PHOTO_SENTINEL`/`emit_photo(path, caption)` writes `\x1eTM-PHOTO {json}`; `_drive()`
     reads one `parse_frame` and branches on the tag it returns, sends the file
@@ -663,7 +688,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | How long the coach's prose is    | `coach/engine/prompt.py` (`## WRITING FOR THE ATHLETE`, shared by every command built on `_build_system_prompt`) + the per-field caps in each `## RESPONSE FORMAT`. Check `coach/formatting.py` first: a field re-injected into later prompts must not be capped (DESIGN_output_verbosity.md §5.1) |
 | A web *view* of existing data    | a GET in `trainmate_web.py` + a panel in `static/app.js` ([§8](#8-web-api-endpoints)) |
 | A web endpoint that would *write* | it does not go in the web app — add the CLI command instead ([§8](#8-web-api-endpoints)) |
-| The Telegram bot                 | `trainmate_bot.py` (runs the CLI as a subprocess) ([§2](#entry-points)) |
+| The Telegram bot                 | `trainmate/chat/` — `ChatBot` in `app.py`, the handlers in `messages.py`/`callbacks.py`. `trainmate_bot.py` only launches it, and the CLI it runs as a subprocess is unchanged ([§2](#entry-points)) |
 | DB schema / a new column         | the relevant `db/*.py` mixin + the table in [§5](#5-database-schema) |
 
 ---
@@ -3953,3 +3978,46 @@ Merging would also have produced a 405-line file holding two jobs that change fo
 different reasons, which is the shape the 400-to-500 line rule then asks to split again.
 `get_completed_activity` did move there, from `db/strength.py`, because it reads
 `completed_activities` — the plural read of the same table was already there.
+
+### The bot is a class, and one file names python-telegram-bot
+
+`trainmate_bot.py` used to be a script whose `main()` was 845 lines: thirty closures over
+fourteen shared names — the live sessions, the persona, the allowlist, the Telegram client,
+the armed chats, the button row a chat was last offered. Nothing outside the process could
+call any of them, so the surface with the most moving parts had the least test coverage in
+the repo — which is why the conversion was done on its own, after everything else had
+settled.
+
+It is `ChatBot` now, in `trainmate/chat/app.py`, assembled from five mixins: `runner`
+starts a CLI subprocess for a chat and reads it to the end, `replies` sends what that
+subprocess produced back, `messages` answers what the athlete typed, `callbacks` answers
+what they tapped, and `scheduler` is what fires without being asked. The twelve shared
+names are attributes on the one object, so the mixins reach them and each other through
+`self` and almost nothing is imported across the package.
+
+The library is the reason the package was worth keeping importable. `tests/test_layering.py`
+has said since the front-ends moved that nothing under `trainmate/chat/` may load
+`python-telegram-bot`: that is what lets `tm bot route` — which the bot spawns once per
+free-text message — read the router's intent table without a chat front-end turning up on
+a command line, and what makes the routing tables and keyboards unit-testable. Moving the
+process into the package would have broken it, so `chat/telegram_api.py` is the one module
+that names the library, and it imports it inside each function rather than at module scope.
+It is 92 lines, under the 100-line floor, on the rule's own exception: it is a concept of
+its own, and it is what holds that layering rule true.
+
+Reading the docstring of the method that used to be `_post_init` is what turned up a
+latent bug older than this commit: python-telegram-bot calls a builder's `post_init` only
+from `run_polling()` and `run_webhook()`, and `_serve()` replaced `run_polling()` when
+`/restart` was designed. So the hook had stopped firing and Telegram's command menu was
+never set when the bot started — only when `/ui` swapped it. `_serve` makes that call
+itself now, through the one `_set_command_menu` both it and `/ui` use, and a failure there
+is journalled rather than raised, because the menu is cosmetic: every command works whether
+or not it is listed.
+
+Two things fell out of the adapter. Six places built an inline keyboard out of rows of
+(label, callback_data): five wrote the same `InlineKeyboardMarkup([[InlineKeyboardButton(…)
+…]])` comprehension, two of those five spelling the loop variable `cb` rather than `data`,
+and `_offer_stop` wrote the single-button form. They are one `inline_keyboard(rows)`.
+And standing the library in is now patching eight functions, so
+`tests/chat_harness.py` can build a real `ChatBot` with nothing to connect to, and
+`tests/test_chat_handlers.py` drives `on_message` and `on_callback` for the first time.

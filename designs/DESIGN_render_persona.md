@@ -70,10 +70,10 @@ deserves the same treatment.
 - Folding transport and voice into one "persona" object. Expert-over-Telegram
   (`json` + expert) is the operator's own daily surface, and the dashboard is
   expert-voiced without a TTY. Two orthogonal axes stay two objects on `runtime`.
-- Moving the bot-side `simple_ui` branches in `trainmate_bot.py` (keyboard, wrap
+- Moving the bot-side `simple_ui` branches in the Telegram front-end (keyboard, wrap
   width, `<pre>` vs flowed text, free-text routing, the help card). Those are the
   persona's *behaviour* — what a message is allowed to do — not its wording, and they
-  are already confined to one file. §8 sketches the same trick for them if it is
+  all read one flag, `ChatBot.simple_ui`. §8 sketches the same trick for them if it is
   ever wanted; it is a separate, smaller change.
 - Any new companion surface. This design changes where the words live, not which
   words exist.
@@ -342,10 +342,11 @@ step.
 
 ## 8. The bot side (deferred)
 
-`trainmate_bot.py` branches on `simple_ui` about ten times: the reply keyboard, the
+The Telegram front-end branches on `simple_ui` about ten times: the reply keyboard, the
 wrap width, `<pre>` versus flowed replies, the help card, whether bare text goes to the
 router, whether the morning push fires, which menu is registered. These are the
-persona's behaviour and they share one file, so they are not this design's problem.
+persona's behaviour and they all read one flag, `ChatBot.simple_ui` in
+`trainmate/chat/app.py`, so they are not this design's problem.
 
 If they ever become one, the same shape fits: an `ExpertChat` / `CompanionChat` pair
 with `reply_markup()`, `wrap_width()`, `format_reply(text)`, `menu_commands()`,
@@ -372,7 +373,9 @@ what makes it cheap to add a third persona later. Not scheduled.
 - `designs/DESIGN_bot_simple_frontend.md` §6, §8 — pointer here.
 - `trainmate/config.py`, `config.yaml.example` — the `telegram.operator_name` knob.
 - `trainmate_bot.py` — one sentence, the new-goal card's "tell your coach" (§5);
-  otherwise untouched.
+  otherwise untouched. Superseded: DESIGN_bot_simple_frontend.md §12.5 replaced the
+  reply-only `new_goal` intent with a real capture, so that card and its sentence are
+  gone. Nothing of this design lives in that file now.
 
 ## 10. Decisions & Open Questions
 

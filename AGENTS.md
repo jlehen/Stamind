@@ -118,10 +118,10 @@
   purpose: `trainmate_web.py`, a flat list of independent GET handlers that splitting
   would not separate; `db/schema.py`, one ordered run of CREATE statements that
   `SCHEMA_VERSION` versions as a unit; and `static/app.js` with `static/style.css`,
-  which are not Python. `trainmate_bot.py` is over the limit as well and is **not** an
-  exception: what the Telegram process can be read without has moved to `trainmate/chat/`,
-  and what is left is `main()` — thirty closures over twelve shared names, waiting to
-  become a class. It is debt, not precedent.
+  which are not Python. One file stays under the 100-line floor for a reason the rule does
+  not list: `trainmate_bot.py` is 38 lines that build `trainmate.chat.app.ChatBot` and run
+  it, and it cannot be merged into a sibling because the `tm-bot` supervisor execs it by
+  path.
 - A package `__init__.py` holds a docstring, and at most the class the package assembles
   from its submodules. It does not re-export the submodules' names. A re-export gives one
   name two homes, and a test that patches the home it knows about reaches code that reads

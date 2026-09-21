@@ -95,11 +95,13 @@ class TestTheWebAppIsAReader(unittest.TestCase):
 class TestTheChatPackageNeedsNoTelegram(unittest.TestCase):
     """`trainmate/chat/` is the Telegram front-end's own code, apart from the process.
 
-    `trainmate_bot.py` imports `python-telegram-bot` lazily inside `main()`, and nothing
-    under `trainmate/chat/` imports it at all. That is what makes the routing tables, the
-    keyboards and the scheduler unit-testable without the library, and what lets
-    `tm bot route` read the router's intent table out of `chat/routing.py` without a chat
-    front-end turning up on a command line.
+    `chat/telegram_api.py` is the only module that names `python-telegram-bot`, and it
+    imports the library inside each function rather than at module scope, so importing
+    anything under `trainmate/chat/` loads none of it. That is what makes the whole
+    front-end — the routing tables, the keyboards, the scheduler and `ChatBot` itself —
+    unit-testable without the library, and what lets `tm bot route` read the router's
+    intent table out of `chat/routing.py` without a chat front-end turning up on a
+    command line.
     """
 
     def test_no_chat_module_loads_the_telegram_library(self):
@@ -112,8 +114,9 @@ class TestTheChatPackageNeedsNoTelegram(unittest.TestCase):
                 offenders[module] = loaded
         self.assertEqual(
             offenders, {},
-            "these chat modules load python-telegram-bot; the library belongs inside "
-            f"trainmate_bot.main(), not here: {offenders}",
+            "these chat modules load python-telegram-bot at import; the library is named "
+            "in chat/telegram_api.py alone, inside the function that needs it, not here: "
+            f"{offenders}",
         )
 
 

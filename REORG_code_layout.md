@@ -932,7 +932,7 @@ place, all twelve passed again. The four sites in the same files that do not pat
 all fail under the sabotage either way: they neutralise the pull one level down, at
 `runtime.garmin`.
 
-### 6.6 Front-ends — **step 1 DONE in Phase D item 9; step 2 is Phase E**
+### 6.6 Front-ends — **DONE: step 1 in Phase D item 9, step 2 in Phase E item 1**
 
 **`cli/bot.py` (~~1,282~~ 1,287 lines) becomes the package `cli/bot/`:**
 - `views.py` (about 255 lines; it is 258): the morning push, the week's changes, the
@@ -983,11 +983,38 @@ a launcher, because `tm-bot` runs it directly.
   - The pure part of the scheduler: `scheduler.py` (97). Under the floor, and a concept of
     its own — when the push and the nightly reflect are due.
   - `__init__.py` is 11 lines of docstring.
-- **Step 2, a real refactor (question 4 in §9).** `main()` is 852 lines made of 30 closures over 12
-  shared names.
-  - It would become a `ChatBot` class, with `runner`, `handlers` and `scheduler` mixins, plus
-    `app.py`.
-  - About 250 test references would move.
+- **Step 2, a real refactor (question 4 in §9). DONE in Phase E item 1.** ~~`main()` is 852
+  lines made of 30 closures over 12 shared names.~~ It was 845 lines and 30 closures, and
+  the shared names are fourteen, not twelve. `trainmate_bot.py` is 38 lines now: it builds
+  `ChatBot` and calls `run()`.
+  - ~~It would become a `ChatBot` class, with `runner`, `handlers` and `scheduler` mixins,
+    plus `app.py`.~~ **Five mixins, not three.** A single `handlers.py` would have landed
+    at about 440 lines, over the band, and it cuts cleanly along the two kinds of update
+    Telegram delivers: `messages.py` (232) is what the athlete typed, `callbacks.py` (189)
+    is what they tapped. `runner.py` (262) kept one CLI subprocess from launch to exit and
+    handed the sending to `replies.py` (222) — the five senders, plus the ✋ Stop button,
+    which the same flushes raise and retire. `scheduler.py` went 97 → 175 with its mixin
+    beside the arithmetic it drives. `app.py` is 169: the configuration, the client, the
+    shared state, and the Application/Updater lifetime.
+  - **One module this section did not name: `telegram_api.py` (92).** `tests/test_layering.py`
+    says nothing under `trainmate/chat/` may load the telegram library, which is what keeps
+    `tm bot route` — spawned once per free-text message — from dragging the front-end onto a
+    command line. Moving the process into the package would have broken that, so one file
+    names the library and imports it inside each function. Under the 100-line floor, on the
+    rule's own two exceptions: a concept of its own, and the thing that holds a layering
+    rule true. It also collapsed the six places that built an inline keyboard out of rows
+    of (label, callback_data) — five copies of one comprehension, two of them spelling the
+    loop variable `cb`, plus the Stop button's single-button form — into one
+    `inline_keyboard(rows)`.
+  - ~~About 250 test references would move.~~ **Thirty.** `tests/test_bot.py` named 29
+    attributes of `trainmate_bot` and `tests/test_runway.py` one. The estimate was out by
+    an order of magnitude because `main()`'s closures were unreachable from a test: only
+    the module-level helpers around them could be named at all, which is the coverage gap
+    the conversion was for.
+  - **The welcome and menu cards went to `keyboards.py`, as item 9 said whoever opened this
+    file should decide.** They name the reply keyboard's labels one by one, so the comment
+    saying "these two are edited together" is gone — they are in the same file now.
+    `keyboards.py` is 296.
 
 **Other changes.**
 - `trainmate/sentinels.py`, as described in §4.8. `prompt.py` drops to about 275 lines.

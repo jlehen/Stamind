@@ -432,11 +432,11 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   reminders and before the morning message, in companion mode, when the chat is free and
   either the morning rule of §4 holds or a waiting change is no newer than
   `changes_notify_upto`.
-- `trainmate_bot.py`: one helper inside `main()`, `_tell_changes_first`, runs `bot changes`
-  ahead of her input, called where `on_message` and `on_callback` accept a tap or a
-  message, before anything is routed or started. Both checks are a database read inside
-  the bot, like the one for reminders. The 21:00 is a constant beside the send rule in
-  `trainmate/heads_up.py`.
+- `trainmate/chat/scheduler.py`, again: `ChatBot._tell_changes_first` runs `bot changes`
+  ahead of her input, called from `on_message` (`chat/messages.py`) and `on_callback`
+  (`chat/callbacks.py`) where they accept a tap or a message, before anything is routed
+  or started. Both checks are a database read inside the bot, like the one for
+  reminders. The 21:00 is a constant beside the send rule in `trainmate/heads_up.py`.
 - `docs/ARCHITECTURE.md`: the `workout_changes` table (`note`, `told_at`), the scheduler, and
   the internal settings markers.
 - DESIGN_plan_change_continuity.md §6.4 is implemented, so it gets a dated amendment pointing

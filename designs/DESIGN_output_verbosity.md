@@ -26,7 +26,7 @@ Calendar signals is fresh (last sync 26m ago); using cache. Pass --force-pull to
 None of it is wrong. In a terminal it is genuinely useful: the command takes eight seconds
 and those lines are how you know it is alive and what it is spending the time on.
 
-But the Telegram front-end **buffers**. `trainmate_bot._drive` accumulates the subprocess's
+But the Telegram front-end **buffers**. `chat/runner.py`'s `_drive` accumulates the subprocess's
 stdout into a list and flushes it at a prompt boundary or at exit. So the athlete's phone
 buzzes once, with the whole run in one `<pre>` message — the progress narration on top,
 already finished, describing work that is over, pushing the answer below the fold. Live
@@ -54,7 +54,7 @@ the adaptation table print anyway.
 
 ## 2. Two audiences, one CLI
 
-The bot is a shim over the real CLI (`trainmate_bot` runs `trainmate_cli.py` as a
+The bot is a shim over the real CLI (`trainmate/chat/` runs `trainmate_cli.py` as a
 subprocess), which is what keeps the two surfaces in permanent parity. That is worth
 keeping. But parity of *commands* is not parity of *reading conditions*:
 
@@ -367,13 +367,14 @@ rather than merely gone.
 
 ### 7.3 Flushing before the wait
 
-Hiding the section fixes the terminal. Chat needs one more thing: `trainmate_bot._drive`
+Hiding the section fixes the terminal. Chat needs one more thing: `chat/runner.py`'s `_drive`
 buffers stdout and flushes at a photo, a button row, a prompt, or exit — so with
 `--show-llm-context` the 321 lines and the strategy arrive **in the same message**, after
 a wait of tens of seconds, which is exactly the shape §1 set out to kill.
 
 A fourth one-way sentinel, `\x1eTM-FLUSH` (`FLUSH_SENTINEL` / `emit_flush()` in
-`trainmate/prompt.py`, `is_flush_request()` in `trainmate_bot.py`), ends the message where
+`trainmate/prompt.py`; both ends are `trainmate/sentinels.py` now, where the reader is
+`flush_wants_a_wait()`), ends the message where
 it stands. Three details:
 
 - **It gates itself.** `emit_flush()` is a no-op unless `is_json_frontend()`. A flush has
@@ -477,7 +478,7 @@ the number and never the call.
 ### 8.4 The one call with no notice
 
 `tm bot route` classifies free text before the real command starts. Its stdout is
-captured by `trainmate_bot._route_intent` and discarded but for the last JSON line, so a
+captured by `chat/runner.py`'s `_route_intent` and discarded but for the last JSON line, so a
 notice there reaches nobody and the journal read is pure waste on the hot path of every
 chat message. `complete(..., wait_notice=False)` turns it off, and that flag is the
 place to say "nobody is waiting on this output" if a second such call ever appears.

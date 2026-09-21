@@ -5,6 +5,10 @@ runs (DESIGN_bot_simple_frontend.md §5.1), and the inline rows raised over a co
 TM-BUTTONS offer, a prompt's choices, a queued item's answers, and the ✋ Stop button over
 an LLM wait (DESIGN_athlete_queue.md §6.2, DESIGN_bot_stop_button.md §3).
 
+The cards `/start` and `/help` answer with, and Telegram's own command menu, are here too:
+the companion card teaches the reply keyboard label by label, so a relabelled button and
+the sentence describing it have to be edited together.
+
 Each kind of tap carries its own callback-data namespace — `ui:`, `stop:`, `q:`, and the
 bare prompt answer — and every decoder here rejects the other three. They share one
 Telegram channel, so a decoder that read another namespace as its own would turn a stale
@@ -28,6 +32,92 @@ SIMPLE_KEYBOARD = [
     ("🧭 My plan", ["plan", "show"]),
     ("📈 Progress", ["progress", "--chart"]),
     ("💬 Talk to me", None),
+]
+
+# The keyboard renders the table two labels per row, in order.
+KEYBOARD_LABELS_PER_ROW = 2
+
+
+def simple_keyboard_rows() -> List[List[str]]:
+    """The §5.1 reply keyboard's labels, laid out the way the bot attaches them."""
+    labels = [label for label, _ in SIMPLE_KEYBOARD]
+    return [labels[i:i + KEYBOARD_LABELS_PER_ROW]
+            for i in range(0, len(labels), KEYBOARD_LABELS_PER_ROW)]
+
+
+# --- What /start and /help say, and Telegram's own command menu ---
+
+WELCOME = (
+    "TrainMate is connected. Send any CLI command — the leading slash is "
+    "optional.\n\n"
+    "Examples:\n"
+    "  /status\n"
+    "  /workout list --weeks 1\n"
+    "  /workout adapt -m \"tired today\"\n"
+    "  /plan show\n\n"
+    "Send /help for the full command list, or /help <command> (e.g. "
+    "/help workout) for a command's options.\n\n"
+    "When a command needs a decision (apply a plan, confirm a wipe) I'll show "
+    "buttons — tap one, or send /cancel to abort."
+)
+
+# Top-level command families surfaced in Telegram's command menu (set_my_commands).
+# Kept in sync by hand with the CLI's subparsers; purely cosmetic (any command
+# still works whether or not it's listed here).
+MENU_COMMANDS = [
+    ("status", "Athlete status, goals, recent metrics"),
+    ("progress", "Training progress timeline (add --chart for a PNG)"),
+    ("workout", "List/generate/adapt/tweak workouts"),
+    ("plan", "Show/generate periodization plans"),
+    ("goal", "Manage training goals"),
+    ("data", "Pull/show Garmin metrics & activities"),
+    ("signal", "Author daily signals"),
+    ("learnings", "Inspect coach learnings"),
+    ("constraint", "Manage directives the coach works around"),
+    ("settings", "Show/change preferences (model, timezone, morning push)"),
+    ("queue", "Questions and messages waiting for the athlete"),
+    ("ui", "Switch simple/expert chat UI (until restart)"),
+    ("cancel", "Abort the command awaiting your answer"),
+    ("restart", "Restart the bot process (picks up new code)"),
+    ("help", "Show command help"),
+]
+
+# --- Simple mode ("companion") cards — DESIGN_bot_simple_frontend.md §5 ---
+# What /start and /help say, beside MENU_COMMANDS. They name the buttons SIMPLE_KEYBOARD
+# draws, which is why they sit in this file rather than beside the handler that sends them.
+
+SIMPLE_WELCOME = (
+    "Hi! I'm your training coach 🏃\n\n"
+    "Use the buttons below:\n"
+    "📅 Today — today's session\n"
+    "🗓 My week — the days ahead\n"
+    "✅ Done lately — how the last days went\n"
+    "🎯 Goals — what you're training for\n"
+    "🧭 My plan — the road to your goal\n"
+    "📈 Progress — how your fitness is building\n"
+    "💬 Talk to me — anything I should know (tired, busy, sore…)\n\n"
+    "Or just type what you want, in your own words — it's the same thing."
+)
+
+# The two lanes, taught rather than discovered (§12.3). The surface has exactly two
+# teachers — this card and the per-message router echoes — and both say the same thing:
+# what you want remembered is recorded here, after a question; what is about how you are
+# doing goes to the coach in your own words. No line promises verbatim delivery on a tap,
+# because no tap delivers it.
+SIMPLE_HELP = SIMPLE_WELCOME + (
+    "\n\nWhen you write to me, one of two things happens:\n"
+    "• Something to remember — a rule, a rough night, a new goal, a change of date — "
+    "I write it down and ask you first.\n"
+    "• Something about how you're doing, what's in the way, or a session you'd like "
+    "changed — that goes to your coach in your own words, and your week comes back "
+    "adjusted."
+)
+
+# Simple mode trims the Telegram command menu to what the athlete needs; every CLI
+# command still works when typed with a leading slash.
+SIMPLE_MENU_COMMANDS = [
+    ("cancel", "Stop what's running"),
+    ("help", "What can I ask?"),
 ]
 
 

@@ -1,18 +1,27 @@
-"""When the bot's scheduler fires, on the athlete's wall clock.
+"""What the bot does without being asked, and when.
 
-The pure half of the scheduler: how long to sleep before the next wake, whether the
+The top half is the arithmetic: how long to sleep before the next wake, whether the
 nightly `data reflect` may start, and the wake itself — reminders that are due, then the
 changes to the athlete's week, then the morning push (DESIGN_bot_simple_frontend.md §4.3,
-DESIGN_athlete_queue.md §6.5, DESIGN_learning_doubt_nudge.md §3.1).
+DESIGN_athlete_queue.md §6.5, DESIGN_learning_doubt_nudge.md §3.1). It takes the callbacks
+that run a command as arguments, so it decides everything and touches nothing.
 
-`main()` hands in the callbacks that actually run a command, so nothing here touches the
-chat or the telegram library.
+The bottom half is `SchedulerMixin`, which is what `ChatBot` passes in: the push chat, one
+wake after another, and the nightly reflect as a process of its own. `_tell_changes_first`
+is there too — not a wake, but the same rule arriving by the other door, when the athlete
+writes or taps before the scheduler got to it (DESIGN_change_heads_up.md §4).
 """
+import asyncio
 import datetime
+import os
+import shlex
+import sys
 from typing import Awaitable, Callable, Dict, List, Tuple
 
-from trainmate import athlete_queue, heads_up, settings
+from trainmate import athlete_queue, heads_up, journal, settings
+from trainmate.chat import runner
 from trainmate.clock import now as athlete_now, reset_cache as forget_timezone
+from trainmate.text import strip_ansi
 
 
 def next_push_delay(
@@ -95,3 +104,72 @@ async def scheduler_wake(
     await run(["bot", "morning"], False)
     last_run["push"] = today
     return 0
+
+
+class SchedulerMixin:
+    """`ChatBot`'s half that drives the wakes above, and the changes told out of turn."""
+
+    async def _run_scheduled(self, argv: List[str], wait: bool) -> None:
+        """Starts a scheduler-run command in the push chat; `wait` holds the wake until it
+        has finished (DESIGN_athlete_queue.md §6.5)."""
+        self._log(self.push_chat_id, "**", shlex.join(argv))
+        session = await self._start_command(
+            self.push_chat_id, argv, quiet=True, source="push"
+        )
+        if wait:
+            await session.task
+
+    async def _tell_changes_first(self, chat_id: int) -> None:
+        """Sends the changes to the athlete's week not told yet, before acting on their own
+        tap or message, whatever the hour and however young the change
+        (DESIGN_change_heads_up.md §4)."""
+        if chat_id != self.push_chat_id or self.sessions.get(chat_id) is not None:
+            return
+        if not heads_up.waiting():
+            return
+        await self._run_scheduled(["bot", "changes"], True)
+
+    async def _reflect_outside_chat(self) -> None:
+        """`data reflect --auto` as a process of its own, like the router: nothing is posted,
+        the chat is not busy, and its output goes to the journal
+        (DESIGN_learning_doubt_nudge.md §3.1)."""
+        argv = ["data", "reflect", "--auto"]
+        self._log(self.push_chat_id, "**", shlex.join(argv))
+        env = runner.cli_env(None, source="push")
+        env.pop("TRAINMATE_FRONTEND")  # a terminal report for the journal, no chat sentinels
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-u", runner.CLI_PATH, *argv,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                cwd=os.path.dirname(runner.CLI_PATH),
+            )
+            out, _ = await proc.communicate()
+        except Exception as exc:
+            journal.record("bot.reflect", f"did not run: {exc}", lvl="warn")
+            return
+        journal.record(
+            "bot.reflect", strip_ansi(out.decode(errors="replace")).strip(),
+            exit_code=proc.returncode,
+        )
+
+    def _start_reflect(self) -> None:
+        task = asyncio.create_task(self._reflect_outside_chat())
+        self.reflect_tasks.add(task)
+        task.add_done_callback(self.reflect_tasks.discard)
+
+    async def _push_loop(self) -> None:
+        """One `scheduler_wake` after another (§4.3). Real idempotency lives in the
+        database marker `bot morning` checks; `last_run` only avoids re-spawning the
+        subprocess every tick within one bot lifetime."""
+        last_run: Dict[str, str] = {}
+        while True:
+            pause = await scheduler_wake(
+                last_run, self.simple_ui,
+                lambda: self.sessions.get(self.push_chat_id) is not None,
+                self._run_scheduled, self._start_reflect,
+            )
+            if pause:
+                await asyncio.sleep(pause)

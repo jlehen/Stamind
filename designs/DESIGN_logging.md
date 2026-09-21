@@ -155,7 +155,7 @@ by construction (the CLI, the REPL, the bot's event loop), so a plain list is en
 
 **`source`** says who started it: `cli`, `repl`, `shell`, `bot`, `push`, `route`, `web`,
 `test`. This is the field that makes "show me only what ran while I was asleep" a one-flag
-query. The bot passes it in `TRAINMATE_SOURCE` — but note that `_cli_env` is one function
+query. The bot passes it in `TRAINMATE_SOURCE` — but note that `cli_env` is one function
 shared by three callers with three different answers, so it takes the value as a
 parameter rather than setting a constant beside `TRAINMATE_FRONTEND`: `_start_command` for
 a chat message is `bot`, the same function firing the morning push is `push`, and
@@ -734,7 +734,8 @@ was clipped, so `-v` is never something to guess at.
 
 ## 8. The bot
 
-`trainmate_bot.py` already has a private logger: `_log(chat_id, direction, msg)`,
+The Telegram front-end already has a private logger: `ChatBot._log(chat_id, direction,
+msg)` in `trainmate/chat/app.py`,
 called from every send, tap and command start, `print()` to the process's stdout. Where
 that stdout goes depends entirely on how `./tm-bot` was launched, which means in practice
 it goes nowhere.
@@ -884,7 +885,7 @@ core turns out to earn it.
 §1. Roughly 150 lines of new code and a lot of one-word edits.
 
 **Phase 2 — the corners.** The bot's eighteen `_log` calls, the `source` parameter on
-`_cli_env` and the parent run id, the ten silent swallows, the run id in the exchange
+`cli_env` and the parent run id, the ten silent swallows, the run id in the exchange
 filenames, the `logging.dir` fix from §6, retention, and `--cost`.
 
 **Phase 3 — only if wanted.** `db.write` records tying a run to the rows it changed,

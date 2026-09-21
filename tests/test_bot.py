@@ -1,16 +1,16 @@
-"""Tests for the Telegram front-end's pure helpers (no telegram dependency)."""
-import ast
-import asyncio
+"""The Telegram front-end's pure modules: what a message means, what the bot draws,
+and when the scheduler fires. None of it needs the telegram library.
+
+`tests/test_chat_process.py` covers the process that uses them — `ChatBot`, its
+handlers, and the state they share."""
 import os
-import pathlib
 import sys
 import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import trainmate_bot as bot
-from trainmate.chat import keyboards, routing, scheduler
+from trainmate.chat import keyboards, replies, routing, scheduler
 
 
 class ParseMessageTest(unittest.TestCase):
@@ -56,45 +56,6 @@ class ParseMessageTest(unittest.TestCase):
             routing.parse_message_to_argv('/workout adapt -m "oops')
 
 
-class AuthTest(unittest.TestCase):
-    def test_allowlisted_id_passes(self):
-        self.assertTrue(bot.is_authorized(42, [1, 42, 3]))
-
-    def test_unlisted_id_rejected(self):
-        self.assertFalse(bot.is_authorized(99, [1, 42, 3]))
-
-    def test_empty_allowlist_rejects_everyone(self):
-        self.assertFalse(bot.is_authorized(42, []))
-
-
-class ChunkTest(unittest.TestCase):
-    def test_short_text_single_chunk(self):
-        self.assertEqual(bot.chunk_text("hello"), ["hello"])
-
-    def test_splits_on_line_boundaries(self):
-        text = "\n".join(["x" * 100 for _ in range(60)])
-        chunks = bot.chunk_text(text, limit=250)
-        self.assertTrue(len(chunks) > 1)
-        self.assertTrue(all(len(c) <= 250 for c in chunks))
-        # Round-trips back to the original once rejoined.
-        self.assertEqual("\n".join(chunks), text)
-
-    def test_hard_splits_overlong_single_line(self):
-        chunks = bot.chunk_text("y" * 1000, limit=300)
-        self.assertTrue(all(len(c) <= 300 for c in chunks))
-        self.assertEqual("".join(chunks), "y" * 1000)
-
-
-class FormatReplyTest(unittest.TestCase):
-    def test_wraps_in_pre_and_escapes_html(self):
-        parts = bot.format_reply("a < b & c > d")
-        self.assertEqual(len(parts), 1)
-        self.assertTrue(parts[0].startswith("<pre>"))
-        self.assertTrue(parts[0].endswith("</pre>"))
-        self.assertIn("&lt;", parts[0])
-        self.assertIn("&amp;", parts[0])
-
-
 class PromptProtocolTest(unittest.TestCase):
     """How a TM-PROMPT request becomes Telegram buttons, and a tap becomes an answer.
 
@@ -132,105 +93,20 @@ class PromptProtocolTest(unittest.TestCase):
         self.assertIsNone(keyboards.decode_callback("only:two"))
 
     def test_format_prompt_message_strips_ansi(self):
-        msg = bot.format_prompt_message({"message": "\033[33mProceed?\033[0m"})
+        msg = replies.format_prompt_message({"message": "\033[33mProceed?\033[0m"})
         self.assertEqual(msg, "Proceed?")
-
-
-class _FakeProc:
-    """Stand-in for the CLI subprocess: exits on its own only if told to."""
-
-    def __init__(self, exits_on_its_own: bool = False) -> None:
-        self.returncode = None
-        self.killed = False
-        self._exits_on_its_own = exits_on_its_own
-
-    async def wait(self) -> int:
-        if not self._exits_on_its_own:
-            await asyncio.sleep(3600)
-        self.returncode = 0
-        return 0
-
-    def kill(self) -> None:
-        self.killed = True
-        self.returncode = -9
-
-
-class RestartTeardownTest(unittest.IsolatedAsyncioTestCase):
-    """/restart's teardown (DESIGN_bot_restart.md §5.2): no orphaned subprocess and no
-    long-poll left open when os._exit() fires."""
-
-    def setUp(self):
-        patcher = mock.patch.object(bot, "RESTART_GRACE_SECONDS", 0.02)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        self.stops = []
-
-    async def _stop_polling(self):
-        self.stops.append(True)
-
-    def _session(self, awaiting=None, proc=None):
-        session = bot._Session(42, proc if proc is not None else _FakeProc(), "n0nce")
-        if awaiting is not None:
-            session.awaiting = awaiting
-            session.answer_future = asyncio.get_running_loop().create_future()
-        return session
-
-    async def test_kills_a_silently_computing_session(self):
-        # A single getUpdates batch can deliver a command and /restart together, so
-        # /restart can land with a subprocess running and no prompt open.
-        session = self._session()
-        await bot.restart_teardown(session, self._stop_polling)
-        self.assertTrue(session.proc.killed)
-
-    async def test_open_prompt_is_answered_cancelled_not_killed(self):
-        session = self._session({"id": "p1", "type": "confirm"}, _FakeProc(exits_on_its_own=True))
-        await bot.restart_teardown(session, self._stop_polling)
-        self.assertTrue(session.answer_future.result()["cancelled"])
-        self.assertFalse(session.proc.killed)
-
-    async def test_open_prompt_whose_process_lingers_is_killed_after_the_grace(self):
-        session = self._session({"id": "p1", "type": "confirm"})
-        await bot.restart_teardown(session, self._stop_polling)
-        self.assertTrue(session.proc.killed)
-
-    async def test_finished_process_is_left_alone(self):
-        session = self._session()
-        session.proc.returncode = 0
-        await bot.restart_teardown(session, self._stop_polling)
-        self.assertFalse(session.proc.killed)
-
-    async def test_releases_the_long_poll(self):
-        # Without this, the abandoned getUpdates never confirms its offset and the
-        # relaunched worker is served the same /restart again (§7).
-        await bot.restart_teardown(None, self._stop_polling)
-        self.assertEqual(self.stops, [True])
-        session = self._session()
-        await bot.restart_teardown(session, self._stop_polling)
-        self.assertEqual(len(self.stops), 2)
-
-    async def test_a_wedged_stop_still_returns(self):
-        async def _hangs():
-            await asyncio.sleep(3600)
-
-        await bot.restart_teardown(None, _hangs)  # must not hold up the hard exit
-
-    async def test_a_failing_stop_still_returns(self):
-        async def _raises():
-            raise RuntimeError("This Updater is not running!")
-
-        await bot.restart_teardown(None, _raises)
 
 
 class MenuCommandsTest(unittest.TestCase):
     def test_restart_is_advertised_in_the_command_menu(self):
         # Not treated as special: the teardown ends any live session cleanly, so a
         # mis-tap costs a reconnect, not work (DESIGN_bot_restart.md §7).
-        names = [name for name, _ in bot.MENU_COMMANDS]
+        names = [name for name, _ in keyboards.MENU_COMMANDS]
         self.assertIn("restart", names)
         self.assertIn("cancel", names)
 
     def test_simple_menu_keeps_cancel_reachable(self):
-        names = [name for name, _ in bot.SIMPLE_MENU_COMMANDS]
+        names = [name for name, _ in keyboards.SIMPLE_MENU_COMMANDS]
         self.assertIn("cancel", names)
 
 
@@ -255,8 +131,8 @@ class UiSwitchTest(unittest.TestCase):
     def test_only_the_expert_menu_advertises_the_switch(self):
         # The simple menu stays the athlete's two entries; the §5.6 confirmation
         # lines teach the way back instead.
-        self.assertIn("ui", [n for n, _ in bot.MENU_COMMANDS])
-        self.assertNotIn("ui", [n for n, _ in bot.SIMPLE_MENU_COMMANDS])
+        self.assertIn("ui", [n for n, _ in keyboards.MENU_COMMANDS])
+        self.assertNotIn("ui", [n for n, _ in keyboards.SIMPLE_MENU_COMMANDS])
 
 
 class SimpleKeyboardTest(unittest.TestCase):
@@ -281,7 +157,7 @@ class SimpleKeyboardTest(unittest.TestCase):
         """The welcome teaches the keyboard, so a relabelled button cannot drift
         out of it (§5.1)."""
         for label, _ in keyboards.SIMPLE_KEYBOARD:
-            self.assertIn(label, bot.SIMPLE_WELCOME, label)
+            self.assertIn(label, keyboards.SIMPLE_WELCOME, label)
 
     def test_non_label_text_is_not_a_button(self):
         self.assertIsNone(keyboards.keyboard_action("show me my week"))
@@ -308,7 +184,7 @@ class TwoLanesTest(unittest.TestCase):
     a verbatim delivery that no tap performs."""
 
     def test_the_help_card_names_both_lanes(self):
-        card = bot.SIMPLE_HELP
+        card = keyboards.SIMPLE_HELP
         self.assertIn("ask you first", card)             # the recording lane
         self.assertIn("in your own words", card)         # the coach lane
         self.assertIn("your coach", card)                # named as the app, per §5
@@ -349,33 +225,6 @@ class StaleKeyboardTest(unittest.TestCase):
         self.assertFalse(keyboards.stale_keyboard_tap("workout list", simple_now=False))
         self.assertFalse(keyboards.stale_keyboard_tap("/ui", simple_now=False))
         self.assertFalse(keyboards.stale_keyboard_tap("", simple_now=False))
-
-    def test_the_re_arm_is_silent_and_only_the_re_arm_is(self):
-        """§5.6: the tap's own answer is the feedback; a typed /ui still confirms.
-        `_set_ui` is a closure inside main(), so the call sites are read from source."""
-        tree = ast.parse(pathlib.Path(bot.__file__).read_text())
-        rearm, announced = [], []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.If):
-                continue
-            stale = any(
-                isinstance(call.func, ast.Name)
-                and call.func.id == "stale_keyboard_tap"
-                for call in ast.walk(node.test)
-                if isinstance(call, ast.Call)
-            )
-            for call in ast.walk(node):
-                if not (isinstance(call, ast.Call)
-                        and isinstance(call.func, ast.Name)
-                        and call.func.id == "_set_ui"):
-                    continue
-                silent = any(
-                    kw.arg == "announce" and kw.value.value is False
-                    for kw in call.keywords
-                )
-                (rearm if stale else announced).append(silent)
-        self.assertEqual(rearm, [True])
-        self.assertEqual(announced, [False])
 
 
 class GuardrailTest(unittest.TestCase):
@@ -554,18 +403,6 @@ class UiCallbackTest(unittest.TestCase):
         self.assertEqual(rows[1][0][1], keyboards.ui_callback_data("t", "3"))
 
 
-def _nested_functions() -> dict:
-    """Every function defined inside `trainmate_bot.py`, name → source text. The bot's
-    command loop lives in closures inside `main()`, so an invariant about it is read
-    from the source rather than called."""
-    source = pathlib.Path(bot.__file__).read_text()
-    found = {}
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            found[node.name] = ast.get_source_segment(source, node)
-    return found
-
-
 class StopButtonTest(unittest.TestCase):
     """The ✋ Stop button raised over a coach call (DESIGN_bot_stop_button.md)."""
 
@@ -593,24 +430,6 @@ class StopButtonTest(unittest.TestCase):
     def test_fits_telegrams_64_byte_callback_cap(self):
         data = keyboards.stop_callback_data("aabbccdd")  # secrets.token_hex(4) width
         self.assertLessEqual(len(data.encode()), 64, data)
-
-
-class PollingModelTest(unittest.TestCase):
-    """Polling stays live while a command computes — the condition for a Stop tap or
-    /cancel to reach a command waiting on the coach (DESIGN_bot_stop_button.md §5)."""
-
-    def test_the_command_loop_never_stops_polling(self):
-        self.assertNotIn("_pause_polling", _nested_functions()["_drive"])
-
-    def test_only_the_restart_handler_stops_polling(self):
-        """The long-poll is closed for exactly one reason: /restart is about to exit the
-        process (DESIGN_bot_restart.md §5.2). Anything else that stops it strands the
-        chat with a bot that has gone deaf."""
-        callers = sorted(
-            name for name, source in _nested_functions().items()
-            if "_pause_polling" in source and name not in ("main", "_pause_polling")
-        )
-        self.assertEqual(callers, ["_restart"])
 
 
 class PushScheduleTest(unittest.TestCase):

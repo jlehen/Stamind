@@ -1018,8 +1018,8 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
 (ARCHITECTURE §2), which is what makes them cheap:
 
 - **Text:** `/progress` in chat just runs `tm progress`; the width-aware
-  renderer (§7.1) is the whole story. `MENU_COMMANDS` in `trainmate_bot.py`
-  (hand-synced by design) gains a `progress` entry.
+  renderer (§7.1) is the whole story. `MENU_COMMANDS` in
+  `trainmate/chat/keyboards.py` (hand-synced by design) gains a `progress` entry.
 - **Chart:** `/progress --chart` renders the full §2 two-panel picture to
   PNG and sends it as a photo. The drawing itself lives in
   **`trainmate/analytics/chart.py`** — `render_timeline_png(payload) -> bytes`
@@ -1042,7 +1042,7 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
     `emit_photo(path, caption=None)` helper (the `\x1e` record-separator
     framing already guarantees prose never collides; the photo line is
     written alone on its line and flushed atomically).
-    `trainmate_bot.py:_drive()` gains one branch beside
+    `_drive()` (`trainmate/chat/runner.py`) gains one branch beside
     `sentinels.parse_frame`: flush the text buffer, `bot.send_photo` with the
     payload's `caption`, and unlink the temp file in a `finally` (so a
     failed send, `/cancel` kill, or timeout doesn't orphan it).
@@ -1286,13 +1286,14 @@ implementing §10.2 from scratch — several steps are already partly done.
 - `adherence.planned_load` is already public — only the `tss is not None`
   fix (§3) remains there.
 - The photo transport, whole: `PHOTO_SENTINEL`/`emit_photo` in
-  `trainmate/prompt.py`; `parse_photo_request`, the `_drive()` photo branch
-  and the unknown-sentinel drop in `trainmate_bot.py`; the bot tests.
+  `trainmate/prompt.py`; the frame reader, the `_drive()` photo branch and the
+  unknown-sentinel drop, now `trainmate/sentinels.py` and `trainmate/chat/runner.py`;
+  the bot tests.
 - `tm progress` dispatcher entry in `trainmate_cli.py` (no alias — the
   prefix mechanism covers it, §7.1); the
   `p` alias for `plan` is **already removed** (rev 6 cited its pre-snapshot
   line 708 — stale; nothing left to do); the `MENU_COMMANDS` `progress`
-  entry in `trainmate_bot.py`.
+  entry, now in `trainmate/chat/keyboards.py`.
 - matplotlib in `requirements.txt` (optional tier); `progress.png` in
   `.gitignore`.
 
