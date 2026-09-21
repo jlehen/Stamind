@@ -4,7 +4,7 @@ set -e
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Must match trainmate_bot.py's RESTART_EXIT_CODE.
+# Must match RESTART_EXIT_CODE in trainmate/chat/runner.py.
 RESTART_EXIT_CODE=75
 
 if [ "$TM_BOT_SUPERVISED" = "1" ]; then

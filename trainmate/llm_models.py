@@ -3,15 +3,16 @@
 See DESIGN_model_selection.md. `config.llm_models` is the menu, the `settings.llm_model` row
 is the choice, and the display numbers are positions in the menu — never stored, so reordering
 the config cannot repoint an existing choice. Writing the choice is `settings set coach-model`
-(DESIGN_settings.md); this module reads it. `trainmate.db` and `trainmate.settings` are
-imported lazily inside each function so importing this module (and `trainmate.openrouter`
-through it) never opens the DB.
+(DESIGN_settings.md); this module reads it. The database handle is read as `runtime.db`
+at call time; `trainmate.settings` stays a function-local import, because it imports this
+module back for the menu validator.
 """
 
 from typing import Any, Dict, List, Optional
 
+from trainmate import runtime
 from trainmate.config import config
-from trainmate.util import cmd
+from trainmate.text import cmd
 
 LLM_MODEL_SETTING = "llm_model"
 
@@ -21,16 +22,9 @@ def configured_models() -> List[str]:
     return config.llm_models
 
 
-def stored_model() -> Optional[str]:
-    """The model identifier stored in the database, or None if the config default rules."""
-    from trainmate.db import db
-    return db.get_setting(LLM_MODEL_SETTING)
-
-
 def stored_at() -> Optional[str]:
     """UTC ISO instant the stored choice was last written, or None if nothing is stored."""
-    from trainmate.db import db
-    row = db.get_setting_row(LLM_MODEL_SETTING)
+    row = runtime.db.get_setting_row(LLM_MODEL_SETTING)
     return row["updated_at"] if row else None
 
 

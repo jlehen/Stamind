@@ -1,6 +1,7 @@
 """Schema stamping, transactions, and the invariants that used to live at the CLI."""
 import hashlib
 import os
+import shutil
 import sqlite3
 import tempfile
 import unittest
@@ -11,7 +12,7 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_db_lifecycle.db")
 
 from trainmate.db import Database
-from trainmate.db.base import SCHEMA_VERSION
+from trainmate.db.schema import SCHEMA_VERSION
 
 test_db = bind_test_db(TEST_DB_PATH)
 
@@ -19,6 +20,7 @@ test_db = bind_test_db(TEST_DB_PATH)
 class TestSchemaStamping(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
         self.path = os.path.join(self.dir, "stamp.db")
 
     def test_a_fresh_database_is_stamped_at_the_current_version(self):
@@ -98,74 +100,6 @@ class TestSchemaStamping(unittest.TestCase):
             )}
         self.assertIn("workouts", tables)
 
-    def test_the_signal_rename_carries_the_rows_and_the_sync_token(self):
-        """`daily_context` → `daily_signals` runs once, against the only database that
-        exists, so the rows and the Calendar syncToken have to survive it — a fresh
-        CREATE TABLE instead of the ALTER would silently empty the signal history and
-        force a full re-pull (DESIGN_calendar_signal_ingest.md §6.1)."""
-        db = Database(db_path=self.path)
-        with db._get_connection() as conn:
-            conn.execute("DROP TABLE daily_signals")
-            conn.execute("""
-                CREATE TABLE daily_context (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date            TEXT NOT NULL,
-                    metric          TEXT NOT NULL,
-                    value           REAL,
-                    text            TEXT,
-                    google_event_id TEXT NOT NULL UNIQUE,
-                    updated         TEXT
-                )
-            """)
-            conn.execute(
-                "INSERT INTO daily_context (date, metric, value, text, google_event_id) "
-                "VALUES ('2026-06-10', 'alcohol', 2.0, 'Alcohol: 2.0', 'evt-1')"
-            )
-            conn.execute(
-                "INSERT INTO sync_state (key, sync_token) VALUES ('calendar_context', 'tok')"
-            )
-            conn.commit()
-        unstamp_schema(db)
-
-        Database(db_path=self.path)
-
-        with db._get_connection() as conn:
-            tables = {r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )}
-            rows = conn.execute(
-                "SELECT metric, value FROM daily_signals"
-            ).fetchall()
-            token = conn.execute(
-                "SELECT sync_token FROM sync_state WHERE key = 'calendar_signals'"
-            ).fetchone()
-        self.assertNotIn("daily_context", tables)
-        self.assertEqual([tuple(r) for r in rows], [("alcohol", 2.0)])
-        self.assertEqual(token[0], "tok")
-
-    def test_the_four_hand_edit_kinds_become_tweaks(self):
-        """`workout add`, `rm`, `swap` and `restore` are gone, and what they wrote was the
-        athlete's own request (DESIGN_workout_tweak.md §7)."""
-        db = Database(db_path=self.path)
-        kinds = ("add", "rm", "swap", "restore", "adapt")
-        with db._get_connection() as conn:
-            for kind in kinds:
-                conn.execute(
-                    "INSERT INTO workout_changes (created_at, kind) VALUES (?, ?)",
-                    ("2026-09-01T06:00:00+00:00", kind),
-                )
-            conn.commit()
-        unstamp_schema(db)
-
-        Database(db_path=self.path)
-
-        with db._get_connection() as conn:
-            migrated = [
-                r[0] for r in conn.execute("SELECT kind FROM workout_changes ORDER BY id")
-            ]
-        self.assertEqual(migrated, ["tweak", "tweak", "tweak", "tweak", "adapt"])
-
-
 class TestTransaction(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
@@ -235,7 +169,7 @@ class TestWipingOwnsItsRecompute(unittest.TestCase):
                 distance_km=10.0, elevation_gain_m=0.0, avg_hr=140, max_hr=160,
                 rpe=5, tss=50.0,
             )
-        from trainmate.garmin.pmc import recompute_derived
+        from trainmate.garmin.derived import recompute_derived
         recompute_derived(dbh=test_db)
 
     def test_wiping_the_window_walks_the_ewmas_again(self):

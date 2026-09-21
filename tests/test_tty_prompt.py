@@ -18,7 +18,7 @@ class _Tty(io.StringIO):
 class TestTtyConfirm(unittest.TestCase):
     def setUp(self) -> None:
         self.prompt = TtyPrompt()
-        # The journal record is covered by test_journal.TestPromptAnswers.
+        # The journal record is covered by test_journal_records.TestPromptAnswers.
         patcher = patch("trainmate.prompt._record_answer")
         patcher.start()
         self.addCleanup(patcher.stop)

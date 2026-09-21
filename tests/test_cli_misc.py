@@ -4,13 +4,12 @@ from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
 from trainmate.cli.argparse_ext import _subparser_choices
-from trainmate.util import strip_ansi
+from trainmate.text import strip_ansi
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_cli_misc.db")
 
 from trainmate.db import Database
-import trainmate.db
 import trainmate_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
@@ -284,7 +283,7 @@ class TestCliMisc(unittest.TestCase):
         self.assertTrue(mock_coach.data_bootstrap.call_args[1].get("no_pull"))
 
     @patch("trainmate.runtime.garmin")
-    @patch("trainmate.timeline.build_timeline_payload")
+    @patch("trainmate.timeline_rows.build_timeline_payload")
     def test_progress_renders_end_to_end_from_the_payload(self, mock_build, mock_garmin):
         # Not an alias test — `pr` is prefix resolution, covered in test_cli_dashless.
         # What this pins is the only run_cli path through the progress renderer, which

@@ -61,7 +61,7 @@ which way it runs.
 
 ## §2 — Dimensions intersect, and each resolves to a window
 
-`resolve_window` (trainmate/cli/selectors.py) turns every selector given into a
+`resolve_window` (trainmate/cli/windows.py) turns every selector given into a
 (start, end) pair and **intersects** them: `-m 3 -d 2026-06-10..` is the part of mesocycle 3
 from the 10th onward. Nothing is silently dropped, which the old precedence chain did.
 
@@ -193,8 +193,8 @@ versions arrived later with DESIGN_plan_rollback.md. `-g` was the pre-`-M` spell
 ### Even the macrocycle is the wrong key
 
 What shapes a generated week is the **mesocycle covering those dates**. The rest of the
-app already knew this: `get_active_mesocycle(date)`, `get_next_mesocycle(date)` and
-`get_mesocycle_ranges(start, end)` are all date-keyed, and `workout adapt`, the mesocycle
+app already knew this: `get_active_mesocycle(date)` and `get_mesocycle_ranges(start, end)`
+are both date-keyed, and `workout adapt`, the mesocycle
 progress context, the mesocycle-boundary hint and `workout compare` reach their mesocycles that
 way without naming a goal. Generation was the one command routing through an objective to
 reach mesocycles a date lookup finds directly.
@@ -323,7 +323,7 @@ quietly swallows the days belonging to a goal nobody has planned for. `-g N` now
 to N's own span: the day after the goal before it, whether or not that goal has a plan.
 
 The CLI resolves the goal and the start (`_plan_targets`/`_goal_span_start` in
-trainmate/cli/plans.py) and the service takes `start_date` as a parameter, so the selector
+trainmate/cli/windows.py) and the service takes `start_date` as a parameter, so the selector
 policy stays on the CLI side (§3). The service owns the notice, because only it holds both
 readings: it prints one when the caller's bound and its own derivation disagree, which is
 exactly when the days before the goal were about to be absorbed.

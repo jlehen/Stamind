@@ -355,7 +355,7 @@ The three human actions and their effects are:
 > `--auto` paragraphs below describe revs 1 and 2.
 
 **`--auto` (unattended runs).** `plan generate` already carries an `--auto` flag
-for non-interactive use (plans.py — skips prompts, see [reflect/bootstrap split]
+for non-interactive use (`cli/plans/generate.py` — skips prompts, see [reflect/bootstrap split]
 nudge). The learning-writing commands `data reflect`/`data bootstrap` do **not**
 have one today and would **gain** it, with the same "no prompts" meaning. Under
 `--auto` there is no human to confirm, so **staleness** demotions are **applied
@@ -432,7 +432,7 @@ week) so `# distinct supporting weeks` matches the grandfathered level. `source 
 seeded evidence.
 
 Schema is additive (new table + nullable column), consistent with the in-place
-`ALTER TABLE ... ADD COLUMN` idiom already in `db/base.py`.
+`ALTER TABLE ... ADD COLUMN` idiom already in `db/schema.py`.
 
 ---
 

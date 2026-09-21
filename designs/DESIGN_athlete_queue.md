@@ -548,7 +548,7 @@ item's place in the queue. `tm queue tell` is a terminal command, not a tap.
 
 ## 12. Touch points
 
-- `trainmate/db/base.py`: the `athlete_queue` table. `trainmate/db/queue.py`: queue once per
+- `trainmate/db/schema.py`: the `athlete_queue` table. `trainmate/db/queue.py`: queue once per
   subject, the next item of a walk, close, move to the back, hide until a time, the items
   whose reminder time has passed.
 - `trainmate/athlete_queue.py`: the list of kinds with the `message` kind, the walk (the next
@@ -556,17 +556,19 @@ item's place in the queue. `tm queue tell` is a terminal command, not a tap.
   sending due reminders.
 - `trainmate/prompt.py`: `emit_queue_item` with the `TM-QUEUE` sentinel, the hint in its
   place on a terminal, and the labels of the three later choices.
-- `trainmate_bot.py`: the sentinel sends a new message; a `q:` tap runs `bot queue`, keeps its
+- `trainmate/chat/callbacks.py` and `replies.py`, with the `q:` callback namespace in
+  `trainmate/chat/keyboards.py`:
+  the sentinel sends a new message; a `q:` tap runs `bot queue`, keeps its
   buttons on a busy chat and shows the chosen answer; "Not now" swaps in the three choices;
   each scheduler wake runs `bot queue --remind` when a reminder is due and waits for it
   before the push.
 - `trainmate/cli/queue.py`: `tm queue` (bare runs `list`), `list`, `answer [id]`, `tell`, and
   the hidden `bot queue` with `--remind`, whose parser entry sits with the other `bot`
-  commands in `cli/bot.py`.
-- `trainmate/cli/bot.py`: `run_bot_morning` starts a walk at its end.
-- `trainmate/cli/status.py` and `workout adapt` (`cli/workouts/generate.py`): the hint, beside
+  commands in `cli/bot/parser.py`.
+- `trainmate/cli/bot/views.py`: `run_bot_morning` starts a walk at its end.
+- `trainmate/cli/status.py` and `workout adapt` (`cli/workouts/adapt.py`): the hint, beside
   the end-of-schedule hint.
-- `trainmate/cli/render.py`: the list, the item, reminder and hint renderers, expert and
+- `trainmate/cli/render/`: the list, the item, reminder and hint renderers, expert and
   companion (the companion's hint prints nothing).
 - Tests, with the `message` kind and a question kind defined in the tests: a subject queued
   once, including after a drop; queue order, and "after the others" moving an item to the

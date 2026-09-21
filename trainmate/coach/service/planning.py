@@ -1,303 +1,28 @@
-import json
+"""`plan generate`, `plan apply`, `plan rollback`: the periodization itself.
+
+The macrocycle and its mesocycles — what the months ahead are for, not what any day
+holds. `plan_generate` reads the goals, the constraints and the training behind the
+athlete, asks the model for a strategy, and hands back a proposal that has written
+nothing. `plan_apply` writes it as a new version. `plan_rollback` makes an older version
+current again. The sessions under a plan are `generate.py`.
+
+It is one mixin of :class:`CoachService` — see coach/service/__init__.py.
+"""
 from datetime import datetime, timedelta
-from typing import Any, List, Optional, Tuple, Dict
-from trainmate.config import config
-from trainmate.types import PlanProposal, Workout
-from trainmate.coach.proposals import PlanFingerprints
-from trainmate.adherence import planned_load
-from trainmate.sports import canonical_sport
-from trainmate import signals
+from typing import Any, Dict, List, Optional, Tuple
+
+from trainmate.types import Workout
+from trainmate.clock import today_str as _today_str
+from trainmate.coach.proposals import PlanFingerprints, PlanProposal
 from trainmate.db.periodization import repair_mesocycle_contiguity
-from trainmate.util import (
-    aside, step, cyan, bold, cmd, wrap_text, format_labeled_paragraph, default_wrap_width,
-    notice,
-)
-import trainmate.coach.service as _svc
-
-
-def _banner(title: str, width: int) -> Tuple[str, str]:
-    """The '=== TITLE ===' head line and its matching closing rule, kept inside the
-    wrap width so a narrow client doesn't fold the rule onto a second line."""
-    head = f"=== {title} ===" if len(title) + 8 <= width else wrap_text(title, width)
-    return head, "=" * min(width, max(len(line) for line in head.split("\n")))
-
-
-def _print_prior_training_review(text: str, width: int) -> None:
-    """Shows the planned-vs-actual review that goes to the model as prompt context.
-
-    Printed verbatim: the review now carries column-aligned zone tables already wrapped
-    to their own width, and re-wrapping would shred the alignment
-    (DESIGN_intensity_distribution.md §6)."""
-    head, rule = _banner("PRIOR TRAINING REVIEW (planned vs actual)", width)
-    print(cyan(bold(f"\n{head}")))
-    print(text)
-    print(cyan(bold(f"{rule}\n")))
-
-
-def _print_new_strategy(
-    strategy: str, mesocycles: List[Dict[str, Any]], width: int
-) -> None:
-    """Shows the freshly generated plan for the apply/discard decision.
-
-    Each mesocycle is a head line plus its focus indented underneath, matching
-    `plan show`, rather than one long line the terminal breaks where it likes."""
-    head, rule = _banner("NEW PERIODIZATION STRATEGY (MACROCYCLE)", width)
-    print(cyan(bold(f"\n{head}")))
-    print(format_labeled_paragraph(bold("Overall Strategy:"), strategy, width))
-    print()
-    print(bold("Mesocycles:"))
-    for m in mesocycles:
-        mesocycle_head = wrap_text(
-            f"- {m['name']} ({m['start_date']} to {m['end_date']})", width
-        )
-        print(format_labeled_paragraph(bold(mesocycle_head), m['focus'], width))
-    print(cyan(bold(f"{rule}\n")))
+from trainmate.text import cyan, default_wrap_width, wrap_text
+from trainmate.output import notice, step
 
 
 class PlanningMixin:
-    """Part of :class:`CoachService` — see coach/service/__init__.py."""
-
     def plan_rm(self, objective_id: int) -> None:
         """Deletes the periodization plan for a specific objective."""
         self._db.delete_macrocycle_for_objective(objective_id)
-
-    def _objective_macrocycle_ids(self, objective_id: int) -> List[int]:
-        """Every plan version the goal owns, active and superseded alike.
-
-        Archival works off all of them because a superseded version can still own live
-        sessions (DESIGN_backward_evaluation.md §14)."""
-        return [m['id'] for m in self._db.get_macrocycle_versions(objective_id)]
-
-    def goal_archive(self, objective_id: int) -> Dict[str, Any]:
-        """Stands the goal's future sessions down and clears them from Calendar.
-
-        One void per live session the goal's plan versions own, from today on, under one
-        `stand-down` change — the same row-level `macrocycle_id` scoping that spares a
-        neighbouring goal (DESIGN_workout_revisions.md §10). The plan, its versions and its
-        feedback are untouched: calling a goal off hides it from planning but must not
-        destroy its history (DESIGN_backward_evaluation.md §14). Past sessions stay put —
-        a called-off race does not un-train the work already done.
-
-        Returns {archived_workouts, untagged, first_date, last_date}."""
-        today_str = _svc._today_str()
-        sessions = self._db.live_workouts_for_macrocycles(
-            self._objective_macrocycle_ids(objective_id), today_str
-        )
-        if sessions:
-            with self._db.workout_change(
-                kind="stand-down", summary="Goal called off."
-            ) as change:
-                for w in sessions:
-                    change.void(
-                        date=w['date'], sport_type=w['sport_type'],
-                        reason="Goal called off",
-                    )
-        return {
-            'archived_workouts': len(sessions),
-            'untagged': self._db.count_untagged_future_workouts(today_str),
-            'first_date': min((w['date'] for w in sessions), default=None),
-            'last_date': max((w['date'] for w in sessions), default=None),
-        }
-
-    def goal_reinstate(self, objective_id: int) -> Dict[str, Any]:
-        """Brings back the sessions `goal_archive` stood down, and re-pushes them.
-
-        The mirror of `goal_archive` (DESIGN_backward_evaluation.md §14), read off the live
-        view: every lineage still showing a `stand-down` void gets a copy of the revision
-        that void ended, floored at today, so a goal reinstated months later recovers only
-        the sessions still ahead. A slot regenerated or edited since no longer has that
-        void live and is left alone — something else owns it now
-        (DESIGN_workout_revisions.md §10).
-
-        Returns {restored_workouts, unhonored, first_date, last_date}."""
-        today_str = _svc._today_str()
-        stood_down = self._db.stood_down_sessions(
-            self._objective_macrocycle_ids(objective_id), today_str
-        )
-        if not stood_down:
-            return {
-                'restored_workouts': 0, 'unhonored': [],
-                'first_date': None, 'last_date': None,
-            }
-        with self._db.workout_change(
-            kind="reinstate", summary="Goal reinstated."
-        ) as change:
-            for revision in stood_down:
-                change.restore(revision)
-            appended = list(change.appended)
-        restored = self._db.hydrate_revisions(appended)
-        # As in `plan rollback` (§8): the restored sessions predate any honoring made
-        # while the goal was stood down, so they cannot reflect it.
-        unhonored = self._db.clear_honored_after(
-            max(r['stood_down_at'] for r in stood_down), today_str
-        )
-        return {
-            'restored_workouts': len(restored),
-            'unhonored': unhonored,
-            'first_date': min((w['date'] for w in restored), default=None),
-            'last_date': max((w['date'] for w in restored), default=None),
-        }
-
-    def constraint_plan_impact(self, constraint: Dict[str, Any]) -> Dict[str, Any]:
-        """Magnitude of a directive against the active plan (DESIGN_constraints.md §7,
-        concrete formula): the planned load it displaces, expressed as a percentage of the
-        plan's trailing weekly planned load (a self-scaling ratio — no absolute TSS number
-        rots as the athlete's fitness changes), plus its span in days. The trailing week is
-        the 7 days immediately before the constraint's start, so the reference point isn't
-        itself affected by the constraint being evaluated. Feeds the human-confirmed replan
-        proposal only — never an automatic regen."""
-        start, end = constraint['start_date'], constraint['end_date']
-        window_start = max(start, _svc._today_str())
-        rest = canonical_sport('rest')
-
-        def _load(w_start: str, w_end: str) -> float:
-            sessions = [
-                w for w in self._db.get_workouts(start_date=w_start, end_date=w_end)
-                if canonical_sport(w.get('sport_type', '')) != rest
-            ]
-            return sum(planned_load(w) for w in sessions)
-
-        displaced_load = _load(window_start, end)
-        days = (datetime.strptime(end, "%Y-%m-%d").date()
-                - datetime.strptime(start, "%Y-%m-%d").date()).days + 1
-
-        trailing_end_date = datetime.strptime(start, "%Y-%m-%d").date() - timedelta(days=1)
-        trailing_start_date = trailing_end_date - timedelta(days=6)
-        trailing_weekly_load = _load(
-            trailing_start_date.strftime("%Y-%m-%d"), trailing_end_date.strftime("%Y-%m-%d")
-        )
-        displaced_pct = (
-            (displaced_load / trailing_weekly_load * 100) if trailing_weekly_load > 0 else 0.0
-        )
-        return {
-            'days': days,
-            'displaced_load': displaced_load,
-            'trailing_weekly_load': trailing_weekly_load,
-            'displaced_pct': displaced_pct,
-        }
-
-    def capture_message_constraint(
-        self, candidate: Dict[str, Any], default_date_str: str
-    ) -> Optional[int]:
-        """Creates one durable constraint from a `new_constraints` candidate the CLI has
-        already confirmed with the athlete (DESIGN_constraints.md §8 two-confirmation
-        flow, step 1). Always `source='message'`, always advisory (`rest=0`) — the LLM can
-        never mark an extracted constraint as a deterministic rest window (trust boundary
-        §8); a genuine rest escalation is a deliberate human action (`constraint edit <id>
-        --rest`). Never sets `replan=1` either — a large capture only *surfaces a
-        suggestion* to escalate, which the human acts on separately."""
-        title = (candidate.get('title') or '').strip()
-        if not title:
-            return None
-        start = candidate.get('start_date') or default_date_str
-        end = candidate.get('end_date') or start
-        if end < start:
-            end = start
-        cid = self._db.add_constraint(
-            title=title, start_date=start, end_date=end, rest=0,
-            description=candidate.get('description'), replan=0, source='message',
-        )
-        constraint = self._db.get_constraint(cid)
-        impact = self.constraint_plan_impact(constraint)
-        if self.constraint_is_plan_shaping(constraint, impact):
-            # Through the renderer, because the escalation this names is the operator's
-            # typed work: in companion chat the same fact is said without commands, and
-            # the plan-adjusting tap is the offer the capture ends on
-            # (DESIGN_bot_simple_frontend.md §12.10).
-            from trainmate import runtime
-            runtime.render.constraint_plan_shaping(cid, impact)
-        return cid
-
-    def known_signal_metrics(self) -> List[str]:
-        """`signals.known_metrics` for this instance's config and history (§5)."""
-        return signals.known_metrics(config.signal_metrics, self._db.list_signal_metrics())
-
-    def capture_message_signal(
-        self, candidate: Dict[str, Any], default_date_str: str,
-        metric_override: Optional[str] = None
-    ) -> List[dict]:
-        """Creates the daily-signal rows for one `new_signals` candidate the CLI has
-        already confirmed with the athlete (DESIGN_signal_extraction.md §2).
-
-        `metric_override` is the category the athlete settled on, which may differ from the
-        one the model proposed (§6). A `value` that is not a number is dropped rather than
-        coerced: the model may only pass through a number the note stated, and a fabricated
-        one would enter the quantitative path as a measurement (§3).
-        """
-        metric = signals.normalize_metric(metric_override or candidate.get("metric"))
-        if not metric:
-            return []
-        start = candidate.get("date") or default_date_str
-        end = candidate.get("end_date") or start
-        if end < start:
-            end = start
-        value = candidate.get("value")
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            value = None
-        text = signals.signal_summary(metric, value, str(candidate.get("text") or "").strip())
-        return signals.write_signal_days(start, end, metric, value, text)
-
-    @staticmethod
-    def constraint_is_plan_shaping(
-        constraint: Dict[str, Any], impact: Dict[str, Any]
-    ) -> bool:
-        """Concrete §7 magnitude heuristic for whether to *propose* a replan. Two
-        independent triggers, either firing proposes a replan; deliberately no
-        per-session "importance" term (TrainMate has no priority field at all):
-
-        1. Displaced-load trigger (relative): the constraint's overlapping planned load
-           is >= config.replan_displaced_load_pct of the plan's trailing weekly planned
-           load (default 50 — wipes out at least half a typical week).
-        2. Rest-window floor: the constraint is a `rest` window spanning >= config.
-           replan_rest_span_days days (default 3), regardless of load overlap (it may
-           land in a light taper week yet still reshape everything after it).
-        """
-        if impact['displaced_pct'] >= config.replan_displaced_load_pct:
-            return True
-        if (
-            constraint.get('rest')
-            and impact['days'] >= config.replan_rest_span_days
-        ):
-            return True
-        return False
-
-    def _changed_inputs_text(
-        self, macro: Optional[Dict[str, Any]]
-    ) -> Optional[str]:
-        """The staleness reason and its diff for the plan being replaced, or None when
-        there is no plan, or it was current (DESIGN_plan_change_continuity.md §6.2)."""
-        if not macro:
-            return None
-        change_reason = self.config_changed(macro)
-        if not change_reason:
-            return None
-        diff = self.staleness_diff(macro)
-        return f"{change_reason}\n\n{diff}" if diff else change_reason
-
-    def plan_reshape_verdict(
-        self, macro: Dict[str, Any], change_reason: str,
-    ) -> Optional[Dict[str, Any]]:
-        """The verdict call's read on whether `change_reason` would have reshaped `macro`:
-        {"reshaping": bool, "why": str}, or None when no verdict could be had. Fails open
-        on purpose — the staleness question must never hang on the network, so any error
-        or malformed reply leaves the athlete with the question and no verdict (§10)."""
-        from trainmate.openrouter import openrouter_client
-        if getattr(openrouter_client, "show_prompt_only", False):
-            # That flag shows the command's own prompt; this preliminary would print
-            # its prompt instead and exit before the one being asked for.
-            return None
-        try:
-            verdict = self.engine._plan_reshape_verdict(
-                change_reason, self.staleness_diff(macro), macro.get('strategy') or "",
-                self._db.get_mesocycles_for_macrocycle(macro['id']),
-            )
-        except Exception as e:
-            aside(f"Could not get the coach's read on this change: {e}")
-            return None
-        reshaping = verdict.get('reshaping') if isinstance(verdict, dict) else None
-        if not isinstance(reshaping, bool):
-            return None
-        return {'reshaping': reshaping, 'why': str(verdict.get('why') or "").strip()}
 
     def plan_generate(
         self, force: bool = False, objective_id: Optional[int] = None,
@@ -333,15 +58,18 @@ class PlanningMixin:
         else:
             next_goal = self._db.get_active_objective()
             if not next_goal:
+                # `goal: None` is the caller's signal that there was nothing to plan
+                # for, and `strategy` carries the reason rather than a strategy.
                 return {
                     'strategy': (
                         "No active goals found. TrainMate needs at least one objective."
                     ),
                     'mesocycles': [], 'reused': False, 'goal': None,
+                    'prior_training_review': None, 'has_prior_training': False,
                 }
 
         # Compute plan-window dates (constraints are fetched below with the hashes).
-        today_str = _svc._today_str()
+        today_str = _today_str()
         today_date = datetime.strptime(today_str, "%Y-%m-%d").date()
 
         # Determine plan start date based on preceding goals with plans
@@ -400,34 +128,15 @@ class PlanningMixin:
             )
 
         # Compute current hashes
-        # We need to fetch active objectives for hash computation so the hash covers the whole landscape
+        # We need to fetch active objectives for hash computation so the hash
+        # covers the whole landscape
         objectives = self._db.upcoming_objectives()
-        # All active constraints feed the plan prompt; only the plan-shaping (replan=1)
-        # ones fingerprint the plan and are snapshotted, so a tactical "no run Thursday"
-        # never trips the reuse-vs-regen decision (DESIGN_constraints.md §7).
         constraints = self._db.get_constraints(today_str)
-        replan_constraints = [c for c in constraints if c.get('replan')]
         # Fingerprint the inputs the strategy is about to be generated against, and carry
         # them to `plan_apply` verbatim. Re-deriving at accept time meant an edit made
         # between generating and accepting was recorded as if the strategy had seen it,
         # which silently defeats the staleness detector (see coach/proposals.py).
-        goals_hash = self.engine._get_goals_hash(objectives)
-        constraints_hash = self.engine._get_constraints_hash(replan_constraints)
-        fingerprints = PlanFingerprints(
-            goals_hash=goals_hash,
-            constraints_hash=constraints_hash,
-            config_hash=self.engine._get_config_hash(),
-            config_snapshot=self._get_config_snapshot(),
-            profile_snapshot=self._get_profile_snapshot(),
-            goals_snapshot=json.dumps(self.engine._clean_goals(objectives)),
-            constraints_snapshot=json.dumps(
-                self.engine._clean_constraints(replan_constraints)
-            ),
-            all_constraints_snapshot=json.dumps(
-                self.engine._clean_constraints_all(constraints)
-            ),
-            science_snapshot=self._get_science_snapshot(),
-        )
+        fingerprints = self.plan_fingerprints(objectives, constraints)
 
         # Try to retrieve existing macrocycle
         strategy = ""
@@ -444,10 +153,12 @@ class PlanningMixin:
         )
 
         reused = False
+        prior_training_review = None
+        has_prior_training = False
         if existing_macro and not force and not pending_feedback:
             if (
-                existing_macro['goals_hash'] == goals_hash
-                and existing_macro['constraints_hash'] == constraints_hash
+                existing_macro['goals_hash'] == fingerprints.goals_hash
+                and existing_macro['constraints_hash'] == fingerprints.constraints_hash
                 and self.config_changed(existing_macro) is None
             ):
                 reused = True
@@ -467,19 +178,11 @@ class PlanningMixin:
             # `fresh` withholds only this mesocycle: `prev_macro` still reaches the
             # planned-vs-actual review below, which is what the athlete trained, not the
             # intent they are departing from.
-            prev_strategy_text = None
+            previous_plan = None
             if prev_macro and not fresh:
-                prev_mesos = self._db.get_mesocycles_for_macrocycle(prev_macro['id'])
-                prev_meso_text = ""
-                for m in prev_mesos:
-                    prev_meso_text += (
-                        f"  - {m['name']} ({m['start_date']} to {m['end_date']}): "
-                        f"{m['focus']}\n"
-                    )
-                prev_strategy_text = (
-                    "## PREVIOUS PERIODIZATION STRATEGY (FOR CONTEXT)\n"
-                    f"- Overall Strategy: {prev_macro['strategy']}\n"
-                    f"- Mesocycles:\n{prev_meso_text or '  - None\n'}"
+                previous_plan = (
+                    prev_macro['strategy'],
+                    self._db.get_mesocycles_for_macrocycle(prev_macro['id']),
                 )
 
             # The mesocycle the athlete is mid-way through, offered so the new plan may let it
@@ -530,6 +233,7 @@ class PlanningMixin:
             prior_training_text = self._build_prior_training_context(
                 [preceding_macro, prev_macro], today_str
             )
+            has_prior_training = bool(prior_training_text)
             if prior_training_text and show_context:
                 # Rebuilt at the caller's own width rather than re-wrapping the prompt
                 # copy: the zone tables are column-aligned, so re-wrapping them (as
@@ -537,16 +241,9 @@ class PlanningMixin:
                 # instead of fitting them (DESIGN_intensity_distribution.md §6). Built
                 # only when it will be shown — off the flag it is a second full pass
                 # over the same plans for nothing (DESIGN_output_verbosity.md §7).
-                prior_training_display = self._build_prior_training_context(
+                prior_training_review = self._build_prior_training_context(
                     [preceding_macro, prev_macro], today_str, width=width,
                 )
-                _print_prior_training_review(prior_training_display, width)
-            elif prior_training_text:
-                aside(wrap_text(
-                    "A planned-vs-actual review of your past plans is feeding this "
-                    f"strategy. Pass {cmd('--show-llm-context')} to read what the coach "
-                    "is being shown."
-                ))
             self._maybe_warn_stale_analysis(today_str)
             macro_data = self.engine._plan_generate_strategy(
                 next_goal=next_goal,
@@ -555,7 +252,7 @@ class PlanningMixin:
                 today_str=today_str,
                 guidelines=guidelines,
                 profile=profile,
-                previous_strategy_text=prev_strategy_text,
+                previous_plan=previous_plan,
                 plan_start_str=plan_start_str,
                 athlete_feedback=feedback_text,
                 history_summary=history_summary,
@@ -568,8 +265,6 @@ class PlanningMixin:
             strategy = macro_data.get("strategy", "Endurance preparation strategy.")
             mesocycles = macro_data.get("mesocycles", [])
 
-            _print_new_strategy(strategy, mesocycles, width)
-
             if auto_apply:
                 self.plan_apply(
                     next_goal['id'], strategy, mesocycles, fingerprints=fingerprints
@@ -579,6 +274,11 @@ class PlanningMixin:
         return {
             'strategy': strategy, 'mesocycles': mesocycles, 'reused': reused,
             'goal': next_goal, 'fingerprints': fingerprints,
+            # What the caller may show: the planned-vs-actual review laid out at its
+            # width when it asked for it, and whether one fed the prompt at all — the
+            # flag that would reveal it is the CLI's, so the offer to pass it is too.
+            'prior_training_review': prior_training_review,
+            'has_prior_training': has_prior_training,
         }
 
     def plan_apply(
@@ -604,24 +304,9 @@ class PlanningMixin:
             notice(f"Note: mesocycle dates repaired — {note}.")
 
         if fingerprints is None:
-            today_str = _svc._today_str()
-            objectives = self._db.upcoming_objectives()
-            constraints = self._db.get_constraints(today_str)
-            replan_constraints = [c for c in constraints if c.get('replan')]
-            fingerprints = PlanFingerprints(
-                goals_hash=self.engine._get_goals_hash(objectives),
-                constraints_hash=self.engine._get_constraints_hash(replan_constraints),
-                config_hash=self.engine._get_config_hash(),
-                config_snapshot=self._get_config_snapshot(),
-                profile_snapshot=self._get_profile_snapshot(),
-                goals_snapshot=json.dumps(self.engine._clean_goals(objectives)),
-                constraints_snapshot=json.dumps(
-                    self.engine._clean_constraints(replan_constraints)
-                ),
-                all_constraints_snapshot=json.dumps(
-                    self.engine._clean_constraints_all(constraints)
-                ),
-                science_snapshot=self._get_science_snapshot(),
+            fingerprints = self.plan_fingerprints(
+                self._db.upcoming_objectives(),
+                self._db.get_constraints(_today_str()),
             )
 
         self._db.save_macrocycle(
@@ -684,7 +369,7 @@ class PlanningMixin:
                     "back to."
                 )
 
-        today_str = _svc._today_str()
+        today_str = _today_str()
 
         # 1. Flip the active version so date->plan lookups resolve to the restored plan.
         self._db.set_active_macrocycle(target['id'])

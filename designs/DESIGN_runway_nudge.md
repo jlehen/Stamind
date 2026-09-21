@@ -37,7 +37,7 @@ Parts of this already exist, scattered by surface rather than by fact:
   which command was typed. §3 folds it into the detector rather than adding a second
   hint beside it.
 - `progress` renders a **plan-gap banner** ("plan generated through X, N weeks before the
-  next objective") from `progression.plan_gap`, and a **plan-lapsed** empty state — but only
+  next objective") from `runway.plan_gap`, and a **plan-lapsed** empty state — but only
   when the athlete happens to run `progress` (DESIGN_progress_timeline.md §3).
 - The daily touchpoints — `workout adapt`, `status`, the bot's morning push — say nothing.
   Worse, two of them actively mislead once the schedule is exhausted: the morning push
@@ -52,14 +52,14 @@ compute the fact once, surface it where the athlete already is, name the exact c
 
 ## 2. One detector, many wordings
 
-`progression.runway()` becomes the single source, beside `plan_gap` and following its
+`runway.runway()` becomes the single source, beside `plan_gap` and following its
 contract: pure over rows the caller fetched, returning a small structured result each
 surface words itself (DESIGN_progress_timeline.md §6.0 — computing once keeps surfaces
 from diverging on *when* it fires or *by how much*).
 
 Inputs: today, the workouts from today forward, the mesocycles of the active macrocycle,
 the active objectives, and `config.runway_warning_days` (§7). **Rest rows count**, as they
-do in `progression.plan_end` (progression.py): a planned rest day is a row like any other
+do in `runway.plan_end` (analytics/runway.py): a planned rest day is a row like any other
 (§2.1), so the last covered date is read off the rows directly — no margin, no guessing
 whether a quiet tail is a taper or a hole.
 
@@ -71,8 +71,8 @@ Output: `None` when nothing fires, else:
 - for `mesocycle`: the next mesocycle's id, so every surface can name `-m ..<id>`;
 - for `span`: the periodization end date, so the wording can say how much plan is left;
 - for `plan_end_next_goal`: the objective — via `plan_gap`, **fed the mesocycle-derived
-  plan end**, not `progression.plan_end`. The two differ exactly when the detector
-  fires: `progression.plan_end` is the last *row* (right for the progress banner, which
+  plan end**, not `runway.plan_end`. The two differ exactly when the detector
+  fires: `runway.plan_end` is the last *row* (right for the progress banner, which
   asks "do the workouts reach the goal?"), while classification here asks "does the
   *periodization* reach a goal?" — a span cliff must not read as a goal gap. (`plan_end` is
   itself a misnomer by the project vocabulary — the plan is the periodization, never the
@@ -86,11 +86,11 @@ Classification is an exact comparison, and it can be because generation covers e
 date of its span: a planned rest day is written as an explicit rest row, never a hole.
 This is already the model's behavior — the response schema names "Rest Day" as a title,
 `adapt` already has the rule ("an omitted date keeps the plan; an absent row and an
-explicit rest day mean different things", `coach/engine/workouts.py`), and the live data
+explicit rest day mean different things", `coach/engine/adapt.py`), and the live data
 confirms it (every date of the current plan holds a row, taper rest included). This
 design promotes the behavior to an invariant: one sentence in the generate task stating
 it, and a deterministic backstop that fills any hole the model leaves with the existing
-`_rest_workout` factory (`coach/service/workouts.py` — the same factory the rest-window
+`_rest_workout` factory (`coach/service/guards.py` — the same factory the rest-window
 pre-pass uses), so the invariant holds by construction, not by model compliance.
 
 The earlier draft carried a "rest-tail margin" here (reusing `adapt_terminal_window_days`
@@ -211,8 +211,9 @@ the §4 hints arrive the moment the CLI prints them. Byte-parity preserved, noth
 
 The athlete never types commands, so the suggestion must become a button or prose — and
 per the standing split, the CLI owns *what* to offer, the bot only renders
-(`trainmate/cli/bot.py::MORNING_BUTTONS` defines the rows; `trainmate_bot.py` renders
-them and maps the taps — the offer spans both files). `bot morning` grows one conditional
+(`trainmate/cli/bot/views.py::MORNING_BUTTONS` defines the rows;
+`trainmate/chat/keyboards.py` renders them and maps the taps — the offer spans
+both files). `bot morning` grows one conditional
 line, inside its existing per-day idempotent push.
 
 **Span and mesocycle cliffs — a line and a one-tap fix.** This **amends

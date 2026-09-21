@@ -35,7 +35,7 @@ import sys
 # so the package root has to be put on the path explicitly.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from trainmate.db import db
+from trainmate import runtime
 from trainmate.sports import canonical_sport
 
 # (table, column, is the column a comma-separated list?)
@@ -69,7 +69,7 @@ def collect():
     """Every row whose stored value is not already canonical, as
     (table, column, rowid, old, new)."""
     pending = []
-    with db._get_connection() as conn:
+    with runtime.db._get_connection() as conn:
         for table, column, multi in TARGETS:
             for row in conn.execute(f"SELECT id, {column} AS v FROM {table}"):
                 old = row["v"]
@@ -102,7 +102,7 @@ def main() -> int:
             print("Aborted.")
             return 1
 
-    with db._get_connection() as conn:
+    with runtime.db._get_connection() as conn:
         cursor = conn.cursor()
         for table, column, rowid, _old, new in pending:
             cursor.execute(

@@ -159,7 +159,7 @@ off the end.
 ## 6. Freshness — the signature has to see the lineage
 
 `pushed_signature` is a hash of exactly the fields that determine the rendered event
-(`calendar_state.CALENDAR_FIELDS`), and an event is re-pushed when the hash moves. The
+(`workout_state.CALENDAR_FIELDS`), and an event is re-pushed when the hash moves. The
 description now depends on the whole lineage, so the hash has to move whenever the lineage
 grows.
 
@@ -225,16 +225,16 @@ one more entry gives way to it rather than the other way round.
 - a moved session's history names both the destination and the vacated date;
 - a void entry prints no `Duration:` and no `Target:`;
 - a `Change:` line appears only when the change summary differs from the revision's reason;
-- appending a revision marks the event stale — the rule spans `db/workouts.py` and
-  `calendar_state.py`, so the test spans them too (AGENTS.md);
+- appending a revision marks the event stale — the rule spans `db/workout_change.py` and
+  `workout_state.py`, so the test spans them too (AGENTS.md);
 - a lineage past the budget renders the newest entries plus the count of what was dropped,
   and stays inside the budget.
 
 ## 9. Deliberately not done
 
-- **The web UI keeps its one-line `Originally:`.** `static/app.js` renders a card, not a
-  document, and the terminal already has `workout batches` for history. If the card should
-  grow a history it should grow a collapsible one, which is its own change.
+- **The web UI keeps its one-line `Originally:`.** `static/workouts.js` renders a card,
+  not a document, and the terminal already has `workout batches` for history. If the
+  card should grow a history it should grow a collapsible one, which is its own change.
 - **No per-entry diff.** An entry states what the session *was*, not what changed against
   its predecessor. A diff would need a vocabulary for every field, and reading two adjacent
   entries answers the same question.

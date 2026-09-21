@@ -257,7 +257,7 @@ last because body weight is not stored (§8).
 
 A shipped, static table maps every exercise TrainMate knows about to one **movement
 pattern** and one **equipment** class. It ships with the code, like the zone tables in
-`garmin/load.py`; nobody configures it. Garmin's category/name pairs are aliases into it,
+`analytics/load.py`; nobody configures it. Garmin's category/name pairs are aliases into it,
 and so are the plain-English names the athlete or the coach use.
 
 Garmin's exercise vocabulary is finite and public. The table maps **all of it** at
@@ -1398,9 +1398,9 @@ kinds with the model-backed "Something else…", `strength name`, `strength rese
 `workout compare` / "Done lately" with their name source and the "sets not read yet"
 line — both of which rendered a strength activity as duration, load and RPE only
 (`cli/common.py::format_actual`,
-`cli/render.py::simple_compare_lines`). At the end of it TrainMate knows what the athlete
-lifts and the coach does not use it yet. Deliberately boring, so it can be checked against
-reality before anything depends on it.
+`cli/render/session_lines.py::simple_compare_lines`). At the end of it TrainMate knows
+what the athlete lifts and the coach does not use it yet. Deliberately boring, so it can
+be checked against reality before anything depends on it.
 
 It amended two implemented designs. DESIGN_athlete_queue.md: its list of kinds (§8) gained
 `sets_final` and `set_names`, and its §4 the rule that an answer whose kind did not apply it
@@ -1421,9 +1421,10 @@ or not a session is planned today, then the set-reading step, then its walk.
    `restore` carrying the sets, and the description split at its seam when a strength
    session is shown to the week planner (§9).
 4. The strength science, `trainmate/strength/progression.md` (§10).
-5. The strength planner, `trainmate/strength/planner.py`: the brief instruction in the week
-   planner's TASK, its own prompt, the checks on its output, the comparison and the evidence
-   rule for a kept session, and its place in `workout_generate` and `workout_adapt` (§9).
+5. The strength planner, `trainmate/strength/planner.py` with its prompt and reply checks in
+   `trainmate/strength/planner_prompt.py`: the brief instruction in the week planner's TASK,
+   its own prompt, the checks on its output, the comparison and the evidence rule for a kept
+   session, and its place in `workout_generate` and `workout_adapt` (§9).
 6. The exercise lines in the `workout generate` preview (§9).
 
 Three implemented designs are amended when it lands. DESIGN_workout_revisions.md: a revision
@@ -1599,7 +1600,7 @@ build: every brief is new, so every session is written again (§9).
    a trio, a circuit, two exercises done one after the other, and an unnamed set inside a
    run. A test on the marks: a day with two activities marks the one that holds the most
    prescribed exercises and leaves the other bare.
-3. The strength planner's prompt in `planner.py` (§9). The sentence "Nothing else decides
+3. The strength planner's prompt in `planner_prompt.py` (§9). The sentence "Nothing else decides
    the content" goes. `### CHOOSING THE EXERCISES` opens with the rule: start from the most
    comparable session as done, change only what the brief, the duration, the equipment or
    the progression asks for, size the session to what the athlete fits in the time, and
@@ -1607,7 +1608,7 @@ build: every brief is new, so every session is written again (§9).
    sentence says that alternating two exercises keeps the rest between two sets of the same
    one. `### THE NOTES` gains the alternation and the sentence for a new exercise. The line
    under SESSIONS TO CHECK names the second and the third ground for a change, and a session
-   to check whose brief or duration moved, which `_moved_on` already knows, prints a line
+   to check whose brief or duration moved, which `Session.moved_on` already knows, prints a line
    that says so. One region more for `tests/test_prompt_gates.py`.
 4. docs/ARCHITECTURE.md: the history's second section and the two keys.
 
@@ -1762,6 +1763,17 @@ Open:
   reps or fewer, named as the floor it is, and never competing with a tested max. It needs a
   home of its own, because the benchmark logbook assumes one number per kind of test in
   about ten places.
+- e1RM as a benchmark anchor. It is Tuesday, and the athlete records a squat e1RM 8% above
+  the last one. `benchmark record` prints "run `plan generate`", because its band check
+  reads every anchor kind alike. `plan show` never calls the plan stale for that number:
+  `_threshold_reasons` skips `e1rm` on purpose, so that a squat PR cannot invalidate a
+  periodization (DESIGN_intensity_distribution.md §10). So the athlete is told to do
+  something the rest of the app says is not needed. Making the two checks agree is the small
+  fix. What is wanted is bigger: e1RM dropped from the benchmark anchors altogether. The
+  Decided list above keeps `e1rm` in the logbook because this design does not touch the
+  logbook, not because the anchor is settled. Dropping it needs a design of its own, and that
+  design has to say where a lift's progress is read instead — the progress-view entry above.
+  Not done.
 - The strength test. When an athlete has a strength goal, a mesocycle's boundary week has to
   choose between the FTP test and a strength test, and the shipped benchmark science's
   strength entry ("1RM test, or e1RM from a set near failure") needs a protocol the watch

@@ -11,14 +11,16 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import athlete_queue, clock, runtime
 from trainmate.athlete_queue import ANSWERED, DROP, DROPPED, MESSAGE, SKIP, STALE
-from trainmate.cli.selectors import add_selector_args, has_selector, resolve_window
-from trainmate.prompt import (
-    QUEUE_LATER_BACK, QUEUE_LATER_CHOICES, QUEUE_LATER_DAY, QUEUE_LATER_HOUR,
-    QUEUE_NOT_NOW, Choice, emit_queue_item, is_json_frontend,
+from trainmate.cli.selectors import add_selector_args
+from trainmate.cli.windows import has_selector, resolve_window
+from trainmate.prompt import Choice
+from trainmate.sentinels import emit_queue_item, is_json_frontend
+from trainmate.athlete_queue import (
+    QUEUE_LATER_BACK, QUEUE_LATER_CHOICES, QUEUE_LATER_DAY, QUEUE_LATER_HOUR, QUEUE_NOT_NOW,
 )
-from trainmate.util import (
-    bold, cmd, cyan, fmt_span, fmt_timestamp, gray, notice, red, wrap_text,
-)
+from trainmate.text import bold, capitalized, cmd, cyan, gray, red, wrap_text
+from trainmate.output import notice
+from trainmate.clock import fmt_span, fmt_timestamp
 
 QUEUE_DONE_LINE = "That's all for now — thanks!"
 QUEUE_SETTLED_LINE = "Already settled — thanks!"
@@ -131,7 +133,8 @@ def _closed_day(item: Dict[str, Any]) -> str:
 
 
 def _button_label(text: str) -> str:
-    return text[:1].upper() + text[1:]
+    """An answer as it reads on a chat button."""
+    return capitalized(text)
 
 
 def queue_buttons(item: Dict[str, Any], skip: bool) -> List[dict]:

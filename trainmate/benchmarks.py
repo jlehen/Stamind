@@ -65,6 +65,17 @@ SPORT_ANCHORS: Dict[str, List[str]] = {
 }
 
 
+def label_for_kind(kind: str) -> str:
+    """What to call an anchor kind on screen, falling back to the kind itself.
+
+    A logbook row can carry a kind this build does not know — an older TrainMate
+    wrote it, or the athlete recorded one by hand. Five surfaces wrote this fallback
+    out for themselves, and one of them called the lookup twice to do it.
+    """
+    anchor = ANCHOR_KINDS.get(kind)
+    return anchor.label if anchor else kind
+
+
 def anchor_for_kind(kind: str) -> Optional[AnchorKind]:
     """The AnchorKind for `kind`, or None if unknown."""
     return ANCHOR_KINDS.get(kind)

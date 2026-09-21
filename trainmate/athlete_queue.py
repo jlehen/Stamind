@@ -9,9 +9,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from trainmate import clock, runtime
 from trainmate.db.queue import queue_stamp
-from trainmate.prompt import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
 # Re-exported: what a feature needs lives in queue_kind, so a feature can queue items
 # without importing the list of kinds that imports it.
+from trainmate.text import capitalized
 from trainmate.queue_kind import (  # noqa: F401
     ANSWERED, DROPPED, MESSAGE, QUESTION, STALE, Kind, NotApplied, queue,
 )
@@ -19,10 +19,28 @@ from trainmate.learning_doubts import LEARNING_KIND
 from trainmate.strength.questions import SET_NAMES_KIND, SETS_FINAL_KIND
 
 # The action codes a chooser returns and a button carries (§6.2). An answer is `a<n>`, the
-# n-th answer stored with the item. The three "later" codes live in trainmate.prompt, where
-# the bot reads them too.
+# n-th answer stored with the item.
 DROP = "d"
 SKIP = "s"
+
+# The "later" choices of a queued item: action code, words, and the emoji a chat button
+# adds. One definition for the terminal's chooser and the bot's "Not now" row, which the bot
+# swaps in from the tap itself (DESIGN_athlete_queue.md §6.4).
+QUEUE_LATER_HOUR = "h"
+QUEUE_LATER_DAY = "t"
+QUEUE_LATER_BACK = "b"
+QUEUE_NOT_NOW = "n"
+QUEUE_LATER_CHOICES = (
+    (QUEUE_LATER_HOUR, "in 1 hour", "⏰"),
+    (QUEUE_LATER_DAY, "in 1 day", "⏰"),
+    (QUEUE_LATER_BACK, "after the others", "↩️"),
+)
+
+
+def queue_later_label(words: str, emoji: str) -> str:
+    """A "later" choice as a chat button: '⏰ In 1 hour'."""
+    return f"{emoji} {capitalized(words)}"
+
 
 # A message is a question whose only answer is "got it", and it has no drop (§4).
 MESSAGE_ANSWERS = ({"label": "got it"},)

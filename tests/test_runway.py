@@ -1,7 +1,7 @@
 """End-of-runway nudges (DESIGN_runway_nudge.md): the pure detector, the wordings each
 surface draws, and the surfaces themselves.
 
-The detector half needs no database — `progression.runway` is row-in, like `plan_gap`.
+The detector half needs no database — `analytics.runway.runway` is row-in, like `plan_gap`.
 The surface half drives the real CLI against a temp database, because the point of the
 design is that `workout adapt`, `status`, `workout list` and the morning push cannot
 answer the same morning differently (§3).
@@ -20,24 +20,26 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_trainmate_runway.db")
 
 from trainmate.db import Database
-import trainmate.db
 import trainmate_cli  # noqa: F401  (re-exports the workout handlers)
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate import progression, runtime  # noqa: E402
-from trainmate.cli import render as render_cli, runway as runway_cli  # noqa: E402
+from trainmate import runtime  # noqa: E402
+from trainmate.cli import runway as runway_cli  # noqa: E402
+from trainmate.cli.render import plan_lines as render_plan  # noqa: E402
 from trainmate.cli.workouts import generate as generate_cli  # noqa: E402
-from trainmate.cli.bot import MORNING_MARKER  # noqa: E402
+from trainmate.cli.bot.views import MORNING_MARKER  # noqa: E402
 from trainmate.config import config  # noqa: E402
-from trainmate.cli.render import SPORT_EMOJI, SIMPLE_PASSED_LINE  # noqa: E402
+from trainmate.cli.render.plan_lines import SIMPLE_PASSED_LINE  # noqa: E402
+from trainmate.cli.render.session_lines import SPORT_EMOJI  # noqa: E402
 from trainmate.cli.runway import RUNWAY_BUTTON_LABEL  # noqa: E402
-from trainmate.prompt import BUTTONS_SENTINEL  # noqa: E402
-from trainmate.progression import (  # noqa: E402
+from trainmate.sentinels import BUTTONS_SENTINEL
+from trainmate.analytics.runway import (  # noqa: E402
     RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_PLAN_END_NO_GOAL, RUNWAY_SPAN,
+    plan_end, runway,
 )
-from trainmate.util import today_str  # noqa: E402
+from trainmate.clock import today_str
 
 TODAY = "2026-08-31"
 WARN = 7
@@ -75,11 +77,22 @@ def _goal(offset: int, title="Klausenpass", status="active"):
     return {"id": 9, "title": title, "target_date": _d(offset), "status": status}
 
 
+class PlanEndTest(unittest.TestCase):
+    """`plan_end` over `plan_dates` — which rows the schedule is judged to cover (§2.1)."""
+
+    def test_the_last_non_removed_workout_ends_the_plan(self):
+        workouts = [_w(2), _w(9, removed=True), _w(5, sport_type="rest")]
+        self.assertEqual(plan_end(workouts), _d(5))
+
+    def test_none_when_no_non_removed_workouts(self):
+        self.assertIsNone(plan_end([_w(2, removed=True)]))
+
+
 class RunwayDetectorTest(unittest.TestCase):
-    """`progression.runway` — when it fires and what it classifies (§2)."""
+    """`analytics.runway.runway` — when it fires and what it classifies (§2)."""
 
     def _run(self, workouts, mesocycles, objectives=(), today=TODAY, warn=WARN):
-        return progression.runway(
+        return runway(
             list(workouts), list(mesocycles), list(objectives), today, warn
         )
 
@@ -189,7 +202,7 @@ class RunwayWordingTest(unittest.TestCase):
         ]
 
     def test_mesocycle_cliff_names_the_next_mesocycle_by_id(self):
-        state = progression.runway(
+        state = runway(
             [_w(4)],
             [_meso(-30, 4, meso_id=6), _meso(5, 45, meso_id=7)],
             [], TODAY, WARN,
@@ -200,24 +213,24 @@ class RunwayWordingTest(unittest.TestCase):
         self.assertIn("workout generate -m ..7", second)
 
     def test_day_zero_never_reads_in_zero_days(self):
-        state = progression.runway([_w(0)], [_meso(-30, 45)], [], TODAY, WARN)
+        state = runway([_w(0)], [_meso(-30, 45)], [], TODAY, WARN)
         first, _ = self._lines(state)
         self.assertIn("Scheduled workouts run out today.", first)
         self.assertNotIn("0 day(s)", first)
 
     def test_a_passed_cliff_reads_in_the_past_tense(self):
-        state = progression.runway([_w(-3)], [_meso(-60, 45)], [], TODAY, WARN)
+        state = runway([_w(-3)], [_meso(-60, 45)], [], TODAY, WARN)
         first, _ = self._lines(state)
         self.assertIn("Scheduled workouts ran out 3 day(s) ago", first)
 
     def test_span_cliff_says_how_much_plan_is_left(self):
-        state = progression.runway([_w(4)], [_meso(-30, 45)], [], TODAY, WARN)
+        state = runway([_w(4)], [_meso(-30, 45)], [], TODAY, WARN)
         _, second = self._lines(state)
         self.assertIn("Your plan covers 6 more weeks", second)
         self.assertIn("'workout generate'", second)
 
     def test_plan_cliff_with_a_goal_names_it_and_the_goal_flag(self):
-        state = progression.runway(
+        state = runway(
             [_w(5)], [_meso(-30, 5)], [_goal(60, title="Klausen")], TODAY, WARN
         )
         first, second = self._lines(state)
@@ -226,7 +239,7 @@ class RunwayWordingTest(unittest.TestCase):
         self.assertIn("'workout generate -g'", second)
 
     def test_plan_cliff_with_nothing_after_it_asks_for_a_goal_first(self):
-        state = progression.runway([_w(5)], [_meso(-30, 5)], [], TODAY, WARN)
+        state = runway([_w(5)], [_meso(-30, 5)], [], TODAY, WARN)
         first, second = self._lines(state)
         self.assertIn("nothing is planned beyond it", first)
         self.assertIn("'goal add'", second)
@@ -237,23 +250,23 @@ class SimpleRunwayWordingTest(unittest.TestCase):
     """The companion wordings the morning push draws instead of the hint (§6)."""
 
     def test_a_span_cliff_offers_to_plan_the_next_weeks(self):
-        state = progression.runway([_w(4)], [_meso(-30, 45)], [], TODAY, WARN)
-        line = render_cli.simple_runway_lines(state, TODAY)[0]
+        state = runway([_w(4)], [_meso(-30, 45)], [], TODAY, WARN)
+        line = render_plan.simple_runway_lines(state, TODAY)[0]
         self.assertIn("your schedule runs out in 4 days", line)
         self.assertIn("Want me to plan the next few weeks?", line)
 
     def test_a_plan_cliff_celebrates_and_points_at_the_computer(self):
-        state = progression.runway([_w(5)], [_meso(-30, 5)], [], TODAY, WARN)
-        line = render_cli.simple_runway_lines(state, TODAY)[0]
+        state = runway([_w(5)], [_meso(-30, 5)], [], TODAY, WARN)
+        line = render_plan.simple_runway_lines(state, TODAY)[0]
         self.assertIn("that's the goal you've been training toward", line)
         self.assertIn("happens from the computer", line)
 
     def test_only_span_and_mesocycle_cliffs_earn_a_button(self):
-        span = progression.runway([_w(4)], [_meso(-30, 45)], [], TODAY, WARN)
-        mesocycle = progression.runway(
+        span = runway([_w(4)], [_meso(-30, 45)], [], TODAY, WARN)
+        mesocycle = runway(
             [_w(4)], [_meso(-30, 4, meso_id=6), _meso(5, 45, meso_id=7)], [], TODAY, WARN
         )
-        plan = progression.runway([_w(5)], [_meso(-30, 5)], [], TODAY, WARN)
+        plan = runway([_w(5)], [_meso(-30, 5)], [], TODAY, WARN)
         self.assertEqual(runway_cli.runway_argv(span), "workout generate")
         self.assertEqual(runway_cli.runway_argv(mesocycle), "workout generate -m ..7")
         self.assertIsNone(runway_cli.runway_argv(plan))
@@ -350,7 +363,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         self._sessions(-2)
         coach = MagicMock()
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.workouts.generate.ensure_recent_data"):
+                patch("trainmate.cli.workouts.adapt.ensure_recent_data"):
             code, out, _ = run_cli(["workout", "adapt", "-y"])
         self.assertEqual(code, 0)
         coach.workout_adapt.assert_not_called()
@@ -397,7 +410,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         coach.workout_adapt.return_value.new_constraints = ()
         coach.workout_adapt.return_value.reason = "All good."
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.workouts.generate.ensure_recent_data"), \
+                patch("trainmate.cli.workouts.adapt.ensure_recent_data"), \
                 patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "adapt", "-y"])
         self.assertEqual(code, 0)
@@ -413,7 +426,7 @@ class RunwaySurfaceTest(unittest.TestCase):
         self._sessions(-2)
         coach = MagicMock()
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.workouts.generate.ensure_recent_data"), \
+                patch("trainmate.cli.workouts.adapt.ensure_recent_data"), \
                 patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
             code, out, _ = run_cli(["workout", "adapt", "-y"])
         self.assertEqual(code, 0)
@@ -586,7 +599,7 @@ class MorningPushRunwayTest(unittest.TestCase):
         coach = MagicMock()
         with patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}), \
                 patch.object(runtime, "coach_service", coach, create=True), \
-                patch("trainmate.cli.bot.ensure_recent_data"):
+                patch("trainmate.cli.bot.views.ensure_recent_data"):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")
@@ -627,9 +640,9 @@ class CoverageInvariantTest(unittest.TestCase):
         self.assertIn("Cover EVERY date of the span", system_prompt)
 
     def test_the_backstop_fills_the_dates_the_model_left_out(self):
-        from trainmate.coach.service.workouts import WorkoutGenMixin
+        from trainmate.coach.service.guards import GuardsMixin
         proposed = [{"date": _d(0), "sport_type": "running", "title": "Long run"}]
-        filled = WorkoutGenMixin._fill_coverage_gaps(proposed, _d(0), _d(3))
+        filled = GuardsMixin._fill_coverage_gaps(proposed, _d(0), _d(3))
         self.assertEqual(len(filled), 4)
         rest = [w for w in filled if w["sport_type"] == "rest"]
         self.assertEqual([w["date"] for w in rest], [_d(1), _d(2), _d(3)])
@@ -637,8 +650,8 @@ class CoverageInvariantTest(unittest.TestCase):
         self.assertNotIn("forced constraint", rest[0]["description"])
 
     def test_an_empty_proposal_is_not_salvaged_into_a_span_of_rest(self):
-        from trainmate.coach.service.workouts import WorkoutGenMixin
-        self.assertEqual(WorkoutGenMixin._fill_coverage_gaps([], _d(0), _d(3)), [])
+        from trainmate.coach.service.guards import GuardsMixin
+        self.assertEqual(GuardsMixin._fill_coverage_gaps([], _d(0), _d(3)), [])
 
 
 class SimpleGeneratePreviewTest(unittest.TestCase):
@@ -701,17 +714,20 @@ class AddGoalIntentTest(unittest.TestCase):
     what stays behind the §7 line is the periodization built on it."""
 
     def test_the_intent_reaches_the_capture_and_not_a_reply(self):
-        from trainmate.cli.bot import ROUTER_INTENTS
-        import trainmate_bot
-        self.assertIn("add_goal", ROUTER_INTENTS)
-        self.assertNotIn("new_goal", ROUTER_INTENTS)
+        from trainmate.chat import messages, routing
+        self.assertIn("add_goal", routing.ROUTER_INTENTS)
+        self.assertNotIn("new_goal", routing.ROUTER_INTENTS)
         # A capture, so it carries the athlete's text rather than running fixed argv.
-        self.assertNotIn("add_goal", trainmate_bot.ROUTER_INTENT_ARGV)
-        self.assertEqual(trainmate_bot.ROUTER_CAPTURE_INTENTS["add_goal"], "add_goal")
-        self.assertFalse(hasattr(trainmate_bot, "new_goal_reply"))
+        self.assertNotIn("add_goal", routing.ROUTER_INTENT_ARGV)
+        self.assertEqual(routing.ROUTER_CAPTURE_INTENTS["add_goal"], "add_goal")
+        # `messages` is where a canned reply for an intent would sit, beside the one
+        # that answers `help`; there is none, because the goal is captured for real.
+        self.assertFalse(hasattr(messages, "new_goal_reply"))
 
     def test_the_plan_for_it_is_still_named_as_the_operators_work(self):
-        from trainmate.cli.render import simple_plan_setup_line, simple_plan_wrapped_line
+        from trainmate.cli.render.plan_lines import (
+            simple_plan_setup_line, simple_plan_wrapped_line,
+        )
         for line in (simple_plan_setup_line(), simple_plan_wrapped_line()):
             self.assertIn("from the computer", line)
             # "coach" formally means the app, so the human who runs `plan generate` is

@@ -1,4 +1,5 @@
 from typing import Optional
+from trainmate.db.schema import WORKOUTS_APPEND_ONLY_TRIGGERS
 
 
 class WipesMixin:
@@ -58,15 +59,8 @@ class WipesMixin:
             # (DESIGN_strength_tracking.md §9).
             cursor.execute("DELETE FROM prescribed_sets")
             cursor.execute("DELETE FROM strength_checks")
-            cursor.execute("""
-                CREATE TRIGGER workouts_no_update BEFORE UPDATE ON workouts
-                WHEN NOT (OLD.lineage_id IS NULL AND NEW.lineage_id = NEW.id)
-                BEGIN SELECT RAISE(ABORT, 'workouts is append-only: append a revision'); END
-            """)
-            cursor.execute("""
-                CREATE TRIGGER workouts_no_delete BEFORE DELETE ON workouts
-                BEGIN SELECT RAISE(ABORT, 'workouts is append-only: append a void revision'); END
-            """)
+            for statement in WORKOUTS_APPEND_ONLY_TRIGGERS:
+                cursor.execute(statement)
 
     @staticmethod
     def _delete_by_date(cursor, table: str, start: Optional[str], end: Optional[str]) -> None:
@@ -115,7 +109,7 @@ class WipesMixin:
         # call it. It lived in cli/data.py to dodge a garmin<->db import cycle; the
         # lazy runtime singletons dissolved that, so it can live here now, where every
         # caller gets it. Imported inside the method to keep module import order free.
-        from trainmate.garmin.pmc import recompute_derived
+        from trainmate.garmin.derived import recompute_derived
         recompute_derived(dbh=self)
 
     def wipe_calendar_signals(

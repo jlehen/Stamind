@@ -122,8 +122,8 @@ the athlete's answer to an open prompt. It stops polling for the span where a
 CLI subprocess is silently churning with no prompt open.
 
 This has to be scoped to the *silent-compute* phase specifically, not the whole
-session — the existing interactive-prompt protocol (`_present_prompt`,
-`trainmate_bot.py:387-418`) depends on live polling to receive the athlete's
+session — the existing interactive-prompt protocol (`_present_prompt`, now
+`trainmate/chat/replies.py`) depends on live polling to receive the athlete's
 button tap or text reply while the subprocess is blocked on stdin. Pausing
 polling for the entire session lifetime would silently break every confirm/choose
 prompt (plan apply, destructive-command confirmation, etc.) — the bot would never
@@ -149,17 +149,16 @@ into (§7); the `command_timeout` watchdog still bounds a genuinely stuck run.
 Implementation-wise this means replacing `application.run_polling()`'s always-on
 background fetch loop with an explicit start/stop around the compute phase —
 `run_polling()` doesn't expose a "pause between messages" toggle. Shipped as
-`_serve()` (`trainmate_bot.py:620-637`), which drives the Application and Updater
+`_serve()` (`ChatBot`, `trainmate/chat/app.py`), which drives the Application and Updater
 lifecycle by hand so `_pause_polling`/`_resume_polling` can stop and start
-`getUpdates` mid-session. This is a real touch point in `trainmate_bot.py`'s core
-loop, not a side effect of adding `/restart`.
+`getUpdates` mid-session. This is a real touch point in the bot's core loop, not a
+side effect of adding `/restart`.
 
 ### 5.2 `/restart`
 
 Handled the same way `/cancel` and `/start` already are in `on_message()`
-(`trainmate_bot.py:527-581`, the `restart` branch at `:551-553`) — matched on
-`token_low == "restart"`, gated by the existing `is_authorized(chat.id,
-allowed_ids)` check. No new auth mechanism: the
+(`trainmate/chat/messages.py`) — matched on `token_low == "restart"`, gated by the
+same allowlist check (`ChatBot._authorized`) every other message passes. No new auth mechanism: the
 Telegram allowlist is already the access control, so there's no need for a
 shared secret at this layer (that idea only makes sense at the process layer in
 §3, where it's not doing security work either — it's just avoiding argv
@@ -172,8 +171,9 @@ can carry a command *and* a `/restart` sent right behind it, and both are handle
 before `_drive` has paused polling. So the teardown deals with a live session in
 whatever state it happens to be in, not just a prompt-blocked one.
 
-Behavior — `restart_teardown()` (`trainmate_bot.py:274-294`), then the handler
-`_restart` (`:518-525`):
+Behavior — `restart_teardown()` (a module function in `trainmate/chat/runner.py`, so it
+can be driven without a Telegram client), then the handler `_restart`
+(`trainmate/chat/messages.py`):
 
 1. If a prompt is open for this chat, resolve its answer future as `cancelled`.
    That is what `_cancel` does mid-prompt — note it does *not* kill; the point is
@@ -200,17 +200,22 @@ logged and stepped over, never allowed to prevent the exit.
 - **`tm-bot`**: add the supervisor loop, the `TM_BOT_SUPERVISED` branch, and the
   signal trap (§4). No backoff logic needed. The existing venv-bootstrap + exec
   becomes the worker body, untouched.
-- **`trainmate_bot.py`**:
-  - `RESTART_EXIT_CODE = 75` and `RESTART_GRACE_SECONDS = 2.0` constants.
+- **`trainmate_bot.py`** (the Telegram front-end is `trainmate/chat/` now, and the list
+  below says where each piece went):
+  - `RESTART_EXIT_CODE = 75` and `RESTART_GRACE_SECONDS = 2.0` constants — in
+    `chat/runner.py`, which is what `tm-bot`'s own comment points at.
   - `on_message()`: new `token_low == "restart"` branch, dispatching to `_restart`
-    and the module-level `restart_teardown()` (§5.2).
+    and the module-level `restart_teardown()` (§5.2) — `chat/messages.py` and
+    `chat/runner.py`.
   - Polling loop rework to pause/resume `getUpdates` around the silent-compute
     phase (§5.1) — the larger of the two `trainmate_bot.py` changes, and one
     that touches existing `/cancel` behavior, not just new code. Concretely:
     `run_polling()` is replaced by `_serve()`, plus `_pause_polling` /
-    `_resume_polling` and the `restarting` latch they honour.
-  - `MENU_COMMANDS` (the `set_my_commands` list) gains a `restart` entry — it is an
-    ordinary command, not a special one (§7).
+    `_resume_polling` and the `restarting` latch they honour. `_serve` and
+    `_pause_polling` are `ChatBot` methods in `chat/app.py`; the resume half and the
+    latch are gone with the pause (§5.1).
+  - `MENU_COMMANDS` (the `set_my_commands` list, `chat/keyboards.py`) gains a `restart`
+    entry — it is an ordinary command, not a special one (§7).
 - No config changes — reuses `telegram.allowed_chat_ids`.
 - No DB changes.
 

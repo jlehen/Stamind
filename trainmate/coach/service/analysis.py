@@ -1,14 +1,19 @@
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional, Dict
 from trainmate.config import config
-from trainmate.types import Constraint, Workout
+from trainmate.types import CompletedActivity, Constraint
 from trainmate import garmin
-from trainmate.garmin import activity_load
-from trainmate.signals import excluded_channels
-from trainmate.util import (
-    today_date as _today_date, step, cyan, cmd, notice,
-)
-import trainmate.coach.service as _svc
+from trainmate.analytics import weekly_evidence
+from trainmate.analytics.load import activity_load
+from trainmate.analytics.pmc import load_ratio
+from trainmate.text import cmd, cyan
+from trainmate.output import notice, step
+from trainmate.clock import today_date as _today_date
+
+# Fallback look-back for `reflect` when no watermark exists yet (bootstrap not run).
+DEFAULT_REFLECT_WEEKS = 4
 
 
 def _nonblank(value: Any) -> bool:
@@ -69,15 +74,6 @@ def _unreadable_parts(decision: Dict[str, Any], cycles: bool) -> List[str]:
 
 class DataAnalysisMixin:
     """Part of :class:`CoachService` — see coach/service/__init__.py."""
-
-    # Channels of the per-day z, mapping the metric column to its baseline mean/std keys.
-    # Sign convention (documented for the LLM): +hrv better, +rhr worse, +sleep better
-    # (DESIGN_quantitative_signal_impact.md §3).
-    _RESPONSE_Z_CHANNELS = (
-        ("rhr", "rhr", "rhr_baseline_mean", "rhr_baseline_std"),
-        ("hrv", "hrv", "hrv_baseline_mean", "hrv_baseline_std"),
-        ("sleep", "sleep_score", "sleep_baseline_mean", "sleep_baseline_std"),
-    )
 
     def _resolve_until(self, until_date_str: Optional[str]):
         until_date = _today_date()
@@ -245,10 +241,10 @@ class DataAnalysisMixin:
             # No watermark yet (bootstrap not run). Reflect over a recent default window
             # rather than dead-ending, but nudge the user toward bootstrap.
             from_date = (
-                until_date - timedelta(weeks=_svc.DEFAULT_REFLECT_WEEKS) + timedelta(days=1)
+                until_date - timedelta(weeks=DEFAULT_REFLECT_WEEKS) + timedelta(days=1)
             )
             notice(
-                f"No reflect baseline found; reflecting over the last {_svc.DEFAULT_REFLECT_WEEKS} "
+                f"No reflect baseline found; reflecting over the last {DEFAULT_REFLECT_WEEKS} "
                 f"weeks. Run {cmd('data bootstrap')} to reconstruct your full training "
                 "history first.",
             )
@@ -276,206 +272,6 @@ class DataAnalysisMixin:
             self._advance_reflect_watermark(until_date.strftime("%Y-%m-%d"))
             self._review_learning_proposals()
         return decision
-
-    @staticmethod
-    def _week_constraints(
-        constraints: List[Constraint], week_start, week_end
-    ) -> List[Dict[str, Any]]:
-        """Constraints overlapping [week_start, week_end] (date objects), each tagged
-        'full' (spans the whole in-window week) or 'partial'. Fed to the analysis as
-        discounting context only — a constraint may explain an anomaly away but is never
-        cited as supporting evidence (DESIGN_constraints.md §2, §6). Dates are ISO strings
-        so lexicographic comparison is chronological."""
-        ws, we = week_start.strftime("%Y-%m-%d"), week_end.strftime("%Y-%m-%d")
-        out: List[Dict[str, Any]] = []
-        for c in constraints:
-            start, end = c.get('start_date'), c.get('end_date')
-            if not start or not end or start > we or end < ws:
-                continue  # missing dates or no overlap with this week
-            out.append({
-                "title": c.get('title'),
-                "impact": c.get('description') or "",
-                "coverage": "full" if (start <= ws and end >= we) else "partial",
-            })
-        return out
-
-    @staticmethod
-    def _day_response_z(
-        metric_row: Dict[str, Any], baseline: Optional[Dict[str, Any]]
-    ) -> Dict[str, Optional[float]]:
-        """Baseline-relative z-score `(value - mean) / std` for ONE morning's rhr/hrv/sleep
-        — the shared definition of "notches from normal" used by both the weekly feature
-        (averaged over the week) and the signal-impact alignment (per morning). A channel
-        is None when its metric value is missing, the baseline mean/std is missing, or std
-        is zero (undefined). Unrounded; callers round as they emit
-        (DESIGN_quantitative_signal_impact.md §3)."""
-        out: Dict[str, Optional[float]] = {}
-        for channel, metric_key, mean_key, std_key in DataAnalysisMixin._RESPONSE_Z_CHANNELS:
-            mean = baseline.get(mean_key) if baseline else None
-            std = baseline.get(std_key) if baseline else None
-            value = metric_row.get(metric_key)
-            if mean is None or not std or value is None:
-                out[channel] = None  # missing baseline/value or zero std -> undefined
-            else:
-                out[channel] = (value - mean) / std
-        return out
-
-    @staticmethod
-    def _week_response_features(
-        w_metrics: List[Dict[str, Any]], baseline: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Deterministic body-response features for one week: mean sleep/stress, and
-        baseline-relative z-scores `(value - mean) / std` for rhr/hrv/sleep averaged over
-        the week's days. A component is None when its baseline mean/std is missing or std
-        is zero (undefined), or no metric day carries the value; `vs_baseline_z` is only
-        included when at least one component is computable (§3)."""
-        def _avg(key: str) -> Optional[float]:
-            vals = [m[key] for m in w_metrics if m.get(key) is not None]
-            return round(sum(vals) / len(vals), 1) if vals else None
-
-        def _z(channel: str) -> Optional[float]:
-            vals = [
-                z for z in (
-                    DataAnalysisMixin._day_response_z(m, baseline)[channel] for m in w_metrics
-                ) if z is not None
-            ]
-            return round(sum(vals) / len(vals), 2) if vals else None
-
-        vs_baseline_z = {
-            "rhr": _z("rhr"),
-            "hrv": _z("hrv"),
-            "sleep": _z("sleep"),
-        }
-        features: Dict[str, Any] = {
-            "avg_sleep_score": _avg("sleep_score"),
-            "avg_stress": _avg("stress"),
-        }
-        if any(v is not None for v in vs_baseline_z.values()):
-            features["vs_baseline_z"] = vs_baseline_z
-        return features
-
-    @staticmethod
-    def _norm_signal_value(value: Optional[float]):
-        """Pass a logged signal magnitude through for display: drop float noise on whole
-        numbers (4.0 -> 4) so doses read cleanly, keep fractional values rounded; None
-        (presence-only / unparseable) stays None (§3.1). TrainMate never interprets the
-        scale — it only tidies the number."""
-        if value is None:
-            return None
-        f = float(value)
-        return int(f) if f.is_integer() else round(f, 2)
-
-    @staticmethod
-    def _signal_days(
-        daily_signals: List[Dict[str, Any]],
-        metrics: List[Dict[str, Any]],
-        activities: List[Dict[str, Any]],
-        baseline_for,
-        k: int,
-        min_signal_days: int = 1,
-    ) -> Dict[str, List[Dict[str, Any]]]:
-        """Deterministic per-episode alignment of external signals against the
-        mornings that bracket them (DESIGN_quantitative_signal_impact.md §3–§4). NO
-        statistics: pure clustering + join + the existing per-day z.
-
-        For each signal category it (1) clusters the logged signal-days into *episodes* —
-        maximal runs separated by fewer than `k` drink-free days (§3.0); (2) emits, per
-        episode, the `days` dose sequence (each signal-day's magnitude + that day's
-        training load) and the `surrounding_mornings` strip spanning
-        `(first − k + 1) … (last + k)`, each morning carrying its preceding day's load and
-        the baseline-relative z of the recovery channels; (3) drops any response channel
-        that duplicates the signal's own construct (§3.2). Categories below
-        `min_signal_days` total signal-days are omitted (§5).
-
-        `baseline_for(date_str)` returns the baseline valid on/just before that morning
-        (or None). `k` is the look-ahead, `min_signal_days` the inclusion floor."""
-        # Day-of training load: sum of derived load over the day's activities (0 on a rest
-        # day), NOT the rolling acute EWMA — the stimulus for a morning is the day before it
-        # (§3 "Day-of load").
-        load_by_date: Dict[str, float] = {}
-        for act in activities:
-            load_by_date[act['date']] = load_by_date.get(act['date'], 0.0) + activity_load(act)
-
-        def day_load(date_str: str) -> int:
-            return int(round(load_by_date.get(date_str, 0.0)))
-
-        metric_by_date = {m['date']: m for m in metrics}
-
-        # Aggregate signal magnitude per (category, date): a day may carry more than one
-        # row of the same category (combined dose); None when no row supplies a value.
-        per_cat: Dict[str, Dict[str, Optional[float]]] = {}
-        for c in daily_signals:
-            cat = c.get('metric')
-            if not cat:
-                continue
-            day_map = per_cat.setdefault(cat, {})
-            v = c.get('value')
-            if v is not None:
-                day_map[c['date']] = (day_map.get(c['date']) or 0.0) + float(v)
-            else:
-                day_map.setdefault(c['date'], None)
-
-        out: Dict[str, List[Dict[str, Any]]] = {}
-        for cat in sorted(per_cat.keys()):
-            day_map = per_cat[cat]
-            signal_dates = sorted(day_map.keys())
-            if len(signal_dates) < min_signal_days:
-                continue  # too few signal-days to be worth prompting on (§5)
-
-            excluded = excluded_channels(cat)
-
-            # Cluster signal-days into episodes: two consecutive signal-days join the same
-            # episode when fewer than k drink-free days separate them (§3.0).
-            episodes: List[List[str]] = []
-            run = [signal_dates[0]]
-            for prev, cur in zip(signal_dates, signal_dates[1:]):
-                gap_free = (
-                    datetime.strptime(cur, "%Y-%m-%d").date()
-                    - datetime.strptime(prev, "%Y-%m-%d").date()
-                ).days - 1
-                if gap_free < k:
-                    run.append(cur)
-                else:
-                    episodes.append(run)
-                    run = [cur]
-            episodes.append(run)
-
-            rows: List[Dict[str, Any]] = []
-            for ep in episodes:
-                first = datetime.strptime(ep[0], "%Y-%m-%d").date()
-                last = datetime.strptime(ep[-1], "%Y-%m-%d").date()
-                days = [
-                    {
-                        "date": d,
-                        "value": DataAnalysisMixin._norm_signal_value(day_map[d]),
-                        "load_tss": day_load(d),
-                    }
-                    for d in ep
-                ]
-                mornings = []
-                cur = first - timedelta(days=k - 1)
-                end = last + timedelta(days=k)
-                while cur <= end:
-                    m_str = cur.strftime("%Y-%m-%d")
-                    prev_str = (cur - timedelta(days=1)).strftime("%Y-%m-%d")
-                    zs = DataAnalysisMixin._day_response_z(
-                        metric_by_date.get(m_str, {}), baseline_for(m_str)
-                    )
-                    vs_normal = {
-                        ch: round(z, 2)
-                        for ch, z in zs.items()
-                        if z is not None and ch not in excluded
-                    }
-                    mornings.append({
-                        "morning": m_str,
-                        "prev_day_load_tss": day_load(prev_str),
-                        "vs_normal": vs_normal,
-                    })
-                    cur += timedelta(days=1)
-                rows.append({"days": days, "surrounding_mornings": mornings})
-
-            out[cat] = rows
-        return out
 
     def _run_workout_analysis(
         self, from_date, until_date,
@@ -524,7 +320,7 @@ class DataAnalysisMixin:
         # not just [from,until]: an incremental reflect window holds almost no drinking
         # history to find a pattern in (DESIGN_quantitative_signal_impact.md §6). Computed
         # before the fingerprint because they are hashed into it (§8).
-        signal_days = self._signal_days(
+        signal_days = weekly_evidence.signal_days(
             daily_signals=self._db.get_daily_signals(),
             metrics=self._db.get_metrics_cache(),
             activities=self._db.get_completed_activities(),
@@ -535,7 +331,7 @@ class DataAnalysisMixin:
 
         # Reuse path: if the evidence is unchanged since the last analysis, return the
         # cached reconstruction instead of paying for another LLM pass (unless --force).
-        fingerprint = self.engine._get_evidence_fingerprint(
+        fingerprint = self._get_evidence_fingerprint(
             completed_activities, metrics, from_str, until_str, constraints, daily_signals,
             signal_days
         )
@@ -587,9 +383,7 @@ class DataAnalysisMixin:
 
         # PMC weekly trajectory (DESIGN_pmc_fitness_fatigue.md §5.4): the warm-up cutoff
         # and a full in-window date->CTL map, both read once, for end_ctl/week_ramp/min_tsb.
-        pmc_cutoff = garmin.pmc_warmup_cutoff_for(
-            garmin.pmc_history_start(dbh=self._db), config.pmc_ctl_days
-        )
+        pmc_cutoff = garmin.warmup_cutoff(self._db)
         ctl_by_date = {m['date']: m.get('ctl') for m in metrics}
 
         # Build summaries per week
@@ -651,13 +445,13 @@ class DataAnalysisMixin:
 
             max_load_ratio = None
             ratios = [
-                r for r in (garmin.load_ratio(m.get('atl'), m.get('ctl')) for m in w_metrics)
+                r for r in (load_ratio(m.get('atl'), m.get('ctl')) for m in w_metrics)
                 if r is not None
             ]
             if ratios:
                 max_load_ratio = max(ratios)
 
-            end_ctl, week_ramp, min_tsb = self._pmc_week_summary(
+            end_ctl, week_ramp, min_tsb = weekly_evidence.pmc_week_summary(
                 w_metrics, ctl_by_date, pmc_cutoff
             )
 
@@ -669,8 +463,8 @@ class DataAnalysisMixin:
             # lookup per week (at the week's last in-window day) is enough.
             week_start, week_end = days_in_week[0], days_in_week[-1]
             baseline = self._db.get_baseline(week_end.strftime("%Y-%m-%d"))
-            response = self._week_response_features(w_metrics, baseline)
-            week_events = self._week_constraints(constraints, week_start, week_end)
+            response = weekly_evidence.week_response_features(w_metrics, baseline)
+            week_events = weekly_evidence.week_constraints(constraints, week_start, week_end)
             # All signals for the week, handed to the LLM verbatim (no collapsing
             # of multiple metrics/day — DESIGN_calendar_signal_ingest.md §7).
             week_signals = sorted(
@@ -805,3 +599,62 @@ class DataAnalysisMixin:
             )
 
         return decision
+
+    def _get_evidence_fingerprint(
+        self, completed_activities: List[CompletedActivity],
+        metrics: List[Dict[str, Any]], window_start: str, window_end: str,
+        constraints: Optional[List[Constraint]] = None,
+        daily_signals: Optional[List[Dict[str, Any]]] = None,
+        signal_days: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Fingerprints the *evidence* a backward evaluation reconstructs from — the
+        completed activities + daily metrics (+ overlapping constraints) within a window —
+        so a re-run over unchanged data can be detected (see DESIGN_backward_evaluation.md
+        §5, §8). `signal_days` is the *full-history* episode mesocycle, hashed as computed
+        because it is built outside the window (DESIGN_quantitative_signal_impact.md §8).
+
+        We hash the load-bearing fields (not just activity ids) so that a re-pull which
+        *corrects* a value also shifts the fingerprint. Hashing the concrete activity-id
+        set rather than only the date range narrows the overlapping/shrinking-window edge
+        (§7). Constraints and `stress` are hashed because they now feed the analysis input
+        as discounting context (DESIGN_richer_analysis_evidence.md §5, DESIGN_constraints.md §6).
+
+        DELIBERATE OMISSIONS (§11 / richer-evidence §5): the prompt text, the science/*.md
+        files and bare baseline recomputation are NOT hashed, so editing one reuses a stale
+        reconstruction until the underlying data changes. `--force` is the escape hatch.
+        """
+        act_digest = sorted(
+            {
+                (
+                    a.get('activity_id'), a.get('date'), a.get('activity_type'),
+                    a.get('duration_sec'), a.get('tss'), a.get('rpe'),
+                    a.get('zone1_sec'), a.get('zone2_sec'), a.get('zone3_sec'),
+                    a.get('zone4_sec'), a.get('zone5_sec'),
+                )
+                for a in completed_activities
+            }
+        )
+        met_digest = sorted(
+            (m.get('date'), m.get('rhr'), m.get('hrv'), m.get('sleep_score'),
+             m.get('stress'), m.get('ctl'), m.get('atl'), m.get('tsb'))
+            for m in metrics
+        )
+        evt_digest = sorted(
+            (c.get('id'), c.get('start_date'), c.get('end_date'),
+             int(c.get('rest') or 0),
+             c.get('title'), c.get('description'))
+            for c in (constraints or [])
+        )
+        # Daily signals feed the analysis input, so an added/edited/deleted signal must
+        # shift the fingerprint (DESIGN_calendar_signal_ingest.md §7).
+        sig_digest = sorted(
+            (c.get('date'), c.get('metric'), c.get('value'), c.get('text'))
+            for c in (daily_signals or [])
+        )
+        serialized = json.dumps(
+            {'window': [window_start, window_end],
+             'activities': act_digest, 'metrics': met_digest, 'constraints': evt_digest,
+             'daily_signals': sig_digest, 'signal_days': signal_days or {}},
+            sort_keys=True
+        )
+        return hashlib.sha256(serialized.encode('utf-8')).hexdigest()

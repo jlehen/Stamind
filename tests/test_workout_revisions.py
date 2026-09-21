@@ -13,12 +13,14 @@ all, and it fails on slot chains alone.
 import ast
 import os
 import pathlib
+import shutil
 import sqlite3
 import tempfile
 import unittest
 
 from tests.helpers import rebind_test_db, save_workout
 from trainmate.coach.formatting import format_planned_workouts_detailed
+from trainmate.coach.service import CoachService
 from trainmate.db import Database
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -29,9 +31,10 @@ DB_DIR = ROOT / "trainmate/db"
 # exempt by living in `scripts/`, outside the directory this glob walks.
 EXEMPT_FUNCTIONS = ("wipe_workouts",)
 
-# Where reads of the raw table are legitimate: the append path itself, which owns both
-# the history surfaces and the slot lookup every append starts from.
-APPEND_PATH_MODULE = "workouts.py"
+# Where reads of the raw table are legitimate: the three modules the append path is cut
+# into, which own the slot lookup every append starts from and the history surfaces. Keyed
+# on the prefix, so the split of `workouts.py` did not need a list of names here.
+APPEND_PATH_PREFIX = "workout"
 
 # `_init_db` names `workouts` because it DEFINES the live view over it. That is the DDL
 # that makes the rule enforceable, not a read that dodges it.
@@ -102,7 +105,7 @@ class TestWorkoutsTableIsAppendOnly(unittest.TestCase):
         everything else reads `live_workouts`, or it would see dead revisions."""
         offenders = []
         for path in sorted(DB_DIR.glob("*.py")):
-            if path.name == APPEND_PATH_MODULE:
+            if path.name.startswith(APPEND_PATH_PREFIX):
                 continue
             tree = ast.parse(path.read_text())
             for fn in _functions(tree):
@@ -115,6 +118,7 @@ class TestWorkoutsTableIsAppendOnly(unittest.TestCase):
 
 def _fresh_db(testcase) -> Database:
     directory = tempfile.mkdtemp()
+    testcase.addCleanup(shutil.rmtree, directory, True)
     db = Database(db_path=os.path.join(directory, "revisions.db"))
     rebind_test_db(db)
     return db
@@ -175,7 +179,7 @@ class TestTheGuardSurvivesAMove(unittest.TestCase):
     def test_the_move_is_not_counted_as_a_third_easing(self):
         """The move kept the ride's numbers, so the marker still counts the two easings
         and no more (§12)."""
-        from trainmate.cli.workouts._helpers import modification_markers
+        from trainmate.workout_state import modification_markers
         moved = self.db.get_workout("2026-09-03", "cycling")
         self.assertEqual(modification_markers(moved), ["ADAPTED ×2"])
 
@@ -334,7 +338,6 @@ class TestRevisionBehaviour(unittest.TestCase):
         insertion: the destination carries the source's lineage, so the tally follows
         it (§4/§11)."""
         from trainmate.coach.proposals import RevisionProposal
-        import trainmate.coach
 
         self._generate(("2026-09-01", "strength_training", "Heavy lift", 60))
         with self.db.workout_change(kind="adapt", summary="Sore") as change:
@@ -344,7 +347,7 @@ class TestRevisionBehaviour(unittest.TestCase):
         lift = self.db.get_workout("2026-09-01", "strength_training")
         self.assertEqual(lift["adaptation_count"], 1)
 
-        service = trainmate.coach.CoachService(db_instance=self.db)
+        service = CoachService(db_instance=self.db)
         service.workout_revision_apply(RevisionProposal(
             reason="Swap the lift for mobility.",
             # Same load, so the substitution is not itself an easing and the assertion
@@ -369,10 +372,9 @@ class TestRevisionBehaviour(unittest.TestCase):
         """A displaced session can become ONE of the sessions replacing it. Handing its
         lineage to both would leave one session live in two slots (§10)."""
         from trainmate.coach.proposals import RevisionProposal
-        import trainmate.coach
 
         self._generate(("2026-09-01", "strength_training", "Heavy lift", 60))
-        service = trainmate.coach.CoachService(db_instance=self.db)
+        service = CoachService(db_instance=self.db)
         service.workout_revision_apply(RevisionProposal(
             reason="Two easy sessions instead.",
             workouts=[

@@ -8,32 +8,9 @@ import sys
 from datetime import datetime, timezone
 
 from trainmate import clock, llm_models, settings
-from trainmate.util import (
-    aside, bold, cmd, cyan, dim, fmt_timestamp, green, pad_visible, red, visible_len,
-    yellow, notice,
-)
-
-
-# The settings a chat message may change (DESIGN_bot_simple_frontend.md §12.7): the knobs
-# that shape the athlete's own experience of the chat, and nothing else. Named here rather
-# than in the bot, beside the registry it guards, so a knob added to SETTINGS is not
-# routable until someone deliberately puts it on this list. Anything operator- or
-# cost-shaped — a model role, adapt-first — is off it by construction.
-ROUTABLE_SETTINGS = (
-    settings.MORNING_TIME, settings.MORNING_DEADLINE, settings.PUSH,
-    settings.LEARNING_QUESTIONS, settings.TERSE,
-)
-
-
-def routable_setting(name: str) -> "settings.Setting | None":
-    """The setting a captured key names, or None when the key is off the allowlist.
-
-    Exact names only: the prefix matching `settings.get` allows is a convenience for a
-    human at a keyboard, and widening a guardrail by abbreviation is not one."""
-    token = (name or "").strip().lower()
-    if token not in ROUTABLE_SETTINGS:
-        return None
-    return settings.get(token)
+from trainmate.text import bold, cmd, cyan, dim, green, pad_visible, red, visible_len, yellow
+from trainmate.output import aside, notice
+from trainmate.clock import fmt_timestamp
 
 
 def _since(iso_utc: str) -> str:

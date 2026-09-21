@@ -15,11 +15,10 @@ def _days_out(n: int) -> str:
     """Fixtures ride on today: a plan window needs its goal in the future, so a
     hardcoded date expires the test the day it passes. Reads the app's clock, so a
     pinned test and the command it runs agree on which day it is."""
-    from trainmate.util import today_date
+    from trainmate.clock import today_date
     return (today_date() + timedelta(days=n)).isoformat()
 
 from trainmate.db import Database
-import trainmate.db
 import trainmate_cli
 
 test_db = Database(db_path=TEST_DB_PATH)

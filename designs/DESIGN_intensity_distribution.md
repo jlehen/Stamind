@@ -31,7 +31,7 @@ The bottom row is what the coach sees today. The rows above it are what happened
 Two mechanisms hide this, and it is worth being precise about which:
 
 - **Projection.** hrTSS is a *weighted sum of the very table above* (`HR_ZONE_TSS_PER_SEC`,
-  `garmin/load.py`). It is not blind to intensity — it is a projection of a five-dimensional
+  `analytics/load.py`). It is not blind to intensity — it is a projection of a five-dimensional
   fact onto one axis. Many distributions map to the same scalar, and the shape is what is
   lost. Note what the table had to do to keep the bottom row flat: 81 minutes of Z2 had to
   disappear. That trade is the creep.
@@ -64,9 +64,9 @@ because the rest of the design argues against it, not because anything here is s
 
 Zone-seconds were already summed in two places, so this design was mostly consolidation:
 
-- **Per elapsed mesocycle** — `coach/service/context.py::_build_prior_training_context` emitted
-  HR `Z1-2/Z3/Z4-5` and power `Z1-2/Z3-4/Z5-7` minutes per mesocycle, for the strategy prompt. It
-  now delegates to `_intensity_history_context` and the old rollup is gone.
+- **Per elapsed mesocycle** — `coach/service/history_context.py::_build_prior_training_context`
+  emitted HR `Z1-2/Z3/Z4-5` and power `Z1-2/Z3-4/Z5-7` minutes per mesocycle, for the strategy
+  prompt. It now delegates to `_intensity_history_context` and the old rollup is gone.
 - **Per week** — `coach/service/analysis.py` puts `zone_distribution_sec` and
   `power_zone_distribution_sec` into every weekly summary fed to the analysis LLM.
 
@@ -241,7 +241,7 @@ the rule belongs here and not in §10.
 
 Two vocabularies currently disagree, and they are different *kinds* of list. `SPORT_MAPPING`
 (`sports.py`) holds complete activity-type names, matched exactly by `canonical_sport`.
-`CYCLING_TERMS` (`garmin/load.py`) holds substring *fragments* — `"ride"` is not an activity
+`CYCLING_TERMS` (`analytics/load.py`) holds substring *fragments* — `"ride"` is not an activity
 type — matched loosely by `sync.py`. `SPORT_MAPPING` has no `gravel_cycling` or `cyclocross`;
 `CYCLING_TERMS` has both. So a gravel ride *does* get its power zones fetched, then falls
 through `canonical_sport` unchanged into a `gravel_cycling` row of its own — one athlete's
@@ -285,7 +285,7 @@ discarding the original.
 
 **The rename is DONE — do not re-apply any of it (checklist kept for the record).** It touched
 six code sites that spelled `road_biking` out: the generate and adapt LLM response schemas
-(`coach/engine/workouts.py`), two CLI `choices` lists (`cli/goals.py`), the learnings-schema
+(`coach/engine/sessions.py`), two CLI `choices` lists (`cli/goals.py`), the learnings-schema
 example (`coach/engine/__init__.py`) and `workout add`'s help text
 (`cli/workouts/parser.py`). All six now say `cycling`; the only survivors of the old spelling
 are `SPORT_MAPPING`'s alias list and `benchmarks.SPORT_ANCHORS`, both of which keep it on
@@ -419,7 +419,7 @@ table grades it.
 **Pre-implementation motivation; the missing branch below now ships.** The adapt TASK carries a
 fourth branch (`drift_branch`, gated on `has_intensity`) beside the `CORRECTING EXECUTION
 DRIFT` guidance and the `MEASURED INTENSITY DISTRIBUTION OF THE ACTIVE MESOCYCLE` data section
-(`coach/engine/workouts.py`). The argument is kept because it is what those three pieces of
+(`coach/engine/adapt.py`). The argument is kept because it is what those three pieces of
 prompt text answer to.
 
 `DESIGN_mesocycle_boundary.md` §2 constrains `adapt` in two ways that must not be confused. The
@@ -430,7 +430,7 @@ is tactical, eases transiently, does not reshape periodization — is prompt tex
 string, and it is the part in play.
 
 The obstacle was narrower than "the mandate forbids it". It was a missing branch. The adapt
-TASK (`coach/engine/workouts.py`) offered exactly three:
+TASK (`coach/engine/adapt.py`) offered exactly three:
 
 ```
 - If they are showing high fatigue or injury risk ... replace hard workouts with
@@ -535,13 +535,13 @@ Z3 allowance is correctable *now*, which the mesocycle-to-date average would tak
 to reveal.
 
 **Threading.** Follow `pmc_context` exactly — it already does this end to end. Compute in the
-service layer in `coach/service/adaptation.py`, beside the `_pmc_prompt_context(...)` call;
+service layer in `coach/service/adapt.py`, beside the `_pmc_prompt_context(...)` call;
 pass as a new named argument into `self.engine._workout_adapt_logic(...)`; accept it in that
-function's signature in `coach/engine/workouts.py` (which already ends `pmc_context:
+function's signature in `coach/engine/adapt.py` (which already ends `pmc_context:
 Optional[str] = None`) and render it as its own section.
 
 **Not via `meso_text`.** That string is built by `_get_active_strategy_and_meso_text`
-(`coach/service/prompt.py`) and handed to *both* plan generation and adaptation, so putting
+(`coach/service/athlete_context.py`) and handed to *both* plan generation and adaptation, so putting
 the table there would silently grow the generate prompt a section §9.2 says it should not
 have. It is the shortest path and nothing would fail; hence stating it.
 
@@ -614,7 +614,7 @@ generation."*
 ### 9.5 The one collision with existing machinery
 
 A drift correction saves through `save_workout`, which stores `adapted_at` and bumps
-`adaptation_count` whenever it is handed a timestamp — and `coach/service/adaptation.py`
+`adaptation_count` whenever it is handed a timestamp — and `coach/service/revision_apply.py`
 mints one per run and passes it to *every* session it saves. The session then carries
 `[ALREADY EASED by a prior adaptation …]`, and the `DO NOT COMPOUND` section instructs the
 model to default to holding it and to raise its bar with each prior easing.
@@ -640,7 +640,7 @@ feature does not wait on it.
 
 **Interim stopgap — decide per session in the save loop, not in `save_workout`.** The DB layer
 is a generic writer that stamps whatever it is told, and other callers rely on that; the caller
-is what must stop handing over the timestamp. The loop in `coach/service/adaptation.py` already
+is what must stop handing over the timestamp. The loop in `coach/service/revision_apply.py` already
 fetches the pre-save row on its first line (`existing = self._db.get_workout(...)`), so the
 comparison is free:
 
@@ -871,19 +871,21 @@ and lays one cell per line at phone width, so width is not its constraint.
 
 **The capped cell is a new formatter, and the grid lives with the load table.** `fmt_duration`
 is unchanged — `mesocycle_report` and both prompt paths want `12h30` — so the cap is its own
-function in `cli/progress.py`, beside `format_weekly_table`. The grid belongs there too, not in
-`intensity.py`: it has to align row for row with the load table and it shares that table's week
-column, band walk and 48-column budget. `intensity.py` keeps what it already owns, the
-aggregation (`zone_rows`) and the prompt-width table the coach reads.
+function in `cli/progress_zones.py`, beside the grid. The grid belongs with the load table in
+`cli/progress_load.py`, not in `analytics/`: it has to align row for row with that table and
+it shares its week column, band walk and 48-column budget. `analytics/intensity.py` keeps
+the aggregation (`zone_rows`) and `analytics/zone_tables.py` the prompt-width table the
+coach reads.
 
 **Every glyph means one thing, and none of them overlap.** `~` is already taken: `meso_bands`
 prefixes it to the label of a mesocycle TrainMate *reconstructed from training history* rather
-than one a plan prescribed (`progression.py`), and the load table's legend reads `~ inferred`.
+than one a plan prescribed (`analytics/timeline.py`), and the load table's legend reads `~ inferred`.
 Reusing it for coverage would put two definitions of one character fifteen lines apart on one
 screen.
 
 The full set on this screen, kept here because this table is where a reader looks a marker up
-(`cli/progress.py`, `NOT_TRAINED`/`UNDERCOUNTED`/`LOAD_SPARSE`/`PLANNED`):
+(`cli/progress_zones.py` for `NOT_TRAINED`/`UNDERCOUNTED`/`PLANNED`, `cli/progress_load.py`
+for `LOAD_SPARSE`):
 
 | Glyph | Where | Means |
 |---|---|---|
@@ -910,14 +912,14 @@ not run would assert that they trained without recording it, which is §7's mean
 exactly backwards. Not-trained, badly-recorded and genuinely-easy are three different facts.
 
 **Coverage gets its own threshold, per currency.** `hr_zone_coverage_min` (default 0.5) exists
-for one purpose: `garmin/load.py` uses it to decide whether to trust hrTSS or fall back to the
+for one purpose: `analytics/load.py` uses it to decide whether to trust hrTSS or fall back to the
 athlete's RPE. That is a "safe to compute load from" bar, not a "safe to show a human" bar — a
 week at 55% passes it while missing nearly half its recorded time. And it is HR-named while
 the power table needs one too, where coverage is structurally lower because a ride with no
 meter contributes its full duration and zero power seconds. A display threshold of its own,
 default 0.8, keeps `!` rare enough to still be read.
 
-**~~A module constant in `intensity.py`, not config~~ — retracted; see §11's rev note.** The
+**~~A module constant in `analytics/intensity.py`, not config~~ — retracted; see §11's rev note.** The
 argument was that `hr_zone_coverage_min` earns its config key by changing a computed load,
 while this one only decides whether a table admits it is incomplete, which is not a knob an
 athlete has a reason to turn. Real data disproved the second half: the flat 0.8 was an
@@ -966,7 +968,7 @@ for its own instrument.
 The `hr_sparse` case is worse and belongs to the *load* table, not this one: the athlete
 trained normally, the strap died, no RPE was entered, and the week reads as a genuine
 adherence miss that the week planner will then adapt the sessions around. `_measurement_is_load`
-(`garmin/load.py`) already implements the test; the load table should mark it. Filed in §11
+(`analytics/load.py`) already implements the test; the load table should mark it. Filed in §11
 because it is a `progress` defect that predates this design.
 
 **One currency per table, chosen by coverage.** An earlier draft chose power where *any*
@@ -1002,12 +1004,12 @@ renders these weeks — `progression._week_meso` returns a null label and `band_
 `unplanned` — so the zone table inherits the fix by reusing the band walk.
 
 **Where the numbers come from: `weekly_aggregates`, not a second fetch.** `render_progress` is
-handed one payload and reads no database, and that payload — `progression.assemble_timeline` —
+handed one payload and reads no database, and that payload — `timeline.assemble_timeline` —
 carries load only. The zone rows join it where the load figures are already computed:
 `weekly_aggregates` receives every activity row and already buckets them by week to sum
 `activity_load`, so a week's zone rows are that same list passed to `intensity.zone_rows`. No new
 query, no second fetch path, and the renderer stays pure and DB-free — which is the property the
-one-payload rule exists to protect (`timeline.py`, CODE_REVIEW #5). `clip_payload_for_weeks`
+one-payload rule exists to protect (`timeline_rows.py`, CODE_REVIEW #5). `clip_payload_for_weeks`
 returns weeks whole, so windowing needs no change. The chart endpoint then carries rows its PNG
 ignores; that is the price of one payload and it is a few hundred floats — and `/api/zones`
 turned out to want exactly those rows anyway.
@@ -1029,8 +1031,8 @@ is the thing that cannot move. So `Z3 1h02 in w/c 06-22` and `Z3 45m/wk in Base 
 averages over different seven-day spans and will not reconcile. Related: `_week_meso` labels
 a week by majority overlap, so a week straddling two mesocycles sits under one band while its
 earlier days counted into the other mesocycle's numbers. Neither is a defect and neither is worth
-fixing — but the coach reads mesocycle grain (`coach/service/context.py`) while the athlete's
-default screen is week grain, so the mismatch can surface inside one conversation, and the
+fixing — but the coach reads mesocycle grain (`coach/service/mesocycle_context.py`) while the
+athlete's default screen is week grain, so the mismatch can surface inside one conversation, and the
 next reader of this code will otherwise try to "fix" it.
 
 **`--mesocycles` keeps the graded view.** Per-week rates over completed weeks, beside the
@@ -1069,14 +1071,15 @@ read row against row.
 | `--chart [PATH]` | | Unchanged, and **unaffected by `[sport]`**: the PNG's two panels are PMC and whole-athlete weekly load. A per-sport zone stack is `DESIGN_progress_timeline.md` §8 follow-on 3. The web app's *chart* is the same PNG and gains nothing; its read-only `/api/zones` view is a separate surface (see §10). |
 | `--no-pull` / `--force-pull` | | The standard auto-ensure throttle, mutually exclusive. No effect on layout. |
 
-**What the option sweep exposes**, all of it in `intensity.py` and `cli/progress.py`:
+**What the option sweep exposes**, all of it in `analytics/intensity.py`, `analytics/zone_tables.py` and `cli/progress_zones.py`:
 
 - **`mesocycle_report` must stop printing its own notes, which means it does change.** Today
   `format_notes` is called inside it, so three mesocycles render the same caveats three times —
   nine lines saying two things. They belong once per section, under the last mesocycle. That needs
   a `notes: bool = True` parameter, defaulting true so `cli/status.py` and
-  `coach/service/context.py` are untouched, with `--mesocycles` passing `notes=False` and emitting
-  once itself. The prompt path keeps its per-mesocycle notes deliberately: it sends one mesocycle.
+  `coach/service/mesocycle_context.py` are untouched, with `--mesocycles` passing `notes=False` and
+  emitting once itself. The prompt path keeps its per-mesocycle notes deliberately: it sends one
+  mesocycle.
 - **`HR_REST_NOTE` has to be split in two, not re-keyed.** It reads "HR during strength *and
   interval-with-rest* work reflects rest intervals as much as effort", which is two claims
   with different scopes joined by an "and". Strength is a property of the sport and can be
@@ -1107,7 +1110,7 @@ read row against row.
   header are bare appends, measuring 57 and 84 characters at `width=48` — the 48-column
   contract this section claims is false under `--mesocycles` today. Both are prose; route them
   through `_wrap`. The zone *rows* must not be.
-- **`run_progress` re-wraps any line over 48 columns**, which is exactly what `intensity.py`'s
+- **`run_progress` re-wraps any line over 48 columns**, which is exactly what `analytics/zone_tables.py`'s
   module docstring forbids ("wrapped once here and never re-wrapped downstream — a
   screen-width re-wrap would shred the columns"). **As shipped, only the `--mesocycles` section is
   printed outside that loop** — `mesocycle_report` lays one zone cell per line at phone width and
@@ -1235,7 +1238,7 @@ equivalent — that absence is `HR_LAG_NOTE`'s point restated — so collapsing 
 banding by the back door and §5 forbids it.
 
 **The fields are declared the way every other field is: a prose-annotated JSON example in the
-prompt** (`coach/engine/workouts.py`), exactly as `duration_minutes` and `tss` are today. That is
+prompt** (`coach/engine/sessions.py`), exactly as `duration_minutes` and `tss` are today. That is
 not in tension with §10's refusal to parse prose — §10 rejects reading intent back *out* of
 `description` after the fact. Here the model states the distribution as JSON while it still knows
 the intent, and the athlete-readable sentence is rendered back from the columns at display time.
@@ -1265,7 +1268,7 @@ generation. Sessions planned before this ships render no ghost row until the nex
 generate`, which is a gap of days and wants one note line, not a migration.
 
 **Nothing has to be done about the calendar hash, and one thing must not be done.**
-`CALENDAR_FIELDS` (`calendar_state.py`) is an allowlist, so new columns are excluded by
+`CALENDAR_FIELDS` (`workout_state.py`) is an allowlist, so new columns are excluded by
 default; `rpe` is already there as deliberate precedent. But `description` *is* in the
 allowlist, so the athlete-readable sentence — `Target: ~25min recovery, ~30min aerobic, ~10min
 threshold, ~18min VO2max+` — must be **rendered from the columns at display time and never
@@ -1311,7 +1314,7 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
   has no per-exercise field and `latest_thresholds()` keys on `anchor_kind` alone, so a
   deadlift PR logged after a squat PR becomes one `e1rm` value jumping 70%. TrainMate does not
   plan progressive strength well enough yet to justify the schema. Two smaller fixes instead:
-  exclude `e1rm` from the drift check in `config_changed()` (`coach/service/prompt.py`, the
+  exclude `e1rm` from the drift check in `config_changed()` (`coach/service/staleness.py`, the
   loop over anchor kinds — a squat PR should never invalidate a periodization), and note in
   `benchmark record`'s help that one lift should be tracked for now. The §6 mockup drops the
   exercise name accordingly.
@@ -1332,7 +1335,7 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
   serves a read-only `/api/zones` (per-sport time in zone, measured behind today and
   prescribed ahead, plus a stacked proportion bar per week in the Progress tab). It reuses
   `window_sport_stats`/`select_zone_sports`/`zone_currency`, so a sport the terminal omits is
-  omitted there for the same reason — the rules live in `intensity.py` and neither surface
+  omitted there for the same reason — the rules live in `analytics/intensity.py` and neither surface
   owns a second copy. `--chart` itself is still untouched.
 
 ## 11. Housekeeping this lands on

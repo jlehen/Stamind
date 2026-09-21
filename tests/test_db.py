@@ -9,10 +9,8 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_trainmate_db.db")
 
 from trainmate.db import (
-    Database, normalize_sports, valid_confidence, learning_is_dormant,
-    derive_confidence, confidence_rank, step_down, RETIRE_PROPOSAL,
+    Database,
 )
-import trainmate.db
 from trainmate.db.objectives import goal_state
 
 test_db = Database(db_path=TEST_DB_PATH)
@@ -214,20 +212,6 @@ class TestDatabase(unittest.TestCase):
     # Five distinct calendar weeks (each normalizes to its own Monday).
     WEEKS = ["2026-05-04", "2026-05-12", "2026-05-20", "2026-05-28", "2026-06-05"]
 
-    def test_derive_confidence_pure_function(self):
-        # Defaults: moderate at 3 net weeks, established at 5.
-        self.assertEqual(derive_confidence(0, 0), "tentative")   # no basis -> floor
-        self.assertEqual(derive_confidence(2, 0), "tentative")
-        self.assertEqual(derive_confidence(3, 0), "moderate")
-        self.assertEqual(derive_confidence(5, 0), "established")
-        self.assertEqual(derive_confidence(6, 1), "established")  # net 5
-        # Contradiction nets down; only contradiction (not an empty basis) proposes retire.
-        self.assertEqual(derive_confidence(2, 2), RETIRE_PROPOSAL)  # net 0, contradicted
-        self.assertEqual(derive_confidence(5, 3), "tentative")      # net 2
-        self.assertEqual(confidence_rank("tentative"), 1)
-        self.assertEqual(step_down("established"), "moderate")
-        self.assertEqual(step_down("tentative"), RETIRE_PROPOSAL)
-
     def test_add_derives_confidence_from_distinct_weeks(self):
         # Citing 3 distinct weeks -> moderate; the LLM sets no confidence.
         test_db.apply_learning_deltas([
@@ -409,29 +393,6 @@ class TestDatabase(unittest.TestCase):
         self.assertFalse(test_db.get_learning(lid)["archived"])
         self.assertEqual(len(test_db.get_learning_evidence(lid)), 3)
 
-    def test_grandfather_seeds_basis_to_sustain_level(self):
-        """A learning predating the evidence model keeps its level after recompute, because
-        the migration seeds a synthetic supporting basis sized to sustain it (§9)."""
-        # Simulate a pre-evidence row: insert directly with no basis, then run the migration.
-        now = datetime.now(timezone.utc).isoformat()
-        with test_db._get_connection() as conn:
-            conn.execute(
-                "INSERT INTO coach_learnings (text, sports, confidence, created_at, "
-                "updated_at, last_reinforced_at) VALUES "
-                "('Legacy established', 'general', 'established', ?, ?, ?)",
-                (now, now, now)
-            )
-            lid = conn.execute(
-                "SELECT id FROM coach_learnings WHERE text='Legacy established'"
-            ).fetchone()[0]
-        test_db._grandfather_learning_evidence()
-        # 5 distinct synthetic supporting weeks -> recompute keeps 'established'.
-        basis = test_db.get_learning_evidence(lid)
-        self.assertEqual(len({e["week_commencing"] for e in basis}), 5)
-        test_db.recompute_all_confidence()
-        learning = next(l for l in test_db.get_learnings() if l["id"] == lid)
-        self.assertEqual(learning["confidence"], "established")
-        self.assertIsNone(learning["proposed_confidence"])
 
     def test_analysis_cache_upsert_and_retention(self):
         """One row per horizon; saving again overwrites the slot. `reconstruction`
@@ -605,24 +566,6 @@ class TestDatabase(unittest.TestCase):
                          "tok-456")
         self.assertEqual(test_db.get_sync_state(key="garmin")["through_date"], "2026-06-14")
 
-    def test_learning_helpers(self):
-        self.assertEqual(normalize_sports(None), "general")
-        self.assertEqual(normalize_sports(""), "general")
-        self.assertEqual(normalize_sports("Running, Cycling"), "running,cycling")
-        self.assertEqual(normalize_sports(["Running", " Hiking "]), "running,hiking")
-
-        self.assertEqual(valid_confidence("established"), "established")
-        self.assertIsNone(valid_confidence("bogus"))
-
-        base = datetime.now(timezone.utc)
-        # Higher confidence survives longer: established budget is 180 days.
-        fresh = {"confidence": "established",
-                 "last_reinforced_at": (base - timedelta(days=100)).isoformat()}
-        stale = {"confidence": "established",
-                 "last_reinforced_at": (base - timedelta(days=200)).isoformat()}
-        self.assertFalse(learning_is_dormant(fresh, base))
-        self.assertTrue(learning_is_dormant(stale, base))
-
 
 class TestPlannedZoneColumns(unittest.TestCase):
     """DESIGN_intensity_distribution.md §9.8 — the intensity target on `workouts`."""
@@ -692,7 +635,7 @@ class TestPlannedZoneColumns(unittest.TestCase):
         it, so a target-only change moves the hash all the same — the event renders a
         `Target:` line, and one that disagrees with the plan is a wrong event
         (DESIGN_calendar_lineage.md §6, amending DESIGN_intensity_distribution.md §9.8)."""
-        from trainmate.calendar_state import calendar_signature
+        from trainmate.workout_state import calendar_signature
         self._save(duration_minutes=60, planned_zone_sec=[300, 1800, 0, 0, 0],
                    planned_zone_currency="hr")
         before = calendar_signature(test_db.get_workout("2026-06-10", "running"))
@@ -807,25 +750,6 @@ class TestGoalStateIsDerived(unittest.TestCase):
         self.assertEqual(
             test_db.get_governing_macrocycle()["objective_id"], latest
         )
-
-    def test_a_completed_goal_is_no_longer_stored(self):
-        """One-off migration: the state left the column when it became derivable."""
-        with test_db._get_connection() as conn:
-            conn.execute(
-                "INSERT INTO objectives (title, target_date, sport_type, status)"
-                " VALUES ('Legacy', '2026-07-04', 'cycling', 'completed')"
-            )
-            conn.commit()
-
-        # A database still holding this state predates the stamp, so clear it: an
-        # already-migrated database legitimately skips the migration.
-        unstamp_schema(test_db)
-        Database(db_path=TEST_DB_PATH)          # re-init runs the migration
-
-        row = test_db.get_objectives()[0]
-        self.assertEqual(row["status"], "active")
-        self.assertEqual(goal_state(row), "completed")     # unchanged where it counts
-
 
 if __name__ == "__main__":
     unittest.main()

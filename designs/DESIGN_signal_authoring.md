@@ -134,7 +134,7 @@ signal list [METRIC] [-d RANGE] [-m|-M|-g RANGE]
 `trainmate_cli.py` next to the other top-level commands; range filtering comes from
 the shared `add_selector_args`/`resolve_window` pair (DESIGN_cli_selectors.md).
 
-**`trainmate/google_calendar.py`** — two methods on `CalendarSyncer`:
+**`trainmate/gcal/client.py`** — two methods on `CalendarSyncer`:
 - `add_signal_event(date, metric, value, text, existing_event_id=None) -> str`
   — builds the body with `extendedProperties.private = {source:
   <calendar_signal_tag>, metric, value?}`, all-day (`end = start + 1 day`);

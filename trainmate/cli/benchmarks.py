@@ -3,15 +3,14 @@ import sys
 from typing import Optional, Tuple
 
 from trainmate import runtime
-from trainmate.util import (
-    aside, bold, dim, green, red, cyan, gray, cmd, format_labeled_paragraph, fmt_date,
-    today_str as _today_str, notice,
-)
+from trainmate.text import bold, cmd, cyan, dim, format_labeled_paragraph, gray, green, red
+from trainmate.output import aside, notice
+from trainmate.clock import fmt_date, today_str as _today_str
 from trainmate.cli.selectors import add_single_date_arg
 from trainmate.sports import canonical_sport
 from trainmate import benchmarks
 from trainmate.benchmarks import (
-    ANCHOR_KINDS, LOGBOOK_KINDS, anchors_for_sport,
+    ANCHOR_KINDS, LOGBOOK_KINDS, anchors_for_sport, label_for_kind,
     unit_for_kind, format_value, format_delta, is_improvement,
 )
 
@@ -56,8 +55,7 @@ def _benchmark_line(r: dict, prev_value: Optional[float]) -> str:
     `prev_value` is the next-older value of the same kind, which the signed delta is
     measured against; None when this row is the first of its kind."""
     kind = r["anchor_kind"]
-    anchor = ANCHOR_KINDS.get(kind)
-    label = anchor.label if anchor else kind
+    label = label_for_kind(kind)
     value = float(r["value"])
     delta_disp = ""
     if prev_value is not None:

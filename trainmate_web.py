@@ -17,14 +17,18 @@ from datetime import datetime, timedelta
 from flask import Flask, jsonify, request, send_from_directory
 from typing import Any, Dict, List, Optional
 from trainmate import journal, runtime
-from trainmate import benchmarks, garmin, intensity, llm_models, plan_diff, progression
-from trainmate.adherence import analyze_adherence, classify_adherence, date_covered
-from trainmate.calendar_state import calendar_status
-from trainmate.cli.common import adherence_verdicts
-from trainmate.cli.workouts._helpers import modification_markers
-from trainmate.config import config, plan_config_hash
+from trainmate import benchmarks, llm_models
+from trainmate.plan_versions import diff_plans, resolve_versions
+from trainmate.analytics import timeline
+from trainmate.analytics import intensity
+from trainmate.analytics.load import activity_load, rpe_divergence
+from trainmate.analytics.adherence import classify_adherence, unplanned_kind
+from trainmate.analytics.compare import adherence_verdicts, adherence_window, compare_days
+from trainmate.workout_state import calendar_status, modification_markers
+from trainmate.config import config
+from trainmate.plan_inputs import plan_config_hash
 from trainmate.sports import canonical_sport
-from trainmate.util import today_str
+from trainmate.clock import today_str
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
@@ -235,15 +239,17 @@ def list_workouts() -> Any:
     # (`adherence_verdicts`), never a second implementation. No pull — §8.
     today = today_str()
     past = sorted(w["date"] for w in workouts if w["date"] <= today)
-    verdicts = adherence_verdicts(past[0], past[-1]) if past else {}
+    verdicts = (
+        adherence_verdicts(runtime.db, past[0], past[-1], today) if past else {}
+    )
     return jsonify([_annotate_workout(w, verdicts.get(w["id"])) for w in workouts])
 
 
 @app.route("/api/workouts/compare", methods=["GET"])
 def compare_workouts() -> Any:
     """Plan-vs-actual adherence over a date range (mirrors `workout compare`,
-    trainmate/cli/workouts.py). Unlike the CLI it never calls `garmin.ensure_data` —
-    the dashboard consumes cached data only (§8). Reuses `analyze_adherence`; returns a
+    trainmate/cli/workouts/compare.py). Unlike the CLI it never calls `garmin.ensure_data` —
+    the dashboard consumes cached data only (§8). Reuses `analytics.compare`; returns a
     day-by-day structure so the frontend renders without re-deriving any logic.
 
     Query params: ?start_date=&end_date= (default 14-day lookback ending today,
@@ -265,53 +271,14 @@ def compare_workouts() -> Any:
     end_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
     if end_obj < start_obj:
         return jsonify({"error": "end_date is before start_date."}), 400
-    history_days = (end_obj - start_obj).days + 1
 
-    all_workouts = runtime.db.get_workouts(start_date=start_date, end_date=end_date)
-    activities = runtime.db.get_completed_activities(start_date=start_date, end_date=end_date)
-    covered_ranges = runtime.db.get_mesocycle_ranges(start_date, end_date)
+    window = adherence_window(runtime.db, start_date, end_date, today)
     threshold = config.minor_activity_load_threshold
 
-    discrepancies, matching_results, informational = analyze_adherence(
-        planned_workouts=all_workouts,
-        completed_activities=activities,
-        start_date_obj=start_obj,
-        history_days=history_days,
-        minor_activity_load_threshold=threshold,
-        covered_ranges=covered_ranges,
-        pending_from=today,
-        rejected_matches=runtime.db.get_rejected_matches(),
-    )
-
-    matched_act_ids = {
-        r["completed"]["activity_id"] for r in matching_results if r["completed"]
-    }
-    acts_by_date: Dict[str, List[Dict[str, Any]]] = {}
-    for act in activities:
-        acts_by_date.setdefault(act["date"], []).append(act)
-    results_by_date: Dict[str, List[Dict[str, Any]]] = {}
-    for r in matching_results:
-        results_by_date.setdefault(r["date"], []).append(r)
-
     days: List[Dict[str, Any]] = []
-    for d in range(history_days):
-        date_curr = (start_obj + timedelta(days=d)).strftime("%Y-%m-%d")
-        day_results = results_by_date.get(date_curr, [])
-        day_acts = acts_by_date.get(date_curr, [])
-        unplanned = [a for a in day_acts if a["activity_id"] not in matched_act_ids]
-
-        if sport_filter:
-            day_results = [
-                r for r in day_results
-                if r["planned"]["sport_type"].lower() == sport_filter
-            ]
-            unplanned = [
-                a for a in unplanned if sport_filter in a["activity_type"].lower()
-            ]
-
-        if not day_results and not unplanned:
-            continue
-
+    for date_curr, day_results, unplanned in compare_days(
+        start_obj, window.history_days, window.results, window.activities, sport_filter
+    ):
         results_out = []
         for r in day_results:
             w = r["planned"]
@@ -329,21 +296,15 @@ def compare_workouts() -> Any:
                 "status": verdict["status"],
             })
 
-        unplanned_out = []
-        for act in unplanned:
-            load = garmin.activity_load(act)
-            if load < threshold:
-                kind = "minor"
-            elif date_covered(date_curr, covered_ranges):
-                kind = "unplanned"
-            else:
-                kind = "off_plan"
-            unplanned_out.append({
+        unplanned_out = [
+            {
                 "activity": act,
-                "load": round(load, 1),
-                "rpe_divergence": garmin.rpe_divergence(act),
-                "kind": kind,
-            })
+                "load": round(activity_load(act), 1),
+                "rpe_divergence": rpe_divergence(act),
+                "kind": unplanned_kind(act, date_curr, window.covered_ranges, threshold),
+            }
+            for act in unplanned
+        ]
 
         days.append({
             "date": date_curr,
@@ -360,8 +321,8 @@ def compare_workouts() -> Any:
         "days": days,
         # Structured facts plus the rendered sentence, rather than CLI-voiced prose the
         # dashboard would have to parse to filter or restyle by kind.
-        "discrepancies": [d.to_dict() for d in discrepancies],
-        "informational": informational,
+        "discrepancies": [d.to_dict() for d in window.discrepancies],
+        "informational": window.informational,
     })
 
 
@@ -386,12 +347,12 @@ def get_timeline_png() -> Any:
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
-    from trainmate import timeline
-    payload = timeline.build_timeline_payload(runtime.db)
-    clipped = progression.clip_payload_for_weeks(payload, weeks_arg, today)
+    from trainmate import timeline_rows
+    payload = timeline_rows.build_timeline_payload(runtime.db)
+    clipped = timeline.clip_payload_for_weeks(payload, weeks_arg, today)
 
     try:
-        from trainmate import chart
+        from trainmate.analytics import chart
         png = chart.render_timeline_png(clipped)
     except ImportError:
         return (
@@ -435,9 +396,9 @@ def get_zones() -> Any:
 
     explicit = [s for s in request.args.getlist("sport") if s]
 
-    from trainmate import timeline
-    payload = timeline.build_timeline_payload(runtime.db)
-    past, future, hidden = progression.select_weeks(payload["weeks"], weeks_arg, today)
+    from trainmate import timeline_rows
+    payload = timeline_rows.build_timeline_payload(runtime.db)
+    past, future, hidden = timeline.select_weeks(payload["weeks"], weeks_arg, today)
     weeks = past + future
 
     stats = intensity.window_sport_stats(weeks)
@@ -544,14 +505,14 @@ def plan_diff_versions() -> Any:
 
     Query: {goal_id?, from_version?, to_version?}. Defaults to the version before the
     active one vs the active one, for the next active goal. The comparison itself lives
-    in trainmate/plan_diff.py — the CLI renders the very same structure as text."""
+    in trainmate/plan_versions.py — the CLI renders the very same structure as text."""
     goal_id = _resolve_goal_id(request.args.get("goal_id"))
     if goal_id is None:
         return jsonify({"error": "No goal to compare plan versions for."}), 400
     goal = runtime.db.get_objective(goal_id)
     if not goal:
         return jsonify({"error": f"Goal with ID {goal_id} not found."}), 404
-    old, new, error = plan_diff.resolve_versions(
+    old, new, error = resolve_versions(
         runtime.db, goal,
         _version_arg(request.args.get("from_version")),
         _version_arg(request.args.get("to_version")),
@@ -559,7 +520,7 @@ def plan_diff_versions() -> Any:
     if error:
         code, message = error
         return jsonify({"error": message, "code": code}), 404 if code == "not_found" else 400
-    diff = plan_diff.diff_plans(
+    diff = diff_plans(
         old, new,
         runtime.db.get_mesocycles_for_macrocycle(old['id']),
         runtime.db.get_mesocycles_for_macrocycle(new['id']),
@@ -638,10 +599,9 @@ def get_benchmarks() -> Any:
     for row, prev in benchmarks.with_previous(rows):
         kind = row["anchor_kind"]
         value = float(row["value"])
-        anchor = benchmarks.anchor_for_kind(kind)
         out.append({
             **row,
-            "label": anchor.label if anchor else kind,
+            "label": benchmarks.label_for_kind(kind),
             "formatted": benchmarks.format_value(kind, value),
             "delta": benchmarks.format_delta(kind, value, prev) if prev else None,
             "improvement": (
@@ -655,10 +615,7 @@ def get_benchmarks() -> Any:
         "thresholds": [
             {
                 "anchor_kind": kind,
-                "label": (
-                    benchmarks.anchor_for_kind(kind).label
-                    if benchmarks.anchor_for_kind(kind) else kind
-                ),
+                "label": benchmarks.label_for_kind(kind),
                 "value": value,
                 "formatted": benchmarks.format_value(kind, value),
                 "unit": benchmarks.unit_for_kind(kind),

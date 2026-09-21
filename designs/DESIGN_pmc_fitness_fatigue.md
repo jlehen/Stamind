@@ -7,7 +7,7 @@
 > 1. **ACWR is retired** (2026-07-31, DESIGN_load_ratio.md). Every mention of
 >    `acute_workload` / `chronic_workload` / `acwr` / the `acwr_*_days` config params /
 >    `color_acwr` *anywhere* in this doc — above and below — is historical. `ATL:CTL`
->    (`garmin/pmc.py` `load_ratio`, `util.py` `color_load_ratio`) took the ACWR slot on
+>    (`analytics/pmc.py` `load_ratio` and `color_load_ratio`) took the ACWR slot on
 >    every line this design specifies; details and the per-surface list in §7.
 > 2. **The module paths were rewritten by a package split.** `garmin.py`,
 >    `coach/service.py`, `coach/engine.py` and `cli/workouts.py` are all packages now.
@@ -120,27 +120,28 @@ design started from (ACWR-era, historical per the amendment banner).
 
 | Layer | Where (current) | Then (pre-PMC) |
 |---|---|---|
-| Compute | `trainmate/garmin/pmc.py` `recompute_derived()` | full-sweep acute (7d sum), chronic (28d/4), ACWR per metrics day |
-| Store | `athlete_metrics_cache` (`db/base.py`), `save_metric_cache()` (`db/activities.py`), `AthleteMetric` (`types.py`) | `acute_workload`, `chronic_workload`, `acwr` columns |
+| Compute | `trainmate/garmin/derived.py` `recompute_derived()`, over the maths in `analytics/pmc.py` | full-sweep acute (7d sum), chronic (28d/4), ACWR per metrics day |
+| Store | `athlete_metrics_cache` (`db/schema.py`), `save_metric_cache()` (`db/activities.py`), `AthleteMetric` (`types.py`) | `acute_workload`, `chronic_workload`, `acwr` columns |
 | Wipe | `wipe_garmin_data()` (`db/wipes.py`) | deletes rows by range; **does not** recompute (see §4) |
-| Coach, per-day | `format_metrics_history()` (`coach/formatting.py`) → generate & adapt prompts (`coach/engine/workouts.py`) | `... ACWR=1.12` per day line — **unguarded** `:.2f`, see §5.1 |
-| Coach, summary | data summary in `coach/service/context.py` → strategy/plan prompts | "Current ACWR: 1.12 (latest)" |
+| Coach, per-day | `format_metrics_history()` (`coach/formatting.py`) → generate & adapt prompts (`coach/engine/generate.py`, `adapt.py`) | `... ACWR=1.12` per day line — **unguarded** `:.2f`, see §5.1 |
+| Coach, summary | data summary in `coach/service/history_context.py` → strategy/plan prompts | "Current ACWR: 1.12 (latest)" |
 | Coach, weekly | analysis weekly digest (`coach/service/analysis.py`) | `max_acwr` per week |
-| Cache key | evidence fingerprint (`coach/engine/prompt.py` `met_digest`) | hashes 6-tuple incl. `m.get('acwr')` per metrics row |
-| User | `tm status` (`cli/status.py`), `tm data show-metrics` table/CSV (`cli/data.py`), `color_acwr` (`util.py`) | ACWR + acute/chronic shown; `acwr or 0.0` zero-fill |
+| Cache key | evidence fingerprint (`coach/service/analysis.py` `met_digest`) | hashes 6-tuple incl. `m.get('acwr')` per metrics row |
+| User | `tm status` (`cli/status.py`), `tm data show-metrics` table/CSV (`cli/data/show.py`), `color_acwr` (was `util.py`) | ACWR + acute/chronic shown; `acwr or 0.0` zero-fill |
 
 **Package split (post-ship).** The four modules this design names were split into
 packages after it merged, so the original paths no longer resolve. Current homes:
 
 | Design says | Actually lives in |
 |---|---|
-| `garmin.py` — `recompute_derived`, `compute_pmc`, `pmc_*`, `backfill_tss` | `trainmate/garmin/pmc.py` |
+| `garmin.py` — `recompute_derived`, `backfill_tss`, `pmc_history_start` | `trainmate/garmin/derived.py` |
+| `garmin.py` — `compute_pmc`, `load_ratio`, `pmc_ramp`, `pmc_display_values`, `pmc_data_caveat` | `trainmate/analytics/pmc.py` (no database, no Garmin) |
 | `garmin.py` — `pull()`, `_warn_manual` | `trainmate/garmin/sync.py` |
-| `garmin.py` — the derivation pad | `trainmate/garmin/client.py` `_derivation_pad_days()` |
-| `coach/service.py` — data summary, PMC/ramp/caveat lines | `trainmate/coach/service/context.py` |
+| `garmin.py` — the derivation pad | `trainmate/analytics/pmc.py` `derivation_pad_days()` |
+| `coach/service.py` — data summary, PMC/ramp/caveat lines | `trainmate/coach/service/history_context.py` |
 | `coach/service.py` — weekly digest | `trainmate/coach/service/analysis.py` |
 | `coach/engine.py` — `met_digest` fingerprint | `trainmate/coach/engine/prompt.py` |
-| `coach/engine.py` — generate/adapt prompt assembly | `trainmate/coach/engine/workouts.py` |
+| `coach/engine.py` — generate/adapt prompt assembly | `trainmate/coach/engine/generate.py`, `adapt.py` |
 | `cli/workouts.py` | `trainmate/cli/workouts/*.py` (but see §6.2b — that surface is gone) |
 
 Each row gets a PMC counterpart — no new subsystem. (Rev. 5 also listed plan-side
@@ -226,7 +227,7 @@ tsb_d = ctl_{d-1} − atl_{d-1}          # yesterday's values, per the science f
   load feeds the EWMA), we just don't widen the cache's "one row per Garmin
   metrics day" meaning.
 - **Refresh paths:** the only callers of `recompute_derived()` are `pull()`
-  (`garmin/sync.py`) and `backfill_tss()` (`garmin/pmc.py`) — plus the post-wipe
+  (`garmin/sync.py`) and `backfill_tss()` (`garmin/derived.py`) — plus the post-wipe
   recompute this design adds at the command layer (§4).
 - **Cost:** the sweep is already O(all days); this adds three multiplications
   per day. Nothing to optimize.
@@ -259,9 +260,9 @@ split along the pure/impure line, which is the better shape and is what the code
 
 | Piece | Where | Role |
 |---|---|---|
-| `pmc_history_start(dbh=None)` | `garmin/pmc.py` | the two `MIN()` reads (first activity, first metrics); the *only* DB hit |
-| `pmc_warmup_cutoff_for(start, ctl_days)` | `garmin/pmc.py` | pure `start + ctl_days`; unit-testable, no DB |
-| `pmc_warmup_cutoff(history_start=None)` | `cli/common.py` | CLI convenience wrapper binding the two against `cli.db` |
+| `pmc_history_start(dbh=None)` | `garmin/derived.py` | the two `MIN()` reads (first activity, first metrics); the *only* DB hit |
+| `pmc_warmup_cutoff_for(start, ctl_days)` | `analytics/pmc.py` | pure `start + ctl_days`; unit-testable, no DB |
+| `warmup_cutoff(dbh=None, history_start=None)` | `garmin/derived.py` | binds the two: the one function every surface asks, so none of them can pair a history start with a different window |
 
 Two invariants ride on this split and must survive any refactor:
 
@@ -272,7 +273,7 @@ Two invariants ride on this split and must survive any refactor:
 - **Fetch once, pass down.** The "surfaces can't derive it differently" guarantee is now
   enforced by threading `history_start` (or the cutoff derived from it) down through a
   command, not by there being one function. `cli/status.py` and
-  `coach/service/context.py::_pmc_prompt_context` both do exactly one lookup per command
+  `coach/service/history_context.py::_pmc_prompt_context` both do exactly one lookup per command
   and hand the result to every consumer.
 
 **(b) A plain "still warming up" flag when *today itself* is short on history.**
@@ -355,7 +356,7 @@ becomes false and is rewritten.
 
 **Ramp rate stays a fixed 7-day delta** — "per week" is its definition, not a tunable
 window, so there is deliberately no `pmc_ramp_days` config param. As built, `pmc_ramp`
-does take `window: int = 7` (`garmin/pmc.py`), but that is a **test seam, not a knob**:
+does take `window: int = 7` (`analytics/pmc.py`), but that is a **test seam, not a knob**:
 no caller passes it, and the parameter exists so the interior-gap rules it also drives
 (the `2 × window` lookback bound and the `Δ · window / offset` rescale) can be exercised
 at small windows without fabricating weeks of fixture data. Wiring it to config would
@@ -406,7 +407,7 @@ params exist for deliberate experimentation, not casual tuning.
 
 ## 4. Storage & wipe
 
-- `db/base.py`: `ALTER TABLE athlete_metrics_cache ADD COLUMN {ctl,atl,tsb} REAL`
+- `db/schema.py`: `ALTER TABLE athlete_metrics_cache ADD COLUMN {ctl,atl,tsb} REAL`
   using the same `try/except sqlite3.OperationalError` idempotent-migration
   pattern already used for the `completed_activities` zone columns. (The
   `CREATE TABLE IF NOT EXISTS` also gains the columns for fresh DBs.)
@@ -498,11 +499,11 @@ Two summary lines, added after the existing ACWR line:
 (The trailing `ATL:CTL` field replaced the separate ACWR line this design appended
 after — see §7.)
 
-- The **PMC line** goes into the data summary (`coach/service/context.py`) that feeds
+- The **PMC line** goes into the data summary (`coach/service/history_context.py`) that feeds
   the strategy/plan prompts, so plan generation can reason about sustainable build
   rates and current freshness.
 - The **ramp line** must reach the prompts that actually set weekly TSS —
-  generate and adapt (`coach/engine/workouts.py`) — *and* the strategy/plan
+  generate and adapt (`coach/engine/generate.py`, `adapt.py`) — *and* the strategy/plan
   prompts. So the same one-liner is emitted into **both** contexts: once in the
   data summary, and once in the generate/adapt metrics context (a single line
   beside the per-day lines, not repeated per day). It is computed from the **full
@@ -578,7 +579,7 @@ One line under ACWR (`cli/status.py`):
   is NULL or the latest row is inside the §3.3 warm-up window, render `—` for that
   field (or omit the whole line if all three are absent). Same NULL/dash rule for
   the ramp, plus the §3.1 interior-gap / young-DB omit rule.
-- **`color_tsb(tsb)` (new, `util.py` beside `color_acwr`) colors only the two
+- **`color_tsb(tsb)` (new, beside the maths it judges) colors only the two
   risk ends, phase-blind:** `< −30` red (excessive fatigue), `> +25` yellow
   (detraining / over-tapered). **The `−30..+25` middle stays uncolored** — its
   meaning is phase-dependent (mid-build a +15 means fitness is *decaying*;
@@ -595,7 +596,7 @@ One line under ACWR (`cli/status.py`):
 
 - **Ramp bands must touch:** `≥ 8` red, `5–8` yellow (i.e. `5 ≤ ramp < 8`), else
   plain. No green band: a low ramp is correct during a taper, so green would
-  wrongly bless it. (`color_ramp` in `util.py`.)
+  wrongly bless it. (`color_ramp` in `analytics/pmc.py`.)
 - **TSB lag footnote.** `TSB = CTL(yesterday) − ATL(yesterday)`, so the printed
   triple won't subtract to the shown TSB; a dim one-line footnote states this so
   the user doesn't read it as a bug.
@@ -603,7 +604,7 @@ One line under ACWR (`cli/status.py`):
 ### 6.2 `tm data show-metrics`
 
 Three new table columns and CSV fields next to the existing ACWR/Acute/Chronic
-ones (`cli/data.py`). Same NULL → blank/`—` and warm-up omission as the status
+ones (`cli/data/show.py`). Same NULL → blank/`—` and warm-up omission as the status
 line; the CSV emits empty cells (not `0`) for suppressed/NULL values so
 downstream parsing doesn't read a zero as data.
 
@@ -612,7 +613,7 @@ downstream parsing doesn't read a zero as data.
 > **This surface does not exist. Do not go looking for it, and do not "restore" it
 > without revisiting the decision below.** It shipped in `613b47c` and was deliberately
 > deleted in `ce0b74d` (*"workout adapt: collapse metrics table to a one-line day
-> count"*). `trainmate/cli/workouts/generate.py` now prints only
+> count"*). `trainmate/cli/workouts/adapt.py` now prints only
 > `Using N days of recovery metrics (past N-day window).`
 >
 > **Why it went:** the reason for the table was "the athlete should see what the coach
@@ -703,7 +704,7 @@ retention.
   > `color_acwr` is historical — most of that text is in §§1–6, i.e. **above** this
   > note. (An earlier revision of this note said "everything below", which pointed at
   > roughly the one paragraph that isn't affected.) In live code the only ACWR residue
-  > is the idempotent `DROP COLUMN` migration in `db/base.py`.
+  > is the idempotent `DROP COLUMN` migration in `db/schema.py`.
   >
   > **What took its slot, surface by surface** — `ATL:CTL` is not merely ACWR deleted;
   > it is ACWR *replaced*, on every line this design specifies:
@@ -711,13 +712,13 @@ retention.
   > | Surface (this doc) | Was | Now |
   > |---|---|---|
   > | per-day prompt line (§5.1) | `ACWR=1.12` | `ATL:CTL=1.15` (`coach/formatting.py`) |
-  > | data-summary line (§5.2) | "Current ACWR: 1.12 (latest)" | `ATL:CTL 1.15 (relative overload)`, folded into the PMC line (`coach/service/context.py`) |
+  > | data-summary line (§5.2) | "Current ACWR: 1.12 (latest)" | `ATL:CTL 1.15 (relative overload)`, folded into the PMC line (`coach/service/history_context.py`) |
   > | weekly digest key (§5.4) | `max_acwr` | `max_load_ratio` (`coach/service/analysis.py`) |
   > | `tm status` (§6.1) | ACWR line | `ATL:CTL` field on the Fitness line (`cli/status.py`) |
-  > | `tm data show-metrics` (§6.2) | ACWR column / CSV field | `ATL:CTL` column / CSV field (`cli/data.py`) |
-  > | coloring | `color_acwr` (0.8–1.3 band) | `color_load_ratio` — overload end only: `> 1.5` red, `1.3–1.5` yellow, low uncolored (`util.py`) |
+  > | `tm data show-metrics` (§6.2) | ACWR column / CSV field | `ATL:CTL` column / CSV field (`cli/data/show.py`) |
+  > | coloring | `color_acwr` (0.8–1.3 band) | `color_load_ratio` — overload end only: `> 1.5` red, `1.3–1.5` yellow, low uncolored (`analytics/pmc.py`) |
   >
-  > Helpers: `garmin.load_ratio(atl, ctl)` (`garmin/pmc.py`) — `None` when either EWMA
+  > Helpers: `load_ratio(atl, ctl)` (`analytics/pmc.py`) — `None` when either EWMA
   > is NULL or `ctl <= 0`, so it inherits the §3.3(a) warm-up blanking of the values it
   > divides. Rationale for the retirement (ACWR fighting block periodization, and its
   > direct contradiction with the TSB bands) is in DESIGN_load_ratio.md §§1–2.
@@ -804,7 +805,7 @@ Added since (pinning contracts §3.2 gained for the forward fold):
 > The section below is the *original* spec, kept verbatim for its rationale. Treating
 > it as a to-do list means re-deriving working code.
 >
-> **Shipped (`trainmate/progression.py`, DESIGN_progress_timeline.md §4):**
+> **Shipped (`trainmate/analytics/progression.py`, DESIGN_progress_timeline.md §4):**
 >
 > | Phase-2 element | As built |
 > |---|---|
@@ -842,7 +843,7 @@ the "app computes" principle says the LLM should not do in its head. Best-effort
 full projection over the plan's own workouts (not a zero-training bound), with a
 warning when the plan doesn't yet reach the event.
 
-Computed **on demand at prompt-assembly time** (now `coach/service/context.py`), **not** in
+Computed **on demand at prompt-assembly time** (now `coach/service/history_context.py`), **not** in
 `recompute_derived()` and **not stored**: it depends on the plan and the event
 date and is forward-looking, so it stays out of the pure, plan-independent
 backward pass. This is the one place PMC reads the plan, read-only.

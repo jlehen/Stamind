@@ -5,8 +5,8 @@ See DESIGN_settings.md. `config.yaml` carries the install default, the `settings
 carries the athlete's override, and `resolve()` is the one place the two are combined.
 Each knob's storage key stays owned by the module that reads it
 (`clock.TIMEZONE_SETTING`, `llm_models.LLM_MODEL_SETTING`); this module owns the
-athlete-facing name, the validator and the resolution order. `trainmate.db` is imported
-lazily inside each function, so importing this module never opens the database.
+athlete-facing name, the validator and the resolution order. The database handle is
+read as `runtime.db` at call time, so importing this module never opens it.
 """
 
 import re
@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Callable, List, Optional, Tuple
 
-from trainmate import clock, llm_models
+from trainmate import clock, llm_models, runtime
 from trainmate.config import config
-from trainmate.util import cmd
+from trainmate.text import cmd
 
 # Athlete-facing names — the vocabulary `settings set` accepts and every caller passes.
 COACH_MODEL = "coach-model"
@@ -325,15 +325,13 @@ def get(name: str) -> Setting:
 
 def stored(name: str) -> Optional[str]:
     """The raw stored value, or None when the athlete never set this one."""
-    from trainmate.db import db
-    return db.get_setting(get(name).key)
+    return runtime.db.get_setting(get(name).key)
 
 
 def resolve(name: str) -> Resolved:
     """Combines the stored row, the config file and the built-in default (§3)."""
-    from trainmate.db import db
     setting = get(name)
-    row = db.get_setting_row(setting.key)
+    row = runtime.db.get_setting_row(setting.key)
     if row:
         return Resolved(value=row["value"], source="db", set_at=row["updated_at"])
     try:
@@ -356,10 +354,9 @@ def value(name: str) -> Any:
 def write(name: str, token: Any) -> str:
     """Validates `token`, stores it, and drops whatever cache it invalidates. Returns the
     stored form. Raises ValueError as the setting's parser does, having written nothing."""
-    from trainmate.db import db
     setting = get(name)
     parsed = setting.parse(token)
-    db.set_setting(setting.key, parsed)
+    runtime.db.set_setting(setting.key, parsed)
     if setting.on_change:
         setting.on_change()
     return parsed
@@ -368,9 +365,8 @@ def write(name: str, token: Any) -> str:
 def clear(name: str) -> bool:
     """Forgets the stored value so config.yaml (or the built-in default) rules again.
     True when a row was actually removed."""
-    from trainmate.db import db
     setting = get(name)
-    cleared = db.clear_setting(setting.key)
+    cleared = runtime.db.clear_setting(setting.key)
     if setting.on_change:
         setting.on_change()
     return cleared
@@ -384,6 +380,21 @@ def commitment_days() -> int:
     """How many days from today the week planner must account for session by session
     (DESIGN_plan_change_continuity.md §4.1). Operator-only: not in ROUTABLE_SETTINGS."""
     return value(COMMITMENT_DAYS)
+
+
+def commitment_end(today_str: str) -> Optional[str]:
+    """The last day of the commitment window, or None when it is empty (§4.1).
+
+    `N` days starting today, so `1` covers today alone and `0` covers nothing. The
+    window's length and where it ends are one rule, and `workout generate` was
+    deriving the end from the length itself.
+    """
+    days = commitment_days() or 0
+    if days <= 0:
+        return None
+    # `clock.parse_date`, not this module's own `parse_date`, which parses a setting
+    # token — `clock.shift` is that arithmetic already.
+    return clock.shift(today_str, days - 1)
 
 
 def change_delay_minutes() -> int:

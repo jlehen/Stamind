@@ -56,11 +56,18 @@ def confirm_new_constraints(
         ):
             runtime.render.constraint_candidate_discarded()
             continue
-        cid = runtime.coach_service.capture_message_constraint(candidate, date_str)
+        cid, shaping = runtime.coach_service.capture_message_constraint(
+            candidate, date_str
+        )
         if cid is None:
             continue
         captured.append(cid)
         runtime.render.constraint_captured(cid, title, start, end, date_str)
+        if shaping:
+            # The escalation this names is the operator's typed work: in companion
+            # chat the same fact is said without commands, and the plan-adjusting tap
+            # is the offer the capture ends on (DESIGN_bot_simple_frontend.md §12.10).
+            runtime.render.constraint_plan_shaping(cid, shaping)
     rules = [candidate['title'].strip() for candidate in candidates if open_ended(candidate)]
     if rules:
         runtime.render.constraints_open_ended(rules, text)

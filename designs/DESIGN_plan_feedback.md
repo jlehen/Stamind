@@ -41,7 +41,7 @@ reopen.
 **No LLM at capture.** The understanding step belongs to the regeneration call, which happens
 anyway and is the only consumer of the result. This is the same-call folding that
 `workout adapt --message` already established (the note is "passed to the SAME LLM" doing the
-adaptation — trainmate/coach/service/adaptation.py). Capture itself is an INSERT: milliseconds,
+adaptation — trainmate/coach/service/adapt.py). Capture itself is an INSERT: milliseconds,
 offline, nothing to misroute. Consequence: the echo confirms the note was *recorded*, not
 *understood*; a misreading surfaces at the gate that already exists for it — `plan generate`'s
 preview-and-confirm.
@@ -238,12 +238,12 @@ skip the plan is what `workout adapt -m` is for (§12 revisits).
   active and "(consumed by the successor version)" when superseded.
 - **`plan diff`**: the feedback panel stops prose-diffing a slot and lists each side's attached
   notes; for adjacent versions old→new that reads as "what drove the change".
-  `trainmate/plan_diff.py`, shared with `/api/plan/diff`.
+  `trainmate/plan_versions.py`, shared with `/api/plan/diff`.
 - **`status`**: when pending notes exist, one line near the plan section:
   `Plan feedback: 2 pending — plan generate will address them.`
 - **Web dashboard** (read-only, unchanged contract): the `strategy-feedback` and
   `cycle-details-feedback` panels render the pending list (date, filing, text) from the same DB
-  helper; the `app.js` explanatory note updates.
+  helper; the explanatory note in `static/plan.js` updates.
 
 ## 9. Code touch points
 
@@ -252,16 +252,16 @@ is not restated in comments.
 
 | File | Change |
 | --- | --- |
-| `trainmate/cli/plans.py` | Parser rebuilt (§4); `run_plan_feedback` rewritten around append/list/rm/replan; `plan show` + versions rendering (§8); `_FEEDBACK_REGEN_NOTE` removed |
+| `trainmate/cli/plans/` | Parser rebuilt (§4); `run_plan_feedback` rewritten around append/list/rm/replan; `plan show` + versions rendering (§8); `_FEEDBACK_REGEN_NOTE` removed |
 | `trainmate/cli/selectors.py` | Single-target mesocycle atom resolver (§5) |
 | `trainmate/db/periodization.py` | `update_macrocycle_feedback`/`update_mesocycle_feedback` replaced by `add_plan_feedback` / `list_plan_feedback(macrocycle_id)` (joined with meso names) / `rm_plan_feedback` |
-| `trainmate/db/base.py` | Migration §6 |
+| `trainmate/db/schema.py` | Migration §6 |
 | `trainmate/types.py` | Drop `feedback` fields; add `PlanFeedback` |
 | `trainmate/coach/service/planning.py` | Regen gate disjunct; pending-notes prompt assembly (§7) |
 | `trainmate/coach/engine/planning.py` | Section text (§7) |
-| `trainmate/plan_diff.py` | Feedback panel → note lists (§8) |
+| `trainmate/plan_versions.py` | Feedback panel → note lists (§8) |
 | `trainmate/cli/status.py` | Pending-count line (§8) |
-| `trainmate_web.py` + `static/app.js`/`index.html`/`style.css` | Render pending list (§8) |
+| `trainmate_web.py` + `static/plan.js`/`index.html`/`style.css` | Render pending list (§8) |
 | `README.md` | Steering-channels table row + the `plan feedback` mentions |
 | `ARCHITECTURE.md` | Schema tables (macrocycles/mesocycles rows → `plan_feedback` table), command table rows for `plan feedback`/`plan diff`, prose mentions of the feedback flow |
 | `tests/test_feedback.py` | Rewritten (§10) |

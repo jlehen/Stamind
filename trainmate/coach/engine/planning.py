@@ -1,8 +1,33 @@
 from datetime import datetime
-from typing import Any, List, Optional, Dict
+from typing import Any, Dict, List, Optional, Tuple
 from trainmate.types import Objective, Constraint
-from trainmate.util import cyan, step, wrap_text
+from trainmate.text import cyan, wrap_text
+from trainmate.output import step
 import trainmate.coach.engine as _eng
+
+
+def _previous_strategy_section(
+    previous_plan: Optional[Tuple[str, List[Dict[str, Any]]]]
+) -> Optional[str]:
+    """The plan being replaced, as the prompt section that carries it.
+
+    Built here because every other `## …` section of every prompt is built here: a
+    section assembled in the service is one the prompt-structure rules do not reach
+    (designs/DESIGN_prompt_structure.md). The service hands over the strategy and its
+    mesocycles; the wording of the section is the engine's.
+    """
+    if not previous_plan:
+        return None
+    strategy, mesocycles = previous_plan
+    meso_text = "".join(
+        f"  - {m['name']} ({m['start_date']} to {m['end_date']}): {m['focus']}\n"
+        for m in mesocycles
+    )
+    return (
+        "## PREVIOUS PERIODIZATION STRATEGY (FOR CONTEXT)\n"
+        f"- Overall Strategy: {strategy}\n"
+        f"- Mesocycles:\n{meso_text or '  - None\n'}"
+    )
 
 
 class PlanStrategyMixin:
@@ -11,7 +36,8 @@ class PlanStrategyMixin:
     def _plan_generate_strategy(
         self, next_goal: Objective, objectives: List[Objective],
         constraints: List[Constraint], today_str: str, guidelines: str,
-        profile: Optional[Dict[str, Any]], previous_strategy_text: Optional[str] = None,
+        profile: Optional[Dict[str, Any]],
+        previous_plan: Optional[Tuple[str, List[Dict[str, Any]]]] = None,
         plan_start_str: Optional[str] = None, athlete_feedback: Optional[str] = None,
         history_summary: Optional[str] = None, prior_training_text: Optional[str] = None,
         learnings: Optional[str] = None,
@@ -116,6 +142,7 @@ write no such paragraph: an opening that announces a change the mesocycles do no
 worse than none. Everything after that paragraph is the strategy as usual.
 """
 
+        previous_strategy_text = _previous_strategy_section(previous_plan)
         if previous_strategy_text:
             custom_task += """
 ### CONTINUITY WITH THE PREVIOUS PLAN

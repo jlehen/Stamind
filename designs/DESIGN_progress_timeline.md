@@ -34,7 +34,7 @@ the *presentation*-side view of past **and future**)
 > `partial_plan`. `*` correspondingly means "this row's planned figure spans
 > fewer than seven days", which is in-progress and plan-edge alike; the footnote
 > names whichever edge falls in view (`plan starts 08-01 (Sat)`).
-> (3) **The CLI≡endpoint equivalence test is deleted** (§9). Once `timeline.py`
+> (3) **The CLI≡endpoint equivalence test is deleted** (§9). Once `timeline_rows.py`
 > made both surfaces call one builder, the test asserted `f(db) == f(db)` and
 > could not fail. The shared function *is* the pin.
 > (4) **Warnings are structured** (§6.0): `{code, text, command?}` instead of
@@ -44,7 +44,7 @@ the *presentation*-side view of past **and future**)
 > now its own payload field; renderers dispatch on `code`.
 > (5) **One windowing implementation** (§7.1). "Which weeks does `--weeks` show"
 > lived in three places — the text table, `clip_payload_for_weeks(cap_future)`
-> for the chart, and `--mesocycles`. All three now call `progression.select_weeks`.
+> for the chart, and `--mesocycles`. All three now call `timeline.select_weeks`.
 > (6) **The zone tables move behind `-z`/`--zones`** (naming a sport implies it).
 > They tripled a numbers-first command from ~27 lines to 96 at phone width and
 > answer a different question from the load table.
@@ -89,7 +89,7 @@ the *presentation*-side view of past **and future**)
 > `GET /api/timeline.png` (§6), drawn by the same renderer as the Telegram
 > photo — one chart drawing instead of rev 6's two "accepted-cost"
 > hand-maintained renderings. The renderer is extracted to
-> `trainmate/chart.py` (§7.2) so CLI and web share it, and the JSON endpoint
+> `trainmate/analytics/chart.py` (§7.2) so CLI and web share it, and the JSON endpoint
 > now ships *with* its first consumer (§8.5) instead of ahead of any.
 > (2) **Superseded-version *labels* are cut** (rev 6's §6.1 layer 2):
 > exhuming old plan versions via `macrocycles.created_at` to put a cosmetic
@@ -308,7 +308,7 @@ week's planned total genuinely partial (Mon–Wed only); that week takes
 being resliced or hidden: the bar stays honest, the marker explains it.
 When plan end < the next objective's `target_date`, the gap travels as its own
 **structured payload field**, `plan_gap` (§6.0) — `{objective, weeks_before,
-plan_end}`, derived once in `progression.plan_gap` — and each surface words it
+plan_end}`, derived once in `runway.plan_gap` — and each surface words it
 itself: the CLI as a banner, the chart as a footer line (*"plan generated
 through 2026-07-31 (9 wks before objective)"*). Deliberately **not** a
 `warnings` entry (rev 9): the renderers had to prefix-match its prose to skip
@@ -370,7 +370,7 @@ the row is partial and the footnote says *why*.
 - *Weeks the plan never covered* (pre-adoption history inside the window, or
   a week whose every planned row was removed) → actual bar renders, planned
   shows `—`, **no adherence percentage** (never divide by zero) — matching
-  `adherence.py`'s precedent of treating activity outside planned coverage as
+  `analytics/adherence.py`'s precedent of treating activity outside planned coverage as
   informational, not a deviation. "Covered" means the week holds at least one
   non-removed workout row: the same rows the planned total is summed from, so
   the flag and the figure cannot disagree (rev 9 — see §6.1).
@@ -459,11 +459,12 @@ and gains a hard consistency requirement instead:
   what actually happened), the §3 rule for today, planned beyond — through
   plan end. Implementation: `compute_pmc()` gains an optional
   `seed=(ctl0, atl0)` parameter (default `(0.0, 0.0)`, pinned in
-  `tests/test_pmc.py`), and `progression.py` calls it for the fold rather
+  `tests/test_pmc.py`), and `analytics/progression.py` calls it for the fold rather
   than owning a second copy of the recurrence.
 - **Stored values become full-precision** — the second (and last) change to
   the shipped core: `compute_pmc()` drops the 1-dp rounding of its outputs
-  (`trainmate/garmin/pmc.py` — `garmin` is a package now); values are stored
+  (the maths in `trainmate/analytics/pmc.py`, the sweep that stores it in
+  `trainmate/garmin/derived.py`); values are stored
   exact and rounded only at display —
   which every consumer already does (`:.1f` in status / show-metrics /
   prompt formatting), and which acute/chronic/ACWR storage already
@@ -517,17 +518,17 @@ presentation-side model" — no longer true: the backward core is coach-facing.
 What *this* feature owns is presentation: the trend picture, the seam, and
 the projection.)
 
-## 5. New modules: `trainmate/progression.py` + `trainmate/timeline.py`
+## 5. New modules: `trainmate/analytics/progression.py` + `trainmate/timeline_rows.py`
 
-`progression.py` is pure functions, no singleton state — same shape as
-`trainmate/adherence.py` and `coach/formatting.py` (the "pure helpers"
+`analytics/progression.py` is pure functions, no singleton state — same shape as
+`trainmate/analytics/adherence.py` and `coach/formatting.py` (the "pure helpers"
 precedent). Takes rows as
 arguments, never touches `db` directly, so it is shared verbatim by all
-three front-ends (§7). One purity caveat, same as `adherence.py`'s:
-`garmin.activity_load` reads `config` thresholds and importing
-`trainmate.garmin` imports the `db` singleton, so tests follow the existing
-patch-before-import pattern (`tests/test_analysis.py` precedent) — the
-functions are still deterministic given rows + config.
+three front-ends (§7). One purity caveat, same as `analytics/adherence.py`'s:
+`analytics.load.activity_load` reads `config` thresholds, so the functions are
+deterministic given rows + config rather than rows alone. The second half of this
+caveat is gone: the load model left `trainmate/garmin/` for `trainmate/analytics/`,
+which imports no database, so no patch-before-import dance is needed any more.
 
 ```python
 DayPoint = dict  # {date, load, source: 'actual'|'planned',
@@ -551,7 +552,7 @@ def fitness_series(day_points, metrics_rows, today, ctl_days, atl_days,
     # garmin.compute_pmc(..., seed=(ctl_A, atl_A)) folded over the day_points
     # loads through plan end (§4). Never recomputes the past. The caller
     # fetches metrics_rows, the config τs, and the cutoff (via
-    # garmin.pmc_history_start / pmc_warmup_cutoff_for) so this stays
+    # garmin.warmup_cutoff) so this stays
     # row-in/row-out.
 
 def weekly_aggregates(activities, workouts, today, meso_spans, *,
@@ -593,7 +594,7 @@ def assemble_timeline(activities, workouts, metrics_rows, mesocycles,
     # The ENTIRE §6.0 payload — days, weeks, meso_bands, objectives, plan_gap,
     # warnings — built here and ONLY here, from the helpers
     # above plus the §6.1 layered lookup. Rows come in from
-    # trainmate/timeline.py (below); neither the CLI handler nor the endpoint
+    # trainmate/timeline_rows.py (below); neither the CLI handler nor the endpoint
     # owns any assembly or warning-wording logic. This is deliberate: the
     # rev-4 snapshot let each caller assemble its own payload and the two
     # copies had already diverged on when the plan-gap warning fires and how
@@ -601,7 +602,7 @@ def assemble_timeline(activities, workouts, metrics_rows, mesocycles,
     # conflict — this stays row-in/row-out.
 ```
 
-**The row-fetching half: `trainmate/timeline.py`** (rev 6). `progression.py`
+**The row-fetching half: `trainmate/timeline_rows.py`** (rev 6). `analytics/progression.py`
 stays pure, so *somebody* has to do the db reads — and having each front-end do
 them was the other half of the CODE_REVIEW #5 divergence. One small module
 owns them:
@@ -612,7 +613,7 @@ def build_timeline_payload(dbh) -> dict
     # get_objectives(active) + get_objectives(completed) sorted by target_date,
     # get_governing_macrocycle() + its mesocycles (§6.1),
     # get_analysis_cache("long") for the bootstrap reconstruction,
-    # garmin.pmc_history_start/pmc_warmup_cutoff_for for the warm-up cutoff,
+    # garmin.warmup_cutoff for the warm-up cutoff,
     # config.pmc_ctl_days/pmc_atl_days — then one call to assemble_timeline.
     # `dbh` is passed explicitly so the CLI's rebindable db and the web's
     # singleton each resolve against the handle the rest of their command used.
@@ -629,8 +630,8 @@ The v1 web surface serves the picture, not the data. Thin handler in
 `timeline.build_timeline_payload(db)` (§5, which owns every read: activities,
 workouts, the stored PMC rows (§4), the governing macrocycle + its mesocycles
 for the §6.1 labels, active *and* completed objectives, the bootstrap
-reconstruction, and the `garmin.pmc_history_start`-derived warm-up cutoff), one
-`progression.clip_payload_for_weeks` for `?weeks`, one
+reconstruction, and the `garmin.warmup_cutoff` warm-up cutoff), one
+`timeline.clip_payload_for_weeks` for `?weeks`, one
 `chart.render_timeline_png` (§7.2), returned as `image/png`. The CLI handler is
 the same shape and calls the same builder, so the two surfaces cannot render
 different payloads (§5, §9).
@@ -828,7 +829,7 @@ spans as given.
 
 CLI and Telegram are the surfaces the athlete actually checks daily; the web
 tab is the least visited and, in v1, frames the same PNG the bot sends. All
-three consume the §5 functions through `timeline.build_timeline_payload` —
+three consume the §5 functions through `timeline_rows.build_timeline_payload` —
 CLI/bot directly, the web via `/api/timeline.png` (§6). Rollout
 order follows usage:
 CLI first (§10), which also honours the existing convention that the web API
@@ -1017,11 +1018,11 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
 (ARCHITECTURE §2), which is what makes them cheap:
 
 - **Text:** `/progress` in chat just runs `tm progress`; the width-aware
-  renderer (§7.1) is the whole story. `MENU_COMMANDS` in `trainmate_bot.py`
-  (hand-synced by design) gains a `progress` entry.
+  renderer (§7.1) is the whole story. `MENU_COMMANDS` in
+  `trainmate/chat/keyboards.py` (hand-synced by design) gains a `progress` entry.
 - **Chart:** `/progress --chart` renders the full §2 two-panel picture to
   PNG and sends it as a photo. The drawing itself lives in
-  **`trainmate/chart.py`** — `render_timeline_png(payload) -> bytes`
+  **`trainmate/analytics/chart.py`** — `render_timeline_png(payload) -> bytes`
   (matplotlib, `Agg` backend, imported lazily inside the function), fed the
   §6.0 payload — called by this path and by the web endpoint (§6), so the
   §2 picture has exactly **one** implementation. (The rev-4 snapshot drew
@@ -1041,8 +1042,8 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
     `emit_photo(path, caption=None)` helper (the `\x1e` record-separator
     framing already guarantees prose never collides; the photo line is
     written alone on its line and flushed atomically).
-    `trainmate_bot.py:_drive()` gains one branch beside
-    `parse_prompt_request`: flush the text buffer, `bot.send_photo` with the
+    `_drive()` (`trainmate/chat/runner.py`) gains one branch beside
+    `sentinels.parse_frame`: flush the text buffer, `bot.send_photo` with the
     payload's `caption`, and unlink the temp file in a `finally` (so a
     failed send, `/cancel` kill, or timeout doesn't orphan it).
     `parse_photo_request` joins the pure helpers unit-tested in
@@ -1087,7 +1088,7 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
       it the default — and two rotated labels on one `x` are unreadable.
 - **matplotlib** sits in `requirements.txt`'s optional tier (like
   `python-telegram-bot`; already there since the snapshot, §10.1): imported
-  lazily inside `chart.py`; without it, text mode works, `--chart` fails
+  lazily inside `analytics/chart.py`; without it, text mode works, `--chart` fails
   with an install hint, and the web endpoint answers 503 carrying the same
   hint (§6). First import builds the font cache (seconds, one-time) — well
   inside the bot's `telegram_command_timeout` (180 s), noted here so a slow
@@ -1095,7 +1096,7 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
 
 ### 7.3 Web: **Progress** tab — the PNG, framed
 
-Fifth top-level tab in `static/index.html` / `static/app.js`, loaded lazily
+Fifth top-level tab in `static/index.html` / `static/progress.js`, loaded lazily
 via the existing `loadedTabs` mechanism. V1 is deliberately minimal — the
 picture, not an app:
 
@@ -1125,7 +1126,7 @@ parity model that keeps the bot maintenance-free).
 
 ## 8. Follow-ons (designed-for, explicitly out of v1)
 
-The endpoint payload and `progression.py` are shaped so each of these is
+The endpoint payload and `analytics/progression.py` are shaped so each of these is
 additive:
 
 1. **ACWR projection ribbon.** Extend the *existing* rolling-sum
@@ -1257,7 +1258,7 @@ the §7.2 photo transport for free where they need a chart in chat.)*
 - `tests/test_bot.py`: `parse_photo_request` round-trip with `emit_photo`
   framing (sentinel/JSON incl. the `caption` field, non-photo lines return
   `None`, unknown-sentinel lines dropped) — same pattern as the existing
-  `parse_prompt_request` tests. The matplotlib rendering itself stays untested (visual output),
+  `sentinels.parse_frame` tests. The matplotlib rendering itself stays untested (visual output),
   matching the front-end stance below.
 - Endpoint test alongside the existing web tests: `GET /api/timeline.png`
   over a fixture DB returns 200, `image/png`, and a body starting with the
@@ -1266,7 +1267,7 @@ the §7.2 photo transport for free where they need a chart in chat.)*
   absent (import patched out) → 503 carrying the install hint; pure-reader
   property (no Garmin/LLM mocks needed — that's the assertion).
   **No CLI≡endpoint equivalence test (rev 9).** Rev 6 pinned the two surfaces
-  against each other after CODE_REVIEW finding #5. Once `timeline.py` gave both
+  against each other after CODE_REVIEW finding #5. Once `timeline_rows.py` gave both
   a single row-fetching path, that test read `assertEqual(f(db), f(db))` and
   could not fail — ceremony, not a pin. The shared builder *is* the guarantee;
   a test can only restate it.
@@ -1285,19 +1286,20 @@ implementing §10.2 from scratch — several steps are already partly done.
 - `adherence.planned_load` is already public — only the `tss is not None`
   fix (§3) remains there.
 - The photo transport, whole: `PHOTO_SENTINEL`/`emit_photo` in
-  `trainmate/prompt.py`; `parse_photo_request`, the `_drive()` photo branch
-  and the unknown-sentinel drop in `trainmate_bot.py`; the bot tests.
+  `trainmate/prompt.py`; the frame reader, the `_drive()` photo branch and the
+  unknown-sentinel drop, now `trainmate/sentinels.py` and `trainmate/chat/runner.py`;
+  the bot tests.
 - `tm progress` dispatcher entry in `trainmate_cli.py` (no alias — the
   prefix mechanism covers it, §7.1); the
   `p` alias for `plan` is **already removed** (rev 6 cited its pre-snapshot
   line 708 — stale; nothing left to do); the `MENU_COMMANDS` `progress`
-  entry in `trainmate_bot.py`.
+  entry, now in `trainmate/chat/keyboards.py`.
 - matplotlib in `requirements.txt` (optional tier); `progress.png` in
   `.gitignore`.
 
 **Exists in rev-4 form — reworked to this rev:**
 
-- `trainmate/progression.py`: delete the module-level `CTL_DAYS`/`ATL_DAYS`
+- `trainmate/analytics/progression.py`: delete the module-level `CTL_DAYS`/`ATL_DAYS`
   and the from-zero full-history recursion; replace with
   read-the-stored-rows + the anchored fold (§4), config τs, and
   `assemble_timeline` (§5 — the snapshot has **no** such function; each
@@ -1305,20 +1307,20 @@ implementing §10.2 from scratch — several steps are already partly done.
 - `trainmate/cli/progress.py`: the renderer gains the rev-6 pins
   (elapsed-week rule, degenerate-input guards, the
   `visible_len` width budget); `_render_chart_png` moves out to
-  `trainmate/chart.py` (§7.2).
+  `trainmate/analytics/chart.py` (§7.2).
 - `trainmate_web.py`: the snapshot's JSON `/api/timeline` becomes
   `GET /api/timeline.png` (§6); JSON is deferred to §8.5.
 - `static/`: the uPlot tab (CDN include, `app.js` chart code, styles) is
   replaced by the `<img>` tab (§7.3).
-- `tests/test_progression.py`, `test_cli_progress.py`, `test_web.py`:
+- `tests/test_progression.py`, `test_cli_progress.py`, `test_web_progress.py`:
   rewritten to the §9 list.
 
 **New — no snapshot counterpart:**
 
 - `compute_pmc`'s `seed` parameter + the unrounding (+ `tests/test_pmc.py`
   updates) (§4).
-- `trainmate/chart.py` (§7.2; extraction, but the module is new).
-- `trainmate/timeline.py` (§5) — the shared row-fetching path, added in rev 6
+- `trainmate/analytics/chart.py` (§7.2; extraction, but the module is new).
+- `trainmate/timeline_rows.py` (§5) — the shared row-fetching path, added in rev 6
   after CODE_REVIEW #5 and the reason §9 needs no CLI≡endpoint test.
 - The governing-objective db helper (§6.1). (Rev 6 also added a
   version-in-force governance rule here; rev 9 deleted it.)
@@ -1329,19 +1331,19 @@ Ordered by usage (CLI/bot before web), each step independently shippable:
 
 1. `garmin.compute_pmc` gains the optional `seed` parameter and drops its
    1-dp output rounding (full-precision storage, §4) (+ the
-   `tests/test_pmc.py` updates, §9); rework `trainmate/progression.py` +
+   `tests/test_pmc.py` updates, §9); rework `trainmate/analytics/progression.py` +
    `tests/test_progression.py` per §10.1 (incl. `assemble_timeline`, §5);
    the `tss is not None` fix in `adherence.planned_load` (§3).
 2. Rework `tm progress` text mode to this rev (`trainmate/cli/progress.py`
    + formatting-helper tests, §9). Telegram text follows via parity; the
    dispatcher/alias/menu work is already done (§10.1).
-3. Extract `trainmate/chart.py` from the snapshot's `_render_chart_png`
+3. Extract `trainmate/analytics/chart.py` from the snapshot's `_render_chart_png`
    (§7.2); the transport around it is already done (§10.1).
 4. `GET /api/timeline.png` in `trainmate_web.py`, replacing the snapshot's
    JSON endpoint, + endpoint test (§9).
 5. **Progress** tab: replace the snapshot's uPlot tab with the `<img>` +
    range buttons (§7.3); drop the uPlot CDN include from `index.html`.
-6. ARCHITECTURE.md: §2 module map (+`progression.py`, +`chart.py`,
+6. ARCHITECTURE.md: §2 module map (+`analytics/progression.py`, +`analytics/chart.py`,
    +`cli/progress.py`, bot photo protocol bullet), §7 CLI command table
    (+`progress`), §8 endpoint table (+`/api/timeline.png`) + front-end tab
    list (+Progress), §12 — **fold into the existing PMC documentation**,
@@ -1371,7 +1373,7 @@ Ordered by usage (CLI/bot before web), each step independently shippable:
 - **Planned-today undercount** (§3 today rule; rev 2 mislabeled this
   "double-count") is accepted; if it proves annoying in practice (frequent
   two-session days), the rule can move to per-`sport_type` matching using
-  `adherence.py`'s pairing logic.
+  `analytics/adherence.py`'s pairing logic.
 - **Chart-by-default in chat?** Bare `/progress` gives text (§7.2); if the
   photo turns out to be what's wanted every time, defaulting `--chart` on
   under the json frontend is a one-line change — but it makes the same

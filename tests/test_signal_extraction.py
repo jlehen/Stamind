@@ -15,13 +15,11 @@ TEST_DB_PATH = test_db_path("test_signal_extraction.db")
 
 from trainmate import runtime, signals
 from trainmate.db import Database
-import trainmate.db
-import trainmate.coach
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach import coach_service
+from trainmate.coach.service import coach_service
 
 
 class TestVocabulary(unittest.TestCase):
@@ -30,7 +28,7 @@ class TestVocabulary(unittest.TestCase):
         with patch.object(
             config, "data", {"coach": {"signal_metrics": {"Altitude": "above 1500 m"}}}
         ):
-            merged = config.signal_metrics
+            merged = signals.signal_metrics()
         self.assertIn("alcohol", merged, "shipped categories must survive config")
         self.assertEqual(merged["altitude"], "above 1500 m", "config key is normalized")
 
@@ -39,7 +37,7 @@ class TestVocabulary(unittest.TestCase):
         with patch.object(
             config, "data", {"coach": {"signal_metrics": {"heat": "my own wording"}}}
         ):
-            self.assertEqual(config.signal_metrics["heat"], "my own wording")
+            self.assertEqual(signals.signal_metrics()["heat"], "my own wording")
 
     def test_every_shipped_sleep_category_trips_the_exclusion_guard(self):
         """The guard matches a substring, so a sleep category named without it would
@@ -238,7 +236,8 @@ class TestCaptureMessageSignal(unittest.TestCase):
 
 
 class TestConfirmationLadder(unittest.TestCase):
-    """The two-question ladder in `cli/workouts/generate.py` (§6).
+    """The two-question ladder in `cli/candidates.py`, which `workout adapt -m`
+    reaches from `cli/workouts/adapt.py` (§6).
 
     Two y/N calls have to yield all three outcomes — reuse, coin, log nothing — because
     `runtime.prompt.confirm` is shared with the Telegram frontend and stays binary.

@@ -8,6 +8,7 @@ from trainmate import clock, runtime
 from trainmate.prompt import Choice
 from trainmate.queue_kind import QUESTION, Kind, NotApplied
 from trainmate.strength import sets, vocabulary
+from trainmate.text import capitalized
 
 LEAVE_UNNAMED = "leave it unnamed"
 NONE_OF_THESE = "none"
@@ -29,10 +30,6 @@ empty list when no name fits.
 Return a JSON object with exactly this key:
 {{"names": ["name", "name"]}}
 """
-
-
-def _capitalized(text: str) -> str:
-    return text[:1].upper() + text[1:]
 
 
 def activity_words(payload: Dict[str, Any]) -> str:
@@ -107,7 +104,7 @@ def _sets_final_companion(item: Dict[str, Any]) -> str:
             f"{len(spans)} group{'s' if len(spans) != 1 else ''} of sets the watch "
             "couldn't name"
         )
-    return (f"{_capitalized(companion_activity_words(item))} has {' and '.join(halves)}. "
+    return (f"{capitalized(companion_activity_words(item))} has {' and '.join(halves)}. "
             "Are the sets in Garmin final?")
 
 
@@ -156,7 +153,7 @@ def _set_names_words(item: Dict[str, Any], companion: bool) -> str:
     group = (f"{sets.set_span(payload['first'], payload['last'])}: "
              f"{sets.reps_and_load(payload['reps'], payload['load_kg'], companion)}")
     if companion:
-        return f"{_capitalized(companion_activity_words(item))}, {group}. What was it?"
+        return f"{capitalized(companion_activity_words(item))}, {group}. What was it?"
     return f"{activity_words(payload)}, {group}. What was it?"
 
 
@@ -187,6 +184,9 @@ def _apply_set_names(item: Dict[str, Any], index: int, text: Optional[str]) -> s
 def propose(text: str) -> List[str]:
     """Up to three vocabulary names for what the athlete typed: the one model call in the
     naming path, and every name it returns is checked against the vocabulary (§7)."""
+    # At call time, not at the top: `athlete_queue` imports this module and every CLI
+    # command imports `athlete_queue`, so a top-level import would put `requests` on
+    # every command's startup path (ARCHITECTURE.md §14, which layer may load which).
     from trainmate.openrouter import openrouter_client
     system = PROPOSE_SYSTEM_PROMPT.format(names="\n".join(vocabulary.names()))
     result = openrouter_client.complete(

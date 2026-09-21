@@ -1,41 +1,26 @@
-from typing import Optional
+"""The coach engine: the prompts, the model call, and the patch seam the tests use.
+
+The files are `prompt.py` (the shared system prompt), `planning.py` (`plan generate`),
+`analysis.py` (the weekly history analysis), and the week planner's four:
+`sessions.py` (the sections both week-planner prompts share), `notes.py` (the sections
+about the athlete's words), `generate.py` (`workout generate`) and `adapt.py`
+(`workout adapt` and `workout tweak`).
+
+Every file here that calls the model reaches it through `_eng.openrouter_client`, looked
+up when it is called, so that `patch("trainmate.coach.engine.openrouter_client")` reaches
+all of them. `sessions.py` and `notes.py` are prompt text only and call nothing.
+"""
 from trainmate.openrouter import openrouter_client
-
-# Shared JSON-output instruction for incrementally updating coach learnings. The LLM emits
-# only deltas; the app owns the merge so unchanged observations are never lost. The model
-# does NOT set confidence — it attributes each observation to the training WEEK(S) that back
-# (or contradict) it, and the app computes confidence from the accumulated distinct weeks
-# (DESIGN_evidence_based_confidence.md §6).
-LEARNING_UPDATES_FIELD = (
-    '  "learning_updates": [\n'
-    "    // Optional. Updates to athlete observations. Attribute each observation to the\n"
-    "    //   specific week_commencing (Monday, YYYY-MM-DD) value(s) shown in the weekly\n"
-    "    //   summaries that justify it. Each item is one of:\n"
-    '    //   {"op": "add", "text": "New observation.", "sports": "running", "evidence": ["2026-05-04", "2026-05-11"]},\n'
-    '    //   {"op": "revise", "id": 3, "text": "Reworded observation #3.", "evidence": ["2026-05-18"]},\n'
-    '    //   {"op": "reinforce", "id": 4, "evidence": ["2026-05-25"]},\n'
-    '    //   {"op": "contradict", "id": 5, "evidence": ["2026-06-01"],\n'
-    '    //    "reason": "HRV fell after both doubles; the second session was cut short."},\n'
-    '    //   {"op": "retire", "id": 6}\n'
-    '    // "sports": comma-separated sport(s) the observation applies to (e.g. "running,cycling"),\n'
-    '    //   or "general" if not sport-specific. Defaults to "general".\n'
-    '    // "evidence": the week_commencing date(s) of training that SUPPORT the observation\n'
-    "    //   (add/revise/reinforce) or CONTRADICT it (contradict). Do NOT set a confidence\n"
-    "    //   level — the app derives it from how many distinct weeks back each observation.\n"
-    '    // Use "reinforce" when an existing observation holds again in a new week; "contradict"\n'
-    "    //   when a week shows the opposite (this can lower its confidence).\n"
-    '    // "reason" (contradict only): one line saying what in the cited weeks went against\n'
-    "    //   the observation.\n"
-    "    // Existing observations persist automatically; do NOT repeat unchanged ones.\n"
-    "    // Reference existing observations by the [id] shown under COACH LEARNINGS.\n"
-)
-
 
 from trainmate.coach.engine.prompt import PromptBuildMixin
 from trainmate.coach.engine.planning import PlanStrategyMixin
-from trainmate.coach.engine.workouts import WorkoutLogicMixin
+from trainmate.coach.engine.generate import WorkoutGenerateMixin
+from trainmate.coach.engine.adapt import WorkoutAdaptMixin
 from trainmate.coach.engine.analysis import AnalysisLogicMixin
 
 
-class CoachEngine(PromptBuildMixin, PlanStrategyMixin, WorkoutLogicMixin, AnalysisLogicMixin):
+class CoachEngine(
+    PromptBuildMixin, PlanStrategyMixin, WorkoutGenerateMixin, WorkoutAdaptMixin,
+    AnalysisLogicMixin,
+):
     """Pure business logic coach that builds prompts, computes hashes, and makes LLM calls."""

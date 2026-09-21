@@ -20,7 +20,7 @@ progress. Three assets already in the code cover most of the machinery:
 - The structured-prompt protocol (`trainmate/prompt.py`, `TRAINMATE_FRONTEND=json`)
   already renders decisions as tappable inline buttons.
 - `workout adapt -m "…"` is already a free-text inbox: one LLM call classifies the
-  message and extracts constraint-shaped directives (`coach/service/adaptation.py`).
+  message and extracts constraint-shaped directives (`coach/service/adapt.py`).
 - Per-athlete instances already work: `TRAINMATE_CONFIG` selects a config file, and the
   instance's `database:` lives beside it (ARCHITECTURE.md §9). One checkout, two bots,
   two tokens, zero routing code.
@@ -199,8 +199,9 @@ of six buttons (two per row, in table order), each mapping to fixed argv:
 | 💬 Talk to me    | shows the capture prompt (§5.2)|
 
 The `/start` welcome and `set_my_commands` menu get simple-mode variants to match.
-Labels live in one table in `trainmate_bot.py` beside `MENU_COMMANDS`, import-safe and
-unit-testable like the existing pure helpers.
+Labels live in one table in `trainmate/chat/keyboards.py`, import-safe and
+unit-testable like everything else in that package; the welcome and menu cards sit in
+that same file, because they name the labels one by one.
 
 ### 5.2 "Talk to me"
 
@@ -356,7 +357,7 @@ parity promise nobody re-checks.
 > commands call one method per thing they have to say, and the override set *is* the
 > opt-in list — so the fallback below is inheritance rather than discipline. Everything
 > this section says about the *words* still holds; only where they live has moved
-> (`cli/render.py`).
+> (`cli/render/`).
 
 Initial opt-in set: `workout list` (today/week), `progress` (chart caption + two-line
 summary), the adapt result, and `bot morning`. The §11 breadth pass added `goal list`
@@ -457,11 +458,11 @@ earns it is expert detail, and the chat surface does not audit.
 
 | File | Change |
 |---|---|
-| `trainmate_bot.py` | ui-mode switch (config at start, `/ui` flips it live, §5.6), reply keyboard + label→argv table, capture-tap chat state (§5.2), `ui:` callback namespace, `TM-BUTTONS` parsing, push scheduler task |
+| `trainmate/chat/` | ui-mode switch (config at start, `/ui` flips it live, §5.6, on `ChatBot.simple_ui`), reply keyboard + label→argv table (`keyboards.py`), capture-tap chat state (§5.2, `ChatBot.armed`), `ui:` callback namespace (`callbacks.py`), `TM-BUTTONS` parsing (`runner.py`/`replies.py`), push scheduler task (`scheduler.py`) |
 | `trainmate/prompt.py` | `BUTTONS_SENTINEL` + `emit_buttons()` (mirror of `emit_photo`) |
 | `trainmate/cli/bot.py` | new hidden family: `bot morning`, `bot route`, `bot constraints`, `bot mesocycle` (§11.2) |
 | `trainmate/config.py` | `telegram_ui`; the push knobs and the router role resolve through `trainmate/settings.py` |
-| `trainmate/cli/render.py` | the companion voice: line builders, `ExpertRenderer`/`CompanionRenderer`, `TRAINMATE_RENDER` interpretation (was a helper in `cli/common.py` — DESIGN_render_persona.md §7) |
+| `trainmate/cli/render/` | the companion voice: line builders (`session_lines.py`, `plan_lines.py`), `ExpertRenderer`/`CompanionRenderer`, `TRAINMATE_RENDER` interpretation (was a helper in `cli/common.py` — DESIGN_render_persona.md §7) |
 | `trainmate/cli/candidates.py` | the confirm loops a note's candidates pass through, shared by `workout adapt -m` and `bot capture note` (§12.10, §12.11) |
 | `docs/ARCHITECTURE.md` | §2 entry points, §9 config keys, bot section |
 | `tests/` | pure-helper tests (keyboard table, sentinel codec, router table→argv, tone renderer), `bot morning` idempotency against a temp DB, `bot route` with a mocked OpenRouter |
@@ -561,7 +562,7 @@ Each phase ships alone; her onboarding starts at phase 1.
 **Open**
 1. Router echo: always show "→ …", or only when confidence is low? Draft: always;
    applies unless objected to before phase 3 (rollout §9). Implemented as: always
-   (`ROUTER_ECHO` in trainmate_bot.py); trivially revisitable.
+   (`ROUTER_ECHO` in `trainmate/chat/routing.py`); trivially revisitable.
 2. Whether the router model is enough for §12.2's extraction calls — transcription,
    not judgment, says yes; watched in practice, and the role is already a setting.
 3. Multi-intent messages and slotted views (§12.8): deferred until a real message
@@ -772,7 +773,7 @@ CLI↔bot channel.
 `bot capture note` instead. Its extraction call returns the same candidate shapes the
 adapt inbox yields — `new_constraints` and `new_signals` — and persists them through
 the same confirmed-candidate paths (`capture_message_constraint`,
-`capture_message_signal` in `coach/service/planning.py`), so the trust boundary moves
+`capture_message_signal` in `coach/service/goals_constraints.py`), so the trust boundary moves
 not at all: still advisory-only, still no LLM-set `rest` or `replan`, still no
 fabricated numbers, still nothing stored without the athlete's yes. One capture call
 extracts *both* kinds, so a mixed note — "knee's acting up, no running for two weeks,
@@ -1006,10 +1007,10 @@ The §7 posture after this pass, in full:
 | File | Change |
 |---|---|
 | `trainmate/cli/bot.py` | `bot capture <intent>` family (extraction prompts beside `ROUTER_SYSTEM_PROMPT`), `bot goals` picker, new `ROUTER_INTENTS` rows (`new_goal` → `add_goal`, §12.5) |
-| `trainmate_bot.py` | new intent→argv and echo rows; text-carrying intents pass the message to `bot capture`; the §5.2 rescue window retargets from `adapt -m` to `bot capture note` (§12.3); the stale-tap path speaks ("That offer expired — just send it again.", §12.3) instead of silently stripping the row |
+| `trainmate/chat/` | new intent→argv and echo rows (`routing.py`); text-carrying intents pass the message to `bot capture`; the §5.2 rescue window retargets from `adapt -m` to `bot capture note` (§12.3); the stale-tap path speaks ("That offer expired — just send it again.", §12.3) instead of silently stripping the row |
 | `trainmate/cli/workouts/generate.py` | the per-candidate confirm loops — the constraint confirm and `_confirm_new_signals` with its reuse-first category ladder — factor out into a shared helper `bot capture note` calls: one behavior, ladder included, on both paths |
-| `trainmate/coach/engine/workouts.py` | the `new_constraints`/`new_signals` schema fragments and extraction-rule text become shared constants this prompt and the §12.2 capture prompts both include — one candidate vocabulary, no drift |
-| `trainmate/coach/service/planning.py` | `capture_message_constraint`/`_signal` reused as-is, but the plan-shaping notice renders per persona: under simple rendering its `constraint edit --replan` / `plan generate` suggestion becomes the §12.3 adjust-offer button, never expert command text in companion chat — a `runtime.render` method with a companion override, now that the render persona has landed (DESIGN_render_persona.md §4) |
+| `trainmate/coach/engine/notes.py` | the `new_constraints`/`new_signals` schema fragments and extraction-rule text become shared constants this prompt and the §12.2 capture prompts both include — one candidate vocabulary, no drift |
+| `trainmate/coach/service/goals_constraints.py` | `capture_message_constraint`/`_signal` reused as-is, but the plan-shaping notice renders per persona: under simple rendering its `constraint edit --replan` / `plan generate` suggestion becomes the §12.3 adjust-offer button, never expert command text in companion chat — a `runtime.render` method with a companion override, now that the render persona has landed (DESIGN_render_persona.md §4) |
 | `trainmate/cli/settings.py` | routable-keys allowlist named beside the settings it guards |
 | `tests/` | `RouterTablesTest` reshaped (note intents share `bot capture note`; every capture intent maps to `bot capture <intent>`), mocked-extraction tests per capture kind (missing-field marker included, §12.2), nomination outcomes per §12.4 (clean, session hand-off, pinned re-capture, no-match), the shared confirm helper exercised from both adapt and capture |
 

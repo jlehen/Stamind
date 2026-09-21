@@ -117,6 +117,14 @@ class ActivitiesMixin:
             self.bump_strength_history()
         return len(stale)
 
+    def get_completed_activity(self, activity_id: str) -> Optional[Dict[str, Any]]:
+        """One activity by its Garmin id."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM completed_activities WHERE activity_id = ?", (activity_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
     def get_completed_activities(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> List[CompletedActivity]:

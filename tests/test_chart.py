@@ -1,6 +1,6 @@
-"""Pure-helper tests for the timeline chart (trainmate/chart.py).
+"""Pure-helper tests for the timeline chart (trainmate/analytics/chart.py).
 
-Full rendering is exercised through `GET /api/timeline.png` in test_web.py; here we
+Full rendering is exercised through `GET /api/timeline.png` in test_web_progress.py; here we
 pin the label-fitting rules that keep mesocycle names from overprinting each other
 (DESIGN_progress_timeline.md §6.1/§7.2).
 """
@@ -9,7 +9,7 @@ import unittest
 import matplotlib
 matplotlib.use("Agg")
 
-from trainmate.chart import (  # noqa: E402  (must follow the backend selection)
+from trainmate.analytics.chart import (  # noqa: E402  (must follow the backend selection)
     _fit_label, _chars_per_axis, _span_dates, _MIN_BAND_LABEL_CHARS,
 )
 
@@ -92,7 +92,7 @@ class TestPlanEndMarkerStaysInsideTheWindow(unittest.TestCase):
     def _top_axis_right_edge(self, payload):
         import matplotlib.pyplot as plt
         import matplotlib.dates as mdates
-        from trainmate import chart
+        from trainmate.analytics import chart
 
         captured = []
         original = plt.subplots
@@ -132,7 +132,7 @@ class TestBothPanelsKeepTheirDateLabels(unittest.TestCase):
 
     def _axes(self):
         import matplotlib.pyplot as plt
-        from trainmate import chart
+        from trainmate.analytics import chart
 
         days = [
             {"date": f"2026-06-{d:02d}", "load": 10.0, "source": "actual",
@@ -172,7 +172,7 @@ class TestWeeklyBarsUseTheComparableSlice(unittest.TestCase):
     def _planned_heights(self, weeks):
         import matplotlib.pyplot as plt
         import matplotlib.dates as mdates
-        from trainmate import chart
+        from trainmate.analytics import chart
 
         fig, ax = plt.subplots()
         self.addCleanup(plt.close, fig)

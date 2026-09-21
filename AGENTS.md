@@ -107,14 +107,37 @@
         except Exception as e:
             print(f"Error reading science guideline {filename}: {e}")
 - When displaying prose from the LLM, always run it through `wrap_text` in
-  `trainmate/util.py`, so the words wrap nicely.
-- One command family per file under `trainmate/cli/`, and split a family into
-  a file per command once it outgrows roughly 400 lines. `plans.py`, `render.py`, `bot.py`
-  and `progress.py` are over the limit; they are debt, not precedent. Code shared by two
-  commands goes in a module of its own — `cli/common.py` for renderers, otherwise its own
-  file — never in whichever command file happened to define it first. A function-local
-  import added to dodge a cycle between two CLI modules is the signal that shared code is
-  in the wrong place; move it rather than deferring the import.
+  `trainmate/text.py`, so the words wrap nicely.
+- A Python file over 500 lines is split, and the pieces land between 150 and 400 lines. A
+  file of 400 to 500 lines is split only when it holds two jobs that change for different
+  reasons. A file under 100 lines is merged into a sibling, unless it is a concept on its
+  own or it exists to break an import cycle. A split follows what the code does — one
+  command, one concept, one step of a pipeline — and never "helpers". Some files are over
+  the limit only because their docstrings restate rationale the design doc already holds;
+  trim the docstring before reaching for a split. Three things stay over 500 lines on
+  purpose: `trainmate_web.py`, a flat list of independent GET handlers that splitting
+  would not separate; `db/schema.py`, one ordered run of CREATE statements that
+  `SCHEMA_VERSION` versions as a unit; and `static/style.css`, which is not Python. One
+  file stays under the 100-line floor for a reason the rule does not list:
+  `trainmate_bot.py` is 38 lines that build `trainmate.chat.app.ChatBot` and run it, and
+  it cannot be merged into a sibling because the `tm-bot` supervisor execs it by path.
+- A package `__init__.py` holds a docstring, and at most the class the package assembles
+  from its submodules. It does not re-export the submodules' names. A re-export gives one
+  name two homes, and a test that patches the home it knows about reaches code that reads
+  the other one. `garmin/__init__.py` still re-exports everything; it is debt, not
+  precedent.
+- Code under `trainmate/coach/engine/` looks the model client up when it is called, as
+  `_eng.openrouter_client`, after `import trainmate.coach.engine as _eng` at the top of
+  the file. Importing the name itself — `from trainmate.coach.engine import
+  openrouter_client` — binds a copy, and the 132 `patch` calls on
+  `trainmate.coach.engine.openrouter_client` would then replace a name nothing reads, so
+  every one of those tests would reach OpenRouter for real.
+- One command family per file under `trainmate/cli/`, and split a family into a file per
+  command once it outgrows roughly 400 lines. Code shared by two commands goes in a module
+  of its own — `cli/common.py` for renderers, otherwise its own file — never in whichever
+  command file happened to define it first. A function-local import added to dodge a cycle
+  between two CLI modules is the signal that shared code is in the wrong place; move it
+  rather than deferring the import.
 - Comments and docstrings say what the code does and name the design section
   that says why (`DESIGN_x.md §N`). Do not restate the rationale: it is already
   written down once, and a paraphrase beside the code is the copy that goes
@@ -133,10 +156,23 @@
   ```
 
   To run one file, put its name after `-p`, for example `-p "test_bot.py"`.
+- The suite is green when it fails exactly these four and nothing else. They fail because
+  the live `config.yaml` is in companion mode, not because of anything in the code:
+  `test_cli_bot.MorningPushTest.test_adapt_first_off_never_touches_the_coach`, and, in
+  `test_cli_settings.TestMorningPushKnobs`, `test_a_non_switch_is_refused`,
+  `test_the_built_in_defaults_apply_with_nothing_configured` and
+  `test_the_morning_command_adapts_only_when_the_switch_is_on`. A fifth failure is yours.
+- Do not decide you are done from a single-file run. Some modules never bind a test
+  database of their own and rely on an earlier module in the full run having bound one, so
+  alone they fail with "tests must not open the production database" — `test_dispatch.py`
+  is the current example. Use a per-file run while iterating, and the full suite before
+  committing.
 - You can run the tests without asking the user.
-- A fresh worktree fails at test collection until `config.yaml`, `service_account.json`
-  and `venv` are symlinked in from the main checkout. Do not symlink `trainmate.db`: the
-  worktree's own empty database is what keeps a stray run off the athlete's data.
+- A fresh worktree fails at test collection until `config.yaml` and `venv` are symlinked
+  in from the main checkout. `service_account.json` is needed by two test modules only,
+  `test_gcal_client.py` and `test_gcal_history.py`, which build a real `CalendarSyncer`;
+  without it the other 2006 tests still collect and run. Do not symlink `trainmate.db`:
+  the worktree's own empty database is what keeps a stray run off the athlete's data.
 - An invariant that spans files ("a propose method never writes") gets a test that reads
   the source and names the offender. Key it on a shape (a return annotation, a directory
   glob), never on a hand-maintained list of names.

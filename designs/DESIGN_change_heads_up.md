@@ -489,8 +489,8 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
 
 ## 10. Touch points
 
-- `trainmate/db/base.py`: the `told_at` column on `workout_changes`, with the migration of §9.
-- `trainmate/db/workouts.py`: `workout_change` stamps `told_at` when she is watching;
+- `trainmate/db/schema.py`: the `told_at` column on `workout_changes`, with the migration of §9.
+- `trainmate/db/workout_change.py`: `workout_change` stamps `told_at` when she is watching;
   `rollback_to_change` builds the rollback's `note` from the told changes it undoes (§6); a
   query for the changes waiting to be told, and a write that marks them told;
   `get_workout_changes` also says which changes are waiting. `change_has_live_revisions`
@@ -500,26 +500,31 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   new query.
 - The helper that says whether she is watching, beside `is_json_frontend` in
   `trainmate/prompt.py`.
-- `trainmate/coach/service/adaptation.py`: `workout_revision_apply` stores the reason in
+- `trainmate/coach/service/revision_apply.py`: `workout_revision_apply` stores the reason in
   `note`.
-- `trainmate/coach/engine/workouts.py`: the adapt prompt presents the `-m` message as her
+- `trainmate/coach/engine/notes.py`: the adapt prompt presents the `-m` message as her
   coach's note when she is not watching (§3). Only the paragraph that tells the week planner
   how to weigh the note is swapped, under the existing `has_message` gate. The section titles
   stay.
-- `trainmate/cli/workouts/generate.py`: the replace question at the start of
-  `run_workout_generate` and `run_workout_adapt`, before the LLM call (§5); the wording of
-  the exits that write nothing after a Replace (§5); the notice under the line (§8);
-  `_change_line` prints the description and "not sent yet"; the new `workout notify` (§4),
-  with its parser entry in `trainmate/cli/workouts/parser.py`. As built, the question, the
-  notice and `workout notify` live in `trainmate/cli/workouts/heads_up.py`, because
-  `generate.py` is past the size limit, and the send rule in `trainmate/heads_up.py`.
-- `trainmate/cli/bot.py`: the hidden `bot changes`; `run_bot_morning` loses the week line.
-- `trainmate_bot.py`: `scheduler_wake` runs `bot changes` after the due reminders and before
-  the morning message, in companion mode, when the chat is free and either the morning rule
-  of §4 holds or a waiting change is no newer than `changes_notify_upto`. One helper runs `bot
-  changes` ahead of her input, called where `on_message` and `on_callback` accept a tap or a
-  message, before anything is routed or started. Both checks are a database read inside the
-  bot, like the one for reminders. The 21:00 is a constant beside them.
+- `trainmate/cli/workouts/` — `generate.py`, `adapt.py` and `rollback.py`: the replace
+  question at the start of `run_workout_generate` and `run_workout_adapt`, before the LLM
+  call (§5); the wording of the exits that write nothing after a Replace (§5); the notice
+  under the line (§8); `_change_line` prints the description and "not sent yet"; the
+  new `workout notify` (§4), with its parser entry in
+  `trainmate/cli/workouts/parser.py`. As built, the question, the notice and
+  `workout notify` live in `trainmate/cli/workouts/heads_up.py`, because `generate.py`
+  was past the size limit at the time, and the send rule in `trainmate/heads_up.py`.
+- `trainmate/cli/bot/views.py`: the hidden `bot changes`; `run_bot_morning` loses the
+  week line.
+- `trainmate/chat/scheduler.py`: `scheduler_wake` runs `bot changes` after the due
+  reminders and before the morning message, in companion mode, when the chat is free and
+  either the morning rule of §4 holds or a waiting change is no newer than
+  `changes_notify_upto`.
+- `trainmate/chat/scheduler.py`, again: `ChatBot._tell_changes_first` runs `bot changes`
+  ahead of her input, called from `on_message` (`chat/messages.py`) and `on_callback`
+  (`chat/callbacks.py`) where they accept a tap or a message, before anything is routed
+  or started. Both checks are a database read inside the bot, like the one for
+  reminders. The 21:00 is a constant beside the send rule in `trainmate/heads_up.py`.
 - `docs/ARCHITECTURE.md`: the `workout_changes` table (`note`, `told_at`), the scheduler, and
   the internal settings markers.
 - DESIGN_plan_change_continuity.md §6.4 is implemented, so it gets a dated amendment pointing
@@ -528,9 +533,9 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
 
 Revision 9 adds to those:
 
-- `trainmate/db/workouts.py`: `change_date_span`, the first and last day a change wrote, for
-  the §5 comparison; `change_writes_day`, whether it wrote a session on a given day, for the
-  §4 rule.
+- `trainmate/db/workout_history.py`: `change_date_span`, the first and last day a change
+  wrote, for the §5 comparison; `change_writes_day`, whether it wrote a session on a given
+  day, for the §4 rule.
 - `trainmate/heads_up.py`: `waiting()` hangs `touches_today` on each row it returns; `due`
   sends on it once the wait is up, and `sends_at` returns the hour it goes out at.
   `sends_after_delay` is the one place that says which of the two rules applies, so the
@@ -542,9 +547,10 @@ Revision 9 adds to those:
 - `trainmate/cli/workouts/heads_up.py`: `replacing_unsent` takes the days the run may write
   and asks nothing when they miss the unsent change's days (§5).
 - `trainmate/cli/workouts/generate.py`: `run_workout_generate` resolves the span before
-  opening `replacing_unsent`, and hands it to `_generate`; `_adapt_window` gives the adapt
-  and tweak windows. `trainmate/cli/workouts/strength_only.py` takes its span from the
-  caller for the same reason.
+  opening `replacing_unsent`, and hands it to `_generate`. `_adapt_window` in
+  `trainmate/cli/workouts/adapt.py` gives the adapt and tweak windows.
+  `trainmate/cli/workouts/strength_only.py` takes its span from the caller for the same
+  reason.
 
 ## 11. Tests
 

@@ -12,7 +12,6 @@ from unittest.mock import patch
 
 from tests.helpers import (
     as_instance, bind_test_db, clear_all_tables, pin_clock, rebind_test_db, run_cli,
-    unstamp_schema,
 )
 from tests import test_db_path
 
@@ -20,7 +19,7 @@ test_db = bind_test_db(test_db_path("test_change_heads_up.db"))
 
 from trainmate import heads_up, runtime
 from trainmate.coach.proposals import RevisionProposal
-from trainmate.util import today_str
+from trainmate.clock import today_str
 
 
 def _at(day: int, hour: int, minute: int = 0) -> datetime:
@@ -508,26 +507,6 @@ class BatchesTest(_DbCase):
         self.assertIn("rollback", rollback)
         self.assertFalse(under.startswith(" "), under)
         self.assertNotIn("Undo of change", "\n".join(r + u for r, u in self._rows()))
-
-
-class MigrationTest(unittest.TestCase):
-    """The column's way in marks every existing change as told (§9)."""
-
-    def test_existing_changes_are_told_and_the_push_marker_goes(self):
-        db = bind_test_db(test_db_path("test_change_heads_up_migration.db"))
-        self.addCleanup(rebind_test_db, test_db)
-        with db.workout_change(kind="generate", note="Old news.") as change:
-            change.append(date="2026-09-25", sport_type="running", title="Run")
-        db.set_setting("push_note_last", "1")
-        with db._get_connection() as conn:
-            conn.execute("ALTER TABLE workout_changes DROP COLUMN told_at")
-            conn.commit()
-        unstamp_schema(db)
-        db._init_db()
-        [row] = db.get_workout_changes()
-        self.assertIsNotNone(db.get_change(row["id"])["told_at"])
-        self.assertEqual(db.get_change(row["id"])["told_at"], row["created_at"])
-        self.assertIsNone(db.get_setting("push_note_last"))
 
 
 if __name__ == "__main__":

@@ -278,19 +278,19 @@ unrelated parts of the message into a brief, or drops the request.
 |---|---|
 | `cli/workouts/parser.py`, `edit.py` | The two sub-commands and their handlers. |
 | `coach/service/editing.py` | `workout_add` and `_replaced_header`. |
-| `db/workouts.py` | The `add` and `rm` change kinds. `_lineage_is_manual`. The two lineage rules "an `add` starts a new lineage" and "a `generate` over a manual session starts a new lineage". `replaced_manual`. The hydrated `source` field. |
+| `db/workout_change.py` | The `add` and `rm` change kinds. `_lineage_is_manual`. The two lineage rules "an `add` starts a new lineage" and "a `generate` over a manual session starts a new lineage". `replaced_manual`. The hydrated `source` field. |
 | `types.py` | `Workout.source`. |
 | `coach/revisions.py` | `carried_lineage`: a replacement always continues the session it replaces. |
 | `coach/service/workouts.py` | Manual sessions as standing sessions outside the commitment window. The manual clause of the voids. The notice "Replaced the session you added". |
 | `coach/formatting.py` | The `[ADDED BY THE ATHLETE]` and `[athlete-added]` tags. |
-| `coach/engine/workouts.py` | The "[athlete-added]" paragraph of the adapt TASK. |
+| `coach/engine/adapt.py` | The "[athlete-added]" paragraph of the adapt TASK. |
 | `strength/planner.py` | Sessions "shown as context": every strength session is written or checked. |
-| `calendar_reconcile.py` | The manual clause of `leaves_trace`. |
-| `google_calendar.py` | The `[Manual]` title tag. `add` as a reason to say `[Deleted]`. |
-| `calendar_lineage.py` | The labels "Added by hand", "Replaced by hand" and `rm`'s "Cancelled". |
-| `cli/workouts/_helpers.py` | The `[MANUAL]` and `[REPLACED]` markers. |
+| `gcal/reconcile.py` | The manual clause of `leaves_trace`. |
+| `gcal/event.py` | The `[Manual]` title tag. `add` as a reason to say `[Deleted]`. |
+| `gcal/history.py` | The labels "Added by hand", "Replaced by hand" and `rm`'s "Cancelled". |
+| `cli/workouts/session_line.py` | The `[MANUAL]` and `[REPLACED]` markers. |
 | `cli/workouts/generate.py` | "N added by hand" in the question `workout generate` asks. |
-| `progression.py` | `coverage_end`. Without manual sessions it is the same function as `plan_end`. |
+| `analytics/runway.py` | `coverage_end`. Without manual sessions it is the same function as `plan_end`. |
 | `static/` | The manual badge and the two commands in the help text. |
 | `workout adapt` | Its alias `a`. With `add` gone, the prefix `a` already means `adapt`. |
 
@@ -300,8 +300,8 @@ unrelated parts of the message into a brief, or drops the request.
 |---|---|
 | `cli/workouts/parser.py`, `edit.py`, `_helpers.py` | The sub-command, its handler and `_resolve_swap_ops`. |
 | `coach/service/editing.py` | The whole file: `workout_swap_validate`, `workout_swap_apply` and their helpers. `WorkoutEditMixin` leaves `CoachService`. |
-| `db/workouts.py` | The `swap` change kind. |
-| `calendar_lineage.py`, `_helpers.py`, `static/` | The labels "Moved" and "Moved away", the `[SWAPPED]` marker and its badge. |
+| `db/workout_change.py` | The `swap` change kind. |
+| `gcal/history.py`, `_helpers.py`, `static/` | The labels "Moved" and "Moved away", the `[SWAPPED]` marker and its badge. |
 
 What stays: a session can still stand in a slot other than the one it started in, because
 `workout adapt` and `workout tweak` move sessions. So the lineage rule for a move, and the
@@ -312,7 +312,7 @@ read that hides the stale half of a moved session, both stay.
 | Where | What is removed |
 |---|---|
 | `cli/workouts/parser.py`, `edit.py` | The sub-command and its handler. |
-| `db/workouts.py` | The `restore` change kind and `revision_before_live_void`. |
+| `db/workout_change.py` | The `restore` change kind and `revision_before_live_void`. |
 | `workout rollback`'s help | The sentence saying it is not `workout restore`. |
 | `workout list --removed` | The flag. Its help says it exists "to find their ID for restoring". |
 

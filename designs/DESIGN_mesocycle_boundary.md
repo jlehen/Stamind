@@ -4,7 +4,7 @@
 
 `workout adapt` reads a backward window of recovery metrics (`config.metrics_lookback_days`)
 and adapts forward from the evaluation date to the end of the mesocycle containing it
-(`coach/service/adaptation.py::workout_adapt`). The backward window has a fixed size. The
+(`coach/service/adapt.py::workout_adapt`). The backward window has a fixed size. The
 forward range does not — it shrinks toward nothing as the evaluation date approaches the
 mesocycle's end.
 
@@ -55,7 +55,7 @@ of it.
 ## 3. Terminal-window guidance (prompt)
 
 When the evaluation date falls within `config.adapt_terminal_window_days` of the mesocycle's end,
-`coach/engine/workouts.py::_workout_adapt_logic` appends a `THIS MESOCYCLE IS ENDING` section to
+`coach/engine/adapt.py::_workout_adapt_logic` appends a `THIS MESOCYCLE IS ENDING` section to
 the task. It states the two consequences from §1 and biases the model toward holding planned
 load: an easing has no runway left to rebound, and a cut must not be deepened to "carry" the
 athlete into a mesocycle that will be planned against its own metrics when it is generated.
@@ -72,7 +72,7 @@ prompt to before.
 
 **Superseded (2026-08-31) by DESIGN_runway_nudge.md §3.** A mesocycle boundary with no fresh
 sessions after it is one of the four ways the schedule can run out, so this hint is now the
-`mesocycle` kind of `progression.runway`, printed by `cli/runway.py` on every daily surface —
+`mesocycle` kind of `runway.runway`, printed by `cli/runway.py` on every daily surface —
 `workout adapt`, `status` and the morning push — rather than on adapt alone, and from the
 first day of `config.runway_warning_days` rather than the terminal window. §3's prompt-side
 `THIS MESOCYCLE IS ENDING` section is untouched and stays on `adapt_terminal_window_days`. The
@@ -102,8 +102,8 @@ it only once it was too late to act on.
   (DESIGN_constraint_honoring.md §1). This entry stands: nothing extends *adapt's* range.
 - **Feeding the next mesocycle's concrete sessions to the model as read-only context.** The system
   prompt already lists every mesocycle's name, date range and focus
-  (`coach/service/prompt.py::_get_active_strategy_and_meso_text`), which is enough to support
-  the "is easing cheap here?" judgement. Adding the sessions would introduce a new data path
+  (`coach/service/athlete_context.py::_get_active_strategy_and_meso_text`), which is enough to
+  support the "is easing cheap here?" judgement. Adding the sessions would introduce a new data path
   and a new class of prompt-visible-but-immutable workout for modest gain.
 
 ## 6. Known asymmetry

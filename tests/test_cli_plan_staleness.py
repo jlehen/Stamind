@@ -12,6 +12,7 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_plan_stale.db")
 
+from trainmate import plan_inputs
 from trainmate.db import Database
 import trainmate_cli  # noqa: F401  (registers the command tree)
 
@@ -47,8 +48,8 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
     def _seed(self, *, stale: bool) -> tuple:
         """A goal with an active plan, generated either from the live profile or from a
         snapshot that no longer matches it."""
-        from trainmate.coach import coach_service
-        from trainmate.config import plan_profile
+        from trainmate.coach.service import coach_service
+        from trainmate.plan_inputs import plan_profile
 
         oid = test_db.add_objective(
             title="Spring Race", target_date=self._days_out(60), sport_type="running"
@@ -59,15 +60,15 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             config_hash = "not-the-current-hash"
         else:
             snapshot = plan_profile()
-            config_hash = coach_service._get_config_hash()
+            config_hash = plan_inputs.plan_config_hash()
         mid = test_db.save_macrocycle(
             objective_id=oid,
             strategy="strategy",
             # Real fingerprints: goals and the plan-shaping constraints flag the plan too
             # (DESIGN_plan_change_continuity.md §6.5), so a placeholder would make every
             # seeded plan stale.
-            goals_hash=coach_service._get_goals_hash(test_db.upcoming_objectives()),
-            constraints_hash=coach_service._get_constraints_hash([]),
+            goals_hash=plan_inputs.goals_hash(test_db.upcoming_objectives()),
+            constraints_hash=plan_inputs.constraints_hash([]),
             mesocycles=[{
                 "name": "Base", "start_date": self._days_out(0),
                 "end_date": self._days_out(30), "focus": "aerobic",
@@ -76,10 +77,10 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             config_snapshot=coach_service._get_config_snapshot(),
             profile_snapshot=json.dumps(snapshot),
             goals_snapshot=json.dumps(
-                coach_service.engine._clean_goals(test_db.upcoming_objectives())
+                plan_inputs.clean_goals(test_db.upcoming_objectives())
             ),
             constraints_snapshot=json.dumps(
-                coach_service.engine._clean_constraints([])
+                plan_inputs.clean_constraints([])
             ),
         )
         return oid, mid
@@ -314,7 +315,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         """Returning on the first reason let one edit swallow the other: `plan show`
         named one, the verdict never learned of the other, and `plan keep` stamped both
         away (DESIGN_plan_change_continuity.md §6.5)."""
-        from trainmate.coach import coach_service
+        from trainmate.coach.service import coach_service
 
         # An FTP on record BEFORE the plan, so the plan's snapshot has one to drift from:
         # a newly recorded anchor is not drift (DESIGN_benchmark_workouts.md §3.5).
@@ -362,7 +363,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         """The athlete's science documents set the structure, so an edit to one is the
         most plan-shaping input there is; the reason names the file and the diff shows
         the line (DESIGN_plan_staleness.md §11)."""
-        from trainmate.coach import coach_service
+        from trainmate.coach.service import coach_service
 
         template = "# Template\n\n- 1/week Resistance Training\n- 0-2/week HIIT\n"
         with self._with_science_dir({"template.md": template, "notes.md": "# Notes\n"}) as d:
@@ -399,7 +400,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
     def test_a_plan_without_a_science_snapshot_is_not_held_to_one(self):
         """A plan generated before the column existed cannot say what it was built
         against, so it is not flagged on this axis until its next stamp (§11)."""
-        from trainmate.coach import coach_service
+        from trainmate.coach.service import coach_service
 
         with self._with_science_dir({"template.md": "# Template\n"}):
             self._seed(stale=False)
@@ -410,7 +411,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
     @patch("trainmate.runtime.garmin")
     def test_plan_keep_stamps_the_science_documents_too(self, _mock_garmin):
         """The stamp has to clear every axis, or a kept plan flags again tomorrow."""
-        from trainmate.coach import coach_service
+        from trainmate.coach.service import coach_service
 
         with self._with_science_dir({"template.md": "# Template\n"}) as d:
             self._seed(stale=True)
@@ -422,7 +423,7 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
             self.assertIsNone(coach_service.config_changed(self._macro()))
 
     def test_two_threshold_moves_are_reported_together(self):
-        from trainmate.coach import coach_service
+        from trainmate.coach.service import coach_service
 
         self._seed(stale=False)
         for kind, value, unit in (("ftp", 265.0, "W"), ("lthr", 172.0, "bpm")):

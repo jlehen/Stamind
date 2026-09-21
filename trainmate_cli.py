@@ -8,15 +8,11 @@ cycle is gone with it.
 import argparse
 import sys
 import traceback
-from typing import Optional
 
-from trainmate import clock, journal, runtime
+from trainmate import clock, journal
 from trainmate.prompt import PromptCancelled
-from trainmate.util import (
-    bold, dim, green, red, cyan, blue, magenta, gray, aside, visible_len, pad_visible,
-    wrap_text, format_labeled_text, format_labeled_paragraph, default_wrap_width,
-    today_str as _today_str, today_date as _today_date, notice,
-)
+from trainmate.text import bold, cyan, dim, red
+from trainmate.output import aside, notice
 
 from trainmate.cli.argparse_ext import (
     UsageExit, WrapAwareArgumentParser,
@@ -54,39 +50,8 @@ COMMAND_ORDER = {
     "data": ["pull", "reflect", "show-metrics", "show-activities"],
 }
 
-from trainmate.cli.common import ensure_recent_data
-from trainmate.cli.status import run_status
-from trainmate.cli.progress import run_progress
-from trainmate.cli.goals import (
-    run_goal_add, run_goal_edit, run_goal_list, run_goal_rm, run_goal_wipe,
-)
-from trainmate.cli.constraints import (
-    run_constraint_add, run_constraint_edit, run_constraint_list,
-    run_constraint_show, run_constraint_rm, run_constraint_wipe,
-)
-from trainmate.cli.benchmarks import (
-    run_benchmark_record, run_benchmark_list, run_benchmark_rm, run_benchmark_wipe,
-)
-from trainmate.cli.learnings import (
-    run_learning_list, run_learning_show, run_learning_edit, run_learning_rm,
-    run_learning_demote, run_learning_keep, run_learning_wipe,
-)
-from trainmate.cli.plans import (
-    run_plan_generate, run_plan_show, run_plan_rm, run_plan_feedback, run_plan_wipe,
-    run_plan_rollback, run_plan_versions, run_plan_diff,
-)
-from trainmate.cli.workouts import (
-    run_workout_list, run_workout_compare, run_workout_generate, run_workout_adapt,
-    run_workout_tweak, run_workout_push, run_workout_wipe, run_workout_batches,
-    run_workout_rollback, run_workout_prune_calendar,
-)
-from trainmate.cli.data import (
-    run_data_pull, run_data_bootstrap, run_data_reflect, run_data_backfill_tss,
-    run_data_show_metrics, run_data_show_activities, run_data_wipe,
-)
-from trainmate.cli.signals import (
-    run_signal_add, run_signal_rm, run_signal_list, run_signal_list_metrics,
-)
+# Only the parser builders. Each one attaches its command's handler as `func=`, so the
+# dispatcher never names a handler and importing one here bound 71 names nothing read.
 from trainmate.cli.status import add_status_parser
 from trainmate.cli.progress import add_progress_parser
 from trainmate.cli.goals import add_goal_parser
@@ -94,16 +59,14 @@ from trainmate.cli.constraints import add_constraint_parser
 from trainmate.cli.benchmarks import add_benchmark_parser
 from trainmate.cli.signals import add_signal_parser
 from trainmate.cli.learnings import add_learnings_parser
-from trainmate.cli.plans import add_plan_parser
-from trainmate.cli.workouts import add_workout_parser
-from trainmate.cli.data import add_data_parser
+from trainmate.cli.plans.parser import add_plan_parser
+from trainmate.cli.workouts.parser import add_workout_parser
+from trainmate.cli.data.parser import add_data_parser
 from trainmate.cli.settings import add_settings_parser
-from trainmate.cli.journal import add_journal_parser
+from trainmate.cli.journal.parser import add_journal_parser
 from trainmate.cli.queue import add_queue_parser
 from trainmate.cli.strength import add_strength_parser
-from trainmate.cli.bot import (
-    add_bot_parser, run_bot_constraints, run_bot_morning, run_bot_route,
-)
+from trainmate.cli.bot.parser import add_bot_parser
 
 
 def build_parser():

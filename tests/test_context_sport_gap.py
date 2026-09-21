@@ -1,13 +1,18 @@
-"""`PmcContextMixin._week_sport_gap_note`: the per-sport annotation on a mesocycle's
-"Weeks already trained" prompt lines (coach/service/context.py). Pure function —
-reads only its arguments, no `self._db` — so it is exercised directly here rather
-than through a full CoachService/DB fixture."""
+"""`MesocycleContextMixin._week_sport_gap_note`: the per-sport annotation on a
+mesocycle's "Weeks already trained" prompt lines (coach/service/mesocycle_context.py).
+Pure function — reads only its arguments, no `self._db` — so it is exercised directly
+here rather than through a full CoachService/DB fixture.
+
+The second class below covers how the 15-day summary counts sports, which is
+`HistoryContextMixin._get_recent_history_summary` (coach/service/history_context.py).
+It keeps a fake handle, because that one does read the database."""
 import unittest
 
-from trainmate.coach.service.context import PmcContextMixin
+from trainmate.coach.service.history_context import HistoryContextMixin
+from trainmate.coach.service.mesocycle_context import MesocycleContextMixin
 
 
-class _Ctx(PmcContextMixin):
+class _Ctx(MesocycleContextMixin):
     pass
 
 
@@ -78,6 +83,53 @@ class TestWeekSportGapNote(unittest.TestCase):
         week = {"planned_load": None}
         self.assertIsNone(self.ctx._week_sport_gap_note(week, denom=None, actual=0.0))
         self.assertIsNone(self.ctx._week_sport_gap_note(week, denom=100.0, actual=0.0))
+
+
+class _FakeDB:
+    """The two reads `_get_recent_history_summary` makes, and nothing else."""
+
+    def __init__(self, activities):
+        self._activities = activities
+
+    def get_metrics_cache(self, start_date=None, end_date=None):
+        return []
+
+    def get_completed_activities(self, start_date=None, end_date=None):
+        return self._activities
+
+
+class _DbCtx(HistoryContextMixin):
+    def __init__(self, activities):
+        self._db = _FakeDB(activities)
+
+
+class TestRecentHistorySportsAreCanonical(unittest.TestCase):
+    """The 15-day summary counts sports the way every other surface does.
+
+    Garmin spells one sport several ways — `road_biking` outdoors, `indoor_cycling` on
+    the trainer. Grouped on the raw spelling, the coach read one week of riding as two
+    sports it had never heard of, while `status` and `progress` called the same rides
+    `cycling` (trainmate/sports.py)."""
+
+    def test_two_garmin_spellings_of_cycling_are_one_line(self):
+        ctx = _DbCtx([
+            {"activity_type": "road_biking", "duration_sec": 5400.0},
+            {"activity_type": "road_biking", "duration_sec": 3600.0},
+            {"activity_type": "indoor_cycling", "duration_sec": 3600.0},
+            {"activity_type": "trail_running", "duration_sec": 1800.0},
+        ])
+        summary = ctx._get_recent_history_summary("2026-09-20")
+
+        self.assertIn("  - cycling: 3 activities, total duration 3.5 hours", summary)
+        self.assertIn("  - running: 1 activity, total duration 0.5 hours", summary)
+        for raw in ("road_biking", "indoor_cycling", "trail_running"):
+            self.assertNotIn(raw, summary)
+
+    def test_an_unknown_sport_keeps_its_own_name(self):
+        ctx = _DbCtx([{"activity_type": "kitesurfing", "duration_sec": 3600.0}])
+        self.assertIn("  - kitesurfing: 1 activity", ctx._get_recent_history_summary(
+            "2026-09-20"
+        ))
 
 
 if __name__ == "__main__":

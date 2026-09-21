@@ -40,7 +40,7 @@ a chain. The chain is right. What comes out the other end of it is not.
    (`cli/workouts/generate.py::_resolve_span`), so without a selector the change does not
    reach the athlete for up to `workout_generation_span_days`.
 4. That selected run rewrites the span wholesale.
-   `coach/service/workouts.py::workout_generate_apply` voids every live session in the
+   `coach/service/generate.py::workout_generate_apply` voids every live session in the
    span the new proposal does not re-propose, then writes the new ones.
 
 Step 4 is where the surprise is made.
@@ -53,7 +53,8 @@ three sessions a week to four, and runs `workout generate -m`.
 
 **The rewrite is blind.** The `workout generate` prompt is shown nothing about the
 sessions currently standing in the horizon, except the handful an adaptation already
-eased (`adaptation_count > 0`, `coach/service/workouts.py::workout_generate`). So the
+eased (`adaptation_count > 0`, `coach/service/workouts.py::workout_generate`, the file
+`generate.py` was split out of). So the
 model rewrites the span with no idea what the athlete was told last week. Days the
 correction has nothing to do with are re-rolled along with the rest, because the model
 has nothing to hold them steady against.
@@ -64,7 +65,7 @@ carry a row, and `_fill_coverage_gaps` adds a "Rest Day" for any the model leave
 rest row. That row is a session in a different slot — slots are `(date, sport)`, and
 `rest` is a sport — so it starts its own lineage and gets its own Calendar event. The
 ride's void carries the change kind `generate`, which is not in `ATHLETE_VOID_KINDS`
-(`db/workouts.py`), so `calendar_reconcile.py::_plan` tears the ride's event down.
+(`db/workout_change.py`), so `gcal/reconcile.py::_plan` tears the ride's event down.
 Thursday now reads "Rest Day", with nothing to say a ride was there yesterday or why it
 went. The "Rest Day" body says "no session planned for this day", which is not true: a
 session was planned, and a decision removed it.
@@ -73,7 +74,7 @@ session was planned, and a decision removed it.
 running", Thursday's run would become a ride. Same reasoning: different sport, different
 slot, new lineage. The run's event is deleted and a ride event appears with an empty
 History section. Compare `workout adapt`, which hands the displaced session's lineage to
-its new-sport replacement (`coach/service/adaptation.py::workout_adapt_apply`,
+its new-sport replacement (`coach/service/revision_apply.py::workout_revision_apply`,
 `lineage_id=displaced['id']`), so the event updates in place, retitled, with the run
 underneath it in History.
 
@@ -93,7 +94,7 @@ reason (DESIGN_calendar_lineage.md §3). That reads as a change to something the
 recognises.
 
 **`workout adapt` already leaves the trace this design wants.** Its move rule leaves a
-replacement on any date it empties (`coach/engine/workouts.py::_move_task`), the
+replacement on any date it empties (`coach/engine/sessions.py::move_task`), the
 replacement carries the displaced session's lineage, and the event is retitled
 "[Adapted] Rest Day" with the reason and the old session in History. Nothing in this
 design changes adapt's behaviour except what §4.6 shows it about a session's earlier form.
@@ -201,7 +202,7 @@ Both bounds of the standing sessions are load-bearing:
 a standing session and carries its tag. Past the window the week planner re-places tests
 itself, from the record it is already given: every anchor's latest value and last test
 date, every test on the calendar in the ninety days before the span, and the tests planned
-in the elapsed part of the mesocycle (`coach/service/context.py::_anchor_history_text`,
+in the elapsed part of the mesocycle (`coach/service/mesocycle_context.py::_anchor_history_text`,
 `_mesocycle_benchmark_lines`). The plan is the plan out there, and that includes its tests.
 
 One set, computed once, used by the prompt section (§4.6), the preview (§4.5) and the trace
@@ -238,9 +239,9 @@ accounted for and explained (§4.5).
 
 The codebase already holds both answers to "the model was asked, but did it?":
 
-- `coach/service/workouts.py::_enforce_rest_windows_generate` — deterministic. A `rest`
+- `coach/service/guards.py::_enforce_rest_windows_generate` — deterministic. A `rest`
   constraint bypasses the model for those dates entirely.
-- `coach/service/workouts.py::_warn_missing_boundary_benchmarks` — "warn, don't
+- `coach/service/guards.py::_warn_missing_boundary_benchmarks` — "warn, don't
   auto-insert".
 
 The window belongs in the second tier, because breaking it is sometimes correct. There is
@@ -301,7 +302,7 @@ today. That is what puts it on the Calendar `Reason:` line and on the `[Cancelle
 **The lineage rules.** `_lineage_for` already answers explicit-lineage appends (adapt's
 sport change) and appends over a void (new session). `replaces` maps onto the
 explicit case: apply voids the named slot first, then appends the new entry with
-`lineage_id` of the session it replaces. Nothing new in `db/workouts.py`.
+`lineage_id` of the session it replaces. Nothing new in `db/workout_change.py`.
 
 **Resolving the answers.** `_resolve_kept` already carries the conflict rules for one
 answer — a KEEP naming an unoccupied slot is dropped, an explicit session for a slot beats
@@ -330,7 +331,7 @@ a KEEP of it. `_resolve_standing` needs the rest of them, and they are as flat:
 because DESIGN_workout_revisions.md §9's no-op rule silently suppresses a revision whose
 prescription is unchanged, and because §5.5's deterministic passes remove sessions the
 model never spoke about. The no-op comparison lives in the write path today
-(`db/workouts.py::WorkoutChange._write`, `_same_prescription` against the live row), and
+(`db/workout_change.py::WorkoutChange._write`, `_same_prescription` against the live row), and
 apply calls `append` unconditionally, so the proposal step runs the same comparison
 against the standing rows it already loads and marks the equal ones `kept` before the
 table is drawn. Reporting the answers instead would tell the operator a wording-only
@@ -447,7 +448,7 @@ carries the kind of the change that made it:
 A session `workout adapt` or `workout tweak` moves leaves a void where it left and a copy on
 its own lineage where it landed. No word is drawn: the event moves.
 
-`[Deleted]` is what `google_calendar.py::sync_workout` draws today for a goal called off,
+`[Deleted]` is what `gcal/event.py::event_body` draws today for a goal called off,
 and it keeps meaning "you did this". `[Cancelled]` is new and means "your coach did this".
 Both carry the void's `reason` as a `Reason:` line, which §4.5 now fills with the coach's
 own words instead of "Not in the regenerated plan".
@@ -476,11 +477,11 @@ above already are:
 ### 5.2 Which voids keep their event
 
 `ATHLETE_VOID_KINDS = ("stand-down",)` has three consumers.
-`coach/service/adaptation.py::workout_adapt` asks **who asked for this?** — so
+`coach/service/adapt.py::workout_adapt` asks **who asked for this?** — so
 the week planner is not told the athlete cancelled a day the plan merely stopped scheduling. That
 is about authorship, and the constant stays as it is for that job.
-`google_calendar.py::_void_label` asks **whose decision does the word report?**, which is
-the same question. `calendar_reconcile.py::_plan` asks **should this day leave a trace?**,
+`gcal/event.py::_void_label` asks **whose decision does the word report?**, which is
+the same question. `gcal/reconcile.py::_plan` asks **should this day leave a trace?**,
 and borrowed the authorship set because the questions happened to coincide. They no longer
 do:
 
@@ -510,8 +511,8 @@ slot's live row, the lineage was superseded and the event is torn down as today.
 
 **The window is stamped on the change, not re-read at sync time.** Rev. 2 had
 `window_end` reach `_plan()` as a settings read. That makes the answer depend on *when the
-sync runs*: write with `--no-sync` (`calendar_reconcile.no_calendar_sync`), push a
-fortnight later, and a void that was outside the window when it was written is inside it
+sync runs*: write without reconciling, push a fortnight later, and a void that was
+outside the window when it was written is inside it
 by the time it is reconciled, because the window has moved forward. So each
 `workout_change` records the `window_end` in force when it ran, and the rule reads it
 back. The decision is a property of the removal, not of the clock. No lower bound is
@@ -540,7 +541,7 @@ Removed with the hand-edit commands (DESIGN_workout_tweak.md §5).
 
 Thursday's dropped ride becomes Thursday's "Rest Day" in the ride's lineage, the reason
 on it, the ride in its History. That is what `workout adapt`'s move rule already
-produces (`coach/engine/workouts.py::_move_task`), and the same event, retitled, is
+produces (`coach/engine/sessions.py::move_task`), and the same event, retitled, is
 what the athlete sees in both cases. The `[Cancelled]` word does not appear: nothing was
 left without a replacement. The rest row's body carries the coach's sentence — "Long ride
 cancelled — never two hard days in a row" — and not the coverage backstop's "no session
@@ -578,7 +579,7 @@ claims.
 written. So the keep-list comes from `workout_calendar_state`
 instead, which is the ownership record: the reconcile clears a lineage's row when it
 tears that lineage's event down, so a row still standing means the event is still
-claimed. `db/workouts.py::claimed_calendar_event_ids` reads it.
+claimed. `db/workout_history.py::claimed_calendar_event_ids` reads it.
 
 Repeated `workout generate` runs on the same day do not stack markers: every answer but
 `keep` lands on the session's own lineage (§4.5), so a day re-decided in a later run is
@@ -620,12 +621,12 @@ which diff. That is most of what rev. 3's §6 was.
 So `workout generate` reads what it reads today, with two additions and a rule:
 
 - **Today's profile, the plan and the current constraints**, as now. The plan's strategy
-  text and mesocycle list already reach the prompt (`coach/engine/workouts.py`,
+  text and mesocycle list already reach the prompt (`coach/engine/generate.py`,
   `strategy`, `meso_text`).
 - **The standing sessions** (§4.6).
 - **The current mesocycle's past constraints.** Today the prompt is given only the
   constraints still active on or after the span's start
-  (`coach/service/workouts.py`, `get_constraints(gen_start)`). A constraint that ended
+  (`coach/service/generate.py`, `get_constraints(gen_start)`). A constraint that ended
   last week — "ill 1 to 5 September" — is not shown, so the week planner sees three missed
   sessions in the mesocycle-progress section and not why. The lower bound becomes the
   current mesocycle's start date, and constraints that ended before the span are rendered
@@ -691,7 +692,7 @@ it having run.
 **Into the preview.** The per-session sentences are the right-hand column of §4.5's table;
 the week line prints above it. The operator can reject the proposal.
 
-**Onto the Calendar, as `Reason:`, once.** Today `calendar_lineage.py::_entry` prints a
+**Onto the Calendar, as `Reason:`, once.** Today `gcal/history.py::_entry` prints a
 revision's own `reason` as `Reason:` and the change's `summary` as `Change:` when the two
 differ. For an adaptation the summary is the batch's overall rationale — "HRV suppressed
 three mornings running" — which is a second *why*, not a *what*, so the label misleads
@@ -747,7 +748,7 @@ These stood in rev. 3 as inputs to the diff. They stand now because `plan show` 
 without them, and they are useful whatever `workout generate` does.
 
 **A profile edit currently swallows a concurrent threshold move.** `config_changed`
-(`coach/service/prompt.py`) checks the profile hash first and **returns on the first
+(`coach/service/staleness.py`) checks the profile hash first and **returns on the first
 thing it finds**; thresholds are only examined when the profile is unchanged, and the
 threshold loop itself returns on the first key in alphabetical order rather than the
 largest move. So: the athlete retests, FTP 250 → 265, the plan flags it correctly. Before
@@ -828,7 +829,7 @@ holding the moment it does — "both questions stamp on 'keep', so the same chan
 about once" — and `plan show` stamps nothing. So the verdict is cached on the macrocycle
 against the snapshot it was asked about, and §10's "Where it is not asked" and
 "Deliberately not done" paragraphs are amended. The call fails open as it does today
-(`coach/service/planning.py::plan_reshape_verdict`): the plan prints whatever the network
+(`coach/service/staleness.py::plan_reshape_verdict`): the plan prints whatever the network
 does, with an aside where the verdict would have been.
 
 **Already landed.** `workout_generate_apply` carried a test's `benchmark_type` onto
@@ -876,7 +877,7 @@ mesocycle has a constraint that ended before the span, and not otherwise.
 - The mesocycle's past constraints are fetched from the mesocycle start; one that ended
   before the span renders under the past heading; one still active does not.
 
-`tests/test_calendar.py` — `leaves_trace` for each clause: athlete kind outside the
+`tests/test_gcal_reconcile.py` — `leaves_trace` for each clause: athlete kind outside the
 window, coach kind inside, coach kind outside (torn down), `N=0`. The window is read from
 the change, so a void reconciled a fortnight later gets the answer it had when written; a
 rollback's restored copy reads the original change's stamp. `_plan` reads a void from its
@@ -888,7 +889,7 @@ the day. A trace-keeping void with no event gets one. `[Deleted]` for `stand-dow
 `[Cancelled]` for `generate`/`adapt`/`tweak`; a `generate` or `tweak` revision with a reason
 is **not** titled `[Adapted]`, an `adapt` revision is.
 
-`tests/test_calendar_lineage.py` — a History entry prints `Reason:` from the revision, the
+`tests/test_gcal_history.py` — a History entry prints `Reason:` from the revision, the
 batch summary under the same label only when the revision has none, and `Change:` never.
 
 `tests/test_cli_plan_staleness.py` — `config_changed` reports a profile edit and a
@@ -903,11 +904,11 @@ silence it; a forced second push the same day does not repeat it; a push that re
 silently does not consume it; it says "undone" after a rollback; it says nothing when the
 rollback preceded the first push.
 
-`tests/test_periodization.py` — an easy run written over a scheduled test is not a test
-(landed, `c2d11f9`).
+`tests/test_periodization_generation_span.py` — an easy run written over a scheduled
+test is not a test (landed, `c2d11f9`).
 
-`tests/test_cli_workouts.py` — `prune-calendar` keeps a marker whose slot a later session
-has taken, and still deletes an event no lineage claims (§5.6).
+`tests/test_cli_workouts_calendar.py` — `prune-calendar` keeps a marker whose slot a
+later session has taken, and still deletes an event no lineage claims (§5.6).
 
 ## 9. Worked example
 

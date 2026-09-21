@@ -74,16 +74,17 @@ Same relative-overload signal, three improvements:
   construction. In the EWMAs a given day weighs ~14% in ATL but only ~2% in CTL.
 - **Nothing new to store.** It is a division of two columns already on every row.
 
-`garmin.pmc.load_ratio(atl, ctl)` is the single server-side implementation, returning
+`analytics.pmc.load_ratio(atl, ctl)` is the single server-side implementation, returning
 `None` when either EWMA is NULL or CTL has not warmed above zero (a ratio against ~0 is
 noise). It is derived at read time and never stored, so it cannot drift from the EWMAs it
 divides.
 
 One deliberate mirror: `/api/metrics` serves raw `ctl`/`atl` and no ratio, so the web
-dashboard repeats the division and the same `ctl > 0` / NULL guard in `static/app.js`
-(the status card and the metrics table). Every consumer that runs Python — CLI, coach,
-analysis — goes through `load_ratio`. Serving the ratio from the endpoint would remove
-the mirror; that is a separate change, not a defect here.
+dashboard repeats the division and the same `ctl > 0` / NULL guard in
+`static/dashboard.js` (the status card) and `static/records.js` (the metrics table).
+Every consumer that runs Python — CLI, coach, analysis — goes through `load_ratio`.
+Serving the ratio from the endpoint would remove the mirror; that is a separate
+change, not a defect here.
 
 ### Job assignment after the change
 
@@ -145,7 +146,7 @@ enforces it.
 
 ## 6. Migration
 
-Single-user, so a one-off guarded DDL in `db/base.py` (AGENTS.md) drops
+Single-user, so a one-off guarded DDL in `db/schema.py` (AGENTS.md) drops
 `acute_workload`, `chronic_workload`, and `acwr` from `athlete_metrics_cache`. No
 separate script and no backward compatibility: `save_metric_cache()` loses the three
 parameters, `AthleteMetric` loses the three fields, and `recompute_derived()` loses the

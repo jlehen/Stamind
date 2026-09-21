@@ -244,7 +244,7 @@ an ordinary unambiguous prefix, so the group needs no registered alias at all an
 
 ## 5. Data model
 
-This is the **rev-6 schema, inlined** — it is what `db/base.py` creates and what the
+This is the **rev-6 schema, inlined** — it is what `db/schema.py` creates and what the
 live database holds. (Rev 6 dropped `binding`/`sport`/`type` and added `rest`; the
 migration is pure idempotent DDL in `_init_db`, see the preamble and §9.)
 
@@ -331,7 +331,7 @@ For each directive in the fetched set:
   **post-hoc override of the model's output, not a prompt instruction** — the
   model still returns whatever it likes for that date, and the app rewrites it:
   - `generate` calls the LLM for the whole plan and then saves the returned list
-    (`coach/service/workouts.py`'s `workout_generate`, the `workouts =
+    (`coach/service/generate.py`'s `workout_generate`, the `workouts =
     planner_reply.get("workouts", [])` → `save_workout` loop). The pre-pass
     (`_enforce_rest_windows_generate`) runs **between** those two steps: drop any
     session the model placed on a rest date and splice in a forced
@@ -356,7 +356,7 @@ For each directive in the fetched set:
     explicit rest entry, with a `change_reason` naming the constraint (the
     change_reason footprint is now grounded in a durable row, not a smuggled
     ephemeral note). This reuses `adapt`'s existing displaced-session handling:
-    `workout_adapt_apply` already removes every session on a date that isn't
+    `workout_revision_apply` already removes every session on a date that isn't
     covered by a given day's proposal, so handing it a single synthesized `rest`
     proposal for that date correctly clears all of that day's sessions, not just
     the first one.
@@ -397,8 +397,9 @@ Authoring is CLI-only, so §4 is the whole mutating surface. That endpoint's win
 is deliberately *not* `constraint list`'s: a rolling `metrics_lookback_days` plus
 everything upcoming, because the dashboard has no mesocycle context in which the
 mesocycle anchor would read. The
-`trainmate_bot.py` touch is only a one-line command label
-(`("lifeevent", "Manage life events")`) and is handled by the §9 forwarder — no
+Telegram touch is only a one-line command label in `MENU_COMMANDS`
+(`("lifeevent", "Manage life events")`, `trainmate/chat/keyboards.py`) and is handled
+by the §9 forwarder — no
 special work.
 
 ---
@@ -431,7 +432,7 @@ take — just constraint-triggered instead of pre-classified.
 **Which goals the replan rebuilds.** The ones whose **own span holds the disrupted
 days** — never "the next goal on the calendar". Goals partition the timeline (a goal
 owns from the day after the goal before it, clamped to today, through its target date),
-so the overlapping set is contiguous and `cli/plans.py`'s `goal_range_for_window` names
+so the overlapping set is contiguous and `cli/windows.py`'s `goal_range_for_window` names
 it as an `IdRange` over the shared `-g` grammar (DESIGN_cli_selectors.md §9). Three
 cases fall out:
 
@@ -513,14 +514,15 @@ load displacements trip it) and tune the two knobs from there.
 **Snapshotting & staleness.** `plan generate` records the active `replan = 1`
 constraints onto the macrocycle as a new `constraints_snapshot` (the successor
 to `lifeevents_snapshot`), so "inputs this plan was built on" stays inspectable
-(`plans._print_considered_inputs`). But the strategy prompt (§5) is built from
+(`_print_considered_inputs` in `cli/plans/show.py`). But the strategy prompt (§5) is
+built from
 *every* active constraint, not just the `replan = 1` subset — so a `plan show`
 reading `constraints_snapshot` alone could print "Constraints considered: None"
 while a tactical directive plainly shaped the strategy text, which misleads
 exactly when someone is auditing why a plan reads the way it does. A second
 column, `all_constraints_snapshot`, therefore also records every active
 constraint at generation time, each tagged with its `replan` flag
-(`CoachEngine._clean_constraints_all`) — display only, never hashed. `plan show`
+(`plan_inputs.clean_constraints_all`) — display only, never hashed. `plan show`
 renders it as a second, explicitly-tactical list alongside the plan-shaping one,
 so the reader is never left inferring "no constraints" from an empty
 plan-shaping section. The staleness fingerprint moves with the first column: the
@@ -533,7 +535,7 @@ and fight the magnitude flow above; plan-level staleness is exactly what `replan
 escalation is for.
 
 Both columns are **renamed in place** (`lifeevents_hash` → `constraints_hash`,
-`lifeevents_snapshot` → `constraints_snapshot`, `db/base.py`), so legacy snapshot
+`lifeevents_snapshot` → `constraints_snapshot`, `db/schema.py`), so legacy snapshot
 *values* survive under the new column name rather than being stranded under the old
 one. An earlier draft said `lifeevents_snapshot` was left untouched; renaming is
 simpler and keeps one read path, and the display code already tolerates both the
@@ -575,7 +577,7 @@ across every active goal is a reasonable, if occasionally redundant, default.
 channel. It becomes a **fast-capture inbox** classified by the *same* `adapt`
 LLM call that already evaluates the day — no separate classification pass, no
 extra LLM round-trip or cost. The response schema (the same JSON object that
-carries `adapted_workouts`, in `coach/engine/workouts.py`'s
+carries `adapted_workouts`, in `coach/engine/adapt.py`'s
 `_workout_adapt_logic`) gains a sibling field with its own formal shape, mirroring
 what `constraint add` itself accepts:
 
@@ -617,7 +619,7 @@ what `constraint add` itself accepts:
    ephemeral nudge — the message still influenced *this* run's adaptation via
    the advisory text, but nothing durable is written.
 2. **Then confirm the adaptation.** The existing adapt preview + `[y/N]` apply
-   prompt (`cli/workouts/generate.py`) runs as it does today. Declining the constraint in
+   prompt (`cli/workouts/adapt.py`) runs as it does today. Declining the constraint in
    step 1 does not stop step 2, and vice versa — they are independent
    commits.
 
@@ -653,17 +655,17 @@ than needing separate enforcement.
 `lifeevent` / `le` / `e` were retained for one release as thin **forwarders** to
 `constraint … --replan` (a life event was, by definition, plan-shaping), emitting a
 deprecation notice. That release has passed: no `lifeevent` command exists anywhere
-today — `trainmate_cli.py` dispatches only `constraint`, and `trainmate_bot.py`
-lists only `("constraint", …)`. (Behavior change the forwarder carried while it
-lived: it could propose a regen at add time, §7 step 3.)
+today — `trainmate_cli.py` dispatches only `constraint`, and `MENU_COMMANDS`
+(`trainmate/chat/keyboards.py`) lists only `("constraint", …)`. (Behavior change the
+forwarder carried while it lived: it could propose a regen at add time, §7 step 3.)
 
 **Data migration — a one-off operation, not part of `_init_db`. Historical: this
 script has run and has since been deleted** (`scripts/` holds only
 `migrate_constraints_drop_binding.py` and `migrate_cycling_sport_rename.py`), and
 the `lifeevents` table it read is dropped unconditionally by `_init_db` (§10 step 8,
-`db/base.py`'s `DROP TABLE IF EXISTS lifeevents`). The reasoning is kept because it
+`db/schema.py`'s `DROP TABLE IF EXISTS lifeevents`). The reasoning is kept because it
 is the standing rule for *any* future row-copy migration here. Every other migration
-in `base.py` is idempotent *by construction*: `CREATE TABLE IF NOT
+in `schema.py` is idempotent *by construction*: `CREATE TABLE IF NOT
 EXISTS`, `ADD COLUMN` guarded by `except OperationalError`, and renames
 guarded by column/table presence all self-terminate, because their guard
 condition stops being true after the first run. A *row copy* between two
@@ -755,7 +757,7 @@ through the one current read path rather than stranding them.
    `context` → `signal` rename, which drops the alias entirely).
 8. ~~Later release: remove the `lifeevent` forwarder; drop the `lifeevents` table.~~
    **Done** — the forwarder is gone and `_init_db` unconditionally drops `lifeevents`
-   (and its older `life_events` name), `db/base.py`.
+   (and its older `life_events` name), `db/schema.py`.
 
 **All eight steps have shipped**, plus rev 6's collapse to a single `rest` flag on
 top of them. Steps 1–3 were shippable on their own (new object usable, existing life

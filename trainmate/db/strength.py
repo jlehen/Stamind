@@ -16,9 +16,15 @@ STRENGTH_TYPE = "strength_training"
 ACTIVE = "active"
 REST = "rest"
 
-# The `named_by` values that mean a person chose the name — in Garmin, or in TrainMate.
-# Only these reach the strength history and the naming answers (§5, §8).
-NAMED_BY_PERSON = ("garmin", "athlete")
+# Who named a set (§5). GARMIN is a person's pick in Garmin Connect or on the watch
+# face; ATHLETE is an answer they gave TrainMate; WATCH is the watch's own guess.
+# Only the two a person left reach the strength history and the naming answers
+# (§5, §8), which is what `NAMED_BY_PERSON` is for — it is built from them rather
+# than spelling the same two strings twice.
+GARMIN = "garmin"
+ATHLETE = "athlete"
+WATCH = "watch"
+NAMED_BY_PERSON = (GARMIN, ATHLETE)
 
 # When the strength history last changed, in the settings table: code writes it, the
 # athlete never edits it, and the strength planner reads it as its evidence (§5, §9).
@@ -33,13 +39,6 @@ def _person_marks() -> str:
 class StrengthMixin:
     """Exercise sets hanging off a Garmin activity, and the three columns that say whether
     they were read, frozen or discarded."""
-
-    def get_completed_activity(self, activity_id: str) -> Optional[Dict[str, Any]]:
-        with self._get_connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM completed_activities WHERE activity_id = ?", (activity_id,)
-            ).fetchone()
-            return dict(row) if row else None
 
     def strength_activities(
         self, since: str, before: Optional[str] = None, date: Optional[str] = None,
@@ -120,7 +119,7 @@ class StrengthMixin:
     ) -> None:
         """Names the sets at `seqs` as a person's answer, or clears their name with None
         (§7). Nothing else sets `named_by = athlete`."""
-        named_by = "athlete" if exercise else None
+        named_by = ATHLETE if exercise else None
         with self._get_connection() as conn:
             conn.executemany(
                 "UPDATE exercise_sets SET exercise = ?, named_by = ? "
@@ -135,9 +134,9 @@ class StrengthMixin:
         is what "yes, final" and `strength reset` say about them (§6). Returns how many."""
         with self._get_connection() as conn:
             cursor = conn.execute(
-                "UPDATE exercise_sets SET named_by = 'athlete' "
-                "WHERE activity_id = ? AND named_by = 'watch'",
-                (activity_id,),
+                "UPDATE exercise_sets SET named_by = ? "
+                "WHERE activity_id = ? AND named_by = ?",
+                (ATHLETE, activity_id, WATCH),
             )
             conn.commit()
             confirmed = cursor.rowcount
@@ -216,32 +215,17 @@ class StrengthMixin:
 
     # --- what the strength planner prescribed (§9) ---
 
-    def get_prescribed_sets(self, workout_id: int) -> List[Dict[str, Any]]:
-        """One revision's prescribed exercises, in the order they are done."""
-        with self._get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM prescribed_sets WHERE workout_id = ? ORDER BY position",
-                (workout_id,),
-            ).fetchall()
-            return [dict(row) for row in rows]
-
     def prescribed_sets_for_revisions(
         self, revision_ids: Sequence[int]
     ) -> Dict[int, List[Dict[str, Any]]]:
-        """The prescribed exercises of several revisions at once, keyed by revision."""
+        """The prescribed exercises of several revisions at once, keyed by revision.
+
+        The same read hydration does, with a connection of its own rather than one it was
+        handed (`db/workouts.py::_prescribed_set_rows`)."""
         if not revision_ids:
             return {}
-        placeholders = ",".join("?" * len(revision_ids))
         with self._get_connection() as conn:
-            rows = conn.execute(
-                f"SELECT * FROM prescribed_sets WHERE workout_id IN ({placeholders}) "
-                "ORDER BY workout_id, position",
-                tuple(revision_ids),
-            ).fetchall()
-        grouped: Dict[int, List[Dict[str, Any]]] = {}
-        for row in rows:
-            grouped.setdefault(row["workout_id"], []).append(dict(row))
-        return grouped
+            return self._prescribed_set_rows(conn, revision_ids)
 
     def get_strength_check(self, lineage_id: int) -> Optional[str]:
         """The stamp this session's kilograms were last weighed against, or None."""

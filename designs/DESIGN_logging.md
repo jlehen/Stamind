@@ -155,7 +155,7 @@ by construction (the CLI, the REPL, the bot's event loop), so a plain list is en
 
 **`source`** says who started it: `cli`, `repl`, `shell`, `bot`, `push`, `route`, `web`,
 `test`. This is the field that makes "show me only what ran while I was asleep" a one-flag
-query. The bot passes it in `TRAINMATE_SOURCE` — but note that `_cli_env` is one function
+query. The bot passes it in `TRAINMATE_SOURCE` — but note that `cli_env` is one function
 shared by three callers with three different answers, so it takes the value as a
 parameter rather than setting a constant beside `TRAINMATE_FRONTEND`: `_start_command` for
 a chat message is `bot`, the same function firing the morning push is `push`, and
@@ -171,10 +171,9 @@ is not this app's usual answer, and the first draft of this design said the athl
 calendar day, from `clock.active_zone()`, because every other date is resolved that way
 (`DESIGN_user_timezone.md` §1).
 
-It cannot be. `active_zone()` reads the `timezone` setting, which reaches
-`from trainmate.db import db`, which builds a `Database`, which runs all twenty schema
-migrations. Naming a log file would create and migrate the database on `tm help` — the
-exact thing `runtime.py` and `trainmate/db/__init__.py` both carry docstrings forbidding.
+It cannot be. `active_zone()` reads the `timezone` setting, which reaches `runtime.db`,
+which builds a `Database`, which creates every table. Naming a log file would create the
+database on `tm help` — the exact thing `runtime.py` carries a docstring forbidding.
 Worse, it would put a database dependency in the one code path whose job is to survive the
 database being unreachable, which is most of §4.1's argument.
 
@@ -351,8 +350,8 @@ fills itself from lines that were already written, already worded for a human, a
 sitting at the moment worth recording.
 
 Three aside-tier decisions do not go through `aside()` at all and are untouched here:
-`cli/progress.py` and `cli/status.py` each call `asides_enabled()` directly to decide
-whether to build `intensity.format_notes`, and `data pull` returns its summary as a string
+`cli/progress_zones.py` and `cli/status.py` each call `asides_enabled()` directly to decide
+whether to build `zone_tables.format_notes`, and `data pull` returns its summary as a string
 for the caller to print (§3.1 of the output design). All three are caveats or answers, not
 trace, so the trace tier loses nothing by not reaching them.
 
@@ -375,7 +374,7 @@ data", "Calendar event was deleted on Google", "stored timezone is unknown on th
 machine". Something outside the app did not work.
 
 By that line, only about **13 sites** convert — nine in `garmin/` (eight in `sync.py`, one
-in `pmc.py`), two in `calendar_reconcile.py`, one in `google_calendar.py`, one in
+in `pmc.py`), two in `gcal/reconcile.py`, one in `gcal/client.py`, one in
 `clock.py` — plus the `Warning: Failed to log LLM exchange` in `openrouter.py`, which is
 the log failing to log and belongs in the journal more than anywhere. Everything else keeps
 its `print`.
@@ -701,7 +700,7 @@ design.
 
 `warn` in the END column is a true statement and an unhelpful one. Three runs in a row
 ended `warn` for the same reason — Garmin returned one activity with sparse HR zones and no
-RPE, so its load is an underestimate — and nothing on screen said so. `util.warn` had
+RPE, so its load is an underestimate — and nothing on screen said so. `output.warn` had
 printed it at the time, hours earlier, inside a `bot morning` that scrolled past. Reading a
 coded column and then running a second command to learn what it was coding is the failure
 §7.2 fixed for the columns, in a different place: the listing knew and did not say.
@@ -735,7 +734,8 @@ was clipped, so `-v` is never something to guess at.
 
 ## 8. The bot
 
-`trainmate_bot.py` already has a private logger: `_log(chat_id, direction, msg)`,
+The Telegram front-end already has a private logger: `ChatBot._log(chat_id, direction,
+msg)` in `trainmate/chat/app.py`,
 called from every send, tap and command start, `print()` to the process's stdout. Where
 that stdout goes depends entirely on how `./tm-bot` was launched, which means in practice
 it goes nowhere.
@@ -826,7 +826,7 @@ the question that was open; a confirm inside `tm shell` lands on the typed line'
 not the shell's; and `ask_text` writes nothing at all, which is the §4.4 rule.
 
 **A structural test on the read-only verbs.** §7.1 hides a run by matching the last word of
-its command against a set of names, and that set lives in `cli/journal.py` while the names
+its command against a set of names, and that set lives in `cli/journal/runs.py` while the names
 live in the parser tree — two files, so the invariant needs a test that spans them.
 `TestReadOnlyVerbs` walks the real tree and fails on any verb that no longer names a
 command: a renamed or retired one would otherwise match nothing, silently, and its runs
@@ -880,12 +880,12 @@ The core is small and stands alone. The rest is optional and can be judged on wh
 core turns out to earn it.
 
 **Phase 1 — the spine.** `trainmate/journal.py`, the run bracket in `run_once`, `step` /
-`warn` / `fail` in `util.py`, the 29 aside reclassifications, the `llm.call` record, and
+`warn` / `fail` in `output.py`, the 29 aside reclassifications, the `llm.call` record, and
 `tm journal` with its list and detail views. This is what answers all three questions in
 §1. Roughly 150 lines of new code and a lot of one-word edits.
 
 **Phase 2 — the corners.** The bot's eighteen `_log` calls, the `source` parameter on
-`_cli_env` and the parent run id, the ten silent swallows, the run id in the exchange
+`cli_env` and the parent run id, the ten silent swallows, the run id in the exchange
 filenames, the `logging.dir` fix from §6, retention, and `--cost`.
 
 **Phase 3 — only if wanted.** `db.write` records tying a run to the rows it changed,

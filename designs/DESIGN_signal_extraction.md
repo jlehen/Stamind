@@ -196,14 +196,16 @@ for.)
   `cli/signals.py`, which now calls them).
 - **`config.py`** — `signal_metrics`, merging the shipped map with `coach.signal_metrics`.
 - **`coach/service/analysis.py`** — exclusion table moved out; calls `excluded_channels`.
-- **`coach/engine/workouts.py`** — `_signal_extraction_task()` (the vocabulary and the
-  rules), the `new_signals` schema member, and two new parameters. `has_message` now gates
+- **`coach/engine/notes.py`** — `signal_extraction_task()` (the vocabulary and the
+  rules) and the `new_signals` schema member; **`coach/engine/adapt.py`** takes the two
+  new parameters that feed them. `has_message` now gates
   six regions, not four; `tests/test_prompt_gates.py` covers the two new ones.
-- **`coach/service/planning.py`** — `capture_message_signal`, `known_signal_metrics`.
-- **`coach/service/adaptation.py`** — renders the vocabulary, passes the backdate floor,
+- **`coach/service/goals_constraints.py`** — `capture_message_signal`, `known_signal_metrics`.
+- **`coach/service/adapt.py`** — renders the vocabulary, passes the backdate floor,
   reads `new_signals` off the decision onto the proposal.
 - **`coach/proposals.py`** — `RevisionProposal.new_signals`.
-- **`cli/workouts/generate.py`** — `_confirm_new_signals`, the step-1b ladder.
+- **`cli/workouts/adapt.py`** — the step-1b ladder, which it asks through
+  `cli/candidates.py::confirm_new_signals`.
 - **`cli/signals.py`** — shares the writer; warns when `signal add` names an unlisted
   category.
 

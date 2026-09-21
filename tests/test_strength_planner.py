@@ -19,8 +19,8 @@ from trainmate.db import Database
 import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
 from trainmate import runtime, settings
-from trainmate.coach import coach_service
-from trainmate.strength import planner, prescription, sets
+from trainmate.coach.service import coach_service
+from trainmate.strength import planner, planner_prompt, prescription, sets
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)
@@ -233,7 +233,7 @@ class CheckingTest(_PlannerCase):
         ]}]
         result = self.strength_pass([entry])
         # The strength planner is told, or it answers "keep" to a change code would apply.
-        self.assertIn(planner.MOVED_ON, self.asked[0][1])
+        self.assertIn(planner_prompt.MOVED_ON, self.asked[0][1])
         self.assertEqual(result.added, [])
         self.assertIn("Chin up 3×3–5", entry["description"])
         self.assertEqual([r["exercise"] for r in entry["prescribed_sets"]],
@@ -251,7 +251,7 @@ class CheckingTest(_PlannerCase):
             answer("2026-09-17", row("belt squat", 3, 4, 6, 150.0), reason="Jump."),
         ]}]
         result = self.strength_pass([entry])
-        self.assertNotIn(planner.MOVED_ON, self.asked[0][1])
+        self.assertNotIn(planner_prompt.MOVED_ON, self.asked[0][1])
         self.assertEqual(result.added, [])
         self.assertIn("Belt squat 3×4–6 @ 140 kg", entry["description"])
         self.assertEqual([r["load_kg"] for r in entry["prescribed_sets"]], [140.0])
@@ -278,7 +278,7 @@ class WriteAgainTest(_PlannerCase):
                    reason="Your gym days alternate the belt squat and the push press."),
         ]}]
         result = self.strength_pass([], write_again=True)
-        self.assertIn(planner.ASKED_AGAIN, self.asked[0][1])
+        self.assertIn(planner_prompt.ASKED_AGAIN, self.asked[0][1])
         [added] = result.added
         self.assertEqual([r["exercise"] for r in added["prescribed_sets"]],
                          ["belt squat", "barbell push press"])
@@ -319,7 +319,7 @@ class OutputChecksTest(_PlannerCase):
             {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
              "load_kg": -5},
         ):
-            self.assertIsNone(planner._clean_exercise(bad), bad)
+            self.assertIsNone(planner_prompt._clean_exercise(bad), bad)
 
     def test_a_light_session_marks_every_row(self):
         self.gym("2026-09-17")
@@ -485,7 +485,7 @@ class ThroughGenerateTest(_PlannerCase):
                    row("barbell push press", 3, 5, 7, 50.0), reason=reason),
         ]}]
         proposal = self.strength_only()
-        self.assertIn(planner.ASKED_AGAIN, self.asked[0][1])
+        self.assertIn(planner_prompt.ASKED_AGAIN, self.asked[0][1])
         self.assertEqual(proposal.kind, "generate")
         self.assertEqual([w["sport_type"] for w in proposal.workouts], ["strength_training"])
         self.assertIn(("2026-09-17", "running"), proposal.held)
@@ -527,7 +527,7 @@ class ThroughGenerateTest(_PlannerCase):
             week_planner.complete.return_value = {"reasoning": "Build.",
                                                   "workouts": [thursday]}
             coach_service.workout_generate(fresh=True)
-        self.assertIn(planner.ASKED_AGAIN, self.asked[0][1])
+        self.assertIn(planner_prompt.ASKED_AGAIN, self.asked[0][1])
 
 
 class RecordingTest(_PlannerCase):
@@ -587,7 +587,7 @@ class PromptTest(_PlannerCase):
 
     def test_the_accessory_names_shown_are_the_ones_the_athlete_does(self):
         """The full accessory list would double the region with names nobody lifts (§9)."""
-        listed = planner._exercise_list({"cable biceps curl"})
+        listed = planner_prompt._exercise_list({"cable biceps curl"})
         self.assertIn("cable biceps curl (accessory, cable)", listed)
         self.assertIn("belt squat (squat, machine)", listed)
         self.assertNotIn("barbell biceps curl (accessory", listed)

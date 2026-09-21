@@ -1,15 +1,22 @@
-"""Where "now" comes from: the athlete's timezone and the one clock every date reads.
+"""The athlete's time, and how a day is written.
+
+Three things live here. The athlete's timezone, which is where "now" comes from. The
+day as the rest of the app says it: `today_str`, `fmt_date`, `fmt_span`. And the plain
+arithmetic on an ISO date — one parser, one range, one shift — which used to be copied
+into seven modules that each wanted a date a week ago.
 
 See DESIGN_user_timezone.md. The `settings.timezone` row holds an IANA zone name and is
 written by `tm settings set timezone`; with no row the machine's own zone rules (§3).
-`util.today_date()` imports this module on every date call, so `trainmate.db` is imported
-lazily inside each function here — importing it must never open the database.
+`today_date()` sits on every code path, so the handle is read as `runtime.db` at call
+time — importing this module must never open the database.
 """
 
 import sqlite3
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import date, datetime, timedelta, timezone
+from typing import List, Optional
 from zoneinfo import ZoneInfo, available_timezones
+
+from trainmate import runtime
 
 TIMEZONE_SETTING = "timezone"
 
@@ -21,14 +28,12 @@ _zone: object = _UNRESOLVED
 
 def stored_name() -> Optional[str]:
     """The zone name stored in the database, or None when the machine's zone rules."""
-    from trainmate.db import db
-    return db.get_setting(TIMEZONE_SETTING)
+    return runtime.db.get_setting(TIMEZONE_SETTING)
 
 
 def stored_at() -> Optional[str]:
     """UTC ISO instant the stored zone was last written, or None if nothing is stored."""
-    from trainmate.db import db
-    row = db.get_setting_row(TIMEZONE_SETTING)
+    row = runtime.db.get_setting_row(TIMEZONE_SETTING)
     return row["updated_at"] if row else None
 
 
@@ -66,7 +71,8 @@ def _resolve_stored(name: Optional[str]) -> Optional[ZoneInfo]:
         # the journal takes its day and its timestamps from the system clock and imports
         # nothing from this module, so nothing asks for the zone again
         # (DESIGN_logging.md §5.3).
-        from trainmate.util import cmd, warn
+        from trainmate.output import warn
+        from trainmate.text import cmd
         warn(
             f"stored timezone '{name}' is unknown on this machine — using the "
             f"machine's own timezone. Set a valid one with "
@@ -77,7 +83,7 @@ def _resolve_stored(name: Optional[str]) -> Optional[ZoneInfo]:
 
 def now() -> datetime:
     """The current instant, aware, in the athlete's zone. The one clock every "what day is
-    it" computation reads (util.today_date)."""
+    it" computation reads (`today_date` below)."""
     zone = active_zone()
     return datetime.now(zone) if zone else datetime.now().astimezone()
 
@@ -128,6 +134,90 @@ def describe() -> str:
         return str(zone)
     local = datetime.now().astimezone()
     return f"the machine's timezone ({local.tzname()}, {offset_label(local)})"
+
+
+def today_date() -> date:
+    """Returns today's date in the athlete's timezone (DESIGN_user_timezone.md §1).
+
+    Garmin keys daily metrics and activities on the athlete's local calendar
+    date, so every "what day is it" computation must use local time rather than
+    UTC (a UTC frontier drifts a day at the boundary hours). Instants stored for
+    comparison (created_at, last-pull timestamps) stay in UTC elsewhere.
+    """
+    return now().date()
+
+
+def day_str(value: date) -> str:
+    """Returns a date as a YYYY-MM-DD string — the inverse of `parse_date`."""
+    return value.strftime("%Y-%m-%d")
+
+
+def today_str() -> str:
+    """Returns today's local calendar date as a YYYY-MM-DD string."""
+    return day_str(today_date())
+
+
+def days_between(start: str, end: str) -> int:
+    """Returns whole days from `start` to `end` (both YYYY-MM-DD), negative if end precedes it."""
+    return (parse_date(end) - parse_date(start)).days
+
+
+def fmt_date(date_str: Optional[str]) -> str:
+    """Renders a YYYY-MM-DD date as 'YYYY-MM-DD Ddd' (e.g. '2026-06-05 Fri').
+
+    The one date renderer for every surface with room for the weekday. Falls back to
+    the raw string when the value isn't a parseable date, so a caller can hand this
+    whatever a row happens to hold."""
+    if not date_str:
+        return "?"
+    try:
+        return parse_date(str(date_str)).strftime("%Y-%m-%d %a")
+    except ValueError:
+        return str(date_str)
+
+
+def fmt_span(start: Optional[str], end: Optional[str], sep: str = " to ") -> str:
+    """Renders a date range with the weekday on both ends. A range that starts and
+    ends on the same day collapses to that one date."""
+    if start and end and start == end:
+        return fmt_date(start)
+    return f"{fmt_date(start)}{sep}{fmt_date(end)}"
+
+
+def fmt_timestamp(iso: Optional[str]) -> str:
+    """Renders a stored UTC ISO timestamp as 'YYYY-MM-DD Ddd HH:MM' in the athlete's
+    timezone — stored precise, converted only on display (DESIGN_user_timezone.md §5).
+
+    Falls back to the raw string if it isn't parseable (e.g. a date-only legacy value)."""
+    if not iso:
+        return "?"
+    try:
+        return to_local(datetime.fromisoformat(iso)).strftime("%Y-%m-%d %a %H:%M")
+    except ValueError:
+        return iso
+
+
+def parse_date(date_str: str) -> date:
+    """An ISO `YYYY-MM-DD` string as a date, raising ValueError on anything else.
+
+    Every date TrainMate stores is written this way, so one parser serves them all."""
+    return datetime.strptime(date_str, "%Y-%m-%d").date()
+
+
+def date_range(start: str, end: str) -> List[str]:
+    """Every ISO date from `start` to `end`, both ends included. Empty when `end` falls
+    before `start`."""
+    out: List[str] = []
+    cur, last = parse_date(start), parse_date(end)
+    while cur <= last:
+        out.append(cur.isoformat())
+        cur += timedelta(days=1)
+    return out
+
+
+def shift(date_str: str, days: int) -> str:
+    """`date_str` moved `days` forward (backward when negative), as an ISO date."""
+    return (parse_date(date_str) + timedelta(days=days)).isoformat()
 
 
 def resolve(token: str) -> str:

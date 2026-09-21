@@ -2,100 +2,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from trainmate.config import config
-
-# Ordered confidence levels, weakest → strongest. Confidence is now APP-COMPUTED from each
-# learning's evidence basis (see derive_confidence) rather than LLM-asserted.
-CONFIDENCE_LEVELS = ("tentative", "moderate", "established")
-
-# Sentinel stored in `proposed_confidence` when the pending downgrade is a *retirement*
-# (net support fell to ≤0 under contradiction). Not a real confidence level, so it never
-# validates as one.
-RETIRE_PROPOSAL = "retire"
+from trainmate.learning_confidence import (
+    RETIRE_PROPOSAL, confidence_rank, derive_confidence,
+    learning_is_dormant, normalize_sports, step_down, valid_confidence,
+)
 
 # `coach_learnings.status`. Retiring a learning archives it, so a slip is restored with its
 # evidence (DESIGN_learning_doubt_nudge.md §6).
 ACTIVE = "active"
 ARCHIVED = "archived"
-
-# A learning is "dormant" — kept in the DB but excluded from LLM prompts — once it has gone
-# unreinforced for longer than the budget for its confidence level. Decay is soft: a dormant
-# learning revives the moment new supporting evidence lands (or a staleness step re-arms its
-# clock). Every reflect and bootstrap run also lowers a dormant learning one level
-# (DESIGN_learning_doubt_nudge.md §3.2). The per-level budgets (days) are tunable via
-# `config.learning_staleness_days`.
-
-
-def normalize_sports(value: Any) -> str:
-    """Normalizes a sport-scope value (list or comma string) to a comma-joined,
-    lowercased string; empty/missing becomes 'general'."""
-    if not value:
-        return "general"
-    if isinstance(value, (list, tuple)):
-        parts = [str(s).strip().lower() for s in value if str(s).strip()]
-    else:
-        parts = [s.strip().lower() for s in str(value).split(",") if s.strip()]
-    return ",".join(parts) if parts else "general"
-
-
-def valid_confidence(value: Any) -> Optional[str]:
-    """Returns the confidence value if it is a recognized level, else None."""
-    return value if value in CONFIDENCE_LEVELS else None
-
-
-def confidence_rank(value: Any) -> int:
-    """Ordinal rank for comparing levels. RETIRE_PROPOSAL / unknown rank below tentative."""
-    try:
-        return CONFIDENCE_LEVELS.index(value) + 1
-    except ValueError:
-        return 0  # retire / unknown — below tentative
-
-
-def step_down(level: str) -> str:
-    """The next confidence level *down*, or RETIRE_PROPOSAL below tentative."""
-    rank = confidence_rank(level)
-    if rank <= 1:
-        return RETIRE_PROPOSAL
-    return CONFIDENCE_LEVELS[rank - 2]
-
-
-def derive_confidence(
-    supporting_weeks: int, contradicting_weeks: int,
-    thresholds: Optional[Dict[str, int]] = None
-) -> str:
-    """Maps an evidence basis to a confidence level (DESIGN_evidence_based_confidence.md §3).
-
-    `net = supporting − contradicting`. Returns RETIRE_PROPOSAL only when contradiction has
-    actually driven net ≤ 0 — a learning with *no* basis yet (net 0, nothing contradicting)
-    rests at the tentative floor rather than being proposed for retirement.
-    """
-    thresholds = thresholds or config.learning_confidence_thresholds
-    net = supporting_weeks - contradicting_weeks
-    if net >= thresholds.get("established", 5):
-        return "established"
-    if net >= thresholds.get("moderate", 3):
-        return "moderate"
-    if net >= 1:
-        return "tentative"
-    if contradicting_weeks > 0:
-        return RETIRE_PROPOSAL
-    return "tentative"
-
-
-def learning_is_dormant(learning: Dict[str, Any], now: Optional[datetime] = None) -> bool:
-    """True if a learning has gone unreinforced past its confidence-based budget."""
-    now = now or datetime.now(timezone.utc)
-    ref = learning.get("last_reinforced_at") or learning.get("created_at")
-    if not ref:
-        return False
-    try:
-        ref_dt = datetime.fromisoformat(ref)
-    except (ValueError, TypeError):
-        return False
-    staleness_days = config.learning_staleness_days
-    budget = staleness_days.get(
-        learning.get("confidence") or "tentative", staleness_days["tentative"]
-    )
-    return (now - ref_dt) > timedelta(days=budget)
 
 
 def _monday_str(date_str: str) -> Optional[str]:
@@ -280,24 +195,6 @@ class LearningsMixin:
         base = datetime.strptime(anchor, "%Y-%m-%d").date()
         weeks = [(base - timedelta(weeks=i)).strftime("%Y-%m-%d") for i in range(need)]
         self._add_evidence_weeks(cursor, learning_id, weeks, +1, source, anchor_iso)
-
-    def _grandfather_learning_evidence(self) -> None:
-        """One-time seed of a synthetic basis for learnings predating the evidence model
-        (those with an empty basis). Idempotent: a learning gains ≥1 row here and is never
-        revisited. See DESIGN_evidence_based_confidence.md §9."""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT cl.id, cl.confidence, cl.created_at FROM coach_learnings cl "
-                "LEFT JOIN learning_evidence le ON le.learning_id = cl.id "
-                "WHERE le.id IS NULL"
-            )
-            rows = cursor.fetchall()
-            for row in rows:
-                self._seed_synthetic_evidence(
-                    cursor, row["id"], row["confidence"] or "tentative",
-                    row["created_at"], source="migration"
-                )
 
     def _recompute_confidence(self, cursor, learning_id: int, now: str) -> None:
         """Re-derives a learning's confidence from its basis and applies the upgrade/propose

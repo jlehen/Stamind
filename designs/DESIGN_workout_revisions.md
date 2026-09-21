@@ -20,7 +20,8 @@ That mismatch shows up in four places.
 | Adapt displacing a session | Hard `DELETE` — the old row is gone |
 
 The third one is unrecoverable data loss on a normal day's use
-(`coach/service/adaptation.py`).
+(`coach/service/adaptation.py`, the file `adapt.py` and `revision_apply.py` were split
+out of).
 
 **Seven columns exist to fake a history a chain would give for free.**
 `original_date`, `original_description`, `original_duration_minutes`, `original_tss`,
@@ -509,7 +510,7 @@ regeneration rather than a second `adapt`. The section header says exactly that,
 sparse list of four sessions out of twenty-four is otherwise read as a plan to build around.
 
 **Metadata only, plus a `keep` action.** Each session is rendered by
-`format_planned_workouts` — date, sport, title, load, the `[ALREADY EASED ...]` tag, the
+`format_standing_workouts` — date, sport, title, load, the `[ALREADY EASED ...]` tag, the
 prior run's reason and the session's intensity target, ~360 characters — and the model
 answers with one of two things:
 
@@ -518,8 +519,9 @@ answers with one of two things:
 {...an ordinary fully-written workout...}          replace it
 ```
 
-`WorkoutGenMixin._resolve_kept` swaps each KEEP for the session it names before any other
-pass runs, so the preview, the guards and the save all see one uniform list of full sessions.
+`StandingMixin._resolve_standing` (`coach/service/standing.py`) swaps each KEEP for the
+session it names before any other pass runs, so the preview, the guards and the save all
+see one uniform list of full sessions.
 `workout_generate_apply` then claims the slot — sparing it the void every unfilled slot gets
 — and appends nothing.
 
@@ -555,7 +557,7 @@ The rest render no line: a rest day has nothing to prescribe, and a sport whose 
 not cover a currency is not given one to plan in (§9.8's coverage rule).
 
 Showing the target invites a revised one back on a KEEP, so `CARRYING OVER` says a KEEP
-carries no `planned_zone_sec`. Nothing depends on the model obeying that: `_resolve_kept`
+carries no `planned_zone_sec`. Nothing depends on the model obeying that: `_resolve_standing`
 rebuilds the entry from the live session and discards whatever else was attached.
 
 The rendering both prompts share — identity, load, the already-eased tag, the change reason,
@@ -564,7 +566,7 @@ its own `[COMPLETED]`/`[BENCHMARK]` markers into it and appends the
 description below. The two prompts were drifting apart line by line, and the target was the
 line that made them differ in what they *knew*, not just in how much they said.
 
-**A KEEP is claimed, not obeyed.** `_resolve_kept` drops one naming a slot no carried session
+**A KEEP is claimed, not obeyed.** `_resolve_standing` drops one naming a slot no carried session
 occupies — it would claim a day nothing then writes, and a silently blank day is the worse
 failure — and an explicit session for the same slot beats a KEEP of it. The marker rides on
 the resolved dict rather than in a set beside it, so a later pass that *replaces* the session
@@ -579,7 +581,7 @@ and the slot reverts to an ordinary write.
   and there is a handful of them rather than a horizon.
 - **Showing what the session was eased *from*.** The tag asserts the current form is the
   reduced plan without showing the original. `original_*` above is derived and reaches only
-  `calendar_state.py`. Until it is shown, "restore load as the athlete recovers" is an
+  `workout_state.py`. Until it is shown, "restore load as the athlete recovers" is an
   instruction the model has no target for — a real gap, but one that belongs to whichever
   command is asked to do the restoring.
 

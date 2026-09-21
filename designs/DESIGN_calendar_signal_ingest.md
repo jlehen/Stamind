@@ -26,7 +26,7 @@ specific signal: that's too narrow and would repeat for sleep, stress, meals,
 etc. Instead we want **one generic channel** through which any external source
 can hand TrainMate a dated, optionally-quantified signal.
 
-Google Calendar is already wired in (`google_calendar.py`, service account) and
+Google Calendar is already wired in (`gcal/client.py`, service account) and
 is human-visible and editable from a phone, which makes it a natural generic
 inbox. An external syncer (a separate repo, mirroring how `GarminScraper` feeds
 Garmin data — see `DESIGN_garmin_direct_pull.md`) drops one event per
@@ -95,7 +95,7 @@ We use `extendedProperties.private` rather than a title convention (e.g.
 **Privacy: what the tag actually guarantees.** The server-side filter is *not*
 available on the steady-state path. Google Calendar makes `privateExtendedProperty`
 and `syncToken` mutually exclusive, so the code drops the filter whenever a sync
-token is set (`google_calendar.py`, `sync_signals`). Concretely:
+token is set (`gcal/client.py`, `sync_signals`). Concretely:
 
 - **Full pull** (first run, or 410 token expiry) — filter applied; only tagged
   signal events are fetched.
@@ -179,7 +179,7 @@ As built it carries `upsert_daily_signal_by_event`, `get_daily_signals(start, en
 metric)` and `delete_daily_signal_by_event` for the sync path, plus
 `get_daily_signal_by_id`, `delete_daily_signal` and `list_signal_metrics` added
 later for the `signal` CLI (`DESIGN_signal_authoring.md`). Table creation goes in
-`db/base.py` alongside the others.
+`db/schema.py` alongside the others.
 
 `delete_daily_signal_by_event` returns whether a row actually went away. That
 matters because a cancelled event reaches us stripped of its
@@ -281,7 +281,7 @@ the daily metrics. The LLM reads "alcohol: 2 on 2026-06-13" beside the trashed
 2026-06-14 HRV/Body Battery and attributes the dip correctly. The meaning lives
 in the model, not in TrainMate.
 
-**Adaptation reads it too.** The daily adaptation (`coach/service/adaptation.py`)
+**Adaptation reads it too.** The daily adaptation (`coach/service/adapt.py`)
 pulls the same signals over its own window so it can tell a lifestyle-suppressed
 morning from genuine training fatigue and not cut load on an artifact. Its window
 starts **one day before** the metrics window: recovery lags the signal by a day,

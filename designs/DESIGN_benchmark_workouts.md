@@ -52,7 +52,7 @@
 > - The generate prompt names the boundary week as the *slot* and leaves due-ness to the
 >   guidelines, explicitly counting tests placed in the same span (the one fact the
 >   science file cannot know). A new **ANCHORS ON RECORD** user-content section
->   (`_anchor_history_text()`, `coach/service/context.py`) supplies each anchor's last
+>   (`_anchor_history_text()`, `coach/service/mesocycle_context.py`) supplies each anchor's last
 >   value, provenance and measured date — the dates the interval floor is judged against.
 > - `_warn_missing_boundary_benchmarks()` gains a fourth silence: any test — proposed in
 >   the batch, live before the span, or a measured logbook row — within `MIN_RETEST_DAYS`
@@ -110,16 +110,16 @@ The scary version of this feature is "a benchmark updates my FTP, which rewrites
 all my historical TSS and corrupts the PMC." **That cannot happen here**, and it
 is worth stating up front because it shapes everything below.
 
-TrainMate computes TSS from Garmin's *time-in-zone seconds* (`garmin/load.py`),
+TrainMate computes TSS from Garmin's *time-in-zone seconds* (`analytics/load.py`),
 where the zoning was already done inside the athlete's Garmin account. The
 app-side `ftp`/`lthr` values (the benchmark logbook, §3.2) are never read by the
 load model. They feed exactly two things:
 
 - the **coaching prompt** the LLM reads (so it prescribes zones/targets), and
-- the **plan-staleness check** (`config_changed()`, `coach/service/prompt.py:60`).
+- the **plan-staleness check** (`config_changed()`, `coach/service/staleness.py`).
 
 A third reader arrived later and is worth naming: the intensity **mesocycle report** renders
-the anchor trend over the reported window (`intensity.py:710`, §6). It feeds the coaching
+the anchor trend over the reported window (`analytics/mesocycle_report.py`, §6). It feeds the coaching
 prompt too, so it does not widen the blast radius — but it is a consumer of the logbook.
 
 So updating an app-side threshold is a *forward-looking prescription* change, not
@@ -152,7 +152,7 @@ workout, and a separate logbook for results.
 ### 3.1 `benchmark_type` on `Workout`
 
 A nullable `benchmark_type` lives on the `Workout` TypedDict (`types.py:47`, the field at
-`:66`) and the `workouts` table (`db/base.py:112`, migrated at `:286-296`). When set, the
+`:66`) and the `workouts` table (`db/schema.py`). When set, the
 session is a test:
 
     ftp_20min | ftp_ramp | run_threshold_30min | run_5k_tt |
@@ -164,14 +164,15 @@ field list, and a field missing from any list is silently dropped. The flag is
 therefore threaded through each enumeration:
 
 - the model's JSON output contract in **both** generate
-  (`coach/engine/workouts.py:187-190`) and adapt (`:503-505`), with a prompt
+  (`coach/engine/generate.py`) and adapt (`coach/engine/adapt.py`), with a prompt
   instruction to preserve the field when re-emitting a session. The model, not
   the app, owns the flag's survival across an adaptation — consistent with
   §4.2's no-guards stance;
-- `save_workout` (signature + SQL, `db/workouts.py:21, 105, 137, 156`) on the
-  generate save path (`coach/service/workouts.py:429`);
-- the adapt rebuild dict (`coach/service/adaptation.py:251-276`) and
-  `workout_adapt_apply` (`:384`) — the spot a first pass misses. Without it, the
+- `save_workout` (signature + SQL, `db/workout_change.py`) on the
+  generate save path (`coach/service/generate.py`);
+- the adapt rebuild dict (`coach/revisions.py::structure_revision`) and
+  `workout_revision_apply` (`coach/service/revision_apply.py`) — the spot a first
+  pass misses. Without it, the
   model's proposal to move a test is rebuilt without the flag and saved as an
   ordinary workout: the act of protecting the test is exactly what would strip
   its benchmark identity, silently.
@@ -179,7 +180,7 @@ therefore threaded through each enumeration:
 **One app-side guard, deliberately.** "The model owns survival" is the rule for the
 *proposal*; the SQL keeps a belt-and-braces default underneath it. The UPDATE branch of
 `save_workout` writes `benchmark_type = COALESCE(?, benchmark_type)`
-(`db/workouts.py:105`), exactly like `tss` and the other optional columns — so a
+(`db/workout_change.py`), exactly like `tss` and the other optional columns — so a
 same-`(date, sport)` re-save that simply omits the field preserves the stored value
 instead of nulling it. This is not the kind of guard §4.2 argues against: it reverses no
 model intent and reads no proposal batch, it only stops an omission from being read as a
@@ -187,7 +188,7 @@ deletion.
 
 Preserving an omission must not mean the flag is *unclearable*, though — §4.2's POSTPONE
 fallback needs to strip it, and for one revision could not. `save_workout` therefore takes
-a `clear_benchmark` flag (`db/workouts.py:21, 105`) that blanks the column in place; the
+a `clear_benchmark` flag (`db/workout_change.py`) that blanks the column in place; the
 UPDATE reads `CASE WHEN ? THEN NULL ELSE COALESCE(?, benchmark_type) END`. It is off for
 every caller but adapt (§4.2), so the default behaviour — omission preserves — is
 unchanged.
@@ -251,12 +252,12 @@ shown a negative-looking progression.
 
     effective_thresholds()  ->  {ftp, lthr, ...} from the latest logbook rows
 
-It lives in the **service layer** (`coach/service/prompt.py:28-43`), the only layer with
+It lives in the **service layer** (`coach/service/athlete_context.py`), the only layer with
 both config and DB access — the engine is a pure prompt-builder over data handed to it and
 imports no `db`, and that stayed true. The service passes `profile=` into every engine
-call (`coach/service/prompt.py:258`, `coach/service/workouts.py:349`,
-`coach/service/adaptation.py:159`, `coach/service/planning.py:301`,
-`coach/service/analysis.py:691`); `_effective_profile()` (`coach/service/prompt.py:45-53`)
+call (`coach/service/athlete_context.py`, `coach/service/generate.py`,
+`coach/service/adapt.py`, `coach/service/planning.py`,
+`coach/service/analysis.py`); `_effective_profile()` (`coach/service/athlete_context.py`)
 overlays the effective thresholds onto `config.user_profile` first and hands over the
 merged result. Two engine-side changes completed the wiring (an earlier draft claimed "no
 engine change" — wrong on inspection):
@@ -270,7 +271,7 @@ engine change" — wrong on inspection):
   `config.user_profile` directly in the engine — once `ftp`/`lthr` left config
   (§3.4) it would have silently returned only `max_hr`. It is **gone**: the
   threshold read moved to the service, so `_get_config_snapshot()` and
-  `config_changed()` (`coach/service/prompt.py:55-107`) judge drift over effective
+  `config_changed()` (`coach/service/staleness.py`) judge drift over effective
   values, and `PROFILE_THRESHOLD_FIELDS` (`config.py:450`, read by `plan_profile()`)
   keeps the thresholds out of the config *hash*, so they are judged on the tolerance
   axis only.
@@ -287,13 +288,13 @@ joins the snapshot — `ftp`/`lthr` are not special (§3.5). That needed one sma
 fix first: `config_changed()` used to treat a key it had never seen as instant drift
 ("`css` was added"), so a first-ever swim test would have flagged every pre-existing plan
 stale, bypassing the 5% tolerance. It now **skips keys absent from the *old* snapshot**
-(`coach/service/prompt.py:99-101`): a newly recorded kind starts feeding prompts
+(`coach/service/staleness.py`): a newly recorded kind starts feeding prompts
 immediately and joins drift-checking from the next generated plan onward; only a >5%
 *change* in a kind the plan was actually built with triggers a replan. A key that
-*disappears* still reads as drift (`:102-103`) — a threshold the plan relied on going
+*disappears* still reads as drift — a threshold the plan relied on going
 missing is real.
 
-**The one exception: `e1rm` never trips a replan** (`coach/service/prompt.py:97-98`). The
+**The one exception: `e1rm` never trips a replan** (`coach/service/staleness.py`). The
 logbook has no per-exercise field, so a single `e1rm` value collides across lifts: a
 deadlift PR logged the week after a squat PR reads as one anchor jumping ~70%, which under
 the uniform rule would invalidate a whole periodization on a bookkeeping artefact
@@ -321,7 +322,7 @@ document, and no config field that looks editable but silently is not.
 
 **Honest caveat about a re-added key.** Nothing *strips* the profile dict.
 `_effective_profile()` is `{**config.user_profile, **effective_thresholds()}`
-(`coach/service/prompt.py:53`), so an `ftp:` typed back into `config.yaml` does still
+(`coach/service/athlete_context.py`), so an `ftp:` typed back into `config.yaml` does still
 render in the coaching prompt — while being invisible to `effective_thresholds()`, the
 drift snapshot, `status` and `benchmark list`, and while a logbook row of the same kind
 silently overrides it. That asymmetry is the deliberate price of having no fallback
@@ -342,7 +343,7 @@ Two rules make the cutover seamless:
   reads thresholds from the DB alone, a `generate`/`status` run before the seed
   rows exist finds no `ftp` key, compares against a macrocycle snapshot that has
   one, and reports a spurious "ftp was removed"
-  (`coach/service/prompt.py:102-103`).
+  (`coach/service/staleness.py`).
 - **Values:** seed the *exact* numbers currently in config, so existing
   macrocycle snapshots still match and `config_changed()` stays quiet.
 
@@ -352,8 +353,8 @@ lines conditionally (`coach/engine/prompt.py:37-39`), and the snapshot/drift cod
 absent keys. A plan generated with no FTP on record prescribes by RPE and HR
 feel, which is what a coach does with an untested athlete. So generation
 proceeds, and a cold-start hint (`_maybe_nudge_no_threshold()`,
-`coach/service/prompt.py:222-237`, fired from `coach/service/workouts.py:350`) mirrors
-`_maybe_nudge_bootstrap()` (`:239`, fired from `coach/service/planning.py:330`):
+`coach/service/athlete_context.py`, fired from `coach/service/generate.py`) mirrors
+`_maybe_nudge_bootstrap()` (same file, fired from `coach/service/planning.py`):
 *"No fitness thresholds on record — prescriptions will use RPE/HR feel until you record
 one (`benchmark record …`) or complete the scheduled benchmark."* `max_hr` alone does not
 silence it: config physiology is not a measured anchor. The very first generated plan
@@ -384,7 +385,7 @@ snapshotted, prompted, trended and displayed like everything else.
 Benchmarks belong at mesocycle boundaries and on a ~4–6 week cadence
 (`benchmarks.md` §1). The split of labor plays to each side's strength:
 
-- **The LLM places.** The generation prompt (`coach/engine/workouts.py:155-167`)
+- **The LLM places.** The generation prompt (`coach/engine/generate.py`)
   instructs the week planner to schedule one benchmark of the appropriate kind in each
   mesocycle-boundary week the generated span covers — except the terminal mesocycle's —
   preceded by an opener/easy day so TSB is positive on test day, phrased
@@ -426,8 +427,8 @@ whose final mesocycle ends months before its target date is an ordinary boundary
 gets its test. Only the run-in to the event is protected.
 - **A deterministic post-check verifies.** After generation, if a covered
   boundary week ended up with no `benchmark_type` workout,
-  `_warn_missing_boundary_benchmarks()` (`coach/service/workouts.py:195-233`, called at
-  `:426`) prints a warning — same spirit as the rest-window pass
+  `_warn_missing_boundary_benchmarks()` (`coach/service/guards.py`, called from
+  `workout_generate`) prints a warning — same spirit as the rest-window pass
   (`_enforce_rest_windows_generate`), but a warning rather than an insertion: a
   missing test surfaces for the athlete to regenerate, it is not silently
   auto-fixed. The check stays silent when the boundary week sits under a `rest`
@@ -450,15 +451,15 @@ not the logbook, so a test performed but never recorded still counts.
 
 **Same-day collision.** `save_workout` keys on (date, sport), so a second
 same-sport session on a benchmark date would overwrite the test. Deterministic
-rule, in `_drop_benchmark_collisions()` (`coach/service/workouts.py:165-193`, called at
-`:413`, before the rest pass and before any save): on a date holding a benchmark of
+rule, in `_drop_benchmark_collisions()` (`coach/service/guards.py`, called from
+`workout_generate` before the rest pass and before any save): on a date holding a benchmark of
 sport X, drop any other proposed sport-X session and warn. The benchmark is identified
 by its flag — no guessing needed. Sports are compared canonically, so a `road_biking`
 session cannot slip past a `cycling` benchmark on a spelling.
 
 ### 4.2 Adapt — "reschedule, don't dilute"
 
-**It is its own helper** (`coach/engine/workouts.py::_benchmark_task`) rather than prose
+**It is its own helper** (`coach/engine/sessions.py::benchmark_task`) rather than prose
 inline in the TASK, because of the closing line below: the two must not drift apart. Note
 that adapt's postponement escape — "the next generated mesocycle re-places the test when it is
 due" — is honest only because a mesocycle boundary really does bring a `workout generate`. A
@@ -476,17 +477,17 @@ by engineering guards around it**. A deterministic guard here would have to
 reverse-engineer intent from a proposal batch — is this pair of changes a move,
 a displacement, or a softening? (Concretely: exempting benchmark rows from the
 overridden-workout deletion in `workout_revision_apply`,
-`coach/service/adaptation.py:299-322`, would prevent the very deletion that completes a
+`coach/service/revision_apply.py`, would prevent the very deletion that completes a
 legitimate move, leaving the test duplicated on both days.) That is precisely the
 judgement the model already has in front of it, so the model keeps it — the deletion
 there carries no benchmark exemption, as designed.
 
-**The prompt rule** (`coach/engine/workouts.py:373-381`): never reduce or soften a
+**The prompt rule** (`coach/engine/sessions.py::benchmark_task`): never reduce or soften a
 benchmark session; if the athlete
 will not be fresh (negative TSB), move it *intact* — same content,
 `benchmark_type` preserved — to a later day within the mesocycle and lighten the
 days before it. Moving is necessarily the LLM's call: TSB is backward-looking
-only (`garmin/pmc.py:47` — computed from *completed* load), so no deterministic
+only (`analytics/pmc.py` — computed from *completed* load), so no deterministic
 pass can know which future day will be fresh; the model, which sees the TSB
 history and the planned load ahead, judges it. Fallback the model is told
 explicitly: when the benchmark sits on the last day of the mesocycle and no later
@@ -516,9 +517,9 @@ next generate run the mesocycle already tested (DESIGN_mesocycle_progress.md §4
 The app-side half is not a guard on the model's judgement but the absence of one: with
 `benchmark_type` COALESCE-preserved on UPDATE (§3.1), a proposal that correctly emitted
 `null` was overridden by the stored value, so the POSTPONE fallback above could not be
-carried out however well the model followed it. `workout_adapt_apply` now passes
+carried out however well the model followed it. `workout_revision_apply` now passes
 `clear_benchmark` when a returned change lands on a benchmark row without re-emitting the
-flag (`coach/service/adaptation.py:401`). The signal is sound here specifically because
+flag (`coach/service/revision_apply.py`). The signal is sound here specifically because
 adapt tells the model that *a benchmark it is not changing is not returned at all* —
 so a returned change that drops the flag is a statement, not an omission. The accepted
 cost is the mirror case: a model that softens a test *and* forgets the flag loses the
@@ -558,7 +559,7 @@ one will follow.
 
 FTP tests are done indoors on Zwift (ramp or 20-min protocol), which **computes
 and displays the FTP number on screen**. Meanwhile the app stores only Garmin's
-bucketed zone-seconds, **not** the raw power stream (`garmin/load.py`) — so it
+bucketed zone-seconds, **not** the raw power stream (`analytics/load.py`) — so it
 cannot recompute "20-min best power × 0.95" after the fact. The data simply isn't
 there. Therefore:
 
@@ -578,7 +579,7 @@ completion flag today) confirms the *planned* benchmark was done. The FTP
 the test happened."
 
 **What actually runs today.** The adherence matcher is benchmark-agnostic —
-`trainmate/adherence.py` contains no benchmark-aware code at all. For each day it sorts
+`trainmate/analytics/adherence.py` contains no benchmark-aware code at all. For each day it sorts
 that day's activities by **load descending** (`:165`) and matches the *first*
 sport-compatible one to each planned session (`:190-199`), consuming it so a second
 planned session cannot claim it again. On a test date with two same-sport activities, the
@@ -619,7 +620,7 @@ generic so an outdoor test just needs a preference edit.
 ## 6. Surfacing
 
 - `workout list` carries a `[BENCHMARK]` marker (alongside `[ADAPTED]`) —
-  `cli/workouts/_helpers.py:60-62`.
+  `cli/workouts/session_line.py:66`.
 - CLI verb `benchmark`, mirroring `goal` / `constraint` (`cli/benchmarks.py`,
   dispatched at `trainmate_cli.py:325-337`):
   - `benchmark record <sport> --<kind> <value> [--date …] [--note …] [--source …]`
@@ -636,9 +637,10 @@ generic so an outdoor test just needs a preference edit.
 - `status` shows the current effective threshold per kind and its last-tested date,
   with `max_hr` labelled `(config)` (`cli/status.py:128-157`).
 - The intensity **mesocycle report** renders anchor movement across the reported window —
-  `_benchmark_lines()` (`intensity.py:710`), fed both into the coaching prompt
-  (`coach/service/context.py:251, 295-300`) and into `progress`
-  (`cli/progress.py:846-856`). This is the shipped "is overload working?" surface.
+  `_benchmark_lines()` (`analytics/mesocycle_report.py`), fed both into the coaching prompt
+  (`coach/service/mesocycle_context.py`) and into `progress`
+  (`render_mesocycle_section` in `cli/progress_zones.py`). This is the shipped "is overload
+  working?" surface.
 - The read-only web dashboard has a **Benchmarks** view: `GET /api/benchmarks`
   (`trainmate_web.py:571-617`) returns the logbook plus the effective threshold set,
   each row carrying its `formatted` value and a direction-aware `delta`. It shares
@@ -646,7 +648,7 @@ generic so an outdoor test just needs a preference edit.
   cannot disagree about what a row is compared against. Reads only — recording stays
   in the CLI (see the read-only demotion in ARCHITECTURE.md §"Web dashboard").
 - **Phase 3, not built:** the progress timeline (`DESIGN_progress_timeline.md`) plotting
-  the anchor trend beside CTL. `trainmate/chart.py` has no anchor series today; the mesocycle
+  the anchor trend beside CTL. `trainmate/analytics/chart.py` has no anchor series today; the mesocycle
   report above covers the need in text.
 
 ---

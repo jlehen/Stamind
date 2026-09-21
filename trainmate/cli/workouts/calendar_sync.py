@@ -2,15 +2,40 @@
 with the database."""
 import argparse
 import sys
-from typing import Optional
+from datetime import datetime, timedelta
 from trainmate import runtime
-from trainmate.calendar_state import calendar_status
-from trainmate.util import (
-    step, dim, green, red, cyan, cmd, fmt_date, fmt_span, today_str as _today_str, notice,
-)
-from trainmate.cli.selectors import resolve_window
+from trainmate.workout_state import calendar_status
+from trainmate.text import cmd, cyan, dim, green, red
+from trainmate.output import notice, step
+from trainmate.clock import fmt_date, fmt_span, today_str as _today_str
+from trainmate.cli.windows import resolve_window
+from trainmate.gcal.event import event_day
 
-from trainmate.cli.workouts._helpers import warn_stale_before
+
+def warn_stale_before(start_date: str) -> None:
+    """Flags workouts left `stale` on days earlier than the window just pushed.
+
+    `workout push` defaults to today onward, so a row that went stale in the past —
+    realistically a push that failed while offline — has nothing that would ever
+    re-push it. Freshness is derived, not stored (see trainmate.workout_state), so
+    the marker is durable; this just makes it visible outside the pushed range."""
+    try:
+        cutoff = (
+            datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+    except ValueError:
+        return
+    earlier = runtime.db.get_workouts(end_date=cutoff, include_removed=True)
+    stale = [w for w in earlier if calendar_status(w) == 'stale']
+    if not stale:
+        return
+    label = "workout" if len(stale) == 1 else "workouts"
+    earliest = min(w['date'] for w in stale)
+    notice(
+        f"Note: {len(stale)} {label} before {fmt_date(start_date)} still read [STALE] "
+        f"— their calendar events are out of date and this push did not cover them. "
+        f"Run {cmd(f'workout push -d {earliest}..')} to update them.",
+    )
 
 
 def run_workout_push(args: argparse.Namespace) -> None:
@@ -76,17 +101,10 @@ def run_workout_wipe(args: argparse.Namespace) -> None:
         for w in synced_workouts:
             ge_id = w['google_event_id']
             if ge_id:
-                runtime.calendar_syncer.delete_workout_event(ge_id)
+                runtime.calendar_syncer.delete_event(ge_id)
 
     runtime.db.wipe_workouts()
     print(green("All workouts wiped successfully."))
-
-
-def _event_day(event: dict) -> Optional[str]:
-    """The day an event sits on. Workout events are all-day (`start.date`); a timed
-    start is tolerated in case one was hand-edited in Google Calendar."""
-    start = event.get('start') or {}
-    return start.get('date') or (start.get('dateTime') or "")[:10] or None
 
 
 def run_workout_prune_calendar(args: argparse.Namespace) -> None:
@@ -115,7 +133,7 @@ def run_workout_prune_calendar(args: argparse.Namespace) -> None:
     for event in events:
         if event.get('id') in known:
             continue
-        day = _event_day(event)
+        day = event_day(event)
         if start_date and (day is None or day < start_date):
             continue
         if end_date and (day is None or day > end_date):

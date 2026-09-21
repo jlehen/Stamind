@@ -9,9 +9,10 @@ import sys
 import textwrap
 from typing import Optional
 
-from trainmate.util import (
-    bold, dim, red, yellow, cmd, default_wrap_width, format_labeled_paragraph, wrap_text, warn,
+from trainmate.text import (
+    bold, cmd, default_wrap_width, dim, format_labeled_paragraph, red, wrap_text, yellow,
 )
+from trainmate.output import warn
 
 
 class UsageExit(SystemExit):
@@ -176,7 +177,7 @@ class WrapAwareArgumentParser(argparse.ArgumentParser):
         # then names what is missing last, where the eye lands — except in chat, where
         # a help dump costs a screenful (DESIGN_cli_noargs.md §a).
         if message.startswith("the following arguments are required"):
-            from trainmate.prompt import is_json_frontend
+            from trainmate.sentinels import is_json_frontend
             if is_json_frontend():
                 self.exit(2, red(f"{self.prog}: error: {message}\n")
                           + dim("Run " + cmd(f"{self.prog} -h") + " for usage.\n"))
@@ -184,19 +185,6 @@ class WrapAwareArgumentParser(argparse.ArgumentParser):
             self.exit(2, red(f"\n{self.prog}: error: {message}\n"))
         super().error(message)
 
-def _weeks_arg(raw: str):
-    """`--weeks N` must be a whole number >= 1, or the literal `all`
-    (DESIGN_progress_timeline.md §7.1) — rejected at argparse, so a `0` can't silently
-    fall through to the default. `all` matches the web endpoint's `?weeks=all`."""
-    if raw == "all":
-        return "all"
-    try:
-        n = int(raw)
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"invalid int value: '{raw}'")
-    if n < 1:
-        raise argparse.ArgumentTypeError("must be >= 1")
-    return n
 
 # A selector endpoint reaching back from today (`-7d`, `-2w..+1w`) starts with a dash, so
 # argparse reads it as an option and reports a missing value. It is glued to its flag as

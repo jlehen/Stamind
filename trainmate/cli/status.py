@@ -1,17 +1,19 @@
 from datetime import datetime, timezone
 from trainmate import athlete_queue, runtime
-from trainmate import intensity
-from trainmate.baselines import classify_metric, is_anomalous, UNKNOWN
+from trainmate.analytics.mesocycle_report import mesocycle_report
+from trainmate.analytics.pmc import (
+    PMC_TSB_LAG_NOTE, color_load_ratio, color_ramp, load_ratio, pmc_cells,
+    pmc_data_caveat, pmc_display_values, pmc_ramp, pmc_warming_note,
+)
+from trainmate.analytics.baselines import classify_metric, is_anomalous, UNKNOWN
 from trainmate.config import config
-from trainmate.util import (
-    aside, asides_enabled, bold, dim, green, red, yellow, cyan, magenta, gray, cmd,
-    color_load_ratio, color_ramp, pmc_cells, pmc_warming_note, format_labeled_paragraph,
-    default_wrap_width, PMC_TSB_LAG_NOTE, fmt_date, today_str as _today_str,
-    today_date as _today_date, notice,
+from trainmate.text import (
+    asides_enabled, bold, cmd, cyan, default_wrap_width, dim, format_labeled_paragraph, gray,
+    green, magenta, red, yellow,
 )
-from trainmate.cli.common import (
-    constraint_line, ensure_recent_data, pmc_warmup_cutoff,
-)
+from trainmate.output import aside, notice
+from trainmate.clock import fmt_date, today_date as _today_date, today_str as _today_str
+from trainmate.cli.common import constraint_line, ensure_recent_data
 from trainmate.cli import staleness
 from trainmate.cli.runway import current_runway
 from trainmate.coach import honoring
@@ -138,7 +140,7 @@ def run_status(args) -> None:
                 # What the mesocycle ACTUALLY measured, beside what it was for
                 # (DESIGN_intensity_distribution.md §9). Already wrapped to the target
                 # width — never re-wrap it, the zone table is column-aligned.
-                report = intensity.mesocycle_report(
+                report = mesocycle_report(
                     active_meso, _today_str(), runtime.db.get_completed_activities,
                     current_week=True, benchmarks=runtime.db.get_benchmark_results(),
                     with_focus=False, indent="", width=default_wrap_width(),
@@ -249,16 +251,16 @@ def run_status(args) -> None:
         # stored CTL series. All garmin helpers read runtime.db (dbh=), the same database the
         # metrics above came from.
         history_start = runtime.garmin.pmc_history_start(dbh=runtime.db)
-        warmup_cutoff = pmc_warmup_cutoff(history_start)
-        ctl_v, atl_v, tsb_v = runtime.garmin.pmc_display_values(last_metrics, warmup_cutoff)
+        warmup_cutoff = runtime.garmin.warmup_cutoff(runtime.db, history_start)
+        ctl_v, atl_v, tsb_v = pmc_display_values(last_metrics, warmup_cutoff)
         if ctl_v is not None or atl_v is not None or tsb_v is not None:
             ctl_s, atl_s, tsb_s = pmc_cells(ctl_v, atl_v, tsb_v)
             ctl_by_date = {m['date']: m.get('ctl') for m in metrics}
-            ramp_v = runtime.garmin.pmc_ramp(
+            ramp_v = pmc_ramp(
                 ctl_by_date, last_metrics['date'], warmup_cutoff=warmup_cutoff
             )
             ramp_s = color_ramp(ramp_v) + "/wk" if ramp_v is not None else "—"
-            ratio_v = runtime.garmin.load_ratio(atl_v, ctl_v)
+            ratio_v = load_ratio(atl_v, ctl_v)
             ratio_s = color_load_ratio(ratio_v) if ratio_v is not None else "—"
             print(
                 f"- Fitness    : CTL {ctl_s} | ATL {atl_s} | TSB {tsb_s} | "
@@ -268,7 +270,7 @@ def run_status(args) -> None:
                 aside(f"  {PMC_TSB_LAG_NOTE}")
         # Young/warming DB (§3.3b): say WHY freshness reads low — shown even while the
         # values themselves are warm-up-suppressed above (the suppression is the reason).
-        caveat = runtime.garmin.pmc_data_caveat(history_start)
+        caveat = pmc_data_caveat(history_start)
         if caveat:
             print(dim("  " + pmc_warming_note(caveat['n_days'], config.pmc_ctl_days)))
         

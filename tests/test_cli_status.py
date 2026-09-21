@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
-from trainmate.util import fmt_date
+from trainmate.clock import fmt_date
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_trainmate_cli_status.db")
@@ -19,7 +19,6 @@ def _days_out(n: int) -> str:
 GOAL_DATE = _days_out(120)
 
 from trainmate.db import Database
-import trainmate.db
 import trainmate_cli
 
 test_db = Database(db_path=TEST_DB_PATH)

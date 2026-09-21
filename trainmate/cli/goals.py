@@ -1,10 +1,9 @@
 import argparse
 import sys
 from trainmate import runtime
-from trainmate.util import (
-    bold, green, red, cyan, gray, cmd, format_labeled_paragraph, fmt_date,
-    today_str as _today_str, notice,
-)
+from trainmate.text import bold, cmd, cyan, format_labeled_paragraph, gray, green, red
+from trainmate.output import notice
+from trainmate.clock import fmt_date, today_str as _today_str
 from trainmate.cli.common import print_plan_cascade, report_unhonored
 from trainmate.db.objectives import (
     goal_state, GOAL_UPCOMING, GOAL_ARCHIVED, ARCHIVED,

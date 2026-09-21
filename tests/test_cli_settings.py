@@ -12,7 +12,6 @@ TEST_DB_PATH = test_db_path("test_trainmate_cli_settings.db")
 
 from trainmate import settings
 from trainmate.db import Database
-import trainmate.db
 import trainmate_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
@@ -300,17 +299,17 @@ class TestMorningPushKnobs(SettingsTestCase):
 
     def test_the_push_window_is_computed_from_the_stored_times(self):
         import datetime
-        import trainmate_bot
+        from trainmate.chat import scheduler
         self.run_cli(["settings", "set", "morning-time", "06:00"])
         self.run_cli(["settings", "set", "morning-deadline", "09:00"])
         now = datetime.datetime(2026, 6, 10, 5, 0)
         self.assertEqual(
-            trainmate_bot.next_push_delay(
+            scheduler.next_push_delay(
                 now, settings.morning_time(), settings.morning_deadline()),
             3600.0)
 
     def test_the_morning_command_adapts_only_when_the_switch_is_on(self):
-        with patch("trainmate.cli.bot._auto_adapt_note", return_value="adapted") as note:
+        with patch("trainmate.cli.bot.views._auto_adapt_note", return_value="adapted") as note:
             self.run_cli(["bot", "morning", "--force"])
             self.assertFalse(note.called)
             self.run_cli(["settings", "set", "adapt-first", "on"])

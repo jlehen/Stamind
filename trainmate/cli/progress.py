@@ -1,610 +1,37 @@
 """`tm progress` — the projected Performance Management Chart, numbers-first
-(DESIGN_progress_timeline.md §7.1). All rendering is pure formatting helpers fed
-the `assemble_timeline` payload (§6.0), so they are unit-testable without a DB,
-per the `coach/formatting.py` precedent.
+(DESIGN_progress_timeline.md §7.1).
 
-The whole table is laid out to the bot's 48-column budget and stays fixed-width,
-so a TTY and Telegram render identically; width is measured with `visible_len`
-(emoji are double-width), never `len`.
-"""
+This file is the command: the argparse tree, the handler, the chart delivery, and
+`render_progress`, which assembles one page out of the two halves beside it —
+`cli/progress_load.py` for the fitness line and the weekly load table,
+`cli/progress_zones.py` for the time-in-zone grid and the mesocycle report. All of it is
+fed the `assemble_timeline` payload (§6.0), so the formatting is unit-testable without a
+database, per the `coach/formatting.py` precedent."""
 import argparse
-import textwrap
+from datetime import timedelta
+from typing import Any, Dict, List, Optional
 
-from trainmate.cli.argparse_ext import _weeks_arg
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Sequence, Tuple
-
-from trainmate import progression, chart, intensity
-from trainmate.plan_lineage import delta_baseline, plan_lineage
-# Which sports get a table, and in which currency: aggregation, not layout, so it lives
-# in `intensity` where the web dashboard reads it from too (ARCHITECTURE.md §8).
-from trainmate.intensity import (
-    ZONE_SPORT_MIN_SHARE, select_zone_sports, window_sport_stats, zone_currency,
-)
-from trainmate.sports import SPORT_MAPPING, canonical_sport
-from trainmate.util import (
-    asides_enabled, bold, green, red, yellow, gray, dim, cmd, pad_visible, visible_len,
-    wrap_text, color_tsb, fmt_date, today_str as _today_str, PMC_TSB_LAG_NOTE,
-    notice, warn, keep_whole,
-)
+from trainmate import runtime
+from trainmate.analytics import chart, timeline
+from trainmate.analytics.pmc import PMC_TSB_LAG_NOTE
+from trainmate.config import config
+from trainmate.text import cmd, dim, keep_whole, red, visible_len, wrap_text
+from trainmate.output import notice, warn
+from trainmate.clock import parse_date, today_str as _today_str
 from trainmate.cli.common import ensure_recent_data
-
-# `trainmate_cli` (the `db` facade) is imported lazily inside `run_progress`: it
-# imports this module, so a module-level import here is a cycle that breaks
-# whenever this module is imported in isolation (e.g. by its own formatting
-# tests) — same reason `cli/common.py` defers the same import.
-
-SPARK_CHARS = "▁▂▃▄▅▆▇█"  # ▁..█
-BAR_WIDTH = 12
-WEEK_COL_WIDTH = 11
-NUM_COL_WIDTH = 4
-TABLE_WIDTH = 48  # the bot's column budget; the band rule may use all of it
-BAND_LABEL_WIDTH = TABLE_WIDTH - 5  # '── ' + label + ' ' + at least one closing '─'
-
-# Zone-table columns (DESIGN_intensity_distribution.md §9.6). Z1 and Z2 get a sixth
-# character so they keep their minutes past ten hours — the only two zones that ever get
-# there, and they get there on exactly the hiking, ski-touring and high-volume cycling
-# weeks where the aerobic base is the whole question. 11 + 6 + 6 + 5x5 = 48 for the
-# 7-zone power table, 11 + 6 + 6 + 3x5 = 38 for the 5-zone HR one.
-ZONE_WIDE_COL = 6
-ZONE_COL = 5
-NOT_TRAINED = "—"
-UNDERCOUNTED = "!"
-# The load table's own marker, and a different claim from the zone table's `!`: the week
-# contains an activity whose HR recording was too sparse to trust AND carried no RPE, so
-# the LOAD is undercounted too and the week reads as an adherence miss it never was
-# (DESIGN_intensity_distribution.md §11).
-LOAD_SPARSE = "?"
-# The future half: this week's cells are what the plan PRESCRIBES, not what was measured
-# (DESIGN_intensity_distribution.md §9.8).
-PLANNED = "+"
-# Not a glyph — a footer note. The plan for this sport was written in the other currency,
-# so no comparison is offered: power Z6/Z7 have no HR equivalent and collapsing seven onto
-# five would be banding by the back door.
-CURRENCY_MISMATCH = "~mismatch"
-
-_NO_BAND = object()  # sentinel: no band emitted yet (a real meso_label may be None)
-
-
-def _to_date(date_str: str):
-    """'2026-07-31' -> date(2026, 7, 31). The one ISO-date parser for this module, so
-    the renderer doesn't sprinkle `datetime.strptime(...)` inline (mirrors
-    `progression._to_date`)."""
-    return datetime.strptime(date_str, "%Y-%m-%d").date()
-
-
-def _short_date(date_str: str) -> str:
-    """'2026-07-31' -> '07-31'.
-
-    The one place a displayed day carries no weekday: this table is laid out to the
-    bot's 48-column budget, and four more characters per label does not fit. The
-    footer notes spell the weekday out where a plan edge actually matters."""
-    return date_str[5:]
-
-
-def _weekday(date_str: str) -> str:
-    """'2026-07-31' -> 'Wed'."""
-    return _to_date(date_str).strftime("%a")
-
-
-def sparkline(values: List[Optional[float]]) -> str:
-    """Min-max-scaled 8-level sparkline, one char per value. `None` cells (warm-up
-    edge inside the window, or no anchor) render as a blank space; a flat series
-    (min == max) renders all present cells at the floor glyph. Range-stretching can
-    make a small climb look steep — accepted (§7.1): the real numbers sit alongside."""
-    present = [v for v in values if v is not None]
-    if not present:
-        return " " * len(values)
-    lo, hi = min(present), max(present)
-    chars = []
-    for v in values:
-        if v is None:
-            chars.append(" ")
-        elif hi == lo:
-            chars.append(SPARK_CHARS[0])
-        else:
-            idx = round((v - lo) / (hi - lo) * (len(SPARK_CHARS) - 1))
-            chars.append(SPARK_CHARS[idx])
-    return "".join(chars)
-
-
-def _cells(value: Optional[float], scale_max: float, width: int) -> int:
-    """`value` as a whole number of bar cells on the shared scale, clamped to the bar.
-    A zero scale_max yields 0 (no division by the zero max)."""
-    if scale_max <= 0 or not value:
-        return 0
-    return max(0, min(width, round(width * value / scale_max)))
-
-
-def render_bar(
-    actual: float, plan: Optional[float], scale_max: float, is_future: bool,
-    width: int = BAR_WIDTH,
-) -> str:
-    """Bullet bar on the shared absolute-load scale `scale_max` (§7.1): past weeks
-    fill `▓` to actual and tick `│` at plan, future weeks ghost-fill `▒` to plan."""
-    if is_future:
-        n = _cells(plan, scale_max, width)
-        return "▒" * n + "░" * (width - n)
-
-    n = _cells(actual, scale_max, width)
-    bar = ["▓"] * n + ["░"] * (width - n)
-    if plan:
-        # First cell *beyond* plan: filled-up-to-the-tick reads as on-plan. Clamped
-        # into the bar, because the week whose plan *is* scale_max maps to p == width
-        # and is precisely the week whose tick matters most (§7.1).
-        p = min(_cells(plan, scale_max, width), width - 1)
-        bar[p] = "│"
-    return "".join(bar)
-
-
-def truncate_label(label: str, width: int = BAND_LABEL_WIDTH) -> str:
-    """Truncates a mesocycle label to `width` with a trailing ellipsis."""
-    if len(label) <= width:
-        return label
-    return label[: width - 1] + "…"
-
-
-def band_header(label: Optional[str], width: int = TABLE_WIDTH) -> str:
-    """A mesocycle band rule spanning the table — `── Base Consolidation ─────────`
-    (§7.1). Weeks the plan never governed band under 'unplanned' (§6.1 'no match')."""
-    text = truncate_label(label) if label else "unplanned"
-    prefix = f"── {text} "
-    # At least one closing dash, so the table's right edge stays straight (§7.1);
-    # BAND_LABEL_WIDTH reserves the room.
-    return prefix + "─" * max(1, width - visible_len(prefix))
-
-
-def format_form_line(
-    source: Optional[str], ctl: Optional[float], atl: Optional[float],
-    tsb: Optional[float],
-) -> str:
-    """'FORM today (actual)  CTL 55  ATL 61  TSB -6' — the numbers-first answer to
-    'am I on track', tagging where today's load came from (§7.1): `(actual)` once
-    today's session has synced, `(planned)` while the fold counts the planned session
-    in its place. TSB is coloured by `color_tsb`, reusing `tm status`'s conventions.
-    Returns the still-warming message when today has no PMC value (§4).
-
-    One decimal on all three, matching `tm status` — `color_tsb` has always printed
-    TSB to 1 dp, so rounding CTL/ATL to whole numbers beside it made one line carry
-    two precisions. Single-space separation keeps the trio inside the 48-col budget."""
-    if ctl is None or atl is None or tsb is None:
-        return dim("FORM today   PMC still warming — not enough history yet")
-    tag = f" ({source})" if source else ""
-    return f"FORM today{tag} CTL {ctl:.1f} ATL {atl:.1f} TSB {color_tsb(tsb)}"
-
-
-def format_sparkline_line(
-    ctl_samples: List[Optional[float]], weeks_shown: int,
-    plan_end_proj: Optional[str] = None,
-) -> str:
-    """'CTL 8w ▁▂▂▃▃▅▅▆   plan end 07-31: CTL 61 TSB +1' — the CTL trend, one cell per
-    displayed week, with the plan-end projection appended when the plan reaches no
-    objective (else the per-objective lines carry it). `weeks_shown` counts the cells
-    drawn, which on a short history is fewer than `--weeks` asked for (§7.1)."""
-    spark = sparkline(ctl_samples)
-    line = f"CTL {weeks_shown}w {spark}"
-    if plan_end_proj:
-        line += f"   {plan_end_proj}"
-    return line
-
-
-def format_plan_end_proj(plan_end_date: str, ctl: float, tsb: float) -> str:
-    return f"plan end {_short_date(plan_end_date)}: CTL {ctl:.0f} TSB {tsb:+.0f}"
-
-
-def format_objective_projection_lines(
-    objective: Dict[str, Any], ctl: float, tsb: float
-) -> List[str]:
-    """Per-objective projection, shown once the plan reaches that objective's target
-    date (§7.1)."""
-    return [
-        f"\U0001F3C1 {fmt_date(objective['target_date'])} {objective['title']}",
-        f"   projected CTL {ctl:.0f}, TSB {tsb:+.0f}",
-    ]
-
-
-def format_plan_gap_banner(
-    plan_end_date: str, next_objective: Dict[str, Any], weeks_before: int
-) -> List[str]:
-    """The plan-end gap banner (§3): plan generated through X, N weeks before the next
-    objective it doesn't yet reach; names the fix (`workout generate -g`, whose bare form
-    is the active goal). The gap itself (which objective, how many weeks) is computed once
-    in `progression.plan_gap` and passed in — this is presentation only (§7.1)."""
-    return [
-        yellow(
-            f"⚠ plan generated through {_short_date(plan_end_date)} "
-            f"— {weeks_before} wks before"
-        ),
-        f"  \U0001F3C1 {fmt_date(next_objective['target_date'])} {next_objective['title']}",
-        yellow(f"  ({cmd('workout generate -g', quote=False)})"),
-    ]
-
-
-def _warning_line(w: Dict[str, Any]) -> str:
-    """One footer warning in yellow. The payload stays ANSI-free for the web, so a
-    warning that names a command carries it in `command` and gets it styled here —
-    rather than this end guessing from the prose (§6.0)."""
-    text = w["text"]
-    name = w.get("command")
-    marker = f"`{name}`" if name else None
-    if marker and marker in text:
-        head, _, tail = text.partition(marker)
-        return yellow(f"⚠ {head}") + cmd(name) + yellow(tail)
-    return yellow(f"⚠ {text}")
-
-
-def format_no_plan_banner(lapsed_date: Optional[str]) -> List[str]:
-    """The 'no plan generated' / 'plan lapsed' empty states (§3): past-only PMC, name
-    the fix. `lapsed_date` set → the plan was outrun by the rolling horizon."""
-    if lapsed_date:
-        return [
-            yellow(f"⚠ plan lapsed {_short_date(lapsed_date)} — projection unavailable"),
-            green(f"  Run {cmd('workout generate')} to project forward again."),
-        ]
-    return [
-        yellow("⚠ no plan generated — projection unavailable"),
-        green(f"  Run {cmd('plan generate')} "
-              f"(after {cmd('data bootstrap')} if never run) to project forward."),
-    ]
-
-
-def _week_row(week: Dict[str, Any], scale_max: float, today: str) -> str:
-    week_label = f"w/c {_short_date(week['week_commencing'])}"
-    # One marker, one meaning: this row's planned figure spans fewer than seven days —
-    # because the week is still running, or because a plan edge falls inside it (§3).
-    if week.get("in_progress") or week.get("partial_plan"):
-        week_label += "*"
-    if week.get("load_sparse"):
-        week_label += LOAD_SPARSE
-    week_col = pad_visible(week_label, WEEK_COL_WIDTH)
-
-    denom = progression.week_plan_denom(week)
-    plan_col = pad_visible(
-        "—" if denom is None else f"{denom:.0f}", NUM_COL_WIDTH, align_left=False
-    )
-
-    is_future = week["week_commencing"] > today and not week.get("in_progress")
-    bar = render_bar(week["actual_load"], denom, scale_max, is_future)
-    if is_future:
-        # No actual and no adherence yet — leave the columns off rather than filling
-        # them with em-dashes the eye has to skip.
-        return f"{week_col} {plan_col}  {bar}"
-
-    actual_col = pad_visible(
-        f"{week['actual_load']:.0f}", NUM_COL_WIDTH, align_left=False
-    )
-    # A week the plan only half covers has no comparable pair to divide (§3): three
-    # planned days over seven trained ones is the 477% the `*` now stands for.
-    if denom and not week.get("partial_plan"):
-        pct = f"{round(week['actual_load'] / denom * 100)}%"
-    else:
-        pct = "—"
-    pct_col = pad_visible(pct, NUM_COL_WIDTH, align_left=False)
-    return f"{week_col} {plan_col}  {bar} {actual_col} {pct_col}"
-
-
-def table_rows(weeks: List[Dict[str, Any]], today: str) -> List[str]:
-    """The fixed-width WEEKLY LOAD table rows only (header, band rules, one row per
-    week) — the part held to the 48-column budget (§7.1). Legend/warning lines are
-    ordinary prose and wrap at the normal CLI width instead. Bar scale is the max
-    weekly load among the displayed rows, so it doesn't jump when future weeks
-    arrive."""
-    if not weeks:
-        return []
-    scale_candidates = [
-        w["planned_load"] if w.get("planned_load") is not None else 0.0 for w in weeks
-    ] + [w["actual_load"] for w in weeks]
-    scale_max = max(scale_candidates) if scale_candidates else 0.0
-
-    header = (
-        f"{pad_visible('WEEKLY LOAD', WEEK_COL_WIDTH)} "
-        f"{pad_visible('plan', NUM_COL_WIDTH, align_left=False)}  "
-        f"{pad_visible('▓done ▒plan', BAR_WIDTH)} "
-        f"{pad_visible('done', NUM_COL_WIDTH, align_left=False)} "
-        f"{pad_visible('adh', NUM_COL_WIDTH, align_left=False)}"
-    )
-    lines = [bold(header)]
-
-    # A band rule wherever the mesocycle changes, so each label is written once, in
-    # full, instead of truncated onto every row.
-    current_label: Any = _NO_BAND
-    for week in weeks:
-        label = week.get("meso_label")
-        if label != current_label:
-            lines.append(gray(band_header(label)))
-            current_label = label
-        lines.append(_week_row(week, scale_max, today))
-    return lines
-
-
-def format_weekly_table(
-    weeks: List[Dict[str, Any]], today: str,
-    has_inferred: bool, partial_note: Optional[str], hidden_weeks: int = 0,
-) -> List[str]:
-    """The WEEKLY LOAD table (§7.1): fixed-width rows plus a legend footer. `weeks`
-    must already be windowed by the caller; `hidden_weeks` counts every week that
-    window dropped — past *and* projected — named in the legend so the truncation is
-    never silent."""
-    lines = table_rows(weeks, today)
-    if not lines:
-        return []
-    legend_parts = []
-    if has_inferred:
-        legend_parts.append("~ inferred")
-    legend_parts.append("* part week")
-    if any(w.get("load_sparse") for w in weeks):
-        legend_parts.append(f"{LOAD_SPARSE} load undercounted — recording gap, no RPE")
-    if partial_note:
-        legend_parts.append(partial_note)
-    if hidden_weeks:
-        legend_parts.append(f"+{hidden_weeks} more (--weeks all)")
-    lines.append(gray(" · ".join(legend_parts)))
-    return lines
-
-
-# ------------------------------------------------------------------ zone tables
-# The intensity half of the screen (DESIGN_intensity_distribution.md §9.6). It lives here
-# rather than in `intensity.py` because it aligns row for row with the load table above
-# and shares that table's week column, band walk and 48-column budget; `intensity.py`
-# keeps the aggregation and the prompt-width table the coach reads.
-
-
-def fmt_zone_cell(seconds: float) -> str:
-    """A zone's time capped to four characters — `55m`, `5h00`, `12h`, `—` for none.
-
-    `intensity.fmt_duration` renders `12h30` at five characters, and a 7-zone power table
-    of five-character cells is 55 columns — it overruns the budget precisely for the
-    high-volume cyclist the power table exists to serve. Z3 and above never reach ten
-    hours in a week, so nothing above tempo loses precision anywhere (§9.6).
-    """
-    minutes = int(round((seconds or 0.0) / 60.0))
-    if minutes <= 0:
-        return NOT_TRAINED
-    if minutes < 60:
-        return f"{minutes}m"
-    hours = minutes // 60
-    return f"{hours}h" if hours >= 10 else f"{hours}h{minutes % 60:02d}"
-
-
-def zone_col_widths(n_zones: int) -> List[int]:
-    return [ZONE_WIDE_COL, ZONE_WIDE_COL][:n_zones] + [ZONE_COL] * max(0, n_zones - 2)
-
-
-def _zone_cells_row(label: str, cells: Sequence[str]) -> str:
-    widths = zone_col_widths(len(cells))
-    body = "".join(
-        pad_visible(c, w, align_left=False) for c, w in zip(cells, widths)
-    )
-    return pad_visible(label, WEEK_COL_WIDTH) + body
-
-
-def zone_week_cells(
-    week: Dict[str, Any], sport: str, currency: str, n_zones: int
-) -> Tuple[List[str], bool]:
-    """`(cells, undercounted)` for one week of one sport's table.
-
-    Three states, not two (§9.6): no duration is not-trained and renders `—` unmarked;
-    duration with nothing recorded in this currency renders `—` and takes a `!`, because
-    asserting the athlete simply did not train would be §7's meaning turned exactly
-    backwards; a real row renders its minutes and takes a `!` below the display bar.
-
-    The unrecorded branch reads the JUDGEABLE duration, so one 5-minute unrecorded
-    activity does not light the week — §11's floor, applied to both `!` paths.
-    """
-    state = intensity.week_zone_state(week, sport, currency)
-    if state.seconds is None:
-        return [NOT_TRAINED] * n_zones, state.undercounted
-    return [fmt_zone_cell(s) for s in state.seconds], state.undercounted
-
-
-def planned_week_cells(
-    week: Dict[str, Any], sport: str, currency: str, n_zones: int
-) -> Tuple[List[str], bool]:
-    """`(cells, currency_mismatch)` for a FUTURE week — what the plan prescribes (§9.8).
-
-    Comparison is offered only when the planned currency matches the displayed one.
-    Power Z6 (anaerobic) and Z7 (neuromuscular) have no HR equivalent, so collapsing
-    seven onto five would be banding by the back door and §5 forbids it. A mismatch
-    therefore renders `—` and says why in the footer rather than converting.
-    """
-    state = intensity.week_zone_state(week, sport, currency, is_future=True)
-    if state.seconds is not None:
-        return [fmt_zone_cell(s) for s in state.seconds], False
-    return [NOT_TRAINED] * n_zones, state.currency_mismatch
-
-
-def _legend(text: str) -> List[str]:
-    """One legend paragraph wrapped into the table's budget, continuations indented so
-    they read as the same line rather than as a new one."""
-    return textwrap.wrap(
-        text, width=TABLE_WIDTH, subsequent_indent="  ", break_on_hyphens=False
-    ) or [text]
-
-
-def zone_table(
-    weeks: List[Dict[str, Any]], sport: str, currency: str,
-    sport_seconds: float, window_seconds: float, coverage: float,
-    today: Optional[str] = None,
-) -> Tuple[List[str], set]:
-    """One sport's weekly zone table plus the set of glyphs it actually used: header,
-    column row, band rules, one row per week.
-
-    Past and in-progress weeks carry what was MEASURED; weeks beyond today carry what the
-    plan PRESCRIBES, ghost rows under today exactly like the load table's ghost bars
-    (§9.8). The current week sits inline with full weeks, marked `*`: the marker is what
-    §4's argument asks for at weekly grain, and a separate section for one week would cost
-    more than it saves.
-    """
-    spec = intensity.CURRENCY_BY_KEY[currency]
-    n_zones = len(spec.labels)
-    tag = "pwr" if currency == "power" else "HR"
-    lines = _legend(
-        f"ZONES {sport} [{tag} {coverage * 100:.0f}%] — "
-        f"{intensity.fmt_duration(sport_seconds)} of "
-        f"{intensity.fmt_duration(window_seconds)} total"
-    )
-    lines = [bold(lines[0])] + lines[1:]
-    lines.append(_zone_cells_row(
-        "week", [f"Z{i}" for i in range(1, n_zones + 1)]
-    ))
-
-    used: set = set()
-    current_label: Any = _NO_BAND
-    for week in weeks:
-        label = week.get("meso_label")
-        if label != current_label:
-            lines.append(gray(band_header(label)))
-            current_label = label
-        week_label = f"w/c {_short_date(week['week_commencing'])}"
-        is_future = (
-            today is not None
-            and week["week_commencing"] > today
-            and not week.get("in_progress")
-        )
-        if is_future:
-            cells, mismatch = planned_week_cells(week, sport, currency, n_zones)
-            if any(c != NOT_TRAINED for c in cells):
-                week_label += PLANNED
-                used.add(PLANNED)
-            if mismatch:
-                used.add(CURRENCY_MISMATCH)
-        else:
-            cells, undercounted = zone_week_cells(week, sport, currency, n_zones)
-            if week.get("in_progress"):
-                week_label += "*"
-            if undercounted:
-                week_label += UNDERCOUNTED
-                used.add(UNDERCOUNTED)
-        used.update(c for c in cells if c == NOT_TRAINED)
-        lines.append(_zone_cells_row(week_label, cells))
-
-    names = " · ".join(
-        f"Z{i} {label}" for i, label in enumerate(spec.labels, start=1)
-    )
-    lines.extend(gray(l) for l in _legend(f"{names} · * in progress"))
-    return lines, used
-
-
-def zone_section(
-    weeks: List[Dict[str, Any]], preferences: Sequence[str],
-    explicit: Optional[Sequence[str]] = None, forced_currency: Optional[str] = None,
-    hidden_weeks: int = 0, today: Optional[str] = None,
-    stats_weeks: Optional[List[Dict[str, Any]]] = None,
-) -> List[str]:
-    """Every zone table plus the shared footer, or the empty-state line.
-
-    `weeks` is the whole displayed window, past and future (§9.8); `stats_weeks` is the past
-    half, since every filter reads MEASURED coverage. The default stacks one table
-    per qualifying sport, because fixing the grain to a single sport buys legibility at
-    the price of a new lie: an athlete who swapped two planned runs for two rides of equal
-    TSS reads a running-only table as whole-athlete load held flat beside a collapsed
-    aerobic base — the exact signature of intensity creep, on a week where nothing went
-    wrong. The cycling table rising as the running table falls makes "they rode instead"
-    self-evident (§9.6).
-    """
-    # The sport filter, the 10% floor and the currency choice all read MEASURED coverage,
-    # so they are computed over the past weeks even when future ones are drawn (§9.6).
-    stats = window_sport_stats(weeks if stats_weeks is None else stats_weeks)
-    window_seconds = sum(agg["seconds"] for agg in stats.values())
-    sports, low, no_data = select_zone_sports(explicit, preferences, stats)
-
-    lines: List[str] = []
-    drawn: List[str] = []
-    used_markers: set = set()
-    for sport in sports:
-        agg = stats.get(sport)
-        currency = zone_currency(stats, sport, forced_currency)
-        if not agg or currency is None:
-            continue
-        if lines:
-            lines.append("")
-        table, markers = zone_table(
-            weeks, sport, currency, agg["seconds"], window_seconds,
-            agg["coverage"].get(currency, 0.0), today=today,
-        )
-        lines.extend(table)
-        drawn.append(sport)
-        used_markers |= markers
-
-    if not drawn:
-        # Both failures key on *no rows in the window*, not on *not a known sport*:
-        # `canonical_sport` passes unknown values through stripped and lowercased, so
-        # nothing is unrecognised at that layer and the list must come from the data.
-        have = sorted(
-            s for s, agg in stats.items() if any(agg["zone_seconds"].values())
-        )
-        asked = ", ".join(canonical_sport(s) for s in explicit) if explicit else None
-        if asked:
-            lines.extend(yellow(l) for l in _legend(
-                f"No zone data for {asked} in this window."
-            ))
-        else:
-            lines.extend(yellow(l) for l in _legend(
-                "No zone data in this window."
-            ))
-        if have:
-            lines.extend(gray(l) for l in _legend(
-                f"Sports with zone data here: {', '.join(have)}"
-            ))
-        return lines
-
-    footer: List[str] = []
-    parts = []
-    if NOT_TRAINED in used_markers:
-        parts.append(f"{NOT_TRAINED} not trained")
-    if UNDERCOUNTED in used_markers:
-        # Says nothing about the TSS beside it: the load fallback swaps at
-        # `hr_zone_coverage_min`, not at the display bar, so across most of the 0.5-0.8
-        # band the week's TSS is still hrTSS computed from these very seconds (§9.6).
-        parts.append(
-            f"{UNDERCOUNTED} zone minutes undercounted — the recording missed time"
-        )
-    if PLANNED in used_markers:
-        parts.append(f"{PLANNED} planned, not yet ridden")
-    if parts:
-        footer.extend(_legend(" · ".join(parts)))
-    if CURRENCY_MISMATCH in used_markers:
-        footer.extend(_legend(
-            "Some planned sessions were written in the other currency — no comparison "
-            "is offered for those weeks. The next plan generation re-picks it."
-        ))
-    if no_data:
-        footer.extend(_legend(
-            f"{', '.join(no_data)}: activities but no zone recording in this window"
-        ))
-    if low:
-        footer.extend(_legend(
-            f"{', '.join(low)} omitted (under {ZONE_SPORT_MIN_SHARE * 100:.0f}% of "
-            f"volume) — name them to see: tm progress {low[0]}"
-        ))
-    if hidden_weeks:
-        footer.append(f"+{hidden_weeks} more weeks (--weeks all)")
-    lines.extend(gray(l) for l in footer)
-    return lines
-
-
-def unknown_sport_preferences(preferences: Sequence[str]) -> List[str]:
-    """Warnings for `sport_preferences` entries that are not canonical sports (§9.6).
-
-    A warning and not an error: `SPORT_MAPPING` has no `swimming` or `rowing` entry and a
-    genuinely new sport must still round-trip. Emitted here, where the list is consumed,
-    and not in `Config.__init__` — `config.py` has no validation pass and is imported in
-    every process, so a warning there would greet `tm --help`, the Telegram bot and the
-    web app alike, none of which read this list.
-    """
-    import difflib
-    out = []
-    for name in preferences:
-        key = canonical_sport(name)
-        if key in SPORT_MAPPING:
-            continue
-        close = difflib.get_close_matches(key, list(SPORT_MAPPING), n=1, cutoff=0.6)
-        hint = f" Did you mean '{close[0]}'?" if close else ""
-        out.append(
-            f"sport_preferences: '{name}' is not a known sport — it will be matched "
-            f"literally against activity types.{hint}"
-        )
-    return out
+from trainmate.cli.progress_load import (
+    format_form_line, format_no_plan_banner, format_objective_projection_lines,
+    format_plan_end_proj, format_plan_gap_banner, format_sparkline_line,
+    format_weekly_table, short_date, warning_line, weekday,
+)
+from trainmate.cli.progress_zones import (
+    render_mesocycle_section, unknown_sport_preferences, zone_section,
+)
+
+# `timeline_rows` is imported inside `run_progress` and stays there: it reaches the
+# Garmin package for the warm-up cutoff, so a module-level import would put all of
+# `garmin/` on the startup path of every command, this one included
+# (ARCHITECTURE.md §14).
 
 
 def render_progress(
@@ -631,7 +58,7 @@ def render_progress(
     warnings = payload["warnings"]
     by_date = {p["date"]: p for p in days}
 
-    past_weeks, future_weeks, hidden_weeks = progression.select_weeks(
+    past_weeks, future_weeks, hidden_weeks = timeline.select_weeks(
         payload["weeks"], weeks_window, today
     )
     display_weeks = past_weeks + future_weeks
@@ -650,7 +77,7 @@ def render_progress(
     # Sparkline: one CTL sample per displayed past week (its last day <= today).
     ctl_samples: List[Optional[float]] = []
     for w in past_weeks:
-        w_start = _to_date(w["week_commencing"])
+        w_start = parse_date(w["week_commencing"])
         sample: Optional[float] = None
         for offset in range(6, -1, -1):
             d = (w_start + timedelta(days=offset)).strftime("%Y-%m-%d")
@@ -718,11 +145,11 @@ def render_progress(
     for verb, date, aligned in (
         ("starts", payload.get("plan_start"), 0), ("ends", plan_end, 6),
     ):
-        if not date or _to_date(date).weekday() == aligned:
+        if not date or parse_date(date).weekday() == aligned:
             continue  # a plan starting Monday / ending Sunday leaves no partial week
-        d = _to_date(date)
+        d = parse_date(date)
         if (d - timedelta(days=d.weekday())).strftime("%Y-%m-%d") in shown:
-            notes.append(f"plan {verb} {_short_date(date)} ({_weekday(date)})")
+            notes.append(f"plan {verb} {short_date(date)} ({weekday(date)})")
     lines += format_weekly_table(
         display_weeks, today, has_inferred,
         " · ".join(notes) if notes else None, hidden_weeks,
@@ -743,125 +170,8 @@ def render_progress(
             lines.append("")
             lines += zone_lines
 
-    lines += [_warning_line(w) for w in warnings]
+    lines += [warning_line(w) for w in warnings]
     return lines
-
-
-def _mesocycles_in_window(dbh, start: str, end: str) -> List[Dict[str, Any]]:
-    """Every mesocycle overlapping `start..end`, plus the mesocycle preceding the first of
-    them so §4.1's delta has a left-hand side.
-
-    The preceding plan is the previous *goal's* — the one that governed the window's
-    earlier dates — never an earlier version of this goal's own, which was superseded
-    before it was ever trained (DESIGN_plan_rollback.md §6.1).
-    """
-    governing = dbh.get_governing_macrocycle()
-    preceding = (
-        dbh.get_preceding_macrocycle(governing["objective_id"]) if governing else None
-    )
-    return plan_lineage(dbh, [preceding, governing])
-
-
-def _orphan_week_note(
-    weeks: List[Dict[str, Any]], reported: List[Dict[str, Any]]
-) -> List[str]:
-    """The weeks in the window that belong to no reported mesocycle, named.
-
-    `--mesocycles` reproduces the very loss §9.6 exists to prevent, and by more than one
-    route: weeks belonging to no mesocycle are silently absent, and `rate_window`
-    additionally excludes each mesocycle's partial tail from both sides of its division —
-    correctly, and invisibly, dropping up to six more days per mesocycle. Silence would be
-    the mesocycle-grained blindness this section was written about, reintroduced by the flag
-    that opts into mesocycle grain.
-    """
-    orphans = []
-    for week in weeks:
-        mon = week["week_commencing"]
-        sun = _to_date(mon) + timedelta(days=6)
-        sun_s = sun.strftime("%Y-%m-%d")
-        if not any(
-            b["start_date"] <= sun_s and b["end_date"] >= mon for b in reported
-        ):
-            orphans.append(_short_date(mon))
-    if not orphans:
-        return []
-    shown = orphans[:2]
-    tail = f", +{len(orphans) - len(shown)} more" if len(orphans) > len(shown) else ""
-    return _legend(
-        f"{len(orphans)} week{'s' if len(orphans) != 1 else ''} in this window "
-        f"belong to no mesocycle ({', '.join(shown)}{tail}), and each mesocycle's final partial "
-        f"week is excluded from its rate — run without --mesocycles for the weekly view"
-    )
-
-
-def render_mesocycle_section(
-    dbh, payload: Dict[str, Any], weeks_window: Any, today: str,
-    explicit: Sequence[str], preferences: Sequence[str],
-) -> List[str]:
-    """`--mesocycles`: the graded view, per mesocycle instead of per week (§9.6).
-
-    Two grains, two questions — the week table answers *when did it change*, the mesocycle
-    table answers *did the mesocycle do what it said*. Only the mesocycle has a stated intent to
-    be graded against, which is why the weekly table carries no verdict and no focus. It
-    REPLACES the weekly zone table rather than appending to it: the flag is a choice of
-    grain, not an extra section.
-
-    Single-sport, because N sports x M mesocycles is not a view. And it trades brevity for
-    grain rather than the other way round — a single mesocycle runs about 25 lines at phone
-    width — so the help text says so.
-    """
-    weeks, _, _ = progression.select_weeks(payload["weeks"], weeks_window, today)
-    if not weeks:
-        return []
-    window_start = weeks[0]["week_commencing"]
-
-    stats = window_sport_stats(weeks)
-    sports, _, _ = select_zone_sports(explicit, preferences, stats)
-    if not sports:
-        return [yellow("No sport with zone data in this window.")]
-    sport = sports[0]
-
-    def fetch(start: str, end: str) -> List[Dict[str, Any]]:
-        return [
-            a for a in dbh.get_completed_activities(start_date=start, end_date=end)
-            if canonical_sport(a.get("activity_type") or "unknown") == sport
-        ]
-
-    mesocycles = _mesocycles_in_window(dbh, window_start, today)
-    benchmarks = dbh.get_benchmark_results()
-    lines: List[str] = [bold(f"ZONES BY MESOCYCLE — {sport}")]
-    reported: List[Dict[str, Any]] = []
-    for i, meso in enumerate(mesocycles):
-        if meso["end_date"] < window_start or meso["start_date"] > today:
-            continue
-        text = intensity.mesocycle_report(
-            meso, today, fetch,
-            current_week=meso["start_date"] <= today <= meso["end_date"],
-            previous=delta_baseline(mesocycles, i),
-            benchmarks=benchmarks, notes=False, indent="", width=TABLE_WIDTH,
-        )
-        if text:
-            lines.append("")
-            lines.extend(text.split("\n"))
-            reported.append(meso)
-
-    if not reported:
-        return [yellow("No mesocycle overlaps this window.")]
-
-    # Once per section, under the last mesocycle — `mesocycle_report` printing its own would
-    # render the same two caveats three times over three mesocycles (§9.6). Standing
-    # boilerplate, so terminal-only (DESIGN_output_verbosity.md §3.2).
-    rows = intensity.zone_rows(fetch(window_start, today))
-    notes = intensity.format_notes(rows, width=TABLE_WIDTH) if asides_enabled() else []
-    if notes:
-        lines.append("")
-        lines.extend(gray(n) for n in notes)
-    orphan = _orphan_week_note(weeks, reported)
-    if orphan:
-        lines.append("")
-        lines.extend(gray(o) for o in orphan)
-    return lines
-
 
 DEFAULT_CHART_PATH = "./progress.png"
 
@@ -884,7 +194,7 @@ def emit_chart(chart_arg: Any, payload: Dict[str, Any], caption: str) -> None:
         )
         return
 
-    from trainmate.prompt import emit_photo, is_json_frontend
+    from trainmate.sentinels import emit_photo, is_json_frontend
     if is_json_frontend():
         import tempfile
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
@@ -903,15 +213,14 @@ def run_progress(args: argparse.Namespace) -> None:
     load through plan end, and the weekly planned-vs-actual bars (§7.1). Auto-ensures
     fresh Garmin data first (the seam would otherwise read yesterday's un-synced ride
     as a 0-load day)."""
-    from trainmate import runtime
-    from trainmate import timeline
+    from trainmate import timeline_rows
     ensure_recent_data(
         no_pull=args.no_pull, force_pull=getattr(args, "force_pull", False)
     )
     today = _today_str()
     weeks_window = getattr(args, "weeks", None) or 8
 
-    payload = timeline.build_timeline_payload(runtime.db)
+    payload = timeline_rows.build_timeline_payload(runtime.db)
     runtime.render.progress(payload, args, today, weeks_window)
 
 
@@ -923,8 +232,6 @@ def print_progress_report(
 
     The companion form of this is CompanionRenderer.progress
     (DESIGN_render_persona.md §5)."""
-    from trainmate import runtime
-    from trainmate.config import config
     sports = list(getattr(args, "sports", None) or [])
     mesocycles = getattr(args, "mesocycles", False)
     # Naming a sport IS a request for its zone table; otherwise the tables are opt-in
@@ -962,11 +269,26 @@ def print_progress_report(
     if chart_arg:
         emit_chart(
             chart_arg,
-            progression.clip_payload_for_weeks(
+            timeline.clip_payload_for_weeks(
                 payload, weeks_window, today, cap_future=True
             ),
             lines[0] if lines else "",
         )
+
+
+def _weeks_arg(raw: str):
+    """`--weeks N` must be a whole number >= 1, or the literal `all`
+    (DESIGN_progress_timeline.md §7.1) — rejected at argparse, so a `0` can't silently
+    fall through to the default. `all` matches the web endpoint's `?weeks=all`."""
+    if raw == "all":
+        return "all"
+    try:
+        n = int(raw)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: '{raw}'")
+    if n < 1:
+        raise argparse.ArgumentTypeError("must be >= 1")
+    return n
 
 
 def add_progress_parser(subparsers, pull_bypass_parser):

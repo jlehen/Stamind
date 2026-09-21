@@ -19,10 +19,11 @@ def _goal_ahead(days: int) -> str:
     goal is only `upcoming` while it is ahead — a literal expired the fingerprint tests
     the day it passed, and both hashes then described the same empty goal list."""
     from datetime import timedelta
-    from trainmate.util import today_date
+    from trainmate.clock import today_date
     return (today_date() + timedelta(days=days)).isoformat()
 
 
+from trainmate import plan_inputs
 from trainmate.db import Database
 from trainmate.coach.proposals import RevisionProposal, PlanFingerprints
 from trainmate.coach.revisions import normalize_load_fields, pair_revisions
@@ -30,7 +31,7 @@ from trainmate.coach.revisions import normalize_load_fields, pair_revisions
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach import coach_service
+from trainmate.coach.service import coach_service
 
 
 class TestPairAdaptations(unittest.TestCase):
@@ -267,7 +268,7 @@ class TestPlanFingerprintsSurviveTheAcceptStep(unittest.TestCase):
             title="Spring Race", target_date=_goal_ahead(210),
             sport_type="running",
         )
-        at_generate_time = coach_service.engine._get_goals_hash(
+        at_generate_time = plan_inputs.goals_hash(
             test_db.upcoming_objectives()
         )
 
@@ -285,7 +286,7 @@ class TestPlanFingerprintsSurviveTheAcceptStep(unittest.TestCase):
             title="Summer Race", target_date=_goal_ahead(301),
             sport_type="running",
         )
-        before_edit = coach_service.engine._get_goals_hash(test_db.upcoming_objectives())
+        before_edit = plan_inputs.goals_hash(test_db.upcoming_objectives())
         test_db.update_objective(second_goal, title="Summer Race (moved)")
         coach_service.plan_apply(
             second_goal, "Build", [],

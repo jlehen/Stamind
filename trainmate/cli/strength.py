@@ -14,7 +14,9 @@ from trainmate.db.strength import ACTIVE
 from trainmate.prompt import Choice
 from trainmate.queue_kind import NotApplied
 from trainmate.strength import questions, sets, vocabulary
-from trainmate.util import bold, cmd, fail, fmt_date, gray, notice, red, wrap_text
+from trainmate.text import bold, capitalized, cmd, gray, red, wrap_text
+from trainmate.output import fail, notice
+from trainmate.clock import fmt_date
 
 # The heading for a lift whose Garmin name the vocabulary lacks: stored verbatim, with
 # no pattern (§4).
@@ -89,12 +91,12 @@ def _ask_group(activity_id: str, group: sets.Group, recent: List[str]) -> int:
         # which is the whole of what makes a guess count (§7).
         if any(s["named_by"] == sets.WATCH for s in group.sets):
             runtime.db.name_exercise_sets(activity_id, group.seqs, group.exercise)
-            print(f"{_capitalize(sets.set_span(group.first, group.last))} confirmed: "
+            print(f"{capitalized(sets.set_span(group.first, group.last))} confirmed: "
                   f"{group.exercise}.")
         return group.last + 1
     if picked == CLEAR:
         runtime.db.name_exercise_sets(activity_id, group.seqs, None)
-        print(f"{_capitalize(sets.set_span(group.first, group.last))} left unnamed.")
+        print(f"{capitalized(sets.set_span(group.first, group.last))} left unnamed.")
         return group.last + 1
     if picked == OTHER:
         text = runtime.prompt.ask_text(sets.SOMETHING_ELSE["ask"]).strip()
@@ -109,10 +111,6 @@ def _ask_group(activity_id: str, group: sets.Group, recent: List[str]) -> int:
     runtime.db.name_exercise_sets(activity_id, group.seqs[:count], exercise)
     print(f"Named {sets.set_span(group.first, group.first + count - 1)}: {exercise}.")
     return group.first + count
-
-
-def _capitalize(text: str) -> str:
-    return text[:1].upper() + text[1:]
 
 
 def _name_activity(activity: Dict[str, Any], recent: List[str]) -> None:

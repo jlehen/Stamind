@@ -12,7 +12,7 @@ TEST_DB_PATH = test_db_path("test_trainmate_clock.db")
 
 from trainmate import clock, settings
 from trainmate.db import Database
-from trainmate.util import fmt_timestamp, today_date, today_str
+from trainmate.clock import fmt_timestamp, today_date, today_str
 
 
 def _set_zone(zone: str) -> str:
@@ -226,18 +226,18 @@ class TestPushWindowFollowsTheAthlete(ClockTestCase):
     machine's (§2)."""
 
     def test_the_scheduler_reads_the_stored_zone(self):
-        import trainmate_bot
+        from trainmate.chat import scheduler
         _set_zone(FAR_EAST)
-        self.assertEqual(trainmate_bot.athlete_now().date(),
+        self.assertEqual(scheduler.athlete_now().date(),
                          datetime.now(ZoneInfo(FAR_EAST)).date())
 
     def test_the_window_is_computed_in_wall_clock_terms(self):
-        import trainmate_bot
+        from trainmate.chat import scheduler
         # 07:00 local, whatever zone that is: the 08:00 push is an hour out.
         now = datetime(2026, 6, 10, 7, 0, tzinfo=ZoneInfo("Europe/Paris"))
-        self.assertEqual(trainmate_bot.next_push_delay(now, "08:00", "15:00"), 3600.0)
+        self.assertEqual(scheduler.next_push_delay(now, "08:00", "15:00"), 3600.0)
         inside = datetime(2026, 6, 10, 9, 0, tzinfo=ZoneInfo("Europe/Paris"))
-        self.assertEqual(trainmate_bot.next_push_delay(inside, "08:00", "15:00"), 0.0)
+        self.assertEqual(scheduler.next_push_delay(inside, "08:00", "15:00"), 0.0)
 
 
 if __name__ == "__main__":

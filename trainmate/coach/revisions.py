@@ -3,22 +3,10 @@
 Kept apart from `proposals.py`, which holds only the frozen records the coach hands the
 CLI: this is the logic that fills them in.
 """
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from trainmate.coach.proposals import RevisionPair
 from trainmate.sports import canonical_sport
-
-
-@dataclass(frozen=True)
-class RevisionPair:
-    """One proposed session and the planned session it stands in for.
-
-    `original` is the session being replaced — the same-sport session for an in-place
-    change, or the displaced one for a sport swap. None when nothing was planned that day.
-    """
-    proposal: Dict[str, Any]
-    original: Optional[Dict[str, Any]]
-    is_swap: bool
 
 
 def replaces_source(entry: Dict[str, Any]) -> Optional[Tuple[str, str]]:
@@ -97,6 +85,12 @@ def structure_revision(
             # §11). None on a session that is not going anywhere.
             'replaces_slot': w.get('replaces_slot'),
             'replaces_lineage': w.get('replaces_lineage'),
+            # The intensity target, in the shape the week planner wrote it: apply reads it
+            # back through `intensity.parse_planned_zones`, and omitting it here is how an
+            # eased target used to be asked for, returned, and then dropped on the way to
+            # the row (DESIGN_intensity_distribution.md §9.8).
+            'planned_zone_currency': w.get('planned_zone_currency'),
+            'planned_zone_sec': w.get('planned_zone_sec'),
         } for w in revised
     ]
 
@@ -104,17 +98,28 @@ def structure_revision(
 def prescription_matches(proposed: Dict[str, Any], live: Dict[str, Any]) -> bool:
     """Whether appending `proposed` over `live` would be suppressed as a no-op.
 
-    The §9 no-op rule lives in the write path (`db.workouts.WorkoutChange._write`), so a
+    The §9 no-op rule lives in the write path (`db.workout_change.WorkoutChange._write`), so a
     preview built from the week planner's answers would report a wording-only revision as a
     change to the day. The proposal step asks this instead, against the standing rows it
     already loaded (DESIGN_plan_change_continuity.md §4.5). It mirrors `append`'s merge:
     a field the proposal omits carries forward and is therefore not a change.
+
+    Prose is compared on its words, not its spacing: a model that re-lists a session it is
+    holding wraps the same sentence differently often enough, and a proposal that only
+    re-wraps a line is not a change the athlete can see.
     """
-    from trainmate import intensity
+    from trainmate.analytics import intensity
+
+    def _words(value: Any) -> str:
+        return " ".join(str(value or "").split())
+
     if live.get('removed'):
         return False
-    for field in ('date', 'sport_type', 'title', 'description'):
+    for field in ('date', 'sport_type'):
         if proposed.get(field) != live.get(field):
+            return False
+    for field in ('title', 'description'):
+        if _words(proposed.get(field)) != _words(live.get(field)):
             return False
     for field in ('duration_minutes', 'rpe', 'tss'):
         value = proposed.get(field)

@@ -24,7 +24,7 @@ from trainmate.db import Database
 import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
 from trainmate import settings
-from trainmate.coach import coach_service
+from trainmate.coach.service import coach_service
 from trainmate.strength import planner, prescription
 
 if os.path.exists(TEST_DB_PATH):
@@ -113,7 +113,7 @@ class _TweakCase(unittest.TestCase):
 
 
 class CommandTest(_TweakCase):
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
+    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
     @patch("trainmate.runtime.coach_service")
     def test_every_d_reaches_the_service_with_the_message(self, service, _pull):
         from trainmate.coach.proposals import RevisionProposal
@@ -241,7 +241,7 @@ class WhatItWritesTest(_TweakCase):
                       description="[Intervals]\n75 min, 5x5 at threshold.")
         self.apply(self.tweak(reply(longer), days=[THURSDAY]))
 
-        from trainmate.cli.workouts._helpers import modification_markers
+        from trainmate.workout_state import modification_markers
         thursday = test_db.get_workout(THURSDAY, "cycling")
         self.assertEqual(thursday["adaptation_count"], 0)
         self.assertEqual(modification_markers(thursday), ["TWEAKED"])

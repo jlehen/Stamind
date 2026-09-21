@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 from trainmate import journal
 from trainmate.config import config
-from trainmate.prompt import emit_flush, is_json_frontend
-from trainmate.util import Spinner, aside, warn
+from trainmate.sentinels import emit_flush, is_json_frontend
+from trainmate.output import Spinner, aside, warn
 
 # A fenced reply may be one line (```{"a":1}```) or many, with or without a language
 # tag; the one-line form has no newline to split on. The `$` anchor deliberately
@@ -44,6 +44,10 @@ class OpenRouterClient:
         """Initializes the API endpoint. The model resolves lazily — see `model`."""
         self.api_url: str = "https://openrouter.ai/api/v1/chat/completions"
         self._model: Optional[str] = None
+        # `--show-llm-prompt-only` sets this on the singleton: print the prompt the next
+        # call would send and stop, rather than spend the call. Declared here so the two
+        # readers ask an attribute that exists instead of guarding with a default.
+        self.show_prompt_only: bool = False
 
     @property
     def model(self) -> str:
@@ -326,7 +330,7 @@ class OpenRouterClient:
             ValueError: If the OpenRouter API Key is missing or response is empty.
             requests.exceptions.HTTPError: If HTTP error occurs during requests.
         """
-        if getattr(self, "show_prompt_only", False):
+        if self.show_prompt_only:
             import sys
             print("=== SYSTEM PROMPT ===")
             print(system_content)

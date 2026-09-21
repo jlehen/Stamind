@@ -12,14 +12,13 @@ import argparse
 import sys
 from typing import Optional
 from trainmate import runtime
-from trainmate.util import (
-    aside, bold, dim, green, red, cyan, gray, cmd, format_labeled_paragraph, fmt_date,
-    fmt_span, today_str as _today_str, notice,
-)
-from trainmate.cli.selectors import (
-    IdRange, add_selector_args, has_selector, resolve_window,
-)
+from trainmate.text import bold, cmd, cyan, dim, format_labeled_paragraph, gray, green, red
+from trainmate.output import aside, notice
+from trainmate.clock import fmt_date, fmt_span, today_str as _today_str
+from trainmate.cli.selectors import IdRange, add_selector_args
+from trainmate.cli.windows import goal_range_for_window, has_selector, resolve_window
 from trainmate.cli.common import constraint_line
+from trainmate.cli.plans.generate import run_plan_generate
 from trainmate.coach import honoring
 
 
@@ -173,7 +172,6 @@ def _maybe_replan(constraint_id: int, title: str, replan_flag: Optional[bool]) -
 def _replan_targets(constraint: dict) -> Optional[IdRange]:
     """The goals a replan of this directive would rebuild — the ones whose own span holds
     the disrupted days (DESIGN_constraints.md §7). None when no goal's span does."""
-    from trainmate.cli.plans import goal_range_for_window
     return goal_range_for_window(constraint['start_date'], constraint['end_date'])
 
 
@@ -197,13 +195,11 @@ def _report_nothing_to_replan(constraint: dict) -> None:
 
 def _run_replan_flow(title: str, constraint: dict) -> None:
     """Escalates a directive to plan-shaping and runs the existing plan-generate confirm
-    flow (each step of which still confirms before applying). Imported lazily to avoid a
-    CLI import cycle.
+    flow (each step of which still confirms before applying).
 
     It rebuilds the goals whose own span holds the disrupted days, so a window straddling
     a race replans both of the plans it breaks — one strategy call, preview and `y` each
     (DESIGN_constraints.md §7)."""
-    from trainmate.cli.plans import run_plan_generate
     targets = _replan_targets(constraint)
     if targets is None:
         _report_nothing_to_replan(constraint)

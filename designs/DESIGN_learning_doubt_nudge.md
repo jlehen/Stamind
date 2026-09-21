@@ -400,13 +400,14 @@ question then closes as stale.
 
 ## 10. Touch points
 
-- `trainmate_bot.py`: `scheduler_wake` starts `data reflect --auto` once a day after 03:00,
-  from Wednesday to Sunday, in companion mode, as a process outside the chat whose output
-  goes to the journal.
+- `trainmate/chat/scheduler.py`: `scheduler_wake` starts `data reflect --auto` once a
+  day after 03:00, from Wednesday to Sunday, in companion mode, as a process outside the
+  chat whose output goes to the journal.
 - `trainmate/settings.py`: the `learning-questions` switch, on by default.
-  `trainmate/cli/settings.py`: it joins `ROUTABLE_SETTINGS`. `trainmate/cli/bot.py`: its line
-  in `SETTING_DESCRIPTIONS`, its two sentences in `_setting_effect`, and the router's
-  description of `change_setting`, so "stop asking me about that stuff" reaches it.
+  `trainmate/cli/bot/capture.py`: it joins `ROUTABLE_SETTINGS`, and it gains its line in
+  `SETTING_DESCRIPTIONS` and its two sentences in `_setting_effect`.
+  `trainmate/chat/routing.py`: the router's description of `change_setting`, so
+  "stop asking me about that stuff" reaches it.
 - `trainmate/learning_doubts.py` (new): the `learning` kind (expert and companion wording,
   the check of §5, the two answers, no drop), registered in `athlete_queue.KINDS`; and the
   queuing of §5, which skips a learning with a question still waiting or a dormant learning,
@@ -421,7 +422,7 @@ question then closes as stale.
   questions (or, with the switch off, applies the proposals).
 - `trainmate/coach/engine/__init__.py`: `reason` on the `contradict` op in
   `LEARNING_UPDATES_FIELD`.
-- `trainmate/db/learnings.py` and `db/base.py`: the `status` column on `coach_learnings` and
+- `trainmate/db/learnings.py` and `db/schema.py`: the `status` column on `coach_learnings` and
   a `reason` column on `learning_evidence`, with their migrations; `apply_learning_deltas`
   storing a contradiction's reason; the `archived` flag in `get_learnings`; archive in place
   of the four deletes; `restore_learning`; the staleness sweep without its proposing branch;
@@ -429,10 +430,10 @@ question then closes as stale.
   `_exists`.
 - `trainmate/cli/learnings.py`: `rm --purge`, `restore`, `list -a/--all`, `show` finding an
   archived learning and printing the reasons, keep/demote printing through the renderer.
-- `trainmate/cli/data.py`: the reason under a contradiction in the reflect report, and the
+- `trainmate/cli/data/analysis.py`: the reason under a contradiction in the reflect report, and the
   queue hint at the end of `data reflect` and `data bootstrap`.
 - `trainmate/cli/status.py` and `trainmate_web.py`: archived learnings left out.
-- `trainmate/cli/render.py`: renderer methods for the two answers' replies, one rung down or
+- `trainmate/cli/render/`: renderer methods for the two answers' replies, one rung down or
   on the retirement rung, with expert and companion bodies. The question's own companion
   wording lives with the kind in `learning_doubts.py`, as the strength kinds' does.
 - Tests (`tests/test_bot.py`, `tests/test_athlete_queue.py`, `tests/test_learnings*.py`, a

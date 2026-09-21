@@ -34,7 +34,7 @@ historical review record — the findings below describe the *rev. 1* design.
 
 ## 1. Zero-seeded EWMAs feed six weeks of garbage to the LLM (blocking)
 
-**Resolved** — accepted as written. Leading-edge blanking ships in `garmin/pmc.py` and every
+**Resolved** — accepted as written. Leading-edge blanking ships in `analytics/pmc.py` and every
 surface that reads PMC; design §3.3(a).
 
 The design seeds CTL and ATL at 0 at the start of DB history. An athlete

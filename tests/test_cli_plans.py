@@ -13,7 +13,6 @@ from tests import test_db_path
 TEST_DB_PATH = test_db_path("test_trainmate_cli_plans.db")
 
 from trainmate.db import Database
-import trainmate.db
 import trainmate_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
@@ -79,7 +78,7 @@ class TestCliPlans(unittest.TestCase):
         (DESIGN_cli_selectors.md §9)."""
         # The app's clock, not the machine's: the two must agree or the expected spans
         # are computed against a different day than the command reads.
-        from trainmate.util import today_date
+        from trainmate.clock import today_date
         today = today_date()
 
         def out(n):
@@ -132,6 +131,71 @@ class TestCliPlans(unittest.TestCase):
         # and stays a single goal.
         calls, _ = _planned(["plan", "generate", "-g"])
         self.assertEqual([c["objective_id"] for c in calls], [first])
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
+    def test_the_preview_is_drawn_by_the_cli_not_the_service(self, mock_coach, _garmin):
+        """`plan generate` shows the strategy before asking to apply it, and the review
+        behind it when the athlete passed the flag.
+
+        The service used to print both itself, which left this command — the one whose
+        whole output is a preview — with no persona seam."""
+        mock_coach.plan_generate.return_value = {
+            "strategy": "Build the aerobic base, then sharpen.",
+            "mesocycles": [
+                {"name": "Base 1", "start_date": "2026-01-01",
+                 "end_date": "2026-01-28", "focus": "aerobic volume"},
+            ],
+            "reused": False,
+            "goal": None,
+            "prior_training_review": "PLANNED vs ACTUAL\n  week 1  320 / 280",
+            "has_prior_training": True,
+        }
+        _exit, stdout, _err = self.run_cli(["plan", "generate", "--show-llm-context"])
+        self.assertIn("NEW PERIODIZATION STRATEGY", stdout)
+        self.assertIn("Build the aerobic base", stdout)
+        self.assertIn("Base 1", stdout)
+        self.assertIn("PRIOR TRAINING REVIEW", stdout)
+        self.assertIn("PLANNED vs ACTUAL", stdout)
+        # Pointing at a flag the athlete just used is noise.
+        self.assertNotIn("--show-llm-context", stdout)
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
+    def test_with_no_goal_the_reason_is_said_not_framed_as_a_strategy(
+        self, mock_coach, _garmin
+    ):
+        """A fresh install types `plan generate` before adding a goal.
+
+        The service answers `goal: None`, and puts the reason where a strategy would go.
+        Drawing that under the NEW PERIODIZATION STRATEGY banner would read as though the
+        coach had written one, which is what happened for a moment when the printing moved
+        out of the service."""
+        mock_coach.plan_generate.return_value = {
+            "strategy": "No active goals found. TrainMate needs at least one objective.",
+            "mesocycles": [], "reused": False, "goal": None,
+            "prior_training_review": None, "has_prior_training": False,
+        }
+        _exit, stdout, _err = self.run_cli(["plan", "generate"])
+        self.assertIn("No active goals found", stdout)
+        self.assertNotIn("NEW PERIODIZATION STRATEGY", stdout)
+        self.assertNotIn("Mesocycles:", stdout)
+        # And it never gets as far as asking whether to apply it.
+        self.assertNotIn("Apply this new periodization strategy?", stdout)
+
+    @patch("trainmate.runtime.garmin")
+    @patch("trainmate.runtime.coach_service")
+    def test_without_the_flag_the_review_is_named_not_printed(self, mock_coach, _garmin):
+        mock_coach.plan_generate.return_value = {
+            "strategy": "s",
+            "mesocycles": [{"name": "Base", "start_date": "2026-01-01",
+                            "end_date": "2026-01-28", "focus": "aerobic"}],
+            "reused": False, "goal": {"id": 1, "title": "Race"},
+            "prior_training_review": None, "has_prior_training": True,
+        }
+        _exit, stdout, _err = self.run_cli(["plan", "generate"])
+        self.assertNotIn("PRIOR TRAINING REVIEW", stdout)
+        self.assertIn("--show-llm-context", stdout)
 
     @patch("trainmate.runtime.garmin")
     @patch("trainmate.runtime.coach_service")

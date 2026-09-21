@@ -3,16 +3,27 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional, Tuple
 
-from trainmate import runtime
+from trainmate import freshness, runtime
+from trainmate.analytics.load import compute_load, measured_tss
+from trainmate.analytics.pmc import derivation_pad_days
+from trainmate.clock import date_range, parse_date, shift, today_str
 from trainmate.config import config
-from trainmate.util import Progress, today_str, cmd, fail, step, warn, keep_whole
+from trainmate.text import cmd, keep_whole
+from trainmate.output import Progress, fail, step, warn
 import trainmate.garmin as _g
-from trainmate.garmin.client import (GarminAuthRequired, GarminClient, _date_range,
-    _derivation_pad_days, _shift, _to_date)
-from trainmate.garmin.load import _safe_round, compute_load, measured_tss
+from trainmate.garmin.client import GarminAuthRequired, GarminClient
 from trainmate.sports import canonical_sport
-from trainmate.garmin.pmc import recompute_derived
+from trainmate.garmin.derived import recompute_derived
 from trainmate.strength import sets as strength_sets
+
+
+def _safe_round(value: Any, ndigits: int = 1) -> float:
+    """A Garmin field as a rounded float, 0.0 when the payload had nothing usable."""
+    try:
+        return round(float(value), ndigits)
+    except (ValueError, TypeError):
+        return 0.0
+
 
 def _ingest_activities(client: GarminClient, start: str, end: str, throttle: float) -> int:
     """Ingests the range's activities, returning how many Garmin returned — -1 on a
@@ -110,7 +121,7 @@ def _ingest_activities(client: GarminClient, start: str, end: str, throttle: flo
     return len(activities)
 def _ingest_metrics(client: GarminClient, start: str, end: str, throttle: float) -> int:
     """Ingests one row per day in the range, returning how many days that was."""
-    dates = _date_range(start, end)
+    dates = date_range(start, end)
     step(f"Fetching daily metrics for {len(dates)} day(s) {start}..{end}...")
     with Progress(len(dates)) as bar:
         for date_str in dates:
@@ -190,21 +201,21 @@ def pull(
 # we never log into Garmin twice per command.
 _ensured: Optional[Tuple[str, str]] = None
 def _sync_calendar_signals(force: bool) -> None:
-    """Bridge to the calendar module's signal sync, lazily imported so a missing
+    """Bridge to the Calendar's signal sync, lazily imported so a missing
     service-account file (calendar unconfigured) can never break a Garmin read. The
-    gating, throttling, and error handling all live in google_calendar."""
+    gating, throttling, and error handling all live in `gcal/client.py`."""
     try:
-        from trainmate import google_calendar
+        from trainmate.gcal import client as gcal_client
     except Exception:
         return  # Calendar not importable/configured — nothing to sync.
-    google_calendar.sync_calendar_signals(force=force)
+    gcal_client.sync_calendar_signals(force=force)
 def _pull_command(start: str, end: str) -> str:
     return f"python trainmate_cli.py data pull -d {start}..{end}"
 def _contiguous_regions(missing: List[str]) -> List[Tuple[str, str]]:
     """Groups a sorted list of YYYY-MM-DD dates into contiguous [start, end] regions."""
     regions: List[Tuple[str, str]] = []
     for d in missing:
-        if regions and _shift(regions[-1][1], 1) == d:
+        if regions and shift(regions[-1][1], 1) == d:
             regions[-1] = (regions[-1][0], d)
         else:
             regions.append((d, d))
@@ -231,7 +242,7 @@ def ensure_data(start_date: str, end_date: str, force: bool = False) -> None:
         return
 
     today = today_str()
-    pad_start = _shift(start_date, -_derivation_pad_days())
+    pad_start = shift(start_date, -derivation_pad_days())
     req_end = min(end_date, today)  # can't pull the future
     if req_end < pad_start:
         return  # window lies entirely in the future
@@ -249,51 +260,40 @@ def ensure_data(start_date: str, end_date: str, force: bool = False) -> None:
 
     # Cold start: nothing pulled ever -> hand the user a backfill command.
     if not state and not present:
-        sugg_start = min(pad_start, _shift(today, -config.garmin_initial_backfill_days))
+        sugg_start = min(pad_start, shift(today, -config.garmin_initial_backfill_days))
         _warn_manual(sugg_start, today, cold=True)
         _remember(pad_start, req_end)
         return
 
     # Is the recent (mutable) zone stale? --force-pull treats it as stale unconditionally.
-    stale = True
-    last_pull_age_min: Optional[int] = None
-    if state and state.get("last_pull_utc"):
-        try:
-            age = datetime.now(timezone.utc) - datetime.fromisoformat(state["last_pull_utc"])
-            last_pull_age_min = int(age.total_seconds() // 60)
-            stale = age > timedelta(minutes=refresh_minutes)
-        except (ValueError, TypeError):
-            stale = True
-    if force:
-        stale = True
-    mutable_start = _shift(today, -(mutable_days - 1))
+    # The window is the shared one; `trainmate/freshness.py` says why it is not two rules.
+    age = freshness.last_pull_age(state)
+    last_pull_age_min = freshness.age_minutes(age) if age is not None else None
+    stale = force or age is None or age > timedelta(minutes=refresh_minutes)
+    mutable_start = shift(today, -(mutable_days - 1))
 
     # A needed day must be fetched if it has no row, or it's in the (stale) mutable
     # zone where values can still change.
     to_fetch = [
-        d for d in _date_range(pad_start, req_end)
+        d for d in date_range(pad_start, req_end)
         if d not in present or (stale and d >= mutable_start)
     ]
     if not to_fetch:
         # Nothing to do. If the only reason we're not re-fetching the recent mutable zone
         # is the refresh-minutes throttle, say so — otherwise this silent reuse is opaque.
         if not stale and req_end >= mutable_start:
-            age_note = (
-                f"last pull {last_pull_age_min}m ago, < {refresh_minutes}m"
-                if last_pull_age_min is not None else "recently pulled"
-            )
-            step(
-                f"Garmin data is fresh ({age_note}); using cache. "
-                "Pass --force-pull to refresh now."
+            # `not stale` means the age parsed, so there is always a number to quote.
+            freshness.fresh_notice(
+                "Garmin data", f"last pull {last_pull_age_min}m ago, < {refresh_minutes}m"
             )
         _remember(pad_start, req_end)
         return
 
     auto_regions: List[Tuple[str, str]] = []
     surfaced_regions: List[Tuple[str, str]] = []
-    pad_days = _derivation_pad_days()
+    pad_days = derivation_pad_days()
     for region in _contiguous_regions(to_fetch):
-        span = (_to_date(region[1]) - _to_date(region[0])).days + 1
+        span = (parse_date(region[1]) - parse_date(region[0])).days + 1
         # Small gaps pull automatically; large ones are surfaced as a command. Regions
         # lying entirely BEFORE the requested window exist only to warm the derivation
         # pad — bounded by the pad itself and never asked for by the user — so they always

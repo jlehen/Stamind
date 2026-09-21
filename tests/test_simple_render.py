@@ -1,5 +1,10 @@
-"""Simple-rendering helpers and the companion-mode config knobs
-(DESIGN_bot_simple_frontend.md §3, §4.3, §6)."""
+"""The companion voice on a day, and the companion-mode config knobs
+(DESIGN_bot_simple_frontend.md §3, §4.3, §6).
+
+`trainmate/cli/render/session_lines.py`, plus the two rules about the render package
+itself: which voice `TRAINMATE_RENDER` picks, and that no command module imports the
+package back. The plan-side line builders are tests/test_simple_render_plan.py.
+"""
 import os
 import sys
 import unittest
@@ -7,7 +12,12 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from tests.helpers import pin_clock
+
 from trainmate.cli import render
+from trainmate.cli.render import session_lines
+from trainmate.cli.render.companion import CompanionRenderer
+from trainmate.cli.render.expert import ExpertRenderer
 from trainmate.config import Config
 
 
@@ -17,53 +27,60 @@ class MakeRendererTest(unittest.TestCase):
     def test_unset_is_expert(self):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("TRAINMATE_RENDER", None)
-            self.assertIsInstance(render.make_renderer(), render.ExpertRenderer)
+            self.assertIsInstance(render.make_renderer(), ExpertRenderer)
 
     def test_simple_selects_the_companion_rendering(self):
         with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
-            self.assertIsInstance(render.make_renderer(), render.CompanionRenderer)
+            self.assertIsInstance(render.make_renderer(), CompanionRenderer)
         with patch.dict(os.environ, {"TRAINMATE_RENDER": " SIMPLE "}):
-            self.assertIsInstance(render.make_renderer(), render.CompanionRenderer)
+            self.assertIsInstance(render.make_renderer(), CompanionRenderer)
 
     def test_other_values_stay_expert(self):
         with patch.dict(os.environ, {"TRAINMATE_RENDER": "fancy"}):
             renderer = render.make_renderer()
-        self.assertIsInstance(renderer, render.ExpertRenderer)
-        self.assertNotIsInstance(renderer, render.CompanionRenderer)
+        self.assertIsInstance(renderer, ExpertRenderer)
+        self.assertNotIsInstance(renderer, CompanionRenderer)
 
     def test_the_companion_inherits_every_surface_it_does_not_word_itself(self):
         """The opt-in list is the override set, so a surface nobody thought about gets
         the expert form rather than nothing (§2)."""
-        for name in dir(render.ExpertRenderer):
+        for name in dir(ExpertRenderer):
             if name.startswith("_"):
                 continue
-            self.assertTrue(hasattr(render.CompanionRenderer, name))
+            self.assertTrue(hasattr(CompanionRenderer, name))
 
 
 class RenderImportDirectionTest(unittest.TestCase):
-    """`cli/render.py` imports the command modules; they must not import it back
+    """`cli/render/` imports the command modules; they must not import it back
     (DESIGN_render_persona.md §7).
 
-    The graph is acyclic only in that direction: `render.py` reaches into the commands
-    for their expert renderers, and the commands reach `render.py` through
-    `runtime.render`, whose builder defers the import. A command module that imports it
-    directly closes the loop, and a function-local import added to dodge that is the
-    sign the graph has gone wrong, not a fix — so this looks for the module name
+    The graph is acyclic only in that direction: the render package reaches into the
+    commands for their expert renderers, and the commands reach the render package
+    through `runtime.render`, whose builder defers the import. A command module that
+    imports it directly closes the loop, and a function-local import added to dodge that
+    is the sign the graph has gone wrong, not a fix — so this looks for the module name
     anywhere in the file. Keyed on a directory glob, so a CLI module written tomorrow is
     covered tomorrow rather than whenever someone remembers the rule."""
 
-    # `bot.py` is the exception the design names: the companion-only surfaces call the
-    # line builders directly, because for them there is nothing to choose (§3).
-    ALLOWED = {"render.py", "bot.py"}
+    # The `bot` package is the exception the design names: the companion-only surfaces
+    # call the line builders directly, because for them there is nothing to choose (§3).
+    # Each exempt file is listed by its path under `cli/`, not by its bare name, so a
+    # `views.py` in another command package is still covered — and not by the directory
+    # either, so a new file under `cli/bot/` has to be added here deliberately. The
+    # render package's own files are exempt by directory, so cutting it into more files
+    # never quietly widens the exemption.
+    ALLOWED = {"bot/views.py", "bot/capture.py", "bot/edit.py"}
 
     def test_no_command_module_imports_the_renderer(self):
         from pathlib import Path
-        from trainmate.cli import render as render_module
-        cli_dir = Path(render_module.__file__).parent
+        from trainmate.cli import render as render_package
+        render_dir = Path(render_package.__file__).parent
+        cli_dir = render_dir.parent
         offenders = [
             path.relative_to(cli_dir.parent).as_posix()
             for path in sorted(cli_dir.rglob("*.py"))
-            if path.name not in self.ALLOWED
+            if path.relative_to(cli_dir).as_posix() not in self.ALLOWED
+            and render_dir not in path.parents
             and "cli.render" in path.read_text()
         ]
         self.assertEqual(offenders, [])
@@ -73,49 +90,50 @@ class SessionLineTest(unittest.TestCase):
     def test_full_line_with_lead_and_duration(self):
         w = {"sport_type": "running", "title": "Easy run", "duration_minutes": 40}
         self.assertEqual(
-            render.simple_session_line(w, lead="Today"), "🏃 Today: Easy run — 40 min"
+            session_lines.simple_session_line(w, lead="Today"), "🏃 Today: Easy run — 40 min"
         )
 
     def test_without_duration_or_lead(self):
         w = {"sport_type": "cycling", "title": "Spin"}
-        self.assertEqual(render.simple_session_line(w), "🚴 Spin")
+        self.assertEqual(session_lines.simple_session_line(w), "🚴 Spin")
 
     def test_unknown_sport_gets_the_generic_emoji(self):
         w = {"sport_type": "curling", "title": "Sweep"}
         self.assertTrue(
-            render.simple_session_line(w).startswith(render.DEFAULT_SPORT_EMOJI)
+            session_lines.simple_session_line(w).startswith(session_lines.DEFAULT_SPORT_EMOJI)
         )
 
     def test_every_canonical_sport_has_its_own_emoji(self):
         from trainmate.sports import CANONICAL_SPORTS
         for sport in CANONICAL_SPORTS:
-            self.assertIn(sport, render.SPORT_EMOJI)
+            self.assertIn(sport, session_lines.SPORT_EMOJI)
 
 
 class DayLinesTest(unittest.TestCase):
+    def setUp(self):
+        pin_clock(self, "2026-08-25")
+
     def test_empty_day_is_a_rest_day(self):
         self.assertEqual(
-            render.simple_day_lines([], "2026-08-25"), [render.REST_DAY_LINE]
+            session_lines.simple_day_lines([], "2026-08-25"), [session_lines.REST_DAY_LINE]
         )
 
     def test_session_day_includes_the_description(self):
-        with patch("trainmate.cli.render._today_str", return_value="2026-08-25"):
-            lines = render.simple_day_lines(
-                [{"sport_type": "running", "title": "Easy run",
-                  "duration_minutes": 40, "date": "2026-08-25",
-                  "description": "Conversational pace."}],
-                "2026-08-25",
-            )
+        lines = session_lines.simple_day_lines(
+            [{"sport_type": "running", "title": "Easy run",
+              "duration_minutes": 40, "date": "2026-08-25",
+              "description": "Conversational pace."}],
+            "2026-08-25",
+        )
         self.assertEqual(lines[0], "🏃 Today: Easy run — 40 min")
         self.assertIn("Conversational pace.", lines[1])
 
     def test_another_day_is_named_not_called_today(self):
-        with patch("trainmate.cli.render._today_str", return_value="2026-08-25"):
-            lines = render.simple_day_lines(
-                [{"sport_type": "running", "title": "Long run",
-                  "date": "2026-08-27"}],
-                "2026-08-27",
-            )
+        lines = session_lines.simple_day_lines(
+            [{"sport_type": "running", "title": "Long run",
+              "date": "2026-08-27"}],
+            "2026-08-27",
+        )
         self.assertNotIn("Today", lines[0])
         self.assertIn("2026-08-27", lines[0])
 
@@ -123,18 +141,17 @@ class DayLinesTest(unittest.TestCase):
         """A prescription has blank lines in it, so a blank line cannot also be what
         ends one session — without the rule the second header reads as another
         paragraph of the first one's text (DESIGN_bot_simple_frontend.md §6)."""
-        with patch("trainmate.cli.render._today_str", return_value="2026-08-25"):
-            lines = render.simple_day_lines(
-                [{"sport_type": "cycling", "title": "HIIT 4x5", "date": "2026-08-25",
-                  "duration_minutes": 85,
-                  "description": "Warm up 15 min.\n\nMain set: 4x5 min.\n\nCool down."},
-                 {"sport_type": "strength_training", "title": "Strength",
-                  "date": "2026-08-25", "duration_minutes": 40,
-                  "description": "Squat 3x4.\n\nRDL 3x4."}],
-                "2026-08-25",
-            )
+        lines = session_lines.simple_day_lines(
+            [{"sport_type": "cycling", "title": "HIIT 4x5", "date": "2026-08-25",
+              "duration_minutes": 85,
+              "description": "Warm up 15 min.\n\nMain set: 4x5 min.\n\nCool down."},
+             {"sport_type": "strength_training", "title": "Strength",
+              "date": "2026-08-25", "duration_minutes": 40,
+              "description": "Squat 3x4.\n\nRDL 3x4."}],
+            "2026-08-25",
+        )
         text = "\n".join(lines)
-        rule = render.SIMPLE_SESSION_RULE
+        rule = session_lines.SIMPLE_SESSION_RULE
         self.assertEqual(text.count(f"\n{rule}\n"), 1, text)
         head, tail = text.split(rule)
         self.assertIn("HIIT 4x5", head)
@@ -144,34 +161,32 @@ class DayLinesTest(unittest.TestCase):
 
     def test_a_lone_session_gets_no_rule(self):
         """The rule separates sessions; with one session there is nothing to separate."""
-        with patch("trainmate.cli.render._today_str", return_value="2026-08-25"):
-            lines = render.simple_day_lines(
-                [{"sport_type": "running", "title": "Easy run", "date": "2026-08-25",
-                  "duration_minutes": 40, "description": "Conversational pace."}],
-                "2026-08-25",
-            )
-        self.assertNotIn(render.SIMPLE_SESSION_RULE, "\n".join(lines))
+        lines = session_lines.simple_day_lines(
+            [{"sport_type": "running", "title": "Easy run", "date": "2026-08-25",
+              "duration_minutes": 40, "description": "Conversational pace."}],
+            "2026-08-25",
+        )
+        self.assertNotIn(session_lines.SIMPLE_SESSION_RULE, "\n".join(lines))
 
 
     def _today(self, verdicts=None):
-        with patch("trainmate.cli.render._today_str", return_value="2026-08-25"):
-            return render.simple_day_lines(
-                [{"id": 7, "sport_type": "running", "title": "Easy run",
-                  "duration_minutes": 40, "date": "2026-08-25",
-                  "description": "Conversational pace."}],
-                "2026-08-25", verdicts,
-            )
+        return session_lines.simple_day_lines(
+            [{"id": 7, "sport_type": "running", "title": "Easy run",
+              "duration_minutes": 40, "date": "2026-08-25",
+              "description": "Conversational pace."}],
+            "2026-08-25", verdicts,
+        )
 
     def test_a_session_already_trained_is_acknowledged(self):
         """Asking for a day you have already trained should say so, not just re-read the
         prescription back (DESIGN_bot_simple_frontend.md §6)."""
         lines = self._today({7: {"status": "done", "label": "Done", "reasons": []}})
-        self.assertEqual(lines[1], render.SIMPLE_DONE_LINE)
+        self.assertEqual(lines[1], session_lines.SIMPLE_DONE_LINE)
 
     def test_a_session_that_came_in_off_plan_still_counts_as_done(self):
         lines = self._today({7: {"status": "partial", "label": "Partial",
                                  "reasons": ["duration mismatch"]}})
-        self.assertEqual(lines[1], render.SIMPLE_DONE_LINE)
+        self.assertEqual(lines[1], session_lines.SIMPLE_DONE_LINE)
         # The mismatch itself is expert detail — the companion never reads it out.
         self.assertFalse(any("mismatch" in line for line in lines))
 
@@ -180,18 +195,18 @@ class DayLinesTest(unittest.TestCase):
         not news to someone reading their own day."""
         for status, label in (("pending", "Not yet"), ("missed", "Missed")):
             lines = self._today({7: {"status": status, "label": label, "reasons": []}})
-            self.assertNotIn(render.SIMPLE_DONE_LINE, lines)
+            self.assertNotIn(session_lines.SIMPLE_DONE_LINE, lines)
             self.assertEqual(lines, self._today())
 
 
 class WeekLinesTest(unittest.TestCase):
     def test_empty_window_is_a_break(self):
-        lines = render.simple_week_lines([])
+        lines = session_lines.simple_week_lines([])
         self.assertEqual(len(lines), 1)
         self.assertIn("enjoy the break", lines[0])
 
     def test_sessions_are_dated_and_counted(self):
-        lines = render.simple_week_lines([
+        lines = session_lines.simple_week_lines([
             {"sport_type": "running", "title": "Easy run",
              "duration_minutes": 40, "date": "2026-08-25"},
             {"sport_type": "cycling", "title": "Endurance ride",
@@ -202,13 +217,13 @@ class WeekLinesTest(unittest.TestCase):
         self.assertIn("2 sessions planned", lines[-1])
 
     def test_singular_session_word(self):
-        lines = render.simple_week_lines(
+        lines = session_lines.simple_week_lines(
             [{"sport_type": "running", "title": "Easy run", "date": "2026-08-25"}]
         )
         self.assertIn("1 session planned", lines[-1])
 
     def test_a_trained_session_gets_the_check_and_the_count(self):
-        lines = render.simple_week_lines(
+        lines = session_lines.simple_week_lines(
             [{"id": 1, "sport_type": "running", "title": "Easy run",
               "date": "2026-08-25"},
              {"id": 2, "sport_type": "cycling", "title": "Endurance ride",
@@ -221,7 +236,7 @@ class WeekLinesTest(unittest.TestCase):
 
     def test_missed_and_pending_sessions_say_nothing(self):
         # §6 tone rule: a gap is never remarked on in the listing.
-        lines = render.simple_week_lines(
+        lines = session_lines.simple_week_lines(
             [{"id": 1, "sport_type": "running", "title": "Easy run",
               "date": "2026-08-25"}],
             verdicts={1: {"status": "missed"}},
@@ -247,7 +262,7 @@ class CompareLinesTest(unittest.TestCase):
                 "duration_sec": minutes * 60}
 
     def lines(self, days, start="2026-08-24", end=TODAY):
-        return render.simple_compare_lines(days, start, end, self.TODAY)
+        return session_lines.simple_compare_lines(days, start, end, self.TODAY)
 
     def test_a_trained_session_is_checked_with_what_was_done(self):
         lines = self.lines([
@@ -320,292 +335,16 @@ class WhenWordsTest(unittest.TestCase):
     """`simple_when` — the countdown vocabulary of the goal and plan views (§11)."""
 
     def test_the_near_words(self):
-        self.assertEqual(render.simple_when("2026-08-25", "2026-08-25"), "today")
-        self.assertEqual(render.simple_when("2026-08-26", "2026-08-25"), "tomorrow")
-        self.assertEqual(render.simple_when("2026-08-30", "2026-08-25"), "in 5 days")
+        self.assertEqual(session_lines.simple_when("2026-08-25", "2026-08-25"), "today")
+        self.assertEqual(session_lines.simple_when("2026-08-26", "2026-08-25"), "tomorrow")
+        self.assertEqual(session_lines.simple_when("2026-08-30", "2026-08-25"), "in 5 days")
 
     def test_weeks_then_months(self):
-        self.assertEqual(render.simple_when("2026-09-26", "2026-08-25"), "in 5 weeks")
-        self.assertEqual(render.simple_when("2027-04-30", "2026-08-30"), "in 8 months")
+        self.assertEqual(session_lines.simple_when("2026-09-26", "2026-08-25"), "in 5 weeks")
+        self.assertEqual(session_lines.simple_when("2027-04-30", "2026-08-30"), "in 8 months")
 
     def test_a_past_date_reads_as_passed(self):
-        self.assertEqual(render.simple_when("2026-08-20", "2026-08-25"), "passed")
-
-
-class GoalLinesTest(unittest.TestCase):
-    """`simple_goal_lines` — the companion goals view (§11): countdown words, no IDs
-    or state tags, archived goals silent, completed ones one celebration line."""
-
-    EVENT = {"id": 1, "title": "Marathon", "target_date": "2026-09-26",
-             "sport_type": "running", "date_type": "event", "status": "active",
-             "description": "Sub 4 hours."}
-    HORIZON = {"id": 2, "title": "Climb faster", "target_date": "2026-09-30",
-               "sport_type": "cycling", "date_type": "horizon", "status": "active",
-               "description": ""}
-
-    def test_event_goal_names_the_day_and_the_countdown(self):
-        lines = render.simple_goal_lines([self.EVENT], "2026-08-25")
-        self.assertIn("🎯 What you're training for:", lines[0])
-        self.assertIn("🏃 Marathon — on Sat Sep 26 (in 5 weeks)", lines[1])
-        self.assertIn("Sub 4 hours.", lines[2])
-
-    def test_horizon_goal_reads_as_by_approximately(self):
-        lines = render.simple_goal_lines([self.HORIZON], "2026-08-25")
-        self.assertIn("🚴 Climb faster — by ~Wed Sep 30 (in 5 weeks)", lines[1])
-
-    def test_no_expert_ids_or_tags_leak(self):
-        for line in render.simple_goal_lines([self.EVENT], "2026-08-25"):
-            self.assertNotIn("ID", line)
-            self.assertNotIn("[UPCOMING]", line)
-
-    def test_completed_goals_become_one_celebration_line(self):
-        past = dict(self.EVENT, target_date="2026-05-01")
-        lines = render.simple_goal_lines([past, self.EVENT], "2026-08-25")
-        self.assertIn("Marathon — on Sat Sep 26", "\n".join(lines))
-        # ✅, not 🏁: a goal behind her is checked off like anything else done, and 🏁
-        # is left to mean the target still ahead on every surface (§11.1).
-        self.assertIn("✅ 1 goal already behind you", lines[-1])
-
-    def test_archived_goals_say_nothing(self):
-        archived = dict(self.HORIZON, status="archived")
-        lines = render.simple_goal_lines([self.EVENT, archived], "2026-08-25")
-        self.assertNotIn("Climb faster", "\n".join(lines))
-
-    def test_empty_is_an_invitation(self):
-        lines = render.simple_goal_lines([], "2026-08-25")
-        self.assertEqual(len(lines), 1)
-        self.assertIn("No goal on the horizon", lines[0])
-
-
-class PlanLinesTest(unittest.TestCase):
-    """`simple_plan_lines` — the companion plan view (§11, §11.2): one stanza per mesocycle,
-    a blank line before each — marker and name, then the window and the one thing the
-    window cannot say — the active mesocycle's focus headline, and the goal day closing
-    the road."""
-
-    GOAL = {"id": 1, "title": "Marathon", "target_date": "2026-09-26",
-            "sport_type": "running", "date_type": "event", "status": "active"}
-    ACTIVE_MACRO = {"id": 6, "status": "active"}
-    MESOCYCLES = [
-        {"id": 1, "name": "Base", "start_date": "2026-07-27",
-         "end_date": "2026-08-16", "focus": "Aerobic volume."},
-        {"id": 2, "name": "Build", "start_date": "2026-08-17",
-         "end_date": "2026-09-06", "focus": "Threshold work."},
-        {"id": 3, "name": "Peak", "start_date": "2026-09-07",
-         "end_date": "2026-09-16", "focus": "Race sharpening."},
-    ]
-
-    def _lines(self, today="2026-08-30"):
-        return render.simple_plan_lines(
-            self.GOAL, self.ACTIVE_MACRO, self.MESOCYCLES, today
-        )
-
-    def test_the_road_by_stanza(self):
-        lines = self._lines()
-        self.assertEqual(lines[:12], [
-            "🧭 The road to Marathon",
-            "",
-            "✅ Base",
-            "Jul 27 – Aug 16",
-            "",
-            "📍 Build",
-            "Aug 17 – Sep 06 · you're in week 2 of 3",
-            "Threshold work.",
-            "",
-            "⏳ Peak",
-            "Sep 07 – Sep 16 · 10 days",
-            "",
-        ])
-        self.assertIn("🏁 The big day: Sat Sep 26 (in 4 weeks)", lines[-1])
-
-    def test_a_blank_line_opens_every_stanza(self):
-        """A phone flows the text, so whitespace is the only column it can draw
-        (§11.2): every marker line, and the close, sits under a blank one."""
-        lines = self._lines()
-        for i, line in enumerate(lines):
-            if line[:1] in ("✅", "📍", "⏳", "🏁"):
-                self.assertEqual(lines[i - 1], "", f"no blank line before {line!r}")
-
-    def test_a_finished_mesocycle_says_nothing_past_its_window(self):
-        """✅ says done and the window says when, so no tail and no focus behind them."""
-        lines = self._lines()
-        i = lines.index("✅ Base")
-        self.assertEqual(lines[i + 1:i + 3], ["Jul 27 – Aug 16", ""])
-
-    def test_exact_week_mesocycles_read_in_weeks(self):
-        lines = render.simple_plan_lines(
-            self.GOAL, self.ACTIVE_MACRO,
-            [{"id": 3, "name": "Peak", "start_date": "2026-09-07",
-              "end_date": "2026-09-20", "focus": "Race sharpening."}],
-            "2026-08-30",
-        )
-        self.assertEqual(lines[2:4], ["⏳ Peak", "Sep 07 – Sep 20 · 2 weeks"])
-
-    def test_a_long_focus_shrinks_to_its_first_sentence(self):
-        wall = ("Three weeks: two loading microcycles plus a deload. LOADING WEEKS: "
-                "1-2 threshold sessions accumulating 40+ min in zone, " + "x" * 300)
-        mesocycles = [dict(self.MESOCYCLES[1], focus=wall)]
-        lines = render.simple_plan_lines(
-            self.GOAL, self.ACTIVE_MACRO, mesocycles, "2026-08-30"
-        )
-        self.assertEqual(
-            lines[4], "Three weeks: two loading microcycles plus a deload."
-        )
-
-    def test_a_long_single_sentence_focus_is_cut_at_a_word(self):
-        wall = "word " * 100
-        mesocycles = [dict(self.MESOCYCLES[1], focus=wall)]
-        lines = render.simple_plan_lines(
-            self.GOAL, self.ACTIVE_MACRO, mesocycles, "2026-08-30"
-        )
-        self.assertTrue(lines[4].endswith("…"))
-        self.assertLessEqual(len(lines[4]), 221)
-
-    def test_a_leading_label_is_not_the_headline(self):
-        """The `plan generate` model likes to open a focus with "Purpose: …" — a field
-        name, not a headline. Only a one-word label goes; a sentence with a colon in it stays."""
-        self.assertEqual(
-            render.simple_focus_snippet("Purpose: make the week non-negotiable. Then more."),
-            "Make the week non-negotiable.",
-        )
-        self.assertEqual(
-            render.simple_focus_snippet("Three weeks: two loading microcycles."),
-            "Three weeks: two loading microcycles.",
-        )
-
-    def test_only_the_active_mesocycle_carries_its_focus(self):
-        joined = "\n".join(self._lines())
-        self.assertNotIn("Aerobic volume.", joined)
-        self.assertNotIn("Race sharpening.", joined)
-
-    def test_a_horizon_goal_closes_without_a_big_day(self):
-        goal = dict(self.GOAL, date_type="horizon")
-        lines = render.simple_plan_lines(
-            goal, self.ACTIVE_MACRO, self.MESOCYCLES, "2026-08-30"
-        )
-        self.assertIn("🏁 Building toward ~Sat Sep 26", lines[-1])
-
-    def test_a_superseded_version_says_so(self):
-        macro = dict(self.ACTIVE_MACRO, status="superseded")
-        lines = render.simple_plan_lines(
-            self.GOAL, macro, self.MESOCYCLES, "2026-08-30"
-        )
-        self.assertIn("older version", lines[1])
-
-    def test_no_expert_ids_leak(self):
-        for line in self._lines():
-            self.assertNotIn("ID", line)
-            self.assertNotIn("Macrocycle", line)
-
-    def test_no_mesocycles_is_a_gentle_note(self):
-        lines = render.simple_plan_lines(self.GOAL, self.ACTIVE_MACRO, [], "2026-08-30")
-        self.assertIn("No training mesocycles drawn up yet", lines[-1])
-
-
-class MesocycleButtonsTest(unittest.TestCase):
-    """`simple_mesocycle_buttons` — the door under the plan view (§11.2): one "Tell me
-    more" whose leaves send `bot mesocycle <id>` for the mesocycles under way or ahead."""
-
-    MESOCYCLES = PlanLinesTest.MESOCYCLES
-
-    def test_mesocycles_under_way_or_ahead_sit_behind_one_button(self):
-        buttons = render.simple_mesocycle_buttons(self.MESOCYCLES, "2026-08-30")
-        self.assertEqual(len(buttons), 1)
-        self.assertEqual(buttons[0]["label"], "🔎 Tell me more")
-        leaves = buttons[0]["menu"]
-        self.assertEqual([leaf["label"] for leaf in leaves], ["📍 Build", "⏳ Peak"])
-        self.assertEqual([leaf["send"] for leaf in leaves], ["bot mesocycle 2", "bot mesocycle 3"])
-
-    def test_a_lone_mesocycle_is_offered_directly(self):
-        buttons = render.simple_mesocycle_buttons(self.MESOCYCLES, "2026-09-10")
-        self.assertEqual(buttons, [{"label": "🔎 Tell me more", "send": "bot mesocycle 3"}])
-
-    def test_nothing_ahead_offers_nothing(self):
-        self.assertEqual(render.simple_mesocycle_buttons(self.MESOCYCLES, "2026-09-20"), [])
-
-    def test_a_long_name_is_cut_to_a_label(self):
-        mesocycles = [self.MESOCYCLES[1],
-                  dict(self.MESOCYCLES[2], name="Climb-Specific Severe / HIIT Transmutation")]
-        label = render.simple_mesocycle_buttons(mesocycles, "2026-08-30")[0]["menu"][1]["label"]
-        self.assertLessEqual(len(label), render.PICKER_LABEL_MAX)
-        self.assertTrue(label.endswith("…"))
-
-
-class ProgressLinesTest(unittest.TestCase):
-    """The §6 tone rule: every CTL branch reads as good news, and the trend line is
-    always first (it doubles as the chart caption)."""
-
-    TODAY = "2026-08-25"
-
-    def _payload(self, start_ctl, end_ctl):
-        return {"days": [
-            {"date": "2026-07-25", "ctl": start_ctl},
-            {"date": self.TODAY, "ctl": end_ctl},
-        ]}
-
-    def test_no_history_is_a_beginning(self):
-        lines = render.simple_progress_lines({"days": []}, self.TODAY)
-        self.assertIn("getting started", lines[0])
-        self.assertEqual(len(lines), 2)
-
-    def test_rising_ctl_is_climbing(self):
-        lines = render.simple_progress_lines(self._payload(40.0, 50.0), self.TODAY)
-        self.assertIn("climbing", lines[0])
-        self.assertIn("25%", lines[0])
-
-    def test_flat_ctl_is_steady(self):
-        lines = render.simple_progress_lines(self._payload(50.0, 50.5), self.TODAY)
-        self.assertIn("steady", lines[0])
-
-    def test_falling_ctl_is_freshening_not_decay(self):
-        lines = render.simple_progress_lines(self._payload(50.0, 40.0), self.TODAY)
-        self.assertIn("freshening", lines[0])
-        for word in ("down", "lost", "behind", "miss"):
-            self.assertNotIn(word, lines[0].lower())
-
-    def test_future_days_are_ignored(self):
-        payload = {"days": [
-            {"date": "2026-07-25", "ctl": 40.0},
-            {"date": self.TODAY, "ctl": 50.0},
-            {"date": "2026-09-25", "ctl": 90.0},
-        ]}
-        lines = render.simple_progress_lines(payload, self.TODAY)
-        self.assertIn("25%", lines[0])
-
-
-class ConstraintLinesTest(unittest.TestCase):
-    """simple_constraint_lines — the §5.5 companion constraints view: day words, no
-    IDs or tier tags, and an empty list that reads as a clean slate."""
-
-    TODAY = "2026-08-25"
-
-    def _line(self, **kw):
-        c = {"title": "no run Thursday", "start_date": "2026-08-27",
-             "end_date": "2026-08-27", "rest": 0}
-        c.update(kw)
-        return render.simple_constraint_lines([c], self.TODAY)[1]
-
-    def test_empty_is_a_clean_slate(self):
-        [line] = render.simple_constraint_lines([], self.TODAY)
-        self.assertIn("Nothing on the list", line)
-
-    def test_single_day_reads_as_the_day(self):
-        self.assertEqual(self._line(), "• no run Thursday — Thu Aug 27")
-
-    def test_today_reads_as_today(self):
-        line = self._line(start_date=self.TODAY, end_date=self.TODAY)
-        self.assertTrue(line.endswith("— today"), line)
-
-    def test_range_names_both_ends(self):
-        self.assertIn("Thu Aug 27 to Fri Sep 04", self._line(end_date="2026-09-04"))
-
-    def test_rest_gets_the_sleep_bullet(self):
-        self.assertTrue(self._line(rest=1).startswith("🛌"))
-
-    def test_no_expert_ids_leak(self):
-        line = self._line()
-        self.assertNotIn("ID", line)
-        self.assertNotIn("advisory", line)
+        self.assertEqual(session_lines.simple_when("2026-08-20", "2026-08-25"), "passed")
 
 
 class CompanionConfigKnobsTest(unittest.TestCase):
@@ -645,7 +384,6 @@ class CompanionConfigKnobsTest(unittest.TestCase):
         self.assertIsNone(cfg.raw("telegram", "push", "enabled"))
         self.assertIsNone(cfg.raw("telegram", "nothing", "here"))
         self.assertIsNone(cfg.raw("absent"))
-
 
 if __name__ == "__main__":
     unittest.main()
