@@ -1827,12 +1827,44 @@ The lines above Phase A are one per item, from before §3 changed.
   four journal modules rather than all four, and moving it out needs a second base class
   holding one method, which is more structure than the duplication it would remove.
 
-**Next up:** the branch's last commit: the two REORG files deleted, and nothing else.
-Two things close before it, per §7. The REORG citations in six files — `signals.py`,
-`clock.py`, `workout_state.py`, `test_layering.py`, `test_cli_plans.py` and
-`test_isolation_guards.py`, nine citations in all — each move their reasoning into
-`ARCHITECTURE.md` §15 or go away. And §5.2's unfinished e1RM item needs a durable home
-outside these two files.
+- **Phase E is complete, and this commit is the branch's last piece of work.** The three
+  items landed one commit each: the bot's `main()` became a `ChatBot` class, `static/app.js`
+  became six scripts, and the eight test files over 800 lines were cut. This commit closes
+  the two things §7 says must close before the documents are deleted. The nine REORG
+  citations in six files are gone. Three now point at `ARCHITECTURE.md` §14, "Which layer
+  may load which": `workout_state.py`, for why the read-only web app can import it,
+  `test_layering.py`'s module docstring, where the rules that file asserts are written out,
+  and `test_isolation_guards.py`, where §14 explains the patch-target gate. The other six
+  were dropped, because each sentence carried its whole reason without the pointer. No §15
+  entry was added, and none was needed: §14 already holds the two layering rules and the
+  gate, §15's `util.py` entry already holds why the dates went to `clock.py`, and
+  `cli/plans/generate.py`'s own docstring already holds why the plan preview left the coach
+  service, citing `DESIGN_render_persona.md` §5. §5.2's unfinished e1RM item is now a bullet
+  in `DESIGN_strength_tracking.md` §12, beside the progress-view question it shares the
+  benchmark logbook with: what `benchmark record` prints today, why `plan show` disagrees,
+  that dropping e1RM from the anchors is what is wanted, and that it needs a design of its
+  own.
+
+- **The review of this commit, and its one blocking finding was mine.** A read-only agent
+  re-read all six cited REORG sections and checked every dropped pointer against the place
+  the reasoning was supposed to already live. It found one false claim: rewriting
+  `test_isolation_guards.py`'s docstring without its pointer, I had called
+  `ensure_recent_data` the seam with more patch sites than anything else in the suite. It
+  has 30; `trainmate.coach.engine.openrouter_client` has 132. The sentence now says what is
+  true and what this guard actually cares about — `ensure_recent_data` is the one name the
+  suite patches through four different modules, and nothing else is patched through more
+  than two. `ARCHITECTURE.md` §14 carried the same loose superlative, which is where I
+  copied it from, so that sentence is corrected in this commit too rather than left for a
+  pointer to land on. Three of the agent's four nits were declined: the small fix §5.2
+  proposed is already in the design bullet in substance, a back-pointer from
+  `DESIGN_intensity_distribution.md` §10 would be the duplication `AGENTS.md` forbids, and
+  trimming `test_layering.py`'s two class docstrings is pre-existing duplication rather than
+  anything this commit introduced. The fourth was taken: the e1RM bullet had said the
+  logbook keeps `e1rm` *because* dropping it is wanted, which inverts the reason.
+  `Phase E, the last loose ends: the REORG citations and the e1RM item`
+
+**Next up:** the branch's last commit — these two documents deleted, and nothing else.
+Then `REORG_DONE` in the worktree, never added to version control (§7).
 
 ---
 

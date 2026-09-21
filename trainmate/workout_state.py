@@ -8,7 +8,7 @@ lives with the maths that decides it.
 The two sit together because every surface that shows one shows the other, and
 because neither reads the database: both are derived from a workout row the caller
 already has. That is what lets the read-only web app import this module without
-pulling the CLI in behind it (REORG_code_layout.md §4.3).
+pulling the CLI in behind it (ARCHITECTURE §14, "Which layer may load which").
 
 The calendar half works like this. The freshness of a workout's Google Calendar event is
 *derived*, not stored: on

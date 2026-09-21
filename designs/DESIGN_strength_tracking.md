@@ -1754,6 +1754,17 @@ Open:
   reps or fewer, named as the floor it is, and never competing with a tested max. It needs a
   home of its own, because the benchmark logbook assumes one number per kind of test in
   about ten places.
+- e1RM as a benchmark anchor. It is Tuesday, and the athlete records a squat e1RM 8% above
+  the last one. `benchmark record` prints "run `plan generate`", because its band check
+  reads every anchor kind alike. `plan show` never calls the plan stale for that number:
+  `_threshold_reasons` skips `e1rm` on purpose, so that a squat PR cannot invalidate a
+  periodization (DESIGN_intensity_distribution.md §10). So the athlete is told to do
+  something the rest of the app says is not needed. Making the two checks agree is the small
+  fix. What is wanted is bigger: e1RM dropped from the benchmark anchors altogether. The
+  Decided list above keeps `e1rm` in the logbook because this design does not touch the
+  logbook, not because the anchor is settled. Dropping it needs a design of its own, and that
+  design has to say where a lift's progress is read instead — the progress-view entry above.
+  Not done.
 - The strength test. When an athlete has a strength goal, a mesocycle's boundary week has to
   choose between the FTP test and a strength test, and the shipped benchmark science's
   strength entry ("1RM test, or e1RM from a set near failure") needs a protocol the watch

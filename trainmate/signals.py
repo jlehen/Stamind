@@ -128,8 +128,7 @@ def signal_metrics() -> Dict[str, str]:
     category outside this list.
 
     A property of `Config` until the reorg, which made this the one app module
-    `config.py` had to import — and `config.py` is what every other module imports
-    first (REORG_code_layout.md §4.10).
+    `config.py` had to import — and `config.py` is what every other module imports first.
     """
     merged = dict(DEFAULT_SIGNAL_METRICS)
     raw = config.get("coach", {}).get("signal_metrics") or {}

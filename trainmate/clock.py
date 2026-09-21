@@ -200,8 +200,7 @@ def fmt_timestamp(iso: Optional[str]) -> str:
 def parse_date(date_str: str) -> date:
     """An ISO `YYYY-MM-DD` string as a date, raising ValueError on anything else.
 
-    Every date TrainMate stores is written this way, so one parser serves them all
-    (REORG_code_layout.md §4.7)."""
+    Every date TrainMate stores is written this way, so one parser serves them all."""
     return datetime.strptime(date_str, "%Y-%m-%d").date()
 
 

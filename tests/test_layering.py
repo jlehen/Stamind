@@ -6,7 +6,8 @@ test that imports a module in a fresh interpreter and reads `sys.modules` afterw
 what actually got loaded, not what the file says it imports.
 
 Every rule is keyed on a module-name prefix, never on a list of files, so a new file
-under a package is covered the day it is written (REORG_execution.md §5.2).
+under a package is covered the day it is written. The rules themselves are written
+out in ARCHITECTURE §14, "Which layer may load which".
 """
 import glob
 import os
@@ -40,7 +41,7 @@ class TestAnalyticsIsPure(unittest.TestCase):
 
     Importing any of it must not pull in the storage layer. The rule is what lets the
     coach, the CLI and the web app share one load model without three of them paying for
-    a database package they are not using (REORG_code_layout.md §4.1).
+    a database package they are not using.
 
     A module here may still take a database handle as an argument — `adherence_window`
     does. It is being handed one that someone else built; that is not the same as
@@ -72,7 +73,7 @@ class TestTheWebAppIsAReader(unittest.TestCase):
 
     This replaced a grep over the web file's own text, which kept passing while the
     import happened one module deeper — `cli/workouts/_helpers` reached the CLI package,
-    and the CLI package reached everything (REORG_code_layout.md §4.3).
+    and the CLI package reached everything.
     """
 
     FORBIDDEN = (

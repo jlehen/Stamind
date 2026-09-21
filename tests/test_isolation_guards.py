@@ -179,7 +179,7 @@ def _loop_strings(node: ast.For) -> dict:
     Two tests write their targets that way — a loop over two module paths, and a loop
     over two attribute names fed into an f-string. A target the collector cannot read is a
     seam the gate cannot guard, and one of those four is `generate.ensure_recent_data`,
-    which REORG_execution.md §9 calls the worst case.
+    which the suite patches through four different modules (ARCHITECTURE §14).
     """
     if not isinstance(node.target, ast.Name) or not isinstance(node.iter, (ast.Tuple, ast.List)):
         return {}

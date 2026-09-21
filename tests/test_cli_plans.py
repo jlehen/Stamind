@@ -139,7 +139,7 @@ class TestCliPlans(unittest.TestCase):
         behind it when the athlete passed the flag.
 
         The service used to print both itself, which left this command — the one whose
-        whole output is a preview — with no persona seam (REORG_code_layout.md §4.9)."""
+        whole output is a preview — with no persona seam."""
         mock_coach.plan_generate.return_value = {
             "strategy": "Build the aerobic base, then sharpen.",
             "mesocycles": [
@@ -170,7 +170,7 @@ class TestCliPlans(unittest.TestCase):
         The service answers `goal: None`, and puts the reason where a strategy would go.
         Drawing that under the NEW PERIODIZATION STRATEGY banner would read as though the
         coach had written one, which is what happened for a moment when the printing moved
-        out of the service (REORG_code_layout.md §4.9)."""
+        out of the service."""
         mock_coach.plan_generate.return_value = {
             "strategy": "No active goals found. TrainMate needs at least one objective.",
             "mesocycles": [], "reused": False, "goal": None,

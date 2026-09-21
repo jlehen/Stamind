@@ -3389,7 +3389,8 @@ test naming the target and the test file it is written in.
 It reads a target a loop builds as well as a literal one — a `for` over a tuple of strings,
 and an f-string made from one — because three of those four sites name an
 `ensure_recent_data` (`cli/status`, `cli/workouts/adapt`, `cli/workouts/generate`), the
-seam with the most call sites in the suite.
+one name the suite patches through four different modules — `cli/bot/views.py` is the
+fourth, and it writes its target out in full.
 A target passed `create=True` is skipped, because that keyword is mock's own way of saying
 the attribute may not exist yet. `patch.object` and `patch.dict` need no guard: they are
 handed the object, so a name that has moved raises `AttributeError` where it is used.
