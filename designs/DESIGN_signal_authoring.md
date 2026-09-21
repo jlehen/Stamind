@@ -89,7 +89,7 @@ signal add METRIC [TEXT] [-d RANGE] [--value N] [-l LABEL]
   the ingested-event style: **with a label** → `label (value)` (e.g.
   `severe heatwave (38.0)`); **without** → `Metric: value` (e.g. `Alcohol: 2.0`).
   The value is dropped from the rendering when absent.
-- **Idempotent upsert by (date, metric):** if a `trainmate-context` event with
+- **Idempotent upsert by (date, metric):** if a `stamind-context` event with
   the same metric already exists on a day, **update** it (calendar + row) rather
   than create a duplicate. The schema deliberately doesn't enforce
   `UNIQUE(date,metric)` (ingest §5) — as the first-party producer we own this

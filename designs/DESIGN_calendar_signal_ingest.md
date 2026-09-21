@@ -76,7 +76,7 @@ With one shared calendar there are **three** classes of events, not two:
 
 | Class | Origin | Stamind action |
 |-------|--------|------------------|
-| Workouts | Stamind (`extendedProperties.private.source = "TrainMate"`) | written by us; ignore on read |
+| Workouts | Stamind (`extendedProperties.private.source = "stamind"`) | written by us; ignore on read |
 | Signals | external syncer (tagged, see §4) | **ingest** |
 | Ordinary life events | the user, by hand (dentist, a flight) | ignore |
 
@@ -88,7 +88,7 @@ We use `extendedProperties.private` rather than a title convention (e.g.
 - **Unambiguous three-way split** — no text heuristics.
 - **Invisible to the human view** — the event title still just reads "2 drinks".
 - **Server-side filterable on the full pull** — `events().list(privateExtendedProperty=
-  "source=trainmate-context")` returns *only* signal events. See the privacy note
+  "source=stamind-context")` returns *only* signal events. See the privacy note
   below for the important limit on this.
 - **Survives edits** — editing the title leaves the tag intact.
 
@@ -123,14 +123,16 @@ One **all-day** event per signal-day per metric, on the configured calendar:
 - `summary` / `description`: human-readable text, shown to the user and fed to
   the LLM verbatim (e.g. summary `"Alcohol: 2 drinks"`).
 - `extendedProperties.private`:
-  - `source = "trainmate-context"` — **required** positive marker. The string is
+  - `source = "stamind-context"` — **required** positive marker. The string is
     configurable (`google.calendar_signal_tag` in YAML, `config.calendar_signal_tag`
-    in code); `"trainmate-context"` is the default and the contract above assumes it.
+    in code); `"stamind-context"` is the default and the contract above assumes it.
     Both the read filter and Stamind's own authoring path use the configured value,
-    so changing it orphans previously-written events until they are re-tagged. That is
-    why the `context` → `signal` rename left this **string** alone while renaming the
-    config key around it: the tag is a contract with the external syncer and with every
-    event already on the calendar, not internal vocabulary.
+    so changing it orphans previously-written events until they are re-tagged. The tag
+    is a contract with the external syncer and with every event already on the calendar,
+    not internal vocabulary. The earlier `context` → `signal` rename therefore renamed
+    the config key and left the **string** alone. The rename of the app to Stamind did
+    change it, but only because a one-off migration re-tagged every event already on
+    the calendar and the syncer was edited by hand on the same day.
   - `metric = "<category>"` — **required** free-form category string, e.g.
     `"alcohol"`, `"sleep_quality"`, `"stress"`. Stamind treats it as opaque.
     "Required" is a contract on the syncer, not an ingest-time validation: an event
@@ -345,7 +347,7 @@ was the `value` column existing from day one.
 
 ## 9. Summary
 
-External sources drop **tagged all-day events** (`source=trainmate-context`,
+External sources drop **tagged all-day events** (`source=stamind-context`,
 `metric`, optional `value`) on the **single existing calendar**. Stamind
 **incrementally syncs** them via `syncToken` into a new **`daily_signals`** table,
 reconciling edits and deletions by event id. The server-side tag filter applies to

@@ -453,10 +453,11 @@ class Config:
 
     @property
     def calendar_signal_tag(self) -> str:
-        """Gets the source tag for calendar events. The default keeps the pre-rename
-        string: it is written into events the external syncer also produces, so changing
-        it orphans every event already tagged (DESIGN_calendar_signal_ingest.md §4)."""
-        return self.get("google", {}).get("calendar_signal_tag", "trainmate-context")
+        """Gets the source tag for calendar events. The external syncer writes the same
+        string into the events it produces, so the two have to agree: an event tagged
+        with anything else is invisible to the ingest (DESIGN_calendar_signal_ingest.md
+        §4)."""
+        return self.get("google", {}).get("calendar_signal_tag", "stamind-context")
 
     @property
     def high_intensity_rpe_threshold(self) -> int:

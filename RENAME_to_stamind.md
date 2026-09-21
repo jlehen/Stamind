@@ -61,7 +61,7 @@ These are the only two places where a plain substitution would break something.
 **The workout event tag.** Every workout event the app writes to Google Calendar carries a
 hidden property `source=TrainMate`. The constant is `WORKOUT_EVENT_TAG` in
 `trainmate/gcal/event.py:24`. Normal calendar sync finds events by their stored event id.
-`workout calendar sweep` is different: it looks for leftover events, and the tag is the only
+`workout prune-calendar` is different: it looks for leftover events, and the tag is the only
 way it can find them.
 
 A real week. It is Wednesday. Thursday's ride is in the calendar, tagged `source=TrainMate`.
@@ -175,8 +175,9 @@ A fresh worktree needs `config.yaml` and `venv` symlinked in first.
 1. Land the branch on `main`: rebase, then fast-forward.
 2. Run the script once with your config, and once with
    `STAMIND_CONFIG=piupiu/config_piupiu.yaml`.
-3. Run `sm workout calendar sweep` for each athlete. It lists events by the new tag. If it
-   still sees the app's events, the re-tag worked.
+3. Run `sm workout prune-calendar -n` for each athlete. It lists events by the new tag. If it
+   still sees the app's events, the re-tag worked. Keep the `-n`: without it the command
+   deletes every event it reads as an orphan.
 4. The author changes the external syncer, in its own repo, to write `stamind-context`. Do
    this before the syncer's next run, so that no new event gets the old tag.
 
@@ -227,5 +228,5 @@ A fresh worktree needs `config.yaml` and `venv` symlinked in first.
 - The full suite shows its 4 baseline failures and nothing else.
 - `./sm status` works for both athletes.
 - Both bots answer on Telegram.
-- `sm workout calendar sweep` finds the app's events under the new tag.
+- `sm workout prune-calendar -n` finds the app's events under the new tag.
 - This document is deleted.

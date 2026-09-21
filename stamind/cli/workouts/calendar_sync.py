@@ -110,7 +110,7 @@ def run_workout_wipe(args: argparse.Namespace) -> None:
 def run_workout_prune_calendar(args: argparse.Namespace) -> None:
     """Deletes workout events on the calendar that no local workout row references.
 
-    Ownership is read from the calendar side (the `source=TrainMate` tag), because the
+    Ownership is read from the calendar side (the `source=stamind` tag), because the
     orphans this cleans up are exactly the ones the database can no longer name — a
     fresh DB, a restored backup, or a wipe that never reached Calendar.
     """

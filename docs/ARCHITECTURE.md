@@ -1614,7 +1614,7 @@ no precedence rule — the kind was recorded when the change ran:
   - **Orphans** are the reverse direction: an event whose session is gone (fresh DB,
     restored backup, a wipe that skipped Calendar) can no longer be named locally, so
     `workout prune-calendar` sweeps from the calendar side — `list_workout_events` finds
-    them by the `source=TrainMate` tag and deletes any id no lineage claims.
+    them by the `source=stamind` tag and deletes any id no lineage claims.
   - **Backward adherence marking** is the past-looking counterpart to the forward push:
     for each *strictly past* planned workout with an event, it re-renders the event with a
     verdict from `adherence.classify_adherence` — a `[Done]`/`[Missed]`/`[Partial]`/
@@ -2301,7 +2301,7 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `workout`    | `tweak`      | `w t`    | Ask the coach for a change the athlete decided (`MESSAGE` positional, e.g. `"Saturday: a 4 hour hike instead of the ride"`): shorter or harder, another sport, other exercises in a strength session, a session added, dropped or brought back, moved, two days swapped. `workout adapt`'s flow, preview and apply with a narrower job: only the days the request is about may change, each between today and the end of the current mesocycle. `-d DATE` names a day and may be given more than once; without it the week planner reads the days off the message. `-y` applies without asking; `--no-pull` and the LLM debug flags as on `adapt`. Recorded as kind `tweak`, undone by `workout rollback` (DESIGN_workout_tweak.md §3) |
 | `workout`    | `push`       | `w p`    | Sync planned workouts to Google Calendar. Defaults to today onward; pushes only unsynced unless `-f`/`--force` re-pushes already-synced ones. |
 | `workout`    | `wipe`       | —        | Delete all workouts                                                      |
-| `workout`    | `prune-calendar` | —    | Delete Calendar workout events that no local row references — the orphans a fresh DB, a restored backup, or a wipe that never reached Calendar leaves behind. Ownership read from the `source=TrainMate` tag, not from stored ids; events of soft-removed workouts are kept. `-d RANGE` windows it (as on `data wipe`), `-n`/`--dry-run` previews, `-y` skips the prompt |
+| `workout`    | `prune-calendar` | —    | Delete Calendar workout events that no local row references — the orphans a fresh DB, a restored backup, or a wipe that never reached Calendar leaves behind. Ownership read from the `source=stamind` tag, not from stored ids; events of soft-removed workouts are kept. `-d RANGE` windows it (as on `data wipe`), `-n`/`--dry-run` previews, `-y` skips the prompt |
 | `data`       | `pull`       | `d p`    | Fetch Garmin activities/metrics and Google Calendar signals (`-d RANGE`/`--metrics-only`/`--activities-only`/`--sleep`). Defaults to the last 2 days ending today. |
 | `data`       | `bootstrap`  | `d b`    | Cold-start reconstruction over the full backlog; seeds evidence-based learnings, sets the reflect watermark. Flags: `-d RANGE`, `--context`, `--force`, `--inspect-only`, `--auto`. No date filter → window auto-detected (since previous goal, else 12 wk). |
 | `data`       | `reflect`    | `d r`    | Incremental analysis since the reflect watermark; updates learnings + physiological insights (no cycle inference — §10.3) and resolves pending demotions (same flags as `bootstrap`). Window ends on the last completed week unless an end date is given, so a mid-week run with nothing complete costs nothing. `--auto`: unattended — staleness demotions auto-apply, contradiction ones stay queued. |
@@ -3096,7 +3096,7 @@ External daily signals the coach should factor in — alcohol, sleep quality,
 stress, big meals, a heatwave — reach Stamind through the **single existing
 Google Calendar**, not through app-specific features. Producers write one all-day
 event per signal-day, tagged in `extendedProperties.private`:
-`source=trainmate-context` (the positive marker, configurable via
+`source=stamind-context` (the positive marker, configurable via
 `calendar_signal_tag`), `metric` (opaque category), and an optional numeric
 `value`. Two producers exist: a separate syncer (out of scope, mirroring
 `GarminScraper`) for spreadsheet-backed streams, and Stamind's own `signal`
@@ -3114,8 +3114,8 @@ Calendar (tagged events) ──► gcal.client.sync_calendar_signals
    ──► coach analysis weekly summaries (per-week `daily_signals`)
 ```
 
-- **Distinguishing events:** Stamind writes workouts tagged `source=TrainMate` and
-  ingests only events tagged `source=trainmate-context` (or the configured
+- **Distinguishing events:** Stamind writes workouts tagged `source=stamind` and
+  ingests only events tagged `source=stamind-context` (or the configured
   `calendar_signal_tag`). The server-side `privateExtendedProperty` filter applies to
   the **full pull only** — the API forbids it alongside a `syncToken` — so the
   incremental stream carries every changed event and is filtered **client-side** before

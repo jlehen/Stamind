@@ -222,7 +222,7 @@ google:
   # Google Calendar that planned workouts are written to / read from.
   calendar_id: "YOUR_CALENDAR_ID@group.calendar.google.com"
   # Source tag for calendar events containing daily signals.
-  #calendar_signal_tag: "trainmate-context"
+  #calendar_signal_tag: "stamind-context"
 
 garmin:
   email: "you@example.com"

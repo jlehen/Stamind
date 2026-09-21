@@ -21,8 +21,7 @@ from stamind.types import Workout
 
 # Tag stamped on every workout event we write, and the only handle on ownership left
 # once the rows that referenced the events are gone (see `client.list_workout_events`).
-# Kept as-is through the Stamind rename: events already in the calendar carry this value.
-WORKOUT_EVENT_TAG = "TrainMate"
+WORKOUT_EVENT_TAG = "stamind"
 
 # Past-event adherence verdict -> title tag, shared rather than copied
 # (adherence.STATUS_LABELS). "Not yet" is in the map but unreachable here:

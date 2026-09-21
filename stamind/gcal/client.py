@@ -312,6 +312,14 @@ class CalendarSyncer:
         (or a wipe that skipped the calendar) orphans events no row points at any
         more, so `workout prune-calendar` has to sweep from the calendar side.
         """
+        return self.list_events_by_tag(WORKOUT_EVENT_TAG)
+
+    def list_events_by_tag(self, tag: str) -> List[dict]:
+        """Every live event carrying `source=<tag>`, whole calendar, no date window.
+
+        Cancelled events are left out (`showDeleted` defaults to False), so a caller
+        that writes to what comes back never patches a deleted event.
+        """
         if not self.calendar_id:
             return []
 
@@ -322,7 +330,7 @@ class CalendarSyncer:
                 'calendarId': self.calendar_id,
                 'singleEvents': True,
                 'maxResults': CALENDAR_SYNC_PAGE_SIZE,
-                'privateExtendedProperty': f"source={WORKOUT_EVENT_TAG}",
+                'privateExtendedProperty': f"source={tag}",
             }
             if page_token:
                 params['pageToken'] = page_token
