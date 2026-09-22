@@ -32,6 +32,7 @@ has **one canonical home**; other sections point to it instead of paraphrasing
 13. [Daily Signals (Calendar Ingest)](#13-daily-signal-calendar-ingest)
 14. [Testing](#14-testing)
 15. [Design Rationale & History](#15-design-rationale--history)
+16. [Gym Logger (Telegram Mini App)](#16-gym-logger-telegram-mini-app)
 
 ---
 
@@ -191,16 +192,19 @@ classes themselves.
     - `replies` is what goes back into the chat for that command: prose, a chart, an
       offer row, a queued item, a question — and the ✋ Stop button the flushes raise and
       retire.
-    - `messages` is what an arriving message does; `callbacks` is what a tap does.
+    - `messages` is what an arriving message does — the athlete's own text in
+      `on_message`, and the gym logger page's one data message in `on_web_app_data`
+      (DESIGN_gym_logger.md §6); `callbacks` is what a tap does.
     - `routing` is what one chat message means — both halves of the router's intent table
       (`ROUTER_INTENTS`, which `sm bot route` builds its prompt from, and the intent→argv,
       intent→capture and echo tables the bot maps a returned name onto), plus
       `parse_message_to_argv` and the `/ui` switch.
     - `keyboards` is every button the bot draws and every tap it decodes — the reply
-      keyboard with what each label runs, the inline rows, the four callback-data
-      namespaces (`ui:`, `stop:`, `q:`, and a bare prompt answer) with each decoder
-      rejecting the other three, and the `/start` and `/help` cards, which name the
-      keyboard's labels one by one.
+      keyboard with what each label runs, the gym button that opens the Mini App
+      (`gym_button`, §16), the inline rows, the four callback-data namespaces (`ui:`,
+      `stop:`, `q:`, and a bare prompt answer) with each decoder rejecting the other
+      three, and the `/start` and `/help` cards, which name the keyboard's labels one by
+      one.
     - `scheduler` is when the push and the nightly reflect are due, and the mixin that
       drives them.
 
@@ -378,7 +382,7 @@ classes themselves.
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. `waiting()` hangs `touches_today` on each row, and `sends_after_delay` is the single place that says whether a change goes out after `change-delay` minutes or at a morning time. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workout_change.py` imports it safely. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
 | `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
-| `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class and listing the Garmin names that mean it (Connect's catalog and the FIT SDK names). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the recent strength days (`strength.recent_days`, 8), what was prescribed beside what was done, then the days the prescription was not followed, then `## SESSIONS AS DONE` — the same days as whole sessions, each activity's length, set count and RPE over its exercises in order, the ones the athlete alternated joined by "+" (read from overlapping runs of sets), and a "(not prescribed)" mark on what the day's session did not hold. `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — which sessions the call is about, the call, and folding the answers back into the proposal — and `planner_prompt.py` is what that call tells the model and the checks a returned exercise passes before it becomes a prescribed set; `progression.md` is the shipped science only this call reads. Each session it is asked about carries the equipment and constraints of its day and the mesocycle covering it — name, span and which week of it the date is, from `get_covering_mesocycle` — so the plan's boundary reaches the call as a fact rather than as the brief's prose. Rows in `db/strength.py`; surgery in `cli/strength.py`. |
+| `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class and listing the Garmin names that mean it (Connect's catalog and the FIT SDK names). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the recent strength days (`strength.recent_days`, 8), what was prescribed beside what was done, then the days the prescription was not followed, then `## SESSIONS AS DONE` — the same days as whole sessions, each activity's length, set count and RPE over its exercises in order, the ones the athlete alternated joined by "+" (read from overlapping runs of sets), and a "(not prescribed)" mark on what the day's session did not hold. `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — which sessions the call is about, the call, and folding the answers back into the proposal — and `planner_prompt.py` is what that call tells the model and the checks a returned exercise passes before it becomes a prescribed set; `progression.md` is the shipped science only this call reads. Each session it is asked about carries the equipment and constraints of its day and the mesocycle covering it — name, span and which week of it the date is, from `get_covering_mesocycle` — so the plan's boundary reaches the call as a fact rather than as the brief's prose. `logger.py` is the gym logger's two payloads — the session encoded into the Mini App button's address and the log the page sends back — and holds no database access ([§16](#16-gym-logger-telegram-mini-app)). Rows in `db/strength.py`; surgery in `cli/strength.py`, the gym log in `cli/strength_ingest.py`. |
 | `db/`                | `db`                 | SQLite wrapper; `Database` composed from         |
 |                      |                      | per-domain mixins. Full CRUD for all tables.     |
 |                      |                      | The write path onto `workouts` is               |
@@ -684,6 +688,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A preference the athlete can change at runtime | `stamind/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`stamind/queue_kind.py`) added to `KINDS` in `stamind/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
 | A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `activity_lines`, `logbook`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`, and `strength log`/`exercises` which read the record and the vocabulary back), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
+| A gym session logged on the phone | `miniapp/` (the page), `strength/logger.py` (the two payloads), `cli/strength_ingest.py` (`strength ingest`), `strength/sets.py::take_over_logs` (the pull handing the log to Garmin's activity), `gym_logs` + `upsert_logged_activity`/`save_gym_log`/`gym_log_for_day`/`move_gym_log` in `db/strength.py`. The bot's button and the handler for the page's message are DESIGN_gym_logger.md §6 and not wired yet. DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
 | What a strength session prescribes | `strength/planner.py` (the pass and the call), `strength/planner_prompt.py` (the prompt and the checks on the reply), `strength/progression.md` (the science it reads), `strength/history.py` (what the athlete lifted), `strength/prescription.py` (the description and its seam), `prescribed_sets` + `strength_checks` in `db/schema.py`, the carry in `db/workout_change.py::WorkoutChange`, and the pass's place in `coach/service/generate.py` and `coach/service/adapt.py`. DESIGN_strength_tracking.md §9 |
 | A CLI command                    | `stamind/cli/<family>.py` (`run_*`), dispatcher in `stamind_cli.py` ([§7](#7-cli-commands-reference)) |
 | A message telling the athlete to run something | wrap the command in `text.cmd()`, nested *inside* the line's colour call, so it renders as the bright shade of that colour — and emit it with `output.aside`, not `print`: a "you could now run X" hint is side information |
@@ -1380,8 +1385,9 @@ pull overlapping a dashboard refresh is ordinary rather than exceptional.
 `schema_version` table. Later starts see the stamp and do nothing, so `sm --help`
 performs no I/O; the DDL used to run in full — around 630 lines, writes included — on
 every process start. It is **CREATE TABLE IF NOT EXISTS only**: the in-place migrations
-are gone. Both instances were stamped at 18, so every one of them had already run, and a
-migration here is one-off by policy (AGENTS.md). What they built is folded into the
+are gone. Both instances were stamped at 18 when they were squashed, so every one of
+them had already run, and a migration here is one-off by policy (AGENTS.md). The bump
+to 19 adds `gym_logs`, which the CREATE below builds on the next start. What they built is folded into the
 CREATE statements, in the column order they produced. Clearing the stamp still rebuilds
 a database that is missing a table; a database older than the squash cannot be upgraded
 by this code at all, and needs a checkout from before it. Bump `SCHEMA_VERSION` when the
@@ -1654,7 +1660,7 @@ down.
 ### completed_activities
 | Column              | Type    | Notes                                              |
 |---------------------|---------|----------------------------------------------------|
-| `activity_id`       | TEXT PK | Garmin activity ID                                 |
+| `activity_id`       | TEXT PK | Garmin activity ID, or `log:<date>` for the placeholder a gym log hangs off until Garmin's own activity for that day turns up ([§16](#16-gym-logger-telegram-mini-app)) |
 | `date`              | TEXT    | YYYY-MM-DD                                         |
 | `start_time`        | TEXT    |                                                    |
 | `activity_name`     | TEXT    |                                                    |
@@ -1720,6 +1726,20 @@ stood at 145 the next morning, from lifting already weighed.
 |-------------------|---------|----------------------------------------------------------|
 | `lineage_id`      | INTEGER | PK — `workouts.lineage_id`, the session                   |
 | `checked_against` | TEXT    | The value `strength_history_changed_at` had when the history shown to the strength planner was built — not the clock, so sets read while a preview waited are not counted as weighed |
+
+### gym_logs
+The raw log the gym logger page sent, kept beside the sets it was turned into, so a later
+grading step has the departures without deriving them again (DESIGN_gym_logger.md §5).
+One row per activity: ingesting a day twice replaces its log, and the row moves onto
+Garmin's activity when the pull takes the log over. Rows cascade with their
+`completed_activities` row.
+
+| Column        | Type    | Notes                                                        |
+|---------------|---------|---------------------------------------------------------------|
+| `activity_id` | TEXT PK | The activity the log belongs to, `ON DELETE CASCADE`          |
+| `revision_id` | INTEGER | The `workouts.id` the page was given; NULL when it had none   |
+| `received_at` | TEXT    | When `strength ingest` read the file (UTC ISO)                |
+| `payload`     | TEXT    | The page's message verbatim, as it was sent                   |
 
 ### activity_match_decisions
 The athlete's answer to a planned-vs-completed pairing the matcher had to guess at
@@ -2327,6 +2347,7 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `strength`   | `discard`    | `str d`  | `strength discard DATE [--undo]`: keep that day's activity out of the strength history; it still counts as training. The sets stay stored; its waiting questions are settled. On a day with two strength activities it asks which one |
 | `strength`   | `log`        | `str l`  | `strength log [EXERCISE] [-p PATTERN]`: the athlete's own logbook. Bare, the lifts on record grouped by movement pattern with their session count and last day; with an exercise (a part of a name matches every lift it is part of), a line per session oldest first. Groups by pattern, never merges two lifts into one series; sessions counted by day, discarded sessions and unnamed sets left out, no number derived (DESIGN_strength_tracking.md §7) |
 | `strength`   | `exercises`  | `str e`  | `strength exercises [TEXT] [-p PATTERN]`: the shipped vocabulary. Bare, the nine movement patterns and how many exercises each holds; with a pattern or a search term, the exercises themselves with their equipment, the athlete's own marked (§4) |
+| `strength`   | `ingest`     | `str i`  | `strength ingest FILE`: store the JSON the gym logger page sent as that day's sets, every set named by the athlete, and print what was done beside what was written. Writes the placeholder activity `log:<date>`, so the next morning's pull hands the sets to Garmin's own activity for the day. Ingesting the same day twice replaces the earlier log. Run by the bot, not usually typed ([§16](#16-gym-logger-telegram-mini-app)) |
 | `journal`    | —            | `j`      | The operational record: one row per command run, newest first — id, when (athlete's zone), source, command, wall time, model calls · tokens, and how it ended (`ok`, `warn`, `cancelled`, `FAILED`, `?` for a run with no `run.end`), with a gray legend under the table glossing the outcomes on screen. Every run that did not simply finish also gets a line under the table saying why — the exception for a `FAILED` one, the first warning it logged otherwise — so `warn` is never a status you have to open a second command to decode. Runs that only looked — `list`, `show`, `status`, `journal`, any `-h` — are left out unless `-a` asks for them, unless they went wrong or called a model; command lines and those reasons are clipped to the width of the screen unless `-v` asks for them in full (DESIGN_logging.md §7.1–§7.3). Filters: `-n N`, the shared `-d RANGE`, `--source`, `--command`, `--failed`, plus `--cost` for the by-model/by-command token rollup and `--follow` to tail the file live (DESIGN_logging.md §7) |
 | `journal`    | `show`       | `j 5a0e` | Everything one run wrote, by id prefix: where it ran, each event as an offset from its start, the LLM exchange files it produced, the traceback if it failed, and the runs it spawned. The bare `journal <id>` form is the same command; an ambiguous prefix lists what it matched |
 | `journal`    | `prune`      | `j p`    | Force the retention sweep now — journal days past `logging.retain_days`, exchange files past `logging.retain_exchange_days`. Otherwise it runs at most once a UTC day, off the first command to finish (DESIGN_logging.md §10) |
@@ -2514,6 +2535,7 @@ but the credentials is optional and falls back to the default shown:
 | `telegram.push.*`      | —    | Morning push (simple ui only): `enabled` (default true), `morning_time` (`08:00`), `morning_deadline` (`15:00`), `adapt_first` (default false → run `workout adapt -y` before rendering) |
 | `telegram.bot_token` / `telegram.allowed_chat_ids` | — | The bot's token (or the `TELEGRAM_BOT_TOKEN` env var) and the numeric chat-id allowlist ([§2](#entry-points)) |
 | `telegram.command_timeout_seconds` / `telegram.prompt_timeout_seconds` / `telegram.wrap_width` | — | The silent-run watchdog (180), the idle-prompt cancel (300) and the chat wrap width (48) |
+| `telegram.miniapp_url`  | str  | Address of the gym logger's Mini App page, the one the "🏋️ Log today's gym" button opens ([§16](#16-gym-logger-telegram-mini-app)). Absent → no gym button. Read as `config.miniapp_url` |
 | `telegram.change_delay_minutes` | int | How long a change to one of today's sessions waits before the athlete is told, measured from the newest waiting change so a second run restarts it (default: 20; 0 sends on the bot's next wake). Companion mode only. Also a setting (`settings set change-delay N`). DESIGN_change_heads_up.md §4 |
 | `web.host` / `web.port` / `web.debug` | — | Where the dashboard binds (`127.0.0.1` / 5000 / false) |
 | `coach.metrics_lookback_days` | int | Rolling window for adaptation (default: 15)                  |
@@ -4146,3 +4168,92 @@ order and make the same five calls the one block made, in the same order.
 
 There is no build step, no bundler and no module system, and none was added. Against one
 script, six cost five more round trips on a page served from localhost.
+
+---
+
+## 16. Gym Logger (Telegram Mini App)
+
+A gym session is the one session Garmin records badly: the watch guesses half the exercise
+names and the athlete answers questions the next morning to fix them. The gym logger
+replaces that with a page the athlete ticks sets on while resting between them, so every
+set arrives named. The contract is `DESIGN_gym_logger.md`; it is a prototype, and §7 there
+lists what it deliberately does not decide.
+
+**The week it covers.** It is Thursday, a gym day. The bot's morning message carries a
+button holding the day's session — the exercises, sets, rep ranges and kilograms the
+strength planner wrote. At 18:02 the athlete taps it in the gym, and a page opens inside
+Telegram. They tick sets, change a weight, swap the belt squat for a leg press, add an
+exercise the session did not ask for, and at 19:05 tap "Finish". The page sends one
+message to the bot, the bot writes it to a file and runs `sm strength ingest <file>`, and
+the summary comes back in the chat. On Friday morning the pull finds Garmin's activity for
+Thursday and hands it the logged sets instead of reading Garmin's own, so Garmin supplies
+heart rate, duration and RPE while the log supplies the sets. Nothing is asked.
+
+**Where the code is.** `miniapp/` is the page: static files, no build step, no server.
+`stamind/strength/logger.py` holds the two payloads and touches no database.
+`stamind/cli/strength_ingest.py` is the `strength ingest` command — a file of its own
+because the `strength` family was already at the ~400 lines AGENTS.md splits at.
+`stamind/strength/sets.py::take_over_logs` is the pull's side. The rows live in
+`db/strength.py` and the `gym_logs` table ([§5](#gym_logs)). The button the athlete taps
+and the handler that receives what the page sends back are in `stamind/chat/`:
+`keyboards.gym_button`, `app.ChatBot._keyboard`, `telegram_api.reply_keyboard` and
+`messages.ChatBot.on_web_app_data`.
+
+**The two payloads.** Out: `session_payload` turns a hydrated session into `{"v", "r", "d",
+"t", "x", "notes"}` — the revision id, the day, the title, the prescribed rows in position
+order, and the text under the exercise lines of the description cut to 300 characters (the
+brief above the seam is left out: the page is for the gym, not for reading).
+`session_url(base_url, workout)` packs that JSON base64url into the address's hash
+fragment, which a browser never sends to the host serving the page. In: `parse_log(text)`
+reads the page's message into a `Log` — the revision id, the day, the two clock times, the
+note, and one `Entry` per exercise with its `position` (the prescribed row it stands for,
+`None` for one the session did not ask for) and its sets as `(reps, load_kg, seconds)`.
+It is strict and raises `LogError`: the page builds the shape itself and offers vocabulary
+names only, so a name `vocabulary.get` does not know is a bug on that side rather than an
+athlete's typo, and the error names every such name.
+
+**The button.** The companion reply keyboard is built on every send rather than once at
+startup, so it follows the week: `ChatBot._keyboard` asks `_gym_button` for a first row
+each time. That method reads `telegram.miniapp_url` and stops there when it is unset — no
+button, and no database read. With it set, it asks the database for the live strength
+sessions dated from today to six days out, and `keyboards.gym_button` picks the earliest
+one that has prescribed sets. The label names the day: "🏋️ Log today's gym" on the day
+itself, "🏋️ Log Thursday's gym" otherwise. The row's cell is a `(label, url)` pair rather
+than a plain label, and `telegram_api.reply_keyboard` turns exactly that pair into a
+`KeyboardButton(label, web_app=WebAppInfo(url))`. Tapping it opens the page and sends no
+text, so `keyboard_action` and `stale_keyboard_tap` never see the label. Expert mode has
+no reply keyboard and so no button (DESIGN_gym_logger.md §7).
+
+**The handler.** What the page sends at "Finish" arrives as its own kind of update, so
+`register_handlers` wires a third handler ahead of the text one:
+`MessageHandler(filters.StatusUpdate.WEB_APP_DATA, on_web_app_data)`.
+`ChatBot.on_web_app_data` checks the allowlist the way `on_message` does, and defers with
+the same "still running" line when a command is already going in that chat. Otherwise it
+writes the message verbatim to `<data_dir>/gym_logs/<date>-<hhmmss>.json` and runs
+`strength ingest <that file>` through `_start_command`, so the summary streams into the
+chat the way every command's output does. The bot parses nothing itself: every write goes
+through the CLI.
+
+**The ingest.** `strength ingest FILE` parses the log, then writes three things. It upserts
+the placeholder activity `log:<date>` in `completed_activities` — `activity_type =
+strength_training`, `activity_name = "Logged gym session"`, the start time and length from
+the two clock times — so the sets have an activity to hang off before Garmin has one. It
+stores the sets through the ordinary `store_exercise_sets`, read and frozen at once: one
+active row per logged set with `named_by = athlete`, and a rest row between two consecutive
+sets whose seconds are both known, carrying the gap. And it keeps the message verbatim in
+`gym_logs`. Because `store_exercise_sets` deletes by activity id and the activity row is an
+upsert, ingesting the same day twice replaces the earlier log rather than doubling it.
+That placeholder is the one row in `completed_activities` Garmin did not supply, so
+`prune_completed_activities` skips it: the pull's deletion reconcile would otherwise take
+the log away the same evening it was written. The summary the command prints is one head
+line, one line per exercise against what was written at that position, and the prescribed
+exercises no entry stood for.
+
+**The takeover.** `sets.read_new_activities` runs before every pull reads Garmin's sets.
+It groups the pending strength activities by day and asks `gym_log_for_day` for each;
+where there is a log, `move_gym_log` moves the `exercise_sets` rows and the `gym_logs` row
+onto the Garmin activity, stamps it read and frozen, deletes the placeholder, and the
+activity is dropped from the list to fetch. A day the watch split in two gives the log to
+the longest activity, and the others are read from Garmin as before. The function still
+logs into Garmin only when there is something left to read, so a morning whose every
+pending activity is covered by a log makes no Garmin call at all.

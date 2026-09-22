@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gym logger</title>
+<!-- Served by GitHub Pages under /Stamind/, so every asset is relative (DESIGN_gym_logger §2). -->
+<link rel="stylesheet" href="./style.css">
+<!-- An empty icon, so the browser does not ask for a favicon that is not there. -->
+<link rel="icon" href="data:,">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<header class="head" id="head">
+  <div class="head-top">
+    <h1 id="title">Gym session</h1>
+    <div class="rest" id="rest">
+      <span class="rest-value" id="rest-value">00:00</span>
+      <span class="rest-label" id="rest-label">since start</span>
+    </div>
+  </div>
+  <p class="head-sub"><span id="day"></span> <span class="tally" id="tally"></span></p>
+</header>
+
+<!-- The coach's note scrolls away: only the title, the date and the rest timer stay pinned. -->
+<p class="head-notes" id="head-notes" hidden></p>
+
+<main id="cards"></main>
+
+<section class="foot">
+  <input class="note" id="session-note" type="text" placeholder="Session note">
+  <button class="wide" id="add-exercise" type="button">+ Add an exercise</button>
+  <button class="wide primary" id="finish" type="button">Finish</button>
+  <button class="wide quiet" id="reset" type="button">Start over</button>
+</section>
+
+<!-- The exercise search, for a swap and for an added exercise (DESIGN_gym_logger §1). -->
+<div class="sheet" id="search-sheet" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head">
+      <h2 id="search-title">Swap exercise</h2>
+      <button class="close" id="search-close" type="button">✕</button>
+    </div>
+    <input class="search-input" id="search-input" type="search" autocomplete="off"
+           placeholder="Search exercises">
+    <label class="toggle" id="search-all-row">
+      <input id="search-all" type="checkbox"> Search every exercise
+    </label>
+    <div class="results" id="search-results"></div>
+  </div>
+</div>
+
+<!-- Outside Telegram there is no `sendData`, so the log is shown to be copied (§4). -->
+<div class="sheet" id="output-sheet" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head">
+      <h2 id="output-title">Your log</h2>
+      <button class="close" id="output-close" type="button">✕</button>
+    </div>
+    <p class="sheet-hint" id="output-hint" hidden></p>
+    <p class="sheet-note" id="output-note"></p>
+    <textarea class="output" id="output-text" readonly rows="6"></textarea>
+    <button class="wide primary" id="output-copy" type="button">Copy</button>
+  </div>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

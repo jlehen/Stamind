@@ -1,14 +1,18 @@
-"""What the bot does with what the athlete sends: a message, a tap, or nothing at all.
+"""What the bot does with what the athlete sends: a message, a tap, the gym logger's
+page, or nothing at all.
 
 A real `ChatBot` is built against the stand-ins in `tests/chat_harness.py` and driven
-through `on_message` and `on_callback`. That is what these cases are for: the persona, the
-allowlist, the live sessions, the armed chats and the row of buttons a chat was last
-offered are attributes on one object, and a handler reading the wrong one would still pass
-every test of the pure modules in `tests/test_bot.py`.
+through `on_message`, `on_callback` and `on_web_app_data`. That is what these cases are
+for: the persona, the allowlist, the live sessions, the armed chats and the row of buttons
+a chat was last offered are attributes on one object, and a handler reading the wrong one
+would still pass every test of the pure modules in `tests/test_bot.py`.
 """
 import asyncio
+import json
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -17,9 +21,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.chat_harness import (
     _FakeProc, _FakeQuery, build_chat_bot, callback_update, message_update,
-    record_commands, routes_to,
+    record_commands, routes_to, web_app_update,
 )
-from stamind.chat import keyboards, runner, scheduler
+from stamind import clock
+from stamind.chat import keyboards, messages, runner, scheduler
+from stamind.config import config
 
 
 class MessageHandlerTest(unittest.IsolatedAsyncioTestCase):
@@ -167,6 +173,64 @@ class PersonaSwitchTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(started, [(42, ["workout", "list"], False, "bot")])
         # Silently: the answer to the tap is the only feedback the switch earns.
         self.assertEqual(chat_bot.bot.texts(), [])
+
+
+class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
+    """The one message the gym logger's page sends (DESIGN_gym_logger.md §6).
+
+    It is Thursday, 19:05, and the athlete has just tapped "Finish" in the gym. The bot
+    keeps the message as a file and hands it to `strength ingest`; it never reads it
+    itself, because every write goes through the CLI."""
+
+    LOG = json.dumps({
+        "v": 1, "r": 727, "d": "2026-09-24", "st": "18:02", "en": "19:05",
+        "x": [{"n": "belt squat", "p": 1, "sets": [[5, 120, 40], [6, 140, 210]]}],
+    })
+
+    def setUp(self):
+        self.data_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.data_dir, True)
+        patcher = mock.patch.dict(config.data, {"data_dir": self.data_dir})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def gym_logs(self):
+        return os.path.join(self.data_dir, "gym_logs")
+
+    async def test_the_log_is_written_to_a_file_the_ingest_is_then_given(self):
+        chat_bot = build_chat_bot(self, ui="simple")
+        started = record_commands(self, chat_bot)
+        update, _replied = web_app_update(data=self.LOG)
+        await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
+        self.assertEqual(len(started), 1)
+        chat_id, argv, quiet, source = started[0]
+        self.assertEqual((chat_id, quiet, source), (42, False, "bot"))
+        self.assertEqual(argv[:2], ["strength", "ingest"])
+        self.assertEqual(os.path.dirname(argv[2]), self.gym_logs())
+        self.assertTrue(argv[2].endswith(".json"), argv[2])
+        self.assertTrue(os.path.basename(argv[2]).startswith(clock.today_str()), argv[2])
+        with open(argv[2], encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), self.LOG)
+
+    async def test_an_unlisted_chat_is_refused_and_nothing_is_written(self):
+        chat_bot = build_chat_bot(self, allowed=(42,))
+        started = record_commands(self, chat_bot)
+        update, replied = web_app_update(chat_id=99, data=self.LOG)
+        await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
+        self.assertEqual(started, [])
+        self.assertIn("Not authorized", replied[0][0])
+        self.assertFalse(os.path.exists(self.gym_logs()))
+
+    async def test_a_log_arriving_while_a_command_runs_is_told_to_wait(self):
+        chat_bot = build_chat_bot(self, ui="simple")
+        started = record_commands(self, chat_bot)
+        chat_bot.sessions[42] = runner.Session(42, _FakeProc(), "n0nce")
+        update, replied = web_app_update(data=self.LOG)
+        await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
+        self.assertEqual(started, [])
+        self.assertEqual(replied[0][0], messages.BUSY_NOTICE)
+        self.assertIsNotNone(replied[0][1]["reply_markup"])
+        self.assertFalse(os.path.exists(self.gym_logs()))
 
 
 class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):

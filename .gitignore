@@ -37,3 +37,6 @@ __pycache__/
 
 # vim swap files (one was committed by accident)
 .*.swp
+# The gym-logger prototype bot (DESIGN_gym_logger.md): its own config and database
+config.proto.yaml
+stamind.proto.db*

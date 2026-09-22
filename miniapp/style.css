@@ -1,0 +1,453 @@
+/* The gym logger's look (DESIGN_gym_logger.md §1): Telegram's theme colours when Telegram
+   supplies them, a readable light or dark fallback in a plain browser. */
+
+:root {
+  --fallback-bg: #ffffff;
+  --fallback-text: #111111;
+  --fallback-hint: #6b7280;
+  --fallback-card: #f2f3f5;
+  --fallback-line: #dcdfe4;
+  --fallback-button: #2f7bd6;
+  --fallback-button-text: #ffffff;
+
+  --bg: var(--tg-theme-bg-color, var(--fallback-bg));
+  --text: var(--tg-theme-text-color, var(--fallback-text));
+  --hint: var(--tg-theme-hint-color, var(--fallback-hint));
+  --card: var(--tg-theme-secondary-bg-color, var(--fallback-card));
+  --accent: var(--tg-theme-button-color, var(--fallback-button));
+  --accent-text: var(--tg-theme-button-text-color, var(--fallback-button-text));
+  --line: var(--fallback-line);
+  --done: #1f9d55;
+  --danger: #c23b3b;
+
+  --tap: 44px;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fallback-bg: #17212b;
+    --fallback-text: #f5f5f5;
+    --fallback-hint: #9aa7b4;
+    --fallback-card: #202b36;
+    --fallback-line: #33414f;
+    --fallback-button: #4a9be8;
+    --done: #3ec27a;
+    --danger: #ef7a7a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Several things here are hidden with the `hidden` attribute while their class sets `display`,
+   which would otherwise win. */
+[hidden] {
+  display: none !important;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  padding: 0 12px 40px;
+  -webkit-text-size-adjust: 100%;
+}
+
+button, input, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ----- header ----- */
+
+.head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding: 12px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.head-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.rest {
+  flex: none;
+  text-align: right;
+}
+
+.rest-value {
+  display: block;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.rest-label, .head-sub {
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.head-sub {
+  margin: 4px 0 0;
+}
+
+.head-notes {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--hint);
+}
+
+/* ----- one exercise ----- */
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 10px 10px 12px;
+  margin: 12px 0;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.card-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title {
+  font-size: 17px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.card-pres {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.moves {
+  flex: none;
+  display: flex;
+  gap: 4px;
+}
+
+.move {
+  width: 36px;
+  height: var(--tap);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hint);
+  font-size: 18px;
+}
+
+/* ----- one set ----- */
+
+.set {
+  display: grid;
+  grid-template-columns: 16px 1fr 1fr var(--tap);
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.set-index {
+  font-size: 12px;
+  color: var(--hint);
+  text-align: center;
+}
+
+.stepper {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.step {
+  flex: none;
+  width: 38px;
+  min-height: var(--tap);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.step:active {
+  background: var(--line);
+}
+
+.num {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  padding: 0;
+}
+
+.num:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+/* An untaken set is a ghost of the tick it will become, so a glance tells them apart. */
+.tick {
+  width: var(--tap);
+  height: var(--tap);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--hint);
+  opacity: 0.35;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.set.done .tick {
+  background: var(--done);
+  border-color: var(--done);
+  color: #ffffff;
+  opacity: 1;
+}
+
+.set.done .stepper {
+  border-color: var(--done);
+}
+
+.set.done .num {
+  color: var(--done);
+  font-weight: 650;
+}
+
+/* ----- the buttons under an exercise ----- */
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pill {
+  flex: 1 1 auto;
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.pill.danger {
+  color: var(--danger);
+}
+
+.note {
+  width: 100%;
+  min-height: var(--tap);
+  margin-top: 8px;
+  padding: 0 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: transparent;
+  font-size: 14px;
+}
+
+.note::placeholder {
+  color: var(--hint);
+}
+
+/* ----- the session's own row of actions ----- */
+
+.foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.foot .note {
+  margin-top: 0;
+  background: var(--card);
+  border-style: solid;
+}
+
+.wide {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 16px;
+}
+
+.wide.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 650;
+}
+
+.wide.quiet {
+  border: 0;
+  background: transparent;
+  color: var(--hint);
+  font-size: 14px;
+}
+
+/* ----- the search and the log, both bottom sheets ----- */
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.sheet-box {
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--bg);
+  border-radius: 16px 16px 0 0;
+  padding: 12px 12px 20px;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sheet-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 17px;
+}
+
+.close {
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 18px;
+}
+
+.search-input {
+  width: 100%;
+  min-height: var(--tap);
+  margin-top: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  font-size: 14px;
+  color: var(--hint);
+}
+
+.toggle input {
+  width: 20px;
+  height: 20px;
+}
+
+.results {
+  margin-top: 4px;
+}
+
+.result {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.result-name {
+  display: block;
+  font-size: 16px;
+}
+
+.result-kind {
+  display: block;
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.empty, .sheet-note {
+  font-size: 14px;
+  color: var(--hint);
+}
+
+.sheet-hint {
+  margin: 10px 0 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--danger);
+}
+
+.output {
+  width: 100%;
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}

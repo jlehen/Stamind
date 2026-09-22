@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Bump when the DDL below changes, so an existing database picks the change up once.
 # Reusing a number a previous commit already stamped is silent (ARCHITECTURE.md §5).
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 # The append-only rule, as the database enforces it (DESIGN_workout_revisions.md §14).
 # `wipe_workouts` drops both triggers to clear the table and puts them back from here, so
@@ -527,6 +527,21 @@ class SchemaMixin:
                 CREATE TABLE IF NOT EXISTS strength_checks (
                     lineage_id       INTEGER PRIMARY KEY,
                     checked_against  TEXT NOT NULL
+                )
+            """)
+
+            # The raw gym log the Mini App sent, kept beside the sets it was turned into,
+            # so a later grading step has the departures without deriving them again
+            # (DESIGN_gym_logger.md §5). One log per activity: ingesting a day twice
+            # replaces the earlier one. Rows go with their activity.
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS gym_logs (
+                    activity_id  TEXT PRIMARY KEY,
+                    revision_id  INTEGER,
+                    received_at  TEXT NOT NULL,
+                    payload      TEXT NOT NULL,
+                    FOREIGN KEY (activity_id) REFERENCES completed_activities(activity_id)
+                        ON DELETE CASCADE
                 )
             """)
 

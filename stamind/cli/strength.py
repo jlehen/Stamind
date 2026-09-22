@@ -3,13 +3,15 @@
 `strength name` names a day's groups on the spot, `strength reset` reads a day's sets again
 from Garmin, and `strength discard` keeps a day's activity out of the strength history. On a
 day with two strength activities, reset and discard ask which one. `strength log` reads the
-record back, and `strength exercises` the vocabulary behind it.
+record back, and `strength exercises` the vocabulary behind it. `strength ingest` is the
+sixth command of the family and lives in `strength_ingest.py` (DESIGN_gym_logger.md §5).
 """
 import argparse
 from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import clock, runtime, settings
 from stamind.cli.selectors import parse_single_date
+from stamind.cli.strength_ingest import add_ingest_parser
 from stamind.db.strength import ACTIVE
 from stamind.prompt import Choice
 from stamind.queue_kind import NotApplied
@@ -370,8 +372,8 @@ def add_strength_parser(subparsers):
         description=(
             "Stamind reads your sets from Garmin the morning after you lift. Anything it "
             "can't name, it asks you about through the queue. `log` and `exercises` read "
-            "your record and the vocabulary behind it back; the other three fix a day by "
-            "hand."
+            "your record and the vocabulary behind it back, `ingest` stores a session you "
+            "logged on your phone, and the other three fix a day by hand."
         ),
     )
     strength_subparsers = strength_parser.add_subparsers(
@@ -457,5 +459,9 @@ def add_strength_parser(subparsers):
         help="Only exercises of this movement pattern",
     )
     s_exercises.set_defaults(func=run_strength_exercises)
+
+    # The gym logger's own command, in a file of its own: the family is already at the
+    # ~400 lines AGENTS.md splits at (DESIGN_gym_logger.md §5).
+    add_ingest_parser(strength_subparsers)
 
     return strength_parser

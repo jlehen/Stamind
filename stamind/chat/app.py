@@ -20,11 +20,12 @@ import signal
 import sys
 from typing import Dict, List, Optional, Tuple
 
-from stamind import journal
+from stamind import clock, journal, runtime
 from stamind.chat import telegram_api
 from stamind.chat.callbacks import CallbacksMixin
 from stamind.chat.keyboards import (
-    MENU_COMMANDS, SIMPLE_MENU_COMMANDS, simple_keyboard_rows,
+    GYM_SPORT, MENU_COMMANDS, SIMPLE_MENU_COMMANDS, gym_button, gym_window_end,
+    simple_keyboard_rows,
 )
 from stamind.chat.messages import MessagesMixin
 from stamind.chat.replies import RepliesMixin
@@ -32,6 +33,7 @@ from stamind.chat.runner import RunnerMixin, Session
 from stamind.chat.scheduler import SchedulerMixin
 from stamind.config import config
 from stamind.output import warn
+from stamind.strength import logger
 
 
 class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, SchedulerMixin):
@@ -63,7 +65,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         self.bot = self.application.bot
         self.updater = self.application.updater
         telegram_api.register_handlers(
-            self.application, self.on_message, self.on_callback
+            self.application, self.on_message, self.on_callback, self.on_web_app_data
         )
 
         self.sessions: Dict[int, Session] = {}
@@ -76,10 +78,6 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         self.ui_actions: Dict[int, Tuple[str, List[dict]]] = {}
         # Held until each ends: asyncio keeps only a weak reference to a running task.
         self.reflect_tasks: set = set()
-
-        # The persistent §5.1 reply keyboard — built unconditionally, attached (and
-        # re-asserted on every message) only while the persona is simple.
-        self.reply_keyboard = telegram_api.reply_keyboard(simple_keyboard_rows())
 
         # The one remaining stop on the long-poll is /restart's, which closes it before
         # the process exits (DESIGN_bot_restart.md §5.2); the lock guards against that
@@ -101,8 +99,28 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         # line instead (§6).
         return 900 if self.simple_ui else config.telegram_wrap_width
 
+    def _gym_button(self) -> Optional[Tuple[str, str]]:
+        """The gym button's label and the address it opens, or None when no Mini App is
+        configured or no gym session is coming (DESIGN_gym_logger.md §6)."""
+        base_url = config.telegram_miniapp_url
+        if not base_url:
+            return None
+        today = clock.today_str()
+        workouts = runtime.db.get_workouts(
+            today, gym_window_end(today), sport_type=GYM_SPORT
+        )
+        found = gym_button(workouts, today)
+        if found is None:
+            return None
+        label, workout = found
+        return label, logger.session_url(base_url, workout)
+
     def _keyboard(self):
-        return self.reply_keyboard if self.simple_ui else None
+        """The §5.1 reply keyboard the companion attaches, rebuilt on every send so the
+        gym button follows the week (DESIGN_gym_logger.md §6). Expert mode has none."""
+        if not self.simple_ui:
+            return None
+        return telegram_api.reply_keyboard(simple_keyboard_rows(self._gym_button()))
 
     def _log(self, chat_id: int, direction: str, msg: str) -> None:
         """The bot's own timeline: printed live, and journalled (DESIGN_logging.md §8).

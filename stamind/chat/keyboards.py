@@ -16,10 +16,14 @@ tap into an action (DESIGN_bot_stop_button.md §7). Telegram caps callback data 
 bytes, which is why a queued item's id travels inside the data rather than in anything
 the bot remembers.
 """
+import datetime
 import re
 from typing import Any, List, Optional, Tuple
 
 from stamind.athlete_queue import QUEUE_LATER_CHOICES, queue_later_label
+from stamind.clock import day_str, parse_date
+from stamind.sports import canonical_sport
+from stamind.types import Workout
 
 # Reply-keyboard label → fixed argv; None arms free-text capture (§5.1/§5.2).
 # Buttons never reach beyond this table; the keyboard renders it two per row, in order.
@@ -38,11 +42,59 @@ SIMPLE_KEYBOARD = [
 KEYBOARD_LABELS_PER_ROW = 2
 
 
-def simple_keyboard_rows() -> List[List[str]]:
-    """The §5.1 reply keyboard's labels, laid out the way the bot attaches them."""
+def simple_keyboard_rows(gym: Any = None) -> List[List[Any]]:
+    """The §5.1 reply keyboard's labels, laid out the way the bot attaches them.
+
+    `gym` is the gym button `gym_button` found — a label, or the (label, url) pair that
+    opens the Mini App. It takes the first row on its own (DESIGN_gym_logger.md §6)."""
     labels = [label for label, _ in SIMPLE_KEYBOARD]
-    return [labels[i:i + KEYBOARD_LABELS_PER_ROW]
-            for i in range(0, len(labels), KEYBOARD_LABELS_PER_ROW)]
+    rows: List[List[Any]] = [labels[i:i + KEYBOARD_LABELS_PER_ROW]
+                             for i in range(0, len(labels), KEYBOARD_LABELS_PER_ROW)]
+    if gym is None:
+        return rows
+    return [[gym]] + rows
+
+
+# --- The gym button (DESIGN_gym_logger.md §6) ---
+
+# The sport a gym session is filed under, and how far ahead the button looks: today and
+# the six days after it.
+GYM_SPORT = "strength_training"
+GYM_WINDOW_DAYS = 7
+
+GYM_TODAY_LABEL = "🏋️ Log today's gym"
+
+
+def gym_window_end(today: str) -> str:
+    """The last day the gym button looks at, given today (both YYYY-MM-DD)."""
+    return day_str(parse_date(today) + datetime.timedelta(days=GYM_WINDOW_DAYS - 1))
+
+
+def gym_label(day: str, today: str) -> str:
+    """What the button says for a session on `day`: "today's" on the day itself, and the
+    weekday's name otherwise (§6)."""
+    if day == today:
+        return GYM_TODAY_LABEL
+    return f"🏋️ Log {parse_date(day).strftime('%A')}'s gym"
+
+
+def gym_button(workouts: List[Workout], today: str) -> Optional[Tuple[str, Workout]]:
+    """The gym button's label and the session it carries, or None when there is nothing to
+    log (§6).
+
+    The earliest strength session with prescribed sets, dated from today to six days out.
+    `workouts` are live sessions; a cancelled one never reaches here."""
+    end = gym_window_end(today)
+    for workout in sorted(workouts, key=lambda w: str(w.get("date") or "")):
+        day = str(workout.get("date") or "")
+        if day < today or day > end:
+            continue
+        if canonical_sport(str(workout.get("sport_type") or "")) != GYM_SPORT:
+            continue
+        if not workout.get("prescribed_sets"):
+            continue
+        return gym_label(day, today), workout
+    return None
 
 
 # --- What /start and /help say, and Telegram's own command menu ---

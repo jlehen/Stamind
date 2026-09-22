@@ -143,6 +143,23 @@ def message_update(chat_id: int = 42, text: str = "/status"):
     return update, replied
 
 
+def web_app_update(chat_id: int = 42, data: str = "{}"):
+    """The one update the gym logger's page sends at "Finish" (DESIGN_gym_logger.md §4),
+    and the list its `reply_text` answers land in."""
+    replied = []
+
+    async def reply_text(text, **kw):
+        replied.append((text, kw))
+
+    message = SimpleNamespace(
+        text=None, web_app_data=SimpleNamespace(data=data), reply_text=reply_text
+    )
+    update = SimpleNamespace(
+        effective_message=message, effective_chat=SimpleNamespace(id=chat_id)
+    )
+    return update, replied
+
+
 def callback_update(query: _FakeQuery, chat_id: int = 42):
     return SimpleNamespace(
         callback_query=query, effective_chat=SimpleNamespace(id=chat_id)
