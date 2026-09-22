@@ -15,12 +15,12 @@ from tests.helpers import (
 
 TEST_DB_PATH = test_db_path("test_constraints_replan.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 def tearDownModule():
@@ -136,7 +136,7 @@ class TestConstraintReplanTarget(unittest.TestCase):
         ))
 
     def _targets(self, start, end):
-        from trainmate.cli.constraints import _replan_targets
+        from stamind.cli.constraints import _replan_targets
         return _replan_targets(self._constraint(start, end))
 
     def test_a_far_window_targets_the_goal_it_lands_in_not_the_next_one(self):
@@ -166,9 +166,9 @@ class TestConstraintReplanTarget(unittest.TestCase):
     def test_the_flow_hands_plan_generate_the_goals_and_not_a_dead_kwarg(self):
         """The regression itself. `goal_id=` was read by nothing, so `plan generate` saw
         no goal and fell back to the next one on the calendar."""
-        from trainmate.cli.constraints import _run_replan_flow
+        from stamind.cli.constraints import _run_replan_flow
         constraint = self._constraint("2026-11-03", "2026-11-10")
-        with patch("trainmate.cli.constraints.run_plan_generate") as generate, \
+        with patch("stamind.cli.plans.generate.run_plan_generate") as generate, \
                 patch("builtins.print"):
             _run_replan_flow("Family holiday", constraint)
         ns = generate.call_args[0][0]
@@ -177,11 +177,11 @@ class TestConstraintReplanTarget(unittest.TestCase):
         self.assertFalse(hasattr(ns, "goal_id"))
 
     def test_nothing_to_target_reports_instead_of_regenerating(self):
-        from trainmate.cli.constraints import _run_replan_flow
+        from stamind.cli.constraints import _run_replan_flow
         constraint = self._constraint("2026-08-01", "2026-08-10")
         buf = io.StringIO()
-        with patch("trainmate.cli.constraints.run_plan_generate") as generate, \
-                patch("trainmate.cli.constraints._today_str", return_value="2026-08-31"), \
+        with patch("stamind.cli.plans.generate.run_plan_generate") as generate, \
+                patch("stamind.cli.constraints._today_str", return_value="2026-08-31"), \
                 redirect_stdout(buf):
             _run_replan_flow("Was ill", constraint)
         generate.assert_not_called()
@@ -192,24 +192,24 @@ class TestConstraintReplanTarget(unittest.TestCase):
     def test_the_proposal_is_not_raised_when_no_plan_covers_the_window(self):
         """"Replan around it?" presupposes a plan holding those days. A 10-day rest window
         in the past clears the §7 rest floor, but there is nothing a `y` could rebuild."""
-        from trainmate.cli.constraints import _maybe_replan
+        from stamind.cli.constraints import _maybe_replan
         cid = test_db.add_constraint(
             title="Was ill", start_date="2026-08-01", end_date="2026-08-10",
             rest=1, source="manual",
         )
-        with patch("trainmate.runtime.prompt") as prompt, patch("builtins.print"):
+        with patch("stamind.runtime.prompt") as prompt, patch("builtins.print"):
             _maybe_replan(cid, "Was ill", None)
         prompt.confirm.assert_not_called()
         self.assertEqual(test_db.get_constraint(cid)["replan"], 0)
 
     def test_the_proposal_is_still_raised_for_a_window_a_plan_covers(self):
         # The guard above must not swallow the ordinary case it sits in front of.
-        from trainmate.cli.constraints import _maybe_replan
+        from stamind.cli.constraints import _maybe_replan
         cid = test_db.add_constraint(
             title="Family holiday", start_date="2026-11-03", end_date="2026-11-10",
             rest=1, source="manual",
         )
-        with patch("trainmate.runtime.prompt") as prompt, patch("builtins.print"):
+        with patch("stamind.runtime.prompt") as prompt, patch("builtins.print"):
             prompt.confirm.return_value = False
             _maybe_replan(cid, "Family holiday", None)
         prompt.confirm.assert_called_once()

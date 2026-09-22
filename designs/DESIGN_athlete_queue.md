@@ -1,9 +1,9 @@
-# Design: The queue of things TrainMate wants to tell or ask the athlete
+# Design: The queue of things Stamind wants to tell or ask the athlete
 
 **Status:** Implemented · **Date:** 2026-09-14 (rev. 3)
 
-Revision 3 settles the terminal command: a bare `tm queue` lists, `tm queue answer` goes
-through the items, and `tm queue tell` leaves a message, which is also the first thing that
+Revision 3 settles the terminal command: a bare `sm queue` lists, `sm queue answer` goes
+through the items, and `sm queue tell` leaves a message, which is also the first thing that
 can put an item in the queue (§5). It says when the terminal reads the queue (§5.2). "In 1
 day" comes back two minutes before the time of day the item was shown (§4), and the
 scheduler sends reminders before the morning push (§6.5). The check that closes an item is
@@ -51,7 +51,7 @@ next rest day.
 
 So one question holds up the chat at the one moment of the day she most needs it. The other
 waits days for a free slot and keeps its own record of what it asked. Both problems have
-the same cause: TrainMate has no place to put a question that can wait.
+the same cause: Stamind has no place to put a question that can wait.
 
 ## 2. The rule: what goes in the queue
 
@@ -143,7 +143,7 @@ For a **question**:
   next time. The next item is shown now.
 - **Later**, with a choice of when it comes back. The next item is shown now.
   - **In 1 hour.** The item keeps its place in the line but is hidden until an hour after
-    the tap. Then TrainMate sends it again on its own, as a reminder (§6.5).
+    the tap. Then Stamind sends it again on its own, as a reminder (§6.5).
   - **In 1 day.** The same, but hidden until tomorrow, two minutes before the time the walk
     that showed it started. A walk starts when the command that began it starts, so the
     morning push's walk starts at 08:00, and anything put off from it comes back at 07:58
@@ -177,7 +177,7 @@ would show A again. With A alone in the queue, it would come straight back, fore
 ends with "That's all for now — thanks!". A walk that finds nothing to show sends nothing.
 
 "Next time" means the next walk. The morning push starts one every day it runs (§6.1), and
-`tm queue answer` starts one (§5.1).
+`sm queue answer` starts one (§5.1).
 
 **A reminder brings back one item on its own.** Acting on it ends there: it does not
 continue into the rest of the queue, which waits for the next walk. For "in 1 day", a
@@ -191,14 +191,14 @@ has passed.
 
 ### 5.1 The command
 
-`tm queue` is a command group with three sub-commands. A bare `tm queue` runs `tm queue
+`sm queue` is a command group with three sub-commands. A bare `sm queue` runs `sm queue
 list`. That is the exception DESIGN_cli_noargs.md §a3 already makes for `settings`: a group
 may act bare when it has one read-only view that shows its whole state, and its other
-sub-commands are addressed through that view. `tm queue answer <id>` takes its id from the
+sub-commands are addressed through that view. `sm queue answer <id>` takes its id from the
 list, as `settings set` takes a name from `settings list`.
 
 ```
-$ tm queue
+$ sm queue
 === QUEUE ===
 
   #13  question  Wed Sep 16 08:00  Tue Sep 15 18:10 gym session, sets 1–4: 10, 10, 10, 9 reps @ 100 kg
@@ -213,7 +213,7 @@ $ tm queue
 The questions in these examples come from features that do not exist yet; they show the
 shape. Hidden items are listed after the waiting ones, with the time they come back.
 
-`tm queue list --closed` lists the closed items instead, in the order they closed. Each line
+`sm queue list --closed` lists the closed items instead, in the order they closed. Each line
 shows when the item closed and, at its end, how: answered, dropped, or stale. `-d` picks the
 days they closed on, in the athlete's timezone and in the range grammar every filtering
 command shares (DESIGN_cli_selectors.md §1). With no `-d` it shows the last 7 days. `-d`
@@ -222,7 +222,7 @@ queue and has no days to pick. The queue records when an item closed, not when t
 it: a message sent on Tuesday morning and acknowledged that evening shows the evening.
 
 ```
-$ tm queue list --closed
+$ sm queue list --closed
 === QUEUE · CLOSED 2026-09-10 Thu .. 2026-09-16 Wed ===
 
   #13  question  2026-09-16 Wed 08:04  Tue Sep 15 18:10 gym session, sets 1–4: …  · answered
@@ -232,10 +232,10 @@ $ tm queue list --closed
 3 closed: 2 answered, 1 dropped.
 ```
 
-`tm queue answer` walks the waiting items with the blocking chooser, one at a time:
+`sm queue answer` walks the waiting items with the blocking chooser, one at a time:
 
 ```
-$ tm queue answer
+$ sm queue answer
 
 Question 1 of 4 · #13 · queued Wed Sep 16 08:00
 Tue Sep 15 18:10 gym session, sets 1–4: 10, 10, 10, 9 reps @ 100 kg. What was it?
@@ -276,14 +276,14 @@ is Thursday 21:10.
 
 Enter skips. To leave a walk, press Enter through it or Ctrl-C; every answer already given is
 already written. On piped input or under cron, the chooser's end-of-input rule picks the
-default, so a walk there skips everything and writes nothing. `tm queue answer 19` shows item
+default, so a walk there skips everything and writes nothing. `sm queue answer 19` shows item
 19 alone, whatever its place, and ends after it. An answer can be typed text, like
 "something else…": the chooser asks for the text on the spot, and the kind applies it.
 
-`tm queue tell "<text>"` queues a message:
+`sm queue tell "<text>"` queues a message:
 
 ```
-$ tm queue tell "Charge your watch tonight — long ride tomorrow."
+$ sm queue tell "Charge your watch tonight — long ride tomorrow."
 Queued #19. It goes out with the next morning message, or with 'queue answer'.
 ```
 
@@ -291,7 +291,7 @@ On an instance run for a companion athlete, this is how the operator leaves her 
 it is the only kind in this change: the `message` kind, whose subject is the time it was
 queued (so the same words told twice are two messages), whose payload is the text, and
 which is never stale. It is also what makes the queue checkable by hand before any feature
-adopts it. A message the operator regrets is closed with `tm queue answer <id>` and "got
+adopts it. A message the operator regrets is closed with `sm queue answer <id>` and "got
 it".
 
 In Telegram, the expert persona types the same commands. `queue list` and `queue tell`
@@ -302,7 +302,7 @@ than waiting on a chooser.
 
 The terminal shows the queue in four places and never starts a walk on its own.
 
-`tm queue` and `tm queue list` show everything. `tm queue answer` goes through it.
+`sm queue` and `sm queue list` show everything. `sm queue answer` goes through it.
 
 `status` and `workout adapt` print a two-line hint whenever something is waiting, in the
 same place and the same yellow as the end-of-schedule hint of DESIGN_runway_nudge.md §4.
@@ -346,7 +346,7 @@ Nothing waits. The command that sent the question has already exited. She can ta
 tired" on the briefing, type a message to the router, or leave the question until the
 evening. The question's buttons keep working for as long as the item is waiting.
 
-A message from `tm queue tell` arrives the same way:
+A message from `sm queue tell` arrives the same way:
 
 > 📬 Charge your watch tonight — long ride tomorrow.
 >
@@ -357,13 +357,13 @@ A message from `tm queue tell` arrives the same way:
 This is the main change to the bot. It needs a new sentinel, meaning a new kind of line the
 CLI prints with a special marker so the bot reads it as an instruction instead of as text.
 
-Today's non-blocking buttons, the `TM-BUTTONS` row, are remembered by the bot, one row per
+Today's non-blocking buttons, the `SM-BUTTONS` row, are remembered by the bot, one row per
 chat, and a new row makes the previous one dead. That is deliberate: "an offer left
 overnight is gone by breakfast" (DESIGN_bot_simple_frontend.md §12.3). A question cannot
 live like that. If the question's row replaced the briefing's row, the push would lose
 "Feeling tired" every morning there is a question.
 
-So a queued item travels on its own line, `\x1eTM-QUEUE {json}`. It carries the item id, the
+So a queued item travels on its own line, `\x1eSM-QUEUE {json}`. It carries the item id, the
 text, the buttons (a label and an action code each) and the time the walk started. The bot
 sends the text as a new message and writes the whole meaning of each button into the button
 itself: `q:<item id>:<action>:<walk start>`. For example, `q:12:a2:1789538400` is the second
@@ -375,7 +375,7 @@ the answers stored with the item, never the answer itself, so it always fits in 
 The bot stores nothing about these buttons. They do not replace the briefing's row, the
 briefing's row does not replace them, and a bot restart loses nothing.
 
-A tap runs `tm bot queue 12 a2 --since 1789538400`, a hidden command beside `bot morning`. It
+A tap runs `sm bot queue 12 a2 --since 1789538400`, a hidden command beside `bot morning`. It
 checks that item 12 is still waiting and still worth asking, applies the action, and sends
 the next item of the walk or the closing line. After a reminder's tap it sends nothing more.
 The walk start is also what "in 1 day" is measured from (§4). A tap while another command is
@@ -501,12 +501,12 @@ or any other feature. The `message` kind of §5.1 is the first entry in that lis
 smallest example of one.
 
 Amended 2026-09-14 (DESIGN_strength_tracking.md §7): `sets_final` and `set_names` are the next
-two entries. A feature takes what it needs from `trainmate/queue_kind.py` (the `Kind` shape,
+two entries. A feature takes what it needs from `stamind/queue_kind.py` (the `Kind` shape,
 `queue` and `NotApplied`), so the list of kinds can import the feature without the feature
 importing the list.
 
 Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §5): `learning`, from
-`trainmate/learning_doubts.py`, is the next entry.
+`stamind/learning_doubts.py`, is the next entry.
 
 ## 9. Guardrails
 
@@ -519,7 +519,7 @@ text of an item inside fixed wording, and nothing more.
 What an answer writes must be reversible, the same condition DESIGN_bot_simple_frontend.md
 §7 sets for anything a tap can change; each feature shows how its answers are undone. A drop
 writes nothing except that the question is not asked again, and later and skip write only the
-item's place in the queue. `tm queue tell` is a terminal command, not a tap.
+item's place in the queue. `sm queue tell` is a terminal command, not a tap.
 
 ## 10. Deliberately not done
 
@@ -548,27 +548,27 @@ item's place in the queue. `tm queue tell` is a terminal command, not a tap.
 
 ## 12. Touch points
 
-- `trainmate/db/schema.py`: the `athlete_queue` table. `trainmate/db/queue.py`: queue once per
+- `stamind/db/schema.py`: the `athlete_queue` table. `stamind/db/queue.py`: queue once per
   subject, the next item of a walk, close, move to the back, hide until a time, the items
   whose reminder time has passed.
-- `trainmate/athlete_queue.py`: the list of kinds with the `message` kind, the walk (the next
+- `stamind/athlete_queue.py`: the list of kinds with the `message` kind, the walk (the next
   waiting item, closing stale ones on the way), the actions with the "in 1 day" time, and
   sending due reminders.
-- `trainmate/prompt.py`: `emit_queue_item` with the `TM-QUEUE` sentinel, the hint in its
+- `stamind/prompt.py`: `emit_queue_item` with the `SM-QUEUE` sentinel, the hint in its
   place on a terminal, and the labels of the three later choices.
-- `trainmate/chat/callbacks.py` and `replies.py`, with the `q:` callback namespace in
-  `trainmate/chat/keyboards.py`:
+- `stamind/chat/callbacks.py` and `replies.py`, with the `q:` callback namespace in
+  `stamind/chat/keyboards.py`:
   the sentinel sends a new message; a `q:` tap runs `bot queue`, keeps its
   buttons on a busy chat and shows the chosen answer; "Not now" swaps in the three choices;
   each scheduler wake runs `bot queue --remind` when a reminder is due and waits for it
   before the push.
-- `trainmate/cli/queue.py`: `tm queue` (bare runs `list`), `list`, `answer [id]`, `tell`, and
+- `stamind/cli/queue.py`: `sm queue` (bare runs `list`), `list`, `answer [id]`, `tell`, and
   the hidden `bot queue` with `--remind`, whose parser entry sits with the other `bot`
   commands in `cli/bot/parser.py`.
-- `trainmate/cli/bot/views.py`: `run_bot_morning` starts a walk at its end.
-- `trainmate/cli/status.py` and `workout adapt` (`cli/workouts/adapt.py`): the hint, beside
+- `stamind/cli/bot/views.py`: `run_bot_morning` starts a walk at its end.
+- `stamind/cli/status.py` and `workout adapt` (`cli/workouts/adapt.py`): the hint, beside
   the end-of-schedule hint.
-- `trainmate/cli/render/`: the list, the item, reminder and hint renderers, expert and
+- `stamind/cli/render/`: the list, the item, reminder and hint renderers, expert and
   companion (the companion's hint prints nothing).
 - Tests, with the `message` kind and a question kind defined in the tests: a subject queued
   once, including after a drop; queue order, and "after the others" moving an item to the

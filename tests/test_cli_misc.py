@@ -3,14 +3,14 @@ import unittest
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
-from trainmate.cli.argparse_ext import _subparser_choices
-from trainmate.text import strip_ansi
+from stamind.cli.argparse_ext import _subparser_choices
+from stamind.text import strip_ansi
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_misc.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_misc.db")
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -42,7 +42,7 @@ class TestCliMisc(unittest.TestCase):
     def test_help_and_usage(self):
         exit_code, stdout, stderr = self.run_cli(["--help"])
         self.assertEqual(exit_code, 0)
-        self.assertIn("TrainMate - Local Training Coach CLI", stdout)
+        self.assertIn("Stamind - Local Training Coach CLI", stdout)
         self.assertIn("goal", stdout)
         self.assertIn("constraint", stdout)
         self.assertIn("workout", stdout)
@@ -63,10 +63,10 @@ class TestCliMisc(unittest.TestCase):
         # Every help surface — usage, description, option column — has to fit the
         # width, including the chat client's. The sub-command slot is the one argparse
         # can't break, which is why it reads `<command>` rather than `{a,b,c,…}`.
-        parser, _ = trainmate_cli.build_parser()
+        parser, _ = stamind_cli.build_parser()
         for width in (80, 48):
             with patch.dict(os.environ, {"COLUMNS": str(width),
-                                         "TRAINMATE_WRAP_WIDTH": str(width)}):
+                                         "STAMIND_WRAP_WIDTH": str(width)}):
                 for argv in ([], ["workout"], ["workout", "generate"]):
                     sub = parser
                     for token in argv:
@@ -90,7 +90,7 @@ class TestCliMisc(unittest.TestCase):
         # DESIGN_cli_noargs.md §a: on a terminal the error answers itself with the
         # command's own help — the positional it names is only meaningful alongside
         # its description — and puts the missing line last, where the eye lands.
-        with patch.dict(os.environ, {"TRAINMATE_FRONTEND": ""}):
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": ""}):
             exit_code, stdout, stderr = self.run_cli(["constraint", "add"])
         self.assertEqual(exit_code, 2)
         self.assertIn("positional arguments:", stderr)
@@ -103,7 +103,7 @@ class TestCliMisc(unittest.TestCase):
     def test_missing_argument_stays_one_line_on_the_json_frontend(self):
         # ...but a screenful of help is a screenful of chat, so the bot gets the
         # line plus a pointer to the help it can ask for (§a).
-        with patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}):
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
             exit_code, stdout, stderr = self.run_cli(["constraint", "add"])
         self.assertEqual(exit_code, 2)
         self.assertNotIn("positional arguments:", stderr)
@@ -245,8 +245,8 @@ class TestCliMisc(unittest.TestCase):
                 self.assertEqual(exit_code, 0)
                 self.assertEqual(count(token), 0)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_no_pull_behavior_across_commands(self, mock_coach, mock_garmin):
         # 1. workout compare without --no-pull
         exit_code, stdout, stderr = self.run_cli(["workout", "compare", "-d", "3d"])
@@ -282,8 +282,8 @@ class TestCliMisc(unittest.TestCase):
         mock_coach.data_bootstrap.assert_called_once()
         self.assertTrue(mock_coach.data_bootstrap.call_args[1].get("no_pull"))
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.timeline_rows.build_timeline_payload")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.timeline_rows.build_timeline_payload")
     def test_progress_renders_end_to_end_from_the_payload(self, mock_build, mock_garmin):
         # Not an alias test — `pr` is prefix resolution, covered in test_cli_dashless.
         # What this pins is the only run_cli path through the progress renderer, which

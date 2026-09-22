@@ -2,7 +2,7 @@
 
 **Status:** Implemented · **Date:** 2026-06-28 · **Companion to:** `DESIGN_calendar_signal_ingest.md`
 
-A top-level `signal` command that lets TrainMate **author, list, and remove**
+A top-level `signal` command that lets Stamind **author, list, and remove**
 the same tagged signal events it already ingests. The ingest design
 (`DESIGN_calendar_signal_ingest.md`) only ever *read* tagged events; the sole
 producer was an out-of-scope external syncer. This adds the **first-party
@@ -19,9 +19,9 @@ former `lifeevent`, DESIGN_constraints.md §9). The ingest channel already exist
 but the signal tag lives in `extendedProperties.private` precisely so it is
 **invisible and unsettable from the Google Calendar UI** (ingest §3). So a human
 *cannot* hand-author a properly-tagged event; today only the external syncer
-can. For one-off signals we want TrainMate itself to be that producer.
+can. For one-off signals we want Stamind itself to be that producer.
 
-**Principle preserved:** TrainMate stays domain-agnostic. `metric` is opaque
+**Principle preserved:** Stamind stays domain-agnostic. `metric` is opaque
 free text (`"heat"`, `"sleep"`, …); no per-signal logic, no weather lookups.
 
 ---
@@ -75,7 +75,7 @@ signal add METRIC [TEXT] [-d RANGE] [--value N] [-l LABEL]
 - `METRIC` (positional): opaque category, mandatory. `list-metrics` shows the
   ones already in use, to discourage `heat` vs `heatwave` drift.
 - `--value`: optional **free numeric** the user supplies (severity, °C, count —
-  TrainMate doesn't interpret it). Free text alone is also fine. This was
+  Stamind doesn't interpret it). Free text alone is also fine. This was
   originally written as storage-only, "kept for the future quantitative path";
   that path has since **shipped** — `_signal_days`
   (`coach/service/analysis.py`) clusters valued signal-days into per-category
@@ -89,7 +89,7 @@ signal add METRIC [TEXT] [-d RANGE] [--value N] [-l LABEL]
   the ingested-event style: **with a label** → `label (value)` (e.g.
   `severe heatwave (38.0)`); **without** → `Metric: value` (e.g. `Alcohol: 2.0`).
   The value is dropped from the rendering when absent.
-- **Idempotent upsert by (date, metric):** if a `trainmate-context` event with
+- **Idempotent upsert by (date, metric):** if a `stamind-context` event with
   the same metric already exists on a day, **update** it (calendar + row) rather
   than create a duplicate. The schema deliberately doesn't enforce
   `UNIQUE(date,metric)` (ingest §5) — as the first-party producer we own this
@@ -129,12 +129,12 @@ signal list [METRIC] [-d RANGE] [-m|-M|-g RANGE]
 
 ## 4. Code touch points
 
-**`trainmate/cli/signals.py`** (new, modeled on `cli/constraints.py`):
+**`stamind/cli/signals.py`** (new, modeled on `cli/constraints.py`):
 `run_signal_add/_rm/_list/_list_metrics`. Subparsers + dispatch wired into
-`trainmate_cli.py` next to the other top-level commands; range filtering comes from
+`stamind_cli.py` next to the other top-level commands; range filtering comes from
 the shared `add_selector_args`/`resolve_window` pair (DESIGN_cli_selectors.md).
 
-**`trainmate/gcal/client.py`** — two methods on `CalendarSyncer`:
+**`stamind/gcal/client.py`** — two methods on `CalendarSyncer`:
 - `add_signal_event(date, metric, value, text, existing_event_id=None) -> str`
   — builds the body with `extendedProperties.private = {source:
   <calendar_signal_tag>, metric, value?}`, all-day (`end = start + 1 day`);
@@ -142,7 +142,7 @@ the shared `add_selector_args`/`resolve_window` pair (DESIGN_cli_selectors.md).
 - reuse/generalize `delete_workout_event` → a plain `delete_event(event_id)`
   (it's already source-agnostic) for `rm`.
 
-**`trainmate/db/signals.py`** — small read/delete helpers:
+**`stamind/db/signals.py`** — small read/delete helpers:
 - `get_daily_signals(...)` gains an optional `metric` filter.
 - `get_daily_signal_by_id(id)` and `delete_daily_signal(id)` for `rm`.
 - `list_signal_metrics() -> [{metric, count, first_date, last_date}]` for `lm`.
@@ -166,7 +166,7 @@ bullet it qualifies, rather than in the resolved-decisions section.
    need for either — `sig` is an ordinary unambiguous prefix, which the
    prefix-matching rework prefers over a registered alias. See
    DESIGN_cli_noargs.md §d.)
-2. **`value`** → free numeric the user supplies; TrainMate never interprets it
+2. **`value`** → free numeric the user supplies; Stamind never interprets it
    *semantically* — but it is read quantitatively, see §3.
 3. **`list` default window** → `config.metrics_lookback_days` (15), matching the
    coach's metrics-lookback window.

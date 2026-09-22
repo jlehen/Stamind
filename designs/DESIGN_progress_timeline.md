@@ -50,7 +50,7 @@ the *presentation*-side view of past **and future**)
 > answer a different question from the load table.
 > (7) Leftovers: `zero_load_workout_count` is dated from today, so a past row
 > nobody can fix no longer keeps the banner permanently lit; the FORM line prints
-> CTL/ATL at one decimal to match the TSB beside it and `tm status`; the config
+> CTL/ATL at one decimal to match the TSB beside it and `sm status`; the config
 > `sport_preferences` check only runs when zone tables are asked for; and
 > `--mesocycles` no longer crashes on `get_previous_macrocycle()` (its hand-rolled
 > test stub had the wrong signature, so the suite passed while the flag died on
@@ -89,7 +89,7 @@ the *presentation*-side view of past **and future**)
 > `GET /api/timeline.png` (§6), drawn by the same renderer as the Telegram
 > photo — one chart drawing instead of rev 6's two "accepted-cost"
 > hand-maintained renderings. The renderer is extracted to
-> `trainmate/analytics/chart.py` (§7.2) so CLI and web share it, and the JSON endpoint
+> `stamind/analytics/chart.py` (§7.2) so CLI and web share it, and the JSON endpoint
 > now ships *with* its first consumer (§8.5) instead of ahead of any.
 > (2) **Superseded-version *labels* are cut** (rev 6's §6.1 layer 2):
 > exhuming old plan versions via `macrocycles.created_at` to put a cosmetic
@@ -100,7 +100,7 @@ the *presentation*-side view of past **and future**)
 > rule, which keeps the `created_at` pin (§6.1) — that half is load-bearing.
 > (3) **Branch-state inventory** (§10.1): the rev-4 snapshot on this branch
 > already implements parts of §10 in older form (public `planned_load`, the
-> photo transport, `tm progress` + menu entry, the `p`-alias removal,
+> photo transport, `sm progress` + menu entry, the `p`-alias removal,
 > matplotlib in requirements, `--chart`); the rollout now says per step what
 > is done, what is reworked, and what is new — so nobody hunts for a
 > `_planned_load` that is already public. Stale references fixed (rounding
@@ -114,7 +114,7 @@ the *presentation*-side view of past **and future**)
 > anchoring the fold on it silently dropped today's planned session from the
 > projection (~12 TSB too optimistic per 100-TSS session) and made the CLI
 > (which pulls) disagree with the pure-reader endpoint. Today is now always
-> fold territory per the §3 today-rule; the `tm status` ≡ `tm progress`
+> fold territory per the §3 today-rule; the `sm status` ≡ `sm progress`
 > invariant is correspondingly restated: TSB always identical, CTL/ATL
 > identical once today's load has synced, and the FORM line tags today's
 > source (§7.1). (2) **Full-precision storage.** `compute_pmc()` stops
@@ -150,10 +150,10 @@ the *presentation*-side view of past **and future**)
 > (`DESIGN_pmc_fitness_fatigue.md`, merge `ca8591b`): `garmin.compute_pmc()` now
 > computes CTL/ATL/TSB over full history on every `recompute_derived()` sweep,
 > stores them on `athlete_metrics_cache`, and surfaces them in the coach prompts,
-> `tm status`, and `tm data show-metrics`. That obsoletes rev 4's §4 ("new math,
+> `sm status`, and `sm data show-metrics`. That obsoletes rev 4's §4 ("new math,
 > additive"): this feature no longer computes anything about the *past* — it
 > reads the stored series (recomputing under different conventions would make
-> `tm progress` disagree with `tm status` on the same day's CTL, a variant of
+> `sm progress` disagree with `sm status` on the same day's CTL, a variant of
 > the very seam-lie §3 exists to prevent) — and its projection becomes a forward
 > fold of the same recurrence seeded from the last stored row, which is exactly
 > the PMC design's deferred **Phase 2**, generalized from one event-day number
@@ -166,7 +166,7 @@ the *presentation*-side view of past **and future**)
 > implementation snapshot on this branch predates the PMC merge (see
 > `CODE_REVIEW_progress_timeline.md`) and is reworked to this rev before merge.
 >
-> Rev 4 (implementability review): photo caption carried in the TM-PHOTO
+> Rev 4 (implementability review): photo caption carried in the SM-PHOTO
 > payload, CLI weekly bars as absolute load on a shared max-anchored scale,
 > table fixed-width at the 48-col budget, sparkline sampling pinned, endpoint
 > returns all active objectives with renderers clipping. Rev 3: projection
@@ -187,7 +187,7 @@ positive form on race day*. Below it, weekly planned-vs-actual load bars
 labeled by mesocycle make the periodization wave and adherence visible at a
 glance.
 
-V1 ships on **all three front-ends**: `tm progress` (text, numbers-first),
+V1 ships on **all three front-ends**: `sm progress` (text, numbers-first),
 Telegram (same text for free via CLI parity, plus the full chart as a PNG
 photo), and a web **Progress** tab that frames the **same PNG** (the
 interactive rendering is a follow-on, §8.5). One computation (§5) and one
@@ -197,13 +197,13 @@ chart renderer (§7.2) feed all three; only the delivery differs (§7).
 
 ## 1. Motivation
 
-TrainMate holds both halves of the progression story but never draws them in
+Stamind holds both halves of the progression story but never draws them in
 one place:
 
 - The **past** is visible as tables (`workout compare`, the History tab) and —
-  since the PMC merge — as *today's* CTL/ATL/TSB numbers (`tm status`, the
+  since the PMC merge — as *today's* CTL/ATL/TSB numbers (`sm status`, the
   coach prompts). But there is still no trend: "am I fitter than in April?"
-  means scanning `tm data show-metrics` rows and integrating by eye.
+  means scanning `sm data show-metrics` rows and integrating by eye.
 - The **future** is visible only as a list of workouts and a mesocycle
   strategy blob — the periodization wave (build/recover, volume ramp) exists
   in the data (every planned workout carries `tss`) but the user cannot *see*
@@ -346,7 +346,7 @@ the row is partial and the footnote says *why*.
 - *No completed activities at all* (fresh install — a plan may already be
   generated) → no past series and no PMC (no anchor, §4), but the planned
   future still renders: weekly bars for planned weeks, PMC panel suppressed,
-  and the warning "no activity history yet — run `tm data pull` first" on
+  and the warning "no activity history yet — run `sm data pull` first" on
   every surface. A blank tab would be strictly less useful than showing the
   plan about to start. (Rev 5 said "empty `days`/`weeks`", contradicting
   §4's "the weekly bars don't depend on PMC and render regardless" — the §4
@@ -415,13 +415,13 @@ TSB_d = CTL_{d-1} − ATL_{d-1}          (form going *into* day d)
 
 and `recompute_derived()` stores the result on `athlete_metrics_cache`
 (`ctl`/`atl`/`tsb` columns, full-sweep on every pull/backfill/wipe path). Those
-stored numbers already reach the coach prompts, `tm status`, and `tm data
+stored numbers already reach the coach prompts, `sm status`, and `sm data
 show-metrics`. This feature therefore computes **nothing new about the past**
 and gains a hard consistency requirement instead:
 
 - **Past half: read, don't recompute.** Past DayPoints — dates strictly
   before today; today belongs to the fold below — take `ctl`/`atl`/`tsb`
-  verbatim from the stored metrics rows. `tm progress` and `tm status` must
+  verbatim from the stored metrics rows. `sm progress` and `sm status` must
   show the *same* CTL for the same past day — two implementations of
   "fitness on day d" disagreeing across commands would be a variant of the
   seam-lie §3 exists to prevent. (For *today*, where the fold deliberately
@@ -463,8 +463,8 @@ and gains a hard consistency requirement instead:
   than owning a second copy of the recurrence.
 - **Stored values become full-precision** — the second (and last) change to
   the shipped core: `compute_pmc()` drops the 1-dp rounding of its outputs
-  (the maths in `trainmate/analytics/pmc.py`, the sweep that stores it in
-  `trainmate/garmin/derived.py`); values are stored
+  (the maths in `stamind/analytics/pmc.py`, the sweep that stores it in
+  `stamind/garmin/derived.py`); values are stored
   exact and rounded only at display —
   which every consumer already does (`:.1f` in status / show-metrics /
   prompt formatting), and which acute/chronic/ACWR storage already
@@ -518,16 +518,16 @@ presentation-side model" — no longer true: the backward core is coach-facing.
 What *this* feature owns is presentation: the trend picture, the seam, and
 the projection.)
 
-## 5. New modules: `trainmate/analytics/progression.py` + `trainmate/timeline_rows.py`
+## 5. New modules: `stamind/analytics/progression.py` + `stamind/timeline_rows.py`
 
 `analytics/progression.py` is pure functions, no singleton state — same shape as
-`trainmate/analytics/adherence.py` and `coach/formatting.py` (the "pure helpers"
+`stamind/analytics/adherence.py` and `coach/formatting.py` (the "pure helpers"
 precedent). Takes rows as
 arguments, never touches `db` directly, so it is shared verbatim by all
 three front-ends (§7). One purity caveat, same as `analytics/adherence.py`'s:
 `analytics.load.activity_load` reads `config` thresholds, so the functions are
 deterministic given rows + config rather than rows alone. The second half of this
-caveat is gone: the load model left `trainmate/garmin/` for `trainmate/analytics/`,
+caveat is gone: the load model left `stamind/garmin/` for `stamind/analytics/`,
 which imports no database, so no patch-before-import dance is needed any more.
 
 ```python
@@ -594,7 +594,7 @@ def assemble_timeline(activities, workouts, metrics_rows, mesocycles,
     # The ENTIRE §6.0 payload — days, weeks, meso_bands, objectives, plan_gap,
     # warnings — built here and ONLY here, from the helpers
     # above plus the §6.1 layered lookup. Rows come in from
-    # trainmate/timeline_rows.py (below); neither the CLI handler nor the endpoint
+    # stamind/timeline_rows.py (below); neither the CLI handler nor the endpoint
     # owns any assembly or warning-wording logic. This is deliberate: the
     # rev-4 snapshot let each caller assemble its own payload and the two
     # copies had already diverged on when the plan-gap warning fires and how
@@ -602,7 +602,7 @@ def assemble_timeline(activities, workouts, metrics_rows, mesocycles,
     # conflict — this stays row-in/row-out.
 ```
 
-**The row-fetching half: `trainmate/timeline_rows.py`** (rev 6). `analytics/progression.py`
+**The row-fetching half: `stamind/timeline_rows.py`** (rev 6). `analytics/progression.py`
 stays pure, so *somebody* has to do the db reads — and having each front-end do
 them was the other half of the CODE_REVIEW #5 divergence. One small module
 owns them:
@@ -626,7 +626,7 @@ redundant rather than reassuring (§9): the shared builder *is* the guarantee.
 ## 6. Web API: `GET /api/timeline.png`
 
 The v1 web surface serves the picture, not the data. Thin handler in
-`trainmate_web.py` — three statements, no row-fetching of its own: one call to
+`stamind_web.py` — three statements, no row-fetching of its own: one call to
 `timeline.build_timeline_payload(db)` (§5, which owns every read: activities,
 workouts, the stored PMC rows (§4), the governing macrocycle + its mesocycles
 for the §6.1 labels, active *and* completed objectives, the bootstrap
@@ -835,15 +835,15 @@ order follows usage:
 CLI first (§10), which also honours the existing convention that the web API
 *tracks* the CLI feature set (ARCHITECTURE §8), rather than inverting it.
 
-### 7.1 CLI: `tm progress`
+### 7.1 CLI: `sm progress`
 
-New command family `trainmate/cli/progress.py` (`run_progress`) + dispatcher
-entry in `trainmate_cli.py`. **No registered alias**: `progress` is reachable by
+New command family `stamind/cli/progress.py` (`run_progress`) + dispatcher
+entry in `stamind_cli.py`. **No registered alias**: `progress` is reachable by
 unambiguous prefix (`pr` — `p` is ambiguous against `plan`), which is a
 different guarantee from an alias and can be broken by any future sibling
 command. DESIGN_cli_noargs.md §d is the canonical statement of that distinction.
 The top-level `p` alias for
-`plan` (trainmate_cli.py:708) is **removed in the same change** — following
+`plan` (stamind_cli.py:708) is **removed in the same change** — following
 the recent removal of the deprecated `c` alias for `signal` — so the two
 command names can't be confused mid-typing. Follows the standard **auto-ensure**
 convention (`cli/common.py`): fresh Garmin data is pulled under the usual
@@ -886,20 +886,20 @@ objective line, wrapped inside the same width budget:
 - **The FORM line shows today per the §4 fold** — and tags where today's
   load came from: `FORM today (actual)` once today's activity has synced,
   `FORM today (planned)` while the fold is counting the planned session in
-  its place. Presentation conventions are `tm status`'s, reused not
+  its place. Presentation conventions are `sm status`'s, reused not
   reimplemented: same `color_tsb`, same one-decimal CTL/ATL, same
   `PMC_TSB_LAG_NOTE` footnote wherever TSB is printed (the PMC design's §6.1
-  conventions). **No ramp figure**, though `tm status` prints one: the 48-column
+  conventions). **No ramp figure**, though `sm status` prints one: the 48-column
   line has no room for a fourth number, and the CTL trend it would summarise is
   already the sparkline directly below it. The consistency contract with
-  `tm status` (pinned by tests, §9): **TSB today is always identical** (it is
+  `sm status` (pinned by tests, §9): **TSB today is always identical** (it is
   day-entering — computed from yesterday's values, which both commands read
   from the same stored rows); **CTL/ATL today are identical whenever today's
   load has synced** (full-precision storage + the same recurrence make the
   fold reproduce the stored row bit-exactly, §4) and differ *deliberately*
   while a planned session is pending — progress includes it, status shows
   the stored load-0 snapshot; the `(planned)` tag is what keeps that honest
-  rather than confusing. `tm status` stays the snapshot; `tm progress` adds
+  rather than confusing. `sm status` stays the snapshot; `sm progress` adds
   the trajectory and the projection.
 - **Warm-up states** (§4): on a young DB the FORM line and projection are
   replaced by the still-warming message (mirroring the status line), and the
@@ -954,7 +954,7 @@ objective line, wrapped inside the same width budget:
   no anchor) render blank, and a flat series (min = max) renders all cells
   at the floor glyph; `--weeks` must be ≥ 1, rejected at argparse (the
   rev-4 snapshot's `or 8` silently swallowed 0).
-- **Width-aware** via the existing `TRAINMATE_WRAP_WIDTH` mechanism
+- **Width-aware** via the existing `STAMIND_WRAP_WIDTH` mechanism
   (`util.default_wrap_width`). Budget: the bot's `telegram_wrap_width`
   default is **48** — column layout above is week 11 + plan 4 + bar 12 +
   actual 4 + pct 4 + separators = 40, asserted by a renderer test (§9). The
@@ -1017,12 +1017,12 @@ objective line, wrapped inside the same width budget:
 No bot-native command; both paths ride the CLI-as-subprocess parity model
 (ARCHITECTURE §2), which is what makes them cheap:
 
-- **Text:** `/progress` in chat just runs `tm progress`; the width-aware
+- **Text:** `/progress` in chat just runs `sm progress`; the width-aware
   renderer (§7.1) is the whole story. `MENU_COMMANDS` in
-  `trainmate/chat/keyboards.py` (hand-synced by design) gains a `progress` entry.
+  `stamind/chat/keyboards.py` (hand-synced by design) gains a `progress` entry.
 - **Chart:** `/progress --chart` renders the full §2 two-panel picture to
   PNG and sends it as a photo. The drawing itself lives in
-  **`trainmate/analytics/chart.py`** — `render_timeline_png(payload) -> bytes`
+  **`stamind/analytics/chart.py`** — `render_timeline_png(payload) -> bytes`
   (matplotlib, `Agg` backend, imported lazily inside the function), fed the
   §6.0 payload — called by this path and by the web endpoint (§6), so the
   §2 picture has exactly **one** implementation. (The rev-4 snapshot drew
@@ -1032,17 +1032,17 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
   - On a TTY (and any non-json frontend, incl. piped): writes
     `./progress.png` (or the `--chart PATH` argument), overwriting, and
     prints the path. `progress.png` joins `.gitignore`.
-  - Under `TRAINMATE_FRONTEND=json` (how the bot launches the CLI): writes a
+  - Under `STAMIND_FRONTEND=json` (how the bot launches the CLI): writes a
     `tempfile.NamedTemporaryFile(delete=False)` PNG and emits a **photo
-    line** on stdout — `\x1eTM-PHOTO {"path": ..., "caption": ...}` — a
+    line** on stdout — `\x1eSM-PHOTO {"path": ..., "caption": ...}` — a
     sibling of the existing `PROMPT_SENTINEL` protocol. The CLI supplies the
     §7.1 FORM line as `caption`; the payload carries it because the bot
     process has no other way to know it (it must not re-parse forwarded chat
-    text). `trainmate/prompt.py` gains `PHOTO_SENTINEL` + an
+    text). `stamind/prompt.py` gains `PHOTO_SENTINEL` + an
     `emit_photo(path, caption=None)` helper (the `\x1e` record-separator
     framing already guarantees prose never collides; the photo line is
     written alone on its line and flushed atomically).
-    `_drive()` (`trainmate/chat/runner.py`) gains one branch beside
+    `_drive()` (`stamind/chat/runner.py`) gains one branch beside
     `sentinels.parse_frame`: flush the text buffer, `bot.send_photo` with the
     payload's `caption`, and unlink the temp file in a `finally` (so a
     failed send, `/cancel` kill, or timeout doesn't orphan it).
@@ -1143,7 +1143,7 @@ additive:
    each, not just the first), a per-zone weekly table stacked under the
    WEEKLY LOAD table, and `--mesocycles` for the graded per-mesocycle view.
    **Behind `-z`/`--zones` since rev 9** (naming a sport implies it): on real
-   data the tables took `tm progress` from 27 lines to 96 at phone width, and
+   data the tables took `sm progress` from 27 lines to 96 at phone width, and
    they answer a different question from the load table they sit under — the
    command's own answer to "am I on track" must stay readable without them. It
    scopes only the intensity content: CTL/ATL/TSB, the projection and the
@@ -1246,7 +1246,7 @@ the §7.2 photo transport for free where they need a chart in chat.)*
   `PMC_TSB_LAG_NOTE` carried, the
   lapsed-plan banner, the partial-final-week marker, the degenerate inputs
   (zero-max bar scale, blank and flat sparklines, `--weeks 0` rejected), the
-  young-DB still-warming state; plus a narrow `TRAINMATE_WRAP_WIDTH` variant
+  young-DB still-warming state; plus a narrow `STAMIND_WRAP_WIDTH` variant
   asserting `visible_len(line) ≤ 48` for **every** output line (not `len` —
   emoji are double-width).
 - `tests/test_chart.py`: the pure helpers of the PNG — the §7.2 label-collision
@@ -1286,29 +1286,29 @@ implementing §10.2 from scratch — several steps are already partly done.
 - `adherence.planned_load` is already public — only the `tss is not None`
   fix (§3) remains there.
 - The photo transport, whole: `PHOTO_SENTINEL`/`emit_photo` in
-  `trainmate/prompt.py`; the frame reader, the `_drive()` photo branch and the
-  unknown-sentinel drop, now `trainmate/sentinels.py` and `trainmate/chat/runner.py`;
+  `stamind/prompt.py`; the frame reader, the `_drive()` photo branch and the
+  unknown-sentinel drop, now `stamind/sentinels.py` and `stamind/chat/runner.py`;
   the bot tests.
-- `tm progress` dispatcher entry in `trainmate_cli.py` (no alias — the
+- `sm progress` dispatcher entry in `stamind_cli.py` (no alias — the
   prefix mechanism covers it, §7.1); the
   `p` alias for `plan` is **already removed** (rev 6 cited its pre-snapshot
   line 708 — stale; nothing left to do); the `MENU_COMMANDS` `progress`
-  entry, now in `trainmate/chat/keyboards.py`.
+  entry, now in `stamind/chat/keyboards.py`.
 - matplotlib in `requirements.txt` (optional tier); `progress.png` in
   `.gitignore`.
 
 **Exists in rev-4 form — reworked to this rev:**
 
-- `trainmate/analytics/progression.py`: delete the module-level `CTL_DAYS`/`ATL_DAYS`
+- `stamind/analytics/progression.py`: delete the module-level `CTL_DAYS`/`ATL_DAYS`
   and the from-zero full-history recursion; replace with
   read-the-stored-rows + the anchored fold (§4), config τs, and
   `assemble_timeline` (§5 — the snapshot has **no** such function; each
   caller assembles its own payload, the CODE_REVIEW #5 divergence).
-- `trainmate/cli/progress.py`: the renderer gains the rev-6 pins
+- `stamind/cli/progress.py`: the renderer gains the rev-6 pins
   (elapsed-week rule, degenerate-input guards, the
   `visible_len` width budget); `_render_chart_png` moves out to
-  `trainmate/analytics/chart.py` (§7.2).
-- `trainmate_web.py`: the snapshot's JSON `/api/timeline` becomes
+  `stamind/analytics/chart.py` (§7.2).
+- `stamind_web.py`: the snapshot's JSON `/api/timeline` becomes
   `GET /api/timeline.png` (§6); JSON is deferred to §8.5.
 - `static/`: the uPlot tab (CDN include, `app.js` chart code, styles) is
   replaced by the `<img>` tab (§7.3).
@@ -1319,8 +1319,8 @@ implementing §10.2 from scratch — several steps are already partly done.
 
 - `compute_pmc`'s `seed` parameter + the unrounding (+ `tests/test_pmc.py`
   updates) (§4).
-- `trainmate/analytics/chart.py` (§7.2; extraction, but the module is new).
-- `trainmate/timeline_rows.py` (§5) — the shared row-fetching path, added in rev 6
+- `stamind/analytics/chart.py` (§7.2; extraction, but the module is new).
+- `stamind/timeline_rows.py` (§5) — the shared row-fetching path, added in rev 6
   after CODE_REVIEW #5 and the reason §9 needs no CLI≡endpoint test.
 - The governing-objective db helper (§6.1). (Rev 6 also added a
   version-in-force governance rule here; rev 9 deleted it.)
@@ -1331,15 +1331,15 @@ Ordered by usage (CLI/bot before web), each step independently shippable:
 
 1. `garmin.compute_pmc` gains the optional `seed` parameter and drops its
    1-dp output rounding (full-precision storage, §4) (+ the
-   `tests/test_pmc.py` updates, §9); rework `trainmate/analytics/progression.py` +
+   `tests/test_pmc.py` updates, §9); rework `stamind/analytics/progression.py` +
    `tests/test_progression.py` per §10.1 (incl. `assemble_timeline`, §5);
    the `tss is not None` fix in `adherence.planned_load` (§3).
-2. Rework `tm progress` text mode to this rev (`trainmate/cli/progress.py`
+2. Rework `sm progress` text mode to this rev (`stamind/cli/progress.py`
    + formatting-helper tests, §9). Telegram text follows via parity; the
    dispatcher/alias/menu work is already done (§10.1).
-3. Extract `trainmate/analytics/chart.py` from the snapshot's `_render_chart_png`
+3. Extract `stamind/analytics/chart.py` from the snapshot's `_render_chart_png`
    (§7.2); the transport around it is already done (§10.1).
-4. `GET /api/timeline.png` in `trainmate_web.py`, replacing the snapshot's
+4. `GET /api/timeline.png` in `stamind_web.py`, replacing the snapshot's
    JSON endpoint, + endpoint test (§9).
 5. **Progress** tab: replace the snapshot's uPlot tab with the `<img>` +
    range buttons (§7.3); drop the uPlot CDN include from `index.html`.

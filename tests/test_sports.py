@@ -1,10 +1,10 @@
-"""Tests for the canonical sport vocabulary (`trainmate/sports.py`): alias resolution,
+"""Tests for the canonical sport vocabulary (`stamind/sports.py`): alias resolution,
 the invariants the reverse index relies on, and the single-source-of-truth wiring that
 feeds the CLI's `--sport` choices and the coach prompts' `sport_type` enum.
 """
 import unittest
 
-from trainmate.sports import (
+from stamind.sports import (
     CANONICAL_SPORTS, SPORT_MAPPING, canonical_sport, sport_aliases,
 )
 
@@ -63,7 +63,7 @@ class TestDownhillSkiing(unittest.TestCase):
 
 class TestPromptAndCliWiring(unittest.TestCase):
     def test_coach_prompt_enum_lists_every_canonical_sport_plus_rest(self):
-        from trainmate.coach.engine.sessions import SPORT_TYPE_ENUM
+        from stamind.coach.engine.sessions import SPORT_TYPE_ENUM
         for sport in CANONICAL_SPORTS + ["rest"]:
             self.assertIn(f'"{sport}"', SPORT_TYPE_ENUM)
         for line in SPORT_TYPE_ENUM.splitlines():
@@ -72,8 +72,8 @@ class TestPromptAndCliWiring(unittest.TestCase):
         self.assertTrue(SPORT_TYPE_ENUM.endswith('"rest",\n'))
 
     def test_goal_cli_accepts_every_canonical_sport(self):
-        import trainmate_cli
-        parser = trainmate_cli.build_parser()[0]
+        import stamind_cli
+        parser = stamind_cli.build_parser()[0]
         for sport in CANONICAL_SPORTS:
             args = parser.parse_args(["goal", "add", "T", "2026-12-01", sport])
             self.assertEqual(args.sport, [sport])

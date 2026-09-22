@@ -33,7 +33,7 @@ defaulting mutator safe, so those commands act rather than refuse.
 
 ## §a — A missing argument prints the command's help, then the missing line
 
-`WrapAwareArgumentParser.error` (trainmate/cli/argparse_ext.py) intercepts the
+`WrapAwareArgumentParser.error` (stamind/cli/argparse_ext.py) intercepts the
 argparse "the following arguments are required: …" message and answers it with
 the command's own `-h` output, followed by that line — last, where the eye lands
 after a screen of text and where the shell prompt puts it next to what you type.
@@ -53,10 +53,10 @@ there the shape is already known and only one token is wrong.
 stdout, so whatever the terminal prints the athlete reads as a message — and a
 help text that costs a scroll in a terminal costs a screenful of chat (37 lines
 for a forgotten `constraint add` title, at the bot's ~48-col wrap). So under
-`TRAINMATE_FRONTEND=json` the error keeps its older, shorter shape: the missing
+`STAMIND_FRONTEND=json` the error keeps its older, shorter shape: the missing
 line plus a pointer to the `-h` the athlete can ask for on its own. The medium
 decides, not the command: same parser, same rule, one branch on
-`is_json_frontend()` (trainmate/prompt.py — the single reader of that env var,
+`is_json_frontend()` (stamind/prompt.py — the single reader of that env var,
 shared with the transport choice and `progress --chart`'s delivery).
 
 The override lives on the root parser class, which argparse reuses for every
@@ -96,12 +96,12 @@ for an argument the invocation should have carried.
 
 `goal`, `constraint`, `benchmark`, `signal`, `learnings`, `workout`, `data`,
 `plan` — and the root command itself — take a sub-command, and a bare run prints
-that level's full help and exits **1** (trainmate_cli.py, one guard per group).
+that level's full help and exits **1** (stamind_cli.py, one guard per group).
 
 This is *not* §a's path. The sub-command is registered as an optional argument,
 so argparse never raises "the following arguments are required" and the parser
 override never fires: there is no missing line to print, and none of §a's chat
-short form either. Under `TRAINMATE_FRONTEND=json` a bare `goal` therefore sends
+short form either. Under `STAMIND_FRONTEND=json` a bare `goal` therefore sends
 the whole help text to chat — the screenful §a exists to avoid.
 
 That is deliberate, because the two cases differ in what the athlete asked for. A
@@ -145,7 +145,7 @@ and cron decline rather than proceed. `-y` skips it for scripted use. They diffe
 only in the lead line and which alternative they name: `goal edit --status
 archived` (DESIGN_backward_evaluation.md §14.5) and `plan generate --force`. The
 inventory itself is one renderer, `print_plan_cascade`
-(trainmate/cli/common.py) — two copies of a blast-radius count drift into
+(stamind/cli/common.py) — two copies of a blast-radius count drift into
 disagreeing about one cascade.
 
 `plan rm` is the member worth stating, because its name undersells it: it reads as
@@ -162,10 +162,10 @@ native `-h`/`--help` listing and the recursive `help` tree — used to lead with
 whatever happened to be added first (e.g. `help`, `shell`) rather than the
 commands an athlete reaches for daily (`status`, `workout`).
 
-`COMMAND_ORDER` (trainmate_cli.py) is the single source of truth: one list per
+`COMMAND_ORDER` (stamind_cli.py) is the single source of truth: one list per
 command level, keyed by the parent's canonical name (`""` for the top level),
 each listing that level's *visible* sub-commands most-useful first. After the
-tree is assembled, `sort_command_tree` (trainmate/cli/argparse_ext.py) walks it
+tree is assembled, `sort_command_tree` (stamind/cli/argparse_ext.py) walks it
 once and reorders each sub-parsers action's `_choices_actions` (the listing +
 `help` tree) to match, keeping each command's aliases grouped with it. Names
 absent from the list sort stably to the end; hidden `advanced=True` commands are
@@ -236,7 +236,7 @@ retired. The two deliberate exceptions both concern a destructive command:
 
 ### Where it lives
 
-`_resolve_subcommand` (trainmate/cli/argparse_ext.py) resolves one token against
+`_resolve_subcommand` (stamind/cli/argparse_ext.py) resolves one token against
 one level: exact canonical name, then exact alias, then unique prefix. The
 sub-parsers action records `canonical_names` and `alias_of` as commands register,
 so prefixes only ever match *canonical* names — which is precisely why an alias
@@ -261,13 +261,13 @@ pins each, because every violation fails silently — the wrong thing simply res
 
 Because resolution emits the **canonical** name, argparse — and therefore
 `args.command` / `args.subcommand` — never sees an alias or a prefix. The
-dispatcher in `trainmate_cli.py` compares one canonical name per branch, so a
+dispatcher in `stamind_cli.py` compares one canonical name per branch, so a
 shorthand is now defined in exactly one place: the `aliases=` list.
 
 ## §e — Help wraps to the client's width, in every part of the message
 
 argparse is built around an 80-column terminal, and only some of the help obeys
-even that. `WrapAwareHelpFormatter` (trainmate/cli/argparse_ext.py) already
+even that. `WrapAwareHelpFormatter` (stamind/cli/argparse_ext.py) already
 narrowed the option column for chat width; three other parts of the message still
 ran past the edge, on a real terminal as well as in chat.
 
@@ -286,8 +286,8 @@ wrapping here goes through `_fill`, which turns that off.
 **The usage line.** Two causes. Its wrapped continuations align under the program
 name, which at chat width leaves a handful of columns per line — narrow mode
 re-flows the whole line at a flat two-space indent instead. And the program name
-itself was `sys.argv[0]`: nobody types `trainmate_cli.py`, so the parser is built
-with `prog="tm"`, the launcher's real name and 14 columns shorter.
+itself was `sys.argv[0]`: nobody types `stamind_cli.py`, so the parser is built
+with `prog="sm"`, the launcher's real name and 12 columns shorter.
 
 `test_help_wraps_to_the_client_width` (tests/test_cli_misc.py) asserts the whole
 message — usage, description, options — fits at both 80 and 48 columns.

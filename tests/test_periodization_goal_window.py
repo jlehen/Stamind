@@ -19,12 +19,12 @@ def _days_out(n: int) -> str:
 
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestPlanGoalWindow(unittest.TestCase):
@@ -50,7 +50,7 @@ class TestPlanGoalWindow(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_named_goal_bounds_the_plan_to_its_own_span(self, mock_client):
         """`plan generate -g N` opens N's plan after the goal before it, even when that
         goal has no plan of its own yet — and says so, because the reading it replaces
@@ -90,7 +90,7 @@ class TestPlanGoalWindow(unittest.TestCase):
             "The first mesocycle must start on the start date (2026-08-23).", prompt
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_bound_the_derivation_already_agrees_with_says_nothing(self, mock_client):
         """The notice is transitional, so it stays quiet when both readings pick the same
         first day."""
@@ -107,7 +107,7 @@ class TestPlanGoalWindow(unittest.TestCase):
             )
         self.assertNotIn("own span", out.getvalue())
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_plans_a_goal_only_weeks_away(self, mock_client):
         # No lower bound on the plan window: a near goal gets a short macrocycle rather
         # than a refusal — how to periodize three weeks is the science docs' call.
@@ -161,7 +161,7 @@ class TestPlanGoalWindow(unittest.TestCase):
             coach_service.plan_generate(objective_id=obj_id)
         self.assertIn("no window to plan in", str(ctx.exception))
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_far_goal_plans_one_macrocycle_to_the_goal(self, mock_client):
         # A 30-week horizon is no longer split into interim goals: one macrocycle runs to
         # the goal itself, and the athlete's goal list is left alone.
@@ -188,7 +188,7 @@ class TestPlanGoalWindow(unittest.TestCase):
         self.assertEqual(len(test_db.get_objectives(status="active")), 1)
         self.assertIsNotNone(test_db.get_macrocycle_for_objective(obj_id))
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_multi_goal_planning_and_deletion(self, mock_client):
         # Goal A must stay inside `goals_lookback_days` of today for B's plan to chain
         # off it, so both goals ride on today rather than on fixed dates.

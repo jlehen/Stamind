@@ -15,17 +15,17 @@ def _goal_ahead(days: int = 100) -> str:
     These goals are scaffolding — nothing asserts the date — but a plan is only active
     while its goal is ahead, so a literal expired the tests the day it passed.
     """
-    from trainmate.clock import today_date
+    from stamind.clock import today_date
     return (today_date() + timedelta(days=days)).isoformat()
 
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_web_progress.db")
+TEST_DB_PATH = test_db_path("test_stamind_web_progress.db")
 
-from trainmate.db import Database
-from trainmate.analytics import timeline
+from stamind.db import Database
+from stamind.analytics import timeline
 
-import trainmate_web
+import stamind_web
 
 # An isolated database for the web app's singleton; test_web.py says why.
 test_db = Database(db_path=TEST_DB_PATH)
@@ -62,7 +62,7 @@ class TestTimelinePngEndpoint(unittest.TestCase):
         global test_db
         test_db = Database(db_path=TEST_DB_PATH)
         rebind_test_db(test_db)
-        cls.client = trainmate_web.app.test_client()
+        cls.client = stamind_web.app.test_client()
 
     @classmethod
     def tearDownClass(cls):
@@ -131,7 +131,7 @@ class TestTimelinePayload(unittest.TestCase):
         clear_all_tables(test_db)
 
     def _payload(self):
-        from trainmate import timeline_rows
+        from stamind import timeline_rows
         return timeline_rows.build_timeline_payload(test_db)
 
     def test_no_activity_at_all_warns_and_empty_days(self):

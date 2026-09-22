@@ -4,19 +4,19 @@ import unittest
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_benchmarks.db")
+TEST_DB_PATH = test_db_path("test_stamind_benchmarks.db")
 
-from trainmate.db import Database
-import trainmate.db
-import trainmate.config
-import trainmate_cli
+from stamind.db import Database
+import stamind.db
+import stamind.config
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
-from trainmate import benchmarks as bm
+from stamind.coach.service import coach_service
+from stamind import benchmarks as bm
 
 
 class TestBenchmarkVocabulary(unittest.TestCase):
@@ -177,7 +177,7 @@ class TestEffectiveThresholds(unittest.TestCase):
         # config is neither required, forbidden, nor stripped — it rides through as ordinary
         # profile data, and a logbook value simply overlays it.
         with patch.dict(
-            trainmate.config.config.data,
+            stamind.config.config.data,
             {"user_profile": {"max_hr": 185, "ftp": 999, "lthr": 199}},
         ):
             prof = coach_service._effective_profile()

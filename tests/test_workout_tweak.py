@@ -20,12 +20,12 @@ from tests.helpers import (
 
 TEST_DB_PATH = test_db_path("test_workout_tweak.db")
 
-from trainmate.db import Database
-import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
+from stamind.db import Database
+import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
-from trainmate import settings
-from trainmate.coach.service import coach_service
-from trainmate.strength import planner, prescription
+from stamind import settings
+from stamind.coach.service import coach_service
+from stamind.strength import planner, prescription
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)
@@ -96,7 +96,7 @@ class _TweakCase(unittest.TestCase):
 
     def tweak(self, answer, days=(), message="Saturday: a 4 hour hike instead of the ride"):
         """The proposal a tweak makes against `answer`, and the week planner's client."""
-        with patch("trainmate.coach.engine.openrouter_client") as client, \
+        with patch("stamind.coach.engine.openrouter_client") as client, \
                 redirect_stdout(io.StringIO()):
             client.complete.return_value = answer
             self.client = client
@@ -104,7 +104,7 @@ class _TweakCase(unittest.TestCase):
 
     @staticmethod
     def apply(proposal):
-        with patch("trainmate.runtime.calendar_syncer"), redirect_stdout(io.StringIO()):
+        with patch("stamind.runtime.calendar_syncer"), redirect_stdout(io.StringIO()):
             coach_service.workout_revision_apply(proposal)
 
     @staticmethod
@@ -113,10 +113,10 @@ class _TweakCase(unittest.TestCase):
 
 
 class CommandTest(_TweakCase):
-    @patch("trainmate.cli.workouts.adapt.ensure_recent_data")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_every_d_reaches_the_service_with_the_message(self, service, _pull):
-        from trainmate.coach.proposals import RevisionProposal
+        from stamind.coach.proposals import RevisionProposal
         service.workout_tweak.return_value = RevisionProposal(
             reason="Swapped.", workouts=[], range_start=TODAY, range_end=MESO_END,
             kind="tweak",
@@ -217,7 +217,7 @@ class WhatItWritesTest(_TweakCase):
         change = test_db.get_workout_changes()[0]
         self.assertEqual(change["kind"], "tweak")
 
-        with patch("trainmate.runtime.calendar_syncer"):
+        with patch("stamind.runtime.calendar_syncer"):
             test_db.rollback_to_change(change["id"], TODAY)
 
         saturday = test_db.get_workouts(start_date=SATURDAY, end_date=SATURDAY)
@@ -241,7 +241,7 @@ class WhatItWritesTest(_TweakCase):
                       description="[Intervals]\n75 min, 5x5 at threshold.")
         self.apply(self.tweak(reply(longer), days=[THURSDAY]))
 
-        from trainmate.workout_state import modification_markers
+        from stamind.workout_state import modification_markers
         thursday = test_db.get_workout(THURSDAY, "cycling")
         self.assertEqual(thursday["adaptation_count"], 0)
         self.assertEqual(modification_markers(thursday), ["TWEAKED"])

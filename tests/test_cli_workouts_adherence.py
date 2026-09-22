@@ -11,8 +11,8 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_adherence.db")
 
-from trainmate.db import Database
-from trainmate.coach.proposals import GenerateProposal
+from stamind.db import Database
+from stamind.coach.proposals import GenerateProposal
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -142,7 +142,7 @@ class TestCliWorkoutsListingGrades(unittest.TestCase):
     def test_workout_list_says_what_stale_is_about(self):
         """[STALE] names no subject on its own: the legend has to say Google Calendar,
         and name the command that fixes it."""
-        from trainmate.workout_state import calendar_signature
+        from stamind.workout_state import calendar_signature
         wid = save_workout(test_db,
             date=PROPOSED_DATE, sport_type="running", title="Drifted Run",
             description="easy",
@@ -168,7 +168,7 @@ class TestCliWorkoutsListingGrades(unittest.TestCase):
         footer — and `[KEPT]`, the one marker only a preview prints, has to be in it."""
         import io
         from contextlib import redirect_stdout
-        from trainmate.cli.workouts.generate import print_generate_preview
+        from stamind.cli.workouts.generate import print_generate_preview
         proposal = GenerateProposal(
             reasoning="Reasoning",
             workouts=(
@@ -196,9 +196,9 @@ class TestCliWorkoutsListingGrades(unittest.TestCase):
         """A new adherence status or a new change kind must not reach the listing with
         no entry in the legend. Keyed on the two maps that produce the words, never on a
         copy of them."""
-        from trainmate.analytics.adherence import STATUS_LABELS
-        from trainmate.cli.workouts.session_line import _MARKER_GLOSS
-        from trainmate.workout_state import _KIND_MARKERS
+        from stamind.analytics.adherence import STATUS_LABELS
+        from stamind.cli.workouts.session_line import _MARKER_GLOSS
+        from stamind.workout_state import _KIND_MARKERS
         glossed = {word for word, _gloss in _MARKER_GLOSS}
         for label in STATUS_LABELS.values():
             self.assertIn(label.upper(), glossed)
@@ -248,7 +248,7 @@ class TestCliWorkoutsListingGrades(unittest.TestCase):
         self.assertNotIn("Endurance Ride", stdout)
         self.assertIn("[REST OK]", _line_for(stdout, "Rest"))
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_workout_list_freshens_only_what_it_has_to_grade(self, mock_garmin):
         """The listing reports on completed activities now, so it pulls like every other
         surface that reads them — over its past span only. A listing entirely ahead of us

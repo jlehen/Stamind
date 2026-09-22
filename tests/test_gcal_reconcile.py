@@ -10,10 +10,10 @@ from unittest.mock import MagicMock, patch
 from tests.helpers import rebind_test_db
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_gcal_reconcile.db")
+TEST_DB_PATH = test_db_path("test_stamind_gcal_reconcile.db")
 
-from trainmate.db import Database
-from trainmate.gcal.event import event_body
+from stamind.db import Database
+from stamind.gcal.event import event_body
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -54,7 +54,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
         The automatic reconcile is suppressed throughout this class: these tests ask what
         `_plan` decides, so letting the write path act on that decision first would leave
         nothing to decide."""
-        from trainmate.gcal.reconcile import no_calendar_sync
+        from stamind.gcal.reconcile import no_calendar_sync
         with no_calendar_sync():
             with test_db.workout_change(
                 kind=kind, commitment_end=commitment_end
@@ -68,7 +68,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
         return session["id"]
 
     def _void(self, date_str, *, kind, commitment_end=None, sport="cycling"):
-        from trainmate.gcal.reconcile import no_calendar_sync
+        from stamind.gcal.reconcile import no_calendar_sync
         with no_calendar_sync():
             with test_db.workout_change(
                 kind=kind, commitment_end=commitment_end
@@ -76,7 +76,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
                 change.void(date=date_str, sport_type=sport, reason="because")
 
     def _plan(self, lineage):
-        from trainmate.gcal.reconcile import _plan
+        from stamind.gcal.reconcile import _plan
         return _plan(test_db, [lineage])
 
     # --- leaves_trace, clause by clause -------------------------------------------
@@ -120,7 +120,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
         self.assertEqual([w["id"] for w in pushes], [lineage])
 
     def test_a_rollbacks_restored_copy_reads_the_original_changes_stamp(self):
-        from trainmate.gcal.reconcile import no_calendar_sync
+        from stamind.gcal.reconcile import no_calendar_sync
         lineage = self._session("2026-09-11")
         self._void("2026-09-11", kind="generate", commitment_end="2026-09-15")
         void_revision = test_db.get_lineage_revisions(lineage)[-1]
@@ -136,7 +136,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
     def test_a_void_covered_in_the_same_slot_still_keeps_its_event(self):
         """`live_workouts` is "highest id in the slot", so a marker written and then
         covered is never the slot's live row — read it from its lineage (§5.2)."""
-        from trainmate.gcal.reconcile import no_calendar_sync
+        from stamind.gcal.reconcile import no_calendar_sync
         replaced = self._session("2026-09-11")
         with no_calendar_sync():
             with test_db.workout_change(
@@ -152,7 +152,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
         self.assertEqual(teardowns, [])
 
     def test_a_lineage_superseded_in_place_is_still_torn_down(self):
-        from trainmate.gcal.reconcile import no_calendar_sync
+        from stamind.gcal.reconcile import no_calendar_sync
         lineage = self._session("2026-09-11")
         with no_calendar_sync():
             with test_db.workout_change(kind="tweak") as change:
@@ -169,7 +169,7 @@ class TestARemovalLeavesATrace(unittest.TestCase):
     def test_a_trace_keeping_void_with_no_event_gets_one(self):
         """A session written and dropped between two syncs never had an event, and would
         otherwise leave no trace at all (§5.2)."""
-        from trainmate.gcal.reconcile import no_calendar_sync
+        from stamind.gcal.reconcile import no_calendar_sync
         with no_calendar_sync():
             with test_db.workout_change(kind="generate") as change:
                 change.append(
@@ -229,7 +229,7 @@ class TestMarkingAdherenceOnPastEvents(unittest.TestCase):
     def test_mark_adherence_from_results_skips_today_and_eventless(self):
         # Only strictly-past planned workouts that already have a Calendar event
         # get marked: today/future and event-less rows are skipped.
-        from trainmate.gcal.reconcile import mark_adherence_from_results
+        from stamind.gcal.reconcile import mark_adherence_from_results
 
         today = "2026-06-20"
         results = [
@@ -263,7 +263,7 @@ class TestMarkingAdherenceOnPastEvents(unittest.TestCase):
             },
         ]
 
-        with patch("trainmate.runtime.calendar_syncer") as mock_syncer:
+        with patch("stamind.runtime.calendar_syncer") as mock_syncer:
             marked = mark_adherence_from_results(results, today_str=today)
 
         self.assertEqual(marked, 1)
@@ -276,7 +276,7 @@ class TestMarkingAdherenceOnPastEvents(unittest.TestCase):
         # Re-marking a settled past event is a no-op: the first pass writes and
         # records the adherence signature; a second pass with that signature
         # stored on the row skips the Calendar update entirely.
-        from trainmate.gcal.reconcile import mark_adherence_from_results
+        from stamind.gcal.reconcile import mark_adherence_from_results
 
         today = "2026-06-20"
 
@@ -296,8 +296,8 @@ class TestMarkingAdherenceOnPastEvents(unittest.TestCase):
             }]
 
         # First pass: nothing recorded yet -> pushes and stamps the signature.
-        with patch("trainmate.runtime.calendar_syncer") as mock_syncer, \
-                patch("trainmate.runtime.db") as mock_db:
+        with patch("stamind.runtime.calendar_syncer") as mock_syncer, \
+                patch("stamind.runtime.db") as mock_db:
             first = make_results()
             marked = mark_adherence_from_results(first, today_str=today)
             self.assertEqual(marked, 1)
@@ -307,8 +307,8 @@ class TestMarkingAdherenceOnPastEvents(unittest.TestCase):
             self.assertEqual(wid, 7)
 
         # Second pass: the row now carries that signature -> skipped, no write.
-        with patch("trainmate.runtime.calendar_syncer") as mock_syncer, \
-                patch("trainmate.runtime.db") as mock_db:
+        with patch("stamind.runtime.calendar_syncer") as mock_syncer, \
+                patch("stamind.runtime.db") as mock_db:
             second = make_results()
             second[0]["planned"]["adherence_pushed_signature"] = signature
             marked = mark_adherence_from_results(second, today_str=today)

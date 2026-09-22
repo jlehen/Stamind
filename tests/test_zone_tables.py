@@ -6,8 +6,8 @@ only ever drawn from one: the assertion is on the text, not on the report.
 """
 import unittest
 
-from trainmate.analytics import intensity, zone_tables
-from trainmate.analytics.mesocycle_report import mesocycle_report
+from stamind.analytics import intensity, zone_tables
+from stamind.analytics.mesocycle_report import mesocycle_report
 
 
 def act(date, sport, duration_sec, hr=None, power=None, rpe=None):

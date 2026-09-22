@@ -20,12 +20,12 @@ def _days_out(n: int) -> str:
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 GOAL_DATE = _days_out(71)
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 def _generate_workouts(**kwargs):
@@ -71,8 +71,8 @@ class TestRegenerationClearsTheOldSessions(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_generate_plan_and_workouts_separately(self, mock_client, mock_calendar):
         obj_id = test_db.add_objective(
             title="Zurich Marathon", target_date=GOAL_DATE,
@@ -109,8 +109,8 @@ class TestRegenerationClearsTheOldSessions(unittest.TestCase):
         self.assertEqual(_session_titles(workouts), ["Base Run"])
         mock_client.complete.assert_called_once()
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_generate_preserves_completed_today_workout(
         self, mock_client, mock_calendar
     ):
@@ -160,8 +160,8 @@ class TestRegenerationClearsTheOldSessions(unittest.TestCase):
         for call in mock_calendar.delete_event.call_args_list:
             self.assertNotEqual(call.args[0], "evt-today")
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_generate_workouts_clears_stale_synced_workouts(
         self, mock_client, mock_calendar
     ):
@@ -208,8 +208,8 @@ class TestRegenerationClearsTheOldSessions(unittest.TestCase):
         # Its Google Calendar event was deleted.
         mock_calendar.delete_event.assert_called_once_with("evt-old-123")
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_generate_workouts_clears_stale_unsynced_calendar_workouts(
         self, mock_client, mock_calendar
     ):

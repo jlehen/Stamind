@@ -72,7 +72,7 @@ Revision 3 folded in a review against the code and her real history. What it add
 
 ## 1. The problem
 
-In companion mode the athlete sees TrainMate only through her Telegram chat. The operator
+In companion mode the athlete sees Stamind only through her Telegram chat. The operator
 also changes her sessions from the terminal, and she does not see those runs. Today she
 hears about one kind of them late, and about the other kind never.
 
@@ -110,7 +110,7 @@ sessions stay silent for now (§12).
 ## 2. The rule
 
 > When `workout generate` or `workout adapt` changes the athlete's week and she did not
-> watch it happen, TrainMate tells her on Telegram just before her next morning message —
+> watch it happen, Stamind tells her on Telegram just before her next morning message —
 > or within minutes, when the change is to one of today's sessions. If she opens her chat
 > before that, she is told first. The operator can send what is waiting at once with
 > `workout notify`.
@@ -250,7 +250,7 @@ the changes go out when it comes back but not after 21:00; and a change to today
 would end after 21:00 waits for the next morning like any other, because by then today is
 over anyway.
 
-**The operator can send it now.** TrainMate cannot know that the operator is done trying, or
+**The operator can send it now.** Stamind cannot know that the operator is done trying, or
 that a change matters before the next morning. The operator can. It is Wednesday 18:00 and the
 operator moves Thursday's run to the morning, because Thursday evening is taken. Nothing
 touches Wednesday, so the message would wait for Thursday 08:00, an hour before the run. The
@@ -326,7 +326,7 @@ evening's lift did not happen. That change writes Sunday, and nothing else. At 1
 operator runs `workout generate -m 20` for the mesocycle that starts on Monday. The question
 is not asked, and Sunday's adaptation stands.
 
-So each command says which days it may write, and TrainMate compares that with the first and
+So each command says which days it may write, and Stamind compares that with the first and
 last day the unsent change wrote:
 
 - `workout generate` knows its span before it calls the week planner — `-d`, `-m`, `-M` and
@@ -368,7 +368,7 @@ A run with `-y`, `--auto` or `--force` asks nothing and builds on top, as today.
 change 7 has been sent, a second run is a real second change, its line is written against a
 week she knows, and nothing is asked.
 
-## 6. What TrainMate records
+## 6. What Stamind records
 
 Today the morning message keeps one number, `push_note_last`: the id of the last change it
 told her about. That is not enough once a change can be told the moment it is written. Take
@@ -426,7 +426,7 @@ not quoted.
 front of a `workout generate` or `workout adapt` line.
 
 How a run knows she is watching: the bot starts every command it runs in her chat with
-`TRAINMATE_FRONTEND=json` (`prompt.is_json_frontend()`), and companion mode is `telegram.ui:
+`STAMIND_FRONTEND=json` (`prompt.is_json_frontend()`), and companion mode is `telegram.ui:
 simple` in the instance's config (`config.telegram_ui`). The `/ui` switch in the chat lasts
 only until the bot restarts, so the config file decides, here and in the bot's two new steps
 (§4). This rests on her chat being the only one the bot allows, which is the single-athlete
@@ -489,8 +489,8 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
 
 ## 10. Touch points
 
-- `trainmate/db/schema.py`: the `told_at` column on `workout_changes`, with the migration of §9.
-- `trainmate/db/workout_change.py`: `workout_change` stamps `told_at` when she is watching;
+- `stamind/db/schema.py`: the `told_at` column on `workout_changes`, with the migration of §9.
+- `stamind/db/workout_change.py`: `workout_change` stamps `told_at` when she is watching;
   `rollback_to_change` builds the rollback's `note` from the told changes it undoes (§6); a
   query for the changes waiting to be told, and a write that marks them told;
   `get_workout_changes` also says which changes are waiting. `change_has_live_revisions`
@@ -499,32 +499,32 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
   the test in `tests/test_workout_generate_window.py` that reads the first one moves to the
   new query.
 - The helper that says whether she is watching, beside `is_json_frontend` in
-  `trainmate/prompt.py`.
-- `trainmate/coach/service/revision_apply.py`: `workout_revision_apply` stores the reason in
+  `stamind/prompt.py`.
+- `stamind/coach/service/revision_apply.py`: `workout_revision_apply` stores the reason in
   `note`.
-- `trainmate/coach/engine/notes.py`: the adapt prompt presents the `-m` message as her
+- `stamind/coach/engine/notes.py`: the adapt prompt presents the `-m` message as her
   coach's note when she is not watching (§3). Only the paragraph that tells the week planner
   how to weigh the note is swapped, under the existing `has_message` gate. The section titles
   stay.
-- `trainmate/cli/workouts/` — `generate.py`, `adapt.py` and `rollback.py`: the replace
+- `stamind/cli/workouts/` — `generate.py`, `adapt.py` and `rollback.py`: the replace
   question at the start of `run_workout_generate` and `run_workout_adapt`, before the LLM
   call (§5); the wording of the exits that write nothing after a Replace (§5); the notice
   under the line (§8); `_change_line` prints the description and "not sent yet"; the
   new `workout notify` (§4), with its parser entry in
-  `trainmate/cli/workouts/parser.py`. As built, the question, the notice and
-  `workout notify` live in `trainmate/cli/workouts/heads_up.py`, because `generate.py`
-  was past the size limit at the time, and the send rule in `trainmate/heads_up.py`.
-- `trainmate/cli/bot/views.py`: the hidden `bot changes`; `run_bot_morning` loses the
+  `stamind/cli/workouts/parser.py`. As built, the question, the notice and
+  `workout notify` live in `stamind/cli/workouts/heads_up.py`, because `generate.py`
+  was past the size limit at the time, and the send rule in `stamind/heads_up.py`.
+- `stamind/cli/bot/views.py`: the hidden `bot changes`; `run_bot_morning` loses the
   week line.
-- `trainmate/chat/scheduler.py`: `scheduler_wake` runs `bot changes` after the due
+- `stamind/chat/scheduler.py`: `scheduler_wake` runs `bot changes` after the due
   reminders and before the morning message, in companion mode, when the chat is free and
   either the morning rule of §4 holds or a waiting change is no newer than
   `changes_notify_upto`.
-- `trainmate/chat/scheduler.py`, again: `ChatBot._tell_changes_first` runs `bot changes`
+- `stamind/chat/scheduler.py`, again: `ChatBot._tell_changes_first` runs `bot changes`
   ahead of her input, called from `on_message` (`chat/messages.py`) and `on_callback`
   (`chat/callbacks.py`) where they accept a tap or a message, before anything is routed
   or started. Both checks are a database read inside the bot, like the one for
-  reminders. The 21:00 is a constant beside the send rule in `trainmate/heads_up.py`.
+  reminders. The 21:00 is a constant beside the send rule in `stamind/heads_up.py`.
 - `docs/ARCHITECTURE.md`: the `workout_changes` table (`note`, `told_at`), the scheduler, and
   the internal settings markers.
 - DESIGN_plan_change_continuity.md §6.4 is implemented, so it gets a dated amendment pointing
@@ -533,23 +533,23 @@ the upgrade would send every old line at once. Nothing is lost on her instance:
 
 Revision 9 adds to those:
 
-- `trainmate/db/workout_history.py`: `change_date_span`, the first and last day a change
+- `stamind/db/workout_history.py`: `change_date_span`, the first and last day a change
   wrote, for the §5 comparison; `change_writes_day`, whether it wrote a session on a given
   day, for the §4 rule.
-- `trainmate/heads_up.py`: `waiting()` hangs `touches_today` on each row it returns; `due`
+- `stamind/heads_up.py`: `waiting()` hangs `touches_today` on each row it returns; `due`
   sends on it once the wait is up, and `sends_at` returns the hour it goes out at.
   `sends_after_delay` is the one place that says which of the two rules applies, so the
   scheduler and the terminal notice cannot drift.
-- `trainmate/settings.py`: the `change-delay` setting, seeded by `telegram.change_delay_minutes`
+- `stamind/settings.py`: the `change-delay` setting, seeded by `telegram.change_delay_minutes`
   in config.yaml, built-in default 20 minutes, read through `settings.change_delay_minutes()`.
   It is not in `ROUTABLE_SETTINGS`: the athlete does not set how soon she hears from her
   coach. `parse_minutes` joins `parse_days` over a shared `_parse_count`.
-- `trainmate/cli/workouts/heads_up.py`: `replacing_unsent` takes the days the run may write
+- `stamind/cli/workouts/heads_up.py`: `replacing_unsent` takes the days the run may write
   and asks nothing when they miss the unsent change's days (§5).
-- `trainmate/cli/workouts/generate.py`: `run_workout_generate` resolves the span before
+- `stamind/cli/workouts/generate.py`: `run_workout_generate` resolves the span before
   opening `replacing_unsent`, and hands it to `_generate`. `_adapt_window` in
-  `trainmate/cli/workouts/adapt.py` gives the adapt and tweak windows.
-  `trainmate/cli/workouts/strength_only.py` takes its span from the caller for the same
+  `stamind/cli/workouts/adapt.py` gives the adapt and tweak windows.
+  `stamind/cli/workouts/strength_only.py` takes its span from the caller for the same
   reason.
 
 ## 11. Tests
@@ -619,7 +619,7 @@ Revision 9 adds to those:
   run back, the first one is waiting again (§6).
 - Undoing a rollback. She is told "The change to your week was undone." and not that the
   earlier change is back.
-- The athlete queue. It is the place for things TrainMate wants to tell or ask her, but its
+- The athlete queue. It is the place for things Stamind wants to tell or ask her, but its
   messages carry "Got it" and "Not now" and come back every morning until she taps one. A
   change is read once, like the briefing. The queue also does not record whether a message
   went out, which the undone message needs.
@@ -633,9 +633,9 @@ Revision 9 adds to those:
   going out drags the rest with it, as it always has (§4). Timing each change separately
   would mean sending them in several bursts, and she would read one week in pieces.
 - Sending the morning's changes ahead of her morning time, for example an hour before. Her
-  morning time is the hour she chose to hear from TrainMate, which is the same reason nothing
+  morning time is the hour she chose to hear from Stamind, which is the same reason nothing
   is sent after 21:00.
-- `workout notify` as a `queue` command. `tm queue` lists the group's whole state and its
+- `workout notify` as a `queue` command. `sm queue` lists the group's whole state and its
   other commands act on what that list shows (DESIGN_athlete_queue.md §5.1). A waiting change
   is not a queue item, so the list would not show what the command sends. Listing the changes
   there too would give "waiting" two meanings in one list: received and not yet answered for

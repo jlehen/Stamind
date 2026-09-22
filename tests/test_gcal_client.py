@@ -12,11 +12,11 @@ from unittest.mock import patch, MagicMock
 from tests.helpers import rebind_test_db
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_gcal_client.db")
+TEST_DB_PATH = test_db_path("test_stamind_gcal_client.db")
 
-from trainmate.db import Database
-import trainmate.gcal.client
-from trainmate.gcal.client import CalendarSyncer, quiet_events
+from stamind.db import Database
+import stamind.gcal.client
+from stamind.gcal.client import CalendarSyncer, quiet_events
 
 # Its own client, since nothing builds one at import any more. The tests below patch
 # `.service` on it, so the real Google connection is never used.
@@ -349,7 +349,7 @@ class TestCalendarSync(unittest.TestCase):
                 "updated": "2026-06-13T20:00:00Z",
                 "start": {"date": "2026-06-13"},
                 "extendedProperties": {"private": {
-                    "source": "trainmate-context", "metric": "alcohol", "value": "2",
+                    "source": "stamind-context", "metric": "alcohol", "value": "2",
                 }},
             },
             {"id": "evt-old", "status": "cancelled"},  # deletes the pre-seeded row
@@ -384,7 +384,7 @@ class TestCalendarSync(unittest.TestCase):
         )
         # The list query used the server-side signal filter.
         _, kwargs = mock_service.events().list.call_args
-        self.assertEqual(kwargs.get("privateExtendedProperty"), "source=trainmate-context")
+        self.assertEqual(kwargs.get("privateExtendedProperty"), "source=stamind-context")
 
     def test_sync_signals_ignores_cancelled_events_that_are_not_ours(self):
         """On the incremental path the stream carries every cancelled event, not just
@@ -438,7 +438,7 @@ class TestCalendarSync(unittest.TestCase):
                 "summary": "Poor sleep",
                 "start": {"date": "2026-06-14"},
                 "extendedProperties": {"private": {
-                    "source": "trainmate-context", "metric": "sleep_quality",
+                    "source": "stamind-context", "metric": "sleep_quality",
                 }},
             }],
             "nextSyncToken": "fresh-tok",
@@ -479,7 +479,7 @@ class TestCalendarSync(unittest.TestCase):
         first_kwargs = mock_service.events().list.call_args_list[-2][1]
         second_kwargs = mock_service.events().list.call_args_list[-1][1]
         self.assertEqual(
-            first_kwargs.get("privateExtendedProperty"), "source=TrainMate"
+            first_kwargs.get("privateExtendedProperty"), "source=stamind"
         )
         self.assertNotIn("pageToken", first_kwargs)
         self.assertEqual(second_kwargs.get("pageToken"), "page-2")
@@ -524,7 +524,7 @@ class TestCalendarSync(unittest.TestCase):
         mock_service.events().insert().execute.return_value = {"id": "evt-new"}
         with patch.object(calendar_syncer, "service", mock_service), \
                 patch.object(calendar_syncer, "calendar_id", "cal-test"), \
-                patch("trainmate.gcal.client.Progress") as mock_progress, \
+                patch("stamind.gcal.client.Progress") as mock_progress, \
                 patch("builtins.print") as mock_print:
             calendar_syncer.sync_multiple(workouts)
 

@@ -9,15 +9,15 @@ from datetime import datetime
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, rebind_test_db
-from trainmate.analytics import weekly_evidence
-from trainmate.db import Database
+from stamind.analytics import weekly_evidence
+from stamind.db import Database
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_analysis_evidence.db")
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestWeekResponseFeatures(unittest.TestCase):
@@ -262,7 +262,7 @@ class TestRicherEvidenceIntegration(unittest.TestCase):
             description="long hours, poor sleep",
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_features_and_events_reach_the_prompt(self, mock_client):
         self._seed_week()
         mock_client.complete.return_value = {"macrocycle_summary": "s", "learning_updates": []}
@@ -275,7 +275,7 @@ class TestRicherEvidenceIntegration(unittest.TestCase):
         self.assertIn("vs_baseline_z", user_content)
         self.assertIn("avg_stress", user_content)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_signal_days_reaches_the_prompt(self, mock_client):
         """A logged external signal (alcohol) surfaces as an episode-aligned signal_days
         section in the analysis user content (DESIGN_quantitative_signal_impact.md §4)."""
@@ -292,7 +292,7 @@ class TestRicherEvidenceIntegration(unittest.TestCase):
         self.assertIn("surrounding_mornings", user_content)
         self.assertIn("alcohol", user_content)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_editing_a_life_event_invalidates_the_cache(self, mock_client):
         """A constraint change shifts the evidence fingerprint, so the next run recomputes
         rather than reusing the cached reconstruction."""
@@ -310,7 +310,7 @@ class TestRicherEvidenceIntegration(unittest.TestCase):
             )
         self.assertEqual(mock_client.complete.call_count, 2)  # not reused
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_out_of_window_constraint_does_not_invalidate_the_cache(self, mock_client):
         """Constraints are fetched windowed, so one lying entirely outside [from,until]
         never reaches the fingerprint and the reconstruction stays reusable
@@ -330,7 +330,7 @@ class TestRicherEvidenceIntegration(unittest.TestCase):
             )
         self.assertEqual(mock_client.complete.call_count, 1)  # cached reconstruction reused
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_out_of_window_signal_invalidates_the_cache(self, mock_client):
         """`signal_days` is built full-history, so a signal logged OUTSIDE [from,until]
         still changes the prompt — and must therefore shift the fingerprint

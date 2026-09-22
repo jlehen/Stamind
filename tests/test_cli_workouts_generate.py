@@ -9,13 +9,13 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
-from trainmate.clock import fmt_date
-from trainmate.coach.proposals import RevisionProposal, GenerateProposal
+from stamind.clock import fmt_date
+from stamind.coach.proposals import RevisionProposal, GenerateProposal
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_generate.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -66,7 +66,7 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
     def run_cli(self, args, input_value="n"):
         return run_cli(args, input_value)
 
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.coach_service")
     def test_workout_batches_and_rollback(self, mock_coach):
         """`workout batches` lists every change and `workout rollback` picks one
         (DESIGN_workout_revisions.md §10)."""
@@ -132,9 +132,9 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
         self.run_cli(["workout", "rollback", "-y", "-v"])
         self.assertTrue(mock_coach.workout_rollback.call_args.kwargs.get("verbose"))
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_confirms_before_replacing_live_plan(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -197,9 +197,9 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
         mock_coach.workout_generate.assert_called_once()
         mock_coach.workout_generate_apply.assert_called_once()
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_fresh_reaches_the_service_and_promises_nothing(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -228,9 +228,9 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
         self.run_cli(["workout", "generate", "-d", "today..", "-f"])
         self.assertFalse(mock_coach.workout_generate.call_args.kwargs["fresh"])
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_promises_no_held_day_to_a_span_past_them(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -247,9 +247,9 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
         self.assertIn("Regenerate?", question)
         self.assertNotIn("are yours", question)
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_strength_only_counts_and_writes_the_strength_sessions(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -283,9 +283,9 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
         )
         self.assertNotEqual(exit_code, 0)
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_previews_the_workouts_then_asks_before_writing(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -334,9 +334,9 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
         self.run_cli(["workout", "generate", "-v"])
         self.assertTrue(mock_coach.workout_generate_apply.call_args.kwargs["verbose"])
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_with_no_proposed_sessions_asks_nothing(
         self, mock_coach, mock_prompt, _ensure
     ):
@@ -353,9 +353,9 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
         mock_prompt.confirm.assert_not_called()
         mock_coach.workout_generate_apply.assert_not_called()
 
-    @patch("trainmate.cli.workouts.generate.ensure_recent_data")
-    @patch("trainmate.runtime.prompt")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
     def test_generate_force_keeps_out_of_date_plan_warning(
         self, mock_coach, mock_prompt, _ensure
     ):

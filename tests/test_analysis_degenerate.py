@@ -5,14 +5,14 @@ import unittest
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, rebind_test_db
-from trainmate.db import Database
+from stamind.db import Database
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_analysis_degenerate.db")
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestDegenerateAnalysisResponse(unittest.TestCase):
@@ -57,7 +57,7 @@ class TestDegenerateAnalysisResponse(unittest.TestCase):
         ],
     }
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_an_unreadable_response_fails_instead_of_saving_emptiness(self, mock_client):
         mock_client.complete.return_value = dict(self.MANGLED)
 
@@ -74,7 +74,7 @@ class TestDegenerateAnalysisResponse(unittest.TestCase):
         self.assertIsNone(test_db.get_sync_state("bootstrap"))
         self.assertEqual(test_db.get_learnings(), [])
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_failed_bootstrap_leaves_the_next_one_free_to_retry(self, mock_client):
         """No bootstrap record means the retry is not gated behind the repeat prompt, and
         no cache means it actually reaches the LLM."""
@@ -95,7 +95,7 @@ class TestDegenerateAnalysisResponse(unittest.TestCase):
         self.assertEqual(result["macrocycle_summary"], "A real reconstruction")
         self.assertEqual(len(test_db.get_learnings()), 1)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_partly_readable_response_warns_and_still_saves(self, mock_client):
         """One good part is a result worth keeping — but the unreadable ones are named
         rather than left to render as blank sections."""
@@ -115,7 +115,7 @@ class TestDegenerateAnalysisResponse(unittest.TestCase):
         self.assertIn("mesocycles", printed)
         self.assertIsNotNone(test_db.get_analysis_cache("long"))
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_deltas_the_app_cannot_read_are_reported_not_silently_dropped(self, mock_client):
         mock_client.complete.return_value = {
             "macrocycle_summary": "A real reconstruction",
@@ -133,7 +133,7 @@ class TestDegenerateAnalysisResponse(unittest.TestCase):
         self.assertIn("2 coach-learning updates", printed)
         self.assertEqual(len(test_db.get_learnings()), 1)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_bootstrap_that_seeds_nothing_says_so(self, mock_client):
         """The gpt-5.6-terra case: a clean reconstruction with `learning_updates: []`. The
         run succeeded, so only naming the empty outcome stops the next command's cold-start
@@ -148,7 +148,7 @@ class TestDegenerateAnalysisResponse(unittest.TestCase):
         printed = " ".join(str(c.args[0]) for c in mock_print.call_args_list if c.args)
         self.assertIn("no active coach observations on record", printed)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_the_cold_start_nudge_stops_pointing_at_a_command_already_run(self, mock_client):
         mock_client.complete.return_value = {
             "macrocycle_summary": "A real reconstruction", "learning_updates": [],

@@ -26,8 +26,8 @@ class TestImportsAreSideEffectFree(unittest.TestCase):
             "opened = []\n"
             "real = sqlite3.connect\n"
             "sqlite3.connect = lambda *a, **k: (opened.append(a[0]), real(*a, **k))[1]\n"
-            "import trainmate_cli\n"
-            "import trainmate_web\n"
+            "import stamind_cli\n"
+            "import stamind_web\n"
             "print('OPENED:' + repr(opened))\n"
         )
         result = subprocess.run(
@@ -38,15 +38,15 @@ class TestImportsAreSideEffectFree(unittest.TestCase):
 
 
 class TestLibraryDoesNotImportTheCli(unittest.TestCase):
-    def test_no_module_under_trainmate_imports_trainmate_cli(self):
+    def test_no_module_under_stamind_imports_stamind_cli(self):
         """The CLI is a frontend; the library must not reach up into it.
 
-        This is what forced the `sys.modules.setdefault("trainmate_cli", ...)` alias,
+        This is what forced the `sys.modules.setdefault("stamind_cli", ...)` alias,
         and it meant a service call could open a terminal conversation on a caller that
         had no terminal.
         """
         offenders = []
-        for root, _, files in os.walk(os.path.join(REPO, "trainmate")):
+        for root, _, files in os.walk(os.path.join(REPO, "stamind")):
             for name in files:
                 if not name.endswith(".py"):
                     continue
@@ -58,7 +58,7 @@ class TestLibraryDoesNotImportTheCli(unittest.TestCase):
                         imported = tuple(a.name for a in node.names)
                     elif isinstance(node, ast.ImportFrom):
                         imported = (node.module or "",)
-                    if any(m == "trainmate_cli" for m in imported):
+                    if any(m == "stamind_cli" for m in imported):
                         offenders.append(f"{os.path.relpath(path, REPO)}:{node.lineno}")
 
         self.assertEqual(offenders, [], f"library modules importing the CLI: {offenders}")

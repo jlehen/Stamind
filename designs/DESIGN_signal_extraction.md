@@ -103,7 +103,7 @@ Two consequences, both acted on:
    covers both "couldn't get to sleep" and "was woken by something", which `insomnia` does
    not.
 2. The vocabulary and the exclusion table now live in the **same file**
-   (`trainmate/signals.py`), moved out of `coach/service/analysis.py`. They were in
+   (`stamind/signals.py`), moved out of `coach/service/analysis.py`. They were in
    different layers, which is how someone renames a category without noticing the guard.
    `config_template_full.yaml` repeats the warning where a category is actually named.
 
@@ -190,7 +190,7 @@ for.)
 
 ## 7. Code touch points
 
-- **`trainmate/signals.py`** (new) — `DEFAULT_SIGNAL_METRICS`, `SIGNAL_CHANNEL_EXCLUSIONS`
+- **`stamind/signals.py`** (new) — `DEFAULT_SIGNAL_METRICS`, `SIGNAL_CHANNEL_EXCLUSIONS`
   + `excluded_channels()`, `normalize_metric`, `format_vocabulary`, `nearest_known`, and
   the shared writer `write_signal_days` (with `date_range`/`signal_summary` lifted out of
   `cli/signals.py`, which now calls them).

@@ -23,7 +23,7 @@ Four defects, one command:
    needing `--force` to apply it is the regeneration gate misfiring.
 
 And the fact that unlocks the redesign: at regeneration time,
-`trainmate/coach/service/planning.py` concatenates **all** feedback — macro plus every mesocycle,
+`stamind/coach/service/planning.py` concatenates **all** feedback — macro plus every mesocycle,
 labeled by phase — into a single prompt section that `plan generate`'s model call reads whole.
 Routing at capture time therefore decides a label and a storage row, never what the model
 considers. The current interface demands careful filing for a reader that reads the whole cabinet
@@ -41,7 +41,7 @@ reopen.
 **No LLM at capture.** The understanding step belongs to the regeneration call, which happens
 anyway and is the only consumer of the result. This is the same-call folding that
 `workout adapt --message` already established (the note is "passed to the SAME LLM" doing the
-adaptation — trainmate/coach/service/adapt.py). Capture itself is an INSERT: milliseconds,
+adaptation — stamind/coach/service/adapt.py). Capture itself is an INSERT: milliseconds,
 offline, nothing to misroute. Consequence: the echo confirms the note was *recorded*, not
 *understood*; a misreading surfaces at the gate that already exists for it — `plan generate`'s
 preview-and-confirm.
@@ -59,7 +59,7 @@ Where this sits among the real-world-context channels (the boundary lines do not
 
 Goals:
 
-- Capture with no selector, no flags, no IDs: `tm plan feedback "…"` and you have your prompt back.
+- Capture with no selector, no flags, no IDs: `sm plan feedback "…"` and you have your prompt back.
 - Optional explicit filing addressed the way the athlete thinks: mesocycle name, date, or bare `-m`
   for the current mesocycle. IDs keep working.
 - Append semantics with visible history and per-note removal.
@@ -70,7 +70,7 @@ Goals:
 Non-goals:
 
 - **No LLM routing at capture** (§11: latency it can't pay for, buying a label the regen ignores).
-- **No unified inbox** (`tm coach "…"` classifying nudge/constraint/feedback in one place). That
+- **No unified inbox** (`sm coach "…"` classifying nudge/constraint/feedback in one place). That
   is the plausible end-state and this log is its natural substrate, but it reorganizes the channel
   taxonomy and deserves its own design (DESIGN_capture_inbox.md, unwritten).
 - **No range-grammar extension across the CLI.** The new `-m` atoms (§5) are defined in the shared
@@ -117,7 +117,7 @@ gets the §a missing-argument treatment. Over the bot every form is one-line and
 
 `--replan` runs the same flow as `plan generate` for that goal after saving — preview, then a
 human `y`, per the constraints precedent that nothing regenerates a plan without one
-(trainmate/cli/constraints.py §7 note). It does not imply `--force`; it does not need to (§7).
+(stamind/cli/constraints.py §7 note). It does not imply `--force`; it does not need to (§7).
 
 `plan generate --feedback "text"` is the same thing for an athlete who starts from `plan
 generate`. It files a plan-level note exactly as `plan feedback "text"` does, then runs the
@@ -157,7 +157,7 @@ All resolution happens against **active** macrocycles only. Filing to a supersed
 meaningless for steering the next one, so a mesocycle ID outside the active plans errors (this
 tightens today's unchecked `get_mesocycle`).
 
-The resolver lives in `trainmate/cli/selectors.py` beside the range machinery, as a single-atom
+The resolver lives in `stamind/cli/selectors.py` beside the range machinery, as a single-atom
 function the range grammar can lift the day every command wants `workout list -m climb`. Add a
 forward-note to DESIGN_cli_selectors.md §1 that `-m` atoms gain dates and name-infixes here first.
 
@@ -189,7 +189,7 @@ Migration — one-off, per AGENTS.md (single user, no backward-compat scaffoldin
    best available and only orders a one-off backfill).
 3. `ALTER TABLE macrocycles DROP COLUMN feedback` and likewise on `mesocycles` (precedent: the
    constraints table dropped `binding`/`sport`/`type` the same way).
-4. `trainmate/types.py`: drop the two `feedback` fields; add a `PlanFeedback` TypedDict.
+4. `stamind/types.py`: drop the two `feedback` fields; add a `PlanFeedback` TypedDict.
 
 ## 7. Consumption
 
@@ -205,7 +205,7 @@ Wednesday `plan generate` would ask about the profile edit, and a "no" would pri
 current plan" just before the note rewrote it anyway. The new plan is built from the current
 inputs, so the profile edit reaches it without the question.
 
-**Prompt.** In `trainmate/coach/engine/planning.py`, the `### ATHLETE FEEDBACK ON THE PREVIOUS
+**Prompt.** In `stamind/coach/engine/planning.py`, the `### ATHLETE FEEDBACK ON THE PREVIOUS
 PLAN` section becomes:
 
 ```
@@ -223,7 +223,7 @@ science principles and guidelines.
 
 Oldest first so later notes read as amendments of earlier ones ("actually, keep the second test").
 Filed notes carry the phase **name** — names survive version churn; IDs do not. The service layer
-(`trainmate/coach/service/planning.py`) assembles the list from pending rows joined with mesocycle
+(`stamind/coach/service/planning.py`) assembles the list from pending rows joined with mesocycle
 names, replacing today's slot-reading code.
 
 **Not consumers.** `workout generate` and `workout adapt` keep reading only the mesocycle focus
@@ -238,7 +238,7 @@ skip the plan is what `workout adapt -m` is for (§12 revisits).
   active and "(consumed by the successor version)" when superseded.
 - **`plan diff`**: the feedback panel stops prose-diffing a slot and lists each side's attached
   notes; for adjacent versions old→new that reads as "what drove the change".
-  `trainmate/plan_versions.py`, shared with `/api/plan/diff`.
+  `stamind/plan_versions.py`, shared with `/api/plan/diff`.
 - **`status`**: when pending notes exist, one line near the plan section:
   `Plan feedback: 2 pending — plan generate will address them.`
 - **Web dashboard** (read-only, unchanged contract): the `strategy-feedback` and
@@ -252,16 +252,16 @@ is not restated in comments.
 
 | File | Change |
 | --- | --- |
-| `trainmate/cli/plans/` | Parser rebuilt (§4); `run_plan_feedback` rewritten around append/list/rm/replan; `plan show` + versions rendering (§8); `_FEEDBACK_REGEN_NOTE` removed |
-| `trainmate/cli/selectors.py` | Single-target mesocycle atom resolver (§5) |
-| `trainmate/db/periodization.py` | `update_macrocycle_feedback`/`update_mesocycle_feedback` replaced by `add_plan_feedback` / `list_plan_feedback(macrocycle_id)` (joined with meso names) / `rm_plan_feedback` |
-| `trainmate/db/schema.py` | Migration §6 |
-| `trainmate/types.py` | Drop `feedback` fields; add `PlanFeedback` |
-| `trainmate/coach/service/planning.py` | Regen gate disjunct; pending-notes prompt assembly (§7) |
-| `trainmate/coach/engine/planning.py` | Section text (§7) |
-| `trainmate/plan_versions.py` | Feedback panel → note lists (§8) |
-| `trainmate/cli/status.py` | Pending-count line (§8) |
-| `trainmate_web.py` + `static/plan.js`/`index.html`/`style.css` | Render pending list (§8) |
+| `stamind/cli/plans/` | Parser rebuilt (§4); `run_plan_feedback` rewritten around append/list/rm/replan; `plan show` + versions rendering (§8); `_FEEDBACK_REGEN_NOTE` removed |
+| `stamind/cli/selectors.py` | Single-target mesocycle atom resolver (§5) |
+| `stamind/db/periodization.py` | `update_macrocycle_feedback`/`update_mesocycle_feedback` replaced by `add_plan_feedback` / `list_plan_feedback(macrocycle_id)` (joined with meso names) / `rm_plan_feedback` |
+| `stamind/db/schema.py` | Migration §6 |
+| `stamind/types.py` | Drop `feedback` fields; add `PlanFeedback` |
+| `stamind/coach/service/planning.py` | Regen gate disjunct; pending-notes prompt assembly (§7) |
+| `stamind/coach/engine/planning.py` | Section text (§7) |
+| `stamind/plan_versions.py` | Feedback panel → note lists (§8) |
+| `stamind/cli/status.py` | Pending-count line (§8) |
+| `stamind_web.py` + `static/plan.js`/`index.html`/`style.css` | Render pending list (§8) |
 | `README.md` | Steering-channels table row + the `plan feedback` mentions |
 | `ARCHITECTURE.md` | Schema tables (macrocycles/mesocycles rows → `plan_feedback` table), command table rows for `plan feedback`/`plan diff`, prose mentions of the feedback flow |
 | `tests/test_feedback.py` | Rewritten (§10) |
@@ -295,7 +295,7 @@ is not restated in comments.
   `--rm` + re-add covers rewording.
 - **A `next` keyword atom.** Collides with plausible mesocycle names; `+2w` says it
   deterministically.
-- **Unified inbox (`tm coach`).** The right end-state; out of scope here (§3). This table is its
+- **Unified inbox (`sm coach`).** The right end-state; out of scope here (§3). This table is its
   substrate.
 
 ## 12. Open questions

@@ -34,7 +34,7 @@ async function fetchStatus() {
         } else {
             activeGoalId = null;
             goalTitleEl.innerText = "No Active Goal";
-            goalCountdownEl.innerText = "Add a goal with 'tm goal add'";
+            goalCountdownEl.innerText = "Add a goal with 'sm goal add'";
             goalCountdownEl.style.color = "var(--text-muted)";
         }
 
@@ -80,7 +80,7 @@ async function fetchStatus() {
                 banner.style.display = "flex";
                 logConsole(
                     "Warning: config.yaml has changed since the active periodization "
-                    + "plan was generated. Run 'tm plan generate' to update.", "warning"
+                    + "plan was generated. Run 'sm plan generate' to update.", "warning"
                 );
             } else {
                 banner.style.display = "none";
@@ -95,7 +95,7 @@ function renderLearningsSummary(learnings, summary) {
     const el = document.getElementById("memory-learnings");
     if (!el) return;
     if (!learnings || learnings.length === 0) {
-        el.innerText = "No observations cached yet. Run 'tm data bootstrap' (CLI) to "
+        el.innerText = "No observations cached yet. Run 'sm data bootstrap' (CLI) to "
             + "reconstruct your training history and seed observations.";
         return;
     }
@@ -109,7 +109,7 @@ function renderSyncFreshness(syncState) {
     const el = document.getElementById("sync-freshness");
     if (!el) return;
     if (!syncState || (!syncState.through_date && !syncState.last_pull_utc)) {
-        el.innerText = "Garmin data: never pulled — run 'tm data pull' (CLI).";
+        el.innerText = "Garmin data: never pulled — run 'sm data pull' (CLI).";
         return;
     }
     const through = syncState.through_date ? fmtDate(syncState.through_date) : "?";

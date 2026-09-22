@@ -76,7 +76,7 @@ them per signal-day and shows the result to the LLM.
 - **Use the magnitude** (`value`): the raw drink count is shown, so 2 and 6 are
   visibly different, not one "drink day."
 - **Category-agnostic:** the same alignment runs identically for `alcohol`, a big
-  meal, … TrainMate never encodes what any of them mean.
+  meal, … Stamind never encodes what any of them mean.
 - Feed the result into the **existing** analysis prompt so a durable
   conclusion accrues confidence through the week-keyed evidence basis
   (`DESIGN_evidence_based_confidence.md`) — no second confidence path.
@@ -173,7 +173,7 @@ them into a single "worse" score — picking what "worse" means is the LLM's job
 
 The method is generic in its **mechanism** (it shows whatever number is logged),
 but the *resolution* of any conclusion is only as good as the number the logger can
-honestly supply. TrainMate never interprets the scale of `value`; the encoding is a
+honestly supply. Stamind never interprets the scale of `value`; the encoding is a
 choice made **when the signal is logged**. Every signal therefore lands in one of
 three tiers — and because the LLM (not a fitted model) reads the rows, the
 degradation is automatic, no special casing:
@@ -524,5 +524,5 @@ Saturday night still felt Monday) legible instead of lost in a weekly aggregate.
 rows are **not stored as a learning** — they are rendered into the existing analysis
 prompt so the **LLM** authors any durable conclusion and the **existing week-keyed
 evidence model** grows its confidence. Only `data bootstrap` and `data reflect`
-change; the picture sharpens automatically as signal-days accumulate. TrainMate still
+change; the picture sharpens automatically as signal-days accumulate. Stamind still
 never learns what any single signal *means*.

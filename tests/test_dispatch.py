@@ -8,7 +8,7 @@ keeps it honest.
 """
 import unittest
 
-import trainmate_cli
+import stamind_cli
 
 
 def leaf_parsers(parser, path=()):
@@ -61,7 +61,7 @@ class TestEveryCommandHasAHandler(unittest.TestCase):
     ANSWERED_BY_THE_DISPATCHER = {("help",), ("shell",)}
 
     def setUp(self):
-        self.parser, self.named = trainmate_cli.build_parser()
+        self.parser, self.named = stamind_cli.build_parser()
 
     def test_every_leaf_command_binds_a_callable(self):
         missing = []
@@ -74,10 +74,10 @@ class TestEveryCommandHasAHandler(unittest.TestCase):
         self.assertEqual(missing, [], f"commands with no handler: {missing}")
 
     def test_a_bare_command_group_prints_its_help_and_fails(self):
-        """`tm goal` with no sub-command should say what it offers, not exit silently.
+        """`sm goal` with no sub-command should say what it offers, not exit silently.
 
         The groups are read off the parser, not listed here: the list used to omit
-        `bot`, which was hiding the fact that bare `tm bot` printed the *top-level*
+        `bot`, which was hiding the fact that bare `sm bot` printed the *top-level*
         help. A group added tomorrow is covered tomorrow.
         """
         from tests.helpers import run_cli
@@ -88,7 +88,7 @@ class TestEveryCommandHasAHandler(unittest.TestCase):
             with self.subTest(group=name):
                 exit_code, stdout, _ = run_cli([name])
                 self.assertEqual(exit_code, 1, f"bare `{name}` should not report success")
-                self.assertIn(f"tm {name}", stdout)
+                self.assertIn(f"sm {name}", stdout)
 
     def test_handlers_are_distinct_per_command(self):
         """A copy-paste that binds two sub-commands to one handler is a real bug and

@@ -6,16 +6,16 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, run_cli
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_goal_date_type.db")
+TEST_DB_PATH = test_db_path("test_stamind_goal_date_type.db")
 
-from trainmate import plan_inputs
-from trainmate.db import Database
-import trainmate_cli
+from stamind import plan_inputs
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 GOAL_DATE = "2026-09-27"
 
@@ -91,8 +91,8 @@ class TestGoalDateType(unittest.TestCase):
             plan_inputs.goals_hash([horizon]),
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_horizon_goal_branches_the_planning_and_generation_prompts(
         self, mock_client, mock_calendar
     ):
@@ -115,8 +115,8 @@ class TestGoalDateType(unittest.TestCase):
         self.assertIn("a boundary week near it is an ordinary boundary", gen_prompt)
         self.assertNotIn("competes with the effort it is meant to", gen_prompt)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_event_goal_keeps_the_event_prompts(self, mock_client, mock_calendar):
         pin_clock(self, "2026-06-01")
         self._add_goal()

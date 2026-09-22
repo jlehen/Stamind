@@ -13,13 +13,13 @@ def _m(minutes):
 def _hr(sport, mins, coverage=0.95, judged="same"):
     # `judged=None` is the unjudgeable row: every session that week was under the
     # `zone_min_activity_minutes` floor, so the recording can't be graded (§11).
-    from trainmate.analytics.intensity import ZoneRow
+    from stamind.analytics.intensity import ZoneRow
     jc = coverage if judged == "same" else judged
     return ZoneRow(sport, "hr", tuple(_m(v) for v in mins), coverage, jc)
 
 
 def _pwr(sport, mins, coverage=0.9, judged="same"):
-    from trainmate.analytics.intensity import ZoneRow
+    from stamind.analytics.intensity import ZoneRow
     jc = coverage if judged == "same" else judged
     return ZoneRow(sport, "power", tuple(_m(v) for v in mins), coverage, jc)
 
@@ -42,7 +42,7 @@ def clock_at(day: str):
     part-way through, rather than freezing it for the whole case."""
     as_date = date.fromisoformat(day)
     return patch(
-        "trainmate.clock.now",
+        "stamind.clock.now",
         return_value=datetime.combine(as_date, time(12)).astimezone(),
     )
 
@@ -50,7 +50,7 @@ def clock_at(day: str):
 def pin_clock(testcase, day: str) -> None:
     """Freezes the clock at `day` for the life of one test.
 
-    Patches `trainmate.clock.now`, the one instant every "what day is it" computation
+    Patches `stamind.clock.now`, the one instant every "what day is it" computation
     reads (DESIGN_user_timezone.md §1), so a module that imports `today_str` or
     `today_date` by value is pinned too. This was a hand-written list of those import
     sites and had drifted to 6 of the 24 that exist, letting real time reach fixtures
@@ -67,14 +67,14 @@ def as_instance(testcase, ui: str, from_chat: bool = False) -> None:
 
     Whether the athlete watches a run turns on both (DESIGN_change_heads_up.md §6), and the
     operator's own config.yaml must not decide it for a test."""
-    from trainmate.config import config
+    from stamind.config import config
     telegram = dict(config.data.get("telegram") or {}, ui=ui)
     for patcher in (patch.dict(config.data, {"telegram": telegram}), patch.dict(os.environ)):
         patcher.start()
         testcase.addCleanup(patcher.stop)
-    os.environ.pop("TRAINMATE_FRONTEND", None)
+    os.environ.pop("STAMIND_FRONTEND", None)
     if from_chat:
-        os.environ["TRAINMATE_FRONTEND"] = "json"
+        os.environ["STAMIND_FRONTEND"] = "json"
 
 
 # Delete children before parents to satisfy foreign-key constraints. `workouts` is
@@ -123,16 +123,16 @@ def rebind_test_db(test_db) -> None:
     reconciles the lineages it touched (DESIGN_workout_revisions.md §8) — so isolating
     a test from the real database means isolating it from the real calendar too. The
     default mock is installed only when nothing is bound yet, so an active `@patch` on
-    `trainmate.runtime.calendar_syncer` still owns the handle for its test.
+    `stamind.runtime.calendar_syncer` still owns the handle for its test.
     """
-    from trainmate import runtime
-    from trainmate.clock import reset_cache as forget_timezone
+    from stamind import runtime
+    from stamind.clock import reset_cache as forget_timezone
     # The athlete timezone is resolved once per process from the settings table, so a
     # handle swap has to drop it or the new database's setting is never read.
     forget_timezone()
     if "calendar_syncer" not in vars(runtime):
         runtime.calendar_syncer = MagicMock()
-    from trainmate.gcal.reconcile import reconcile
+    from stamind.gcal.reconcile import reconcile
     test_db.calendar_hook = reconcile
     runtime.db = test_db
 
@@ -169,7 +169,7 @@ def restore_db_handles(testcase) -> None:
     concrete singleton where the lazy accessor used to be would hand the next module a
     stale database instead of one it can still bind.
     """
-    from trainmate import runtime
+    from stamind import runtime
 
     saved = [(runtime, vars(runtime).get("db", _UNBOUND))]
 
@@ -184,7 +184,7 @@ def restore_db_handles(testcase) -> None:
 
 def bind_test_db(db_path: str, fresh: bool = True):
     """Builds an isolated Database at `db_path` and binds it everywhere."""
-    from trainmate.db import Database
+    from stamind.db import Database
 
     if fresh and os.path.exists(db_path):
         os.remove(db_path)
@@ -201,17 +201,17 @@ def skip_strength_planner(testcase) -> None:
     would reach the network through it. Returning None is what the pass itself does when
     there is nothing new to write from, so the proposal is the one the test expects.
     """
-    patcher = patch("trainmate.strength.planner.run", return_value=None)
+    patcher = patch("stamind.strength.planner.run", return_value=None)
     patcher.start()
     testcase.addCleanup(patcher.stop)
 
 
 def run_cli(args: list, input_value: str = "n"):
-    """Invoke trainmate_cli.main() and capture stdout/stderr."""
-    import trainmate_cli
-    from trainmate import runtime
+    """Invoke stamind_cli.main() and capture stdout/stderr."""
+    import stamind_cli
+    from stamind import runtime
 
-    # The renderer is a cached singleton, so a test that patches TRAINMATE_RENDER after
+    # The renderer is a cached singleton, so a test that patches STAMIND_RENDER after
     # one was built would otherwise get the wrong voice — silently, in the direction
     # that still passes (DESIGN_render_persona.md §6). Each run builds its own, exactly
     # as a real CLI process does.
@@ -219,14 +219,14 @@ def run_cli(args: list, input_value: str = "n"):
 
     stdout_buf = io.StringIO()
     stderr_buf = io.StringIO()
-    with patch.object(sys, "argv", ["trainmate_cli.py"] + args):
+    with patch.object(sys, "argv", ["stamind_cli.py"] + args):
         with (
             patch("sys.stdout", stdout_buf),
             patch("sys.stderr", stderr_buf),
             patch("builtins.input", return_value=input_value),
         ):
             try:
-                trainmate_cli.main()
+                stamind_cli.main()
                 exit_code = 0
             except SystemExit as e:
                 exit_code = e.code

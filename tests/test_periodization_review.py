@@ -22,12 +22,12 @@ def _days_out(n: int) -> str:
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 GOAL_DATE = _days_out(71)
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestPriorTrainingReview(unittest.TestCase):
@@ -85,7 +85,7 @@ class TestPriorTrainingReview(unittest.TestCase):
         }
         return obj_id
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_plan_generate_injects_planned_vs_actual(self, mock_client):
         # Option A (DESIGN_backward_evaluation.md §6): the prior plan's elapsed mesocycles are
         # compared against what was actually completed, and fed into the strategy prompt.
@@ -104,7 +104,7 @@ class TestPriorTrainingReview(unittest.TestCase):
         self.assertIn("Z2 aerobic", system_prompt)
         self.assertNotIn("HR zones Z1-2/Z3/Z4-5", system_prompt)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_plan_generate_sees_how_each_threshold_was_obtained(self, mock_client):
         """A recorded test reaches the strategy prompt as a test, with the athlete's note.
         Given only the profile's bare value, the model called a 20-min test "modelled"
@@ -130,7 +130,7 @@ class TestPriorTrainingReview(unittest.TestCase):
             prompt.index("## ANCHORS ON RECORD"),
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_the_review_is_withheld_from_the_caller_by_default(self, mock_client):
         # It is the longest thing this command can print, and it would land above the
         # strategy the athlete actually asked for (DESIGN_output_verbosity.md §7). What
@@ -142,7 +142,7 @@ class TestPriorTrainingReview(unittest.TestCase):
         self.assertTrue(proposal["has_prior_training"])
         self.assertIn("## PRIOR TRAINING REVIEW", mock_client.complete.call_args[0][0])
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_show_context_hands_the_review_back(self, mock_client):
         obj_id = self._prior_training_fixture(mock_client)
         proposal = coach_service.plan_generate(
@@ -150,7 +150,7 @@ class TestPriorTrainingReview(unittest.TestCase):
         )
         self.assertIn("PLANNED vs ACTUAL", proposal["prior_training_review"])
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_the_display_copy_is_built_only_when_it_is_shown(self, mock_client):
         # Showing it costs a second full pass over the same plans, re-laid-out at the
         # terminal's width. Off the flag that pass buys nothing (§7).
@@ -224,8 +224,8 @@ class TestCompletedSeasonsReachTheReview(unittest.TestCase):
                 rpe=5, tss=100.0, zone1_sec=600, zone2_sec=3000,
             )
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_last_seasons_mesocycles_are_in_the_next_plans_prompt(
         self, mock_client, mock_calendar
     ):
@@ -249,8 +249,8 @@ class TestCompletedSeasonsReachTheReview(unittest.TestCase):
         self.assertIn('focus "aerobic volume"', prompt)
         self.assertIn("Weekly load", prompt)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_an_archived_season_stays_out(self, mock_client, mock_calendar):
         """`archived` is the athlete saying it did not happen — the one thing the date
         cannot know, and the only reason the column still exists."""
@@ -301,8 +301,8 @@ class TestLearningsReachTheStrategyPrompt(unittest.TestCase):
         """The system prompt of the plan call — the first of the two `replan` makes."""
         return mock_client.complete.call_args_list[0][0][0]
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def _generate(self, learning, mock_client, mock_calendar):
         # The whole clock, not one alias: pinning only `service._today_str` left the goal
         # date below to be judged against the real one, so these expired on 2026-09-27.

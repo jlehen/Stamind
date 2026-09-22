@@ -11,7 +11,7 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_calendar.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -44,7 +44,7 @@ class TestCliWorkoutsCalendarSync(unittest.TestCase):
     def run_cli(self, args, input_value="n"):
         return run_cli(args, input_value)
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_workout_push_command(self, mock_calendar):
         exit_code, stdout, stderr = self.run_cli(["workout", "push"])
         self.assertEqual(exit_code, 0)
@@ -62,11 +62,11 @@ class TestCliWorkoutsCalendarSync(unittest.TestCase):
         self.assertIn("Syncing 1 workouts to Google Calendar", stdout)
         mock_calendar.sync_multiple.assert_called_once()
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_workout_push_warns_about_stale_past_workouts(self, mock_calendar):
         """`push` defaults to today onward, so a past row left stale by a failed push
         has nothing that would re-push it. It must at least be surfaced."""
-        from trainmate.workout_state import calendar_signature
+        from stamind.workout_state import calendar_signature
         today = datetime.now(timezone.utc).date()
         past = (today - timedelta(days=4)).strftime("%Y-%m-%d")
 
@@ -90,7 +90,7 @@ class TestCliWorkoutsCalendarSync(unittest.TestCase):
         # Warning only — the past row stays outside the pushed window.
         mock_calendar.sync_multiple.assert_not_called()
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_workout_push_no_warning_when_past_is_clean(self, mock_calendar):
         """A past workout that is synced (or was never pushed) must not warn."""
         today = datetime.now(timezone.utc).date()
@@ -102,7 +102,7 @@ class TestCliWorkoutsCalendarSync(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertNotIn("still read [STALE]", stdout)
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_workout_wipe(self, mock_calendar):
         save_workout(test_db,
             date="2026-06-02", sport_type="running", title="Run 1",
@@ -135,7 +135,7 @@ class TestCliWorkoutsCalendarSync(unittest.TestCase):
         self.assertEqual(len(test_db.get_workouts()), 0)
         mock_calendar.delete_event.assert_called_once_with("ge_2")
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_workout_prune_calendar(self, mock_calendar):
         # One live workout, one soft-removed (keeps its event), and two calendar
         # events no row claims — the fresh-database case.
@@ -192,7 +192,7 @@ class TestCliWorkoutsCalendarSync(unittest.TestCase):
             ["ge_orphan_a", "ge_orphan_b"],
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_workout_prune_calendar_nothing_to_do(self, mock_calendar):
         save_workout(test_db,
             date="2026-06-02", sport_type="running", title="Run 1",
@@ -206,11 +206,11 @@ class TestCliWorkoutsCalendarSync(unittest.TestCase):
         self.assertIn("No orphaned Calendar events", stdout)
         mock_calendar.delete_event.assert_not_called()
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_workout_prune_calendar_keeps_a_marker_covered_in_its_slot(self, mock_calendar):
         """A marker is not an orphan just because a session took its slot
         (DESIGN_plan_change_continuity.md §5.6)."""
-        from trainmate.gcal.reconcile import no_calendar_sync
+        from stamind.gcal.reconcile import no_calendar_sync
         # The reconcile is suppressed so the ownership rows stay as written: this test
         # asks what `prune-calendar` reads, not what the sync would have done first.
         with no_calendar_sync():

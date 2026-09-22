@@ -15,15 +15,15 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_adaptation_history.db")
 
-from trainmate.db import Database
-import trainmate.config
+from stamind.db import Database
+import stamind.config
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.analytics.adherence import REST_VIOLATION, analyze_adherence
-from trainmate.coach.service import CoachService, coach_service
-from trainmate.sports import canonical_sport
+from stamind.analytics.adherence import REST_VIOLATION, analyze_adherence
+from stamind.coach.service import CoachService, coach_service
+from stamind.sports import canonical_sport
 
 
 class TestAdaptLeavesHistoryAlone(unittest.TestCase):
@@ -97,13 +97,13 @@ class TestAdaptLeavesHistoryAlone(unittest.TestCase):
             ],
         )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_drops_proposal_past_mesocycle_end(self, mock_client):
         """The next mesocycle is out of adapt's reach on the write side too: a proposal dated
         past the mesocycle's end is dropped, so the applied range can never stretch into the next
         mesocycle (DESIGN_mesocycle_boundary.md §1)."""
         self._save_two_mesocycle_plan()
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {
                 "metrics_lookback_days": 3,
@@ -137,13 +137,13 @@ class TestAdaptLeavesHistoryAlone(unittest.TestCase):
 
             self.assertEqual([p["date"] for p in proposed], ["2026-06-29"])
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_drops_already_completed_session(self, mock_client):
         """A session already performed (matched by a completed activity) is locked history:
         the guard drops any proposal targeting it, even if the model returns one — you cannot
         adapt a workout you have already finished today."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -214,7 +214,7 @@ class TestAdaptLeavesHistoryAlone(unittest.TestCase):
                 prompt_user_content,
             )
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_rest_day_does_not_displace_a_completed_session(self, mock_client):
         """Dropping the day's OTHER session must not take the finished one with it.
 
@@ -225,7 +225,7 @@ class TestAdaptLeavesHistoryAlone(unittest.TestCase):
         (DESIGN_workout_revisions.md §9.2).
         """
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -302,12 +302,12 @@ class TestAdaptLeavesHistoryAlone(unittest.TestCase):
             )
             self.assertEqual([d for d in discrepancies if d.kind == REST_VIOLATION], [])
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_rest_constraint_does_not_clear_a_completed_session(self, mock_client):
         """A `rest` constraint outranks a hold (§6 over §9.1) but not history: the day's
         remaining session is forced to rest while the finished one stands (§9.2)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,
@@ -352,7 +352,7 @@ class TestAdaptLeavesHistoryAlone(unittest.TestCase):
             self.assertEqual(ride["title"], "Long Indoor Z2")
             self.assertIsNone(test_db.get_workout("2026-06-03", "strength_training"))
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_abandoned_session_is_partial_not_completed(self, mock_client):
         """A session the athlete abandoned after the warm-up is NOT completed history.
 
@@ -362,7 +362,7 @@ class TestAdaptLeavesHistoryAlone(unittest.TestCase):
         touching it, so the week planner was told a session the athlete never did was in the bank
         and forbidden from salvaging the rest of the day (ARCHITECTURE.md §15)."""
         test_profile = {"lthr": 165, "max_hr": 185}
-        with patch.dict(trainmate.config.config.data, {
+        with patch.dict(stamind.config.config.data, {
             "user_profile": test_profile,
             "coach": {
                 "metrics_lookback_days": 3,

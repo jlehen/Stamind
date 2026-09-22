@@ -17,9 +17,9 @@ from tests import test_db_path
 
 test_db = bind_test_db(test_db_path("test_change_heads_up.db"))
 
-from trainmate import heads_up, runtime
-from trainmate.coach.proposals import RevisionProposal
-from trainmate.clock import today_str
+from stamind import heads_up, runtime
+from stamind.coach.proposals import RevisionProposal
+from stamind.clock import today_str
 
 
 def _at(day: int, hour: int, minute: int = 0) -> datetime:
@@ -139,10 +139,10 @@ class _DbCase(unittest.TestCase):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
         pin_clock(self, "2026-09-23")
-        calendar = patch("trainmate.runtime.calendar_syncer")
+        calendar = patch("stamind.runtime.calendar_syncer")
         calendar.start()
         self.addCleanup(calendar.stop)
-        morning = patch("trainmate.settings.morning_time", return_value="08:00")
+        morning = patch("stamind.settings.morning_time", return_value="08:00")
         morning.start()
         self.addCleanup(morning.stop)
         as_instance(self, "simple")
@@ -222,7 +222,7 @@ class ReplaceQuestionTest(_DbCase):
 
         `window` is the days the run may write, open-ended from today by default, which is
         what `workout adapt` passes."""
-        from trainmate.cli.workouts.heads_up import replacing_unsent
+        from stamind.cli.workouts.heads_up import replacing_unsent
         out = StringIO()
         window = window or (today_str(), None)
         with redirect_stdout(out), replacing_unsent(skip, window) as replaced:
@@ -264,7 +264,7 @@ class ReplaceQuestionTest(_DbCase):
         self.change(note="First attempt.")
         self._answer("replace")
         out = StringIO()
-        from trainmate.cli.workouts.heads_up import replacing_unsent
+        from stamind.cli.workouts.heads_up import replacing_unsent
         with self.assertRaises(RuntimeError), redirect_stdout(out):
             with replacing_unsent(False, (today_str(), None)):
                 raise RuntimeError("LLM down")
@@ -350,7 +350,7 @@ class GenerateAfterReplaceTest(_DbCase):
                          "end_date": "2026-11-30", "focus": "aerobic"}],
         )
         for target in ("ensure_recent_data", "_confirm_out_of_date_plans"):
-            patcher = patch(f"trainmate.cli.workouts.generate.{target}", return_value=True)
+            patcher = patch(f"stamind.cli.workouts.generate.{target}", return_value=True)
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -362,7 +362,7 @@ class GenerateAfterReplaceTest(_DbCase):
             "rpe": 3, "tss": 30,
         }]}
         replace = patch.object(runtime.prompt, "choose", return_value="replace")
-        with patch("trainmate.coach.engine.openrouter_client") as client, replace:
+        with patch("stamind.coach.engine.openrouter_client") as client, replace:
             client.complete.return_value = reply
             # The §5 choice gets "replace"; every confirm gets run_cli's "n".
             _code, out, _ = run_cli(["workout", "generate", "-d", "today..2026-09-27"])
@@ -383,7 +383,7 @@ class GenerateAfterReplaceTest(_DbCase):
             "rpe": 3, "tss": 30,
         }]}
         choose = patch.object(runtime.prompt, "choose", return_value="replace")
-        with patch("trainmate.coach.engine.openrouter_client") as client, choose as ask:
+        with patch("stamind.coach.engine.openrouter_client") as client, choose as ask:
             client.complete.return_value = reply
             run_cli(["workout", "generate", "-d", "2026-09-24..2026-09-27"])
         ask.assert_not_called()
@@ -394,7 +394,7 @@ class SendNoticeTest(_DbCase):
     """The line under the one the athlete will get (§8). The clock is pinned at 12:00."""
 
     def _notice(self, dates):
-        from trainmate.cli.workouts.heads_up import print_send_notice
+        from stamind.cli.workouts.heads_up import print_send_notice
         out = StringIO()
         with redirect_stdout(out):
             print_send_notice(dates)
@@ -414,14 +414,14 @@ class SendNoticeTest(_DbCase):
         self.assertNotIn("today's session", out)
 
     def test_before_the_morning_time_a_change_to_today_goes_this_morning(self):
-        with patch("trainmate.clock.now", return_value=_at(23, 6, 30)):
+        with patch("stamind.clock.now", return_value=_at(23, 6, 30)):
             out = " ".join(self._notice({"2026-09-23"}).split())
         self.assertIn("at 08:00 today", out)
         self.assertNotIn("today's session", out)
 
     def test_a_session_moved_out_of_today_counts_as_today(self):
-        from trainmate.cli.workouts.heads_up import revision_dates
-        from trainmate.coach.revisions import RevisionPair
+        from stamind.cli.workouts.heads_up import revision_dates
+        from stamind.coach.revisions import RevisionPair
         moved = {"date": "2026-09-26", "sport_type": "running"}
         proposal = RevisionProposal(
             reason="Rain.", workouts=[moved], range_start=today_str(),
@@ -451,7 +451,7 @@ class NotifyTest(_DbCase):
         self.assertIn(f"{heads_up.CHANGE_LEAD} Second.", out)
         self.assertEqual(test_db.get_setting(heads_up.NOTIFY_MARKER), str(second))
         self.assertLess(first, second)
-        with patch("trainmate.clock.now", return_value=_at(23, 22, 30)):
+        with patch("stamind.clock.now", return_value=_at(23, 22, 30)):
             self.assertTrue(heads_up.changes_due())
 
     def test_declining_sends_nothing_early(self):
@@ -475,7 +475,7 @@ class NotifyTest(_DbCase):
         run_cli(["workout", "notify"], input_value="y")
         test_db.rollback_to_change(undone, today_str(), summary="undo")
         self.change(note="The next change.", day="2026-09-25")
-        with patch("trainmate.clock.now", return_value=_at(23, 22, 30)):
+        with patch("stamind.clock.now", return_value=_at(23, 22, 30)):
             self.assertFalse(heads_up.changes_due())
 
 

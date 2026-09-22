@@ -10,16 +10,16 @@ import unittest.mock
 from datetime import date, timedelta
 
 from tests.helpers import clear_all_tables, rebind_test_db, restore_db_handles
-from trainmate.db import Database
-import trainmate.garmin as garmin
-from trainmate.analytics.pmc import (
+from stamind.db import Database
+import stamind.garmin as garmin
+from stamind.analytics.pmc import (
     color_ramp, color_tsb, compute_pmc, pmc_cells, pmc_data_caveat,
     pmc_display_values, pmc_ramp, pmc_warming_note, pmc_warmup_cutoff_for,
 )
 from tests import test_db_path
 
 
-TEST_DB_PATH = test_db_path("test_trainmate_pmc.db")
+TEST_DB_PATH = test_db_path("test_stamind_pmc.db")
 test_db = Database(db_path=TEST_DB_PATH)
 
 
@@ -237,7 +237,7 @@ class TestRamp(unittest.TestCase):
 class TestColors(unittest.TestCase):
     def setUp(self):
         # Force color on regardless of TTY so the band is observable.
-        self._patch = unittest.mock.patch("trainmate.text.is_color_enabled", return_value=True)
+        self._patch = unittest.mock.patch("stamind.text.is_color_enabled", return_value=True)
         self._patch.start()
 
     def tearDown(self):
@@ -426,7 +426,7 @@ class TestWeekSummary(unittest.TestCase):
         ]
 
     def setUp(self):
-        from trainmate.analytics import weekly_evidence
+        from stamind.analytics import weekly_evidence
         self.summary = weekly_evidence.pmc_week_summary
         series = self._rows("2026-03-02", [10.0 + i for i in range(14)])
         self.ctl_by_date = {m["date"]: m["ctl"] for m in series}
@@ -476,7 +476,7 @@ class TestPMCService(_DBBackedTest):
     def setUp(self):
         self._use_test_db()
         clear_all_tables(test_db)
-        from trainmate.coach.service import CoachService
+        from stamind.coach.service import CoachService
         self.svc = CoachService(db_instance=test_db)
         # 60 days of steady load + metrics rows, recomputed so CTL/ATL are populated and
         # the latest row is well past the warm-up cutoff.

@@ -18,7 +18,7 @@
 > 3. **ACWR is retired and the modules were split into packages.** ACWR went away on 2026-07-31
 >    (DESIGN_load_ratio.md); findings 4(b), 6 and 7 quote ACWR code that no longer exists, and
 >    those quotes are marked in place. Every module and line reference in this file also
->    predates the package split (`garmin.py` → `trainmate/garmin/*`, `coach/engine.py` and
+>    predates the package split (`garmin.py` → `stamind/garmin/*`, `coach/engine.py` and
 >    `coach/service.py` → packages), and is left as written: read all file/line pointers below
 >    as *where the code lived in July 2026*, not as a map of the tree today.
 
@@ -139,7 +139,7 @@ lookback bounded (design §3.1). The `last_metrics['acwr'] or 0.0` pattern quote
 **since-removed code** (banner note 3), cited here only as the zero-fill precedent to avoid.
 
 `status.py` uses `last_metrics['acwr'] or 0.0`. Copying that pattern means
-post-deploy `tm status --no-pull` prints `CTL 0.0 | ATL 0.0 | TSB 0.0` —
+post-deploy `sm status --no-pull` prints `CTL 0.0 | ATL 0.0 | TSB 0.0` —
 and TSB 0.0 *looks like a meaningful neutral reading*, not missing data.
 Spec: omit or dash when NULL, never zero-fill. Also unspecified: the ramp
 needs the row at exactly d−7; the design covers the young-DB edge but not an

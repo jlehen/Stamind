@@ -2,7 +2,7 @@
 
 ## The problem
 
-Switching the LLM TrainMate talks to means editing `config.yaml` by hand. Today that file
+Switching the LLM Stamind talks to means editing `config.yaml` by hand. Today that file
 carries the alternatives as commented-out lines:
 
 ```yaml
@@ -63,11 +63,11 @@ No labels or nicknames — the OpenRouter identifier is already short and is wha
 LLM exchange logs, so a second name for the same thing would only be one more thing to keep in
 sync.
 
-TrainMate is single-user (AGENTS.md), so this is a one-off config edit, not a migration: `model:`
+Stamind is single-user (AGENTS.md), so this is a one-off config edit, not a migration: `model:`
 goes away, `models:` arrives. `config_template.yaml` changes the same way. Nothing reads the old
 key afterward.
 
-New accessors on `Config` (`trainmate/config.py`), replacing `openrouter_model`:
+New accessors on `Config` (`stamind/config.py`), replacing `openrouter_model`:
 
 - `llm_models -> list[str]` — the configured list. Empty/absent falls back to a single-entry
   list holding the current hard-coded default (`"google/gemini-3.5-flash"`), so a fresh install
@@ -86,9 +86,9 @@ CREATE TABLE IF NOT EXISTS settings (
 )
 ```
 
-First and only key: `llm_model`. Created in `trainmate/db/schema.py` alongside the other tables;
+First and only key: `llm_model`. Created in `stamind/db/schema.py` alongside the other tables;
 accessors `get_setting(key)` / `get_setting_row(key)` / `set_setting(key, value)` /
-`clear_setting(key)` land in a `SettingsMixin` (in `trainmate/db/base.py`), following the `sync_state`
+`clear_setting(key)` land in a `SettingsMixin` (in `stamind/db/base.py`), following the `sync_state`
 upsert pattern (`INSERT … ON CONFLICT(key) DO UPDATE`). `get_setting_row` returns the whole row
 (`{key, value, updated_at}`) rather than just the value, because the "set 3d ago" annotation §4.1
 asks for needs the timestamp — a value-only getter cannot answer *when*.
@@ -110,13 +110,13 @@ Highest wins:
 
 `OpenRouterClient.__init__` currently does `self.model = config.openrouter_model` at *import*
 time. It can't read the DB there without dragging a database connection into every import of
-`trainmate.openrouter`. So `.model` becomes a lazily-resolved property:
+`stamind.openrouter`. So `.model` becomes a lazily-resolved property:
 
 ```python
 @property
 def model(self) -> str:
     if self._model is None:
-        self._model = active_model()      # trainmate/llm_models.py, reads runtime.db at call time
+        self._model = active_model()      # stamind/llm_models.py, reads runtime.db at call time
     return self._model
 
 @model.setter
@@ -124,7 +124,7 @@ def model(self, value: str) -> None:
     self._model = value
 ```
 
-The setter keeps `openrouter_client.model = args.llm_model` in `trainmate_cli.py` working
+The setter keeps `openrouter_client.model = args.llm_model` in `stamind_cli.py` working
 verbatim, and keeps the existing test (`tests/test_cli_misc.py::test_llm_model_override`)
 meaningful. Resolution happens on first use — after the DB exists, and after any
 `--llm-model` override has been applied.
@@ -132,12 +132,12 @@ meaningful. Resolution happens on first use — after the DB exists, and after a
 Because the resolved value is cached, the registry's `on_change` hook for `coach-model`
 calls `openrouter_client.reset_model()` to drop it — a set and a reset both change what the
 next call should resolve to. One CLI invocation is one process, so this matters only in the
-REPL (`tm shell`), where many commands share a process and the athlete reasonably expects a
+REPL (`sm shell`), where many commands share a process and the athlete reasonably expects a
 model change to take effect on the very next line.
 
 ### §3.2 — The resolver module
 
-New `trainmate/llm_models.py`, the single place that knows how config and DB combine:
+New `stamind/llm_models.py`, the single place that knows how config and DB combine:
 
 | Function | Returns |
 | --- | --- |
@@ -151,12 +151,12 @@ New `trainmate/llm_models.py`, the single place that knows how config and DB com
 | `clear_active_model()` | Deletes the row, falling back to the config default |
 
 Reads the handle as `runtime.db` at call time, so importing it — and
-`trainmate.openrouter` through it — touches no database.
+`stamind.openrouter` through it — touches no database.
 
 ### §3.3 — A stored model that left the config list
 
 The athlete edits `config.yaml` and drops the model that is currently stored. The stored id is
-still a perfectly valid OpenRouter identifier, so TrainMate keeps using it rather than silently
+still a perfectly valid OpenRouter identifier, so Stamind keeps using it rather than silently
 switching models behind the athlete's back. `model list` shows it as an extra, unnumbered line:
 
 ```

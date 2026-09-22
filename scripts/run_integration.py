@@ -1,7 +1,7 @@
 import os
 import sys
 from datetime import datetime, timedelta, timezone
-from trainmate import runtime
+from stamind import runtime
 
 def main() -> None:
     """Manually runs the calendar sync integration test with mocked/simulated database workouts."""

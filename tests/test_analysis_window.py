@@ -8,14 +8,14 @@ from datetime import datetime
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, rebind_test_db
-from trainmate.db import Database
+from stamind.db import Database
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_analysis_window.db")
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestReflectWatermark(unittest.TestCase):
@@ -38,7 +38,7 @@ class TestReflectWatermark(unittest.TestCase):
     def setUp(self):
         clear_all_tables(test_db)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_bootstrap_establishes_watermark(self, mock_client):
         mock_client.complete.return_value = {"macrocycle_summary": "s", "learning_updates": []}
         coach_service.data_bootstrap(
@@ -47,7 +47,7 @@ class TestReflectWatermark(unittest.TestCase):
         wm = test_db.get_sync_state("reflect")
         self.assertEqual(wm["through_date"], "2026-06-07")
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_reflect_starts_after_watermark(self, mock_client):
         """Reflect ingests only evidence newer than the watermark, so overlapping history
         is never re-counted (the source of confidence converging to 'established')."""
@@ -63,7 +63,7 @@ class TestReflectWatermark(unittest.TestCase):
         # Watermark advanced to the new through-date.
         self.assertEqual(test_db.get_sync_state("reflect")["through_date"], "2026-06-21")
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_reflect_no_new_evidence_skips_llm(self, mock_client):
         """With nothing new since the watermark, reflect makes no LLM call."""
         test_db.set_sync_state(
@@ -73,7 +73,7 @@ class TestReflectWatermark(unittest.TestCase):
         self.assertEqual(result, {})
         mock_client.complete.assert_not_called()
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_short_horizon_asks_for_response_not_cycles(self, mock_client):
         """Horizon selects the question, not just the window: a few weeks cannot support a
         periodization claim, so reflect is never asked for one (§10.3)."""
@@ -90,7 +90,7 @@ class TestReflectWatermark(unittest.TestCase):
         self.assertIn("physiological_insights", prompt)
         self.assertIn("learning_updates", prompt)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_long_horizon_still_asks_for_cycles(self, mock_client):
         mock_client.complete.return_value = {"macrocycle_summary": "s", "learning_updates": []}
         coach_service.data_bootstrap(
@@ -101,8 +101,8 @@ class TestReflectWatermark(unittest.TestCase):
         self.assertIn("inferred_mesocycles", prompt)
         self.assertIn("physiological_insights", prompt)
 
-    @patch("trainmate.coach.service.analysis._today_date")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.service.analysis._today_date")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_reflect_ends_on_the_last_completed_week(self, mock_client, mock_today):
         """Weeks are the unit of evidence, so a window may not end mid-week — a part-week
         would otherwise be cited as a whole one and could never be topped up (§10.4)."""
@@ -115,8 +115,8 @@ class TestReflectWatermark(unittest.TestCase):
         # Through Sunday 06-21, not Wednesday 06-24.
         self.assertEqual(test_db.get_sync_state("reflect")["through_date"], "2026-06-21")
 
-    @patch("trainmate.coach.service.analysis._today_date")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.service.analysis._today_date")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_reflect_midweek_with_no_completed_week_is_free(self, mock_client, mock_today):
         """What makes a daily invocation harmless: no completed week, no LLM call."""
         mock_today.return_value = datetime(2026, 6, 24).date()      # Wednesday
@@ -127,8 +127,8 @@ class TestReflectWatermark(unittest.TestCase):
         self.assertEqual(result, {})
         mock_client.complete.assert_not_called()
 
-    @patch("trainmate.coach.service.analysis._today_date")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.service.analysis._today_date")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_an_explicit_end_date_is_taken_as_given(self, mock_client, mock_today):
         """The snap is a default, not a policy: a named end date is the caller's call."""
         mock_today.return_value = datetime(2026, 6, 24).date()
@@ -139,7 +139,7 @@ class TestReflectWatermark(unittest.TestCase):
         coach_service.data_reflect(until_date_str="2026-06-24", no_pull=True)
         self.assertEqual(test_db.get_sync_state("reflect")["through_date"], "2026-06-24")
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_reflect_watermark_never_rewinds(self, mock_client):
         """A back-dated explicit window must not rewind the watermark."""
         test_db.set_sync_state(

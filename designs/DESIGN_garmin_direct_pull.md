@@ -2,7 +2,7 @@
 
 **Status:** Implemented · **Date:** 2026-06-09 · **Branch:** `main`
 
-This document captures the design for reworking `data pull` so TrainMate fetches
+This document captures the design for reworking `data pull` so Stamind fetches
 daily metrics and activities **directly from Garmin Connect**, tracks when data
 was last pulled, and **auto-pulls when a read needs data it doesn't have or that
 has gone stale**. It replaces the current Google Sheets ingestion path entirely.
@@ -15,7 +15,7 @@ has gone stale**. It replaces the current Google Sheets ingestion path entirely.
 > unchanged in shape. Four things moved underneath it, and this revision folds them in
 > rather than leaving the reader to discover them:
 >
-> 1. **`trainmate/garmin.py` became the package `trainmate/garmin/`** (§3, §4, §12).
+> 1. **`stamind/garmin.py` became the package `stamind/garmin/`** (§3, §4, §12).
 > 2. **ACWR was retired** in favour of the PMC (CTL/ATL/TSB) and the ATL:CTL load ratio —
 >    DESIGN_pmc_fitness_fatigue.md, DESIGN_load_ratio.md. Every acute/chronic/ACWR mention
 >    below is marked superseded in place (§4, §7, §8, §10).
@@ -32,19 +32,19 @@ Today data reaches the SQLite cache through **two hops**:
 
 ```
 Garmin Connect ──[GarminScraper repo: sync.py + garmin_client.py]──► Google Sheet
-               ──[TrainMate: google_sheets.py::sync_data]──► SQLite
+               ──[Stamind: google_sheets.py::sync_data]──► SQLite
 ```
 
 `GarminScraper` (a separate repo, `/home/jlh/src/GarminScraper`) logs into Garmin
 via `garminconnect`, computes TSS / RPE / HR-zones, and upserts rows into two
-sheet tabs ("Daily Metrics", "Activities"). TrainMate's `data pull` then reads
+sheet tabs ("Daily Metrics", "Activities"). Stamind's `data pull` then reads
 the *entire* sheet (`A1:Z5000`) and both (a) ingests raw rows and (b) recomputes
 derived metrics for every date.
 
 This is brittle and manual: the user must run GarminScraper out-of-band to keep
 the sheet current, and `data pull` only ever sees what the sheet happens to hold.
 
-**The goal:** collapse the two hops into one. TrainMate talks to Garmin directly,
+**The goal:** collapse the two hops into one. Stamind talks to Garmin directly,
 records a watermark of how far data has been pulled and when, and transparently
 refreshes recent data (and bootstraps/backfills on request) as commands read it.
 
@@ -79,18 +79,18 @@ refreshes recent data (and bootstraps/backfills on request) as commands read it.
 ## 3. Architecture: one hop
 
 ```
-Garmin Connect ──[TrainMate: trainmate/garmin/]──► SQLite
+Garmin Connect ──[Stamind: stamind/garmin/]──► SQLite
                   (login + fetch + measured-TSS / zone parsing / RPE read,
                    then db.save_completed_activity / save_metric_cache / save_baseline)
 ```
 
 The pure logic from GarminScraper — login/token handling, per-day metric
 extraction, per-activity fetch, TSS computation, HR-zone parsing — moves into a
-new `trainmate/garmin` (rev. 1 shipped it as a single `garmin.py`; it is now a package —
+new `stamind/garmin` (rev. 1 shipped it as a single `garmin.py`; it is now a package —
 §4). (The TSS/load math was subsequently reworked — see the
 Load model note in §4 and ARCHITECTURE.md §12.) The Sheets **write** side
 (`sheets_client.py`) and the
-TrainMate Sheets **read** side (`google_sheets.py::GarminSheetsReader`) both go
+Stamind Sheets **read** side (`google_sheets.py::GarminSheetsReader`) both go
 away. The rows that GarminScraper used to shape for the sheet are instead shaped
 for the existing `db.save_*` calls.
 
@@ -98,9 +98,9 @@ for the existing `db.save_*` calls.
 
 ## 4. Module layout
 
-**New: `trainmate/garmin/`** — ported and adapted from GarminScraper. Rev. 1 specified one
+**New: `stamind/garmin/`** — ported and adapted from GarminScraper. Rev. 1 specified one
 file; it grew past comfortable reading and was split into four submodules, all re-exported
-from `trainmate/garmin/__init__.py` so `from trainmate import garmin`,
+from `stamind/garmin/__init__.py` so `from stamind import garmin`,
 `garmin.pull(...)` and `patch.object(garmin, …)` all keep working unchanged:
 
 | Submodule | Holds |
@@ -139,24 +139,24 @@ from `trainmate/garmin/__init__.py` so `from trainmate import garmin`,
   measured `tss` for stored activities from their saved zone seconds (no Garmin calls) and
   returns the number of rows that changed; CLI: `data backfill-tss [-d RANGE] [-v]`.
 
-**Removed:** `trainmate/google_sheets.py` (the `GarminSheetsReader` /
+**Removed:** `stamind/google_sheets.py` (the `GarminSheetsReader` /
 `sheets_reader` singleton). Its derived-metric logic (acute/chronic workload,
 ACWR, 28-day baselines) is preserved but moves into the recompute pass (§10).
 
 > **Superseded (2026-07-31, DESIGN_load_ratio.md).** Acute/chronic workload and ACWR were
 > retired: the columns are actively DROPped from `athlete_metrics_cache` on schema init
-> and no `acwr` symbol survives in `trainmate/`. What the recompute pass inherited from
+> and no `acwr` symbol survives in `stamind/`. What the recompute pass inherited from
 > the Sheets reader is the **28-day baselines**; the workload half was replaced by the
 > PMC — CTL / ATL / TSB EWMAs (DESIGN_pmc_fitness_fatigue.md) plus the ATL:CTL **load
 > ratio** that took over ACWR's job without fighting block periodization. Read every
 > "acute/chronic/ACWR" below as "CTL/ATL/TSB + load ratio".
 
-**Changed:** `trainmate_cli.py` `data pull` subcommand and the auto-ensure call
-sites; `trainmate/db.py` (new `sync_state` table + helpers — now the `trainmate/db/`
-package, `db/schema.py` + `db/activities.py`); `trainmate/config.py`
-(new knobs); `trainmate/clock.py` (local-date helper, §12).
+**Changed:** `stamind_cli.py` `data pull` subcommand and the auto-ensure call
+sites; `stamind/db.py` (new `sync_state` table + helpers — now the `stamind/db/`
+package, `db/schema.py` + `db/activities.py`); `stamind/config.py`
+(new knobs); `stamind/clock.py` (local-date helper, §12).
 
-**Dependency:** add `garminconnect` to TrainMate's requirements.
+**Dependency:** add `garminconnect` to Stamind's requirements.
 
 ---
 
@@ -320,7 +320,7 @@ computed dates, e.g.:
 
 ```
 This view needs data back to 2026-02-10, but the database starts at 2026-05-01.
-Run:  python trainmate_cli.py data pull -d 2026-02-10..2026-04-30
+Run:  python stamind_cli.py data pull -d 2026-02-10..2026-04-30
 ```
 
 Cold start uses `garmin_initial_backfill_days` (default 90) to compute the
@@ -416,7 +416,7 @@ tokens already exist.
 No token-file pre-checking: we simply attempt `login(tokenstore=…)`; the
 exception surfacing *is* the re-auth signal. Callers catch `GarminAuthRequired`,
 fall back to cached DB data, and warn: *"Garmin re-auth required — run
-`python trainmate_cli.py data pull` in a terminal."*
+`python stamind_cli.py data pull` in a terminal."*
 
 **Decision A — the web is a pure reader.** The Flask app never pulls from Garmin.
 It renders whatever the DB holds and surfaces the watermark ("synced N ago") so
@@ -427,7 +427,7 @@ path entirely, and sidesteps token-store write races between server and CLI.
 > **Rev. 2 — Decision A is now enforced, not merely observed.** It used to hold because
 > no route happened to call `pull()`, backed by a single `POST /api/metrics/pull` that
 > answered 409 with the CLI command. The dashboard has since been demoted to read-only
-> repo-wide: a `before_request` guard in `trainmate_web.py` **405s every mutating verb**
+> repo-wide: a `before_request` guard in `stamind_web.py` **405s every mutating verb**
 > (POST/PUT/PATCH/DELETE) in one place, and the pull endpoint is gone. A route that wants
 > to write has to delete the guard first — which is the point. The dashboard still reads
 > `sync_state` and renders the freshness line, exactly as designed here.
@@ -437,7 +437,7 @@ section (`garmin.email` / `garmin.password` — rev. 1 wrote them flat; see §13
 **not** read from the environment —
 `config.yaml` is gitignored, and keeping them out of env avoids leaking
 credentials into process listings and shell history. The measured TSS is
-computed in TrainMate from Garmin's per-zone seconds via fixed Coggan/Friel
+computed in Stamind from Garmin's per-zone seconds via fixed Coggan/Friel
 multipliers (the FTP/LTHR that define those zones live on the Garmin side), so
 the GarminScraper `.env` duplication disappears. FTP/LTHR remain in
 `config.yaml` `user_profile` for coaching context. Token store defaults to
@@ -446,7 +446,7 @@ the GarminScraper `.env` duplication disappears. FTP/LTHR remain in
 > **Rev. 3 — the token store is per-instance state, and the old default hid that.** The
 > original default `~/.garminconnect` was shared machine-wide, and `login(tokenstore=…)`
 > resumes any valid tokens found there *without ever touching*
-> `garmin.email`/`garmin.password` — so a second athlete's TRAINMATE_CONFIG instance
+> `garmin.email`/`garmin.password` — so a second athlete's STAMIND_CONFIG instance
 > that left `token_dir` unset silently pulled the **primary** athlete's Garmin data
 > into its own database. `token_dir` now follows the same CONFIG_PATH rule as
 > `database:`/`science_dir:`: relative values resolve against the config file's
@@ -462,7 +462,7 @@ the GarminScraper `.env` duplication disappears. FTP/LTHR remain in
 ## 12. Timezone fix — calendar dates vs instants
 
 Garmin keys all daily metrics and activities on the athlete's **local** calendar
-date. TrainMate currently computes "today" in **UTC** (`datetime.now(timezone.utc)`),
+date. Stamind currently computes "today" in **UTC** (`datetime.now(timezone.utc)`),
 which drifts a day from local at boundary hours — producing a lagging frontier
 (Europe, after local midnight) or a permanent false "today missing" warning
 (Americas, evenings).
@@ -480,7 +480,7 @@ Split the `datetime.now(timezone.utc)` uses:
 
 *Rev. 2 — the rule, not a site list.* Rev. 1 enumerated the call sites by file and line.
 Those pointers are all dead (`db` and `coach` became packages, `cli.py` split into
-`trainmate_cli.py` + `trainmate/cli/`, `google_sheets.py` was deleted), and enumerating
+`stamind_cli.py` + `stamind/cli/`, `google_sheets.py` was deleted), and enumerating
 them was never the invariant anyway. The invariant that actually holds, and is worth
 checking on review, is: **every calendar date goes through `clock.today_date()` /
 `clock.today_str()`; every surviving `datetime.now(timezone.utc)` is an instant
@@ -523,7 +523,7 @@ Each gets a typed accessor on `Config` alongside the existing properties.
 
 ## 14. Migration & removal
 
-- Delete `trainmate/google_sheets.py`; remove `google_sheet_id` usage for metrics
+- Delete `stamind/google_sheets.py`; remove `google_sheet_id` usage for metrics
   (Calendar config stays).
 - Existing accumulated history already lives in the DB from prior `data pull`
   runs, so there is no data migration — the watermark simply initializes from the
@@ -554,7 +554,7 @@ Each gets a typed accessor on `Config` alongside the existing properties.
 **Open / to confirm during implementation** — *resolved (rev. 2):*
 - Exact helper name(s) in `util` (`today_str()` vs `local_today()`). → **both**:
   `clock.today_date()` returns a `date`, `clock.today_str()` the `YYYY-MM-DD` string.
-- Whether `ensure_data` lives in `trainmate/garmin.py` or a thin coordinator
+- Whether `ensure_data` lives in `stamind/garmin.py` or a thin coordinator
   module called by the CLI. → it lives in the garmin package, `garmin/sync.py`,
   alongside `pull()`; the CLI calls it at command entry.
 - Whether a cron `data pull` should emit a desktop/push notification on

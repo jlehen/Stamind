@@ -19,12 +19,12 @@ def _days_out(n: int) -> str:
 
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 def _generate_workouts(**kwargs):
@@ -173,8 +173,8 @@ class TestDateKeyedGeneration(unittest.TestCase):
 
     # --- what generation actually does with it ------------------------------------
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_the_plan_covering_today_shapes_the_sessions_not_the_earliest_goal(
         self, mock_client, _mock_calendar
     ):
@@ -195,8 +195,8 @@ class TestDateKeyedGeneration(unittest.TestCase):
         # the span falls in from the dates alone.
         self.assertIn("> Build", system_prompt)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_span_crossing_two_plans_tags_each_session_with_its_own(
         self, mock_client, _mock_calendar
     ):
@@ -226,8 +226,8 @@ class TestDateKeyedGeneration(unittest.TestCase):
         self.assertIn("spring", system_prompt)
         self.assertIn("autumn", system_prompt)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_horizon_past_the_last_mesocycle_says_so(self, mock_client, _mock_calendar):
         """Days past the plan's end have no mesocycle to follow — a date-keyed view can see
         that and say it, where the goal-keyed one could not."""
@@ -240,8 +240,8 @@ class TestDateKeyedGeneration(unittest.TestCase):
         self.assertIn("The plan runs out on", out.getvalue())
         self.assertIn(_days_out(20), out.getvalue())
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_no_plan_at_all_still_names_plan_generate(self, mock_client, _mock_calendar):
         self._goal("Autumn Marathon", _days_out(90))
         with self.assertRaises(ValueError) as ctx:

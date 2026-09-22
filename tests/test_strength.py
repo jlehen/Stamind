@@ -12,14 +12,14 @@ from tests.helpers import clear_all_tables, rebind_test_db, run_cli, save_workou
 
 TEST_DB_PATH = test_db_path("test_strength.db")
 
-from trainmate.db import Database
-import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
+from stamind.db import Database
+import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
-from trainmate import athlete_queue, runtime, settings
-from trainmate.cli.render.session_lines import simple_compare_lines
-from trainmate.garmin import sync
-from trainmate.sentinels import QUEUE_SENTINEL
-from trainmate.strength import questions, sets, vocabulary
+from stamind import athlete_queue, runtime, settings
+from stamind.cli.render.session_lines import simple_compare_lines
+from stamind.garmin import sync
+from stamind.sentinels import QUEUE_SENTINEL
+from stamind.strength import questions, sets, vocabulary
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)
@@ -116,12 +116,12 @@ class _StrengthCase(unittest.TestCase):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
         self.now = WEDNESDAY_8AM
-        moving_clock = patch("trainmate.clock.now", side_effect=lambda: self.now)
+        moving_clock = patch("stamind.clock.now", side_effect=lambda: self.now)
         moving_clock.start()
         self.addCleanup(moving_clock.stop)
         settings.write(settings.STRENGTH_SETS_SINCE, "2026-09-01")
         self.garmin = FakeGarmin()
-        connect = patch("trainmate.garmin.connect", return_value=self.garmin)
+        connect = patch("stamind.garmin.connect", return_value=self.garmin)
         connect.start()
         self.addCleanup(connect.stop)
         self.addCleanup(runtime.reset, "prompt")
@@ -512,7 +512,7 @@ class SetNamesTest(_StrengthCase):
         self.assertIsNone(test_db.get_exercise_sets("tue")[0]["exercise"])
 
     def test_a_proposal_is_only_ever_a_name_the_vocabulary_has(self):
-        with patch("trainmate.openrouter.openrouter_client.complete",
+        with patch("stamind.openrouter.openrouter_client.complete",
                    return_value={"names": ["Pec Deck", "nordic curl", 7, "pec deck",
                                            "chest fly", "leg press"]}):
             self.assertEqual(questions.propose("butterfly machine"),
@@ -526,7 +526,7 @@ class SetNamesTest(_StrengthCase):
 class CommandsTest(_StrengthCase):
     def setUp(self):
         super().setUp()
-        os.environ.pop("TRAINMATE_FRONTEND", None)
+        os.environ.pop("STAMIND_FRONTEND", None)
         self.activity("mon", day="2026-09-14", payload=garmin_sets(lift("SQUAT", "LEG_PRESS")))
 
     def test_name_splits_a_block_and_asks_the_rest_again(self):
@@ -654,7 +654,7 @@ class ShownTest(_StrengthCase):
     def test_workout_compare_and_done_lately_show_the_sets(self):
         activity = self.activity("tue", payload=garmin_sets(lift("SQUAT", "LEG_PRESS", 10, 140)))
         self.read()
-        os.environ.pop("TRAINMATE_RENDER", None)
+        os.environ.pop("STAMIND_RENDER", None)
         _, out, _ = run_cli(["workout", "compare", "-d", TUESDAY, "--no-pull", "--no-mark"])
         self.assertIn("leg press 1×10 @ 140", out)
         lines = simple_compare_lines([(TUESDAY, [], [self.row("tue")])], TUESDAY, TUESDAY,
@@ -669,7 +669,7 @@ class LogTest(_StrengthCase):
 
     def setUp(self):
         super().setUp()
-        os.environ.pop("TRAINMATE_FRONTEND", None)
+        os.environ.pop("STAMIND_FRONTEND", None)
         self.activity("sun", day="2026-09-13", payload=garmin_sets(
             lift("SQUAT", "BELT_SQUAT", 5, 120),
             lift("SQUAT", "BELT_SQUAT", 5, 140),
@@ -746,7 +746,7 @@ class LogTest(_StrengthCase):
         _, out, _ = run_cli(["strength", "exercises"])
         for pattern in vocabulary.PATTERNS:
             self.assertIn(pattern, out)
-        self.assertIn(f"{len(vocabulary.all_exercises())} exercises TrainMate can name", out)
+        self.assertIn(f"{len(vocabulary.all_exercises())} exercises Stamind can name", out)
         self.assertIn("2 on your record", out)  # belt squat and goblet squat
 
     def test_one_pattern_lists_its_exercises_and_marks_the_athletes_own(self):
@@ -767,11 +767,11 @@ class MorningPushTest(_StrengthCase):
 
     def setUp(self):
         super().setUp()
-        ensure = patch("trainmate.garmin.ensure_data")
+        ensure = patch("stamind.garmin.ensure_data")
         ensure.start()
         self.addCleanup(ensure.stop)
-        env = patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json",
-                                      "TRAINMATE_RENDER": "simple"})
+        env = patch.dict(os.environ, {"STAMIND_FRONTEND": "json",
+                                      "STAMIND_RENDER": "simple"})
         env.start()
         self.addCleanup(env.stop)
         test_db.set_setting("push_adapt_first", "off")

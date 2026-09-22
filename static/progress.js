@@ -18,7 +18,7 @@ function fmtDuration(seconds) {
 }
 
 // --- TIME IN ZONE (DESIGN_intensity_distribution.md §9.6/§9.8) ---
-// The web form of `tm progress -z`: one table per qualifying sport, measured behind
+// The web form of `sm progress -z`: one table per qualifying sport, measured behind
 // today and prescribed ahead of it. Every judgement (which sports, which currency, what
 // counts as undercounted) is made server-side by the same functions the CLI calls — this
 // only draws the result.

@@ -2,7 +2,7 @@
 
 Both cases here are drift bugs the old shape allowed: a preview that re-derived the
 apply-time rule, and a fingerprint recomputed after the athlete had a chance to edit
-the inputs. See trainmate/coach/proposals.py.
+the inputs. See stamind/coach/proposals.py.
 """
 import json
 import os
@@ -19,19 +19,19 @@ def _goal_ahead(days: int) -> str:
     goal is only `upcoming` while it is ahead — a literal expired the fingerprint tests
     the day it passed, and both hashes then described the same empty goal list."""
     from datetime import timedelta
-    from trainmate.clock import today_date
+    from stamind.clock import today_date
     return (today_date() + timedelta(days=days)).isoformat()
 
 
-from trainmate import plan_inputs
-from trainmate.db import Database
-from trainmate.coach.proposals import RevisionProposal, PlanFingerprints
-from trainmate.coach.revisions import normalize_load_fields, pair_revisions
+from stamind import plan_inputs
+from stamind.db import Database
+from stamind.coach.proposals import RevisionProposal, PlanFingerprints
+from stamind.coach.revisions import normalize_load_fields, pair_revisions
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestPairAdaptations(unittest.TestCase):

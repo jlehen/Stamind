@@ -19,16 +19,16 @@ def _goal_ahead(days: int = 100) -> str:
     These goals are scaffolding — nothing asserts the date — but a plan is only active
     while its goal is ahead, so a literal expired the tests the day it passed.
     """
-    from trainmate.clock import today_date
+    from stamind.clock import today_date
     return (today_date() + timedelta(days=days)).isoformat()
 
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_web_plan.db")
+TEST_DB_PATH = test_db_path("test_stamind_web_plan.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
-import trainmate_web
+import stamind_web
 
 # An isolated database for the web app's singleton; test_web.py says why.
 test_db = Database(db_path=TEST_DB_PATH)
@@ -43,7 +43,7 @@ class TestPlanVersionsEndpoint(unittest.TestCase):
         global test_db
         test_db = Database(db_path=TEST_DB_PATH)
         rebind_test_db(test_db)
-        cls.client = trainmate_web.app.test_client()
+        cls.client = stamind_web.app.test_client()
 
     @classmethod
     def tearDownClass(cls):
@@ -86,7 +86,7 @@ class TestPlanVersionsEndpoint(unittest.TestCase):
 
 class TestPlanDiffEndpoint(unittest.TestCase):
     """GET /api/plan/diff — the web face of `plan diff`. Both front-ends render the same
-    trainmate/plan_versions.py structure, so this asserts the payload, not the wording."""
+    stamind/plan_versions.py structure, so this asserts the payload, not the wording."""
 
     @classmethod
     def setUpClass(cls):
@@ -95,7 +95,7 @@ class TestPlanDiffEndpoint(unittest.TestCase):
         global test_db
         test_db = Database(db_path=TEST_DB_PATH)
         rebind_test_db(test_db)
-        cls.client = trainmate_web.app.test_client()
+        cls.client = stamind_web.app.test_client()
 
     @classmethod
     def tearDownClass(cls):

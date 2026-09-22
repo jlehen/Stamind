@@ -58,10 +58,10 @@
 > from `N = 0` — a first-pull DB is the youngest case, not an excluded one.
 > (3) The §3.3(b) caveat wording is parameterized by τ_ctl, and while the whole
 > history is still inside the warm-up window it states that values are *suppressed*
-> instead of caveating numbers that aren't shown — and `tm status` shows it even
+> instead of caveating numbers that aren't shown — and `sm status` shows it even
 > then. (4) The TSB-lag footnote appears only where TSB itself is shown.
 
-`trainmate/science/training_load.md` (f0bb707) documents the full Performance Management
+`stamind/science/training_load.md` (f0bb707) documents the full Performance Management
 Chart model — CTL (fitness), ATL (fatigue), TSB (form), and the CTL ramp rate —
 and its §5 coaching directives tell the coach things like *"when TSB falls below
 −30, default to recovery"* and *"taper so TSB rises into +5..+25 by event day"*.
@@ -69,7 +69,7 @@ But the app never computes any of these numbers. The science file is concatenate
 verbatim into every coach prompt, so the LLM knows the *theory* perfectly and can
 never apply it: the directives reference values that appear nowhere in its input.
 The ACWR half of the same document **is** implemented end-to-end
-(`garmin.recompute_derived()` → `athlete_metrics_cache` → prompts → `tm status`);
+(`garmin.recompute_derived()` → `athlete_metrics_cache` → prompts → `sm status`);
 this design gives the PMC half the identical treatment.
 
 **The app computes; the LLM reasons.** Same division of labour as everywhere
@@ -94,7 +94,7 @@ free from the science file.
   can climb unsustainably for weeks while ACWR stays in the sweet spot, the
   exact divergence `training_load.md` warns about (§5 directives, after the file's
   ACWR→ATL:CTL renumbering).
-- **The user can't see fitness either.** `tm status` shows ACWR/acute/chronic
+- **The user can't see fitness either.** `sm status` shows ACWR/acute/chronic
   but nothing answers "am I fitter than last month?" or "how fresh am I?" —
   the two questions the PMC exists for.
 
@@ -120,29 +120,29 @@ design started from (ACWR-era, historical per the amendment banner).
 
 | Layer | Where (current) | Then (pre-PMC) |
 |---|---|---|
-| Compute | `trainmate/garmin/derived.py` `recompute_derived()`, over the maths in `analytics/pmc.py` | full-sweep acute (7d sum), chronic (28d/4), ACWR per metrics day |
+| Compute | `stamind/garmin/derived.py` `recompute_derived()`, over the maths in `analytics/pmc.py` | full-sweep acute (7d sum), chronic (28d/4), ACWR per metrics day |
 | Store | `athlete_metrics_cache` (`db/schema.py`), `save_metric_cache()` (`db/activities.py`), `AthleteMetric` (`types.py`) | `acute_workload`, `chronic_workload`, `acwr` columns |
 | Wipe | `wipe_garmin_data()` (`db/wipes.py`) | deletes rows by range; **does not** recompute (see §4) |
 | Coach, per-day | `format_metrics_history()` (`coach/formatting.py`) → generate & adapt prompts (`coach/engine/generate.py`, `adapt.py`) | `... ACWR=1.12` per day line — **unguarded** `:.2f`, see §5.1 |
 | Coach, summary | data summary in `coach/service/history_context.py` → strategy/plan prompts | "Current ACWR: 1.12 (latest)" |
 | Coach, weekly | analysis weekly digest (`coach/service/analysis.py`) | `max_acwr` per week |
 | Cache key | evidence fingerprint (`coach/service/analysis.py` `met_digest`) | hashes 6-tuple incl. `m.get('acwr')` per metrics row |
-| User | `tm status` (`cli/status.py`), `tm data show-metrics` table/CSV (`cli/data/show.py`), `color_acwr` (was `util.py`) | ACWR + acute/chronic shown; `acwr or 0.0` zero-fill |
+| User | `sm status` (`cli/status.py`), `sm data show-metrics` table/CSV (`cli/data/show.py`), `color_acwr` (was `util.py`) | ACWR + acute/chronic shown; `acwr or 0.0` zero-fill |
 
 **Package split (post-ship).** The four modules this design names were split into
 packages after it merged, so the original paths no longer resolve. Current homes:
 
 | Design says | Actually lives in |
 |---|---|
-| `garmin.py` — `recompute_derived`, `backfill_tss`, `pmc_history_start` | `trainmate/garmin/derived.py` |
-| `garmin.py` — `compute_pmc`, `load_ratio`, `pmc_ramp`, `pmc_display_values`, `pmc_data_caveat` | `trainmate/analytics/pmc.py` (no database, no Garmin) |
-| `garmin.py` — `pull()`, `_warn_manual` | `trainmate/garmin/sync.py` |
-| `garmin.py` — the derivation pad | `trainmate/analytics/pmc.py` `derivation_pad_days()` |
-| `coach/service.py` — data summary, PMC/ramp/caveat lines | `trainmate/coach/service/history_context.py` |
-| `coach/service.py` — weekly digest | `trainmate/coach/service/analysis.py` |
-| `coach/engine.py` — `met_digest` fingerprint | `trainmate/coach/engine/prompt.py` |
-| `coach/engine.py` — generate/adapt prompt assembly | `trainmate/coach/engine/generate.py`, `adapt.py` |
-| `cli/workouts.py` | `trainmate/cli/workouts/*.py` (but see §6.2b — that surface is gone) |
+| `garmin.py` — `recompute_derived`, `backfill_tss`, `pmc_history_start` | `stamind/garmin/derived.py` |
+| `garmin.py` — `compute_pmc`, `load_ratio`, `pmc_ramp`, `pmc_display_values`, `pmc_data_caveat` | `stamind/analytics/pmc.py` (no database, no Garmin) |
+| `garmin.py` — `pull()`, `_warn_manual` | `stamind/garmin/sync.py` |
+| `garmin.py` — the derivation pad | `stamind/analytics/pmc.py` `derivation_pad_days()` |
+| `coach/service.py` — data summary, PMC/ramp/caveat lines | `stamind/coach/service/history_context.py` |
+| `coach/service.py` — weekly digest | `stamind/coach/service/analysis.py` |
+| `coach/engine.py` — `met_digest` fingerprint | `stamind/coach/engine/prompt.py` |
+| `coach/engine.py` — generate/adapt prompt assembly | `stamind/coach/engine/generate.py`, `adapt.py` |
+| `cli/workouts.py` | `stamind/cli/workouts/*.py` (but see §6.2b — that surface is gone) |
 
 Each row gets a PMC counterpart — no new subsystem. (Rev. 5 also listed plan-side
 `Mesocycle`/`Workout.tss` rows for the phase color and taper projection; those are
@@ -297,7 +297,7 @@ not a computed accuracy figure:
   window, so every surfaced value is suppressed; then the line instead states
   that PMC is suppressed and why, rather than caveating numbers the prompt
   doesn't contain.
-- **To the user** — a matching short `tm status` line, and the `_warn_manual`
+- **To the user** — a matching short `sm status` line, and the `_warn_manual`
   baseline text (`garmin/sync.py`) gains a PMC sentence so a young-DB user sees
   *why* freshness reads low. **Warm branch only:** `_warn_manual(cold=True)` — the
   "no Garmin data has been pulled yet" case — carries no PMC sentence, because with
@@ -562,7 +562,7 @@ is small and self-healing; not worth guarding.
 
 ## 6. Surfacing to the user (CLI first)
 
-### 6.1 `tm status`
+### 6.1 `sm status`
 
 One line under ACWR (`cli/status.py`):
 
@@ -601,7 +601,7 @@ One line under ACWR (`cli/status.py`):
   triple won't subtract to the shown TSB; a dim one-line footnote states this so
   the user doesn't read it as a bug.
 
-### 6.2 `tm data show-metrics`
+### 6.2 `sm data show-metrics`
 
 Three new table columns and CSV fields next to the existing ACWR/Acute/Chronic
 ones (`cli/data/show.py`). Same NULL → blank/`—` and warm-up omission as the status
@@ -613,7 +613,7 @@ downstream parsing doesn't read a zero as data.
 > **This surface does not exist. Do not go looking for it, and do not "restore" it
 > without revisiting the decision below.** It shipped in `613b47c` and was deliberately
 > deleted in `ce0b74d` (*"workout adapt: collapse metrics table to a one-line day
-> count"*). `trainmate/cli/workouts/adapt.py` now prints only
+> count"*). `stamind/cli/workouts/adapt.py` now prints only
 > `Using N days of recovery metrics (past N-day window).`
 >
 > **Why it went:** the reason for the table was "the athlete should see what the coach
@@ -621,7 +621,7 @@ downstream parsing doesn't read a zero as data.
 > reasoning*, so a full trajectory table above the Decision Summary was redundant noise
 > on every adapt — several screenfuls of columns to re-derive a judgment the paragraph
 > underneath already states. The one-line day count keeps the honest part (how much data
-> fed the decision) at ~1% of the vertical space. `tm status` and `tm data show-metrics`
+> fed the decision) at ~1% of the vertical space. `sm status` and `sm data show-metrics`
 > remain the places to read the trajectory itself.
 
 The original spec, kept for the record: the same three columns on the trajectory table
@@ -635,10 +635,10 @@ Nothing bespoke *for this design* — the bot and web tab render what the shared
 status/summary code produces.
 
 > **Superseded: the web PMC chart shipped.** §7 lists it as a non-goal ("nice, not
-> now"); that is no longer true. `GET /api/timeline.png` (`trainmate_web.py`) serves
+> now"); that is no longer true. `GET /api/timeline.png` (`stamind_web.py`) serves
 > the web **Progress** tab a PNG of merged past/planned load *plus the projected
 > CTL/ATL/TSB series*, rendered by `chart.render_timeline_png`; the Telegram bot posts
-> the identical image and `tm progress` prints the same triple as text. That work is
+> the identical image and `sm progress` prints the same triple as text. That work is
 > specified by **DESIGN_progress_timeline.md** (§6 for the endpoint, §7 for the three
 > front-ends) — read it there, not here. Anyone treating §7's non-goal as current
 > would rebuild a shipped feature.
@@ -651,7 +651,7 @@ status/summary code produces.
 
 - Idempotent `ALTER TABLE` on `athlete_metrics_cache` (§4) — no data migration;
   NULL-tolerant on old rows.
-- The next `tm data pull` (or any `recompute_derived()` path) back-populates PMC
+- The next `sm data pull` (or any `recompute_derived()` path) back-populates PMC
   for the entire cached history in one sweep. Old analysis caches refresh
   naturally via the fingerprint change (§5.5).
 - **Docs:** update `ARCHITECTURE.md` (AGENTS.md L2–3 requires it) — the
@@ -665,7 +665,7 @@ backfill defaults to 90 days (`garmin_initial_backfill_days`); §3.3(a) blanks t
 first 42, and the §3.3(b) flag runs to ~126 days. So a new user sees **no** PMC
 for ~6 weeks, then flagged numbers for weeks more — whereas ACWR is trustworthy at
 28 days. This is inherent to the model, not a bug. The only real remedy is a
-deeper Garmin backfill (`tm data pull --start`), itself bounded by Garmin's
+deeper Garmin backfill (`sm data pull --start`), itself bounded by Garmin's
 retention.
 
 **Out of scope, deliberately:**
@@ -714,8 +714,8 @@ retention.
   > | per-day prompt line (§5.1) | `ACWR=1.12` | `ATL:CTL=1.15` (`coach/formatting.py`) |
   > | data-summary line (§5.2) | "Current ACWR: 1.12 (latest)" | `ATL:CTL 1.15 (relative overload)`, folded into the PMC line (`coach/service/history_context.py`) |
   > | weekly digest key (§5.4) | `max_acwr` | `max_load_ratio` (`coach/service/analysis.py`) |
-  > | `tm status` (§6.1) | ACWR line | `ATL:CTL` field on the Fitness line (`cli/status.py`) |
-  > | `tm data show-metrics` (§6.2) | ACWR column / CSV field | `ATL:CTL` column / CSV field (`cli/data/show.py`) |
+  > | `sm status` (§6.1) | ACWR line | `ATL:CTL` field on the Fitness line (`cli/status.py`) |
+  > | `sm data show-metrics` (§6.2) | ACWR column / CSV field | `ATL:CTL` column / CSV field (`cli/data/show.py`) |
   > | coloring | `color_acwr` (0.8–1.3 band) | `color_load_ratio` — overload end only: `> 1.5` red, `1.3–1.5` yellow, low uncolored (`analytics/pmc.py`) |
   >
   > Helpers: `load_ratio(atl, ctl)` (`analytics/pmc.py`) — `None` when either EWMA
@@ -805,7 +805,7 @@ Added since (pinning contracts §3.2 gained for the forward fold):
 > The section below is the *original* spec, kept verbatim for its rationale. Treating
 > it as a to-do list means re-deriving working code.
 >
-> **Shipped (`trainmate/analytics/progression.py`, DESIGN_progress_timeline.md §4):**
+> **Shipped (`stamind/analytics/progression.py`, DESIGN_progress_timeline.md §4):**
 >
 > | Phase-2 element | As built |
 > |---|---|

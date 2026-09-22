@@ -4,10 +4,10 @@ import unittest
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_learnings.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_learnings.db")
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)

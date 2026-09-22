@@ -3,17 +3,17 @@ import unittest
 from datetime import date
 
 from tests.helpers import clear_all_tables, rebind_test_db
-from trainmate.analytics.adherence import analyze_adherence, format_discrepancies
+from stamind.analytics.adherence import analyze_adherence, format_discrepancies
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_adaptation_adherence.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestAdaptationAdherence(unittest.TestCase):
@@ -123,7 +123,7 @@ class TestAdaptationAdherence(unittest.TestCase):
         self.assertTrue(any("Unplanned Activity! Performed 'Extra Run'" in l for l in lines))
 
     def test_classify_adherence_statuses(self):
-        from trainmate.analytics.adherence import classify_adherence
+        from stamind.analytics.adherence import classify_adherence
 
         run = {"sport_type": "running", "title": "Run",
                "duration_minutes": 30, "rpe": 5, "tss": 25}
@@ -502,7 +502,7 @@ class TestPendingSessions(unittest.TestCase):
 
 class TestClassifyPending(unittest.TestCase):
     def test_pending_flag_changes_the_verdict_only_when_unmatched(self):
-        from trainmate.analytics.adherence import classify_adherence
+        from stamind.analytics.adherence import classify_adherence
         run = {"sport_type": "running", "title": "Run", "duration_minutes": 60,
                "tss": 50.0, "rpe": 5}
         self.assertEqual(classify_adherence(run, None)["status"], "missed")
@@ -516,7 +516,7 @@ class TestClassifyPending(unittest.TestCase):
         )
 
     def test_a_rest_day_is_never_pending(self):
-        from trainmate.analytics.adherence import classify_adherence
+        from stamind.analytics.adherence import classify_adherence
         rest = {"sport_type": "rest", "title": "Rest"}
         self.assertEqual(
             classify_adherence(rest, None, pending=True)["status"], "rest_ok"

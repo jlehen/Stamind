@@ -8,11 +8,11 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_settings.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_settings.db")
 
-from trainmate import settings
-from trainmate.db import Database
-import trainmate_cli
+from stamind import settings
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -46,8 +46,8 @@ class SettingsTestCase(unittest.TestCase):
                 pass
 
     def setUp(self):
-        from trainmate.config import config
-        from trainmate.openrouter import openrouter_client
+        from stamind.config import config
+        from stamind.openrouter import openrouter_client
         clear_all_tables(test_db)
         openrouter_client.reset_model()
         patcher = patch.dict(config.data, self.CONFIG)
@@ -92,7 +92,7 @@ class TestTheListing(SettingsTestCase):
 
     def test_a_config_value_this_setting_cannot_read_is_reported_not_obeyed(self):
         # What PyYAML makes of an unquoted 07:30 — a sexagesimal integer (§3).
-        from trainmate.config import config
+        from stamind.config import config
         with patch.dict(config.data, {"telegram": {"push": {"morning_time": 450}}}):
             exit_code, stdout, _ = self.run_cli(["settings"])
             self.assertEqual(exit_code, 0)
@@ -179,11 +179,11 @@ class TestCoachModel(SettingsTestCase):
         _, stdout, _ = self.run_cli(["settings", "list", "coach-model"])
         self.assertIn("not in config list", stdout)
         # Still the model that would be queried — nothing is auto-corrected.
-        from trainmate.llm_models import active_model
+        from stamind.llm_models import active_model
         self.assertEqual(active_model(), "anthropic/claude-opus-4.8")
 
     def test_the_invocation_override_wins_and_stores_nothing(self):
-        from trainmate.openrouter import openrouter_client
+        from stamind.openrouter import openrouter_client
         self.run_cli(["settings", "set", "coach-model", "2"])
         exit_code, _, _ = self.run_cli(
             ["--llm-model", "google/gemini-2.5-pro", "goal", "list"])
@@ -192,7 +192,7 @@ class TestCoachModel(SettingsTestCase):
         self.assertEqual(self._stored(), self.MODELS[1])
 
     def test_the_client_resolves_the_stored_model(self):
-        from trainmate.openrouter import openrouter_client
+        from stamind.openrouter import openrouter_client
         self.run_cli(["settings", "set", "coach-model", "3"])
         self.assertEqual(openrouter_client.model, self.MODELS[2])
 
@@ -217,7 +217,7 @@ class TestRouterModel(SettingsTestCase):
         self.assertIsNone(settings.router_model())
 
     def test_config_seeds_it_and_the_stored_row_overrides(self):
-        from trainmate.config import config
+        from stamind.config import config
         seeded = dict(self.CONFIG["llm"], router_model=self.MODELS[3])
         with patch.dict(config.data, {"llm": seeded}):
             self.assertEqual(settings.router_model(), self.MODELS[3])
@@ -227,7 +227,7 @@ class TestRouterModel(SettingsTestCase):
             self.assertEqual(settings.router_model(), self.MODELS[3])
 
     def test_a_config_key_emptied_out_reads_as_unset(self):
-        from trainmate.config import config
+        from stamind.config import config
         seeded = dict(self.CONFIG["llm"], router_model="   ")
         with patch.dict(config.data, {"llm": seeded}):
             self.assertIsNone(settings.router_model())
@@ -236,7 +236,7 @@ class TestRouterModel(SettingsTestCase):
 
     def test_the_router_command_uses_it(self):
         self.run_cli(["settings", "set", "router-model", "2"])
-        from trainmate.openrouter import openrouter_client
+        from stamind.openrouter import openrouter_client
         with patch.object(openrouter_client, "complete",
                           return_value={"intent": "show_today"}) as complete:
             exit_code, stdout, _ = self.run_cli(["bot", "route", "what's today?"])
@@ -257,7 +257,7 @@ class TestMorningPushKnobs(SettingsTestCase):
         self.assertFalse(settings.adapt_first())
 
     def test_config_seeds_them(self):
-        from trainmate.config import config
+        from stamind.config import config
         telegram = {"push": {"enabled": False, "morning_time": "07:30",
                           "morning_deadline": "12:00", "adapt_first": True}}
         with patch.dict(config.data, {"telegram": telegram}):
@@ -267,7 +267,7 @@ class TestMorningPushKnobs(SettingsTestCase):
             self.assertTrue(settings.adapt_first())
 
     def test_a_stored_row_overrides_config_and_reset_gives_it_back(self):
-        from trainmate.config import config
+        from stamind.config import config
         with patch.dict(config.data, {"telegram": {"push": {"morning_time": "07:30"}}}):
             self.run_cli(["settings", "set", "morning-time", "06:15"])
             self.assertEqual(settings.morning_time(), "06:15")
@@ -299,7 +299,7 @@ class TestMorningPushKnobs(SettingsTestCase):
 
     def test_the_push_window_is_computed_from_the_stored_times(self):
         import datetime
-        from trainmate.chat import scheduler
+        from stamind.chat import scheduler
         self.run_cli(["settings", "set", "morning-time", "06:00"])
         self.run_cli(["settings", "set", "morning-deadline", "09:00"])
         now = datetime.datetime(2026, 6, 10, 5, 0)
@@ -309,7 +309,7 @@ class TestMorningPushKnobs(SettingsTestCase):
             3600.0)
 
     def test_the_morning_command_adapts_only_when_the_switch_is_on(self):
-        with patch("trainmate.cli.bot.views._auto_adapt_note", return_value="adapted") as note:
+        with patch("stamind.cli.bot.views._auto_adapt_note", return_value="adapted") as note:
             self.run_cli(["bot", "morning", "--force"])
             self.assertFalse(note.called)
             self.run_cli(["settings", "set", "adapt-first", "on"])
@@ -331,7 +331,7 @@ class TestRegistryShape(SettingsTestCase):
             self.assertRegex(name, r"^[a-z][a-z0-9-]*$")
 
     def test_every_setting_resolves_with_an_empty_database_and_config(self):
-        from trainmate.config import config
+        from stamind.config import config
         with patch.dict(config.data, {}, clear=True):
             for name in settings.names():
                 with self.subTest(name=name):

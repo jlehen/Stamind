@@ -21,7 +21,7 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, pin_clock, rebind_test_db
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_periodization.db")
+TEST_DB_PATH = test_db_path("test_stamind_periodization.db")
 
 
 def _days_out(n: int) -> str:
@@ -33,13 +33,13 @@ def _days_out(n: int) -> str:
 # (same rot 2a7cd71 fixed in test_constraints.py).
 GOAL_DATE = _days_out(71)
 
-import trainmate.config
-from trainmate.db import Database
+import stamind.config
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 def _generate_workouts(**kwargs):
@@ -100,10 +100,10 @@ class TestPlanGeneratePrompt(unittest.TestCase):
         self.assertIn("Base Building (2026-06-01 to 2026-06-28): Zone 2 runs", prompt)
         self.assertIn("Peak & Taper (2026-06-29 to 2026-07-05): Tapering", prompt)
         self.assertIn("## COACH LEARNINGS & ACTIVE PERIODIZATION STRATEGY", prompt)
-        self.assertIn("START OF TRAINMATE SPORTS SCIENCE GUIDELINES", prompt)
-        self.assertIn("END OF TRAINMATE SPORTS SCIENCE GUIDELINES", prompt)
+        self.assertIn("START OF STAMIND SPORTS SCIENCE GUIDELINES", prompt)
+        self.assertIn("END OF STAMIND SPORTS SCIENCE GUIDELINES", prompt)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_replan_provides_previous_strategy_context_to_llm(self, mock_client):
         obj_id = test_db.add_objective(
             title="Zurich Marathon", target_date=GOAL_DATE,
@@ -174,7 +174,7 @@ class TestPlanGeneratePrompt(unittest.TestCase):
                 "Wednesday": 0.0,
             },
         }
-        with patch.dict(trainmate.config.config.data, {"user_profile": test_profile}):
+        with patch.dict(stamind.config.config.data, {"user_profile": test_profile}):
             prompt = coach_service._get_coach_system_prompt([], [])
             self.assertIn("Jane Doe", prompt)
             self.assertIn("Birth Year: 1990", prompt)
@@ -194,14 +194,14 @@ class TestPlanGeneratePrompt(unittest.TestCase):
             "name": "Jane Doe",
             "weekly_target_hours": 8.0,
         }
-        with patch.dict(trainmate.config.config.data, {"user_profile": test_profile}):
+        with patch.dict(stamind.config.config.data, {"user_profile": test_profile}):
             prompt = coach_service._get_coach_system_prompt([], [])
             self.assertIn("no day-by-day schedule configured", prompt)
             self.assertIn("No day-by-day availability schedule is configured", prompt)
             self.assertNotIn("Adhere to the day-by-day weekly availability schedule", prompt)
             self.assertNotIn("No availability configured", prompt)
 
-    @patch("trainmate.runtime.config")
+    @patch("stamind.runtime.config")
     def test_load_science_guidelines(self, mock_config):
         temp_app_dir = tempfile.mkdtemp()
         temp_user_dir = tempfile.mkdtemp()
@@ -229,10 +229,10 @@ class TestPlanGeneratePrompt(unittest.TestCase):
             # the athlete's banner opens.
             self.assertLess(
                 guidelines.index("App guideline text"),
-                guidelines.index("END OF TRAINMATE SPORTS SCIENCE GUIDELINES"),
+                guidelines.index("END OF STAMIND SPORTS SCIENCE GUIDELINES"),
             )
             self.assertLess(
-                guidelines.index("END OF TRAINMATE SPORTS SCIENCE GUIDELINES"),
+                guidelines.index("END OF STAMIND SPORTS SCIENCE GUIDELINES"),
                 guidelines.index("START OF ATHLETE-PROVIDED SPORTS SCIENCE GUIDELINES"),
             )
             self.assertLess(
@@ -243,7 +243,7 @@ class TestPlanGeneratePrompt(unittest.TestCase):
             shutil.rmtree(temp_app_dir)
             shutil.rmtree(temp_user_dir)
 
-    @patch("trainmate.runtime.config")
+    @patch("stamind.runtime.config")
     def test_science_guidelines_omit_banner_for_empty_source(self, mock_config):
         """A fresh install has no `science/` dir — it must produce no athlete banner at
         all, rather than an empty one (DESIGN_prompt_structure.md §3)."""
@@ -256,12 +256,12 @@ class TestPlanGeneratePrompt(unittest.TestCase):
 
             guidelines = coach_service._load_science_guidelines()
 
-            self.assertIn("START OF TRAINMATE SPORTS SCIENCE GUIDELINES", guidelines)
+            self.assertIn("START OF STAMIND SPORTS SCIENCE GUIDELINES", guidelines)
             self.assertNotIn("ATHLETE-PROVIDED", guidelines)
         finally:
             shutil.rmtree(temp_app_dir)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_recent_history_summary_periodization_plan(self, mock_client):
         pin_clock(self, "2026-06-18")
         obj_id = test_db.add_objective(
@@ -295,8 +295,8 @@ class TestPlanGeneratePrompt(unittest.TestCase):
         self.assertIn("running: 1 activity", system_prompt)
         self.assertIn("Resting Heart Rate: 55.0 bpm", system_prompt)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_recent_history_workout_generation(self, mock_client, mock_calendar):
         pin_clock(self, "2026-06-18")
         obj_id = test_db.add_objective(

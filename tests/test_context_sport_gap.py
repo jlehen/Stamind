@@ -8,8 +8,8 @@ The second class below covers how the 15-day summary counts sports, which is
 It keeps a fake handle, because that one does read the database."""
 import unittest
 
-from trainmate.coach.service.history_context import HistoryContextMixin
-from trainmate.coach.service.mesocycle_context import MesocycleContextMixin
+from stamind.coach.service.history_context import HistoryContextMixin
+from stamind.coach.service.mesocycle_context import MesocycleContextMixin
 
 
 class _Ctx(MesocycleContextMixin):
@@ -109,7 +109,7 @@ class TestRecentHistorySportsAreCanonical(unittest.TestCase):
     Garmin spells one sport several ways — `road_biking` outdoors, `indoor_cycling` on
     the trainer. Grouped on the raw spelling, the coach read one week of riding as two
     sports it had never heard of, while `status` and `progress` called the same rides
-    `cycling` (trainmate/sports.py)."""
+    `cycling` (stamind/sports.py)."""
 
     def test_two_garmin_spellings_of_cycling_are_one_line(self):
         ctx = _DbCtx([

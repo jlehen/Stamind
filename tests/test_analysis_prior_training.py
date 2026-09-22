@@ -5,14 +5,14 @@ import os
 import unittest
 
 from tests.helpers import clear_all_tables, rebind_test_db, save_workout
-from trainmate.db import Database
+from stamind.db import Database
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_analysis_prior_training.db")
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestPriorTrainingContext(unittest.TestCase):

@@ -37,7 +37,7 @@ def _modules_loaded_by(import_lines: str, prefixes: tuple) -> list:
 
 
 class TestAnalyticsIsPure(unittest.TestCase):
-    """`trainmate/analytics/` is training maths over rows it is handed.
+    """`stamind/analytics/` is training maths over rows it is handed.
 
     Importing any of it must not pull in the storage layer. The rule is what lets the
     coach, the CLI and the web app share one load model without three of them paying for
@@ -45,26 +45,26 @@ class TestAnalyticsIsPure(unittest.TestCase):
 
     A module here may still take a database handle as an argument — `adherence_window`
     does. It is being handed one that someone else built; that is not the same as
-    importing `trainmate.db`.
+    importing `stamind.db`.
     """
 
     def test_no_analytics_module_loads_the_database_package(self):
         offenders = {}
-        for path in sorted(glob.glob(os.path.join(REPO, "trainmate", "analytics", "*.py"))):
+        for path in sorted(glob.glob(os.path.join(REPO, "stamind", "analytics", "*.py"))):
             name = os.path.basename(path)[:-3]
-            module = "trainmate.analytics" if name == "__init__" else f"trainmate.analytics.{name}"
-            loaded = _modules_loaded_by(f"import {module}", ("trainmate.db",))
+            module = "stamind.analytics" if name == "__init__" else f"stamind.analytics.{name}"
+            loaded = _modules_loaded_by(f"import {module}", ("stamind.db",))
             if loaded:
                 offenders[module] = loaded
         self.assertEqual(
             offenders, {},
             "these analytics modules load the storage layer; take the rows as an "
-            f"argument instead of importing trainmate.db: {offenders}",
+            f"argument instead of importing stamind.db: {offenders}",
         )
 
 
 class TestTheWebAppIsAReader(unittest.TestCase):
-    """`trainmate_web` serves the dashboard and writes nothing.
+    """`stamind_web` serves the dashboard and writes nothing.
 
     That is a claim about capability, not about intent: a reader that has imported the
     coach service or the Calendar client is one call away from writing, and an operator
@@ -77,39 +77,39 @@ class TestTheWebAppIsAReader(unittest.TestCase):
     """
 
     FORBIDDEN = (
-        "trainmate.cli",              # a front-end; the web app is another one
-        "trainmate.coach",            # the model call and everything it orchestrates
-        "trainmate.openrouter",       # the model client itself
-        "trainmate.gcal",             # writes events, and reads the credentials file
+        "stamind.cli",              # a front-end; the web app is another one
+        "stamind.coach",            # the model call and everything it orchestrates
+        "stamind.openrouter",       # the model client itself
+        "stamind.gcal",             # writes events, and reads the credentials file
         "googleapiclient",
     )
 
     def test_importing_the_web_app_loads_no_writer(self):
-        loaded = _modules_loaded_by("import trainmate_web", self.FORBIDDEN)
+        loaded = _modules_loaded_by("import stamind_web", self.FORBIDDEN)
         self.assertEqual(
             loaded, [],
             "the web app is read-only, so importing it must not load these; follow the "
-            f"chain from trainmate_web's own imports: {loaded}",
+            f"chain from stamind_web's own imports: {loaded}",
         )
 
 
 class TestTheChatPackageNeedsNoTelegram(unittest.TestCase):
-    """`trainmate/chat/` is the Telegram front-end's own code, apart from the process.
+    """`stamind/chat/` is the Telegram front-end's own code, apart from the process.
 
     `chat/telegram_api.py` is the only module that names `python-telegram-bot`, and it
     imports the library inside each function rather than at module scope, so importing
-    anything under `trainmate/chat/` loads none of it. That is what makes the whole
+    anything under `stamind/chat/` loads none of it. That is what makes the whole
     front-end — the routing tables, the keyboards, the scheduler and `ChatBot` itself —
-    unit-testable without the library, and what lets `tm bot route` read the router's
+    unit-testable without the library, and what lets `sm bot route` read the router's
     intent table out of `chat/routing.py` without a chat front-end turning up on a
     command line.
     """
 
     def test_no_chat_module_loads_the_telegram_library(self):
         offenders = {}
-        for path in sorted(glob.glob(os.path.join(REPO, "trainmate", "chat", "*.py"))):
+        for path in sorted(glob.glob(os.path.join(REPO, "stamind", "chat", "*.py"))):
             name = os.path.basename(path)[:-3]
-            module = "trainmate.chat" if name == "__init__" else f"trainmate.chat.{name}"
+            module = "stamind.chat" if name == "__init__" else f"stamind.chat.{name}"
             loaded = _modules_loaded_by(f"import {module}", ("telegram",))
             if loaded:
                 offenders[module] = loaded

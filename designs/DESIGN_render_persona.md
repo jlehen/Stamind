@@ -46,10 +46,10 @@ To know which surfaces have opted in, they grep. To add a surface they pick a sp
 a command body and add a sixteenth branch. The expert form, meanwhile, is inline in
 the command it belongs to, so the two voices of one surface are never side by side.
 
-The codebase already solved this shape once. `TRAINMATE_FRONTEND` chooses a prompt
+The codebase already solved this shape once. `STAMIND_FRONTEND` chooses a prompt
 *transport*, and no command asks which one it got: `make_prompt()` builds a
 `TtyPrompt` or `JsonPrompt` at startup, `runtime.prompt` hands it out, and commands
-call `confirm()` on whatever they were given. `TRAINMATE_RENDER` chooses a *voice* and
+call `confirm()` on whatever they were given. `STAMIND_RENDER` chooses a *voice* and
 deserves the same treatment.
 
 ## 2. Goals / Non-Goals
@@ -84,7 +84,7 @@ A **renderer** is the voice a CLI process speaks in. There are two, they share o
 method set, and a process gets exactly one for its lifetime:
 
 ```
-TRAINMATE_RENDER  ──►  make_renderer()  ──►  runtime.render
+STAMIND_RENDER  ──►  make_renderer()  ──►  runtime.render
      (unset)              ExpertRenderer          reports, tables, IDs, operator nudges
      simple               CompanionRenderer       prose, day words, no IDs, no nudges
 ```
@@ -102,7 +102,7 @@ renderer, because for them there is nothing to choose.
 
 ## 4. The renderer
 
-One package, `trainmate/cli/render/`, holding the pure line builders — `session_lines.py`
+One package, `stamind/cli/render/`, holding the pure line builders — `session_lines.py`
 for a day and what was trained in it, `plan_lines.py` for the goals, constraints and plan
 it is built from, both moved from `cli/common.py`, `cli/runway.py` and `cli/plans.py`,
 see §7 — and the two classes, `expert.py` and `companion.py`.
@@ -158,9 +158,9 @@ class CompanionRenderer(ExpertRenderer):
 
 
 def make_renderer(render: Optional[str] = None):
-    """The one place TRAINMATE_RENDER is interpreted (mirrors make_prompt)."""
+    """The one place STAMIND_RENDER is interpreted (mirrors make_prompt)."""
     if render is None:
-        render = os.environ.get("TRAINMATE_RENDER", "")
+        render = os.environ.get("STAMIND_RENDER", "")
     return CompanionRenderer() if render.strip().lower() == "simple" else ExpertRenderer()
 ```
 
@@ -170,8 +170,8 @@ def make_renderer(render: Optional[str] = None):
 @_builder("render")
 def _build_render():
     """The active voice: ExpertRenderer on a terminal and in the operator's chat,
-    CompanionRenderer under the simple bot (trainmate.cli.render.make_renderer)."""
-    from trainmate.cli.render import make_renderer
+    CompanionRenderer under the simple bot (stamind.cli.render.make_renderer)."""
+    from stamind.cli.render import make_renderer
     return make_renderer()
 ```
 
@@ -279,7 +279,7 @@ returns None and the "did I draw, or did I choose not to" ambiguity goes away.
 ## 6. Tests
 
 `runtime.render` is a cached singleton, so once any test has built it,
-`patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"})` changes the env and not the
+`patch.dict(os.environ, {"STAMIND_RENDER": "simple"})` changes the env and not the
 object. The failure runs both ways, and the quiet direction is the worse one: the
 class-level patcher in `test_runway.py` would build a companion renderer first, and
 every expert test after it in the process would print companion prose — most assert on
@@ -325,7 +325,7 @@ gets uncomfortable. Before them, one wording commit: the operator's name replace
 5. **Sweep.** Move the `simple_*` line builders and the `SIMPLE_*` constants from
    `cli/common.py`, `cli/runway.py`, `cli/plans.py` and `cli/workouts/revisions.py`
    (`_simple_preview_lines`) into `cli/render.py` so the companion voice is one file;
-   update the `bot.py` imports. Delete `is_simple_render()`; `TRAINMATE_RENDER` is
+   update the `bot.py` imports. Delete `is_simple_render()`; `STAMIND_RENDER` is
    now read in `make_renderer` only. Update DESIGN_bot_simple_frontend.md §6 and §8 to
    point here.
 
@@ -347,7 +347,7 @@ The Telegram front-end branches on `simple_ui` about ten times: the reply keyboa
 wrap width, `<pre>` versus flowed replies, the help card, whether bare text goes to the
 router, whether the morning push fires, which menu is registered. These are the
 persona's behaviour and they all read one flag, `ChatBot.simple_ui` in
-`trainmate/chat/app.py`, so they are not this design's problem.
+`stamind/chat/app.py`, so they are not this design's problem.
 
 If they ever become one, the same shape fits: an `ExpertChat` / `CompanionChat` pair
 with `reply_markup()`, `wrap_width()`, `format_reply(text)`, `menu_commands()`,
@@ -357,23 +357,23 @@ what makes it cheap to add a third persona later. Not scheduled.
 
 ## 9. Touch points
 
-- `trainmate/cli/render/` — new: line builders, `ExpertRenderer`,
+- `stamind/cli/render/` — new: line builders, `ExpertRenderer`,
   `CompanionRenderer`, `make_renderer`.
-- `trainmate/runtime.py` — the `render` builder.
-- `trainmate/cli/common.py`, `cli/runway.py`, `cli/plans.py`,
+- `stamind/runtime.py` — the `render` builder.
+- `stamind/cli/common.py`, `cli/runway.py`, `cli/plans.py`,
   `cli/workouts/revisions.py` — lose the `simple_*` builders and constants (step 5).
-- `trainmate/cli/workouts/generate.py`, `cli/goals.py`, `cli/plans/`,
+- `stamind/cli/workouts/generate.py`, `cli/goals.py`, `cli/plans/`,
   `cli/progress.py`, `cli/workouts/revisions.py`, `cli/constraints.py`,
   `cli/runway.py`, `cli/status.py` — command bodies call `runtime.render.*`; inline
   expert code becomes named functions in place.
-- `trainmate/cli/bot/` — import path of the line builders only.
+- `stamind/cli/bot/` — import path of the line builders only.
 - `tests/helpers.py` — `run_cli` resets the renderer per invocation; the env-patching
   tests are untouched.
 - `tests/test_simple_render.py` — the three `is_simple_render()` tests become
   `make_renderer()` tests.
 - `designs/DESIGN_bot_simple_frontend.md` §6, §8 — pointer here.
-- `trainmate/config.py`, `config.yaml.example` — the `telegram.operator_name` knob.
-- `trainmate_bot.py` — one sentence, the new-goal card's "tell your coach" (§5);
+- `stamind/config.py`, `config.yaml.example` — the `telegram.operator_name` knob.
+- `stamind_bot.py` — one sentence, the new-goal card's "tell your coach" (§5);
   otherwise untouched. Superseded: DESIGN_bot_simple_frontend.md §12.5 replaced the
   reply-only `new_goal` intent with a real capture, so that card and its sentence are
   gone. Nothing of this design lives in that file now.

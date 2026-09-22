@@ -9,8 +9,8 @@ import ast
 import pathlib
 import unittest
 
-SERVICE_DIR = pathlib.Path(__file__).resolve().parents[1] / "trainmate/coach/service"
-CLI_DIR = pathlib.Path(__file__).resolve().parents[1] / "trainmate/cli"
+SERVICE_DIR = pathlib.Path(__file__).resolve().parents[1] / "stamind/coach/service"
+CLI_DIR = pathlib.Path(__file__).resolve().parents[1] / "stamind/cli"
 
 # The readers, so everything else on `db` counts as a write. Listing the *writers* was
 # the earlier shape and it had drifted past six of them, `workout_change` — the write
@@ -103,7 +103,7 @@ class TestPreviewsRenderTheProposal(unittest.TestCase):
     """
 
     def test_no_preview_reads_the_database(self):
-        # Keyed on every preview *function* under trainmate/cli/, not on the one file
+        # Keyed on every preview *function* under stamind/cli/, not on the one file
         # that happened to be the bug: `workouts/generate.py` and `render/` draw
         # previews too, and the old `revisions*.py` glob matched neither.
         offenders, checked = [], set()
@@ -124,7 +124,7 @@ class TestPreviewsRenderTheProposal(unittest.TestCase):
                         offenders.append(f"{path.name}:{fn.name} reads db.{node.attr}")
         self.assertEqual(offenders, [], "\n".join(offenders))
         # A rule nothing matches is a rule that has quietly stopped being checked.
-        self.assertTrue(checked, "no preview function found under trainmate/cli/")
+        self.assertTrue(checked, "no preview function found under stamind/cli/")
 
     def test_the_revision_preview_module_reads_no_database_at_all(self):
         """Whole-module, not just its preview-named functions: this file is nothing but

@@ -26,7 +26,7 @@ llm:
 
 google:
   service_account_file: "service_account.json"
-  calendar_id: "trainmate-workouts@group.calendar.google.com"
+  calendar_id: "stamind-workouts@group.calendar.google.com"
 
 garmin:
   email: "sam@example.com"

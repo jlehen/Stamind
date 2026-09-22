@@ -3,13 +3,13 @@ import unittest
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
-from trainmate.clock import fmt_date
+from stamind.clock import fmt_date
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_signals.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_signals.db")
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -38,7 +38,7 @@ class TestCliSignals(unittest.TestCase):
     def run_cli(self, args, input_value="n"):
         return run_cli(args, input_value)
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_signal_add_and_list(self, mock_calendar):
         mock_calendar.calendar_id = "cal-1"
         ids = iter(["evt-1", "evt-2", "evt-3"])
@@ -76,7 +76,7 @@ class TestCliSignals(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("heat: 3 days", stdout)
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_signal_add_no_label_uses_metric_value_form(self, mock_calendar):
         mock_calendar.calendar_id = "cal-1"
         mock_calendar.add_signal_event.return_value = "evt-1"
@@ -90,7 +90,7 @@ class TestCliSignals(unittest.TestCase):
             mock_calendar.add_signal_event.call_args.args[3], "Alcohol: 2.0"
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_signal_add_label_flag(self, mock_calendar):
         mock_calendar.calendar_id = "cal-1"
         mock_calendar.add_signal_event.return_value = "evt-1"
@@ -103,7 +103,7 @@ class TestCliSignals(unittest.TestCase):
         rows = test_db.get_daily_signals("2026-06-25", "2026-06-25", metric="heat")
         self.assertEqual(rows[0]["text"], "severe heatwave, poor sleep")
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_signal_add_idempotent_by_date_metric(self, mock_calendar):
         mock_calendar.calendar_id = "cal-1"
         mock_calendar.add_signal_event.return_value = "evt-1"
@@ -118,7 +118,7 @@ class TestCliSignals(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["text"], "second")
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_signal_rm_deletes_calendar_event(self, mock_calendar):
         mock_calendar.calendar_id = "cal-1"
         test_db.upsert_daily_signal_by_event("evt-9", "2026-06-25", "heat", None, "hot")
@@ -129,7 +129,7 @@ class TestCliSignals(unittest.TestCase):
         mock_calendar.delete_event.assert_called_once_with("evt-9")
         self.assertEqual(test_db.get_daily_signals("2026-06-25", "2026-06-25"), [])
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_signal_rm_refuses_unscoped(self, mock_calendar):
         mock_calendar.calendar_id = "cal-1"
         test_db.upsert_daily_signal_by_event("evt-9", "2026-06-25", "heat", None, "hot")

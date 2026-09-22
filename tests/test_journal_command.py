@@ -1,4 +1,4 @@
-"""`tm journal` reads the files back in the athlete's terms
+"""`sm journal` reads the files back in the athlete's terms
 (DESIGN_logging.md §7): what the default listing leaves out and what the
 footer says about it (§7.1), and why a row that is not `ok` says so on the
 same screen (§7.3).
@@ -6,8 +6,8 @@ same screen (§7.3).
 import unittest
 from unittest.mock import patch
 
-from trainmate import journal
-from trainmate.text import default_wrap_width, visible_len
+from stamind import journal
+from stamind.text import default_wrap_width, visible_len
 from tests.helpers import bind_test_db, run_cli
 from tests import test_db_path
 from tests.test_journal import JournalTestCase
@@ -22,7 +22,7 @@ def setUpModule():
 
 
 class TestJournalCommand(JournalTestCase):
-    """`tm journal` reads the files back in the athlete's terms (§7)."""
+    """`sm journal` reads the files back in the athlete's terms (§7)."""
 
     def test_the_listing_shows_one_row_per_run_with_its_outcome(self):
         self._seed_runs()
@@ -51,7 +51,7 @@ class TestJournalCommand(JournalTestCase):
         self.assertIn("Traceback (most recent call last):", out)
 
     def test_an_ambiguous_prefix_lists_what_it_matched_rather_than_guessing(self):
-        with patch("trainmate.journal.secrets.token_hex",
+        with patch("stamind.journal.secrets.token_hex",
                    side_effect=["ab121234", "ab125678"]):
             for argv in (["status"], ["help"]):
                 journal.start_run(argv)

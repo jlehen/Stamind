@@ -11,15 +11,15 @@ from unittest.mock import MagicMock, patch
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_bot_capture.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_bot_capture.db")
 
-from trainmate.db import Database
-import trainmate_cli  # noqa: F401  (registers the bot parser)
+from stamind.db import Database
+import stamind_cli  # noqa: F401  (registers the bot parser)
 
-from trainmate import runtime
-from trainmate.config import config
-from trainmate.sentinels import BUTTONS_SENTINEL
-from trainmate.clock import today_str
+from stamind import runtime
+from stamind.config import config
+from stamind.sentinels import BUTTONS_SENTINEL
+from stamind.clock import today_str
 
 # One database for the whole module: the classes below share it and clear its tables per
 # test, so its lifecycle is module-level, not per-class.
@@ -76,7 +76,7 @@ class _CaptureCase(unittest.TestCase):
     def setUp(self):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
-        patcher = patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"})
+        patcher = patch.dict(os.environ, {"STAMIND_RENDER": "simple"})
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -91,7 +91,7 @@ class _CaptureCase(unittest.TestCase):
         """Runs one `bot capture …`; returns (exit code, stdout, the prompt)."""
         prompt = self.prompt(answers)
         with patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             **({"side_effect": extraction} if isinstance(extraction, Exception)
                else {"return_value": extraction}),
         ):
@@ -336,9 +336,9 @@ class CaptureEditTest(_CaptureCase):
         )[0]
         prompt = self.prompt(True)
         with patch(
-            "trainmate.openrouter.OpenRouterClient.complete",
+            "stamind.openrouter.OpenRouterClient.complete",
             return_value={"kind": "session", "id": session["id"]},
-        ), patch("trainmate.cli.bot.edit._hand_off_to_coach") as handoff:
+        ), patch("stamind.cli.bot.edit._hand_off_to_coach") as handoff:
             code, out, _ = run_cli(
                 ["bot", "capture", "edit_goal", "move my long run to Sunday"]
             )
@@ -403,7 +403,7 @@ class CaptureSettingTest(_CaptureCase):
         )
 
     def test_an_allowlisted_key_is_written_and_read_back_as_its_effect(self):
-        from trainmate import settings
+        from stamind import settings
         code, out, prompt = self._run({"key": "morning-time", "value": "07:00"})
         self.assertEqual(code, 0)
         self.assertEqual(settings.morning_time(), "07:00")
@@ -413,7 +413,7 @@ class CaptureSettingTest(_CaptureCase):
         self.assertNotIn("morning-time set to", out)
 
     def test_an_off_list_key_is_refused_honestly_and_names_the_operator(self):
-        from trainmate import settings
+        from stamind import settings
         code, out, prompt = self._run({"key": "coach-model", "value": "3"},
                                       text="use a smarter model")
         self.assertEqual(code, 0)
@@ -424,28 +424,28 @@ class CaptureSettingTest(_CaptureCase):
         self.assertIsNone(settings.stored(settings.COACH_MODEL))
 
     def test_an_operator_shaped_key_does_not_widen_the_guardrail(self):
-        from trainmate import settings
+        from stamind import settings
         code, out, _ = self._run({"key": "adapt-first", "value": "on"})
         self.assertEqual(code, 0)
         self.assertIsNone(settings.stored(settings.ADAPT_FIRST))
         self.assertIn("not me", out)
 
     def test_a_value_the_setting_cannot_read_asks_rather_than_writing(self):
-        from trainmate import settings
+        from stamind import settings
         code, out, _ = self._run({"key": "morning-time", "value": "breakfast"})
         self.assertEqual(code, 0)
         self.assertIsNone(settings.stored(settings.MORNING_TIME))
         self.assertIn("didn't catch what to set it to", out)
 
     def test_declining_leaves_the_setting_alone(self):
-        from trainmate import settings
+        from stamind import settings
         code, _, _ = self._run({"key": "push", "value": "off"}, answers=False)
         self.assertEqual(code, 0)
         self.assertIsNone(settings.stored(settings.PUSH))
 
     def test_the_learning_questions_switch_reads_back_as_its_effect(self):
         """"Stop asking me about that stuff" (DESIGN_learning_doubt_nudge.md §3.4)."""
-        from trainmate import settings
+        from stamind import settings
         code, _, prompt = self._run({"key": "learning-questions", "value": "off"},
                                     text="stop asking me about that stuff")
         self.assertEqual(code, 0)
@@ -457,7 +457,7 @@ class CaptureSettingTest(_CaptureCase):
 
     def test_the_terse_switch_reads_back_as_its_effect(self):
         """"Your messages are too long" (DESIGN_output_verbosity.md §9)."""
-        from trainmate import settings
+        from stamind import settings
         code, _, prompt = self._run({"key": "terse", "value": "on"},
                                     text="your messages are too long, keep it short")
         self.assertEqual(code, 0)

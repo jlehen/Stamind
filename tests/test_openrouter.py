@@ -2,9 +2,9 @@ import io
 import os
 import unittest
 from unittest.mock import patch, MagicMock
-from trainmate import journal
-from trainmate.openrouter import OpenRouterClient, _human_wait
-from trainmate.sentinels import FLUSH_SENTINEL
+from stamind import journal
+from stamind.openrouter import OpenRouterClient, _human_wait
+from stamind.sentinels import FLUSH_SENTINEL
 
 
 def _ok_response(content: str) -> MagicMock:
@@ -87,13 +87,13 @@ class TestParseJsonContent(unittest.TestCase):
 
     def test_dropping_an_object_is_recorded(self):
         # Silence was half the bug: nothing said the discarded characters existed.
-        with patch("trainmate.openrouter.journal.note") as note:
+        with patch("stamind.openrouter.journal.note") as note:
             OpenRouterClient._parse_json_content('{"a": 1}\n{"a": 2}')
         note.assert_called_once()
         self.assertEqual(note.call_args.kwargs["lvl"], "warn")
 
     def test_a_single_object_is_not_reported(self):
-        with patch("trainmate.openrouter.journal.note") as note:
+        with patch("stamind.openrouter.journal.note") as note:
             OpenRouterClient._parse_json_content('{"a": 1}\n\nAnything else?')
         note.assert_not_called()
 
@@ -110,7 +110,7 @@ class TestOpenRouterClient(unittest.TestCase):
         # tests have no business reaching (DESIGN_model_selection.md §3.1).
         self.client.model = "openai/gpt-5.4"
 
-    @patch("trainmate.openrouter.requests.post")
+    @patch("stamind.openrouter.requests.post")
     def test_openrouter_error_payload_raises_valueerror(self, mock_post):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -129,7 +129,7 @@ class TestOpenRouterClient(unittest.TestCase):
 
         self.assertIn("Rate limit reached for gpt-5.4", str(ctx.exception))
 
-    @patch("trainmate.openrouter.requests.post")
+    @patch("stamind.openrouter.requests.post")
     def test_error_payload_is_logged_exactly_once(self, mock_post):
         # The ValueError raised on the error branch falls into the generic handler, so
         # without a guard the same exchange gets written to two log files.
@@ -142,7 +142,7 @@ class TestOpenRouterClient(unittest.TestCase):
 
         self.assertEqual(log.call_count, 1)
 
-    @patch("trainmate.openrouter.requests.post")
+    @patch("stamind.openrouter.requests.post")
     def test_non_dict_error_value_still_surfaces(self, mock_post):
         mock_post.return_value = _ok_response("")
         mock_post.return_value.json.return_value = {"error": "upstream exploded"}
@@ -153,7 +153,7 @@ class TestOpenRouterClient(unittest.TestCase):
 
         self.assertIn("upstream exploded", str(ctx.exception))
 
-    @patch("trainmate.openrouter.requests.post")
+    @patch("stamind.openrouter.requests.post")
     def test_empty_choices_raises(self, mock_post):
         resp = _ok_response("")
         resp.json.return_value = {"choices": []}
@@ -165,7 +165,7 @@ class TestOpenRouterClient(unittest.TestCase):
 
         self.assertIn("Empty completion", str(ctx.exception))
 
-    @patch("trainmate.openrouter.requests.post")
+    @patch("stamind.openrouter.requests.post")
     def test_an_error_inside_the_choice_surfaces_as_the_providers_words(self, mock_post):
         # A provider that dies after generation began still answers 200, with the
         # error beside the partial content — a lone "{" with no usage this morning.
@@ -187,7 +187,7 @@ class TestOpenRouterClient(unittest.TestCase):
         self.assertIn("Provider disconnected", log.call_args.kwargs["error_msg"])
         self.assertIs(rec.call_args.args[2], False)
 
-    @patch("trainmate.openrouter.requests.post")
+    @patch("stamind.openrouter.requests.post")
     def test_an_unreadable_reply_is_a_failed_call_that_names_its_finish_reason(
         self, mock_post
     ):
@@ -206,7 +206,7 @@ class TestOpenRouterClient(unittest.TestCase):
         self.assertIn("not readable JSON", log.call_args.kwargs["error_msg"])
         self.assertIs(rec.call_args.args[2], False)
 
-    @patch("trainmate.openrouter.requests.post")
+    @patch("stamind.openrouter.requests.post")
     def test_a_readable_reply_is_recorded_once_as_ok(self, mock_post):
         mock_post.return_value = _ok_response('{"ok": true}')
 
@@ -218,7 +218,7 @@ class TestOpenRouterClient(unittest.TestCase):
         self.assertNotIn("error_msg", log.call_args.kwargs)
         self.assertIs(rec.call_args.args[2], True)
 
-    @patch("trainmate.openrouter.requests.post")
+    @patch("stamind.openrouter.requests.post")
     def test_request_carries_auth_json_mode_and_timeout(self, mock_post):
         mock_post.return_value = _ok_response('{"ok": true}')
 
@@ -236,9 +236,9 @@ class TestOpenRouterClient(unittest.TestCase):
         roles = [m["role"] for m in kwargs["json"]["messages"]]
         self.assertEqual(roles, ["system", "user"])
 
-    @patch("trainmate.openrouter.requests.post")
+    @patch("stamind.openrouter.requests.post")
     def test_missing_api_key_raises_before_any_request(self, mock_post):
-        with patch("trainmate.openrouter.config") as cfg:
+        with patch("stamind.openrouter.config") as cfg:
             cfg.openrouter_api_key = ""
             with self.assertRaises(ValueError) as ctx:
                 self.client.complete("s", "u")
@@ -266,9 +266,9 @@ class TestChatFlush(unittest.TestCase):
             at_post["stdout"] = buf.getvalue()
             return _ok_response('{"ok": true}')
 
-        with patch.dict(os.environ, {"TRAINMATE_FRONTEND": frontend}), \
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": frontend}), \
                 patch("sys.stdout", buf), \
-                patch("trainmate.openrouter.requests.post", side_effect=_record), \
+                patch("stamind.openrouter.requests.post", side_effect=_record), \
                 patch.object(self.client, "_log_exchange"):
             self.client.complete("SYSTEM", "USER", label="test")
         return at_post["stdout"]
@@ -299,7 +299,7 @@ class TestWaitNotice(unittest.TestCase):
         self.client.model = "openai/gpt-5.4"
         run = journal.Run(id="r1", argv=[], source="cli", parent=None, started=0.0,
                           command="workout adapt")
-        current = patch("trainmate.openrouter.journal.current", return_value=run)
+        current = patch("stamind.openrouter.journal.current", return_value=run)
         current.start()
         self.addCleanup(current.stop)
 
@@ -307,10 +307,10 @@ class TestWaitNotice(unittest.TestCase):
         """Everything `_announce_wait` printed, with `journal.llm_durations` answering
         `samples` (ms) for every lookup."""
         buf = io.StringIO()
-        with patch.dict(os.environ, {"TRAINMATE_FRONTEND": frontend,
-                                     "TRAINMATE_VERBOSE": ""}, clear=False), \
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": frontend,
+                                     "STAMIND_VERBOSE": ""}, clear=False), \
                 patch("sys.stdout", buf), \
-                patch("trainmate.openrouter.journal.llm_durations",
+                patch("stamind.openrouter.journal.llm_durations",
                       return_value=list(samples)):
             self.client._announce_wait("workout_adapt", notice)
         return buf.getvalue()
@@ -344,7 +344,7 @@ class TestWaitNotice(unittest.TestCase):
         self.assertIsNone(self._wait_estimate([40000]))
 
     def _wait_estimate(self, samples):
-        with patch("trainmate.openrouter.journal.llm_durations",
+        with patch("stamind.openrouter.journal.llm_durations",
                    return_value=list(samples)):
             return self.client._wait_estimate("workout_adapt")
 
@@ -358,23 +358,23 @@ class TestWaitNotice(unittest.TestCase):
             calls.append((command, model))
             return [] if model else [50000, 50000]
 
-        with patch("trainmate.openrouter.journal.llm_durations", side_effect=_durations):
+        with patch("stamind.openrouter.journal.llm_durations", side_effect=_durations):
             self.assertEqual(self.client._wait_estimate("workout_adapt"), 50.0)
         self.assertEqual(
             calls, [("workout adapt", "openai/gpt-5.4"), ("workout adapt", None)]
         )
 
     def test_a_call_outside_any_command_has_no_history(self):
-        with patch("trainmate.openrouter.journal.current", return_value=None), \
-                patch("trainmate.openrouter.journal.llm_durations") as durations:
+        with patch("stamind.openrouter.journal.current", return_value=None), \
+                patch("stamind.openrouter.journal.llm_durations") as durations:
             self.assertIsNone(self.client._wait_estimate("workout_adapt"))
         durations.assert_not_called()
 
     def test_an_unreadable_journal_costs_the_number_and_not_the_call(self):
         buf = io.StringIO()
-        with patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"}, clear=False), \
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}, clear=False), \
                 patch("sys.stdout", buf), \
-                patch("trainmate.openrouter.journal.llm_durations",
+                patch("stamind.openrouter.journal.llm_durations",
                       side_effect=OSError("no logs")):
             self.client._announce_wait("workout_adapt", self.NOTICE)
         self.assertIn("Reviewing your coming sessions — this can take a while.",

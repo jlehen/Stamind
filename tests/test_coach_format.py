@@ -1,11 +1,11 @@
-"""Tests for trainmate/coach/formatting.py — the renderers that build the coach
+"""Tests for stamind/coach/formatting.py — the renderers that build the coach
 prompt. Exact strings are the contract here: the string IS what the model reads."""
 import unittest
 
-from trainmate.coach.formatting import format_completed_activities
-from trainmate.coach.formatting import format_metrics_history
-from trainmate.analytics.pmc import PMC_TSB_LAG_NOTE
-from trainmate.coach.engine.prompt import PromptBuildMixin
+from stamind.coach.formatting import format_completed_activities
+from stamind.coach.formatting import format_metrics_history
+from stamind.analytics.pmc import PMC_TSB_LAG_NOTE
+from stamind.coach.engine.prompt import PromptBuildMixin
 
 
 def _activity(**overrides):

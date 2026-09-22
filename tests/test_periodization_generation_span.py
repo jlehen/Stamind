@@ -18,15 +18,15 @@ def _days_out(n: int) -> str:
 
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 
-from trainmate.cli.workouts import generate as generate_cli
-from trainmate.config import config
-from trainmate.cli.selectors import IdRange
-from trainmate.db import Database
+from stamind.cli.workouts import generate as generate_cli
+from stamind.config import config
+from stamind.cli.selectors import IdRange
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestGenerationSpanIsBounded(unittest.TestCase):
@@ -79,8 +79,8 @@ class TestGenerationSpanIsBounded(unittest.TestCase):
             description=f"[{title}]\n30 mins", duration_minutes=30,
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_the_span_opens_where_the_caller_put_it(self, mock_client, _mock_calendar):
         """A mesocycle that starts next month is generated from its own first day: `-m` names
         a span, not a horizon reaching back to today."""
@@ -95,8 +95,8 @@ class TestGenerationSpanIsBounded(unittest.TestCase):
         prompt = "".join(str(a) for a in mock_client.complete.call_args.args)
         self.assertIn(f"starting from {_days_out(30)}", prompt)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_the_span_never_opens_in_the_past(self, mock_client, _mock_calendar):
         """A mesocycle already under way is regenerated from today: yesterday is history."""
         mock_client.complete.return_value = self._response(_days_out(1))
@@ -106,8 +106,8 @@ class TestGenerationSpanIsBounded(unittest.TestCase):
         self.assertEqual(proposal.gen_start, _days_out(0))
         self.assertEqual(proposal.gen_end, _days_out(10))
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_only_the_sessions_inside_the_span_are_displaced(
         self, mock_client, _mock_calendar
     ):
@@ -131,8 +131,8 @@ class TestGenerationSpanIsBounded(unittest.TestCase):
         self.assertNotIn("Inside", live)
         self.assertIn(f"Run {_days_out(31)}", live)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_an_ordinary_session_written_over_a_test_is_not_a_test(
         self, mock_client, _mock_calendar
     ):
@@ -198,8 +198,8 @@ class TestGenerationSpanIsBounded(unittest.TestCase):
             generate_cli._resolve_span(args), (_days_out(0), _days_out(90)),
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_no_span_at_all_is_the_config_horizon_from_today(
         self, mock_client, _mock_calendar
     ):

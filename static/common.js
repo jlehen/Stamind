@@ -1,4 +1,4 @@
-// TrainMate dashboard — a READ-ONLY view over the database (ARCHITECTURE.md §8).
+// Stamind dashboard — a READ-ONLY view over the database (ARCHITECTURE.md §8).
 // Nothing here writes: the API refuses every mutating verb, so each panel that used to
 // carry a button now names the CLI command that does the job instead.
 //

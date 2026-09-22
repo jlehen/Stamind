@@ -18,12 +18,12 @@ def _days_out(n: int) -> str:
 
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 
 class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
@@ -58,7 +58,7 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
         )
         return oid, mid
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_archiving_one_goal_spares_the_other_goals_sessions(self, _cal):
         """The sweep is scoped by plan version, not by date: both sessions sit in the
         same future window, and only the called-off goal's is stood down."""
@@ -81,7 +81,7 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
             ["B session"],
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_archiving_leaves_untagged_sessions_in_place_and_counts_them(self, _cal):
         """An untagged session belongs to no plan version, so no goal may claim it."""
         oid, mid = self._goal_with_plan(
@@ -100,7 +100,7 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
             ["Untagged"],
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_archiving_leaves_the_training_already_done(self, _cal):
         """A called-off race does not un-train the work behind the athlete."""
         oid, mid = self._goal_with_plan(
@@ -117,7 +117,7 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
             ["Done"],
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_archiving_keeps_the_plan_its_versions_and_its_feedback(self, _cal):
         """The whole point of archiving over deleting: the history survives."""
         oid, mid = self._goal_with_plan(
@@ -134,7 +134,7 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
         self.assertEqual(len(test_db.get_mesocycles_for_macrocycle(mid)), 1)
         self.assertEqual(len(test_db.list_plan_feedback(mid)), 1)
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_reinstating_brings_the_stood_down_sessions_back(self, _cal):
         """`goal_reinstate` is the exact mirror of `goal_archive`."""
         oid, mid = self._goal_with_plan(
@@ -153,7 +153,7 @@ class TestGoalArchivalStandsSessionsDown(unittest.TestCase):
             ["A session"],
         )
 
-    @patch("trainmate.runtime.calendar_syncer")
+    @patch("stamind.runtime.calendar_syncer")
     def test_reinstating_recovers_only_what_is_still_ahead(self, _cal):
         """A goal reinstated late gets back the sessions still in front of it, not the
         ones whose dates passed while it was called off (DESIGN_plan_rollback.md §9)."""

@@ -1,5 +1,5 @@
-"""Pure formatting-helper tests for the load half of `tm progress`
-(trainmate/cli/progress_load.py and the `render_progress` page that assembles it), per
+"""Pure formatting-helper tests for the load half of `sm progress`
+(stamind/cli/progress_load.py and the `render_progress` page that assembles it), per
 the `coach/formatting.py` precedent: no DB, no CLI dispatch.
 
 The zone grid's own tests are tests/test_cli_progress_zones.py.
@@ -9,11 +9,11 @@ import unittest
 
 os.environ.setdefault("NO_COLOR", "1")  # keep assertions ANSI-free
 
-from trainmate.text import visible_len, wrap_text
-from trainmate.analytics import progression
-from trainmate.analytics.pmc import compute_pmc, pmc_cells, pmc_display_values
-from trainmate.cli.progress import render_progress
-from trainmate.cli.progress_load import (
+from stamind.text import visible_len, wrap_text
+from stamind.analytics import progression
+from stamind.analytics.pmc import compute_pmc, pmc_cells, pmc_display_values
+from stamind.cli.progress import render_progress
+from stamind.cli.progress_load import (
     BAND_LABEL_WIDTH, BAR_WIDTH, TABLE_WIDTH, _week_row, band_header, format_form_line,
     format_weekly_table, render_bar, sparkline, table_rows, truncate_label, warning_line,
 )
@@ -457,7 +457,7 @@ class TestRenderProgress(unittest.TestCase):
         self.assertIn("CTL 3w", text)
 
     def test_every_line_within_48_columns(self):
-        os.environ["TRAINMATE_WRAP_WIDTH"] = "48"
+        os.environ["STAMIND_WRAP_WIDTH"] = "48"
         try:
             days = [_day("2026-07-03", 55, 61, -6, "actual"),
                     _day("2026-07-31", 61, 60, 1, "planned")]
@@ -475,14 +475,14 @@ class TestRenderProgress(unittest.TestCase):
                 for sub in wrapped.split("\n"):
                     self.assertLessEqual(visible_len(sub), 48, msg=repr(sub))
         finally:
-            del os.environ["TRAINMATE_WRAP_WIDTH"]
+            del os.environ["STAMIND_WRAP_WIDTH"]
 
 
 class TestStatusConsistencyContract(unittest.TestCase):
-    """§7.1's contract with `tm status`, pinned rather than argued.
+    """§7.1's contract with `sm status`, pinned rather than argued.
 
-    `tm status` renders the latest stored metrics row through
-    `pmc_display_values` + `pmc_cells`; `tm progress` renders the §4 fold of
+    `sm status` renders the latest stored metrics row through
+    `pmc_display_values` + `pmc_cells`; `sm progress` renders the §4 fold of
     the same series through `format_form_line`. Both sides are built here from one set
     of loads so the two really are the same day's numbers.
     """
@@ -490,7 +490,7 @@ class TestStatusConsistencyContract(unittest.TestCase):
     LOADS = {f"2026-06-{d:02d}": 40.0 + d for d in range(1, 31)}
 
     def _stored_rows(self, today_load):
-        """The rows `recompute_derived()` would write — the series `tm status` reads."""
+        """The rows `recompute_derived()` would write — the series `sm status` reads."""
         loads = dict(self.LOADS, **{self.TODAY: today_load})
         pmc = compute_pmc(loads, "2026-06-01", self.TODAY, 42, 7)
         return [{"date": d, "ctl": c, "atl": a, "tsb": t}

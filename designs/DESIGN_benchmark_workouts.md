@@ -56,7 +56,7 @@
 >   value, provenance and measured date — the dates the interval floor is judged against.
 > - `_warn_missing_boundary_benchmarks()` gains a fourth silence: any test — proposed in
 >   the batch, live before the span, or a measured logbook row — within `MIN_RETEST_DAYS`
->   (`trainmate/benchmarks.py`) of the boundary. Any anchor silences, since the check
+>   (`stamind/benchmarks.py`) of the boundary. Any anchor silences, since the check
 >   cannot know which anchor a missing test would have measured; a false silence costs
 >   one un-nudged athlete where a false nag contradicts the generator.
 > - Adapt's last-day fallback (§4.2) inverted: a benchmark that cannot be moved to a
@@ -91,13 +91,13 @@
 >    timeline plot rev. 1 listed under §6 is still Phase 3.
 
 Make fitness tests (FTP, threshold pace, CSS, e1RM) a **first-class, planned**
-part of TrainMate: the week planner schedules them on fresh days, daily adaptation
+part of Stamind: the week planner schedules them on fresh days, daily adaptation
 protects them, and their results are recorded in a dated logbook that becomes the
 source of truth for the athlete's thresholds — feeding the coaching prompt, the
 replan trigger, and long-term progress tracking.
 
 *Before this design*, a benchmark existed only as prose in
-`trainmate/science/benchmarks.md`. The week planner *could* schedule one as an ordinary
+`stamind/science/benchmarks.md`. The week planner *could* schedule one as an ordinary
 workout, but nothing placed them reliably, nothing stopped daily `adapt` from softening
 one into meaninglessness, and there was nowhere to put the result. This design closes
 those three gaps.
@@ -110,7 +110,7 @@ The scary version of this feature is "a benchmark updates my FTP, which rewrites
 all my historical TSS and corrupts the PMC." **That cannot happen here**, and it
 is worth stating up front because it shapes everything below.
 
-TrainMate computes TSS from Garmin's *time-in-zone seconds* (`analytics/load.py`),
+Stamind computes TSS from Garmin's *time-in-zone seconds* (`analytics/load.py`),
 where the zoning was already done inside the athlete's Garmin account. The
 app-side `ftp`/`lthr` values (the benchmark logbook, §3.2) are never read by the
 load model. They feed exactly two things:
@@ -218,7 +218,7 @@ a dated logbook of test results. One row per measurement:
 | `note`        | free text (protocol, conditions)                     |
 
 The `unit` strings in that table are the *literal stored values* — they come from the one
-vocabulary table in `trainmate/benchmarks.py:35-45`, so a query or a fixture can be
+vocabulary table in `stamind/benchmarks.py:35-45`, so a query or a fixture can be
 written straight off it.
 
 Each sport has its plausible anchor kind(s) — cycling→`ftp`, running→`threshold_pace` /
@@ -334,8 +334,8 @@ config has no *documented* threshold field, not that the loader refuses one.
 **Seeding is a one-off, not machinery.** By the time seeding is possible,
 `benchmark record` exists — and two invocations of it *are* the migration:
 
-    tm benchmark record cycling --ftp 220 --note "seeded from config"
-    tm benchmark record running --lthr 165 --note "seeded from config"
+    sm benchmark record cycling --ftp 220 --note "seeded from config"
+    sm benchmark record running --lthr 165 --note "seeded from config"
 
 Two rules make the cutover seamless:
 
@@ -563,7 +563,7 @@ bucketed zone-seconds, **not** the raw power stream (`analytics/load.py`) — so
 cannot recompute "20-min best power × 0.95" after the fact. The data simply isn't
 there. Therefore:
 
-    tm benchmark record cycling --ftp 250
+    sm benchmark record cycling --ftp 250
 
 is the primary capture path — reliable, one line, using Zwift's authoritative
 value. Auto-extraction from the activity stream is explicitly **not** built first
@@ -572,14 +572,14 @@ value. Auto-extraction from the activity stream is explicitly **not** built firs
 ### 5.3 Activity matching confirms the test happened
 
 The completed ride reaches Garmin Connect regardless of the Zwift→Garmin link,
-because the athlete also records on a Garmin device. TrainMate's normal Garmin
+because the athlete also records on a Garmin device. Stamind's normal Garmin
 pull sees it, and the adherence matcher (derived per-run — nothing persists a
 completion flag today) confirms the *planned* benchmark was done. The FTP
 *number* comes from the `benchmark record` command; Garmin's job is only "yes,
 the test happened."
 
 **What actually runs today.** The adherence matcher is benchmark-agnostic —
-`trainmate/analytics/adherence.py` contains no benchmark-aware code at all. For each day it sorts
+`stamind/analytics/adherence.py` contains no benchmark-aware code at all. For each day it sorts
 that day's activities by **load descending** (`:165`) and matches the *first*
 sport-compatible one to each planned session (`:190-199`), consuming it so a second
 planned session cannot claim it again. On a test date with two same-sport activities, the
@@ -622,7 +622,7 @@ generic so an outdoor test just needs a preference edit.
 - `workout list` carries a `[BENCHMARK]` marker (alongside `[ADAPTED]`) —
   `cli/workouts/session_line.py:66`.
 - CLI verb `benchmark`, mirroring `goal` / `constraint` (`cli/benchmarks.py`,
-  dispatched at `trainmate_cli.py:325-337`):
+  dispatched at `stamind_cli.py:325-337`):
   - `benchmark record <sport> --<kind> <value> [--date …] [--note …] [--source …]`
     — one `--<kind>` flag per logbook kind, generated from the vocabulary, so a new
     kind gains its flag for free. Pace kinds accept `M:SS` or a decimal.
@@ -642,13 +642,13 @@ generic so an outdoor test just needs a preference edit.
   (`render_mesocycle_section` in `cli/progress_zones.py`). This is the shipped "is overload
   working?" surface.
 - The read-only web dashboard has a **Benchmarks** view: `GET /api/benchmarks`
-  (`trainmate_web.py:571-617`) returns the logbook plus the effective threshold set,
+  (`stamind_web.py:571-617`) returns the logbook plus the effective threshold set,
   each row carrying its `formatted` value and a direction-aware `delta`. It shares
   `benchmarks.with_previous()` with `benchmark list`, so the terminal and the browser
   cannot disagree about what a row is compared against. Reads only — recording stays
   in the CLI (see the read-only demotion in ARCHITECTURE.md §"Web dashboard").
 - **Phase 3, not built:** the progress timeline (`DESIGN_progress_timeline.md`) plotting
-  the anchor trend beside CTL. `trainmate/analytics/chart.py` has no anchor series today; the mesocycle
+  the anchor trend beside CTL. `stamind/analytics/chart.py` has no anchor series today; the mesocycle
   report above covers the need in text.
 
 ---

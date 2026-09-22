@@ -19,12 +19,12 @@ import tempfile
 import unittest
 
 from tests.helpers import rebind_test_db, save_workout
-from trainmate.coach.formatting import format_planned_workouts_detailed
-from trainmate.coach.service import CoachService
-from trainmate.db import Database
+from stamind.coach.formatting import format_planned_workouts_detailed
+from stamind.coach.service import CoachService
+from stamind.db import Database
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-DB_DIR = ROOT / "trainmate/db"
+DB_DIR = ROOT / "stamind/db"
 
 # The one name allowed to write `workouts` outside the append path: the `data wipe` reset,
 # which is a reset rather than a write path to convert (§14). The one-off rebuild is
@@ -60,7 +60,7 @@ def _sql_strings(node):
 class TestWorkoutsTableIsAppendOnly(unittest.TestCase):
     """`workouts` is never updated and never deleted from (§2).
 
-    Keyed on a glob over `trainmate/db/`, not a list of filenames, so a module written
+    Keyed on a glob over `stamind/db/`, not a list of filenames, so a module written
     tomorrow is covered tomorrow and not whenever someone remembers it."""
 
     def test_no_module_updates_or_deletes_workouts(self):
@@ -179,7 +179,7 @@ class TestTheGuardSurvivesAMove(unittest.TestCase):
     def test_the_move_is_not_counted_as_a_third_easing(self):
         """The move kept the ride's numbers, so the marker still counts the two easings
         and no more (§12)."""
-        from trainmate.workout_state import modification_markers
+        from stamind.workout_state import modification_markers
         moved = self.db.get_workout("2026-09-03", "cycling")
         self.assertEqual(modification_markers(moved), ["ADAPTED ×2"])
 
@@ -337,7 +337,7 @@ class TestRevisionBehaviour(unittest.TestCase):
         """An adapt that swaps a session's sport is a move, not a deletion and an
         insertion: the destination carries the source's lineage, so the tally follows
         it (§4/§11)."""
-        from trainmate.coach.proposals import RevisionProposal
+        from stamind.coach.proposals import RevisionProposal
 
         self._generate(("2026-09-01", "strength_training", "Heavy lift", 60))
         with self.db.workout_change(kind="adapt", summary="Sore") as change:
@@ -371,7 +371,7 @@ class TestRevisionBehaviour(unittest.TestCase):
     def test_two_substitutions_on_one_day_do_not_share_a_lineage(self):
         """A displaced session can become ONE of the sessions replacing it. Handing its
         lineage to both would leave one session live in two slots (§10)."""
-        from trainmate.coach.proposals import RevisionProposal
+        from stamind.coach.proposals import RevisionProposal
 
         self._generate(("2026-09-01", "strength_training", "Heavy lift", 60))
         service = CoachService(db_instance=self.db)

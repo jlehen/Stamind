@@ -6,12 +6,12 @@ from unittest import mock
 from tests.helpers import clear_all_tables, pin_clock, unstamp_schema, rebind_test_db, save_workout
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_db.db")
+TEST_DB_PATH = test_db_path("test_stamind_db.db")
 
-from trainmate.db import (
+from stamind.db import (
     Database,
 )
-from trainmate.db.objectives import goal_state
+from stamind.db.objectives import goal_state
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -635,7 +635,7 @@ class TestPlannedZoneColumns(unittest.TestCase):
         it, so a target-only change moves the hash all the same — the event renders a
         `Target:` line, and one that disagrees with the plan is a wrong event
         (DESIGN_calendar_lineage.md §6, amending DESIGN_intensity_distribution.md §9.8)."""
-        from trainmate.workout_state import calendar_signature
+        from stamind.workout_state import calendar_signature
         self._save(duration_minutes=60, planned_zone_sec=[300, 1800, 0, 0, 0],
                    planned_zone_currency="hr")
         before = calendar_signature(test_db.get_workout("2026-06-10", "running"))

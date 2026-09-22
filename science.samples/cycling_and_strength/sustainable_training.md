@@ -4,7 +4,7 @@
 [Sustainable Training](https://sparecycles.blog/2022/01/02/sustainable-training/)
 (sparecycles.blog).
 
-> **AUTHORITY: PRESCRIPTIVE.** This document defines what TrainMate uses as a basis
+> **AUTHORITY: PRESCRIPTIVE.** This document defines what Stamind uses as a basis
 > when generating workouts (structure, duration, intensitives, work:rest ratios,
 > weekly sessions counts, mesocycle ordering, taper magnitudes).
 > Other reference documents may contradict: in general this document wins but

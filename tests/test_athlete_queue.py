@@ -12,15 +12,15 @@ from tests.helpers import clear_all_tables, rebind_test_db, run_cli, save_workou
 
 TEST_DB_PATH = test_db_path("test_athlete_queue.db")
 
-from trainmate.db import Database
-import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
+from stamind.db import Database
+import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
-from trainmate import athlete_queue, clock, runtime
-from trainmate.cli import queue as queue_cli
-from trainmate.coach.proposals import RevisionProposal
-from trainmate.sentinels import BUTTONS_SENTINEL, QUEUE_SENTINEL
-from trainmate.athlete_queue import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
-from trainmate.clock import today_str
+from stamind import athlete_queue, clock, runtime
+from stamind.cli import queue as queue_cli
+from stamind.coach.proposals import RevisionProposal
+from stamind.sentinels import BUTTONS_SENTINEL, QUEUE_SENTINEL
+from stamind.athlete_queue import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
+from stamind.clock import today_str
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)
@@ -39,7 +39,7 @@ WEDNESDAY_8AM = datetime(2026, 9, 16, 8, 0).astimezone()
 
 
 def queue_lines(out):
-    """The TM-QUEUE payloads a run wrote, in order. Split on newlines only:
+    """The SM-QUEUE payloads a run wrote, in order. Split on newlines only:
     `str.splitlines` also breaks on the sentinel's own \\x1e."""
     return [json.loads(line[len(QUEUE_SENTINEL):]) for line in out.split("\n")
             if line.startswith(QUEUE_SENTINEL)]
@@ -76,7 +76,7 @@ class _QueueCase(unittest.TestCase):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
         self.now = WEDNESDAY_8AM
-        moving_clock = patch("trainmate.clock.now", side_effect=lambda: self.now)
+        moving_clock = patch("stamind.clock.now", side_effect=lambda: self.now)
         moving_clock.start()
         self.addCleanup(moving_clock.stop)
         self.stale = set()
@@ -258,11 +258,11 @@ class ReminderTest(_QueueCase):
 
 
 class ChatTest(_QueueCase):
-    """Under the bot every item goes out as a TM-QUEUE line, and a tap runs `bot queue`."""
+    """Under the bot every item goes out as a SM-QUEUE line, and a tap runs `bot queue`."""
 
     def setUp(self):
         super().setUp()
-        env = patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json"})
+        env = patch.dict(os.environ, {"STAMIND_FRONTEND": "json"})
         env.start()
         self.addCleanup(env.stop)
 
@@ -317,7 +317,7 @@ class ChatTest(_QueueCase):
     def test_the_companion_has_no_skip_and_the_expert_does(self):
         """Skip and "after the others" differ in a way she cannot see (§6.4)."""
         self.ask("A")
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             _, out, _ = run_cli(["queue", "answer"])
         [companion] = queue_lines(out)
         _, out, _ = run_cli(["queue", "answer"])
@@ -353,7 +353,7 @@ class MorningWalkTest(_QueueCase):
         garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
         garmin.start()
         self.addCleanup(garmin.stop)
-        env = patch.dict(os.environ, {"TRAINMATE_FRONTEND": "json", "TRAINMATE_RENDER": "simple"})
+        env = patch.dict(os.environ, {"STAMIND_FRONTEND": "json", "STAMIND_RENDER": "simple"})
         env.start()
         self.addCleanup(env.stop)
         test_db.set_setting("push_adapt_first", "off")
@@ -385,8 +385,8 @@ class TerminalTest(_QueueCase):
         env = patch.dict(os.environ, {})
         env.start()
         self.addCleanup(env.stop)
-        os.environ.pop("TRAINMATE_FRONTEND", None)
-        os.environ.pop("TRAINMATE_RENDER", None)
+        os.environ.pop("STAMIND_FRONTEND", None)
+        os.environ.pop("STAMIND_RENDER", None)
         runtime.reset("prompt")
 
     def test_a_bare_queue_lists_the_waiting_items_then_the_hidden_ones(self):
@@ -430,7 +430,7 @@ class TerminalTest(_QueueCase):
     def test_a_date_range_keeps_the_items_closed_on_the_athletes_own_days(self):
         """00:30 in Paris is the evening before in UTC: the day is the athlete's."""
         paris = ZoneInfo("Europe/Paris")
-        zone = patch("trainmate.clock.active_zone", return_value=paris)
+        zone = patch("stamind.clock.active_zone", return_value=paris)
         zone.start()
         self.addCleanup(zone.stop)
         self.now = datetime(2026, 9, 14, 8, 0, tzinfo=paris)
@@ -512,13 +512,13 @@ class HintTest(_QueueCase):
         env = patch.dict(os.environ, {})
         env.start()
         self.addCleanup(env.stop)
-        os.environ.pop("TRAINMATE_RENDER", None)
-        for target in ("trainmate.cli.status.ensure_recent_data",
-                       "trainmate.cli.workouts.adapt.ensure_recent_data"):
+        os.environ.pop("STAMIND_RENDER", None)
+        for target in ("stamind.cli.status.ensure_recent_data",
+                       "stamind.cli.workouts.adapt.ensure_recent_data"):
             pull = patch(target)
             pull.start()
             self.addCleanup(pull.stop)
-        coach = patch("trainmate.runtime.coach_service")
+        coach = patch("stamind.runtime.coach_service")
         coach.start().workout_adapt.return_value = RevisionProposal(
             reason="Metrics are green", workouts=[], new_constraints=[],
             range_start="2026-09-16", range_end="2026-09-30",
@@ -542,7 +542,7 @@ class HintTest(_QueueCase):
 
     def test_the_companion_prints_no_hint(self):
         athlete_queue.tell("Charge your watch.")
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             for argv in (["status"], ["workout", "adapt"]):
                 _, out, _ = run_cli(argv)
                 self.assertNotIn("waiting for you", out, argv)

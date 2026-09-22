@@ -2,17 +2,17 @@
 
 ## 1. What the timezone decides
 
-Every date TrainMate computes is a *calendar* date in somebody's day: which workout is
+Every date Stamind computes is a *calendar* date in somebody's day: which workout is
 due today, whether a session is behind or ahead, which day a Garmin metric belongs to,
 where the planning window opens. Garmin itself keys daily metrics and activities on the
 athlete's local calendar date, so a UTC frontier would drift a day at the boundary hours.
 
 Before this, "somebody" was the machine: `clock.today_date()` returned `date.today()`. That
 is right on a laptop the athlete carries and wrong everywhere else — a server in UTC, a
-home box left on a different setting, an athlete who moved. TrainMate is a
+home box left on a different setting, an athlete who moved. Stamind is a
 single-athlete-per-instance app, so the fix is one zone per instance, set by that athlete.
 
-`trainmate/clock.py` is the one place that answers "what time is it", and
+`stamind/clock.py` is the one place that answers "what time is it", and
 `clock.today_date()` is where every date starts. Nothing else calls `date.today()`.
 
 ## 2. Which clocks follow it
@@ -66,15 +66,15 @@ what makes the change land in the same process (the REPL, the bot, the tests).
 The zone is one row of the `settings` command (DESIGN_settings.md §4) — it had a top-level
 `timezone` command of its own until the preference registry absorbed it.
 
-`tm settings list timezone` shows the active zone *with the local date and time it
+`sm settings list timezone` shows the active zone *with the local date and time it
 produces*, so the athlete checks it against their watch rather than trusting a name they
 half-remember.
 
-`tm settings set timezone <zone>` stores it. Matching ignores case, and a name that matches
+`sm settings set timezone <zone>` stores it. Matching ignores case, and a name that matches
 nothing lists the zones *containing* what was typed:
 
 ```
-$ tm settings set timezone york
+$ sm settings set timezone york
 'york' is not a timezone name. Did you mean:
   America/New_York
 ```
@@ -84,7 +84,7 @@ That search is the discovery mechanism, and it is why the zone is validated by
 for where they live, and a list of 486 zones would be unreadable; typing the city is what
 an athlete can actually do.
 
-`tm settings reset timezone` forgets the zone and follows the machine again. Unlike every
+`sm settings reset timezone` forgets the zone and follows the machine again. Unlike every
 other setting, there is no `config.yaml` key behind it: a zone is the athlete's, not the
 install's, so "unset" means "follow this machine" (§3).
 

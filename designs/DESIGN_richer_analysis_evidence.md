@@ -194,7 +194,7 @@ Later designs put more fields on the same weekly summary: `power_zone_distributi
 (DESIGN_pmc_fitness_fatigue.md), and an optional `daily_signals` list
 (DESIGN_calendar_signal_ingest.md). A separate full-history `signal_days` section rides
 *beside* the summaries in the same user content (DESIGN_quantitative_signal_impact.md).
-`trainmate/coach/service/analysis.py` is the authority on the emitted shape.
+`stamind/coach/service/analysis.py` is the authority on the emitted shape.
 
 ---
 

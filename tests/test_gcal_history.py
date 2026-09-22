@@ -10,17 +10,17 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from tests.helpers import rebind_test_db, save_workout
-from trainmate.gcal import history
-from trainmate.workout_state import calendar_signature, calendar_status
-from trainmate.db import Database
-from trainmate.gcal.client import CalendarSyncer, quiet_events
+from stamind.gcal import history
+from stamind.workout_state import calendar_signature, calendar_status
+from stamind.db import Database
+from stamind.gcal.client import CalendarSyncer, quiet_events
 
 # Its own client, since nothing builds one at import any more. The tests below patch
 # `.service` on it, so the real Google connection is never used.
 calendar_syncer = CalendarSyncer()
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_gcal_history.db")
+TEST_DB_PATH = test_db_path("test_stamind_gcal_history.db")
 
 ZONES = [None, 40 * 60, 90 * 60, None, None, None, None]
 

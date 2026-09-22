@@ -4,10 +4,10 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
-from trainmate.clock import fmt_date
+from stamind.clock import fmt_date
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_cli_status.db")
+TEST_DB_PATH = test_db_path("test_stamind_cli_status.db")
 
 
 def _days_out(n: int) -> str:
@@ -18,8 +18,8 @@ def _days_out(n: int) -> str:
 # stop appearing once they pass (same rot 2a7cd71 fixed in test_constraints.py).
 GOAL_DATE = _days_out(120)
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -48,7 +48,7 @@ class TestCliStatus(unittest.TestCase):
     def run_cli(self, args, input_value="n"):
         return run_cli(args, input_value)
 
-    @patch("trainmate.cli.status.ensure_recent_data")
+    @patch("stamind.cli.status.ensure_recent_data")
     def test_status_command(self, _ens):
         test_db.save_metric_cache(
             date="2026-05-31",
@@ -69,7 +69,7 @@ class TestCliStatus(unittest.TestCase):
 
         exit_code, stdout, stderr = self.run_cli(["status"])
         self.assertEqual(exit_code, 0)
-        self.assertIn("=== TRAINMATE ATHLETE STATUS ===", stdout)
+        self.assertIn("=== STAMIND ATHLETE STATUS ===", stdout)
         self.assertIn("London Marathon", stdout)
         self.assertIn("Resting HR : 48 bpm", stdout)
         self.assertIn("Overnight HRV: 82 ms", stdout)
@@ -120,7 +120,7 @@ class TestCliStatus(unittest.TestCase):
             stdout_vv,
         )
 
-    @patch("trainmate.cli.status.ensure_recent_data")
+    @patch("stamind.cli.status.ensure_recent_data")
     def test_status_pmc_never_zero_fills_and_explains_warmup(self, _ens):
         # §6.1/§8: pulled-but-never-recomputed rows have NULL PMC — status must not
         # print "CTL 0.0 | ... | TSB 0.0" (a zero TSB reads as a real neutral balance).
@@ -138,12 +138,12 @@ class TestCliStatus(unittest.TestCase):
         self.assertIn("PMC still warming", stdout)
         self.assertIn("40 days", stdout)
 
-    @patch("trainmate.cli.status.ensure_recent_data")
+    @patch("stamind.cli.status.ensure_recent_data")
     def test_status_pmc_line_past_warmup(self, _ens):
         # A DB with 60 days of steady load, recomputed: the latest row is past the
         # 42-day warm-up cutoff, so status shows real CTL/ATL/TSB, a ramp, the TSB-lag
         # footnote, and (59 < 126 days) the still-warming flag.
-        from trainmate import garmin as real_garmin
+        from stamind import garmin as real_garmin
         today = datetime.now().date()
         for i in range(59, -1, -1):
             ds = (today - timedelta(days=i)).isoformat()

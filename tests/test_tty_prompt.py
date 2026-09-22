@@ -7,7 +7,7 @@ import io
 import unittest
 from unittest.mock import patch
 
-from trainmate.prompt import TtyPrompt
+from stamind.prompt import TtyPrompt
 
 
 class _Tty(io.StringIO):
@@ -19,7 +19,7 @@ class TestTtyConfirm(unittest.TestCase):
     def setUp(self) -> None:
         self.prompt = TtyPrompt()
         # The journal record is covered by test_journal_records.TestPromptAnswers.
-        patcher = patch("trainmate.prompt._record_answer")
+        patcher = patch("stamind.prompt._record_answer")
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -55,7 +55,7 @@ class TestTypeahead(unittest.TestCase):
         import termios
         with patch("sys.stdin", _Tty()), patch("termios.tcflush") as flush, \
                 patch("builtins.input", return_value="y"), \
-                patch("trainmate.prompt._record_answer"):
+                patch("stamind.prompt._record_answer"):
             TtyPrompt().confirm("Apply?")
         flush.assert_called_once()
         self.assertEqual(flush.call_args.args[1], termios.TCIFLUSH)
@@ -63,7 +63,7 @@ class TestTypeahead(unittest.TestCase):
     def test_piped_answers_are_left_alone(self):
         with patch("sys.stdin", io.StringIO("y\n")), patch("termios.tcflush") as flush, \
                 patch("builtins.input", return_value="y"), \
-                patch("trainmate.prompt._record_answer"):
+                patch("stamind.prompt._record_answer"):
             TtyPrompt().confirm("Apply?")
         flush.assert_not_called()
 

@@ -1,4 +1,4 @@
-# TrainMate — the complete configuration reference.
+# Stamind — the complete configuration reference.
 #
 # Every key the application reads appears below. The ones a working install must fill in
 # carry values; every tuning knob is commented out at the value the code already uses, so
@@ -14,7 +14,7 @@
 # Two secrets can come from the environment instead of being written to disk:
 #   OPENROUTER_API_KEY    overrides `llm.api_key`.
 #   TELEGRAM_BOT_TOKEN    overrides `telegram.bot_token`.
-# A third variable, TRAINMATE_CONFIG, picks which config file a command runs against —
+# A third variable, STAMIND_CONFIG, picks which config file a command runs against —
 # that is how one checkout serves two athletes. See "Two athletes, one checkout" below.
 
 
@@ -33,16 +33,16 @@
 # learning    A sentence the coach model wrote about you from your own history — "your
 #             Tuesday intervals suffer after a Monday strength session". Each carries a
 #             confidence of tentative, moderate or established, earned from how many weeks
-#             of evidence back it up. `tm learnings` lists and curates them.
+#             of evidence back it up. `sm learnings` lists and curates them.
 # signal      Something you log about a day that is not training but still moves your
-#             recovery — alcohol, a broken night, heat, stress, illness. `tm signal add`.
+#             recovery — alcohol, a broken night, heat, stress, illness. `sm signal add`.
 # anchor      A measured number a workout can be prescribed against — FTP, LTHR, threshold
 #             pace, CSS, max HR. All but max HR live in the benchmark logbook
-#             (`tm benchmark`), not in this file.
+#             (`sm benchmark`), not in this file.
 # zone        A heart-rate zone. "Uncovered" time is recorded time that no zone claims,
 #             usually because the effort sat below zone 1.
 # CTL / ATL   Fitness and fatigue: two moving averages of daily load, one slow, one fast.
-#             Their difference is TSB, "form". `tm progress` charts all three.
+#             Their difference is TSB, "form". `sm progress` charts all three.
 
 
 llm:
@@ -77,8 +77,8 @@ llm:
 #data_dir: "athlete2"
 
 # The SQLite database this install operates on. A relative path resolves against this
-# config file's directory (or `data_dir:` when set); default trainmate.db beside it.
-#database: "trainmate.db"
+# config file's directory (or `data_dir:` when set); default stamind.db beside it.
+#database: "stamind.db"
 
 # Your own sports-science guidelines: a directory of *.md files pasted into every coaching
 # prompt as the ATHLETE-PROVIDED section, so you can tell the coach how you want to be
@@ -86,11 +86,11 @@ llm:
 # file's directory; default science/ beside it. Point a second athlete at their own
 # directory to give them their own training philosophy, or point two instances at the same
 # absolute path to share one. Either way the guidelines the app itself ships
-# (trainmate/science/) are still applied.
+# (stamind/science/) are still applied.
 #science_dir: "science"
 
 # Two trails the app writes for whoever runs it: the run journal (runs/YYYY-MM-DD.jsonl,
-# one line per event, read back with `tm journal`) and the full text of every exchange with
+# one line per event, read back with `sm journal`) and the full text of every exchange with
 # the model (llm_exchanges/*.md). They exist for you to read when something looks wrong —
 # the app never reads them back to make a decision (DESIGN_logging.md §2.1). Every key has
 # a working default, so leaving the whole section out behaves exactly as shown.
@@ -102,7 +102,7 @@ llm:
 #  # `debug` additionally records the exceptions the app catches and hides on screen.
 #  #level: "info"
 #  # How many days each directory keeps. The clean-up runs at most once a day, off the
-#  # first command to finish after midnight UTC; `tm journal prune` forces one now.
+#  # first command to finish after midnight UTC; `sm journal prune` forces one now.
 #  #retain_days: 90
 #  #retain_exchange_days: 90
 
@@ -110,13 +110,13 @@ llm:
 # Two athletes, one checkout
 # ---------------------------------------------------------------------------
 # Give the second athlete a config file of their own and point every command at it:
-#   TRAINMATE_CONFIG=/path/to/other/config.yaml ./tm status     (and likewise ./tm-bot)
+#   STAMIND_CONFIG=/path/to/other/config.yaml ./sm status     (and likewise ./sm-bot)
 # Put that file in its own directory and the database and other relative paths land there
 # too; or keep both configs side by side and give the second one a `data_dir:` (above).
 # Either way the two instances must not share state: each needs its own Telegram bot token,
 # its own Garmin credentials and token_dir (see the warning there), its own Google
 # calendar_id, its own logs/, and — unless `science_dir:` says otherwise — its own science/
-# guidelines beside it. A file named in TRAINMATE_CONFIG must exist: a typo aborts the
+# guidelines beside it. A file named in STAMIND_CONFIG must exist: a typo aborts the
 # command rather than quietly falling back to the first athlete's database.
 
 # How fresh cached data must be before a command re-pulls it. Within this many minutes of
@@ -129,7 +129,7 @@ llm:
 # better-established the learning, the longer the rope: six months of evidence should not
 # lapse as fast as a hunch from three weeks. Nothing is lost either way — a dormant learning
 # revives the moment new supporting evidence lands, and the demotion is only a proposal
-# (`tm learnings demote` accepts it, `tm learnings keep` refuses it).
+# (`sm learnings demote` accepts it, `sm learnings keep` refuses it).
 #learning_staleness_days:
 #  tentative: 21
 #  moderate: 60
@@ -151,7 +151,7 @@ llm:
 #  moderate: 3
 #  established: 5
 
-# Flask web front-end (run trainmate_web.py directly). Optional — omit to use defaults.
+# Flask web front-end (run stamind_web.py directly). Optional — omit to use defaults.
 #web:
 #  # Interface to bind. Loopback by default so the dev server isn't exposed on every
 #  # interface; set to 0.0.0.0 to serve the LAN.
@@ -161,7 +161,7 @@ llm:
 #  # visitor code execution on any traceback, so it must never be on for a reachable bind.
 #  #debug: false
 
-# Telegram chat front-end (run with ./tm-bot). Optional — omit the whole section to disable
+# Telegram chat front-end (run with ./sm-bot). Optional — omit the whole section to disable
 # it. Create a bot with @BotFather to get the token; message the bot once and check the
 # logs (or @userinfobot) for your numeric chat id.
 #telegram:
@@ -222,7 +222,7 @@ google:
   # Google Calendar that planned workouts are written to / read from.
   calendar_id: "YOUR_CALENDAR_ID@group.calendar.google.com"
   # Source tag for calendar events containing daily signals.
-  #calendar_signal_tag: "trainmate-context"
+  #calendar_signal_tag: "stamind-context"
 
 garmin:
   email: "you@example.com"
@@ -251,11 +251,11 @@ garmin:
   # it, so your RPE is used for the load instead. Default 0.5, calibrated against the
   # activity history.
   #hr_zone_coverage_min: 0.5
-  # The key above decides the *load*. The next three only decide what `tm progress` says
+  # The key above decides the *load*. The next three only decide what `sm progress` says
   # about how patchy its zone coverage was.
   #
   # Shortest activity allowed to raise an under-count marker ('?' on the load table, '!' on
-  # the zone tables) in `tm progress`. A 5-minute mobility session with a cold strap is not
+  # the zone tables) in `sm progress`. A 5-minute mobility session with a cold strap is not
   # evidence that a 340-TSS week was under-counted, nor evidence about the strap. Shorter
   # sessions still contribute their load and their zone minutes; they just lose their vote
   # on the markers. Default 20 minutes.
@@ -268,7 +268,7 @@ garmin:
   # Per-sport overrides of that bar, keyed by canonical sport name. Uncovered time is not
   # always a recording failure — it is also the rest between sets, the chairlift back up,
   # the flat walking on a hike, the held pose, all of which sit below zone 1 where no zone
-  # claims them. trainmate/intensity.py already ships lower bars for the sports where that
+  # claims them. stamind/intensity.py already ships lower bars for the sports where that
   # is structural (strength_training 0.45, downhill_skiing and indoor_climbing 0.15, hiking
   # 0.10, yoga 0.05); every other sport uses the bar above. Add an entry here to override
   # either.
@@ -417,8 +417,8 @@ user_profile:
   # max_hr is the only anchor that lives here, because it barely moves. The trainable ones
   # — FTP, LTHR, threshold pace, CSS, e1RM — go in the dated benchmark logbook instead,
   # which is the source the coach reads:
-  #   tm benchmark record cycling --ftp 220
-  #   tm benchmark record running --lthr 165
+  #   sm benchmark record cycling --ftp 220
+  #   sm benchmark record running --lthr 165
   # With none on record the coach prescribes by RPE and heart-rate feel and schedules a
   # benchmark to establish them. A logbook value always beats a same-named key here.
   weekly_target_hours: 6.0

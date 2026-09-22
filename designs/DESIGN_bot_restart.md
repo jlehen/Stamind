@@ -5,12 +5,12 @@
 
 ## 1. Motivation
 
-`tm-bot` is a thin wrapper that `exec`s `trainmate_bot.py`, a single long-polling
+`sm-bot` is a thin wrapper that `exec`s `stamind_bot.py`, a single long-polling
 process with no supervisor. Today, picking up a new deploy, or nudging a bot
 that's gone unresponsive without it having actually died, means someone with
 shell access has to kill and relaunch it by hand. The athlete wants to trigger
 that from Telegram itself with a `/restart` command, without adding a second
-binary/script to keep in sync with `tm-bot`.
+binary/script to keep in sync with `sm-bot`.
 
 Note the scope this implies: `/restart` only helps when the bot is still
 responsive enough to *receive* it. A genuine hang (deadlocked, not polling at
@@ -23,7 +23,7 @@ design doesn't attempt to change that (§2 Non-Goals).
 **Goals**
 - An authorized chat can send `/restart` and get a fresh bot process back within a
   few seconds, no shell access required.
-- Reuse `tm-bot` as the only file that changes shape — no new script to deploy.
+- Reuse `sm-bot` as the only file that changes shape — no new script to deploy.
 
 **Non-goals**
 - Zero-downtime / hot code reload. A brief gap while polling tears down and
@@ -31,36 +31,36 @@ design doesn't attempt to change that (§2 Non-Goals).
 - Automatic crash recovery. A worker that exits for any reason other than the
   deliberate restart signal (unhandled exception, OOM-kill, a stray SIGTERM,
   whatever) is **not** relaunched — the supervisor exits right along with it,
-  exactly like unsupervised `tm-bot` behaves today (§4). Recovering from a real
+  exactly like unsupervised `sm-bot` behaves today (§4). Recovering from a real
   crash still means a human notices and restarts it (shell access, or whatever
   the deployment layer provides) — `/restart` can't help, since a crashed process
   isn't around to receive it. Traded away for a much simpler supervisor: no
   backoff schedule, no crash-loop, no "was that a deliberate stop or a crash?"
   judgment call.
-- Supervision across host reboots (systemd/tmux/whatever runs `tm-bot` today) —
+- Supervision across host reboots (systemd/tmux/whatever runs `sm-bot` today) —
   unchanged.
-- Restarting other TrainMate processes (`trainmate_web.py`, cron jobs) from
+- Restarting other Stamind processes (`stamind_web.py`, cron jobs) from
   Telegram — `/restart` only targets the bot.
-- Multi-chat considerations. TrainMate's config only supports one athlete /
+- Multi-chat considerations. Stamind's config only supports one athlete /
   one allowlisted chat right now, so this design doesn't reason about
   concurrent sessions across chats.
 
 ## 3. Architecture: supervisor loop + child sentinel
 
-`tm-bot` gains two modes, selected by an env var it sets on itself rather than a
+`sm-bot` gains two modes, selected by an env var it sets on itself rather than a
 CLI arg — a positional/flag arg would risk colliding with args meant to be passed
 through, and env vars naturally aren't inherited by anything that isn't this
 script's own child.
 
-- **Default invocation** (`./tm-bot ...`, e.g. from a terminal, tmux pane, or
-  systemd unit): `tm-bot` is the **supervisor**. It loops forever, each iteration
-  launching a child of itself with `TM_BOT_SUPERVISED=1` set and `"$@"` forwarded,
+- **Default invocation** (`./sm-bot ...`, e.g. from a terminal, tmux pane, or
+  systemd unit): `sm-bot` is the **supervisor**. It loops forever, each iteration
+  launching a child of itself with `SM_BOT_SUPERVISED=1` set and `"$@"` forwarded,
   then waits for it to exit and decides whether to relaunch (§4).
-- **`TM_BOT_SUPERVISED=1` already set**: `tm-bot` is the **worker** — it skips
-  straight to today's venv-check-and-`exec` of `trainmate_bot.py`. This path is
-  byte-for-byte what `tm-bot` does today.
+- **`SM_BOT_SUPERVISED=1` already set**: `sm-bot` is the **worker** — it skips
+  straight to today's venv-check-and-`exec` of `stamind_bot.py`. This path is
+  byte-for-byte what `sm-bot` does today.
 
-`trainmate_bot.py` doesn't need to know any of this exists — it only needs to
+`stamind_bot.py` doesn't need to know any of this exists — it only needs to
 exit with the right code when a restart is wanted (§5).
 
 ## 4. Exit-code contract
@@ -82,7 +82,7 @@ Concretely:
   need to classify a child's exit as "deliberate stop" vs. "crash" — every
   non-75 exit gets the same treatment (the supervisor also exits). This is what
   makes automatic crash recovery explicitly out of scope (§2): a crash now
-  behaves exactly like it does in today's unsupervised `tm-bot`.
+  behaves exactly like it does in today's unsupervised `sm-bot`.
 - The supervisor still **traps SIGINT/SIGTERM sent to itself**, but only to
   avoid orphaning the child — not to decide whether to relaunch (the exit-code
   check already does that). Two cases matter differently:
@@ -95,16 +95,16 @@ Concretely:
     `systemctl stop` under `KillMode=process`) does **not** automatically reach
     the child. Without a trap, the supervisor would die and leave the worker
     running, unsupervised and undiscoverable by name (see the open question in
-    §7 on how `tm-bot` is actually run). The trap should signal the child, wait
+    §7 on how `sm-bot` is actually run). The trap should signal the child, wait
     briefly, `SIGKILL` if it's still alive, then let the supervisor exit.
-- Implementation note: `tm-bot` currently has `set -e` at the top. Capturing the
+- Implementation note: `sm-bot` currently has `set -e` at the top. Capturing the
   child's exit status with a bare `wait "$pid"` trips `errexit` on any non-zero
   status — which is every relaunch-worthy exit, including 75 — and would abort
   the supervisor before it ever checks the code. Capture it as
   `wait "$pid" || rc=$?` (or inside an `if`) so `set -e` doesn't short-circuit
   the loop.
 - Supervisor lifecycle events (start / stop / relaunch + reason) get logged to
-  stdout, same stream `tm-bot` already writes to today.
+  stdout, same stream `sm-bot` already writes to today.
 
 ## 5. Command surface
 
@@ -116,14 +116,14 @@ Concretely:
 > explicit Updater lifecycle in `_serve()`, which `/restart` still needs (§5.2, §7).
 > The rest of this section is kept as the record of why the pause existed.
 
-To keep this simple with a single authorized chat (§2), `tm-bot` only polls
+To keep this simple with a single authorized chat (§2), `sm-bot` only polls
 Telegram (`getUpdates`) while there's nothing to compute: idle, or blocked on
 the athlete's answer to an open prompt. It stops polling for the span where a
 CLI subprocess is silently churning with no prompt open.
 
 This has to be scoped to the *silent-compute* phase specifically, not the whole
 session — the existing interactive-prompt protocol (`_present_prompt`, now
-`trainmate/chat/replies.py`) depends on live polling to receive the athlete's
+`stamind/chat/replies.py`) depends on live polling to receive the athlete's
 button tap or text reply while the subprocess is blocked on stdin. Pausing
 polling for the entire session lifetime would silently break every confirm/choose
 prompt (plan apply, destructive-command confirmation, etc.) — the bot would never
@@ -149,7 +149,7 @@ into (§7); the `command_timeout` watchdog still bounds a genuinely stuck run.
 Implementation-wise this means replacing `application.run_polling()`'s always-on
 background fetch loop with an explicit start/stop around the compute phase —
 `run_polling()` doesn't expose a "pause between messages" toggle. Shipped as
-`_serve()` (`ChatBot`, `trainmate/chat/app.py`), which drives the Application and Updater
+`_serve()` (`ChatBot`, `stamind/chat/app.py`), which drives the Application and Updater
 lifecycle by hand so `_pause_polling`/`_resume_polling` can stop and start
 `getUpdates` mid-session. This is a real touch point in the bot's core loop, not a
 side effect of adding `/restart`.
@@ -157,7 +157,7 @@ side effect of adding `/restart`.
 ### 5.2 `/restart`
 
 Handled the same way `/cancel` and `/start` already are in `on_message()`
-(`trainmate/chat/messages.py`) — matched on `token_low == "restart"`, gated by the
+(`stamind/chat/messages.py`) — matched on `token_low == "restart"`, gated by the
 same allowlist check (`ChatBot._authorized`) every other message passes. No new auth mechanism: the
 Telegram allowlist is already the access control, so there's no need for a
 shared secret at this layer (that idea only makes sense at the process layer in
@@ -171,9 +171,9 @@ can carry a command *and* a `/restart` sent right behind it, and both are handle
 before `_drive` has paused polling. So the teardown deals with a live session in
 whatever state it happens to be in, not just a prompt-blocked one.
 
-Behavior — `restart_teardown()` (a module function in `trainmate/chat/runner.py`, so it
+Behavior — `restart_teardown()` (a module function in `stamind/chat/runner.py`, so it
 can be driven without a Telegram client), then the handler `_restart`
-(`trainmate/chat/messages.py`):
+(`stamind/chat/messages.py`):
 
 1. If a prompt is open for this chat, resolve its answer future as `cancelled`.
    That is what `_cancel` does mid-prompt — note it does *not* kill; the point is
@@ -197,18 +197,18 @@ logged and stepped over, never allowed to prevent the exit.
 
 ## 6. Touch points
 
-- **`tm-bot`**: add the supervisor loop, the `TM_BOT_SUPERVISED` branch, and the
+- **`sm-bot`**: add the supervisor loop, the `SM_BOT_SUPERVISED` branch, and the
   signal trap (§4). No backoff logic needed. The existing venv-bootstrap + exec
   becomes the worker body, untouched.
-- **`trainmate_bot.py`** (the Telegram front-end is `trainmate/chat/` now, and the list
+- **`stamind_bot.py`** (the Telegram front-end is `stamind/chat/` now, and the list
   below says where each piece went):
   - `RESTART_EXIT_CODE = 75` and `RESTART_GRACE_SECONDS = 2.0` constants — in
-    `chat/runner.py`, which is what `tm-bot`'s own comment points at.
+    `chat/runner.py`, which is what `sm-bot`'s own comment points at.
   - `on_message()`: new `token_low == "restart"` branch, dispatching to `_restart`
     and the module-level `restart_teardown()` (§5.2) — `chat/messages.py` and
     `chat/runner.py`.
   - Polling loop rework to pause/resume `getUpdates` around the silent-compute
-    phase (§5.1) — the larger of the two `trainmate_bot.py` changes, and one
+    phase (§5.1) — the larger of the two `stamind_bot.py` changes, and one
     that touches existing `/cancel` behavior, not just new code. Concretely:
     `run_polling()` is replaced by `_serve()`, plus `_pause_polling` /
     `_resume_polling` and the `restarting` latch they honour. `_serve` and
@@ -241,7 +241,7 @@ logged and stepped over, never allowed to prevent the exit.
   mid-compute. The original design said "an open prompt's subprocess only,
   because polling is paused during compute" — true in the steady state, but a
   single `getUpdates` batch can deliver a command and a `/restart` together, and
-  the "can't happen" case then orphans a running `tm` (§5.2 steps 1-2).
+  the "can't happen" case then orphans a running `sm` (§5.2 steps 1-2).
 - **`/restart` stops the Updater before `os._exit()`.** This answers the original
   open question about updates crossing the restart gap, checked against the
   installed python-telegram-bot 22.8. PTB keeps the `getUpdates` offset in memory
@@ -263,7 +263,7 @@ logged and stepped over, never allowed to prevent the exit.
   back. A mis-tap costs a reconnect, not work — so there is no reason to make the
   command harder to find than any other. (`/start` remains absent, as Telegram
   sends it automatically on first contact.)
-- **Open:** how is `tm-bot` actually run in production right now (bare
+- **Open:** how is `sm-bot` actually run in production right now (bare
   foreground, `nohup`, `tmux`, a systemd unit)? Determines whether a plain
   `kill <supervisor-pid>` reaches the child automatically (process-group
   delivery) or needs the supervisor's trap to relay it (§4), and whether the
@@ -273,6 +273,6 @@ logged and stepped over, never allowed to prevent the exit.
 
 - Hot-reloading code without a process restart.
 - Automatic crash recovery / crash-loop backoff (§2).
-- Restarting `trainmate_web.py` or other services from Telegram.
+- Restarting `stamind_web.py` or other services from Telegram.
 - Multi-instance / highly-available bot deployment.
 - Multi-chat / concurrent-session handling (§2).

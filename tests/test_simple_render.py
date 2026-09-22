@@ -1,8 +1,8 @@
 """The companion voice on a day, and the companion-mode config knobs
 (DESIGN_bot_simple_frontend.md §3, §4.3, §6).
 
-`trainmate/cli/render/session_lines.py`, plus the two rules about the render package
-itself: which voice `TRAINMATE_RENDER` picks, and that no command module imports the
+`stamind/cli/render/session_lines.py`, plus the two rules about the render package
+itself: which voice `STAMIND_RENDER` picks, and that no command module imports the
 package back. The plan-side line builders are tests/test_simple_render_plan.py.
 """
 import os
@@ -14,29 +14,29 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.helpers import pin_clock
 
-from trainmate.cli import render
-from trainmate.cli.render import session_lines
-from trainmate.cli.render.companion import CompanionRenderer
-from trainmate.cli.render.expert import ExpertRenderer
-from trainmate.config import Config
+from stamind.cli import render
+from stamind.cli.render import session_lines
+from stamind.cli.render.companion import CompanionRenderer
+from stamind.cli.render.expert import ExpertRenderer
+from stamind.config import Config
 
 
 class MakeRendererTest(unittest.TestCase):
-    """The one place TRAINMATE_RENDER is read (DESIGN_render_persona.md §4)."""
+    """The one place STAMIND_RENDER is read (DESIGN_render_persona.md §4)."""
 
     def test_unset_is_expert(self):
         with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("TRAINMATE_RENDER", None)
+            os.environ.pop("STAMIND_RENDER", None)
             self.assertIsInstance(render.make_renderer(), ExpertRenderer)
 
     def test_simple_selects_the_companion_rendering(self):
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "simple"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             self.assertIsInstance(render.make_renderer(), CompanionRenderer)
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": " SIMPLE "}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": " SIMPLE "}):
             self.assertIsInstance(render.make_renderer(), CompanionRenderer)
 
     def test_other_values_stay_expert(self):
-        with patch.dict(os.environ, {"TRAINMATE_RENDER": "fancy"}):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "fancy"}):
             renderer = render.make_renderer()
         self.assertIsInstance(renderer, ExpertRenderer)
         self.assertNotIsInstance(renderer, CompanionRenderer)
@@ -73,7 +73,7 @@ class RenderImportDirectionTest(unittest.TestCase):
 
     def test_no_command_module_imports_the_renderer(self):
         from pathlib import Path
-        from trainmate.cli import render as render_package
+        from stamind.cli import render as render_package
         render_dir = Path(render_package.__file__).parent
         cli_dir = render_dir.parent
         offenders = [
@@ -104,7 +104,7 @@ class SessionLineTest(unittest.TestCase):
         )
 
     def test_every_canonical_sport_has_its_own_emoji(self):
-        from trainmate.sports import CANONICAL_SPORTS
+        from stamind.sports import CANONICAL_SPORTS
         for sport in CANONICAL_SPORTS:
             self.assertIn(sport, session_lines.SPORT_EMOJI)
 

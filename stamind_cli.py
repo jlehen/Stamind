@@ -1,0 +1,348 @@
+"""Stamind CLI entry point: the argparse dispatcher (``main``) and its helpers.
+
+The process-wide singletons live in ``stamind.runtime`` and handlers read them as
+``runtime.<name>`` at use time. Nothing under ``stamind/`` imports this module any
+more, so the self-alias into ``sys.modules`` that used to break the resulting import
+cycle is gone with it.
+"""
+import argparse
+import sys
+import traceback
+
+from stamind import clock, journal
+from stamind.prompt import PromptCancelled
+from stamind.text import bold, cyan, dim, red
+from stamind.output import aside, notice
+
+from stamind.cli.argparse_ext import (
+    UsageExit, WrapAwareArgumentParser,
+    _print_command_tree, translate_dashless_argv, _HelpAllAction,
+    sort_command_tree,
+)
+
+# Help lists commands by usefulness, not argparse registration order
+# (DESIGN_cli_noargs.md §c). One list per level, keyed by the parent's canonical
+# name ("" = top level), each level's visible sub-commands most-useful first.
+# Prefix matching leaves no trace in the listings, so both help surfaces say it out
+# loud (DESIGN_cli_noargs.md §d).
+PREFIX_HINT = "Any prefix that matches one command is that command: 'wo li' = 'workout list'."
+
+# The two commands answered from the parser tree itself rather than by a handler, so they
+# are the two that legitimately carry no `func` (`_dispatch`).
+TREE_COMMANDS = ("help", "shell")
+
+COMMAND_ORDER = {
+    "": ["status", "workout", "progress", "plan", "goal",
+         "constraint", "benchmark", "strength", "signal", "queue", "learnings", "data", "settings",
+         "journal", "shell", "help"],
+    "settings": ["list", "set", "reset"],
+    "queue": ["list", "answer", "tell"],
+    "strength": ["name", "reset", "discard"],
+    "journal": ["show", "prune"],
+    "goal": ["list", "add", "edit", "rm"],
+    "constraint": ["list", "show", "add", "edit", "rm"],
+    "benchmark": ["list", "record", "rm"],
+    "signal": ["list", "list-metrics", "add", "rm"],
+    "learnings": ["list", "show", "edit", "demote", "keep", "rm"],
+    "plan": ["show", "generate", "keep", "feedback", "versions", "diff", "rollback"],
+    "workout": ["list", "show", "adapt", "tweak", "compare", "generate", "rollback",
+                "batches"],
+    "data": ["pull", "reflect", "show-metrics", "show-activities"],
+}
+
+# Only the parser builders. Each one attaches its command's handler as `func=`, so the
+# dispatcher never names a handler and importing one here bound 71 names nothing read.
+from stamind.cli.status import add_status_parser
+from stamind.cli.progress import add_progress_parser
+from stamind.cli.goals import add_goal_parser
+from stamind.cli.constraints import add_constraint_parser
+from stamind.cli.benchmarks import add_benchmark_parser
+from stamind.cli.signals import add_signal_parser
+from stamind.cli.learnings import add_learnings_parser
+from stamind.cli.plans.parser import add_plan_parser
+from stamind.cli.workouts.parser import add_workout_parser
+from stamind.cli.data.parser import add_data_parser
+from stamind.cli.settings import add_settings_parser
+from stamind.cli.journal.parser import add_journal_parser
+from stamind.cli.queue import add_queue_parser
+from stamind.cli.strength import add_strength_parser
+from stamind.cli.bot.parser import add_bot_parser
+
+
+def build_parser():
+    """Construct the argparse tree and return ``(parser, named_subparsers)``.
+
+    ``named_subparsers`` maps a top-level command to its sub-parser so the
+    dispatcher can print per-group help. Split out from ``main`` so the REPL can
+    build the tree once and reuse it across many lines of input.
+    """
+    parser = WrapAwareArgumentParser(
+        # Not sys.argv[0]: nobody types 'stamind_cli.py', and every wrapped usage line
+        # is indented under it (DESIGN_cli_noargs.md §e).
+        prog="sm",
+        description="Stamind - Local Training Coach CLI",
+        epilog=PREFIX_HINT,
+    )
+    parser.add_argument(
+        "--llm-model", dest="llm_model",
+        help="Override the coach model for this run; 'settings list coach-model' "
+             "shows the menu"
+    )
+    parser.add_argument(
+        "--helpall", action=_HelpAllAction,
+        help="Show every command including hidden maintenance ones (same as 'help --all')"
+    )
+    parser.add_argument(
+        "--debug", action="store_true",
+        help="Re-raise on failure instead of printing a one-line error"
+    )
+
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # help command — prints every command and sub-command in one place. Registered
+    # as a real sub-command (rather than just argparse's own --help) so it can
+    # recurse through the whole sub-parser tree; see _print_command_tree.
+    help_parser = subparsers.add_parser(
+        "help", help="Show every command and sub-command in one place"
+    )
+    help_parser.add_argument(
+        "--all", action="store_true", dest="show_all",
+        help="Also list hidden maintenance commands (wipe, bootstrap, …)"
+    )
+
+    # shell command — drop into the interactive REPL. See _repl.
+    subparsers.add_parser(
+        "shell",
+        help="Start an interactive shell, dispatching each line like a command"
+    )
+
+    # Common parser for commands that support bypassing or forcing the auto-pull.
+    # --no-pull and --force-pull are opposite ends of the same throttle, so they're
+    # mutually exclusive.
+    pull_bypass_parser = argparse.ArgumentParser(add_help=False)
+    _pull_group = pull_bypass_parser.add_mutually_exclusive_group()
+    _pull_group.add_argument(
+        "--no-pull", action="store_true", dest="no_pull",
+        help="Skip the Garmin/Calendar pull check, reading purely from the SQLite cache"
+    )
+    _pull_group.add_argument(
+        "--force-pull", action="store_true", dest="force_pull",
+        help="Force a Garmin/Calendar refresh even within the refresh-minutes window, "
+             "bypassing the cache-reuse throttle"
+    )
+
+    # Common parser for debugging LLM prompts
+    llm_debug_parser = argparse.ArgumentParser(add_help=False)
+    llm_debug_parser.add_argument(
+        "--show-llm-prompt-only", action="store_true", dest="show_llm_prompt_only",
+        help="Print the prompt that would be sent to the LLM and exit without sending"
+    )
+
+    # Date/mesocycle/macrocycle/goal filtering is not a shared parent parser: each command
+    # calls stamind.cli.selectors.add_selector_args with its own default window and
+    # direction (DESIGN_cli_selectors.md §3).
+    add_status_parser(subparsers, pull_bypass_parser)
+    add_progress_parser(subparsers, pull_bypass_parser)
+    add_goal_parser(subparsers)
+    add_constraint_parser(subparsers)
+    add_benchmark_parser(subparsers)
+    add_signal_parser(subparsers)
+    add_learnings_parser(subparsers)
+    add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser)
+    add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser)
+    add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser)
+    add_settings_parser(subparsers)
+    add_queue_parser(subparsers)
+    add_strength_parser(subparsers)
+    add_journal_parser(subparsers)
+    add_bot_parser(subparsers)
+
+    # Read off the tree rather than hand-listed: this was a literal dict and `bot` was
+    # never added to it, so bare `sm bot` printed the top-level help instead of its own.
+    named_subparsers = dict(subparsers.choices)
+    sort_command_tree(parser, COMMAND_ORDER)
+    return parser, named_subparsers
+
+
+def run_once(argv, parser, named_subparsers, source=None) -> None:
+    """Parse one command line and dispatch it, bracketed by a journal run.
+
+    Shared by ``main`` and the REPL, which is why the bracket lives here rather than in
+    ``main``: ``sm shell`` runs many commands in one process, so a run is a command, not
+    a process (DESIGN_logging.md §3). It sits just inside the two existing error
+    boundaries, so every failed command records its own traceback with no new handler
+    anywhere — the bracket notes the exception and re-raises it unchanged (§5.4).
+
+    Three outcomes, because an exit code conflates three things: ``ok`` for a command
+    that finished — a domain refusal included — ``cancelled`` for a deliberate abort,
+    ``failed`` for an unhandled exception. A line that only ever printed usage or help
+    gets no outcome at all: it is dropped, which is why the bracket is deferred (§3).
+    """
+    journal.start_run(argv, source=source, defer=True)
+    clock.start_command()
+    try:
+        _dispatch(argv, parser, named_subparsers)
+    except UsageExit:
+        # Not an outcome: nothing happened but the help now on screen, so the run is
+        # dropped rather than closed (DESIGN_logging.md §3).
+        journal.drop_run()
+        raise
+    except SystemExit as exc:
+        journal.end_run("ok", exit_code=exc.code if isinstance(exc.code, int) else 0)
+        raise
+    except (PromptCancelled, KeyboardInterrupt):
+        journal.end_run("cancelled", exit_code=130)
+        raise
+    except BaseException as exc:
+        journal.end_run(
+            "failed", exit_code=1, error=f"{type(exc).__name__}: {exc}",
+            traceback_text=traceback.format_exc(),
+        )
+        raise
+    finally:
+        clock.end_command()
+    journal.end_run("ok")
+
+
+def _dispatch(argv, parser, named_subparsers) -> None:
+    """Parse one command line and run its handler."""
+    # Parse the arguments. Network-appliance-style dashless options
+    # (e.g. `workout adapt message "..." no-pull`) are first rewritten back into
+    # `--flag` form against the parser tree, so both syntaxes share one definition.
+    args = parser.parse_args(translate_dashless_argv(parser, argv))
+
+    if getattr(args, "llm_model", None):
+        from stamind.openrouter import openrouter_client
+        openrouter_client.model = args.llm_model
+
+    if getattr(args, "show_llm_prompt_only", False):
+        from stamind.openrouter import openrouter_client
+        openrouter_client.show_prompt_only = True
+
+    if not args.command:
+        parser.print_help()
+        raise UsageExit(1)
+
+    # Aliases and prefixes are resolved to canonical names before argparse sees them
+    # (DESIGN_cli_noargs.md §d), so `cmd` is always canonical.
+    cmd = args.command.lower()
+
+    # Every command but the two below carries its handler, bound with set_defaults()
+    # next to the sub-parser that defines its flags. The 200-line elif ladder this
+    # replaces had to be edited in step with the parser definitions, and a branch that
+    # fell through simply did nothing.
+    handler = getattr(args, "func", None)
+    if handler is None and cmd not in TREE_COMMANDS:
+        # A command group invoked bare (`sm goal`): show what it offers. Asked before
+        # the run is named, so it drops with the other help-only lines
+        # (DESIGN_logging.md §3).
+        group = named_subparsers.get(cmd)
+        (group or parser).print_help()
+        raise UsageExit(1)
+
+    # On the record too, so `journal` can tell a read-only view from a command that
+    # changed something whatever prefix was typed (DESIGN_logging.md §7.1).
+    journal.name_run(cmd, getattr(args, "subcommand", None))
+
+    if cmd == "help":
+        print(bold(parser.description))
+        print()
+        _print_command_tree(parser, include_advanced=getattr(args, "show_all", False))
+        aside(PREFIX_HINT)
+        return
+    if cmd == "shell":
+        _repl(parser, named_subparsers)
+        return
+
+    handler(args)
+
+
+def _repl(parser, named_subparsers) -> None:
+    """Read commands interactively until EOF/exit, dispatching each like a shell.
+
+    Reached via the ``shell``/``sh`` command. Importing ``readline`` gives line
+    editing and an in-session history for free.
+    """
+    import shlex
+    try:
+        import readline  # noqa: F401 -- registering it enables editing/history
+    except ImportError:
+        pass
+
+    print(bold("Stamind interactive shell") +
+          dim(" — type a command, 'help' for the list, 'exit' or Ctrl-D to quit."))
+    while True:
+        try:
+            line = input(cyan("sm> "))
+        except EOFError:  # Ctrl-D
+            print()
+            break
+        except KeyboardInterrupt:  # Ctrl-C at the prompt: abandon the line, stay in
+            print()
+            continue
+
+        line = line.strip()
+        if not line:
+            continue
+        if line.lower() in ("exit", "quit", "q"):
+            break
+
+        try:
+            argv = shlex.split(line)
+        except ValueError as exc:  # e.g. an unbalanced quote
+            notice(f"Parse error: {exc}", red)
+            continue
+
+        try:
+            # A typed line is a run of its own, naming the shell run as its parent
+            # (DESIGN_logging.md §3).
+            run_once(argv, parser, named_subparsers, source="repl")
+        except SystemExit:
+            # argparse errors, `-h`, and missing-subcommand paths call sys.exit;
+            # swallow it so a bad line doesn't tear down the whole shell.
+            pass
+        except PromptCancelled:
+            print("Cancelled.")
+        except KeyboardInterrupt:  # Ctrl-C mid-command: cancel it, keep the shell
+            print()
+        except Exception as exc:  # a handler blew up; report and keep going
+            notice(f"Error: {exc}", red)
+
+
+def main(argv=None) -> None:
+    """Entry point. With no arguments, print help; use `shell` for the REPL.
+
+    The single error boundary for a command run. Handlers used to wrap themselves in
+    `except Exception` and print the message, which discarded the traceback, returned
+    exit code 0 for a failed command, and hid real bugs behind a one-line summary — the
+    `next_goal` NameError read as "Error during plan generation: name 'next_goal' is
+    not defined" for as long as it existed. Failures now reach here, print in red, and
+    exit non-zero; `--debug` re-raises so the traceback survives.
+    """
+    if argv is None:
+        argv = sys.argv[1:]
+    parser, named_subparsers = build_parser()
+    debug = "--debug" in argv
+    try:
+        run_once(argv, parser, named_subparsers)
+    except SystemExit:
+        raise
+    except PromptCancelled:
+        # A deliberate abort (front-end /cancel or idle timeout), not a failure.
+        print("Cancelled.")
+        sys.exit(130)
+    except Exception as e:
+        if debug:
+            raise
+        notice(f"Error: {e}", red)
+        aside("Re-run with --debug for the full traceback.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except PromptCancelled:
+        # An interactive prompt was cancelled (front-end /cancel or idle timeout);
+        # abort the command without the traceback an uncaught BaseException prints.
+        print("Cancelled.")

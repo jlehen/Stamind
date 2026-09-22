@@ -26,7 +26,7 @@ Four consequences, in the order they bite:
 
 - **The deload is duplicated or dropped.** The TASK instructs the model to "incorporate any
   deload weeks … in accordance with the science guidelines". There is no structural deload
-  concept anywhere in TrainMate — it is prompt prose only — so nothing said whether the
+  concept anywhere in Stamind — it is prompt prose only — so nothing said whether the
   mesocycle's easy week had already been taken. A second one in week 4 was a compliant answer.
 - **The progression restarts.** With only a 15-day activity average to anchor on, the
   mesocycle's remaining weeks get re-derived as though they were its opening weeks. CTL is a
@@ -104,7 +104,7 @@ elapsed part holding no rows at all.
 ### 3.1 Reusing the weekly maths
 
 The week lines come from `progression.weekly_aggregates` — the same planned-vs-actual weekly
-computation `tm progress` renders — so the week planner and the athlete can never read different
+computation `sm progress` renders — so the week planner and the athlete can never read different
 numbers for the same week. `progression.week_plan_denom` supplies the comparable denominator,
 which for the in-progress week is its elapsed slice.
 

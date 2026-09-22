@@ -9,7 +9,7 @@ the athlete produced (§9.2a), and the width the whole report has to fit inside 
 """
 import unittest
 
-from trainmate.analytics.mesocycle_report import (
+from stamind.analytics.mesocycle_report import (
     current_week_window, measured_window, mesocycle_report, rate_window,
 )
 

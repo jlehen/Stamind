@@ -2,7 +2,7 @@
 
 ## 1. The problem
 
-TrainMate says a lot before it says anything. A `data show-activities` over Telegram
+Stamind says a lot before it says anything. A `data show-activities` over Telegram
 arrived like this:
 
 ```
@@ -54,7 +54,7 @@ the adaptation table print anyway.
 
 ## 2. Two audiences, one CLI
 
-The bot is a shim over the real CLI (`trainmate/chat/` runs `trainmate_cli.py` as a
+The bot is a shim over the real CLI (`stamind/chat/` runs `stamind_cli.py` as a
 subprocess), which is what keeps the two surfaces in permanent parity. That is worth
 keeping. But parity of *commands* is not parity of *reading conditions*:
 
@@ -83,7 +83,7 @@ write that failed, a domain refusal. Always printed, on every front-end. `print`
 
 **An aside.** Progress narration, cache-reuse notes, defaulting notices, next-step hints,
 standing caveats — side information. Printed on a terminal, suppressed in chat.
-`trainmate.output.aside`, or `asides_enabled()` where the caller is building a list of lines
+`stamind.output.aside`, or `asides_enabled()` where the caller is building a list of lines
 rather than printing them.
 
 ```python
@@ -93,13 +93,13 @@ def aside(text: str, color_fn=None) -> None:
     print((color_fn or dim)(text))
 ```
 
-`asides_enabled()` reads `TRAINMATE_VERBOSE` first, then falls back to "not the JSON
-front-end" via `trainmate.prompt.is_json_frontend` — the one place `TRAINMATE_FRONTEND` is
+`asides_enabled()` reads `STAMIND_VERBOSE` first, then falls back to "not the JSON
+front-end" via `stamind.prompt.is_json_frontend` — the one place `STAMIND_FRONTEND` is
 interpreted, so the transport decision is not re-derived here.
 
 It is called `aside` and not `note` because this app already spends "note" four ways: plan
 feedback notes, the athlete's `-m` note, daily-signal notes, and `PMC_TSB_LAG_NOTE`. One
-of those is even a local variable (`trainmate/cli/plans/feedback.py`, `_feedback_rm`) that
+of those is even a local variable (`stamind/cli/plans/feedback.py`, `_feedback_rm`) that
 would
 have shadowed the import.
 
@@ -263,19 +263,19 @@ front-end — a protocol, not a wrap rule, and more than the tap is worth today.
 
 ## 4. Why an env var and not a flag
 
-`TRAINMATE_VERBOSE=1` forces asides on; `=0` forces them off. There is no CLI flag, and
+`STAMIND_VERBOSE=1` forces asides on; `=0` forces them off. There is no CLI flag, and
 that is not an oversight: `-v/--verbose` is already taken by seven sub-commands
 (`status`, `constraint list`, `learnings list`, `data backfill-tss`, three under `workout`)
 where it means "more detail in this listing" — a different axis entirely. A global
 `--verbose` would land in the same namespace and quietly mean two things.
 
 An env var also matches how the other front-end knobs already work
-(`TRAINMATE_FRONTEND`, `TRAINMATE_WRAP_WIDTH`), and the bot needs no change: it sets
-`TRAINMATE_FRONTEND=json`, which is already the signal.
+(`STAMIND_FRONTEND`, `STAMIND_WRAP_WIDTH`), and the bot needs no change: it sets
+`STAMIND_FRONTEND=json`, which is already the signal.
 
 ## 5. The prose
 
-The display side only fixes lines TrainMate writes. The Decision Summary is written by the
+The display side only fixes lines Stamind writes. The Decision Summary is written by the
 model, so it is fixed in the prompt, in two places.
 
 **A shared style section.** `_build_system_prompt` now carries `## WRITING FOR THE ATHLETE`
@@ -311,14 +311,14 @@ learnings, they run rarely, and their prose is context rather than chatter.
 
 The line to hold: **cap prose that is read once; leave prose that is read again by the
 next prompt.** Before capping a new field, check whether anything feeds it back in —
-`trainmate/coach/formatting.py` is where that happens. (`adaptation_summary` is safe:
+`stamind/coach/formatting.py` is where that happens. (`adaptation_summary` is safe:
 only the per-workout `modification_reason` is re-injected, not the batch summary.)
 
 ## 6. What this does not change
 
 No command gained or lost a capability, no data is stored differently, and the terminal
-sees the same output it always did — every suppressed line is one `TRAINMATE_VERBOSE=1`
-away. The bot is untouched: it already declared itself via `TRAINMATE_FRONTEND=json`, and
+sees the same output it always did — every suppressed line is one `STAMIND_VERBOSE=1`
+away. The bot is untouched: it already declared itself via `STAMIND_FRONTEND=json`, and
 this change simply gives that declaration a second meaning.
 
 ## 7. The prompt context, and the wait
@@ -372,8 +372,8 @@ buffers stdout and flushes at a photo, a button row, a prompt, or exit — so wi
 `--show-llm-context` the 321 lines and the strategy arrive **in the same message**, after
 a wait of tens of seconds, which is exactly the shape §1 set out to kill.
 
-A fourth one-way sentinel, `\x1eTM-FLUSH` (`FLUSH_SENTINEL` / `emit_flush()` in
-`trainmate/prompt.py`; both ends are `trainmate/sentinels.py` now, where the reader is
+A fourth one-way sentinel, `\x1eSM-FLUSH` (`FLUSH_SENTINEL` / `emit_flush()` in
+`stamind/prompt.py`; both ends are `stamind/sentinels.py` now, where the reader is
 `flush_wants_a_wait()`), ends the message where
 it stands. Three details:
 
@@ -485,7 +485,7 @@ the number and never the call.
 
 ### 8.4 The one call with no notice
 
-`tm bot route` classifies free text before the real command starts. Its stdout is
+`sm bot route` classifies free text before the real command starts. Its stdout is
 captured by `chat/runner.py`'s `_route_intent` and discarded but for the last JSON line, so a
 notice there reaches nobody and the journal read is pure waste on the hot path of every
 chat message. `complete(..., wait_notice=None)` turns it off, and that value is the
@@ -513,7 +513,7 @@ Three changes, each closing one part of that story:
 - **Keys pressed before the question are dropped.** `TtyPrompt` flushes the terminal's
   pending input before each question. A key pressed before the question was on screen
   cannot be an answer to it. Piped stdin is not a terminal and is left alone, so a
-  scripted `yes | tm ...` still works.
+  scripted `yes | sm ...` still works.
 - **An unclear answer is asked again.** A confirm accepts `y`, `yes`, `n`, `no`, or a blank
   line for the default. Anything else prints "Please answer y or n." and asks again. A
   stray key typed *after* the question, which the flush cannot catch, now costs one

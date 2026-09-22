@@ -17,8 +17,8 @@ def _days_out(n: int) -> str:
 
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 
-from trainmate.db import Database
-from trainmate.db.periodization import repair_mesocycle_contiguity
+from stamind.db import Database
+from stamind.db.periodization import repair_mesocycle_contiguity
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -27,7 +27,7 @@ rebind_test_db(test_db)
 class TestPlanLineage(unittest.TestCase):
     """The retrospective mesocycle walk takes the previous *goal's* plan and never an earlier
     *version* of this goal's own (DESIGN_plan_rollback.md §6.1). `_mesocycles_in_window` used
-    to call the version accessor, so `tm progress --mesocycles` reported every mesocycle twice
+    to call the version accessor, so `sm progress --mesocycles` reported every mesocycle twice
     after any regeneration — the two plans cover the same dates."""
 
     TODAY = "2026-08-05"
@@ -67,7 +67,7 @@ class TestPlanLineage(unittest.TestCase):
     def test_regenerating_does_not_duplicate_the_mesocycles(self):
         """The regression: v1 and v2 span the same dates, so walking both reports every
         calendar period twice and counts each activity into two mesocycles."""
-        from trainmate.cli.progress_zones import _mesocycles_in_window
+        from stamind.cli.progress_zones import _mesocycles_in_window
 
         obj = self._goal("Autumn Marathon", "2026-09-20")
         self._plan(obj, "v1", [("V1 Base", "2026-06-01", "2026-06-28"),
@@ -82,7 +82,7 @@ class TestPlanLineage(unittest.TestCase):
     def test_the_previous_goals_plan_is_walked(self):
         """The other half: a window reaching back past the current plan's first mesocycle
         lands in the previous goal's plan, which nothing else supplies."""
-        from trainmate.cli.progress_zones import _mesocycles_in_window
+        from stamind.cli.progress_zones import _mesocycles_in_window
 
         spring = self._goal("Spring 10k", "2026-05-31")
         self._plan(spring, "spring", [("Spring Base", "2026-04-06", "2026-05-31")])

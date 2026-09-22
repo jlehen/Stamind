@@ -18,8 +18,8 @@ from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_workout_generate_window.db")
 
-from trainmate.db import Database
-from trainmate.sports import canonical_sport
+from stamind.db import Database
+from stamind.sports import canonical_sport
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
@@ -106,12 +106,12 @@ class WindowTestCase(unittest.TestCase):
 
     def generate(self, *entries, start=None, end=None, note=None, apply=True, fresh=False):
         """The whole flow against a canned reply. Returns the proposal."""
-        from trainmate import runtime
+        from stamind import runtime
         response = {"reasoning": "why", "workouts": list(entries)}
         if note:
             response["athlete_note"] = note
-        with patch("trainmate.runtime.calendar_syncer"), \
-                patch("trainmate.coach.engine.openrouter_client") as client:
+        with patch("stamind.runtime.calendar_syncer"), \
+                patch("stamind.coach.engine.openrouter_client") as client:
             client.complete.return_value = response
             proposal = runtime.coach_service.workout_generate(
                 start_date=start, end_date=end, fresh=fresh
@@ -348,7 +348,7 @@ class TestTheConflictRules(WindowTestCase):
 
     def test_two_entries_naming_one_target_keep_the_first(self):
         self.ride(_days_out(2))
-        with patch("trainmate.coach.service.standing.notice"):
+        with patch("stamind.coach.service.standing.notice"):
             self.generate(
                 self.session(_days_out(4), sport="cycling", title="First",
                              replaces={"date": _days_out(2), "sport_type": "cycling"},
@@ -365,7 +365,7 @@ class TestTheConflictRules(WindowTestCase):
     def test_a_destination_outside_the_span_is_refused_and_the_source_stands(self):
         self.ride(_days_out(2))
         before = test_db.get_workout(_days_out(2), "cycling")
-        with patch("trainmate.coach.service.standing.notice"):
+        with patch("stamind.coach.service.standing.notice"):
             self.generate(
                 self.session(_days_out(40), sport="cycling", title="Long ride",
                              replaces={"date": _days_out(2), "sport_type": "cycling"},
@@ -380,7 +380,7 @@ class TestTheConflictRules(WindowTestCase):
         where it stands."""
         self.window(2)
         self.ride(_days_out(15))
-        with patch("trainmate.coach.service.standing.notice"):
+        with patch("stamind.coach.service.standing.notice"):
             self.generate(
                 self.session(_days_out(16), sport="cycling", title="Moved ride",
                              replaces={"date": _days_out(15), "sport_type": "cycling"},
@@ -391,7 +391,7 @@ class TestTheConflictRules(WindowTestCase):
     def test_a_destination_whose_occupant_is_kept_is_refused_and_both_stand(self):
         self.ride(_days_out(2))
         self.long_run(_days_out(4))
-        with patch("trainmate.coach.service.standing.notice"):
+        with patch("stamind.coach.service.standing.notice"):
             self.generate(
                 self.session(_days_out(4), sport="running", title="Moved run",
                              replaces={"date": _days_out(2), "sport_type": "cycling"},

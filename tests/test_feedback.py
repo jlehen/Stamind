@@ -20,15 +20,15 @@ def _days_out(n: int) -> str:
 # day it passes (same rot 2a7cd71 fixed in test_constraints.py).
 GOAL_DATE = _days_out(71)
 
-TEST_DB_PATH = test_db_path("test_trainmate_feedback.db")
+TEST_DB_PATH = test_db_path("test_stamind_feedback.db")
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
+from stamind.coach.service import coach_service
 
 # Three mesocycles around today, so a bare `-m`, a date atom and a name infix all have
 # something to resolve to — and 'build' deliberately matches two of them.
@@ -320,7 +320,7 @@ class TestFeedbackFiling(FeedbackTestCase):
 class TestFeedbackLifecycle(FeedbackTestCase):
     """Pending := attached to the ACTIVE macrocycle; supersession consumes (§6)."""
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_regeneration_consumes_the_pending_notes(self, mock_client):
         obj_id, macro_id, mesos = self._plan()
         test_db.add_plan_feedback(macro_id, "drop the second FTP test")
@@ -339,8 +339,8 @@ class TestFeedbackLifecycle(FeedbackTestCase):
         self.assertEqual(test_db.list_plan_feedback(new_macro["id"]), [])
         self.assertEqual(len(test_db.list_plan_feedback(macro_id)), 1)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_a_declined_preview_leaves_the_notes_pending(self, mock_coach, mock_garmin):
         obj_id, macro_id, _ = self._plan()
         test_db.add_plan_feedback(macro_id, "the Friday sessions should progress duration")
@@ -357,8 +357,8 @@ class TestFeedbackLifecycle(FeedbackTestCase):
         mock_coach.plan_apply.assert_not_called()
         self.assertEqual(len(test_db.list_plan_feedback(macro_id)), 1)
 
-    @patch("trainmate.runtime.calendar_syncer")
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.runtime.calendar_syncer")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_rollback_makes_the_notes_pending_again(self, mock_client, mock_calendar):
         obj_id, macro_id, _ = self._plan()
         test_db.add_plan_feedback(macro_id, "too much intensity")
@@ -385,7 +385,7 @@ class TestFeedbackLifecycle(FeedbackTestCase):
 class TestFeedbackConsumption(FeedbackTestCase):
     """The regeneration gate and the prompt section it feeds (§7)."""
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def _generate(self, mock_client, **kwargs):
         mock_client.complete.return_value = {
             "strategy": "New strategy",
@@ -402,8 +402,8 @@ class TestFeedbackConsumption(FeedbackTestCase):
     def test_pending_feedback_regenerates_without_force(self):
         obj_id, macro_id, _ = self._plan()
         # Same inputs as the plan in place: without feedback this reuses.
-        with patch("trainmate.plan_inputs.goals_hash", return_value="ghash"), \
-                patch("trainmate.plan_inputs.constraints_hash", return_value="chash"), \
+        with patch("stamind.plan_inputs.goals_hash", return_value="ghash"), \
+                patch("stamind.plan_inputs.constraints_hash", return_value="chash"), \
                 patch.object(coach_service, "config_changed", return_value=None):
             proposal, _ = self._generate()
             self.assertTrue(proposal["reused"])
@@ -441,8 +441,8 @@ class TestFeedbackConsumption(FeedbackTestCase):
 class TestFeedbackReplan(FeedbackTestCase):
     """`--replan` collapses append + regenerate, still behind the human `y` (§4)."""
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_replan_saves_then_reaches_the_confirm_gate(self, mock_coach, mock_garmin):
         obj_id, macro_id, _ = self._plan()
         mock_coach.config_changed.return_value = None
@@ -467,6 +467,35 @@ class TestFeedbackReplan(FeedbackTestCase):
         # --force is neither passed nor needed: pending feedback opens the gate (§7).
         self.assertFalse(mock_coach.plan_generate.call_args.kwargs["force"])
 
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
+    def test_a_yes_applies_the_plan_and_names_what_to_run_next(self, mock_coach,
+                                                               mock_garmin):
+        """The far side of the gate: a `y` saves the new periodization, and the athlete is
+        told the schedule is still the old one until `workout generate` runs."""
+        obj_id, macro_id, _ = self._plan()
+        # A bootstrapped athlete, so the first-run `data bootstrap` nudge in
+        # `plan generate` does not eat the `y` meant for the proposal.
+        test_db.set_sync_state(None, "2026-09-01T00:00:00Z", key="reflect")
+        mock_coach.config_changed.return_value = None
+        mock_coach.plan_generate.return_value = {
+            "strategy": "Proposed", "mesocycles": [], "reused": False,
+            "goal": test_db.get_objective(obj_id),
+        }
+
+        exit_code, stdout, _ = self.run_cli(
+            ["plan", "feedback", "ease the Fridays", "--replan"], input_value="y"
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            [n["text"] for n in test_db.list_plan_feedback(macro_id)],
+            ["ease the Fridays"],
+        )
+        mock_coach.data_bootstrap.assert_not_called()
+        mock_coach.plan_apply.assert_called_once()
+        self.assertIn("If you applied the new plan", stdout)
+
 
 class TestFeedbackFromGenerate(FeedbackTestCase):
     """`plan generate --feedback TEXT` files the note as `plan feedback` does, then generates."""
@@ -478,8 +507,8 @@ class TestFeedbackFromGenerate(FeedbackTestCase):
             "goal": test_db.get_objective(obj_id),
         }
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_the_note_is_filed_then_the_new_plan_waits_for_a_yes(self, mock_coach, mock_garmin):
         obj_id, macro_id, _ = self._plan()
         self._proposal(mock_coach, obj_id)
@@ -498,8 +527,8 @@ class TestFeedbackFromGenerate(FeedbackTestCase):
         mock_coach.plan_apply.assert_not_called()
         self.assertIn("Plan discarded", stdout)
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_a_changed_input_asks_nothing_when_a_note_is_pending(self, mock_coach, mock_garmin):
         obj_id, _, _ = self._plan()
         self._proposal(mock_coach, obj_id)
@@ -514,8 +543,8 @@ class TestFeedbackFromGenerate(FeedbackTestCase):
         self.assertNotIn("Keeping the current periodization strategy", stdout)
         mock_coach.plan_generate.assert_called_once()
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_a_goal_with_no_plan_is_refused(self, mock_coach, mock_garmin):
         obj_id = test_db.add_objective(
             title="Zurich Marathon", target_date=GOAL_DATE, sport_type="running",
@@ -530,8 +559,8 @@ class TestFeedbackFromGenerate(FeedbackTestCase):
         self.assertIn(f"goal edit {obj_id} --desc", stdout)
         mock_coach.plan_generate.assert_not_called()
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_a_range_of_goals_is_refused(self, mock_coach, mock_garmin):
         first_id, first_macro, _ = self._plan()
         second_id = test_db.add_objective(
@@ -548,8 +577,8 @@ class TestFeedbackFromGenerate(FeedbackTestCase):
         self.assertEqual(test_db.list_plan_feedback(first_macro), [])
         mock_coach.plan_generate.assert_not_called()
 
-    @patch("trainmate.runtime.garmin")
-    @patch("trainmate.runtime.coach_service")
+    @patch("stamind.runtime.garmin")
+    @patch("stamind.runtime.coach_service")
     def test_an_empty_note_is_refused(self, mock_coach, mock_garmin):
         _, macro_id, _ = self._plan()
 
@@ -581,7 +610,7 @@ class TestFeedbackDisplay(FeedbackTestCase):
             stdout.index("Athlete Feedback"), stdout.index("Mesocycle Timeline")
         )
 
-    @patch("trainmate.runtime.garmin")
+    @patch("stamind.runtime.garmin")
     def test_status_counts_the_pending_notes(self, mock_garmin):
         obj_id, macro_id, _ = self._plan()
         test_db.add_plan_feedback(macro_id, "overall too easy")
@@ -592,7 +621,7 @@ class TestFeedbackDisplay(FeedbackTestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("Plan feedback: 2 pending", stdout)
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_plan_diff_lists_each_versions_notes(self, mock_client):
         obj_id, macro_id, _ = self._plan()
         test_db.add_plan_feedback(macro_id, "drop the second FTP test")

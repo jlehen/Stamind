@@ -29,7 +29,7 @@ The second way is to edit the schedule by hand, with no model call. There are fo
 
 The second way costs code that the first does not need.
 
-**A session typed by hand is not the coach's.** So TrainMate has to remember that it is the
+**A session typed by hand is not the coach's.** So Stamind has to remember that it is the
 athlete's own, everywhere:
 
 - The database derives a field, `source`, that says "manual" for such a session.
@@ -130,8 +130,8 @@ already trained), how to write a strength day, how to move a session, the benchm
 the intensity target, and the two "second jobs" that turn a message into a constraint or a
 daily signal to confirm.
 
-**What TrainMate enforces after the reply.** The model is told which days it may change,
-and TrainMate does not take its word for it:
+**What Stamind enforces after the reply.** The model is told which days it may change,
+and Stamind does not take its word for it:
 
 - The days are the ones given with `-d`, else `tweak_dates`. When the reply changes sessions
   and names no usable day, the run stops and says: name the day with `-d`.

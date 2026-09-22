@@ -13,7 +13,7 @@
 - Say **mesocycle**, never "block". A **session** is planned; an **activity** is what Garmin
   recorded. Name the model call, never "the planner" or "the call": the **week
   planner** is the call inside `workout generate` and `workout adapt` that writes the sessions,
-  the **strength planner** is the call that writes a strength session. "The coach" is TrainMate
+  the **strength planner** is the call that writes a strength session. "The coach" is Stamind
   speaking to the athlete, whichever call wrote the words.
 - A **brief** is the week planner's description of a strength day: what the session is for
   and what the plan asks of it, with no exercise, set, rep or load in it. The strength
@@ -49,7 +49,7 @@
   precision. Only round the values on display.
 - Avoid duplication. Do not duplicate function with business logic, instead
   re-use the existing code if this doesn't add too much complexity.
-- Every TrainMate instance is operated by the author (the companion instance runs a second
+- Every Stamind instance is operated by the author (the companion instance runs a second
   athlete from the same checkout). So when a migration is necessary, plan for a one-off
   migration and don't bloat the code with backward compatibility support.
 
@@ -107,7 +107,7 @@
         except Exception as e:
             print(f"Error reading science guideline {filename}: {e}")
 - When displaying prose from the LLM, always run it through `wrap_text` in
-  `trainmate/text.py`, so the words wrap nicely.
+  `stamind/text.py`, so the words wrap nicely.
 - A Python file over 500 lines is split, and the pieces land between 150 and 400 lines. A
   file of 400 to 500 lines is split only when it holds two jobs that change for different
   reasons. A file under 100 lines is merged into a sibling, unless it is a concept on its
@@ -115,24 +115,32 @@
   command, one concept, one step of a pipeline — and never "helpers". Some files are over
   the limit only because their docstrings restate rationale the design doc already holds;
   trim the docstring before reaching for a split. Three things stay over 500 lines on
-  purpose: `trainmate_web.py`, a flat list of independent GET handlers that splitting
+  purpose: `stamind_web.py`, a flat list of independent GET handlers that splitting
   would not separate; `db/schema.py`, one ordered run of CREATE statements that
   `SCHEMA_VERSION` versions as a unit; and `static/style.css`, which is not Python. One
   file stays under the 100-line floor for a reason the rule does not list:
-  `trainmate_bot.py` is 38 lines that build `trainmate.chat.app.ChatBot` and run it, and
-  it cannot be merged into a sibling because the `tm-bot` supervisor execs it by path.
+  `stamind_bot.py` is 38 lines that build `stamind.chat.app.ChatBot` and run it, and
+  it cannot be merged into a sibling because the `sm-bot` supervisor execs it by path.
 - A package `__init__.py` holds a docstring, and at most the class the package assembles
   from its submodules. It does not re-export the submodules' names. A re-export gives one
   name two homes, and a test that patches the home it knows about reaches code that reads
   the other one. `garmin/__init__.py` still re-exports everything; it is debt, not
   precedent.
-- Code under `trainmate/coach/engine/` looks the model client up when it is called, as
-  `_eng.openrouter_client`, after `import trainmate.coach.engine as _eng` at the top of
-  the file. Importing the name itself — `from trainmate.coach.engine import
+- Code under `stamind/coach/engine/` looks the model client up when it is called, as
+  `_eng.openrouter_client`, after `import stamind.coach.engine as _eng` at the top of
+  the file. Importing the name itself — `from stamind.coach.engine import
   openrouter_client` — binds a copy, and the 132 `patch` calls on
-  `trainmate.coach.engine.openrouter_client` would then replace a name nothing reads, so
+  `stamind.coach.engine.openrouter_client` would then replace a name nothing reads, so
   every one of those tests would reach OpenRouter for real.
-- One command family per file under `trainmate/cli/`, and split a family into a file per
+- A command that runs another command calls its handler through the module, as
+  `_generate.run_plan_generate(...)` after `import stamind.cli.plans.generate as
+  _generate`, for the reason above: `from … import run_plan_generate` binds a copy, so a
+  test patching the handler where it is defined stubs a name the caller never reads, the
+  real handler runs, and the test reaches OpenRouter believing it mocked the coach.
+  Wiring a handler into argparse with `set_defaults(func=run_plan_generate)` is a
+  reference and not a call, so the parsers keep their plain imports.
+  `tests/test_isolation_guards.py` fails on a new one and names the file and line.
+- One command family per file under `stamind/cli/`, and split a family into a file per
   command once it outgrows roughly 400 lines. Code shared by two commands goes in a module
   of its own — `cli/common.py` for renderers, otherwise its own file — never in whichever
   command file happened to define it first. A function-local import added to dodge a cycle
@@ -171,7 +179,7 @@
 - A fresh worktree fails at test collection until `config.yaml` and `venv` are symlinked
   in from the main checkout. `service_account.json` is needed by two test modules only,
   `test_gcal_client.py` and `test_gcal_history.py`, which build a real `CalendarSyncer`;
-  without it the other 2006 tests still collect and run. Do not symlink `trainmate.db`:
+  without it the other 2006 tests still collect and run. Do not symlink `stamind.db`:
   the worktree's own empty database is what keeps a stray run off the athlete's data.
 - An invariant that spans files ("a propose method never writes") gets a test that reads
   the source and names the offender. Key it on a shape (a return annotation, a directory

@@ -4,7 +4,7 @@ rather than run it.
 
 `JournalTestCase` below is the harness the whole family shares; the other
 three modules import it. What one run records is `test_journal_run.py` and
-`test_journal_records.py`; `tm journal` reading it back is
+`test_journal_records.py`; `sm journal` reading it back is
 `test_journal_command.py`.
 """
 import ast
@@ -18,8 +18,8 @@ import unittest
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
-from trainmate import journal
-from trainmate.config import config
+from stamind import journal
+from stamind.config import config
 from tests.helpers import bind_test_db
 from tests import test_db_path
 
@@ -106,7 +106,7 @@ class TestWriter(JournalTestCase):
 
     def test_the_day_file_is_named_for_the_utc_day_not_the_athletes(self):
         # §4: naming the file from the athlete's zone would build and migrate the
-        # database, on `tm help` and in the path that must survive it being unreachable.
+        # database, on `sm help` and in the path that must survive it being unreachable.
         journal.record("note", "x")
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         self.assertEqual(
@@ -265,7 +265,7 @@ class TestEveryQuestionGoesThroughTheBroker(unittest.TestCase):
     ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     def test_no_command_or_coach_module_calls_input_directly(self):
-        root = os.path.join(self.ROOT, "trainmate")
+        root = os.path.join(self.ROOT, "stamind")
         offenders = []
         for tree in ("cli", "coach"):
             for folder, _dirs, files in os.walk(os.path.join(root, tree)):
@@ -296,11 +296,11 @@ class TestReadOnlyVerbs(unittest.TestCase):
     a `show` added under a new group tomorrow needs no edit here."""
 
     def test_every_read_only_verb_names_a_command_in_the_tree(self):
-        import trainmate_cli
-        from trainmate.cli.argparse_ext import _subparsers_action
-        from trainmate.cli.journal.runs import READ_ONLY_VERBS
+        import stamind_cli
+        from stamind.cli.argparse_ext import _subparsers_action
+        from stamind.cli.journal.runs import READ_ONLY_VERBS
 
-        parser, _named = trainmate_cli.build_parser()
+        parser, _named = stamind_cli.build_parser()
 
         def names(level):
             action = _subparsers_action(level)
@@ -331,12 +331,12 @@ class TestNoSilentSwallows(unittest.TestCase):
     """
 
     ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ENTRY_POINTS = ("trainmate_cli.py", "trainmate_bot.py", "trainmate_web.py")
+    ENTRY_POINTS = ("stamind_cli.py", "stamind_bot.py", "stamind_web.py")
 
     def _sources(self):
         for name in self.ENTRY_POINTS:
             yield os.path.join(self.ROOT, name)
-        package = os.path.join(self.ROOT, "trainmate")
+        package = os.path.join(self.ROOT, "stamind")
         for dirpath, _dirs, files in os.walk(package):
             if "__pycache__" in dirpath:
                 continue

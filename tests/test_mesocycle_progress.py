@@ -7,18 +7,18 @@ from unittest.mock import patch
 from tests.helpers import clear_all_tables, rebind_test_db, save_workout
 from tests import test_db_path
 
-TEST_DB_PATH = test_db_path("test_trainmate_block_progress.db")
+TEST_DB_PATH = test_db_path("test_stamind_block_progress.db")
 
-from trainmate.db import Database
-import trainmate_cli
+from stamind.db import Database
+import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 rebind_test_db(test_db)
 
-from trainmate.analytics import zone_tables
-from trainmate.coach.service import coach_service
-from trainmate.coach.engine.generate import (
+from stamind.analytics import zone_tables
+from stamind.coach.service import coach_service
+from stamind.coach.engine.generate import (
     _mesocycle_composition_task, _mesocycle_progress_task,
 )
 
@@ -366,7 +366,7 @@ class TestMesocycleCompositionContext(unittest.TestCase):
 class TestMesocycleProgressReachesThePrompt(unittest.TestCase):
     """The threading end to end: service -> engine -> both halves of the LLM call."""
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def _prompts(self, mesocycle_progress, has_intensity, mock_client):
         mock_client.complete.return_value = {"reasoning": "ok", "workouts": []}
         coach_service.engine._workout_generate_logic(

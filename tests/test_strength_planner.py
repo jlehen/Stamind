@@ -15,12 +15,12 @@ from tests.helpers import clear_all_tables, rebind_test_db, save_workout
 
 TEST_DB_PATH = test_db_path("test_strength_planner.db")
 
-from trainmate.db import Database
-import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
+from stamind.db import Database
+import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
-from trainmate import runtime, settings
-from trainmate.coach.service import coach_service
-from trainmate.strength import planner, planner_prompt, prescription, sets
+from stamind import runtime, settings
+from stamind.coach.service import coach_service
+from stamind.strength import planner, planner_prompt, prescription, sets
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)
@@ -63,7 +63,7 @@ class _PlannerCase(unittest.TestCase):
     def setUp(self):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
-        moving_clock = patch("trainmate.clock.now", return_value=TUESDAY_8AM)
+        moving_clock = patch("stamind.clock.now", return_value=TUESDAY_8AM)
         moving_clock.start()
         self.addCleanup(moving_clock.stop)
         settings.write(settings.STRENGTH_SETS_SINCE, "2026-08-01")
@@ -308,7 +308,7 @@ class OutputChecksTest(_PlannerCase):
         }]}]
         result = self.strength_pass([])
         self.assertEqual(result.dropped, [
-            "2026-09-17: 'Nordic curl' is not an exercise TrainMate knows, left out"
+            "2026-09-17: 'Nordic curl' is not an exercise Stamind knows, left out"
         ])
         self.assertIn("Belt squat 3×4–6 @ 140 kg", result.added[0]["description"])
 
@@ -414,7 +414,7 @@ class ThroughAdaptTest(_PlannerCase):
             answer("2026-09-17", row("belt squat", 3, 4, 6, 145.0),
                    reason="Monday's sets all reached 6 at 140; add 5."),
         ]}]
-        with patch("trainmate.coach.engine.openrouter_client") as week_planner:
+        with patch("stamind.coach.engine.openrouter_client") as week_planner:
             week_planner.complete.return_value = {
                 "change_needed": False, "reason": "No adaptation needed.",
                 "adapted_workouts": [],
@@ -434,12 +434,12 @@ class ThroughAdaptTest(_PlannerCase):
         self.assertEqual(test_db.get_strength_check(gym["id"]), proposal.strength_stamp)
 
     def test_the_preview_prints_the_kilograms(self):
-        from trainmate.cli.workouts.generate import print_generate_preview
-        from trainmate.coach.proposals import GenerateProposal
+        from stamind.cli.workouts.generate import print_generate_preview
+        from stamind.coach.proposals import GenerateProposal
         session = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
         proposal = GenerateProposal(
             reasoning="Second week of the build.", workouts=(session,),
-            strength_dropped=("2026-09-21: 'Nordic curl' is not an exercise TrainMate "
+            strength_dropped=("2026-09-21: 'Nordic curl' is not an exercise Stamind "
                               "knows, left out",),
         )
         with patch("builtins.print") as printed:
@@ -470,8 +470,8 @@ class ThroughGenerateTest(_PlannerCase):
         test_db.record_strength_check(gym["id"], test_db.strength_history_stamp())
 
     def strength_only(self):
-        with patch("trainmate.runtime.calendar_syncer"), \
-                patch("trainmate.coach.engine.openrouter_client") as week_planner:
+        with patch("stamind.runtime.calendar_syncer"), \
+                patch("stamind.coach.engine.openrouter_client") as week_planner:
             proposal = coach_service.workout_generate_strength(TODAY, MESO_END)
             if proposal.workouts:
                 coach_service.workout_revision_apply(proposal)
@@ -504,8 +504,8 @@ class ThroughGenerateTest(_PlannerCase):
         self.assertIn("stand as written", proposal.reason)
 
     def test_a_plain_workout_generate_keeps_the_committed_gym_unasked(self):
-        with patch("trainmate.runtime.calendar_syncer"), \
-                patch("trainmate.coach.engine.openrouter_client") as week_planner:
+        with patch("stamind.runtime.calendar_syncer"), \
+                patch("stamind.coach.engine.openrouter_client") as week_planner:
             week_planner.complete.return_value = {"reasoning": "Build.", "workouts": []}
             proposal = coach_service.workout_generate()
         self.assertEqual(self.asked, [])
@@ -522,8 +522,8 @@ class ThroughGenerateTest(_PlannerCase):
         thursday = {"date": "2026-09-17", "sport_type": "strength_training",
                     "title": "Full-Body Strength", "description": BRIEF,
                     "duration_minutes": 70, "rpe": 7, "tss": 50}
-        with patch("trainmate.runtime.calendar_syncer"), \
-                patch("trainmate.coach.engine.openrouter_client") as week_planner:
+        with patch("stamind.runtime.calendar_syncer"), \
+                patch("stamind.coach.engine.openrouter_client") as week_planner:
             week_planner.complete.return_value = {"reasoning": "Build.",
                                                   "workouts": [thursday]}
             coach_service.workout_generate(fresh=True)
@@ -572,7 +572,7 @@ class PromptTest(_PlannerCase):
         system, user = self.asked[0]
         self.assertIn("START OF HOW TO PROGRESS", system)
         self.assertIn("Every exercise is written as a rep range at one load", system)
-        self.assertIn("## EXERCISES TRAINMATE KNOWS", system)
+        self.assertIn("## EXERCISES STAMIND KNOWS", system)
         self.assertIn("belt squat (squat, machine)", system)
         self.assertIn("## STRENGTH HISTORY", user)
         self.assertIn("Equipment that day: pull-up bar, kettlebells up to 24 kg", user)

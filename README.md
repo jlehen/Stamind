@@ -1,9 +1,9 @@
-# TrainMate
+# Stamind
 
 **A local AI coach that plans your season, writes your workouts, and adjusts
 them every morning from your Garmin data.**
 
-You tell TrainMate what you are training for and what life is doing to your
+You tell Stamind what you are training for and what life is doing to your
 week. It builds a periodized plan, turns it into day-by-day sessions, puts them
 in your Google Calendar, and then re-reads your recovery every morning to ease,
 move or hold the day's workout. It runs on your own machine against a local
@@ -16,8 +16,8 @@ ready-made sets, so you start from a real methodology and change what you
 disagree with.
 
 ```
-$ ./tm status
-=== TRAINMATE ATHLETE STATUS ===
+$ ./sm status
+=== STAMIND ATHLETE STATUS ===
 
 Next Goal: Hillcrest hill-climb (CYCLING)
 Target Date: 2027-06-13 Sun (34 days remaining)
@@ -41,8 +41,8 @@ a coach so an athlete who never wants to learn a command can still use it.
 
 - [Who it is for](#who-it-is-for)
 - [Quick start](#quick-start)
-- [The words TrainMate uses](#the-words-trainmate-uses)
-- [A week with TrainMate](#a-week-with-trainmate)
+- [The words Stamind uses](#the-words-stamind-uses)
+- [A week with Stamind](#a-week-with-stamind)
 - [Features](#features)
 - [The three interfaces](#the-three-interfaces)
 - [Setup in detail](#setup-in-detail)
@@ -63,9 +63,9 @@ wants a coach on their phone, not a command language.
 You need:
 
 - Python 3.10 or newer.
-- An [OpenRouter](https://openrouter.ai/) API key. TrainMate uses OpenRouter so
+- An [OpenRouter](https://openrouter.ai/) API key. Stamind uses OpenRouter so
   you can pick the model. See [Choosing a model](#choosing-a-model).
-- A Garmin Connect account. TrainMate reads daily metrics and activities
+- A Garmin Connect account. Stamind reads daily metrics and activities
   directly from it.
 - A Google service account with access to one Google Calendar. The
   [setup section](#google-calendar-and-the-service-account) walks through it.
@@ -73,15 +73,15 @@ You need:
 What it costs to run: the coach model is called when you generate a plan, when
 you generate workouts, and once a day when you adapt. Each of those is one large
 call with tens of thousands of tokens of context. Nothing else spends money.
-`./tm journal --cost` rolls up your own spend by model and by command, so after
+`./sm journal --cost` rolls up your own spend by model and by command, so after
 a week you will know your number.
 
 ## Quick start
 
-1. **Install.** The `./tm` wrapper runs the CLI inside the repo's own
+1. **Install.** The `./sm` wrapper runs the CLI inside the repo's own
    virtualenv and creates it on first run:
    ```bash
-   ./tm                                   # first run creates venv/ and stops
+   ./sm                                   # first run creates venv/ and stops
    venv/bin/pip install -r requirements.txt
    ```
 2. **Configure.** Copy `config_template.yaml` to `config.yaml` and fill in the
@@ -97,30 +97,30 @@ a week you will know your number.
    ([The science directory](#the-science-directory-your-coaching-philosophy)).
 5. **Say what you are training for.**
    ```bash
-   ./tm goal add "Hillcrest hill-climb" 2027-06-13 cycling
+   ./sm goal add "Hillcrest hill-climb" 2027-06-13 cycling
    ```
 6. **Record your thresholds.** Skippable: with nothing on record the coach
    prescribes by feel and schedules a test.
    ```bash
-   ./tm benchmark record cycling --ftp 250
+   ./sm benchmark record cycling --ftp 250
    ```
 7. **Generate.** A plan first, then the sessions. The workouts land in your
    calendar.
    ```bash
-   ./tm plan generate
-   ./tm workout generate
+   ./sm plan generate
+   ./sm workout generate
    ```
 8. **Live with it.**
    ```bash
-   ./tm data pull && ./tm workout adapt    # every morning
-   ./tm status                             # whenever you wonder where you stand
+   ./sm data pull && ./sm workout adapt    # every morning
+   ./sm status                             # whenever you wonder where you stand
    ```
 
-Any unambiguous prefix works as a command: `./tm wo li` is `workout list`.
-`./tm help` prints every command and sub-command on one page, and `./tm shell`
-opens an interactive prompt if you prefer not to retype `./tm`.
+Any unambiguous prefix works as a command: `./sm wo li` is `workout list`.
+`./sm help` prints every command and sub-command on one page, and `./sm shell`
+opens an interactive prompt if you prefer not to retype `./sm`.
 
-## The words TrainMate uses
+## The words Stamind uses
 
 A handful of words come back in every command, message and document. Each one
 means one thing.
@@ -150,11 +150,11 @@ means one thing.
   and what the plan asks of it, with no exercise, set, rep or load in it. It is
   the first paragraph of the session's description, and the strength planner
   writes the rest underneath it.
-- **The coach.** TrainMate talking to you, whichever model call wrote the words.
+- **The coach.** Stamind talking to you, whichever model call wrote the words.
   Every one of those calls runs on the coach model, see
   [Choosing a model](#choosing-a-model).
 
-## A week with TrainMate
+## A week with Stamind
 
 Here is what the daily rhythm looks like once a plan is in place. The athlete
 and the numbers are fictional, and the transcripts are abridged, but the
@@ -163,7 +163,7 @@ shape of every output is the real one.
 **Monday morning.** You pull last night's data and let the coach look at it:
 
 ```
-$ ./tm data pull && ./tm workout adapt
+$ ./sm data pull && ./sm workout adapt
 Auto-syncing Garmin…
 Querying OpenRouter… this usually takes about 25s.
 
@@ -178,7 +178,7 @@ All metrics are green and the schedule is on track. No changes recommended.
 your own words, and the coach eases the day without rewriting the mesocycle:
 
 ```
-$ ./tm workout adapt -m "late night, a couple of drinks, feel flat"
+$ ./sm workout adapt -m "late night, a couple of drinks, feel flat"
 Querying OpenRouter… this usually takes about 25s.
 
 Decision Summary:
@@ -201,20 +201,20 @@ signal.
 it becomes a constraint the coach has to work around:
 
 ```
-$ ./tm constraint add "away, no bike" --start 2027-05-16 --end 2027-05-18
+$ ./sm constraint add "away, no bike" --start 2027-05-16 --end 2027-05-18
 ID: 7 | away, no bike: 2027-05-16 Sun to 2027-05-18 Tue | advisory · not yet in the schedule
 Constraint added successfully.
 ```
 
 An advisory constraint is honored by the coach's judgement. Add `--rest` for a
-hard no-training window, and TrainMate rests those dates without asking the
-model. If a constraint is big enough to reshape the plan, TrainMate derives
+hard no-training window, and Stamind rests those dates without asking the
+model. If a constraint is big enough to reshape the plan, Stamind derives
 that from its size and asks whether to regenerate.
 
 **Saturday.** You look at how the week went and what is coming:
 
 ```
-$ ./tm workout list -d -7d..
+$ ./sm workout list -d -7d..
 === WORKOUT SCHEDULE ===
 ID: 118 | 2027-05-10 Mon | STRENGTH_TRAINING | Strength: Lower Body [DONE] [SYNCED] | 60min | TSS 28 | RPE 6
 ID: 121 | 2027-05-11 Tue | YOGA | Mobility Session [DONE] [ADAPTED] [SYNCED] | 30min | TSS 4 | RPE 1
@@ -230,7 +230,7 @@ Every session behind you carries a verdict: `[DONE]`, `[PARTIAL]`, `[MISSED]`,
 day is not over. The same verdict is stamped on the Calendar event.
 
 Thursday's hill repeats came in `[PARTIAL]` and you want to know why.
-`./tm workout show 125` prints that one session in full: the workout
+`./sm workout show 125` prints that one session in full: the workout
 description, when it was planned and last adapted, the activity it was graded
 against, and how far off it landed. It is `workout list -vv` under a name that
 says what it does, and it takes the same filters. `workout list -v` sits in
@@ -241,7 +241,7 @@ a ride or a run.
 **Sunday.** You check the bigger picture:
 
 ```
-$ ./tm progress
+$ ./sm progress
 FORM today (planned) CTL 41.2 ATL 47.9 TSB -6.7
 CTL 8w ▃▄▅▅▆▆▇█   plan end 06-12: CTL 45 TSB +3
 
@@ -296,7 +296,7 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
   `science/` say how you want to be coached, and `science.samples/` ships two
   worked sets to copy. See
   [The science directory](#the-science-directory-your-coaching-philosophy).
-- **Periodized plans.** From your goals, constraints and profile, TrainMate
+- **Periodized plans.** From your goals, constraints and profile, Stamind
   builds a macrocycle (the whole arc to your goal), its mesocycles (a few
   weeks with one focus each) and the microcycles (your actual weeks). How a
   short run-in or a multi-season build should be structured comes from the
@@ -334,7 +334,7 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
   ride"` asks the coach for a change you have already decided: a session made
   shorter, another sport, other exercises, a day dropped, two days swapped. The
   coach writes it, and only the days you name change.
-- **A coach that learns, with evidence.** TrainMate keeps durable learnings
+- **A coach that learns, with evidence.** Stamind keeps durable learnings
   about you, such as how you respond to back-to-back hard days. Each learning's
   confidence is computed from the training weeks that support or contradict it,
   not asserted by the model. Learnings decay if unreinforced. When recent
@@ -376,7 +376,7 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
   history; `--purge` is the irreversible cascade. Regenerated workouts are
   archived, not deleted. The Telegram bot declines destructive commands unless
   you pass `-y`.
-- **A run journal.** `./tm journal` shows what the app did and when: each
+- **A run journal.** `./sm journal` shows what the app did and when: each
   command, how long it took, what it called and how it ended. `--cost` rolls up
   model calls; `--failed` shows only the runs that broke.
 - **Runway warnings.** When the generated schedule is about to run out, every
@@ -386,17 +386,17 @@ Sat 15 · 🚴 Long Easy Ride — 150 min
 
 All three sit on the same coaching logic and the same database.
 
-**The CLI** (`./tm`) is where everything that changes state lives. `./tm --help`
-lists the everyday commands; `./tm help --all` also shows the rarely-used
+**The CLI** (`./sm`) is where everything that changes state lives. `./sm --help`
+lists the everyday commands; `./sm help --all` also shows the rarely-used
 maintenance ones such as `wipe`, `workout push` and `data backfill-tss`.
 
-**The web dashboard** (`venv/bin/python trainmate_web.py`, then
+**The web dashboard** (`venv/bin/python stamind_web.py`, then
 `http://127.0.0.1:5000`) is read-only. It never writes a row, pulls from Garmin,
 calls the LLM or touches your calendar, so it is safe to leave running beside
 the CLI and the bot. Six tabs: Dashboard, Workouts, Progress, Benchmarks,
 Learnings and History. Each panel names the CLI command that would change it.
 
-**The Telegram bot** (`./tm-bot`) runs every message through the CLI as a
+**The Telegram bot** (`./sm-bot`) runs every message through the CLI as a
 subprocess, so it supports exactly what the CLI does. It has two personae,
 chosen per install with `telegram.ui:` in the config:
 
@@ -432,7 +432,7 @@ Setup for either mode:
    refers to the person who set it up.
 4. Start the long-polling bot. No public URL is needed:
    ```bash
-   ./tm-bot
+   ./sm-bot
    ```
 
 Only allow-listed chat ids are served. Because the bot cannot ask for
@@ -478,21 +478,21 @@ The sections you must fill:
   sessions a week, belongs in `science/` (next section).
 
 Trainable thresholds do not go in the config. FTP, LTHR and threshold pace live
-in the dated benchmark logbook, recorded with `./tm benchmark record`, and that
+in the dated benchmark logbook, recorded with `./sm benchmark record`, and that
 logbook is what the coach reads.
 
 Everything you might want to change without editing the file by hand lives
-behind one command. `./tm settings` lists each preference, its value, and where
+behind one command. `./sm settings` lists each preference, its value, and where
 it came from. Values are stored in the database and survive restarts, and the
 same command works from Telegram, which is the point: the phone has no editor.
 
 ```bash
-./tm settings                             # the whole list
-./tm settings set coach-model 2           # switch the LLM behind the coach
-./tm settings set timezone Europe/Paris   # what "today" means
-./tm settings set morning-time 07:00      # when the bot opens your day
-./tm settings set commitment-days 7       # how far ahead the week is settled
-./tm settings reset morning-time          # back to what config.yaml says
+./sm settings                             # the whole list
+./sm settings set coach-model 2           # switch the LLM behind the coach
+./sm settings set timezone Europe/Paris   # what "today" means
+./sm settings set morning-time 07:00      # when the bot opens your day
+./sm settings set commitment-days 7       # how far ahead the week is settled
+./sm settings reset morning-time          # back to what config.yaml says
 ```
 
 Set the timezone if the machine runs on UTC, otherwise the training day rolls
@@ -518,7 +518,7 @@ If you do not have a Google service account yet, it is a one-time setup:
 
 Garmin buckets every activity into heart-rate and power zones the moment it is
 recorded, using whatever thresholds your profile holds at the time. There is no
-raw stream to re-bucket later, and TrainMate reads those buckets as they are.
+raw stream to re-bucket later, and Stamind reads those buckets as they are.
 So pin four settings in Garmin Connect before your first pull:
 
 1. Disable **automatic FTP detection**.
@@ -527,11 +527,11 @@ So pin four settings in Garmin Connect before your first pull:
 4. **Heart-rate zones**: set the basis to **%LTHR**, not %max HR, and keep the
    default bands.
 
-Then one habit: whenever `./tm benchmark record` establishes a new FTP or LTHR,
+Then one habit: whenever `./sm benchmark record` establishes a new FTP or LTHR,
 enter the same value in Garmin Connect. Change the anchor values, never the
 percentage bands.
 
-Why: TrainMate treats your benchmark logbook as the truth about your
+Why: Stamind treats your benchmark logbook as the truth about your
 thresholds, and its zone vocabulary and load math assume Garmin's default bands
 sit on those anchors. If Garmin silently bumps your FTP, the same effort starts
 landing one zone lower, and two sessions prescribed identically six months
@@ -554,8 +554,8 @@ gets a complete, separate instance by putting their `config.yaml` in a directory
 of its own and pointing every command at it:
 
 ```bash
-TRAINMATE_CONFIG=/path/to/other/config.yaml ./tm status
-TRAINMATE_CONFIG=/path/to/other/config.yaml ./tm-bot
+STAMIND_CONFIG=/path/to/other/config.yaml ./sm status
+STAMIND_CONFIG=/path/to/other/config.yaml ./sm-bot
 ```
 
 Their database, logs, science guidelines and Garmin token store all land beside
@@ -585,7 +585,7 @@ health, described at the end of this section. Copy the files you like into
 `science/` and edit them, or imitate their shape for your own.
 
 Every `.md` file in `science/` (gitignored, empty by default) is injected into
-the coaching prompts alongside the built-in guidelines in `trainmate/science/`.
+the coaching prompts alongside the built-in guidelines in `stamind/science/`.
 The built-ins teach mainstream sports science: zones, load math, periodization
 theory, benchmarking, recovery metrics. They deliberately do not pick a
 methodology. A file in `science/` is where you say which approach the coach
@@ -644,7 +644,7 @@ have to be about performance at all.
 
 When life gets in the way, the tool you reach for depends on whether the change
 is strategic (it should reshape the plan) or tactical (it affects a day or a
-few). TrainMate keeps two kinds of record apart: **observations** are things
+few). Stamind keeps two kinds of record apart: **observations** are things
 that happened to you, **directives** are things you ask the coach to work
 around.
 
@@ -695,7 +695,7 @@ Three things to know when you regenerate:
 
 ## Choosing a model
 
-TrainMate uses two model roles, both picked from the `llm.models` list in your
+Stamind uses two model roles, both picked from the `llm.models` list in your
 config.
 
 - **The coach model** answers every call that coaches: it writes the plan, it is
@@ -724,7 +724,7 @@ llm:
   router_model: "google/gemini-3.5-flash"
 ```
 
-`./tm settings list coach-model` prints the numbered menu and marks which entry
+`./sm settings list coach-model` prints the numbered menu and marks which entry
 holds which role. `--llm-model <id>` overrides the coach model for a single
 command without storing anything.
 
@@ -761,4 +761,4 @@ athlete.
 
 ## License
 
-TrainMate is released under the [BSD 3-Clause License](LICENSE).
+Stamind is released under the [BSD 3-Clause License](LICENSE).

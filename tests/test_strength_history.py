@@ -15,12 +15,12 @@ from tests.helpers import clear_all_tables, rebind_test_db
 
 TEST_DB_PATH = test_db_path("test_strength_history.db")
 
-from trainmate.db import Database
-import trainmate_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
+from stamind.db import Database
+import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
-from trainmate import settings
-from trainmate.config import config
-from trainmate.strength import history, prescription, sets
+from stamind import settings
+from stamind.config import config
+from stamind.strength import history, prescription, sets
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)
@@ -74,7 +74,7 @@ class _HistoryCase(unittest.TestCase):
     def setUp(self):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
-        moving_clock = patch("trainmate.clock.now", return_value=WEDNESDAY_8AM)
+        moving_clock = patch("stamind.clock.now", return_value=WEDNESDAY_8AM)
         moving_clock.start()
         self.addCleanup(moving_clock.stop)
         settings.write(settings.STRENGTH_SETS_SINCE, "2026-08-01")
@@ -390,7 +390,7 @@ class SeamTest(_HistoryCase):
     """The week planner is shown the brief and never a kilogram (§9)."""
 
     def test_the_week_planner_sees_the_title_and_the_brief_only(self):
-        from trainmate.coach.formatting import (
+        from stamind.coach.formatting import (
             format_planned_workouts_detailed, format_standing_workouts,
         )
         self.planned("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
@@ -403,7 +403,7 @@ class SeamTest(_HistoryCase):
             self.assertNotIn("140", text)
 
     def test_a_session_with_no_prescribed_sets_is_shown_whole(self):
-        from trainmate.coach.formatting import format_planned_workouts_detailed
+        from stamind.coach.formatting import format_planned_workouts_detailed
         with test_db.workout_change(kind="generate") as change:
             change.append(
                 date="2026-09-17", sport_type="running", title="Tempo",

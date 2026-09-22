@@ -14,14 +14,14 @@ from tests.helpers import clear_all_tables, rebind_test_db, save_workout
 
 TEST_DB_PATH = test_db_path("test_constraints_honored.db")
 
-from trainmate.db import Database
+from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
-from trainmate.coach.service import coach_service
-from trainmate.coach import honoring
-from trainmate.cli.common import constraint_line
+from stamind.coach.service import coach_service
+from stamind.coach import honoring
+from stamind.cli.common import constraint_line
 
 
 def tearDownModule():
@@ -99,7 +99,7 @@ class TestHonoredAt(unittest.TestCase):
         self.assertFalse(honoring.covers(
             straddling, "2026-06-01", "2026-06-28"))
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_no_change_run_stamps_only_when_the_caller_records_it(self, mock_client):
         """A run proposing nothing never reaches apply, so the no-change branch records it
         explicitly — requiring a *change* would leave "no adaptation needed" flagged
@@ -118,7 +118,7 @@ class TestHonoredAt(unittest.TestCase):
         coach_service.workout_revision_record_no_change(proposal)
         self.assertIsNotNone(test_db.get_constraint(cid)["honored_at"])
 
-    @patch("trainmate.coach.engine.openrouter_client")
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_declined_adapt_proposal_stamps_nothing(self, mock_client):
         """A proposal the athlete never accepted reflects nothing, so the stamp waits for
         the `y` — i.e. for `workout_revision_apply`."""
@@ -182,7 +182,7 @@ class TestHonoredAt(unittest.TestCase):
         """`constraint edit` through its real handler, so the clear is tested where it
         lives."""
         import argparse
-        from trainmate.cli.constraints import run_constraint_edit
+        from stamind.cli.constraints import run_constraint_edit
         ns = argparse.Namespace(id=cid, title=None, start=None, end=None, rest=None,
                                 desc=None, replan=None)
         for k, v in flags.items():
@@ -190,8 +190,8 @@ class TestHonoredAt(unittest.TestCase):
         # The §7 replan proposal is a separate decision and asks on stdin; declining it
         # here keeps this test about the honored axis (and off the terminal).
         with patch("builtins.print"), \
-                patch("trainmate.cli.constraints._run_replan_flow"), \
-                patch("trainmate.runtime.prompt") as prompt:
+                patch("stamind.cli.constraints._run_replan_flow"), \
+                patch("stamind.runtime.prompt") as prompt:
             prompt.confirm.return_value = False
             run_constraint_edit(ns)
 
@@ -222,7 +222,7 @@ class TestHonoredAt(unittest.TestCase):
             ("Base 2", "2026-06-01", "2026-06-30"),
             ("Build 1", "2026-07-01", "2026-08-15"),
         ])
-        from trainmate.cli.constraints import point_at_honor
+        from stamind.cli.constraints import point_at_honor
         for start, end, should_fire in (
             ("2026-07-05", "2026-07-10", True),    # wholly beyond the active mesocycle
             ("2026-06-28", "2026-07-04", True),    # straddling its boundary
@@ -231,7 +231,7 @@ class TestHonoredAt(unittest.TestCase):
             with self.subTest(start=start):
                 cid = self._constraint(start, end)
                 buf = io.StringIO()
-                with patch("trainmate.cli.constraints._today_str", return_value="2026-06-01"), \
+                with patch("stamind.cli.constraints._today_str", return_value="2026-06-01"), \
                         redirect_stdout(buf):
                     point_at_honor(cid)
                 out = " ".join(buf.getvalue().split())
@@ -245,10 +245,10 @@ class TestHonoredAt(unittest.TestCase):
             ("Base 2", "2026-06-01", "2026-06-30"),
             ("Build 1", "2026-07-01", "2026-08-15"),
         ])
-        from trainmate.cli.constraints import point_at_honor
+        from stamind.cli.constraints import point_at_honor
         cid = self._constraint("2026-07-20", "2026-07-24")
         buf = io.StringIO()
-        with patch("trainmate.cli.constraints._today_str", return_value="2026-06-01"), \
+        with patch("stamind.cli.constraints._today_str", return_value="2026-06-01"), \
                 redirect_stdout(buf):
             point_at_honor(cid)
         out = " ".join(buf.getvalue().split())
@@ -263,10 +263,10 @@ class TestHonoredAt(unittest.TestCase):
             ("Build 1", "2026-08-15", "2026-09-14"),
             ("Build 2", "2026-09-15", "2026-10-04"),
         ])
-        from trainmate.cli.constraints import point_at_honor
+        from stamind.cli.constraints import point_at_honor
         cid = self._constraint("2026-09-12", "2026-09-20")
         buf = io.StringIO()
-        with patch("trainmate.cli.constraints._today_str", return_value="2026-08-21"), \
+        with patch("stamind.cli.constraints._today_str", return_value="2026-08-21"), \
                 redirect_stdout(buf):
             point_at_honor(cid)
         out = " ".join(buf.getvalue().split())
@@ -285,10 +285,10 @@ class TestHonoredAt(unittest.TestCase):
         """Its last day is ungoverned but its first is not, so there are still governed
         days to build around — named, with `plan generate` for the rest."""
         self._plan_mesocycles([("Build 1", "2026-08-15", "2026-09-14")])
-        from trainmate.cli.constraints import point_at_honor
+        from stamind.cli.constraints import point_at_honor
         cid = self._constraint("2026-09-10", "2026-09-25")
         buf = io.StringIO()
-        with patch("trainmate.cli.constraints._today_str", return_value="2026-08-21"), \
+        with patch("stamind.cli.constraints._today_str", return_value="2026-08-21"), \
                 redirect_stdout(buf):
             point_at_honor(cid)
         out = " ".join(buf.getvalue().split())
@@ -302,10 +302,10 @@ class TestHonoredAt(unittest.TestCase):
         # `get_active_mesocycle` falls back to a neighbouring mesocycle when none covers the
         # date, so naming one here would name a mesocycle the constraint is not in.
         self._plan("2026-06-01", "2026-06-30")
-        from trainmate.cli.constraints import point_at_honor
+        from stamind.cli.constraints import point_at_honor
         cid = self._constraint("2026-09-01", "2026-09-05")
         buf = io.StringIO()
-        with patch("trainmate.cli.constraints._today_str", return_value="2026-06-01"), \
+        with patch("stamind.cli.constraints._today_str", return_value="2026-06-01"), \
                 redirect_stdout(buf):
             point_at_honor(cid)
         out = " ".join(buf.getvalue().split())
@@ -316,11 +316,11 @@ class TestHonoredAt(unittest.TestCase):
     def test_the_add_time_message_stays_quiet_on_a_plan_shaping_constraint(self):
         # It is being built into the plan, so pointing at a rebuild is the wrong tier.
         self._plan("2026-06-01", "2026-06-30")
-        from trainmate.cli.constraints import point_at_honor
+        from stamind.cli.constraints import point_at_honor
         cid = self._constraint("2026-07-05", "2026-07-10")
         test_db.update_constraint(cid, replan=1)
         buf = io.StringIO()
-        with patch("trainmate.cli.constraints._today_str", return_value="2026-06-01"), \
+        with patch("stamind.cli.constraints._today_str", return_value="2026-06-01"), \
                 redirect_stdout(buf):
             point_at_honor(cid)
         self.assertEqual(buf.getvalue(), "")
@@ -343,7 +343,7 @@ class TestHonoredAt(unittest.TestCase):
         it for itself, which is how `constraint show` came to flag a plan-shaping
         directive the count deliberately skips (§2).
         """
-        from trainmate.cli.constraints import point_at_honor, run_constraint_show
+        from stamind.cli.constraints import point_at_honor, run_constraint_show
         self._plan_mesocycles([("Base 2", "2026-06-01", "2026-06-30"),
                            ("Build 1", "2026-07-01", "2026-08-15")])
         cases = {
@@ -356,7 +356,7 @@ class TestHonoredAt(unittest.TestCase):
         for label, cid in cases.items():
             with self.subTest(case=label):
                 constraint = test_db.get_constraint(cid)
-                with patch("trainmate.cli.constraints._today_str",
+                with patch("stamind.cli.constraints._today_str",
                            return_value="2026-06-01"):
                     swept = [
                         c["id"] for c in
