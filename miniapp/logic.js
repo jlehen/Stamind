@@ -81,6 +81,7 @@ export function newState(session, startedAt) {
     t: session.t || "Gym session",
     notes: session.notes || "",
     startedAt,
+    finishedAt: null,
     note: "",
     x: (session.x || []).map((row, index) => prescribedExercise(row, index + 1)),
   };
@@ -274,18 +275,37 @@ export function setSessionNote(state, text) {
 }
 
 // ---------------------------------------------------------------------------------------
+// Finishing (§4): the first Finish stops the clock. The log, and every set ticked after it,
+// carry that moment, so an edited log sent again replaces the first instead of adding one.
+// ---------------------------------------------------------------------------------------
+
+export function clockAt(state, now) {
+  return state.finishedAt ?? now;
+}
+
+export function markFinished(state, now) {
+  if (state.finishedAt) {
+    return state;
+  }
+  const after = next(state);
+  after.finishedAt = now;
+  return after;
+}
+
+// ---------------------------------------------------------------------------------------
 // The log payload (§4): one entry per exercise with at least one done set.
 // ---------------------------------------------------------------------------------------
 
 export function buildLog(state, now) {
+  const end = clockAt(state, now);
   const log = {
     v: 1,
     r: state.r,
     // The day the athlete lifted, from the phone's clock, which can differ from the session's
     // date when they train early or late; `r` still says which session this stood for.
-    d: localDate(now),
+    d: localDate(end),
     st: formatClock(state.startedAt),
-    en: formatClock(now),
+    en: formatClock(end),
     x: [],
   };
   for (const exercise of state.x) {

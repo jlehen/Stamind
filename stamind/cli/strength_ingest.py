@@ -97,14 +97,16 @@ def _not_done(log: logger.Log, prescribed: Dict[int, Dict[str, Any]]) -> List[st
     return missing
 
 
-def _summary(log: logger.Log, workout: Optional[Workout]) -> None:
+def _summary(log: logger.Log, workout: Optional[Workout], replaced: bool) -> None:
     """What was done, and where it departed from what was written (§5). Without the
-    revision there is nothing to compare against, so the lines say only what was done."""
+    revision there is nothing to compare against, so the lines say only what was done. A
+    log sent again for a day says so, since the athlete otherwise reads two logs."""
     prescribed = {row["position"]: row
                   for row in (workout or {}).get("prescribed_sets") or []}
     count = sum(len(entry.sets) for entry in log.exercises)
+    head = "Updated the log of" if replaced else "Logged"
     lines = [
-        f"Logged {fmt_date(log.date)}, {log.start}–{log.end}: "
+        f"{head} {fmt_date(log.date)}, {log.start}–{log.end}: "
         f"{len(log.exercises)} exercise{'' if len(log.exercises) == 1 else 's'}, "
         f"{count} set{'' if count == 1 else 's'}."
     ]
@@ -131,6 +133,7 @@ def run_strength_ingest(args: argparse.Namespace) -> None:
         fail(str(broken))
         return
     workout = _revision(log.revision_id)
+    replaced = runtime.db.gym_log_for_day(log.date) is not None
     activity_id = runtime.db.upsert_logged_activity(
         log.date, f"{log.date} {log.start}:00", _duration_sec(log)
     )
@@ -140,7 +143,7 @@ def run_strength_ingest(args: argparse.Namespace) -> None:
     if log.revision_id is not None and workout is None:
         notice("The session this log was written against is gone, so the summary cannot "
                "say what it departed from.")
-    _summary(log, workout)
+    _summary(log, workout, replaced)
 
 
 def add_ingest_parser(strength_subparsers) -> None:

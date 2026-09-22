@@ -299,10 +299,13 @@ class IngestTest(_IngestCase):
 
     def test_ingesting_the_same_day_twice_replaces_the_first_log(self):
         workout = a_session()
-        self.ingest(self.example_for(workout))
-        self.ingest(self.example_for(workout, st="19:00", en="19:30", x=[
+        first = self.ingest(self.example_for(workout))
+        self.assertIn("Logged 2026-09-24 Thu", first)
+        second = self.ingest(self.example_for(workout, st="19:00", en="19:30", x=[
             {"n": "belt squat", "p": 1, "sets": [[5, 150, 60], [5, 150, 300]]},
         ]))
+        self.assertIn("Updated the log of 2026-09-24 Thu, 19:00–19:30: 1 exercise, 2 sets.",
+                      second)
         activity = test_db.get_completed_activity("log:" + GYM_DAY)
         self.assertEqual(activity["start_time"], f"{GYM_DAY} 19:00:00")
         self.assertEqual(activity["duration_sec"], 30 * 60)

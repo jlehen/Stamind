@@ -26,6 +26,13 @@ After the last set the athlete taps "Finish". The page sends one text message of
 every set named, and replies with a summary: what was done, and where it departed from
 what was written.
 
+Finish stops the clock, and the page keeps the log. In the changing room the athlete
+notices a mistyped weight, opens the page again from the same button, fixes it and taps
+"Send again". The log goes out with the same start and end, and the bot replaces the
+evening's log instead of adding a second; its summary opens with "Updated the log of". A
+Finish tapped by mistake halfway through the session is not handled: the sets ticked after
+it are stamped at the finish time.
+
 The next morning the pull finds Garmin's activity for that day. Instead of reading
 Garmin's sets, half of them unnamed, it hands the logged sets to that activity. Garmin
 supplies heart rate, duration and RPE; the log supplies the sets. Nothing is asked.
@@ -77,9 +84,10 @@ Each set is `[reps, kg, seconds since the session started]`; `kg` is null for a
 bodyweight exercise. `p` is the position of the prescribed row this exercise stands for;
 an added exercise has no `p`, a swapped one keeps the `p` of the row it replaced. A
 prescribed exercise not done is simply absent. `st` and `en` are local clock times, and
-`d` is the day the athlete lifted, from the phone's clock at Finish: a session done a day
-early or late is logged on the day it happened, and `r` still says which session it was.
-Forty-two sets of twelve exercises take about 1 KB.
+`d` is the day the athlete lifted, from the phone's clock at the first Finish: a session
+done a day early or late is logged on the day it happened, and `r` still says which session
+it was. A log sent again after an edit carries the same `d`, `st` and `en`, so it lands on
+the same day's placeholder (§5). Forty-two sets of twelve exercises take about 1 KB.
 
 ## 5. The ingest
 
@@ -131,3 +139,5 @@ an evening pull would delete the log before the next morning's takeover.
 - Expert mode, which has no reply keyboard to hold the button.
 - Refreshing the button after a `workout adapt` run from the terminal; the log carries the
   revision id, so a stale button costs nothing but a mismatch in the summary.
+- A log sent again after the morning pull handed it to Garmin's activity: it lands on a
+  fresh placeholder, and the activity keeps the sets of the first send.

@@ -314,6 +314,13 @@ h1 {
   border-style: solid;
 }
 
+.sent {
+  margin: 0;
+  font-size: 13px;
+  color: var(--hint);
+  text-align: center;
+}
+
 .wide {
   width: 100%;
   min-height: 48px;

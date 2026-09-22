@@ -4185,7 +4185,9 @@ strength planner wrote. At 18:02 the athlete taps it in the gym, and a page open
 Telegram. They tick sets, change a weight, swap the belt squat for a leg press, add an
 exercise the session did not ask for, and at 19:05 tap "Finish". The page sends one
 message to the bot, the bot writes it to a file and runs `sm strength ingest <file>`, and
-the summary comes back in the chat. On Friday morning the pull finds Garmin's activity for
+the summary comes back in the chat. Finish stops the page's clock: a weight fixed in the
+changing room and sent again carries the same end time, and the ingest replaces Thursday's
+log instead of adding a second. On Friday morning the pull finds Garmin's activity for
 Thursday and hands it the logged sets instead of reading Garmin's own, so Garmin supplies
 heart rate, duration and RPE while the log supplies the sets. Nothing is asked.
 

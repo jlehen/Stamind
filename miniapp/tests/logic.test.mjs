@@ -255,6 +255,21 @@ test("the rest timer counts from the last ticked set", () => {
   assert.equal(logic.formatMMSS(-3), "00:00");
 });
 
+test("the first Finish stops the clock, and a log sent again ends at the same moment", () => {
+  let state = tickSet(exampleState(), 0, 0, 40);
+  assert.equal(state.finishedAt, null);
+  state = logic.markFinished(state, END);
+  const later = END + 20 * 60 * 1000;
+  assert.equal(logic.markFinished(state, later).finishedAt, END);
+  assert.equal(logic.clockAt(state, later), END);
+  // A set ticked after the finish is stamped at the finish, and the log still ends there.
+  state = tickSet(state, 0, 1, (logic.clockAt(state, later) - state.startedAt) / 1000);
+  const log = logic.buildLog(state, later);
+  assert.equal(log.en, "19:05");
+  assert.equal(log.d, "2026-09-24");
+  assert.deepEqual(log.x[0].sets.map((set) => set[2]), [40, 63 * 60]);
+});
+
 test("the header shows the session's own date in words", () => {
   assert.equal(logic.formatDay("2026-09-24"), "Thu Sep 24");
   assert.equal(logic.formatDay(""), "");

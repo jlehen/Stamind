@@ -23,6 +23,7 @@ const ui = {
   sessionNote: document.getElementById("session-note"),
   addExercise: document.getElementById("add-exercise"),
   finish: document.getElementById("finish"),
+  sent: document.getElementById("sent"),
   reset: document.getElementById("reset"),
   searchSheet: document.getElementById("search-sheet"),
   searchTitle: document.getElementById("search-title"),
@@ -173,7 +174,21 @@ function render() {
     ui.sessionNote.value = state.note;
   }
   ui.cards.replaceChildren(...state.x.map(exerciseCard));
+  const finished = Boolean(state.finishedAt);
+  ui.sent.hidden = !finished;
+  if (finished) {
+    ui.sent.textContent = `Sent at ${logic.formatClock(state.finishedAt)}. You can still edit: `
+      + "Send again replaces that log.";
+  }
+  setFinishLabel(finished ? "Send again" : "Finish");
   tick();
+}
+
+function setFinishLabel(label) {
+  ui.finish.textContent = label;
+  if (inTelegram) {
+    tg.MainButton.setText(label);
+  }
 }
 
 function exerciseCard(exercise, xi) {
@@ -258,12 +273,18 @@ function stepper(spec) {
 }
 
 function secondsNow() {
-  return (Date.now() - state.startedAt) / 1000;
+  // After Finish the clock stands still (§4), so a set ticked later is stamped at the finish.
+  return (logic.clockAt(state, Date.now()) - state.startedAt) / 1000;
 }
 
 function tick() {
   const done = logic.doneSetCount(state);
   ui.tally.textContent = done === 1 ? "· 1 set done" : `· ${done} sets done`;
+  if (state.finishedAt) {
+    ui.restLabel.textContent = "in total";
+    ui.restValue.textContent = logic.formatMMSS(secondsNow());
+    return;
+  }
   const last = logic.lastSetSeconds(state);
   ui.restLabel.textContent = done ? "since last set" : "since start";
   ui.restValue.textContent = logic.formatMMSS(secondsNow() - last);
@@ -319,7 +340,8 @@ function choose(row) {
 // ---------------------------------------------------------------------------------------
 
 function onFinish() {
-  const result = logic.finish(state, Date.now());
+  const now = Date.now();
+  const result = logic.finish(state, now);
   if (!result.log.x.length) {
     say("No set is ticked yet, so there is nothing to send.");
     return;
@@ -329,6 +351,9 @@ function onFinish() {
         + "Shorten the notes, or remove an exercise you did not do.");
     return;
   }
+  // The first Finish stops the clock (§4); a log sent again after an edit ends at the same
+  // moment, and the bot replaces the earlier one instead of adding a second.
+  apply(logic.markFinished(state, now));
   if (inTelegram) {
     try {
       tg.sendData(result.text);
