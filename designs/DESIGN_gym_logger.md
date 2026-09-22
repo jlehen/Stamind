@@ -33,9 +33,9 @@ supplies heart rate, duration and RPE; the log supplies the sets. Nothing is ask
 ## 2. Where things live
 
 - `miniapp/` — the page: `index.html`, `app.js`, `style.css`, `exercises.json`. Static,
-  no build step, no server. Served by GitHub Pages at `https://jlehen.github.io/Stamind/`
-  through `.github/workflows/pages.yml`, which deploys the folder on every push that
-  touches it.
+  no build step, no server. Served by GitHub Pages at
+  `https://jlehen.github.io/Stamind/miniapp/` through `.github/workflows/pages.yml`, which
+  deploys the folder on every push to the branch; the site root stays free.
 - `stamind/strength/logger.py` — the two payloads (§3, §4): the session encoded into the
   button's URL, and the log decoded and validated. Pure functions, no database.
 - `stamind/cli/strength.py` gains `strength ingest FILE`.

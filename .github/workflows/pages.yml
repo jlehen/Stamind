@@ -1,4 +1,5 @@
-# Publishes the gym logger page at https://jlehen.github.io/Stamind/ (DESIGN_gym_logger.md §2).
+# Publishes the gym logger page at https://jlehen.github.io/Stamind/miniapp/
+# (DESIGN_gym_logger.md §2).
 name: Deploy the gym logger to GitHub Pages
 
 on:
@@ -27,8 +28,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # The page lives under /miniapp/ on the site, so the site root stays free (§2).
+      - run: mkdir -p _site && cp -r miniapp _site/miniapp
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: miniapp
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
