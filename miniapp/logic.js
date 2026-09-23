@@ -390,6 +390,17 @@ export function searchExercises(catalog, query, pattern) {
   return hits.slice(0, SEARCH_LIMIT);
 }
 
+// Free Exercise DB serves its photos from its public repository (DESIGN_gym_logger.md §2).
+export const PHOTO_BASE = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/";
+
+export function photosOf(catalog, name) {
+  const row = catalog.find((entry) => entry.n === name);
+  if (!row || !row.f) {
+    return [];
+  }
+  return [0, 1].map((index) => `${PHOTO_BASE}${row.f}/${index}.jpg`);
+}
+
 export function patternOf(catalog, name) {
   const row = catalog.find((entry) => entry.n === name);
   return row ? row.p : null;

@@ -280,3 +280,16 @@ test("the saved state is keyed by the session's revision id", () => {
   assert.equal(logic.storageKey(727), "stamind-gym-v1-r727");
   assert.notEqual(logic.storageKey(727), logic.storageKey(728));
 });
+
+test("an exercise linked to Free Exercise DB has its two photos, any other has none", () => {
+  const catalog = [
+    { n: "barbell back squat", p: "squat", e: "barbell", f: "Barbell_Squat" },
+    { n: "belt squat", p: "squat", e: "machine" },
+  ];
+  assert.deepEqual(logic.photosOf(catalog, "barbell back squat"), [
+    `${logic.PHOTO_BASE}Barbell_Squat/0.jpg`,
+    `${logic.PHOTO_BASE}Barbell_Squat/1.jpg`,
+  ]);
+  assert.deepEqual(logic.photosOf(catalog, "belt squat"), []);
+  assert.deepEqual(logic.photosOf(catalog, "not listed"), []);
+});

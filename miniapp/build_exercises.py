@@ -19,11 +19,15 @@ OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exercises.j
 
 
 def rows():
-    """Every vocabulary exercise as the page reads it: name, pattern, equipment."""
-    return [
-        {"n": exercise.name, "p": exercise.pattern, "e": exercise.equipment}
-        for exercise in vocabulary.all_exercises()
-    ]
+    """Every vocabulary exercise as the page reads it: name, pattern, equipment, and the
+    Free Exercise DB id of its photos when it has one."""
+    listed = []
+    for exercise in vocabulary.all_exercises():
+        row = {"n": exercise.name, "p": exercise.pattern, "e": exercise.equipment}
+        if exercise.photos:
+            row["f"] = exercise.photos
+        listed.append(row)
+    return listed
 
 
 def text() -> str:

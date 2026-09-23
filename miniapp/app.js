@@ -50,6 +50,8 @@ const SEND_FAILED = "Telegram did not take the log. Copy it and send it to the b
   + "message.";
 
 let catalog = [];
+// The exercises whose photos are open. Not saved: they close when the page reloads.
+const photosOpen = new Set();
 let state = null;
 let storeKey = "";
 let swapIndex = null;
@@ -205,6 +207,19 @@ function exerciseCard(exercise, xi) {
   head.append(moves);
   card.append(head);
 
+  const photos = logic.photosOf(catalog, exercise.n);
+  if (photosOpen.has(exercise.n)) {
+    const strip = el("div", "photos");
+    for (const address of photos) {
+      const photo = el("img");
+      photo.src = address;
+      photo.alt = `${exercise.n}, photo`;
+      photo.loading = "lazy";
+      strip.append(photo);
+    }
+    card.append(strip);
+  }
+
   exercise.sets.forEach((set, si) => card.append(setRow(exercise, xi, set, si)));
 
   const tools = el("div", "tools");
@@ -212,6 +227,10 @@ function exerciseCard(exercise, xi) {
   tools.append(button("− Set", "pill", () => apply(logic.removeSet(state, xi))));
   tools.append(button("⇄ Swap", "pill", () => openSearch(xi)));
   tools.append(button("✕ Remove", "pill danger", () => apply(logic.removeExercise(state, xi))));
+  if (photos.length) {
+    const label = photosOpen.has(exercise.n) ? "Hide photos" : "Photos";
+    tools.append(button(label, "pill", () => togglePhotos(exercise.n)));
+  }
   card.append(tools);
 
   const note = el("input", "note");
@@ -221,6 +240,15 @@ function exerciseCard(exercise, xi) {
   note.addEventListener("change", () => applyQuiet(logic.setExerciseNote(state, xi, note.value)));
   card.append(note);
   return card;
+}
+
+function togglePhotos(name) {
+  if (photosOpen.has(name)) {
+    photosOpen.delete(name);
+  } else {
+    photosOpen.add(name);
+  }
+  render();
 }
 
 function setRow(exercise, xi, set, si) {

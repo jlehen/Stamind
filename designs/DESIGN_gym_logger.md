@@ -43,6 +43,17 @@ supplies heart rate, duration and RPE; the log supplies the sets. Nothing is ask
   no build step, no server. Served by GitHub Pages at
   `https://jlehen.github.io/Stamind/miniapp/` through `.github/workflows/pages.yml`, which
   deploys the folder on every push to the branch; the site root stays free.
+  `exercises.json` is the vocabulary as the page searches it, written by
+  `miniapp/build_exercises.py`.
+- Photos. It is Thursday and the strength planner has written a Romanian deadlift the
+  athlete has not done before. Its card has a "Photos" button, and a tap shows two photos of
+  the lift under its name. They come from Free Exercise DB, a public-domain set of about 870
+  exercises with two photos each, loaded from its GitHub repository; nothing is copied into
+  this one. The vocabulary's fifth column holds the entry's id. A row gets one only when the
+  entry is the same exercise, so a belt squat, which the set lacks, has no button rather than
+  a photo of another squat. The links came from a Gemini Flash and Sonnet comparison of the
+  two lists, kept for the main movement patterns and checked by hand; an exercise without
+  one is linked by hand when it is wanted.
 - `stamind/strength/logger.py` — the two payloads (§3, §4): the session encoded into the
   button's URL, and the log decoded and validated. Pure functions, no database.
 - `stamind/cli/strength.py` gains `strength ingest FILE`.

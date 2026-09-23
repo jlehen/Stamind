@@ -167,7 +167,7 @@ class VocabularyTest(unittest.TestCase):
             for line in table:
                 if line.startswith("#") or not line.strip():
                     continue
-                name, _pattern, _equipment, aliases = line.rstrip("\n").split("\t")
+                name, _pattern, _equipment, aliases = line.rstrip("\n").split("\t")[:4]
                 for alias in aliases.split():
                     self.assertNotIn(alias, seen, f"{alias} means {seen.get(alias)} and {name}")
                     seen[alias] = name

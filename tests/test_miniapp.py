@@ -46,9 +46,16 @@ class ExerciseCatalogTest(unittest.TestCase):
             rows = json.load(handle)
         self.assertTrue(rows)
         for row in rows:
-            self.assertEqual(set(row), {"n", "p", "e"})
+            self.assertLessEqual({"n", "p", "e"}, set(row))
+            self.assertLessEqual(set(row), {"n", "p", "e", "f"})
             self.assertIn(row["p"], vocabulary.PATTERNS)
             self.assertIn(row["e"], vocabulary.EQUIPMENT)
+
+    def test_the_linked_exercises_carry_their_photos(self):
+        with open(JSON_PATH, encoding="utf-8") as handle:
+            rows = {row["n"]: row for row in json.load(handle)}
+        self.assertEqual(rows["barbell back squat"]["f"], "Barbell_Squat")
+        self.assertNotIn("f", rows["belt squat"])
 
 
 if __name__ == "__main__":
