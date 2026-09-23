@@ -472,7 +472,10 @@ classes themselves.
 |                      |                      | its date, load, target, reason and body           |
 |                      |                      | (DESIGN_calendar_lineage.md); its `load_line` is  |
 |                      |                      | the one place `Duration \| TSS \| RPE` is written,|
-|                      |                      | used by the event top as well. `client.py` = the  |
+|                      |                      | used by the event top as well. `depth_section`    |
+|                      |                      | prints the same entries for `workout show         |
+|                      |                      | --history N`, capped at N revisions instead of a  |
+|                      |                      | character budget. `client.py` = the               |
 |                      |                      | only file that calls the API: `CalendarSyncer`    |
 |                      |                      | creates/updates/deletes the events (outbound) and |
 |                      |                      | ingests tagged signal events into `daily_signals` |

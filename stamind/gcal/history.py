@@ -3,7 +3,7 @@
 `workouts` is an append-only log, so every form a session ever had is still a row and the
 lineage links them (DESIGN_workout_revisions.md §4). This renders those rows as the
 `History` section at the bottom of the event: every revision except the one the event is
-showing, newest first.
+showing, newest first. `workout show --history` prints the same entries in the terminal.
 
 The renderer is pure text over raw revision dicts — what `db.get_lineage_revisions`
 returns, with the change's `kind`, `created_at` and `summary` joined on. `for_workout` is
@@ -154,6 +154,26 @@ def history_section(
     if not entries:
         return None
     return "\n\n".join([f"{SEPARATOR}\n{header}"] + entries)
+
+
+def depth_section(
+    revisions: Sequence[Dict[str, Any]], head_revision_id: int, depth: Optional[int],
+) -> Optional[str]:
+    """The same entries as `history_section`, capped at `depth` earlier revisions instead
+    of a character budget: what `workout show --history` prints in a terminal. `depth`
+    None shows them all. None when there is no history."""
+    earlier = _earlier(revisions, head_revision_id)
+    if not earlier:
+        return None
+    header = f"History · {_plural(len(earlier), 'earlier revision')}, newest first"
+    shown = earlier if depth is None else earlier[:depth]
+    total = len(revisions)
+    entries = [_entry(revision, position, total) for position, revision in shown]
+    if len(shown) < len(earlier):
+        entries.append(
+            f"… {_plural(len(earlier) - len(shown), 'earlier revision')} not shown."
+        )
+    return "\n\n".join([header] + entries)
 
 
 def for_workout(

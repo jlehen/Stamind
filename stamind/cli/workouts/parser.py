@@ -3,6 +3,8 @@
 Each sub-parser binds its handler with set_defaults(func=...), so the flags and the
 function that reads them are defined together.
 """
+import argparse
+
 from stamind.text import green
 from stamind.cli.selectors import add_selector_args, add_single_date_arg, parse_target
 from stamind.cli.workouts.calendar_sync import (
@@ -14,6 +16,19 @@ from stamind.cli.workouts.generate import run_workout_generate
 from stamind.cli.workouts.listing import run_workout_list, run_workout_show
 from stamind.cli.workouts.rollback import run_workout_batches, run_workout_rollback
 from stamind.cli.workouts.heads_up import run_workout_notify
+
+
+def _history_depth(value: str):
+    """`workout show --history DEPTH`: a count of at least 1, or 'all'."""
+    if value == "all":
+        return value
+    try:
+        depth = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a number or 'all', got '{value}'")
+    if depth < 1:
+        raise argparse.ArgumentTypeError(f"expected at least 1, got {depth}")
+    return depth
 
 
 def _add_listing_args(parser):
@@ -85,6 +100,14 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     )
     w_show.set_defaults(func=run_workout_show)
     _add_listing_args(w_show)
+    w_show.add_argument(
+        "--history", "-H", nargs="?", type=_history_depth, const="all", default=None,
+        metavar="DEPTH",
+        help="Also show the earlier forms each session had, newest first: when it was "
+             "planned, adapted or changed on request, and what it asked each time. "
+             "DEPTH is how many earlier forms to show at most; 'all', or no DEPTH, shows "
+             "every one"
+    )
 
     # workout compare
     w_cmp = workout_subparsers.add_parser(

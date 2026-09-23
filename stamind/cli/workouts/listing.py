@@ -10,8 +10,9 @@ from stamind import runtime
 from stamind.analytics import intensity
 from stamind.analytics.compare import adherence_verdicts, format_actual
 from stamind.config import config
+from stamind.gcal import history
 from stamind.gcal.event import event_url
-from stamind.text import bold, cyan, format_labeled_paragraph, gray, yellow
+from stamind.text import bold, cyan, format_labeled_paragraph, gray, wrap_text, yellow
 from stamind.output import notice, warn
 from stamind.clock import fmt_date, fmt_timestamp, today_str as _today_str
 from stamind.cli.runway import list_end_marker
@@ -105,6 +106,23 @@ def run_workout_show(args: argparse.Namespace) -> None:
     run_workout_list(args)
 
 
+def _print_history(workout: dict, depth) -> None:
+    """The session's earlier forms under its detail lines, when `--history` asked for them:
+    the entries the Calendar event carries (DESIGN_calendar_lineage.md §3), capped at
+    `depth` of them instead of a character budget."""
+    if depth is None:
+        return
+    section = history.depth_section(
+        runtime.db.get_lineage_revisions(workout['id']), workout['revision_id'],
+        None if depth == "all" else depth,
+    )
+    if not section:
+        print(gray("  History: none, this is the session's first form."))
+        return
+    indented = "\n".join(f"  {line}" if line else "" for line in section.split("\n"))
+    print(wrap_text(indented))
+
+
 def print_workout_table(
     workouts: list, verdicts: dict, args: argparse.Namespace, *,
     start_date: Optional[str], end_date: Optional[str], ids: list, names_a_range: bool,
@@ -181,6 +199,7 @@ def print_workout_table(
         if summary and summary not in seen_summaries:
             seen_summaries.add(summary)
             print(format_labeled_paragraph("  Adapt summary:", summary, color_fn=gray))
+        _print_history(w, getattr(args, "history", None))
         print(gray("-" * 40))
     # Where the schedule stops, when the listed range runs past it (§4). A listing with
     # nothing to show renders it alone: an empty range past the cliff is exactly where the

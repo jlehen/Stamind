@@ -259,6 +259,56 @@ class TestCliWorkoutsListing(unittest.TestCase):
         self.assertIn("Today Run", span_out)
         self.assertIn("30 mins easy", span_out)
 
+    def test_workout_show_history_walks_the_lineage_to_the_depth_asked(self):
+        """`workout show --history N` prints the session's earlier forms, newest first,
+        and at most N of them; with no N it prints them all."""
+        today_str = datetime.now(timezone.utc).date().strftime("%Y-%m-%d")
+        for description, minutes, reason in (
+            ("Tempo 3x10", 60, None), ("Tempo 2x10", 45, "legs heavy"),
+            ("Tempo 1x10", 30, "slept badly"),
+        ):
+            workout_id = save_workout(test_db,
+                date=today_str, sport_type="running", title="Tempo",
+                description=description, duration_minutes=minutes,
+                modification_reason=reason, adaptation_summary=reason,
+            )
+
+        exit_code, plain, _ = self.run_cli(
+            ["workout", "show", str(workout_id), "--no-pull"])
+        self.assertEqual(exit_code, 0)
+        self.assertNotIn("History", plain)
+
+        exit_code, capped, _ = self.run_cli(
+            ["workout", "show", str(workout_id), "--history", "1", "--no-pull"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("History · 2 earlier revisions, newest first", capped)
+        self.assertIn("[2/3] Adapted", capped)
+        self.assertIn("Reason: legs heavy", capped)
+        self.assertNotIn("[1/3]", capped)
+        self.assertIn("1 earlier revision not shown.", capped)
+
+        exit_code, full, _ = self.run_cli(
+            ["workout", "show", str(workout_id), "--history", "--no-pull"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("[1/3] Planned", full)
+        self.assertIn("Tempo 3x10", full)
+        self.assertNotIn("not shown", full)
+        self.assertLess(full.index("[2/3]"), full.index("[1/3]"))
+
+    def test_workout_show_history_on_a_first_form_says_so(self):
+        today_str = datetime.now(timezone.utc).date().strftime("%Y-%m-%d")
+        workout_id = save_workout(test_db,
+            date=today_str, sport_type="running", title="Easy", description="30 mins",
+        )
+        exit_code, stdout, _ = self.run_cli(
+            ["workout", "show", str(workout_id), "-H", "all", "--no-pull"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("History: none, this is the session's first form.", stdout)
+
+    def test_workout_show_history_refuses_a_depth_below_one(self):
+        exit_code, _, _ = self.run_cli(["workout", "show", "--history", "0", "--no-pull"])
+        self.assertNotEqual(exit_code, 0)
+
     def test_workout_list_shows_repeat_adapt_count(self):
         """A session eased once reads [ADAPTED]; eased again reads [ADAPTED ×2].
 
