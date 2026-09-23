@@ -244,8 +244,8 @@ decline ring row	pull_horizontal	bodyweight	ROW/DECLINE_RING_ROW
 dumbbell row	pull_horizontal	dumbbell	ROW/DUMBBELL_ROW	Bent_Over_Two-Dumbbell_Row
 elevated feet inverted row	pull_horizontal	bodyweight	ROW/ELEVATED_FEET_INVERTED_ROW ROW/WEIGHTED_ELEVATED_FEET_INVERTED_ROW
 elevated ring row	pull_horizontal	bodyweight	ROW/ELEVATED_RING_ROW
-face pull	accessory	barbell	ROW/FACE_PULL BANDED_EXERCISES/FACE_PULL SUSPENSION/FACE_PULL
-face pull with external rotation	accessory	barbell	ROW/FACE_PULL_WITH_EXTERNAL_ROTATION
+face pull	accessory	cable	ROW/FACE_PULL BANDED_EXERCISES/FACE_PULL SUSPENSION/FACE_PULL
+face pull with external rotation	accessory	cable	ROW/FACE_PULL_WITH_EXTERNAL_ROTATION
 indoor row	pull_horizontal	barbell	ROW/INDOOR_ROW INDOOR_ROW
 inverted row	pull_horizontal	bodyweight	ROW/INVERTED_ROW ROW/WEIGHTED_INVERTED_ROW SUSPENSION/INVERTED_ROW	Inverted_Row
 inverted row with feet on swiss ball	pull_horizontal	bodyweight	ROW/INVERTED_ROW_WITH_FEET_ON_SWISS_BALL ROW/WEIGHTED_INVERTED_ROW_WITH_FEET_ON_SWISS_BALL
