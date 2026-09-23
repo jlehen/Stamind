@@ -1,0 +1,2 @@
+# The Playwright screenshot script needs a node_modules beside it; it is not part of the page.
+tests/node_modules

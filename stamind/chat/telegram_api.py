@@ -33,10 +33,16 @@ def build_application(token: str):
     return Application.builder().token(token).build()
 
 
-def register_handlers(application, on_message, on_callback) -> None:
-    """Wires the two update kinds the bot answers: a text message, and a button tap."""
+def register_handlers(application, on_message, on_callback, on_web_app_data) -> None:
+    """Wires the three update kinds the bot answers: the Mini App's data message, a text
+    message, and a button tap."""
     from telegram.ext import CallbackQueryHandler, MessageHandler, filters
 
+    # First, so the page's message never falls to the text handler
+    # (DESIGN_gym_logger.md §6).
+    application.add_handler(
+        MessageHandler(filters.StatusUpdate.WEB_APP_DATA, on_web_app_data)
+    )
     # filters.TEXT catches commands too (a '/status' message is still text).
     application.add_handler(MessageHandler(filters.TEXT, on_message))
     application.add_handler(CallbackQueryHandler(on_callback))
@@ -60,12 +66,22 @@ def inline_keyboard(rows):
 
 
 def reply_keyboard(rows):
-    """The persistent reply keyboard, from rows of labels
-    (DESIGN_bot_simple_frontend.md §5.1)."""
-    from telegram import KeyboardButton, ReplyKeyboardMarkup
+    """The persistent reply keyboard, from rows of cells
+    (DESIGN_bot_simple_frontend.md §5.1).
+
+    A cell is a plain label, or a (label, url) pair — the gym button, which opens the
+    Mini App at that address instead of sending its label as text
+    (DESIGN_gym_logger.md §6)."""
+    from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
+
+    def cell(value):
+        if not isinstance(value, tuple):
+            return KeyboardButton(value)
+        label, url = value
+        return KeyboardButton(label, web_app=WebAppInfo(url=url))
 
     return ReplyKeyboardMarkup(
-        [[KeyboardButton(label) for label in row] for row in rows],
+        [[cell(value) for value in row] for row in rows],
         resize_keyboard=True, is_persistent=True,
     )
 

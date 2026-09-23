@@ -178,6 +178,67 @@ class SimpleKeyboardTest(unittest.TestCase):
         )
 
 
+class GymButtonTest(unittest.TestCase):
+    """Which session the gym button carries, and what it says (DESIGN_gym_logger.md §6).
+
+    The week here is the design's: Tuesday 2026-09-22 is "today", and the gym day two
+    days out is Thursday 2026-09-24."""
+
+    TUESDAY = "2026-09-22"
+    THURSDAY = "2026-09-24"
+
+    def session(self, day, prescribed=True, sport="strength_training"):
+        sets = [{"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6}]
+        return {"date": day, "sport_type": sport, "title": "Gym: lower body strength",
+                "prescribed_sets": sets if prescribed else []}
+
+    def test_today_is_offered_over_a_later_gym_day(self):
+        today = self.session(self.TUESDAY)
+        found = keyboards.gym_button([self.session(self.THURSDAY), today], self.TUESDAY)
+        self.assertEqual(found, ("🏋️ Log today's gym", today))
+
+    def test_the_next_gym_day_is_named_by_its_weekday(self):
+        thursday = self.session(self.THURSDAY)
+        found = keyboards.gym_button([thursday], self.TUESDAY)
+        self.assertEqual(found, ("🏋️ Log Thursday's gym", thursday))
+
+    def test_a_session_past_the_window_is_not_offered(self):
+        """Today plus six days: the seventh waits for tomorrow's keyboard."""
+        self.assertIsNotNone(keyboards.gym_button([self.session("2026-09-28")], self.TUESDAY))
+        self.assertIsNone(keyboards.gym_button([self.session("2026-09-29")], self.TUESDAY))
+
+    def test_yesterdays_gym_day_is_gone(self):
+        self.assertIsNone(keyboards.gym_button([self.session("2026-09-21")], self.TUESDAY))
+
+    def test_a_session_with_no_prescribed_sets_has_nothing_to_log(self):
+        session = self.session(self.THURSDAY, prescribed=False)
+        self.assertIsNone(keyboards.gym_button([session], self.TUESDAY))
+
+    def test_another_sport_is_not_a_gym_day(self):
+        session = self.session(self.THURSDAY, sport="cycling")
+        self.assertIsNone(keyboards.gym_button([session], self.TUESDAY))
+
+    def test_an_alias_spelling_still_reads_as_strength(self):
+        """Older rows spell the sport `strength`; `canonical_sport` is what reconciles
+        the two spellings everywhere else."""
+        session = self.session(self.THURSDAY, sport="strength")
+        self.assertIsNotNone(keyboards.gym_button([session], self.TUESDAY))
+
+    def test_the_gym_row_sits_above_the_companion_labels(self):
+        plain = keyboards.simple_keyboard_rows()
+        withgym = keyboards.simple_keyboard_rows(("🏋️ Log today's gym", "https://x/#s=e30"))
+        self.assertEqual(withgym[0], [("🏋️ Log today's gym", "https://x/#s=e30")])
+        self.assertEqual(withgym[1:], plain)
+        self.assertEqual(plain[0], ["📅 Today", "🗓 My week"])
+
+    def test_the_gym_label_is_neither_a_command_nor_a_stale_tap(self):
+        """Tapping it opens the page and sends no text, so nothing here should ever see
+        it; if Telegram ever did deliver it as text, it must not run anything."""
+        for label in ("🏋️ Log today's gym", "🏋️ Log Thursday's gym"):
+            self.assertIsNone(keyboards.keyboard_action(label), label)
+            self.assertFalse(keyboards.stale_keyboard_tap(label, simple_now=False), label)
+
+
 class TwoLanesTest(unittest.TestCase):
     """The two lanes are taught, not discovered (§12.3). The surface has exactly two
     teachers — the help card and the per-message router echoes — and neither may promise

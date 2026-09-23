@@ -3,9 +3,11 @@
 # A Garmin name is CATEGORY/NAME; a bare CATEGORY is a set tagged with the category
 # and no exercise. Authored from Garmin Connect's exercise catalog and the FIT SDK
 # exercise names on 2026-09-14; a name Garmin adds later is added here by hand.
-# exercise	pattern	equipment	garmin names
-machine chest press	push_horizontal	machine	
-machine shoulder press	push_vertical	machine	
+# The photos column is the id of the same exercise in Free Exercise DB (public domain), whose
+# two photos the gym logger shows (DESIGN_gym_logger.md §2); empty when it has no exact match.
+# exercise	pattern	equipment	garmin names	photos
+machine chest press	push_horizontal	machine		Machine_Bench_Press
+machine shoulder press	push_vertical	machine		Machine_Shoulder_Military_Press
 machine row	pull_horizontal	machine	
 leg extension	accessory	machine	BANDED_EXERCISES/LEG_EXTENSION
 pec deck	accessory	machine	
@@ -13,49 +15,49 @@ hip abduction machine	accessory	machine
 hip adduction machine	accessory	machine	
 alternating dumbbell chest press	push_horizontal	dumbbell	BENCH_PRESS/ALTERNATING_DUMBBELL_CHEST_PRESS
 alternating dumbbell chest press on swiss ball	push_horizontal	dumbbell	BENCH_PRESS/ALTERNATING_DUMBBELL_CHEST_PRESS_ON_SWISS_BALL
-barbell bench press	push_horizontal	barbell	BENCH_PRESS/BARBELL_BENCH_PRESS
-barbell board bench press	push_horizontal	barbell	BENCH_PRESS/BARBELL_BOARD_BENCH_PRESS
-barbell floor press	push_horizontal	barbell	BENCH_PRESS/BARBELL_FLOOR_PRESS
+barbell bench press	push_horizontal	barbell	BENCH_PRESS/BARBELL_BENCH_PRESS	Barbell_Bench_Press_-_Medium_Grip
+barbell board bench press	push_horizontal	barbell	BENCH_PRESS/BARBELL_BOARD_BENCH_PRESS	Board_Press
+barbell floor press	push_horizontal	barbell	BENCH_PRESS/BARBELL_FLOOR_PRESS	Floor_Press
 bench press	push_horizontal	barbell	BENCH_PRESS/BENCH_PRESS BENCH_PRESS
-close grip barbell bench press	push_horizontal	barbell	BENCH_PRESS/CLOSE_GRIP_BARBELL_BENCH_PRESS
-decline barbell bench press	push_horizontal	barbell	BENCH_PRESS/DECLINE_BARBELL_BENCH_PRESS
-decline dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/DECLINE_DUMBBELL_BENCH_PRESS
-dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/DUMBBELL_BENCH_PRESS
-dumbbell floor press	push_horizontal	dumbbell	BENCH_PRESS/DUMBBELL_FLOOR_PRESS
-incline barbell bench press	push_horizontal	barbell	BENCH_PRESS/INCLINE_BARBELL_BENCH_PRESS
-incline dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/INCLINE_DUMBBELL_BENCH_PRESS
-incline smith machine bench press	push_horizontal	machine	BENCH_PRESS/INCLINE_SMITH_MACHINE_BENCH_PRESS
+close grip barbell bench press	push_horizontal	barbell	BENCH_PRESS/CLOSE_GRIP_BARBELL_BENCH_PRESS	Close-Grip_Barbell_Bench_Press
+decline barbell bench press	push_horizontal	barbell	BENCH_PRESS/DECLINE_BARBELL_BENCH_PRESS	Decline_Barbell_Bench_Press
+decline dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/DECLINE_DUMBBELL_BENCH_PRESS	Decline_Dumbbell_Bench_Press
+dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/DUMBBELL_BENCH_PRESS	Dumbbell_Bench_Press
+dumbbell floor press	push_horizontal	dumbbell	BENCH_PRESS/DUMBBELL_FLOOR_PRESS	Dumbbell_Floor_Press
+incline barbell bench press	push_horizontal	barbell	BENCH_PRESS/INCLINE_BARBELL_BENCH_PRESS	Barbell_Incline_Bench_Press_-_Medium_Grip
+incline dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/INCLINE_DUMBBELL_BENCH_PRESS	Incline_Dumbbell_Press
+incline smith machine bench press	push_horizontal	machine	BENCH_PRESS/INCLINE_SMITH_MACHINE_BENCH_PRESS	Smith_Machine_Incline_Bench_Press
 isometric barbell bench press	push_horizontal	barbell	BENCH_PRESS/ISOMETRIC_BARBELL_BENCH_PRESS
 kettlebell chest press	push_horizontal	kettlebell	BENCH_PRESS/KETTLEBELL_CHEST_PRESS
-neutral grip dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/NEUTRAL_GRIP_DUMBBELL_BENCH_PRESS
-neutral grip dumbbell incline bench press	push_horizontal	dumbbell	BENCH_PRESS/NEUTRAL_GRIP_DUMBBELL_INCLINE_BENCH_PRESS
+neutral grip dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/NEUTRAL_GRIP_DUMBBELL_BENCH_PRESS	Dumbbell_Bench_Press_with_Neutral_Grip
+neutral grip dumbbell incline bench press	push_horizontal	dumbbell	BENCH_PRESS/NEUTRAL_GRIP_DUMBBELL_INCLINE_BENCH_PRESS	Hammer_Grip_Incline_DB_Bench_Press
 one arm floor press	push_horizontal	bodyweight	BENCH_PRESS/ONE_ARM_FLOOR_PRESS BENCH_PRESS/WEIGHTED_ONE_ARM_FLOOR_PRESS
 partial lockout	push_horizontal	barbell	BENCH_PRESS/PARTIAL_LOCKOUT
-reverse grip barbell bench press	push_horizontal	barbell	BENCH_PRESS/REVERSE_GRIP_BARBELL_BENCH_PRESS
+reverse grip barbell bench press	push_horizontal	barbell	BENCH_PRESS/REVERSE_GRIP_BARBELL_BENCH_PRESS	Reverse_Triceps_Bench_Press
 reverse grip incline bench press	push_horizontal	barbell	BENCH_PRESS/REVERSE_GRIP_INCLINE_BENCH_PRESS
 single arm cable chest press	push_horizontal	cable	BENCH_PRESS/SINGLE_ARM_CABLE_CHEST_PRESS
-single arm dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/SINGLE_ARM_DUMBBELL_BENCH_PRESS
-smith machine bench press	push_horizontal	machine	BENCH_PRESS/SMITH_MACHINE_BENCH_PRESS
+single arm dumbbell bench press	push_horizontal	dumbbell	BENCH_PRESS/SINGLE_ARM_DUMBBELL_BENCH_PRESS	One_Arm_Dumbbell_Bench_Press
+smith machine bench press	push_horizontal	machine	BENCH_PRESS/SMITH_MACHINE_BENCH_PRESS	Smith_Machine_Bench_Press
 swiss ball dumbbell chest press	push_horizontal	dumbbell	BENCH_PRESS/SWISS_BALL_DUMBBELL_CHEST_PRESS
 triple stop barbell bench press	push_horizontal	barbell	BENCH_PRESS/TRIPLE_STOP_BARBELL_BENCH_PRESS
-wide grip barbell bench press	push_horizontal	barbell	BENCH_PRESS/WIDE_GRIP_BARBELL_BENCH_PRESS
-air squat	squat	bodyweight	SQUAT/AIR_SQUAT
-alternating box dumbbell step ups	single_leg	dumbbell	SQUAT/ALTERNATING_BOX_DUMBBELL_STEP_UPS
+wide grip barbell bench press	push_horizontal	barbell	BENCH_PRESS/WIDE_GRIP_BARBELL_BENCH_PRESS	Wide-Grip_Barbell_Bench_Press
+air squat	squat	bodyweight	SQUAT/AIR_SQUAT	Bodyweight_Squat
+alternating box dumbbell step ups	single_leg	dumbbell	SQUAT/ALTERNATING_BOX_DUMBBELL_STEP_UPS	Dumbbell_Step_Ups
 back squat with body bar	squat	barbell	SQUAT/BACK_SQUAT_WITH_BODY_BAR
 back squats	squat	bodyweight	SQUAT/BACK_SQUATS SQUAT/WEIGHTED_BACK_SQUATS
 balancing squat	squat	bodyweight	SQUAT/BALANCING_SQUAT SQUAT/WEIGHTED_BALANCING_SQUAT
-barbell back squat	squat	barbell	SQUAT/BARBELL_BACK_SQUAT
-barbell box squat	squat	barbell	SQUAT/BARBELL_BOX_SQUAT
-barbell front squat	squat	barbell	SQUAT/BARBELL_FRONT_SQUAT
-barbell hack squat	squat	barbell	SQUAT/BARBELL_HACK_SQUAT
+barbell back squat	squat	barbell	SQUAT/BARBELL_BACK_SQUAT	Barbell_Squat
+barbell box squat	squat	barbell	SQUAT/BARBELL_BOX_SQUAT	Box_Squat
+barbell front squat	squat	barbell	SQUAT/BARBELL_FRONT_SQUAT	Front_Barbell_Squat
+barbell hack squat	squat	barbell	SQUAT/BARBELL_HACK_SQUAT	Barbell_Hack_Squat
 barbell half squat	squat	barbell	SQUAT/BARBELL_HALF_SQUAT
-barbell hang squat snatch	hinge	barbell	SQUAT/BARBELL_HANG_SQUAT_SNATCH
+barbell hang squat snatch	hinge	barbell	SQUAT/BARBELL_HANG_SQUAT_SNATCH	Hang_Snatch
 barbell lateral step up	single_leg	barbell	SQUAT/BARBELL_LATERAL_STEP_UP
 barbell quarter squat	squat	barbell	SQUAT/BARBELL_QUARTER_SQUAT
 barbell siff squat	squat	barbell	SQUAT/BARBELL_SIFF_SQUAT
-barbell squat snatch	hinge	barbell	SQUAT/BARBELL_SQUAT_SNATCH
+barbell squat snatch	hinge	barbell	SQUAT/BARBELL_SQUAT_SNATCH	Snatch
 barbell squat with heels raised	squat	barbell	SQUAT/BARBELL_SQUAT_WITH_HEELS_RAISED
-barbell step up	single_leg	barbell	SQUAT/BARBELL_STEP_UP
+barbell step up	single_leg	barbell	SQUAT/BARBELL_STEP_UP	Barbell_Step_Ups
 barbell stepover	squat	barbell	SQUAT/BARBELL_STEPOVER
 belt squat	squat	machine	SQUAT/BELT_SQUAT
 bench squat with rotational chop	squat	bodyweight	SQUAT/BENCH_SQUAT_WITH_ROTATIONAL_CHOP SQUAT/WEIGHTED_BENCH_SQUAT_WITH_ROTATIONAL_CHOP
@@ -66,26 +68,26 @@ crossed arm barbell front squat	squat	barbell	SQUAT/CROSSED_ARM_BARBELL_FRONT_SQ
 crossover dumbbell step up	single_leg	dumbbell	SQUAT/CROSSOVER_DUMBBELL_STEP_UP
 dumbbell front squat	squat	dumbbell	SQUAT/DUMBBELL_FRONT_SQUAT
 dumbbell overhead squat single arm	squat	dumbbell	SQUAT/DUMBBELL_OVERHEAD_SQUAT_SINGLE_ARM
-dumbbell split squat	single_leg	dumbbell	SQUAT/DUMBBELL_SPLIT_SQUAT
-dumbbell squat	squat	dumbbell	SQUAT/DUMBBELL_SQUAT
+dumbbell split squat	single_leg	dumbbell	SQUAT/DUMBBELL_SPLIT_SQUAT	Split_Squat_with_Dumbbells
+dumbbell squat	squat	dumbbell	SQUAT/DUMBBELL_SQUAT	Dumbbell_Squat
 dumbbell squat clean	hinge	dumbbell	SQUAT/DUMBBELL_SQUAT_CLEAN
 dumbbell squat snatch	hinge	dumbbell	SQUAT/DUMBBELL_SQUAT_SNATCH
-dumbbell step up	single_leg	dumbbell	SQUAT/DUMBBELL_STEP_UP
+dumbbell step up	single_leg	dumbbell	SQUAT/DUMBBELL_STEP_UP	Dumbbell_Step_Ups
 dumbbell stepover	squat	dumbbell	SQUAT/DUMBBELL_STEPOVER
 dumbbell thrusters	squat	dumbbell	SQUAT/DUMBBELL_THRUSTERS
 elevated single leg squat	single_leg	bodyweight	SQUAT/ELEVATED_SINGLE_LEG_SQUAT SQUAT/WEIGHTED_ELEVATED_SINGLE_LEG_SQUAT
 figure four squats	squat	bodyweight	SQUAT/FIGURE_FOUR_SQUATS SQUAT/WEIGHTED_FIGURE_FOUR_SQUATS
 goblet squat	squat	dumbbell	SQUAT/GOBLET_SQUAT
-kettlebell squat	squat	kettlebell	SQUAT/KETTLEBELL_SQUAT
+kettlebell squat	squat	kettlebell	SQUAT/KETTLEBELL_SQUAT	Goblet_Squat
 kettlebell swing overhead	hinge	kettlebell	SQUAT/KETTLEBELL_SWING_OVERHEAD
 kettlebell swing with flip to squat	hinge	kettlebell	SQUAT/KETTLEBELL_SWING_WITH_FLIP_TO_SQUAT
 lateral dumbbell step up	single_leg	dumbbell	SQUAT/LATERAL_DUMBBELL_STEP_UP
-leg press	squat	machine	SQUAT/LEG_PRESS
+leg press	squat	machine	SQUAT/LEG_PRESS	Leg_Press
 medicine ball squat	squat	dumbbell	SQUAT/MEDICINE_BALL_SQUAT
 one legged squat	single_leg	barbell	SQUAT/ONE_LEGGED_SQUAT
-overhead barbell squat	squat	barbell	SQUAT/OVERHEAD_BARBELL_SQUAT
+overhead barbell squat	squat	barbell	SQUAT/OVERHEAD_BARBELL_SQUAT	Overhead_Squat
 overhead dumbbell squat	squat	dumbbell	SQUAT/OVERHEAD_DUMBBELL_SQUAT
-overhead squat	squat	barbell	SQUAT/OVERHEAD_SQUAT
+overhead squat	squat	barbell	SQUAT/OVERHEAD_SQUAT	Overhead_Squat
 partial single leg squat	single_leg	bodyweight	SQUAT/PARTIAL_SINGLE_LEG_SQUAT SQUAT/WEIGHTED_PARTIAL_SINGLE_LEG_SQUAT
 pistol squat	single_leg	bodyweight	SQUAT/PISTOL_SQUAT SQUAT/WEIGHTED_PISTOL_SQUAT
 plie slides	squat	bodyweight	SQUAT/PLIE_SLIDES SQUAT/WEIGHTED_PLIE_SLIDES
@@ -98,14 +100,14 @@ ruck front squat	squat	barbell	SQUAT/RUCK_FRONT_SQUAT
 single leg bench get up	core_carry	bodyweight	SQUAT/SINGLE_LEG_BENCH_GET_UP SQUAT/WEIGHTED_SINGLE_LEG_BENCH_GET_UP
 single leg bench squat	single_leg	bodyweight	SQUAT/SINGLE_LEG_BENCH_SQUAT SQUAT/WEIGHTED_SINGLE_LEG_BENCH_SQUAT
 single leg squat on swiss ball	single_leg	bodyweight	SQUAT/SINGLE_LEG_SQUAT_ON_SWISS_BALL SQUAT/WEIGHTED_SINGLE_LEG_SQUAT_ON_SWISS_BALL
-squat	squat	bodyweight	SQUAT/SQUAT SQUAT/WEIGHTED_SQUAT BANDED_EXERCISES/SQUAT SUSPENSION/SQUAT SQUAT
+squat	squat	bodyweight	SQUAT/SQUAT SQUAT/WEIGHTED_SQUAT BANDED_EXERCISES/SQUAT SUSPENSION/SQUAT SQUAT	Bodyweight_Squat
 squat american swing	hinge	kettlebell	SQUAT/SQUAT_AMERICAN_SWING
 squat and side kick	accessory	barbell	SQUAT/SQUAT_AND_SIDE_KICK
 squat jumps in n out	accessory	barbell	SQUAT/SQUAT_JUMPS_IN_N_OUT
-squats with band	squat	cable	SQUAT/SQUATS_WITH_BAND
+squats with band	squat	cable	SQUAT/SQUATS_WITH_BAND	Squats_-_With_Bands
 staggered squat	squat	bodyweight	SQUAT/STAGGERED_SQUAT SQUAT/WEIGHTED_STAGGERED_SQUAT
 step up	single_leg	bodyweight	SQUAT/STEP_UP SQUAT/WEIGHTED_STEP_UP
-suitcase squats	squat	dumbbell	SQUAT/SUITCASE_SQUATS
+suitcase squats	squat	dumbbell	SQUAT/SUITCASE_SQUATS	Dumbbell_Squat
 sumo squat	squat	barbell	SQUAT/SUMO_SQUAT
 sumo squat slide in	squat	bodyweight	SQUAT/SUMO_SQUAT_SLIDE_IN SQUAT/WEIGHTED_SUMO_SQUAT_SLIDE_IN
 sumo squat to high pull	hinge	barbell	SQUAT/SUMO_SQUAT_TO_HIGH_PULL
@@ -119,24 +121,24 @@ wall ball	squat	dumbbell	SQUAT/WALL_BALL
 wall ball squat and press	squat	dumbbell	SQUAT/WALL_BALL_SQUAT_AND_PRESS
 weighted swiss ball wall squat	squat	bodyweight	SQUAT/WEIGHTED_SWISS_BALL_WALL_SQUAT
 weighted wall squat	squat	bodyweight	SQUAT/WEIGHTED_WALL_SQUAT
-wide stance barbell squat	squat	barbell	SQUAT/WIDE_STANCE_BARBELL_SQUAT
+wide stance barbell squat	squat	barbell	SQUAT/WIDE_STANCE_BARBELL_SQUAT	Wide_Stance_Barbell_Squat
 wide stance goblet squat	squat	dumbbell	SQUAT/WIDE_STANCE_GOBLET_SQUAT
-zercher squat	squat	barbell	SQUAT/ZERCHER_SQUAT SANDBAG/ZERCHER_SQUAT
+zercher squat	squat	barbell	SQUAT/ZERCHER_SQUAT SANDBAG/ZERCHER_SQUAT	Zercher_Squats
 kbs overhead	hinge	kettlebell	SQUAT/KBS_OVERHEAD
 pilates plie squats parallel turned out flat and heels	squat	bodyweight	SQUAT/PILATES_PLIE_SQUATS_PARALLEL_TURNED_OUT_FLAT_AND_HEELS
 releve straight leg and knee bent with one leg variation	squat	bodyweight	SQUAT/RELEVE_STRAIGHT_LEG_AND_KNEE_BENT_WITH_ONE_LEG_VARIATION
-barbell deadlift	hinge	barbell	DEADLIFT/BARBELL_DEADLIFT
-barbell straight leg deadlift	hinge	barbell	DEADLIFT/BARBELL_STRAIGHT_LEG_DEADLIFT
-deadlift	hinge	barbell	DEADLIFT/DEADLIFT BANDED_EXERCISES/DEADLIFT DEADLIFT
-romanian deadlift	hinge	barbell	DEADLIFT/ROMANIAN_DEADLIFT
+barbell deadlift	hinge	barbell	DEADLIFT/BARBELL_DEADLIFT	Barbell_Deadlift
+barbell straight leg deadlift	hinge	barbell	DEADLIFT/BARBELL_STRAIGHT_LEG_DEADLIFT	Stiff-Legged_Barbell_Deadlift
+deadlift	hinge	barbell	DEADLIFT/DEADLIFT BANDED_EXERCISES/DEADLIFT DEADLIFT	Barbell_Deadlift
+romanian deadlift	hinge	barbell	DEADLIFT/ROMANIAN_DEADLIFT	Romanian_Deadlift
 dumbbell deadlift	hinge	dumbbell	DEADLIFT/DUMBBELL_DEADLIFT
 dumbbell single leg deadlift to row	hinge	dumbbell	DEADLIFT/DUMBBELL_SINGLE_LEG_DEADLIFT_TO_ROW
-dumbbell straight leg deadlift	hinge	dumbbell	DEADLIFT/DUMBBELL_STRAIGHT_LEG_DEADLIFT
+dumbbell straight leg deadlift	hinge	dumbbell	DEADLIFT/DUMBBELL_STRAIGHT_LEG_DEADLIFT	Stiff-Legged_Dumbbell_Deadlift
 kettlebell deadlift	hinge	kettlebell	DEADLIFT/KETTLEBELL_DEADLIFT
 kettlebell floor to shelf	hinge	kettlebell	DEADLIFT/KETTLEBELL_FLOOR_TO_SHELF
 kettlebell sumo deadlift	hinge	kettlebell	DEADLIFT/KETTLEBELL_SUMO_DEADLIFT
 one arm one leg deadlift	hinge	dumbbell	DEADLIFT/ONE_ARM_ONE_LEG_DEADLIFT
-rack pull	hinge	barbell	DEADLIFT/RACK_PULL
+rack pull	hinge	barbell	DEADLIFT/RACK_PULL	Rack_Pulls
 rotational dumbbell straight leg deadlift	hinge	dumbbell	DEADLIFT/ROTATIONAL_DUMBBELL_STRAIGHT_LEG_DEADLIFT
 ruck deadlift	hinge	barbell	DEADLIFT/RUCK_DEADLIFT
 single arm deadlift	hinge	dumbbell	DEADLIFT/SINGLE_ARM_DEADLIFT
@@ -146,24 +148,24 @@ single leg deadlift with barbell	hinge	barbell	DEADLIFT/SINGLE_LEG_DEADLIFT_WITH
 single leg rdl circuit	hinge	barbell	DEADLIFT/SINGLE_LEG_RDL_CIRCUIT
 single leg romanian deadlift circuit	hinge	barbell	DEADLIFT/SINGLE_LEG_ROMANIAN_DEADLIFT_CIRCUIT
 single leg romanian deadlift with dumbbell	hinge	dumbbell	DEADLIFT/SINGLE_LEG_ROMANIAN_DEADLIFT_WITH_DUMBBELL
-sumo deadlift	hinge	barbell	DEADLIFT/SUMO_DEADLIFT
+sumo deadlift	hinge	barbell	DEADLIFT/SUMO_DEADLIFT	Sumo_Deadlift
 sumo deadlift high pull	hinge	barbell	DEADLIFT/SUMO_DEADLIFT_HIGH_PULL
-trap bar deadlift	hinge	barbell	DEADLIFT/TRAP_BAR_DEADLIFT
+trap bar deadlift	hinge	barbell	DEADLIFT/TRAP_BAR_DEADLIFT	Trap_Bar_Deadlift
 wide grip barbell deadlift	hinge	barbell	DEADLIFT/WIDE_GRIP_BARBELL_DEADLIFT
-straight leg deadlift	hinge	barbell	DEADLIFT/STRAIGHT_LEG_DEADLIFT
-alternating barbell forward lunge	single_leg	barbell	LUNGE/ALTERNATING_BARBELL_FORWARD_LUNGE
-alternating dumbbell lunge	single_leg	dumbbell	LUNGE/ALTERNATING_DUMBBELL_LUNGE
+straight leg deadlift	hinge	barbell	DEADLIFT/STRAIGHT_LEG_DEADLIFT	Stiff-Legged_Barbell_Deadlift
+alternating barbell forward lunge	single_leg	barbell	LUNGE/ALTERNATING_BARBELL_FORWARD_LUNGE	Barbell_Lunge
+alternating dumbbell lunge	single_leg	dumbbell	LUNGE/ALTERNATING_DUMBBELL_LUNGE	Dumbbell_Lunges
 alternating dumbbell lunge with reach	single_leg	dumbbell	LUNGE/ALTERNATING_DUMBBELL_LUNGE_WITH_REACH
 back foot elevated dumbbell split squat	single_leg	dumbbell	LUNGE/BACK_FOOT_ELEVATED_DUMBBELL_SPLIT_SQUAT
 barbell box lunge	single_leg	barbell	LUNGE/BARBELL_BOX_LUNGE
-barbell bulgarian split squat	single_leg	barbell	LUNGE/BARBELL_BULGARIAN_SPLIT_SQUAT
+barbell bulgarian split squat	single_leg	barbell	LUNGE/BARBELL_BULGARIAN_SPLIT_SQUAT	One_Leg_Barbell_Squat
 barbell crossover lunge	single_leg	barbell	LUNGE/BARBELL_CROSSOVER_LUNGE
 barbell front split squat	single_leg	barbell	LUNGE/BARBELL_FRONT_SPLIT_SQUAT
-barbell lunge	single_leg	barbell	LUNGE/BARBELL_LUNGE
+barbell lunge	single_leg	barbell	LUNGE/BARBELL_LUNGE	Barbell_Lunge
 barbell reverse lunge	single_leg	barbell	LUNGE/BARBELL_REVERSE_LUNGE
 barbell side lunge	single_leg	barbell	LUNGE/BARBELL_SIDE_LUNGE
 barbell split squat	single_leg	barbell	LUNGE/BARBELL_SPLIT_SQUAT
-core control rear lunge	single_leg	dumbbell	LUNGE/CORE_CONTROL_REAR_LUNGE
+core control rear lunge	single_leg	dumbbell	LUNGE/CORE_CONTROL_REAR_LUNGE	Dumbbell_Rear_Lunge
 curtsy lunge	single_leg	dumbbell	LUNGE/CURTSY_LUNGE
 diagonal lunge	single_leg	dumbbell	LUNGE/DIAGONAL_LUNGE
 drop lunge	single_leg	dumbbell	LUNGE/DROP_LUNGE
@@ -171,11 +173,11 @@ dumbbell box lunge	single_leg	dumbbell	LUNGE/DUMBBELL_BOX_LUNGE
 dumbbell bulgarian split squat	single_leg	dumbbell	LUNGE/DUMBBELL_BULGARIAN_SPLIT_SQUAT
 dumbbell crossover lunge	single_leg	dumbbell	LUNGE/DUMBBELL_CROSSOVER_LUNGE
 dumbbell diagonal lunge	single_leg	dumbbell	LUNGE/DUMBBELL_DIAGONAL_LUNGE
-dumbbell lunge	single_leg	dumbbell	LUNGE/DUMBBELL_LUNGE
+dumbbell lunge	single_leg	dumbbell	LUNGE/DUMBBELL_LUNGE	Dumbbell_Lunges
 dumbbell lunge and rotation	single_leg	dumbbell	LUNGE/DUMBBELL_LUNGE_AND_ROTATION
 dumbbell overhead bulgarian split squat	single_leg	dumbbell	LUNGE/DUMBBELL_OVERHEAD_BULGARIAN_SPLIT_SQUAT
 dumbbell overhead walking lunge	single_leg	dumbbell	LUNGE/DUMBBELL_OVERHEAD_WALKING_LUNGE
-dumbbell reverse lunge	single_leg	dumbbell	LUNGE/DUMBBELL_REVERSE_LUNGE
+dumbbell reverse lunge	single_leg	dumbbell	LUNGE/DUMBBELL_REVERSE_LUNGE	Dumbbell_Rear_Lunge
 dumbbell reverse lunge to high knee and press	single_leg	dumbbell	LUNGE/DUMBBELL_REVERSE_LUNGE_TO_HIGH_KNEE_AND_PRESS
 dumbbell side lunge	single_leg	dumbbell	LUNGE/DUMBBELL_SIDE_LUNGE
 elevated front foot barbell split squat	single_leg	barbell	LUNGE/ELEVATED_FRONT_FOOT_BARBELL_SPLIT_SQUAT
@@ -197,7 +199,7 @@ overhead dumbbell reverse lunge	single_leg	dumbbell	LUNGE/OVERHEAD_DUMBBELL_REVE
 overhead dumbbell split squat	single_leg	dumbbell	LUNGE/OVERHEAD_DUMBBELL_SPLIT_SQUAT
 overhead lunge	single_leg	dumbbell	LUNGE/OVERHEAD_LUNGE
 overhead lunge with rotation	single_leg	dumbbell	LUNGE/OVERHEAD_LUNGE_WITH_ROTATION
-reverse barbell box lunge	single_leg	barbell	LUNGE/REVERSE_BARBELL_BOX_LUNGE
+reverse barbell box lunge	single_leg	barbell	LUNGE/REVERSE_BARBELL_BOX_LUNGE	Elevated_Back_Lunge
 reverse box lunge	single_leg	bodyweight	LUNGE/REVERSE_BOX_LUNGE
 reverse dumbbell box lunge	single_leg	dumbbell	LUNGE/REVERSE_DUMBBELL_BOX_LUNGE
 reverse dumbbell crossover lunge	single_leg	dumbbell	LUNGE/REVERSE_DUMBBELL_CROSSOVER_LUNGE
@@ -221,9 +223,9 @@ side to side lunge chops	single_leg	bodyweight	LUNGE/SIDE_TO_SIDE_LUNGE_CHOPS LU
 siff jump lunge	accessory	bodyweight	LUNGE/SIFF_JUMP_LUNGE LUNGE/WEIGHTED_SIFF_JUMP_LUNGE
 single arm reverse lunge and press	single_leg	dumbbell	LUNGE/SINGLE_ARM_REVERSE_LUNGE_AND_PRESS
 sliding lateral lunge	single_leg	bodyweight	LUNGE/SLIDING_LATERAL_LUNGE LUNGE/WEIGHTED_SLIDING_LATERAL_LUNGE
-walking barbell lunge	single_leg	barbell	LUNGE/WALKING_BARBELL_LUNGE
+walking barbell lunge	single_leg	barbell	LUNGE/WALKING_BARBELL_LUNGE	Barbell_Walking_Lunge
 walking dumbbell lunge	single_leg	dumbbell	LUNGE/WALKING_DUMBBELL_LUNGE
-walking lunge	single_leg	bodyweight	LUNGE/WALKING_LUNGE LUNGE/WEIGHTED_WALKING_LUNGE
+walking lunge	single_leg	bodyweight	LUNGE/WALKING_LUNGE LUNGE/WEIGHTED_WALKING_LUNGE	Bodyweight_Walking_Lunge
 weighted curtsy lunge	single_leg	bodyweight	LUNGE/WEIGHTED_CURTSY_LUNGE
 weighted shifting side lunge	single_leg	bodyweight	LUNGE/WEIGHTED_SHIFTING_SIDE_LUNGE
 weighted side lunge and press	single_leg	bodyweight	LUNGE/WEIGHTED_SIDE_LUNGE_AND_PRESS
@@ -232,44 +234,44 @@ wide grip overhead barbell split squat	single_leg	barbell	LUNGE/WIDE_GRIP_OVERHE
 alternating dumbbell row	pull_horizontal	dumbbell	ROW/ALTERNATING_DUMBBELL_ROW
 banded face pulls	accessory	cable	ROW/BANDED_FACE_PULLS
 barbell bench pull	pull_horizontal	barbell	ROW/BARBELL_BENCH_PULL
-barbell row	pull_horizontal	barbell	ROW/BARBELL_ROW
+barbell row	pull_horizontal	barbell	ROW/BARBELL_ROW	Bent_Over_Barbell_Row
 barbell straight leg deadlift to row	hinge	barbell	ROW/BARBELL_STRAIGHT_LEG_DEADLIFT_TO_ROW
-bent over row with barbell	pull_horizontal	barbell	ROW/BENT_OVER_ROW_WITH_BARBELL
-bent over row with dumbell	pull_horizontal	dumbbell	ROW/BENT_OVER_ROW_WITH_DUMBELL
+bent over row with barbell	pull_horizontal	barbell	ROW/BENT_OVER_ROW_WITH_BARBELL	Bent_Over_Barbell_Row
+bent over row with dumbell	pull_horizontal	dumbbell	ROW/BENT_OVER_ROW_WITH_DUMBELL	Bent_Over_Two-Dumbbell_Row
 cable row standing	pull_horizontal	cable	ROW/CABLE_ROW_STANDING
-chest supported dumbbell row	pull_horizontal	dumbbell	ROW/CHEST_SUPPORTED_DUMBBELL_ROW
+chest supported dumbbell row	pull_horizontal	dumbbell	ROW/CHEST_SUPPORTED_DUMBBELL_ROW	Dumbbell_Incline_Row
 decline ring row	pull_horizontal	bodyweight	ROW/DECLINE_RING_ROW
-dumbbell row	pull_horizontal	dumbbell	ROW/DUMBBELL_ROW
+dumbbell row	pull_horizontal	dumbbell	ROW/DUMBBELL_ROW	Bent_Over_Two-Dumbbell_Row
 elevated feet inverted row	pull_horizontal	bodyweight	ROW/ELEVATED_FEET_INVERTED_ROW ROW/WEIGHTED_ELEVATED_FEET_INVERTED_ROW
 elevated ring row	pull_horizontal	bodyweight	ROW/ELEVATED_RING_ROW
-face pull	accessory	barbell	ROW/FACE_PULL BANDED_EXERCISES/FACE_PULL SUSPENSION/FACE_PULL
-face pull with external rotation	accessory	barbell	ROW/FACE_PULL_WITH_EXTERNAL_ROTATION
+face pull	accessory	cable	ROW/FACE_PULL BANDED_EXERCISES/FACE_PULL SUSPENSION/FACE_PULL
+face pull with external rotation	accessory	cable	ROW/FACE_PULL_WITH_EXTERNAL_ROTATION
 indoor row	pull_horizontal	barbell	ROW/INDOOR_ROW INDOOR_ROW
-inverted row	pull_horizontal	bodyweight	ROW/INVERTED_ROW ROW/WEIGHTED_INVERTED_ROW SUSPENSION/INVERTED_ROW
+inverted row	pull_horizontal	bodyweight	ROW/INVERTED_ROW ROW/WEIGHTED_INVERTED_ROW SUSPENSION/INVERTED_ROW	Inverted_Row
 inverted row with feet on swiss ball	pull_horizontal	bodyweight	ROW/INVERTED_ROW_WITH_FEET_ON_SWISS_BALL ROW/WEIGHTED_INVERTED_ROW_WITH_FEET_ON_SWISS_BALL
 kettlebell row	pull_horizontal	kettlebell	ROW/KETTLEBELL_ROW
 modified inverted row	pull_horizontal	bodyweight	ROW/MODIFIED_INVERTED_ROW ROW/WEIGHTED_MODIFIED_INVERTED_ROW
 neutral grip alternating dumbbell row	pull_horizontal	dumbbell	ROW/NEUTRAL_GRIP_ALTERNATING_DUMBBELL_ROW
-one arm bent over row	pull_horizontal	dumbbell	ROW/ONE_ARM_BENT_OVER_ROW
+one arm bent over row	pull_horizontal	dumbbell	ROW/ONE_ARM_BENT_OVER_ROW	One-Arm_Dumbbell_Row
 one legged dumbbell row	pull_horizontal	dumbbell	ROW/ONE_LEGGED_DUMBBELL_ROW
 renegade row	pull_horizontal	dumbbell	ROW/RENEGADE_ROW
-reverse grip barbell row	pull_horizontal	barbell	ROW/REVERSE_GRIP_BARBELL_ROW
-ring row	pull_horizontal	bodyweight	ROW/RING_ROW
+reverse grip barbell row	pull_horizontal	barbell	ROW/REVERSE_GRIP_BARBELL_ROW	Reverse_Grip_Bent-Over_Rows
+ring row	pull_horizontal	bodyweight	ROW/RING_ROW	Suspended_Row
 rope handle cable row	pull_horizontal	cable	ROW/ROPE_HANDLE_CABLE_ROW
-row	pull_horizontal	barbell	ROW/ROW BANDED_EXERCISES/ROW SANDBAG/ROW SLED/ROW SUSPENSION/ROW ROW
+row	pull_horizontal	barbell	ROW/ROW BANDED_EXERCISES/ROW SANDBAG/ROW SLED/ROW SUSPENSION/ROW ROW	Bent_Over_Barbell_Row
 ruck bentover row	pull_horizontal	barbell	ROW/RUCK_BENTOVER_ROW
-seated cable row	pull_horizontal	cable	ROW/SEATED_CABLE_ROW
+seated cable row	pull_horizontal	cable	ROW/SEATED_CABLE_ROW	Seated_Cable_Rows
 seated dumbbell row	pull_horizontal	dumbbell	ROW/SEATED_DUMBBELL_ROW
 seated underhand grip cable row	pull_horizontal	cable	ROW/SEATED_UNDERHAND_GRIP_CABLE_ROW
-single arm cable row	pull_horizontal	cable	ROW/SINGLE_ARM_CABLE_ROW
+single arm cable row	pull_horizontal	cable	ROW/SINGLE_ARM_CABLE_ROW	Seated_One-arm_Cable_Pulley_Rows
 single arm cable row and rotation	pull_horizontal	cable	ROW/SINGLE_ARM_CABLE_ROW_AND_ROTATION
 single arm inverted row	pull_horizontal	bodyweight	ROW/SINGLE_ARM_INVERTED_ROW ROW/WEIGHTED_SINGLE_ARM_INVERTED_ROW
-single arm neutral grip dumbbell row	pull_horizontal	dumbbell	ROW/SINGLE_ARM_NEUTRAL_GRIP_DUMBBELL_ROW
+single arm neutral grip dumbbell row	pull_horizontal	dumbbell	ROW/SINGLE_ARM_NEUTRAL_GRIP_DUMBBELL_ROW	One-Arm_Dumbbell_Row
 single arm neutral grip dumbbell row and rotation	pull_horizontal	dumbbell	ROW/SINGLE_ARM_NEUTRAL_GRIP_DUMBBELL_ROW_AND_ROTATION
-suspended inverted row	pull_horizontal	bodyweight	ROW/SUSPENDED_INVERTED_ROW ROW/WEIGHTED_SUSPENDED_INVERTED_ROW
-t bar row	pull_horizontal	barbell	ROW/T_BAR_ROW
+suspended inverted row	pull_horizontal	bodyweight	ROW/SUSPENDED_INVERTED_ROW ROW/WEIGHTED_SUSPENDED_INVERTED_ROW	Suspended_Row
+t bar row	pull_horizontal	barbell	ROW/T_BAR_ROW	T-Bar_Row_with_Handle
 towel grip inverted row	pull_horizontal	bodyweight	ROW/TOWEL_GRIP_INVERTED_ROW ROW/WEIGHTED_TOWEL_GRIP_INVERTED_ROW
-trx inverted row	pull_horizontal	bodyweight	ROW/TRX_INVERTED_ROW ROW/WEIGHTED_TRX_INVERTED_ROW
+trx inverted row	pull_horizontal	bodyweight	ROW/TRX_INVERTED_ROW ROW/WEIGHTED_TRX_INVERTED_ROW	Inverted_Row_with_Straps
 underhand grip cable row	pull_horizontal	cable	ROW/UNDERHAND_GRIP_CABLE_ROW
 v grip cable row	pull_horizontal	cable	ROW/V_GRIP_CABLE_ROW
 weighted row	pull_horizontal	bodyweight	ROW/WEIGHTED_ROW
@@ -278,12 +280,12 @@ rdl bent over row with barbell dumbbell	hinge	dumbbell	ROW/RDL_BENT_OVER_ROW_WIT
 dumbbell row wheelchair	pull_horizontal	dumbbell	ROW/DUMBBELL_ROW_WHEELCHAIR
 30 degree lat pulldown	pull_vertical	cable	PULL_UP/_30_DEGREE_LAT_PULLDOWN
 band assisted chin up	pull_vertical	bodyweight	PULL_UP/BAND_ASSISTED_CHIN_UP
-band assisted pull up	pull_vertical	cable	PULL_UP/BAND_ASSISTED_PULL_UP
-banded pull ups	pull_vertical	bodyweight	PULL_UP/BANDED_PULL_UPS
+band assisted pull up	pull_vertical	cable	PULL_UP/BAND_ASSISTED_PULL_UP	Band_Assisted_Pull-Up
+banded pull ups	pull_vertical	bodyweight	PULL_UP/BANDED_PULL_UPS	Band_Assisted_Pull-Up
 burpee pull up	accessory	bodyweight	PULL_UP/BURPEE_PULL_UP PULL_UP/WEIGHTED_BURPEE_PULL_UP
-chin up	pull_vertical	bodyweight	PULL_UP/CHIN_UP PULL_UP/WEIGHTED_CHIN_UP
+chin up	pull_vertical	bodyweight	PULL_UP/CHIN_UP PULL_UP/WEIGHTED_CHIN_UP	Chin-Up
 close grip chin up	pull_vertical	bodyweight	PULL_UP/CLOSE_GRIP_CHIN_UP PULL_UP/WEIGHTED_CLOSE_GRIP_CHIN_UP
-close grip lat pulldown	pull_vertical	cable	PULL_UP/CLOSE_GRIP_LAT_PULLDOWN
+close grip lat pulldown	pull_vertical	cable	PULL_UP/CLOSE_GRIP_LAT_PULLDOWN	Close-Grip_Front_Lat_Pulldown
 crossover chin up	pull_vertical	bodyweight	PULL_UP/CROSSOVER_CHIN_UP PULL_UP/WEIGHTED_CROSSOVER_CHIN_UP
 ez bar pullover	accessory	barbell	PULL_UP/EZ_BAR_PULLOVER
 hanging hurdle	pull_vertical	bodyweight	PULL_UP/HANGING_HURDLE PULL_UP/WEIGHTED_HANGING_HURDLE
@@ -293,19 +295,19 @@ kneeling lat pulldown	pull_vertical	cable	PULL_UP/KNEELING_LAT_PULLDOWN
 kneeling underhand grip lat pulldown	pull_vertical	cable	PULL_UP/KNEELING_UNDERHAND_GRIP_LAT_PULLDOWN
 l pull up	pull_vertical	bodyweight	PULL_UP/L_PULL_UP PULL_UP/WEIGHTED_L_PULL_UP
 lat pulldown	pull_vertical	cable	PULL_UP/LAT_PULLDOWN
-mixed grip chin up	pull_vertical	bodyweight	PULL_UP/MIXED_GRIP_CHIN_UP PULL_UP/WEIGHTED_MIXED_GRIP_CHIN_UP
-mixed grip pull up	pull_vertical	bodyweight	PULL_UP/MIXED_GRIP_PULL_UP PULL_UP/WEIGHTED_MIXED_GRIP_PULL_UP
+mixed grip chin up	pull_vertical	bodyweight	PULL_UP/MIXED_GRIP_CHIN_UP PULL_UP/WEIGHTED_MIXED_GRIP_CHIN_UP	Mixed_Grip_Chin
+mixed grip pull up	pull_vertical	bodyweight	PULL_UP/MIXED_GRIP_PULL_UP PULL_UP/WEIGHTED_MIXED_GRIP_PULL_UP	Mixed_Grip_Chin
 neutral grip chin up	pull_vertical	bodyweight	PULL_UP/NEUTRAL_GRIP_CHIN_UP PULL_UP/WEIGHTED_NEUTRAL_GRIP_CHIN_UP
 neutral grip pull up	pull_vertical	bodyweight	PULL_UP/NEUTRAL_GRIP_PULL_UP PULL_UP/WEIGHTED_NEUTRAL_GRIP_PULL_UP
-pull up	pull_vertical	bodyweight	PULL_UP/PULL_UP PULL_UP/WEIGHTED_PULL_UP SUSPENSION/PULL_UP PULL_UP
-reverse grip pulldown	pull_vertical	cable	PULL_UP/REVERSE_GRIP_PULLDOWN
+pull up	pull_vertical	bodyweight	PULL_UP/PULL_UP PULL_UP/WEIGHTED_PULL_UP SUSPENSION/PULL_UP PULL_UP	Pullups
+reverse grip pulldown	pull_vertical	cable	PULL_UP/REVERSE_GRIP_PULLDOWN	Underhand_Cable_Pulldowns
 standing cable pullover	accessory	cable	PULL_UP/STANDING_CABLE_PULLOVER
 straight arm pulldown	accessory	cable	PULL_UP/STRAIGHT_ARM_PULLDOWN
 suspended chin up	pull_vertical	bodyweight	PULL_UP/SUSPENDED_CHIN_UP PULL_UP/WEIGHTED_SUSPENDED_CHIN_UP
 swiss ball ez bar pullover	accessory	barbell	PULL_UP/SWISS_BALL_EZ_BAR_PULLOVER
 towel pull up	pull_vertical	bodyweight	PULL_UP/TOWEL_PULL_UP PULL_UP/WEIGHTED_TOWEL_PULL_UP
 wide grip pull up	pull_vertical	bodyweight	PULL_UP/WEIGHTED_WIDE_GRIP_PULL_UP PULL_UP/WIDE_GRIP_PULL_UP
-wide grip lat pulldown	pull_vertical	cable	PULL_UP/WIDE_GRIP_LAT_PULLDOWN
+wide grip lat pulldown	pull_vertical	cable	PULL_UP/WIDE_GRIP_LAT_PULLDOWN	Wide-Grip_Lat_Pulldown
 alternating hands medicine ball push up	push_horizontal	bodyweight	PUSH_UP/ALTERNATING_HANDS_MEDICINE_BALL_PUSH_UP PUSH_UP/WEIGHTED_ALTERNATING_HANDS_MEDICINE_BALL_PUSH_UP
 alternating staggered push up	push_horizontal	bodyweight	PUSH_UP/ALTERNATING_STAGGERED_PUSH_UP PUSH_UP/WEIGHTED_ALTERNATING_STAGGERED_PUSH_UP
 biceps push up	push_horizontal	bodyweight	PUSH_UP/BICEPS_PUSH_UP PUSH_UP/WEIGHTED_BICEPS_PUSH_UP
@@ -314,16 +316,16 @@ chest press with band	push_horizontal	cable	PUSH_UP/CHEST_PRESS_WITH_BAND
 clapping push up	push_horizontal	bodyweight	PUSH_UP/CLAPPING_PUSH_UP PUSH_UP/WEIGHTED_CLAPPING_PUSH_UP
 close grip medicine ball push up	push_horizontal	bodyweight	PUSH_UP/CLOSE_GRIP_MEDICINE_BALL_PUSH_UP PUSH_UP/WEIGHTED_CLOSE_GRIP_MEDICINE_BALL_PUSH_UP
 close hands push up	push_horizontal	bodyweight	PUSH_UP/CLOSE_HANDS_PUSH_UP PUSH_UP/WEIGHTED_CLOSE_HANDS_PUSH_UP
-decline push up	push_horizontal	bodyweight	PUSH_UP/DECLINE_PUSH_UP PUSH_UP/WEIGHTED_DECLINE_PUSH_UP
+decline push up	push_horizontal	bodyweight	PUSH_UP/DECLINE_PUSH_UP PUSH_UP/WEIGHTED_DECLINE_PUSH_UP	Decline_Push-Up
 diamond push up	push_horizontal	bodyweight	PUSH_UP/DIAMOND_PUSH_UP PUSH_UP/WEIGHTED_DIAMOND_PUSH_UP
-dynamic push up	push_horizontal	bodyweight	PUSH_UP/DYNAMIC_PUSH_UP
+dynamic push up	push_horizontal	bodyweight	PUSH_UP/DYNAMIC_PUSH_UP	Plyo_Push-up
 explosive crossover push up	push_horizontal	bodyweight	PUSH_UP/EXPLOSIVE_CROSSOVER_PUSH_UP PUSH_UP/WEIGHTED_EXPLOSIVE_CROSSOVER_PUSH_UP
-explosive push up	push_horizontal	bodyweight	PUSH_UP/EXPLOSIVE_PUSH_UP PUSH_UP/WEIGHTED_EXPLOSIVE_PUSH_UP
+explosive push up	push_horizontal	bodyweight	PUSH_UP/EXPLOSIVE_PUSH_UP PUSH_UP/WEIGHTED_EXPLOSIVE_PUSH_UP	Plyo_Push-up
 feet elevated side to side push up	push_horizontal	bodyweight	PUSH_UP/FEET_ELEVATED_SIDE_TO_SIDE_PUSH_UP PUSH_UP/WEIGHTED_FEET_ELEVATED_SIDE_TO_SIDE_PUSH_UP
 hand release push up	push_horizontal	bodyweight	PUSH_UP/HAND_RELEASE_PUSH_UP PUSH_UP/WEIGHTED_HAND_RELEASE_PUSH_UP
-handstand push up	push_horizontal	bodyweight	PUSH_UP/HANDSTAND_PUSH_UP PUSH_UP/WEIGHTED_HANDSTAND_PUSH_UP
+handstand push up	push_horizontal	bodyweight	PUSH_UP/HANDSTAND_PUSH_UP PUSH_UP/WEIGHTED_HANDSTAND_PUSH_UP	Handstand_Push-Ups
 hindu push up	push_horizontal	bodyweight	PUSH_UP/HINDU_PUSH_UP PUSH_UP/WEIGHTED_HINDU_PUSH_UP
-incline push up	push_horizontal	bodyweight	PUSH_UP/INCLINE_PUSH_UP PUSH_UP/WEIGHTED_INCLINE_PUSH_UP
+incline push up	push_horizontal	bodyweight	PUSH_UP/INCLINE_PUSH_UP PUSH_UP/WEIGHTED_INCLINE_PUSH_UP	Incline_Push-Up
 isometric explosive push up	push_horizontal	bodyweight	PUSH_UP/ISOMETRIC_EXPLOSIVE_PUSH_UP PUSH_UP/WEIGHTED_ISOMETRIC_EXPLOSIVE_PUSH_UP
 judo push up	push_horizontal	bodyweight	PUSH_UP/JUDO_PUSH_UP PUSH_UP/WEIGHTED_JUDO_PUSH_UP
 kipping handstand push up	push_horizontal	bodyweight	PUSH_UP/KIPPING_HANDSTAND_PUSH_UP
@@ -331,58 +333,58 @@ kipping parallette handstand push up	push_horizontal	bodyweight	PUSH_UP/KIPPING_
 kneeling push up	push_horizontal	bodyweight	PUSH_UP/KNEELING_PUSH_UP PUSH_UP/WEIGHTED_KNEELING_PUSH_UP
 medicine ball chest pass	push_horizontal	dumbbell	PUSH_UP/MEDICINE_BALL_CHEST_PASS
 medicine ball push up	push_horizontal	bodyweight	PUSH_UP/MEDICINE_BALL_PUSH_UP PUSH_UP/WEIGHTED_MEDICINE_BALL_PUSH_UP
-one arm push up	push_horizontal	bodyweight	PUSH_UP/ONE_ARM_PUSH_UP PUSH_UP/WEIGHTED_ONE_ARM_PUSH_UP
+one arm push up	push_horizontal	bodyweight	PUSH_UP/ONE_ARM_PUSH_UP PUSH_UP/WEIGHTED_ONE_ARM_PUSH_UP	Single-Arm_Push-Up
 parallette handstand push up	push_horizontal	bodyweight	PUSH_UP/PARALLETTE_HANDSTAND_PUSH_UP PUSH_UP/WEIGHTED_PARALLETTE_HANDSTAND_PUSH_UP
 pike push up	push_vertical	bodyweight	PUSH_UP/PIKE_PUSH_UP PUSH_UP/WEIGHTED_PIKE_PUSH_UP
 push up	push_horizontal	bodyweight	PUSH_UP/PUSH_UP PUSH_UP/WEIGHTED_PUSH_UP SUSPENSION/PUSH_UP PUSH_UP
 push up and row	push_horizontal	bodyweight	PUSH_UP/PUSH_UP_AND_ROW PUSH_UP/WEIGHTED_PUSH_UP_AND_ROW
 push up plus	push_horizontal	bodyweight	PUSH_UP/PUSH_UP_PLUS PUSH_UP/WEIGHTED_PUSH_UP_PLUS
-push up with feet on swiss ball	push_horizontal	bodyweight	PUSH_UP/PUSH_UP_WITH_FEET_ON_SWISS_BALL PUSH_UP/WEIGHTED_PUSH_UP_WITH_FEET_ON_SWISS_BALL
+push up with feet on swiss ball	push_horizontal	bodyweight	PUSH_UP/PUSH_UP_WITH_FEET_ON_SWISS_BALL PUSH_UP/WEIGHTED_PUSH_UP_WITH_FEET_ON_SWISS_BALL	Push-Ups_With_Feet_On_An_Exercise_Ball
 push up with one hand on medicine ball	push_horizontal	bodyweight	PUSH_UP/PUSH_UP_WITH_ONE_HAND_ON_MEDICINE_BALL PUSH_UP/WEIGHTED_PUSH_UP_WITH_ONE_HAND_ON_MEDICINE_BALL
 ring handstand push up	push_horizontal	bodyweight	PUSH_UP/RING_HANDSTAND_PUSH_UP PUSH_UP/WEIGHTED_RING_HANDSTAND_PUSH_UP
-ring push up	push_horizontal	bodyweight	PUSH_UP/RING_PUSH_UP PUSH_UP/WEIGHTED_RING_PUSH_UP
+ring push up	push_horizontal	bodyweight	PUSH_UP/RING_PUSH_UP PUSH_UP/WEIGHTED_RING_PUSH_UP	Suspended_Push-Up
 shoulder push up	push_horizontal	bodyweight	PUSH_UP/SHOULDER_PUSH_UP PUSH_UP/WEIGHTED_SHOULDER_PUSH_UP
 shoulder tapping push up	push_horizontal	bodyweight	PUSH_UP/SHOULDER_TAPPING_PUSH_UP
 single arm medicine ball push up	push_horizontal	bodyweight	PUSH_UP/SINGLE_ARM_MEDICINE_BALL_PUSH_UP PUSH_UP/WEIGHTED_SINGLE_ARM_MEDICINE_BALL_PUSH_UP
 spiderman push up	push_horizontal	bodyweight	PUSH_UP/SPIDERMAN_PUSH_UP PUSH_UP/WEIGHTED_SPIDERMAN_PUSH_UP
 stacked feet push up	push_horizontal	bodyweight	PUSH_UP/STACKED_FEET_PUSH_UP PUSH_UP/WEIGHTED_STACKED_FEET_PUSH_UP
 staggered hands push up	push_horizontal	bodyweight	PUSH_UP/STAGGERED_HANDS_PUSH_UP PUSH_UP/WEIGHTED_STAGGERED_HANDS_PUSH_UP
-suspended push up	push_horizontal	bodyweight	PUSH_UP/SUSPENDED_PUSH_UP PUSH_UP/WEIGHTED_SUSPENDED_PUSH_UP
+suspended push up	push_horizontal	bodyweight	PUSH_UP/SUSPENDED_PUSH_UP PUSH_UP/WEIGHTED_SUSPENDED_PUSH_UP	Suspended_Push-Up
 swiss ball push up	push_horizontal	bodyweight	PUSH_UP/SWISS_BALL_PUSH_UP PUSH_UP/WEIGHTED_SWISS_BALL_PUSH_UP
 swiss ball push up plus	push_horizontal	bodyweight	PUSH_UP/SWISS_BALL_PUSH_UP_PLUS PUSH_UP/WEIGHTED_SWISS_BALL_PUSH_UP_PLUS
-t push up	push_horizontal	bodyweight	PUSH_UP/T_PUSH_UP PUSH_UP/WEIGHTED_T_PUSH_UP
+t push up	push_horizontal	bodyweight	PUSH_UP/T_PUSH_UP PUSH_UP/WEIGHTED_T_PUSH_UP	Push_Up_to_Side_Plank
 triple stop push up	push_horizontal	bodyweight	PUSH_UP/TRIPLE_STOP_PUSH_UP PUSH_UP/WEIGHTED_TRIPLE_STOP_PUSH_UP
-wide hands push up	push_horizontal	bodyweight	PUSH_UP/WEIGHTED_WIDE_HANDS_PUSH_UP PUSH_UP/WIDE_HANDS_PUSH_UP
-wide grip push up	push_horizontal	bodyweight	PUSH_UP/WIDE_GRIP_PUSH_UP
+wide hands push up	push_horizontal	bodyweight	PUSH_UP/WEIGHTED_WIDE_HANDS_PUSH_UP PUSH_UP/WIDE_HANDS_PUSH_UP	Push-Up_Wide
+wide grip push up	push_horizontal	bodyweight	PUSH_UP/WIDE_GRIP_PUSH_UP	Push-Up_Wide
 pilates pushup	push_horizontal	bodyweight	PUSH_UP/PILATES_PUSHUP
 wall push up	push_horizontal	bodyweight	PUSH_UP/WALL_PUSH_UP
 alternating dumbbell shoulder press	push_vertical	dumbbell	SHOULDER_PRESS/ALTERNATING_DUMBBELL_SHOULDER_PRESS
-arnold press	push_vertical	dumbbell	SHOULDER_PRESS/ARNOLD_PRESS
+arnold press	push_vertical	dumbbell	SHOULDER_PRESS/ARNOLD_PRESS	Arnold_Dumbbell_Press
 barbell front squat to push press	push_vertical	barbell	SHOULDER_PRESS/BARBELL_FRONT_SQUAT_TO_PUSH_PRESS
-barbell push press	push_vertical	barbell	SHOULDER_PRESS/BARBELL_PUSH_PRESS
-barbell shoulder press	push_vertical	barbell	SHOULDER_PRESS/BARBELL_SHOULDER_PRESS
+barbell push press	push_vertical	barbell	SHOULDER_PRESS/BARBELL_PUSH_PRESS	Push_Press
+barbell shoulder press	push_vertical	barbell	SHOULDER_PRESS/BARBELL_SHOULDER_PRESS	Barbell_Shoulder_Press
 dead curl press	accessory	barbell	SHOULDER_PRESS/DEAD_CURL_PRESS
 dumbbell alternating shoulder press and twist	push_vertical	dumbbell	SHOULDER_PRESS/DUMBBELL_ALTERNATING_SHOULDER_PRESS_AND_TWIST
 dumbbell front raise	accessory	dumbbell	SHOULDER_PRESS/DUMBBELL_FRONT_RAISE
 dumbbell hammer curl to lunge to press	accessory	dumbbell	SHOULDER_PRESS/DUMBBELL_HAMMER_CURL_TO_LUNGE_TO_PRESS
 dumbbell push press	push_vertical	dumbbell	SHOULDER_PRESS/DUMBBELL_PUSH_PRESS
-dumbbell shoulder press	push_vertical	dumbbell	SHOULDER_PRESS/DUMBBELL_SHOULDER_PRESS
+dumbbell shoulder press	push_vertical	dumbbell	SHOULDER_PRESS/DUMBBELL_SHOULDER_PRESS	Dumbbell_Shoulder_Press
 floor inverted shoulder press	push_vertical	bodyweight	SHOULDER_PRESS/FLOOR_INVERTED_SHOULDER_PRESS SHOULDER_PRESS/WEIGHTED_FLOOR_INVERTED_SHOULDER_PRESS
 inverted shoulder press	push_vertical	bodyweight	SHOULDER_PRESS/INVERTED_SHOULDER_PRESS SHOULDER_PRESS/WEIGHTED_INVERTED_SHOULDER_PRESS
 kneeling landmine press	push_vertical	barbell	SHOULDER_PRESS/KNEELING_LANDMINE_PRESS
-military press	push_vertical	barbell	SHOULDER_PRESS/MILITARY_PRESS
+military press	push_vertical	barbell	SHOULDER_PRESS/MILITARY_PRESS	Standing_Military_Press
 one arm push press	push_vertical	dumbbell	SHOULDER_PRESS/ONE_ARM_PUSH_PRESS
-overhead barbell press	push_vertical	barbell	SHOULDER_PRESS/OVERHEAD_BARBELL_PRESS
-overhead dumbbell press	push_vertical	dumbbell	SHOULDER_PRESS/OVERHEAD_DUMBBELL_PRESS
+overhead barbell press	push_vertical	barbell	SHOULDER_PRESS/OVERHEAD_BARBELL_PRESS	Barbell_Shoulder_Press
+overhead dumbbell press	push_vertical	dumbbell	SHOULDER_PRESS/OVERHEAD_DUMBBELL_PRESS	Dumbbell_Shoulder_Press
 ruck press	push_vertical	barbell	SHOULDER_PRESS/RUCK_PRESS
-seated barbell shoulder press	push_vertical	barbell	SHOULDER_PRESS/SEATED_BARBELL_SHOULDER_PRESS
-seated dumbbell shoulder press	push_vertical	dumbbell	SHOULDER_PRESS/SEATED_DUMBBELL_SHOULDER_PRESS
-single arm dumbbell shoulder press	push_vertical	dumbbell	SHOULDER_PRESS/SINGLE_ARM_DUMBBELL_SHOULDER_PRESS
+seated barbell shoulder press	push_vertical	barbell	SHOULDER_PRESS/SEATED_BARBELL_SHOULDER_PRESS	Seated_Barbell_Military_Press
+seated dumbbell shoulder press	push_vertical	dumbbell	SHOULDER_PRESS/SEATED_DUMBBELL_SHOULDER_PRESS	Seated_Dumbbell_Press
+single arm dumbbell shoulder press	push_vertical	dumbbell	SHOULDER_PRESS/SINGLE_ARM_DUMBBELL_SHOULDER_PRESS	Dumbbell_One-Arm_Shoulder_Press
 single arm step up and press	single_leg	dumbbell	SHOULDER_PRESS/SINGLE_ARM_STEP_UP_AND_PRESS
-smith machine overhead press	push_vertical	machine	SHOULDER_PRESS/SMITH_MACHINE_OVERHEAD_PRESS
+smith machine overhead press	push_vertical	machine	SHOULDER_PRESS/SMITH_MACHINE_OVERHEAD_PRESS	Smith_Machine_Overhead_Shoulder_Press
 split stance hammer curl to press	accessory	barbell	SHOULDER_PRESS/SPLIT_STANCE_HAMMER_CURL_TO_PRESS
 standing landmine press	push_vertical	barbell	SHOULDER_PRESS/STANDING_LANDMINE_PRESS
-strict press	push_vertical	barbell	SHOULDER_PRESS/STRICT_PRESS
+strict press	push_vertical	barbell	SHOULDER_PRESS/STRICT_PRESS	Standing_Military_Press
 swiss ball dumbbell shoulder press	push_vertical	dumbbell	SHOULDER_PRESS/SWISS_BALL_DUMBBELL_SHOULDER_PRESS
 weight plate front raise	accessory	dumbbell	SHOULDER_PRESS/WEIGHT_PLATE_FRONT_RAISE
 dumbbell curl to overhead press wheelchair	accessory	dumbbell	SHOULDER_PRESS/DUMBBELL_CURL_TO_OVERHEAD_PRESS_WHEELCHAIR
@@ -394,16 +396,16 @@ barbell hang pull	hinge	barbell	OLYMPIC_LIFT/BARBELL_HANG_PULL
 barbell hang squat clean	hinge	barbell	OLYMPIC_LIFT/BARBELL_HANG_SQUAT_CLEAN
 barbell high pull	hinge	barbell	OLYMPIC_LIFT/BARBELL_HIGH_PULL
 barbell high pull block	hinge	barbell	OLYMPIC_LIFT/BARBELL_HIGH_PULL_BLOCK
-barbell power clean	hinge	barbell	OLYMPIC_LIFT/BARBELL_POWER_CLEAN
-barbell power snatch	hinge	barbell	OLYMPIC_LIFT/BARBELL_POWER_SNATCH
-barbell power snatch block	hinge	barbell	OLYMPIC_LIFT/BARBELL_POWER_SNATCH_BLOCK
-barbell snatch	hinge	barbell	OLYMPIC_LIFT/BARBELL_SNATCH
-barbell split jerk	push_vertical	barbell	OLYMPIC_LIFT/BARBELL_SPLIT_JERK
+barbell power clean	hinge	barbell	OLYMPIC_LIFT/BARBELL_POWER_CLEAN	Power_Clean
+barbell power snatch	hinge	barbell	OLYMPIC_LIFT/BARBELL_POWER_SNATCH	Power_Snatch
+barbell power snatch block	hinge	barbell	OLYMPIC_LIFT/BARBELL_POWER_SNATCH_BLOCK	Power_Snatch_from_Blocks
+barbell snatch	hinge	barbell	OLYMPIC_LIFT/BARBELL_SNATCH	Snatch
+barbell split jerk	push_vertical	barbell	OLYMPIC_LIFT/BARBELL_SPLIT_JERK	Split_Jerk
 barbell squat clean	hinge	barbell	OLYMPIC_LIFT/BARBELL_SQUAT_CLEAN
-clean	hinge	barbell	OLYMPIC_LIFT/CLEAN SANDBAG/CLEAN
-clean and jerk	hinge	barbell	OLYMPIC_LIFT/CLEAN_AND_JERK
-clean and press	hinge	barbell	OLYMPIC_LIFT/CLEAN_AND_PRESS SANDBAG/CLEAN_AND_PRESS
-dumbbell clean	hinge	dumbbell	OLYMPIC_LIFT/DUMBBELL_CLEAN
+clean	hinge	barbell	OLYMPIC_LIFT/CLEAN SANDBAG/CLEAN	Clean
+clean and jerk	hinge	barbell	OLYMPIC_LIFT/CLEAN_AND_JERK	Clean_and_Jerk
+clean and press	hinge	barbell	OLYMPIC_LIFT/CLEAN_AND_PRESS SANDBAG/CLEAN_AND_PRESS	Clean_and_Press
+dumbbell clean	hinge	dumbbell	OLYMPIC_LIFT/DUMBBELL_CLEAN	Dumbbell_Clean
 dumbbell hang pull	hinge	dumbbell	OLYMPIC_LIFT/DUMBBELL_HANG_PULL
 dumbbell hang snatch	hinge	dumbbell	OLYMPIC_LIFT/DUMBBELL_HANG_SNATCH
 dumbbell power clean and jerk	hinge	dumbbell	OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_JERK
@@ -415,13 +417,13 @@ one hand dumbbell split snatch	hinge	dumbbell	OLYMPIC_LIFT/ONE_HAND_DUMBBELL_SPL
 push jerk	push_vertical	barbell	OLYMPIC_LIFT/PUSH_JERK
 single arm dumbbell snatch	hinge	dumbbell	OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_SNATCH
 single arm hang snatch	hinge	dumbbell	OLYMPIC_LIFT/SINGLE_ARM_HANG_SNATCH
-single arm kettlebell snatch	hinge	kettlebell	OLYMPIC_LIFT/SINGLE_ARM_KETTLEBELL_SNATCH
-split jerk	push_vertical	barbell	OLYMPIC_LIFT/SPLIT_JERK
-squat clean and jerk	hinge	barbell	OLYMPIC_LIFT/SQUAT_CLEAN_AND_JERK
-snatch	hinge	barbell	OLYMPIC_LIFT/SNATCH
+single arm kettlebell snatch	hinge	kettlebell	OLYMPIC_LIFT/SINGLE_ARM_KETTLEBELL_SNATCH	One-Arm_Kettlebell_Snatch
+split jerk	push_vertical	barbell	OLYMPIC_LIFT/SPLIT_JERK	Split_Jerk
+squat clean and jerk	hinge	barbell	OLYMPIC_LIFT/SQUAT_CLEAN_AND_JERK	Clean_and_Jerk
+snatch	hinge	barbell	OLYMPIC_LIFT/SNATCH	Snatch
 trap bar high pull	hinge	barbell	OLYMPIC_LIFT/TRAP_BAR_HIGH_PULL
 barbell hip thrust on floor	hinge	barbell	HIP_RAISE/BARBELL_HIP_THRUST_ON_FLOOR
-barbell hip thrust with bench	hinge	barbell	HIP_RAISE/BARBELL_HIP_THRUST_WITH_BENCH
+barbell hip thrust with bench	hinge	barbell	HIP_RAISE/BARBELL_HIP_THRUST_WITH_BENCH	Barbell_Hip_Thrust
 bent knee swiss ball reverse hip raise	hinge	bodyweight	HIP_RAISE/BENT_KNEE_SWISS_BALL_REVERSE_HIP_RAISE HIP_RAISE/WEIGHTED_BENT_KNEE_SWISS_BALL_REVERSE_HIP_RAISE
 bridge with leg extension	accessory	bodyweight	HIP_RAISE/BRIDGE_WITH_LEG_EXTENSION HIP_RAISE/WEIGHTED_BRIDGE_WITH_LEG_EXTENSION
 clam bridge	accessory	bodyweight	HIP_RAISE/CLAM_BRIDGE HIP_RAISE/WEIGHTED_CLAM_BRIDGE
@@ -437,7 +439,7 @@ kettlebell swing	hinge	kettlebell	HIP_RAISE/KETTLEBELL_SWING
 marching hip raise	hinge	bodyweight	HIP_RAISE/MARCHING_HIP_RAISE HIP_RAISE/WEIGHTED_MARCHING_HIP_RAISE
 marching hip raise with feet on a swiss ball	hinge	bodyweight	HIP_RAISE/MARCHING_HIP_RAISE_WITH_FEET_ON_A_SWISS_BALL HIP_RAISE/WEIGHTED_MARCHING_HIP_RAISE_WITH_FEET_ON_A_SWISS_BALL
 reverse hip raise	hinge	bodyweight	HIP_RAISE/REVERSE_HIP_RAISE HIP_RAISE/WEIGHTED_REVERSE_HIP_RAISE
-single leg hip raise	hinge	bodyweight	HIP_RAISE/SINGLE_LEG_HIP_RAISE HIP_RAISE/WEIGHTED_SINGLE_LEG_HIP_RAISE
+single leg hip raise	hinge	bodyweight	HIP_RAISE/SINGLE_LEG_HIP_RAISE HIP_RAISE/WEIGHTED_SINGLE_LEG_HIP_RAISE	Single_Leg_Glute_Bridge
 single leg hip raise with foot on bench	hinge	bodyweight	HIP_RAISE/SINGLE_LEG_HIP_RAISE_WITH_FOOT_ON_BENCH HIP_RAISE/WEIGHTED_SINGLE_LEG_HIP_RAISE_WITH_FOOT_ON_BENCH
 single leg hip raise with foot on bosu ball	hinge	bodyweight	HIP_RAISE/SINGLE_LEG_HIP_RAISE_WITH_FOOT_ON_BOSU_BALL HIP_RAISE/WEIGHTED_SINGLE_LEG_HIP_RAISE_WITH_FOOT_ON_BOSU_BALL
 single leg hip raise with foot on foam roller	accessory	bodyweight	HIP_RAISE/SINGLE_LEG_HIP_RAISE_WITH_FOOT_ON_FOAM_ROLLER HIP_RAISE/WEIGHTED_SINGLE_LEG_HIP_RAISE_WITH_FOOT_ON_FOAM_ROLLER
@@ -451,9 +453,9 @@ leg circles	accessory	bodyweight	HIP_RAISE/LEG_CIRCLES
 leg lift	accessory	bodyweight	HIP_RAISE/LEG_LIFT
 leg lift in external rotation	accessory	bodyweight	HIP_RAISE/LEG_LIFT_IN_EXTERNAL_ROTATION
 hip swing	hinge	kettlebell	HIP_SWING/HIP_SWING HIP_SWING
-one arm swing	hinge	kettlebell	HIP_SWING/ONE_ARM_SWING
+one arm swing	hinge	kettlebell	HIP_SWING/ONE_ARM_SWING	One-Arm_Kettlebell_Swings
 single arm dumbbell swing	hinge	dumbbell	HIP_SWING/SINGLE_ARM_DUMBBELL_SWING
-single arm kettlebell swing	hinge	kettlebell	HIP_SWING/SINGLE_ARM_KETTLEBELL_SWING
+single arm kettlebell swing	hinge	kettlebell	HIP_SWING/SINGLE_ARM_KETTLEBELL_SWING	One-Arm_Kettlebell_Swings
 step out swing	hinge	kettlebell	HIP_SWING/STEP_OUT_SWING
 bar holds	core_carry	barbell	CARRY/BAR_HOLDS
 carry	core_carry	dumbbell	CARRY/CARRY CARRY
@@ -468,9 +470,9 @@ overhead carry	core_carry	dumbbell	CARRY/OVERHEAD_CARRY
 abs jabs	core_carry	bodyweight	CORE/ABS_JABS CORE/WEIGHTED_ABS_JABS
 alternating plate reach	core_carry	dumbbell	CORE/ALTERNATING_PLATE_REACH
 alternating slide out	core_carry	bodyweight	CORE/ALTERNATING_SLIDE_OUT CORE/WEIGHTED_ALTERNATING_SLIDE_OUT
-barbell rollout	core_carry	bodyweight	CORE/BARBELL_ROLLOUT CORE/WEIGHTED_BARBELL_ROLLOUT
+barbell rollout	core_carry	bodyweight	CORE/BARBELL_ROLLOUT CORE/WEIGHTED_BARBELL_ROLLOUT	Barbell_Ab_Rollout
 body bar oblique twist	core_carry	barbell	CORE/BODY_BAR_OBLIQUE_TWIST
-cable core press	core_carry	cable	CORE/CABLE_CORE_PRESS
+cable core press	core_carry	cable	CORE/CABLE_CORE_PRESS	Pallof_Press
 cable side bend	core_carry	cable	CORE/CABLE_SIDE_BEND
 core	core_carry	bodyweight	CORE/CORE CORE
 crescent circle	accessory	bodyweight	CORE/CRESCENT_CIRCLE CORE/WEIGHTED_CRESCENT_CIRCLE
@@ -479,29 +481,29 @@ elevated feet russian twist	core_carry	bodyweight	CORE/ELEVATED_FEET_RUSSIAN_TWI
 ghd back extensions	accessory	bodyweight	CORE/GHD_BACK_EXTENSIONS CORE/WEIGHTED_GHD_BACK_EXTENSIONS
 half turkish get up	core_carry	bodyweight	CORE/HALF_TURKISH_GET_UP
 hanging l sit	core_carry	bodyweight	CORE/HANGING_L_SIT CORE/WEIGHTED_HANGING_L_SIT
-inchworm	core_carry	bodyweight	CORE/INCHWORM
-kettlebell windmill	core_carry	kettlebell	CORE/KETTLEBELL_WINDMILL
-kneeling ab wheel	core_carry	bodyweight	CORE/KNEELING_AB_WHEEL CORE/WEIGHTED_KNEELING_AB_WHEEL
+inchworm	core_carry	bodyweight	CORE/INCHWORM	Inchworm
+kettlebell windmill	core_carry	kettlebell	CORE/KETTLEBELL_WINDMILL	Kettlebell_Windmill
+kneeling ab wheel	core_carry	bodyweight	CORE/KNEELING_AB_WHEEL CORE/WEIGHTED_KNEELING_AB_WHEEL	Ab_Roller
 l sit	core_carry	bodyweight	CORE/L_SIT CORE/WEIGHTED_L_SIT
 modified front lever	core_carry	bodyweight	CORE/MODIFIED_FRONT_LEVER CORE/WEIGHTED_MODIFIED_FRONT_LEVER
 open knee tucks	core_carry	bodyweight	CORE/OPEN_KNEE_TUCKS CORE/WEIGHTED_OPEN_KNEE_TUCKS
 overhead walk	core_carry	bodyweight	CORE/OVERHEAD_WALK
 ring l sit	core_carry	bodyweight	CORE/RING_L_SIT CORE/WEIGHTED_RING_L_SIT
-russian twist	core_carry	bodyweight	CORE/RUSSIAN_TWIST SANDBAG/RUSSIAN_TWIST
+russian twist	core_carry	bodyweight	CORE/RUSSIAN_TWIST SANDBAG/RUSSIAN_TWIST	Russian_Twist
 side abs leg lift	accessory	bodyweight	CORE/SIDE_ABS_LEG_LIFT CORE/WEIGHTED_SIDE_ABS_LEG_LIFT
 side bend	core_carry	bodyweight	CORE/SIDE_BEND CORE/WEIGHTED_SIDE_BEND
-swiss ball jackknife	core_carry	bodyweight	CORE/SWISS_BALL_JACKKNIFE CORE/WEIGHTED_SWISS_BALL_JACKKNIFE
+swiss ball jackknife	core_carry	bodyweight	CORE/SWISS_BALL_JACKKNIFE CORE/WEIGHTED_SWISS_BALL_JACKKNIFE	Exercise_Ball_Pull-In
 swiss ball pike	core_carry	bodyweight	CORE/SWISS_BALL_PIKE CORE/WEIGHTED_SWISS_BALL_PIKE
 swiss ball rollout	core_carry	bodyweight	CORE/SWISS_BALL_ROLLOUT CORE/WEIGHTED_SWISS_BALL_ROLLOUT
 toes to elbows	core_carry	bodyweight	CORE/TOES_TO_ELBOWS
 triangle hip press	core_carry	bodyweight	CORE/TRIANGLE_HIP_PRESS CORE/WEIGHTED_TRIANGLE_HIP_PRESS
-trx suspended jackknife	core_carry	bodyweight	CORE/TRX_SUSPENDED_JACKKNIFE CORE/WEIGHTED_TRX_SUSPENDED_JACKKNIFE
+trx suspended jackknife	core_carry	bodyweight	CORE/TRX_SUSPENDED_JACKKNIFE CORE/WEIGHTED_TRX_SUSPENDED_JACKKNIFE	Suspended_Reverse_Crunch
 turkish get up	core_carry	bodyweight	CORE/TURKISH_GET_UP
 u boat	core_carry	bodyweight	CORE/U_BOAT CORE/WEIGHTED_U_BOAT
 windmill switches	core_carry	bodyweight	CORE/WEIGHTED_WINDMILL_SWITCHES CORE/WINDMILL_SWITCHES
 abdominal leg rotations	core_carry	bodyweight	CORE/ABDOMINAL_LEG_ROTATIONS
 arm and leg extension on knees	accessory	bodyweight	CORE/ARM_AND_LEG_EXTENSION_ON_KNEES
-bicycle	core_carry	bodyweight	CORE/BICYCLE
+bicycle	core_carry	bodyweight	CORE/BICYCLE	Air_Bike
 bicep curl with leg extension	accessory	bodyweight	CORE/BICEP_CURL_WITH_LEG_EXTENSION
 cat cow	accessory	bodyweight	CORE/CAT_COW
 corkscrew	core_carry	bodyweight	CORE/CORKSCREW
@@ -515,9 +517,9 @@ pelvic clocks	core_carry	bodyweight	CORE/PELVIC_CLOCKS
 roll over	core_carry	bodyweight	CORE/ROLL_OVER
 roll up	core_carry	bodyweight	CORE/ROLL_UP
 rolling	core_carry	bodyweight	CORE/ROLLING
-rowing 1	core_carry	bodyweight	CORE/ROWING_1
+rowing 1	core_carry	bodyweight	CORE/ROWING_1	Rowing_Stationary
 rowing 2	core_carry	bodyweight	CORE/ROWING_2
-scissors	core_carry	bodyweight	CORE/SCISSORS
+scissors	core_carry	bodyweight	CORE/SCISSORS	Scissor_Kick
 single leg circles	accessory	bodyweight	CORE/SINGLE_LEG_CIRCLES
 single leg stretch	accessory	bodyweight	CORE/SINGLE_LEG_STRETCH
 snake twist 1 and 2	core_carry	bodyweight	CORE/SNAKE_TWIST_1_AND_2
@@ -557,7 +559,7 @@ mountain climber on sliding discs	accessory	bodyweight	PLANK/MOUNTAIN_CLIMBER_ON
 mountain climber with feet on bosu ball	accessory	bodyweight	PLANK/MOUNTAIN_CLIMBER_WITH_FEET_ON_BOSU_BALL PLANK/WEIGHTED_MOUNTAIN_CLIMBER_WITH_FEET_ON_BOSU_BALL
 mountain climber with hands on bench	accessory	bodyweight	PLANK/MOUNTAIN_CLIMBER_WITH_HANDS_ON_BENCH PLANK/WEIGHTED_MOUNTAIN_CLIMBER_WITH_HANDS_ON_BENCH
 mountain climber with hands on swiss ball	accessory	bodyweight	PLANK/MOUNTAIN_CLIMBER_WITH_HANDS_ON_SWISS_BALL PLANK/WEIGHTED_MOUNTAIN_CLIMBER_WITH_HANDS_ON_SWISS_BALL
-plank	core_carry	bodyweight	PLANK/PLANK PLANK/WEIGHTED_PLANK BANDED_EXERCISES/PLANK SUSPENSION/PLANK POSE/PLANK PLANK
+plank	core_carry	bodyweight	PLANK/PLANK PLANK/WEIGHTED_PLANK BANDED_EXERCISES/PLANK SUSPENSION/PLANK POSE/PLANK PLANK	Plank
 plank jacks with feet on sliding discs	accessory	bodyweight	PLANK/PLANK_JACKS_WITH_FEET_ON_SLIDING_DISCS PLANK/WEIGHTED_PLANK_JACKS_WITH_FEET_ON_SLIDING_DISCS
 plank knee twist	core_carry	bodyweight	PLANK/PLANK_KNEE_TWIST PLANK/WEIGHTED_PLANK_KNEE_TWIST
 plank pike jumps	accessory	bodyweight	PLANK/PLANK_PIKE_JUMPS PLANK/WEIGHTED_PLANK_PIKE_JUMPS
@@ -572,7 +574,7 @@ plyometric side plank	core_carry	bodyweight	PLANK/PLYOMETRIC_SIDE_PLANK PLANK/WE
 ring plank sprawls	core_carry	bodyweight	PLANK/RING_PLANK_SPRAWLS
 rolling side plank	core_carry	bodyweight	PLANK/ROLLING_SIDE_PLANK PLANK/WEIGHTED_ROLLING_SIDE_PLANK
 side kick plank	accessory	bodyweight	PLANK/SIDE_KICK_PLANK PLANK/WEIGHTED_SIDE_KICK_PLANK
-side plank	core_carry	bodyweight	PLANK/SIDE_PLANK PLANK/WEIGHTED_SIDE_PLANK SUSPENSION/SIDE_PLANK POSE/SIDE_PLANK
+side plank	core_carry	bodyweight	PLANK/SIDE_PLANK PLANK/WEIGHTED_SIDE_PLANK SUSPENSION/SIDE_PLANK POSE/SIDE_PLANK	Side_Bridge
 side plank and row	pull_horizontal	bodyweight	PLANK/SIDE_PLANK_AND_ROW PLANK/WEIGHTED_SIDE_PLANK_AND_ROW
 side plank lift	core_carry	bodyweight	PLANK/SIDE_PLANK_LIFT PLANK/WEIGHTED_SIDE_PLANK_LIFT
 side plank to plank with reach under	core_carry	bodyweight	PLANK/SIDE_PLANK_TO_PLANK_WITH_REACH_UNDER
@@ -592,7 +594,7 @@ swiss ball plank	core_carry	bodyweight	PLANK/SWISS_BALL_PLANK PLANK/WEIGHTED_SWI
 swiss ball plank leg lift	accessory	bodyweight	PLANK/SWISS_BALL_PLANK_LEG_LIFT PLANK/WEIGHTED_SWISS_BALL_PLANK_LEG_LIFT
 swiss ball plank leg lift and hold	accessory	bodyweight	PLANK/SWISS_BALL_PLANK_LEG_LIFT_AND_HOLD PLANK/WEIGHTED_SWISS_BALL_PLANK_LEG_LIFT_AND_HOLD
 swiss ball plank with feet on bench	core_carry	bodyweight	PLANK/SWISS_BALL_PLANK_WITH_FEET_ON_BENCH PLANK/WEIGHTED_SWISS_BALL_PLANK_WITH_FEET_ON_BENCH
-swiss ball prone jackknife	core_carry	bodyweight	PLANK/SWISS_BALL_PRONE_JACKKNIFE PLANK/WEIGHTED_SWISS_BALL_PRONE_JACKKNIFE
+swiss ball prone jackknife	core_carry	bodyweight	PLANK/SWISS_BALL_PRONE_JACKKNIFE PLANK/WEIGHTED_SWISS_BALL_PRONE_JACKKNIFE	Exercise_Ball_Pull-In
 swiss ball side plank	core_carry	bodyweight	PLANK/SWISS_BALL_SIDE_PLANK PLANK/WEIGHTED_SWISS_BALL_SIDE_PLANK
 t stabilization	core_carry	bodyweight	PLANK/T_STABILIZATION PLANK/WEIGHTED_T_STABILIZATION
 three way plank	core_carry	bodyweight	PLANK/THREE_WAY_PLANK PLANK/WEIGHTED_THREE_WAY_PLANK
@@ -605,19 +607,19 @@ wide stance plank with diagonal arm lift	core_carry	bodyweight	PLANK/WEIGHTED_WI
 wide stance plank with diagonal leg lift	accessory	bodyweight	PLANK/WEIGHTED_WIDE_STANCE_PLANK_WITH_DIAGONAL_LEG_LIFT PLANK/WIDE_STANCE_PLANK_WITH_DIAGONAL_LEG_LIFT
 wide stance plank with leg lift	accessory	bodyweight	PLANK/WEIGHTED_WIDE_STANCE_PLANK_WITH_LEG_LIFT PLANK/WIDE_STANCE_PLANK_WITH_LEG_LIFT
 wide stance plank with opposite arm and leg lift	accessory	bodyweight	PLANK/WIDE_STANCE_PLANK_WITH_OPPOSITE_ARM_AND_LEG_LIFT PLANK/WEIGHTED_WIDE_STANCE_PLANK_WITH_OPPOSITE_ARM_AND_LEG_LIFT
-bridge with glute lower lift	hinge	bodyweight	PLANK/BRIDGE_WITH_GLUTE_LOWER_LIFT
-bridge one leg bridge	hinge	bodyweight	PLANK/BRIDGE_ONE_LEG_BRIDGE
+bridge with glute lower lift	hinge	bodyweight	PLANK/BRIDGE_WITH_GLUTE_LOWER_LIFT	Butt_Lift_Bridge
+bridge one leg bridge	hinge	bodyweight	PLANK/BRIDGE_ONE_LEG_BRIDGE	Single_Leg_Glute_Bridge
 plank with arm variations	core_carry	bodyweight	PLANK/PLANK_WITH_ARM_VARIATIONS
 reverse plank with leg pull	core_carry	bodyweight	PLANK/REVERSE_PLANK_WITH_LEG_PULL
 bicycle crunch	core_carry	bodyweight	CRUNCH/BICYCLE_CRUNCH CRUNCH/WEIGHTED_BICYCLE_CRUNCH BANDED_EXERCISES/BICYCLE_CRUNCH
-cable crunch	core_carry	cable	CRUNCH/CABLE_CRUNCH
+cable crunch	core_carry	cable	CRUNCH/CABLE_CRUNCH	Cable_Crunch
 circular arm crunch	core_carry	bodyweight	CRUNCH/CIRCULAR_ARM_CRUNCH
 cross leg reverse crunch	core_carry	bodyweight	CRUNCH/CROSS_LEG_REVERSE_CRUNCH CRUNCH/WEIGHTED_CROSS_LEG_REVERSE_CRUNCH
-crossed arms crunch	core_carry	bodyweight	CRUNCH/CROSSED_ARMS_CRUNCH CRUNCH/WEIGHTED_CROSSED_ARMS_CRUNCH
-crunch	core_carry	bodyweight	CRUNCH/CRUNCH CRUNCH/WEIGHTED_CRUNCH SUSPENSION/CRUNCH CRUNCH
+crossed arms crunch	core_carry	bodyweight	CRUNCH/CROSSED_ARMS_CRUNCH CRUNCH/WEIGHTED_CROSSED_ARMS_CRUNCH	Crunches
+crunch	core_carry	bodyweight	CRUNCH/CRUNCH CRUNCH/WEIGHTED_CRUNCH SUSPENSION/CRUNCH CRUNCH	Crunches
 crunch chop	core_carry	bodyweight	CRUNCH/CRUNCH_CHOP CRUNCH/WEIGHTED_CRUNCH_CHOP
 double crunch	core_carry	bodyweight	CRUNCH/DOUBLE_CRUNCH CRUNCH/WEIGHTED_DOUBLE_CRUNCH
-elbow to knee crunch	core_carry	bodyweight	CRUNCH/ELBOW_TO_KNEE_CRUNCH CRUNCH/WEIGHTED_ELBOW_TO_KNEE_CRUNCH
+elbow to knee crunch	core_carry	bodyweight	CRUNCH/ELBOW_TO_KNEE_CRUNCH CRUNCH/WEIGHTED_ELBOW_TO_KNEE_CRUNCH	Elbow_to_Knee
 flutter kicks	accessory	bodyweight	CRUNCH/FLUTTER_KICKS CRUNCH/WEIGHTED_FLUTTER_KICKS
 foam roller reverse crunch on bench	accessory	bodyweight	CRUNCH/FOAM_ROLLER_REVERSE_CRUNCH_ON_BENCH CRUNCH/WEIGHTED_FOAM_ROLLER_REVERSE_CRUNCH_ON_BENCH
 foam roller reverse crunch with dumbbell	accessory	dumbbell	CRUNCH/FOAM_ROLLER_REVERSE_CRUNCH_WITH_DUMBBELL
@@ -626,11 +628,11 @@ frog press	core_carry	bodyweight	CRUNCH/FROG_PRESS
 hanging knee raise oblique crunch	core_carry	bodyweight	CRUNCH/HANGING_KNEE_RAISE_OBLIQUE_CRUNCH CRUNCH/WEIGHTED_HANGING_KNEE_RAISE_OBLIQUE_CRUNCH
 hip crossover	core_carry	bodyweight	CRUNCH/HIP_CROSSOVER CRUNCH/WEIGHTED_HIP_CROSSOVER
 hollow rock	core_carry	bodyweight	CRUNCH/HOLLOW_ROCK CRUNCH/WEIGHTED_HOLLOW_ROCK
-incline reverse crunch	core_carry	bodyweight	CRUNCH/INCLINE_REVERSE_CRUNCH CRUNCH/WEIGHTED_INCLINE_REVERSE_CRUNCH
-kneeling cable crunch	core_carry	cable	CRUNCH/KNEELING_CABLE_CRUNCH
+incline reverse crunch	core_carry	bodyweight	CRUNCH/INCLINE_REVERSE_CRUNCH CRUNCH/WEIGHTED_INCLINE_REVERSE_CRUNCH	Decline_Reverse_Crunch
+kneeling cable crunch	core_carry	cable	CRUNCH/KNEELING_CABLE_CRUNCH	Cable_Crunch
 kneeling cross crunch	core_carry	bodyweight	CRUNCH/KNEELING_CROSS_CRUNCH CRUNCH/WEIGHTED_KNEELING_CROSS_CRUNCH
-kneeling oblique cable crunch	core_carry	cable	CRUNCH/KNEELING_OBLIQUE_CABLE_CRUNCH
-knees to elbow	core_carry	bodyweight	CRUNCH/KNEES_TO_ELBOW
+kneeling oblique cable crunch	core_carry	cable	CRUNCH/KNEELING_OBLIQUE_CABLE_CRUNCH	Kneeling_Cable_Crunch_With_Alternating_Oblique_Twists
+knees to elbow	core_carry	bodyweight	CRUNCH/KNEES_TO_ELBOW	Elbow_to_Knee
 leg climb crunch	core_carry	bodyweight	CRUNCH/LEG_CLIMB_CRUNCH
 leg extensions	accessory	bodyweight	CRUNCH/LEG_EXTENSIONS CRUNCH/WEIGHTED_LEG_EXTENSIONS
 leg levers	core_carry	bodyweight	CRUNCH/LEG_LEVERS
@@ -639,21 +641,21 @@ modified pilates roll up with ball	core_carry	bodyweight	CRUNCH/MODIFIED_PILATES
 pilates crunch	core_carry	bodyweight	CRUNCH/PILATES_CRUNCH CRUNCH/WEIGHTED_PILATES_CRUNCH
 pilates roll up with ball	core_carry	bodyweight	CRUNCH/PILATES_ROLL_UP_WITH_BALL CRUNCH/WEIGHTED_PILATES_ROLL_UP_WITH_BALL
 raised legs crunch	core_carry	bodyweight	CRUNCH/RAISED_LEGS_CRUNCH CRUNCH/WEIGHTED_RAISED_LEGS_CRUNCH
-reverse crunch	core_carry	bodyweight	CRUNCH/REVERSE_CRUNCH CRUNCH/WEIGHTED_REVERSE_CRUNCH BANDED_EXERCISES/REVERSE_CRUNCH
+reverse crunch	core_carry	bodyweight	CRUNCH/REVERSE_CRUNCH CRUNCH/WEIGHTED_REVERSE_CRUNCH BANDED_EXERCISES/REVERSE_CRUNCH	Reverse_Crunch
 reverse crunch on a bench	core_carry	bodyweight	CRUNCH/REVERSE_CRUNCH_ON_A_BENCH CRUNCH/WEIGHTED_REVERSE_CRUNCH_ON_A_BENCH
 reverse curl and lift	accessory	bodyweight	CRUNCH/REVERSE_CURL_AND_LIFT CRUNCH/WEIGHTED_REVERSE_CURL_AND_LIFT
 rotational lift	core_carry	bodyweight	CRUNCH/ROTATIONAL_LIFT CRUNCH/WEIGHTED_ROTATIONAL_LIFT
 ruck flutter kicks	accessory	bodyweight	CRUNCH/RUCK_FLUTTER_KICKS
 seated alternating reverse crunch	core_carry	bodyweight	CRUNCH/SEATED_ALTERNATING_REVERSE_CRUNCH CRUNCH/WEIGHTED_SEATED_ALTERNATING_REVERSE_CRUNCH
-seated leg u	core_carry	bodyweight	CRUNCH/SEATED_LEG_U CRUNCH/WEIGHTED_SEATED_LEG_U
+seated leg u	core_carry	bodyweight	CRUNCH/SEATED_LEG_U CRUNCH/WEIGHTED_SEATED_LEG_U	Seated_Leg_Tucks
 side to side crunch and weave	core_carry	bodyweight	CRUNCH/SIDE_TO_SIDE_CRUNCH_AND_WEAVE CRUNCH/WEIGHTED_SIDE_TO_SIDE_CRUNCH_AND_WEAVE
 single leg reverse crunch	core_carry	bodyweight	CRUNCH/SINGLE_LEG_REVERSE_CRUNCH CRUNCH/WEIGHTED_SINGLE_LEG_REVERSE_CRUNCH
 skater crunch cross	single_leg	bodyweight	CRUNCH/SKATER_CRUNCH_CROSS CRUNCH/WEIGHTED_SKATER_CRUNCH_CROSS
-standing cable crunch	core_carry	cable	CRUNCH/STANDING_CABLE_CRUNCH
+standing cable crunch	core_carry	cable	CRUNCH/STANDING_CABLE_CRUNCH	Standing_Rope_Crunch
 standing side crunch	core_carry	bodyweight	CRUNCH/STANDING_SIDE_CRUNCH
 step climb	core_carry	bodyweight	CRUNCH/STEP_CLIMB CRUNCH/WEIGHTED_STEP_CLIMB
 straight leg crunch with ball	core_carry	bodyweight	CRUNCH/STRAIGHT_LEG_CRUNCH_WITH_BALL
-swiss ball crunch	core_carry	bodyweight	CRUNCH/SWISS_BALL_CRUNCH CRUNCH/WEIGHTED_SWISS_BALL_CRUNCH
+swiss ball crunch	core_carry	bodyweight	CRUNCH/SWISS_BALL_CRUNCH CRUNCH/WEIGHTED_SWISS_BALL_CRUNCH	Exercise_Ball_Crunch
 swiss ball reverse crunch	core_carry	bodyweight	CRUNCH/SWISS_BALL_REVERSE_CRUNCH CRUNCH/WEIGHTED_SWISS_BALL_REVERSE_CRUNCH
 swiss ball russian twist	core_carry	bodyweight	CRUNCH/SWISS_BALL_RUSSIAN_TWIST CRUNCH/WEIGHTED_SWISS_BALL_RUSSIAN_TWIST
 swiss ball side crunch	core_carry	bodyweight	CRUNCH/SWISS_BALL_SIDE_CRUNCH CRUNCH/WEIGHTED_SWISS_BALL_SIDE_CRUNCH
@@ -662,7 +664,7 @@ toes to bar	core_carry	bodyweight	CRUNCH/TOES_TO_BAR CRUNCH/WEIGHTED_TOES_TO_BAR
 triceps crunch	accessory	bodyweight	CRUNCH/TRICEPS_CRUNCH
 alternating sit up	core_carry	bodyweight	SIT_UP/ALTERNATING_SIT_UP SIT_UP/WEIGHTED_ALTERNATING_SIT_UP
 bent knee v up	core_carry	bodyweight	SIT_UP/BENT_KNEE_V_UP SIT_UP/WEIGHTED_BENT_KNEE_V_UP
-butterfly sit up	core_carry	bodyweight	SIT_UP/BUTTERFLY_SIT_UP
+butterfly sit up	core_carry	bodyweight	SIT_UP/BUTTERFLY_SIT_UP	Frog_Sit-Ups
 cross punch roll up	core_carry	bodyweight	SIT_UP/CROSS_PUNCH_ROLL_UP SIT_UP/WEIGHTED_CROSS_PUNCH_ROLL_UP
 crossed arms sit up	core_carry	bodyweight	SIT_UP/CROSSED_ARMS_SIT_UP SIT_UP/WEIGHTED_CROSSED_ARMS_SIT_UP
 get up sit up	core_carry	bodyweight	SIT_UP/GET_UP_SIT_UP SIT_UP/WEIGHTED_GET_UP_SIT_UP
@@ -679,7 +681,7 @@ reclining circle	accessory	bodyweight	SIT_UP/RECLINING_CIRCLE SIT_UP/WEIGHTED_RE
 reverse curl up	accessory	bodyweight	SIT_UP/REVERSE_CURL_UP SIT_UP/WEIGHTED_REVERSE_CURL_UP
 russian twist on swiss ball	core_carry	bodyweight	SIT_UP/RUSSIAN_TWIST_ON_SWISS_BALL SIT_UP/WEIGHTED_RUSSIAN_TWIST_ON_SWISS_BALL
 single leg swiss ball jackknife	core_carry	bodyweight	SIT_UP/SINGLE_LEG_SWISS_BALL_JACKKNIFE SIT_UP/WEIGHTED_SINGLE_LEG_SWISS_BALL_JACKKNIFE
-sit up	core_carry	bodyweight	SIT_UP/SIT_UP SIT_UP/WEIGHTED_SIT_UP SUSPENSION/SIT_UP SIT_UP
+sit up	core_carry	bodyweight	SIT_UP/SIT_UP SIT_UP/WEIGHTED_SIT_UP SUSPENSION/SIT_UP SIT_UP	Sit-Up
 sit up turkish get up	core_carry	bodyweight	SIT_UP/SIT_UP_TURKISH_GET_UP
 the teaser	core_carry	bodyweight	SIT_UP/THE_TEASER
 the teaser weighted	core_carry	bodyweight	SIT_UP/THE_TEASER_WEIGHTED
@@ -688,7 +690,7 @@ v up	core_carry	bodyweight	SIT_UP/V_UP SIT_UP/WEIGHTED_V_UP
 weighted butterfly situp	core_carry	bodyweight	SIT_UP/WEIGHTED_BUTTERFLY_SITUP
 x abs	core_carry	bodyweight	SIT_UP/WEIGHTED_X_ABS SIT_UP/X_ABS
 hanging knee raise	core_carry	bodyweight	LEG_RAISE/HANGING_KNEE_RAISE LEG_RAISE/WEIGHTED_HANGING_KNEE_RAISE
-hanging leg raise	core_carry	bodyweight	LEG_RAISE/HANGING_LEG_RAISE LEG_RAISE/WEIGHTED_HANGING_LEG_RAISE
+hanging leg raise	core_carry	bodyweight	LEG_RAISE/HANGING_LEG_RAISE LEG_RAISE/WEIGHTED_HANGING_LEG_RAISE	Hanging_Leg_Raise
 hanging single leg raise	core_carry	bodyweight	LEG_RAISE/HANGING_SINGLE_LEG_RAISE LEG_RAISE/WEIGHTED_HANGING_SINGLE_LEG_RAISE
 kettlebell leg raises	core_carry	kettlebell	LEG_RAISE/KETTLEBELL_LEG_RAISES
 lateral stepover	core_carry	bodyweight	LEG_RAISE/LATERAL_STEPOVER LEG_RAISE/WEIGHTED_LATERAL_STEPOVER
@@ -696,14 +698,14 @@ leg lowering drill	core_carry	bodyweight	LEG_RAISE/LEG_LOWERING_DRILL LEG_RAISE/
 leg raise	core_carry	bodyweight	LEG_RAISE/LEG_RAISE LEG_RAISE
 lying straight leg raise	core_carry	bodyweight	LEG_RAISE/LYING_STRAIGHT_LEG_RAISE LEG_RAISE/WEIGHTED_LYING_STRAIGHT_LEG_RAISE
 medicine ball leg drops	core_carry	dumbbell	LEG_RAISE/MEDICINE_BALL_LEG_DROPS
-quadruped leg raise	core_carry	bodyweight	LEG_RAISE/QUADRUPED_LEG_RAISE LEG_RAISE/WEIGHTED_QUADRUPED_LEG_RAISE
+quadruped leg raise	core_carry	bodyweight	LEG_RAISE/QUADRUPED_LEG_RAISE LEG_RAISE/WEIGHTED_QUADRUPED_LEG_RAISE	Rear_Leg_Raises
 reverse leg raise	core_carry	bodyweight	LEG_RAISE/REVERSE_LEG_RAISE LEG_RAISE/WEIGHTED_REVERSE_LEG_RAISE
 reverse leg raise on swiss ball	core_carry	bodyweight	LEG_RAISE/REVERSE_LEG_RAISE_ON_SWISS_BALL LEG_RAISE/WEIGHTED_REVERSE_LEG_RAISE_ON_SWISS_BALL
 single leg lowering drill	core_carry	bodyweight	LEG_RAISE/SINGLE_LEG_LOWERING_DRILL LEG_RAISE/WEIGHTED_SINGLE_LEG_LOWERING_DRILL
-cable pull through	hinge	cable	CHOP/CABLE_PULL_THROUGH
-cable rotational lift	core_carry	cable	CHOP/CABLE_ROTATIONAL_LIFT
-cable woodchop	core_carry	cable	CHOP/CABLE_WOODCHOP
-chop	core_carry	cable	CHOP/CHOP CHOP
+cable pull through	hinge	cable	CHOP/CABLE_PULL_THROUGH	Pull_Through
+cable rotational lift	core_carry	cable	CHOP/CABLE_ROTATIONAL_LIFT	Standing_Cable_Lift
+cable woodchop	core_carry	cable	CHOP/CABLE_WOODCHOP	Standing_Cable_Wood_Chop
+chop	core_carry	cable	CHOP/CHOP CHOP	Standing_Cable_Wood_Chop
 cross chop to knee	core_carry	bodyweight	CHOP/CROSS_CHOP_TO_KNEE CHOP/WEIGHTED_CROSS_CHOP_TO_KNEE
 dumbbell chop	core_carry	dumbbell	CHOP/DUMBBELL_CHOP
 half kneeling rotation	core_carry	bodyweight	CHOP/HALF_KNEELING_ROTATION CHOP/WEIGHTED_HALF_KNEELING_ROTATION
@@ -717,10 +719,10 @@ kneeling stability chop	core_carry	cable	CHOP/KNEELING_STABILITY_CHOP
 kneeling woodchopper	core_carry	cable	CHOP/KNEELING_WOODCHOPPER
 medicine ball wood chops	core_carry	dumbbell	CHOP/MEDICINE_BALL_WOOD_CHOPS
 power squat chops	squat	bodyweight	CHOP/POWER_SQUAT_CHOPS CHOP/WEIGHTED_POWER_SQUAT_CHOPS
-standing rotational chop	core_carry	cable	CHOP/STANDING_ROTATIONAL_CHOP
+standing rotational chop	core_carry	cable	CHOP/STANDING_ROTATIONAL_CHOP	Standing_Cable_Wood_Chop
 standing split rotational chop	core_carry	cable	CHOP/STANDING_SPLIT_ROTATIONAL_CHOP
 standing split rotational reverse chop	core_carry	cable	CHOP/STANDING_SPLIT_ROTATIONAL_REVERSE_CHOP
-standing stability reverse chop	core_carry	cable	CHOP/STANDING_STABILITY_REVERSE_CHOP
+standing stability reverse chop	core_carry	cable	CHOP/STANDING_STABILITY_REVERSE_CHOP	Standing_Cable_Lift
 alternating dumbbell biceps curl	accessory	dumbbell	CURL/ALTERNATING_DUMBBELL_BICEPS_CURL
 alternating dumbbell biceps curl on swiss ball	accessory	dumbbell	CURL/ALTERNATING_DUMBBELL_BICEPS_CURL_ON_SWISS_BALL
 alternating incline dumbbell biceps curl	accessory	dumbbell	CURL/ALTERNATING_INCLINE_DUMBBELL_BICEPS_CURL
@@ -774,8 +776,8 @@ dumbbell biceps curl wheelchair	accessory	dumbbell	CURL/DUMBBELL_BICEPS_CURL_WHE
 bottle curl	accessory	dumbbell	CURL/BOTTLE_CURL
 seated bottle curl	accessory	dumbbell	CURL/SEATED_BOTTLE_CURL
 alternating dumbbell lying triceps extension	accessory	dumbbell	TRICEPS_EXTENSION/ALTERNATING_DUMBBELL_LYING_TRICEPS_EXTENSION
-bench dip	push_vertical	bodyweight	TRICEPS_EXTENSION/BENCH_DIP TRICEPS_EXTENSION/WEIGHTED_BENCH_DIP
-dip	push_vertical	bodyweight	TRICEPS_EXTENSION/BODY_WEIGHT_DIP TRICEPS_EXTENSION/WEIGHTED_DIP SUSPENSION/DIP
+bench dip	push_vertical	bodyweight	TRICEPS_EXTENSION/BENCH_DIP TRICEPS_EXTENSION/WEIGHTED_BENCH_DIP	Bench_Dips
+dip	push_vertical	bodyweight	TRICEPS_EXTENSION/BODY_WEIGHT_DIP TRICEPS_EXTENSION/WEIGHTED_DIP SUSPENSION/DIP	Parallel_Bar_Dip
 cable kickback	accessory	cable	TRICEPS_EXTENSION/CABLE_KICKBACK
 cable lying triceps extension	accessory	cable	TRICEPS_EXTENSION/CABLE_LYING_TRICEPS_EXTENSION
 cable overhead triceps extension	accessory	cable	TRICEPS_EXTENSION/CABLE_OVERHEAD_TRICEPS_EXTENSION
@@ -829,7 +831,7 @@ muscle up	accessory	bodyweight	LATERAL_RAISE/MUSCLE_UP
 one arm cable lateral raise	accessory	cable	LATERAL_RAISE/ONE_ARM_CABLE_LATERAL_RAISE
 overhand grip rear lateral raise	accessory	dumbbell	LATERAL_RAISE/OVERHAND_GRIP_REAR_LATERAL_RAISE
 plate raises	accessory	dumbbell	LATERAL_RAISE/PLATE_RAISES
-ring dip	push_vertical	bodyweight	LATERAL_RAISE/RING_DIP LATERAL_RAISE/WEIGHTED_RING_DIP
+ring dip	push_vertical	bodyweight	LATERAL_RAISE/RING_DIP LATERAL_RAISE/WEIGHTED_RING_DIP	Ring_Dips
 ring dip kipping	push_vertical	bodyweight	LATERAL_RAISE/RING_DIP_KIPPING
 ring muscle up	accessory	bodyweight	LATERAL_RAISE/RING_MUSCLE_UP LATERAL_RAISE/WEIGHTED_RING_MUSCLE_UP
 rope climb	accessory	bodyweight	LATERAL_RAISE/ROPE_CLIMB LATERAL_RAISE/WEIGHTED_ROPE_CLIMB
@@ -838,7 +840,7 @@ seated lateral raise	accessory	dumbbell	LATERAL_RAISE/SEATED_LATERAL_RAISE
 seated rear lateral raise	accessory	dumbbell	LATERAL_RAISE/SEATED_REAR_LATERAL_RAISE
 side lying lateral raise	accessory	dumbbell	LATERAL_RAISE/SIDE_LYING_LATERAL_RAISE
 standing lift	accessory	dumbbell	LATERAL_RAISE/STANDING_LIFT
-suspended row	pull_horizontal	bodyweight	LATERAL_RAISE/SUSPENDED_ROW
+suspended row	pull_horizontal	bodyweight	LATERAL_RAISE/SUSPENDED_ROW	Suspended_Row
 underhand grip rear lateral raise	accessory	dumbbell	LATERAL_RAISE/UNDERHAND_GRIP_REAR_LATERAL_RAISE
 wall slide	accessory	bodyweight	LATERAL_RAISE/WALL_SLIDE LATERAL_RAISE/WEIGHTED_WALL_SLIDE
 wall walk	accessory	bodyweight	LATERAL_RAISE/WALL_WALK
@@ -903,10 +905,10 @@ standing barbell calf raise	accessory	barbell	CALF_RAISE/STANDING_BARBELL_CALF_R
 standing calf raise	accessory	bodyweight	CALF_RAISE/STANDING_CALF_RAISE CALF_RAISE/WEIGHTED_STANDING_CALF_RAISE
 standing dumbbell calf raise	accessory	dumbbell	CALF_RAISE/STANDING_DUMBBELL_CALF_RAISE
 band good morning	hinge	cable	LEG_CURL/BAND_GOOD_MORNING
-bar good morning	hinge	barbell	LEG_CURL/BAR_GOOD_MORNING
+bar good morning	hinge	barbell	LEG_CURL/BAR_GOOD_MORNING	Good_Morning
 good morning	hinge	bodyweight	LEG_CURL/GOOD_MORNING
 leg curl	accessory	bodyweight	LEG_CURL/LEG_CURL LEG_CURL/WEIGHTED_LEG_CURL LEG_CURL
-seated barbell good morning	hinge	barbell	LEG_CURL/SEATED_BARBELL_GOOD_MORNING
+seated barbell good morning	hinge	barbell	LEG_CURL/SEATED_BARBELL_GOOD_MORNING	Seated_Good_Mornings
 single leg barbell good morning	hinge	barbell	LEG_CURL/SINGLE_LEG_BARBELL_GOOD_MORNING
 single leg sliding leg curl	accessory	bodyweight	LEG_CURL/SINGLE_LEG_SLIDING_LEG_CURL
 sliding leg curl	accessory	bodyweight	LEG_CURL/SLIDING_LEG_CURL
@@ -933,7 +935,7 @@ side step	accessory	bodyweight	HYPEREXTENSION/SIDE_STEP HYPEREXTENSION/WEIGHTED_
 single leg back extension	accessory	bodyweight	HYPEREXTENSION/SINGLE_LEG_BACK_EXTENSION HYPEREXTENSION/WEIGHTED_SINGLE_LEG_BACK_EXTENSION
 spine extension	accessory	bodyweight	HYPEREXTENSION/SPINE_EXTENSION HYPEREXTENSION/WEIGHTED_SPINE_EXTENSION
 static back extension	accessory	bodyweight	HYPEREXTENSION/STATIC_BACK_EXTENSION HYPEREXTENSION/WEIGHTED_STATIC_BACK_EXTENSION
-superman from floor	core_carry	bodyweight	HYPEREXTENSION/SUPERMAN_FROM_FLOOR HYPEREXTENSION/WEIGHTED_SUPERMAN_FROM_FLOOR
+superman from floor	core_carry	bodyweight	HYPEREXTENSION/SUPERMAN_FROM_FLOOR HYPEREXTENSION/WEIGHTED_SUPERMAN_FROM_FLOOR	Superman
 superman on swiss ball	core_carry	bodyweight	HYPEREXTENSION/SUPERMAN_ON_SWISS_BALL
 swiss ball back extension	accessory	bodyweight	HYPEREXTENSION/SWISS_BALL_BACK_EXTENSION HYPEREXTENSION/WEIGHTED_SWISS_BALL_BACK_EXTENSION
 swiss ball hyperextension	accessory	bodyweight	HYPEREXTENSION/SWISS_BALL_HYPEREXTENSION HYPEREXTENSION/WEIGHTED_SWISS_BALL_HYPEREXTENSION
@@ -941,7 +943,7 @@ swiss ball opposite arm and leg lift	accessory	bodyweight	HYPEREXTENSION/SWISS_B
 cobra	accessory	bodyweight	HYPEREXTENSION/COBRA
 supine floor barre	accessory	bodyweight	HYPEREXTENSION/SUPINE_FLOOR_BARRE
 band side lying leg raise	core_carry	cable	HIP_STABILITY/BAND_SIDE_LYING_LEG_RAISE
-dead bug	core_carry	bodyweight	HIP_STABILITY/DEAD_BUG HIP_STABILITY/WEIGHTED_DEAD_BUG
+dead bug	core_carry	bodyweight	HIP_STABILITY/DEAD_BUG HIP_STABILITY/WEIGHTED_DEAD_BUG	Dead_Bug
 external hip raise	hinge	bodyweight	HIP_STABILITY/EXTERNAL_HIP_RAISE HIP_STABILITY/WEIGHTED_EXTERNAL_HIP_RAISE
 fire hydrant kicks	accessory	bodyweight	HIP_STABILITY/FIRE_HYDRANT_KICKS HIP_STABILITY/WEIGHTED_FIRE_HYDRANT_KICKS
 hip circles	accessory	bodyweight	HIP_STABILITY/HIP_CIRCLES HIP_STABILITY/WEIGHTED_HIP_CIRCLES WARM_UP/HIP_CIRCLES
@@ -1165,7 +1167,7 @@ high plank leg lifts	accessory	cable	BANDED_EXERCISES/HIGH_PLANK_LEG_LIFTS
 hip extension	accessory	cable	BANDED_EXERCISES/HIP_EXTENSION
 internal rotation	accessory	cable	BANDED_EXERCISES/INTERNAL_ROTATION
 jumping jack	accessory	cable	BANDED_EXERCISES/JUMPING_JACK
-kneeling crunch	core_carry	cable	BANDED_EXERCISES/KNEELING_CRUNCH
+kneeling crunch	core_carry	cable	BANDED_EXERCISES/KNEELING_CRUNCH	Cable_Crunch
 lateral band walks	accessory	cable	BANDED_EXERCISES/LATERAL_BAND_WALKS
 lateral raise	accessory	cable	BANDED_EXERCISES/LATERAL_RAISE LATERAL_RAISE
 latpull	accessory	cable	BANDED_EXERCISES/LATPULL
@@ -1182,7 +1184,7 @@ squat to press	squat	cable	BANDED_EXERCISES/SQUAT_TO_PRESS
 tricep extension	accessory	cable	BANDED_EXERCISES/TRICEP_EXTENSION
 tricep kickback	accessory	cable	BANDED_EXERCISES/TRICEP_KICKBACK
 wall crawl with external rotation	accessory	bodyweight	BANDED_EXERCISES/WALL_CRAWL_WITH_EXTERNAL_ROTATION
-chest press	push_horizontal	cable	BANDED_EXERCISES/CHEST_PRESS SLED/CHEST_PRESS SUSPENSION/CHEST_PRESS
+chest press	push_horizontal	cable	BANDED_EXERCISES/CHEST_PRESS SLED/CHEST_PRESS SUSPENSION/CHEST_PRESS	Cable_Chest_Press
 side raise	accessory	cable	BANDED_EXERCISES/SIDE_RAISE
 lateral raise wheelchair	accessory	cable	BANDED_EXERCISES/LATERAL_RAISE_WHEELCHAIR
 triceps extension wheelchair	accessory	cable	BANDED_EXERCISES/TRICEPS_EXTENSION_WHEELCHAIR
@@ -1242,7 +1244,7 @@ warm up	accessory	bodyweight	RUN/WARM_UP WARM_UP
 indoor track run	accessory	bodyweight	RUN_INDOOR/INDOOR_TRACK_RUN
 treadmill	accessory	bodyweight	RUN_INDOOR/TREADMILL
 around the world	accessory	dumbbell	SANDBAG/AROUND_THE_WORLD
-back squat	squat	dumbbell	SANDBAG/BACK_SQUAT
+back squat	squat	dumbbell	SANDBAG/BACK_SQUAT	Dumbbell_Squat
 bear crawl pull through	accessory	dumbbell	SANDBAG/BEAR_CRAWL_PULL_THROUGH
 bear hug squat	squat	dumbbell	SANDBAG/BEAR_HUG_SQUAT
 front carry	core_carry	dumbbell	SANDBAG/FRONT_CARRY
@@ -1480,7 +1482,7 @@ downward facing dog to cobra	accessory	bodyweight	POSE/DOWNWARD_FACING_DOG_TO_CO
 seated cat cow	accessory	bodyweight	POSE/SEATED_CAT_COW
 ride	accessory	bodyweight	BIKE/RIDE
 rowing machine	accessory	machine	INDOOR_ROW/ROWING_MACHINE
-shoulder press	push_vertical	barbell	SHOULDER_PRESS
+shoulder press	push_vertical	barbell	SHOULDER_PRESS	Barbell_Shoulder_Press
 olympic lift	hinge	barbell	OLYMPIC_LIFT
 triceps extension	accessory	dumbbell	TRICEPS_EXTENSION
 flye	accessory	dumbbell	FLYE

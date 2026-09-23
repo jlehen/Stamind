@@ -1,4 +1,6 @@
 from typing import Any, Dict, List, Optional
+
+from stamind.db.strength import LOG_PREFIX
 from stamind.types import AthleteMetric, AthleteBaseline, CompletedActivity
 
 
@@ -79,11 +81,11 @@ class ActivitiesMixin:
     def prune_completed_activities(
         self, start_date: str, end_date: str, keep_ids: List[str]
     ) -> int:
-        """Deletes completed activities in [start_date, end_date] whose activity_id
-        is not in `keep_ids`. Used to reconcile a fresh Garmin pull with local
-        state: an activity removed upstream (e.g. a duplicate Zwift auto-upload the
-        user deleted in Garmin Connect) would otherwise linger and show up as an
-        unplanned activity. Returns the number of rows deleted.
+        """Deletes completed activities in [start_date, end_date] whose activity_id is
+        not in `keep_ids`, a gym log's placeholder excepted. Used to reconcile a fresh
+        Garmin pull with local state: an activity removed upstream (e.g. a duplicate
+        Zwift auto-upload the user deleted in Garmin Connect) would otherwise linger
+        and show up as an unplanned activity. Returns the number of rows deleted.
 
         Scoped to the pulled date range so a narrow pull never touches activities
         outside the window it actually re-fetched."""
@@ -95,10 +97,13 @@ class ActivitiesMixin:
                 "WHERE date >= ? AND date <= ?",
                 (start_date, end_date),
             )
+            # A gym log's placeholder is not Garmin's, so no pull returns it
+            # (DESIGN_gym_logger.md §5).
             stale = [
                 row["activity_id"]
                 for row in cursor.fetchall()
                 if row["activity_id"] not in keep
+                and not row["activity_id"].startswith(LOG_PREFIX)
             ]
             # The sets go with the activity, so a deleted strength activity changes what the
             # strength history shows (DESIGN_strength_tracking.md §5).

@@ -26,6 +26,11 @@ ATHLETE = "athlete"
 WATCH = "watch"
 NAMED_BY_PERSON = (GARMIN, ATHLETE)
 
+# The activity a gym log hangs off until Garmin's own activity for that day turns up
+# (DESIGN_gym_logger.md §5). One per day, so ingesting a day twice replaces its log.
+LOG_PREFIX = "log:"
+LOGGED_NAME = "Logged gym session"
+
 # When the strength history last changed, in the settings table: code writes it, the
 # athlete never edits it, and the strength planner reads it as its evidence (§5, §9).
 HISTORY_STAMP_KEY = "strength_history_changed_at"
@@ -212,6 +217,78 @@ class StrengthMixin:
                 sql + " ORDER BY a.date DESC, a.start_time, s.seq", params
             ).fetchall()
             return [dict(row) for row in rows]
+
+    # --- the gym log the Mini App sent (DESIGN_gym_logger.md §5) ---
+
+    def upsert_logged_activity(
+        self, date: str, start_time: Optional[str], duration_sec: Optional[float]
+    ) -> str:
+        """Creates or replaces the placeholder activity a day's gym log hangs off, and
+        returns its id (DESIGN_gym_logger.md §5)."""
+        activity_id = LOG_PREFIX + date
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO completed_activities "
+                "  (activity_id, date, start_time, activity_name, activity_type, "
+                "   duration_sec, discarded) "
+                "VALUES (?, ?, ?, ?, ?, ?, 0) "
+                "ON CONFLICT(activity_id) DO UPDATE SET "
+                "  date = excluded.date, start_time = excluded.start_time, "
+                "  activity_name = excluded.activity_name, "
+                "  activity_type = excluded.activity_type, "
+                "  duration_sec = excluded.duration_sec, discarded = 0",
+                (activity_id, date, start_time, LOGGED_NAME, STRENGTH_TYPE, duration_sec),
+            )
+            conn.commit()
+        return activity_id
+
+    def save_gym_log(
+        self, activity_id: str, revision_id: Optional[int], payload: str
+    ) -> None:
+        """Keeps the raw log beside the sets it was turned into (§5)."""
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO gym_logs (activity_id, revision_id, received_at, payload) "
+                "VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(activity_id) DO UPDATE SET "
+                "  revision_id = excluded.revision_id, "
+                "  received_at = excluded.received_at, payload = excluded.payload",
+                (activity_id, revision_id,
+                 datetime.now(timezone.utc).isoformat(), payload),
+            )
+            conn.commit()
+
+    def gym_log_for_day(self, date: str) -> Optional[Dict[str, Any]]:
+        """The placeholder activity holding that day's gym log, or None when the day has
+        no log (§5)."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT a.* FROM completed_activities a "
+                "JOIN gym_logs g ON g.activity_id = a.activity_id "
+                "WHERE a.activity_id = ?",
+                (LOG_PREFIX + date,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def move_gym_log(self, placeholder_id: str, activity_id: str) -> None:
+        """Hands the placeholder's sets and its raw log to the Garmin activity of the same
+        day, deletes the placeholder, and stamps the activity read and frozen (§5)."""
+        now = queue_stamp(datetime.now(timezone.utc))
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM exercise_sets WHERE activity_id = ?", (activity_id,))
+            conn.execute("DELETE FROM gym_logs WHERE activity_id = ?", (activity_id,))
+            conn.execute("UPDATE exercise_sets SET activity_id = ? WHERE activity_id = ?",
+                         (activity_id, placeholder_id))
+            conn.execute("UPDATE gym_logs SET activity_id = ? WHERE activity_id = ?",
+                         (activity_id, placeholder_id))
+            conn.execute(
+                "UPDATE completed_activities SET sets_read_at = ?, sets_final_at = ? "
+                "WHERE activity_id = ?",
+                (now, now, activity_id),
+            )
+            conn.execute("DELETE FROM completed_activities WHERE activity_id = ?",
+                         (placeholder_id,))
+        self.bump_strength_history()
 
     # --- what the strength planner prescribed (§9) ---
 

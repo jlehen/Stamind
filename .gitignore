@@ -21,8 +21,9 @@ stamind.db-journal
 stamind.db-wal
 stamind.db-shm
 
-# Logs
+# Logs, and the gym logs the bot writes before ingesting them (DESIGN_gym_logger.md §6)
 logs
+gym_logs/
 
 # Chart output (sm progress --chart)
 progress.png
@@ -37,3 +38,6 @@ __pycache__/
 
 # vim swap files (one was committed by accident)
 .*.swp
+# The gym-logger prototype bot (DESIGN_gym_logger.md): its own config and database
+config.proto.yaml
+stamind.proto.db*

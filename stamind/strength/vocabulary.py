@@ -1,7 +1,8 @@
 """The exercise vocabulary (DESIGN_strength_tracking.md §4).
 
 `exercises.tsv` beside this module gives every exercise one movement pattern and one
-equipment class, and lists the Garmin names that mean it. It ships with the code and nobody
+equipment class, lists the Garmin names that mean it, and may name the Free Exercise DB entry
+whose photos show it. It ships with the code and nobody
 configures it; a name Garmin adds later is added to the file by hand.
 """
 import os
@@ -30,6 +31,8 @@ class Exercise:
     name: str
     pattern: str
     equipment: str
+    # Free Exercise DB id whose photos the gym logger shows (DESIGN_gym_logger.md §2).
+    photos: Optional[str] = None
 
 
 @lru_cache(maxsize=None)
@@ -41,8 +44,9 @@ def _table() -> Tuple[Dict[str, Exercise], Dict[str, str]]:
         for line in table:
             if not line.strip() or line.startswith("#"):
                 continue
-            name, pattern, equipment, aliases = (line.rstrip("\n").split("\t") + [""])[:4]
-            exercises[name] = Exercise(name, pattern, equipment)
+            fields = (line.rstrip("\n").split("\t") + ["", ""])[:5]
+            name, pattern, equipment, aliases, photos = fields
+            exercises[name] = Exercise(name, pattern, equipment, photos or None)
             for alias in aliases.split():
                 garmin[alias] = name
     return exercises, garmin

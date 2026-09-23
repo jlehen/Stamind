@@ -14,7 +14,7 @@ from stamind.db.strength import ACTIVE, GARMIN, REST, STRENGTH_TYPE, WATCH
 from stamind.queue_kind import queue
 from stamind.strength import vocabulary
 from stamind.output import Progress, step, warn
-from stamind.clock import today_str
+from stamind.clock import fmt_date, today_str
 
 # The two queue kinds (§7). Their wording, check and answers are in strength/questions.py.
 SETS_FINAL = "sets_final"
@@ -283,15 +283,41 @@ def logbook() -> Dict[str, List[Logged]]:
     }
 
 
+def take_over_logs(pending: Sequence[Dict[str, Any]]) -> List[str]:
+    """Hands each day's gym log to the pending activity it belongs to, and returns the
+    activity ids the log now covers (DESIGN_gym_logger.md §5).
+
+    A day the watch split in two gives the log to the longer activity; the other is read
+    from Garmin as usual."""
+    by_day: Dict[str, List[Dict[str, Any]]] = {}
+    for activity in pending:
+        by_day.setdefault(activity["date"], []).append(activity)
+    covered: List[str] = []
+    for day, activities in by_day.items():
+        placeholder = runtime.db.gym_log_for_day(day)
+        if not placeholder:
+            continue
+        longest = max(activities, key=lambda a: a.get("duration_sec") or 0)
+        runtime.db.move_gym_log(placeholder["activity_id"], longest["activity_id"])
+        step(f"{fmt_date(day)}: took the sets from the gym log.")
+        covered.append(longest["activity_id"])
+    return covered
+
+
 def read_new_activities(client: Any = None) -> SetsRead:
     """Reads the sets of every strength activity from `strength-sets-since` on, dated before
-    today and never read, and freezes each or asks whether it is final (§6). Logs into
-    Garmin only when there is something to read."""
+    today and never read, and freezes each or asks whether it is final (§6). An activity a
+    gym log covers takes the logged sets instead (DESIGN_gym_logger.md §5). Logs into
+    Garmin only when there is something left to read."""
     since = settings.strength_sets_since()
     if not since:
         return SetsRead(None, [])
     today = today_str()
     pending = runtime.db.strength_activities(since, before=today, unread=True)
+    if not pending:
+        return SetsRead(None, [])
+    covered = take_over_logs(pending)
+    pending = [a for a in pending if a["activity_id"] not in covered]
     if not pending:
         return SetsRead(None, [])
     client = client or runtime.garmin.connect()

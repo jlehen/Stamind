@@ -17,6 +17,7 @@ import shlex
 import time
 from typing import List, Optional
 
+from stamind import clock
 from stamind.chat import runner, telegram_api
 from stamind.chat.keyboards import (
     SIMPLE_HELP, SIMPLE_WELCOME, WELCOME, keyboard_action, stale_keyboard_tap,
@@ -26,7 +27,22 @@ from stamind.chat.routing import (
     ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, UI_EXPERT_ON, UI_SIMPLE_ON,
     UI_USAGE, parse_message_to_argv, parse_ui_switch,
 )
+from stamind.config import config
 from stamind.sentinels import prompt_answer
+
+# Told to anything arriving while a command is still going, whichever door it came in by:
+# a typed message, or the Mini App's data message.
+BUSY_NOTICE = "A command is still running. Use the buttons above, or /cancel."
+
+# Where the page's message is kept, under the instance's data_dir, so `strength ingest`
+# reads a file like any other (DESIGN_gym_logger.md §6).
+GYM_LOG_DIR = "gym_logs"
+
+
+def unauthorized_notice(chat_id: int) -> str:
+    """What an unlisted chat gets back, with the id the operator has to allowlist."""
+    return (f"Not authorized. Your chat id is {chat_id}; add it to "
+            "telegram.allowed_chat_ids to enable access.")
 
 
 class MessagesMixin:
@@ -110,7 +126,7 @@ class MessagesMixin:
         await self._set_command_menu(target)
         if announce and target:
             await self.bot.send_message(
-                chat_id=chat_id, text=UI_SIMPLE_ON, reply_markup=self.reply_keyboard
+                chat_id=chat_id, text=UI_SIMPLE_ON, reply_markup=self._keyboard()
             )
         elif announce:
             await self.bot.send_message(
@@ -137,10 +153,7 @@ class MessagesMixin:
 
         if not self._authorized(chat.id):
             self._log(chat.id, "--", "unauthorized")
-            await message.reply_text(
-                f"Not authorized. Your chat id is {chat.id}; add it to "
-                "telegram.allowed_chat_ids to enable access."
-            )
+            await message.reply_text(unauthorized_notice(chat.id))
             return
 
         token_low = text.lstrip("/").lower()
@@ -178,9 +191,7 @@ class MessagesMixin:
                 fut.set_result(prompt_answer(awaiting.get("id"), answer=text))
                 self._log(chat.id, "  ", "text answer")
                 return
-            await message.reply_text(
-                "A command is still running. Use the buttons above, or /cancel."
-            )
+            await message.reply_text(BUSY_NOTICE)
             return
 
         # About to act on the athlete's own message: what changed in their week goes first.
@@ -230,3 +241,43 @@ class MessagesMixin:
         self._log(chat.id, "  ", f"run: {shlex.join(argv)}")
         await context.bot.send_chat_action(chat_id=chat.id, action="typing")
         await self._start_command(chat.id, argv)
+
+    def _write_gym_log(self, data: str) -> str:
+        """Keeps the page's message as a file under `<data_dir>/gym_logs/`, named for the
+        moment it arrived, and returns its path (DESIGN_gym_logger.md §6)."""
+        folder = os.path.join(config.data_dir, GYM_LOG_DIR)
+        os.makedirs(folder, exist_ok=True)
+        stamp = clock.now()
+        path = os.path.join(
+            folder, f"{clock.day_str(stamp.date())}-{stamp.strftime('%H%M%S')}.json"
+        )
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(data)
+        return path
+
+    async def on_web_app_data(self, update, context) -> None:
+        """The one message the gym logger's page sends when the athlete taps "Finish".
+
+        It is written to a file and handed to `strength ingest`, whose summary streams
+        back the way every command's output does. The bot never reads the log itself:
+        every write goes through the CLI (DESIGN_gym_logger.md §6)."""
+        message = update.effective_message
+        chat = update.effective_chat
+        if message is None or chat is None or message.web_app_data is None:
+            return
+
+        data = message.web_app_data.data or ""
+        self._log(chat.id, ">>", f"web_app_data <{len(data.encode('utf-8'))} bytes>")
+
+        if not self._authorized(chat.id):
+            self._log(chat.id, "--", "unauthorized")
+            await message.reply_text(unauthorized_notice(chat.id))
+            return
+
+        if self.sessions.get(chat.id) is not None:
+            await message.reply_text(BUSY_NOTICE, reply_markup=self._keyboard())
+            return
+
+        path = self._write_gym_log(data)
+        self._log(chat.id, "  ", f"gym log: {path}")
+        await self._start_command(chat.id, ["strength", "ingest", path])

@@ -19,8 +19,11 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from tests import test_db_path
 from tests.chat_harness import _FakeProc, build_chat_bot
-from stamind.chat import keyboards, replies, runner
+from tests.helpers import bind_test_db, save_workout
+from stamind import clock
+from stamind.chat import keyboards, replies, runner, telegram_api
 from stamind.chat.app import ChatBot
 from stamind.config import config
 
@@ -244,6 +247,76 @@ class SharedStateTest(unittest.TestCase):
     def test_only_the_companion_attaches_the_reply_keyboard(self):
         self.assertIsNotNone(build_chat_bot(self, ui="simple")._keyboard())
         self.assertIsNone(build_chat_bot(self, ui="expert")._keyboard())
+
+
+class GymKeyboardTest(unittest.TestCase):
+    """The companion keyboard is built per send, so the gym button follows the week
+    (DESIGN_gym_logger.md §6).
+
+    Today is a gym day here, so the first row is the button that opens the page with
+    today's session packed into its address."""
+
+    BASE_URL = "https://jlehen.github.io/Stamind/"
+    BELT_SQUAT = {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
+                  "load_kg": 140.0}
+
+    def setUp(self):
+        self.db = bind_test_db(test_db_path("test_chat_process.db"))
+
+    def a_gym_day(self, day):
+        save_workout(
+            self.db, date=day, sport_type="strength_training",
+            title="Gym: lower body strength",
+            description="Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg",
+            prescribed_sets=[self.BELT_SQUAT],
+        )
+
+    def keyboard_with_url(self, chat_bot):
+        """`chat_bot._keyboard()` with the Mini App configured; the harness's stand-in
+        hands back ("reply-keyboard", rows)."""
+        telegram = {"allowed_chat_ids": [42], "ui": "simple", "miniapp_url": self.BASE_URL}
+        with mock.patch.dict(config.data, {"telegram": telegram}):
+            return chat_bot._keyboard()
+
+    def test_a_gym_day_puts_the_button_above_the_usual_labels(self):
+        self.a_gym_day(clock.today_str())
+        _kind, rows = self.keyboard_with_url(build_chat_bot(self, ui="simple"))
+        label, url = rows[0][0]
+        self.assertEqual(label, "🏋️ Log today's gym")
+        self.assertTrue(url.startswith(self.BASE_URL + "#s="), url)
+        self.assertEqual(rows[1:], keyboards.simple_keyboard_rows())
+
+    def test_a_week_with_no_gym_day_keeps_the_plain_keyboard(self):
+        _kind, rows = self.keyboard_with_url(build_chat_bot(self, ui="simple"))
+        self.assertEqual(rows, keyboards.simple_keyboard_rows())
+
+    def test_without_a_miniapp_url_there_is_no_button_and_no_database_read(self):
+        self.a_gym_day(clock.today_str())
+        chat_bot = build_chat_bot(self, ui="simple")
+        with mock.patch.object(self.db, "get_workouts") as never:
+            _kind, rows = chat_bot._keyboard()
+        self.assertEqual(rows, keyboards.simple_keyboard_rows())
+        never.assert_not_called()
+
+
+class WebAppButtonTest(unittest.TestCase):
+    """The gym button is the one reply-keyboard cell carrying an address, so it is drawn
+    as a web-app button rather than a plain label (DESIGN_gym_logger.md §6)."""
+
+    def test_a_label_and_url_pair_becomes_a_web_app_button(self):
+        try:
+            import telegram  # noqa: F401 -- only to skip where it is not installed
+        except ImportError:
+            self.skipTest("python-telegram-bot is not installed")
+        markup = telegram_api.reply_keyboard(
+            [[("🏋️ Log today's gym", "https://jlehen.github.io/Stamind/#s=e30")],
+             ["📅 Today", "🗓 My week"]]
+        )
+        gym, plain = markup.keyboard[0][0], markup.keyboard[1][0]
+        self.assertEqual(gym.text, "🏋️ Log today's gym")
+        self.assertEqual(gym.web_app.url, "https://jlehen.github.io/Stamind/#s=e30")
+        self.assertEqual(plain.text, "📅 Today")
+        self.assertIsNone(plain.web_app)
 
 
 class SendingTest(unittest.IsolatedAsyncioTestCase):
