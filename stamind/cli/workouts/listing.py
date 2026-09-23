@@ -106,15 +106,15 @@ def run_workout_show(args: argparse.Namespace) -> None:
     run_workout_list(args)
 
 
-def _print_history(workout: dict, depth) -> None:
+def _print_history(workout: dict, depth: Optional[int]) -> None:
     """The session's earlier forms under its detail lines, when `--history` asked for them:
     the entries the Calendar event carries (DESIGN_calendar_lineage.md §3), capped at
-    `depth` of them instead of a character budget."""
+    `depth` of them instead of a character budget; 0 or less shows them all."""
     if depth is None:
         return
     section = history.depth_section(
         runtime.db.get_lineage_revisions(workout['id']), workout['revision_id'],
-        None if depth == "all" else depth,
+        depth if depth > 0 else None,
     )
     if not section:
         print(gray("  History: none, this is the session's first form."))

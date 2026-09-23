@@ -295,6 +295,12 @@ class TestCliWorkoutsListing(unittest.TestCase):
         self.assertNotIn("not shown", full)
         self.assertLess(full.index("[2/3]"), full.index("[1/3]"))
 
+        for depth in ("0", "-1", "all"):
+            exit_code, same, _ = self.run_cli(
+                ["workout", "show", str(workout_id), "--history", depth, "--no-pull"])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(same, full, depth)
+
     def test_workout_show_history_on_a_first_form_says_so(self):
         today_str = datetime.now(timezone.utc).date().strftime("%Y-%m-%d")
         workout_id = save_workout(test_db,
@@ -304,10 +310,6 @@ class TestCliWorkoutsListing(unittest.TestCase):
             ["workout", "show", str(workout_id), "-H", "all", "--no-pull"])
         self.assertEqual(exit_code, 0)
         self.assertIn("History: none, this is the session's first form.", stdout)
-
-    def test_workout_show_history_refuses_a_depth_below_one(self):
-        exit_code, _, _ = self.run_cli(["workout", "show", "--history", "0", "--no-pull"])
-        self.assertNotEqual(exit_code, 0)
 
     def test_workout_list_shows_repeat_adapt_count(self):
         """A session eased once reads [ADAPTED]; eased again reads [ADAPTED ×2].
