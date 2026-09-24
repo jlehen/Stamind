@@ -109,9 +109,9 @@ class PayloadTest(unittest.TestCase):
 
     def test_the_url_carries_the_payload_in_its_hash_fragment(self):
         workout = a_session()
-        url = logger.session_url("https://example.invalid/Stamind/", workout)
+        url = logger.session_url(workout)
         head, _, packed = url.partition("#s=")
-        self.assertEqual(head, "https://example.invalid/Stamind/")
+        self.assertEqual(head, logger.PAGE_URL)
         self.assertNotIn("=", packed)
         padded = packed + "=" * (-len(packed) % 4)
         decoded = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))

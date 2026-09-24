@@ -549,13 +549,6 @@ class Config:
         name = str(self.get("telegram", {}).get("operator_name", "") or "").strip()
         return name or "the person who set this up for you"
 
-    @property
-    def telegram_miniapp_url(self) -> Optional[str]:
-        """Address of the gym logger's Mini App page, the one the bot's gym button opens
-        (DESIGN_gym_logger.md §3). Unset, the bot draws no gym button. Under `telegram:`."""
-        url = str(self.get("telegram", {}).get("miniapp_url", "") or "").strip()
-        return url or None
-
     # --- Web front-end (stamind_web.py) ---
     @property
     def web_host(self) -> str:

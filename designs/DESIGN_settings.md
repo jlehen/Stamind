@@ -47,6 +47,12 @@ the athlete is told. It is 20 by default. It is a row here because the operator 
 by feel after living with it, not because the athlete would: like `commitment-days` and
 `strength-sets-since`, it stays off `ROUTABLE_SETTINGS`, so it cannot be changed from chat.
 
+Amended 2026-09-24 (DESIGN_gym_logger.md §6): `strength-logger`, in the Strength group, says
+whether the companion keyboard offers the gym logger button. It is on by default. The page's
+address is built into the code, so the switch is the only thing to set. Like `change-delay`,
+it stays off `ROUTABLE_SETTINGS`: the operator turns it off for an instance whose athlete
+does not lift.
+
 Out, and staying in `config.yaml`: credentials (`llm.api_key`, `garmin.password`), file
 paths (`database`, `science_dir`, `service_account_file`), the web bind address, the
 Telegram plumbing (`bot_token`, `allowed_chat_ids`, timeouts, `wrap_width`), and every

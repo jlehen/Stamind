@@ -10,6 +10,9 @@ from datetime import date as date_type
 from typing import Any, Dict, List, NamedTuple, Optional
 
 from stamind.strength import prescription, vocabulary
+
+# The page .github/workflows/pages.yml publishes (DESIGN_gym_logger.md §2).
+PAGE_URL = "https://jlehen.github.io/Stamind/miniapp/"
 from stamind.types import Workout
 
 # The payload version both sides write and check (§3, §4).
@@ -82,12 +85,12 @@ def session_payload(workout: Workout) -> Dict[str, Any]:
     }
 
 
-def session_url(base_url: str, workout: Workout) -> str:
+def session_url(workout: Workout) -> str:
     """The page's address with the session in its hash fragment, which a browser never
     sends to the host serving the page (§3)."""
     blob = json.dumps(session_payload(workout), separators=(",", ":"), ensure_ascii=False)
     packed = base64.urlsafe_b64encode(blob.encode("utf-8")).decode("ascii").rstrip("=")
-    return f"{base_url}#s={packed}"
+    return f"{PAGE_URL}#s={packed}"
 
 
 def parse_log(text: str) -> Log:

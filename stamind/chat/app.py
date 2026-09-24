@@ -20,7 +20,7 @@ import signal
 import sys
 from typing import Dict, List, Optional, Tuple
 
-from stamind import clock, journal, runtime
+from stamind import clock, journal, runtime, settings
 from stamind.chat import telegram_api
 from stamind.chat.callbacks import CallbacksMixin
 from stamind.chat.keyboards import (
@@ -100,10 +100,9 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         return 900 if self.simple_ui else config.telegram_wrap_width
 
     def _gym_button(self) -> Optional[Tuple[str, str]]:
-        """The gym button's label and the address it opens, or None when no Mini App is
-        configured or no gym session is coming (DESIGN_gym_logger.md §6)."""
-        base_url = config.telegram_miniapp_url
-        if not base_url:
+        """The gym button's label and the address it opens, or None when the `strength-logger`
+        setting is off or no gym session is coming (DESIGN_gym_logger.md §6)."""
+        if not settings.strength_logger():
             return None
         today = clock.today_str()
         workouts = runtime.db.get_workouts(
@@ -113,7 +112,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         if found is None:
             return None
         label, workout = found
-        return label, logger.session_url(base_url, workout)
+        return label, logger.session_url(workout)
 
     def _keyboard(self):
         """The §5.1 reply keyboard the companion attaches, rebuilt on every send so the

@@ -58,11 +58,12 @@ supplies heart rate, duration and RPE; the log supplies the sets. Nothing is ask
   button's URL, and the log decoded and validated. Pure functions, no database.
 - `stamind/cli/strength.py` gains `strength ingest FILE`.
 - `stamind/chat/` — the keyboard button and the handler for the page's data message.
-- Config: `telegram.miniapp_url`, the page's address. Absent: no button, no handler.
+- The page's address is built in, as `logger.PAGE_URL`. The `strength-logger` setting, on by
+  default, turns the button off for one instance: `sm settings set strength-logger off`.
 
 ## 3. The session payload (bot → page)
 
-The URL is `<miniapp_url>#s=<base64url(JSON)>`. The hash fragment is never sent to the
+The URL is `<PAGE_URL>#s=<base64url(JSON)>`. The hash fragment is never sent to the
 host serving the page.
 
 ```json
@@ -131,7 +132,7 @@ an evening pull would delete the log before the next morning's takeover.
 
 ## 6. The bot
 
-- The companion keyboard is rebuilt on every send. When `telegram.miniapp_url` is set and
+- The companion keyboard is rebuilt on every send. When the `strength-logger` setting is on and
   a live strength session with prescribed sets exists today, or else within the next seven
   days, the first row is the gym button, labelled with the day ("🏋️ Log today's gym",
   "🏋️ Log Thursday's gym"), a `KeyboardButton(text, web_app=WebAppInfo(url))`. Otherwise

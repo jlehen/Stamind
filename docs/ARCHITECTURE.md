@@ -1827,7 +1827,9 @@ treated as already committed to; `push_enabled`, `push_morning_time`,
 `push_morning_deadline` and `push_adapt_first`, the morning-push window and its switches;
 `changes_delay_minutes` (`change-delay`), how long a change to one of today's sessions waits
 before the athlete is told (DESIGN_change_heads_up.md §4); `coach_terse` (`terse`), whether
-the coach keeps what it says about a change short (DESIGN_output_verbosity.md §9).
+the coach keeps what it says about a change short (DESIGN_output_verbosity.md §9);
+`strength_logger` (`strength-logger`), whether the companion keyboard offers the gym
+logger button (DESIGN_gym_logger.md §6).
 Three internal markers are the exception, not preferences: `push_morning_last`, the
 per-day idempotency stamp (`DESIGN_bot_simple_frontend.md` §4.3);
 `changes_notify_upto`, the id of the newest change `workout notify` asked the bot to send
@@ -2538,7 +2540,6 @@ but the credentials is optional and falls back to the default shown:
 | `telegram.push.*`      | —    | Morning push (simple ui only): `enabled` (default true), `morning_time` (`08:00`), `morning_deadline` (`15:00`), `adapt_first` (default false → run `workout adapt -y` before rendering) |
 | `telegram.bot_token` / `telegram.allowed_chat_ids` | — | The bot's token (or the `TELEGRAM_BOT_TOKEN` env var) and the numeric chat-id allowlist ([§2](#entry-points)) |
 | `telegram.command_timeout_seconds` / `telegram.prompt_timeout_seconds` / `telegram.wrap_width` | — | The silent-run watchdog (180), the idle-prompt cancel (300) and the chat wrap width (48) |
-| `telegram.miniapp_url`  | str  | Address of the gym logger's Mini App page, the one the "🏋️ Log today's gym" button opens ([§16](#16-gym-logger-telegram-mini-app)). Absent → no gym button. Read as `config.miniapp_url` |
 | `telegram.change_delay_minutes` | int | How long a change to one of today's sessions waits before the athlete is told, measured from the newest waiting change so a second run restarts it (default: 20; 0 sends on the bot's next wake). Companion mode only. Also a setting (`settings set change-delay N`). DESIGN_change_heads_up.md §4 |
 | `web.host` / `web.port` / `web.debug` | — | Where the dashboard binds (`127.0.0.1` / 5000 / false) |
 | `coach.metrics_lookback_days` | int | Rolling window for adaptation (default: 15)                  |
@@ -4225,8 +4226,8 @@ athlete's typo, and the error names every such name.
 
 **The button.** The companion reply keyboard is built on every send rather than once at
 startup, so it follows the week: `ChatBot._keyboard` asks `_gym_button` for a first row
-each time. That method reads `telegram.miniapp_url` and stops there when it is unset — no
-button, and no database read. With it set, it asks the database for the live strength
+each time. That method reads the `strength-logger` setting and stops there when it is off — no
+button, and no database read. With it on, it asks the database for the live strength
 sessions dated from today to six days out, and `keyboards.gym_button` picks the earliest
 one that has prescribed sets. The label names the day: "🏋️ Log today's gym" on the day
 itself, "🏋️ Log Thursday's gym" otherwise. The row's cell is a `(label, url)` pair rather

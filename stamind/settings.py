@@ -31,6 +31,7 @@ CHANGE_DELAY = "change-delay"
 STRENGTH_SETS_SINCE = "strength-sets-since"
 LEARNING_QUESTIONS = "learning-questions"
 TERSE = "terse"
+STRENGTH_LOGGER = "strength-logger"
 
 
 def parse_hhmm(token: Any) -> str:
@@ -284,6 +285,16 @@ SETTINGS: List[Setting] = [
         config_path=("strength", "sets_since"),
         unset_label="(sets are not read)",
     ),
+    Setting(
+        name=STRENGTH_LOGGER,
+        key="strength_logger",
+        group="Strength",
+        summary="Whether the companion keyboard offers the gym logger button",
+        value_hint="on|off",
+        parse=parse_switch,
+        fallback="on",
+        coerce=_is_on,
+    ),
 ]
 
 
@@ -443,3 +454,9 @@ def terse() -> bool:
     """Whether the coach keeps what it says about a change short
     (DESIGN_output_verbosity.md §9)."""
     return value(TERSE)
+
+
+def strength_logger() -> bool:
+    """Whether the companion keyboard offers the gym logger button (DESIGN_gym_logger.md §6).
+    Operator-only: not in ROUTABLE_SETTINGS."""
+    return value(STRENGTH_LOGGER)

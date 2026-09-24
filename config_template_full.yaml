@@ -190,9 +190,6 @@ llm:
 #  # this is what fills the blank in "tell ___ — setting up a new goal happens from the
 #  # computer". Unset, that reads "the person who set this up for you".
 #  #operator_name: Alex
-#  # Address of the gym logger's Mini App page, which the bot's "🏋️ Log today's gym"
-#  # button opens (DESIGN_gym_logger.md §3). Unset, there is no gym button.
-#  #miniapp_url: "https://you.github.io/Stamind/"
 #  # Morning push (simple ui mode only): the bot opens the day by itself with today's
 #  # session and a few follow-up buttons. It records what it has sent in the instance's
 #  # database, so restarting the bot never double-sends.
