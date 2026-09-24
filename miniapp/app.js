@@ -259,18 +259,17 @@ function exerciseCard(exercise, xi) {
   exercise.sets.forEach((set, si) => card.append(setRow(exercise, xi, set, si)));
 
   const tools = el("div", "tools");
-  const undoCard = button("↶ Undo", "pill undo", () => undo(logic.undoCard(history, state, id)));
+  const undoCard = button("↶", "pill undo", () => undo(logic.undoCard(history, state, id)));
   undoCard.disabled = !logic.canUndoCard(history, id);
   undoCard.setAttribute("aria-label", `Undo the last change to ${exercise.n}`);
   tools.append(undoCard);
   tools.append(button("+ Set", "pill", () => apply(logic.addSet(state, xi), id)));
   tools.append(button("− Set", "pill", () => apply(logic.removeSet(state, xi), id)));
-  // ↻ rather than ⇄: this puts another exercise here, it does not trade two cards (§1).
-  tools.append(button("↻ Swap", "pill", () => openSearch("swap", xi)));
+  tools.append(button("⇆ Swap", "pill", () => openSearch("swap", xi)));
   tools.append(button("⤵ Insert", "pill", () => openSearch("insert", xi)));
-  tools.append(button("✕ Remove", "pill danger", () => apply(logic.removeExercise(state, xi))));
+  tools.append(button("✕ Del", "pill danger", () => apply(logic.removeExercise(state, xi))));
   if (photos.length) {
-    const label = photosOpen.has(exercise.n) ? "Hide photos" : "Photos";
+    const label = photosOpen.has(exercise.n) ? "📷 Hide" : "📷 Pic";
     tools.append(button(label, "pill", () => togglePhotos(exercise.n)));
   }
   card.append(tools);

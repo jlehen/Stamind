@@ -22,14 +22,15 @@ page saves its state on the phone, so a closed Telegram reopens where it left of
 
 Each card has an "Insert" button. It puts the new exercise right after that card, so a
 face pull added after the rows does not have to climb up from the bottom one tap at a time.
-The button that puts another exercise in a card's place is "↻ Swap": a short word for a
-phone, with ↻ rather than ⇄ so it does not read as two cards trading places.
+The button that puts another exercise in a card's place is "⇆ Swap". The card's
+seven buttons (↶, + Set, − Set, Swap, Insert, Del, Pic) sit in two rows of four, so their
+labels stay short.
 
 A tap can be taken back. The header's "Undo" takes back the last change anywhere on the
-page, one step per tap, up to the last 50. Each card also has its own "↶ Undo" among its
+page, one step per tap, up to the last 50. Each card also has its own ↶ among its
 buttons, which takes back only the last change made to that card. Here is an example: the
-athlete ticks the third squat set, then raises the pull-up weight. The squat card's Undo
-unticks the set and leaves the pull-up weight alone. A removed card has no Undo left, so only
+athlete ticks the third squat set, then raises the pull-up weight. The squat card's ↶
+unticks the set and leaves the pull-up weight alone. A removed card has no ↶ left, so only
 the header's Undo brings it back.
 Undo never takes back a Finish: once a log is sent, the fix is an edit and "Send again".
 The undo history is saved on the phone with the rest, so a reopened page can still undo.
@@ -79,7 +80,7 @@ supplies heart rate, duration and RPE; the log supplies the sets. Nothing is ask
   `exercises.json` is the vocabulary as the page searches it, written by
   `miniapp/build_exercises.py`.
 - Photos. It is Thursday and the strength planner has written a Romanian deadlift the
-  athlete has not done before. Its card has a "Photos" button, and a tap shows two photos of
+  athlete has not done before. Its card has a "📷 Pic" button, and a tap shows two photos of
   the lift under its name. They come from Free Exercise DB, a public-domain set of about 870
   exercises with two photos each, loaded from its GitHub repository; nothing is copied into
   this one. The vocabulary's fifth column holds the entry's id. A row gets one only when the
