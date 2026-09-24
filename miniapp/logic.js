@@ -73,14 +73,15 @@ export function demoSession() {
 // The state the page keeps: the session, plus what the athlete has done to it.
 // ---------------------------------------------------------------------------------------
 
-export function newState(session, startedAt) {
+// The clock does not run until `startClock`, so the athlete can change the exercises first (§1).
+export function newState(session) {
   return {
     v: 1,
     r: session.r,
     d: session.d,
     t: session.t || "Gym session",
     notes: session.notes || "",
-    startedAt,
+    startedAt: null,
     finishedAt: null,
     note: "",
     x: (session.x || []).map((row, index) => prescribedExercise(row, index + 1)),
@@ -278,6 +279,16 @@ export function setSessionNote(state, text) {
 // Finishing (§4): the first Finish stops the clock. The log, and every set ticked after it,
 // carry that moment, so an edited log sent again replaces the first instead of adding one.
 // ---------------------------------------------------------------------------------------
+
+// The Start button starts the clock, and so does the first ticked set if the athlete forgot it.
+export function startClock(state, now) {
+  if (state.startedAt) {
+    return state;
+  }
+  const after = next(state);
+  after.startedAt = now;
+  return after;
+}
 
 export function clockAt(state, now) {
   return state.finishedAt ?? now;

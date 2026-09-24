@@ -19,6 +19,8 @@ const ui = {
   headNotes: document.getElementById("head-notes"),
   restValue: document.getElementById("rest-value"),
   restLabel: document.getElementById("rest-label"),
+  rest: document.getElementById("rest"),
+  startClock: document.getElementById("start-clock"),
   cards: document.getElementById("cards"),
   sessionNote: document.getElementById("session-note"),
   addExercise: document.getElementById("add-exercise"),
@@ -278,7 +280,11 @@ function setRow(exercise, xi, set, si) {
     },
   }));
 
-  const check = button("✓", "tick", () => apply(logic.toggleDone(state, xi, si, secondsNow())));
+  const check = button("✓", "tick", () => {
+    // A set ticked before Start starts the clock, so its time is 0 rather than lost (§1).
+    state = logic.startClock(state, Date.now());
+    apply(logic.toggleDone(state, xi, si, secondsNow()));
+  });
   check.setAttribute("aria-pressed", String(set.done));
   check.setAttribute("aria-label", set.done ? `Set ${si + 1} done` : `Mark set ${si + 1} done`);
   row.append(check);
@@ -308,6 +314,12 @@ function secondsNow() {
 function tick() {
   const done = logic.doneSetCount(state);
   ui.tally.textContent = done === 1 ? "· 1 set done" : `· ${done} sets done`;
+  const started = Boolean(state.startedAt);
+  ui.startClock.hidden = started;
+  ui.rest.hidden = !started;
+  if (!started) {
+    return;
+  }
   if (state.finishedAt) {
     ui.restLabel.textContent = "in total";
     ui.restValue.textContent = logic.formatMMSS(secondsNow());
@@ -442,7 +454,7 @@ function ask(message, onYes) {
 function startOver() {
   ask("Throw away everything logged here and start from the written session?", () => {
     store.remove(storeKey);
-    apply(logic.newState(sessionFromUrl(), Date.now()));
+    apply(logic.newState(sessionFromUrl()));
   });
 }
 
@@ -476,7 +488,7 @@ async function loadCatalog() {
 async function restore(session) {
   const saved = await store.get(logic.storageKey(session.r));
   if (!saved) {
-    return logic.newState(session, Date.now());
+    return logic.newState(session);
   }
   try {
     const parsed = JSON.parse(saved);
@@ -487,13 +499,14 @@ async function restore(session) {
   } catch (problem) {
     console.warn("the saved session could not be read", problem);
   }
-  return logic.newState(session, Date.now());
+  return logic.newState(session);
 }
 
 function wire() {
   ui.sessionNote.addEventListener("change",
     () => applyQuiet(logic.setSessionNote(state, ui.sessionNote.value)));
   ui.addExercise.addEventListener("click", () => openSearch(null));
+  ui.startClock.addEventListener("click", () => apply(logic.startClock(state, Date.now())));
   ui.finish.addEventListener("click", onFinish);
   ui.reset.addEventListener("click", startOver);
   ui.searchInput.addEventListener("input", renderResults);

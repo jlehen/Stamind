@@ -15,7 +15,9 @@
 <header class="head" id="head">
   <div class="head-top">
     <h1 id="title">Gym session</h1>
-    <div class="rest" id="rest">
+    <!-- The clock waits for Start, so the exercises can be changed before the first set (§1). -->
+    <button class="start" id="start-clock" type="button">Start</button>
+    <div class="rest" id="rest" hidden>
       <span class="rest-value" id="rest-value">00:00</span>
       <span class="rest-label" id="rest-label">since start</span>
     </div>

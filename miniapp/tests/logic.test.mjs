@@ -24,7 +24,7 @@ const CATALOG = [
 ];
 
 function exampleState() {
-  return logic.newState(logic.sessionFromHash(EXAMPLE_HASH), START);
+  return logic.startClock(logic.newState(logic.sessionFromHash(EXAMPLE_HASH)), START);
 }
 
 function tickSet(state, xi, si, seconds) {
@@ -137,7 +137,8 @@ test("a full twelve-exercise session still fits in one message", () => {
   let state = logic.newState({
     v: 1, r: 727, d: "2026-09-24", t: "Gym: everything",
     x: Array.from({ length: 12 }, () => ({ n: "seated cable row", s: 4, lo: 8, hi: 10, kg: 60 })),
-  }, START);
+  });
+  state = logic.startClock(state, START);
   for (let xi = 0; xi < 12; xi += 1) {
     for (let si = 0; si < 4; si += 1) {
       state = tickSet(state, xi, si, 60 * (xi * 4 + si));
@@ -253,6 +254,15 @@ test("the rest timer counts from the last ticked set", () => {
   assert.equal(logic.doneSetCount(state), 2);
   assert.equal(logic.formatMMSS(75), "01:15");
   assert.equal(logic.formatMMSS(-3), "00:00");
+});
+
+test("the clock waits for Start, and a second Start does not move it", () => {
+  const fresh = logic.newState(logic.sessionFromHash(EXAMPLE_HASH));
+  assert.equal(fresh.startedAt, null);
+  const started = logic.startClock(fresh, START);
+  assert.equal(started.startedAt, START);
+  assert.equal(fresh.startedAt, null);
+  assert.equal(logic.startClock(started, END).startedAt, START);
 });
 
 test("the first Finish stops the clock, and a log sent again ends at the same moment", () => {

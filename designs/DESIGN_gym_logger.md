@@ -20,6 +20,13 @@ fourth set, swaps the belt squat for a leg press, removes the curls, moves the r
 appends an exercise the session did not ask for, and types a note. After every tap the
 page saves its state on the phone, so a closed Telegram reopens where it left off.
 
+The clock does not run when the page opens. At 17:50, in the changing room, the athlete
+sees the leg press is out of order and swaps it before walking in. The header shows a
+"Start" button where the timer will be. At 18:00 they tap it, and the timer appears and
+counts from there; the log's start time is 18:00. If they forget and tick the first set at
+18:04, that tick starts the clock, so the set is stamped at 0 seconds and the log starts at
+18:04. "Start over" puts the Start button back.
+
 After the last set the athlete taps "Finish". The page sends one text message of at most
 4,096 bytes to the bot and closes. The bot writes the text to a file and runs
 `sm strength ingest <file>`. The CLI stores the sets as if Garmin had recorded them with
