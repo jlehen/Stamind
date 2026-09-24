@@ -17,6 +17,8 @@
   --accent: var(--tg-theme-button-color, var(--fallback-button));
   --accent-text: var(--tg-theme-button-text-color, var(--fallback-button-text));
   --line: var(--fallback-line);
+  /* Start keeps its own blue: a Telegram theme may make its button colour white. */
+  --start: #2f7bd6;
   --done: #1f9d55;
   --danger: #c23b3b;
 
@@ -32,6 +34,7 @@
     --fallback-card: #202b36;
     --fallback-line: #33414f;
     --fallback-button: #4a9be8;
+    --start: #4a9be8;
     --done: #3ec27a;
     --danger: #ef7a7a;
   }
@@ -105,10 +108,10 @@ h1 {
 .start {
   flex: none;
   padding: 8px 18px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--start);
   border-radius: 10px;
-  background: var(--accent);
-  color: var(--accent-text);
+  background: var(--start);
+  color: #ffffff;
   font: inherit;
   font-size: 16px;
   font-weight: 650;
@@ -128,6 +131,28 @@ h1 {
 
 .head-sub {
   margin: 4px 0 0;
+}
+
+.head-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.act {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.act:disabled, .move:disabled {
+  opacity: 0.3;
 }
 
 .head-notes {
@@ -290,16 +315,16 @@ h1 {
 /* ----- the buttons under an exercise ----- */
 
 .tools {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   margin-top: 10px;
 }
 
 .pill {
-  flex: 1 1 auto;
+  min-width: 0;
   min-height: var(--tap);
-  padding: 0 10px;
+  padding: 0 6px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--bg);
@@ -362,13 +387,6 @@ h1 {
   background: var(--accent);
   color: var(--accent-text);
   font-weight: 650;
-}
-
-.wide.quiet {
-  border: 0;
-  background: transparent;
-  color: var(--hint);
-  font-size: 14px;
 }
 
 /* ----- the search and the log, both bottom sheets ----- */

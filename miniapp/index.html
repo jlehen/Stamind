@@ -23,6 +23,12 @@
     </div>
   </div>
   <p class="head-sub"><span id="day"></span> <span class="tally" id="tally"></span></p>
+  <!-- The page's own actions stay in sight while the cards scroll (§1). -->
+  <div class="head-actions">
+    <button class="act" id="undo" type="button">↶ Undo</button>
+    <button class="act" id="reset-clock" type="button" hidden>⏱ Reset timer</button>
+    <button class="act" id="reset" type="button">Start over</button>
+  </div>
 </header>
 
 <!-- The coach's note scrolls away: only the title, the date and the rest timer stay pinned. -->
@@ -36,10 +42,9 @@
   <button class="wide primary" id="finish" type="button">Finish</button>
   <!-- After the first Finish the clock stands still and a second send replaces the log (§4). -->
   <p class="sent" id="sent" hidden></p>
-  <button class="wide quiet" id="reset" type="button">Start over</button>
 </section>
 
-<!-- The exercise search, for a swap and for an added exercise (DESIGN_gym_logger §1). -->
+<!-- The exercise search, for a swap, an insert and an added exercise (DESIGN_gym_logger §1). -->
 <div class="sheet" id="search-sheet" hidden>
   <div class="sheet-box">
     <div class="sheet-head">

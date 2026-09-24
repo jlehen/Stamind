@@ -10,6 +10,8 @@ export const ADDED_SETS = 3;
 export const ADDED_REPS = 8;
 export const ADDED_KG = 20;
 export const SEARCH_LIMIT = 40;
+// How many changes Undo can take back, so the saved history stays small.
+export const UNDO_DEPTH = 50;
 
 const EN_DASH = "–";
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -74,17 +76,24 @@ export function demoSession() {
 // ---------------------------------------------------------------------------------------
 
 // The clock does not run until `startClock`, so the athlete can change the exercises first (§1).
-export function newState(session) {
+// Every card has an `id` that never changes, so a card's own undo finds it wherever it moved;
+// "Start over" passes the next free one, so no new card reuses an id the undo history holds.
+export function newState(session, firstId = 1) {
+  const x = (session.x || []).map((row, index) => prescribedExercise(row, index + 1));
+  x.forEach((exercise, index) => { exercise.id = firstId + index; });
   return {
-    v: 1,
+    v: 2,
     r: session.r,
     d: session.d,
     t: session.t || "Gym session",
     notes: session.notes || "",
     startedAt: null,
+    // The start a timer reset threw away, which the next Start measures the ticked sets from.
+    clockWas: null,
     finishedAt: null,
     note: "",
-    x: (session.x || []).map((row, index) => prescribedExercise(row, index + 1)),
+    nextId: firstId + x.length,
+    x,
   };
 }
 
@@ -109,7 +118,7 @@ function prescribedExercise(row, position) {
 }
 
 export function storageKey(revision) {
-  return `stamind-gym-v1-r${revision}`;
+  return `stamind-gym-v2-r${revision}`;
 }
 
 export function prescriptionLine(exercise) {
@@ -235,14 +244,19 @@ export function swapExercise(state, xi, name) {
   return after;
 }
 
-export function addExercise(state, name, equipment) {
+// `at` is the index the new card takes: the end for "Add an exercise", the place after a card
+// for that card's "Insert".
+export function addExercise(state, name, equipment, at = state.x.length) {
   const after = next(state);
   const kg = equipment === "bodyweight" ? null : ADDED_KG;
   const sets = [];
   for (let i = 0; i < ADDED_SETS; i += 1) {
     sets.push({ reps: ADDED_REPS, kg, done: false, t: null });
   }
-  after.x.push({ n: name, p: null, s: null, lo: null, hi: null, kg: null, note: "", sets });
+  const id = after.nextId;
+  after.nextId += 1;
+  after.x.splice(at, 0, { id, n: name, p: null, s: null, lo: null, hi: null, kg: null, note: "",
+                          sets });
   return after;
 }
 
@@ -281,12 +295,38 @@ export function setSessionNote(state, text) {
 // ---------------------------------------------------------------------------------------
 
 // The Start button starts the clock, and so does the first ticked set if the athlete forgot it.
+// After a timer reset, the sets already ticked keep their moment and are measured from the new
+// start; one ticked before it counts as 0 (§1).
 export function startClock(state, now) {
   if (state.startedAt) {
     return state;
   }
   const after = next(state);
   after.startedAt = now;
+  if (after.clockWas !== null) {
+    const shift = (after.clockWas - now) / 1000;
+    for (const exercise of after.x) {
+      for (const set of exercise.sets) {
+        if (set.done && set.t !== null) {
+          set.t = Math.max(0, Math.round(set.t + shift));
+        }
+      }
+    }
+    after.clockWas = null;
+  }
+  return after;
+}
+
+// The timer reset brings the Start button back, and takes the Finish with it: the next Finish
+// sends a log with the new start and end, which replaces the one already sent (§4).
+export function resetClock(state) {
+  if (!state.startedAt) {
+    return state;
+  }
+  const after = next(state);
+  after.clockWas = after.startedAt;
+  after.startedAt = null;
+  after.finishedAt = null;
   return after;
 }
 
@@ -301,6 +341,55 @@ export function markFinished(state, now) {
   const after = next(state);
   after.finishedAt = now;
   return after;
+}
+
+// ---------------------------------------------------------------------------------------
+// Undo (§1). The history is a list of `{ state, card }`: the state before a change, and the id
+// of the card the change was made on, or null for a change to the page as a whole. Undo never
+// takes back a Finish: the sent log stays sent.
+// ---------------------------------------------------------------------------------------
+
+export function record(history, before, card) {
+  return [...history, { state: before, card }].slice(-UNDO_DEPTH);
+}
+
+export function undoAll(history, state) {
+  if (!history.length) {
+    return null;
+  }
+  const restored = next(history[history.length - 1].state);
+  restored.finishedAt = state.finishedAt;
+  return { state: restored, history: history.slice(0, -1) };
+}
+
+export function canUndoCard(history, card) {
+  return history.some((entry) => entry.card === card);
+}
+
+// Puts the card back as it was before its own last change, wherever it sits now, and leaves
+// every other card alone. The states saved after that change still hold the card as it was,
+// so they get its restored copy too, or an Undo further back would bring the change back.
+export function undoCard(history, state, card) {
+  const index = history.findLastIndex((entry) => entry.card === card);
+  const xi = state.x.findIndex((exercise) => exercise.id === card);
+  if (index < 0 || xi < 0) {
+    return null;
+  }
+  const old = history[index].state.x.find((exercise) => exercise.id === card);
+  const after = next(state);
+  after.x[xi] = structuredClone(old);
+  const kept = history.filter((_, i) => i !== index).map((entry, i) => {
+    if (i < index) {
+      return entry;
+    }
+    const patched = next(entry.state);
+    const at = patched.x.findIndex((exercise) => exercise.id === card);
+    if (at >= 0) {
+      patched.x[at] = structuredClone(old);
+    }
+    return { state: patched, card: entry.card };
+  });
+  return { state: after, history: kept };
 }
 
 // ---------------------------------------------------------------------------------------

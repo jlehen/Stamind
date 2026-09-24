@@ -20,12 +20,34 @@ fourth set, swaps the belt squat for a leg press, removes the curls, moves the r
 appends an exercise the session did not ask for, and types a note. After every tap the
 page saves its state on the phone, so a closed Telegram reopens where it left off.
 
+Each card has an "Insert" button. It puts the new exercise right after that card, so a
+face pull added after the rows does not have to climb up from the bottom one tap at a time.
+The button that puts another exercise in a card's place is "↻ Swap": a short word for a
+phone, with ↻ rather than ⇄ so it does not read as two cards trading places.
+
+A tap can be taken back. The header's "Undo" takes back the last change anywhere on the
+page, one step per tap, up to the last 50. Each card also has its own ↶, which takes back
+only the last change made to that card. Here is an example: the athlete ticks the third
+squat set, then raises the pull-up weight. The squat card's ↶ unticks the set and leaves the
+pull-up weight alone. A removed card has no ↶ left, so only the header's Undo brings it back.
+Undo never takes back a Finish: once a log is sent, the fix is an edit and "Send again".
+The undo history is saved on the phone with the rest, so a reopened page can still undo.
+
 The clock does not run when the page opens. At 17:50, in the changing room, the athlete
 sees the leg press is out of order and swaps it before walking in. The header shows a
 "Start" button where the timer will be. At 18:00 they tap it, and the timer appears and
 counts from there; the log's start time is 18:00. If they forget and tick the first set at
 18:04, that tick starts the clock, so the set is stamped at 0 seconds and the log starts at
-18:04. "Start over" puts the Start button back.
+18:04.
+
+The header also has "Reset timer", shown while the clock runs. It puts the Start button
+back and keeps every ticked set ticked. Here is an example: the athlete taps Start at 17:50
+by mistake, ticks a set at 18:05, then taps "Reset timer" and taps Start again at 18:10.
+The 18:05 set came before the new start, so it counts as 0 seconds; a set ticked at 18:12
+counts as 2 minutes. A reset after Finish also clears the Finish, so the next
+Finish sends a log with the new start and end, and the bot replaces the one it had.
+"Start over", also in the header, goes back to the session as written and puts the Start
+button back; Undo brings back what it threw away.
 
 After the last set the athlete taps "Finish". The page sends one text message of at most
 4,096 bytes to the bot and closes. The bot writes the text to a file and runs

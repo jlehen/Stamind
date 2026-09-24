@@ -287,7 +287,7 @@ test("the header shows the session's own date in words", () => {
 });
 
 test("the saved state is keyed by the session's revision id", () => {
-  assert.equal(logic.storageKey(727), "stamind-gym-v1-r727");
+  assert.equal(logic.storageKey(727), "stamind-gym-v2-r727");
   assert.notEqual(logic.storageKey(727), logic.storageKey(728));
 });
 
@@ -302,4 +302,89 @@ test("an exercise linked to Free Exercise DB has its two photos, any other has n
   ]);
   assert.deepEqual(logic.photosOf(catalog, "belt squat"), []);
   assert.deepEqual(logic.photosOf(catalog, "not listed"), []);
+});
+
+test("an inserted exercise lands after its card, with an id no other card has", () => {
+  let state = exampleState();
+  state = logic.addExercise(state, "leg press", "machine", 1);
+  assert.deepEqual(state.x.map((x) => x.n), ["belt squat", "leg press", "pull up"]);
+  assert.equal(state.x[1].p, null);
+  state = logic.addExercise(state, "barbell curl", "barbell");
+  assert.deepEqual(state.x.map((x) => x.id), [1, 3, 2, 4]);
+  // "Start over" numbers the written cards after every id the undo history may still hold.
+  const over = logic.newState(logic.sessionFromHash(EXAMPLE_HASH), state.nextId);
+  assert.deepEqual(over.x.map((x) => x.id), [5, 6]);
+});
+
+test("a timer reset brings Start back, and the ticked sets are measured from the new start", () => {
+  // Start at 17:50 by mistake, a set ticked at 18:05, then the timer reset.
+  const early = new Date(2026, 8, 24, 17, 50, 0).getTime();
+  let state = logic.startClock(logic.newState(logic.sessionFromHash(EXAMPLE_HASH)), early);
+  state = tickSet(state, 0, 0, 15 * 60);
+  state = logic.markFinished(state, END);
+  state = logic.resetClock(state);
+  assert.equal(state.startedAt, null);
+  assert.equal(state.finishedAt, null);
+  assert.equal(logic.resetClock(state), state);
+  // Start again at 18:00: the 18:05 set is five minutes in.
+  const restarted = logic.startClock(state, START - 2 * 60 * 1000);
+  assert.equal(restarted.x[0].sets[0].t, 5 * 60);
+  assert.equal(restarted.clockWas, null);
+  // Start again at 18:10 instead: the set came before the start, so it counts as 0.
+  assert.equal(logic.startClock(state, START + 8 * 60 * 1000).x[0].sets[0].t, 0);
+});
+
+test("Undo takes back the last change anywhere, but never the Finish", () => {
+  let state = exampleState();
+  let history = [];
+  const change = (after, card) => {
+    history = logic.record(history, state, card);
+    state = after;
+  };
+  change(tickSet(state, 0, 0, 30), 1);
+  change(logic.bumpKg(state, 1, 0, logic.KG_STEP), 2);
+  state = logic.markFinished(state, END);
+  let result = logic.undoAll(history, state);
+  assert.equal(result.state.x[1].sets[0].kg, null);
+  assert.equal(result.state.x[0].sets[0].done, true);
+  assert.equal(result.state.finishedAt, END);
+  result = logic.undoAll(result.history, result.state);
+  assert.equal(result.state.x[0].sets[0].done, false);
+  assert.equal(logic.undoAll(result.history, result.state), null);
+});
+
+test("a card's own undo takes back that card's last change and leaves the others alone", () => {
+  let state = exampleState();
+  let history = [];
+  const change = (after, card) => {
+    history = logic.record(history, state, card);
+    state = after;
+  };
+  change(tickSet(state, 0, 0, 30), 1);
+  change(logic.bumpKg(state, 1, 0, logic.KG_STEP), 2);
+  change(logic.moveExercise(state, 1, -1), null);
+  assert.equal(logic.canUndoCard(history, 1), true);
+  // The squat is second now; its undo finds it there and unticks the set.
+  let result = logic.undoCard(history, state, 1);
+  assert.deepEqual(result.state.x.map((x) => x.n), ["pull up", "belt squat"]);
+  assert.equal(result.state.x[1].sets[0].done, false);
+  assert.equal(result.state.x[0].sets[0].kg, logic.KG_STEP);
+  assert.equal(logic.canUndoCard(result.history, 1), false);
+  assert.equal(logic.undoCard(result.history, result.state, 1), null);
+  // Undoing the move and then the pull-up's weight must not tick the squat's set again.
+  result = logic.undoAll(result.history, result.state);
+  result = logic.undoAll(result.history, result.state);
+  assert.deepEqual(result.state.x.map((x) => x.n), ["belt squat", "pull up"]);
+  assert.equal(result.state.x[0].sets[0].done, false);
+  assert.equal(result.state.x[1].sets[0].kg, null);
+  assert.equal(result.history.length, 0);
+});
+
+test("the undo history keeps the last fifty changes", () => {
+  const state = exampleState();
+  let history = [];
+  for (let i = 0; i < logic.UNDO_DEPTH + 5; i += 1) {
+    history = logic.record(history, state, null);
+  }
+  assert.equal(history.length, logic.UNDO_DEPTH);
 });

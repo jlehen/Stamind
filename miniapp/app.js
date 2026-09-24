@@ -21,6 +21,8 @@ const ui = {
   restLabel: document.getElementById("rest-label"),
   rest: document.getElementById("rest"),
   startClock: document.getElementById("start-clock"),
+  undo: document.getElementById("undo"),
+  resetClock: document.getElementById("reset-clock"),
   cards: document.getElementById("cards"),
   sessionNote: document.getElementById("session-note"),
   addExercise: document.getElementById("add-exercise"),
@@ -55,8 +57,12 @@ let catalog = [];
 // The exercises whose photos are open. Not saved: they close when the page reloads.
 const photosOpen = new Set();
 let state = null;
+// What Undo takes back, oldest first (`logic.record`). Saved beside the state.
+let history = [];
 let storeKey = "";
-let swapIndex = null;
+// What the search sheet is for: "swap" or "insert" the card at `searchIndex`, or "add" one.
+let searchMode = "add";
+let searchIndex = null;
 let swapPattern = null;
 
 // ---------------------------------------------------------------------------------------
@@ -124,23 +130,48 @@ const store = deviceStore() || browserStore;
 
 function persist() {
   store.set(storeKey, JSON.stringify(state));
+  store.set(`${storeKey}-undo`, JSON.stringify(history));
 }
 
 // ---------------------------------------------------------------------------------------
 // Applying a change. `apply` redraws, `applyQuiet` does not, because a redraw triggered by a
-// field losing focus would replace the button the tap was heading for.
+// field losing focus would replace the button the tap was heading for. Both record the change
+// for Undo, under the card it was made on (`card`, its id) or under the page (null).
 // ---------------------------------------------------------------------------------------
 
-function apply(after) {
+function remember(after, card) {
+  if (after !== state) {
+    history = logic.record(history, state, card);
+  }
+  state = after;
+  persist();
+}
+
+function apply(after, card = null) {
+  remember(after, card);
+  render();
+}
+
+function applyQuiet(after, card = null) {
+  remember(after, card);
+  tick();
+}
+
+// Finish is the one change Undo does not take back (§1), so it goes around the history.
+function applyUnrecorded(after) {
   state = after;
   persist();
   render();
 }
 
-function applyQuiet(after) {
-  state = after;
+function undo(result) {
+  if (!result) {
+    return;
+  }
+  state = result.state;
+  history = result.history;
   persist();
-  tick();
+  render();
 }
 
 // ---------------------------------------------------------------------------------------
@@ -185,6 +216,7 @@ function render() {
       + "Send again replaces that log.";
   }
   setFinishLabel(finished ? "Send again" : "Finish");
+  ui.undo.disabled = !history.length;
   tick();
 }
 
@@ -197,6 +229,7 @@ function setFinishLabel(label) {
 
 function exerciseCard(exercise, xi) {
   const card = el("section", "card");
+  const id = exercise.id;
 
   const head = el("div", "card-head");
   const name = el("div", "card-name");
@@ -204,6 +237,10 @@ function exerciseCard(exercise, xi) {
   name.append(el("div", "card-pres", logic.prescriptionLine(exercise)));
   head.append(name);
   const moves = el("div", "moves");
+  const undoCard = button("↶", "move", () => undo(logic.undoCard(history, state, id)));
+  undoCard.disabled = !logic.canUndoCard(history, id);
+  undoCard.setAttribute("aria-label", `Undo the last change to ${exercise.n}`);
+  moves.append(undoCard);
   moves.append(button("↑", "move", () => apply(logic.moveExercise(state, xi, -1))));
   moves.append(button("↓", "move", () => apply(logic.moveExercise(state, xi, 1))));
   head.append(moves);
@@ -225,9 +262,11 @@ function exerciseCard(exercise, xi) {
   exercise.sets.forEach((set, si) => card.append(setRow(exercise, xi, set, si)));
 
   const tools = el("div", "tools");
-  tools.append(button("+ Set", "pill", () => apply(logic.addSet(state, xi))));
-  tools.append(button("− Set", "pill", () => apply(logic.removeSet(state, xi))));
-  tools.append(button("⇄ Swap", "pill", () => openSearch(xi)));
+  tools.append(button("+ Set", "pill", () => apply(logic.addSet(state, xi), id)));
+  tools.append(button("− Set", "pill", () => apply(logic.removeSet(state, xi), id)));
+  // ↻ rather than ⇄: this puts another exercise here, it does not trade two cards (§1).
+  tools.append(button("↻ Swap", "pill", () => openSearch("swap", xi)));
+  tools.append(button("⤵ Insert", "pill", () => openSearch("insert", xi)));
   tools.append(button("✕ Remove", "pill danger", () => apply(logic.removeExercise(state, xi))));
   if (photos.length) {
     const label = photosOpen.has(exercise.n) ? "Hide photos" : "Photos";
@@ -239,7 +278,8 @@ function exerciseCard(exercise, xi) {
   note.type = "text";
   note.placeholder = "Note on this exercise";
   note.value = exercise.note || "";
-  note.addEventListener("change", () => applyQuiet(logic.setExerciseNote(state, xi, note.value)));
+  note.addEventListener("change",
+    () => applyQuiet(logic.setExerciseNote(state, xi, note.value), id));
   card.append(note);
   return card;
 }
@@ -254,16 +294,17 @@ function togglePhotos(name) {
 }
 
 function setRow(exercise, xi, set, si) {
+  const id = exercise.id;
   const row = el("div", set.done ? "set done" : "set");
   row.append(el("div", "set-index", String(si + 1)));
 
   row.append(stepper({
     value: String(set.reps),
     unit: "reps",
-    onMinus: () => apply(logic.bumpReps(state, xi, si, -logic.REP_STEP)),
-    onPlus: () => apply(logic.bumpReps(state, xi, si, logic.REP_STEP)),
+    onMinus: () => apply(logic.bumpReps(state, xi, si, -logic.REP_STEP), id),
+    onPlus: () => apply(logic.bumpReps(state, xi, si, logic.REP_STEP), id),
     onType: (text, field) => {
-      applyQuiet(logic.setReps(state, xi, si, parseFloat(text)));
+      applyQuiet(logic.setReps(state, xi, si, parseFloat(text)), id);
       field.value = String(state.x[xi].sets[si].reps);
     },
   }));
@@ -271,19 +312,19 @@ function setRow(exercise, xi, set, si) {
   row.append(stepper({
     value: logic.formatKg(set.kg),
     unit: "kg",
-    onMinus: () => apply(logic.bumpKg(state, xi, si, -logic.KG_STEP)),
-    onPlus: () => apply(logic.bumpKg(state, xi, si, logic.KG_STEP)),
+    onMinus: () => apply(logic.bumpKg(state, xi, si, -logic.KG_STEP), id),
+    onPlus: () => apply(logic.bumpKg(state, xi, si, logic.KG_STEP), id),
     onType: (text, field) => {
       const typed = text.trim() === "" || /^bw$/i.test(text.trim()) ? null : parseFloat(text);
-      applyQuiet(logic.setKg(state, xi, si, typed));
+      applyQuiet(logic.setKg(state, xi, si, typed), id);
       field.value = logic.formatKg(state.x[xi].sets[si].kg);
     },
   }));
 
   const check = button("✓", "tick", () => {
     // A set ticked before Start starts the clock, so its time is 0 rather than lost (§1).
-    state = logic.startClock(state, Date.now());
-    apply(logic.toggleDone(state, xi, si, secondsNow()));
+    const started = logic.startClock(state, Date.now());
+    apply(logic.toggleDone(started, xi, si, secondsNow(started)), id);
   });
   check.setAttribute("aria-pressed", String(set.done));
   check.setAttribute("aria-label", set.done ? `Set ${si + 1} done` : `Mark set ${si + 1} done`);
@@ -306,9 +347,9 @@ function stepper(spec) {
   return box;
 }
 
-function secondsNow() {
+function secondsNow(at = state) {
   // After Finish the clock stands still (§4), so a set ticked later is stamped at the finish.
-  return (logic.clockAt(state, Date.now()) - state.startedAt) / 1000;
+  return (logic.clockAt(at, Date.now()) - at.startedAt) / 1000;
 }
 
 function tick() {
@@ -317,6 +358,7 @@ function tick() {
   const started = Boolean(state.startedAt);
   ui.startClock.hidden = started;
   ui.rest.hidden = !started;
+  ui.resetClock.hidden = !started;
   if (!started) {
     return;
   }
@@ -331,20 +373,31 @@ function tick() {
 }
 
 // ---------------------------------------------------------------------------------------
-// The exercise search: a swap keeps the card's movement pattern as its filter, an added
-// exercise searches everything (§1).
+// The exercise search: a swap keeps the card's movement pattern as its filter, an added or
+// inserted exercise searches everything (§1).
 // ---------------------------------------------------------------------------------------
 
-function openSearch(xi) {
-  swapIndex = xi;
-  swapPattern = xi === null ? null : logic.patternOf(catalog, state.x[xi].n);
-  ui.searchTitle.textContent = xi === null ? "Add an exercise" : "Swap exercise";
-  ui.searchAllRow.hidden = xi === null || !swapPattern;
+function openSearch(mode, xi = null) {
+  searchMode = mode;
+  searchIndex = xi;
+  swapPattern = mode === "swap" ? logic.patternOf(catalog, state.x[xi].n) : null;
+  ui.searchTitle.textContent = searchTitle(mode, xi);
+  ui.searchAllRow.hidden = !swapPattern;
   ui.searchAll.checked = !swapPattern;
   ui.searchInput.value = "";
   ui.searchSheet.hidden = false;
   renderResults();
   ui.searchInput.focus();
+}
+
+function searchTitle(mode, xi) {
+  if (mode === "swap") {
+    return "Swap exercise";
+  }
+  if (mode === "insert") {
+    return `Insert after ${state.x[xi].n}`;
+  }
+  return "Add an exercise";
 }
 
 function closeSearch() {
@@ -368,11 +421,15 @@ function renderResults() {
 
 function choose(row) {
   closeSearch();
-  if (swapIndex === null) {
-    apply(logic.addExercise(state, row.n, row.e));
+  if (searchMode === "swap") {
+    apply(logic.swapExercise(state, searchIndex, row.n), state.x[searchIndex].id);
     return;
   }
-  apply(logic.swapExercise(state, swapIndex, row.n));
+  if (searchMode === "insert") {
+    apply(logic.addExercise(state, row.n, row.e, searchIndex + 1));
+    return;
+  }
+  apply(logic.addExercise(state, row.n, row.e));
 }
 
 // ---------------------------------------------------------------------------------------
@@ -393,7 +450,7 @@ function onFinish() {
   }
   // The first Finish stops the clock (§4); a log sent again after an edit ends at the same
   // moment, and the bot replaces the earlier one instead of adding a second.
-  apply(logic.markFinished(state, now));
+  applyUnrecorded(logic.markFinished(state, now));
   if (inTelegram) {
     try {
       tg.sendData(result.text);
@@ -452,10 +509,8 @@ function ask(message, onYes) {
 }
 
 function startOver() {
-  ask("Throw away everything logged here and start from the written session?", () => {
-    store.remove(storeKey);
-    apply(logic.newState(sessionFromUrl()));
-  });
+  ask("Throw away everything logged here and start from the written session? Undo brings it "
+      + "back.", () => apply(logic.newState(sessionFromUrl(), state.nextId)));
 }
 
 // ---------------------------------------------------------------------------------------
@@ -493,7 +548,7 @@ async function restore(session) {
   try {
     const parsed = JSON.parse(saved);
     // A saved state for this revision wins over the URL, so a reopened app carries on (§1).
-    if (parsed && parsed.v === 1 && parsed.r === session.r && Array.isArray(parsed.x)) {
+    if (parsed && parsed.v === 2 && parsed.r === session.r && Array.isArray(parsed.x)) {
       return parsed;
     }
   } catch (problem) {
@@ -505,8 +560,10 @@ async function restore(session) {
 function wire() {
   ui.sessionNote.addEventListener("change",
     () => applyQuiet(logic.setSessionNote(state, ui.sessionNote.value)));
-  ui.addExercise.addEventListener("click", () => openSearch(null));
+  ui.addExercise.addEventListener("click", () => openSearch("add"));
   ui.startClock.addEventListener("click", () => apply(logic.startClock(state, Date.now())));
+  ui.resetClock.addEventListener("click", () => apply(logic.resetClock(state)));
+  ui.undo.addEventListener("click", () => undo(logic.undoAll(history, state)));
   ui.finish.addEventListener("click", onFinish);
   ui.reset.addEventListener("click", startOver);
   ui.searchInput.addEventListener("input", renderResults);
@@ -536,6 +593,16 @@ function wireTelegram() {
   tg.MainButton.show();
 }
 
+async function restoreHistory() {
+  try {
+    const parsed = JSON.parse(await store.get(`${storeKey}-undo`));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (problem) {
+    console.warn("the undo history could not be read", problem);
+    return [];
+  }
+}
+
 async function start() {
   wire();
   wireTelegram();
@@ -543,6 +610,7 @@ async function start() {
   const session = sessionFromUrl();
   storeKey = logic.storageKey(session.r);
   state = await restore(session);
+  history = await restoreHistory();
   persist();
   render();
   window.setInterval(tick, 1000);

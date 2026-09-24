@@ -61,7 +61,7 @@ async function main() {
     await page.locator("#search-close").click();
 
     // 4. The session's own actions at the foot of the page.
-    await page.locator("#reset").scrollIntoViewIfNeeded();
+    await page.locator("#add-exercise").scrollIntoViewIfNeeded();
     await shoot(page, "04-foot.png");
 
     // 5. Finish outside Telegram, which shows the §4 log to copy.
