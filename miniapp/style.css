@@ -139,19 +139,31 @@ h1 {
   margin-top: 8px;
 }
 
+/* The header's actions take the Start blue, and Start over the danger red, tinted rather than
+   filled so Start stays the one solid button. A Telegram theme's card colour can be white. */
 .act {
   flex: 1 1 0;
   min-width: 0;
   min-height: 36px;
   padding: 0 6px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--start);
   border-radius: 10px;
-  background: var(--card);
+  background: transparent;
+  background: color-mix(in srgb, var(--start) 14%, transparent);
+  color: var(--start);
   font-size: 14px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-.act:disabled, .move:disabled {
+.act.danger {
+  border-color: var(--danger);
+  background: transparent;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+.act:disabled, .move:disabled, .pill:disabled {
   opacity: 0.3;
 }
 
@@ -334,6 +346,11 @@ h1 {
 
 .pill.danger {
   color: var(--danger);
+}
+
+.pill.undo {
+  color: var(--start);
+  font-weight: 600;
 }
 
 .note {

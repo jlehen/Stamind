@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gym logger</title>
-<!-- Served by GitHub Pages under /Stamind/, so every asset is relative (DESIGN_gym_logger §2). -->
-<link rel="stylesheet" href="./style.css">
+<!-- Served by GitHub Pages under /Stamind/, so every asset is relative (DESIGN_gym_logger §2).
+     The deploy turns "?v=dev" into the commit, so a phone never mixes two versions' files. -->
+<link rel="stylesheet" href="./style.css?v=dev">
 <!-- An empty icon, so the browser does not ask for a favicon that is not there. -->
 <link rel="icon" href="data:,">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -26,8 +27,8 @@
   <!-- The page's own actions stay in sight while the cards scroll (§1). -->
   <div class="head-actions">
     <button class="act" id="undo" type="button">↶ Undo</button>
-    <button class="act" id="reset-clock" type="button" hidden>⏱ Reset timer</button>
-    <button class="act" id="reset" type="button">Start over</button>
+    <button class="act" id="reset-clock" type="button" hidden>Reset timer</button>
+    <button class="act danger" id="reset" type="button">Start over</button>
   </div>
 </header>
 
@@ -74,6 +75,6 @@
   </div>
 </div>
 
-<script type="module" src="./app.js"></script>
+<script type="module" src="./app.js?v=dev"></script>
 </body>
 </html>

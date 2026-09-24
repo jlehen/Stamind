@@ -1,6 +1,7 @@
 // The gym logger's DOM layer (DESIGN_gym_logger.md §1): it draws the session, and hands every
 // tap to `logic.js`, which owns the state and the two payloads.
-import * as logic from "./logic.js";
+// "?v=dev" becomes the commit at deploy, like the addresses in index.html (§2).
+import * as logic from "./logic.js?v=dev";
 
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 // `telegram-web-app.js` loads in a plain browser too, and there it reports platform "unknown".
@@ -237,10 +238,6 @@ function exerciseCard(exercise, xi) {
   name.append(el("div", "card-pres", logic.prescriptionLine(exercise)));
   head.append(name);
   const moves = el("div", "moves");
-  const undoCard = button("↶", "move", () => undo(logic.undoCard(history, state, id)));
-  undoCard.disabled = !logic.canUndoCard(history, id);
-  undoCard.setAttribute("aria-label", `Undo the last change to ${exercise.n}`);
-  moves.append(undoCard);
   moves.append(button("↑", "move", () => apply(logic.moveExercise(state, xi, -1))));
   moves.append(button("↓", "move", () => apply(logic.moveExercise(state, xi, 1))));
   head.append(moves);
@@ -262,6 +259,10 @@ function exerciseCard(exercise, xi) {
   exercise.sets.forEach((set, si) => card.append(setRow(exercise, xi, set, si)));
 
   const tools = el("div", "tools");
+  const undoCard = button("↶ Undo", "pill undo", () => undo(logic.undoCard(history, state, id)));
+  undoCard.disabled = !logic.canUndoCard(history, id);
+  undoCard.setAttribute("aria-label", `Undo the last change to ${exercise.n}`);
+  tools.append(undoCard);
   tools.append(button("+ Set", "pill", () => apply(logic.addSet(state, xi), id)));
   tools.append(button("− Set", "pill", () => apply(logic.removeSet(state, xi), id)));
   // ↻ rather than ⇄: this puts another exercise here, it does not trade two cards (§1).

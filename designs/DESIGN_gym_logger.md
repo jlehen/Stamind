@@ -26,10 +26,11 @@ The button that puts another exercise in a card's place is "↻ Swap": a short w
 phone, with ↻ rather than ⇄ so it does not read as two cards trading places.
 
 A tap can be taken back. The header's "Undo" takes back the last change anywhere on the
-page, one step per tap, up to the last 50. Each card also has its own ↶, which takes back
-only the last change made to that card. Here is an example: the athlete ticks the third
-squat set, then raises the pull-up weight. The squat card's ↶ unticks the set and leaves the
-pull-up weight alone. A removed card has no ↶ left, so only the header's Undo brings it back.
+page, one step per tap, up to the last 50. Each card also has its own "↶ Undo" among its
+buttons, which takes back only the last change made to that card. Here is an example: the
+athlete ticks the third squat set, then raises the pull-up weight. The squat card's Undo
+unticks the set and leaves the pull-up weight alone. A removed card has no Undo left, so only
+the header's Undo brings it back.
 Undo never takes back a Finish: once a log is sent, the fix is an edit and "Send again".
 The undo history is saved on the phone with the rest, so a reopened page can still undo.
 
@@ -71,7 +72,10 @@ supplies heart rate, duration and RPE; the log supplies the sets. Nothing is ask
 - `miniapp/` — the page: `index.html`, `app.js`, `style.css`, `exercises.json`. Static,
   no build step, no server. Served by GitHub Pages at
   `https://jlehen.github.io/Stamind/miniapp/` through `.github/workflows/pages.yml`, which
-  deploys the folder on every push to the branch; the site root stays free.
+  deploys the folder on every push to the branch; the site root stays free. The page names
+  its files with `?v=dev`, and the deploy replaces `dev` with the commit. Telegram keeps a
+  file for ten minutes, so without this a phone could run the old `app.js` under the new
+  `index.html`, and the new header buttons would have no style and do nothing.
   `exercises.json` is the vocabulary as the page searches it, written by
   `miniapp/build_exercises.py`.
 - Photos. It is Thursday and the strength planner has written a Romanian deadlift the
