@@ -4198,6 +4198,8 @@ Thursday and hands it the logged sets instead of reading Garmin's own, so Garmin
 heart rate, duration and RPE while the log supplies the sets. Nothing is asked.
 
 **Where the code is.** `miniapp/` is the page: static files, no build step, no server.
+`miniapp/markdown.js` is its "Export to Markdown" button, the session as Markdown for the
+athlete's own notes (DESIGN_gym_logger.md §1).
 `stamind/strength/logger.py` holds the two payloads and touches no database.
 `stamind/cli/strength_ingest.py` is the `strength ingest` command — a file of its own
 because the `strength` family was already at the ~400 lines AGENTS.md splits at.

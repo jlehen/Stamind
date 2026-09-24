@@ -40,6 +40,7 @@
 <section class="foot">
   <input class="note" id="session-note" type="text" placeholder="Session note">
   <button class="wide" id="add-exercise" type="button">+ Add an exercise</button>
+  <button class="wide" id="export-md" type="button">Export to Markdown</button>
   <button class="wide primary" id="finish" type="button">Finish</button>
   <!-- After the first Finish the clock stands still and a second send replaces the log (§4). -->
   <p class="sent" id="sent" hidden></p>
@@ -61,7 +62,8 @@
   </div>
 </div>
 
-<!-- Outside Telegram there is no `sendData`, so the log is shown to be copied (§4). -->
+<!-- Outside Telegram there is no `sendData`, so the log is shown to be copied (§4); the
+     Markdown export lands here too when the phone refuses the clipboard (§1). -->
 <div class="sheet" id="output-sheet" hidden>
   <div class="sheet-box">
     <div class="sheet-head">

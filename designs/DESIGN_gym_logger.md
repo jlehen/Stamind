@@ -64,6 +64,15 @@ evening's log instead of adding a second; its summary opens with "Updated the lo
 Finish tapped by mistake halfway through the session is not handled: the sets ticked after
 it are stamped at the finish time.
 
+The athlete also keeps their own training notes in a text file. Under "Add an exercise" is
+"Export to Markdown", which copies the session to the clipboard as a few lines of Markdown:
+a `### 2026-09-24 [Gym: lower body strength]` heading, the clock times, the coach's note,
+then one line per exercise such as "- Belt squat: 1x5 (120 kg), 2x6 (140 kg)", with the
+exercise's note after a dash and the session note last. Before any set is ticked it copies
+the session as the page holds it, so the athlete can paste the day's workout ahead of time;
+once a set is ticked it copies only the ticked sets, the way the log does. A phone that
+refuses the clipboard gets the same sheet the log uses, with the text to select by hand.
+
 The next morning the pull finds Garmin's activity for that day. Instead of reading
 Garmin's sets, half of them unnamed, it hands the logged sets to that activity. Garmin
 supplies heart rate, duration and RPE; the log supplies the sets. Nothing is asked.

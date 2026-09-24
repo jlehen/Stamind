@@ -2,6 +2,7 @@
 // tap to `logic.js`, which owns the state and the two payloads.
 // "?v=dev" becomes the commit at deploy, like the addresses in index.html (§2).
 import * as logic from "./logic.js?v=dev";
+import { toMarkdown } from "./markdown.js?v=dev";
 
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 // `telegram-web-app.js` loads in a plain browser too, and there it reports platform "unknown".
@@ -27,6 +28,7 @@ const ui = {
   cards: document.getElementById("cards"),
   sessionNote: document.getElementById("session-note"),
   addExercise: document.getElementById("add-exercise"),
+  exportMd: document.getElementById("export-md"),
   finish: document.getElementById("finish"),
   sent: document.getElementById("sent"),
   reset: document.getElementById("reset"),
@@ -38,6 +40,7 @@ const ui = {
   searchResults: document.getElementById("search-results"),
   searchClose: document.getElementById("search-close"),
   outputSheet: document.getElementById("output-sheet"),
+  outputTitle: document.getElementById("output-title"),
   outputHint: document.getElementById("output-hint"),
   outputNote: document.getElementById("output-note"),
   outputText: document.getElementById("output-text"),
@@ -466,12 +469,32 @@ function onFinish() {
 }
 
 function showOutput(result, hint) {
+  showSheet("Your log", result.text, `${result.bytes} bytes of the ${LIMIT} Telegram allows. `
+    + "Copy this into a file and run: sm strength ingest <file>", hint);
+}
+
+function showSheet(title, text, note, hint) {
+  ui.outputTitle.textContent = title;
   ui.outputHint.textContent = hint || "";
   ui.outputHint.hidden = !hint;
-  ui.outputNote.textContent = `${result.bytes} bytes of the ${LIMIT} Telegram allows. `
-    + "Copy this into a file and run: sm strength ingest <file>";
-  ui.outputText.value = result.text;
+  ui.outputNote.textContent = note;
+  ui.outputText.value = text;
+  ui.outputCopy.textContent = "Copy";
   ui.outputSheet.hidden = false;
+}
+
+// The Markdown goes straight to the clipboard; a phone that refuses it gets the sheet (§1).
+function exportMarkdown() {
+  const text = toMarkdown(state, Date.now());
+  const refused = () => showSheet("Markdown", text, "Select the text and copy it.");
+  if (!navigator.clipboard || !navigator.clipboard.writeText) {
+    refused();
+    return;
+  }
+  navigator.clipboard.writeText(text).then(() => {
+    ui.exportMd.textContent = "Copied ✓";
+    window.setTimeout(() => { ui.exportMd.textContent = "Export to Markdown"; }, 2000);
+  }, refused);
 }
 
 function copyOutput() {
@@ -561,6 +584,7 @@ function wire() {
   ui.sessionNote.addEventListener("change",
     () => applyQuiet(logic.setSessionNote(state, ui.sessionNote.value)));
   ui.addExercise.addEventListener("click", () => openSearch("add"));
+  ui.exportMd.addEventListener("click", exportMarkdown);
   ui.startClock.addEventListener("click", () => apply(logic.startClock(state, Date.now())));
   ui.resetClock.addEventListener("click", () => apply(logic.resetClock(state)));
   ui.undo.addEventListener("click", () => undo(logic.undoAll(history, state)));

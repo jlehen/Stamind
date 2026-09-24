@@ -32,7 +32,8 @@ jobs:
       - run: mkdir -p _site && cp -r miniapp _site/miniapp
       # Every deploy gets new file addresses, so a cached old app.js never runs under a new
       # index.html (§2).
-      - run: sed -i "s/?v=dev/?v=${GITHUB_SHA::12}/g" _site/miniapp/index.html _site/miniapp/app.js
+      - run: sed -i "s/?v=dev/?v=${GITHUB_SHA::12}/g" _site/miniapp/index.html _site/miniapp/app.js \
+          _site/miniapp/markdown.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
