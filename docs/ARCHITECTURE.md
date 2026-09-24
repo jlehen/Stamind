@@ -154,7 +154,9 @@ classes themselves.
     Driving the lifetime by hand also means python-telegram-bot's `post_init` hook never
     fires — the library calls it only from `run_polling()`/`run_webhook()` — so `_serve`
     makes the opening `set_my_commands` call itself, through `_set_command_menu`, which
-    `/ui` uses too.
+    `/ui` uses too. A failed poll (a Telegram 502, say) is retried by the library forever,
+    backing off up to 30 seconds; `_on_polling_error` logs it as one line and a `warn`
+    journal record instead of the library's full traceback.
   - **Stopping a coach call.** Every model call emits `SM-FLUSH` right after its wait
     notice ("Reviewing your coming sessions — this usually takes about 40 seconds.");
     the bot attaches a `✋ Stop` inline button to the message that flush sends, with

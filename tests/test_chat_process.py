@@ -424,6 +424,24 @@ class PollingModelTest(unittest.TestCase):
         self.assertEqual(rearm, [True])
         self.assertEqual(announced, [False])
 
+    def test_a_failed_poll_is_reported_by_our_own_callback(self):
+        self.assertIn("error_callback=self._on_polling_error", front_end_functions()["_serve"])
+
+    def test_a_failed_poll_is_one_line_not_a_traceback(self):
+        """A 502 from Telegram is retried by the library, so it is logged as one line."""
+        class NetworkError(Exception):
+            """Stands in for python-telegram-bot's, which the tests never import."""
+
+        chat_bot = build_chat_bot(self)
+        with mock.patch("stamind.chat.app.journal.record") as record, \
+                mock.patch("stamind.chat.app.print", create=True) as printed:
+            chat_bot._on_polling_error(NetworkError("Bad Gateway"))
+        line = printed.call_args.args[0]
+        self.assertIn("polling failed, retrying: NetworkError: Bad Gateway", line)
+        self.assertEqual(printed.call_count, 1)
+        record.assert_called_once()
+        self.assertEqual(record.call_args.kwargs["lvl"], "warn")
+
 
 def _called_name(call: ast.Call):
     """The name a call names, whether it is `f()` or `self.f()`."""

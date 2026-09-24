@@ -131,6 +131,16 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         print(f"{ts} [{chat_id}] {direction} {msg}", flush=True)
         journal.record("bot.event", f"{direction} {msg}", chat=chat_id)
 
+    def _on_polling_error(self, exc: Exception) -> None:
+        """One line per failed poll, in place of the library's full traceback.
+
+        python-telegram-bot retries the poll forever with a backoff capped at 30 seconds,
+        so a Telegram outage such as a 502 Bad Gateway needs no action from us."""
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        msg = f"polling failed, retrying: {type(exc).__name__}: {exc}"
+        print(f"{ts} {msg}", flush=True)
+        journal.record("bot.event", msg, lvl="warn")
+
     async def _pause_polling(self) -> None:
         async with self.polling_lock:
             if self.updater.running:
@@ -159,7 +169,8 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
             await self._set_command_menu(self.simple_ui)
             await self.application.start()
             await self.updater.start_polling(
-                allowed_updates=telegram_api.all_update_types()
+                allowed_updates=telegram_api.all_update_types(),
+                error_callback=self._on_polling_error,
             )
             # Started whenever there is a chat to push to: the persona and the `push`
             # setting are checked per tick inside the loop, so a /ui flip (§5.6) or a
