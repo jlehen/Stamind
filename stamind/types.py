@@ -67,6 +67,8 @@ class Workout(TypedDict):
     date: str
     sport_type: str
     title: str
+    # What kind of session, in at most five characters (DESIGN_calendar_miniapp.md §3.6).
+    short_name: Optional[str]
     description: Optional[str]
     original_description: Optional[str]  # the lineage's first revision
     # Hash of the calendar fields at the last push; freshness is derived from it, not

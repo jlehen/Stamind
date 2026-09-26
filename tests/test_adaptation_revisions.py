@@ -197,6 +197,38 @@ class TestAdaptRevisions(unittest.TestCase):
             )
 
     @patch("stamind.coach.engine.openrouter_client")
+    def test_the_short_name_the_week_planner_writes_reaches_the_row(self, mock_client):
+        """DESIGN_calendar_miniapp.md §3.6: the prompt asks for it, and apply stores it."""
+        with patch.dict(stamind.config.config.data, {
+            "user_profile": {"lthr": 165, "max_hr": 185},
+            "coach": {"metrics_lookback_days": 3, "minor_activity_load_threshold": 10.0},
+        }):
+            mock_client.complete.return_value = {
+                "change_needed": True,
+                "reason": "Short on time Thursday.",
+                "adapted_workouts": [{
+                    "date": "2026-06-04", "sport_type": "running",
+                    "title": "Short hill repeats", "short_name": "Hills",
+                    "description": "4x90s uphill", "duration_minutes": 40,
+                    "rpe": 7, "tss": 45,
+                }],
+            }
+            test_db.save_metric_cache("2026-06-03", 50, 60, 80, 20, 10.0, 8.0, 1.1)
+            test_db.save_baseline("2026-06-03", 50.0, 2.0, 60.0, 5.0, 80.0, 5.0)
+            save_workout(test_db,
+                "2026-06-04", "running", "Hill repeats", "6x90s uphill",
+                duration_minutes=60, rpe=7, tss=60,
+            )
+
+            proposal = coach_service.workout_adapt("2026-06-03")
+            self.assertIn('"short_name"', mock_client.complete.call_args.args[0])
+            coach_service.workout_revision_apply(proposal)
+
+            live = test_db.get_workout("2026-06-04", "running")
+            self.assertEqual(live["title"], "Short hill repeats")
+            self.assertEqual(live["short_name"], "Hills")
+
+    @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_holds_a_relisted_session_instead_of_deleting_it(self, mock_client):
         """A verbatim re-list is the model protecting a same-day session of another sport
         from the displacement rule. Dropping it as a no-op used to delete the very session

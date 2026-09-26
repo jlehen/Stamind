@@ -170,6 +170,15 @@ class TestTheAnswers(WindowTestCase):
             after["modification_reason"], "never two hard days in a row"
         )
 
+    def test_the_short_name_the_week_planner_writes_reaches_the_row(self):
+        """DESIGN_calendar_miniapp.md §3.6: the prompt asks for it, and apply stores it."""
+        self.ride(_days_out(2))
+        self.generate(self.session(
+            _days_out(2), sport="cycling", title="Hill repeats", short_name="Hills",
+        ))
+        self.assertIn('"short_name"', self.prompt_system)
+        self.assertEqual(test_db.get_workout(_days_out(2), "cycling")["short_name"], "Hills")
+
     def test_replaces_moves_the_session_and_its_lineage(self):
         lineage = self.ride(_days_out(2))
         self.generate(self.session(

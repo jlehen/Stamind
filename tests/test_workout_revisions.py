@@ -408,5 +408,60 @@ class TestRevisionBehaviour(unittest.TestCase):
         self.assertNotEqual(live["revision_id"], printed_id)
 
 
+
+class TestShortName(unittest.TestCase):
+    """`short_name` is taken as given like the title, is never a change on its own, and
+    travels with every copy of a revision (DESIGN_calendar_miniapp.md §3.6)."""
+
+    def setUp(self):
+        self.db = _fresh_db(self)
+
+    def _write(self, kind, title, minutes, short_name=None):
+        with self.db.workout_change(kind=kind) as change:
+            change.append(date="2026-09-01", sport_type="running", title=title,
+                          description=f"{minutes} min", duration_minutes=minutes,
+                          tss=minutes, short_name=short_name)
+        return self.db.get_workout_changes()[0]["id"]
+
+    def _live(self):
+        return self.db.get_workout("2026-09-01", "running")
+
+    def test_it_is_taken_as_given_and_never_carried_forward(self):
+        """A recovery jog that replaces a VO2 session does not inherit "VO2"."""
+        self._write("generate", "VO2 intervals", 60, short_name="VO2")
+        self.assertEqual(self._live()["short_name"], "VO2")
+
+        self._write("adapt", "Recovery jog", 30)
+
+        self.assertIsNone(self._live()["short_name"])
+
+    def test_a_short_name_alone_is_not_a_change(self):
+        self._write("generate", "Easy run", 45, short_name="Easy")
+        before = len(self.db.get_plan_revisions())
+
+        self._write("adapt", "Easy run", 45, short_name="Z2")
+
+        self.assertEqual(len(self.db.get_plan_revisions()), before)
+        self.assertEqual(self._live()["short_name"], "Easy")
+
+    def test_rollback_brings_the_short_name_back(self):
+        self._write("generate", "Hill repeats", 60, short_name="Hills")
+        adapt = self._write("adapt", "Tempo run", 50, short_name="Tempo")
+
+        self.db.rollback_to_change(adapt, "2026-09-01")
+
+        self.assertEqual(self._live()["short_name"], "Hills")
+
+    def test_a_void_and_its_restore_keep_the_short_name(self):
+        self._write("generate", "Long run", 120, short_name="Long")
+        before = self.db.get_workout_revision(self._live()["revision_id"])
+        with self.db.workout_change(kind="tweak") as change:
+            change.void(date="2026-09-01", sport_type="running", reason="ill")
+        with self.db.workout_change(kind="rollback") as change:
+            change.restore(before)
+
+        self.assertEqual(self._live()["short_name"], "Long")
+
+
 if __name__ == "__main__":
     unittest.main()

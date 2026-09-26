@@ -410,6 +410,7 @@ def _write(
         "date": session.date,
         "sport_type": session.sport_type,
         "title": session.title,
+        "short_name": live.get("short_name"),
         "description": description,
         "duration_minutes": live.get("duration_minutes"),
         "rpe": live.get("rpe"),

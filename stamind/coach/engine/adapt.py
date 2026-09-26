@@ -357,6 +357,9 @@ evidence-backed observations are authored only by the weekly history analysis
                 '      "date": "YYYY-MM-DD",\n'
                 + SPORT_TYPE_ENUM +
                 '      "title": "Adapted Workout Title",\n'
+                '      "short_name": "Hills", (At most 5 characters naming the kind of session,\n'
+                '        e.g. "Easy", "Long", "Hills", "Tempo", "Z2", "VO2", "Gym". null on a\n'
+                '        rest day)\n'
                 + change_reason_field +
                 '      "description": "Start with the title on its own line in brackets followed by a\n'
                 '        newline, e.g. \"[Tempo Run]\\n\", then an adapted description of intensity,\n'

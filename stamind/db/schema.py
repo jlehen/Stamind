@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Bump when the DDL below changes, so an existing database picks the change up once.
 # Reusing a number a previous commit already stamped is silent (ARCHITECTURE.md §5).
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 # The append-only rule, as the database enforces it (DESIGN_workout_revisions.md §14).
 # `wipe_workouts` drops both triggers to clear the table and puts them back from here, so
@@ -130,7 +130,8 @@ class SchemaMixin:
                     planned_zone4_sec INTEGER,
                     planned_zone5_sec INTEGER,
                     planned_zone6_sec INTEGER,
-                    planned_zone7_sec INTEGER
+                    planned_zone7_sec INTEGER,
+                    short_name TEXT -- at most five characters (DESIGN_calendar_miniapp.md §3.6)
                 )
             """)
 

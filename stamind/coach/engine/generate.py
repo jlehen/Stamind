@@ -328,6 +328,9 @@ class WorkoutGenerateMixin:
             '      "date": "YYYY-MM-DD",\n'
             + SPORT_TYPE_ENUM +
             '      "title": "Workout Title (e.g., Tempo Run, Long Ride, Rest Day)",\n'
+            '      "short_name": "Hills", (At most 5 characters naming the kind of session,\n'
+            '        e.g. "Easy", "Long", "Hills", "Tempo", "Z2", "VO2", "Gym". null on a\n'
+            '        rest day)\n'
             '      "description": "Start with the title on its own line in brackets followed by a\n'
             '        newline, e.g. \"[Tempo Run]\\n\", then a detailed description of intensity,\n'
             '        duration, heart rate zones, and goals.",\n'
