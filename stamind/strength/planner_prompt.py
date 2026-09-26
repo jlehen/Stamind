@@ -106,7 +106,9 @@ and the pulldown"), a cue where one is due, and the starting point for anything 
 history. An exercise the athlete has not been doing gets one sentence saying what is new,
 why, and what it replaces: "Step-ups are new. The plan wants single-leg work for skiing.
 They take the place of the leg press." Do not restate the exercises — they are printed above
-your notes from the data you return.
+your notes from the data you return. Do not restate the brief either — it is printed above the
+exercises. Where the brief already gives the warm-up, the RPE target or what is left out,
+leave it out of the notes.
 
 {science}
 
