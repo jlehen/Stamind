@@ -119,6 +119,38 @@ class TestAdaptEasing(unittest.TestCase):
             self.assertEqual(ride["adaptation_count"], 0)
             self.assertIsNone(ride["adapted_at"])
 
+    @patch("stamind.coach.engine.openrouter_client")
+    def test_adapt_records_whether_it_read_the_night(self, mock_client):
+        """The change row says whether the run read a sleep score for its day, which is what
+        lets the morning push skip an adaptation that already ran with the night in hand
+        (DESIGN_bot_simple_frontend.md §4.2)."""
+        mock_client.complete.return_value = {
+            "change_needed": False, "reason": "All green.", "adapted_workouts": [],
+        }
+        test_db.save_baseline("2026-06-03", 50.0, 2.0, 60.0, 5.0, 80.0, 5.0)
+        save_workout(test_db, "2026-06-05", "cycling", "Climb Threshold", "85 mins, 2x20.",
+                     duration_minutes=85, rpe=7, tss=84)
+        service = CoachService(db_instance=test_db)
+        with patch.dict(stamind.config.config.data, {
+            "user_profile": {"lthr": 165, "max_hr": 185},
+            "coach": {"metrics_lookback_days": 3, "minor_activity_load_threshold": 10.0},
+        }), redirect_stdout(io.StringIO()):
+            # Before the watch synced: a row for the day with no sleep score yet.
+            test_db.save_metric_cache("2026-06-03", 50, None, None, None, None, None, None)
+            blind = service.workout_adapt("2026-06-03")
+            service.workout_revision_record_no_change(blind)
+            test_db.save_metric_cache("2026-06-03", 50, 60, 80, 20, None, None, None)
+            seen = service.workout_adapt("2026-06-03")
+            service.workout_revision_record_no_change(seen)
+        self.assertFalse(blind.sleep_seen)
+        self.assertTrue(seen.sleep_seen)
+        with test_db._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT sleep_seen FROM workout_changes WHERE kind = 'adapt' ORDER BY id"
+            ).fetchall()
+        self.assertEqual([r[0] for r in rows], [0, 1])
+        self.assertEqual(test_db.newest_adapt()["sleep_seen"], 1)
+
     def test_adapt_apply_stamps_recency_and_bumps_count(self):
         """Applying an adaptation that MOVES THE LOAD stamps `adapted_at` and bumps
         `adaptation_count`; a second load-moving adapt of the same session bumps it

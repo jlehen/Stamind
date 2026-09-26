@@ -229,7 +229,8 @@ class RevisionApplyMixin:
         # The reason is also the athlete's line about this change, in the one column both
         # revision commands use (DESIGN_change_heads_up.md §6).
         with self._db.workout_change(
-            kind=proposal.kind, summary=proposal.reason, note=proposal.reason
+            kind=proposal.kind, summary=proposal.reason, note=proposal.reason,
+            sleep_seen=proposal.sleep_seen,
         ) as change:
             for (day, sport), mover in moved_out.items():
                 source = by_slot.get((day, sport))
@@ -321,7 +322,9 @@ class RevisionApplyMixin:
         flagged forever (§8). Separate from `workout_revision_apply` because there is
         nothing to apply, and outside the propose call because a propose writes nothing.
         """
-        with self._db.workout_change(kind=proposal.kind, summary=proposal.reason):
+        with self._db.workout_change(
+            kind=proposal.kind, summary=proposal.reason, sleep_seen=proposal.sleep_seen,
+        ):
             pass
         honoring.stamp(self._db, proposal.covered_constraint_ids)
         # A pass that weighed a session's kilograms and kept them has still weighed them,

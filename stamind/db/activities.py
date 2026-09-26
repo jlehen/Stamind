@@ -263,6 +263,15 @@ class ActivitiesMixin:
                 cursor.execute("SELECT * FROM athlete_metrics_cache ORDER BY date ASC")
             return [dict(row) for row in cursor.fetchall()]  # type: ignore
 
+    def get_sleep_score(self, date_str: str) -> Optional[int]:
+        """The sleep score of the night before `date_str`, or None until the watch has
+        synced since the athlete got up (DESIGN_bot_simple_frontend.md §4.2)."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT sleep_score FROM athlete_metrics_cache WHERE date = ?", (date_str,)
+            ).fetchone()
+            return row["sleep_score"] if row else None
+
     # --- Athlete Baselines ---
     def save_baseline(
         self, date: str, rhr_mean: float, rhr_std: float, hrv_mean: float,

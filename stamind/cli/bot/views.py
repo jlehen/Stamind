@@ -11,6 +11,7 @@ write — `bot morning` stamps its per-day marker and, with `adapt-first` on, ru
 adaptation before it renders; `bot changes` marks each line told as it prints it.
 """
 import argparse
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import clock, heads_up, runtime, settings
@@ -139,17 +140,37 @@ def run_bot_mesocycle(args: argparse.Namespace) -> None:
         print(wrap_text(focus))
 
 
+def _adapted_this_morning(date_str: str) -> bool:
+    """Whether the daily adaptation already ran today with last night's sleep score in hand
+    and nothing has been trained since — then the push does not run it again (§4.2)."""
+    change = runtime.db.newest_adapt()
+    if not change or not change.get("sleep_seen"):
+        return False
+    ran_at = clock.to_local(datetime.fromisoformat(change["created_at"]))
+    if ran_at.strftime("%Y-%m-%d") != date_str:
+        return False
+    # Garmin stamps an activity with its local start time, the clock `ran_at` is now in.
+    since = ran_at.strftime("%Y-%m-%d %H:%M:%S")
+    activities = runtime.db.get_completed_activities(start_date=date_str, end_date=date_str)
+    return all((a.get("start_time") or "") <= since for a in activities)
+
+
 def _auto_adapt_note(date_str: str) -> Optional[str]:
     """Runs the daily adaptation non-interactively (the `workout adapt -y` flow minus
-    its preview) and returns the reason line when a change was applied (§4.2). A
-    failure must not sink the push: the schedule then renders as stored, and the error
-    surfaces only as a terminal aside — never in the athlete's chat.
+    its preview) and returns the reason line when a change was applied, unless one already
+    ran this morning with the night in hand (§4.2). A failure must not sink the push: the
+    schedule then renders as stored, and the error surfaces only as a terminal aside —
+    never in the athlete's chat.
 
     The strength planner's notice joins the line whether or not anything else changed,
     which is what covers the morning of the gym day itself
     (DESIGN_strength_tracking.md §9)."""
     try:
-        ensure_recent_data(date_str)
+        if _adapted_this_morning(date_str):
+            return None
+        # A pull that found no sleep score yet leaves a row for today that the refresh
+        # throttle would keep; the night is what this run is for, so fetch again (§4.2).
+        ensure_recent_data(date_str, force_pull=runtime.db.get_sleep_score(date_str) is None)
         proposal = runtime.coach_service.workout_adapt(date_str)
         if not proposal.workouts:
             runtime.coach_service.workout_revision_record_no_change(proposal)

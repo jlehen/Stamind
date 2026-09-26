@@ -5,6 +5,7 @@ router (DESIGN_bot_simple_frontend.md §4.2, §5.3, §5.5, §11.2, §12.6). The 
 import json
 import os
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 from tests.helpers import (
@@ -17,7 +18,7 @@ TEST_DB_PATH = test_db_path("test_stamind_cli_bot.db")
 from stamind.db import Database
 import stamind_cli
 
-from stamind import runtime
+from stamind import clock, runtime
 from stamind.cli.bot.views import MORNING_MARKER, PUSH_ALL_DONE_LINE
 from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
 from stamind.config import config
@@ -306,6 +307,75 @@ class MorningPushTest(unittest.TestCase):
         self.assertIn("Easy run", out)
         self.assertNotIn("LLM down", out)
         self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+
+    # --- §4.2: the push does not run an adaptation that already ran this morning ---
+
+    def _adapted(self, sleep_seen, created_at=None):
+        """An adapt row as the dawn run leaves it; `created_at` (UTC ISO) backdates it."""
+        with test_db.workout_change(kind="adapt", summary="held", sleep_seen=sleep_seen):
+            pass
+        if created_at is None:
+            return
+        with test_db.transaction() as conn:
+            conn.execute("UPDATE workout_changes SET created_at = ?", (created_at,))
+
+    def _adapt_first_run(self, coach):
+        coach.workout_adapt.return_value = MagicMock(
+            workouts=[], reason="All green.", strength_notice=None,
+        )
+        cfg, svc, pull = self._adapt_first_env(coach)
+        with cfg, svc, pull as pulled:
+            code, out, _ = run_cli(["bot", "morning"])
+        self.assertEqual(code, 0)
+        return out, pulled
+
+    def test_adapt_first_skips_a_run_that_already_saw_the_night(self):
+        """The dawn run read last night's sleep score, so the push spends neither a second
+        LLM call nor a Garmin pull on the same morning."""
+        self._adapted(sleep_seen=True)
+        coach = MagicMock()
+        out, pull = self._adapt_first_run(coach)
+        coach.workout_adapt.assert_not_called()
+        pull.assert_not_called()
+        self.assertIn("Rest day", out)
+
+    def test_adapt_first_runs_again_after_a_run_that_missed_the_night(self):
+        self._adapted(sleep_seen=False)
+        coach = MagicMock()
+        self._adapt_first_run(coach)
+        coach.workout_adapt.assert_called_once()
+
+    def test_adapt_first_runs_again_after_a_session_trained_since(self):
+        self._adapted(sleep_seen=True)
+        later = (clock.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        test_db.save_completed_activity(
+            activity_id="a-ride", date=today_str(), start_time=later, activity_name="Ride",
+            activity_type="cycling", duration_sec=3600, distance_km=30.0,
+            elevation_gain_m=0.0, avg_hr=140, max_hr=160, rpe=None, tss=60.0,
+        )
+        coach = MagicMock()
+        self._adapt_first_run(coach)
+        coach.workout_adapt.assert_called_once()
+
+    def test_adapt_first_ignores_yesterdays_run(self):
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        self._adapted(sleep_seen=True, created_at=yesterday)
+        coach = MagicMock()
+        self._adapt_first_run(coach)
+        coach.workout_adapt.assert_called_once()
+
+    def test_adapt_first_pulls_past_the_throttle_while_the_night_is_missing(self):
+        """A pull that found no sleep score yet leaves a row the refresh throttle would
+        keep, so the push forces the next one."""
+        coach = MagicMock()
+        _, pull = self._adapt_first_run(coach)
+        pull.assert_called_once_with(today_str(), force_pull=True)
+
+    def test_adapt_first_pulls_normally_once_the_night_is_in(self):
+        test_db.save_metric_cache(today_str(), 50, 60, 80, 20, None, None, None)
+        coach = MagicMock()
+        _, pull = self._adapt_first_run(coach)
+        pull.assert_called_once_with(today_str(), force_pull=False)
 
 
 class RouteCommandTest(unittest.TestCase):

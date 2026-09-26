@@ -32,7 +32,8 @@ def add_bot_parser(subparsers):
             "push_morning_last in the settings table and exits silently when already "
             "sent today, so the bot's scheduler can fire it repeatedly without "
             "double-sending. With telegram.push.adapt_first, runs the daily adaptation "
-            "non-interactively first."
+            "non-interactively first, unless one already ran today with last night's "
+            "sleep score in hand and nothing has been trained since."
         ),
     )
     b_morning.set_defaults(func=run_bot_morning)

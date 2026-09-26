@@ -166,6 +166,16 @@ class WorkoutHistoryMixin:
             ).fetchone()
             return dict(row) if row else None
 
+    def newest_adapt(self) -> Optional[Dict[str, Any]]:
+        """The newest `adapt` change, held or applied, or None: what the morning push reads
+        to tell whether the daily adaptation already ran today
+        (DESIGN_bot_simple_frontend.md §4.2)."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM workout_changes WHERE kind = 'adapt' ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            return dict(row) if row else None
+
     def change_date_span(self, change_id: int) -> Optional[Tuple[str, str]]:
         """The first and last day a change wrote, or None when it wrote none — the days a
         later run has to reach for the replace question to be worth asking

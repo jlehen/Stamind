@@ -303,7 +303,7 @@ class WorkoutChangeMixin:
     def workout_change(
         self, kind: str, summary: Optional[str] = None,
         macrocycle_id: Optional[int] = None, note: Optional[str] = None,
-        commitment_end: Optional[str] = None,
+        commitment_end: Optional[str] = None, sleep_seen: Optional[bool] = None,
     ) -> Iterator[WorkoutChange]:
         """Opens the single write path onto `workouts` (§6).
 
@@ -315,7 +315,8 @@ class WorkoutChangeMixin:
         `note` is the coach's line to the athlete about this change and `commitment_end`
         the last day of the window in force while it ran
         (DESIGN_plan_change_continuity.md §6.3, §5.2). A change the athlete watched is
-        told as it is written (DESIGN_change_heads_up.md §6).
+        told as it is written (DESIGN_change_heads_up.md §6). `sleep_seen` says whether an
+        adapt read a sleep score for its day (DESIGN_bot_simple_frontend.md §4.2).
         """
         if kind not in CHANGE_KINDS:
             raise ValueError(f"unknown workout change kind: {kind!r}")
@@ -326,9 +327,10 @@ class WorkoutChangeMixin:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO workout_changes "
-                "(created_at, kind, summary, macrocycle_id, note, commitment_end, told_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (created_at, kind, summary, macrocycle_id, note, commitment_end, told_at),
+                "(created_at, kind, summary, macrocycle_id, note, commitment_end, told_at, "
+                " sleep_seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (created_at, kind, summary, macrocycle_id, note, commitment_end, told_at,
+                 None if sleep_seen is None else int(sleep_seen)),
             )
             change = WorkoutChange(self, conn, int(cursor.lastrowid), kind, created_at)
             yield change

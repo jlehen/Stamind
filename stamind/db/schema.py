@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Bump when the DDL below changes, so an existing database picks the change up once.
 # Reusing a number a previous commit already stamped is silent (ARCHITECTURE.md §5).
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 # The append-only rule, as the database enforces it (DESIGN_workout_revisions.md §14).
 # `wipe_workouts` drops both triggers to clear the table and puts them back from here, so
@@ -154,7 +154,12 @@ class SchemaMixin:
                     -- the one standing whenever the Calendar sync happens to run (§5.2).
                     commitment_end TEXT,
                     -- When the athlete was told about it (DESIGN_change_heads_up.md §6).
-                    told_at       TEXT
+                    told_at       TEXT,
+                    -- 1 when an adapt read a sleep score for its day, 0 when it ran before
+                    -- the watch had synced, NULL on every other kind: what lets the morning
+                    -- push skip a run that already saw the night
+                    -- (DESIGN_bot_simple_frontend.md §4.2).
+                    sleep_seen    INTEGER
                 )
             """)
 

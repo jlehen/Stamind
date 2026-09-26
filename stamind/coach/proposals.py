@@ -72,6 +72,10 @@ class RevisionProposal:
     # entries the output checks dropped — both shown in the preview (§9).
     strength_notice: Optional[str] = None
     strength_dropped: Tuple[str, ...] = ()
+    # Whether the run read a sleep score for its day, stamped on the change row so the
+    # morning push can tell a run that saw the night from one that ran before the watch
+    # synced (DESIGN_bot_simple_frontend.md §4.2).
+    sleep_seen: Optional[bool] = None
 
 
 @dataclass(frozen=True)

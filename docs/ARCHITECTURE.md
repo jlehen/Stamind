@@ -339,7 +339,11 @@ classes themselves.
     item of the walk; "🕐 Not now" swaps in the three later choices from the tap itself.
     `bot morning` ends by starting a walk, and first refreshes Garmin and reads new strength
     sets whatever `adapt-first` says, so a question about yesterday's sets joins that walk
-    (DESIGN_strength_tracking.md §11). Each scheduler wake (`scheduler_wake`) first asks
+    (DESIGN_strength_tracking.md §11). With `adapt-first` on it runs the adaptation only
+    when none has run today with last night's sleep score in hand and nothing trained
+    since, reading that from the newest `adapt` row's `sleep_seen`; when today's sleep
+    score is still missing it forces the Garmin pull first, past the refresh throttle
+    (DESIGN_bot_simple_frontend.md §4.2). Each scheduler wake (`scheduler_wake`) first asks
     the database whether a reminder time has passed and, if one has, runs `bot queue
     --remind` and waits for it before it considers the push, whatever the persona and the
     `push` switch. On a terminal the item's line becomes the two-line hint that `status`
@@ -1392,7 +1396,10 @@ performs no I/O; the DDL used to run in full — around 630 lines, writes includ
 every process start. It is **CREATE TABLE IF NOT EXISTS only**: the in-place migrations
 are gone. Both instances were stamped at 18 when they were squashed, so every one of
 them had already run, and a migration here is one-off by policy (AGENTS.md). The bump
-to 19 adds `gym_logs`, which the CREATE below builds on the next start. What they built is folded into the
+to 19 adds `gym_logs`, which the CREATE below builds on the next start. The bump to 20 adds
+`workout_changes.sleep_seen`, a column a CREATE cannot add to a table that exists, so each
+live database gets it by hand with a one-off
+`ALTER TABLE workout_changes ADD COLUMN sleep_seen INTEGER`. What they built is folded into the
 CREATE statements, in the column order they produced. Clearing the stamp still rebuilds
 a database that is missing a table; a database older than the squash cannot be upgraded
 by this code at all, and needs a checkout from before it. Bump `SCHEMA_VERSION` when the
@@ -1518,6 +1525,7 @@ nothing, because an adapt that looked at the metrics and held is a real event.
 | `macrocycle_id` | INTEGER    | The plan version in force when this ran: context for `workout batches`, distinct from the per-row tag. |
 | `note`          | TEXT       | The coach's one line to the athlete about this change. A `generate` writes it only when something they would notice changed (DESIGN_plan_change_continuity.md §6.3); an `adapt` that changed something stores its reason here too; a `rollback` writes its own line about what it undid. NULL on everything else (DESIGN_change_heads_up.md §6). |
 | `told_at`       | TEXT       | UTC ISO, when the athlete was told about this change: stamped as it is written when they watched the run, else by `bot changes`. A change is **waiting** when it has a `note`, no `told_at`, and still stands (DESIGN_change_heads_up.md §6). |
+| `sleep_seen`    | INTEGER    | 1 when an `adapt` (or `tweak`) read a sleep score for its day, 0 when it ran before the watch had synced, NULL on every other kind. What lets the morning push skip an adaptation that already ran with the night in hand (DESIGN_bot_simple_frontend.md §4.2). |
 | `commitment_end`| TEXT       | Last day of the commitment window in force when this ran, so a removal is judged by the window it was written under rather than by the one standing when the Calendar sync happens to run (§5.2). |
 
 ### workout_calendar_state
@@ -2539,7 +2547,7 @@ but the credentials is optional and falls back to the default shown:
 | `llm.router_model`     | str  | Cheaper model the bot's free-text router (`sm bot route`) and its capture extractions (`sm bot capture`) use; a role, not a `settings list coach-model` entry. Absent → the active coaching model (DESIGN_bot_simple_frontend.md §5.4, §12.2) |
 | `telegram.ui`          | str  | Bot persona: `simple` (default) — the companion mode — or `expert` (DESIGN_bot_simple_frontend.md §3) |
 | `telegram.operator_name` | str | What the companion calls the human who runs the CLI. "Coach" is already the app in the athlete's vocabulary, so the operator gets a word of their own; absent → "the person who set this up for you" (DESIGN_render_persona.md §5) |
-| `telegram.push.*`      | —    | Morning push (simple ui only): `enabled` (default true), `morning_time` (`08:00`), `morning_deadline` (`15:00`), `adapt_first` (default false → run `workout adapt -y` before rendering) |
+| `telegram.push.*`      | —    | Morning push (simple ui only): `enabled` (default true), `morning_time` (`08:00`), `morning_deadline` (`15:00`), `adapt_first` (default false → run `workout adapt -y` before rendering, unless one already ran today with last night's sleep score in hand and nothing has been trained since) |
 | `telegram.bot_token` / `telegram.allowed_chat_ids` | — | The bot's token (or the `TELEGRAM_BOT_TOKEN` env var) and the numeric chat-id allowlist ([§2](#entry-points)) |
 | `telegram.command_timeout_seconds` / `telegram.prompt_timeout_seconds` / `telegram.wrap_width` | — | The silent-run watchdog (180), the idle-prompt cancel (300) and the chat wrap width (48) |
 | `telegram.change_delay_minutes` | int | How long a change to one of today's sessions waits before the athlete is told, measured from the newest waiting change so a second run restarts it (default: 20; 0 sends on the bot's next wake). Companion mode only. Also a setting (`settings set change-delay N`). DESIGN_change_heads_up.md §4 |

@@ -451,5 +451,6 @@ class AdaptMixin:
             removals=removals,
             held=tuple(held),
             covered_constraint_ids=covered,
+            sleep_seen=self._db.get_sleep_score(target_date_str) is not None,
             **strength_planner.proposal_fields(strength),
         )
