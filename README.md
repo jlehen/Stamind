@@ -406,7 +406,8 @@ chosen per install with `telegram.ui:` in the config:
   alignment.
 - **Companion mode** (the default) is for an athlete who does not want
   a command language. A persistent keyboard covers the daily surface: Today, Calendar
-  (a month grid in a page), Done lately, Goals, My plan, Progress, and Talk to me. Free text goes
+  (a month grid in a page), Done lately, Goals & plan (a timeline in a page), Progress, and
+  Talk to me. Free text goes
   through a small intent router on a cheap model: "what's on today" shows the
   day, "I'm wrecked" goes to the coach, "no running until Friday" is saved as a
   constraint after a confirmation. The bot opens each day with a morning message

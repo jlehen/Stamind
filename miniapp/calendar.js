@@ -11,14 +11,10 @@ const ui = {
   next: document.getElementById("next"),
   goal: document.getElementById("goal"),
   stamp: document.getElementById("stamp"),
-  showGrid: document.getElementById("show-grid"),
-  showPlan: document.getElementById("show-plan"),
   gridView: document.getElementById("grid-view"),
-  planView: document.getElementById("plan-view"),
   grid: document.getElementById("grid"),
   endNote: document.getElementById("end-note"),
   legend: document.getElementById("legend"),
-  plan: document.getElementById("plan"),
   problem: document.getElementById("problem"),
   sheet: document.getElementById("day-sheet"),
   sheetTitle: document.getElementById("sheet-title"),
@@ -121,26 +117,6 @@ function renderLegend() {
   });
 }
 
-function renderPlan() {
-  // Rows, not links: why the plan is shaped this way stays with "🧭 My plan" (§3.4).
-  ui.plan.replaceChildren();
-  for (const row of logic.planRows(snapshot)) {
-    if (row.kind === "today") {
-      ui.plan.append(element("li", "plan-today", "Today"));
-      continue;
-    }
-    const item = element("li", "plan-row");
-    if (row.kind === "meso") {
-      item.append(element("span", `swatch meso-${row.index % STRIPS}`));
-      item.append(element("span", "plan-name", row.name));
-      item.append(element("span", "plan-when", row.span));
-    } else {
-      item.append(element("span", "plan-name", `🎯 ${row.text}`));
-    }
-    ui.plan.append(item);
-  }
-}
-
 function openSheet(iso) {
   const found = logic.sheetFor(snapshot, iso);
   if (!found) {
@@ -168,21 +144,6 @@ function openSheet(iso) {
   ui.sheet.hidden = false;
 }
 
-function show(view) {
-  const grid = view === "grid";
-  ui.gridView.hidden = !grid;
-  ui.planView.hidden = grid;
-  ui.showGrid.setAttribute("aria-selected", String(grid));
-  ui.showPlan.setAttribute("aria-selected", String(!grid));
-  ui.prev.hidden = !grid;
-  ui.next.hidden = !grid;
-  if (!grid) {
-    ui.title.textContent = "Plan";
-    return;
-  }
-  renderMonth();
-}
-
 function turn(step) {
   const target = shown + step;
   if (target < 0 || target >= months.length) {
@@ -195,8 +156,6 @@ function turn(step) {
 function wire() {
   ui.prev.addEventListener("click", () => turn(-1));
   ui.next.addEventListener("click", () => turn(1));
-  ui.showGrid.addEventListener("click", () => show("grid"));
-  ui.showPlan.addEventListener("click", () => show("plan"));
   ui.sheetClose.addEventListener("click", () => { ui.sheet.hidden = true; });
   ui.sheet.addEventListener("click", (event) => {
     if (event.target === ui.sheet) {
@@ -247,8 +206,7 @@ async function start() {
   months = logic.monthsBetween(snapshot.from, snapshot.to);
   shown = logic.monthOf(months, snapshot.today);
   renderLegend();
-  renderPlan();
-  show("grid");
+  renderMonth();
 }
 
 start();

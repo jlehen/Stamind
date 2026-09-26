@@ -124,10 +124,3 @@ test("a day with a session can be asked for in full in the chat", async () => {
   assert.equal(logic.fullDayMessage("2026-09-22"), '{"calendar_day":"2026-09-22"}');
 });
 
-test("the plan view runs mesocycles and goals in date order around today", async () => {
-  const snapshot = await logic.snapshotFromHash(`#c=${PACKED}`);
-  const rows = logic.planRows(snapshot);
-  assert.deepEqual(rows.map((row) => row.kind), ["meso", "today", "meso", "goal"]);
-  assert.equal(rows[0].span, "1 Sep – 30 Sep");
-  assert.match(rows[3].text, /Sylvesterlauf/);
-});

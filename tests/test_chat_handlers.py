@@ -243,6 +243,16 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([s[1] for s in started], [["workout", "list", "-d", "2026-09-26"]])
         self.assertFalse(os.path.exists(self.gym_logs()))
 
+    async def test_the_plan_page_asks_why_and_writes_no_log(self):
+        """The athlete taps a mesocycle on "Goals & plan", then "💬 Why, in chat": the bot
+        posts the plan the way "🧭 My plan" did (DESIGN_calendar_miniapp.md §3.7)."""
+        chat_bot = build_chat_bot(self, ui="simple")
+        started = record_commands(self, chat_bot)
+        update, _replied = web_app_update(data='{"plan_why": true}')
+        await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
+        self.assertEqual([s[1] for s in started], [["plan", "show"]])
+        self.assertFalse(os.path.exists(self.gym_logs()))
+
 
 class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
     """What `on_callback` does with a tap on each of the four button namespaces."""

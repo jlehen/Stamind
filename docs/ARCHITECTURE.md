@@ -1524,7 +1524,7 @@ facts are **derived, not stored**. See DESIGN_workout_revisions.md.
 | `sport_canonical`       | TEXT       | The slot key (`stamind.sports.canonical_sport`). |
 | `sport_type`            | TEXT       | The spelling as written.                         |
 | `title`                 | TEXT       |                                                  |
-| `short_name`            | TEXT       | At most five characters naming the kind of session ("Easy", "Hills", "Z2"), which the calendar cell shows under its icon. The week planner writes it with the title in `workout generate`, `workout adapt` and `workout tweak`; stored as written. Taken as given like `title`: `WorkoutChange.append` never carries it forward, and the strength planner's hand-built rows copy it from the live session. Not a prescription field: a revision differing only in it is dropped, and Google Calendar never shows it. NULL on a rest day and on sessions written before the column existed; a one-off script under `scripts/` added the column (`SCHEMA_VERSION` 20, DESIGN_calendar_miniapp.md §3.6). |
+| `short_name`            | TEXT       | At most five characters naming the kind of session ("Easy", "Hills", "Z2"), which the calendar cell shows under its icon. The week planner writes it with the title in `workout generate`, `workout adapt` and `workout tweak`; stored as written. Taken as given like `title`: `WorkoutChange.append` never carries it forward, and the strength planner's hand-built rows copy it from the live session. Not a prescription field: a revision differing only in it is dropped, and Google Calendar never shows it. NULL on a rest day and on sessions written before the column existed; `scripts/migrate_calendar_columns.py` added the column (`SCHEMA_VERSION` 22, DESIGN_calendar_miniapp.md §3.6). |
 | `description`           | TEXT       |                                                  |
 | `duration_minutes`      | INTEGER    |                                                  |
 | `rpe`                   | INTEGER    | Expected RPE 1–10 (excluded from `pushed_signature`) |
@@ -2053,6 +2053,7 @@ Regenerating a plan **supersedes** the prior version (kept) rather than deleting
 | `start_date`    | TEXT                    | YYYY-MM-DD                              |
 | `end_date`      | TEXT                    | YYYY-MM-DD                              |
 | `focus`         | TEXT                    | E.g. "Zone 2 aerobic base, high volume" |
+| `summary`       | TEXT                    | One plain sentence on what the mesocycle is for, which `plan generate` writes for the "Goals & plan" page; stored as given, NULL when the model leaves it out and on plans written before the column existed (`scripts/migrate_calendar_columns.py`, `SCHEMA_VERSION` 22, DESIGN_calendar_miniapp.md §3.7) |
 
 ### plan_feedback
 The plan's feedback log — an append-only list of notes the athlete addressed to the
@@ -2218,7 +2219,8 @@ opted-in list; the `cli/render/` package also holds every companion line builder
 `session_lines.py` for a day and what was trained in it, `plan_lines.py` for the goals,
 constraints and plan it is built from — so the whole voice reads in one place. Two more
 files there speak for the calendar ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)):
-`calendar_page.py` builds the page's snapshot from those line builders, and
+`calendar_page.py` builds the page's snapshot from those line builders, `plan_page.py` the
+"Goals & plan" page's, and
 `calendar_grid.py` is `sm calendar`'s month grid, which `ExpertRenderer.calendar_month`
 prints. The expert table renderers stay in their command modules (`print_workout_table`,
 `print_plan`, `print_progress_report`, …) and `ExpertRenderer` delegates. Command
@@ -4399,19 +4401,31 @@ under every month that runs past it. `at` is `clock.now()`, the "as of" stamp.
 
 **The budget.** Everything but the sheets always goes in. The sheets go in one day at a
 time from today outward (today, tomorrow, yesterday, the day after…) until the next one
-would pass `BUDGET_BYTES`, 6 KB under Telegram's 9.9 KB keyboard limit. `fit` names the
+would pass `BUDGET_BYTES`, 5 KB: Telegram refuses the whole keyboard past about 9.9 KB,
+and the "Goals & plan" page's 2 KB and the gym button share it. `fit` names the
 days whose sheets all went in, so a tap on a day outside it says "This day's details did
 not fit. Days from 11 Sep to 16 Oct have them."
 
-**The button.** `ChatBot._calendar_button` gathers the window and builds the address on
-every send, so the button carries the snapshot of the bot's last message.
-`simple_keyboard_rows` puts the `(label, url)` cell after "📅 Today", where "🗓 My week"
-was, and `telegram_api.reply_keyboard` draws it as a web-app button, like the gym one.
+**The buttons.** `ChatBot._page_buttons` gathers the window once and builds both page
+addresses on every send, so each button carries the snapshot of the bot's last message.
+`simple_keyboard_rows` puts the calendar's `(label, url)` cell after "📅 Today", where
+"🗓 My week" was, and the "🎯 Goals & plan" cell after "✅ Done lately", where "🎯 Goals"
+and "🧭 My plan" were; `telegram_api.reply_keyboard` draws each as a web-app button, like
+the gym one.
 "my week" typed in her own words still reaches `workout list` through the router, and the
 morning push still carries the offer to plan the next weeks. Every send that attaches the
 keyboard goes through `RepliesMixin._send_keyed`. When building the keyboard or sending
 with it fails, that sends the text again without a keyboard and journals the error, so a
 refused keyboard never costs the athlete her answer.
+
+**Goals & plan.** A second page, `miniapp/plan.html` with `plan.js` and `plan_logic.js`,
+borrowing the calendar's CSS and snapshot reading. It lists the mesocycles and the goals
+(upcoming 🎯, completed ✅, archived left out) in date order around a "Today" line; a tapped
+mesocycle shows its dates and `mesocycles.summary`, the one line `plan generate` writes for
+it, and "💬 Why, in chat" sends `{"plan_why": true}`, which `on_web_app_data` turns into
+`plan show` (`plan_page.asks_why`). `plan_page.plan_url` packs `meso` and `goals` from the
+same `Calendar`; past its 2 KB budget the summaries and descriptions are dropped
+(DESIGN_calendar_miniapp.md §3.7).
 
 **The way back.** The sheet has no workout text, so under a day with a session the page
 offers "💬 Full day in chat". Tapping it calls `sendData` with

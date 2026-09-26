@@ -144,8 +144,8 @@ class SimpleKeyboardTest(unittest.TestCase):
             ("run", ["workout", "list", "-d", "today"]),
         )
         self.assertIsNone(keyboards.keyboard_action("🗓 My week"))
-        self.assertEqual(keyboards.keyboard_action("🎯 Goals"), ("run", ["goal", "list"]))
-        self.assertEqual(keyboards.keyboard_action("🧭 My plan"), ("run", ["plan", "show"]))
+        self.assertIsNone(keyboards.keyboard_action("🎯 Goals"))
+        self.assertIsNone(keyboards.keyboard_action("🧭 My plan"))
         self.assertEqual(
             keyboards.keyboard_action("📈 Progress"), ("run", ["progress", "--chart"])
         )
@@ -159,7 +159,9 @@ class SimpleKeyboardTest(unittest.TestCase):
         for label, _ in keyboards.SIMPLE_KEYBOARD:
             self.assertIn(label, keyboards.SIMPLE_WELCOME, label)
         self.assertIn(keyboards.CALENDAR_LABEL, keyboards.SIMPLE_WELCOME)
+        self.assertIn(keyboards.PLAN_LABEL, keyboards.SIMPLE_WELCOME)
         self.assertNotIn("My week", keyboards.SIMPLE_WELCOME)
+        self.assertNotIn("My plan", keyboards.SIMPLE_WELCOME)
 
     def test_non_label_text_is_not_a_button(self):
         self.assertIsNone(keyboards.keyboard_action("show me my week"))
@@ -233,21 +235,25 @@ class GymButtonTest(unittest.TestCase):
         self.assertEqual(withgym[1:], plain)
         self.assertEqual(plain[0], ["📅 Today", "✅ Done lately"])
 
-    def test_the_calendar_cell_takes_the_place_of_my_week(self):
-        """DESIGN_calendar_miniapp.md §6: "🗓 My week" leaves the keyboard, and the
-        calendar's (label, url) cell sits beside "📅 Today" where it was."""
+    def test_the_two_pages_take_the_places_of_my_week_goals_and_my_plan(self):
+        """DESIGN_calendar_miniapp.md §6, §3.7: the calendar's (label, url) cell sits
+        beside "📅 Today" where "🗓 My week" was, and the "Goals & plan" cell after
+        "✅ Done lately", where "🎯 Goals" and "🧭 My plan" were."""
         calendar = (keyboards.CALENDAR_LABEL, "https://x/calendar.html#c=eJw")
+        plan = (keyboards.PLAN_LABEL, "https://x/plan.html#c=eJw")
         gym = ("🏋️ Log today's gym", "https://x/#s=e30")
-        rows = keyboards.simple_keyboard_rows(gym, calendar)
+        rows = keyboards.simple_keyboard_rows(gym, calendar, plan)
         self.assertEqual(rows, [
             [gym],
             ["📅 Today", calendar],
-            ["✅ Done lately", "🎯 Goals"],
-            ["🧭 My plan", "📈 Progress"],
-            ["💬 Talk to me"],
+            ["✅ Done lately", plan],
+            ["📈 Progress", "💬 Talk to me"],
         ])
-        self.assertNotIn("🗓 My week", [label for label, _ in keyboards.SIMPLE_KEYBOARD])
+        labels = [label for label, _ in keyboards.SIMPLE_KEYBOARD]
+        for gone in ("🗓 My week", "🎯 Goals", "🧭 My plan"):
+            self.assertNotIn(gone, labels)
         self.assertIsNone(keyboards.keyboard_action(keyboards.CALENDAR_LABEL))
+        self.assertIsNone(keyboards.keyboard_action(keyboards.PLAN_LABEL))
 
     def test_the_gym_label_is_neither_a_command_nor_a_stale_tap(self):
         """Tapping it opens the page and sends no text, so nothing here should ever see

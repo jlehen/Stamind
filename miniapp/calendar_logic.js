@@ -1,5 +1,5 @@
 // The calendar page's pure logic (DESIGN_calendar_miniapp.md §3, §5): reading the snapshot out
-// of the address, the month grid, the tint, and the plan view's rows. No DOM here, so
+// of the address, the month grid, the tint and the day sheet. No DOM here, so
 // `node --test` runs it.
 
 export const VERSION = 1;
@@ -263,27 +263,4 @@ export function didNotFit(fit) {
   }
   return `This day's details did not fit. Days from ${shortDay(fit[0])} to `
     + `${shortDay(fit[1])} have them.`;
-}
-
-// ---------------------------------------------------------------------------------------
-// The plan view (§3.4): mesocycles and goals in date order, with a "Today" line.
-// ---------------------------------------------------------------------------------------
-
-export function planRows(snapshot) {
-  const rows = [];
-  (snapshot.meso || []).forEach((meso, index) => {
-    rows.push({ kind: "meso", date: meso.s, index, name: meso.n,
-                span: `${shortDay(meso.s)} – ${shortDay(meso.e)}` });
-  });
-  (snapshot.goals || []).forEach((goal) => {
-    rows.push({ kind: "goal", date: goal.d, text: goal.t });
-  });
-  rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  // Today goes after every row that starts on or before it.
-  let at = rows.findIndex((row) => row.date > snapshot.today);
-  if (at === -1) {
-    at = rows.length;
-  }
-  rows.splice(at, 0, { kind: "today", date: snapshot.today });
-  return rows;
 }

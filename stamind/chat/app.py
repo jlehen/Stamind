@@ -25,14 +25,14 @@ from stamind import calendar_days, clock, journal, runtime, settings
 from stamind.chat import runner, telegram_api
 from stamind.chat.callbacks import CallbacksMixin
 from stamind.chat.keyboards import (
-    CALENDAR_LABEL, GYM_SPORT, MENU_COMMANDS, SIMPLE_MENU_COMMANDS, gym_button,
+    CALENDAR_LABEL, GYM_SPORT, MENU_COMMANDS, PLAN_LABEL, SIMPLE_MENU_COMMANDS, gym_button,
     gym_window_end, simple_keyboard_rows,
 )
 from stamind.chat.messages import MessagesMixin
 from stamind.chat.replies import RepliesMixin
 from stamind.chat.runner import RunnerMixin, Session
 from stamind.chat.scheduler import SchedulerMixin
-from stamind.cli.render import calendar_page
+from stamind.cli.render import calendar_page, plan_page
 from stamind.config import config
 from stamind.output import warn
 from stamind.strength import logger
@@ -123,22 +123,26 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         label, workout = found
         return label, logger.session_url(workout)
 
-    def _calendar_button(self) -> Tuple[str, str]:
-        """The calendar's label and the address carrying this moment's snapshot
-        (DESIGN_calendar_miniapp.md §5, §6)."""
+    def _page_buttons(self) -> Tuple[Tuple[str, str], Tuple[str, str]]:
+        """The calendar's and the "Goals & plan" page's (label, address) cells, both
+        carrying this moment's snapshot of one list of days (DESIGN_calendar_miniapp.md §5,
+        §3.7)."""
         today = clock.today_str()
         start, end = calendar_page.window(today)
         cal = calendar_days.gather(runtime.db, start, end, today)
-        return CALENDAR_LABEL, calendar_page.calendar_url(cal, clock.now())
+        now = clock.now()
+        return ((CALENDAR_LABEL, calendar_page.calendar_url(cal, now)),
+                (PLAN_LABEL, plan_page.plan_url(cal, now)))
 
     def _keyboard(self):
         """The §5.1 reply keyboard the companion attaches, rebuilt on every send so the
-        gym button follows the week and the calendar carries a fresh snapshot
+        gym button follows the week and the pages carry a fresh snapshot
         (DESIGN_gym_logger.md §6, DESIGN_calendar_miniapp.md §5). Expert mode has none."""
         if not self.simple_ui:
             return None
+        calendar, plan = self._page_buttons()
         return telegram_api.reply_keyboard(
-            simple_keyboard_rows(self._gym_button(), self._calendar_button())
+            simple_keyboard_rows(self._gym_button(), calendar, plan)
         )
 
     def _log(

@@ -19,7 +19,7 @@ from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, run_cli, 
 from stamind import calendar_days
 from stamind.analytics.adherence import DURATION, LOAD, Gap, off_plan_gaps
 from stamind.cli.render import calendar_grid
-from stamind.cli.render import calendar_page
+from stamind.cli.render import calendar_page, plan_page
 from stamind.cli.render.plan_lines import SIMPLE_END_NOTE
 from stamind.cli.render.session_lines import simple_gap_words
 from stamind.db import Database
@@ -285,6 +285,56 @@ class GapColourTest(CalendarTestCase):
                          "shorter but harder than planned")
         self.assertEqual(simple_gap_words([gap(DURATION, 1.5), gap(LOAD, 1.6)]),
                          "longer and harder than planned")
+
+
+class PlanPageTest(CalendarTestCase):
+    """The "Goals & plan" page's snapshot, built from the calendar's list of days (§3.7)."""
+
+    def payload(self, packed_url):
+        head, packed = packed_url.split("#c=")
+        self.assertEqual(head, plan_page.PAGE_URL)
+        return calendar_page.unpack(packed)
+
+    def cal(self):
+        start, end = calendar_page.window(TODAY)
+        return calendar_days.gather(test_db, start, end, TODAY)
+
+    def test_mesocycles_and_goals_in_companion_words(self):
+        payload = self.payload(plan_page.plan_url(self.cal(), AT))
+        self.assertEqual([m["n"] for m in payload["meso"]], ["Build", "Aerobic base"])
+        self.assertNotIn("m", payload["meso"][0])
+        self.assertTrue(payload["goals"][0]["t"].startswith("🏃 Autumn 10k — on "))
+        self.assertNotIn("k", payload["goals"][0])
+
+    def test_a_summary_a_description_and_a_completed_goal(self):
+        goal = test_db.add_objective(title="Spring half", target_date="2026-09-06",
+                                     sport_type="running", description="Sub 1:50.")
+        test_db.save_macrocycle(
+            objective_id=goal, strategy="s", goals_hash="h", constraints_hash="c",
+            mesocycles=[{"name": "Spring", "start_date": "2026-08-20",
+                         "end_date": "2026-09-06", "focus": "f",
+                         "summary": "Sharpen for the half."}],
+        )
+        payload = self.payload(plan_page.plan_url(self.cal(), AT))
+        spring = [m for m in payload["meso"] if m["n"] == "Spring"][0]
+        self.assertEqual(spring["m"], "Sharpen for the half.")
+        half = [g for g in payload["goals"] if "Spring half" in g["t"]][0]
+        self.assertEqual((half["x"], half["k"]), ("Sub 1:50.", 1))
+
+    def test_past_the_budget_the_words_go_and_the_timeline_stays(self):
+        test_db.add_objective(title="Long words", target_date="2026-11-20",
+                              sport_type="running", description=os.urandom(3000).hex())
+        with patch.object(plan_page, "BUDGET_BYTES", 1500):
+            payload = self.payload(plan_page.plan_url(self.cal(), AT))
+        self.assertTrue(all("x" not in g for g in payload["goals"]))
+        self.assertIn("Long words", " ".join(g["t"] for g in payload["goals"]))
+
+    def test_the_why_the_page_sends(self):
+        self.assertTrue(plan_page.asks_why('{"plan_why": true}'))
+        for data in ('{"plan_why": 1, "x": 2}', '{"calendar_day": "2026-09-26"}', "no"):
+            self.assertFalse(plan_page.asks_why(data), data)
+        with open(os.path.join(REPO, "miniapp", "plan_logic.js"), encoding="utf-8") as handle:
+            self.assertIn(f'WHY_REQUEST = "{plan_page.WHY_REQUEST}"', handle.read())
 
 
 class RequestedDayTest(unittest.TestCase):

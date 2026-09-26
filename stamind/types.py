@@ -204,6 +204,7 @@ class Mesocycle(TypedDict):
     start_date: str
     end_date: str
     focus: str
+    summary: Optional[str]  # one line for the "Goals & plan" page (DESIGN_calendar_miniapp.md §3.7)
 
 class PlanFeedback(TypedDict):
     """One note in a plan's feedback log — a message the athlete addressed to the next

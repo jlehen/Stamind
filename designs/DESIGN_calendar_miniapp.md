@@ -58,7 +58,7 @@ writes in the chat:
 She swipes left and sees October, then early November. The page goes as far as the
 snapshot does, 6 November, and no further.
 
-A switch in the header shows the plan view instead of the grid (§3.4).
+The plan and the goals have a page of their own, "🎯 Goals & plan" (§3.7).
 
 ## 2. Who uses what
 
@@ -160,19 +160,13 @@ sport icon, faded, next to whatever the day planned. In the sheet it is the "➕
 
 ### 3.4 The plan view
 
-The plan view is one list, top to bottom, from the first mesocycle in the snapshot to the
-last goal:
-
-- one row per mesocycle, with its colour, its name and its dates;
-- one row per goal, at its date, in the words of §1's header;
-- a "Today" line between the rows where today falls.
-
-Its rows are not links. It shows no mesocycle focus text. Reading why the plan is shaped
-this way stays with "🧭 My plan", which already answers it in the chat.
+The plan view became a page of its own, "Goals & plan" (§3.7). The calendar shows the
+month grid only.
 
 ### 3.5 Goals
 
-Every goal that is not archived is marked 🎯 on its date, in the grid and in the plan view.
+Every goal that is not archived is marked 🎯 on its date, in the grid and on the
+"Goals & plan" page (§3.7).
 The header shows the nearest goal still ahead, through `simple_goal_line` in
 `cli/render/plan_lines.py`. That function already says "on 13 Dec" for an event, a day
 something happens, and "by ~22 Dec" for a horizon, a date the training aims at. So the
@@ -225,6 +219,43 @@ short_name TEXT`, whenever the column is missing, whatever version the database 
 with. `SCHEMA_VERSION` moves from 19 to 20. The script runs on the author's and the
 companion's databases before either bot is restarted on the new code, because
 `_init_db` only creates tables and never adds a column.
+
+### 3.7 Goals & plan: a page of its own
+
+One button, "🎯 Goals & plan", replaces two: "🎯 Goals" (`goal list`) and "🧭 My plan"
+(`plan show`). Both answered "where am I going", and two buttons whose difference takes more
+than a sentence to explain is what the companion keyboard avoids.
+
+It is Wednesday 30 September. She taps "🎯 Goals & plan". A page opens with one list in date
+order: each mesocycle with its colour (the calendar's strip colour), its name and its dates;
+each goal at its date, in the header's words, 🎯 ahead of her and ✅ once reached; and a
+"Today" line where today falls. The list runs from the first mesocycle in the calendar's
+window to the last goal. An archived goal is not on it.
+
+She taps "Aerobic base". A sheet shows its dates and one line on what it is for: "Rebuild
+the aerobic base and start sprint intervals, ending with an FTP test." Under it,
+"💬 Why, in chat" closes the page and the bot posts `plan show`, the reasoning "🧭 My plan"
+used to give. A mesocycle's focus text runs to 3–4 KB, so it never fits in the button;
+the chat is where it is read. She taps her goal: the sheet shows its line and her
+description of it.
+
+**The summary.** `plan generate` writes it, as a `summary` beside each mesocycle's `focus`
+in its answer format (`## RESPONSE FORMAT` in `coach/engine/planning.py`): one plain
+sentence of at most 90 characters, for the athlete.
+It is stored as given in `mesocycles.summary`, and NULL when the model leaves it out. A
+plan written before this has none until the next `plan generate`; its mesocycles show their
+name and dates, and still offer the chat.
+
+**The snapshot.** The same list of days the calendar is built from (§4) gives the page its
+payload, packed the same way into its own button's address (`cli/render/plan_page.py`):
+`meso` with `n`, `s`, `e` and the summary `m`; `goals` with `t` (`simple_goal_line`), `d`,
+the description `x`, and `k` for a completed goal; `at` and `today`. On the author's
+database it is about 1 KB. Its budget is 2 KB: past it the summaries and the descriptions
+go, the timeline stays, and the chat still answers.
+
+**The way back** is the calendar's (§6): `sendData` with `{"plan_why": true}`, which
+`on_web_app_data` turns into `plan show`. "my goals" or "my plan" typed in her own words
+still reach `goal list` and `plan show` through the router.
 
 ## 4. One list of days
 
@@ -351,8 +382,11 @@ the router still sends to `workout list` (`show_week` in `chat/routing.py`).
 The button is a `(label, url)` cell, built in `simple_keyboard_rows` the way the gym cell is,
 and turned into a `KeyboardButton` with a `WebAppInfo` by `reply_keyboard` in
 `chat/telegram_api.py`. The "🗓 My week" entry leaves `SIMPLE_KEYBOARD`, and the calendar
-cell takes its place in the layout. `SIMPLE_KEYBOARD` keeps its shape of label and
-command. The companion card, which teaches the keyboard label by label, gets the new label.
+cell takes its place in the layout. "🎯 Goals" and "🧭 My plan" leave it too, and the
+"🎯 Goals & plan" cell (§3.7) takes their place after "✅ Done lately". `_page_buttons`
+builds both page cells from one list of days. `SIMPLE_KEYBOARD` keeps its shape of label
+and command. The companion card, which teaches the keyboard label by label, gets the new
+labels.
 
 **When building or sending fails.** Two things could lose a reply today: an exception while
 building the calendar button, and a keyboard Telegram refuses as too long. Both would reach
@@ -426,7 +460,10 @@ Before the budget is set, the author measures what a button can carry:
 **The result, 2026-09-26.** The Bot API refuses a reply keyboard with "reply markup is too
 long" once the whole keyboard passes about 9.9 KB: it took 9,921 bytes of address and
 refused 9,984. The limit counts the whole keyboard, so the gym button's address and the
-labels share it with the calendar. The budget is therefore 6 KB.
+labels share it with the calendar. The budget is therefore 6 KB. With the "Goals & plan"
+page's 2 KB (§3.7) and a gym button of up to 1.9 KB, it is 5 KB: on the author's database
+the days from 4 September to 19 October keep their sheets, and a day outside them still
+offers "💬 Full day in chat".
 
 With the full workout text in each sheet, only five days fit in 6 KB: the grid marks for
 the ten weeks take 1.5 KB and each sheet about 900 bytes. The author chose to drop the
@@ -444,6 +481,12 @@ month with more to say.
   button and the send guard (§6).
 - `miniapp/calendar.*` — the page, with node tests beside the gym logger's in
   `miniapp/tests/`. `miniapp/probe.html` for step 0.
+- The "Goals & plan" page (§3.7): `cli/render/plan_page.py` for its snapshot, and
+  `miniapp/plan.html`, `plan.js` and `plan_logic.js`, which borrow the calendar's CSS and
+  snapshot reading. The summary: `## RESPONSE FORMAT` in `coach/engine/planning.py`,
+  `save_macrocycle` in `db/periodization.py`, the `mesocycles` table in `db/schema.py`,
+  the `Mesocycle` type, and `scripts/migrate_calendar_columns.py`, which adds it and the
+  short name.
 - The short name (§3.6), everywhere a session's fields are listed by hand:
   - the week planner's answer format: `## RESPONSE FORMAT` in `coach/engine/generate.py`,
     `schema_members` in `coach/engine/adapt.py`, and the "write each session in full"
@@ -454,7 +497,7 @@ month with more to say.
   - `WorkoutChange.append` and `REVISION_COLUMNS` in `db/workout_change.py`, `_hydrated`
     in `db/workouts.py`, and the `Workout` type in `types.py`;
   - the `workouts` table in `db/schema.py`, and the one-off migration script under
-    `scripts/`.
+    `scripts/` (`migrate_calendar_columns.py`).
 - `docs/ARCHITECTURE.md` — the new modules, `sm calendar` in the command table, the
   `short_name` column, and the calendar in the row on who reads the adherence grade.
 
@@ -463,7 +506,10 @@ month with more to say.
 The shapes worth pinning: the snapshot's packing survives a round trip; the budget rule
 keeps the sheets nearest today; the list of days on a fixed week, including a day with two
 sessions and one with an unplanned activity; the keyboard with the calendar cell in place of
-"🗓 My week"; the send guard sending the text again when the keyboard fails; "💬 Full day
+"🗓 My week" and the "Goals & plan" cell in place of "🎯 Goals" and "🧭 My plan"; the
+"Goals & plan" snapshot, its budget fallback and its "why" reaching `plan show`; the
+migration adding both columns once; the send guard sending the text again when the
+keyboard fails; "💬 Full day
 in chat" reaching `workout list -d`, and a gym log still reaching `strength ingest`; `append`
 taking `short_name` as given and never counting it as a change; the migration adding the
 column once; a session off its plan getting its colour, its ratio and its words, including

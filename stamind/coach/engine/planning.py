@@ -169,7 +169,10 @@ You MUST respond with a JSON object containing:
       "start_date": "YYYY-MM-DD",
       "end_date": "YYYY-MM-DD",
       "focus": "Key focus and description of this mesocycle (e.g., volume progression,
-        aerobic threshold, rest, peak load, etc.)"
+        aerobic threshold, rest, peak load, etc.)",
+      "summary": "What this mesocycle is for, in one plain sentence of at most 90
+        characters, for the athlete (e.g., Rebuild the aerobic base and start sprint
+        intervals, ending with an FTP test.)"
     }}
   ]
 }}

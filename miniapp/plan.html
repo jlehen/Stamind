@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Goals &amp; plan</title>
+<!-- The calendar's look, served beside it (DESIGN_calendar_miniapp §3.7). The deploy turns
+     "?v=dev" into the commit, so a phone never mixes two versions' files. -->
+<link rel="stylesheet" href="./calendar.css?v=dev">
+<link rel="icon" href="data:,">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<header class="head">
+  <div class="head-top">
+    <h1 id="title">Goals &amp; plan</h1>
+  </div>
+  <div class="head-sub">
+    <span class="stamp" id="stamp"></span>
+  </div>
+</header>
+
+<main id="plan-view">
+  <ul class="plan" id="plan"></ul>
+</main>
+
+<p class="problem" id="problem" hidden></p>
+
+<!-- One row's sheet: a mesocycle's dates and summary, or a goal and its description. -->
+<div class="sheet" id="row-sheet" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head">
+      <h2 id="sheet-title"></h2>
+      <button class="close" id="sheet-close" type="button">✕</button>
+    </div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<script type="module" src="./plan.js?v=dev"></script>
+</body>
+</html>

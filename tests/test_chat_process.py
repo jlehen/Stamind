@@ -29,7 +29,7 @@ from tests.helpers import bind_test_db, save_workout
 from stamind import clock, settings
 from stamind.chat import keyboards, replies, runner, scheduler, telegram_api
 from stamind.chat.app import ChatBot
-from stamind.cli.render import calendar_page
+from stamind.cli.render import calendar_page, plan_page
 from stamind.config import config
 from stamind.strength import logger
 
@@ -266,13 +266,18 @@ class GymKeyboardTest(unittest.TestCase):
                   "load_kg": 140.0}
 
     CALENDAR = (keyboards.CALENDAR_LABEL, "https://x/calendar.html#c=eJw")
+    PLAN = (keyboards.PLAN_LABEL, "https://x/plan.html#c=eJw")
 
     def setUp(self):
         self.db = bind_test_db(test_db_path("test_chat_process.db"))
-        # The calendar cell has its own case below; here it is a fixed cell.
-        patcher = mock.patch.object(ChatBot, "_calendar_button", return_value=self.CALENDAR)
+        # The page cells have their own case below; here they are fixed cells.
+        patcher = mock.patch.object(ChatBot, "_page_buttons",
+                                    return_value=(self.CALENDAR, self.PLAN))
         patcher.start()
         self.addCleanup(patcher.stop)
+
+    def plain_rows(self):
+        return keyboards.simple_keyboard_rows(calendar=self.CALENDAR, plan=self.PLAN)
 
     def a_gym_day(self, day):
         save_workout(
@@ -288,11 +293,11 @@ class GymKeyboardTest(unittest.TestCase):
         label, url = rows[0][0]
         self.assertEqual(label, "🏋️ Log today's gym")
         self.assertTrue(url.startswith(logger.PAGE_URL + "#s="), url)
-        self.assertEqual(rows[1:], keyboards.simple_keyboard_rows(calendar=self.CALENDAR))
+        self.assertEqual(rows[1:], self.plain_rows())
 
     def test_a_week_with_no_gym_day_keeps_the_plain_keyboard(self):
         _kind, rows = build_chat_bot(self, ui="simple")._keyboard()
-        self.assertEqual(rows, keyboards.simple_keyboard_rows(calendar=self.CALENDAR))
+        self.assertEqual(rows, self.plain_rows())
 
     def test_with_the_setting_off_there_is_no_button_and_no_database_read(self):
         self.a_gym_day(clock.today_str())
@@ -300,13 +305,14 @@ class GymKeyboardTest(unittest.TestCase):
         chat_bot = build_chat_bot(self, ui="simple")
         with mock.patch.object(self.db, "get_workouts") as never:
             _kind, rows = chat_bot._keyboard()
-        self.assertEqual(rows, keyboards.simple_keyboard_rows(calendar=self.CALENDAR))
+        self.assertEqual(rows, self.plain_rows())
         never.assert_not_called()
 
 
 class CalendarKeyboardTest(unittest.TestCase):
-    """The calendar cell carries this moment's snapshot, and sits where "🗓 My week" was
-    (DESIGN_calendar_miniapp.md §5, §6)."""
+    """The page cells carry this moment's snapshot: the calendar where "🗓 My week" was,
+    and "Goals & plan" where "🎯 Goals" and "🧭 My plan" were
+    (DESIGN_calendar_miniapp.md §5, §6, §3.7)."""
 
     def setUp(self):
         self.db = bind_test_db(test_db_path("test_chat_process.db"))
@@ -322,7 +328,10 @@ class CalendarKeyboardTest(unittest.TestCase):
         payload = calendar_page.unpack(packed)
         self.assertEqual(payload["today"], clock.today_str())
         self.assertEqual(payload["days"][clock.today_str()]["x"][0]["l"], "40′")
-        self.assertEqual(rows, keyboards.simple_keyboard_rows(calendar=(label, url)))
+        plan = rows[1][1]
+        self.assertEqual(plan[0], keyboards.PLAN_LABEL)
+        self.assertTrue(plan[1].startswith(plan_page.PAGE_URL + "#c="), plan[1])
+        self.assertEqual(rows, keyboards.simple_keyboard_rows(calendar=(label, url), plan=plan))
 
 
 class BackAfterRestartTest(unittest.IsolatedAsyncioTestCase):
