@@ -88,6 +88,19 @@ test("a day whose details did not fit says which days have them", async () => {
   assert.equal(logic.sheetFor(snapshot, "2026-12-01"), null);
 });
 
+test("a goal's day opens with the goal, even with nothing else on it", () => {
+  const goal = { t: "🏃 Greifenseelauf — on 18 Oct (in 3 weeks)", d: "2026-10-18" };
+  const planned = [["Planned", ["🏃 Today: Race — 60 min"]]];
+  const snapshot = { today: "2026-09-25", from: "2026-08-28", to: "2026-11-06",
+                     fit: ["2026-08-28", "2026-11-06"], goals: [goal],
+                     days: { "2026-10-18": { x: [{ i: "🏃" }], sheet: planned } } };
+  assert.deepEqual(logic.sheetFor(snapshot, "2026-10-18").parts,
+                   [["Goal", [goal.t]], ...planned]);
+  delete snapshot.days["2026-10-18"];
+  assert.deepEqual(logic.sheetFor(snapshot, "2026-10-18").parts, [["Goal", [goal.t]]]);
+  assert.equal(logic.sheetFor(snapshot, "2026-10-17"), null);
+});
+
 test("a day with a session can be asked for in full in the chat", async () => {
   const snapshot = await logic.snapshotFromHash(`#c=${PACKED}`);
   assert.equal(logic.asksForFullDay(snapshot, "2026-09-22"), true);

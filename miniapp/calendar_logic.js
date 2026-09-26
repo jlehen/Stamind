@@ -185,7 +185,20 @@ export function inWindow(snapshot, iso) {
   return snapshot.from <= iso && iso <= snapshot.to;
 }
 
+// The heading of the part a goal's day opens with (§3.5).
+export const GOAL = "Goal";
+
 export function sheetFor(snapshot, iso) {
+  // The day's sheet, opening with the goals set on that day (§3.5).
+  const found = daySheet(snapshot, iso);
+  const goals = goalsOn(snapshot, iso).map((goal) => goal.t);
+  if (!goals.length) {
+    return found;
+  }
+  return { ...found, parts: [[GOAL, goals], ...((found && found.parts) || [])] };
+}
+
+function daySheet(snapshot, iso) {
   // The sheet; or, for a day whose details did not fit, the message saying which days have
   // them; or null for a day with nothing to say.
   const day = snapshot.days[iso];
