@@ -30,9 +30,9 @@ VERSION = 1
 DAYS_BACK = 28
 DAYS_AHEAD = 42
 
-# How many packed bytes the address may carry. Half the smallest size step 0 finds every
-# client opening; 16 KB until it is measured (§8).
-BUDGET_BYTES = 16 * 1024
+# How many packed bytes the address may carry. Telegram refuses a whole reply keyboard past
+# about 9.9 KB (measured 2026-09-26), and the gym button and the labels share it (§8).
+BUDGET_BYTES = 6 * 1024
 
 # A description is sent unwrapped: the page lets the browser wrap it (§5).
 UNWRAPPED = 1_000_000

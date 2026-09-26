@@ -4330,7 +4330,7 @@ under every month that runs past it. `at` is `clock.now()`, the "as of" stamp.
 
 **The budget.** Everything but the sheets always goes in. The sheets go in one day at a
 time from today outward (today, tomorrow, yesterday, the day after…) until the next one
-would pass `BUDGET_BYTES`, 16 KB until step 0 measures the real limit. `fit` names the
+would pass `BUDGET_BYTES`, 6 KB under Telegram's 9.9 KB keyboard limit. `fit` names the
 days whose sheets all went in, so a tap on a day outside it says "This day's details did
 not fit. Days from 11 Sep to 16 Oct have them."
 
