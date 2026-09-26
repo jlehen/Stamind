@@ -189,7 +189,8 @@ an evening pull would delete the log before the next morning's takeover.
 ## 7. Not decided here
 
 - Whether the log or Garmin wins on a day with both, beyond the takeover rule above.
-- Grading a session set by set, and what the strength planner is shown of a log.
+- Grading a session set by set: DESIGN_strength_planned_vs_done.md.
+- What the strength planner is shown of a log.
 - A rest timer that alerts: the page cannot notify while the phone is locked.
 - Expert mode, which has no reply keyboard to hold the button.
 - Refreshing the button after a `workout adapt` run from the terminal; the log carries the
