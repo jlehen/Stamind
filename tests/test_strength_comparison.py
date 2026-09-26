@@ -18,9 +18,9 @@ from stamind.db import Database
 import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
 from stamind import settings
-from stamind.analytics.adherence import analyze_adherence, classify_adherence
+from stamind.analytics.adherence import SETS, analyze_adherence, classify_adherence, off_plan_gaps
 from stamind.cli.common import strength_table
-from stamind.cli.render import session_lines
+from stamind.cli.render import calendar_page, session_lines
 from stamind.db.strength import logged_sets
 from stamind.strength import comparison, sets
 
@@ -214,6 +214,18 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(verdict["reasons"], [
             "sets: 0 of 17 planned sets near their load (0%, below 80%); 17 lifted",
         ])
+
+    def test_the_calendar_colours_a_logged_session_by_its_sets(self):
+        # DESIGN_calendar_miniapp.md §3.2: the sets are the one measure, never the load.
+        self.assertEqual(off_plan_gaps(thursday_session(), thursday_activity()), [])
+        light = [dict(watched(row["exercise"], 5, 1.0), card=row["position"])
+                 for row in THURSDAY for _ in range(row["sets"])]
+        result = {"planned": thursday_session(), "completed": thursday_activity(lifted=light),
+                  "status": "partial"}
+        gaps = off_plan_gaps(result["planned"], result["completed"])
+        self.assertEqual([(g.measure, g.planned, g.actual) for g in gaps], [(SETS, 17, 0)])
+        self.assertEqual(calendar_page.glyph(result, GYM_DAY, "2026-09-30"), "less")
+        self.assertEqual(session_lines.simple_gap_words(gaps), "fewer sets than planned")
 
     def test_a_session_the_watch_recorded_alone_keeps_the_time_and_load_verdict(self):
         verdict = classify_adherence(thursday_session(), thursday_activity(gym_log=None))

@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from stamind.benchmarks import format_delta, format_value, is_improvement, label_for_kind
 from stamind.strength import comparison
+from stamind.analytics.adherence import DURATION, SETS, Gap, off_plan_gaps
 from stamind.strength.sets import activity_lines
 from stamind.coach.proposals import RevisionProposal
 from stamind.sports import canonical_sport
@@ -205,10 +206,11 @@ def simple_compare_lines(
             total += 1
             if act:
                 done += 1
-                lines.append(
-                    f"{day} · ✅ {simple_session_line(w)} "
-                    f"(you did {simple_activity_minutes(act)} min)"
-                )
+                did = f"you did {simple_activity_minutes(act)} min"
+                gaps = off_plan_gaps(w, act)
+                if gaps:
+                    did = f"{did}, {simple_gap_words(gaps)}"
+                lines.append(f"{day} · ✅ {simple_session_line(w)} ({did})")
                 lines.extend(simple_session_sets(w, act))
             else:
                 lines.append(f"{day} · ❌ {simple_session_line(w)}")
@@ -227,6 +229,24 @@ def simple_compare_lines(
     else:
         lines.append(f"\n0 of {total} {session_word} done — the plan is ready when you are 💪")
     return lines
+
+
+def simple_gap_words(gaps: List[Gap]) -> str:
+    """Which way a session went off its plan: 'shorter than planned', 'longer but easier
+    than planned' (DESIGN_calendar_miniapp.md §3.2). `gaps` is `off_plan_gaps`' list."""
+    words = []
+    for gap in gaps:
+        if gap.measure == SETS:
+            words.append("fewer sets")
+            continue
+        if gap.measure == DURATION:
+            words.append("shorter" if gap.ratio < 1 else "longer")
+            continue
+        words.append("easier" if gap.ratio < 1 else "harder")
+    if len(words) == 1:
+        return f"{words[0]} than planned"
+    joiner = "and" if (gaps[0].ratio < 1) == (gaps[1].ratio < 1) else "but"
+    return f"{words[0]} {joiner} {words[1]} than planned"
 
 
 def simple_date_word(date_str: str) -> str:

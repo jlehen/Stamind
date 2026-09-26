@@ -15,9 +15,13 @@
   --card: var(--tg-theme-secondary-bg-color, var(--fallback-card));
   --accent: var(--tg-theme-button-color, var(--fallback-button));
   --line: var(--fallback-line);
-  /* The tint: green for a day kept, red for a day missed (§3.2). */
+  /* The tint (§3.2): green as planned, blue less, orange more, deeper with the gap, and a
+     red outline for a missed session. `--strength` comes from the page, 0.3 to 1. */
   --ok: rgba(31, 157, 85, 0.22);
-  --miss: rgba(194, 59, 59, 0.22);
+  --less-rgb: 47 123 214;
+  --more-rgb: 230 126 34;
+  --gap-alpha: 0.5;
+  --miss-line: #c23b3b;
   /* The mesocycle strips, numbered along the one list (§4). */
   --meso-0: #2f7bd6;
   --meso-1: #e08a1e;
@@ -39,7 +43,10 @@
     --fallback-line: #33414f;
     --fallback-button: #4a9be8;
     --ok: rgba(62, 194, 122, 0.28);
-    --miss: rgba(239, 122, 122, 0.28);
+    --less-rgb: 90 160 240;
+    --more-rgb: 245 150 60;
+    --gap-alpha: 0.55;
+    --miss-line: #ef7a7a;
   }
 }
 
@@ -185,8 +192,16 @@ h1 {
   background: var(--ok);
 }
 
+.cell.less {
+  background: rgb(var(--less-rgb) / calc(var(--strength, 1) * var(--gap-alpha)));
+}
+
+.cell.more {
+  background: rgb(var(--more-rgb) / calc(var(--strength, 1) * var(--gap-alpha)));
+}
+
 .cell.miss {
-  background: var(--miss);
+  border: 2px solid var(--miss-line);
 }
 
 .cell.today {
@@ -278,6 +293,11 @@ h1 {
   height: 14px;
   border-radius: 3px;
 }
+
+.key-ok { background: var(--ok); }
+.key-less { background: rgb(var(--less-rgb) / var(--gap-alpha)); }
+.key-more { background: rgb(var(--more-rgb) / var(--gap-alpha)); }
+.key-miss { border: 2px solid var(--miss-line); }
 
 .plan-row {
   padding: 8px 0;

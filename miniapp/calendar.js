@@ -60,7 +60,8 @@ function renderCell(iso) {
   cell.type = "button";
   const tint = logic.tint(day);
   if (tint) {
-    cell.classList.add(tint);
+    cell.classList.add(tint.kind);
+    cell.style.setProperty("--strength", String(tint.strength));
   }
   if (iso === snapshot.today) {
     cell.classList.add("today");

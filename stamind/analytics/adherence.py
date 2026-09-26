@@ -145,41 +145,77 @@ def _adherence_tolerance(exp_load: float) -> float:
     return easy_pct - fraction * (easy_pct - hard_pct)
 
 
+DURATION, LOAD, SETS = "duration", "load", "sets"
+
+
+@dataclass(frozen=True)
+class Gap:
+    """One measure of an activity outside the tolerance of the session it matched."""
+    measure: str      # DURATION (minutes), LOAD, or SETS (planned sets counted)
+    planned: float
+    actual: float
+    tolerance: float
+
+    @property
+    def ratio(self) -> float:
+        return self.actual / self.planned
+
+
+def _graded_by_sets(
+    w: Dict[str, Any], matched_act: Dict[str, Any]
+) -> Optional[comparison.Comparison]:
+    """The sets comparison of a strength session with planned lines, paired with an
+    activity carrying a gym log; None for every other session
+    (DESIGN_strength_planned_vs_done.md §6)."""
+    if not comparison.carries_gym_log(matched_act):
+        return None
+    return comparison.compare_session(w, matched_act)
+
+
+def off_plan_gaps(w: Dict[str, Any], matched_act: Dict[str, Any]) -> List[Gap]:
+    """The length, then the load, when either is off the plan by more than the tolerance;
+    for a session its sets grade, the sets alone, when under `DONE_SHARE` of them counted.
+    Empty means the session was performed within tolerance. Single source of truth for
+    `analyze_adherence`, `classify_adherence` and the companion's words and colours for a
+    session off its plan (DESIGN_calendar_miniapp.md §3.2)."""
+    compared = _graded_by_sets(w, matched_act)
+    if compared is not None:
+        if compared.share >= comparison.DONE_SHARE:
+            return []
+        return [Gap(SETS, compared.planned, compared.counted, 1 - comparison.DONE_SHARE)]
+    exp_load = planned_load(w)
+    tolerance = _adherence_tolerance(exp_load)
+    measures = (
+        (DURATION, w.get("duration_minutes") or 0, matched_act["duration_sec"] / 60.0),
+        (LOAD, exp_load, activity_load(matched_act)),
+    )
+    return [
+        Gap(measure, planned, actual, tolerance)
+        for measure, planned, actual in measures
+        if planned > 0 and abs(actual - planned) / planned > tolerance
+    ]
+
+
 def _discrepancy_reasons(
     w: Dict[str, Any], matched_act: Dict[str, Any]
 ) -> List[str]:
-    """Duration/workload mismatch notes for a planned workout vs the activity it
-    matched. Empty list means the session was performed within tolerance. Single
-    source of truth shared by `analyze_adherence` and `classify_adherence`.
-
-    A strength session with planned lines, paired with an activity carrying a gym log, is
-    graded by its sets instead (DESIGN_strength_planned_vs_done.md §6)."""
-    if comparison.carries_gym_log(matched_act):
-        compared = comparison.compare_session(w, matched_act)
-        if compared is not None:
-            return comparison.reasons(compared)
-    act_duration_min = matched_act["duration_sec"] / 60.0
-    act_load = activity_load(matched_act)
-
-    p_duration = w.get("duration_minutes") or 0
-    exp_load = planned_load(w)
-
-    tolerance = _adherence_tolerance(exp_load)
-    tol_pct = f"+/-{tolerance*100:.0f}%"
-
+    """`off_plan_gaps` as the grader's notes, one per measure off the plan. A session
+    its sets grade gets the one "sets:" reason (DESIGN_strength_planned_vs_done.md §6)."""
+    compared = _graded_by_sets(w, matched_act)
+    if compared is not None:
+        return comparison.reasons(compared)
     reasons: List[str] = []
-    if (
-        p_duration > 0
-        and (abs(act_duration_min - p_duration) / p_duration) > tolerance
-    ):
+    for gap in off_plan_gaps(w, matched_act):
+        tol_pct = f"+/-{gap.tolerance*100:.0f}%"
+        if gap.measure == DURATION:
+            reasons.append(
+                f"duration mismatch {tol_pct} (planned {gap.planned:.0f}m, "
+                f"actual {gap.actual:.0f}m)"
+            )
+            continue
         reasons.append(
-            f"duration mismatch {tol_pct} (planned {p_duration:.0f}m, "
-            f"actual {act_duration_min:.0f}m)"
-        )
-    if exp_load > 0 and (abs(act_load - exp_load) / exp_load) > tolerance:
-        reasons.append(
-            f"workload mismatch {tol_pct} (planned load {exp_load:.1f}, "
-            f"actual load {act_load:.1f})"
+            f"workload mismatch {tol_pct} (planned load {gap.planned:.1f}, "
+            f"actual load {gap.actual:.1f})"
         )
     return reasons
 
