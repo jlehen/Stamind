@@ -17,9 +17,11 @@ from tests import test_db_path
 from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, run_cli, save_workout
 
 from stamind import calendar_days
+from stamind.analytics.adherence import DURATION, LOAD, Gap
 from stamind.cli.render import calendar_grid
 from stamind.cli.render import calendar_page
 from stamind.cli.render.plan_lines import SIMPLE_END_NOTE
+from stamind.cli.render.session_lines import simple_gap_words
 from stamind.db import Database
 
 TEST_DB_PATH = test_db_path("test_calendar.db")
@@ -215,6 +217,54 @@ class SnapshotTest(CalendarTestCase):
     def test_the_page_asks_for_a_day_with_the_bots_key(self):
         with open(os.path.join(REPO, "miniapp", "calendar_logic.js"), encoding="utf-8") as handle:
             self.assertIn(f'DAY_REQUEST = "{calendar_page.DAY_REQUEST}"', handle.read())
+
+
+class GapColourTest(CalendarTestCase):
+    """Monday 21 September: a session off its plan is blue for less and orange for more,
+    with the ratio its depth follows, and the Done line says which way it was off (§3.2)."""
+
+    def monday(self, sport, planned_minutes, planned_tss, minutes, tss):
+        save_workout(test_db, date="2026-09-21", sport_type=sport, title="Intervals",
+                     duration_minutes=planned_minutes, tss=planned_tss)
+        test_db.save_completed_activity(
+            activity_id="a21", date="2026-09-21", start_time="2026-09-21 08:00:00",
+            activity_name="Monday Run", activity_type="running", duration_sec=minutes * 60.0,
+            distance_km=5.0, elevation_gain_m=10.0, avg_hr=140, max_hr=160, rpe=None, tss=tss,
+        )
+        start, end = calendar_page.window(TODAY)
+        payload, sheets = calendar_page.snapshot(
+            calendar_days.gather(test_db, start, end, TODAY), AT)
+        return payload["days"]["2026-09-21"]["x"][0], dict(sheets["2026-09-21"])["Done"]
+
+    def test_cut_short_and_easy_is_blue_with_the_load_ratio(self):
+        mark, done = self.monday("running", 60, 60, 25, 20)
+        self.assertEqual((mark["g"], mark["r"]), ("less", 0.33))
+        self.assertEqual(done, ["✅ 🏃 Intervals — 60 min "
+                                "(you did 25 min, shorter and easier than planned)"])
+
+    def test_longer_but_easier_follows_the_load(self):
+        mark, done = self.monday("running", 60, 60, 100, 30)
+        self.assertEqual((mark["g"], mark["r"]), ("less", 0.5))
+        self.assertIn("(you did 100 min, longer but easier than planned)", done[0])
+
+    def test_a_session_on_its_plan_carries_no_ratio(self):
+        mark, done = self.monday("running", 60, 60, 60, 60)
+        self.assertEqual(mark, {"i": "🏃", "l": "60′", "g": "ok"})
+        self.assertEqual(done, ["✅ 🏃 Intervals — 60 min (you did 60 min)"])
+
+    def test_a_rest_day_trained_through_is_full_orange(self):
+        mark, _done = self.monday("rest", None, None, 60, 50)
+        self.assertEqual(mark, {"i": "🛌", "g": "more"})
+
+    def test_the_words_for_each_way_off(self):
+        def gap(measure, ratio):
+            return Gap(measure, 100.0, 100.0 * ratio, 0.2)
+        self.assertEqual(simple_gap_words([gap(DURATION, 0.5)]), "shorter than planned")
+        self.assertEqual(simple_gap_words([gap(LOAD, 1.6)]), "harder than planned")
+        self.assertEqual(simple_gap_words([gap(DURATION, 0.5), gap(LOAD, 1.6)]),
+                         "shorter but harder than planned")
+        self.assertEqual(simple_gap_words([gap(DURATION, 1.5), gap(LOAD, 1.6)]),
+                         "longer and harder than planned")
 
 
 class RequestedDayTest(unittest.TestCase):

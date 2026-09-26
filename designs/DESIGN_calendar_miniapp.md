@@ -26,10 +26,10 @@ bot's last message (§5).
 
 Each day cell shows the sport of the session as an icon, and under it a short name the week
 planner wrote with the session: "🏃 Easy", "🚴 Hills". Wednesday's ride was done, so its cell
-is tinted green. On Tuesday she ran 32 minutes of a planned 50; "✅ Done lately" already
-counts that as done, so the calendar tints it green too. Last Saturday's session was
-skipped, so its cell is red. Next week's cells have no tint, because those sessions have not
-happened yet.
+is tinted green. On Monday she cut an hour of intervals to 25 easy minutes, so its cell is
+blue, deep because she did a third of the planned load. Thursday's ride went half an hour
+long and hard, so its cell is orange. Last Saturday's session was skipped, so its cell has a
+red outline. Next week's cells have no tint, because those sessions have not happened yet.
 
 Last Sunday she also went for a two-hour hike that nothing had planned. That day shows a
 faded hiking icon next to the planned session's icon. A ten-minute walk to the shops is too
@@ -96,20 +96,42 @@ companion's chat messages use.
 
 ### 3.2 The tint
 
-The tint is the glyph "✅ Done lately" would give the day (`simple_compare_lines` in
-`cli/render/session_lines.py`, DESIGN_bot_simple_frontend.md §6):
+The tint is a picture of `workout compare`: how far each session went from its plan, and
+which way. It follows the grade `classify_adherence` gives the session:
 
-- **green** for ✅: the session was done, fully or in part (`SIMPLE_DONE_STATUSES`), or a
-  planned rest day was kept;
-- **red** for ❌: the session was missed, or a rest day was trained through;
-- **no tint** for a day still ahead.
+- **green:** done within the grader's tolerance, or a planned rest day kept;
+- **blue:** trained, but less than planned;
+- **orange:** trained, but more than planned, or trained on a rest day;
+- **a red outline:** missed. Nothing was recorded, which is not "a lot less";
+- **no tint:** a day still ahead.
 
-A kept rest day turns green only once the day is over; a rest day trained through is red at
-once. A day with two sessions is red if either one is red, otherwise green if either one is
-green: a gym session done in the morning and a run still ahead make a green day. There is
-no amber, and the page never
-shows the grader's reasons. Those are expert detail, and the companion views leave them
-out on purpose.
+Blue and orange are the pair people with colour blindness tell apart best. The red outline
+is a shape as well as a colour, so a missed day never reads as a deep orange one.
+
+**Which way, and how far.** The grader compares two measures with the plan: the length and
+the training load. The load already adds up how long and how hard, so the colour follows
+the load when the load is off the plan, and the length only when the load is within
+tolerance or there is no load to compare. It is Thursday. The plan says 60 minutes of hard
+intervals; she rides 100 minutes easy. The load is half the planned load, so the cell is
+blue: the session asked for more than she gave, even though she was out longer.
+
+The depth follows how far off the measure is, as |log₂(actual ÷ planned)|: half the plan
+and double the plan are both the deepest. Just past the tolerance the colour is pale, never
+invisible. The tolerance is the grader's own (`coach.adherence_tolerance`, ±50% for an easy
+session down to ±15% for a hard one), so a 45-minute run for a planned 50 stays green.
+
+**The words.** The sheet's Done line says which way it was off, next to what was done:
+"✅ 🏃 Intervals — 60 min (you did 100 min, longer but easier than planned)". The words
+come from the same measures as the colour (`off_plan_gaps` in `analytics/adherence.py`), and
+"✅ Done lately" in the chat writes the same line. Two measures off the same way are joined
+with "and", opposite ways with "but". The ✅ stays: the chat's tone rule leads with what was
+done.
+
+A kept rest day turns green only once the day is over; a rest day trained through is orange
+at once. On a day with two sessions a missed one wins, then the session furthest from its
+plan, then green: a gym session done in the morning and a run still ahead make a green day.
+A key under the grid gives the four colours in one line each. On the terminal, `sm calendar`
+keeps its marks ✓ ½ ✗ (§7).
 
 ### 3.3 Activities nobody planned
 
@@ -239,7 +261,10 @@ view can show them (§3.4).
               ["Signals and constraints", ["alcohol: 2"]]]}}}
 ```
 
-- `x` is the day's sessions: icon, label and glyph, `ok` (green), `miss` (red) or `ahead`.
+- `x` is the day's sessions: icon, label and glyph, `ok` (green), `less` (blue), `more`
+  (orange), `miss` (red outline) or `ahead`. A session off its plan also carries `r`, the
+  actual over planned of the measure its colour follows, to two decimals (§3.2). A rest
+  day trained through is `more` with no `r`, the deepest orange.
 - `u` is the faded icons, and `c` and `s` whether the day has a constraint or a signal.
 - `sheet` is the day's sheet as heading and lines. The page prints the lines and lets the
   browser wrap them.
@@ -423,8 +448,9 @@ sessions and one with an unplanned activity; the keyboard with the calendar cell
 "🗓 My week"; the send guard sending the text again when the keyboard fails; "💬 Full day
 in chat" reaching `workout list -d`, and a gym log still reaching `strength ingest`; `append`
 taking `short_name` as given and never counting it as a change; the migration adding the
-column once. On the page, the node tests cover reading `c=` next to Telegram's own
-parameters, the tint, and the two-session rule.
+column once; a session off its plan getting its colour, its ratio and its words, including
+"longer but easier" following the load. On the page, the node tests cover reading `c=` next
+to Telegram's own parameters, the tint and its depth, and the two-session rule.
 
 ## 11. Not handled, not decided
 

@@ -37,11 +37,27 @@ test("no c= means no snapshot, and another version is refused", async () => {
 });
 
 test("the tint: green done, red missed, red wins, none ahead", () => {
-  assert.equal(logic.tint({ x: [{ i: "🏃", g: "ok" }] }), "ok");
-  assert.equal(logic.tint({ x: [{ i: "🏃", g: "miss" }] }), "miss");
-  assert.equal(logic.tint({ x: [{ i: "🏃", g: "ok" }, { i: "🏋️", g: "miss" }] }), "miss");
+  assert.deepEqual(logic.tint({ x: [{ i: "🏃", g: "ok" }] }), { kind: "ok", strength: 1 });
+  assert.equal(logic.tint({ x: [{ i: "🏃", g: "miss" }] }).kind, "miss");
+  assert.equal(logic.tint({ x: [{ i: "🏃", g: "less", r: 0.6 },
+                                { i: "🏋️", g: "miss" }] }).kind, "miss");
   assert.equal(logic.tint({ x: [{ i: "🚴", g: "ahead" }] }), null);
   assert.equal(logic.tint(undefined), null);
+});
+
+test("a session off its plan is blue for less, orange for more, deeper the further", () => {
+  // Tuesday: a 50-minute run cut to 32 minutes. Thursday: a 60-minute ride ridden at double.
+  assert.deepEqual(logic.tint({ x: [{ i: "🏃", g: "less", r: 0.64 }] }),
+                   { kind: "less", strength: Math.abs(Math.log2(0.64)) });
+  assert.deepEqual(logic.tint({ x: [{ i: "🚴", g: "more", r: 2.4 }] }),
+                   { kind: "more", strength: 1 });
+  // Just past the tolerance still shows; a rest day trained through carries no ratio.
+  assert.equal(logic.tint({ x: [{ i: "🚴", g: "more", r: 1.1 }] }).strength, 0.3);
+  assert.deepEqual(logic.tint({ x: [{ i: "🛌", g: "more" }] }), { kind: "more", strength: 1 });
+  // Two sessions: the one furthest from its plan sets the colour, over a green one.
+  assert.deepEqual(logic.tint({ x: [{ i: "🏋️", g: "ok" }, { i: "🏃", g: "less", r: 0.8 },
+                                    { i: "🚴", g: "more", r: 1.5 }] }),
+                   { kind: "more", strength: Math.log2(1.5) });
 });
 
 test("two sessions show two icons and no label", () => {

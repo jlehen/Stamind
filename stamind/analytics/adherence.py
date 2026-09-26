@@ -144,34 +144,56 @@ def _adherence_tolerance(exp_load: float) -> float:
     return easy_pct - fraction * (easy_pct - hard_pct)
 
 
+DURATION, LOAD = "duration", "load"
+
+
+@dataclass(frozen=True)
+class Gap:
+    """One measure of an activity outside the tolerance of the session it matched."""
+    measure: str      # DURATION (minutes) or LOAD
+    planned: float
+    actual: float
+    tolerance: float
+
+    @property
+    def ratio(self) -> float:
+        return self.actual / self.planned
+
+
+def off_plan_gaps(w: Dict[str, Any], matched_act: Dict[str, Any]) -> List[Gap]:
+    """The length, then the load, when either is off the plan by more than the tolerance.
+    Empty means the session was performed within tolerance. Single source of truth for
+    `analyze_adherence`, `classify_adherence` and the companion's words and colours for a
+    session off its plan (DESIGN_calendar_miniapp.md §3.2)."""
+    exp_load = planned_load(w)
+    tolerance = _adherence_tolerance(exp_load)
+    measures = (
+        (DURATION, w.get("duration_minutes") or 0, matched_act["duration_sec"] / 60.0),
+        (LOAD, exp_load, activity_load(matched_act)),
+    )
+    return [
+        Gap(measure, planned, actual, tolerance)
+        for measure, planned, actual in measures
+        if planned > 0 and abs(actual - planned) / planned > tolerance
+    ]
+
+
 def _discrepancy_reasons(
     w: Dict[str, Any], matched_act: Dict[str, Any]
 ) -> List[str]:
-    """Duration/workload mismatch notes for a planned workout vs the activity it
-    matched. Empty list means the session was performed within tolerance. Single
-    source of truth shared by `analyze_adherence` and `classify_adherence`."""
-    act_duration_min = matched_act["duration_sec"] / 60.0
-    act_load = activity_load(matched_act)
-
-    p_duration = w.get("duration_minutes") or 0
-    exp_load = planned_load(w)
-
-    tolerance = _adherence_tolerance(exp_load)
-    tol_pct = f"+/-{tolerance*100:.0f}%"
-
+    """`off_plan_gaps` as the grader's notes, one per measure off the plan."""
     reasons: List[str] = []
-    if (
-        p_duration > 0
-        and (abs(act_duration_min - p_duration) / p_duration) > tolerance
-    ):
+    for gap in off_plan_gaps(w, matched_act):
+        tol_pct = f"+/-{gap.tolerance*100:.0f}%"
+        if gap.measure == DURATION:
+            reasons.append(
+                f"duration mismatch {tol_pct} (planned {gap.planned:.0f}m, "
+                f"actual {gap.actual:.0f}m)"
+            )
+            continue
         reasons.append(
-            f"duration mismatch {tol_pct} (planned {p_duration:.0f}m, "
-            f"actual {act_duration_min:.0f}m)"
-        )
-    if exp_load > 0 and (abs(act_load - exp_load) / exp_load) > tolerance:
-        reasons.append(
-            f"workload mismatch {tol_pct} (planned load {exp_load:.1f}, "
-            f"actual load {act_load:.1f})"
+            f"workload mismatch {tol_pct} (planned load {gap.planned:.1f}, "
+            f"actual load {gap.actual:.1f})"
         )
     return reasons
 

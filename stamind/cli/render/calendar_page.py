@@ -11,13 +11,15 @@ import zlib
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from stamind.analytics.adherence import MISSED, REST_VIOLATION
+from stamind.analytics.adherence import (
+    DURATION, LOAD, MISSED, PARTIAL, REST_VIOLATION, off_plan_gaps,
+)
 from stamind.calendar_days import Calendar, Day, next_goal
 from stamind.clock import day_str, parse_date, shift
 from stamind.sports import canonical_sport
 from stamind.cli.render.plan_lines import simple_goal_line, simple_metric_words
 from stamind.cli.render.session_lines import (
-    SIMPLE_DONE_STATUSES, simple_compare_lines, simple_day_lines, sport_emoji,
+    simple_compare_lines, simple_day_lines, sport_emoji,
 )
 
 # The page the Pages deploy publishes beside the gym logger (§6).
@@ -40,8 +42,8 @@ DAY_REQUEST = "calendar_day"
 # The sheet's three headings (§1).
 PLANNED, DONE, NOTES = "Planned", "Done", "Signals and constraints"
 
-# The glyph a session gets, from the grade "✅ Done lately" would give it (§3.2).
-OK, MISS, AHEAD = "ok", "miss", "ahead"
+# The colour a session gets, from its `classify_adherence` grade (§3.2).
+OK, LESS, MORE, MISS, AHEAD = "ok", "less", "more", "miss", "ahead"
 
 
 def window(today: str) -> Tuple[str, str]:
@@ -50,18 +52,28 @@ def window(today: str) -> Tuple[str, str]:
 
 
 def glyph(result: Dict[str, Any], day: str, today: str) -> str:
-    """Green for ✅, red for ❌, none for a day still ahead (§3.2).
-
-    A kept rest day is only kept once the day is over; a rest day trained through is red at
-    once, like the ❌ line "✅ Done lately" writes for it."""
+    """Green as planned, blue less, orange more, red missed, none for a day still ahead
+    (§3.2). A kept rest day is only kept once the day is over; a rest day trained through
+    is more than it asked for at once."""
     status = result["status"]
-    if status in SIMPLE_DONE_STATUSES:
+    if status == "done":
         return OK
-    if status in (MISSED, REST_VIOLATION):
+    if status == PARTIAL:
+        return LESS if gap_ratio(result) < 1 else MORE
+    if status == MISSED:
         return MISS
+    if status == REST_VIOLATION:
+        return MORE
     if status == "rest_ok" and day < today:
         return OK
     return AHEAD
+
+
+def gap_ratio(result: Dict[str, Any]) -> float:
+    """Actual over planned for a partial session, in the measure its colour follows: the
+    load when it is off the plan, else the length (§3.2)."""
+    gaps = {g.measure: g for g in off_plan_gaps(result["planned"], result["completed"])}
+    return (gaps.get(LOAD) or gaps[DURATION]).ratio
 
 
 def length_label(minutes: Optional[int]) -> Optional[str]:
@@ -97,6 +109,8 @@ def _marks(day: Day, today: str) -> Dict[str, Any]:
     sessions = []
     for r in day.results:
         mark = {"i": icon(r["planned"].get("sport_type")), "g": glyph(r, day.date, today)}
+        if r["status"] == PARTIAL:
+            mark["r"] = round(gap_ratio(r), 2)
         if label:
             mark["l"] = label
         sessions.append(mark)

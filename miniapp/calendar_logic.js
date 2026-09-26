@@ -131,14 +131,40 @@ export function monthWeeks(month) {
 // One day's cell (§3.1, §3.2).
 // ---------------------------------------------------------------------------------------
 
-export function tint(day) {
-  // Red if any session is red, green if one is green, none while everything is ahead.
-  const glyphs = ((day && day.x) || []).map((session) => session.g);
-  if (glyphs.includes("miss")) {
-    return "miss";
+// The palest a session off its plan gets, so a gap just past the tolerance still shows.
+const PALEST = 0.3;
+
+export function gapStrength(session) {
+  // 0.3 to 1 as the gap grows: full at half the plan or double it. A rest day trained
+  // through carries no ratio and is full.
+  if (session.r === undefined) {
+    return 1;
   }
-  if (glyphs.includes("ok")) {
-    return "ok";
+  return Math.min(1, Math.max(PALEST, Math.abs(Math.log2(session.r))));
+}
+
+export function tint(day) {
+  // A missed session wins; then the session furthest from its plan; then green; none
+  // while everything is ahead (§3.2).
+  const sessions = (day && day.x) || [];
+  if (sessions.some((session) => session.g === "miss")) {
+    return { kind: "miss", strength: 1 };
+  }
+  let furthest = null;
+  for (const session of sessions) {
+    if (session.g !== "less" && session.g !== "more") {
+      continue;
+    }
+    const strength = gapStrength(session);
+    if (!furthest || strength > furthest.strength) {
+      furthest = { kind: session.g, strength };
+    }
+  }
+  if (furthest) {
+    return furthest;
+  }
+  if (sessions.some((session) => session.g === "ok")) {
+    return { kind: "ok", strength: 1 };
   }
   return null;
 }
