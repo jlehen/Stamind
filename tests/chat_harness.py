@@ -109,7 +109,7 @@ def build_chat_bot(testcase, ui: str = "simple", allowed=(42,)) -> ChatBot:
             {"telegram": {"allowed_chat_ids": list(allowed), "ui": ui, "wrap_width": 48}},
         ),
         mock.patch.object(telegram_api, "build_application",
-                          lambda token: _FakeApplication()),
+                          lambda token, send_retry_seconds: _FakeApplication()),
         mock.patch.object(telegram_api, "register_handlers", lambda *a, **k: None),
         mock.patch.object(telegram_api, "reply_keyboard",
                           lambda rows: ("reply-keyboard", rows)),

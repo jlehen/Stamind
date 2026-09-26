@@ -166,10 +166,17 @@ class SchedulerMixin:
         subprocess every tick within one bot lifetime."""
         last_run: Dict[str, str] = {}
         while True:
-            pause = await scheduler_wake(
-                last_run, self.simple_ui,
-                lambda: self.sessions.get(self.push_chat_id) is not None,
-                self._run_scheduled, self._start_reflect,
-            )
+            try:
+                pause = await scheduler_wake(
+                    last_run, self.simple_ui,
+                    lambda: self.sessions.get(self.push_chat_id) is not None,
+                    self._run_scheduled, self._start_reflect,
+                )
+            except Exception as exc:
+                # One wake's failure never ends the loop: the push is the one thing that
+                # runs when nobody is looking (DESIGN_telegram_send_retry.md §2).
+                self._log(self.push_chat_id, "!!", f"scheduler wake failed: {exc!r}",
+                          lvl="error")
+                pause = 60
             if pause:
                 await asyncio.sleep(pause)

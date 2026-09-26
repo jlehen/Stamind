@@ -18,6 +18,7 @@ import asyncio
 import datetime
 import signal
 import sys
+import traceback
 from typing import Dict, List, Optional, Tuple
 
 from stamind import clock, journal, runtime, settings
@@ -61,11 +62,14 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         # First call into python-telegram-bot, and deliberately before anything else that
         # needs it: a missing install is answered with the line that fixes it, not with a
         # traceback out of whichever builder happened to run first.
-        self.application = telegram_api.build_application(token)
+        self.application = telegram_api.build_application(
+            token, config.telegram_send_retry_seconds
+        )
         self.bot = self.application.bot
         self.updater = self.application.updater
         telegram_api.register_handlers(
-            self.application, self.on_message, self.on_callback, self.on_web_app_data
+            self.application, self.on_message, self.on_callback, self.on_web_app_data,
+            self._on_error,
         )
 
         self.sessions: Dict[int, Session] = {}
@@ -121,25 +125,40 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
             return None
         return telegram_api.reply_keyboard(simple_keyboard_rows(self._gym_button()))
 
-    def _log(self, chat_id: int, direction: str, msg: str) -> None:
+    def _log(
+        self, chat_id: Optional[int], direction: str, msg: str, lvl: str = "info"
+    ) -> None:
         """The bot's own timeline: printed live, and journalled (DESIGN_logging.md §8).
 
         Also journalled, not instead: an operator watching ./sm-bot in a terminal keeps
         the view they have today. Where that stdout goes depends entirely on how the
-        supervisor was launched, which in practice means nowhere."""
+        supervisor was launched, which in practice means nowhere. No chat for what the
+        process itself hit, such as a failed poll."""
         ts = datetime.datetime.now().strftime("%H:%M:%S")
-        print(f"{ts} [{chat_id}] {direction} {msg}", flush=True)
-        journal.record("bot.event", f"{direction} {msg}", chat=chat_id)
+        chat = "" if chat_id is None else f" [{chat_id}]"
+        print(f"{ts}{chat} {direction} {msg}", flush=True)
+        journal.record("bot.event", f"{direction} {msg}", lvl=lvl, chat=chat_id)
 
     def _on_polling_error(self, exc: Exception) -> None:
         """One line per failed poll, in place of the library's full traceback.
 
         python-telegram-bot retries the poll forever with a backoff capped at 30 seconds,
         so a Telegram outage such as a 502 Bad Gateway needs no action from us."""
-        ts = datetime.datetime.now().strftime("%H:%M:%S")
         msg = f"polling failed, retrying: {type(exc).__name__}: {exc}"
-        print(f"{ts} {msg}", flush=True)
-        journal.record("bot.event", msg, lvl="warn")
+        self._log(None, "!!", msg, lvl="warn")
+
+    async def _on_error(self, update, context) -> None:
+        """The failure a handler ended in. Telegram staying unreachable past the retry
+        window is one line, like a failed poll; anything else is ours and keeps its
+        traceback (DESIGN_telegram_send_retry.md §2)."""
+        exc = context.error
+        chat_id = getattr(getattr(update, "effective_chat", None), "id", None)
+        summary = f"{type(exc).__name__}: {exc}"
+        if telegram_api.is_network_error(exc):
+            self._log(chat_id, "!!", f"telegram unreachable, gave up: {summary}", lvl="warn")
+            return
+        self._log(chat_id, "!!", f"handler failed: {summary}", lvl="error")
+        traceback.print_exception(exc)
 
     async def _pause_polling(self) -> None:
         async with self.polling_lock:

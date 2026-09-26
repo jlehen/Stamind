@@ -9,6 +9,7 @@ athlete. The stand-ins all three use are in `tests/chat_harness.py`.
 import ast
 import asyncio
 import glob
+import inspect
 import os
 import pathlib
 import sys
@@ -23,7 +24,7 @@ from tests import test_db_path
 from tests.chat_harness import _FakeProc, build_chat_bot
 from tests.helpers import bind_test_db, save_workout
 from stamind import clock, settings
-from stamind.chat import keyboards, replies, runner, telegram_api
+from stamind.chat import keyboards, replies, runner, scheduler, telegram_api
 from stamind.chat.app import ChatBot
 from stamind.config import config
 from stamind.strength import logger
@@ -450,6 +451,176 @@ def _called_name(call: ast.Call):
         return func.attr
     return getattr(func, "id", None)
 
+
+
+try:
+    from telegram.error import NetworkError, TimedOut
+    from telegram.request import HTTPXRequest
+except ImportError:  # the rest of this module runs without the library; these cases need it
+    NetworkError = TimedOut = HTTPXRequest = None
+
+
+@unittest.skipIf(NetworkError is None, "python-telegram-bot is not installed")
+class SendRetryTest(unittest.IsolatedAsyncioTestCase):
+    """DESIGN_telegram_send_retry.md §2: a call Telegram fails to answer is tried again
+    after a growing pause, until `telegram.send_retry_seconds` have passed."""
+
+    def setUp(self):
+        self.now = 0.0
+        self.slept = []
+
+    async def _sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
+
+    async def _call(self, window, *answers):
+        request = telegram_api.retrying_request(
+            window, sleep=self._sleep, clock=lambda: self.now
+        )
+        with mock.patch.object(HTTPXRequest, "do_request", side_effect=list(answers)):
+            return await request.do_request("https://api.telegram.org/bot/sendMessage", "POST")
+
+    async def test_a_502_is_tried_again_after_a_growing_pause(self):
+        answer = await self._call(180, (502, b""), (502, b""), (200, b"{}"))
+        self.assertEqual((answer, self.slept), ((200, b"{}"), [1, 2]))
+
+    async def test_a_dropped_connection_and_a_timeout_are_tried_again_too(self):
+        answer = await self._call(180, NetworkError("refused"), TimedOut(), (200, b"{}"))
+        self.assertEqual((answer, self.slept), ((200, b"{}"), [1, 2]))
+
+    async def test_an_answer_that_is_not_a_5xx_is_never_retried(self):
+        answer = await self._call(180, (400, b"bad"))
+        self.assertEqual((answer, self.slept), ((400, b"bad"), []))
+
+    async def test_it_gives_up_once_the_window_has_passed(self):
+        with self.assertRaises(NetworkError):
+            await self._call(180, *([NetworkError("down")] * 40))
+        self.assertEqual(self.slept[:6], [1, 2, 4, 8, 15, 15])
+        self.assertEqual(sum(self.slept), 180)
+
+    async def test_a_5xx_that_outlasts_the_window_goes_through_as_it_came(self):
+        answers = [(503, b"first"), (503, b"second"), (503, b"third"), (503, b"never")]
+        answer = await self._call(5, *answers)
+        self.assertEqual((answer, self.slept), ((503, b"third"), [1, 2]))
+
+    async def test_a_window_of_zero_turns_the_retry_off(self):
+        with self.assertRaises(NetworkError):
+            await self._call(0, NetworkError("down"), (200, b"{}"))
+        self.assertEqual(self.slept, [])
+
+    async def test_each_retry_is_a_debug_line_in_the_journal(self):
+        with mock.patch("stamind.chat.telegram_api.journal.debug") as debug:
+            await self._call(180, (502, b""), (200, b"{}"))
+        self.assertEqual(debug.call_count, 1)
+        self.assertIn("HTTP 502", debug.call_args.args[1])
+
+    def test_every_call_but_the_poll_goes_through_it(self):
+        """The library builds a client of its own for the poll; `.request()` sets the one
+        everything else uses."""
+        self.assertIn(".request(retrying_request(", front_end_functions()["build_application"])
+        self.assertIn("config.telegram_send_retry_seconds", inspect.getsource(ChatBot.__init__))
+
+    def test_the_window_is_read_from_config(self):
+        with mock.patch.dict(config.data, {"telegram": {}}):
+            self.assertEqual(config.telegram_send_retry_seconds, 180.0)
+        with mock.patch.dict(config.data, {"telegram": {"send_retry_seconds": 30}}):
+            self.assertEqual(config.telegram_send_retry_seconds, 30.0)
+
+
+@unittest.skipIf(NetworkError is None, "python-telegram-bot is not installed")
+class ErrorHandlerTest(unittest.IsolatedAsyncioTestCase):
+    """DESIGN_telegram_send_retry.md §2: what a handler's failure becomes once the retrying
+    client has given up."""
+
+    def setUp(self):
+        self.chat_bot = build_chat_bot(self)
+
+    async def _fail_with(self, exc):
+        with mock.patch("stamind.chat.app.journal.record") as record, \
+                mock.patch("stamind.chat.app.traceback.print_exception") as printed:
+            await self.chat_bot._on_error(None, SimpleNamespace(error=exc))
+        return record, printed
+
+    async def test_telegram_staying_down_is_one_warning_not_a_traceback(self):
+        record, printed = await self._fail_with(NetworkError("Bad Gateway"))
+        printed.assert_not_called()
+        self.assertEqual(record.call_args.kwargs["lvl"], "warn")
+        self.assertIn("telegram unreachable, gave up: NetworkError: Bad Gateway",
+                      record.call_args.args[1])
+
+    async def test_our_own_failure_keeps_its_traceback_and_is_an_error(self):
+        record, printed = await self._fail_with(KeyError("mesocycles"))
+        printed.assert_called_once()
+        self.assertEqual(record.call_args.kwargs["lvl"], "error")
+        self.assertIn("handler failed: KeyError: 'mesocycles'", record.call_args.args[1])
+
+    def test_the_handler_is_registered(self):
+        self.assertIn("add_error_handler(on_error)", front_end_functions()["register_handlers"])
+        self.assertIn("self._on_error", inspect.getsource(ChatBot.__init__))
+
+
+@unittest.skipIf(NetworkError is None, "python-telegram-bot is not installed")
+class DriveFailureTest(unittest.IsolatedAsyncioTestCase):
+    """DESIGN_telegram_send_retry.md §2: the streaming task's failure never escapes, and a
+    channel that just died is not written to again."""
+
+    def setUp(self):
+        self.chat_bot = build_chat_bot(self)
+        self.session = runner.Session(42, _FakeProc(), "n0nce")
+
+    def test_the_drive_loop_reports_through_it(self):
+        self.assertIn("_report_drive_failure(session, e)", front_end_functions()["_drive"])
+
+    async def test_telegram_down_means_no_reply_is_attempted(self):
+        with mock.patch("stamind.chat.app.journal.record") as record:
+            await self.chat_bot._report_drive_failure(self.session, NetworkError("Bad Gateway"))
+        self.assertEqual(self.chat_bot.bot.sent, [])
+        self.assertEqual(record.call_args.kwargs["lvl"], "warn")
+
+    async def test_our_own_failure_is_told_to_the_athlete(self):
+        with mock.patch("stamind.chat.app.journal.record") as record:
+            await self.chat_bot._report_drive_failure(self.session, KeyError("mesocycles"))
+        self.assertEqual(self.chat_bot.bot.texts(), ["Internal error: 'mesocycles'"])
+        self.assertEqual(record.call_args.kwargs["lvl"], "error")
+
+    async def test_a_reply_that_fails_too_escapes_nowhere(self):
+        async def failing(**kwargs):
+            raise NetworkError("Bad Gateway")
+
+        self.chat_bot.bot.send_message = failing
+        with mock.patch("stamind.chat.app.journal.record") as record:
+            await self.chat_bot._report_drive_failure(self.session, KeyError("x"))
+        self.assertEqual([c.kwargs["lvl"] for c in record.call_args_list], ["error", "warn"])
+
+
+class PushLoopTest(unittest.IsolatedAsyncioTestCase):
+    """DESIGN_telegram_send_retry.md §2: one wake's failure never ends the push loop."""
+
+    async def test_a_wake_that_raises_is_logged_and_the_loop_goes_on(self):
+        class EndTheTest(BaseException):
+            """Not an Exception, so the loop's guard lets it out."""
+
+        chat_bot = build_chat_bot(self)
+        wakes = []
+        slept = []
+
+        async def wake(*args):
+            wakes.append(len(wakes))
+            if len(wakes) == 1:
+                raise RuntimeError("boom")
+            raise EndTheTest()
+
+        async def sleep(seconds):
+            slept.append(seconds)
+
+        with mock.patch.object(scheduler, "scheduler_wake", wake), \
+                mock.patch.object(scheduler.asyncio, "sleep", sleep), \
+                mock.patch("stamind.chat.app.journal.record") as record:
+            with self.assertRaises(EndTheTest):
+                await chat_bot._push_loop()
+        self.assertEqual((len(wakes), slept), (2, [60]))
+        self.assertEqual(record.call_args.kwargs["lvl"], "error")
+        self.assertIn("scheduler wake failed: RuntimeError('boom')", record.call_args.args[1])
 
 
 if __name__ == "__main__":

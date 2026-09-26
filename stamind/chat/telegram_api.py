@@ -10,19 +10,31 @@ write out five times, plus a sixth spelled slightly differently. A prompt's choi
 SM-BUTTONS offer, a sub-menu, a queued item's answers, its "not now" choices and the
 ✋ Stop button are all rows of (label, callback_data).
 """
+import asyncio
 import sys
+import time
 
+from stamind import journal
 from stamind.text import cmd
 
+# The pause before each retry of a call Telegram failed to answer: doubling from a second
+# and capped, until `telegram.send_retry_seconds` has passed (DESIGN_telegram_send_retry.md
+# §2).
+RETRY_FIRST_DELAY = 1.0
+RETRY_MAX_DELAY = 15.0
 
-def build_application(token: str):
+
+def build_application(token: str, send_retry_seconds: float):
     """The Application the bot polls with.
 
     No `post_init` hook: python-telegram-bot runs that one only from `run_polling()`,
     which `ChatBot._serve` replaces, so the bot does its own opening work there.
 
     This is the first call into the library, so a missing install is reported at startup,
-    with the line that fixes it, rather than on the first button the bot tries to draw."""
+    with the line that fixes it, rather than on the first button the bot tries to draw.
+
+    Only the calls the bot makes go through the retrying client: the library builds a
+    client of its own for the poll (DESIGN_telegram_send_retry.md §2)."""
     try:
         from telegram.ext import Application
     except ImportError:
@@ -30,12 +42,68 @@ def build_application(token: str):
             "python-telegram-bot is not installed. Run: "
             + cmd("venv/bin/pip install -r requirements.txt", quote=False)
         )
-    return Application.builder().token(token).build()
+    return (
+        Application.builder()
+        .token(token)
+        .request(retrying_request(send_retry_seconds))
+        .build()
+    )
 
 
-def register_handlers(application, on_message, on_callback, on_web_app_data) -> None:
-    """Wires the three update kinds the bot answers: the Mini App's data message, a text
-    message, and a button tap."""
+def retrying_request(window_seconds: float, sleep=None, clock=None):
+    """The HTTP client every call but the poll goes through: a call Telegram fails to answer
+    is tried again after a growing pause until `window_seconds` have passed, and then the
+    last failure goes through as it came (DESIGN_telegram_send_retry.md §2).
+
+    A 5xx comes back from the library's own `do_request` as a status code, a connection
+    error or a timeout as a `NetworkError`; both are Telegram not answering. `sleep` and
+    `clock` are for the tests."""
+    from telegram.error import NetworkError
+    from telegram.request import HTTPXRequest
+
+    sleep = sleep or asyncio.sleep
+    clock = clock or time.monotonic
+
+    class RetryingRequest(HTTPXRequest):
+        async def do_request(self, *args, **kwargs):
+            deadline = clock() + window_seconds
+            delay = RETRY_FIRST_DELAY
+            while True:
+                try:
+                    code, payload = await super().do_request(*args, **kwargs)
+                except NetworkError as exc:
+                    if clock() + delay > deadline:
+                        raise
+                    reason = f"{type(exc).__name__}: {exc}"
+                else:
+                    if code < 500 or clock() + delay > deadline:
+                        return code, payload
+                    reason = f"HTTP {code}"
+                journal.debug(
+                    "bot.event", f"telegram did not answer ({reason}), retrying in {delay:g}s"
+                )
+                await sleep(delay)
+                delay = min(delay * 2, RETRY_MAX_DELAY)
+
+    return RetryingRequest()
+
+
+def is_network_error(exc: BaseException) -> bool:
+    """Whether `exc` is the library saying Telegram could not be reached, which is what the
+    retrying client gives up with, and never one of our own failures
+    (DESIGN_telegram_send_retry.md §2)."""
+    try:
+        from telegram.error import NetworkError
+    except ImportError:
+        return False
+    return isinstance(exc, NetworkError)
+
+
+def register_handlers(
+    application, on_message, on_callback, on_web_app_data, on_error
+) -> None:
+    """Wires the three update kinds the bot answers, the Mini App's data message, a text
+    message and a button tap, and the handler for the failure any of them ends in."""
     from telegram.ext import CallbackQueryHandler, MessageHandler, filters
 
     # First, so the page's message never falls to the text handler
@@ -46,6 +114,7 @@ def register_handlers(application, on_message, on_callback, on_web_app_data) -> 
     # filters.TEXT catches commands too (a '/status' message is still text).
     application.add_handler(MessageHandler(filters.TEXT, on_message))
     application.add_handler(CallbackQueryHandler(on_callback))
+    application.add_error_handler(on_error)
 
 
 def all_update_types():

@@ -175,6 +175,10 @@ llm:
 #  # Seconds to wait for you to answer an interactive prompt (tap a button or send text)
 #  # before the command is cancelled. Default 300.
 #  #prompt_timeout_seconds: 300
+#  # Seconds the bot keeps retrying a call Telegram failed to answer (a 502, a dropped
+#  # connection, a timeout) before it gives up and journals one warning. The poll has the
+#  # library's own retry and is not affected. 0 turns the retry off. Default 180.
+#  #send_retry_seconds: 180
 #  # Column width replies wrap to. The CLI's terminal default of 80 gets wrapped a second
 #  # time by a phone and comes out ragged; ~48 fits a portrait screen so the client leaves
 #  # it alone. Raise it on tablets. Ignored in simple ui mode, which sends flowing prose

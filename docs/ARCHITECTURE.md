@@ -147,6 +147,14 @@ classes themselves.
     stale taps. `/cancel` and an idle `telegram.prompt_timeout_seconds` send a
     cancellation the CLI turns into a clean abort; a between-output
     `telegram.command_timeout_seconds` kills a silent runaway.
+  - **Telegram having a bad minute:** every call the bot makes goes through
+    `telegram_api.retrying_request`, which tries a 5xx, a dropped connection or a timeout
+    again after a growing pause for `telegram.send_retry_seconds` (180; 0 = off), then lets
+    the failure through. The poll is not affected: the library builds a client of its own
+    for it, with its own retry. The give-up is one `bot.event` warning, never a traceback:
+    `ChatBot._on_error` for a handler, `runner._report_drive_failure` for the task that
+    streams a command's output, which also keeps the push loop alive
+    (DESIGN_telegram_send_retry.md §2).
   - **Polling runs continuously**, a command in flight or not, so a `✋ Stop` tap,
     `/cancel` or `/restart` reaches the bot while a command is computing. `_serve()`
     still drives the Application/Updater lifecycle by hand instead of
@@ -2557,6 +2565,7 @@ but the credentials is optional and falls back to the default shown:
 | `telegram.push.*`      | —    | Morning push (simple ui only): `enabled` (default true), `morning_time` (`08:00`), `morning_deadline` (`15:00`), `adapt_first` (default false → run `workout adapt -y` before rendering, unless one already ran today with last night's sleep score in hand and nothing has been trained since) |
 | `telegram.bot_token` / `telegram.allowed_chat_ids` | — | The bot's token (or the `TELEGRAM_BOT_TOKEN` env var) and the numeric chat-id allowlist ([§2](#entry-points)) |
 | `telegram.command_timeout_seconds` / `telegram.prompt_timeout_seconds` / `telegram.wrap_width` | — | The silent-run watchdog (180), the idle-prompt cancel (300) and the chat wrap width (48) |
+| `telegram.send_retry_seconds` | float | How long a call Telegram failed to answer is tried again before the bot gives up and journals one warning (default 180; 0 = off). The poll is not affected. DESIGN_telegram_send_retry.md §3 |
 | `telegram.change_delay_minutes` | int | How long a change to one of today's sessions waits before the athlete is told, measured from the newest waiting change so a second run restarts it (default: 20; 0 sends on the bot's next wake). Companion mode only. Also a setting (`settings set change-delay N`). DESIGN_change_heads_up.md §4 |
 | `web.host` / `web.port` / `web.debug` | — | Where the dashboard binds (`127.0.0.1` / 5000 / false) |
 | `coach.metrics_lookback_days` | int | Rolling window for adaptation (default: 15)                  |

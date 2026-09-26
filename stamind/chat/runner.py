@@ -18,6 +18,7 @@ import sys
 from typing import Dict, List, Optional
 
 from stamind import journal
+from stamind.chat import telegram_api
 from stamind.chat.routing import ROUTER_TIMEOUT_SECONDS
 from stamind.sentinels import (
     BUTTONS_SENTINEL, FLUSH_SENTINEL, PHOTO_SENTINEL, PROMPT_SENTINEL, QUEUE_SENTINEL,
@@ -193,10 +194,7 @@ class RunnerMixin:
             if not session.sent and not session.quiet:
                 await self.bot.send_message(chat_id=session.chat_id, text="(no output)")
         except Exception as e:  # pragma: no cover - defensive
-            self._log(session.chat_id, "!!", f"drive error: {e}")
-            await self.bot.send_message(
-                chat_id=session.chat_id, text=f"Internal error: {e}"
-            )
+            await self._report_drive_failure(session, e)
         finally:
             self.sessions.pop(session.chat_id, None)
             if session.proc.returncode is None:
@@ -207,6 +205,27 @@ class RunnerMixin:
             # A command that ends without a last message — killed, or answered with a
             # photo — would otherwise leave a Stop button nothing can act on.
             await self._retire_stop(session)
+
+    async def _report_drive_failure(self, session: Session, exc: Exception) -> None:
+        """Tells the athlete their command died, unless Telegram itself is what died: then
+        the channel is gone and the journal line is the record. The fallback is guarded
+        too, so nothing escapes the task the push loop waits on
+        (DESIGN_telegram_send_retry.md §2)."""
+        summary = f"{type(exc).__name__}: {exc}"
+        if telegram_api.is_network_error(exc):
+            self._log(
+                session.chat_id, "!!", f"telegram unreachable, gave up: {summary}", lvl="warn"
+            )
+            return
+        self._log(session.chat_id, "!!", f"drive error: {summary}", lvl="error")
+        try:
+            await self.bot.send_message(
+                chat_id=session.chat_id, text=f"Internal error: {exc}"
+            )
+        except Exception as send_exc:
+            self._log(
+                session.chat_id, "!!", f"internal error not told: {send_exc}", lvl="warn"
+            )
 
     async def _start_command(
         self, chat_id: int, argv: List[str], quiet: bool = False, source: str = "bot"

@@ -527,6 +527,13 @@ class Config:
         return int(self.get("telegram", {}).get("prompt_timeout_seconds", 300))
 
     @property
+    def telegram_send_retry_seconds(self) -> float:
+        """How long the bot keeps retrying a Telegram call that Telegram failed to answer
+        (a 5xx, a dropped connection, a timeout) before giving up; 0 turns the retry off.
+        Default 180 (DESIGN_telegram_send_retry.md §3)."""
+        return float(self.get("telegram", {}).get("send_retry_seconds", 180))
+
+    @property
     def telegram_wrap_width(self) -> int:
         """Column width the CLI wraps prose to when driven by the bot (via the
         STAMIND_WRAP_WIDTH env var). The CLI's terminal default is 80, which a
