@@ -31,7 +31,9 @@ ROUTER_SYSTEM_PROMPT = (
     "names it: the coach reads the message and re-plans around it.\n"
     "A request that says what to change in the schedule is tweak_session: the athlete has\n"
     "decided. A report of how the athlete is, or of what changed around them, is\n"
-    "coach_message: the coach decides what to change.\n\n"
+    "coach_message: the coach decides what to change.\n"
+    "A message that states a fitness test's number is record_test, even when it also says\n"
+    "how the test felt.\n\n"
     "## INTENTS\n\n"
     + "\n".join(f"- {name}: {desc}" for name, desc in ROUTER_INTENTS.items())
     + "\n\n## OUTPUT FORMAT\n\n"

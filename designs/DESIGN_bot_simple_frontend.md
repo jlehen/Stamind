@@ -998,6 +998,7 @@ messages are too long" reads back as "When I change your week, I'll keep it shor
 | `edit_goal` | capture+nominate | → `goal edit <id> …` (§12.4) |
 | `remove_goal` | picker | `goal rm <id>` — archives (§12.6) |
 | `change_setting` | capture | → `settings set <key> <value>` (§12.7) |
+| `record_test` | capture+nominate | `bot capture test_result` → `benchmark record … [--session <id>]` (DESIGN_benchmark_from_chat.md, 2026-09-26) |
 | `help` / `unclear` | — | *(unchanged)* |
 
 One intent per message stays the rule. A compound message is nearly always a
@@ -1012,7 +1013,8 @@ selector — which is capture machinery applied to a read and needs no new rules
 The §7 posture after this pass, in full:
 
 - Routable mutations: `constraint rm`/`edit`, `goal add`/`edit`/`rm`(=archive),
-  `settings set` over the §12.7 allowlist. Every one is reversible or confirm-gated;
+  `settings set` over the §12.7 allowlist, `benchmark record` (added 2026-09-26,
+  DESIGN_benchmark_from_chat.md). Every one is reversible or confirm-gated;
   most are both. The hard deletes (`--purge`, wipes), plan-shaping (`plan generate`,
   `workout generate` outside the §7 runway button), model roles and `restart` remain
   typed expert vocabulary.

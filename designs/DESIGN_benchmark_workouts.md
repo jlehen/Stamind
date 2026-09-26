@@ -592,6 +592,12 @@ hard effort — but it is a heuristic, not a decision, and it never reports ambi
 > athlete resolve it — never guess."* No such code exists. It belongs with the rest of
 > Phase 3's benchmark-aware matching (auto-linking a result to its planned `workout_id`,
 > §7), and is recorded here so the rule is not mistaken for shipped behaviour.
+>
+> **Amended 2026-09-26.** The link to the planned test now arrives without matching:
+> `benchmark record --session ID` sets `workout_id`, and the morning after a test graded
+> done with no result, the athlete is asked for the number and the answer is filed under
+> that session (DESIGN_benchmark_from_chat.md §4). The same-date disambiguation rule
+> above is still unbuilt.
 
 **No dedup needed:** the athlete deletes the Zwift-uploaded copy in Garmin
 Connect by hand, so a single Garmin-native activity remains. (Known failure
@@ -679,8 +685,9 @@ mesocycle-report anchor lines, the read-only web Benchmarks view (all §6), and 
 sport/kind mismatch check on `record` (§3.2).
 
 **Phase 3 — richer — NOT BUILT:**
-Activity matching auto-links results to planned benchmarks (`workout_id`), including
-the same-date disambiguation rule (§5.3) · modeled/passive anchors (power-duration
+Activity matching auto-links results to planned benchmarks (`workout_id`, now set by
+`--session` and the morning-after question instead, §5.3), including the same-date
+disambiguation rule (§5.3) · modeled/passive anchors (power-duration
 curve for FTP, e1RM from rep-max sets) · progress-timeline integration (§6) · a
 measured-vs-modeled coach learning. A per-exercise dimension on `e1rm` belongs here
 too — it is what would retire the drift exclusion in §3.3.

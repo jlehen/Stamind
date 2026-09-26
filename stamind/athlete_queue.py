@@ -15,6 +15,7 @@ from stamind.text import capitalized
 from stamind.queue_kind import (  # noqa: F401
     ANSWERED, DROPPED, MESSAGE, QUESTION, STALE, Kind, NotApplied, queue,
 )
+from stamind.cli.bot.test_result import TEST_RESULT_KIND
 from stamind.learning_doubts import LEARNING_KIND
 from stamind.strength.questions import SET_NAMES_KIND, SETS_FINAL_KIND
 
@@ -58,10 +59,13 @@ MESSAGE_KIND = Kind(
 )
 
 # The strength kinds ask for a session's sets (DESIGN_strength_tracking.md §7), and the
-# learning kind whether a doubted learning still fits (DESIGN_learning_doubt_nudge.md §5).
+# learning kind whether a doubted learning still fits (DESIGN_learning_doubt_nudge.md §5),
+# and the test-result kind what a test done yesterday gave (DESIGN_benchmark_from_chat.md §4).
 KINDS: Dict[str, Kind] = {
     kind.name: kind
-    for kind in (MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND, LEARNING_KIND)
+    for kind in (
+        MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND, LEARNING_KIND, TEST_RESULT_KIND,
+    )
 }
 
 

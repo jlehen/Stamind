@@ -372,6 +372,28 @@ class MorningWalkTest(_QueueCase):
         self.assertEqual(item["text"], "📬 Charge your watch tonight.")
         self.assertEqual([b["label"] for b in item["buttons"]], ["👍 Got it", "🕐 Not now"])
 
+    def test_a_test_done_without_a_result_is_asked_about_once(self):
+        """The morning after a planned test graded done, with no result in the logbook
+        (DESIGN_benchmark_from_chat.md §4). A missed test and one with a result are not."""
+        save_workout(test_db, today_str(), "running", "Easy run", duration_minutes=40)
+        done = save_workout(test_db, "2026-09-15", "cycling", "20-min FTP test",
+                            benchmark_type="ftp_20min")
+        missed = save_workout(test_db, "2026-09-14", "running", "30-min threshold test",
+                              benchmark_type="run_threshold_30min")
+        recorded = save_workout(test_db, "2026-09-13", "swimming", "CSS test",
+                                benchmark_type="css_400_200")
+        test_db.add_benchmark_result(date="2026-09-13", sport_type="swimming",
+                                     anchor_kind="css", value=105.0, unit="sec/100m")
+        verdicts = {done: {"status": "done"}, missed: {"status": "missed"},
+                    recorded: {"status": "done"}}
+        with patch("stamind.cli.bot.views.adherence_verdicts", return_value=verdicts):
+            _, out, _ = run_cli(["bot", "morning"])
+            run_cli(["bot", "morning", "--force"])
+        [item] = test_db.waiting_queue_items()
+        self.assertEqual((item["kind"], item["subject"]), ("test_result", str(done)))
+        [sent] = queue_lines(out)
+        self.assertIn("How did Tuesday's “20-min FTP test” go?", sent["text"])
+
     def test_a_push_with_nothing_queued_sends_the_briefing_alone(self):
         code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)

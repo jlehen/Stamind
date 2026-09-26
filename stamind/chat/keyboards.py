@@ -158,8 +158,8 @@ SIMPLE_WELCOME = (
 # because no tap delivers it.
 SIMPLE_HELP = SIMPLE_WELCOME + (
     "\n\nWhen you write to me, one of two things happens:\n"
-    "• Something to remember — a rule, a rough night, a new goal, a change of date — "
-    "I write it down and ask you first.\n"
+    "• Something to remember — a rule, a rough night, a new goal, a change of date, "
+    "a test result — I write it down and ask you first.\n"
     "• Something about how you're doing, what's in the way, or a session you'd like "
     "changed — that goes to your coach in your own words, and your week comes back "
     "adjusted."

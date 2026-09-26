@@ -26,8 +26,8 @@ from stamind.cli.render.plan_lines import (
     simple_progress_lines, simple_queue_message, simple_runway_lines,
 )
 from stamind.cli.render.session_lines import (
-    SIMPLE_SESSION_RULE, simple_compare_lines, simple_day_lines, simple_revision_lines,
-    simple_span_words, simple_week_lines,
+    SIMPLE_SESSION_RULE, simple_benchmark_question, simple_compare_lines, simple_day_lines,
+    simple_revision_lines, simple_span_words, simple_week_lines,
 )
 
 
@@ -278,6 +278,26 @@ class CompanionRenderer(ExpertRenderer):
         # (DESIGN_bot_simple_frontend.md §12.7).
         print(green("Done — that's set 👍" if stored != before
                     else "That's already how it is 👍"))
+
+    # -- a test result (DESIGN_benchmark_from_chat.md §1, §3) --
+
+    def benchmark_confirm_question(
+        self, kind: str, value: float, prev: Optional[dict], crosses: bool, date: str,
+        session: Optional[dict], note: Optional[str],
+    ) -> str:
+        return simple_benchmark_question(kind, value, prev, date, session, note, _today_str())
+
+    def benchmark_not_recorded(self) -> None:
+        print("Okay — nothing written down.")
+
+    def benchmark_recorded(self, row: dict, prev: Optional[dict]) -> None:
+        print(green("Written down 💪"))
+
+    def benchmark_replan(self) -> None:
+        print(wrap_text(
+            "That's a big enough change that your plan should be rebuilt around it — "
+            f"{config.telegram_operator_name} takes care of that from the computer."
+        ))
 
     # -- a doubted learning's answer --
 

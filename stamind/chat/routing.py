@@ -79,6 +79,11 @@ ROUTER_INTENTS = {
         "the athlete is not doing one of their goals any more ('I'm not doing the 10k', "
         "'drop the marathon')"
     ),
+    "record_test": (
+        "the athlete gives the result of a fitness test — an FTP, a threshold pace or "
+        "heart rate, a swim or aerobic speed ('did the FTP test, 250', 'threshold pace "
+        "came out at 4:15', 'ramp test done: 262 W, legs were heavy')"
+    ),
     "change_setting": (
         "the athlete asks to change how the app behaves in this chat — when it messages "
         "in the morning, whether it does at all, whether it asks about what it has "
@@ -133,6 +138,7 @@ ROUTER_CAPTURE_INTENTS = {
     "edit_goal": "edit_goal",
     "edit_constraint": "edit_constraint",
     "change_setting": "change_setting",
+    "record_test": "test_result",
 }
 
 
@@ -160,6 +166,7 @@ ROUTER_ECHO = {
     "edit_goal": "sounds like a change to a goal — checking",
     "remove_goal": "showing your goals — tap the one to call off",
     "change_setting": "changing that for you",
+    "record_test": "writing down your test result",
 }
 
 

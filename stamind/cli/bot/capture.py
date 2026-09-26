@@ -3,7 +3,8 @@
 The intents this command answers, and the dispatch between them. `note` is the inbox for
 a rule or a signal the athlete states (§12.3), `add_goal` sets up a new goal (§12.5), and
 `change_setting` changes one of the chat knobs on the `ROUTABLE_SETTINGS` allowlist
-(§12.7). The two edit intents are the long ones and live in `edit.py`.
+(§12.7). The two edit intents are the long ones and live in `edit.py`, and `test_result`
+lives with its queue kind in `test_result.py` (DESIGN_benchmark_from_chat.md).
 
 Every path here previews what was read from real rows and asks before anything is stored,
 and the command it then runs is argv this file assembled — never argv the model wrote
@@ -20,6 +21,7 @@ from stamind.cli.bot.extraction import (
     no_find, send_to_coach_button, valid_date,
 )
 from stamind.cli.bot.route import use_router_model
+from stamind.cli.bot.test_result import capture_test_result
 from stamind.cli.bot.views import MORNING_MARKER
 from stamind.cli.candidates import (
     confirm_new_constraints, confirm_new_signals, open_ended,
@@ -40,7 +42,7 @@ import stamind.cli.settings as _settings
 # added and read intents keep paying for exactly one call.
 
 CAPTURE_INTENTS = (
-    "note", "add_goal", "edit_goal", "edit_constraint", "change_setting",
+    "note", "add_goal", "edit_goal", "edit_constraint", "change_setting", "test_result",
 )
 
 
@@ -355,5 +357,7 @@ def run_bot_capture(args: argparse.Namespace) -> None:
         edit_capture("goal", text, args.pinned_id)
     elif args.intent == "edit_constraint":
         edit_capture("constraint", text, args.pinned_id)
+    elif args.intent == "test_result":
+        capture_test_result(text, args.pinned_id)
     else:
         run_bot_capture_change_setting(text)

@@ -106,11 +106,13 @@ classes themselves.
   `goals`, `constraints`, `benchmarks`, `signals`, `learnings`,
   `settings`, `queue`, `progress` with `progress_load` (the fitness line and the
   weekly load table) and `progress_zones` (the time-in-zone grid, by week and by
-  mesocycle), the `bot/` package (`parser`/`views`/`route`/`extraction`/`capture`/`edit` —
-  the hidden commands the Telegram bot spawns; `views` holds the pushes and the companion
-  lists, `route` the intent classifier, `extraction` what every `bot capture` model call
-  shares, `capture` the note, the new goal and the setting change, and `edit` the two
-  intents that change a row the athlete already has), the `plans/` package
+  mesocycle), the `bot/` package (`parser`/`views`/`route`/`extraction`/`capture`/`edit`/
+  `test_result` — the hidden commands the Telegram bot spawns; `views` holds the pushes and
+  the companion lists, `route` the intent classifier, `extraction` what every `bot capture`
+  model call shares, `capture` the note, the new goal and the setting change, `edit` the
+  two intents that change a row the athlete already has, and `test_result` a fitness-test
+  result read into `benchmark record` plus the `test_result` queue kind that asks for one
+  the morning after a test, DESIGN_benchmark_from_chat.md), the `plans/` package
   (`parser`/`generate`/`show`/`versions`/`feedback`),
   the `workouts/` package
   (`parser`/`adapt`/`generate`/`rollback`/`listing`/`compare`/`calendar_sync`/`revisions`/
@@ -260,7 +262,12 @@ classes themselves.
     preview. `change_setting` is bounded by the `ROUTABLE_SETTINGS` allowlist in
     `cli/settings.py` (`morning-time`, `morning-deadline`, `push`, `learning-questions`,
     `terse`), given to the extraction *and* enforced after it; anything else earns a
-    one-line refusal naming the operator rather than the router's "unclear". Signals get
+    one-line refusal naming the operator rather than the router's "unclear".
+    `record_test` (`bot capture test_result`) reads a fitness-test result and runs
+    `benchmark record` with the value, sport, date, note and `--session` it assembled, so
+    that command's own confirm is the read-back; the `test_result` queue kind, queued by
+    `bot morning` for a planned test graded done with no result, runs the same capture on
+    the typed answer with the session pinned (DESIGN_benchmark_from_chat.md). Signals get
     no removal counterpart on purpose: they are backward-looking evidence, not a rule
     that keeps shaping the schedule (DESIGN_bot_simple_frontend.md §5.5). Subprocesses
     additionally get `STAMIND_RENDER=simple`, read once by
@@ -384,7 +391,7 @@ classes themselves.
 | `plan_inputs.py`     | —                    | What shapes a periodization plan, how it is fingerprinted, and how it is diffed: the profile partition (`plan_profile`, `changed_plan_profile_fields`), the science documents (`athlete_science_documents`, `changed_science_documents`), the goal and constraint cleaners and their hashes, `plan_config_hash()`, and the unified-diff text a staleness reason is shown with. Flat and pure so the read-only dashboard can hash the config without importing the coach. The *judgment* over these inputs is `coach/service/staleness.py` (DESIGN_plan_staleness.md). |
 | `workout_state.py`   | —                    | Two of the three things that can be true of a planned session at once ([§5](#workout-state--three-orthogonal-axes-not-one-enum)): what the athlete changed about it (`modification_markers`) and how far its Calendar event has fallen behind (`calendar_status`, over `CALENDAR_FIELDS` and `calendar_signature`). Neither reads the database — both are derived from a workout row the caller already has — which is what lets the read-only web app import it without pulling the CLI in behind it. Was `calendar_state.py`. |
 | `learning_confidence.py` | —                | What a coach learning's confidence means and how its evidence sets it: the ordered levels, `derive_confidence` over supporting and contradicting weeks, `step_down`, and when a learning goes dormant. Pure rules; `db/learnings.py` keeps only the rows (DESIGN_evidence_based_confidence.md §3, DESIGN_learning_doubt_nudge.md §3.2). |
-| `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, and `learning` from `learning_doubts.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
+| `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, `learning` from `learning_doubts.py`, and `test_result` from `cli/bot/test_result.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. `waiting()` hangs `touches_today` on each row, and `sends_after_delay` is the single place that says whether a change goes out after `change-delay` minutes or at a morning time. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workout_change.py` imports it safely. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
 | `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
@@ -1931,7 +1938,7 @@ verb `benchmark record`/`list`/`rm` (+ hidden `wipe`) (`cli/benchmarks.py`).
 | `value`       | REAL       | The measured number (pace kinds stored in base unit)     |
 | `unit`        | TEXT       | `W` \| `bpm` \| `min/km` \| `sec/100m` \| `kg` \| `km/h`  |
 | `source`      | TEXT       | `test` \| `manual` \| `modeled` (last anticipates Phase 3)|
-| `workout_id`  | INTEGER    | Nullable link to the planned benchmark it satisfied       |
+| `workout_id`  | INTEGER    | Nullable lineage id of the planned test it satisfied; set by `--session` |
 | `note`        | TEXT       | Free text (protocol, conditions)                          |
 | `created`     | TEXT       | UTC ISO                                                    |
 
@@ -2306,7 +2313,7 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `constraint` | `list`       | `cons l` | List directives from the current mesocycle onward (`-a`/`--all`, `-v`, selectors `-d`/`-m`/`-M`/`-g`; default anchor: active mesocycle start, else show all) |
 | `constraint` | `show`       | `cons s` | Show a directive in detail (incl. plan-shaping status and whether a coach pass has honored it) |
 | `constraint` | `wipe`       | —        | Delete all constraints                                                  |
-| `benchmark`  | `record`     | `be rec` | Log a fitness-test result to the `benchmark_results` logbook: positional `SPORT` plus one anchor flag (`--ftp`, `--lthr`, `--threshold-pace`, `--css`, `--e1rm`, `--mas`), `-d/--date` (default today), `--note`, `--source` (`test` default). An implausible sport/anchor pair (`SPORT_ANCHORS`) warns and asks; `-y` skips that prompt ([§5](#benchmark_results)). `b` alone is ambiguous with `bot` |
+| `benchmark`  | `record`     | `be rec` | Log a fitness-test result to the `benchmark_results` logbook: positional `SPORT` plus one anchor flag (`--ftp`, `--lthr`, `--threshold-pace`, `--css`, `--e1rm`, `--mas`), `-d/--date` (default today), `--note`, `--source` (`manual` default), `--session ID` (the planned test it satisfies, stored as `workout_id`). The confirm and the lines after it speak through `runtime.render`, since `bot capture test_result` reaches this command from chat (DESIGN_benchmark_from_chat.md §3). An implausible sport/anchor pair (`SPORT_ANCHORS`) warns and asks; `-y` skips that prompt ([§5](#benchmark_results)). `b` alone is ambiguous with `bot` |
 | `benchmark`  | `list`       | `be l`   | The logbook newest first, each row with its delta against the previous row of the same kind |
 | `benchmark`  | `rm`         | `be rm`  | Delete one logbook row by ID                                            |
 | `benchmark`  | `wipe`       | —        | Delete the whole logbook (hidden; `-y`)                                 |

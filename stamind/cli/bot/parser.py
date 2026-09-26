@@ -86,7 +86,8 @@ def add_bot_parser(subparsers):
     b_capture.add_argument("text", help="The chat message to read")
     b_capture.add_argument(
         "--id", type=int, dest="pinned_id", default=None,
-        help="Pin the object to edit (the picker's leaves re-enter with this set)",
+        help="Pin the object to edit (the picker's leaves re-enter with this set), or "
+             "the session a test result is for",
     )
 
     # bot constraints

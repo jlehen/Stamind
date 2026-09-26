@@ -9,8 +9,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from stamind.coach.proposals import RevisionProposal
-from stamind.text import bold, cmd, dim, green, wrap_text
+from stamind.text import bold, cmd, dim, gray, green, wrap_text
 from stamind.output import notice
+from stamind.cli.benchmarks import (
+    benchmark_confirm_words, print_benchmark_recorded, print_benchmark_replan,
+)
 from stamind.cli.goals import print_goal_row, print_goal_table, report_archived_sessions
 from stamind.cli.learnings import print_learning_demoted, print_learning_kept
 from stamind.cli.plans.generate import print_plan_generate_preview
@@ -230,6 +233,23 @@ class ExpertRenderer:
             print(green(f"{name} is {stored} (unchanged)."))
             return
         print(green(f"{name} set to {stored}") + dim(f" — was {before}."))
+
+    # -- benchmark record (DESIGN_benchmark_from_chat.md §3) --
+
+    def benchmark_confirm_question(
+        self, kind: str, value: float, prev: Optional[dict], crosses: bool, date: str,
+        session: Optional[dict], note: Optional[str],
+    ) -> str:
+        return benchmark_confirm_words(kind, value, prev, crosses)
+
+    def benchmark_not_recorded(self) -> None:
+        print(gray("Not recorded."))
+
+    def benchmark_recorded(self, row: dict, prev: Optional[dict]) -> None:
+        print_benchmark_recorded(row, prev)
+
+    def benchmark_replan(self) -> None:
+        print_benchmark_replan()
 
     # -- a doubted learning's answer (DESIGN_learning_doubt_nudge.md §4) --
 

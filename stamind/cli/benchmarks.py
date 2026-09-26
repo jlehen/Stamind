@@ -19,7 +19,7 @@ from stamind.benchmarks import (
 _KIND_FLAGS = {kind: "--" + kind.replace("_", "-") for kind in LOGBOOK_KINDS}
 
 
-def _parse_value(kind: str, raw: str) -> float:
+def parse_value(kind: str, raw: str) -> float:
     """Parses a CLI value string for `kind` into the stored float. Pace kinds accept
     either ``M:SS`` (4:30) or a decimal in the unit's base; other kinds are plain
     numbers. Raises ValueError on garbage so the handler can report it."""
@@ -49,7 +49,7 @@ def _selected_kind(args: argparse.Namespace) -> Tuple[Optional[str], Optional[st
     return present[0]
 
 
-def _benchmark_line(r: dict, prev_value: Optional[float]) -> str:
+def benchmark_line(r: dict, prev_value: Optional[float]) -> str:
     """One-line rendering of a logbook row for `list` (and the `record` echo).
 
     `prev_value` is the next-older value of the same kind, which the signed delta is
@@ -72,22 +72,23 @@ def _benchmark_line(r: dict, prev_value: Optional[float]) -> str:
     )
 
 
-def run_benchmark_record(args: argparse.Namespace) -> None:
-    """Records a benchmark result — propose→confirm, never silent (§5.1)."""
+def run_benchmark_record(args: argparse.Namespace) -> Optional[int]:
+    """Records a benchmark result — propose→confirm, never silent (§5.1). Returns the new
+    row's id, or None when the athlete said no: `bot capture test_result` reads it
+    (DESIGN_benchmark_from_chat.md §3)."""
     kind, raw = _selected_kind(args)
     if kind is None:
         flags = ", ".join(_KIND_FLAGS[k] for k in LOGBOOK_KINDS)
         notice(f"Give an anchor value, one of: {flags}.", red)
         sys.exit(1)
     try:
-        value = _parse_value(kind, str(raw))
+        value = parse_value(kind, str(raw))
     except (ValueError, IndexError):
         notice(f"Could not parse {_KIND_FLAGS[kind]} value {raw!r}.", red)
         sys.exit(1)
 
     sport = canonical_sport(args.sport)
     date = args.date or _today_str()
-    unit = unit_for_kind(kind)
     label = ANCHOR_KINDS[kind].label
 
     # Reject `record swimming --ftp 250`. A sport with no entry has no opinion and is
@@ -100,46 +101,64 @@ def run_benchmark_record(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
+    # The planned test this result satisfies, stored as its lineage id (§3.2).
+    session = None
+    if args.session is not None:
+        session = runtime.db.get_workout_by_id(args.session)
+        if session is None:
+            notice(f"No session with ID {args.session}.", red)
+            sys.exit(1)
+
     # Show the change against the current latest of this kind before touching anything.
     prev = runtime.db.get_latest_benchmark(kind)
-    new_disp = format_value(kind, value)
-    if prev:
-        old_val = float(prev["value"])
-        delta = format_delta(kind, value, old_val)
-        change = (
-            f" (was {format_value(kind, old_val)}"
-            + (f", {delta}" if delta else "")
-            + ")"
-        )
-    else:
-        change = " (first on record)"
-
+    crosses = _crosses_replan_band(kind, value, prev)
     if not args.yes:
-        crosses = _crosses_replan_band(kind, value, prev)
-        tail = (
-            " — record and suggest replanning the next mesocycle?"
-            if crosses else " — record?"
+        question = runtime.render.benchmark_confirm_question(
+            kind, value, prev, crosses, date, session, args.note,
         )
-        if not runtime.prompt.confirm(f"New {label} {new_disp}{change}{tail}"):
-            print(gray("Not recorded."))
-            return
+        if not runtime.prompt.confirm(question):
+            runtime.render.benchmark_not_recorded()
+            return None
 
     rid = runtime.db.add_benchmark_result(
         date=date, sport_type=sport, anchor_kind=kind, value=value,
-        unit=unit, source=args.source, note=args.note,
+        unit=unit_for_kind(kind), source=args.source,
+        workout_id=session["id"] if session else None, note=args.note,
     )
-    row = runtime.db.get_benchmark_result(rid)
-    if row:
-        # `prev` is this kind's previous latest — exactly the predecessor `list` would
-        # measure the new row's delta against.
-        print(_benchmark_line(row, float(prev["value"]) if prev else None))
+    runtime.render.benchmark_recorded(runtime.db.get_benchmark_result(rid), prev)
+    if crosses:
+        runtime.render.benchmark_replan()
+    return rid
+
+
+def benchmark_confirm_words(
+    kind: str, value: float, prev: Optional[dict], crosses: bool
+) -> str:
+    """The expert confirm: the new value, the change against the latest, the question."""
+    change = " (first on record)"
+    if prev:
+        old_val = float(prev["value"])
+        delta = format_delta(kind, value, old_val)
+        change = f" (was {format_value(kind, old_val)}" + (f", {delta}" if delta else "") + ")"
+    tail = " — record?"
+    if crosses:
+        tail = " — record and suggest replanning the next mesocycle?"
+    return f"New {label_for_kind(kind)} {format_value(kind, value)}{change}{tail}"
+
+
+def print_benchmark_recorded(row: dict, prev: Optional[dict]) -> None:
+    """The new row as `list` draws it, then the success line. `prev` is this kind's
+    previous latest — exactly the predecessor `list` measures the new row's delta against."""
+    print(benchmark_line(row, float(prev["value"]) if prev else None))
     print(green("Benchmark result recorded successfully."))
-    if _crosses_replan_band(kind, value, prev):
-        notice(
-            "This moves your effective threshold past the replan band — run "
-            + cmd("plan generate")
-            + " to rebuild the next mesocycle against the fresh number.",
-        )
+
+
+def print_benchmark_replan() -> None:
+    notice(
+        "This moves your effective threshold past the replan band — run "
+        + cmd("plan generate")
+        + " to rebuild the next mesocycle against the fresh number.",
+    )
 
 
 def _crosses_replan_band(kind: str, value: float, prev: Optional[dict]) -> bool:
@@ -165,7 +184,7 @@ def run_benchmark_list(args: argparse.Namespace) -> None:
         return
 
     for r, prev_value in benchmarks.with_previous(rows):
-        print(_benchmark_line(r, prev_value))
+        print(benchmark_line(r, prev_value))
         if r.get("note"):
             print(format_labeled_paragraph("  Note:", r["note"]))
 
@@ -233,6 +252,10 @@ def add_benchmark_parser(subparsers):
         b_rec, "Test date: YYYY-MM-DD, 'today' (the default) or an offset like -2d"
     )
     b_rec.add_argument("--note", help="Protocol/conditions note")
+    b_rec.add_argument(
+        "--session", type=int, metavar="ID",
+        help="The planned test this result satisfies, by the ID 'workout list' shows",
+    )
     # Defaults to the weaker claim: a typed-in value is an assumption unless the athlete
     # says it came from a performed test — a seed must not start the §1 interval clock.
     b_rec.add_argument(

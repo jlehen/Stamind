@@ -16,7 +16,9 @@ TEST_DB_PATH = test_db_path("test_stamind_cli_bot_capture.db")
 from stamind.db import Database
 import stamind_cli  # noqa: F401  (registers the bot parser)
 
-from stamind import runtime
+from stamind import athlete_queue, runtime
+from stamind.cli.bot import test_result
+from stamind.cli.render.plan_lines import simple_queue_message
 from stamind.config import config
 from stamind.sentinels import BUTTONS_SENTINEL
 from stamind.clock import today_str
@@ -464,5 +466,144 @@ class CaptureSettingTest(_CaptureCase):
         self.assertTrue(settings.terse())
         self.assertIn("When I change your week, I'll keep it short.", prompt.text)
         self.assertNotIn("terse", prompt.text)
+
+
+class CaptureTestResultTest(_CaptureCase):
+    """`bot capture test_result` — DESIGN_benchmark_from_chat.md §3: the message is read
+    into `benchmark record`, whose own confirm is the read-back."""
+
+    def setUp(self):
+        super().setUp()
+        test_db.add_benchmark_result(
+            date="2026-01-10", sport_type="cycling", anchor_kind="ftp", value=235.0,
+            unit="W", source="test",
+        )
+        self.session = save_workout(
+            test_db, today_str(), "cycling", "20-min FTP test", benchmark_type="ftp_20min",
+        )
+
+    def _run(self, extraction, answers=True, text="Did the ramp test instead, 250"):
+        return self.capture(["bot", "capture", "test_result", text], extraction, answers)
+
+    def _extraction(self, **fields):
+        data = {"kind": "ftp", "value": "250", "sport": None, "date": None,
+                "performed": True, "session_id": self.session,
+                "note": "ramp test instead, legs were heavy"}
+        data.update(fields)
+        return data
+
+    def test_a_confirmed_result_is_filed_under_the_listed_test(self):
+        code, out, prompt = self._run(self._extraction())
+        self.assertEqual(code, 0)
+        row = test_db.get_latest_benchmark("ftp")
+        self.assertEqual((row["value"], row["sport_type"], row["source"]),
+                         (250.0, "cycling", "test"))
+        self.assertEqual((row["workout_id"], row["date"]), (self.session, today_str()))
+        self.assertEqual(row["note"], "ramp test instead, legs were heavy")
+        self.assertEqual(prompt.asked, [
+            "Your FTP from today's test, “20-min FTP test”: 250 W, up from 235 W (+6.4%). "
+            "Note: “ramp test instead, legs were heavy”. Shall I write it down?"
+        ])
+        self.assertIn("Written down 💪", out)
+        # 6.4% is past the 5% replan band: the operator's line, never the command (§3).
+        self.assertIn(f"{config.telegram_operator_name} takes care of that", " ".join(out.split()))
+        self.assertNotIn("plan generate", out)
+
+    def test_declining_writes_nothing(self):
+        code, out, _ = self._run(self._extraction(), answers=False)
+        self.assertEqual(code, 0)
+        self.assertEqual(test_db.get_latest_benchmark("ftp")["value"], 235.0)
+        self.assertIn("nothing written down", out)
+
+    def test_no_kind_asks_which_test_instead_of_guessing_one(self):
+        code, out, prompt = self._run(self._extraction(kind=None), text="250")
+        self.assertEqual(code, 0)
+        self.assertIn("Which test was it", out)
+        self.assertEqual(prompt.asked, [])
+
+    def test_e1rm_is_not_offered_from_chat(self):
+        _, out, _ = self._run(self._extraction(kind="e1rm", value="140"))
+        self.assertIn("Which test was it", out)
+        self.assertIsNone(test_db.get_latest_benchmark("e1rm"))
+
+    def test_a_value_that_is_not_a_number_asks_for_it(self):
+        _, out, prompt = self._run(self._extraction(value="quite a lot"))
+        self.assertIn("in W?", out)
+        self.assertEqual(prompt.asked, [])
+
+    def test_a_kind_the_sport_is_not_tested_on_asks_again(self):
+        _, out, prompt = self._run(self._extraction(sport="swimming", session_id=None))
+        self.assertIn("isn't something swimming is tested on", out)
+        self.assertEqual(prompt.asked, [])
+
+    def test_a_number_stated_on_its_own_is_a_manual_row_dated_today(self):
+        """No test named, none said to be done: the weaker default the CLI uses (§3)."""
+        self._run(self._extraction(session_id=None, performed=False, note=None),
+                  text="my FTP is 250")
+        row = test_db.get_latest_benchmark("ftp")
+        self.assertEqual((row["source"], row["workout_id"], row["note"]),
+                         ("manual", None, None))
+        self.assertEqual((row["date"], row["sport_type"]), (today_str(), "cycling"))
+
+    def test_a_session_the_capture_was_not_shown_is_ignored(self):
+        self._run(self._extraction(session_id=self.session + 999, performed=False))
+        self.assertIsNone(test_db.get_latest_benchmark("ftp")["workout_id"])
+
+
+class TestResultQuestionTest(_CaptureCase):
+    """The `test_result` queue kind — DESIGN_benchmark_from_chat.md §4."""
+
+    def setUp(self):
+        super().setUp()
+        env = patch.dict(os.environ, {"STAMIND_FRONTEND": "json"})
+        env.start()
+        self.addCleanup(env.stop)
+        self.day = self.future(-1)
+        self.session = save_workout(
+            test_db, self.day, "cycling", "20-min FTP test", benchmark_type="ftp_20min",
+        )
+        test_result.ask_about(test_db.get_workout_by_id(self.session))
+        [self.item] = test_db.waiting_queue_items()
+
+    def _tap(self, answers=True, typed="250"):
+        prompt = self.prompt(answers)
+        prompt.ask_text = lambda message, **kw: typed
+        extraction = {"kind": "ftp", "value": "250", "performed": False,
+                      "session_id": None, "note": None}
+        with patch("stamind.openrouter.OpenRouterClient.complete", return_value=extraction):
+            code, out, _ = run_cli(["bot", "queue", str(self.item["id"]), "a1",
+                                    "--since", "r1"])
+        return code, out
+
+    def test_the_companion_asks_with_the_three_buttons(self):
+        text, buttons = simple_queue_message(self.item, 1)
+        self.assertIn("“20-min FTP test” go? Tell me the number it gave you", text)
+        self.assertEqual([b["label"] for b in buttons],
+                         ["Tell me the number", "Nothing to record", "🕐 Not now"])
+
+    def test_the_number_is_filed_under_the_pinned_session(self):
+        code, _ = self._tap()
+        self.assertEqual(code, 0)
+        row = test_db.get_latest_benchmark("ftp")
+        self.assertEqual((row["value"], row["workout_id"], row["date"], row["source"]),
+                         (250.0, self.session, self.day, "test"))
+        self.assertIsNotNone(test_db.get_queue_item(self.item["id"])["closed_at"])
+
+    def test_a_no_on_the_read_back_leaves_the_question_waiting(self):
+        _, out = self._tap(answers=False)
+        self.assertIsNone(test_db.get_latest_benchmark("ftp"))
+        self.assertIsNone(test_db.get_queue_item(self.item["id"])["closed_at"])
+        self.assertIn("I'll ask again next time.", out)
+
+    def test_a_result_recorded_another_way_settles_the_question(self):
+        test_db.add_benchmark_result(
+            date=today_str(), sport_type="cycling", anchor_kind="ftp", value=250.0,
+            unit="W", source="manual",
+        )
+        self.assertTrue(athlete_queue.settle_if_stale(self.item))
+
+    def test_a_cancelled_test_settles_the_question(self):
+        save_workout(test_db, self.day, "cycling", "20-min FTP test", removed=True)
+        self.assertTrue(athlete_queue.settle_if_stale(self.item))
 
 

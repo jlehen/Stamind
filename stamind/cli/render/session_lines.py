@@ -10,6 +10,7 @@ which is why they are a module and not methods.
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from stamind.benchmarks import format_delta, format_value, is_improvement, label_for_kind
 from stamind.strength.sets import activity_lines
 from stamind.coach.proposals import RevisionProposal
 from stamind.sports import canonical_sport
@@ -250,6 +251,42 @@ def simple_span_words(start: str, end: str, today: str) -> str:
     if end != start:
         span = f"{span} to {simple_day_word(end, today)}"
     return span
+
+
+def simple_anchor_name(kind: str) -> str:
+    """'FTP', 'threshold pace': an anchor kind the way the athlete says it."""
+    label = label_for_kind(kind)
+    if "(" in label:
+        return label[label.index("(") + 1:label.rindex(")")]
+    return label.lower()
+
+
+def simple_benchmark_question(
+    kind: str, value: float, prev: Optional[dict], date: str, session: Optional[dict],
+    note: Optional[str], today: str,
+) -> str:
+    """The read-back before a test result is written down: the kind, the value with its
+    unit, the date, the test it is filed under and the note in quotes
+    (DESIGN_benchmark_from_chat.md §1, §5)."""
+    when = simple_day_word(date, today)
+    if session and when == "today":
+        source = f"today's test, “{session['title']}”"
+    elif session:
+        source = f"the test on {when}, “{session['title']}”"
+    else:
+        source = when
+    words = f"Your {simple_anchor_name(kind)} from {source}: {format_value(kind, value)}"
+    if prev:
+        old = float(prev["value"])
+        trend = "up" if is_improvement(kind, value, old) else "down"
+        delta = format_delta(kind, value, old)
+        words += f", {trend} from {format_value(kind, old)}" + (f" ({delta})" if delta else "")
+    else:
+        words += ", the first one I have"
+    words += "."
+    if note:
+        words += f" Note: “{note}”."
+    return words + " Shall I write it down?"
 
 
 def _is_rest(w: Optional[dict]) -> bool:

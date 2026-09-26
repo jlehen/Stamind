@@ -352,6 +352,19 @@ class TestBenchmarkCLI(unittest.TestCase):
                 self.assertNotIn("is not an anchor", out)
                 self.assertIsNotNone(test_db.get_latest_benchmark(flag.lstrip("-")))
 
+    def test_session_files_the_result_under_the_planned_test(self):
+        """`--session` sets the logbook's `workout_id` (DESIGN_benchmark_from_chat.md §3)."""
+        lineage = save_workout(test_db, "2026-09-26", "cycling", "20-min FTP test",
+                               benchmark_type="ftp_20min")
+        code, _, _ = run_cli(["benchmark", "record", "cycling", "--ftp", "250",
+                              "--session", str(lineage), "-y"])
+        self.assertEqual(code, 0)
+        self.assertEqual(test_db.get_latest_benchmark("ftp")["workout_id"], lineage)
+        code, out, _ = run_cli(["benchmark", "record", "cycling", "--ftp", "251",
+                                "--session", str(lineage + 999), "-y"])
+        self.assertEqual(code, 1)
+        self.assertIn("No session with ID", out)
+
 
 class TestBenchmarkPlacementGuards(unittest.TestCase):
     """The two deterministic passes around generation (§4.1)."""

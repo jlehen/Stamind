@@ -11,11 +11,12 @@ write — `bot morning` stamps its per-day marker and, with `adapt-first` on, ru
 adaptation before it renders; `bot changes` marks each line told as it prints it.
 """
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import clock, heads_up, runtime, settings
 from stamind.analytics.compare import adherence_verdicts
+from stamind.cli.bot import test_result
 from stamind.cli.common import ensure_recent_data
 # The companion surfaces are companion-only by definition, so they call the line
 # builders directly rather than through `runtime.render` (DESIGN_render_persona.md §3).
@@ -195,6 +196,25 @@ def _refresh_garmin(date_str: str) -> None:
         step(f"Could not refresh Garmin data, briefing what is stored: {e}")
 
 
+def _ask_about_tests(today: str) -> None:
+    """Queues the test-result question for each planned test of the past seven days that
+    was done or partly done and has no result in the logbook
+    (DESIGN_benchmark_from_chat.md §4). A failure must not sink the push."""
+    start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+    end = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    try:
+        tests = [w for w in runtime.db.get_workouts(start_date=start, end_date=end)
+                 if w.get("benchmark_type")]
+        if not tests:
+            return
+        verdicts = adherence_verdicts(runtime.db, start, end, today)
+        for w in tests:
+            if (verdicts.get(w["id"]) or {}).get("status") in SIMPLE_DONE_STATUSES:
+                test_result.ask_about(w)
+    except Exception as e:
+        step(f"Could not check the past week's tests: {e}")
+
+
 def _trained_today(date_str: str) -> Dict[int, Dict[str, Any]]:
     """Today's adherence verdicts over freshly pulled activity data — what the push needs
     to tell a session still ahead from one already behind (§4.1). Like the adaptation, a
@@ -243,6 +263,7 @@ def run_bot_morning(args: argparse.Namespace) -> None:
         runtime.db.set_setting(MORNING_MARKER, today)
         return
     _refresh_garmin(today)
+    _ask_about_tests(today)
 
     adapt_note = _auto_adapt_note(today) if settings.adapt_first() else None
     # After the adaptation, so the verdicts grade the sessions this push is about to show.
