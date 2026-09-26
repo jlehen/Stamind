@@ -70,15 +70,11 @@ class MessagesMixin:
         elif intent in ROUTER_INTENT_ARGV:
             argv = list(ROUTER_INTENT_ARGV[intent])
         elif intent == "help":
-            await self.bot.send_message(
-                chat_id=chat_id, text=SIMPLE_HELP, reply_markup=self._keyboard()
-            )
+            await self._send_keyed(chat_id, SIMPLE_HELP)
             return None
         else:
             if not armed_tap:
-                await self.bot.send_message(
-                    chat_id=chat_id, text=ROUTER_FALLBACK, reply_markup=self._keyboard()
-                )
+                await self._send_keyed(chat_id, ROUTER_FALLBACK)
                 return None
             # A note the router cannot place is still a note (§5.2), and the capture
             # inbox is the one that asks before storing — and still offers the coach on
@@ -125,9 +121,7 @@ class MessagesMixin:
         self.simple_ui = target
         await self._set_command_menu(target)
         if announce and target:
-            await self.bot.send_message(
-                chat_id=chat_id, text=UI_SIMPLE_ON, reply_markup=self._keyboard()
-            )
+            await self._send_keyed(chat_id, UI_SIMPLE_ON)
         elif announce:
             await self.bot.send_message(
                 chat_id=chat_id, text=UI_EXPERT_ON,
@@ -162,14 +156,14 @@ class MessagesMixin:
             return
         if token_low == "start":
             if self.simple_ui:
-                await message.reply_text(SIMPLE_WELCOME, reply_markup=self._keyboard())
+                await self._send_keyed(chat.id, SIMPLE_WELCOME, send=message.reply_text)
             else:
                 await message.reply_text(WELCOME)
             return
         if token_low == "help" and self.simple_ui:
             # Bare help gets the companion card; `/help <cmd>` still reaches the CLI
             # tree for the operator (§5.1).
-            await message.reply_text(SIMPLE_HELP, reply_markup=self._keyboard())
+            await self._send_keyed(chat.id, SIMPLE_HELP, send=message.reply_text)
             return
         if token_low == "restart":
             await self._restart(chat.id)
@@ -212,7 +206,7 @@ class MessagesMixin:
             action = keyboard_action(text)
             if action is not None and action[0] == "capture":
                 self.armed[chat.id] = time.monotonic()
-                await message.reply_text(CAPTURE_PROMPT, reply_markup=self._keyboard())
+                await self._send_keyed(chat.id, CAPTURE_PROMPT, send=message.reply_text)
                 return
             if action is not None:
                 argv = list(action[1])
@@ -275,7 +269,7 @@ class MessagesMixin:
             return
 
         if self.sessions.get(chat.id) is not None:
-            await message.reply_text(BUSY_NOTICE, reply_markup=self._keyboard())
+            await self._send_keyed(chat.id, BUSY_NOTICE, send=message.reply_text)
             return
 
         path = self._write_gym_log(data)

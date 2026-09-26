@@ -32,7 +32,7 @@ PREFIX_HINT = "Any prefix that matches one command is that command: 'wo li' = 'w
 TREE_COMMANDS = ("help", "shell")
 
 COMMAND_ORDER = {
-    "": ["status", "workout", "progress", "plan", "goal",
+    "": ["status", "workout", "calendar", "progress", "plan", "goal",
          "constraint", "benchmark", "strength", "signal", "queue", "learnings", "data", "settings",
          "journal", "shell", "help"],
     "settings": ["list", "set", "reset"],
@@ -67,6 +67,7 @@ from stamind.cli.journal.parser import add_journal_parser
 from stamind.cli.queue import add_queue_parser
 from stamind.cli.strength import add_strength_parser
 from stamind.cli.bot.parser import add_bot_parser
+from stamind.cli.calendar import add_calendar_parser
 
 
 def build_parser():
@@ -150,6 +151,7 @@ def build_parser():
     add_learnings_parser(subparsers)
     add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser)
     add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser)
+    add_calendar_parser(subparsers, pull_bypass_parser)
     add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser)
     add_settings_parser(subparsers)
     add_queue_parser(subparsers)

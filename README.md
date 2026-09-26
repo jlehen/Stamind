@@ -274,7 +274,7 @@ message arrives by itself:
 
 Tapping "Feeling tired" runs the same adaptation as the Wednesday command
 above. Typing "no bike Sunday to Tuesday, I'm travelling" saves the same
-constraint as the Thursday command, after asking you to confirm. "My week"
+constraint as the Thursday command, after asking you to confirm. Typing "my week"
 shows:
 
 ```
@@ -405,8 +405,8 @@ chosen per install with `telegram.ui:` in the config:
   `/status`, `workout list -d 1w`, `/help workout`. Replies keep their column
   alignment.
 - **Companion mode** (the default) is for an athlete who does not want
-  a command language. A persistent keyboard covers the daily surface: Today, My
-  week, Done lately, Goals, My plan, Progress, and Talk to me. Free text goes
+  a command language. A persistent keyboard covers the daily surface: Today, Calendar
+  (a month grid in a page), Done lately, Goals, My plan, Progress, and Talk to me. Free text goes
   through a small intent router on a cheap model: "what's on today" shows the
   day, "I'm wrecked" goes to the coach, "no running until Friday" is saved as a
   constraint after a confirmation. The bot opens each day with a morning message

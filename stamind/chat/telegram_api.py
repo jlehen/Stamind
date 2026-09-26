@@ -86,6 +86,14 @@ def reply_keyboard(rows):
     )
 
 
+def is_refusal(exc: BaseException) -> bool:
+    """Whether Telegram answered the request with "Bad Request", so nothing was sent
+    (DESIGN_calendar_miniapp.md §6)."""
+    from telegram.error import BadRequest
+
+    return isinstance(exc, BadRequest)
+
+
 def drop_reply_keyboard():
     """Tells the client to take the reply keyboard off the phone
     (DESIGN_bot_simple_frontend.md §5.6)."""

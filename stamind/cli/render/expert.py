@@ -21,6 +21,7 @@ from stamind.cli.queue import (
     queue_hint_lines,
 )
 from stamind.cli.runway import runway_hint_lines
+from stamind.cli.render.calendar_grid import month_lines
 from stamind.cli.workouts.compare import print_calendar_marked, print_workout_compare
 from stamind.cli.workouts.generate import print_generate_preview
 from stamind.cli.workouts.listing import print_workout_table
@@ -169,6 +170,12 @@ class ExpertRenderer:
 
     def progress(self, payload: dict, args, today: str, weeks_window: int) -> None:
         print_progress_report(payload, args, today, weeks_window)
+
+    def calendar_month(self, cal, year: int, month: int) -> None:
+        # `sm calendar` has one voice: the companion reaches the page instead
+        # (DESIGN_calendar_miniapp.md §2).
+        for line in month_lines(cal, year, month):
+            print(line)
 
     def revision_preview(self, proposal: RevisionProposal, heading: str) -> None:
         print_revision_preview(proposal, heading)

@@ -11,6 +11,7 @@ one per chat at a time, hung off the "Working on it…" message that precedes a 
 (DESIGN_bot_stop_button.md §4, §7).
 """
 import asyncio
+import functools
 import html
 import os
 import secrets
@@ -72,6 +73,30 @@ def format_reply(text: str, simple: bool = False) -> List[str]:
 class RepliesMixin:
     """`ChatBot`'s half that sends a running command's output back to the chat."""
 
+    async def _send_keyed(self, chat_id: int, text: str, send=None, **kwargs):
+        """Sends `text` under the companion keyboard; the one way the keyboard is attached.
+
+        `send` is the call that sends, `bot.send_message` for this chat by default. A
+        keyboard that fails to build is left off; one Telegram refuses sends the text again
+        without it. Only a refusal is retried: after a timeout the text may have arrived
+        (DESIGN_calendar_miniapp.md §6)."""
+        if send is None:
+            send = functools.partial(self.bot.send_message, chat_id=chat_id)
+        try:
+            keyboard = self._keyboard()
+        except Exception as exc:
+            journal.record("bot.event", f"sent without the keyboard: {exc}", lvl="error",
+                           chat=chat_id)
+            return await send(text=text, **kwargs)
+        try:
+            return await send(text=text, reply_markup=keyboard, **kwargs)
+        except Exception as exc:
+            if not telegram_api.is_refusal(exc):
+                raise
+            journal.record("bot.event", f"sent without the keyboard: {exc}", lvl="error",
+                           chat=chat_id)
+        return await send(text=text, **kwargs)
+
     async def _retire_stop(self, session: Session) -> None:
         """Drops the live Stop button, if there is one: the wait it belonged to is
         over (DESIGN_bot_stop_button.md §7)."""
@@ -97,10 +122,7 @@ class RepliesMixin:
         session.sent = True
         parse_mode = telegram_api.html_parse_mode()
         for part in format_reply(text, simple=self.simple_ui):
-            sent = await self.bot.send_message(
-                chat_id=session.chat_id, text=part, parse_mode=parse_mode,
-                reply_markup=self._keyboard(),
-            )
+            sent = await self._send_keyed(session.chat_id, part, parse_mode=parse_mode)
             session.last_message_id = sent.message_id
         self._log(session.chat_id, "<<", f"{text.count(chr(10)) + 1} line(s)")
         await self._retire_stop(session)

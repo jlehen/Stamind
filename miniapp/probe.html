@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Address probe</title>
+<link rel="icon" href="data:,">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body style="font: 18px/1.5 system-ui, sans-serif; padding: 16px;">
+<!-- Step 0 of DESIGN_calendar_miniapp.md §8: how many bytes a button's address carried after
+     '#'. Deleted once the budget is measured. -->
+<p id="out">Reading the address…</p>
+<script>
+  const hash = window.location.hash.replace(/^#/, "");
+  const filler = /(?:^|&)f=([^&]*)/.exec(hash);
+  const bytes = new TextEncoder().encode(hash).length;
+  // The filler repeats "0123456789", so a byte lost or changed on the way shows.
+  const body = filler ? filler[1] : "";
+  const intact = [...body].every((ch, i) => ch === String(i % 10));
+  document.getElementById("out").textContent = `After '#': ${bytes} bytes. `
+    + `The f= filler: ${body.length} bytes, ${intact ? "intact" : "NOT intact"}.`;
+  if (window.Telegram && window.Telegram.WebApp) {
+    window.Telegram.WebApp.ready();
+  }
+</script>
+</body>
+</html>

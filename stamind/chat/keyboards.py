@@ -26,10 +26,10 @@ from stamind.sports import canonical_sport
 from stamind.types import Workout
 
 # Reply-keyboard label → fixed argv; None arms free-text capture (§5.1/§5.2).
-# Buttons never reach beyond this table; the keyboard renders it two per row, in order.
+# Buttons never reach beyond this table; the keyboard renders it two per row, in order,
+# with the calendar cell in the second place.
 SIMPLE_KEYBOARD = [
     ("📅 Today", ["workout", "list", "-d", "today"]),
-    ("🗓 My week", ["workout", "list"]),
     # A look back is a read: --no-mark keeps the Calendar stamping out of a tap (§5.1).
     ("✅ Done lately", ["workout", "compare", "-d", "7d", "--no-mark"]),
     ("🎯 Goals", ["goal", "list"]),
@@ -42,14 +42,24 @@ SIMPLE_KEYBOARD = [
 KEYBOARD_LABELS_PER_ROW = 2
 
 
-def simple_keyboard_rows(gym: Any = None) -> List[List[Any]]:
+# The calendar page's button: a (label, url) cell in the place "🗓 My week" had
+# (DESIGN_calendar_miniapp.md §6).
+CALENDAR_LABEL = "🗓 Calendar"
+CALENDAR_SLOT = 1
+
+
+def simple_keyboard_rows(gym: Any = None, calendar: Any = None) -> List[List[Any]]:
     """The §5.1 reply keyboard's labels, laid out the way the bot attaches them.
 
     `gym` is the gym button `gym_button` found — a label, or the (label, url) pair that
-    opens the Mini App. It takes the first row on its own (DESIGN_gym_logger.md §6)."""
-    labels = [label for label, _ in SIMPLE_KEYBOARD]
-    rows: List[List[Any]] = [labels[i:i + KEYBOARD_LABELS_PER_ROW]
-                             for i in range(0, len(labels), KEYBOARD_LABELS_PER_ROW)]
+    opens the Mini App. It takes the first row on its own (DESIGN_gym_logger.md §6).
+    `calendar` is the calendar's (label, url) cell, placed after "📅 Today"
+    (DESIGN_calendar_miniapp.md §6)."""
+    cells: List[Any] = [label for label, _ in SIMPLE_KEYBOARD]
+    if calendar is not None:
+        cells.insert(CALENDAR_SLOT, calendar)
+    rows: List[List[Any]] = [cells[i:i + KEYBOARD_LABELS_PER_ROW]
+                             for i in range(0, len(cells), KEYBOARD_LABELS_PER_ROW)]
     if gym is None:
         return rows
     return [[gym]] + rows
@@ -142,7 +152,7 @@ SIMPLE_WELCOME = (
     "Hi! I'm your training coach 🏃\n\n"
     "Use the buttons below:\n"
     "📅 Today — today's session\n"
-    "🗓 My week — the days ahead\n"
+    "🗓 Calendar — your weeks at a glance\n"
     "✅ Done lately — how the last days went\n"
     "🎯 Goals — what you're training for\n"
     "🧭 My plan — the road to your goal\n"

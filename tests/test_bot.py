@@ -143,7 +143,7 @@ class SimpleKeyboardTest(unittest.TestCase):
             keyboards.keyboard_action("📅 Today"),
             ("run", ["workout", "list", "-d", "today"]),
         )
-        self.assertEqual(keyboards.keyboard_action("🗓 My week"), ("run", ["workout", "list"]))
+        self.assertIsNone(keyboards.keyboard_action("🗓 My week"))
         self.assertEqual(keyboards.keyboard_action("🎯 Goals"), ("run", ["goal", "list"]))
         self.assertEqual(keyboards.keyboard_action("🧭 My plan"), ("run", ["plan", "show"]))
         self.assertEqual(
@@ -158,6 +158,8 @@ class SimpleKeyboardTest(unittest.TestCase):
         out of it (§5.1)."""
         for label, _ in keyboards.SIMPLE_KEYBOARD:
             self.assertIn(label, keyboards.SIMPLE_WELCOME, label)
+        self.assertIn(keyboards.CALENDAR_LABEL, keyboards.SIMPLE_WELCOME)
+        self.assertNotIn("My week", keyboards.SIMPLE_WELCOME)
 
     def test_non_label_text_is_not_a_button(self):
         self.assertIsNone(keyboards.keyboard_action("show me my week"))
@@ -229,7 +231,23 @@ class GymButtonTest(unittest.TestCase):
         withgym = keyboards.simple_keyboard_rows(("🏋️ Log today's gym", "https://x/#s=e30"))
         self.assertEqual(withgym[0], [("🏋️ Log today's gym", "https://x/#s=e30")])
         self.assertEqual(withgym[1:], plain)
-        self.assertEqual(plain[0], ["📅 Today", "🗓 My week"])
+        self.assertEqual(plain[0], ["📅 Today", "✅ Done lately"])
+
+    def test_the_calendar_cell_takes_the_place_of_my_week(self):
+        """DESIGN_calendar_miniapp.md §6: "🗓 My week" leaves the keyboard, and the
+        calendar's (label, url) cell sits beside "📅 Today" where it was."""
+        calendar = (keyboards.CALENDAR_LABEL, "https://x/calendar.html#c=eJw")
+        gym = ("🏋️ Log today's gym", "https://x/#s=e30")
+        rows = keyboards.simple_keyboard_rows(gym, calendar)
+        self.assertEqual(rows, [
+            [gym],
+            ["📅 Today", calendar],
+            ["✅ Done lately", "🎯 Goals"],
+            ["🧭 My plan", "📈 Progress"],
+            ["💬 Talk to me"],
+        ])
+        self.assertNotIn("🗓 My week", [label for label, _ in keyboards.SIMPLE_KEYBOARD])
+        self.assertIsNone(keyboards.keyboard_action(keyboards.CALENDAR_LABEL))
 
     def test_the_gym_label_is_neither_a_command_nor_a_stale_tap(self):
         """Tapping it opens the page and sends no text, so nothing here should ever see
