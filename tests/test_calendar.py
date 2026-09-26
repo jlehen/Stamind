@@ -196,8 +196,8 @@ class SnapshotTest(CalendarTestCase):
 
     def test_the_sheet_is_built_from_the_chat_lines(self):
         sheet = dict((h, lines) for h, lines in self.snapshot()[1]["2026-09-22"])
-        self.assertEqual(sheet["Planned"][0], "🏃 2026-09-22 Tue: Easy run — 50 min")
-        self.assertEqual(sheet["Planned"][1], "Easy run in zone 2.")
+        # The session line only: the description stays in the chat (§5).
+        self.assertEqual(sheet["Planned"], ["🏃 2026-09-22 Tue: Easy run — 50 min"])
         self.assertEqual(sheet["Done"], ["✅ 🏃 Easy run — 50 min (you did 32 min)"])
         self.assertEqual(sheet["Signals and constraints"],
                          ["alcohol: 2 — Two drinks the evening before"])

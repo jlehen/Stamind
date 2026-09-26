@@ -72,7 +72,7 @@ def simple_session_line(w: Dict[str, Any], lead: Optional[str] = None) -> str:
 
 def simple_day_lines(
     workouts: List[Dict[str, Any]], date_str: str,
-    verdicts: Optional[Dict[int, Dict[str, Any]]] = None, width: Optional[int] = None,
+    verdicts: Optional[Dict[int, Dict[str, Any]]] = None, descriptions: bool = True,
 ) -> List[str]:
     """Simple rendering of one day's schedule: session line(s) plus the wrapped
     description (the week planner's actual prescription), or the one-line rest message.
@@ -80,22 +80,23 @@ def simple_day_lines(
     (DESIGN_bot_simple_frontend.md §10).
 
     `verdicts` is `adherence_verdicts`' map; a session already trained gets the done
-    line, and every other verdict renders as it did before (§6 tone rule). `width` is
-    the description's wrap width, `wrap_text`'s default when None."""
+    line, and every other verdict renders as it did before (§6 tone rule).
+    `descriptions=False` keeps the session lines only, for the calendar's day sheet
+    (DESIGN_calendar_miniapp.md §5)."""
     if not workouts:
         return [REST_DAY_LINE]
     day_word = "Today" if date_str == _today_str() else fmt_date(date_str)
     lines: List[str] = []
     for w in workouts:
-        if lines:
+        if lines and descriptions:
             lines.append(f"\n{SIMPLE_SESSION_RULE}\n")
         lines.append(simple_session_line(w, lead=day_word))
         status = ((verdicts or {}).get(w.get("id")) or {}).get("status")
         if status in SIMPLE_DONE_STATUSES:
             lines.append(SIMPLE_DONE_LINE)
         description = (w.get("description") or "").strip()
-        if description:
-            lines.append(wrap_text(description, width))
+        if description and descriptions:
+            lines.append(wrap_text(description))
     return lines
 
 
