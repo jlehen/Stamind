@@ -7,6 +7,8 @@ on:
     branches:
       - main
       - worktree-worktree-gym-logger
+      # The calendar test instance (DESIGN_calendar_miniapp.md §8); removed when it lands.
+      - worktree-calendar-miniapp-design
   workflow_dispatch:
 
 permissions:
