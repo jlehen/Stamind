@@ -50,7 +50,9 @@ class SettingsTestCase(unittest.TestCase):
         from stamind.openrouter import openrouter_client
         clear_all_tables(test_db)
         openrouter_client.reset_model()
-        patcher = patch.dict(config.data, self.CONFIG)
+        # The operator's config.yaml must not seed the push knobs these tests read.
+        telegram = {k: v for k, v in (config.data.get("telegram") or {}).items() if k != "push"}
+        patcher = patch.dict(config.data, {**self.CONFIG, "telegram": telegram})
         patcher.start()
         self.addCleanup(patcher.stop)
         self.addCleanup(openrouter_client.reset_model)

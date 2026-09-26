@@ -168,6 +168,11 @@ class MorningPushTest(unittest.TestCase):
         garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
         garmin.start()
         self.addCleanup(garmin.stop)
+        # The operator's config.yaml must not switch adapt-first on for these tests.
+        telegram = {k: v for k, v in (config.data.get("telegram") or {}).items() if k != "push"}
+        pinned = patch.dict(config.data, {"telegram": telegram})
+        pinned.start()
+        self.addCleanup(pinned.stop)
 
     def _trained(self, sport="running", duration_min=40):
         """One completed activity for today, the shape the Garmin pull would have left."""

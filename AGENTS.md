@@ -164,12 +164,9 @@
   ```
 
   To run one file, put its name after `-p`, for example `-p "test_bot.py"`.
-- The suite is green when it fails exactly these four and nothing else. They fail because
-  the live `config.yaml` is in companion mode, not because of anything in the code:
-  `test_cli_bot.MorningPushTest.test_adapt_first_off_never_touches_the_coach`, and, in
-  `test_cli_settings.TestMorningPushKnobs`, `test_a_non_switch_is_refused`,
-  `test_the_built_in_defaults_apply_with_nothing_configured` and
-  `test_the_morning_command_adapts_only_when_the_switch_is_on`. A fifth failure is yours.
+- The suite is green when every test passes. A test must not read the operator's live
+  `config.yaml` (it runs in companion mode): pin what it depends on with `patch.dict` on
+  `config.data`, or with `as_instance` in `tests/helpers.py` for `telegram.ui`.
 - Do not decide you are done from a single-file run. Some modules never bind a test
   database of their own and rely on an earlier module in the full run having bound one, so
   alone they fail with "tests must not open the production database" — `test_dispatch.py`
