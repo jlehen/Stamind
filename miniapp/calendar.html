@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calendar</title>
+<!-- Served beside the gym logger, so every asset is relative (DESIGN_calendar_miniapp §6).
+     The deploy turns "?v=dev" into the commit, so a phone never mixes two versions' files. -->
+<link rel="stylesheet" href="./calendar.css?v=dev">
+<link rel="icon" href="data:,">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<header class="head">
+  <div class="head-top">
+    <button class="nav" id="prev" type="button" aria-label="Previous month">‹</button>
+    <h1 id="title">Calendar</h1>
+    <button class="nav" id="next" type="button" aria-label="Next month">›</button>
+  </div>
+  <div class="head-sub">
+    <span class="goal" id="goal"></span>
+    <span class="stamp" id="stamp"></span>
+  </div>
+  <!-- The switch between the month grid and the plan view (§3.4). -->
+  <div class="switch" role="tablist">
+    <button class="tab" id="show-grid" type="button" aria-selected="true">Month</button>
+    <button class="tab" id="show-plan" type="button" aria-selected="false">Plan</button>
+  </div>
+</header>
+
+<main id="grid-view">
+  <div class="weekdays">
+    <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span>
+    <span>Sat</span><span>Sun</span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <p class="end-note" id="end-note" hidden></p>
+  <ul class="legend" id="legend"></ul>
+</main>
+
+<main id="plan-view" hidden>
+  <ul class="plan" id="plan"></ul>
+</main>
+
+<p class="problem" id="problem" hidden></p>
+
+<!-- One day's sheet: what was planned, what was done, and its signals and constraints (§1). -->
+<div class="sheet" id="day-sheet" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head">
+      <h2 id="sheet-title"></h2>
+      <button class="close" id="sheet-close" type="button">✕</button>
+    </div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<script type="module" src="./calendar.js?v=dev"></script>
+</body>
+</html>

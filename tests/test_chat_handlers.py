@@ -167,10 +167,10 @@ class PersonaSwitchTest(unittest.IsolatedAsyncioTestCase):
         so the tap is the companion whatever persona this process started in."""
         chat_bot = build_chat_bot(self, ui="expert")
         started = record_commands(self, chat_bot)
-        update, _replied = message_update(text="🗓 My week")
+        update, _replied = message_update(text="📅 Today")
         await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
         self.assertTrue(chat_bot.simple_ui)
-        self.assertEqual(started, [(42, ["workout", "list"], False, "bot")])
+        self.assertEqual(started, [(42, ["workout", "list", "-d", "today"], False, "bot")])
         # Silently: the answer to the tap is the only feedback the switch earns.
         self.assertEqual(chat_bot.bot.texts(), [])
 
