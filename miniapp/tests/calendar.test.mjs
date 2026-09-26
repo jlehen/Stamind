@@ -88,6 +88,13 @@ test("a day whose details did not fit says which days have them", async () => {
   assert.equal(logic.sheetFor(snapshot, "2026-12-01"), null);
 });
 
+test("a day with a session can be asked for in full in the chat", async () => {
+  const snapshot = await logic.snapshotFromHash(`#c=${PACKED}`);
+  assert.equal(logic.asksForFullDay(snapshot, "2026-09-22"), true);
+  assert.equal(logic.asksForFullDay(snapshot, "2026-09-24"), false);
+  assert.equal(logic.fullDayMessage("2026-09-22"), '{"calendar_day":"2026-09-22"}');
+});
+
 test("the plan view runs mesocycles and goals in date order around today", async () => {
   const snapshot = await logic.snapshotFromHash(`#c=${PACKED}`);
   const rows = logic.planRows(snapshot);

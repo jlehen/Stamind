@@ -48,9 +48,9 @@ She taps Tuesday. A sheet slides up with three parts, each made of lines the bot
 writes in the chat:
 
 - **Planned:** the session's line, as "📅 Today" writes it: "🏃 2026-09-22 Tue: Easy run
-  — 50 min". Not the full workout text, which does not fit in a button (§8). That text stays
-  in the morning message and in "📅 Today": the calendar shows what and when, the chat
-  shows how.
+  — 50 min". Not the full workout text, which does not fit in a button (§8). Under it, a
+  "💬 Full day in chat" button closes the calendar, and the bot posts that day the way
+  "📅 Today" writes it, workout text included (§6).
 - **Done:** that day's lines from "✅ Done lately": "✅ 🏃 Easy run — 50 min (you did 32
   min)", with the lifted sets under a gym session.
 - **Signals and constraints:** each one on its own line.
@@ -314,6 +314,17 @@ keyboard. The phone keeps the keyboard it already has, and the error goes to the
 Any other failure, such as a timeout, is not retried: the text may already have arrived,
 and sending it again would show it twice.
 
+**The way back: "💬 Full day in chat".** It is Wednesday. She opens the calendar and taps
+Saturday. The sheet shows "🚴 2026-09-26 Sat: Long ride — 3h" and, under it, the button.
+She taps it. The calendar closes, and the bot posts Saturday in the chat, full workout text
+included. A page opened from a keyboard button can hand the bot one message with
+`sendData`, and Telegram closes the page when it does; the page has no way to receive an
+answer. The gym logger already uses this way back. The message is
+`{"calendar_day": "2026-09-26"}`. `on_web_app_data` recognises it and runs
+`workout list -d 2026-09-26`, the command behind "📅 Today", so the day reads exactly as
+"📅 Today" writes it. Any other message is still a gym log. The button shows only under a
+day that has a session, and only when the page was opened from Telegram.
+
 The page lives beside the gym logger: `miniapp/calendar.html`, `miniapp/calendar.js` and
 `miniapp/calendar.css`. The Pages deploy already copies `miniapp/` and stamps every
 `miniapp/*.html` and `miniapp/*.js` with the commit, so it needs no change for files at
@@ -404,15 +415,13 @@ month with more to say.
 The shapes worth pinning: the snapshot's packing survives a round trip; the budget rule
 keeps the sheets nearest today; the list of days on a fixed week, including a day with two
 sessions and one with an unplanned activity; the keyboard with the calendar cell in place of
-"🗓 My week"; the send guard sending the text again when the keyboard fails; `append`
+"🗓 My week"; the send guard sending the text again when the keyboard fails; "💬 Full day
+in chat" reaching `workout list -d`, and a gym log still reaching `strength ingest`; `append`
 taking `short_name` as given and never counting it as a change; the migration adding the
 column once. On the page, the node tests cover reading `c=` next to Telegram's own
 parameters, the tint, and the two-session rule.
 
 ## 11. Not handled, not decided
-
-- **The full workout text of a day other than today.** It is not in the sheet (§8). A
-  "Full session" link that asks the bot for it in the chat is not handled.
 
 - **Editing** from the calendar: moving or dropping a session, or adding a constraint on a
   tapped day. The first edit will need the page to send data back, as the gym logger does.

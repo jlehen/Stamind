@@ -203,6 +203,21 @@ export function sheetFor(snapshot, iso) {
   return { missing: didNotFit(fit) };
 }
 
+// Word for word the bot's `DAY_REQUEST` (cli/render/calendar_page.py); a Python test holds
+// the two together.
+export const DAY_REQUEST = "calendar_day";
+
+export function asksForFullDay(snapshot, iso) {
+  // "💬 Full day in chat" sits under a day that holds a session (§6).
+  const day = snapshot.days[iso];
+  return Boolean(day && day.x && day.x.length);
+}
+
+export function fullDayMessage(iso) {
+  // What `sendData` hands the bot: the one day to post in the chat (§6).
+  return JSON.stringify({ [DAY_REQUEST]: iso });
+}
+
 export function didNotFit(fit) {
   if (!fit) {
     return "This day's details did not fit.";

@@ -34,6 +34,9 @@ DAYS_AHEAD = 42
 # about 9.9 KB (measured 2026-09-26), and the gym button and the labels share it (§8).
 BUDGET_BYTES = 6 * 1024
 
+# The key of the message the sheet's "💬 Full day in chat" sends back (§6).
+DAY_REQUEST = "calendar_day"
+
 # The sheet's three headings (§1).
 PLANNED, DONE, NOTES = "Planned", "Done", "Signals and constraints"
 
@@ -253,3 +256,18 @@ def calendar_url(cal: Calendar, at: datetime) -> str:
     payload, sheets = snapshot(cal, at)
     return f"{PAGE_URL}#c={fit(payload, sheets)}"
 
+
+
+def requested_day(data: str) -> Optional[str]:
+    """The date the page's "💬 Full day in chat" asks for, or None when `data` is some other
+    page's message, such as the gym logger's log (§6)."""
+    try:
+        message = json.loads(data)
+    except ValueError:
+        return None
+    if not isinstance(message, dict) or set(message) != {DAY_REQUEST}:
+        return None
+    try:
+        return day_str(parse_date(message[DAY_REQUEST]))
+    except (TypeError, ValueError):
+        return None

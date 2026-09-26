@@ -362,6 +362,18 @@ h1 {
   white-space: pre-wrap;
 }
 
+/* The way back to the chat (§6). */
+.full-day {
+  width: 100%;
+  min-height: var(--tap);
+  margin-top: 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--tg-theme-button-text-color, #ffffff);
+  font-size: 15px;
+}
+
 .sheet-note {
   font-size: 14px;
   color: var(--hint);

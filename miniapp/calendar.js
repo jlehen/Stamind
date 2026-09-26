@@ -157,6 +157,13 @@ function openSheet(iso) {
       ui.sheetBody.append(element("p", "line", line));
     }
   }
+  // Only a page opened from the keyboard button can send; a browser has no bot (§6).
+  if (tg && logic.asksForFullDay(snapshot, iso)) {
+    const ask = element("button", "full-day", "💬 Full day in chat");
+    ask.type = "button";
+    ask.addEventListener("click", () => tg.sendData(logic.fullDayMessage(iso)));
+    ui.sheetBody.append(ask);
+  }
   ui.sheet.hidden = false;
 }
 
