@@ -61,10 +61,10 @@ that.
   added; a session dropped, which you write as a rest day; a session moved to another day,
   or two days swapped, which MOVING A SESSION TO ANOTHER DAY says how to write; or a
   cancelled session brought back, which you write again from its line under SESSIONS NO
-  LONGER ON THE SCHEDULE. Write each session in full — title, description, duration, RPE
-  and TSS — sized to fit the week around it. The metrics and the planned sessions are your
-  context for that. To change a session's sport, return the new session on the same date
-  with "replaces" naming the slot it takes over.
+  LONGER ON THE SCHEDULE. Write each session in full — title, short name, description,
+  duration, RPE and TSS — sized to fit the week around it. The metrics and the planned
+  sessions are your context for that. To change a session's sport, return the new session
+  on the same date with "replaces" naming the slot it takes over.
 - IT IS THE ATHLETE'S CALL. If the request looks unwise, carry it out and say so in one
   sentence of "reason": three hard days in a row after a swap is that kind of sentence.
   Refuse only what is clearly unsafe given the recovery metrics, or what would rewrite a

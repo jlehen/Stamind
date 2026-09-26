@@ -80,7 +80,8 @@ class _PlannerCase(unittest.TestCase):
             raise reply
         return reply
 
-    def gym(self, day, *rows, title="Full-Body Strength", brief=BRIEF, duration=70):
+    def gym(self, day, *rows, title="Full-Body Strength", brief=BRIEF, duration=70,
+            short_name=None):
         """A planned strength session with the strength planner's exercises on it."""
         description = (
             prescription.render_description(brief, rows, "2–3 min rests.") if rows
@@ -90,7 +91,7 @@ class _PlannerCase(unittest.TestCase):
             change.append(
                 date=day, sport_type="strength_training", title=title,
                 description=description, duration_minutes=duration, rpe=7, tss=50,
-                prescribed_sets=list(rows) or None,
+                prescribed_sets=list(rows) or None, short_name=short_name,
             )
         saved = test_db.get_workout(day, "strength_training")
         self.gym_lineage = saved["id"]
@@ -432,6 +433,27 @@ class ThroughAdaptTest(_PlannerCase):
         self.assertIn("Belt squat 3×4–6 @ 145 kg", gym["description"])
         self.assertIsNotNone(test_db.get_workout("2026-09-17", "running"))
         self.assertEqual(test_db.get_strength_check(gym["id"]), proposal.strength_stamp)
+
+    def test_a_gym_the_strength_planner_writes_again_keeps_its_short_name(self):
+        """The week planner holds Thursday, so the strength planner builds the new row
+        from the live session, short name included (DESIGN_calendar_miniapp.md §3.6)."""
+        self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0), short_name="Gym")
+        test_db.bump_strength_history()
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("belt squat", 3, 4, 6, 145.0), reason="Add 5."),
+        ]}]
+        with patch("stamind.coach.engine.openrouter_client") as week_planner:
+            week_planner.complete.return_value = {
+                "change_needed": False, "reason": "No adaptation needed.",
+                "adapted_workouts": [],
+            }
+            proposal = coach_service.workout_adapt(TODAY)
+        self.assertEqual(proposal.workouts[0]["short_name"], "Gym")
+
+        coach_service.workout_revision_apply(proposal)
+        gym = test_db.get_workout("2026-09-17", "strength_training")
+        self.assertEqual([r["load_kg"] for r in gym["prescribed_sets"]], [145.0])
+        self.assertEqual(gym["short_name"], "Gym")
 
     def test_the_preview_prints_the_kilograms(self):
         from stamind.cli.workouts.generate import print_generate_preview
