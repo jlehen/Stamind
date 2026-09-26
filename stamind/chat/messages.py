@@ -134,6 +134,7 @@ class MessagesMixin:
         """Tears down, replies, then hard-exits with RESTART_EXIT_CODE for the sm-bot
         supervisor to relaunch us. See DESIGN_bot_restart.md §5.2."""
         await runner.restart_teardown(self.sessions.get(chat_id), self._pause_polling)
+        runner.leave_restart_note(chat_id)
         await self.bot.send_message(chat_id=chat_id, text="Restarting…")
         os._exit(runner.RESTART_EXIT_CODE)
 
