@@ -104,7 +104,9 @@ it only once it was too late to act on.
   prompt already lists every mesocycle's name, date range and focus
   (`coach/service/athlete_context.py::_get_active_strategy_and_meso_text`), which is enough to
   support the "is easing cheap here?" judgement. Adding the sessions would introduce a new data path
-  and a new class of prompt-visible-but-immutable workout for modest gain.
+  and a new class of prompt-visible-but-immutable workout for modest gain. This entry is
+  about `workout adapt` only: `workout generate` does show the week either side of its span
+  (§7), because there the missing sessions broke a weekly rule outright.
 
 ## 6. Known asymmetry
 
@@ -133,3 +135,45 @@ objective), so it kept answering "you slept badly, should today change?" in the 
 one goal ending and the next being set. It no longer does. One consequence follows: the
 engine's "no active mesocycle" branch — which dropped the intensity table and the drift
 instructions that reference it — is no longer reachable through this path.
+
+## 7. `workout generate` sees the week either side of its span
+
+### The problem, in a real week
+
+A `workout generate` run writes a span of days. Until now the week planner saw nothing planned
+outside it: it saw the activities Garmin recorded up to today, and no planned session before or
+after the span. A span often starts or ends mid-week — at a mesocycle's first day, at the end of
+the current plan, or at a date the athlete picked with `-d`. A weekly rule then holds only over
+the part of the week the run writes.
+
+It is Saturday 19 September. A new plan starts on Thursday 1 October. The athlete runs
+`workout generate` for it. Monday 28 is already planned as a rest day and Tuesday 29 as
+strength. The week planner sees neither. It treats Thursday to Sunday as a short week of its
+own, applies "two strength sessions a week" to it, and puts strength on Thursday and Friday.
+On Sunday 20 the athlete runs `workout generate` for the end of the old plan, up to Wednesday
+30. That run sees neither Thursday nor Friday. It moves the lift from Tuesday to Monday and
+drops Monday's rest day. The week now holds three strength sessions and no rest day, and
+neither run broke its own rules.
+
+### The rule
+
+The week planner is shown the live sessions planned in the seven days before the span's first
+day and the seven days after its last day, as `SESSIONS JUST OUTSIDE THE SPAN`. It is told to
+count them when it applies a weekly rule, and never to write on those days. Days before today
+are left out: the completed activities already say what happened on them. The section and its
+TASK paragraph appear only when there is such a session, so a run with nothing either side
+sends the prompt it always did.
+
+Each session is one summary line — date, sport, title, load, intensity target — and no
+description. The week planner only counts these sessions; it does not revise them.
+
+The span is enforced on the way out, not only asked for. Any entry the week planner dates
+outside the span is dropped with a notice, and the session already on that day stays. Before
+this section, only a date before the span's start was dropped.
+
+### Not handled
+
+- Nothing checks the result against the days outside the span. The week planner is told not
+  to create a clash with them, and is not overruled when it does.
+- Seven days is fixed. A microcycle longer than a week (an A/B fortnight) is still seen only
+  one week deep at its edge.

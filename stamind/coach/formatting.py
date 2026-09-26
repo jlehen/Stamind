@@ -249,6 +249,15 @@ def format_standing_workouts(
     return "\n\n".join(sections)
 
 
+def format_neighbour_workouts(
+    neighbours: List[Workout], eval_date: Optional[str] = None,
+) -> str:
+    """The SESSIONS JUST OUTSIDE THE SPAN section of the generate prompt: one summary per
+    session and no description, since the week planner only counts them
+    (DESIGN_mesocycle_boundary.md §7)."""
+    return "\n".join(_planned_summary(w, eval_date) for w in neighbours)
+
+
 def _performed_marker(p: Performed) -> str:
     """The done/partial tag for a session that matched an activity. A partial says what
     was actually performed rather than claiming the session happened — a 10-minute

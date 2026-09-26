@@ -26,7 +26,7 @@ from stamind.analytics import intensity
 from stamind.strength import planner as strength_planner
 from stamind.text import cmd, green, keep_whole
 from stamind.output import notice
-from stamind.clock import fmt_date, today_str as _today_str
+from stamind.clock import fmt_date, shift, today_str as _today_str
 
 
 class WorkoutGenMixin:
@@ -164,6 +164,15 @@ class WorkoutGenMixin:
         if not fresh:
             window_end = settings.commitment_end(today_str)
         standing_sessions = self._standing_sessions(span_sessions, window_end)
+        # The week either side of the span as already planned, so a weekly rule counts the
+        # days this run does not write (DESIGN_mesocycle_boundary.md §7). Days before today
+        # are the completed activities' to tell.
+        before = max(today_str, shift(gen_start_str, -7))
+        neighbour_sessions = self._db.get_workouts(
+            start_date=before, end_date=shift(gen_start_str, -1)
+        ) + self._db.get_workouts(
+            start_date=shift(gen_end_str, 1), end_date=shift(gen_end_str, 7)
+        )
         planner_reply = self.engine._workout_generate_logic(
             objectives=objectives,
             constraints=constraints,
@@ -186,6 +195,7 @@ class WorkoutGenMixin:
             anchor_history=self._anchor_history_text(gen_start_str),
             standing_workouts=standing_sessions,
             past_constraints=past_constraints,
+            neighbour_workouts=neighbour_sessions,
             terse=settings.terse(),
         )
 
@@ -207,12 +217,19 @@ class WorkoutGenMixin:
         # Integers, before the preview and the save both read these numbers.
         normalize_load_fields(workouts)
 
-        # Guard the preserved day: when today's completed session is being kept, drop any
-        # workout the model mistakenly dated before the generation start. save_workout
-        # matches on date+sport, so a stray today-dated row would silently overwrite the
-        # completed session we deliberately kept.
-        if gen_start_str != today_str:
-            workouts = [w for w in workouts if w.get('date', '') >= gen_start_str]
+        # Only the span is written. A date before it would overwrite today's completed
+        # session when that day is being kept; a date after it would stand beside a session
+        # the week planner was shown as not its own (DESIGN_mesocycle_boundary.md §7).
+        outside = sorted({
+            w.get('date', '') for w in workouts
+            if not gen_start_str <= w.get('date', '') <= gen_end_str
+        })
+        if outside:
+            notice(
+                f"The coach wrote sessions outside the days this run writes "
+                f"({', '.join(fmt_date(d) for d in outside)}) — leaving those days as they are.",
+            )
+            workouts = [w for w in workouts if gen_start_str <= w.get('date', '') <= gen_end_str]
 
         # Same-day collision guard (§4.1): drop any non-benchmark session that shares a
         # date+sport with a scheduled benchmark, before the (date, sport)-keyed save can

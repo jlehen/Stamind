@@ -53,6 +53,9 @@ STANDING_SCOPE = "You must answer for every session listed here"
 PAST_CONSTRAINTS_INSTRUCTIONS = "### WHAT ALREADY HAPPENED IN THIS MESOCYCLE"
 PAST_CONSTRAINTS_DATA = "## CONSTRAINTS EARLIER IN THIS MESOCYCLE"
 
+NEIGHBOUR_INSTRUCTIONS = "### THE DAYS JUST OUTSIDE THE SPAN"
+NEIGHBOUR_DATA = "## SESSIONS JUST OUTSIDE THE SPAN"
+
 STRENGTH_BRIEF_INSTRUCTIONS = "### WRITING A STRENGTH DAY"
 STRENGTH_KEEP_THE_REQUEST = "A brief names an exercise in one case only"
 STRENGTH_REQUEST_INSTRUCTIONS = "asks for something INSIDE a strength session"
@@ -539,10 +542,32 @@ class TestPastConstraintsGate(unittest.TestCase):
         self.assertNotIn(PAST_CONSTRAINTS_DATA, whole)
 
 
+class TestNeighbourSessionsGate(unittest.TestCase):
+    """The week either side of the span, shown so a weekly rule counts it
+    (DESIGN_mesocycle_boundary.md §7)."""
+
+    NEIGHBOURS = [{
+        "date": "2026-06-08", "sport_type": "strength_training", "title": "Monday lift",
+        "description": "[Monday lift]", "duration_minutes": 60, "rpe": 6, "tss": 30,
+    }]
+
+    def test_a_neighbour_reaches_both_regions(self):
+        system, user = build_generate_prompt(neighbour_workouts=self.NEIGHBOURS)
+        self.assertIn(NEIGHBOUR_INSTRUCTIONS, system)
+        self.assertIn(NEIGHBOUR_DATA, user)
+        self.assertIn("Monday lift", user)
+
+    def test_without_one_neither_appears(self):
+        system, user = build_generate_prompt()
+        whole = system + user
+        self.assertNotIn(NEIGHBOUR_INSTRUCTIONS, whole)
+        self.assertNotIn(NEIGHBOUR_DATA, whole)
+
+
 # The optional inputs whose regions are asserted above.
 GATES_WITH_A_TEST = {
     "athlete_message", "intensity_context", "standing_workouts", "past_constraints",
-    "tweak", "tweak_dates", "terse",
+    "neighbour_workouts", "tweak", "tweak_dates", "terse",
 }
 
 # The rest of the two builders' optional inputs. Being here is not a claim that an input

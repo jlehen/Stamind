@@ -547,6 +547,51 @@ class TestPastConstraintsReachThePrompt(WindowTestCase):
         self.assertNotIn("Old news", self.prompt_user_content + self.prompt_system)
 
 
+class TestTheDaysJustOutsideTheSpan(WindowTestCase):
+    """The week either side of the span is shown and never written
+    (DESIGN_mesocycle_boundary.md §7)."""
+
+    def section(self):
+        text = self.prompt_user_content.split("## SESSIONS JUST OUTSIDE THE SPAN\n", 1)[1]
+        return text.split("\n\n## ", 1)[0]
+
+    def test_the_week_either_side_reaches_the_prompt(self):
+        self.ride(_days_out(2), title="Too early")
+        self.ride(_days_out(8), title="Tuesday lift")
+        self.ride(_days_out(18), title="Monday ride")
+        self.ride(_days_out(25), title="Too late")
+        self.generate(self.session(_days_out(10)), start=_days_out(10), end=_days_out(16))
+        self.assertIn("THE DAYS JUST OUTSIDE THE SPAN", self.prompt_system)
+        section = self.section()
+        self.assertIn("Tuesday lift", section)
+        self.assertIn("Monday ride", section)
+        self.assertNotIn("Too early", section)
+        self.assertNotIn("Too late", section)
+
+    def test_a_day_before_today_is_not_shown(self):
+        """What happened before today is the completed activities' to tell."""
+        self.ride(_days_out(-1), title="Yesterday")
+        self.ride(_days_out(1), title="Tomorrow")
+        self.generate(self.session(_days_out(3)), start=_days_out(3), end=_days_out(5))
+        self.assertIn("Tomorrow", self.section())
+        self.assertNotIn("Yesterday", self.section())
+
+    def test_with_nothing_either_side_neither_section_appears(self):
+        self.generate(self.session(_days_out(10)), start=_days_out(10), end=_days_out(16))
+        self.assertNotIn("JUST OUTSIDE THE SPAN", self.prompt_system)
+        self.assertNotIn("JUST OUTSIDE THE SPAN", self.prompt_user_content)
+
+    def test_an_entry_dated_after_the_span_is_dropped_and_the_session_there_stands(self):
+        self.ride(_days_out(18), title="Monday ride")
+        self.generate(
+            self.session(_days_out(12)), self.session(_days_out(18), title="Extra run"),
+            start=_days_out(10), end=_days_out(16),
+        )
+        self.assertEqual(
+            [w["title"] for w in self.live(_days_out(18))], ["Monday ride"]
+        )
+
+
 class TestTheAthleteNote(WindowTestCase):
     """One line about the change as a whole (§6.3), which waits to be sent when the
     athlete did not watch the run (DESIGN_change_heads_up.md §6)."""

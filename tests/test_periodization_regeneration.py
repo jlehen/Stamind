@@ -100,7 +100,7 @@ class TestRegenerationClearsTheOldSessions(unittest.TestCase):
         mock_client.complete.return_value = {
             "reasoning": "Separate workout reasoning",
             "workouts": [{
-                "date": "2026-06-01", "sport_type": "running",
+                "date": _days_out(0), "sport_type": "running",
                 "title": "Base Run", "description": "30 mins",
             }],
         }

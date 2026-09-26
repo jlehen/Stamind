@@ -1005,7 +1005,11 @@ called by the UIs.
   - **Preserves a completed session:** if today's planned workout already has a
     matching completed activity (`_today_workout_completed`, a one-day
     `analyze_adherence` pass), generation starts *tomorrow*; otherwise today. A
-    defensive filter drops any model-emitted workout dated before the start.
+    defensive filter drops any model-emitted workout dated outside `[gen_start, gen_end]`.
+  - **The week either side:** the live sessions planned in the seven days before
+    `gen_start` (never before today) and the seven after `gen_end` reach the week planner as
+    `SESSIONS JUST OUTSIDE THE SPAN`, shown and never written, so a weekly rule counts the
+    whole week and not the part of it this run writes (DESIGN_mesocycle_boundary.md §7).
   - **Horizon:** `num_days` from `end_date` (or `config.workout_generation_span_days`)
     relative to the start, then `CoachEngine._workout_generate_logic()`.
 - **`workout_generate_apply(proposal)`** — the accepted half. Archives the previous
