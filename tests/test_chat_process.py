@@ -11,6 +11,7 @@ import asyncio
 import glob
 import os
 import pathlib
+import shutil
 import sys
 import tempfile
 import unittest
@@ -321,6 +322,38 @@ class CalendarKeyboardTest(unittest.TestCase):
         self.assertEqual(payload["today"], clock.today_str())
         self.assertEqual(payload["days"][clock.today_str()]["x"][0]["l"], "40′")
         self.assertEqual(rows, keyboards.simple_keyboard_rows(calendar=(label, url)))
+
+
+class BackAfterRestartTest(unittest.IsolatedAsyncioTestCase):
+    """It is 10:40. The athlete sends /restart. The old worker leaves a note naming her
+    chat; the new one tells her it is back, under a keyboard the new code built, so the
+    calendar button carries the new snapshot (DESIGN_bot_restart.md §5.2)."""
+
+    def setUp(self):
+        self.data_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.data_dir, True)
+        self.chat_bot = build_chat_bot(self, ui="simple")
+        patcher = mock.patch.dict(config.data, {"data_dir": self.data_dir})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    async def test_the_chat_that_asked_hears_back_under_a_fresh_keyboard(self):
+        runner.leave_restart_note(42)
+        with mock.patch.object(ChatBot, "_keyboard", return_value="the new keyboard"):
+            await self.chat_bot._say_back()
+        self.assertEqual(self.chat_bot.bot.sent,
+                         [(42, "Back 👍", {"reply_markup": "the new keyboard"})])
+        self.assertEqual(os.listdir(self.data_dir), [])
+
+    async def test_a_start_that_was_no_restart_says_nothing(self):
+        await self.chat_bot._say_back()
+        self.assertEqual(self.chat_bot.bot.sent, [])
+
+    async def test_a_note_for_a_chat_off_the_allowlist_is_dropped(self):
+        runner.leave_restart_note(99)
+        await self.chat_bot._say_back()
+        self.assertEqual(self.chat_bot.bot.sent, [])
+        self.assertEqual(os.listdir(self.data_dir), [])
 
 
 class SendGuardTest(unittest.IsolatedAsyncioTestCase):

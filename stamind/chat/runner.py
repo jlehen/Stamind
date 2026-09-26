@@ -19,6 +19,7 @@ from typing import Dict, List, Optional
 
 from stamind import journal
 from stamind.chat.routing import ROUTER_TIMEOUT_SECONDS
+from stamind.config import config
 from stamind.sentinels import (
     BUTTONS_SENTINEL, FLUSH_SENTINEL, PHOTO_SENTINEL, PROMPT_SENTINEL, QUEUE_SENTINEL,
     SENTINEL_PREFIX, flush_wants_a_wait, parse_frame, prompt_answer,
@@ -41,6 +42,35 @@ RESTART_EXIT_CODE = 75
 # exiting cleanly, then the long-poll closing): nothing may keep us from reaching
 # the exit code above. See DESIGN_bot_restart.md §5.2.
 RESTART_GRACE_SECONDS = 2.0
+
+# The note a /restart leaves under `data_dir` for the next worker: the chat to tell it is
+# back, with a keyboard the new code built (DESIGN_bot_restart.md §5.2).
+RESTART_NOTE = "restart_chat"
+
+
+def leave_restart_note(chat_id: int) -> None:
+    """Writes the chat that asked for the restart. A failure is journalled and stepped
+    over: nothing may keep /restart from reaching its exit."""
+    try:
+        with open(os.path.join(config.data_dir, RESTART_NOTE), "w", encoding="utf-8") as f:
+            f.write(str(chat_id))
+    except OSError as exc:
+        journal.record("bot.event", f"restart note not written: {exc}", lvl="warn")
+
+
+def take_restart_note() -> Optional[int]:
+    """The chat a /restart left, removing the note; None when this start was not one."""
+    path = os.path.join(config.data_dir, RESTART_NOTE)
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read().strip()
+        os.remove(path)
+    except OSError:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
 
 
 class Session:

@@ -175,7 +175,10 @@ classes themselves.
     recovery, by design. `/restart` is a bot command beside `/cancel` and `/start`, under
     the same allowlist: it kills any running command's subprocess and stops the Updater
     (`runner.restart_teardown`, a module function so it can be driven without a client),
-    replies, then `os._exit(75)` (DESIGN_bot_restart.md §4/§5.2).
+    leaves a `restart_chat` note under `data_dir` (`runner.leave_restart_note`), replies,
+    then `os._exit(75)`. The new worker's `_say_back` takes the note once polling is up
+    and sends that chat "Back 👍" under a keyboard it built, so the calendar button is the
+    new code's (DESIGN_bot_restart.md §4/§5.2).
   - **Access** is gated by a numeric chat-id allowlist (`telegram.allowed_chat_ids`).
     Token + allowlist live under a `telegram:` section in `config.yaml` (or
     `TELEGRAM_BOT_TOKEN`).

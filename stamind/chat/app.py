@@ -21,7 +21,7 @@ import sys
 from typing import Dict, List, Optional, Tuple
 
 from stamind import calendar_days, clock, journal, runtime, settings
-from stamind.chat import telegram_api
+from stamind.chat import runner, telegram_api
 from stamind.chat.callbacks import CallbacksMixin
 from stamind.chat.keyboards import (
     CALENDAR_LABEL, GYM_SPORT, MENU_COMMANDS, SIMPLE_MENU_COMMANDS, gym_button,
@@ -35,6 +35,10 @@ from stamind.cli.render import calendar_page
 from stamind.config import config
 from stamind.output import warn
 from stamind.strength import logger
+
+# What the chat that sent /restart hears once the new worker is up (DESIGN_bot_restart.md
+# §5.2).
+BACK_NOTICE = "Back 👍"
 
 
 class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, SchedulerMixin):
@@ -169,6 +173,19 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         except Exception as exc:
             journal.debug("bot.event", f"command menu not updated: {exc}")
 
+    async def _say_back(self) -> None:
+        """After a /restart, tells the chat that asked that the bot is back, under a keyboard
+        this worker built: the old one's calendar button carries the old code's snapshot
+        (DESIGN_bot_restart.md §5.2). A failure is journalled; the bot serves anyway."""
+        chat_id = runner.take_restart_note()
+        if chat_id is None or not self._authorized(chat_id):
+            return
+        try:
+            await self._send_keyed(chat_id, BACK_NOTICE)
+        except Exception as exc:
+            journal.record("bot.event", f"back notice not sent: {exc}", lvl="warn",
+                           chat=chat_id)
+
     async def _serve(self) -> None:
         """Runs the bot until SIGINT/SIGTERM."""
         stop_event = asyncio.Event()
@@ -184,6 +201,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
                 allowed_updates=telegram_api.all_update_types(),
                 error_callback=self._on_polling_error,
             )
+            await self._say_back()
             # Started whenever there is a chat to push to: the persona and the `push`
             # setting are checked per tick inside the loop, so a /ui flip (§5.6) or a
             # `settings set push off` turns it on and off live (DESIGN_settings.md §5).

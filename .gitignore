@@ -24,6 +24,8 @@ stamind.db-shm
 # Logs, and the gym logs the bot writes before ingesting them (DESIGN_gym_logger.md §6)
 logs
 gym_logs/
+# The note a /restart leaves for the next worker (DESIGN_bot_restart.md §5.2)
+restart_chat
 
 # Chart output (sm progress --chart)
 progress.png
