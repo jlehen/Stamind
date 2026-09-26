@@ -3,8 +3,8 @@ from datetime import timedelta
 from typing import List, Dict, Any, Set, Tuple, Optional
 
 from stamind.config import config
-from stamind.analytics.load import activity_load, planned_load
-from stamind.sports import canonical_sport
+from stamind.analytics.load import activity_load, load_method, planned_load, rpe_tss
+from stamind.sports import STRENGTH_SPORTS, canonical_sport
 from stamind.strength import comparison
 
 REST_VIOLATION = "rest_violation"
@@ -172,6 +172,20 @@ def _graded_by_sets(
     return comparison.compare_session(w, matched_act)
 
 
+def _planned_load_like(w: Dict[str, Any], act: Dict[str, Any]) -> Optional[float]:
+    """The planned load on the scale the activity's load was taken on: the plan's own RPE
+    when the athlete's RPE gave the load, and None when the two cannot be compared, which
+    is a strength session measured by heart rate alone (DESIGN_calendar_miniapp.md §3.2)."""
+    method = load_method(act)
+    if method in ("rpe", "rpe_divergence"):
+        if not w.get("rpe") or not w.get("duration_minutes"):
+            return None
+        return rpe_tss(float(w["rpe"]), w["duration_minutes"] * 60.0)
+    if method in ("hr", "hr_sparse") and canonical_sport(w["sport_type"]) in STRENGTH_SPORTS:
+        return None
+    return planned_load(w)
+
+
 def off_plan_gaps(w: Dict[str, Any], matched_act: Dict[str, Any]) -> List[Gap]:
     """The length, then the load, when either is off the plan by more than the tolerance;
     for a session its sets grade, the sets alone, when under `DONE_SHARE` of them counted.
@@ -183,11 +197,10 @@ def off_plan_gaps(w: Dict[str, Any], matched_act: Dict[str, Any]) -> List[Gap]:
         if compared.share >= comparison.DONE_SHARE:
             return []
         return [Gap(SETS, compared.planned, compared.counted, 1 - comparison.DONE_SHARE)]
-    exp_load = planned_load(w)
-    tolerance = _adherence_tolerance(exp_load)
+    tolerance = _adherence_tolerance(planned_load(w))
     measures = (
         (DURATION, w.get("duration_minutes") or 0, matched_act["duration_sec"] / 60.0),
-        (LOAD, exp_load, activity_load(matched_act)),
+        (LOAD, _planned_load_like(w, matched_act) or 0, activity_load(matched_act)),
     )
     return [
         Gap(measure, planned, actual, tolerance)

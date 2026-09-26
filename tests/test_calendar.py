@@ -17,7 +17,7 @@ from tests import test_db_path
 from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, run_cli, save_workout
 
 from stamind import calendar_days
-from stamind.analytics.adherence import DURATION, LOAD, Gap
+from stamind.analytics.adherence import DURATION, LOAD, Gap, off_plan_gaps
 from stamind.cli.render import calendar_grid
 from stamind.cli.render import calendar_page
 from stamind.cli.render.plan_lines import SIMPLE_END_NOTE
@@ -255,6 +255,26 @@ class GapColourTest(CalendarTestCase):
     def test_a_rest_day_trained_through_is_full_orange(self):
         mark, _done = self.monday("rest", None, None, 60, 50)
         self.assertEqual(mark, {"i": "🛌", "g": "more"})
+
+    def test_an_rpe_load_is_held_against_the_plans_rpe(self):
+        # 1 September: 55 minutes planned at RPE 5 (TSS 22), done in 51 at RPE 6. On the RPE
+        # scale that is 51 against 46, not 51 against 22.
+        gym = {"sport_type": "strength_training", "duration_minutes": 55, "tss": 22, "rpe": 5}
+        done = {"duration_sec": 51 * 60.0, "tss": None, "rpe": 6}
+        self.assertEqual(off_plan_gaps(gym, done), [])
+        # 17 September: 30 minutes at RPE 5 planned, 53 at RPE 7 done, is more either way.
+        gym = {"sport_type": "strength_training", "duration_minutes": 30, "tss": 20, "rpe": 5}
+        done = {"duration_sec": 53 * 60.0, "tss": None, "rpe": 7}
+        self.assertEqual([g.measure for g in off_plan_gaps(gym, done)], [DURATION, LOAD])
+
+    def test_heart_rate_alone_does_not_measure_a_gym_session(self):
+        # 21 September before its RPE: 56 of 60 minutes, heart rate reading 13 against 26.
+        done = {"duration_sec": 56 * 60.0, "tss": 13.0, "rpe": None, "zone1_sec": 56 * 60.0}
+        gym = {"sport_type": "strength_training", "duration_minutes": 60, "tss": 26, "rpe": 5}
+        self.assertEqual(off_plan_gaps(gym, done), [])
+        # A run keeps its heart-rate load.
+        run = dict(gym, sport_type="running")
+        self.assertEqual([g.measure for g in off_plan_gaps(run, done)], [LOAD])
 
     def test_the_words_for_each_way_off(self):
         def gap(measure, ratio):

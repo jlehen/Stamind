@@ -115,6 +115,17 @@ tolerance or there is no load to compare. It is Thursday. The plan says 60 minut
 intervals; she rides 100 minutes easy. The load is half the planned load, so the cell is
 blue: the session asked for more than she gave, even though she was out longer.
 
+**The load, like with like.** An activity's load comes from power, from heart rate, or,
+when the athlete entered an RPE (her 1–10 rating of how hard it felt), from RPE × 10 × hours
+(`load_method` in `analytics/load.py`). The session's planned load is the week planner's
+TSS, which is on the power and heart-rate scale. So when the RPE gave the activity's load,
+the plan is put on the same scale from its own RPE: a 55-minute gym session planned at
+RPE 5 is 46, and done in 51 minutes at RPE 6 it is 51, as planned. Against the planned TSS
+of 22 it would read as double. A plan with no RPE gives nothing to compare with, and the
+length alone decides. A gym session measured by heart rate alone is compared by its length
+alone too: heart rate barely rises while lifting, so it reads a full session as half of one.
+A run or a ride measured by heart rate keeps its load.
+
 A gym session logged with the gym logger is graded by its sets instead, neither by length
 nor by load (DESIGN_strength_planned_vs_done.md §6). It is green when at least 80% of its
 planned sets counted, and blue otherwise, with the share counted as the measure: 9 of 17
