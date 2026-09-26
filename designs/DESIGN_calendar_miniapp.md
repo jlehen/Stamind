@@ -362,9 +362,15 @@ Before the budget is set, the author measures what a button can carry:
   the bot could send the keyboard at all, and the largest size that opened with every byte
   intact.
 
-The budget in §5 is half the smallest of those numbers, to leave room for a client that
-was not tested. Until then the code uses 16 KB. If even 16 KB fails, the design goes back for
-review, because the sheets would cover only a few days.
+**The result, 2026-09-26.** The Bot API refuses a reply keyboard with "reply markup is too
+long" once the whole keyboard passes about 9.9 KB: it took 9,921 bytes of address and
+refused 9,984. The limit counts the whole keyboard, so the gym button's address and the
+labels share it with the calendar. The budget is therefore 6 KB.
+
+At 6 KB, on the author's database, the grid marks for the ten weeks take 1.5 KB and each
+day's sheet about 900 bytes, so only five days of sheets fit: two days either side of
+today. That is the case this step was for, and §5's "a day at a time" design needs review
+before it ships (§11).
 
 ## 9. Where things live
 
@@ -401,6 +407,9 @@ column once. On the page, the node tests cover reading `c=` next to Telegram's o
 parameters, the tint, and the two-session rule.
 
 ## 11. Not handled, not decided
+
+- **How the sheets reach the page** (§8's result). A button holds about five days of sheets.
+  Open for the author to decide.
 
 - **Editing** from the calendar: moving or dropping a session, or adding a constraint on a
   tapped day. The first edit will need the page to send data back, as the gym logger does.
