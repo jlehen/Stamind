@@ -27,6 +27,7 @@ from stamind.chat.routing import (
     ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, UI_EXPERT_ON, UI_SIMPLE_ON,
     UI_USAGE, parse_message_to_argv, parse_ui_switch,
 )
+from stamind.cli.render import calendar_page
 from stamind.config import config
 from stamind.sentinels import prompt_answer
 
@@ -250,11 +251,14 @@ class MessagesMixin:
         return path
 
     async def on_web_app_data(self, update, context) -> None:
-        """The one message the gym logger's page sends when the athlete taps "Finish".
+        """A message from one of the two pages: the calendar asking for a day in full, or
+        the gym logger's log when the athlete taps "Finish".
 
-        It is written to a file and handed to `strength ingest`, whose summary streams
-        back the way every command's output does. The bot never reads the log itself:
-        every write goes through the CLI (DESIGN_gym_logger.md §6)."""
+        The calendar's day runs `workout list -d <day>`, the command behind "📅 Today"
+        (DESIGN_calendar_miniapp.md §6). The log is written to a file and handed to
+        `strength ingest`, whose summary streams back the way every command's output does.
+        The bot never reads the log itself: every write goes through the CLI
+        (DESIGN_gym_logger.md §6)."""
         message = update.effective_message
         chat = update.effective_chat
         if message is None or chat is None or message.web_app_data is None:
@@ -270,6 +274,12 @@ class MessagesMixin:
 
         if self.sessions.get(chat.id) is not None:
             await self._send_keyed(chat.id, BUSY_NOTICE, send=message.reply_text)
+            return
+
+        day = calendar_page.requested_day(data)
+        if day is not None:
+            self._log(chat.id, "  ", f"calendar day: {day}")
+            await self._start_command(chat.id, ["workout", "list", "-d", day])
             return
 
         path = self._write_gym_log(data)

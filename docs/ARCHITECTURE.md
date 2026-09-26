@@ -198,7 +198,8 @@ classes themselves.
       when building the keyboard or sending with it fails, it sends the same text again
       without one and journals the error (DESIGN_calendar_miniapp.md §6).
     - `messages` is what an arriving message does — the athlete's own text in
-      `on_message`, and the gym logger page's one data message in `on_web_app_data`
+      `on_message`, and a page's one data message in `on_web_app_data`: the calendar's
+      "💬 Full day in chat" (DESIGN_calendar_miniapp.md §6), else the gym logger's log
       (DESIGN_gym_logger.md §6); `callbacks` is what a tap does.
     - `routing` is what one chat message means — both halves of the router's intent table
       (`ROUTER_INTENTS`, which `sm bot route` builds its prompt from, and the intent→argv,
@@ -4257,8 +4258,9 @@ no reply keyboard and so no button (DESIGN_gym_logger.md §7).
 `register_handlers` wires a third handler ahead of the text one:
 `MessageHandler(filters.StatusUpdate.WEB_APP_DATA, on_web_app_data)`.
 `ChatBot.on_web_app_data` checks the allowlist the way `on_message` does, and defers with
-the same "still running" line when a command is already going in that chat. Otherwise it
-writes the message verbatim to `<data_dir>/gym_logs/<date>-<hhmmss>.json` and runs
+the same "still running" line when a command is already going in that chat. A message
+the calendar sent goes elsewhere ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)).
+Otherwise it writes the message verbatim to `<data_dir>/gym_logs/<date>-<hhmmss>.json` and runs
 `strength ingest <that file>` through `_start_command`, so the summary streams into the
 chat the way every command's output does. The bot parses nothing itself: every write goes
 through the CLI.
@@ -4343,3 +4345,9 @@ morning push still carries the offer to plan the next weeks. Every send that att
 keyboard goes through `RepliesMixin._send_keyed`. When building the keyboard or sending
 with it fails, that sends the text again without a keyboard and journals the error, so a
 refused keyboard never costs the athlete her answer.
+
+**The way back.** The sheet has no workout text, so under a day with a session the page
+offers "💬 Full day in chat". Tapping it calls `sendData` with
+`{"calendar_day": "<date>"}`, and Telegram closes the page. `ChatBot.on_web_app_data`
+reads the date with `calendar_page.requested_day` and runs `workout list -d <date>`, the
+command behind "📅 Today". Any other page message is still a gym log for `strength ingest`.

@@ -232,6 +232,17 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(replied[0][1]["reply_markup"])
         self.assertFalse(os.path.exists(self.gym_logs()))
 
+    async def test_the_calendar_asks_for_a_day_and_writes_no_log(self):
+        """Wednesday: the athlete taps Saturday in the calendar, then "💬 Full day in chat".
+        The bot posts Saturday the way "📅 Today" writes a day
+        (DESIGN_calendar_miniapp.md §6)."""
+        chat_bot = build_chat_bot(self, ui="simple")
+        started = record_commands(self, chat_bot)
+        update, _replied = web_app_update(data='{"calendar_day": "2026-09-26"}')
+        await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
+        self.assertEqual([s[1] for s in started], [["workout", "list", "-d", "2026-09-26"]])
+        self.assertFalse(os.path.exists(self.gym_logs()))
+
 
 class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
     """What `on_callback` does with a tap on each of the four button namespaces."""

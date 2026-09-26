@@ -212,6 +212,27 @@ class SnapshotTest(CalendarTestCase):
         with open(os.path.join(REPO, "miniapp", "calendar_logic.js"), encoding="utf-8") as handle:
             self.assertIn(SIMPLE_END_NOTE, handle.read())
 
+    def test_the_page_asks_for_a_day_with_the_bots_key(self):
+        with open(os.path.join(REPO, "miniapp", "calendar_logic.js"), encoding="utf-8") as handle:
+            self.assertIn(f'DAY_REQUEST = "{calendar_page.DAY_REQUEST}"', handle.read())
+
+
+class RequestedDayTest(unittest.TestCase):
+    """What "💬 Full day in chat" sends, told apart from the gym logger's log (§6)."""
+
+    def test_the_calendars_message_names_the_day(self):
+        self.assertEqual(calendar_page.requested_day('{"calendar_day": "2026-09-26"}'),
+                         "2026-09-26")
+
+    def test_anything_else_is_not_a_request(self):
+        for data in ('{"v": 1, "d": "2026-09-24", "x": []}',
+                     '{"calendar_day": "2026-09-26", "x": 1}',
+                     '{"calendar_day": "tomorrow"}',
+                     '{"calendar_day": 3}',
+                     '["calendar_day"]',
+                     "not json"):
+            self.assertIsNone(calendar_page.requested_day(data), data)
+
 
 class BudgetTest(unittest.TestCase):
     """The sheets go in nearest today first, until the next would pass the budget (§5)."""
