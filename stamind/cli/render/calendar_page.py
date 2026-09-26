@@ -34,9 +34,6 @@ DAYS_AHEAD = 42
 # about 9.9 KB (measured 2026-09-26), and the gym button and the labels share it (§8).
 BUDGET_BYTES = 6 * 1024
 
-# A description is sent unwrapped: the page lets the browser wrap it (§5).
-UNWRAPPED = 1_000_000
-
 # The sheet's three headings (§1).
 PLANNED, DONE, NOTES = "Planned", "Done", "Signals and constraints"
 
@@ -152,7 +149,7 @@ def sheet(cal: Calendar, day: Day) -> List[Any]:
     parts: List[Any] = []
     planned = [r["planned"] for r in day.results]
     if planned or _in_schedule(cal, day.date):
-        parts.append([PLANNED, simple_day_lines(planned, day.date, width=UNWRAPPED)])
+        parts.append([PLANNED, simple_day_lines(planned, day.date, descriptions=False)])
     done = _done_lines(day, cal.today)
     if done:
         parts.append([DONE, done])

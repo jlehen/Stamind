@@ -47,8 +47,10 @@ dates.
 She taps Tuesday. A sheet slides up with three parts, each made of lines the bot already
 writes in the chat:
 
-- **Planned:** what "📅 Today" would have said about that day: the session's line and its
-  full description, which on a strength day holds the exercises, sets, reps and kilograms.
+- **Planned:** the session's line, as "📅 Today" writes it: "🏃 2026-09-22 Tue: Easy run
+  — 50 min". Not the full workout text, which does not fit in a button (§8). That text stays
+  in the morning message and in "📅 Today": the calendar shows what and when, the chat
+  shows how.
 - **Done:** that day's lines from "✅ Done lately": "✅ 🏃 Easy run — 50 min (you did 32
   min)", with the lifted sets under a gym session.
 - **Signals and constraints:** each one on its own line.
@@ -250,8 +252,8 @@ snapshot from the list of days. It writes no new wording. Each line comes from a
 the companion already uses:
 
 - Planned: `simple_day_lines` for that day, called without grades, so the sheet does not
-  say "done" twice. On a day inside the schedule with no session, it returns its rest line,
-  as the chat does.
+  say "done" twice, and without descriptions (§8). On a day inside the schedule with no
+  session, it returns its rest line, as the chat does.
 - Done: the lines `simple_compare_lines` writes for that day, which use
   `simple_activity_line` and `simple_set_lines`.
 - Signals: `simple_metric_words` for the metric, then the value, then the signal's text.
@@ -263,8 +265,8 @@ it with the browser's own `DecompressionStream("deflate")`. A Telegram built on 
 too old for that is not handled.
 
 **The size.** Measured on the author's database on 2026-09-25, this window holds 75
-sessions, 38 activities, 10 signals and 4 constraints. Packed with the sheets, it is about
-47 KB, and most of that is the session descriptions, about 790 characters each. The grid
+sessions, 38 activities, 10 signals and 4 constraints. Packed with the full workout text, it is
+about 47 KB, and most of that is the session descriptions, about 790 characters each. The grid
 marks alone are about 2 KB. Telegram does not publish a limit on a button's address, so
 step 0 (§8) measures it.
 
@@ -367,10 +369,11 @@ long" once the whole keyboard passes about 9.9 KB: it took 9,921 bytes of addres
 refused 9,984. The limit counts the whole keyboard, so the gym button's address and the
 labels share it with the calendar. The budget is therefore 6 KB.
 
-At 6 KB, on the author's database, the grid marks for the ten weeks take 1.5 KB and each
-day's sheet about 900 bytes, so only five days of sheets fit: two days either side of
-today. That is the case this step was for, and §5's "a day at a time" design needs review
-before it ships (§11).
+With the full workout text in each sheet, only five days fit in 6 KB: the grid marks for
+the ten weeks take 1.5 KB and each sheet about 900 bytes. The author chose to drop the
+workout text from the sheets instead. Without it, the whole window packs into 5.5 KB on the
+author's database, so every day in it has its sheet. The budget rule of §5 stays, for a
+month with more to say.
 
 ## 9. Where things live
 
@@ -408,8 +411,8 @@ parameters, the tint, and the two-session rule.
 
 ## 11. Not handled, not decided
 
-- **How the sheets reach the page** (§8's result). A button holds about five days of sheets.
-  Open for the author to decide.
+- **The full workout text of a day other than today.** It is not in the sheet (§8). A
+  "Full session" link that asks the bot for it in the chat is not handled.
 
 - **Editing** from the calendar: moving or dropping a session, or adding a constraint on a
   tapped day. The first edit will need the page to send data back, as the gym logger does.
