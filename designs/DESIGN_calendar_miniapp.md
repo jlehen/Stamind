@@ -138,6 +138,11 @@ The header shows the nearest goal still ahead, through `simple_goal_line` in
 something happens, and "by ~22 Dec" for a horizon, a date the training aims at. So the
 header needs no rule of its own for the two kinds.
 
+Tapping a 🎯 day opens its sheet with a "Goal" part first, in the same words as the header:
+"🏃 Sylvesterlauf — on 13 Dec (in 11 weeks)". A goal's day with nothing else on it opens a
+sheet too. The page builds this part from the goals the snapshot already carries, so it
+costs no byte.
+
 ### 3.6 The short name
 
 A session gets a new field, `short_name`: at most five characters that say what kind of

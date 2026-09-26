@@ -4301,8 +4301,9 @@ starting on Monday. Wednesday's ride was done, so its cell is green. Last Saturd
 was skipped, so its cell is red. Next week has no tint yet. Sunday's two-hour hike that
 nothing planned shows as a faded 🥾 beside the planned run. She taps Tuesday, and a sheet
 slides up with what was planned, what was done and the day's signals, each line the one
-the chat already writes. On the terminal, `sm calendar` prints the same month for the
-author in expert marks.
+the chat already writes. A 🎯 day's sheet opens with the goal, taken from the snapshot's
+goals by `sheetFor` in `calendar_logic.js`. On the terminal, `sm calendar` prints the same
+month for the author in expert marks.
 
 **Where the code is.** `stamind/calendar_days.py` gathers the facts: one `Day` per date,
 and the mesocycles and goals around them ([§2](#package-stamind)). Each view words them
