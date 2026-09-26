@@ -30,6 +30,7 @@ MAX_ANSWERS = 9
 YES_FINAL = {"label": "yes, final"}
 SOMETHING_ELSE = {"label": "something else…", "ask": "What was it? Type the exercise"}
 SETS_NOT_READ = "sets not read yet"
+DISCARDED_LINE = "discarded: counts as training, not for planning weights"
 
 
 class SetsRead(NamedTuple):
@@ -195,6 +196,24 @@ def named_line(group: Group) -> str:
     return f"{group.exercise} {set_chunks(group.sets)}{watch_mark(group.sets)}"
 
 
+def done_text(lifted: Sequence[Dict[str, Any]], exercise: str) -> str:
+    """'1×6 @ 95, 2×6 @ 110', or 'chest press 1×5 @ 55, 2×7 @ 65' when another exercise was
+    lifted in its place: the sets lifted for one exercise of a session, each run under
+    another name headed by that name (DESIGN_strength_planned_vs_done.md §2)."""
+    runs: List[List[Dict[str, Any]]] = []
+    for one in lifted:
+        if runs and runs[-1][0]["exercise"] == one["exercise"]:
+            runs[-1].append(one)
+            continue
+        runs.append([one])
+    parts = []
+    for run in runs:
+        name = run[0]["exercise"]
+        head = "" if name == exercise else f"{name} "
+        parts.append(f"{head}{set_chunks(run)}{watch_mark(run)}")
+    return ", ".join(parts)
+
+
 def position_list(numbers: Sequence[int]) -> str:
     """'set 5', 'sets 1, 3, 7–9': positions among the activity's active sets, runs joined."""
     runs: List[List[int]] = []
@@ -233,7 +252,7 @@ def activity_lines(activity: Dict[str, Any]) -> List[str]:
     if unnamed:
         lines.append(f"{position_list(unnamed)} unnamed")
     if lines and activity.get("discarded"):
-        lines.append("discarded: counts as training, not for planning weights")
+        lines.append(DISCARDED_LINE)
     return lines
 
 
@@ -307,17 +326,17 @@ def take_over_logs(pending: Sequence[Dict[str, Any]]) -> List[str]:
 def read_new_activities(client: Any = None) -> SetsRead:
     """Reads the sets of every strength activity from `strength-sets-since` on, dated before
     today and never read, and freezes each or asks whether it is final (§6). An activity a
-    gym log covers takes the logged sets instead (DESIGN_gym_logger.md §5). Logs into
-    Garmin only when there is something left to read."""
+    gym log covers takes the logged sets instead, today's included, since that moves rows
+    and asks Garmin nothing (DESIGN_gym_logger.md §5, DESIGN_strength_planned_vs_done.md
+    §5). Logs into Garmin only when there is something left to read."""
     since = settings.strength_sets_since()
     if not since:
         return SetsRead(None, [])
     today = today_str()
-    pending = runtime.db.strength_activities(since, before=today, unread=True)
-    if not pending:
-        return SetsRead(None, [])
-    covered = take_over_logs(pending)
-    pending = [a for a in pending if a["activity_id"] not in covered]
+    unread = [a for a in runtime.db.strength_activities(since, unread=True)
+              if a["date"] <= today]
+    covered = take_over_logs(unread)
+    pending = [a for a in unread if a["activity_id"] not in covered and a["date"] < today]
     if not pending:
         return SetsRead(None, [])
     client = client or runtime.garmin.connect()

@@ -15,6 +15,7 @@ from stamind.gcal.event import event_url
 from stamind.text import bold, cyan, format_labeled_paragraph, gray, wrap_text, yellow
 from stamind.output import notice, warn
 from stamind.clock import fmt_date, fmt_timestamp, today_str as _today_str
+from stamind.cli.common import strength_table
 from stamind.cli.runway import list_end_marker
 from stamind.cli.windows import (
     has_selector as _has_selector, resolve_window, split_targets,
@@ -182,6 +183,8 @@ def print_workout_table(
         actual = (verdict or {}).get('completed')
         if actual:
             print(gray(f"  Actual: {format_actual(actual)}"))
+            for line in strength_table(w, actual):
+                print(f"  {line}")
         for reason in (verdict or {}).get('reasons') or []:
             notice(f"  Discrepancy: {reason}")
         print(format_labeled_paragraph("  Description:", w['description']))

@@ -233,8 +233,8 @@ class WorkoutAdaptMixin:
 ## TASK
 Analyze the athlete's actual workout adherence and physiological metrics trajectory over
 the past {history_days} days: completed activities against planned workouts, the calculated
-discrepancies (misses, workload/duration differences, rest violations), and the rolling
-baseline against the daily metrics sequence for signs of accumulated fatigue.
+discrepancies (misses, workload/duration differences, sets short, rest violations), and the
+rolling baseline against the daily metrics sequence for signs of accumulated fatigue.
 
 Based on this, determine if we need to adapt the sessions for the remainder of
 the active mesocycle (from {target_date_str} to {meso_end_date_str}).

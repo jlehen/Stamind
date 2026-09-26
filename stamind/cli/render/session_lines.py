@@ -11,11 +11,13 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from stamind.benchmarks import format_delta, format_value, is_improvement, label_for_kind
+from stamind.strength import comparison
 from stamind.strength.sets import activity_lines
 from stamind.coach.proposals import RevisionProposal
 from stamind.sports import canonical_sport
 from stamind.text import wrap_text
 from stamind.clock import days_between, fmt_date, today_str as _today_str
+from stamind.cli.common import simple_comparison_lines
 from stamind.cli.workouts.revisions import (
     quotes_wording, rewritten_text_only, wording_group_lines, wording_groups,
 )
@@ -151,6 +153,16 @@ def simple_set_lines(act: Dict[str, Any]) -> List[str]:
     return [f"      {line}" for line in activity_lines(act)]
 
 
+def simple_session_sets(w: Dict[str, Any], act: Dict[str, Any]) -> List[str]:
+    """Under a planned session's line: the comparison when it is a strength session with
+    planned lines, else what was lifted (DESIGN_strength_planned_vs_done.md §7)."""
+    compared = comparison.compare_session(w, act)
+    if compared is None:
+        return simple_set_lines(act)
+    by_sets = comparison.carries_gym_log(act)
+    return [f"      {line}" for line in simple_comparison_lines(compared, by_sets)]
+
+
 def simple_activity_minutes(act: Dict[str, Any]) -> int:
     return round((act.get("duration_sec") or 0) / 60)
 
@@ -195,7 +207,7 @@ def simple_compare_lines(
                     f"{day} · ✅ {simple_session_line(w)} "
                     f"(you did {simple_activity_minutes(act)} min)"
                 )
-                lines.extend(simple_set_lines(act))
+                lines.extend(simple_session_sets(w, act))
             else:
                 lines.append(f"{day} · ❌ {simple_session_line(w)}")
         for act in unplanned:

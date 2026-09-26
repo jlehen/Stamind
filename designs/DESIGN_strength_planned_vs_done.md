@@ -1,6 +1,6 @@
 # Design: a past strength session, planned against done, and graded by its sets
 
-**Status:** Proposed · **Date:** 2026-09-26 · **Branch:** `worktree-strength-planned-vs-done`
+**Status:** Implemented · **Date:** 2026-09-26 · **Branch:** `worktree-strength-planned-vs-done`
 
 ## 1. The problem
 
@@ -293,7 +293,8 @@ not how the session went.
 - Below about 50 kg one pin or dumbbell step can be more than 10%: 25 kg against a planned 30
   does not count. The strength planner writes loads the athlete has already lifted, so it
   rarely names a load the machine cannot be set to.
-- The table is wider than a phone. Expert mode in Telegram wraps it.
+- The table is wider than a phone. Expert mode in Telegram draws it as one record per
+  exercise, as it draws every table on a narrow client (`render_table`).
 - The strength planner's own view of what was done (DESIGN_strength_tracking.md §8) still
   pairs by name and does not read the log's cards.
 - The dashboard shows the new verdict but not the table.

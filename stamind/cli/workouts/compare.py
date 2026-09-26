@@ -19,6 +19,7 @@ from stamind.output import notice, warn
 from stamind.clock import (
     fmt_date, parse_date, today_date as _today_date, today_str as _today_str,
 )
+from stamind.cli.common import strength_table
 from stamind.cli.windows import resolve_window
 
 
@@ -109,7 +110,11 @@ def print_workout_compare(
                     print(f"  ACTUAL:     {red(act_str)} {bold(red('[REST VIOLATION]'))}")
                 else:
                     print(f"  ACTUAL:     {green(act_str)}")
-                print_set_lines(act)
+                table = strength_table(w, act)
+                for line in table:
+                    print(f"  {line}")
+                if not table:
+                    print_set_lines(act)
             elif r.get('pending'):
                 print(f"  ACTUAL:     {gray('(not yet — still ahead today)')}")
             elif not is_rest:

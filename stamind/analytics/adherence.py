@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Set, Tuple, Optional
 from stamind.config import config
 from stamind.analytics.load import activity_load, planned_load
 from stamind.sports import canonical_sport
+from stamind.strength import comparison
 
 REST_VIOLATION = "rest_violation"
 MISSED = "missed"
@@ -149,7 +150,14 @@ def _discrepancy_reasons(
 ) -> List[str]:
     """Duration/workload mismatch notes for a planned workout vs the activity it
     matched. Empty list means the session was performed within tolerance. Single
-    source of truth shared by `analyze_adherence` and `classify_adherence`."""
+    source of truth shared by `analyze_adherence` and `classify_adherence`.
+
+    A strength session with planned lines, paired with an activity carrying a gym log, is
+    graded by its sets instead (DESIGN_strength_planned_vs_done.md §6)."""
+    if comparison.carries_gym_log(matched_act):
+        compared = comparison.compare_session(w, matched_act)
+        if compared is not None:
+            return comparison.reasons(compared)
     act_duration_min = matched_act["duration_sec"] / 60.0
     act_load = activity_load(matched_act)
 
@@ -291,8 +299,19 @@ def is_ambiguous_match(w: Dict[str, Any], matched_act: Dict[str, Any]) -> bool:
     So the test is the shortfall alone, and it applies to an exact sport match as readily
     as an aliased one — a 10-minute `strength_training` activity against a 65-minute lift
     is exactly as unclear as a 10-minute `indoor_cardio` one.
+
+    An activity carrying a gym log is never a guess: the athlete tapped Finish on it
+    (DESIGN_strength_planned_vs_done.md §5).
     """
+    if comparison.carries_gym_log(matched_act):
+        return False
     return _duration_shortfall(w, matched_act)
+
+
+def _pairing_order(act: Dict[str, Any]) -> Tuple[bool, float]:
+    """The activity carrying a gym log first, then the heaviest
+    (DESIGN_strength_planned_vs_done.md §5)."""
+    return (not comparison.carries_gym_log(act), -activity_load(act))
 
 
 def analyze_adherence(
@@ -353,8 +372,7 @@ def analyze_adherence(
         day_acts = activities_by_date.get(date_curr, [])
         day_workouts = workouts_by_date.get(date_curr, [])
 
-        # Sort activities by load descending
-        day_acts = sorted(day_acts, key=activity_load, reverse=True)
+        day_acts = sorted(day_acts, key=_pairing_order)
 
         used_act_ids = set()
 

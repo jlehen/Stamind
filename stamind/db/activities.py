@@ -133,7 +133,8 @@ class ActivitiesMixin:
     def get_completed_activities(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> List[CompletedActivity]:
-        """Fetches completed activities, optionally within a date range."""
+        """Fetches completed activities, optionally within a date range, each strength
+        activity with what was lifted in it (`attach_lifted`)."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             if start_date and end_date:
@@ -153,7 +154,9 @@ class ActivitiesMixin:
                     "SELECT * FROM completed_activities "
                     "ORDER BY date ASC, start_time ASC"
                 )
-            return [dict(row) for row in cursor.fetchall()]  # type: ignore
+            activities = [dict(row) for row in cursor.fetchall()]
+        self.attach_lifted(activities)  # type: ignore[attr-defined]
+        return activities  # type: ignore
 
     def get_first_activity_date(self) -> Optional[str]:
         """MIN(date) over completed activities — the cheap history-start lookup, so

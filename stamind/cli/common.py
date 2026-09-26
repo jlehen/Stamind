@@ -1,16 +1,22 @@
 """Shared helpers used across the CLI command modules.
 
 The companion-voice line builders used to live here too; they moved to `cli/render/`
-with the rest of that voice (DESIGN_render_persona.md §7).
+with the rest of that voice (DESIGN_render_persona.md §7). The strength comparison's
+companion lines stayed, because `strength ingest` prints them and a command module never
+imports `cli/render/`.
 """
 import textwrap
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from stamind import runtime
 from stamind.config import config
-from stamind.text import cmd, cyan, gray, green, magenta, visible_len, wrap_text, yellow
+from stamind.text import (
+    capitalized, cmd, cyan, gray, green, magenta, render_table, visible_len, wrap_text,
+    yellow,
+)
 from stamind.output import notice
 from stamind.clock import fmt_date, today_str as _today_str
+from stamind.strength import comparison, prescription, sets
 
 
 def print_strength_notes(proposal) -> None:
@@ -26,6 +32,87 @@ def print_strength_notes(proposal) -> None:
         notice(line)
     if getattr(proposal, 'strength_notice', None):
         print(wrap_text(proposal.strength_notice))
+
+
+def _mark(row: comparison.Row) -> str:
+    """One exercise's mark in the table: '✓', 'swapped 2/3', 'lighter 0/2' (§2)."""
+    counts = f" {row.counted}/{row.planned}"
+    if row.mark == comparison.DONE:
+        return green("✓")
+    if row.mark == comparison.SWAPPED and row.counted >= row.planned:
+        return "swapped"
+    if row.mark == comparison.SWAPPED:
+        return "swapped" + counts
+    if row.mark == comparison.LIGHTER:
+        return yellow("lighter" + counts)
+    if row.mark == comparison.SHORT:
+        return yellow("sets" + counts)
+    if row.mark == comparison.NOT_DONE:
+        return yellow("not done")
+    return gray("not planned")
+
+
+def strength_table(w: Dict[str, Any], act: Dict[str, Any]) -> List[str]:
+    """A past strength session's planned lines against the sets lifted, under its activity
+    line: one row per exercise, then the totals (DESIGN_strength_planned_vs_done.md §2).
+    Empty when the session has no planned lines or the sets are not read. Shared by
+    `workout list -vv` and `workout compare`."""
+    compared = comparison.compare_session(w, act)
+    if compared is None:
+        return []
+    rows = [
+        [row.exercise, prescription.spec(row.lines), sets.done_text(row.sets, row.exercise),
+         _mark(row)]
+        for row in compared.rows
+    ]
+    if compared.unnamed:
+        rows.append([f"{sets.position_list(compared.unnamed)} unnamed", "", "", ""])
+    lines = render_table(["Exercise", "Planned", "Done", ""], rows).splitlines()
+    lines.append(comparison.totals_line(compared, comparison.carries_gym_log(act)))
+    if act.get("discarded"):
+        lines.append(sets.DISCARDED_LINE)
+    return lines
+
+
+def _difference_line(row: comparison.Row) -> Optional[str]:
+    """One exercise that did not go as planned, in companion words; None for one that did
+    (DESIGN_strength_planned_vs_done.md §2)."""
+    name = capitalized(row.exercise)
+    done = sets.done_text(row.sets, row.exercise)
+    counts = f"{row.counted} of {row.planned} sets"
+    if row.mark == comparison.SWAPPED:
+        instead = next(one["exercise"] for one in row.sets if one["exercise"] != row.exercise)
+        head = f"{capitalized(instead)} instead of {row.exercise}"
+        if row.counted >= row.planned:
+            return f"✅ {head}"
+        return f"❌ {head}, {counts}"
+    if row.mark == comparison.LIGHTER:
+        return f"❌ {name}, lighter: {done} (planned {prescription.spec(row.lines)})"
+    if row.mark == comparison.SHORT:
+        return f"❌ {name}, {counts}: {done}"
+    if row.mark == comparison.NOT_DONE:
+        return f"❌ {name}, not done"
+    if row.mark == comparison.NOT_PLANNED:
+        return f"➕ {name} {done}"
+    return None
+
+
+def simple_comparison_lines(compared: comparison.Comparison, by_sets: bool) -> List[str]:
+    """A strength session against its planned lines, in companion words: the totals, the
+    exercises done as planned on one line, then each one that differed
+    (DESIGN_strength_planned_vs_done.md §2). Shared by "Done lately" and `strength
+    ingest`."""
+    lines = [comparison.totals_line(compared, by_sets)]
+    as_planned = [row.exercise for row in compared.rows if row.mark == comparison.DONE]
+    if as_planned:
+        lines.append("✅ " + capitalized(", ".join(as_planned)))
+    for row in compared.rows:
+        line = _difference_line(row)
+        if line:
+            lines.append(line)
+    if compared.unnamed:
+        lines.append(f"➕ {capitalized(sets.position_list(compared.unnamed))} unnamed")
+    return lines
 
 
 def ensure_recent_data(

@@ -251,21 +251,24 @@ class IngestTest(_IngestCase):
         self.assertEqual(json.loads(row["payload"])["note"],
                          "left knee felt off on the squat")
 
-    def test_the_summary_says_what_was_done_against_what_was_written(self):
+    def test_the_summary_is_the_comparison_done_lately_shows(self):
+        """The companion lines of DESIGN_strength_planned_vs_done.md §2, under the head
+        line (§7). The set at 120 kg is not near 140, so the squat reads lighter."""
         workout = a_session(
             description=("Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg\nPull up 3×6–8"),
             prescribed=(BELT_SQUAT, PULL_UP),
         )
         out = self.ingest(self.example_for(workout))
         lines = [line for line in out.splitlines() if line.strip()]
-        self.assertEqual(lines[0],
-                         "Logged 2026-09-24 Thu, 18:02–19:05: 3 exercises, 6 sets.")
-        self.assertEqual(lines[1],
-                         "Belt squat 5 @ 120, 6 @ 140, 5 @ 140 (written 3×4–6 @ 140)")
-        self.assertEqual(lines[2], "Leg press 8 @ 200 (instead of pull up, written 3×6–8)")
-        self.assertEqual(lines[3], "Barbell biceps curl 10 @ 30, 10 @ 30 (not written)")
+        self.assertEqual(lines, [
+            "Logged 2026-09-24 Thu, 18:02–19:05: 3 exercises, 6 sets.",
+            "3 of 6 planned sets · 2 of 2 exercises",
+            "❌ Belt squat, lighter: 1×5 @ 120, 1×6 @ 140, 1×5 @ 140 (planned 3×4–6 @ 140)",
+            "❌ Leg press instead of pull up, 1 of 3 sets",
+            "➕ Barbell biceps curl 2×10 @ 30",
+        ])
 
-    def test_a_prescribed_exercise_nothing_stood_for_is_listed_as_not_done(self):
+    def test_a_prescribed_exercise_nothing_stood_for_reads_not_done(self):
         workout = a_session(
             description=("Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg\nPull up 3×6–8"),
             prescribed=(BELT_SQUAT, PULL_UP),
@@ -273,7 +276,7 @@ class IngestTest(_IngestCase):
         out = self.ingest(self.example_for(workout, x=[
             {"n": "belt squat", "p": 1, "sets": [[5, 140, 60]]},
         ]))
-        self.assertIn("Not done: pull up 3×6–8.", out)
+        self.assertIn("❌ Pull up, not done", out)
 
     def test_a_log_whose_session_is_gone_is_still_ingested(self):
         out = self.ingest({**EXAMPLE_LOG, "r": 9999})

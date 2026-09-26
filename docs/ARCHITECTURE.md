@@ -403,7 +403,7 @@ classes themselves.
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. `waiting()` hangs `touches_today` on each row, and `sends_after_delay` is the single place that says whether a change goes out after `change-delay` minutes or at a morning time. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workout_change.py` imports it safely. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
 | `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
-| `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class, listing the Garmin names that mean it (Connect's catalog and the FIT SDK names), and naming the Free Exercise DB entry whose photos the gym logger shows, for the exercises that have an exact one ([§16](#16-gym-logger-telegram-mini-app)). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the recent strength days (`strength.recent_days`, 8), what was prescribed beside what was done, then the days the prescription was not followed, then `## SESSIONS AS DONE` — the same days as whole sessions, each activity's length, set count and RPE over its exercises in order, the ones the athlete alternated joined by "+" (read from overlapping runs of sets), and a "(not prescribed)" mark on what the day's session did not hold. `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — which sessions the call is about, the call, and folding the answers back into the proposal — and `planner_prompt.py` is what that call tells the model and the checks a returned exercise passes before it becomes a prescribed set; `progression.md` is the shipped science only this call reads. Each session it is asked about carries the equipment and constraints of its day and the mesocycle covering it — name, span and which week of it the date is, from `get_covering_mesocycle` — so the plan's boundary reaches the call as a fact rather than as the brief's prose. `logger.py` is the gym logger's two payloads — the session encoded into the Mini App button's address and the log the page sends back — and holds no database access ([§16](#16-gym-logger-telegram-mini-app)). Rows in `db/strength.py`; surgery in `cli/strength.py`, the gym log in `cli/strength_ingest.py`. |
+| `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class, listing the Garmin names that mean it (Connect's catalog and the FIT SDK names), and naming the Free Exercise DB entry whose photos the gym logger shows, for the exercises that have an exact one ([§16](#16-gym-logger-telegram-mini-app)). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push; a gym log is handed over the same day, [§16](#16-gym-logger-telegram-mini-app)), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the recent strength days (`strength.recent_days`, 8), what was prescribed beside what was done, then the days the prescription was not followed, then `## SESSIONS AS DONE` — the same days as whole sessions, each activity's length, set count and RPE over its exercises in order, the ones the athlete alternated joined by "+" (read from overlapping runs of sets), and a "(not prescribed)" mark on what the day's session did not hold. `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — which sessions the call is about, the call, and folding the answers back into the proposal — and `planner_prompt.py` is what that call tells the model and the checks a returned exercise passes before it becomes a prescribed set; `progression.md` is the shipped science only this call reads. Each session it is asked about carries the equipment and constraints of its day and the mesocycle covering it — name, span and which week of it the date is, from `get_covering_mesocycle` — so the plan's boundary reaches the call as a fact rather than as the brief's prose. `logger.py` is the gym logger's two payloads — the session encoded into the Mini App button's address and the log the page sends back — and holds no database access ([§16](#16-gym-logger-telegram-mini-app)). `comparison.py` is a past session planned against done: which lifted sets count against which planned lines, one mark per exercise, the totals, and the one reason a logged session is partial (DESIGN_strength_planned_vs_done.md); pure, like `logger.py`. Rows in `db/strength.py`; surgery in `cli/strength.py`, the gym log in `cli/strength_ingest.py`. |
 | `db/`                | `db`                 | SQLite wrapper; `Database` composed from         |
 |                      |                      | per-domain mixins. Full CRUD for all tables.     |
 |                      |                      | The write path onto `workouts` is               |
@@ -713,6 +713,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A question or message for the athlete that no command waits on | A `Kind` (`stamind/queue_kind.py`) added to `KINDS` in `stamind/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
 | A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `activity_lines`, `logbook`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`, and `strength log`/`exercises` which read the record and the vocabulary back), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
 | A gym session logged on the phone | `miniapp/` (the page), `strength/logger.py` (the two payloads), `cli/strength_ingest.py` (`strength ingest`), `strength/sets.py::take_over_logs` (the pull handing the log to Garmin's activity), `gym_logs` + `upsert_logged_activity`/`save_gym_log`/`gym_log_for_day`/`move_gym_log` in `db/strength.py`. The bot's button and the handler for the page's message are DESIGN_gym_logger.md §6 and not wired yet. DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
+| A past strength session against its planned lines | `strength/comparison.py` (the counting, the marks, the totals, the §6 reason), `db/strength.py::attach_lifted` (what `get_completed_activities` puts on a strength activity: `lifted`, and `gym_log`), `analytics/adherence.py` (`_discrepancy_reasons` grades a logged session by its sets, `_pairing_order` and `is_ambiguous_match` put the logged activity first), `cli/common.py` (`strength_table` for `workout list -vv` and `workout compare`, `simple_comparison_lines` for "Done lately" and `strength ingest`), `strength/sets.py::done_text` (the Done cell). DESIGN_strength_planned_vs_done.md |
 | What a strength session prescribes | `strength/planner.py` (the pass and the call), `strength/planner_prompt.py` (the prompt and the checks on the reply), `strength/progression.md` (the science it reads), `strength/history.py` (what the athlete lifted), `strength/prescription.py` (the description and its seam), `prescribed_sets` + `strength_checks` in `db/schema.py`, the carry in `db/workout_change.py::WorkoutChange`, and the pass's place in `coach/service/generate.py` and `coach/service/adapt.py`. DESIGN_strength_tracking.md §9 |
 | A CLI command                    | `stamind/cli/<family>.py` (`run_*`), dispatcher in `stamind_cli.py` ([§7](#7-cli-commands-reference)) |
 | A message telling the athlete to run something | wrap the command in `text.cmd()`, nested *inside* the line's colour call, so it renders as the bright shade of that colour — and emit it with `output.aside`, not `print`: a "you could now run X" hint is side information |
@@ -1760,8 +1761,10 @@ stood at 145 the next morning, from lifting already weighed.
 | `checked_against` | TEXT    | The value `strength_history_changed_at` had when the history shown to the strength planner was built — not the clock, so sets read while a preview waited are not counted as weighed |
 
 ### gym_logs
-The raw log the gym logger page sent, kept beside the sets it was turned into, so a later
-grading step has the departures without deriving them again (DESIGN_gym_logger.md §5).
+The raw log the gym logger page sent, kept beside the sets it was turned into
+(DESIGN_gym_logger.md §5). Its cards say which planned line each set stood for, which the
+sets alone lose, so `attach_lifted` reads the sets of a logged activity from here
+(DESIGN_strength_planned_vs_done.md §8).
 One row per activity: ingesting a day twice replaces its log, and the row moves onto
 Garmin's activity when the pull takes the log over. Rows cascade with their
 `completed_activities` row.
@@ -3313,6 +3316,7 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | kinds, `strength name`/`reset`/`discard`, the lines under the    |
 |                                | activity, `strength log`/`exercises` reading the record back,    |
 |                                | the morning push reading sets before its walk                    |
+| `tests/test_strength_comparison.py` | a past strength session planned against done (DESIGN_strength_planned_vs_done.md), on the design's Thursday: which sets count, the marks and totals, the verdict by sets and the one kept by time and load, the logged activity pairing first and never asked about, the sets on the activity, the same-day takeover, the table, the companion lines, `workout show` and `workout compare` |
 | `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the line for a change to today, who is watching, the replace question and its ways out, `workout notify`, `workout batches`. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.as_instance` pins the persona, which the operator's own config.yaml must not decide |
 | `tests/test_constraints*.py`   | the constraint object: DB windowing, the §8 message capture and |
 |                                | the hard-rest pre-pass (`test_constraints.py`); the §7          |
@@ -4221,9 +4225,10 @@ exercise the session did not ask for, and at 19:05 tap "Finish". The page sends 
 message to the bot, the bot writes it to a file and runs `sm strength ingest <file>`, and
 the summary comes back in the chat. Finish stops the page's clock: a weight fixed in the
 changing room and sent again carries the same end time, and the ingest replaces Thursday's
-log instead of adding a second. On Friday morning the pull finds Garmin's activity for
-Thursday and hands it the logged sets instead of reading Garmin's own, so Garmin supplies
-heart rate, duration and RPE while the log supplies the sets. Nothing is asked.
+log instead of adding a second. The next pull, that evening or on Friday morning, finds
+Garmin's activity for Thursday and hands it the logged sets instead of reading Garmin's own,
+so Garmin supplies heart rate, duration and RPE while the log supplies the sets. Nothing is
+asked.
 
 **Where the code is.** `miniapp/` is the page: static files, no build step, no server.
 `miniapp/markdown.js` is its "Export to Markdown" button, the session as Markdown for the
@@ -4290,14 +4295,38 @@ upsert, ingesting the same day twice replaces the earlier log rather than doubli
 That placeholder is the one row in `completed_activities` Garmin did not supply, so
 `prune_completed_activities` skips it: the pull's deletion reconcile would otherwise take
 the log away the same evening it was written. The summary the command prints is one head
-line, one line per exercise against what was written at that position, and the prescribed
-exercises no entry stood for.
+line, then the comparison "Done lately" shows (`cli/common.py::simple_comparison_lines`, see
+**The comparison** below); a log with no session to compare against gets one line per
+exercise instead.
 
 **The takeover.** `sets.read_new_activities` runs before every pull reads Garmin's sets.
-It groups the pending strength activities by day and asks `gym_log_for_day` for each;
-where there is a log, `move_gym_log` moves the `exercise_sets` rows and the `gym_logs` row
-onto the Garmin activity, stamps it read and frozen, deletes the placeholder, and the
-activity is dropped from the list to fetch. A day the watch split in two gives the log to
+It groups the unread strength activities by day, today's included, and asks
+`gym_log_for_day` for each; where there is a log, `move_gym_log` moves the `exercise_sets`
+rows and the `gym_logs` row onto the Garmin activity, stamps it read and frozen, deletes the
+placeholder, and the activity is dropped from the list to fetch. Only the reading from Garmin waits for the
+morning after; the takeover moves rows and asks Garmin nothing, so it runs on the day itself
+(DESIGN_strength_planned_vs_done.md §5). A day the watch split in two gives the log to
 the longest activity, and the others are read from Garmin as before. The function still
 logs into Garmin only when there is something left to read, so a morning whose every
 pending activity is covered by a log makes no Garmin call at all.
+
+**The comparison.** It is Saturday, and the athlete looks back at Thursday. `workout show`
+draws a table under the "Actual:" line: one row per planned exercise with its planned lines,
+the sets lifted and one mark (✓, swapped, lighter, sets short, not done), then the exercises
+lifted that were not planned, then "15 of 17 planned sets · 6 of 7 exercises". The contract
+is DESIGN_strength_planned_vs_done.md. `get_completed_activities` puts the sets on every
+strength activity whose sets are read (`db/strength.py::attach_lifted`): a logged activity's
+come from its `gym_logs` payload, each with the planned line its card stood for, and any
+other's from its `exercise_sets` rows. `strength/comparison.py::compare` counts them (§3
+there), and it is pure, so `analyze_adherence` stays free of the database. The sets also
+decide the verdict, but only for a session paired with an activity carrying a gym log: at
+least 80% of its planned sets counted is `done`, else `partial` with one "sets:" reason
+(`_discrepancy_reasons`). A session the watch recorded alone keeps the minutes-and-load
+verdict, and its totals line says "graded by time and load". The activity carrying a gym log
+pairs first on its day, whatever its load, and is never put to the athlete as a guess
+(`_pairing_order`, `is_ambiguous_match`). The table is `cli/common.py::strength_table`,
+drawn by `workout list -vv` and `workout compare`, and on a narrow client it becomes one
+record per exercise like every `render_table`. The companion's form is
+`cli/common.py::simple_comparison_lines`, under the session in "Done lately" and under the
+head line of `strength ingest`; it lives in `cli/common.py` rather than `cli/render/`
+because `strength ingest` is a command module, and those never import the render package.

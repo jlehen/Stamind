@@ -4,6 +4,7 @@ and what the strength planner prescribed for a planned session (§9).
 Every instant is stored as the athlete queue stores its own (`db/queue.py::queue_stamp`),
 UTC to the microsecond, because the freeze time is part of a queued subject (§7).
 """
+import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -36,6 +37,21 @@ LOGGED_NAME = "Logged gym session"
 HISTORY_STAMP_KEY = "strength_history_changed_at"
 
 
+def logged_sets(payload: str) -> List[Dict[str, Any]]:
+    """A gym log's sets as lifted sets, each with `card`, the position of the planned line
+    its card stood for (DESIGN_strength_planned_vs_done.md §8). `parse_log` checked the
+    message before it was stored, so it is read here as it is."""
+    lifted: List[Dict[str, Any]] = []
+    for entry in json.loads(payload)["x"]:
+        for reps, load_kg, _seconds in entry["sets"]:
+            lifted.append({
+                "exercise": entry["n"].strip(), "reps": reps,
+                "load_kg": None if load_kg is None else float(load_kg),
+                "duration_sec": None, "named_by": ATHLETE, "card": entry.get("p"),
+            })
+    return lifted
+
+
 def _person_marks() -> str:
     """The `?` placeholders for NAMED_BY_PERSON, so the two never fall out of step."""
     return ",".join("?" * len(NAMED_BY_PERSON))
@@ -64,6 +80,37 @@ class StrengthMixin:
         with self._get_connection() as conn:
             rows = conn.execute(sql + " ORDER BY date, start_time", params).fetchall()
             return [dict(row) for row in rows]
+
+    def attach_lifted(self, activities: Sequence[Dict[str, Any]]) -> None:
+        """Puts on each strength activity whose sets are read what was lifted, as `lifted`,
+        and `gym_log` ({"revision_id"}, or None). A logged activity's sets come from the
+        log's cards, anything else's from its active rows with no card
+        (DESIGN_strength_planned_vs_done.md §8)."""
+        read = {a["activity_id"]: a for a in activities
+                if a["activity_type"] == STRENGTH_TYPE and a.get("sets_read_at")}
+        if not read:
+            return
+        marks = ",".join("?" * len(read))
+        with self._get_connection() as conn:
+            logs = conn.execute(
+                f"SELECT * FROM gym_logs WHERE activity_id IN ({marks})", list(read)
+            ).fetchall()
+            rows = conn.execute(
+                "SELECT activity_id, exercise, reps, load_kg, duration_sec, named_by "
+                f"FROM exercise_sets WHERE set_type = ? AND activity_id IN ({marks}) "
+                "ORDER BY activity_id, seq",
+                [ACTIVE, *read],
+            ).fetchall()
+        for activity in read.values():
+            activity["lifted"] = []
+            activity["gym_log"] = None
+        for row in rows:
+            lifted = {key: row[key] for key in row.keys() if key != "activity_id"}
+            read[row["activity_id"]]["lifted"].append(dict(lifted, card=None))
+        for log in logs:
+            activity = read[log["activity_id"]]
+            activity["lifted"] = logged_sets(log["payload"])
+            activity["gym_log"] = {"revision_id": log["revision_id"]}
 
     def bump_strength_history(self) -> None:
         """Records that the strength history now shows something different, which is the

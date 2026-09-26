@@ -3,7 +3,7 @@
 
 The rows land exactly where Garmin's own would, every set named by the athlete, so the
 strength history, the strength planner's habit count and `workout compare` read them
-unchanged. The morning pull then hands them to Garmin's activity for that day (§5).
+unchanged. The next pull then hands them to Garmin's activity for that day (§5).
 """
 import argparse
 from datetime import datetime, timedelta
@@ -11,11 +11,12 @@ from typing import Any, Dict, List, Optional
 
 from stamind import clock, runtime
 from stamind.clock import fmt_date
-from stamind.db.strength import ACTIVE, ATHLETE, REST
+from stamind.db.strength import ACTIVE, ATHLETE, REST, logged_sets
 from stamind.output import fail, notice
-from stamind.strength import logger, prescription, sets
+from stamind.strength import comparison, logger, sets
 from stamind.text import capitalized, wrap_text
 from stamind.types import Workout
+from stamind.cli.common import simple_comparison_lines
 
 
 def _duration_sec(log: logger.Log) -> float:
@@ -71,38 +72,14 @@ def _done(entry: logger.Entry) -> str:
     return ", ".join(parts)
 
 
-def _written(entry: logger.Entry, prescribed: Dict[int, Dict[str, Any]]) -> str:
-    """What the session asked for at this exercise's position, in a parenthesis: nothing
-    was written there, or it was written for another exercise the athlete swapped (§5)."""
-    row = prescribed.get(entry.position) if entry.position is not None else None
-    if row is None:
-        return " (not written)"
-    spec = prescription.spec([row])
-    if row["exercise"] == entry.name:
-        return f" (written {spec})"
-    return f" (instead of {row['exercise']}, written {spec})"
-
-
-def _not_done(log: logger.Log, prescribed: Dict[int, Dict[str, Any]]) -> List[str]:
-    """The prescribed rows no entry of the log stands for, in position order, each with its
-    spec: an exercise written as a warm-up row and a working row can have one done and the
-    other not, and the name alone would read as a contradiction (§5)."""
-    stood_for = {entry.position for entry in log.exercises}
-    missing: List[str] = []
-    for position in sorted(prescribed):
-        if position in stood_for:
-            continue
-        row = prescribed[position]
-        missing.append(f"{row['exercise']} {prescription.spec([row])}")
-    return missing
-
-
-def _summary(log: logger.Log, workout: Optional[Workout], replaced: bool) -> None:
-    """What was done, and where it departed from what was written (§5). Without the
-    revision there is nothing to compare against, so the lines say only what was done. A
-    log sent again for a day says so, since the athlete otherwise reads two logs."""
-    prescribed = {row["position"]: row
-                  for row in (workout or {}).get("prescribed_sets") or []}
+def _summary(
+    log: logger.Log, text: str, workout: Optional[Workout], replaced: bool
+) -> None:
+    """What was done, against what was written: the comparison "Done lately" shows
+    (DESIGN_strength_planned_vs_done.md §7). Without the revision or its planned lines there
+    is nothing to compare against, so the lines say only what was done. A log sent again
+    for a day says so, since the athlete otherwise reads two logs (DESIGN_gym_logger.md
+    §5)."""
     count = sum(len(entry.sets) for entry in log.exercises)
     head = "Updated the log of" if replaced else "Logged"
     lines = [
@@ -110,12 +87,12 @@ def _summary(log: logger.Log, workout: Optional[Workout], replaced: bool) -> Non
         f"{len(log.exercises)} exercise{'' if len(log.exercises) == 1 else 's'}, "
         f"{count} set{'' if count == 1 else 's'}."
     ]
-    for entry in log.exercises:
-        written = _written(entry, prescribed) if workout else ""
-        lines.append(f"{capitalized(entry.name)} {_done(entry)}{written}")
-    missing = _not_done(log, prescribed)
-    if missing:
-        lines.append("Not done: " + ", ".join(missing) + ".")
+    planned = (workout or {}).get("prescribed_sets")
+    if planned:
+        compared = comparison.compare(planned, logged_sets(text))
+        lines.extend(simple_comparison_lines(compared, by_sets=True))
+    else:
+        lines.extend(f"{capitalized(entry.name)} {_done(entry)}" for entry in log.exercises)
     print(wrap_text("\n".join(lines)))
 
 
@@ -143,7 +120,7 @@ def run_strength_ingest(args: argparse.Namespace) -> None:
     if log.revision_id is not None and workout is None:
         notice("The session this log was written against is gone, so the summary cannot "
                "say what it departed from.")
-    _summary(log, workout, replaced)
+    _summary(log, text, workout, replaced)
 
 
 def add_ingest_parser(strength_subparsers) -> None:
@@ -154,8 +131,8 @@ def add_ingest_parser(strength_subparsers) -> None:
         description=(
             "Read the JSON the gym logger page sent, store it as the day's sets with every "
             "set named, and say what was done and where it departed from what was written. "
-            "Ingesting the same day twice replaces the earlier log. The next morning's "
-            "pull hands the sets to Garmin's own activity for that day."
+            "Ingesting the same day twice replaces the earlier log. The next pull hands "
+            "the sets to Garmin's own activity for that day."
         ),
     )
     s_ingest.add_argument("file", metavar="FILE", help="The log the page sent, as JSON")
