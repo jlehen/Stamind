@@ -41,7 +41,7 @@ function openSheet(row) {
   if (tg && found.why) {
     const ask = element("button", "full-day", "💬 Why, in chat");
     ask.type = "button";
-    ask.addEventListener("click", () => tg.sendData(logic.whyMessage()));
+    ask.addEventListener("click", () => tg.sendData(logic.whyMessage(row)));
     ui.sheetBody.append(ask);
   }
   ui.sheet.hidden = false;

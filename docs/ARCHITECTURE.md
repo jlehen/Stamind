@@ -4422,8 +4422,9 @@ refused keyboard never costs the athlete her answer.
 borrowing the calendar's CSS and snapshot reading. It lists the mesocycles and the goals
 (upcoming 🎯, completed ✅, archived left out) in date order around a "Today" line; a tapped
 mesocycle shows its dates and `mesocycles.summary`, the one line `plan generate` writes for
-it, and "💬 Why, in chat" sends `{"plan_why": true}`, which `on_web_app_data` turns into
-`plan show` (`plan_page.asks_why`). `plan_page.plan_url` packs `meso` and `goals` from the
+it, and "💬 Why, in chat" sends `{"plan_why": <macrocycle id>}`, which `on_web_app_data`
+turns into `plan show --macrocycle <id>` (`plan_page.why_plan`); `--macrocycle` alone takes
+its goal from the plan, since the mesocycle may serve a later goal than the next one. `plan_page.plan_url` packs `meso` and `goals` from the
 same `Calendar`; past its 2 KB budget the summaries and descriptions are dropped
 (DESIGN_calendar_miniapp.md §3.7).
 

@@ -5,7 +5,7 @@ packed into the button's address like the calendar's (DESIGN_calendar_miniapp.md
 """
 import json
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from stamind.calendar_days import Calendar
 from stamind.cli.render.calendar_page import VERSION, pack
@@ -19,16 +19,17 @@ PAGE_URL = "https://jlehen.github.io/Stamind/miniapp/plan.html"
 # with the calendar's 5 KB and the gym button (§8).
 BUDGET_BYTES = 2 * 1024
 
-# The message the page's "💬 Why, in chat" sends back (§3.7).
+# The key of the message the page's "💬 Why, in chat" sends back, with the plan's id (§3.7).
 WHY_REQUEST = "plan_why"
 
 
 def snapshot(cal: Calendar, at: datetime) -> Dict[str, Any]:
-    """The mesocycles with their summary, and the goals with their description; a
-    completed goal is marked `k` (§3.7)."""
+    """The mesocycles with their plan's id and summary, and the goals with their
+    description; a completed goal is marked `k` (§3.7)."""
     meso = []
     for m in cal.mesocycles:
-        row = {"n": m["name"], "s": str(m["start_date"]), "e": str(m["end_date"])}
+        row = {"n": m["name"], "s": str(m["start_date"]), "e": str(m["end_date"]),
+               "p": m["macrocycle_id"]}
         if (m.get("summary") or "").strip():
             row["m"] = m["summary"].strip()
         meso.append(row)
@@ -57,9 +58,16 @@ def plan_url(cal: Calendar, at: datetime) -> str:
     return f"{PAGE_URL}#c={packed}"
 
 
-def asks_why(data: str) -> bool:
-    """Whether `data` is the page's "💬 Why, in chat" (§3.7)."""
+def why_plan(data: str) -> Optional[int]:
+    """The plan whose reasoning the page's "💬 Why, in chat" asks for, or None when `data`
+    is some other page's message (§3.7)."""
     try:
-        return json.loads(data) == {WHY_REQUEST: True}
+        message = json.loads(data)
     except ValueError:
-        return False
+        return None
+    if not isinstance(message, dict) or set(message) != {WHY_REQUEST}:
+        return None
+    plan = message[WHY_REQUEST]
+    if isinstance(plan, bool) or not isinstance(plan, int):
+        return None
+    return plan

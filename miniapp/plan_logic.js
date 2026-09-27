@@ -10,7 +10,7 @@ export const WHY_REQUEST = "plan_why";
 export function planRows(snapshot) {
   const rows = [];
   (snapshot.meso || []).forEach((meso, index) => {
-    rows.push({ kind: "meso", date: meso.s, index, name: meso.n,
+    rows.push({ kind: "meso", date: meso.s, index, name: meso.n, plan: meso.p,
                 span: `${shortDay(meso.s)} – ${shortDay(meso.e)}`, summary: meso.m || "" });
   });
   (snapshot.goals || []).forEach((goal) => {
@@ -37,7 +37,8 @@ export function rowSheet(row) {
            lines: [row.text, row.description].filter(Boolean), why: false };
 }
 
-export function whyMessage() {
-  // What `sendData` hands the bot: `plan show` in the chat (§3.7).
-  return JSON.stringify({ [WHY_REQUEST]: true });
+export function whyMessage(row) {
+  // What `sendData` hands the bot: `plan show` of the tapped mesocycle's plan, which may be
+  // another goal's than the next one (§3.7).
+  return JSON.stringify({ [WHY_REQUEST]: row.plan });
 }

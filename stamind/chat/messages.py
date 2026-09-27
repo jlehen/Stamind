@@ -283,9 +283,10 @@ class MessagesMixin:
             self._log(chat.id, "  ", f"calendar day: {day}")
             await self._start_command(chat.id, ["workout", "list", "-d", day])
             return
-        if plan_page.asks_why(data):
-            self._log(chat.id, "  ", "plan: why")
-            await self._start_command(chat.id, ["plan", "show"])
+        plan = plan_page.why_plan(data)
+        if plan is not None:
+            self._log(chat.id, "  ", f"plan: why {plan}")
+            await self._start_command(chat.id, ["plan", "show", "--macrocycle", str(plan)])
             return
 
         path = self._write_gym_log(data)

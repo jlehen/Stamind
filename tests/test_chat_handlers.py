@@ -245,12 +245,13 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_plan_page_asks_why_and_writes_no_log(self):
         """The athlete taps a mesocycle on "Goals & plan", then "💬 Why, in chat": the bot
-        posts the plan the way "🧭 My plan" did (DESIGN_calendar_miniapp.md §3.7)."""
+        posts that mesocycle's plan, whichever goal it serves (DESIGN_calendar_miniapp.md
+        §3.7)."""
         chat_bot = build_chat_bot(self, ui="simple")
         started = record_commands(self, chat_bot)
-        update, _replied = web_app_update(data='{"plan_why": true}')
+        update, _replied = web_app_update(data='{"plan_why": 10}')
         await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
-        self.assertEqual([s[1] for s in started], [["plan", "show"]])
+        self.assertEqual([s[1] for s in started], [["plan", "show", "--macrocycle", "10"]])
         self.assertFalse(os.path.exists(self.gym_logs()))
 
 

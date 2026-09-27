@@ -248,13 +248,17 @@ name and dates, and still offer the chat.
 
 **The snapshot.** The same list of days the calendar is built from (§4) gives the page its
 payload, packed the same way into its own button's address (`cli/render/plan_page.py`):
-`meso` with `n`, `s`, `e` and the summary `m`; `goals` with `t` (`simple_goal_line`), `d`,
+`meso` with `n`, `s`, `e`, the plan's id `p` and the summary `m`; `goals` with `t` (`simple_goal_line`), `d`,
 the description `x`, and `k` for a completed goal; `at` and `today`. On the author's
 database it is about 1 KB. Its budget is 2 KB: past it the summaries and the descriptions
 go, the timeline stays, and the chat still answers.
 
-**The way back** is the calendar's (§6): `sendData` with `{"plan_why": true}`, which
-`on_web_app_data` turns into `plan show`. "my goals" or "my plan" typed in her own words
+**The way back** is the calendar's (§6): `sendData` with `{"plan_why": 10}`, the tapped
+mesocycle's plan, which `on_web_app_data` turns into `plan show --macrocycle 10`. It names
+the plan because a mesocycle may serve a later goal than the next one: it is Sunday 27
+September, the next goal is a climb on Wednesday, and the athlete taps the October
+mesocycle of the December goal; a bare `plan show` would answer with the climb's plan.
+`--macrocycle` alone shows that plan under its own goal. "my goals" or "my plan" typed in her own words
 still reach `goal list` and `plan show` through the router.
 
 ## 4. One list of days

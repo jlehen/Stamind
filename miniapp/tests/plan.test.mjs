@@ -10,8 +10,8 @@ import * as logic from "../plan_logic.js";
 const SNAPSHOT = {
   v: 1, at: "2026-09-30T07:02", today: "2026-09-30",
   meso: [
-    { n: "Build", s: "2026-09-01", e: "2026-09-28" },
-    { n: "Aerobic base", s: "2026-09-29", e: "2026-10-25",
+    { n: "Build", s: "2026-09-01", e: "2026-09-28", p: 6 },
+    { n: "Aerobic base", s: "2026-09-29", e: "2026-10-25", p: 10,
       m: "Rebuild the aerobic base and start sprint intervals." },
   ],
   goals: [
@@ -51,6 +51,8 @@ test("a goal opens its line and its description", () => {
   assert.equal(logic.rowSheet(rows[1]).title, "✅ Goal reached");
 });
 
-test("the why the page sends", () => {
-  assert.equal(logic.whyMessage(), '{"plan_why":true}');
+test("the why names the tapped mesocycle's plan, not the next goal's", () => {
+  const [build, , base] = logic.planRows(SNAPSHOT);
+  assert.equal(logic.whyMessage(base), '{"plan_why":10}');
+  assert.equal(logic.whyMessage(build), '{"plan_why":6}');
 });

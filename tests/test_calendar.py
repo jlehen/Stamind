@@ -318,6 +318,7 @@ class PlanPageTest(CalendarTestCase):
         payload = self.payload(plan_page.plan_url(self.cal(), AT))
         spring = [m for m in payload["meso"] if m["n"] == "Spring"][0]
         self.assertEqual(spring["m"], "Sharpen for the half.")
+        self.assertEqual(spring["p"], test_db.get_macrocycle_for_objective(goal)["id"])
         half = [g for g in payload["goals"] if "Spring half" in g["t"]][0]
         self.assertEqual((half["x"], half["k"]), ("Sub 1:50.", 1))
 
@@ -330,9 +331,10 @@ class PlanPageTest(CalendarTestCase):
         self.assertIn("Long words", " ".join(g["t"] for g in payload["goals"]))
 
     def test_the_why_the_page_sends(self):
-        self.assertTrue(plan_page.asks_why('{"plan_why": true}'))
-        for data in ('{"plan_why": 1, "x": 2}', '{"calendar_day": "2026-09-26"}', "no"):
-            self.assertFalse(plan_page.asks_why(data), data)
+        self.assertEqual(plan_page.why_plan('{"plan_why": 10}'), 10)
+        for data in ('{"plan_why": 1, "x": 2}', '{"plan_why": true}', '{"plan_why": "10"}',
+                     '{"calendar_day": "2026-09-26"}', "no"):
+            self.assertIsNone(plan_page.why_plan(data), data)
         with open(os.path.join(REPO, "miniapp", "plan_logic.js"), encoding="utf-8") as handle:
             self.assertIn(f'WHY_REQUEST = "{plan_page.WHY_REQUEST}"', handle.read())
 
