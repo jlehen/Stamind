@@ -1,6 +1,6 @@
 # Calendar: a Telegram Mini App and `sm calendar`, both built on one list of days
 
-**Status:** Reviewed draft · **Date:** 2026-09-25 · **Branch:** worktree-calendar-miniapp-design
+**Status:** Implemented · **Date:** 2026-09-25 · **Branch:** `worktree-calendar-miniapp-design`
 
 This design comes out of an interview with the author, then one review pass and one pass that
 weighed each review finding against its cost. What was decided is written here as the

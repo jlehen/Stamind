@@ -4377,9 +4377,7 @@ itself. `cli/render/calendar_page.py` is the page's words and the snapshot.
 `ExpertRenderer.calendar_month`, and `cli/calendar.py` is the command, registered in
 `stamind_cli.py`. The page is `miniapp/calendar.html`, `calendar.js` (the DOM) and
 `calendar.css`, beside the gym logger. Its pure logic is `miniapp/calendar_logic.js`,
-under node tests in `miniapp/tests/calendar.test.mjs`. `miniapp/probe.html` is step 0 of
-the design (§8): it prints how many bytes arrived after `#`, and goes once the budget is
-measured.
+under node tests in `miniapp/tests/calendar.test.mjs`.
 
 **The snapshot.** The page has no server. `calendar_page.calendar_url` packs the window,
 four weeks back and six ahead of today, into the button's address after `#c=`: the JSON
