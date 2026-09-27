@@ -12,11 +12,14 @@ import glob
 import inspect
 import os
 import pathlib
+import shutil
 import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest import mock
+
+from telegram.error import BadRequest, TimedOut
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -26,6 +29,7 @@ from tests.helpers import bind_test_db, save_workout
 from stamind import clock, settings
 from stamind.chat import keyboards, replies, runner, scheduler, telegram_api
 from stamind.chat.app import ChatBot
+from stamind.cli.render import calendar_page, plan_page
 from stamind.config import config
 from stamind.strength import logger
 
@@ -261,8 +265,19 @@ class GymKeyboardTest(unittest.TestCase):
     BELT_SQUAT = {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
                   "load_kg": 140.0}
 
+    CALENDAR = (keyboards.CALENDAR_LABEL, "https://x/calendar.html#c=eJw")
+    PLAN = (keyboards.PLAN_LABEL, "https://x/plan.html#c=eJw")
+
     def setUp(self):
         self.db = bind_test_db(test_db_path("test_chat_process.db"))
+        # The page cells have their own case below; here they are fixed cells.
+        patcher = mock.patch.object(ChatBot, "_page_buttons",
+                                    return_value=(self.CALENDAR, self.PLAN))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def plain_rows(self):
+        return keyboards.simple_keyboard_rows(calendar=self.CALENDAR, plan=self.PLAN)
 
     def a_gym_day(self, day):
         save_workout(
@@ -278,11 +293,11 @@ class GymKeyboardTest(unittest.TestCase):
         label, url = rows[0][0]
         self.assertEqual(label, "🏋️ Log today's gym")
         self.assertTrue(url.startswith(logger.PAGE_URL + "#s="), url)
-        self.assertEqual(rows[1:], keyboards.simple_keyboard_rows())
+        self.assertEqual(rows[1:], self.plain_rows())
 
     def test_a_week_with_no_gym_day_keeps_the_plain_keyboard(self):
         _kind, rows = build_chat_bot(self, ui="simple")._keyboard()
-        self.assertEqual(rows, keyboards.simple_keyboard_rows())
+        self.assertEqual(rows, self.plain_rows())
 
     def test_with_the_setting_off_there_is_no_button_and_no_database_read(self):
         self.a_gym_day(clock.today_str())
@@ -290,8 +305,129 @@ class GymKeyboardTest(unittest.TestCase):
         chat_bot = build_chat_bot(self, ui="simple")
         with mock.patch.object(self.db, "get_workouts") as never:
             _kind, rows = chat_bot._keyboard()
-        self.assertEqual(rows, keyboards.simple_keyboard_rows())
+        self.assertEqual(rows, self.plain_rows())
         never.assert_not_called()
+
+
+class CalendarKeyboardTest(unittest.TestCase):
+    """The page cells carry this moment's snapshot: the calendar where "🗓 My week" was,
+    and "Goals & plan" where "🎯 Goals" and "🧭 My plan" were
+    (DESIGN_calendar_miniapp.md §5, §6, §3.7)."""
+
+    def setUp(self):
+        self.db = bind_test_db(test_db_path("test_chat_process.db"))
+
+    def test_the_calendar_cell_opens_the_page_with_today_packed_in(self):
+        save_workout(self.db, date=clock.today_str(), sport_type="running", title="Easy run",
+                     duration_minutes=40)
+        _kind, rows = build_chat_bot(self, ui="simple")._keyboard()
+        label, url = rows[0][1]
+        self.assertEqual(label, keyboards.CALENDAR_LABEL)
+        head, packed = url.split("#c=")
+        self.assertEqual(head, calendar_page.PAGE_URL)
+        payload = calendar_page.unpack(packed)
+        self.assertEqual(payload["today"], clock.today_str())
+        self.assertEqual(payload["days"][clock.today_str()]["x"][0]["l"], "40′")
+        plan = rows[1][1]
+        self.assertEqual(plan[0], keyboards.PLAN_LABEL)
+        self.assertTrue(plan[1].startswith(plan_page.PAGE_URL + "#c="), plan[1])
+        self.assertEqual(rows, keyboards.simple_keyboard_rows(calendar=(label, url), plan=plan))
+
+
+class BackAfterRestartTest(unittest.IsolatedAsyncioTestCase):
+    """It is 10:40. The athlete sends /restart. The old worker leaves a note naming her
+    chat; the new one tells her it is back, under a keyboard the new code built, so the
+    calendar button carries the new snapshot (DESIGN_bot_restart.md §5.2)."""
+
+    def setUp(self):
+        self.data_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.data_dir, True)
+        self.chat_bot = build_chat_bot(self, ui="simple")
+        patcher = mock.patch.dict(config.data, {"data_dir": self.data_dir})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    async def test_the_chat_that_asked_hears_back_under_a_fresh_keyboard(self):
+        runner.leave_restart_note(42)
+        with mock.patch.object(ChatBot, "_keyboard", return_value="the new keyboard"):
+            await self.chat_bot._say_back()
+        self.assertEqual(self.chat_bot.bot.sent,
+                         [(42, "Back 👍", {"reply_markup": "the new keyboard"})])
+        self.assertEqual(os.listdir(self.data_dir), [])
+
+    async def test_a_start_that_was_no_restart_says_nothing(self):
+        await self.chat_bot._say_back()
+        self.assertEqual(self.chat_bot.bot.sent, [])
+
+    async def test_a_note_for_a_chat_off_the_allowlist_is_dropped(self):
+        runner.leave_restart_note(99)
+        await self.chat_bot._say_back()
+        self.assertEqual(self.chat_bot.bot.sent, [])
+        self.assertEqual(os.listdir(self.data_dir), [])
+
+
+class SendGuardTest(unittest.IsolatedAsyncioTestCase):
+    """A keyboard that cannot be built or sent never costs the athlete her answer: the
+    same text goes again without one, and the error is journalled
+    (DESIGN_calendar_miniapp.md §6)."""
+
+    def setUp(self):
+        self.chat_bot = build_chat_bot(self, ui="simple")
+        self.session = runner.Session(42, _FakeProc(), "n0nce")
+        patcher = mock.patch("stamind.chat.replies.journal.record")
+        self.journalled = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def errors(self):
+        return [call.args[1] for call in self.journalled.call_args_list
+                if call.kwargs.get("lvl") == "error"]
+
+    async def test_a_keyboard_that_fails_to_build_sends_the_text_without_one(self):
+        with mock.patch.object(ChatBot, "_keyboard", side_effect=RuntimeError("no db")):
+            sent = await self.chat_bot._flush_output(self.session, ["your week"])
+        self.assertTrue(sent)
+        self.assertEqual(self.chat_bot.bot.texts(), ["your week"])
+        self.assertNotIn("reply_markup", self.chat_bot.bot.sent[0][2])
+        self.assertEqual(self.session.last_message_id, 101)
+        self.assertEqual(self.errors(), ["sent without the keyboard: no db"])
+
+    async def test_a_keyboard_telegram_refuses_is_dropped_and_the_text_sent_again(self):
+        real_send = self.chat_bot.bot.send_message
+
+        async def refuse_keyboards(chat_id=None, text="", **kw):
+            if kw.get("reply_markup") is not None:
+                raise BadRequest("keyboard too long")
+            return await real_send(chat_id=chat_id, text=text, **kw)
+
+        with mock.patch.object(ChatBot, "_keyboard", return_value="a keyboard"), \
+                mock.patch.object(self.chat_bot.bot, "send_message", refuse_keyboards):
+            await self.chat_bot._flush_output(self.session, ["your week"])
+        self.assertEqual(self.chat_bot.bot.texts(), ["your week"])
+        self.assertEqual(self.errors(),
+                         ["sent without the keyboard: keyboard too long"])
+
+    async def test_a_reply_to_the_athletes_message_is_guarded_too(self):
+        replied = []
+
+        async def reply_text(text=None, **kw):
+            if "reply_markup" in kw:
+                raise BadRequest("Bad Request")
+            replied.append(text)
+
+        await self.chat_bot._send_keyed(42, "Hi!", send=reply_text)
+        self.assertEqual(replied, ["Hi!"])
+
+    async def test_a_timeout_is_not_sent_twice(self):
+        attempts = []
+
+        async def time_out(text=None, **kw):
+            attempts.append(text)
+            raise TimedOut()
+
+        with mock.patch.object(ChatBot, "_keyboard", return_value="a keyboard"):
+            with self.assertRaises(TimedOut):
+                await self.chat_bot._send_keyed(42, "Hi!", send=time_out)
+        self.assertEqual(attempts, ["Hi!"])
 
 
 class WebAppButtonTest(unittest.TestCase):
@@ -305,7 +441,7 @@ class WebAppButtonTest(unittest.TestCase):
             self.skipTest("python-telegram-bot is not installed")
         markup = telegram_api.reply_keyboard(
             [[("🏋️ Log today's gym", "https://jlehen.github.io/Stamind/#s=e30")],
-             ["📅 Today", "🗓 My week"]]
+             ["📅 Today", "✅ Done lately"]]
         )
         gym, plain = markup.keyboard[0][0], markup.keyboard[1][0]
         self.assertEqual(gym.text, "🏋️ Log today's gym")

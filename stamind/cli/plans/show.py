@@ -185,6 +185,12 @@ def _print_mesocycle_workouts(
 
 def run_plan_show(args: argparse.Namespace) -> None:
     """Displays the training macrocycle(s) and mesocycles periodization timeline."""
+    # --macrocycle alone shows that plan under its own goal.
+    version_id = getattr(args, 'macrocycle_id', None)
+    if args.goal_id is None and version_id is not None:
+        macrocycle = runtime.db.get_macrocycle(version_id)
+        if macrocycle:
+            args.goal_id = macrocycle['objective_id']
     # The empty state `plan show` alone owns. `resolve_goal` below would say the same
     # thing one line later, but it also serves `plan versions`, `plan diff`, `plan
     # rollback` and `plan feedback`, where the companion sentence is the wrong one

@@ -1,0 +1,457 @@
+/* The calendar page's look (DESIGN_calendar_miniapp.md §3): Telegram's theme colours when
+   Telegram supplies them, the gym logger's light or dark fallback in a plain browser. */
+
+:root {
+  --fallback-bg: #ffffff;
+  --fallback-text: #111111;
+  --fallback-hint: #6b7280;
+  --fallback-card: #f2f3f5;
+  --fallback-line: #dcdfe4;
+  --fallback-button: #2f7bd6;
+
+  --bg: var(--tg-theme-bg-color, var(--fallback-bg));
+  --text: var(--tg-theme-text-color, var(--fallback-text));
+  --hint: var(--tg-theme-hint-color, var(--fallback-hint));
+  --card: var(--tg-theme-secondary-bg-color, var(--fallback-card));
+  --accent: var(--tg-theme-button-color, var(--fallback-button));
+  --line: var(--fallback-line);
+  /* The tint (§3.2): green as planned, blue less, orange more, deeper with the gap, and a
+     red outline for a missed session. `--strength` comes from the page, 0.3 to 1. */
+  --ok: rgba(31, 157, 85, 0.22);
+  --less-rgb: 47 123 214;
+  --more-rgb: 230 126 34;
+  --gap-alpha: 0.5;
+  --miss-line: #c23b3b;
+  /* The mesocycle strips, numbered along the one list (§4). */
+  --meso-0: #2f7bd6;
+  --meso-1: #e08a1e;
+  --meso-2: #8e44ad;
+  --meso-3: #16a085;
+  --meso-4: #c0392b;
+  --meso-5: #7f8c8d;
+
+  --tap: 44px;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fallback-bg: #17212b;
+    --fallback-text: #f5f5f5;
+    --fallback-hint: #9aa7b4;
+    --fallback-card: #202b36;
+    --fallback-line: #33414f;
+    --fallback-button: #4a9be8;
+    --ok: rgba(62, 194, 122, 0.28);
+    --less-rgb: 90 160 240;
+    --more-rgb: 245 150 60;
+    --gap-alpha: 0.55;
+    --miss-line: #ef7a7a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  padding: 0 8px 40px;
+  -webkit-text-size-adjust: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* ----- header ----- */
+
+.head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding: 10px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.head-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.nav {
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 22px;
+}
+
+.nav:disabled {
+  opacity: 0.3;
+}
+
+.head-sub {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.goal {
+  flex: 1;
+  min-width: 0;
+}
+
+.stamp {
+  flex: none;
+  color: var(--hint);
+}
+
+/* ----- the month grid (§3.1) ----- */
+
+.weekdays, .grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.weekdays {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--hint);
+  text-align: center;
+}
+
+.grid {
+  margin-top: 4px;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  min-height: 64px;
+  padding: 2px 2px 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--card);
+  text-align: left;
+  overflow: hidden;
+}
+
+.cell.blank {
+  background: transparent;
+}
+
+.cell.ok {
+  background: var(--ok);
+}
+
+.cell.less {
+  background: rgb(var(--less-rgb) / calc(var(--strength, 1) * var(--gap-alpha)));
+}
+
+.cell.more {
+  background: rgb(var(--more-rgb) / calc(var(--strength, 1) * var(--gap-alpha)));
+}
+
+.cell.miss {
+  border: 2px solid var(--miss-line);
+}
+
+.cell.today {
+  border: 2px solid var(--accent);
+}
+
+.cell.outside, .cell.after-end {
+  opacity: 0.5;
+}
+
+.cell-top {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.num {
+  font-weight: 650;
+}
+
+.mark {
+  font-size: 10px;
+  color: var(--hint);
+}
+
+.goal-mark {
+  margin-left: auto;
+  font-size: 10px;
+}
+
+.icons {
+  font-size: 16px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.faded {
+  opacity: 0.4;
+}
+
+.label {
+  flex: 1;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.strip {
+  height: 4px;
+  margin: 2px -2px 0;
+}
+
+.meso-0 { background: var(--meso-0); }
+.meso-1 { background: var(--meso-1); }
+.meso-2 { background: var(--meso-2); }
+.meso-3 { background: var(--meso-3); }
+.meso-4 { background: var(--meso-4); }
+.meso-5 { background: var(--meso-5); }
+
+.end-note {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--hint);
+}
+
+/* ----- the legend, and the "Goals & plan" page's rows (§3.7) ----- */
+
+.legend, .plan {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.legend li, .plan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.swatch {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.key-ok { background: var(--ok); }
+.key-less { background: rgb(var(--less-rgb) / var(--gap-alpha)); }
+.key-more { background: rgb(var(--more-rgb) / var(--gap-alpha)); }
+.key-miss { border: 2px solid var(--miss-line); }
+
+/* The page is a timeline: a grey rail down the left, each mesocycle a stretch of it in its
+   strip colour, each goal a marker on it, and today a dot (§3.7). */
+.plan {
+  position: relative;
+}
+
+.plan::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 13px;
+  width: 2px;
+  background: var(--line);
+}
+
+.plan li {
+  position: relative;
+  padding-left: 36px;
+}
+
+.plan-row {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  font-size: 15px;
+}
+
+.plan-row.done {
+  color: var(--hint);
+}
+
+.rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 10px;
+  width: 8px;
+}
+
+.rail.done {
+  opacity: 0.4;
+}
+
+.node {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  border-radius: 50%;
+  background: var(--bg);
+  font-size: 15px;
+  line-height: 24px;
+  text-align: center;
+}
+
+.plan-name {
+  flex: 1;
+}
+
+.goal-name {
+  font-weight: 600;
+}
+
+.plan-row.done .goal-name {
+  font-weight: 400;
+}
+
+.plan-when {
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.plan li.plan-today {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-top: 2px solid var(--accent);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.plan-today::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  z-index: 1;
+  left: 7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+
+.problem {
+  margin-top: 24px;
+  color: var(--hint);
+}
+
+/* ----- the day sheet (§1) ----- */
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.sheet-box {
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--bg);
+  border-radius: 16px 16px 0 0;
+  padding: 12px 12px 20px;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sheet-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 17px;
+}
+
+.close {
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 18px;
+}
+
+.part {
+  margin: 14px 0 4px;
+  font-size: 13px;
+  color: var(--hint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.line {
+  margin: 2px 0;
+  font-size: 15px;
+  white-space: pre-wrap;
+}
+
+/* The way back to the chat (§6). */
+.full-day {
+  width: 100%;
+  min-height: var(--tap);
+  margin-top: 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--tg-theme-button-text-color, #ffffff);
+  font-size: 15px;
+}
+
+.sheet-note {
+  font-size: 14px;
+  color: var(--hint);
+}

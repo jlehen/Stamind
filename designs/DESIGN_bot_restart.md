@@ -187,9 +187,19 @@ can be driven without a Telegram client), then the handler `_restart`
 3. Stop the Updater — close the `getUpdates` long-poll — bounded by the same 2 s,
    and latch a `restarting` flag first so `_drive`'s `finally` can't resume
    polling behind us as its subprocess dies. Not cosmetic; see §7.
-4. Reply "Restarting…".
+4. Leave a note naming the chat, `restart_chat` under `data_dir`
+   (`runner.leave_restart_note`), then reply "Restarting…".
 5. `os._exit(RESTART_EXIT_CODE)` — a hard exit rather than trying to unwind the
    Application cleanly from inside a handler.
+
+**Back, under a fresh keyboard.** The companion keyboard is rebuilt only when the bot
+sends, and the calendar button carries a snapshot built by whichever code sent it
+(DESIGN_calendar_miniapp.md §5). So after a /restart that loads new code, the phone would
+keep the old code's button until the next ordinary message. The new worker therefore reads
+the note once polling is up (`ChatBot._say_back`), deletes it, and sends "Back 👍" through
+`_send_keyed` to that chat, if it is still on the allowlist. A note that cannot be written
+or a greeting that fails is journalled and stepped over. A start that was not a /restart
+finds no note and says nothing.
 
 The exit code *is* the contract with the supervisor (§4), so every step above is
 bounded and failure-tolerant: a wedged subprocess or a hung `updater.stop()` is

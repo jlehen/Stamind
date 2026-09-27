@@ -131,9 +131,7 @@ class CallbacksMixin:
         self._log(chat_id, "  ", "stop tap")
         await self._retire_stop(session)
         await self._cancel(chat_id)  # its reply line is /cancel's wording; a tap gets §6's
-        await self.bot.send_message(
-            chat_id=chat_id, text=STOP_DONE, reply_markup=self._keyboard()
-        )
+        await self._send_keyed(chat_id, STOP_DONE)
 
     async def on_callback(self, update, context) -> None:
         query = update.callback_query

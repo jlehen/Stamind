@@ -33,6 +33,7 @@ has **one canonical home**; other sections point to it instead of paraphrasing
 14. [Testing](#14-testing)
 15. [Design Rationale & History](#15-design-rationale--history)
 16. [Gym Logger (Telegram Mini App)](#16-gym-logger-telegram-mini-app)
+17. [Calendar (Telegram Mini App and `sm calendar`)](#17-calendar-telegram-mini-app-and-sm-calendar)
 
 ---
 
@@ -184,7 +185,10 @@ classes themselves.
     recovery, by design. `/restart` is a bot command beside `/cancel` and `/start`, under
     the same allowlist: it kills any running command's subprocess and stops the Updater
     (`runner.restart_teardown`, a module function so it can be driven without a client),
-    replies, then `os._exit(75)` (DESIGN_bot_restart.md §4/§5.2).
+    leaves a `restart_chat` note under `data_dir` (`runner.leave_restart_note`), replies,
+    then `os._exit(75)`. The new worker's `_say_back` takes the note once polling is up
+    and sends that chat "Back 👍" under a keyboard it built, so the calendar button is the
+    new code's (DESIGN_bot_restart.md §4/§5.2).
   - **Access** is gated by a numeric chat-id allowlist (`telegram.allowed_chat_ids`).
     Token + allowlist live under a `telegram:` section in `config.yaml` (or
     `TELEGRAM_BOT_TOKEN`).
@@ -203,9 +207,12 @@ classes themselves.
       `_drive` reading its stdout to the end, `_route_intent`, and `restart_teardown`.
     - `replies` is what goes back into the chat for that command: prose, a chart, an
       offer row, a queued item, a question — and the ✋ Stop button the flushes raise and
-      retire.
+      retire. `_send_keyed` is the one way the companion keyboard is attached to a send:
+      when building the keyboard or sending with it fails, it sends the same text again
+      without one and journals the error (DESIGN_calendar_miniapp.md §6).
     - `messages` is what an arriving message does — the athlete's own text in
-      `on_message`, and the gym logger page's one data message in `on_web_app_data`
+      `on_message`, and a page's one data message in `on_web_app_data`: the calendar's
+      "💬 Full day in chat" (DESIGN_calendar_miniapp.md §6), else the gym logger's log
       (DESIGN_gym_logger.md §6); `callbacks` is what a tap does.
     - `routing` is what one chat message means — both halves of the router's intent table
       (`ROUTER_INTENTS`, which `sm bot route` builds its prompt from, and the intent→argv,
@@ -213,7 +220,8 @@ classes themselves.
       `parse_message_to_argv` and the `/ui` switch.
     - `keyboards` is every button the bot draws and every tap it decodes — the reply
       keyboard with what each label runs, the gym button that opens the Mini App
-      (`gym_button`, §16), the inline rows, the four callback-data namespaces (`ui:`,
+      (`gym_button`, §16), the calendar cell's place in the layout (`CALENDAR_LABEL`,
+      `CALENDAR_SLOT`, §17), the inline rows, the four callback-data namespaces (`ui:`,
       `stop:`, `q:`, and a bare prompt answer) with each decoder rejecting the other
       three, and the `/start` and `/help` cards, which name the keyboard's labels one by
       one.
@@ -236,9 +244,12 @@ classes themselves.
   - **Simple ("companion") mode** — `telegram.ui: simple`, DESIGN_bot_simple_frontend.md.
     The same pipeline gains a persona for a non-technical athlete; expert mode is
     untouched. A persistent reply keyboard (two labels per row) maps labels onto fixed
-    argv (`SIMPLE_KEYBOARD`): today, the week, goals, the periodization plan, progress
-    (DESIGN_bot_simple_frontend.md §5.1, §11); "💬 Talk to me" only shows the capture
-    prompt — every non-label message, tapped or not, is classified by `sm bot route`
+    argv (`SIMPLE_KEYBOARD`): today, what was done lately, goals, the periodization plan,
+    progress (DESIGN_bot_simple_frontend.md §5.1, §11). "🗓 Calendar" sits beside
+    "📅 Today" in the place "🗓 My week" had; it is a `(label, url)` cell that opens the
+    calendar page rather than a label with argv
+    ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)); "💬 Talk to me" only shows
+    the capture prompt — every non-label message, tapped or not, is classified by `sm bot route`
     (a hidden CLI command calling `llm.router_model`) and mapped to argv from the bot's
     own `ROUTER_INTENT_ARGV` table — the model picks an intent, never argv. Two intents
     carry the athlete's words to the coach instead (`ROUTER_MESSAGE_ARGV`): how the
@@ -401,6 +412,7 @@ classes themselves.
 | `learning_confidence.py` | —                | What a coach learning's confidence means and how its evidence sets it: the ordered levels, `derive_confidence` over supporting and contradicting weeks, `step_down`, and when a learning goes dormant. Pure rules; `db/learnings.py` keeps only the rows (DESIGN_evidence_based_confidence.md §3, DESIGN_learning_doubt_nudge.md §3.2). |
 | `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, `learning` from `learning_doubts.py`, and `test_result` from `cli/bot/test_result.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. `waiting()` hangs `touches_today` on each row, and `sends_after_delay` is the single place that says whether a change goes out after `change-delay` minutes or at a morning time. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workout_change.py` imports it safely. |
+| `calendar_days.py`   | —                    | The one list of days the calendar page and `sm calendar` are built on (DESIGN_calendar_miniapp.md §4): `gather(dbh, start, end, today)` returns a `Calendar` holding one `Day` per date — the day's `adherence_window`/`compare_days` rows each graded by `classify_adherence`, every activity that matched no session with its `unplanned_kind`, the constraints and signals covering it — plus the governing mesocycles from `start` to the last goal, the goals not archived, and the schedule's last day (`analytics.runway.plan_end`). Facts only, no text; reads, never writes, never pulls from Garmin. `next_goal` is the nearest goal still ahead ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)). |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
 | `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
 | `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class, listing the Garmin names that mean it (Connect's catalog and the FIT SDK names), and naming the Free Exercise DB entry whose photos the gym logger shows, for the exercises that have an exact one ([§16](#16-gym-logger-telegram-mini-app)). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push; a gym log is handed over the same day, [§16](#16-gym-logger-telegram-mini-app)), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the recent strength days (`strength.recent_days`, 8), what was prescribed beside what was done, then the days the prescription was not followed, then `## SESSIONS AS DONE` — the same days as whole sessions, each activity's length, set count and RPE over its exercises in order, the ones the athlete alternated joined by "+" (read from overlapping runs of sets), and a "(not prescribed)" mark on what the day's session did not hold. `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — which sessions the call is about, the call, and folding the answers back into the proposal — and `planner_prompt.py` is what that call tells the model and the checks a returned exercise passes before it becomes a prescribed set; `progression.md` is the shipped science only this call reads. Each session it is asked about carries the equipment and constraints of its day and the mesocycle covering it — name, span and which week of it the date is, from `get_covering_mesocycle` — so the plan's boundary reaches the call as a fact rather than as the brief's prose. `logger.py` is the gym logger's two payloads — the session encoded into the Mini App button's address and the log the page sends back — and holds no database access ([§16](#16-gym-logger-telegram-mini-app)). `comparison.py` is a past session planned against done: which lifted sets count against which planned lines, one mark per exercise, the totals, and the one reason a logged session is partial (DESIGN_strength_planned_vs_done.md); pure, like `logger.py`. Rows in `db/strength.py`; surgery in `cli/strength.py`, the gym log in `cli/strength_ingest.py`. |
@@ -707,7 +719,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Planned time in zone (a session's intensity target) | `db/schema.py` (`planned_zone_currency`, `planned_zone1..7_sec` on `workouts`), `db/workout_change.py:WorkoutChange.append`, `intensity.parse_planned_zones` / `format_planned_zones`, `coach/engine/sessions.py` (`planned_zone_task`, `planned_zone_fields` — both prompts), `gcal/event.py` + `coach/formatting.py` + `cli/workouts/session_line.py::prescription_lines` (`workout list -v`/`-vv` and the `workout generate` preview) — rendered from the columns, never stored; `planned_zone_seconds` also reads a proposal's unwritten `planned_zone_sec` list through `parse_planned_zones`, DESIGN_intensity_distribution.md §9.8 |
 | Calendar push / daily-signal ingest | `stamind/gcal/`, see [§13](#13-daily-signal-calendar-ingest) |
 | Workout state (modified/calendar/removed) | `stamind/workout_state.py` (`modification_markers` and `calendar_status` — two of the three axes, together because every surface that shows one shows the other, and because neither reads the database), `db/workouts.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
-| What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `analytics/compare.py` (`adherence_window` — the one pairing that reads the database, handed the handle — `adherence_verdicts` keyed by workout id, `compare_days` for the day-by-day walk, and `format_actual` for the effort it graded against), `analytics/adherence.py::unplanned_kind` (what an activity nothing planned turns out to be: minor, unplanned or off-plan), `gcal/reconcile.py` (`mark_adherence_range` — stamping the verdict onto the Calendar event), `cli/workouts/session_line.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/listing.py::_list_verdicts` (which span the listing grades, and the pull it needs), `gcal/event.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/workouts.js` (the badge) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
+| What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `analytics/compare.py` (`adherence_window` — the one pairing that reads the database, handed the handle — `adherence_verdicts` keyed by workout id, `compare_days` for the day-by-day walk, and `format_actual` for the effort it graded against), `analytics/adherence.py::unplanned_kind` (what an activity nothing planned turns out to be: minor, unplanned or off-plan), `gcal/reconcile.py` (`mark_adherence_range` — stamping the verdict onto the Calendar event), `cli/workouts/session_line.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/listing.py::_list_verdicts` (which span the listing grades, and the pull it needs), `gcal/event.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/workouts.js` (the badge), `analytics/adherence.py::off_plan_gaps` (which measure was off and which way, the load held against the plan on the activity's own scale by `_planned_load_like`: the plan's RPE when the athlete's RPE gave the load, none for a gym session measured by heart rate alone: the grader's notes, the companion's "shorter/longer/easier/harder than planned" in `simple_gap_words`, and the calendar's blue or orange), `calendar_days.py` (the calendar page's tint and `sm calendar`'s marks, [§17](#17-calendar-telegram-mini-app-and-sm-calendar)) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
 | Which timezone dates are read in | `stamind/clock.py` (the zone, the cache, the fallback), `clock.today_date`/`clock.fmt_timestamp`, the push window in `stamind/chat/scheduler.py`, DESIGN_user_timezone.md. Changing it is one row of `settings` |
 | A preference the athlete can change at runtime | `stamind/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`stamind/queue_kind.py`) added to `KINDS` in `stamind/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
@@ -1512,6 +1524,7 @@ facts are **derived, not stored**. See DESIGN_workout_revisions.md.
 | `sport_canonical`       | TEXT       | The slot key (`stamind.sports.canonical_sport`). |
 | `sport_type`            | TEXT       | The spelling as written.                         |
 | `title`                 | TEXT       |                                                  |
+| `short_name`            | TEXT       | At most five characters naming the kind of session ("Easy", "Hills", "Z2"), which the calendar cell shows under its icon. The week planner writes it with the title in `workout generate`, `workout adapt` and `workout tweak`; stored as written. Taken as given like `title`: `WorkoutChange.append` never carries it forward, and the strength planner's hand-built rows copy it from the live session. Not a prescription field: a revision differing only in it is dropped, and Google Calendar never shows it. NULL on a rest day and on sessions written before the column existed; `scripts/migrate_calendar_columns.py` added the column (`SCHEMA_VERSION` 22, DESIGN_calendar_miniapp.md §3.6). |
 | `description`           | TEXT       |                                                  |
 | `duration_minutes`      | INTEGER    |                                                  |
 | `rpe`                   | INTEGER    | Expected RPE 1–10 (excluded from `pushed_signature`) |
@@ -2040,6 +2053,7 @@ Regenerating a plan **supersedes** the prior version (kept) rather than deleting
 | `start_date`    | TEXT                    | YYYY-MM-DD                              |
 | `end_date`      | TEXT                    | YYYY-MM-DD                              |
 | `focus`         | TEXT                    | E.g. "Zone 2 aerobic base, high volume" |
+| `summary`       | TEXT                    | One plain sentence on what the mesocycle is for, which `plan generate` writes for the "Goals & plan" page; stored as given, NULL when the model leaves it out and on plans written before the column existed (`scripts/migrate_calendar_columns.py`, `SCHEMA_VERSION` 22, DESIGN_calendar_miniapp.md §3.7) |
 
 ### plan_feedback
 The plan's feedback log — an append-only list of notes the athlete addressed to the
@@ -2203,8 +2217,12 @@ expert-voiced with no TTY. A command body holds no `if simple:` branch — it ca
 `runtime.render.<what happened>(…)`, and `CompanionRenderer`'s override set is the
 opted-in list; the `cli/render/` package also holds every companion line builder —
 `session_lines.py` for a day and what was trained in it, `plan_lines.py` for the goals,
-constraints and plan it is built from — so the whole voice reads in one place. The
-expert table renderers stay in their command modules (`print_workout_table`,
+constraints and plan it is built from — so the whole voice reads in one place. Two more
+files there speak for the calendar ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)):
+`calendar_page.py` builds the page's snapshot from those line builders, `plan_page.py` the
+"Goals & plan" page's, and
+`calendar_grid.py` is `sm calendar`'s month grid, which `ExpertRenderer.calendar_month`
+prints. The expert table renderers stay in their command modules (`print_workout_table`,
 `print_plan`, `print_progress_report`, …) and `ExpertRenderer` delegates. Command
 modules never import `cli/render/` — the builder in `runtime.py` defers that import,
 which is what keeps the graph acyclic, and `test_simple_render.py` exempts the render
@@ -2248,7 +2266,7 @@ Invoked as `python stamind_cli.py [--llm-model MODEL] <command> [subcommand] [ar
 patchable singletons belong to `stamind/runtime.py` ([§6](#6-singletons)). The handler
 functions, named
 `run_<command>_<subcommand>()`, live in the `stamind/cli/` package
-(one module per command family: `status`, `progress`, `goals`, `constraints`,
+(one module per command family: `status`, `progress`, `calendar`, `goals`, `constraints`,
 `benchmarks`, `signals`, `learnings`, `plans`, `settings`, `queue`, `bot`
 (hidden: `bot morning`/`changes`/`route`/`constraints`/`goals`/`mesocycle`/`capture`/`queue`,
 spawned by the Telegram bot —
@@ -2317,6 +2335,7 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `help`       | —            | —        | Print every command and sub-command with its one-line help, recursing through the whole sub-parser tree (unlike `--help`, which only shows one level) |
 | `shell`      | —            | —        | The REPL (`_repl` in `stamind_cli.py`): reads command lines until EOF and runs each through `run_once`, so every line is its own journal run under one parent run |
 | `status`     | —            | `s`, `st` | Show active goals, recent metrics, coach learnings. Also names the end of the scheduled workouts when it is near or just behind, with the exact command that extends it — printed outside the goal branch, so the "nothing is planned beyond it" case reaches the athlete who has no goal on record (DESIGN_runway_nudge.md §4) |
+| `calendar`   | —            | —        | `calendar [DATE]`: the month holding DATE (today by default) as a grid, Monday first, eleven columns a day. A cell's first line is the day number, ◆ when a constraint covers it and • when a signal was recorded; its second is the sessions' icons, the label (the short name, else the planned length; none on a two-session day, and dropped when an activity nothing planned needs the room), the grades in expert marks (✓ done, ½ partial, ✗ missed or rest broken) and `+icon` for an activity nothing planned (minor ones left out). A line under a week names a mesocycle starting in it; the header names the nearest goal. Freshens Garmin over the month's days up to today first, the way `workout list` does, unless `--no-pull`. A day's detail stays `workout list -d DATE -vv` ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)). |
 | `goal`       | `add`        | `g a`    | Add objective (`TITLE DATE SPORT…` positional, `--desc`, `--date-type`)  |
 | `goal`       | `edit`       | `g e`    | Edit objective by ID. `--status archived` calls the goal off: it stands its upcoming sessions down and clears their Calendar events, keeping the plan, its versions and its feedback. `--status active` reinstates the goal and offers those sessions back, floored at today (DESIGN_backward_evaluation.md §14) |
 | `goal`       | `rm`         | `g r`    | Call the goal off — the same action as `goal edit --status archived`, under the verb people reach for: it stands the goal's upcoming sessions down, keeps the plan, its versions and its feedback, and does not ask, because `goal edit --status active` brings it all back. `--purge` is the destructive form for a goal entered by mistake: it deletes the objective and everything the cascade takes with it, printing that inventory plus the count of sessions it would strand and asking first; `-y` skips that prompt (DESIGN_backward_evaluation.md §14.5) |
@@ -4277,8 +4296,9 @@ no reply keyboard and so no button (DESIGN_gym_logger.md §7).
 `register_handlers` wires a third handler ahead of the text one:
 `MessageHandler(filters.StatusUpdate.WEB_APP_DATA, on_web_app_data)`.
 `ChatBot.on_web_app_data` checks the allowlist the way `on_message` does, and defers with
-the same "still running" line when a command is already going in that chat. Otherwise it
-writes the message verbatim to `<data_dir>/gym_logs/<date>-<hhmmss>.json` and runs
+the same "still running" line when a command is already going in that chat. A message
+the calendar sent goes elsewhere ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)).
+Otherwise it writes the message verbatim to `<data_dir>/gym_logs/<date>-<hhmmss>.json` and runs
 `strength ingest <that file>` through `_start_command`, so the summary streams into the
 chat the way every command's output does. The bot parses nothing itself: every write goes
 through the CLI.
@@ -4321,7 +4341,8 @@ other's from its `exercise_sets` rows. `strength/comparison.py::compare` counts 
 there), and it is pure, so `analyze_adherence` stays free of the database. The sets also
 decide the verdict, but only for a session paired with an activity carrying a gym log: at
 least 80% of its planned sets counted is `done`, else `partial` with one "sets:" reason
-(`_discrepancy_reasons`). A session the watch recorded alone keeps the minutes-and-load
+(`_discrepancy_reasons`, through `off_plan_gaps`'s "sets" measure, which the calendar's
+colour reads too). A session the watch recorded alone keeps the minutes-and-load
 verdict, and its totals line says "graded by time and load". The activity carrying a gym log
 pairs first on its day, whatever its load, and is never put to the athlete as a guess
 (`_pairing_order`, `is_ambiguous_match`). The table is `cli/common.py::strength_table`,
@@ -4330,3 +4351,85 @@ record per exercise like every `render_table`. The companion's form is
 `cli/common.py::simple_comparison_lines`, under the session in "Done lately" and under the
 head line of `strength ingest`; it lives in `cli/common.py` rather than `cli/render/`
 because `strength ingest` is a command module, and those never import the render package.
+
+## 17. Calendar (Telegram Mini App and `sm calendar`)
+
+The calendar is read-only. It shows the sessions, what Garmin recorded, the goals, the
+constraints, the daily signals and the mesocycles, and changes nothing. The contract is
+`DESIGN_calendar_miniapp.md`; its §11 lists what it leaves out.
+
+**The week it covers.** It is Friday 25 September. The companion athlete taps
+"🗓 Calendar" in the bot's keyboard, and a page opens on this month, today outlined, weeks
+starting on Monday. Wednesday's ride was done, so its cell is green. Monday's intervals
+were cut to 25 easy minutes, so its cell is deep blue; a ride that went long and hard is
+orange. Last Saturday's run was skipped, so its cell has a red outline. Next week has no
+tint yet. Sunday's two-hour hike that
+nothing planned shows as a faded 🥾 beside the planned run. She taps Tuesday, and a sheet
+slides up with what was planned, what was done and the day's signals, each line the one
+the chat already writes. A 🎯 day's sheet opens with the goal, taken from the snapshot's
+goals by `sheetFor` in `calendar_logic.js`. On the terminal, `sm calendar` prints the same
+month for the author in expert marks.
+
+**Where the code is.** `stamind/calendar_days.py` gathers the facts: one `Day` per date,
+and the mesocycles and goals around them ([§2](#package-stamind)). Each view words them
+itself. `cli/render/calendar_page.py` is the page's words and the snapshot.
+`cli/render/calendar_grid.py` is the terminal grid, printed by
+`ExpertRenderer.calendar_month`, and `cli/calendar.py` is the command, registered in
+`stamind_cli.py`. The page is `miniapp/calendar.html`, `calendar.js` (the DOM) and
+`calendar.css`, beside the gym logger. Its pure logic is `miniapp/calendar_logic.js`,
+under node tests in `miniapp/tests/calendar.test.mjs`.
+
+**The snapshot.** The page has no server. `calendar_page.calendar_url` packs the window,
+four weeks back and six ahead of today, into the button's address after `#c=`: the JSON
+compressed with zlib, then written in base64url. The page finds `c=` among Telegram's own
+launch parameters with the regular expression the gym page uses for `s=`, and opens it
+with `DecompressionStream("deflate")`. Each day carries its sessions (icon, label, and a
+glyph from its `classify_adherence` grade: `ok` done, `less` or `more` partial, `miss`
+missed, `ahead` still to come; a partial session also carries `r`, actual over planned in
+the sets when a gym log grades it, else in the load when the load is off, else in the
+length, from `off_plan_gaps` in `analytics/adherence.py`; a rest day trained through is
+`more` without `r`), the faded icons of the activities nothing planned (not the minor
+ones), and whether a constraint or a signal covers it. Its sheet is built only from the companion line
+builders: `simple_day_lines` without verdicts for "Planned" (the rest line on an empty day
+inside the schedule), that day's `simple_compare_lines` lines for "Done", and
+`simple_metric_words` with the value and text, or a constraint's title and description,
+for "Signals and constraints". The header goal is `simple_goal_line`. `end` is the
+schedule's last day when it falls in the window, and the page prints `SIMPLE_END_NOTE`
+under every month that runs past it. `at` is `clock.now()`, the "as of" stamp.
+
+**The budget.** Everything but the sheets always goes in. The sheets go in one day at a
+time from today outward (today, tomorrow, yesterday, the day after…) until the next one
+would pass `BUDGET_BYTES`, 5 KB: Telegram refuses the whole keyboard past about 9.9 KB,
+and the "Goals & plan" page's 2 KB and the gym button share it. `fit` names the
+days whose sheets all went in, so a tap on a day outside it says "This day's details did
+not fit. Days from 11 Sep to 16 Oct have them."
+
+**The buttons.** `ChatBot._page_buttons` gathers the window once and builds both page
+addresses on every send, so each button carries the snapshot of the bot's last message.
+`simple_keyboard_rows` puts the calendar's `(label, url)` cell after "📅 Today", where
+"🗓 My week" was, and the "🎯 Goals & plan" cell after "✅ Done lately", where "🎯 Goals"
+and "🧭 My plan" were; `telegram_api.reply_keyboard` draws each as a web-app button, like
+the gym one.
+"my week" typed in her own words still reaches `workout list` through the router, and the
+morning push still carries the offer to plan the next weeks. Every send that attaches the
+keyboard goes through `RepliesMixin._send_keyed`. When building the keyboard or sending
+with it fails, that sends the text again without a keyboard and journals the error, so a
+refused keyboard never costs the athlete her answer.
+
+**Goals & plan.** A second page, `miniapp/plan.html` with `plan.js` and `plan_logic.js`,
+borrowing the calendar's CSS and snapshot reading. It draws a timeline: the mesocycles and
+the goals (upcoming 🎯, completed ✅, archived left out) in date order along a rail, each
+mesocycle a stretch of it in its strip colour (faded once ended, and carried through a goal
+or today inside its dates, `row.rail` in `planRows`), and a "Today" dot; a tapped
+mesocycle shows its dates and `mesocycles.summary`, the one line `plan generate` writes for
+it, and "💬 Why, in chat" sends `{"plan_why": <macrocycle id>}`, which `on_web_app_data`
+turns into `plan show --macrocycle <id>` (`plan_page.why_plan`); `--macrocycle` alone takes
+its goal from the plan, since the mesocycle may serve a later goal than the next one. `plan_page.plan_url` packs `meso` and `goals` from the
+same `Calendar`; past its 2 KB budget the summaries and descriptions are dropped
+(DESIGN_calendar_miniapp.md §3.7).
+
+**The way back.** The sheet has no workout text, so under a day with a session the page
+offers "💬 Full day in chat". Tapping it calls `sendData` with
+`{"calendar_day": "<date>"}`, and Telegram closes the page. `ChatBot.on_web_app_data`
+reads the date with `calendar_page.requested_day` and runs `workout list -d <date>`, the
+command behind "📅 Today". Any other page message is still a gym log for `strength ingest`.

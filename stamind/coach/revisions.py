@@ -66,6 +66,7 @@ def structure_revision(
             'date': w['date'],
             'sport_type': w['sport_type'],
             'title': w['title'],
+            'short_name': w.get('short_name'),
             'description': w['description'],
             # This revision's own note; the long batch rationale travels separately as
             # `reason` and lands on the change row (DESIGN_workout_revisions.md §3). Falls

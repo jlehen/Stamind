@@ -67,6 +67,8 @@ class Workout(TypedDict):
     date: str
     sport_type: str
     title: str
+    # What kind of session, in at most five characters (DESIGN_calendar_miniapp.md §3.6).
+    short_name: Optional[str]
     description: Optional[str]
     original_description: Optional[str]  # the lineage's first revision
     # Hash of the calendar fields at the last push; freshness is derived from it, not
@@ -202,6 +204,7 @@ class Mesocycle(TypedDict):
     start_date: str
     end_date: str
     focus: str
+    summary: Optional[str]  # one line for the "Goals & plan" page (DESIGN_calendar_miniapp.md §3.7)
 
 class PlanFeedback(TypedDict):
     """One note in a plan's feedback log — a message the athlete addressed to the next

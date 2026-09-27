@@ -422,6 +422,15 @@ class TestCliPlans(unittest.TestCase):
         )
         self.assertIn("does not belong", stdout)
 
+        # Alone, --macrocycle shows its own goal's plan, though another goal comes first.
+        later = test_db.save_macrocycle(
+            objective_id=other, strategy="Later goal gamma",
+            goals_hash="g", constraints_hash="l", mesocycles=meso,
+        )
+        exit_code, stdout, _ = self.run_cli(["plan", "show", "--macrocycle", str(later)])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Later goal gamma", stdout)
+
     def _seed_two_versions(self) -> tuple:
         """A goal with two plan versions differing in strategy, mesocycle dates and inputs."""
         oid = test_db.add_objective(

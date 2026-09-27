@@ -128,7 +128,8 @@ def run_bot_mesocycle(args: argparse.Namespace) -> None:
     softly rather than as an error."""
     m = runtime.db.get_mesocycle(args.mesocycle_id)
     if not m:
-        print("That mesocycle isn't on your plan any more — tap 🧭 My plan for the current road.")
+        print("That mesocycle isn't on your plan any more — tap 🎯 Goals & plan for the "
+              "current road.")
         return
     macrocycle = runtime.db.get_macrocycle(m["macrocycle_id"])
     if macrocycle and macrocycle.get("status") == "superseded":

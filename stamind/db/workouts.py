@@ -169,6 +169,7 @@ class WorkoutsMixin:
             "date": row["date"],
             "sport_type": row["sport_type"],
             "title": row["title"],
+            "short_name": row["short_name"],
             "description": row["description"],
             "original_description": first["description"],
             "pushed_signature": calendar.get("pushed_signature"),

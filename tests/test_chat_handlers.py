@@ -167,10 +167,10 @@ class PersonaSwitchTest(unittest.IsolatedAsyncioTestCase):
         so the tap is the companion whatever persona this process started in."""
         chat_bot = build_chat_bot(self, ui="expert")
         started = record_commands(self, chat_bot)
-        update, _replied = message_update(text="🗓 My week")
+        update, _replied = message_update(text="📅 Today")
         await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
         self.assertTrue(chat_bot.simple_ui)
-        self.assertEqual(started, [(42, ["workout", "list"], False, "bot")])
+        self.assertEqual(started, [(42, ["workout", "list", "-d", "today"], False, "bot")])
         # Silently: the answer to the tap is the only feedback the switch earns.
         self.assertEqual(chat_bot.bot.texts(), [])
 
@@ -230,6 +230,28 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(started, [])
         self.assertEqual(replied[0][0], messages.BUSY_NOTICE)
         self.assertIsNotNone(replied[0][1]["reply_markup"])
+        self.assertFalse(os.path.exists(self.gym_logs()))
+
+    async def test_the_calendar_asks_for_a_day_and_writes_no_log(self):
+        """Wednesday: the athlete taps Saturday in the calendar, then "💬 Full day in chat".
+        The bot posts Saturday the way "📅 Today" writes a day
+        (DESIGN_calendar_miniapp.md §6)."""
+        chat_bot = build_chat_bot(self, ui="simple")
+        started = record_commands(self, chat_bot)
+        update, _replied = web_app_update(data='{"calendar_day": "2026-09-26"}')
+        await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
+        self.assertEqual([s[1] for s in started], [["workout", "list", "-d", "2026-09-26"]])
+        self.assertFalse(os.path.exists(self.gym_logs()))
+
+    async def test_the_plan_page_asks_why_and_writes_no_log(self):
+        """The athlete taps a mesocycle on "Goals & plan", then "💬 Why, in chat": the bot
+        posts that mesocycle's plan, whichever goal it serves (DESIGN_calendar_miniapp.md
+        §3.7)."""
+        chat_bot = build_chat_bot(self, ui="simple")
+        started = record_commands(self, chat_bot)
+        update, _replied = web_app_update(data='{"plan_why": 10}')
+        await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
+        self.assertEqual([s[1] for s in started], [["plan", "show", "--macrocycle", "10"]])
         self.assertFalse(os.path.exists(self.gym_logs()))
 
 

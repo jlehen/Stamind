@@ -213,10 +213,9 @@ of six buttons (two per row, in table order), each mapping to fixed argv:
 | Button           | Runs                          |
 |------------------|-------------------------------|
 | 📅 Today         | `workout list -d today`       |
-| 🗓 My week       | `workout list`                |
+| 🗓 Calendar      | a page; replaced "🗓 My week" (`workout list`), DESIGN_calendar_miniapp.md §6 |
 | ✅ Done lately   | `workout compare -d 7d --no-mark` (§6) |
-| 🎯 Goals         | `goal list` (§11)             |
-| 🧭 My plan       | `plan show` (§11)             |
+| 🎯 Goals & plan  | a page; replaced "🎯 Goals" (`goal list`) and "🧭 My plan" (`plan show`), DESIGN_calendar_miniapp.md §3.7 |
 | 📈 Progress      | `progress --chart`            |
 | 💬 Talk to me    | shows the capture prompt (§5.2)|
 

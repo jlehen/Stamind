@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from stamind.benchmarks import format_delta, format_value, is_improvement, label_for_kind
 from stamind.strength import comparison
+from stamind.analytics.adherence import DURATION, SETS, Gap, off_plan_gaps
 from stamind.strength.sets import activity_lines
 from stamind.coach.proposals import RevisionProposal
 from stamind.sports import canonical_sport
@@ -75,7 +76,7 @@ def simple_session_line(w: Dict[str, Any], lead: Optional[str] = None) -> str:
 
 def simple_day_lines(
     workouts: List[Dict[str, Any]], date_str: str,
-    verdicts: Optional[Dict[int, Dict[str, Any]]] = None,
+    verdicts: Optional[Dict[int, Dict[str, Any]]] = None, descriptions: bool = True,
 ) -> List[str]:
     """Simple rendering of one day's schedule: session line(s) plus the wrapped
     description (the week planner's actual prescription), or the one-line rest message.
@@ -83,20 +84,22 @@ def simple_day_lines(
     (DESIGN_bot_simple_frontend.md §10).
 
     `verdicts` is `adherence_verdicts`' map; a session already trained gets the done
-    line, and every other verdict renders as it did before (§6 tone rule)."""
+    line, and every other verdict renders as it did before (§6 tone rule).
+    `descriptions=False` keeps the session lines only, for the calendar's day sheet
+    (DESIGN_calendar_miniapp.md §5)."""
     if not workouts:
         return [REST_DAY_LINE]
     day_word = "Today" if date_str == _today_str() else fmt_date(date_str)
     lines: List[str] = []
     for w in workouts:
-        if lines:
+        if lines and descriptions:
             lines.append(f"\n{SIMPLE_SESSION_RULE}\n")
         lines.append(simple_session_line(w, lead=day_word))
         status = ((verdicts or {}).get(w.get("id")) or {}).get("status")
         if status in SIMPLE_DONE_STATUSES:
             lines.append(SIMPLE_DONE_LINE)
         description = (w.get("description") or "").strip()
-        if description:
+        if description and descriptions:
             lines.append(wrap_text(description))
     return lines
 
@@ -203,10 +206,11 @@ def simple_compare_lines(
             total += 1
             if act:
                 done += 1
-                lines.append(
-                    f"{day} · ✅ {simple_session_line(w)} "
-                    f"(you did {simple_activity_minutes(act)} min)"
-                )
+                did = f"you did {simple_activity_minutes(act)} min"
+                gaps = off_plan_gaps(w, act)
+                if gaps:
+                    did = f"{did}, {simple_gap_words(gaps)}"
+                lines.append(f"{day} · ✅ {simple_session_line(w)} ({did})")
                 lines.extend(simple_session_sets(w, act))
             else:
                 lines.append(f"{day} · ❌ {simple_session_line(w)}")
@@ -225,6 +229,24 @@ def simple_compare_lines(
     else:
         lines.append(f"\n0 of {total} {session_word} done — the plan is ready when you are 💪")
     return lines
+
+
+def simple_gap_words(gaps: List[Gap]) -> str:
+    """Which way a session went off its plan: 'shorter than planned', 'longer but easier
+    than planned' (DESIGN_calendar_miniapp.md §3.2). `gaps` is `off_plan_gaps`' list."""
+    words = []
+    for gap in gaps:
+        if gap.measure == SETS:
+            words.append("fewer sets")
+            continue
+        if gap.measure == DURATION:
+            words.append("shorter" if gap.ratio < 1 else "longer")
+            continue
+        words.append("easier" if gap.ratio < 1 else "harder")
+    if len(words) == 1:
+        return f"{words[0]} than planned"
+    joiner = "and" if (gaps[0].ratio < 1) == (gaps[1].ratio < 1) else "but"
+    return f"{words[0]} {joiner} {words[1]} than planned"
 
 
 def simple_date_word(date_str: str) -> str:

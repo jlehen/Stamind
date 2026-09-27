@@ -21,20 +21,25 @@ import sys
 import traceback
 from typing import Dict, List, Optional, Tuple
 
-from stamind import clock, journal, runtime, settings
-from stamind.chat import telegram_api
+from stamind import calendar_days, clock, journal, runtime, settings
+from stamind.chat import runner, telegram_api
 from stamind.chat.callbacks import CallbacksMixin
 from stamind.chat.keyboards import (
-    GYM_SPORT, MENU_COMMANDS, SIMPLE_MENU_COMMANDS, gym_button, gym_window_end,
-    simple_keyboard_rows,
+    CALENDAR_LABEL, GYM_SPORT, MENU_COMMANDS, PLAN_LABEL, SIMPLE_MENU_COMMANDS, gym_button,
+    gym_window_end, simple_keyboard_rows,
 )
 from stamind.chat.messages import MessagesMixin
 from stamind.chat.replies import RepliesMixin
 from stamind.chat.runner import RunnerMixin, Session
 from stamind.chat.scheduler import SchedulerMixin
+from stamind.cli.render import calendar_page, plan_page
 from stamind.config import config
 from stamind.output import warn
 from stamind.strength import logger
+
+# What the chat that sent /restart hears once the new worker is up (DESIGN_bot_restart.md
+# §5.2).
+BACK_NOTICE = "Back 👍"
 
 
 class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, SchedulerMixin):
@@ -118,12 +123,27 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         label, workout = found
         return label, logger.session_url(workout)
 
+    def _page_buttons(self) -> Tuple[Tuple[str, str], Tuple[str, str]]:
+        """The calendar's and the "Goals & plan" page's (label, address) cells, both
+        carrying this moment's snapshot of one list of days (DESIGN_calendar_miniapp.md §5,
+        §3.7)."""
+        today = clock.today_str()
+        start, end = calendar_page.window(today)
+        cal = calendar_days.gather(runtime.db, start, end, today)
+        now = clock.now()
+        return ((CALENDAR_LABEL, calendar_page.calendar_url(cal, now)),
+                (PLAN_LABEL, plan_page.plan_url(cal, now)))
+
     def _keyboard(self):
         """The §5.1 reply keyboard the companion attaches, rebuilt on every send so the
-        gym button follows the week (DESIGN_gym_logger.md §6). Expert mode has none."""
+        gym button follows the week and the pages carry a fresh snapshot
+        (DESIGN_gym_logger.md §6, DESIGN_calendar_miniapp.md §5). Expert mode has none."""
         if not self.simple_ui:
             return None
-        return telegram_api.reply_keyboard(simple_keyboard_rows(self._gym_button()))
+        calendar, plan = self._page_buttons()
+        return telegram_api.reply_keyboard(
+            simple_keyboard_rows(self._gym_button(), calendar, plan)
+        )
 
     def _log(
         self, chat_id: Optional[int], direction: str, msg: str, lvl: str = "info"
@@ -176,6 +196,19 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         except Exception as exc:
             journal.debug("bot.event", f"command menu not updated: {exc}")
 
+    async def _say_back(self) -> None:
+        """After a /restart, tells the chat that asked that the bot is back, under a keyboard
+        this worker built: the old one's calendar button carries the old code's snapshot
+        (DESIGN_bot_restart.md §5.2). A failure is journalled; the bot serves anyway."""
+        chat_id = runner.take_restart_note()
+        if chat_id is None or not self._authorized(chat_id):
+            return
+        try:
+            await self._send_keyed(chat_id, BACK_NOTICE)
+        except Exception as exc:
+            journal.record("bot.event", f"back notice not sent: {exc}", lvl="warn",
+                           chat=chat_id)
+
     async def _serve(self) -> None:
         """Runs the bot until SIGINT/SIGTERM."""
         stop_event = asyncio.Event()
@@ -191,6 +224,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
                 allowed_updates=telegram_api.all_update_types(),
                 error_callback=self._on_polling_error,
             )
+            await self._say_back()
             # Started whenever there is a chat to push to: the persona and the `push`
             # setting are checked per tick inside the loop, so a /ui flip (§5.6) or a
             # `settings set push off` turns it on and off live (DESIGN_settings.md §5).

@@ -27,6 +27,7 @@ from stamind.chat.routing import (
     ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, UI_EXPERT_ON, UI_SIMPLE_ON,
     UI_USAGE, parse_message_to_argv, parse_ui_switch,
 )
+from stamind.cli.render import calendar_page, plan_page
 from stamind.config import config
 from stamind.sentinels import prompt_answer
 
@@ -70,15 +71,11 @@ class MessagesMixin:
         elif intent in ROUTER_INTENT_ARGV:
             argv = list(ROUTER_INTENT_ARGV[intent])
         elif intent == "help":
-            await self.bot.send_message(
-                chat_id=chat_id, text=SIMPLE_HELP, reply_markup=self._keyboard()
-            )
+            await self._send_keyed(chat_id, SIMPLE_HELP)
             return None
         else:
             if not armed_tap:
-                await self.bot.send_message(
-                    chat_id=chat_id, text=ROUTER_FALLBACK, reply_markup=self._keyboard()
-                )
+                await self._send_keyed(chat_id, ROUTER_FALLBACK)
                 return None
             # A note the router cannot place is still a note (§5.2), and the capture
             # inbox is the one that asks before storing — and still offers the coach on
@@ -125,9 +122,7 @@ class MessagesMixin:
         self.simple_ui = target
         await self._set_command_menu(target)
         if announce and target:
-            await self.bot.send_message(
-                chat_id=chat_id, text=UI_SIMPLE_ON, reply_markup=self._keyboard()
-            )
+            await self._send_keyed(chat_id, UI_SIMPLE_ON)
         elif announce:
             await self.bot.send_message(
                 chat_id=chat_id, text=UI_EXPERT_ON,
@@ -139,6 +134,7 @@ class MessagesMixin:
         """Tears down, replies, then hard-exits with RESTART_EXIT_CODE for the sm-bot
         supervisor to relaunch us. See DESIGN_bot_restart.md §5.2."""
         await runner.restart_teardown(self.sessions.get(chat_id), self._pause_polling)
+        runner.leave_restart_note(chat_id)
         await self.bot.send_message(chat_id=chat_id, text="Restarting…")
         os._exit(runner.RESTART_EXIT_CODE)
 
@@ -162,14 +158,14 @@ class MessagesMixin:
             return
         if token_low == "start":
             if self.simple_ui:
-                await message.reply_text(SIMPLE_WELCOME, reply_markup=self._keyboard())
+                await self._send_keyed(chat.id, SIMPLE_WELCOME, send=message.reply_text)
             else:
                 await message.reply_text(WELCOME)
             return
         if token_low == "help" and self.simple_ui:
             # Bare help gets the companion card; `/help <cmd>` still reaches the CLI
             # tree for the operator (§5.1).
-            await message.reply_text(SIMPLE_HELP, reply_markup=self._keyboard())
+            await self._send_keyed(chat.id, SIMPLE_HELP, send=message.reply_text)
             return
         if token_low == "restart":
             await self._restart(chat.id)
@@ -212,7 +208,7 @@ class MessagesMixin:
             action = keyboard_action(text)
             if action is not None and action[0] == "capture":
                 self.armed[chat.id] = time.monotonic()
-                await message.reply_text(CAPTURE_PROMPT, reply_markup=self._keyboard())
+                await self._send_keyed(chat.id, CAPTURE_PROMPT, send=message.reply_text)
                 return
             if action is not None:
                 argv = list(action[1])
@@ -256,11 +252,15 @@ class MessagesMixin:
         return path
 
     async def on_web_app_data(self, update, context) -> None:
-        """The one message the gym logger's page sends when the athlete taps "Finish".
+        """A message from one of the pages: the calendar asking for a day in full, the
+        "Goals & plan" page asking why, or the gym logger's log when the athlete taps
+        "Finish".
 
-        It is written to a file and handed to `strength ingest`, whose summary streams
-        back the way every command's output does. The bot never reads the log itself:
-        every write goes through the CLI (DESIGN_gym_logger.md §6)."""
+        The calendar's day runs `workout list -d <day>`, the command behind "📅 Today"
+        (DESIGN_calendar_miniapp.md §6); the why runs `plan show` (§3.7). The log is written
+        to a file and handed to `strength ingest`, whose summary streams back the way every
+        command's output does. The bot never reads the log itself: every write goes through
+        the CLI (DESIGN_gym_logger.md §6)."""
         message = update.effective_message
         chat = update.effective_chat
         if message is None or chat is None or message.web_app_data is None:
@@ -275,7 +275,18 @@ class MessagesMixin:
             return
 
         if self.sessions.get(chat.id) is not None:
-            await message.reply_text(BUSY_NOTICE, reply_markup=self._keyboard())
+            await self._send_keyed(chat.id, BUSY_NOTICE, send=message.reply_text)
+            return
+
+        day = calendar_page.requested_day(data)
+        if day is not None:
+            self._log(chat.id, "  ", f"calendar day: {day}")
+            await self._start_command(chat.id, ["workout", "list", "-d", day])
+            return
+        plan = plan_page.why_plan(data)
+        if plan is not None:
+            self._log(chat.id, "  ", f"plan: why {plan}")
+            await self._start_command(chat.id, ["plan", "show", "--macrocycle", str(plan)])
             return
 
         path = self._write_gym_log(data)
