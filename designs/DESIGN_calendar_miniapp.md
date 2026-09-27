@@ -226,11 +226,14 @@ One button, "🎯 Goals & plan", replaces two: "🎯 Goals" (`goal list`) and "�
 (`plan show`). Both answered "where am I going", and two buttons whose difference takes more
 than a sentence to explain is what the companion keyboard avoids.
 
-It is Wednesday 30 September. She taps "🎯 Goals & plan". A page opens with one list in date
-order: each mesocycle with its colour (the calendar's strip colour), its name and its dates;
-each goal at its date, in the header's words, 🎯 ahead of her and ✅ once reached; and a
-"Today" line where today falls. The list runs from the first mesocycle in the calendar's
-window to the last goal. An archived goal is not on it.
+It is Wednesday 30 September. She taps "🎯 Goals & plan". A page opens with a timeline: one
+list in date order along a rail down the left edge. Each mesocycle is a stretch of the rail
+in its colour (the calendar's strip colour), with its name and its dates beside it. Each
+goal is a 🎯 marker on the rail at its date, in the header's words, and a ✅ once reached. A
+blue dot and a "Today, 30 Sep" line mark today. A mesocycle that has ended is greyed out. A
+goal or today that falls inside a mesocycle's dates keeps that mesocycle's colour on the rail
+behind it, so her race on Sunday does not look like a gap in the plan. The list runs from
+the first mesocycle in the calendar's window to the last goal. An archived goal is not on it.
 
 She taps "Aerobic base". A sheet shows its dates and one line on what it is for: "Rebuild
 the aerobic base and start sprint intervals, ending with an FTP test." Under it,

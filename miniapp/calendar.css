@@ -278,8 +278,30 @@ h1 {
 .key-more { background: rgb(var(--more-rgb) / var(--gap-alpha)); }
 .key-miss { border: 2px solid var(--miss-line); }
 
+/* The page is a timeline: a grey rail down the left, each mesocycle a stretch of it in its
+   strip colour, each goal a marker on it, and today a dot (§3.7). */
+.plan {
+  position: relative;
+}
+
+.plan::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 13px;
+  width: 2px;
+  background: var(--line);
+}
+
+.plan li {
+  position: relative;
+  padding-left: 36px;
+}
+
 .plan-row {
   width: 100%;
+  min-height: var(--tap);
   padding: 8px 0;
   border: 0;
   border-bottom: 1px solid var(--line);
@@ -292,8 +314,42 @@ h1 {
   color: var(--hint);
 }
 
+.rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 10px;
+  width: 8px;
+}
+
+.rail.done {
+  opacity: 0.4;
+}
+
+.node {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  border-radius: 50%;
+  background: var(--bg);
+  font-size: 15px;
+  line-height: 24px;
+  text-align: center;
+}
+
 .plan-name {
   flex: 1;
+}
+
+.goal-name {
+  font-weight: 600;
+}
+
+.plan-row.done .goal-name {
+  font-weight: 400;
 }
 
 .plan-when {
@@ -301,12 +357,26 @@ h1 {
   font-size: 13px;
 }
 
-.plan-today {
-  padding: 4px 0;
+.plan li.plan-today {
+  padding-top: 6px;
+  padding-bottom: 6px;
   border-top: 2px solid var(--accent);
   color: var(--accent);
   font-size: 13px;
   font-weight: 650;
+}
+
+.plan-today::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  z-index: 1;
+  left: 7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg);
 }
 
 .problem {

@@ -47,22 +47,36 @@ function openSheet(row) {
   ui.sheet.hidden = false;
 }
 
+function rail(row) {
+  // The row's stretch of the rail; none outside every mesocycle, where the grey line shows.
+  if (!row.rail) {
+    return "";
+  }
+  const done = row.rail.done ? " done" : "";
+  return element("span", `rail meso-${row.rail.index % STRIPS}${done}`);
+}
+
 function renderPlan(snapshot) {
   ui.plan.replaceChildren();
   for (const row of logic.planRows(snapshot)) {
     if (row.kind === "today") {
-      ui.plan.append(element("li", "plan-today", "Today"));
+      const today = element("li", "plan-today", `Today, ${calendar.shortDay(row.date)}`);
+      today.prepend(rail(row));
+      ui.plan.append(today);
       continue;
     }
+    // A mesocycle is a stretch of the timeline's rail in its strip colour; a goal is a
+    // marker on the rail.
     const item = element("li");
     const button = element("button", row.done ? "plan-row done" : "plan-row");
     button.type = "button";
+    button.append(rail(row));
     if (row.kind === "meso") {
-      button.append(element("span", `swatch meso-${row.index % STRIPS}`));
       button.append(element("span", "plan-name", row.name));
       button.append(element("span", "plan-when", row.span));
     } else {
-      button.append(element("span", "plan-name", `${row.done ? "✅" : "🎯"} ${row.text}`));
+      button.append(element("span", "node", row.done ? "✅" : "🎯"));
+      button.append(element("span", "plan-name goal-name", row.text));
     }
     button.addEventListener("click", () => openSheet(row));
     item.append(button);

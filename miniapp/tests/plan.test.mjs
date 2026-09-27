@@ -25,8 +25,21 @@ test("mesocycles and goals run in date order around today", () => {
   const rows = logic.planRows(SNAPSHOT);
   assert.deepEqual(rows.map((row) => row.kind), ["meso", "goal", "meso", "today", "goal"]);
   assert.equal(rows[0].span, "1 Sep – 28 Sep");
+  // Build ended on the 28th, so it is greyed like the reached goal; base is still running.
+  assert.equal(rows[0].done, true);
+  assert.equal(rows[2].done, false);
   assert.equal(rows[1].done, true);
   assert.equal(rows[4].done, false);
+});
+
+test("the rail keeps a mesocycle's colour through a goal or today inside its dates", () => {
+  const rows = logic.planRows(SNAPSHOT);
+  // Build: its own stretch, ended. Today falls in the base mesocycle, still running.
+  assert.deepEqual(rows[0].rail, { index: 0, done: true });
+  assert.deepEqual(rows[3].rail, { index: 1, done: false });
+  // The 10k on 27 September fell in Build. The Sylvesterlauf is past every mesocycle.
+  assert.deepEqual(rows[1].rail, { index: 0, done: true });
+  assert.equal(rows[4].rail, undefined);
 });
 
 test("a mesocycle opens its dates, its summary and the way to the chat", () => {

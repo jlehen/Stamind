@@ -11,7 +11,8 @@ export function planRows(snapshot) {
   const rows = [];
   (snapshot.meso || []).forEach((meso, index) => {
     rows.push({ kind: "meso", date: meso.s, index, name: meso.n, plan: meso.p,
-                span: `${shortDay(meso.s)} – ${shortDay(meso.e)}`, summary: meso.m || "" });
+                span: `${shortDay(meso.s)} – ${shortDay(meso.e)}`, summary: meso.m || "",
+                done: meso.e < snapshot.today });
   });
   (snapshot.goals || []).forEach((goal) => {
     rows.push({ kind: "goal", date: goal.d, text: goal.t, description: goal.x || "",
@@ -24,6 +25,19 @@ export function planRows(snapshot) {
     at = rows.length;
   }
   rows.splice(at, 0, { kind: "today", date: snapshot.today });
+  // The rail beside each row: the mesocycle running on its date in that mesocycle's colour,
+  // faded once it has ended. A goal or today inside a mesocycle keeps its colour.
+  const mesos = snapshot.meso || [];
+  for (const row of rows) {
+    let index = row.index;
+    if (row.kind !== "meso") {
+      index = mesos.findIndex((meso) => meso.s <= row.date && row.date <= meso.e);
+    }
+    if (index === -1) {
+      continue;
+    }
+    row.rail = { index, done: mesos[index].e < snapshot.today };
+  }
   return rows;
 }
 

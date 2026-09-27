@@ -4419,8 +4419,10 @@ with it fails, that sends the text again without a keyboard and journals the err
 refused keyboard never costs the athlete her answer.
 
 **Goals & plan.** A second page, `miniapp/plan.html` with `plan.js` and `plan_logic.js`,
-borrowing the calendar's CSS and snapshot reading. It lists the mesocycles and the goals
-(upcoming 🎯, completed ✅, archived left out) in date order around a "Today" line; a tapped
+borrowing the calendar's CSS and snapshot reading. It draws a timeline: the mesocycles and
+the goals (upcoming 🎯, completed ✅, archived left out) in date order along a rail, each
+mesocycle a stretch of it in its strip colour (faded once ended, and carried through a goal
+or today inside its dates, `row.rail` in `planRows`), and a "Today" dot; a tapped
 mesocycle shows its dates and `mesocycles.summary`, the one line `plan generate` writes for
 it, and "💬 Why, in chat" sends `{"plan_why": <macrocycle id>}`, which `on_web_app_data`
 turns into `plan show --macrocycle <id>` (`plan_page.why_plan`); `--macrocycle` alone takes
