@@ -1524,7 +1524,7 @@ facts are **derived, not stored**. See DESIGN_workout_revisions.md.
 | `sport_canonical`       | TEXT       | The slot key (`stamind.sports.canonical_sport`). |
 | `sport_type`            | TEXT       | The spelling as written.                         |
 | `title`                 | TEXT       |                                                  |
-| `short_name`            | TEXT       | At most five characters naming the kind of session ("Easy", "Hills", "Z2"), which the calendar cell shows under its icon. The week planner writes it with the title in `workout generate`, `workout adapt` and `workout tweak`; stored as written. Taken as given like `title`: `WorkoutChange.append` never carries it forward, and the strength planner's hand-built rows copy it from the live session. Not a prescription field: a revision differing only in it is dropped, and Google Calendar never shows it. NULL on a rest day and on sessions written before the column existed; `scripts/migrate_calendar_columns.py` added the column (`SCHEMA_VERSION` 22, DESIGN_calendar_miniapp.md §3.6). |
+| `short_name`            | TEXT       | At most five characters naming the kind of session ("Easy", "Hills", "Z2"), which the calendar cell shows under its icon. The week planner writes it with the title in `workout generate`, `workout adapt` and `workout tweak`; stored as written. Taken as given like `title`: `WorkoutChange.append` never carries it forward, and the strength planner's hand-built rows copy it from the live session. Not a prescription field: a revision differing only in it is dropped, and Google Calendar never shows it. NULL on a rest day. `scripts/migrate_calendar_columns.py` added the column (`SCHEMA_VERSION` 22), and `scripts/backfill_calendar_texts.py` filled the sessions written before it once, from the router model, onto the live revision in place (DESIGN_calendar_miniapp.md §3.6). |
 | `description`           | TEXT       |                                                  |
 | `duration_minutes`      | INTEGER    |                                                  |
 | `rpe`                   | INTEGER    | Expected RPE 1–10 (excluded from `pushed_signature`) |
@@ -2053,7 +2053,7 @@ Regenerating a plan **supersedes** the prior version (kept) rather than deleting
 | `start_date`    | TEXT                    | YYYY-MM-DD                              |
 | `end_date`      | TEXT                    | YYYY-MM-DD                              |
 | `focus`         | TEXT                    | E.g. "Zone 2 aerobic base, high volume" |
-| `summary`       | TEXT                    | One plain sentence on what the mesocycle is for, which `plan generate` writes for the "Goals & plan" page; stored as given, NULL when the model leaves it out and on plans written before the column existed (`scripts/migrate_calendar_columns.py`, `SCHEMA_VERSION` 22, DESIGN_calendar_miniapp.md §3.7) |
+| `summary`       | TEXT                    | One plain sentence on what the mesocycle is for, which `plan generate` writes for the "Goals & plan" page; stored as given, NULL when the model leaves it out. The active plans written before the column existed got theirs once from the router model (`scripts/backfill_calendar_texts.py`); `scripts/migrate_calendar_columns.py` added it (`SCHEMA_VERSION` 22, DESIGN_calendar_miniapp.md §3.7) |
 
 ### plan_feedback
 The plan's feedback log — an append-only list of notes the athlete addressed to the

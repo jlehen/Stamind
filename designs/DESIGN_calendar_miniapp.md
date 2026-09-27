@@ -207,16 +207,16 @@ The rules:
   mirrors that rule for the preview, stays without it too. Google Calendar never shows it,
   so it is not among the fields that make an event stale.
 - **A rest day has none**, and its cell shows 🛌 alone.
-- **A session written before the field existed** has none, and shows its length. It gets a
-  short name only when a later `workout generate` or `workout adapt` changes it, because a
-  rewrite that differs only in the short name is dropped (the rule above). New sessions
-  get one from the start. So on the day this ships, most cells ahead show lengths; they turn
-  into short names as the weeks are written, and within the 6-week window ahead that takes
-  about six weeks. No model call fills the old ones in.
+- **A session written before the field existed** had none. A later `workout generate` or
+  `workout adapt` would not give it one unless it changed the session, because a rewrite
+  that differs only in the short name is dropped (the rule above). So a one-off script,
+  `scripts/backfill_calendar_texts.py`, asks the router model once for the short name of
+  every live session without one, from its title and description, and writes it onto the
+  live revision in place. A session it misses shows its length.
 
 **The migration.** A one-off script adds the column, `ALTER TABLE workouts ADD COLUMN
 short_name TEXT`, whenever the column is missing, whatever version the database is stamped
-with. `SCHEMA_VERSION` moves from 19 to 20. The script runs on the author's and the
+with. `SCHEMA_VERSION` moves to 22. The script runs on the author's and the
 companion's databases before either bot is restarted on the new code, because
 `_init_db` only creates tables and never adds a column.
 
@@ -245,9 +245,10 @@ description of it.
 **The summary.** `plan generate` writes it, as a `summary` beside each mesocycle's `focus`
 in its answer format (`## RESPONSE FORMAT` in `coach/engine/planning.py`): one plain
 sentence of at most 90 characters, for the athlete.
-It is stored as given in `mesocycles.summary`, and NULL when the model leaves it out. A
-plan written before this has none until the next `plan generate`; its mesocycles show their
-name and dates, and still offer the chat.
+It is stored as given in `mesocycles.summary`, and NULL when the model leaves it out. The
+same one-off script (§3.6) asks the router model for the summary of each mesocycle of an
+active plan written before this, from its focus. A mesocycle without one shows its name
+and dates, and still offers the chat.
 
 **The snapshot.** The same list of days the calendar is built from (§4) gives the page its
 payload, packed the same way into its own button's address (`cli/render/plan_page.py`):
