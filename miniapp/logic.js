@@ -81,6 +81,11 @@ export function demoSession() {
 export function newState(session, firstId = 1) {
   const x = (session.x || []).map((row, index) => prescribedExercise(row, index + 1));
   x.forEach((exercise, index) => { exercise.id = firstId + index; });
+  // A warm-up is a lighter entry of the same exercise (stamind/strength/progression.md).
+  for (const exercise of x) {
+    exercise.warmup = exercise.kg !== null && x.some(
+      (other) => other.n === exercise.n && other.kg !== null && other.kg > exercise.kg);
+  }
   return {
     v: 2,
     r: session.r,
@@ -247,16 +252,35 @@ export function swapExercise(state, xi, name) {
 // `at` is the index the new card takes: the end for "Add an exercise", the place after a card
 // for that card's "Insert".
 export function addExercise(state, name, equipment, at = state.x.length) {
-  const after = next(state);
   const kg = equipment === "bodyweight" ? null : ADDED_KG;
   const sets = [];
   for (let i = 0; i < ADDED_SETS; i += 1) {
     sets.push({ reps: ADDED_REPS, kg, done: false, t: null });
   }
+  return insertAdded(next(state), at, name, sets, false);
+}
+
+// Dup: the card's exercise added right after it, with its sets as they stand and its label,
+// none ticked. Like an inserted card, it stands for no written line (§1).
+export function duplicateExercise(state, xi) {
+  const source = state.x[xi];
+  const sets = source.sets.map((set) => ({ reps: set.reps, kg: set.kg, done: false, t: null }));
+  return insertAdded(next(state), xi + 1, source.n, sets, Boolean(source.warmup));
+}
+
+function insertAdded(after, at, name, sets, warmup) {
   const id = after.nextId;
   after.nextId += 1;
   after.x.splice(at, 0, { id, n: name, p: null, s: null, lo: null, hi: null, kg: null, note: "",
-                          sets });
+                          warmup, sets });
+  return after;
+}
+
+// The card's "Warm-up" / "Main" label. The page shows it and the Markdown export writes it; the
+// log does not carry it (§1).
+export function toggleWarmup(state, xi) {
+  const after = next(state);
+  after.x[xi].warmup = !after.x[xi].warmup;
   return after;
 }
 

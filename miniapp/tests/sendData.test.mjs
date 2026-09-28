@@ -70,9 +70,12 @@ test("a log Telegram does not take comes back as a sheet to copy", async (t) => 
 
     // The app is still open after the watchdog, so the athlete is given the log to copy.
     await page.waitForSelector("#output-sheet:not([hidden])", { timeout: 4000 });
-    assert.equal(await page.locator("#output-hint").textContent(),
-                 "Telegram did not take the log. Copy it and send it to the bot as a message.");
+    assert.match(await page.locator("#output-hint").textContent(), /Tap Retry/);
     assert.equal(await page.locator("#output-text").inputValue(), sent[0]);
+
+    // Retry sends the same log again, since the bot keeps only the last one.
+    await page.locator("#output-retry").click();
+    assert.deepEqual(await page.evaluate(() => window.__sent), [sent[0], sent[0]]);
   } finally {
     await engine.close();
     server.kill();

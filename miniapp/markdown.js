@@ -26,7 +26,8 @@ export function toMarkdown(state, now) {
     if (!sets.length) {
       continue;
     }
-    let line = `- ${capitalise(exercise.n)}: ${setRuns(sets)}`;
+    const kind = exercise.warmup ? " (warm-up)" : "";
+    let line = `- ${capitalise(exercise.n)}${kind}: ${setRuns(sets)}`;
     if (exercise.note && exercise.note.trim()) {
       line += ` ${EM_DASH} ${exercise.note.trim()}`;
     }

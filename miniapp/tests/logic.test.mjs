@@ -316,6 +316,38 @@ test("an inserted exercise lands after its card, with an id no other card has", 
   assert.deepEqual(over.x.map((x) => x.id), [5, 6]);
 });
 
+test("a lighter entry of the same exercise starts as the warm-up, every other card as main", () => {
+  // Thursday: "Belt squat 1×5 @ 120, 3×4–6 @ 140", a pull-up, and a leg press on its own.
+  const state = logic.newState({ v: 1, r: 1, d: "2026-09-24", x: [
+    { n: "belt squat", s: 1, lo: 5, hi: 5, kg: 120 },
+    { n: "belt squat", s: 3, lo: 4, hi: 6, kg: 140 },
+    { n: "pull up", s: 3, lo: 6, hi: 8, kg: null },
+    { n: "leg press", s: 3, lo: 8, hi: 10, kg: 200 },
+  ] });
+  assert.deepEqual(state.x.map((x) => x.warmup), [true, false, false, false]);
+  const toggled = logic.toggleWarmup(state, 3);
+  assert.equal(toggled.x[3].warmup, true);
+  // The label stays on the page: the log is the same either way.
+  const ticked = logic.toggleDone(logic.startClock(toggled, START), 3, 0, 60);
+  assert.deepEqual(logic.buildLog(ticked, END).x,
+                   [{ n: "leg press", p: 4, sets: [[10, 200, 60]] }]);
+});
+
+test("Dup adds the card's exercise right after it, its sets as they stand, none ticked", () => {
+  let state = exampleState();
+  state = logic.setKg(state, 0, 0, 100);
+  state = tickSet(state, 0, 0, 30);
+  state = logic.toggleWarmup(state, 0);
+  state = logic.duplicateExercise(state, 0);
+  assert.deepEqual(state.x.map((x) => x.n), ["belt squat", "belt squat", "pull up"]);
+  const copy = state.x[1];
+  assert.equal(copy.id, 3);
+  assert.equal(copy.p, null);
+  assert.equal(copy.warmup, true);
+  assert.deepEqual(copy.sets.map((set) => [set.reps, set.kg, set.done]),
+                   [[6, 100, false], [6, 140, false], [6, 140, false]]);
+});
+
 test("a timer reset brings Start back, and the ticked sets are measured from the new start", () => {
   // Start at 17:50 by mistake, a set ticked at 18:05, then the timer reset.
   const early = new Date(2026, 8, 24, 17, 50, 0).getTime();

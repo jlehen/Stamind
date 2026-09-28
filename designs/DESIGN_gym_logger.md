@@ -22,9 +22,24 @@ page saves its state on the phone, so a closed Telegram reopens where it left of
 
 Each card has an "Insert" button. It puts the new exercise right after that card, so a
 face pull added after the rows does not have to climb up from the bottom one tap at a time.
-The button that puts another exercise in a card's place is "⇆ Swap". The card's
-seven buttons (↶, + Set, − Set, Swap, Insert, Del, Pic) sit in two rows of four, so their
-labels stay short.
+The button that puts another exercise in a card's place is "⇆ Swap". "❐ Dup" puts a copy
+of the card right after it: the same exercise, its sets with the reps and kilograms they
+show now, none ticked. Like an inserted card, the copy stands for no line of the session.
+The card's eight buttons (↶, + Set, − Set, Swap, Insert, Dup, Del, Pic) sit in two rows of
+four, so their labels stay short. Each number box says what it holds, "reps" or "kg", under
+the number.
+
+A warm-up has its own card. The strength planner writes it as a lighter entry of the same
+exercise ahead of the main sets (`stamind/strength/progression.md`), and the page draws one
+card per entry. A line at the top of the page says so, and each card carries a tag,
+"Warm-up" or "Main", that a tap switches. Here is an example. It is Thursday, and the
+session holds "Belt squat 1×5 @ 120, 3×4–6 @ 140" and a leg press at 200 kg. The 120 kg
+card opens as "Warm-up", because a heavier belt squat card exists; the other two open as
+"Main". The athlete wants a warm-up on the leg press too. They tap Dup on it, lower the
+copy to 100 kg, move it up, and tap its tag to make it "Warm-up". The tag stays on the page
+and in the Markdown export: the log does not carry it, since the comparison already shows a
+light set that fits no written line as an extra, never as a miss
+(DESIGN_strength_planned_vs_done.md §3).
 
 A tap can be taken back. The header's "Undo" takes back the last change anywhere on the
 page, one step per tap, up to the last 50. Each card also has its own ↶ among its
@@ -56,6 +71,12 @@ After the last set the athlete taps "Finish". The page sends one text message of
 `sm strength ingest <file>`. The CLI stores the sets as if Garmin had recorded them with
 every set named, and replies with a summary: what was done, and where it departed from
 what was written.
+
+When Telegram takes the log it closes the page. A page still open two seconds after Finish
+shows the log with a "Retry" button and a "Copy" button, and says the log may not have
+reached the bot. A slow phone can still be closing, so the log may well have arrived; a
+second send is safe, because the bot keeps the last one. A log copied from the sheet and
+pasted in the chat reaches the bot the same way as a sent one (§6).
 
 Finish stops the clock, and the page keeps the log. In the changing room the athlete
 notices a mistyped weight, opens the page again from the same button, fixes it and taps
@@ -184,6 +205,9 @@ an evening pull would delete the log before the next morning's takeover.
   the chat is allowed, writes the data to `<data_dir>/gym_logs/<date>-<hhmmss>.json`, and
   runs `strength ingest <file>` through `_start_command`, so the summary reaches the chat
   the way every command's output does.
+- A typed message that starts with `{` is a log the athlete copied from the page and
+  pasted (§1). It goes the same way as the page's own message. A broken paste gets the
+  ingest's own error in the chat.
 
 ## 7. Not decided here
 

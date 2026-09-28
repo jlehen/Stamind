@@ -161,6 +161,11 @@ class MessagesMixin:
             await message.reply_text(BUSY_NOTICE)
             return
 
+        # A log the page could not send, copied from it and pasted (DESIGN_gym_logger.md §6).
+        if text.startswith("{"):
+            await self._ingest_gym_log(chat.id, text)
+            return
+
         # About to act on the athlete's own message: what changed in their week goes first.
         await self._tell_changes_first(chat.id)
 
@@ -252,6 +257,10 @@ class MessagesMixin:
             await self._start_command(chat.id, ["plan", "show", "--macrocycle", str(plan)])
             return
 
+        await self._ingest_gym_log(chat.id, data)
+
+    async def _ingest_gym_log(self, chat_id: int, data: str) -> None:
+        """The gym log, sent by the page or pasted in the chat, handed to `strength ingest`."""
         path = self._write_gym_log(data)
-        self._log(chat.id, "  ", f"gym log: {path}")
-        await self._start_command(chat.id, ["strength", "ingest", path])
+        self._log(chat_id, "  ", f"gym log: {path}")
+        await self._start_command(chat_id, ["strength", "ingest", path])

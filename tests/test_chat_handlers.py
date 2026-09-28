@@ -181,6 +181,17 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
         with open(argv[2], encoding="utf-8") as handle:
             self.assertEqual(handle.read(), self.LOG)
 
+    async def test_a_log_pasted_in_the_chat_goes_to_the_ingest_too(self):
+        """Telegram did not close the page, so the athlete copied the log and pasted it in
+        the chat. It lands where a sent one does (DESIGN_gym_logger.md §6)."""
+        chat_bot = build_chat_bot(self, ui="simple")
+        started = record_commands(self, chat_bot)
+        update, _replied = message_update(text=self.LOG)
+        await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
+        self.assertEqual([s[1][:2] for s in started], [["strength", "ingest"]])
+        with open(started[0][1][2], encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), self.LOG)
+
     async def test_an_unlisted_chat_is_refused_and_nothing_is_written(self):
         chat_bot = build_chat_bot(self, allowed=(42,))
         started = record_commands(self, chat_bot)

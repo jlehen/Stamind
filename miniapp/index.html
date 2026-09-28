@@ -32,7 +32,10 @@
   </div>
 </header>
 
-<!-- The coach's note scrolls away: only the title, the date and the rest timer stay pinned. -->
+<!-- The coach's note scrolls away: only the title, the date and the rest timer stay pinned.
+     A warm-up is its own card, a lighter entry of the same exercise (DESIGN_gym_logger §1). -->
+<p class="head-notes">Warm-up sets have their own card, before the main sets. Tick a warm-up
+  set there, not as an extra set on the main card.</p>
 <p class="head-notes" id="head-notes" hidden></p>
 
 <main id="cards"></main>
@@ -73,6 +76,7 @@
     <p class="sheet-hint" id="output-hint" hidden></p>
     <p class="sheet-note" id="output-note"></p>
     <textarea class="output" id="output-text" readonly rows="6"></textarea>
+    <button class="wide primary" id="output-retry" type="button" hidden>Retry</button>
     <button class="wide primary" id="output-copy" type="button">Copy</button>
   </div>
 </div>

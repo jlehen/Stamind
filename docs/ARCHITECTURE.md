@@ -4302,8 +4302,9 @@ the same "still running" line when a command is already going in that chat. A me
 the calendar sent goes elsewhere ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)).
 Otherwise it writes the message verbatim to `<data_dir>/gym_logs/<date>-<hhmmss>.json` and runs
 `strength ingest <that file>` through `_start_command`, so the summary streams into the
-chat the way every command's output does. The bot parses nothing itself: every write goes
-through the CLI.
+chat the way every command's output does. A typed message that starts with `{` is a log
+pasted from the page after a send that did not close it, and `on_message` hands it to the
+same `_ingest_gym_log`. The bot parses nothing itself: every write goes through the CLI.
 
 **The ingest.** `strength ingest FILE` parses the log, then writes three things. It upserts
 the placeholder activity `log:<date>` in `completed_activities` — `activity_type =

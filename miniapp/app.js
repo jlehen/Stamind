@@ -45,6 +45,7 @@ const ui = {
   outputNote: document.getElementById("output-note"),
   outputText: document.getElementById("output-text"),
   outputCopy: document.getElementById("output-copy"),
+  outputRetry: document.getElementById("output-retry"),
   outputClose: document.getElementById("output-close"),
 };
 
@@ -52,10 +53,11 @@ const ui = {
 const LIMIT = logic.MAX_LOG_BYTES.toLocaleString("en-US");
 
 // How long the page waits for Telegram to take the log and close the app, and what it says
-// when that does not happen.
-const SEND_WATCHDOG_MS = 600;
-const SEND_FAILED = "Telegram did not take the log. Copy it and send it to the bot as a "
-  + "message.";
+// when that does not happen. A slow phone can still be closing, so the words allow for a log
+// that did arrive, and Retry is safe because the bot replaces the earlier log (§1).
+const SEND_WATCHDOG_MS = 2000;
+const SEND_FAILED = "Telegram has not closed the page, so the log may not have reached the bot. "
+  + "Tap Retry. Sending twice is safe: the bot keeps the last one.";
 
 let catalog = [];
 // The exercises whose photos are open. Not saved: they close when the page reloads.
@@ -238,7 +240,15 @@ function exerciseCard(exercise, xi) {
   const head = el("div", "card-head");
   const name = el("div", "card-name");
   name.append(el("div", "card-title", logic.capitalise(exercise.n)));
-  name.append(el("div", "card-pres", logic.prescriptionLine(exercise)));
+  const line = el("div", "card-line");
+  const kind = button(exercise.warmup ? "Warm-up" : "Main",
+    exercise.warmup ? "kind warmup" : "kind", () => apply(logic.toggleWarmup(state, xi), id));
+  kind.setAttribute("aria-label", exercise.warmup
+    ? "Warm-up sets, tap to mark them as the main sets"
+    : "Main sets, tap to mark them as warm-up sets");
+  line.append(kind);
+  line.append(el("span", "card-pres", logic.prescriptionLine(exercise)));
+  name.append(line);
   head.append(name);
   const moves = el("div", "moves");
   moves.append(button("↑", "move", () => apply(logic.moveExercise(state, xi, -1))));
@@ -270,6 +280,7 @@ function exerciseCard(exercise, xi) {
   tools.append(button("− Set", "pill", () => apply(logic.removeSet(state, xi), id)));
   tools.append(button("⇆ Swap", "pill", () => openSearch("swap", xi)));
   tools.append(button("⤵ Insert", "pill", () => openSearch("insert", xi)));
+  tools.append(button("❐ Dup", "pill", () => apply(logic.duplicateExercise(state, xi))));
   tools.append(button("✕ Del", "pill danger", () => apply(logic.removeExercise(state, xi))));
   if (photos.length) {
     const label = photosOpen.has(exercise.n) ? "📷 Hide" : "📷 Pic";
@@ -345,7 +356,11 @@ function stepper(spec) {
   field.setAttribute("aria-label", spec.unit);
   field.addEventListener("focus", () => field.select());
   field.addEventListener("change", () => spec.onType(field.value, field));
-  box.append(field);
+  // The unit under the number, so reps and kilograms cannot be told apart by position only.
+  const middle = el("label", "num-box");
+  middle.append(field);
+  middle.append(el("span", "unit", spec.unit));
+  box.append(middle);
   box.append(button("+", "step", spec.onPlus));
   return box;
 }
@@ -457,8 +472,8 @@ function onFinish() {
   if (inTelegram) {
     try {
       tg.sendData(result.text);
-      // A taken message closes the app, so a page still here after 600 ms means the log
-      // never left, and the athlete gets the same sheet to copy from.
+      // A taken message closes the app, so a page still here after the wait may mean the log
+      // never left, and the athlete gets Retry and the same sheet to copy from.
       window.setTimeout(() => showOutput(result, SEND_FAILED), SEND_WATCHDOG_MS);
       return;
     } catch (problem) {
@@ -470,13 +485,15 @@ function onFinish() {
 
 function showOutput(result, hint) {
   showSheet("Your log", result.text, `${result.bytes} bytes of the ${LIMIT} Telegram allows. `
-    + "Copy this into a file and run: sm strength ingest <file>", hint);
+    + "You can also copy it and paste it in the chat with the bot.", hint);
 }
 
 function showSheet(title, text, note, hint) {
   ui.outputTitle.textContent = title;
   ui.outputHint.textContent = hint || "";
   ui.outputHint.hidden = !hint;
+  // The hint is the failed send's, so Retry comes with it (§1).
+  ui.outputRetry.hidden = !hint;
   ui.outputNote.textContent = note;
   ui.outputText.value = text;
   ui.outputCopy.textContent = "Copy";
@@ -595,6 +612,10 @@ function wire() {
   ui.searchClose.addEventListener("click", closeSearch);
   ui.outputClose.addEventListener("click", () => { ui.outputSheet.hidden = true; });
   ui.outputCopy.addEventListener("click", copyOutput);
+  ui.outputRetry.addEventListener("click", () => {
+    ui.outputSheet.hidden = true;
+    onFinish();
+  });
 }
 
 function wireTelegram() {

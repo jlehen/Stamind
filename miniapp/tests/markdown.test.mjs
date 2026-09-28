@@ -61,3 +61,8 @@ test("after a set is ticked, the export holds the ticked sets, notes and the tim
     "",
   ].join("\n"));
 });
+
+test("a card marked as a warm-up says so in the export", () => {
+  const state = logic.toggleWarmup(logic.newState(SESSION), 2);
+  assert.match(toMarkdown(state, START), /^- Leg extension \(warm-up\): 2x15 \(45 kg\)$/m);
+});
