@@ -1167,6 +1167,13 @@ writes its own, so Thursday's intervals are held and stand. `workout generate --
 clean slate that kept Thursday's kilograms because the week planner wrote the same brief
 again would not be one.
 
+Amended 2026-09-28: `workout generate --strength-only` leaves today out only when today's
+gym is already done. It is Monday September 28. The athlete ran at 07:00 and the gym is at
+18:00. Run at noon, the command writes tonight's gym: it can change no other session, so the
+run says nothing about whether the gym still needs writing. Had the athlete lifted at 07:00
+instead, today's gym would be history and the span would open on Tuesday, the way
+`workout generate` leaves a finished day alone.
+
 Nothing else changes in how a check is applied. The answer is still compared with the
 stored rows as a list, and the evidence rule below still decides whether it is applied, so
 a kept session's exercises cannot change on a morning with no new lifting and no new brief.

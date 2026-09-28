@@ -23,7 +23,8 @@ from stamind.clock import today_str as _today_str
 
 class MatchingMixin:
     def _today_workout_completed(
-        self, today_str: str, completed_activities: List[Dict[str, Any]]
+        self, today_str: str, completed_activities: List[Dict[str, Any]],
+        sport: Optional[str] = None,
     ) -> bool:
         """Returns True when today's planned session has a matching completed activity.
 
@@ -33,6 +34,9 @@ class MatchingMixin:
         window so it uses the exact same planned-vs-completed sport matching as the rest
         of the app. A day counts as completed only when a non-rest planned workout for
         today is paired with an activity; rest days and empty days have nothing to protect.
+
+        `sport` counts today's sessions of that canonical sport only. The whole day is
+        still paired, so the run's activity goes to the run (DESIGN_strength_tracking.md §9).
         """
         planned = [
             w for w in self._db.get_workouts(start_date=today_str, end_date=today_str)
@@ -48,7 +52,13 @@ class MatchingMixin:
             history_days=1,
             minor_activity_load_threshold=config.minor_activity_load_threshold,
         )
-        return any(r['completed'] for r in matching)
+        for result in matching:
+            if not result['completed']:
+                continue
+            if sport and canonical_sport(result['planned']['sport_type']) != sport:
+                continue
+            return True
+        return False
 
     def _rejected_matches(self) -> set:
         """The `(activity_id, sport)` pairings the athlete has said are NOT that session."""

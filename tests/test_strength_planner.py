@@ -551,6 +551,39 @@ class ThroughGenerateTest(_PlannerCase):
             coach_service.workout_generate(fresh=True)
         self.assertIn(planner_prompt.ASKED_AGAIN, self.asked[0][1])
 
+    def test_a_run_done_this_morning_leaves_tonights_gym_to_write(self):
+        """Today holds a run and a gym. The run is done at 07:00, the gym is tonight, and
+        it was written before phase 2, so it has no prescribed sets (§9)."""
+        save_workout(test_db, TODAY, "running", "Easy Run", duration_minutes=40)
+        self.gym(TODAY, title="Evening Circuit", duration=15,
+                 brief="[Evening Circuit]\nGoblet squat, row, dead-bug. 4 rounds.")
+        test_db.save_completed_activity(
+            "act_run", TODAY, f"{TODAY} 07:00:00", "Morning Run", "running",
+            2400.0, 6.0, None, 140, 155, 3, 28.0,
+        )
+        self.replies = [{"sessions": [
+            answer(TODAY, row("goblet squat", 4, 8, 12, 12.0)),
+            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0), reason="Same."),
+        ]}]
+        proposal = self.strength_only()
+        self.assertEqual(proposal.range_start, TODAY)
+        self.assertIn((TODAY, "running"), proposal.held)
+        gym = test_db.get_workout(TODAY, "strength_training")
+        self.assertEqual([r["exercise"] for r in gym["prescribed_sets"]], ["goblet squat"])
+
+    def test_a_gym_done_this_morning_is_left_as_history(self):
+        self.gym(TODAY, row("goblet squat", 4, 8, 12, 12.0), title="Morning Circuit",
+                 duration=15)
+        test_db.save_completed_activity(
+            "act_gym", TODAY, f"{TODAY} 07:00:00", "Strength", "strength_training",
+            900.0, 0.0, None, 110, 130, 5, 11.0,
+        )
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0), reason="Same."),
+        ]}]
+        proposal = self.strength_only()
+        self.assertEqual(proposal.range_start, "2026-09-16")
+
 
 class RecordingTest(_PlannerCase):
     def test_the_check_row_holds_the_stamp_the_history_was_built_from(self):

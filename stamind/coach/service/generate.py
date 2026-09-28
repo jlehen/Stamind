@@ -424,9 +424,11 @@ class WorkoutGenMixin:
         sessions of their dates."""
         today_str = _today_str()
         start = max(start_date, today_str)
-        # Today's session already done is history, as in `workout_generate`.
+        # Today's gym already done is history; the day's other sessions do not count (§9).
         done_today = self._db.get_completed_activities(start_date=today_str, end_date=today_str)
-        if start == today_str and self._today_workout_completed(today_str, done_today):
+        if start == today_str and self._today_workout_completed(
+            today_str, done_today, sport=strength_planner.STRENGTH
+        ):
             start = (date.fromisoformat(today_str) + timedelta(days=1)).isoformat()
         span = self._db.get_workouts(start_date=start, end_date=end_date)
         strength = strength_planner.run(

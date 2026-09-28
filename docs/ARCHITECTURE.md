@@ -1036,7 +1036,9 @@ called by the UIs.
   No week planner call: the strength planner writes every strength session of the span
   again (`write_again`), and the ones whose sets changed come back as a `RevisionProposal`
   of kind `generate`, the other sessions of their dates held, for `workout_revision_apply`
-  (DESIGN_strength_tracking.md §9).
+  (DESIGN_strength_tracking.md §9). The span opens tomorrow only when today's strength
+  session already has a matching completed activity (`_today_workout_completed` with
+  `sport`); a run done that morning leaves tonight's gym in the span.
 - **`plan_apply(objective_id, strategy, mesocycles, fingerprints=None)`** — persists an
   already-generated strategy + mesocycles, returning the goal id it saved under.
   `fingerprints` are the goals/constraints/config hashes and snapshots taken when the
