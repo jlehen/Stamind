@@ -159,12 +159,13 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.data_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.data_dir, True)
-        patcher = mock.patch.dict(config.data, {"data_dir": self.data_dir})
+        patcher = mock.patch.dict(
+            config.data, {"data_dir": self.data_dir, "logging": {"dir": "logs"}})
         patcher.start()
         self.addCleanup(patcher.stop)
 
     def gym_logs(self):
-        return os.path.join(self.data_dir, "gym_logs")
+        return os.path.join(self.data_dir, "logs", "gym_logs")
 
     async def test_the_log_is_written_to_a_file_the_ingest_is_then_given(self):
         chat_bot = build_chat_bot(self)

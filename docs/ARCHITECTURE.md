@@ -2586,7 +2586,7 @@ but the credentials is optional and falls back to the default shown:
 | `data_dir`             | str  | Directory every relative path key below resolves against, replacing the config file's directory as the base; itself config-file-relative. Absent → the config file's directory (the pre-`data_dir` rule) |
 | `database`             | str  | SQLite file this instance operates on; a relative value resolves against the config file's directory / `data_dir:` (default: `stamind.db`) |
 | `science_dir`          | str  | Directory whose `*.md` files become the ATHLETE-PROVIDED science section in every coaching prompt (`coach/formatting.py:_load_science_guidelines`); a relative value resolves against the config file's directory (default: `science`). The app's own `stamind/science/` is not configurable |
-| `logging.dir`          | str  | Root of the two operator log directories — `runs/` (the journal, read with `sm journal`) and `llm_exchanges/` (the full prompts). Relative to the config file's directory, like `database:` (default: `logs`). DESIGN_logging.md §6 |
+| `logging.dir`          | str  | Root of the operator log directories — `runs/` (the journal, read with `sm journal`), `llm_exchanges/` (the full prompts) and `gym_logs/` (each gym logger message, as `strength ingest` was given it). Relative to the config file's directory, like `database:` (default: `logs`). DESIGN_logging.md §6 |
 | `logging.level`        | str  | Lowest level that reaches the journal file: `debug`\|`info`\|`warn`\|`error` (default `info`). `debug` turns on the records for exceptions the app deliberately swallows on screen |
 | `logging.retain_days` / `logging.retain_exchange_days` | int | Days each directory keeps (default 90 each). The sweep runs at most once a UTC day, off the first command to finish; `sm journal prune` forces one |
 | `llm.router_model`     | str  | Cheaper model the bot's free-text router (`sm bot route`) and its capture extractions (`sm bot capture`) use; a role, not a `settings list coach-model` entry. Absent → the active coaching model (DESIGN_bot_simple_frontend.md §5.4, §12.2) |
@@ -4300,7 +4300,7 @@ text, so `keyboard_action` never sees the label (DESIGN_gym_logger.md §6).
 `ChatBot.on_web_app_data` checks the allowlist the way `on_message` does, and defers with
 the same "still running" line when a command is already going in that chat. A message
 the calendar sent goes elsewhere ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)).
-Otherwise it writes the message verbatim to `<data_dir>/gym_logs/<date>-<hhmmss>.json` and runs
+Otherwise it writes the message verbatim to `logs/gym_logs/<date>-<hhmmss>.json` and runs
 `strength ingest <that file>` through `_start_command`, so the summary streams into the
 chat the way every command's output does. A typed message that starts with `{` is a log
 pasted from the page after a send that did not close it, and `on_message` hands it to the

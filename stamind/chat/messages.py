@@ -32,7 +32,7 @@ from stamind.sentinels import prompt_answer
 # a typed message, or the Mini App's data message.
 BUSY_NOTICE = "A command is still running. Use the buttons above, or /cancel."
 
-# Where the page's message is kept, under the instance's data_dir, so `strength ingest`
+# Where the page's message is kept, under the instance's logging.dir, so `strength ingest`
 # reads a file like any other (DESIGN_gym_logger.md §6).
 GYM_LOG_DIR = "gym_logs"
 
@@ -207,9 +207,9 @@ class MessagesMixin:
         await self._start_command(chat.id, argv)
 
     def _write_gym_log(self, data: str) -> str:
-        """Keeps the page's message as a file under `<data_dir>/gym_logs/`, named for the
+        """Keeps the page's message as a file under `logs/gym_logs/`, named for the
         moment it arrived, and returns its path (DESIGN_gym_logger.md §6)."""
-        folder = os.path.join(config.data_dir, GYM_LOG_DIR)
+        folder = os.path.join(config.logging_dir, GYM_LOG_DIR)
         os.makedirs(folder, exist_ok=True)
         stamp = clock.now()
         path = os.path.join(

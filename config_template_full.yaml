@@ -95,8 +95,9 @@ llm:
 # the app never reads them back to make a decision (DESIGN_logging.md §2.1). Every key has
 # a working default, so leaving the whole section out behaves exactly as shown.
 #logging:
-#  # Where those two directories go. Relative paths resolve like `database:` above, so a
-#  # second instance keeps its own logs. Default logs/ beside the config.
+#  # Where those two directories go, with gym_logs/ (the gym logger's messages). Relative
+#  # paths resolve like `database:` above, so a second instance keeps its own logs.
+#  # Default logs/ beside the config.
 #  #dir: "logs"
 #  # Lowest level that reaches the journal file: debug | info | warn | error.
 #  # `debug` additionally records the exceptions the app catches and hides on screen.

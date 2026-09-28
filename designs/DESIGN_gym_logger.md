@@ -202,7 +202,7 @@ an evening pull would delete the log before the next morning's takeover.
   "🏋️ Log Thursday's gym"), a `KeyboardButton(text, web_app=WebAppInfo(url))`. Otherwise
   the keyboard is what it is today.
 - A `MessageHandler(filters.StatusUpdate.WEB_APP_DATA, ...)` receives the log. It checks
-  the chat is allowed, writes the data to `<data_dir>/gym_logs/<date>-<hhmmss>.json`, and
+  the chat is allowed, writes the data to `logs/gym_logs/<date>-<hhmmss>.json`, and
   runs `strength ingest <file>` through `_start_command`, so the summary reaches the chat
   the way every command's output does.
 - A typed message that starts with `{` is a log the athlete copied from the page and
