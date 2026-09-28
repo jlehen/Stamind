@@ -20,8 +20,7 @@ from stamind.cli.plans.generate import print_plan_generate_preview
 from stamind.cli.plans.show import print_plan
 from stamind.cli.progress import print_progress_report
 from stamind.cli.queue import (
-    print_closed_queue_list, print_queue_acted, print_queue_list, queue_chat_message,
-    queue_hint_lines,
+    print_closed_queue_list, print_queue_acted, print_queue_list, queue_hint_lines,
 )
 from stamind.cli.runway import runway_hint_lines
 from stamind.cli.render.calendar_grid import month_lines
@@ -318,13 +317,6 @@ class ExpertRenderer:
 
     def queue_closed_list(self, items: List[Dict[str, Any]], start: str, end: str) -> None:
         print_closed_queue_list(items, start, end)
-
-    def queue_message(
-        self, item: Dict[str, Any], left: Optional[int]
-    ) -> Tuple[str, List[dict]]:
-        """One queued item as a chat message: its text and its buttons
-        (DESIGN_athlete_queue.md §6.1)."""
-        return queue_chat_message(item, left)
 
     def queue_acted(self, item: Dict[str, Any], action: str, line: Optional[str]) -> None:
         print_queue_acted(item, action, line)

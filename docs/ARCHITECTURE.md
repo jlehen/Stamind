@@ -298,8 +298,8 @@ classes themselves.
     `progress`, the five adapt outcome lines, `goal list`, `plan show`, `workout
     generate`'s preview, the revision preview, `constraint rm`, the runway hint's
     silence, the adapt plan-behind refusal, the note-candidate confirms, `goal
-    add`/`edit`/`rm`, `settings set`, the plan-shaping and replan notices, the queue hint's silence and the queued item's
-    wording) and anything
+    add`/`edit`/`rm`, `settings set`, the plan-shaping and replan notices, the queue
+    hint's silence) and anything
     else falls back to the expert form (DESIGN_render_persona.md). Every command a tap
     can reach goes through it, which is what keeps expert command text — `plan
     generate`, `constraint edit --replan`, `goal edit --status active` — out of a chat
@@ -359,7 +359,8 @@ classes themselves.
     `sm bot route`, whose output nobody reads (DESIGN_output_verbosity.md §8, §8.6).
   - **The athlete queue:** a fifth one-way sentinel, `QUEUE_SENTINEL`/`emit_queue_item`
     (`\x1eSM-QUEUE {json}`), carries one queued question or message
-    (`stamind/athlete_queue.py`, DESIGN_athlete_queue.md). The bot sends it as a message
+    (`stamind/athlete_queue.py`, DESIGN_athlete_queue.md). Its text and buttons have one
+    form, `queue_chat_message` in `cli/queue.py` (§6.4). The bot sends it as a message
     of its own whose buttons carry all a tap needs — `q:<item id>:<action>:<walk start>` —
     so it stores nothing, replaces no `SM-BUTTONS` row and loses nothing on a restart. A
     tap runs the hidden `sm bot queue <id> <action> --since <walk start>`, which checks the

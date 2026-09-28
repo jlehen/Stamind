@@ -137,9 +137,9 @@ def _button_label(text: str) -> str:
     return capitalized(text)
 
 
-def queue_buttons(item: Dict[str, Any], skip: bool) -> List[dict]:
-    """An item's chat buttons: its answers, its drop when its kind has one, skip when
-    `skip`, and "Not now", which the bot turns into the three later choices (§6.2, §6.4)."""
+def queue_buttons(item: Dict[str, Any]) -> List[dict]:
+    """An item's chat buttons: its answers, its drop when its kind has one, and "Not now",
+    which the bot turns into the three later choices (§6.2, §6.4)."""
     kind = athlete_queue.kind_of(item)
     buttons = [
         {"label": _button_label(answer["label"]), "action": f"a{number}"}
@@ -151,24 +151,20 @@ def queue_buttons(item: Dict[str, Any], skip: bool) -> List[dict]:
         dropped = athlete_queue.drop_label(item)
         if dropped:
             buttons.append({"label": _button_label(dropped), "action": DROP})
-    if skip:
-        buttons.append({"label": "⏭ Skip", "action": SKIP})
     buttons.append({"label": NOT_NOW_LABEL, "action": QUEUE_NOT_NOW})
     return buttons
 
 
 def queue_chat_message(item: Dict[str, Any], left: Optional[int]) -> Tuple[str, List[dict]]:
-    """One item as the expert's chat message, skip included (§6.4). `left` counts the walk
-    from this item on, and None marks a reminder (§6.5)."""
-    text = athlete_queue.wording(item)
+    """One item as a chat message, in the companion's words and without skip (§6.4). `left`
+    counts the walk from this item on, and None marks a reminder (§6.5)."""
+    text = athlete_queue.wording(item, companion=True)
+    buttons = queue_buttons(item)
     if left is None:
-        return f"⏰ You asked me to come back to #{item['id']}:\n{text}", queue_buttons(
-            item, skip=True
-        )
-    shape = athlete_queue.kind_of(item).shape
-    emoji = "📬" if shape == MESSAGE else "🙋"
-    head = f"{emoji} {shape.capitalize()} #{item['id']} ({left} left)"
-    return f"{head}\n{text}", queue_buttons(item, skip=True)
+        return f"⏰ You asked me to come back to this:\n{text}", buttons
+    if athlete_queue.kind_of(item).shape == MESSAGE:
+        return f"📬 {text}", buttons
+    return f"🙋 Quick question ({left} left)\n{text}", buttons
 
 
 def print_queue_acted(item: Dict[str, Any], action: str, line: Optional[str]) -> None:
@@ -191,7 +187,7 @@ def send_item(item: Dict[str, Any], since: str, left: Optional[int]) -> None:
         runtime.render.queue_hint(*athlete_queue.waiting_counts())
         return
     athlete_queue.shown(item)
-    text, buttons = runtime.render.queue_message(item, left)
+    text, buttons = queue_chat_message(item, left)
     emit_queue_item(item["id"], text, buttons, since)
 
 

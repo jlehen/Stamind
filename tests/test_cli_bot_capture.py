@@ -18,7 +18,7 @@ import stamind_cli  # noqa: F401  (registers the bot parser)
 
 from stamind import athlete_queue, runtime
 from stamind.cli.bot import test_result
-from stamind.cli.render.plan_lines import simple_queue_message
+from stamind.cli.queue import queue_chat_message
 from stamind.config import config
 from stamind.sentinels import BUTTONS_SENTINEL
 from stamind.clock import today_str
@@ -576,7 +576,7 @@ class TestResultQuestionTest(_CaptureCase):
         return code, out
 
     def test_the_companion_asks_with_the_three_buttons(self):
-        text, buttons = simple_queue_message(self.item, 1)
+        text, buttons = queue_chat_message(self.item, 1)
         self.assertIn("“20-min FTP test” go? Tell me the number it gave you", text)
         self.assertEqual([b["label"] for b in buttons],
                          ["Tell me the number", "Nothing to record", "🕐 Not now"])

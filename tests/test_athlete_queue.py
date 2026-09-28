@@ -314,20 +314,14 @@ class ChatTest(_QueueCase):
         _, out, _ = run_cli(["bot", "queue", "--remind"])
         self.assertEqual(queue_lines(out), [])
 
-    def test_the_companion_has_no_skip_and_the_expert_does(self):
+    def test_a_chat_message_has_no_skip(self):
         """Skip and "after the others" differ in a way she cannot see (§6.4)."""
         self.ask("A")
-        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
-            _, out, _ = run_cli(["queue", "answer"])
-        [companion] = queue_lines(out)
         _, out, _ = run_cli(["queue", "answer"])
-        [expert] = queue_lines(out)
-        self.assertEqual([b["action"] for b in companion["buttons"]],
-                         ["a1", "a2", "a3", "d", "n"])
-        self.assertEqual([b["action"] for b in expert["buttons"]],
-                         ["a1", "a2", "a3", "d", "s", "n"])
-        self.assertEqual(companion["text"], "🙋 Quick question (1 left)\nYour A — what was it?")
-        self.assertEqual([b["label"] for b in companion["buttons"]][3:],
+        [sent] = queue_lines(out)
+        self.assertEqual([b["action"] for b in sent["buttons"]], ["a1", "a2", "a3", "d", "n"])
+        self.assertEqual(sent["text"], "🙋 Quick question (1 left)\nYour A — what was it?")
+        self.assertEqual([b["label"] for b in sent["buttons"]][3:],
                          ["Leave it unnamed", "🕐 Not now"])
 
     def test_a_typed_answer_asks_for_its_text(self):

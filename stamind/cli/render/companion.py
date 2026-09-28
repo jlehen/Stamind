@@ -23,7 +23,7 @@ from stamind.cli.render.plan_lines import (
     SIMPLE_NO_PLAN_LINE, simple_end_buttons, simple_end_note, simple_goal_line,
     simple_goal_lines, simple_mesocycle_buttons, simple_metric_words, simple_plan_lines,
     simple_plan_setup_line, simple_plan_shaping_line, simple_plan_wrapped_line,
-    simple_progress_lines, simple_queue_message, simple_runway_lines,
+    simple_progress_lines, simple_runway_lines,
 )
 from stamind.cli.render.session_lines import (
     SIMPLE_SESSION_RULE, simple_benchmark_question, simple_compare_lines, simple_day_lines,
@@ -339,11 +339,6 @@ class CompanionRenderer(ExpertRenderer):
     def queue_hint(self, questions: int, messages: int) -> None:
         """Draws nothing: the morning message brings the questions, and a hint about a
         command she cannot type is noise (DESIGN_athlete_queue.md §5.2)."""
-
-    def queue_message(
-        self, item: Dict[str, Any], left: Optional[int]
-    ) -> Tuple[str, List[dict]]:
-        return simple_queue_message(item, left)
 
     def queue_acted(self, item: Dict[str, Any], action: str, line: Optional[str]) -> None:
         """Only the kind's own line: the tapped message already shows her choice

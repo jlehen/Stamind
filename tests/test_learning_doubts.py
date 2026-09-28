@@ -16,7 +16,7 @@ import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before
 
 from stamind import athlete_queue, learning_doubts, runtime, settings
 from stamind.cli import queue as queue_cli
-from stamind.cli.render.plan_lines import simple_queue_message
+from stamind.cli.queue import queue_chat_message
 from stamind.coach.service import coach_service
 from stamind.coach.service import CoachService
 from stamind.sentinels import QUEUE_SENTINEL
@@ -245,7 +245,7 @@ class WordingTest(_DoubtCase):
         self.doubt()
         self.run_end()
         [item] = self.questions()
-        text, buttons = simple_queue_message(item, 1)
+        text, buttons = queue_chat_message(item, 1)
         self.assertEqual(text, (
             "🙋 Quick question (1 left)\n"
             "Something I've been assuming about you — tell me if it still fits: "

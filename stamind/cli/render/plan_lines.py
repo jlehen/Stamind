@@ -2,22 +2,20 @@
 (DESIGN_bot_simple_frontend.md §6).
 
 The other half of the line builders: goals, constraints, the plan and its mesocycles,
-the fitness summary, the end of the schedule, and the queue's question. Where
+the fitness summary, and the end of the schedule. Where
 `session_lines.py` says what a day holds, this says what the coach and the athlete have
 agreed and where it is going — and it takes the date words from there rather than
 spelling a day two ways."""
 import re
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from stamind import athlete_queue
 from stamind.config import config
 from stamind.analytics.runway import (
     RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN,
 )
 from stamind.text import capitalized, wrap_text
 from stamind.clock import days_between
-from stamind.cli.queue import queue_buttons
 from stamind.cli.runway import crossing_the_end, current_runway, runway_buttons
 from stamind.cli.render.session_lines import (
     simple_date_word, simple_span_words, simple_when, sport_emoji,
@@ -372,18 +370,3 @@ def simple_runway_lines(state: Dict[str, Any], today: str) -> List[str]:
         return [f"{lead} Next up is {obj['title']} ({when}) — that stretch gets set up "
                 f"from the computer, by {config.telegram_operator_name}."]
     return [f"{lead} {simple_plan_wrapped_line()}"]
-
-
-def simple_queue_message(
-    item: Dict[str, Any], left: Optional[int]
-) -> Tuple[str, List[dict]]:
-    """One queued item in the companion's words, without skip: its difference from "after
-    the others" does not fit in a sentence she can see (DESIGN_athlete_queue.md §6.4).
-    `left` counts the walk from this item on, and None marks a reminder (§6.5)."""
-    text = athlete_queue.wording(item, companion=True)
-    buttons = queue_buttons(item, skip=False)
-    if left is None:
-        return f"⏰ You asked me to come back to this:\n{text}", buttons
-    if athlete_queue.kind_of(item).shape == athlete_queue.MESSAGE:
-        return f"📬 {text}", buttons
-    return f"🙋 Quick question ({left} left)\n{text}", buttons
