@@ -69,9 +69,6 @@ The plan and the goals have a page of their own, "🎯 Goals & plan" (§3.7).
   activities, which grade. Each view words those facts in the voice it already has. The two
   must agree on the facts. They need not use the same words.
 
-Expert mode in Telegram has no reply keyboard, so it has no button. This is the same
-situation as the gym logger (DESIGN_gym_logger.md §7). Not handled here.
-
 ## 3. What the page shows
 
 ### 3.1 The day cell
@@ -533,7 +530,6 @@ to Telegram's own parameters, the tint and its depth, and the two-session rule.
 - **Offline.** The data is in the address, but the page's files come from GitHub Pages.
   With no connection, the page opens only while Telegram still holds its files. Google
   Calendar stays the offline view.
-- **Expert mode in Telegram** has no keyboard, so no button (§2).
 - **A long constraint** marks every day it covers. A five-week "no long climb nearby" puts
   a diamond on 35 days. It is true on each of them, so it stays.
 - **A terminal that draws an emoji one column wide** shifts that row of the grid. If it

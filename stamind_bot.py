@@ -1,9 +1,11 @@
 """Stamind Telegram front-end — the launcher.
 
-A chat shim over the existing CLI: each incoming message is treated as a Stamind
-command line (the leading slash Telegram requires is optional) and run through
-``stamind_cli.py`` as a subprocess. Driving the real CLI keeps the bot in permanent
-parity with every command/flag the CLI gains, and isolates each invocation.
+A chat shim over the existing CLI: each incoming message becomes a Stamind command
+line, run through ``stamind_cli.py`` as a subprocess. A message that starts with a
+slash is that command line as typed; a keyboard label runs a fixed one, and any other
+text goes through the intent router (DESIGN_bot_simple_frontend.md). Driving the real
+CLI keeps the bot in permanent parity with every command/flag the CLI gains, and
+isolates each invocation.
 
 Interactive commands work over chat because the CLI is launched with
 ``STAMIND_FRONTEND=json``: its prompt broker (``stamind.prompt``) emits a
@@ -18,9 +20,7 @@ means, what the bot draws, what it sends back, and when the scheduler fires. The
 library is named in one file there, ``chat/telegram_api.py``, and imported only when it is
 called.
 
-``telegram.ui: simple`` (the default) is the companion persona — reply keyboard, intent
-router, morning scheduler, prose replies; ``expert`` is the raw CLI; ``/ui`` flips it per-process
-(DESIGN_bot_simple_frontend.md). ``sm-bot`` supervises this process and relaunches it on
+``sm-bot`` supervises this process and relaunches it on
 ``stamind.chat.runner.RESTART_EXIT_CODE``, which is what ``/restart`` exits with.
 
 Run with: ``./sm-bot`` (or ``venv/bin/python stamind_bot.py``). Configure the token +

@@ -34,8 +34,8 @@ Fitness Thresholds:
 ```
 
 Three ways in: a command line for the operator, a read-only web dashboard, and
-a Telegram bot that either mirrors the CLI or, in **companion mode**, talks like
-a coach so an athlete who never wants to learn a command can still use it.
+a Telegram bot that talks like a coach, so an athlete who never wants to learn a
+command can still use it.
 
 ## Contents
 
@@ -57,7 +57,7 @@ a coach so an athlete who never wants to learn a command can still use it.
 
 Self-coached endurance athletes who wear a Garmin, keep their week in Google
 Calendar, and are comfortable running a command from a terminal. Through
-companion mode, also the people they set it up for: a partner or a friend who
+the Telegram bot, also the people they set it up for: a partner or a friend who
 wants a coach on their phone, not a command language.
 
 You need:
@@ -263,7 +263,7 @@ the two came. A time-in-zone table per sport follows, so a week where your easy
 days quietly drifted into tempo is visible even when the load number says
 everything went to plan.
 
-**The same week on a phone**, if the bot runs in companion mode. The morning
+**The same week on a phone**, through the Telegram bot. The morning
 message arrives by itself:
 
 ```
@@ -397,24 +397,19 @@ the CLI and the bot. Six tabs: Dashboard, Workouts, Progress, Benchmarks,
 Learnings and History. Each panel names the CLI command that would change it.
 
 **The Telegram bot** (`./sm-bot`) runs every message through the CLI as a
-subprocess, so it supports exactly what the CLI does. It has two personae,
-chosen per install with `telegram.ui:` in the config:
+subprocess, so it supports exactly what the CLI does. It is made for an athlete
+who does not want a command language. A persistent keyboard covers the daily
+surface: Today, Calendar (a month grid in a page), Done lately, Goals & plan (a
+timeline in a page), Progress, and Talk to me. Free text goes through a small
+intent router on a cheap model: "what's on today" shows the day, "I'm wrecked"
+goes to the coach, "no running until Friday" is saved as a constraint after a
+confirmation. The bot opens each day with a morning message and three buttons,
+and replies read as short prose rather than tables.
 
-- **Expert mode** (`telegram.ui: expert`) is a terminal in a chat window.
-  Every message is a command line, with or without the leading slash:
-  `/status`, `workout list -d 1w`, `/help workout`. Replies keep their column
-  alignment.
-- **Companion mode** (the default) is for an athlete who does not want
-  a command language. A persistent keyboard covers the daily surface: Today, Calendar
-  (a month grid in a page), Done lately, Goals & plan (a timeline in a page), Progress, and
-  Talk to me. Free text goes
-  through a small intent router on a cheap model: "what's on today" shows the
-  day, "I'm wrecked" goes to the coach, "no running until Friday" is saved as a
-  constraint after a confirmation. The bot opens each day with a morning message
-  and three buttons, and replies read as short prose rather than tables.
-  Typed commands still work. `/ui` flips the mode until the next restart.
+Typed commands still work: a message that starts with a slash is a command line,
+such as `/status`, `/workout list -d 1w` or `/help workout`.
 
-Setup for either mode:
+Setup:
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
 2. Message your bot once, then find your numeric chat id, for example via
@@ -425,7 +420,6 @@ Setup for either mode:
      bot_token: "123456789:ABCdef..."   # or set TELEGRAM_BOT_TOKEN
      allowed_chat_ids:
        - 123456789                      # only these chat ids may use the bot
-     # ui: expert                       # the raw CLI instead of companion mode
    ```
    `config_template.yaml` shows the morning push settings: when it fires, how
    late a missed one is still sent, and whether it runs the daily adaptation
@@ -462,7 +456,7 @@ The sections you must fill:
 - **`llm:`** has `api_key` (an `OPENROUTER_API_KEY` environment variable
   overrides it) and `models`, the list of OpenRouter models this install may
   use. The first entry is the default coach; `settings set coach-model`
-  switches at runtime. `router_model` names the cheap model companion mode
+  switches at runtime. `router_model` names the cheap model the bot
   routes chat with.
 - **`google:`** has `calendar_id`, the calendar your workouts are written to, and
   `service_account_file`, the JSON key used to authenticate.
@@ -711,7 +705,7 @@ config.
   it after planning, while Opus, like five others, adapted nothing in that
   scenario. The full measured comparison, with wall times, is in
   [docs/model_comparison_2026-08.md](docs/model_comparison_2026-08.md).
-- **The router** only classifies free-text chat messages in companion mode into
+- **The router** only classifies free-text chat messages into
   one of a dozen intents. A cheap, fast model is plenty. **The recommendation is
   Gemini Flash** (`google/gemini-3.5-flash`), set with `llm.router_model` or
   `settings set router-model`. Unset, the coach model routes too, which works

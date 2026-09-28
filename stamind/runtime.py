@@ -79,12 +79,9 @@ def _build_prompt():
 
 @_builder("render")
 def _build_render():
-    """The active voice: ExpertRenderer on a terminal and in the operator's chat,
-    CompanionRenderer under the simple bot, chosen from STAMIND_RENDER
-    (stamind.cli.render.make_renderer).
-
-    Transport and voice are two axes, so they stay two objects: expert-over-Telegram is
-    the operator's own daily surface (DESIGN_render_persona.md §2)."""
+    """The active voice: ExpertRenderer on a terminal, CompanionRenderer under the bot,
+    chosen from STAMIND_RENDER (stamind.cli.render.make_renderer,
+    DESIGN_render_persona.md §2)."""
     from stamind.cli.render import make_renderer
     return make_renderer()
 

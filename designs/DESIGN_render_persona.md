@@ -343,6 +343,12 @@ step.
 
 ## 8. The bot side (deferred)
 
+Amended 2026-09-28: no longer needed. The expert persona is removed
+(DESIGN_bot_simple_frontend.md §3), so the front-end has nothing to branch on and
+`ChatBot.simple_ui` is gone. Transport and voice stay two objects on `runtime`. The
+terminal uses a TTY with the expert voice. The bot uses the chat transport with the
+companion voice.
+
 The Telegram front-end branches on `simple_ui` about ten times: the reply keyboard, the
 wrap width, `<pre>` versus flowed replies, the help card, whether bare text goes to the
 router, whether the morning push fires, which menu is registered. These are the

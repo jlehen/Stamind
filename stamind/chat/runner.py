@@ -1,9 +1,9 @@
 """One CLI subprocess per chat, from launch to exit.
 
-A chat message is a Stamind command line, and the bot answers it by running
-`stamind_cli.py` as a child process. `Session` is that child plus the state needed to
-route a pending prompt's answer back into its stdin; `_drive` reads its stdout line by
-line, hands the sentinel frames to the senders in `replies.py` and sends the rest as prose.
+The bot answers a chat message by running `stamind_cli.py` as a child process. `Session` is
+that child plus the state needed to route a pending prompt's answer back into its stdin;
+`_drive` reads its stdout line by line, hands the sentinel frames to the senders in
+`replies.py` and sends the rest as prose.
 
 The child is launched with `STAMIND_FRONTEND=json`, so a `confirm`/`choose`/`text`
 prompt arrives as a framed request line instead of blocking on `input()`
@@ -47,6 +47,10 @@ RESTART_GRACE_SECONDS = 2.0
 # The note a /restart leaves under `data_dir` for the next worker: the chat to tell it is
 # back, with a keyboard the new code built (DESIGN_bot_restart.md §5.2).
 RESTART_NOTE = "restart_chat"
+
+# The bot sends prose the client flows itself, so the CLI wraps far past any real line
+# (DESIGN_bot_simple_frontend.md §6).
+WRAP_WIDTH = 900
 
 
 def leave_restart_note(chat_id: int) -> None:
@@ -99,8 +103,8 @@ def cli_env(
 ) -> Dict[str, str]:
     """Environment for a bot-driven CLI subprocess: structured prompts, no colour,
     unbuffered I/O (so prompt requests arrive before the child waits on stdin), and
-    the narrow wrap width phones want. `simple` opts commands into the companion
-    rendering (DESIGN_bot_simple_frontend.md §6).
+    the wrap width. `simple` opts commands into the companion rendering
+    (DESIGN_bot_simple_frontend.md §6).
 
     `source` is a parameter rather than a constant beside STAMIND_FRONTEND because
     this one function serves three callers with three different answers: a chat message
@@ -265,7 +269,7 @@ class RunnerMixin:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
-            env=cli_env(self._wrap_width(), simple=self.simple_ui, source=source),
+            env=cli_env(WRAP_WIDTH, simple=True, source=source),
             cwd=os.path.dirname(CLI_PATH),
         )
         session = Session(chat_id, proc, secrets.token_hex(4), quiet=quiet)

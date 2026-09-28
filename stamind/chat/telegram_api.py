@@ -163,14 +163,6 @@ def is_refusal(exc: BaseException) -> bool:
     return isinstance(exc, BadRequest)
 
 
-def drop_reply_keyboard():
-    """Tells the client to take the reply keyboard off the phone
-    (DESIGN_bot_simple_frontend.md §5.6)."""
-    from telegram import ReplyKeyboardRemove
-
-    return ReplyKeyboardRemove()
-
-
 def command_menu(commands):
     """Telegram's own command menu, from (name, description) pairs."""
     from telegram import BotCommand

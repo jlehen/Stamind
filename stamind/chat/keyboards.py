@@ -1,7 +1,7 @@
 """Every button the bot draws, and every tap it decodes.
 
-The reply keyboard the companion persona attaches to the chat and what each of its labels
-runs (DESIGN_bot_simple_frontend.md §5.1), and the inline rows raised over a command: a
+The reply keyboard the bot attaches to the chat and what each of its labels runs
+(DESIGN_bot_simple_frontend.md §5.1), and the inline rows raised over a command: a
 SM-BUTTONS offer, a prompt's choices, a queued item's answers, and the ✋ Stop button over
 an LLM wait (DESIGN_athlete_queue.md §6.2, DESIGN_bot_stop_button.md §3).
 
@@ -115,45 +115,8 @@ def gym_button(workouts: List[Workout], today: str) -> Optional[Tuple[str, Worko
 
 
 # --- What /start and /help say, and Telegram's own command menu ---
-
-WELCOME = (
-    "Stamind is connected. Send any CLI command — the leading slash is "
-    "optional.\n\n"
-    "Examples:\n"
-    "  /status\n"
-    "  /workout list --weeks 1\n"
-    "  /workout adapt -m \"tired today\"\n"
-    "  /plan show\n\n"
-    "Send /help for the full command list, or /help <command> (e.g. "
-    "/help workout) for a command's options.\n\n"
-    "When a command needs a decision (apply a plan, confirm a wipe) I'll show "
-    "buttons — tap one, or send /cancel to abort."
-)
-
-# Top-level command families surfaced in Telegram's command menu (set_my_commands).
-# Kept in sync by hand with the CLI's subparsers; purely cosmetic (any command
-# still works whether or not it's listed here).
-MENU_COMMANDS = [
-    ("status", "Athlete status, goals, recent metrics"),
-    ("progress", "Training progress timeline (add --chart for a PNG)"),
-    ("workout", "List/generate/adapt/tweak workouts"),
-    ("plan", "Show/generate periodization plans"),
-    ("goal", "Manage training goals"),
-    ("data", "Pull/show Garmin metrics & activities"),
-    ("signal", "Author daily signals"),
-    ("learnings", "Inspect coach learnings"),
-    ("constraint", "Manage directives the coach works around"),
-    ("settings", "Show/change preferences (model, timezone, morning push)"),
-    ("queue", "Questions and messages waiting for the athlete"),
-    ("ui", "Switch simple/expert chat UI (until restart)"),
-    ("cancel", "Abort the command awaiting your answer"),
-    ("restart", "Restart the bot process (picks up new code)"),
-    ("help", "Show command help"),
-]
-
-# --- Simple mode ("companion") cards — DESIGN_bot_simple_frontend.md §5 ---
-# What /start and /help say, beside MENU_COMMANDS. They name the buttons SIMPLE_KEYBOARD
-# draws, which is why they sit in this file rather than beside the handler that sends them.
+# The cards name the buttons SIMPLE_KEYBOARD draws, which is why they sit in this file
+# rather than beside the handler that sends them (DESIGN_bot_simple_frontend.md §5).
 
 SIMPLE_WELCOME = (
     "Hi! I'm your training coach 🏃\n\n"
@@ -181,8 +144,8 @@ SIMPLE_HELP = SIMPLE_WELCOME + (
     "adjusted."
 )
 
-# Simple mode trims the Telegram command menu to what the athlete needs; every CLI
-# command still works when typed with a leading slash.
+# The Telegram command menu lists only what the athlete needs; every CLI command still
+# works when typed with a leading slash.
 SIMPLE_MENU_COMMANDS = [
     ("cancel", "Stop what's running"),
     ("help", "What can I ask?"),
@@ -196,9 +159,9 @@ UI_STALE_TAP = "That offer expired — just send it again."
 BUSY_TAP = "One moment — still finishing the last thing. Tap again shortly."
 
 # --- The Stop button raised over an LLM wait (DESIGN_bot_stop_button.md §3) ---
-# One button, one meaning, the same in both personas: end the command the athlete is
-# watching wait. "Stopped." is all the reply claims, because a command that already
-# wrote something before this call keeps what it wrote (§6).
+# One button, one meaning: end the command the athlete is watching wait. "Stopped." is all
+# the reply claims, because a command that already wrote something before this call keeps
+# what it wrote (§6).
 STOP_LABEL = "✋ Stop"
 STOP_DONE = "Stopped."
 STOP_ALREADY_DONE = "That's already finished — nothing to stop."
@@ -212,16 +175,6 @@ def keyboard_action(text: str) -> Optional[Tuple[str, Optional[List[str]]]]:
         if stripped == label:
             return ("run", list(argv)) if argv else ("capture", None)
     return None
-
-
-def stale_keyboard_tap(text: str, simple_now: bool) -> bool:
-    """A companion label arriving while the persona is expert: the §5.1 keyboard lives
-    on the phone and outlives the process that attached it (§5.6)."""
-    return (
-        not simple_now
-        and not (text or "").startswith("/")
-        and keyboard_action(text) is not None
-    )
 
 
 def ui_callback_data(token: str, path: str) -> str:

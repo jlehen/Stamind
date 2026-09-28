@@ -4,8 +4,8 @@
 config.yaml, builds the client, wires the two update handlers, and then runs until a
 signal stops it. The five mixins it is assembled from — running a CLI subprocess, sending
 its output back, answering a message, answering a tap, and firing the scheduler — reach
-each other and their shared state through `self`: the live sessions, the current persona,
-the allowlist, and the client itself.
+each other and their shared state through `self`: the live sessions, the allowlist, and the
+client itself.
 
 Polling runs from start to shutdown, a command in flight or not, which is what lets a
 ✋ Stop tap or /cancel reach a command that is waiting on the coach
@@ -25,8 +25,8 @@ from stamind import calendar_days, clock, journal, runtime, settings
 from stamind.chat import runner, telegram_api
 from stamind.chat.callbacks import CallbacksMixin
 from stamind.chat.keyboards import (
-    CALENDAR_LABEL, GYM_SPORT, MENU_COMMANDS, PLAN_LABEL, SIMPLE_MENU_COMMANDS, gym_button,
-    gym_window_end, simple_keyboard_rows,
+    CALENDAR_LABEL, GYM_SPORT, PLAN_LABEL, SIMPLE_MENU_COMMANDS, gym_button, gym_window_end,
+    simple_keyboard_rows,
 )
 from stamind.chat.messages import MessagesMixin
 from stamind.chat.replies import RepliesMixin
@@ -60,9 +60,6 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
             )
         self.prompt_timeout = config.telegram_prompt_timeout
         self.command_timeout = config.telegram_command_timeout
-        # The persona starts from config but /ui may flip it live (§5.6, in-memory
-        # only), so everything derived from it is computed at use time, never captured.
-        self.simple_ui = config.telegram_ui == "simple"
 
         # First call into python-telegram-bot, and deliberately before anything else that
         # needs it: a missing install is answered with the line that fixes it, not with a
@@ -78,7 +75,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         )
 
         self.sessions: Dict[int, Session] = {}
-        # Simple-mode chat state: chats that just tapped "💬 Talk to me" (chat_id →
+        # Chat state: chats that just tapped "💬 Talk to me" (chat_id →
         # monotonic arm time, cleared after one message, /cancel or the prompt timeout);
         # the tap only keeps an unroutable message from bouncing (§5.2). Plus the live
         # SM-BUTTONS payload per chat (chat_id → (token, buttons), valid until replaced
@@ -101,12 +98,6 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         """True only when chat_id is on the allowlist. An empty allowlist authorizes
         no one, which is what an unconfigured instance gets."""
         return chat_id in self.allowed_ids
-
-    def _wrap_width(self) -> int:
-        # Simple mode sends prose the client flows itself, so hard-wrapping at phone
-        # width would only add ragged mid-sentence breaks — wrap far past any real
-        # line instead (§6).
-        return 900 if self.simple_ui else config.telegram_wrap_width
 
     def _gym_button(self) -> Optional[Tuple[str, str]]:
         """The gym button's label and the address it opens, or None when the `strength-logger`
@@ -135,11 +126,9 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
                 (PLAN_LABEL, plan_page.plan_url(cal, now)))
 
     def _keyboard(self):
-        """The §5.1 reply keyboard the companion attaches, rebuilt on every send so the
-        gym button follows the week and the pages carry a fresh snapshot
-        (DESIGN_gym_logger.md §6, DESIGN_calendar_miniapp.md §5). Expert mode has none."""
-        if not self.simple_ui:
-            return None
+        """The §5.1 reply keyboard, rebuilt on every send so the gym button follows the week
+        and the pages carry a fresh snapshot (DESIGN_gym_logger.md §6,
+        DESIGN_calendar_miniapp.md §5)."""
         calendar, plan = self._page_buttons()
         return telegram_api.reply_keyboard(
             simple_keyboard_rows(self._gym_button(), calendar, plan)
@@ -185,14 +174,13 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
             if self.updater.running:
                 await self.updater.stop()
 
-    async def _set_command_menu(self, simple: bool) -> None:
-        """Swaps the list of commands Telegram offers in its own menu.
+    async def _set_command_menu(self) -> None:
+        """Sets the list of commands Telegram offers in its own menu.
 
         Purely cosmetic — every command works whether or not it is listed — so a failure
         is journalled and never stops the caller."""
-        commands = SIMPLE_MENU_COMMANDS if simple else MENU_COMMANDS
         try:
-            await self.bot.set_my_commands(telegram_api.command_menu(commands))
+            await self.bot.set_my_commands(telegram_api.command_menu(SIMPLE_MENU_COMMANDS))
         except Exception as exc:
             journal.debug("bot.event", f"command menu not updated: {exc}")
 
@@ -218,16 +206,16 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         async with self.application:
             # The opening work python-telegram-bot would have done through `post_init`,
             # which it runs only from `run_polling()` — the call this method replaces.
-            await self._set_command_menu(self.simple_ui)
+            await self._set_command_menu()
             await self.application.start()
             await self.updater.start_polling(
                 allowed_updates=telegram_api.all_update_types(),
                 error_callback=self._on_polling_error,
             )
             await self._say_back()
-            # Started whenever there is a chat to push to: the persona and the `push`
-            # setting are checked per tick inside the loop, so a /ui flip (§5.6) or a
-            # `settings set push off` turns it on and off live (DESIGN_settings.md §5).
+            # Started whenever there is a chat to push to: the `push` setting is checked
+            # per tick inside the loop, so a `settings set push off` turns it off live
+            # (DESIGN_settings.md §5).
             push_task = (asyncio.create_task(self._push_loop())
                          if self.push_chat_id is not None else None)
             await stop_event.wait()

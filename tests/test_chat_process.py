@@ -71,18 +71,10 @@ class ChunkTest(unittest.TestCase):
 
 
 class FormatReplyTest(unittest.TestCase):
-    def test_wraps_in_pre_and_escapes_html(self):
-        parts = replies.format_reply("a < b & c > d")
-        self.assertEqual(len(parts), 1)
-        self.assertTrue(parts[0].startswith("<pre>"))
-        self.assertTrue(parts[0].endswith("</pre>"))
-        self.assertIn("&lt;", parts[0])
-        self.assertIn("&amp;", parts[0])
-
-    def test_the_companion_sends_plain_prose(self):
+    def test_sends_plain_prose_and_escapes_html(self):
         """§6: the client flows it, so no <pre> and no column alignment to protect."""
-        parts = replies.format_reply("a < b", simple=True)
-        self.assertEqual(parts, ["a &lt; b"])
+        parts = replies.format_reply("a < b & c > d")
+        self.assertEqual(parts, ["a &lt; b &amp; c &gt; d"])
 
 
 class RestartTeardownTest(unittest.IsolatedAsyncioTestCase):
@@ -206,7 +198,7 @@ class StartupTest(unittest.TestCase):
 
 
 class CommandMenuTest(unittest.IsolatedAsyncioTestCase):
-    """Telegram's own command menu: set when the connection opens, swapped by `/ui`.
+    """Telegram's own command menu, set when the connection opens.
 
     python-telegram-bot fires a builder's `post_init` only from `run_polling()`, and
     `_serve` replaces that call (DESIGN_bot_restart.md §5.2), so the opening set has to be
@@ -215,22 +207,18 @@ class CommandMenuTest(unittest.IsolatedAsyncioTestCase):
     def test_the_menu_is_set_when_the_connection_opens(self):
         self.assertIn("_set_command_menu", front_end_functions()["_serve"])
 
-    async def test_each_persona_offers_its_own_list(self):
-        chat_bot = build_chat_bot(self, ui="simple")
-        await chat_bot._set_command_menu(True)
-        await chat_bot._set_command_menu(False)
-        self.assertEqual(
-            chat_bot.bot.menus,
-            [keyboards.SIMPLE_MENU_COMMANDS, keyboards.MENU_COMMANDS],
-        )
+    async def test_the_menu_is_the_athletes_short_list(self):
+        chat_bot = build_chat_bot(self)
+        await chat_bot._set_command_menu()
+        self.assertEqual(chat_bot.bot.menus, [keyboards.SIMPLE_MENU_COMMANDS])
 
     async def test_a_menu_that_will_not_update_is_not_an_error(self):
-        """Cosmetic: every command works whether or not it is listed, so a failed swap
-        must not take the persona switch down with it."""
-        chat_bot = build_chat_bot(self, ui="simple")
+        """Cosmetic: every command works whether or not it is listed, so a failed update
+        must not stop the bot from serving."""
+        chat_bot = build_chat_bot(self)
         with mock.patch.object(chat_bot.bot, "set_my_commands",
                                side_effect=RuntimeError("flood wait")):
-            await chat_bot._set_command_menu(True)
+            await chat_bot._set_command_menu()
 
 
 class SharedStateTest(unittest.TestCase):
@@ -245,14 +233,16 @@ class SharedStateTest(unittest.TestCase):
         chat_bot = build_chat_bot(self, allowed=())
         self.assertIsNone(chat_bot.push_chat_id)
 
-    def test_the_companion_wraps_far_past_any_real_line(self):
+    def test_every_command_speaks_the_companion_voice_and_wraps_far_past_any_line(self):
         """§6: the client flows the prose, so a phone-width wrap only adds ragged breaks."""
-        self.assertEqual(build_chat_bot(self, ui="simple")._wrap_width(), 900)
-        self.assertEqual(build_chat_bot(self, ui="expert")._wrap_width(), 48)
-
-    def test_only_the_companion_attaches_the_reply_keyboard(self):
-        self.assertIsNotNone(build_chat_bot(self, ui="simple")._keyboard())
-        self.assertIsNone(build_chat_bot(self, ui="expert")._keyboard())
+        self.assertIn(
+            "cli_env(WRAP_WIDTH, simple=True, source=source)",
+            front_end_functions()["_start_command"],
+        )
+        env = runner.cli_env(runner.WRAP_WIDTH, simple=True)
+        self.assertEqual(
+            (env["STAMIND_RENDER"], env["STAMIND_WRAP_WIDTH"]), ("simple", "900")
+        )
 
 
 class GymKeyboardTest(unittest.TestCase):
@@ -289,20 +279,20 @@ class GymKeyboardTest(unittest.TestCase):
 
     def test_a_gym_day_puts_the_button_above_the_usual_labels(self):
         self.a_gym_day(clock.today_str())
-        _kind, rows = build_chat_bot(self, ui="simple")._keyboard()
+        _kind, rows = build_chat_bot(self)._keyboard()
         label, url = rows[0][0]
         self.assertEqual(label, "🏋️ Log today's gym")
         self.assertTrue(url.startswith(logger.PAGE_URL + "#s="), url)
         self.assertEqual(rows[1:], self.plain_rows())
 
     def test_a_week_with_no_gym_day_keeps_the_plain_keyboard(self):
-        _kind, rows = build_chat_bot(self, ui="simple")._keyboard()
+        _kind, rows = build_chat_bot(self)._keyboard()
         self.assertEqual(rows, self.plain_rows())
 
     def test_with_the_setting_off_there_is_no_button_and_no_database_read(self):
         self.a_gym_day(clock.today_str())
         settings.write(settings.STRENGTH_LOGGER, "off")
-        chat_bot = build_chat_bot(self, ui="simple")
+        chat_bot = build_chat_bot(self)
         with mock.patch.object(self.db, "get_workouts") as never:
             _kind, rows = chat_bot._keyboard()
         self.assertEqual(rows, self.plain_rows())
@@ -320,7 +310,7 @@ class CalendarKeyboardTest(unittest.TestCase):
     def test_the_calendar_cell_opens_the_page_with_today_packed_in(self):
         save_workout(self.db, date=clock.today_str(), sport_type="running", title="Easy run",
                      duration_minutes=40)
-        _kind, rows = build_chat_bot(self, ui="simple")._keyboard()
+        _kind, rows = build_chat_bot(self)._keyboard()
         label, url = rows[0][1]
         self.assertEqual(label, keyboards.CALENDAR_LABEL)
         head, packed = url.split("#c=")
@@ -342,7 +332,7 @@ class BackAfterRestartTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.data_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.data_dir, True)
-        self.chat_bot = build_chat_bot(self, ui="simple")
+        self.chat_bot = build_chat_bot(self)
         patcher = mock.patch.dict(config.data, {"data_dir": self.data_dir})
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -372,7 +362,7 @@ class SendGuardTest(unittest.IsolatedAsyncioTestCase):
     (DESIGN_calendar_miniapp.md §6)."""
 
     def setUp(self):
-        self.chat_bot = build_chat_bot(self, ui="simple")
+        self.chat_bot = build_chat_bot(self)
         self.session = runner.Session(42, _FakeProc(), "n0nce")
         patcher = mock.patch("stamind.chat.replies.journal.record")
         self.journalled = patcher.start()
@@ -454,13 +444,13 @@ class SendingTest(unittest.IsolatedAsyncioTestCase):
     """What `replies.py` puts into the chat for a running command."""
 
     def setUp(self):
-        self.chat_bot = build_chat_bot(self, ui="expert")
+        self.chat_bot = build_chat_bot(self)
         self.session = runner.Session(42, _FakeProc(), "n0nce")
 
     async def test_a_flush_sends_the_buffer_and_notes_the_anchor(self):
         sent = await self.chat_bot._flush_output(self.session, ["one", "two"])
         self.assertTrue(sent)
-        self.assertEqual(self.chat_bot.bot.texts(), ["<pre>one\ntwo</pre>"])
+        self.assertEqual(self.chat_bot.bot.texts(), ["one\ntwo"])
         self.assertEqual(self.session.last_message_id, 101)
         self.assertTrue(self.session.sent)
 
@@ -538,29 +528,6 @@ class PollingModelTest(unittest.TestCase):
         )
         self.assertEqual(callers, ["_restart"])
 
-    def test_the_re_arm_is_silent_and_only_the_re_arm_is(self):
-        """§5.6: the tap's own answer is the feedback; a typed /ui still confirms. Read
-        from the source so every call site is covered, not just the two driven above."""
-        rearm, announced = [], []
-        for source in front_end_functions().values():
-            for node in ast.walk(ast.parse(source)):
-                if not isinstance(node, ast.If):
-                    continue
-                stale = any(
-                    _called_name(call) == "stale_keyboard_tap"
-                    for call in ast.walk(node.test) if isinstance(call, ast.Call)
-                )
-                for call in ast.walk(node):
-                    if not isinstance(call, ast.Call) or _called_name(call) != "_set_ui":
-                        continue
-                    silent = any(
-                        kw.arg == "announce" and kw.value.value is False
-                        for kw in call.keywords
-                    )
-                    (rearm if stale else announced).append(silent)
-        self.assertEqual(rearm, [True])
-        self.assertEqual(announced, [False])
-
     def test_a_failed_poll_is_reported_by_our_own_callback(self):
         self.assertIn("error_callback=self._on_polling_error", front_end_functions()["_serve"])
 
@@ -578,14 +545,6 @@ class PollingModelTest(unittest.TestCase):
         self.assertEqual(printed.call_count, 1)
         record.assert_called_once()
         self.assertEqual(record.call_args.kwargs["lvl"], "warn")
-
-
-def _called_name(call: ast.Call):
-    """The name a call names, whether it is `f()` or `self.f()`."""
-    func = call.func
-    if isinstance(func, ast.Attribute):
-        return func.attr
-    return getattr(func, "id", None)
 
 
 

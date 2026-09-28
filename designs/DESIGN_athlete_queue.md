@@ -298,6 +298,10 @@ In Telegram, the expert persona types the same commands. `queue list` and `queue
 answer in text. `queue answer` sends the first item as a message with buttons (§6.2) rather
 than waiting on a chooser.
 
+Amended 2026-09-28: the expert persona is removed (DESIGN_bot_simple_frontend.md §3). The
+same commands still work in the chat when typed with a leading `/`, and `queue answer`
+sends the item in the companion's words.
+
 ### 5.2 When the terminal reads the queue
 
 The terminal shows the queue in four places and never starts a walk on its own.
@@ -418,6 +422,9 @@ the questions she would happily answer.
 
 The expert persona in Telegram shows skip as well, like the terminal. Expert mode is exempt
 from the one-sentence rule.
+
+Amended 2026-09-28: the expert persona is removed (DESIGN_bot_simple_frontend.md §3), so no
+chat message shows skip. The terminal still does.
 
 ### 6.5 Reminders
 

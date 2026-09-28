@@ -534,21 +534,6 @@ class Config:
         return float(self.get("telegram", {}).get("send_retry_seconds", 180))
 
     @property
-    def telegram_wrap_width(self) -> int:
-        """Column width the CLI wraps prose to when driven by the bot (via the
-        STAMIND_WRAP_WIDTH env var). The CLI's terminal default is 80, which a
-        phone-width monospace message then double-wraps; ~48 fits portrait without
-        the client re-wrapping. Default 48."""
-        return int(self.get("telegram", {}).get("wrap_width", 48))
-
-    @property
-    def telegram_ui(self) -> str:
-        """Which persona the Telegram bot presents (DESIGN_bot_simple_frontend.md §3):
-        'simple' (default) adds the reply keyboard, free-text router, morning push and
-        simple rendering; 'expert' is the raw CLI-over-chat. Under `telegram:`."""
-        return str(self.get("telegram", {}).get("ui", "simple")).strip().lower()
-
-    @property
     def telegram_operator_name(self) -> str:
         """What the companion calls the human who runs the CLI (DESIGN_render_persona.md
         §5). "Coach" is already the app in the athlete's vocabulary, so the operator

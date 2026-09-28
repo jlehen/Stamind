@@ -38,8 +38,8 @@ class WrapAwareHelpFormatter(argparse.HelpFormatter):
 
     argparse keys its layout off an 80-col terminal: option help is indented to a
     fixed deep column (``max_help_position`` 24), which on a phone-width client
-    wastes most of every line on the gap between an option and its help. When the
-    Telegram bot drives the CLI it sets STAMIND_WRAP_WIDTH (~48); we pin the
+    wastes most of every line on the gap between an option and its help. A client
+    states its width in STAMIND_WRAP_WIDTH; we pin the
     total width to that and, once narrow, collapse the help column so each option's
     help sits on the next line at a shallow indent instead of far to the right.
     On a real terminal (default width) we defer entirely to argparse's familiar

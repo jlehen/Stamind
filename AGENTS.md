@@ -32,9 +32,9 @@
   general rule first and use the author's data only as a worked example.
 - Never infer a fact from noisy data (Garmin, a partial template match). Ask the human, or
   record it only from an authoritative source.
-- In companion (simple) mode, a difference between two paths that cannot be explained in one
-  sentence is a design bug. Collapse the behaviours; do not keep the affordance and write
-  better copy for it. Expert mode is exempt.
+- In the companion (the Telegram bot), a difference between two paths that cannot be
+  explained in one sentence is a design bug. Collapse the behaviours; do not keep the
+  affordance and write better copy for it. The CLI is exempt.
 - A destructive command defaults to the reversible action (archive) and keeps the hard
   cascade behind `--purge`. If the docs warn the reader off a default every time it is
   mentioned, the default is wrong; fix it rather than repeat the caveat.
@@ -165,8 +165,9 @@
 
   To run one file, put its name after `-p`, for example `-p "test_bot.py"`.
 - The suite is green when every test passes. A test must not read the operator's live
-  `config.yaml` (it runs in companion mode): pin what it depends on with `patch.dict` on
-  `config.data`, or with `as_instance` in `tests/helpers.py` for `telegram.ui`.
+  `config.yaml`: pin what it depends on with `patch.dict` on `config.data`. A test that
+  depends on where a run started, the terminal or the athlete's chat, pins it with
+  `started_from` in `tests/helpers.py`.
 - Do not decide you are done from a single-file run. Some modules never bind a test
   database of their own and rely on an earlier module in the full run having bound one, so
   alone they fail with "tests must not open the production database" — `test_dispatch.py`

@@ -14,7 +14,6 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import clock, runtime, settings
-from stamind.config import config
 
 # Nothing is sent after this hour: a change the bot could not send at the morning time
 # waits for the next morning (§4).
@@ -120,9 +119,7 @@ def sends_at(
 def waiting() -> List[Dict[str, Any]]:
     """The changes waiting to be told, oldest first, each carrying `touches_today`: whether
     it wrote a session dated today, which is what stops it waiting for the next morning
-    (§4). None outside companion mode, where the athlete is the operator (§2)."""
-    if config.telegram_ui != "simple":
-        return []
+    (§4)."""
     today = clock.now().strftime("%Y-%m-%d")
     changes = runtime.db.waiting_changes()
     for change in changes:

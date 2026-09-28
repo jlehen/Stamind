@@ -64,7 +64,7 @@ def reflect_due(now: "datetime.datetime") -> bool:
 
 
 async def scheduler_wake(
-    last_run: Dict[str, str], simple: bool, busy: Callable[[], bool],
+    last_run: Dict[str, str], busy: Callable[[], bool],
     run: Callable[[List[str], bool], Awaitable[None]], reflect: Callable[[], None],
 ) -> float:
     """One wake of the bot's scheduler. `last_run` holds the day the push and the nightly
@@ -73,13 +73,13 @@ async def scheduler_wake(
     oversleep the window.
 
     Reminders that are due go first, and `run` waits for them: a push due on the same wake
-    would otherwise find the chat busy. They go out whatever the persona and whether or not
-    the push is on (DESIGN_athlete_queue.md §6.5). The changes to the athlete's week that
-    are due go next, waited for too, so they come before the push; the config file's
-    persona decides, and the `push` switch does not (DESIGN_change_heads_up.md §4). In
-    companion mode `reflect` starts `data reflect --auto` outside the chat once a day, and
-    nothing waits for it (DESIGN_learning_doubt_nudge.md §3.1). The push fires inside the
-    [morning_time, deadline] window once per bot-day (DESIGN_bot_simple_frontend.md §4.3)."""
+    would otherwise find the chat busy. They go out whether or not the push is on
+    (DESIGN_athlete_queue.md §6.5). The changes to the athlete's week that are due go next,
+    waited for too, so they come before the push; the `push` switch does not stop them
+    (DESIGN_change_heads_up.md §4). `reflect` starts `data reflect --auto` outside the chat
+    once a day, and nothing waits for it (DESIGN_learning_doubt_nudge.md §3.1). The push
+    fires inside the [morning_time, deadline] window once per bot-day
+    (DESIGN_bot_simple_frontend.md §4.3)."""
     # The athlete's wall clock, not the machine's: morning-time/morning-deadline are the
     # hours they wake up in (DESIGN_user_timezone.md §2). Every knob here is re-read each
     # wake — `settings set` runs in a CLI subprocess, so this long-lived process would
@@ -91,12 +91,12 @@ async def scheduler_wake(
         await run(["bot", "changes"], True)
     now = athlete_now()
     today = now.date().isoformat()
-    if simple and reflect_due(now) and last_run.get("reflect") != today:
+    if reflect_due(now) and last_run.get("reflect") != today:
         last_run["reflect"] = today
         reflect()
     delay = next_push_delay(now, settings.morning_time(), settings.morning_deadline())
     pushed = last_run.get("push") == today
-    if delay > 0 or not simple or not settings.push_enabled() or pushed:
+    if delay > 0 or not settings.push_enabled() or pushed:
         return min(max(delay, 60), 300)
     if busy():
         # §4.3: never collide with an in-flight command — retry shortly.
@@ -168,8 +168,7 @@ class SchedulerMixin:
         while True:
             try:
                 pause = await scheduler_wake(
-                    last_run, self.simple_ui,
-                    lambda: self.sessions.get(self.push_chat_id) is not None,
+                    last_run, lambda: self.sessions.get(self.push_chat_id) is not None,
                     self._run_scheduled, self._start_reflect,
                 )
             except Exception as exc:

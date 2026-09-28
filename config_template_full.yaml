@@ -60,7 +60,7 @@ llm:
   # Seconds one OpenRouter request may run before it is abandoned. Writing a whole plan
   # takes a while, so keep this generous. Default 120.
   #request_timeout_seconds: 120
-  # In simple ui mode the Telegram bot reads your free-text messages to work out which
+  # The Telegram bot reads your free-text messages to work out which
   # command you meant (DESIGN_bot_simple_frontend.md §5.4). That job is small, so it can go
   # to a cheaper model than the coaching itself. Name one of the `models:` entries above —
   # one allowlist covers both roles. This only seeds the `router-model` setting;
@@ -179,22 +179,12 @@ llm:
 #  # connection, a timeout) before it gives up and journals one warning. The poll has the
 #  # library's own retry and is not affected. 0 turns the retry off. Default 180.
 #  #send_retry_seconds: 180
-#  # Column width replies wrap to. The CLI's terminal default of 80 gets wrapped a second
-#  # time by a phone and comes out ragged; ~48 fits a portrait screen so the client leaves
-#  # it alone. Raise it on tablets. Ignored in simple ui mode, which sends flowing prose
-#  # and lets the client wrap it.
-#  #wrap_width: 48
-#  # Which face the bot puts on (DESIGN_bot_simple_frontend.md). 'simple' (the default) is
-#  # companion mode for a non-technical athlete: a reply keyboard, free-text messages routed
-#  # to the right command, the morning push below, and answers in plain prose. Typed
-#  # /commands still work in simple mode. 'expert' is the raw CLI over chat.
-#  #ui: simple
-#  # Your name, as the companion says it to the athlete (simple ui mode only). The athlete
+#  # Your name, as the companion says it to the athlete. The athlete
 #  # already calls the app "coach", so the person running the CLI needs a different word:
 #  # this is what fills the blank in "tell ___ — setting up a new goal happens from the
 #  # computer". Unset, that reads "the person who set this up for you".
 #  #operator_name: Alex
-#  # Morning push (simple ui mode only): the bot opens the day by itself with today's
+#  # Morning push: the bot opens the day by itself with today's
 #  # session and a few follow-up buttons. It records what it has sent in the instance's
 #  # database, so restarting the bot never double-sends.
 #  # Each key below only seeds a setting; change any of them live with `settings set`

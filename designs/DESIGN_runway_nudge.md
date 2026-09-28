@@ -207,6 +207,10 @@ does not replace them.
 Free. The expert bot executes the real CLI and returns its output in `<pre>` messages, so
 the §4 hints arrive the moment the CLI prints them. Byte-parity preserved, nothing built.
 
+Amended 2026-09-28: the expert persona is removed (DESIGN_bot_simple_frontend.md §3). A
+command typed in the chat with a leading `/` speaks in the companion voice, so it prints
+no §4 hint. §6 is the only Telegram surface.
+
 ## 6. Telegram, simple mode
 
 The athlete never types commands, so the suggestion must become a button or prose — and

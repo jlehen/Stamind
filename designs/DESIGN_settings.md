@@ -64,6 +64,9 @@ to change by accident, and the thresholds are calibrated as a set.
 restart returns to what `config.yaml` says — that ephemerality is the design
 (DESIGN_bot_simple_frontend.md §5.6), and storing it would quietly reverse it.
 
+Amended 2026-09-28: `telegram.ui`, `/ui` and `telegram.wrap_width` are removed with the
+expert persona (DESIGN_bot_simple_frontend.md §3).
+
 ## §2 — The registry
 
 `stamind/settings.py`. One `Setting` per knob:

@@ -1,12 +1,12 @@
 """What the bot does with a message the athlete sends.
 
 Every text update lands in `on_message`. The allowlist comes first, then the handful of
-words the bot answers itself — /cancel, /start, /help, /restart, /ui — then the answer to
-an open text prompt. Everything past that is a command to run.
+words the bot answers itself — /cancel, /start, /help, /restart — then the answer to an
+open text prompt. Everything past that is a command to run.
 
-Which command depends on the persona. In expert mode the message is a CLI command line
-and `parse_message_to_argv` turns it into argv. In companion mode a keyboard label runs
-its fixed argv, and anything else goes through the intent router: `_simple_route` asks
+Which command depends on the leading slash. A message that starts with `/` is a CLI
+command line, and `parse_message_to_argv` turns it into argv. Without the slash a keyboard
+label runs its fixed argv, and anything else goes through the intent router: `_simple_route` asks
 `sm bot route` what the message means and maps the answer onto either the coach lane,
 which carries the athlete's own words, or the capture inbox, which asks before it stores
 (DESIGN_bot_simple_frontend.md §5, §12.3).
@@ -19,13 +19,10 @@ from typing import List, Optional
 
 from stamind import clock
 from stamind.chat import runner, telegram_api
-from stamind.chat.keyboards import (
-    SIMPLE_HELP, SIMPLE_WELCOME, WELCOME, keyboard_action, stale_keyboard_tap,
-)
+from stamind.chat.keyboards import SIMPLE_HELP, SIMPLE_WELCOME, keyboard_action
 from stamind.chat.routing import (
     CAPTURE_PROMPT, CAPTURE_RESCUE_ECHO, ROUTER_CAPTURE_INTENTS, ROUTER_ECHO,
-    ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, UI_EXPERT_ON, UI_SIMPLE_ON,
-    UI_USAGE, parse_message_to_argv, parse_ui_switch,
+    ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, parse_message_to_argv,
 )
 from stamind.cli.render import calendar_page, plan_page
 from stamind.config import config
@@ -52,7 +49,7 @@ class MessagesMixin:
     async def _simple_route(
         self, chat_id: int, text: str, armed_tap: bool = False
     ) -> Optional[List[str]]:
-        """Maps simple-mode free text onto argv via the intent router (§5.3).
+        """Maps free text onto argv via the intent router (§5.3).
         Replies itself (help text, gentle fallback) and returns None when nothing
         should run; otherwise echoes the routed action and returns the argv.
 
@@ -114,22 +111,6 @@ class MessagesMixin:
                 pass
         return "Cancelling…"
 
-    async def _set_ui(self, chat_id: int, target: bool, announce: bool = True) -> None:
-        """Flips the persona in place (§5.6): swaps the command menu, then confirms —
-        attaching the reply keyboard on the way into simple, removing it on the way
-        out. `announce=False` skips the confirmation for a switch nobody asked for.
-        In-memory only; config.telegram_ui rules again at the next restart."""
-        self.simple_ui = target
-        await self._set_command_menu(target)
-        if announce and target:
-            await self._send_keyed(chat_id, UI_SIMPLE_ON)
-        elif announce:
-            await self.bot.send_message(
-                chat_id=chat_id, text=UI_EXPERT_ON,
-                reply_markup=telegram_api.drop_reply_keyboard(),
-            )
-        self._log(chat_id, "  ", f"ui: {'simple' if target else 'expert'}")
-
     async def _restart(self, chat_id: int) -> None:
         """Tears down, replies, then hard-exits with RESTART_EXIT_CODE for the sm-bot
         supervisor to relaunch us. See DESIGN_bot_restart.md §5.2."""
@@ -157,25 +138,15 @@ class MessagesMixin:
             await message.reply_text(await self._cancel(chat.id))
             return
         if token_low == "start":
-            if self.simple_ui:
-                await self._send_keyed(chat.id, SIMPLE_WELCOME, send=message.reply_text)
-            else:
-                await message.reply_text(WELCOME)
+            await self._send_keyed(chat.id, SIMPLE_WELCOME, send=message.reply_text)
             return
-        if token_low == "help" and self.simple_ui:
+        if token_low == "help":
             # Bare help gets the companion card; `/help <cmd>` still reaches the CLI
             # tree for the operator (§5.1).
             await self._send_keyed(chat.id, SIMPLE_HELP, send=message.reply_text)
             return
         if token_low == "restart":
             await self._restart(chat.id)
-            return
-        if token_low == "ui" or token_low.startswith("ui "):
-            target = parse_ui_switch(token_low, self.simple_ui)
-            if target is None:
-                await message.reply_text(UI_USAGE)
-                return
-            await self._set_ui(chat.id, target)
             return
 
         session = self.sessions.get(chat.id)
@@ -193,18 +164,10 @@ class MessagesMixin:
         # About to act on the athlete's own message: what changed in their week goes first.
         await self._tell_changes_first(chat.id)
 
-        # A tap on the companion keyboard is the companion, whatever persona this
-        # process last settled on: the keyboard sits on the phone until Telegram is
-        # told to drop it, so a restart back into expert leaves it live (§5.6).
-        if stale_keyboard_tap(text, self.simple_ui):
-            # Silently: she tapped a button, not /ui — the answer to the tap is the
-            # only feedback the switch earns (§5.6).
-            await self._set_ui(chat.id, True, announce=False)
-
-        # Simple mode: non-slash text is the companion surface — keyboard labels,
-        # then the free-text router for everything else (§5). A leading slash stays
-        # the expert path, so the operator can still drive the instance from its chat.
-        if self.simple_ui and not text.startswith("/"):
+        # Non-slash text is a keyboard label, or free text for the router (§5). A leading
+        # slash is a CLI command line, so the operator can drive the instance from its
+        # chat.
+        if not text.startswith("/"):
             action = keyboard_action(text)
             if action is not None and action[0] == "capture":
                 self.armed[chat.id] = time.monotonic()

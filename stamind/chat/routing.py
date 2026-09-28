@@ -182,34 +182,6 @@ CAPTURE_RESCUE_ECHO = "noting that for your coach"
 ROUTER_TIMEOUT_SECONDS = 30
 
 
-# --- The /ui runtime persona switch (§5.6) ---
-# Advertised in the expert menu only; the confirmation lines teach the way back, so
-# the switch stays reachable from simple mode without cluttering the athlete's menu.
-
-UI_USAGE = "Usage: /ui [simple|expert] — bare /ui flips the mode."
-UI_SIMPLE_ON = (
-    "Simple mode on 🙌 — buttons below, free text goes through the router.\n"
-    "Send /ui to switch back; a restart returns to what config.yaml says."
-)
-UI_EXPERT_ON = (
-    "Expert mode on — full command vocabulary, monospace output, keyboard removed.\n"
-    "Send /ui to switch back; a restart returns to what config.yaml says."
-)
-
-
-def parse_ui_switch(text: str, simple_now: bool) -> Optional[bool]:
-    """The /ui argument → target persona: True = simple, False = expert, None = show
-    usage. Bare /ui flips the current mode (§5.6)."""
-    parts = text.split()
-    if len(parts) == 1:
-        return not simple_now
-    if len(parts) > 2:
-        return None
-    return {"simple": True, "on": True, "expert": False, "off": False}.get(
-        parts[1].lower()
-    )
-
-
 def parse_message_to_argv(text: str, bot_username: Optional[str] = None) -> Optional[List[str]]:
     """Turns a raw chat message into a CLI argv list, or None if there's nothing to run.
 

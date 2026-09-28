@@ -26,8 +26,8 @@ from stamind.chat.runner import Session
 from stamind.sentinels import prompt_answer
 from stamind.text import strip_ansi
 
-# Telegram caps a message at 4096 chars; we wrap replies in <pre>…</pre> (7 chars
-# of overhead) and want headroom, so chunk the body well under the hard limit.
+# Telegram caps a message at 4096 chars; we want headroom, so chunk the body well under
+# the hard limit.
 MAX_MESSAGE_CHARS = 3800
 
 
@@ -59,22 +59,17 @@ def chunk_text(text: str, limit: int = MAX_MESSAGE_CHARS) -> List[str]:
     return chunks
 
 
-def format_reply(text: str, simple: bool = False) -> List[str]:
-    """Renders CLI output as one or more Telegram HTML messages.
-
-    Expert form wraps each chunk in <pre> so column alignment survives; simple mode
-    sends plain escaped prose the client flows naturally
-    (DESIGN_bot_simple_frontend.md §6)."""
-    if simple:
-        return [html.escape(chunk) for chunk in chunk_text(text)]
-    return [f"<pre>{html.escape(chunk)}</pre>" for chunk in chunk_text(text)]
+def format_reply(text: str) -> List[str]:
+    """Renders CLI output as one or more Telegram HTML messages: plain escaped prose the
+    client flows naturally (DESIGN_bot_simple_frontend.md §6)."""
+    return [html.escape(chunk) for chunk in chunk_text(text)]
 
 
 class RepliesMixin:
     """`ChatBot`'s half that sends a running command's output back to the chat."""
 
     async def _send_keyed(self, chat_id: int, text: str, send=None, **kwargs):
-        """Sends `text` under the companion keyboard; the one way the keyboard is attached.
+        """Sends `text` under the reply keyboard; the one way the keyboard is attached.
 
         `send` is the call that sends, `bot.send_message` for this chat by default. A
         keyboard that fails to build is left off; one Telegram refuses sends the text again
@@ -121,7 +116,7 @@ class RepliesMixin:
             return False
         session.sent = True
         parse_mode = telegram_api.html_parse_mode()
-        for part in format_reply(text, simple=self.simple_ui):
+        for part in format_reply(text):
             sent = await self._send_keyed(session.chat_id, part, parse_mode=parse_mode)
             session.last_message_id = sent.message_id
         self._log(session.chat_id, "<<", f"{text.count(chr(10)) + 1} line(s)")

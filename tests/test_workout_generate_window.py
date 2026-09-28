@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from tests.helpers import (
-    as_instance, clear_all_tables, pin_clock, rebind_test_db, save_workout,
+    clear_all_tables, pin_clock, rebind_test_db, save_workout, started_from,
 )
 from tests import test_db_path
 
@@ -607,7 +607,7 @@ class TestTheAthleteNote(WindowTestCase):
 
     def setUp(self):
         super().setUp()
-        as_instance(self, "simple")
+        started_from(self, "terminal")
 
     def test_it_lands_on_the_change_row_and_waits(self):
         self.ride(_days_out(2))
@@ -628,7 +628,7 @@ class TestTheAthleteNote(WindowTestCase):
 
     def test_a_run_from_the_athletes_chat_is_told_as_it_is_written(self):
         """So its line no longer opens the next morning message (§7)."""
-        as_instance(self, "simple", from_chat=True)
+        started_from(self, "chat")
         self.generate(self.session(_days_out(5)), note="Longer runs from Monday.")
         self.assertEqual(test_db.waiting_changes(), [])
         [change] = [c for c in test_db.get_workout_changes() if c["kind"] == "generate"]

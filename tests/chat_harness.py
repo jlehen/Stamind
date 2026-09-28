@@ -97,23 +97,19 @@ class _FakeQuery:
         self.edited_text = text
 
 
-def build_chat_bot(testcase, ui: str = "simple", allowed=(42,)) -> ChatBot:
+def build_chat_bot(testcase, allowed=(42,)) -> ChatBot:
     """A real `ChatBot` with python-telegram-bot stood in for.
 
     Every builder in `telegram_api` is replaced by one that returns what it was handed, so
     a test can read the rows the front-end built rather than a library object."""
     patchers = [
         mock.patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "test-token"}),
-        mock.patch.dict(
-            config.data,
-            {"telegram": {"allowed_chat_ids": list(allowed), "ui": ui, "wrap_width": 48}},
-        ),
+        mock.patch.dict(config.data, {"telegram": {"allowed_chat_ids": list(allowed)}}),
         mock.patch.object(telegram_api, "build_application",
                           lambda token, send_retry_seconds: _FakeApplication()),
         mock.patch.object(telegram_api, "register_handlers", lambda *a, **k: None),
         mock.patch.object(telegram_api, "reply_keyboard",
                           lambda rows: ("reply-keyboard", rows)),
-        mock.patch.object(telegram_api, "drop_reply_keyboard", lambda: "keyboard-removed"),
         mock.patch.object(telegram_api, "inline_keyboard", lambda rows: rows),
         mock.patch.object(telegram_api, "command_menu", lambda commands: list(commands)),
         mock.patch.object(telegram_api, "html_parse_mode", lambda: "HTML"),

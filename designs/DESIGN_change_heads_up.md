@@ -127,6 +127,11 @@ She read each result in the reply, so neither would send anything. The `workout 
 In expert mode the athlete is the operator, who started every run and watched it. Nothing is
 sent.
 
+Amended 2026-09-28: the expert persona is removed (DESIGN_bot_simple_frontend.md §3), so no
+instance is in expert mode. On every instance a run is watched only when it started from
+the athlete's chat. An operator who is their own athlete gets the message too, when they
+change their own week from the terminal.
+
 The one sentence she needs: whenever your coach changes your week without you, you get a
 message saying what changed with your next morning message, or sooner if your coach sends
 it.
@@ -380,9 +385,8 @@ as told when it never was.
 So each change records it on its own row. `workout_changes` gets a `told_at` column: when the
 athlete was told about the change. It is written in two places:
 
-- **When the change is written**, if she is watching the run: the instance is in companion
-  mode and the run was started from her chat. On an expert instance it is always written
-  here. `workout_change`, the one function every command uses to record a change, asks a
+- **When the change is written**, if she is watching the run: the run was started from her
+  chat. `workout_change`, the one function every command uses to record a change, asks a
   single helper whether she is watching, so every command stamps `told_at` the same way. The
   adapt prompt (§3) and the terminal question (§5) ask the same helper.
 - **By `bot changes`**, once it has printed the message for the bot to post. It cannot know
@@ -426,12 +430,10 @@ not quoted.
 front of a `workout generate` or `workout adapt` line.
 
 How a run knows she is watching: the bot starts every command it runs in her chat with
-`STAMIND_FRONTEND=json` (`prompt.is_json_frontend()`), and companion mode is `telegram.ui:
-simple` in the instance's config (`config.telegram_ui`). The `/ui` switch in the chat lasts
-only until the bot restarts, so the config file decides, here and in the bot's two new steps
-(§4). This rests on her chat being the only one the bot allows, which is the single-athlete
-instance model (DESIGN_bot_simple_frontend.md §4.3). An instance that allowed a second chat
-would count a run from it as watched by her.
+`STAMIND_FRONTEND=json` (`prompt.is_json_frontend()`). This rests on her chat being the
+only one the bot allows, which is the single-athlete instance model
+(DESIGN_bot_simple_frontend.md §4.3). An instance that allowed a second chat would count
+a run from it as watched by her.
 
 ## 7. The morning message
 
@@ -554,8 +556,8 @@ Revision 9 adds to those:
 
 ## 11. Tests
 
-- A `workout adapt` run in the terminal on a companion instance leaves its change waiting.
-  The same run from her chat, or on an expert instance, is told as it is written.
+- A `workout adapt` run in the terminal leaves its change waiting. The same run from her
+  chat is told as it is written.
 - `workout generate` with a week line leaves its change waiting; without one, it does not.
 - The adapt prompt names the message as her coach's note only for a run she is not watching,
   and is unchanged byte for byte otherwise.
@@ -568,7 +570,7 @@ Revision 9 adds to those:
   oldest first; a told change without a line gives the plain sentence; a told adaptation that
   changed nothing gives no message at all.
 - The scheduler sends waiting changes after due reminders and before the morning message on
-  the same wake. It does not send while the chat is busy or in expert mode. It sends whether
+  the same wake. It does not send while the chat is busy. It sends whether
   or not the morning message is switched on.
 - A change to another day made during the day is not sent that day. It goes out at her next
   morning time, ahead of the morning message, together with any other waiting change, oldest
@@ -581,13 +583,13 @@ Revision 9 adds to those:
 - A tap or a message from her while a change is waiting gets the change first, whatever the
   hour, and then its own reply.
 - `workout notify` lists the waiting changes and, once confirmed, makes the scheduler send them
-  on its next wake, after 21:00 included. With nothing waiting, or on an expert instance, it
+  on its next wake, after 21:00 included. With nothing waiting it
   does nothing. A marker left behind by a rollback of every waiting change does not send the
   next change early.
 - A terminal run asks the replace question when the newest change that wrote sessions is
   waiting. Replace rolls it back before the week planner is called and leaves one waiting
   change. Nothing is asked when her own change came after it, when the waiting change was
-  already sent, with `-y`, or on an expert instance.
+  already sent, or with `-y`.
 - Nothing is asked when the run writes no day the unsent change wrote: `workout generate` for
   a span that opens after it leaves it standing. The question comes back as soon as the span
   reaches those days.

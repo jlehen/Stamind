@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 from tests.helpers import (
-    as_instance, clear_all_tables, run_cli, rebind_test_db, save_workout,
+    clear_all_tables, run_cli, rebind_test_db, save_workout, started_from,
 )
 from tests import test_db_path
 
@@ -54,8 +54,8 @@ class ChangesCommandTest(unittest.TestCase):
         calendar = patch("stamind.runtime.calendar_syncer")
         calendar.start()
         self.addCleanup(calendar.stop)
-        # A companion instance, run from the terminal: the athlete watches nothing here.
-        as_instance(self, "simple")
+        # Run from the terminal: the athlete watches nothing here.
+        started_from(self, "terminal")
 
     def _change(self, kind="generate", note="Four sessions a week now.", day=None,
                 sport="cycling", title="Ride"):
@@ -92,14 +92,8 @@ class ChangesCommandTest(unittest.TestCase):
         self.assertIn("Second.", second)
         self.assertIn('"wait": false', second)
 
-    def test_nothing_goes_out_on_an_expert_instance(self):
-        self._change()
-        as_instance(self, "expert")
-        _code, out, _ = run_cli(["bot", "changes"])
-        self.assertEqual(out.strip(), "")
-
     def test_a_change_the_athlete_watched_is_never_sent(self):
-        as_instance(self, "simple", from_chat=True)
+        started_from(self, "chat")
         self._change()
         self.assertEqual(test_db.waiting_changes(), [])
 

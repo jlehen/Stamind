@@ -2,7 +2,8 @@
 
 **Status:** Implemented — rollout phases 1-3 (2026-08-25), the §11 breadth pass
 (2026-08-30), the §12 writes pass, phases 4-7 (2026-09-02), the §11.1 plan-view date
-column (2026-09-03), the §11.2 stanzas and mesocycle door (2026-09-04) · **Date:** 2026-08-25 ·
+column (2026-09-03), the §11.2 stanzas and mesocycle door (2026-09-04), the expert persona
+removed (2026-09-28, §3) · **Date:** 2026-08-25 ·
 **Branch:** worktree-config-env-and-frontend-design
 
 ## 1. Motivation
@@ -67,6 +68,14 @@ One bot binary, two personae, chosen by the instance's config:
 Underneath both personae sits the same pipeline: message → argv → CLI subprocess →
 streamed output + prompts. Simple mode changes how argv is *obtained* (buttons, router)
 and how output is *shown* (rendering), never what runs.
+
+Amended 2026-09-28: the expert persona is removed. The bot has one persona, the
+companion, and `telegram.ui` and the `/ui` switch (§5.6) are gone with it. The operator
+had come to use the simple UI on their own instance too. A message that starts with `/`
+still runs any CLI command from the chat. Its output comes in the companion voice where
+that voice has a form, and in the terminal's form otherwise, sent as plain text. Every
+sentence in this document that names the expert persona, expert mode or `telegram.ui`
+describes the bot before this date.
 
 ## 4. The morning push
 
@@ -330,6 +339,9 @@ phone-shaped, and not worth widening the §7 guardrail for.
 
 ### 5.6 The `/ui` runtime switch
 
+Amended 2026-09-28: removed with the expert persona (§3). The rest of this section
+describes the bot before that date.
+
 `/ui` flips the persona of a running bot: bare `/ui` toggles, `/ui simple` / `/ui
 expert` (aliases `on`/`off`) set it explicitly, anything else prints usage. The flip is
 **in-memory only** — `telegram.ui` in config.yaml is authoritative again at the next
@@ -579,6 +591,9 @@ Each phase ships alone; her onboarding starts at phase 1.
 - The stale-tap persona re-arm is silent (2026-09-04, §5.6). Announcing it made every
   restart open with "Simple mode on 🙌" against a mode the athlete never left; a
   confirmation belongs to `/ui`, which someone typed.
+- The expert persona is removed (2026-09-28, §3). The operator uses the simple UI and
+  types `/command` for everything else, so the second persona, `telegram.ui` and `/ui`
+  had no user left.
 
 **Open**
 1. Router echo: always show "→ …", or only when confidence is low? Draft: always;

@@ -1,7 +1,7 @@
 """What the terminal asks and says about the athlete's heads-up (DESIGN_change_heads_up.md).
 
-On a companion instance a `workout generate` or `workout adapt` started in the terminal
-changes the athlete's week out of their sight, and its line waits for the bot to send it.
+A `workout generate` or `workout adapt` started in the terminal changes the athlete's week
+out of their sight, and its line waits for the bot to send it.
 This module holds the question asked before such a run when the previous attempt was never
 sent (§5), the notice that says when the line goes out (§8), and `workout notify`, which
 asks the bot to send what is waiting at once (§4). `workout generate` and `workout adapt`
@@ -14,7 +14,6 @@ from datetime import datetime
 from typing import Any, Dict, Iterable, Iterator, Optional, Tuple
 
 from stamind import clock, heads_up, runtime, settings
-from stamind.config import config
 from stamind.prompt import Choice, athlete_watching
 from stamind.text import bold, cmd, default_wrap_width, green, wrap_text
 from stamind.output import notice
@@ -158,12 +157,6 @@ def print_send_notice(dates: Iterable[str]) -> None:
 def run_workout_notify(args: argparse.Namespace) -> None:
     """Asks the bot to send the changes waiting to be told on its next wake, whatever the
     hour and however young the change (§4)."""
-    if config.telegram_ui != "simple":
-        print(
-            "This instance is not in companion mode: the athlete runs every change "
-            "themselves, so nothing waits to be sent."
-        )
-        return
     waiting = heads_up.waiting()
     if not waiting:
         print("Nothing is waiting to be sent to the athlete.")

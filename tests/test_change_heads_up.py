@@ -11,7 +11,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from tests.helpers import (
-    as_instance, bind_test_db, clear_all_tables, pin_clock, rebind_test_db, run_cli,
+    bind_test_db, clear_all_tables, pin_clock, rebind_test_db, run_cli, started_from,
 )
 from tests import test_db_path
 
@@ -145,7 +145,7 @@ class _DbCase(unittest.TestCase):
         morning = patch("stamind.settings.morning_time", return_value="08:00")
         morning.start()
         self.addCleanup(morning.stop)
-        as_instance(self, "simple")
+        started_from(self, "terminal")
 
     def change(self, kind="generate", note="Friday's test moves to Saturday.",
                day=None, title="Ride"):
@@ -171,21 +171,15 @@ class WhoIsWatchingTest(_DbCase):
             }],
         ))
 
-    def test_a_terminal_adapt_on_a_companion_instance_waits(self):
+    def test_a_terminal_adapt_waits(self):
         self._adapt()
         [change] = test_db.waiting_changes()
         self.assertEqual((change["kind"], change["note"]), ("adapt", "Friday becomes a rest day."))
 
     def test_the_same_adapt_from_the_athletes_chat_is_told(self):
-        as_instance(self, "simple", from_chat=True)
+        started_from(self, "chat")
         self._adapt()
         self.assertEqual(test_db.waiting_changes(), [])
-
-    def test_the_same_adapt_on_an_expert_instance_is_told(self):
-        as_instance(self, "expert")
-        self._adapt()
-        self.assertEqual(test_db.waiting_changes(), [])
-        self.assertEqual(heads_up.waiting(), [])
 
     def test_an_adapt_that_changed_nothing_has_no_line(self):
         proposal = RevisionProposal(
@@ -291,18 +285,11 @@ class ReplaceQuestionTest(_DbCase):
         self._run(skip=True)
         self.choose.assert_not_called()
 
-    def test_nothing_is_asked_on_an_expert_instance(self):
-        self.change()
-        as_instance(self, "expert")
-        self._answer("replace")
-        self._run()
-        self.choose.assert_not_called()
-
     def test_nothing_is_asked_when_the_athletes_own_change_came_after(self):
         self.change(note="First attempt.")
-        as_instance(self, "simple", from_chat=True)
+        started_from(self, "chat")
         self.change(kind="adapt", note="Moved, as you asked.", day="2026-09-26")
-        as_instance(self, "simple")
+        started_from(self, "terminal")
         self._answer("replace")
         self._run()
         self.choose.assert_not_called()
@@ -431,12 +418,8 @@ class SendNoticeTest(_DbCase):
         )
         self.assertIn(today_str(), revision_dates(proposal))
 
-    def test_nothing_on_an_expert_instance(self):
-        as_instance(self, "expert")
-        self.assertEqual(self._notice({today_str()}), "")
-
     def test_nothing_from_the_athletes_chat(self):
-        as_instance(self, "simple", from_chat=True)
+        started_from(self, "chat")
         self.assertEqual(self._notice({today_str()}), "")
 
 
@@ -462,12 +445,6 @@ class NotifyTest(_DbCase):
     def test_nothing_waiting_says_so(self):
         _code, out, _ = run_cli(["workout", "notify"], input_value="y")
         self.assertIn("Nothing is waiting", out)
-        self.assertIsNone(test_db.get_setting(heads_up.NOTIFY_MARKER))
-
-    def test_an_expert_instance_says_so(self):
-        as_instance(self, "expert")
-        _code, out, _ = run_cli(["workout", "notify"], input_value="y")
-        self.assertIn("not in companion mode", out)
         self.assertIsNone(test_db.get_setting(heads_up.NOTIFY_MARKER))
 
     def test_a_marker_left_by_a_rollback_does_not_send_the_next_change_early(self):

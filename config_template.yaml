@@ -18,7 +18,7 @@ llm:
   models:
     - model: "anthropic/claude-opus-5"
     - model: "google/gemini-3.5-flash"
-  # Cheap model the Telegram companion mode routes free-text messages with (must be one
+  # Cheap model the Telegram bot routes free-text messages with (must be one
   # of the models above). Unset, the coach model routes too. Recommended: Gemini Flash.
   router_model: "google/gemini-3.5-flash"
 
@@ -126,9 +126,8 @@ coach:
 
 # Optional: drive Stamind from your phone (./sm-bot). Omit the whole section to disable
 # it. Create a bot with @BotFather for the token; message it once and use @userinfobot
-# to find your numeric chat id. The bot starts in companion mode: a reply keyboard, plain
-# prose and a morning message. See config_template_full.yaml for the timeouts and the
-# 'expert' raw-CLI mode.
+# to find your numeric chat id. The bot gives a reply keyboard, plain prose and a morning
+# message. See config_template_full.yaml for the timeouts.
 #telegram:
 #  bot_token: "123456789:ABCdef..."   # or set TELEGRAM_BOT_TOKEN
 #  # Allowlist of chat ids permitted to drive the bot. Empty/absent = nobody.

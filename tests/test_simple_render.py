@@ -348,22 +348,14 @@ class WhenWordsTest(unittest.TestCase):
 
 
 class CompanionConfigKnobsTest(unittest.TestCase):
-    """`telegram.ui` — the one companion knob config.yaml alone decides (§3). The push
-    window and the router model resolve through the registry, and are covered against it
-    in tests/test_cli_settings.py (DESIGN_settings.md §3)."""
+    """What config.yaml alone decides for the companion. The push window and the router
+    model resolve through the registry, and are covered against it in
+    tests/test_cli_settings.py (DESIGN_settings.md §3)."""
 
     def _config(self, data):
         cfg = object.__new__(Config)
         cfg.data = data
         return cfg
-
-    def test_ui_defaults_to_simple(self):
-        self.assertEqual(self._config({}).telegram_ui, "simple")
-        self.assertEqual(self._config({"telegram": {}}).telegram_ui, "simple")
-
-    def test_ui_is_read_case_and_space_insensitively(self):
-        cfg = self._config({"telegram": {"ui": " Expert "}})
-        self.assertEqual(cfg.telegram_ui, "expert")
 
     def test_the_operator_is_named_or_described(self):
         """"Coach" is the app in the athlete's vocabulary, so the human with the CLI is

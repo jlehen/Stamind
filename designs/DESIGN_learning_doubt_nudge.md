@@ -120,6 +120,10 @@ second run the same day, which finds nothing new and does nothing.
 The expert persona has no push and no nightly reflect: the operator runs reflect by hand,
 or from cron.
 
+Amended 2026-09-28: the expert persona is removed (DESIGN_bot_simple_frontend.md §3). Every
+running bot starts the nightly reflect and sends the push. On an instance with no bot
+running, the operator runs reflect by hand or from cron.
+
 ### 3.2 What a run queues
 
 At the end of every `data reflect` and `data bootstrap`, the staleness sweep runs first. It
@@ -353,6 +357,9 @@ answers do and the words around the sentences come from database rows and fixed 
 With §6, no answer loses anything for good, so the guardrail holds without a confirm step.
 
 ## 8. Expert mode
+
+Amended 2026-09-28: the bot's expert persona is removed (DESIGN_bot_simple_frontend.md §3).
+Read "expert mode" in this section as the terminal.
 
 There is no push in expert mode, and the question is queued all the same. The operator
 meets it in the queue hint that `status` and `workout adapt` print while something waits,

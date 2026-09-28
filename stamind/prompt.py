@@ -257,14 +257,10 @@ class JsonPrompt:
 
 
 def athlete_watching() -> bool:
-    """Whether the athlete watches this run happen, and so needs no message about it.
-
-    Always on an expert instance, where the athlete is the operator. In companion mode only
+    """Whether the athlete watches this run happen, and so needs no message about it: only
     when the run started from the athlete's chat, which is every run the bot starts
-    (DESIGN_change_heads_up.md §6). The config file decides, not the chat's `/ui` switch.
-    The import is deferred to keep this module stdlib-only."""
-    from stamind.config import config
-    return config.telegram_ui != "simple" or is_json_frontend()
+    (DESIGN_change_heads_up.md §6)."""
+    return is_json_frontend()
 
 
 def make_prompt(frontend: Optional[str] = None, out=None, inp=None):

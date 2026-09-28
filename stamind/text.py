@@ -20,9 +20,9 @@ RESET = "\033[0m"
 def default_wrap_width() -> int:
     """The column width text wrapping targets, default 80.
 
-    Overridable via the STAMIND_WRAP_WIDTH env var so a narrow client (e.g. the
-    Telegram bot rendering into a phone-width monospace message) can ask the CLI to
-    wrap tighter and avoid the client double-wrapping 80-col lines. Floored at 20."""
+    Overridable via the STAMIND_WRAP_WIDTH env var, so a client can state its own width:
+    the Telegram bot asks for a very wide one, because the chat flows prose itself.
+    Floored at 20."""
     raw = os.environ.get("STAMIND_WRAP_WIDTH")
     if not raw:
         return 80
@@ -171,10 +171,10 @@ def truncate_visible(s: str, width: int) -> str:
 
 
 def is_narrow_client() -> bool:
-    """True when the CLI is driven by a narrow front-end (e.g. the Telegram bot)
-    that asked for a tight wrap width via STAMIND_WRAP_WIDTH.
+    """True when the CLI is driven by a narrow front-end that asked for a tight wrap
+    width via STAMIND_WRAP_WIDTH.
 
-    Wide columnar tables wrap unreadably in a phone-width monospace message, so on a
+    Wide columnar tables wrap unreadably at phone width, so on a
     narrow client we collapse them to a vertical record layout instead. A real
     terminal (default width 80) stays False and keeps the familiar table. The 70
     threshold matches the CLI's argparse help formatter."""

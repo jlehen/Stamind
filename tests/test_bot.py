@@ -98,41 +98,9 @@ class PromptProtocolTest(unittest.TestCase):
 
 
 class MenuCommandsTest(unittest.TestCase):
-    def test_restart_is_advertised_in_the_command_menu(self):
-        # Not treated as special: the teardown ends any live session cleanly, so a
-        # mis-tap costs a reconnect, not work (DESIGN_bot_restart.md §7).
-        names = [name for name, _ in keyboards.MENU_COMMANDS]
-        self.assertIn("restart", names)
-        self.assertIn("cancel", names)
-
     def test_simple_menu_keeps_cancel_reachable(self):
         names = [name for name, _ in keyboards.SIMPLE_MENU_COMMANDS]
         self.assertIn("cancel", names)
-
-
-class UiSwitchTest(unittest.TestCase):
-    """The /ui runtime persona switch (§5.6): bare form flips, explicit form sets,
-    anything else reads as usage (None)."""
-
-    def test_bare_ui_flips_the_current_mode(self):
-        self.assertIs(routing.parse_ui_switch("ui", simple_now=False), True)
-        self.assertIs(routing.parse_ui_switch("ui", simple_now=True), False)
-
-    def test_explicit_arguments_set_the_mode_regardless_of_current(self):
-        self.assertIs(routing.parse_ui_switch("ui simple", simple_now=True), True)
-        self.assertIs(routing.parse_ui_switch("ui expert", simple_now=False), False)
-        self.assertIs(routing.parse_ui_switch("ui on", simple_now=True), True)
-        self.assertIs(routing.parse_ui_switch("ui off", simple_now=False), False)
-
-    def test_unknown_or_extra_arguments_read_as_usage(self):
-        self.assertIsNone(routing.parse_ui_switch("ui blorp", simple_now=False))
-        self.assertIsNone(routing.parse_ui_switch("ui simple please", simple_now=False))
-
-    def test_only_the_expert_menu_advertises_the_switch(self):
-        # The simple menu stays the athlete's two entries; the §5.6 confirmation
-        # lines teach the way back instead.
-        self.assertIn("ui", [n for n, _ in keyboards.MENU_COMMANDS])
-        self.assertNotIn("ui", [n for n, _ in keyboards.SIMPLE_MENU_COMMANDS])
 
 
 class SimpleKeyboardTest(unittest.TestCase):
@@ -255,12 +223,11 @@ class GymButtonTest(unittest.TestCase):
         self.assertIsNone(keyboards.keyboard_action(keyboards.CALENDAR_LABEL))
         self.assertIsNone(keyboards.keyboard_action(keyboards.PLAN_LABEL))
 
-    def test_the_gym_label_is_neither_a_command_nor_a_stale_tap(self):
+    def test_the_gym_label_is_not_a_command(self):
         """Tapping it opens the page and sends no text, so nothing here should ever see
         it; if Telegram ever did deliver it as text, it must not run anything."""
         for label in ("🏋️ Log today's gym", "🏋️ Log Thursday's gym"):
             self.assertIsNone(keyboards.keyboard_action(label), label)
-            self.assertFalse(keyboards.stale_keyboard_tap(label, simple_now=False), label)
 
 
 class TwoLanesTest(unittest.TestCase):
@@ -292,24 +259,6 @@ class TwoLanesTest(unittest.TestCase):
         consumed by the capture, so silence there loses it twice (§12.3)."""
         self.assertIn("expired", keyboards.UI_STALE_TAP)
         self.assertIn("send it again", keyboards.UI_STALE_TAP)
-
-
-class StaleKeyboardTest(unittest.TestCase):
-    """A restart returns to config's persona while the phone keeps the §5.1 keyboard;
-    a tap on it must reach the companion, not shlex (§5.6)."""
-
-    def test_label_tapped_in_expert_is_a_stale_tap(self):
-        for label, _ in keyboards.SIMPLE_KEYBOARD:
-            self.assertTrue(keyboards.stale_keyboard_tap(label, simple_now=False), label)
-
-    def test_nothing_is_stale_while_simple(self):
-        for label, _ in keyboards.SIMPLE_KEYBOARD:
-            self.assertFalse(keyboards.stale_keyboard_tap(label, simple_now=True), label)
-
-    def test_expert_typing_is_untouched(self):
-        self.assertFalse(keyboards.stale_keyboard_tap("workout list", simple_now=False))
-        self.assertFalse(keyboards.stale_keyboard_tap("/ui", simple_now=False))
-        self.assertFalse(keyboards.stale_keyboard_tap("", simple_now=False))
 
 
 class GuardrailTest(unittest.TestCase):
@@ -573,9 +522,9 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
     def reflect(self):
         self.reflects.append(self.now.strftime("%a %H:%M"))
 
-    async def wake(self, simple=True, busy=False):
+    async def wake(self, busy=False):
         return await scheduler.scheduler_wake(
-            self.last_run, simple, lambda: busy, self.run_command, self.reflect
+            self.last_run, lambda: busy, self.run_command, self.reflect
         )
 
     async def test_a_due_reminder_goes_out_before_the_push_on_the_same_wake(self):
@@ -585,11 +534,10 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
         ])
         self.assertEqual(self.last_run["push"], "2026-09-16")
 
-    async def test_reminders_go_out_whatever_the_persona_and_the_push_switch(self):
+    async def test_reminders_go_out_with_the_push_switched_off(self):
         with mock.patch.object(scheduler.settings, "push_enabled", return_value=False):
             await self.wake()
-        await self.wake(simple=False)
-        self.assertEqual(self.ran, [(["bot", "queue", "--remind"], True)] * 2)
+        self.assertEqual(self.ran, [(["bot", "queue", "--remind"], True)])
 
     async def test_a_busy_chat_leaves_the_reminder_to_the_next_wake(self):
         pause = await self.wake(busy=True)
@@ -615,12 +563,6 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
         await self.wake()
         self.assertEqual(self.reflects, ["Wed 08:00"])
         self.assertIn((["bot", "morning"], False), self.ran)
-
-    async def test_the_expert_persona_has_no_nightly_reflect(self):
-        import datetime as dt
-        self.now = dt.datetime(2026, 9, 16, 3, 0).astimezone()
-        await self.wake(simple=False)
-        self.assertEqual(self.reflects, [])
 
     async def test_changes_go_out_after_reminders_and_before_the_push(self):
         """DESIGN_change_heads_up.md §4: waited for, so the push finds the chat free."""

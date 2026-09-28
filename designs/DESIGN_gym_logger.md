@@ -179,8 +179,7 @@ an evening pull would delete the log before the next morning's takeover.
   a live strength session with prescribed sets exists today, or else within the next seven
   days, the first row is the gym button, labelled with the day ("🏋️ Log today's gym",
   "🏋️ Log Thursday's gym"), a `KeyboardButton(text, web_app=WebAppInfo(url))`. Otherwise
-  the keyboard is what it is today. Expert mode has no reply keyboard and therefore no
-  button; not handled in the prototype.
+  the keyboard is what it is today.
 - A `MessageHandler(filters.StatusUpdate.WEB_APP_DATA, ...)` receives the log. It checks
   the chat is allowed, writes the data to `<data_dir>/gym_logs/<date>-<hhmmss>.json`, and
   runs `strength ingest <file>` through `_start_command`, so the summary reaches the chat
@@ -192,7 +191,6 @@ an evening pull would delete the log before the next morning's takeover.
 - Grading a session set by set: DESIGN_strength_planned_vs_done.md.
 - What the strength planner is shown of a log.
 - A rest timer that alerts: the page cannot notify while the phone is locked.
-- Expert mode, which has no reply keyboard to hold the button.
 - Refreshing the button after a `workout adapt` run from the terminal; the log carries the
   revision id, so a stale button costs nothing but a mismatch in the summary.
 - A log sent again after the morning pull handed it to Garmin's activity: it lands on a
