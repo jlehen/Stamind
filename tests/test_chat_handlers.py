@@ -185,7 +185,7 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_log_pasted_in_the_chat_goes_to_the_ingest_too(self):
         """Telegram did not close the page, so the athlete copied the log and pasted it in
         the chat. It lands where a sent one does (DESIGN_gym_logger.md §6)."""
-        chat_bot = build_chat_bot(self, ui="simple")
+        chat_bot = build_chat_bot(self)
         started = record_commands(self, chat_bot)
         update, _replied = message_update(text=self.LOG)
         await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
