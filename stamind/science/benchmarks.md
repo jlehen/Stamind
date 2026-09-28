@@ -88,6 +88,15 @@ ramp test and a 20-minute test systematically disagree, in a rider-dependent
 direction. Pick one protocol per anchor and keep it; venue and conditions
 (indoor vs outdoor, trainer, course) are part of the protocol.
 
+EFFORT IS PART OF THE MEASUREMENT — FLOOR: every endurance protocol above
+measures the most the athlete can hold over its distance or duration. An
+effort held back yields a wrong anchor, not a cautious one: the zones computed
+from it sit below what the athlete does on an ordinary day. So a test session
+states the effort to hold, in signs the athlete can check while moving — how
+hard it feels, how much speech is left, that nothing is left at the finish.
+Advice to start under control is about the first minutes, never the target.
+This matters most on a first test, when the athlete has no feel for the pace.
+
 
 3. READING A RESULT
 -------------------

@@ -2,6 +2,22 @@
 
 **Status:** Phase 1 & Phase 2 **implemented**; Phase 3 unbuilt (§7).
 
+> **Rev. 6 (2026-09-28) — a test session says how hard to go.** An athlete ran her first
+> 5 km time trial on 2026-09-25. The session said "start a touch slower than feels right"
+> and named no effort to hold. She ran it cautiously and recorded a threshold heart rate of
+> 153 bpm. Her ordinary runs that spring had averaged 159 to 162 bpm for 45 to 66 minutes.
+> The easy ceiling the sessions drew from the result, 80% of 153, was 122 bpm, and she
+> could not hold it while running.
+>
+> - `benchmarks.md` §2 gains one FLOOR rule: the effort is part of the measurement, so a
+>   test session states the effort to hold, in signs the athlete can check while moving.
+> - Not handled: a result already recorded from a held-back test. The operator removes the
+>   row with `benchmark rm`, the logbook's one correction path (§6). A rule telling the
+>   model to ignore a doubted value was left out, because the athlete's note reaches
+>   `plan generate` and `workout generate` but not `workout adapt`.
+> - Not handled: checking a recorded value against the Garmin history. That would infer a
+>   fact from noisy data.
+
 > **Rev. 5 (2026-09-18) — `plan generate` sees how each threshold was obtained.** The
 > athlete rode a 20-minute FTP test on Zwift on 2026-09-05 and recorded it: 235 W, source
 > `test`, note "Zwift 20 min FTP test". On 2026-09-18 they ran `plan generate`. The new plan
