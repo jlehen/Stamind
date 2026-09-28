@@ -48,9 +48,9 @@ def plan_profile() -> Dict[str, Any]:
     """The user_profile fields that shape the periodization strategy.
 
     Single source of truth for the config_hash fingerprint. The partition and its
-    rationale are DESIGN_plan_staleness.md §3–§4: thresholds are tolerance-checked
-    separately (see above), `name`/`equipment` and each day's `equipment` are excluded as
-    not plan-shaping, and everything else — availability, target hours, preferences,
+    rationale are DESIGN_plan_staleness.md §3–§4 and §11: thresholds are tolerance-checked
+    separately (see above), `name`/`equipment`/`preferences` and each day's `equipment`
+    are excluded as not plan-shaping, and everything else — availability, target hours,
     injuries, sports — is. The exclusions are a denylist so a profile field added later
     counts as plan-shaping until someone decides otherwise (§6).
 
