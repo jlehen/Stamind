@@ -300,7 +300,7 @@ def _generate_one_plan(
         # as part of this plan would mark a stale plan current.
         saved_id = runtime.coach_service.plan_apply(
             goal['id'] if goal else None, proposal['strategy'], mesocycles,
-            fingerprints=proposal.get('fingerprints'),
+            fingerprints=proposal.get('fingerprints'), summary=proposal.get('summary', ''),
         )
         if saved_id is None:
             notice("\nNo goal to attach this plan to — nothing was saved.")

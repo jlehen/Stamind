@@ -237,11 +237,14 @@ def run_plan_show(args: argparse.Namespace) -> None:
 
 
 def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> None:
-    """Renders one plan version: header, strategy, snapshotted inputs, mesocycle timeline.
+    """Renders one plan version: header, goal, the strategy's summary, the staleness report
+    and the mesocycle timeline with each mesocycle's summary. `-v` puts the full strategy
+    and focus in place of the summaries, and adds the feedback notes and snapshotted inputs.
 
     The companion form of this is CompanionRenderer.plan (DESIGN_render_persona.md §5)."""
     mesocycles = runtime.db.get_mesocycles_for_macrocycle(macrocycle['id'])
     show_workouts = getattr(args, 'workouts', False)
+    verbose = getattr(args, 'verbose', False)
     workouts = _plan_workouts(macrocycle)
 
     is_superseded = macrocycle.get('status') == 'superseded'
@@ -272,10 +275,14 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
         [magenta(sport_str), cyan(fmt_date(next_goal['target_date']))],
         width,
     )
-    print(format_labeled_paragraph(f"{bold('Macrocycle Strategy')}:", macrocycle['strategy']))
+    # A plan older than the summary columns has none; -v still shows its strategy and focus.
+    strategy = macrocycle['strategy'] if verbose else macrocycle.get('summary')
+    if strategy:
+        print(format_labeled_paragraph(f"{bold('Macrocycle Strategy')}:", strategy))
     print()
-    _print_plan_feedback(macrocycle, width)
-    _print_considered_inputs(macrocycle)
+    if verbose:
+        _print_plan_feedback(macrocycle, width)
+        _print_considered_inputs(macrocycle)
     # Right under the inputs it contradicts, and only for the version in force: a
     # superseded one is out of date by definition (DESIGN_plan_staleness.md §9). Expert
     # only — the companion body is `simple_plan_lines`, and a replan is operator work.
@@ -341,7 +348,9 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
         )
         print(f"{pad}[{bar}]{extra}")
         _print_mesocycle_workouts(m, workouts, pad, width, show_workouts)
-        print_indented(m['focus'], pad, width)
+        detail = m['focus'] if verbose else m.get('summary')
+        if detail:
+            print_indented(detail, pad, width)
         print(pad + gray("-" * min(40, max(10, width - len(pad)))))
 
 

@@ -163,6 +163,9 @@ You MUST respond with a JSON object containing:
 {{
   "strategy": "Explain the overall training strategy philosophy and periodization strategy
     until the goal date ({next_goal['target_date']}).",
+  "summary": "The strategy in at most two plain sentences of at most 200 characters in
+    all, for the athlete (e.g., Build the aerobic base through the winter, then turn it
+    into threshold power for the spring climb, with a two-week taper.)",
   "mesocycles": [
     {{
       "name": "Phase Name (e.g., {phase_examples})",

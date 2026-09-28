@@ -195,6 +195,7 @@ class Macrocycle(TypedDict):
     reshape_verdict_key: Optional[str]  # the snapshot that verdict was asked about
     status: Optional[str]  # 'active' | 'superseded'
     superseded_at: Optional[str]
+    summary: Optional[str]  # the strategy in two sentences (DESIGN_output_verbosity.md §5.1)
 
 class Mesocycle(TypedDict):
     """Represents a specific mesocycle/phase of training within a macrocycle."""

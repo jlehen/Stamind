@@ -140,6 +140,7 @@ class PlanningMixin:
 
         # Try to retrieve existing macrocycle
         strategy = ""
+        summary = ""
         mesocycles: List[Dict[str, Any]] = []
         existing_macro = None
         if next_goal['id'] is not None:
@@ -163,6 +164,7 @@ class PlanningMixin:
             ):
                 reused = True
                 strategy = existing_macro['strategy']
+                summary = existing_macro.get('summary') or ""
                 mesocycles = self._db.get_mesocycles_for_macrocycle(existing_macro['id'])
                 step(wrap_text(
                     "Reusing existing periodization strategy (macrocycle and mesocycles) "
@@ -263,16 +265,19 @@ class PlanningMixin:
                 anchor_history=self._anchor_history_text(plan_start_str),
             )
             strategy = macro_data.get("strategy", "Endurance preparation strategy.")
+            summary = macro_data.get("summary") or ""
             mesocycles = macro_data.get("mesocycles", [])
 
             if auto_apply:
                 self.plan_apply(
-                    next_goal['id'], strategy, mesocycles, fingerprints=fingerprints
+                    next_goal['id'], strategy, mesocycles, fingerprints=fingerprints,
+                    summary=summary,
                 )
 
         self._maybe_nudge_bootstrap()
         return {
-            'strategy': strategy, 'mesocycles': mesocycles, 'reused': reused,
+            'strategy': strategy, 'summary': summary, 'mesocycles': mesocycles,
+            'reused': reused,
             'goal': next_goal, 'fingerprints': fingerprints,
             # What the caller may show: the planned-vs-actual review laid out at its
             # width when it asked for it, and whether one fed the prompt at all — the
@@ -283,7 +288,7 @@ class PlanningMixin:
 
     def plan_apply(
         self, objective_id: Optional[int], strategy: str, mesocycles: List[Dict[str, Any]],
-        fingerprints: Optional[PlanFingerprints] = None
+        fingerprints: Optional[PlanFingerprints] = None, summary: str = ""
     ) -> Optional[int]:
         """Saves a generated periodization plan to the database, and returns the id of the
         goal it was saved under.
@@ -321,7 +326,8 @@ class PlanningMixin:
             constraints_snapshot=fingerprints.constraints_snapshot,
             all_constraints_snapshot=fingerprints.all_constraints_snapshot,
             science_snapshot=fingerprints.science_snapshot,
-            mesocycles=mesocycles
+            mesocycles=mesocycles,
+            summary=summary,
         )
         return objective_id
 

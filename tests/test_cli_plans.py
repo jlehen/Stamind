@@ -279,6 +279,7 @@ class TestCliPlans(unittest.TestCase):
         test_db.save_macrocycle(
             objective_id=obj_id,
             strategy="Build base then taper",
+            summary="Base, then taper.",
             goals_hash="ghash",
             constraints_hash="chash",
             mesocycles=[{
@@ -286,14 +287,29 @@ class TestCliPlans(unittest.TestCase):
                 "start_date": "2026-06-01",
                 "end_date": "2026-06-28",
                 "focus": "Aerobic threshold volume",
+                "summary": "Build the aerobic base.",
             }],
         )
 
+        # By default the plan and each mesocycle show their summary; -v shows the strategy,
+        # the focus and the inputs instead.
         exit_code, stdout, stderr = self.run_cli(["plan", "show"])
         self.assertEqual(exit_code, 0)
         self.assertIn("=== ACTIVE MACROCYCLE STRATEGY [Macrocycle ID:", stdout)
-        self.assertIn("Build base then taper", stdout)
         self.assertIn("Base Building", stdout)
+        self.assertIn("Base, then taper.", stdout)
+        self.assertIn("Build the aerobic base.", stdout)
+        self.assertNotIn("Build base then taper", stdout)
+        self.assertNotIn("Aerobic threshold volume", stdout)
+        self.assertNotIn("Inputs considered", stdout)
+
+        exit_code, stdout, stderr = self.run_cli(["plan", "show", "-v"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Build base then taper", stdout)
+        self.assertIn("Aerobic threshold volume", stdout)
+        self.assertIn("Inputs considered", stdout)
+        self.assertNotIn("Base, then taper.", stdout)
+        self.assertNotIn("Build the aerobic base.", stdout)
 
         mock_coach.plan_rm.reset_mock()
         obj_to_rm = test_db.add_objective(
@@ -407,7 +423,7 @@ class TestCliPlans(unittest.TestCase):
         self.assertIn("superseded", stdout)
 
         # Showing the superseded version renders its strategy under a superseded header.
-        exit_code, stdout, _ = self.run_cli(["plan", "show", "--macrocycle", str(v1)])
+        exit_code, stdout, _ = self.run_cli(["plan", "show", "--macrocycle", str(v1), "-v"])
         self.assertEqual(exit_code, 0)
         self.assertIn("SUPERSEDED", stdout)
         self.assertIn("First strategy alpha", stdout)
@@ -429,7 +445,7 @@ class TestCliPlans(unittest.TestCase):
         )
         exit_code, stdout, _ = self.run_cli(["plan", "show", "--macrocycle", str(later)])
         self.assertEqual(exit_code, 0)
-        self.assertIn("Later goal gamma", stdout)
+        self.assertIn("Other Goal", stdout)
 
     def _seed_two_versions(self) -> tuple:
         """A goal with two plan versions differing in strategy, mesocycle dates and inputs."""
@@ -556,8 +572,8 @@ class TestCliPlans(unittest.TestCase):
 
         exit_code, stdout, _ = self.run_cli(["plan", "show", "--all"])
         self.assertEqual(exit_code, 0)
-        self.assertIn("First plan", stdout)
-        self.assertIn("Second plan", stdout)
+        self.assertIn("First Goal", stdout)
+        self.assertIn("Second Goal", stdout)
         self.assertNotIn("Unplanned Goal", stdout)
         # Summarised by default, expanded with --workouts.
         self.assertIn("1 workouts · 1h00 · load 45", stdout)
@@ -581,7 +597,7 @@ class TestCliPlans(unittest.TestCase):
             objective_id=oid, strategy="Ride", goals_hash="g", constraints_hash="c",
             mesocycles=[], config_snapshot=json.dumps({"ftp": 220.0, "max_hr": 185.0}),
         )
-        exit_code, stdout, _ = self.run_cli(["plan", "show", "--goal", str(oid)])
+        exit_code, stdout, _ = self.run_cli(["plan", "show", "--goal", str(oid), "-v"])
         self.assertEqual(exit_code, 0)
         self.assertIn("Thresholds considered:", stdout)
         self.assertIn("ftp: 220", stdout)
@@ -603,7 +619,7 @@ class TestCliPlans(unittest.TestCase):
                 "end_date": "2026-06-05", "rest": 0, "description": None, "replan": 0,
             }]),
         )
-        exit_code, stdout, _ = self.run_cli(["plan", "show", "--goal", str(oid)])
+        exit_code, stdout, _ = self.run_cli(["plan", "show", "--goal", str(oid), "-v"])
         self.assertEqual(exit_code, 0)
         self.assertIn("Constraints considered (plan-shaping):", stdout)
         self.assertIn("Also active (tactical", stdout)

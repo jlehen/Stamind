@@ -598,7 +598,7 @@ class TestFeedbackDisplay(FeedbackTestCase):
         test_db.add_plan_feedback(macro_id, "overall too easy")
         test_db.add_plan_feedback(macro_id, "more vertical", mesocycle_id=mesos[2]["id"])
 
-        exit_code, stdout, _ = self.run_cli(["plan", "show"])
+        exit_code, stdout, _ = self.run_cli(["plan", "show", "-v"])
 
         self.assertEqual(exit_code, 0)
         self.assertIn("Athlete Feedback", stdout)

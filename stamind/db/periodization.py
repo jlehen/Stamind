@@ -263,7 +263,7 @@ class PeriodizationMixin:
         constraints_hash: str, mesocycles: List[Dict[str, Any]],
         config_hash: str = "", config_snapshot: str = "", goals_snapshot: str = "",
         constraints_snapshot: str = "", all_constraints_snapshot: str = "",
-        profile_snapshot: str = "", science_snapshot: str = ""
+        profile_snapshot: str = "", science_snapshot: str = "", summary: str = ""
     ) -> int:
         """Saves a macrocycle and its nested mesocycles for the objective.
 
@@ -294,13 +294,13 @@ class PeriodizationMixin:
                     objective_id, strategy, goals_hash, constraints_hash, config_hash,
                     config_snapshot, profile_snapshot, goals_snapshot,
                     constraints_snapshot, all_constraints_snapshot, science_snapshot,
-                    created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    created_at, summary
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (objective_id, strategy, goals_hash, constraints_hash, config_hash,
                   config_snapshot or None, profile_snapshot or None,
                   goals_snapshot or None, constraints_snapshot or None,
                   all_constraints_snapshot or None, science_snapshot or None,
-                  created_at))
+                  created_at, summary or None))
             macrocycle_id = cursor.lastrowid
 
             for meso in mesocycles:

@@ -77,12 +77,14 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     p_show = plan_subparsers.add_parser(
         "show",
         help="Show a macrocycle and its mesocycles periodization strategy "
-             "(--goal/--macrocycle/--all, -w for workouts)",
+             "(--goal/--macrocycle/--all, -w for workouts, -v for the full text)",
         description=(
-            "Show a periodization plan: the macrocycle strategy, the inputs it was "
-            "generated from (goals, constraints, threshold anchors) and its mesocycle "
-            "timeline. Flags any of those inputs that have changed since, and what to do "
-            "about it. Defaults to the active plan of the next active goal; --goal reaches "
+            "Show a periodization plan: the macrocycle strategy and its mesocycle timeline, "
+            "each in a short summary. With -v, the full strategy and each mesocycle's full "
+            "focus, plus the athlete feedback notes and the inputs the plan was generated "
+            "from (goals, constraints, threshold anchors). Flags any input that has changed "
+            "since, and what to do about it. Defaults to the active plan of the next active "
+            "goal; --goal reaches "
             "any goal including completed/archived ones, --macrocycle an earlier plan version, "
             "and --all every goal that has a plan."
         )
@@ -106,6 +108,11 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     p_show.add_argument(
         "-w", "--workouts", action="store_true",
         help="List each mesocycle's scheduled workouts, not just their count/load summary"
+    )
+    p_show.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="Print the full strategy and each mesocycle's full focus instead of their "
+             "summaries, plus the feedback notes and the inputs the plan was generated from"
     )
 
     # plan keep

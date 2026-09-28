@@ -246,10 +246,11 @@ class TestPlanFingerprintsSurviveTheAcceptStep(unittest.TestCase):
         test_db.update_objective(goal_id, title="Autumn Marathon (moved)")
 
         coach_service.plan_apply(
-            goal_id, "Build then taper", [], fingerprints=generated
+            goal_id, "Build then taper", [], fingerprints=generated, summary="Build, taper."
         )
 
         macro = test_db.get_macrocycle_for_objective(goal_id)
+        self.assertEqual(macro["summary"], "Build, taper.")
         self.assertEqual(macro["goals_hash"], "hash-at-generate-time")
         self.assertEqual(macro["constraints_hash"], "constraints-at-generate-time")
         self.assertEqual(macro["config_hash"], "config-at-generate-time")

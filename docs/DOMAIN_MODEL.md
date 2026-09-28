@@ -378,7 +378,7 @@ These are easy to confuse, so they are named apart:
 | Command | What it does |
 |---|---|
 | `plan generate` | Generate or reuse. `-f` forces. `--fresh` withholds the plan in place from the prompt (a clean slate, not a revision — implies `-f`). `-g` targets a goal. `-y` applies without the preview. `--show-llm-context` also prints the planned-vs-actual review it feeds the model. |
-| `plan show` | Strategy, snapshotted inputs, mesocycle timeline with each mesocycle's session count / duration / load. `-M ID` for a superseded version, `-a` for every goal, `-w` to list each mesocycle's sessions. |
+| `plan show` | The strategy's summary, and the mesocycle timeline with each mesocycle's one-line summary and session count / duration / load. `-v` shows the full strategy and focus instead, plus the snapshotted inputs. `-M ID` for a superseded version, `-a` for every goal, `-w` to list each mesocycle's sessions. |
 | `plan versions` | Every kept version for a goal, active and superseded, with IDs and dates. |
 | `plan diff [A] [B]` | Compare two versions: strategy prose, attached feedback, mesocycles added/removed/renamed/re-dated, snapshot deltas. |
 | `plan rollback` | Make a superseded version active again, and put the workouts back the way they were when it last wrote. `-M` names a version other than the previous one. |

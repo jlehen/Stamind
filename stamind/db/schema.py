@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Bump when the DDL below changes, so an existing database picks the change up once.
 # Reusing a number a previous commit already stamped is silent (ARCHITECTURE.md §5).
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 
 # The append-only rule, as the database enforces it (DESIGN_workout_revisions.md §14).
 # `wipe_workouts` drops both triggers to clear the table and puts them back from here, so
@@ -369,6 +369,8 @@ class SchemaMixin:
                     -- the prior macrocycle, marked 'superseded'. Exactly one is 'active'.
                     status TEXT DEFAULT 'active',
                     superseded_at TEXT,
+                    -- the strategy in two sentences, or NULL (DESIGN_output_verbosity.md §5.1)
+                    summary TEXT,
                     FOREIGN KEY (objective_id) REFERENCES objectives(id) ON DELETE CASCADE
                 )
             """)

@@ -306,6 +306,12 @@ not display prose: it is persisted on the macrocycle and re-injected into the sy
 of every subsequent command as `## COACH LEARNINGS & ACTIVE PERIODIZATION STRATEGY`.
 Shortening it would shrink the coach's standing context to buy a shorter one-off read.
 
+The athlete reads a short version instead. `plan generate` writes a `summary` beside the
+strategy, at most two sentences, the way it writes one beside each mesocycle's `focus`
+(DESIGN_calendar_miniapp.md §3.7). `plan show` prints the two summaries, and `-v` prints
+the full strategy and focus in their place. Here `-v` means "more detail in this listing",
+as it does on the other listings (§4). The summaries never reach a prompt.
+
 Same reasoning spares `data analyze` / `data reflect`: their output becomes durable coach
 learnings, they run rarely, and their prose is context rather than chatter.
 
