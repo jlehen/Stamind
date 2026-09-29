@@ -254,7 +254,9 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             "Telegram just before their next morning message, even one that changes "
             "today's sessions. This lists the changes still waiting, each with the line the "
             "athlete will get, and asks the bot to send them on its next wake, within five "
-            "minutes, whatever the hour. "
+            "minutes, whatever the hour. --list stops once they are listed. --sent lists "
+            "the lines the athlete was already told instead, newest first, with when; -d "
+            "picks the days. "
             f"'{green('workout batches')}' marks them 'not sent yet'."
         ),
     )
@@ -262,6 +264,16 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     w_notify.add_argument(
         "-y", "--yes", action="store_true", help="Skip confirmation prompt"
     )
+    w_notify.add_argument(
+        "--list", action="store_true",
+        help="List what is waiting and stop: ask nothing, send nothing",
+    )
+    w_notify.add_argument(
+        "--sent", action="store_true",
+        help="List the lines already told to the athlete instead, from the last 7 days "
+             "unless -d picks the days",
+    )
+    add_selector_args(w_notify, direction="backward", default="7d")
 
     # workout adapt
     w_adapt = workout_subparsers.add_parser(

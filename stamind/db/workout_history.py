@@ -228,6 +228,16 @@ class WorkoutHistoryMixin:
             ).fetchall()
         return [dict(row) for row in rows if self.change_has_live_revisions(row["id"])]
 
+    def told_changes(self) -> List[Dict[str, Any]]:
+        """The changes whose line the athlete was told, newest first (§6)."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM workout_changes "
+                "WHERE note IS NOT NULL AND note != '' AND told_at IS NOT NULL "
+                "ORDER BY told_at DESC, id DESC"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def mark_changes_told(self, change_ids: Sequence[int]) -> None:
         """Records that the athlete was told about these changes (§6)."""
         if not change_ids:
