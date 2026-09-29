@@ -4,19 +4,19 @@ A `workout generate` or `workout adapt` started in the terminal changes the athl
 out of their sight, and its line waits for the bot to send it.
 This module holds the question asked before such a run when the previous attempt was never
 sent (§5), the notice that says when the line goes out (§8), and `workout notify`, which
-asks the bot to send what is waiting at once (§4) and lists the lines already told.
+asks the bot to send what is waiting at once (§4) and lists every line, sent or not.
 `workout generate` and `workout adapt` share the first two.
 """
 import argparse
 import textwrap
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
 from stamind import clock, heads_up, runtime, settings
 from stamind.cli.windows import has_selector, resolve_window
 from stamind.prompt import Choice, athlete_watching
-from stamind.text import bold, cmd, default_wrap_width, green, red, wrap_text
+from stamind.text import bold, cmd, default_wrap_width, gray, green, red, wrap_text, yellow
 from stamind.output import notice
 from stamind.clock import fmt_timestamp, today_str
 
@@ -155,50 +155,67 @@ def print_send_notice(dates: Iterable[str]) -> None:
     )
 
 
-def _print_lines(title: str, changes: List[Dict[str, Any]], stamp) -> None:
-    """The title, then each change's time and kind with the line the athlete gets under it."""
+def _tag(change: Dict[str, Any], waiting_ids: Set[int]) -> str:
+    """Whether the athlete got the change's line: when it was sent, not yet, or never,
+    because the change was undone first (§6)."""
+    if change["told_at"]:
+        return gray(f"sent {fmt_timestamp(change['told_at'])}")
+    if change["id"] in waiting_ids:
+        return yellow("not sent yet")
+    return gray("undone, never sent")
+
+
+def _print_lines(title: str, changes: List[Dict[str, Any]], waiting_ids: Set[int]) -> None:
+    """The title, then each change's line for the athlete under when the change was made,
+    its kind and whether the line was sent."""
     print(bold(title))
     width = default_wrap_width() - 4
+    kind_width = max(len(change["kind"]) for change in changes)
     for change in changes:
-        print(f"  {stamp(change)} ({change['kind']})")
+        made = fmt_timestamp(change["created_at"])
+        kind = change["kind"].ljust(kind_width)
+        print(f"  {made}  {kind}  {_tag(change, waiting_ids)}")
         print(textwrap.indent(wrap_text(heads_up.message(change), width), "    "))
 
 
-def _told_day(change: Dict[str, Any]) -> str:
-    """The athlete's local day a change's line was told on, as YYYY-MM-DD."""
-    return clock.to_local(datetime.fromisoformat(change["told_at"])).strftime("%Y-%m-%d")
+def _made_day(change: Dict[str, Any]) -> str:
+    """The athlete's local day a change was made on, as YYYY-MM-DD."""
+    return clock.to_local(datetime.fromisoformat(change["created_at"])).strftime("%Y-%m-%d")
 
 
-def _print_sent(args: argparse.Namespace) -> None:
-    """The lines told on the days `-d` picks, newest first, each with when (§6)."""
+def _print_history(args: argparse.Namespace) -> None:
+    """The lines of the changes made on the days `-d` picks, oldest first: every one with
+    `--all`, the ones already told with `--sent` (§6)."""
     start, end = resolve_window(args)
-    told = [c for c in runtime.db.told_changes() if start <= _told_day(c) <= end]
-    if not told:
-        print("Nothing was told to the athlete on those days.")
+    changes = [c for c in runtime.db.changes_with_lines() if start <= _made_day(c) <= end]
+    title = "Lines for the athlete, oldest first:"
+    if getattr(args, "sent", False):
+        changes = [c for c in changes if c["told_at"]]
+        title = "Lines already told to the athlete, oldest first:"
+    if not changes:
+        print("No line for the athlete from those days.")
         return
-    _print_lines(
-        "Already told to the athlete, newest first:", told,
-        lambda change: fmt_timestamp(change["told_at"]),
-    )
+    _print_lines(title, changes, {c["id"] for c in heads_up.waiting()})
 
 
 def run_workout_notify(args: argparse.Namespace) -> None:
     """Asks the bot to send the changes waiting to be told on its next wake, whatever the
-    hour and however young the change (§4). `--list` stops once they are listed; `--sent`
-    lists the lines already told instead."""
-    if getattr(args, "sent", False):
-        _print_sent(args)
+    hour and however young the change (§4). `--sent` and `--all` list the lines instead and
+    send nothing."""
+    if getattr(args, "sent", False) or getattr(args, "all", False):
+        _print_history(args)
         return
     if has_selector(args):
-        notice("-d picks the days the lines were told on, so it needs --sent.", red)
+        notice("-d picks the days the changes were made on, so it needs --sent or --all.", red)
         return
     waiting = heads_up.waiting()
     if not waiting:
         print("Nothing is waiting to be sent to the athlete.")
         return
-    _print_lines("Waiting to be sent to the athlete, oldest first:", waiting, _when)
-    if getattr(args, "list", False):
-        return
+    _print_lines(
+        "Waiting to be sent to the athlete, oldest first:", waiting,
+        {c["id"] for c in waiting},
+    )
     if not (getattr(args, "yes", False) or runtime.prompt.confirm("Send them now?")):
         print("Nothing sent. They go out at the usual time.")
         return

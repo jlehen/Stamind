@@ -254,9 +254,10 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             "Telegram just before their next morning message, even one that changes "
             "today's sessions. This lists the changes still waiting, each with the line the "
             "athlete will get, and asks the bot to send them on its next wake, within five "
-            "minutes, whatever the hour. --list stops once they are listed. --sent lists "
-            "the lines the athlete was already told instead, newest first, with when; -d "
-            "picks the days. "
+            "minutes, whatever the hour. --all lists every line instead, sent or not, and "
+            "--sent the ones already sent; both send nothing and cover the changes made "
+            "on the days -d picks. Each line shows when its change was made and whether "
+            "it was sent, and when. "
             f"'{green('workout batches')}' marks them 'not sent yet'."
         ),
     )
@@ -264,14 +265,15 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     w_notify.add_argument(
         "-y", "--yes", action="store_true", help="Skip confirmation prompt"
     )
-    w_notify.add_argument(
-        "--list", action="store_true",
-        help="List what is waiting and stop: ask nothing, send nothing",
+    history = w_notify.add_mutually_exclusive_group()
+    history.add_argument(
+        "--all", action="store_true",
+        help="List every line instead, sent, waiting or undone before it went out, from "
+             "the changes of the last 7 days unless -d picks the days; sends nothing",
     )
-    w_notify.add_argument(
+    history.add_argument(
         "--sent", action="store_true",
-        help="List the lines already told to the athlete instead, from the last 7 days "
-             "unless -d picks the days",
+        help="List only the lines already sent, the same way as --all",
     )
     add_selector_args(w_notify, direction="backward", default="7d")
 

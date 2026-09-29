@@ -8,6 +8,7 @@ import unittest
 from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from io import StringIO
+from typing import Optional
 from unittest.mock import patch
 
 from tests.helpers import (
@@ -25,6 +26,11 @@ from stamind.clock import today_str
 def _at(day: int, hour: int, minute: int = 0) -> datetime:
     """An instant in September 2026 on the local clock."""
     return datetime(2026, 9, day, hour, minute).astimezone()
+
+
+def _noon_utc(day: int) -> str:
+    """Noon on September `day` on the local clock, as the database stores an instant."""
+    return _at(day, 12).astimezone(timezone.utc).isoformat()
 
 
 def _waiting(change_id: int, made: datetime, touches_today: bool = False) -> dict:
@@ -447,29 +453,48 @@ class NotifyTest(_DbCase):
         self.assertIn("Nothing is waiting", out)
         self.assertIsNone(test_db.get_setting(heads_up.NOTIFY_MARKER))
 
-    def _told(self, change_id: int, day: int) -> None:
-        """Records the change's line as told at noon on September `day`."""
-        told_at = _at(day, 12).astimezone(timezone.utc).isoformat()
+    def _stamp(self, change_id: int, made: int, told: Optional[int] = None) -> None:
+        """Sets when the change was made, and when its line was told, at noon on those
+        September days; no `told` leaves the line unsent."""
+        told_at = None
+        if told is not None:
+            told_at = _noon_utc(told)
         with test_db._get_connection() as conn:
             conn.execute(
-                "UPDATE workout_changes SET told_at = ? WHERE id = ?", (told_at, change_id)
+                "UPDATE workout_changes SET created_at = ?, told_at = ? WHERE id = ?",
+                (_noon_utc(made), told_at, change_id),
             )
             conn.commit()
 
-    def test_list_shows_what_waits_and_sends_nothing(self):
-        self.change(note="First.")
-        _code, out, _ = run_cli(["workout", "notify", "--list"])
-        self.assertIn(f"{heads_up.CHANGE_LEAD} First.", out)
+    @staticmethod
+    def _row_above(out: str, text: str) -> str:
+        """The row printed above the line holding `text`: when, kind and tag."""
+        lines = out.splitlines()
+        index = next(i for i, line in enumerate(lines) if text in line)
+        return lines[index - 1]
+
+    def test_all_tags_each_line_sent_waiting_or_undone(self):
+        told = self.change(note="Monday's line.")
+        waiting = self.change(note="Still waiting.", day="2026-09-25")
+        undone = self.change(note="Undone before it went out.", day="2026-09-26")
+        test_db.rollback_to_change(undone, today_str(), summary="undo")
+        self._stamp(told, made=20, told=21)
+        self._stamp(waiting, made=22)
+        self._stamp(undone, made=22)
+        _code, out, _ = run_cli(["workout", "notify", "--all"])
+        self.assertIn("2026-09-20", self._row_above(out, "Monday's line."))
+        self.assertIn("sent 2026-09-21", self._row_above(out, "Monday's line."))
+        self.assertIn("not sent yet", self._row_above(out, "Still waiting."))
+        self.assertIn("undone, never sent", self._row_above(out, "Undone before it went out."))
         self.assertIsNone(test_db.get_setting(heads_up.NOTIFY_MARKER))
 
-    def test_sent_lists_the_lines_told_on_the_days_asked(self):
+    def test_sent_lists_the_sent_lines_of_the_changes_made_on_the_days_asked(self):
         """The clock is pinned on Wednesday the 23rd, so the default week starts on the 17th."""
-        self._told(self.change(note="Early in the month."), 1)
-        self._told(self.change(note="Monday's line."), 21)
-        self.change(note="Still waiting.", day="2026-09-25")
+        self._stamp(self.change(note="Early in the month."), made=1, told=1)
+        self._stamp(self.change(note="Monday's line."), made=21, told=21)
+        self._stamp(self.change(note="Still waiting.", day="2026-09-25"), made=22)
         _code, out, _ = run_cli(["workout", "notify", "--sent"])
         self.assertIn(f"{heads_up.CHANGE_LEAD} Monday's line.", out)
-        self.assertIn("2026-09-21 Mon", out)
         self.assertNotIn("Early in the month.", out)
         self.assertNotIn("Still waiting.", out)
         _code, out, _ = run_cli(["workout", "notify", "--sent", "-d", "2026-09-01"])

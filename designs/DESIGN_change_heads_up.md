@@ -272,10 +272,12 @@ changes are rolled back before the wake, no waiting change is that old, and the 
 the operator makes is not sent early by a leftover. With nothing waiting, or on an expert
 instance, `workout notify` says so and does nothing.
 
-To look without sending, `workout notify --list` prints the same list and stops there.
-`workout notify --sent` prints the lines she was already told instead, newest first, each
-with the time it was told, from the last 7 days unless `-d` picks the days. A told line is
-never deleted: `told_at` keeps the moment, so this is a read of rows already there.
+Each line in the list shows when its change was made, its kind, and a tag: "not sent yet".
+To look back without sending, `workout notify --all` lists every line of the changes made in
+the last 7 days, unless `-d` picks the days, oldest first. Each tag then says "sent" with the
+time it went out, "not sent yet", or "undone, never sent" for a change rolled back before
+the bot got to it. `workout notify --sent` keeps the sent ones only. A told line is never
+deleted: `told_at` keeps the moment, so this is a read of rows already there.
 
 **If she opens her chat, she is told first.** The wait exists so that a message does not
 reach her at a bad moment or in the middle of the operator's work. That does not matter once
