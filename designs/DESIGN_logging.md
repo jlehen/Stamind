@@ -748,6 +748,13 @@ command killed by the watchdog, the morning push firing — is a readable timeli
 spawned CLI subprocess is a run of its own with the bot's run id as its parent, and
 `sm journal <bot-run>` walks into the children.
 
+A send carries the words it sent, as a message received carries what the athlete wrote: the
+text of a reply, of a queued item and of a question, and the labels of a row of buttons. So
+the journal holds both sides of the chat. The morning message is built from the day's
+sessions when it goes out and stored nowhere else, so this line is the only place to read
+what it said once the sessions have moved. A reply longer than one record holds is cut
+(§4.3).
+
 That long-lived run is why §3 needs the `?` outcome and §10 needs its own trigger. It has
 no `run.end` for as long as it is up, and none at all if the supervisor kills it — which
 is the normal way it ends.

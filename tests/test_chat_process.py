@@ -387,6 +387,11 @@ class SendingTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.session.last_message_id, 101)
         self.assertTrue(self.session.sent)
 
+    async def test_a_flush_logs_the_words_it_sent(self):
+        with mock.patch.object(self.chat_bot, "_log") as log:
+            await self.chat_bot._flush_output(self.session, ["one", "two"])
+        log.assert_called_once_with(42, "<<", repr("one\ntwo"))
+
     async def test_an_empty_buffer_sends_nothing(self):
         self.assertFalse(await self.chat_bot._flush_output(self.session, ["", "  "]))
         self.assertEqual(self.chat_bot.bot.sent, [])

@@ -119,7 +119,7 @@ class RepliesMixin:
         for part in format_reply(text):
             sent = await self._send_keyed(session.chat_id, part, parse_mode=parse_mode)
             session.last_message_id = sent.message_id
-        self._log(session.chat_id, "<<", f"{text.count(chr(10)) + 1} line(s)")
+        self._log(session.chat_id, "<<", repr(text))
         await self._retire_stop(session)
         return True
 
@@ -152,6 +152,7 @@ class RepliesMixin:
         token = secrets.token_hex(3)
         self.ui_actions[session.chat_id] = (token, buttons)
         keyboard = telegram_api.inline_keyboard(ui_button_rows(buttons, token))
+        labels = f"buttons {[b.get('label') for b in buttons]}"
         session.sent = True
         if session.last_message_id is not None:
             try:
@@ -159,7 +160,7 @@ class RepliesMixin:
                     chat_id=session.chat_id, message_id=session.last_message_id,
                     reply_markup=keyboard,
                 )
-                self._log(session.chat_id, "<<", f"{len(buttons)} ui button(s)")
+                self._log(session.chat_id, "<<", labels)
                 return
             except Exception as exc:
                 # Older client / edited race — degrade to a fresh message
@@ -168,7 +169,7 @@ class RepliesMixin:
         await self.bot.send_message(
             chat_id=session.chat_id, text="👇", reply_markup=keyboard,
         )
-        self._log(session.chat_id, "<<", f"{len(buttons)} ui button(s)")
+        self._log(session.chat_id, "<<", labels)
 
     async def _send_queue_item(self, session: Session, req: dict) -> None:
         """Sends a queued item as a message of its own (DESIGN_athlete_queue.md §6.2). Its
@@ -179,7 +180,7 @@ class RepliesMixin:
         await self.bot.send_message(
             chat_id=session.chat_id, text=req.get("text") or "", reply_markup=keyboard,
         )
-        self._log(session.chat_id, "<<", f"queue item #{req.get('id')}")
+        self._log(session.chat_id, "<<", f"queue item #{req.get('id')}: {req.get('text')!r}")
 
     async def _send_photo(self, session: Session, req: dict) -> None:
         """Sends the chart PNG a `--chart` run pointed at, then unlinks the temp
@@ -218,13 +219,15 @@ class RepliesMixin:
             await self.bot.send_message(
                 chat_id=session.chat_id, text=message, reply_markup=keyboard
             )
-            self._log(session.chat_id, "??", f"{req.get('type')} prompt {req.get('id')}")
+            self._log(
+                session.chat_id, "??", f"{req.get('type')} prompt {req.get('id')}: {message!r}"
+            )
         else:  # text prompt: the next message is the answer
             await self.bot.send_message(
                 chat_id=session.chat_id,
                 text=message + "\n\n(send your reply, or /cancel)",
             )
-            self._log(session.chat_id, "??", f"text prompt {req.get('id')}")
+            self._log(session.chat_id, "??", f"text prompt {req.get('id')}: {message!r}")
         try:
             return await asyncio.wait_for(
                 session.answer_future, timeout=self.prompt_timeout
