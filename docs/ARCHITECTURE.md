@@ -182,9 +182,13 @@ classes themselves.
     invocation = a loop that relaunches a child of itself, `SM_BOT_SUPERVISED=1` = the
     `exec stamind_bot.py` worker — and traps SIGINT/SIGTERM to TERM-then-KILL the
     child rather than orphan it. `RESTART_EXIT_CODE = 75` is a **cross-file contract**
-    (`sm-bot` and `stamind/chat/runner.py` must stay in sync): only 75 relaunches,
-    every other exit (crash included) ends the supervisor too — no backoff, no crash
-    recovery, by design. `/restart` is a bot command beside `/cancel` and `/start`, under
+    (`sm-bot` and `stamind/chat/runner.py` must stay in sync): only 75 relaunches, and
+    129, a worker killed by a SIGHUP before it could handle one. Every other exit (crash
+    included) ends the supervisor too — no backoff, no crash recovery, by design.
+    **SIGHUP** restarts the bot from a shell, sent to either process: the supervisor
+    passes it on to the worker and waits again, and the worker's `_serve` stops the way it
+    does on SIGTERM, then `run` exits 75. No chat is told (DESIGN_bot_restart.md §5.3).
+    `/restart` is a bot command beside `/cancel` and `/start`, under
     the same allowlist: it kills any running command's subprocess and stops the Updater
     (`runner.restart_teardown`, a module function so it can be driven without a client),
     leaves a `restart_chat` note under `data_dir` (`runner.leave_restart_note`), replies,

@@ -69,8 +69,9 @@ Simplified to one special case:
 
 | Outcome | Trigger | Supervisor action |
 |---|---|---|
-| Requested restart | worker exits with `RESTART_EXIT_CODE` (75) | relaunch immediately |
-| Everything else | any other exit — code 0, a crash, a signal-induced death, operator Ctrl-C, whatever | supervisor exits too — no relaunch |
+| Requested restart | worker exits with `RESTART_EXIT_CODE` (75), after `/restart` or a SIGHUP (§5.3) | relaunch immediately |
+| Killed by SIGHUP | worker dies of a SIGHUP it had no handler for yet (bash reports 129, §5.3) | relaunch immediately |
+| Everything else | any other exit — code 0, a crash, another signal-induced death, operator Ctrl-C, whatever | supervisor exits too — no relaunch |
 
 Concretely:
 
@@ -204,6 +205,36 @@ finds no note and says nothing.
 The exit code *is* the contract with the supervisor (§4), so every step above is
 bounded and failure-tolerant: a wedged subprocess or a hung `updater.stop()` is
 logged and stepped over, never allowed to prevent the exit.
+
+### 5.3 SIGHUP
+
+Added 2026-09-28. `/restart` needs the chat. The operator at a shell has a process id
+instead, so a SIGHUP restarts the bot too, sent to either process.
+
+It is Monday evening. The author pulls new code and runs `kill -HUP` on the `sm-bot`
+supervisor. The supervisor does not act on it: its trap sends the SIGHUP on to the worker
+and goes back to waiting. The worker then stops the way SIGTERM stops it. It closes the
+Telegram long-poll, which confirms the last batch of updates, and it cancels the task of
+any command still running, which kills that command's subprocess. Then it exits with
+`RESTART_EXIT_CODE` instead of 0, and the supervisor starts a new worker on the new code.
+A SIGHUP sent straight to the worker does the same, minus the relay.
+
+Three details make this hold:
+
+- Bash ends a `wait` as soon as a trapped signal arrives, while the worker is still
+  shutting down. The supervisor waits again rather than read that early return as the
+  worker's exit, or it would start a second worker beside the first.
+- The worker installs its handler in `_serve`, a second or so after it starts. A SIGHUP
+  before that kills it outright, and bash reports exit 129. The supervisor relaunches on
+  129 too, so a SIGHUP always ends in a restart.
+- No chat asked, so no chat is told: no restart note, no "Restarting…", no "Back 👍". The
+  athlete's calendar button keeps the old code's snapshot until the bot next writes to them.
+
+Closing the terminal `sm-bot` runs in also sends a SIGHUP. The bot still stops there, as it
+did before: the worker shuts down and the supervisor exits without starting another
+(checked by hand 2026-09-28, closing a pty).
+Not handled: a supervisor started with SIGHUP ignored (`nohup`) cannot trap it, so there
+only a SIGHUP to the worker restarts.
 
 ## 6. Touch points
 

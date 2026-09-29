@@ -52,10 +52,36 @@ class _FakeBot:
         return [text for _chat, text, _kw in self.sent]
 
 
+class _FakeUpdater:
+    def __init__(self) -> None:
+        self.running = False
+
+    async def start_polling(self, **kw):
+        self.running = True
+
+    async def stop(self):
+        self.running = False
+
+
 class _FakeApplication:
+    """Stands in for `telegram.ext.Application`, with as much of its lifetime as `_serve`
+    drives."""
+
     def __init__(self) -> None:
         self.bot = _FakeBot()
-        self.updater = SimpleNamespace(running=False)
+        self.updater = _FakeUpdater()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc_info):
+        return None
+
+    async def start(self):
+        pass
+
+    async def stop(self):
+        pass
 
 
 class _FakeProc:
@@ -113,6 +139,7 @@ def build_chat_bot(testcase, allowed=(42,)) -> ChatBot:
         mock.patch.object(telegram_api, "inline_keyboard", lambda rows: rows),
         mock.patch.object(telegram_api, "command_menu", lambda commands: list(commands)),
         mock.patch.object(telegram_api, "html_parse_mode", lambda: "HTML"),
+        mock.patch.object(telegram_api, "all_update_types", lambda: []),
         # The bot's own timeline goes to stdout; a suite does not need it.
         mock.patch("stamind.chat.app.print", create=True),
         # `_tell_changes_first` reads the database before acting on the athlete's own

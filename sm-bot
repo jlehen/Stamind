@@ -21,9 +21,10 @@ if [ "$SM_BOT_SUPERVISED" = "1" ]; then
 fi
 
 # Supervisor: relaunch the worker only when it exits with RESTART_EXIT_CODE
-# (which is what a /restart from Telegram triggers). Any other exit -- code 0,
-# a crash, a signal-induced death, operator Ctrl-C, whatever -- ends the
-# supervisor too. See DESIGN_bot_restart.md section 4; no backoff or
+# (which is what a /restart from Telegram or a SIGHUP triggers), or when a SIGHUP
+# killed it before it could handle one (exit 129). Any other exit -- code 0, a
+# crash, another signal-induced death, operator Ctrl-C, whatever -- ends the
+# supervisor too. See DESIGN_bot_restart.md sections 4 and 5.3; no backoff or
 # crash-loop handling by design.
 child_pid=""
 
@@ -46,6 +47,17 @@ _on_signal() {
 trap '_on_signal INT' INT
 trap '_on_signal TERM' TERM
 
+# A SIGHUP sent to the supervisor restarts the bot too: it is passed on to the worker.
+hup=0
+_on_hup() {
+    echo "sm-bot: supervisor got SIGHUP, restarting worker..."
+    hup=1
+    if [ -n "$child_pid" ]; then
+        kill -HUP "$child_pid" 2>/dev/null || true
+    fi
+}
+trap _on_hup HUP
+
 echo "sm-bot: supervisor starting (pid $$)"
 while true; do
     echo "sm-bot: launching worker..."
@@ -53,8 +65,14 @@ while true; do
     child_pid=$!
     rc=0
     wait "$child_pid" || rc=$?
+    # A trapped SIGHUP ends the wait at once, while the worker is still shutting down.
+    while [ "$hup" = 1 ]; do
+        hup=0
+        rc=0
+        wait "$child_pid" || rc=$?
+    done
     child_pid=""
-    if [ "$rc" -eq "$RESTART_EXIT_CODE" ]; then
+    if [ "$rc" -eq "$RESTART_EXIT_CODE" ] || [ "$rc" -eq 129 ]; then
         echo "sm-bot: worker requested restart (exit $rc), relaunching..."
         continue
     fi

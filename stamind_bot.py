@@ -21,7 +21,7 @@ library is named in one file there, ``chat/telegram_api.py``, and imported only 
 called.
 
 ``sm-bot`` supervises this process and relaunches it on
-``stamind.chat.runner.RESTART_EXIT_CODE``, which is what ``/restart`` exits with.
+``stamind.chat.runner.RESTART_EXIT_CODE``, which is what ``/restart`` and a SIGHUP exit with.
 
 Run with: ``./sm-bot`` (or ``venv/bin/python stamind_bot.py``). Configure the token +
 allowlist under a ``telegram:`` section in config.yaml (see config_template.yaml).

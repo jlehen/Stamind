@@ -2,9 +2,10 @@
 
 `tests/test_bot.py` covers the front-end's pure modules — what a message means, what the
 bot draws, when the scheduler fires. This file covers the object that uses them: how it
-reads its own configuration, how a command's output reaches the chat, and how /restart
-tears a live command down. `tests/test_chat_handlers.py` covers what arrives from the
-athlete. The stand-ins all three use are in `tests/chat_harness.py`.
+reads its own configuration and how a command's output reaches the chat.
+`tests/test_chat_handlers.py` covers what arrives from the athlete, and
+`tests/test_bot_restart.py` how /restart and a SIGHUP restart the bot. The stand-ins all
+four use are in `tests/chat_harness.py`.
 """
 import ast
 import asyncio
@@ -75,74 +76,6 @@ class FormatReplyTest(unittest.TestCase):
         """§6: the client flows it, so no <pre> and no column alignment to protect."""
         parts = replies.format_reply("a < b & c > d")
         self.assertEqual(parts, ["a &lt; b &amp; c &gt; d"])
-
-
-class RestartTeardownTest(unittest.IsolatedAsyncioTestCase):
-    """/restart's teardown (DESIGN_bot_restart.md §5.2): no orphaned subprocess and no
-    long-poll left open when os._exit() fires."""
-
-    def setUp(self):
-        patcher = mock.patch.object(runner, "RESTART_GRACE_SECONDS", 0.02)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        self.stops = []
-
-    async def _stop_polling(self):
-        self.stops.append(True)
-
-    def _session(self, awaiting=None, proc=None):
-        session = runner.Session(42, proc if proc is not None else _FakeProc(), "n0nce")
-        if awaiting is not None:
-            session.awaiting = awaiting
-            session.answer_future = asyncio.get_running_loop().create_future()
-        return session
-
-    async def test_kills_a_silently_computing_session(self):
-        # A single getUpdates batch can deliver a command and /restart together, so
-        # /restart can land with a subprocess running and no prompt open.
-        session = self._session()
-        await runner.restart_teardown(session, self._stop_polling)
-        self.assertTrue(session.proc.killed)
-
-    async def test_open_prompt_is_answered_cancelled_not_killed(self):
-        session = self._session(
-            {"id": "p1", "type": "confirm"}, _FakeProc(exits_on_its_own=True)
-        )
-        await runner.restart_teardown(session, self._stop_polling)
-        self.assertTrue(session.answer_future.result()["cancelled"])
-        self.assertFalse(session.proc.killed)
-
-    async def test_open_prompt_whose_process_lingers_is_killed_after_the_grace(self):
-        session = self._session({"id": "p1", "type": "confirm"})
-        await runner.restart_teardown(session, self._stop_polling)
-        self.assertTrue(session.proc.killed)
-
-    async def test_finished_process_is_left_alone(self):
-        session = self._session()
-        session.proc.returncode = 0
-        await runner.restart_teardown(session, self._stop_polling)
-        self.assertFalse(session.proc.killed)
-
-    async def test_releases_the_long_poll(self):
-        # Without this, the abandoned getUpdates never confirms its offset and the
-        # relaunched worker is served the same /restart again (§7).
-        await runner.restart_teardown(None, self._stop_polling)
-        self.assertEqual(self.stops, [True])
-        session = self._session()
-        await runner.restart_teardown(session, self._stop_polling)
-        self.assertEqual(len(self.stops), 2)
-
-    async def test_a_wedged_stop_still_returns(self):
-        async def _hangs():
-            await asyncio.sleep(3600)
-
-        await runner.restart_teardown(None, _hangs)  # must not hold up the hard exit
-
-    async def test_a_failing_stop_still_returns(self):
-        async def _raises():
-            raise RuntimeError("This Updater is not running!")
-
-        await runner.restart_teardown(None, _raises)
 
 
 class CliPathTest(unittest.TestCase):

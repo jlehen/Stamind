@@ -197,12 +197,13 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
             journal.record("bot.event", f"back notice not sent: {exc}", lvl="warn",
                            chat=chat_id)
 
-    async def _serve(self) -> None:
-        """Runs the bot until SIGINT/SIGTERM."""
-        stop_event = asyncio.Event()
+    async def _serve(self) -> bool:
+        """Runs the bot until SIGINT, SIGTERM or SIGHUP. True when it was SIGHUP, which asks
+        for a restart (DESIGN_bot_restart.md §5.3)."""
+        stop_signals: asyncio.Queue = asyncio.Queue()
         loop = asyncio.get_running_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, stop_event.set)
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            loop.add_signal_handler(sig, stop_signals.put_nowait, sig)
         async with self.application:
             # The opening work python-telegram-bot would have done through `post_init`,
             # which it runs only from `run_polling()` — the call this method replaces.
@@ -218,12 +219,13 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
             # (DESIGN_settings.md §5).
             push_task = (asyncio.create_task(self._push_loop())
                          if self.push_chat_id is not None else None)
-            await stop_event.wait()
+            stopped_by = await stop_signals.get()
             if push_task is not None:
                 push_task.cancel()
             if self.updater.running:
                 await self.updater.stop()
             await self.application.stop()
+        return stopped_by == signal.SIGHUP
 
     def run(self) -> None:
         """Polls Telegram until interrupted."""
@@ -234,5 +236,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         # hard-exits and a supervisor kill takes it with no warning, which is the normal way
         # it ends and the reason the `?` outcome exists (§3).
         journal.start_run(["sm-bot"], source="bot")
-        asyncio.run(self._serve())
+        restart = asyncio.run(self._serve())
         journal.end_run("ok")
+        if restart:
+            sys.exit(runner.RESTART_EXIT_CODE)
