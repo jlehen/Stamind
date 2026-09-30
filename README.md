@@ -404,7 +404,11 @@ timeline in a page), Progress, and Talk to me. Free text goes through a small
 intent router on a cheap model: "what's on today" shows the day, "I'm wrecked"
 goes to the coach, "no running until Friday" is saved as a constraint after a
 confirmation. The bot opens each day with a morning message and three buttons,
-and replies read as short prose rather than tables.
+and replies read as short prose rather than tables. The two pages show ten weeks
+without the workout texts, because their data travels in the button. With a
+bucket set up ([The pages' files in a bucket](#the-pages-files-in-a-bucket)),
+they show every workout's text, every mesocycle's full description, and every
+month back to the first day Stamind knows.
 
 Typed commands still work: a message that starts with a slash is a command line,
 such as `/status`, `/workout list -d 1w` or `/help workout`.
@@ -508,6 +512,50 @@ If you do not have a Google service account yet, it is a one-time setup:
    events"** permission.
 4. That calendar's ID, shown under "Integrate calendar" on the same page, goes
    in `google.calendar_id`.
+
+### The pages' files in a bucket
+
+This is optional. Without it, the calendar and "Goals & plan" pages show what
+their button carries: ten weeks, no workout text, and a "💬 in chat" button for
+the rest. With it, Stamind keeps an encrypted copy of what the pages show in a
+bucket at Google Cloud Storage, and uploads what changed after every command.
+The pages read it with the key their button carries. Nothing runs on your
+machine for this, and nothing can reach your database.
+
+1. Check that billing is enabled on the Google project of your service account.
+   Google asks for a payment method even when nothing is charged. In Frankfurt,
+   30,000 uploads a month cost $0.15, and Stamind makes a few hundred.
+2. In the Cloud Console, create a bucket for Stamind alone. Its name is public,
+   so put nothing personal in it. Pick any region. Untick **"Enforce public
+   access prevention on this bucket"**. Unticking "Soft delete policy" is
+   optional: with it on, Google keeps each replaced file for seven days, which
+   costs under a cent a month.
+3. In the bucket's permissions, give the service account (the
+   `…@….iam.gserviceaccount.com` address) the role **Storage Object User** on
+   this bucket, and no role on the project.
+4. In the same place, give **`allUsers`** the role **Storage Legacy Object
+   Reader**. It lets anyone download a file whose name they know, and nobody
+   list the bucket. Do not use "Storage Object Viewer", which Google's own guide
+   names first: it lets anyone list the bucket.
+5. Write the bucket's name in `config.yaml`, as `google.storage_bucket`.
+6. Restart the bot. It reads `config.yaml` once, when it starts.
+7. Run `./sm data publish`. It checks each step above, names the one that is
+   wrong, and when all pass uploads every file. The bot's next message carries
+   the new buttons. `./sm status` says when the files need attention.
+
+Run `./sm data publish` again after a new bot token, and whenever older months
+look wrong: a command after the setup refreshes only the months of the ten
+weeks. To switch this off, run `./sm data unpublish`, then remove
+`google.storage_bucket` from `config.yaml`.
+
+The bot token now also opens the athlete's files, so keep `config.yaml` and the
+service account's file readable by their owner only (`chmod 600`). When a phone
+is lost or a button's address has leaked: revoke the token with BotFather, write
+the new one in the config, restart the bot, and run `./sm data publish`.
+
+Two instances can share one bucket, since each bot has its own folder in it.
+Do steps 5 to 7 once per instance, each with its own config. When the two use
+two service accounts, each gets the role of step 3.
 
 ### One-time Garmin settings
 

@@ -1,6 +1,7 @@
 // The "Goals & plan" page's pure logic (DESIGN_calendar_miniapp.md §3.7): the mesocycles and
 // goals in date order around a "Today" line, and what a tapped row opens. The snapshot is
-// read like the calendar's. No DOM here, so `node --test` runs it.
+// read like the calendar's, and the plan file from the bucket replaces it when it arrives
+// (DESIGN_miniapp_storage.md §7.2). No DOM here, so `node --test` runs it.
 import { shortDay } from "./calendar_logic.js?v=dev";
 
 // Word for word the bot's `WHY_REQUEST` (cli/render/plan_page.py); a Python test holds the
@@ -12,7 +13,7 @@ export function planRows(snapshot) {
   (snapshot.meso || []).forEach((meso, index) => {
     rows.push({ kind: "meso", date: meso.s, index, name: meso.n, plan: meso.p,
                 span: `${shortDay(meso.s)} – ${shortDay(meso.e)}`, summary: meso.m || "",
-                done: meso.e < snapshot.today });
+                long: meso.f || "", done: meso.e < snapshot.today });
   });
   (snapshot.goals || []).forEach((goal) => {
     rows.push({ kind: "goal", date: goal.d, text: goal.t, description: goal.x || "",
@@ -41,11 +42,13 @@ export function planRows(snapshot) {
   return rows;
 }
 
-export function rowSheet(row) {
-  // What a tapped row opens: a mesocycle's dates and summary with the way to its reasoning
-  // in the chat; a goal's line and description (§3.7).
+export function rowSheet(row, fromFile = false) {
+  // What a tapped row opens: a mesocycle's dates, summary and long text, with the way to
+  // its reasoning in the chat when the plan file did not arrive (storage §7.2); a goal's
+  // line and description (§3.7).
   if (row.kind === "meso") {
-    return { title: row.name, lines: [row.span, row.summary].filter(Boolean), why: true };
+    return { title: row.name, lines: [row.span, row.summary, row.long].filter(Boolean),
+             why: !fromFile };
   }
   return { title: row.done ? "✅ Goal reached" : "🎯 Goal",
            lines: [row.text, row.description].filter(Boolean), why: false };

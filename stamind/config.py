@@ -83,6 +83,12 @@ class Config:
         return self.get("google", {}).get("calendar_id")
 
     @property
+    def storage_bucket(self) -> Optional[str]:
+        """The bucket the pages read their files from, or None when storage is not set up
+        (DESIGN_miniapp_storage.md §3, §11)."""
+        return self.get("google", {}).get("storage_bucket") or None
+
+    @property
     def llm_models(self) -> list[str]:
         """The OpenRouter models this install may use, in `settings list coach-model`
         display order (DESIGN_model_selection.md §1). Entries are either a bare

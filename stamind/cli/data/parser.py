@@ -8,6 +8,7 @@ from stamind.cli.data.analysis import (
     run_data_bootstrap, run_data_reflect, run_data_show_analysis,
 )
 from stamind.cli.data.cache import run_data_backfill_tss, run_data_pull, run_data_wipe
+from stamind.cli.data.publish import run_data_publish, run_data_unpublish
 from stamind.cli.data.show import run_data_show_activities, run_data_show_metrics
 
 
@@ -23,7 +24,7 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     
     # data pull
     d_pull = data_subparsers.add_parser(
-        "pull",
+        "pull", aliases=["p"],
         help="Fetch Garmin activities/metrics and Google Calendar signals",
         description=(
             "Fetch activities and daily metrics directly from Garmin Connect into the "
@@ -238,6 +239,36 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     )
     add_selector_args(d_wipe, direction="none")
     d_wipe.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompt")
-    
+
+    # data publish / unpublish — the pages' files in the bucket (DESIGN_miniapp_storage.md §9)
+    d_publish = data_subparsers.add_parser(
+        "publish", advanced=True,
+        help="Check the bucket's setup, then upload every file the calendar and "
+             "\"Goals & plan\" pages read",
+        description=(
+            "Check each step of the bucket's setup and name the one that is wrong. When "
+            "all pass, upload every file the pages read, every month of the calendar "
+            "included, and delete any other file in this bot's folder. From then on every "
+            "command uploads what changed. Run it after the setup, after a new bot token, "
+            "and whenever older months are missing or look wrong."
+        ),
+    )
+    d_publish.set_defaults(func=run_data_publish)
+    d_unpublish = data_subparsers.add_parser(
+        "unpublish", advanced=True,
+        help="Delete this bot's files from the bucket; the pages go back to their buttons",
+        description=(
+            "Delete this bot's files from the bucket and forget them, so commands stop "
+            "uploading and the bot's buttons stop carrying the key. Nothing is lost: "
+            "'data publish' builds every file again from the database."
+        ),
+    )
+    d_unpublish.set_defaults(func=run_data_unpublish)
+    for d_files in (d_publish, d_unpublish):
+        d_files.add_argument(
+            "--force", action="store_true",
+            help="Go on when this bot's folder holds files this database never uploaded, "
+                 "as after restoring a backup"
+        )
 
     return data_parser

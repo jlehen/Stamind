@@ -322,7 +322,8 @@ view can show them (§3.4).
 - `u` is the faded icons, and `c` and `s` whether the day has a constraint or a signal.
 - `sheet` is the day's sheet as heading and lines. The page prints the lines and lets the
   browser wrap them.
-- `end` is the last day of the written schedule, when it falls inside the window. The page
+- `end` is the last day of the written schedule, when it falls on or before the window's
+  last day: a schedule that ended before the window greys the whole window. The page
   prints `SIMPLE_END_NOTE`, "That's the end of the current schedule.", under the grid from
   that day on. Without it, the blank days after it would read as rest (DESIGN_runway_nudge.md
   §6).

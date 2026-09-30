@@ -1,7 +1,9 @@
 // The calendar page's DOM layer (DESIGN_calendar_miniapp.md §1, §3): it draws the snapshot
-// the bot packed into the address, and hands every question to `calendar_logic.js`.
+// the bot packed into the address, draws again as the files from the bucket arrive
+// (DESIGN_miniapp_storage.md §7.1), and hands every question to `calendar_logic.js`.
 // "?v=dev" becomes the commit at deploy, like the addresses in calendar.html.
 import * as logic from "./calendar_logic.js?v=dev";
+import * as storage from "./storage.js?v=dev";
 
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 
@@ -15,6 +17,7 @@ const ui = {
   gridView: document.getElementById("grid-view"),
   grid: document.getElementById("grid"),
   endNote: document.getElementById("end-note"),
+  monthNote: document.getElementById("month-note"),
   legend: document.getElementById("legend"),
   problem: document.getElementById("problem"),
   sheet: document.getElementById("day-sheet"),
@@ -28,9 +31,12 @@ const STRIPS = 6;
 // How far a finger has to travel sideways for a swipe to turn the month.
 const SWIPE_PX = 50;
 
+// The one set of data the drawing reads: the button's, then what the files replace.
 let snapshot = null;
 let months = [];
 let shown = 0;
+// The page key, the bucket and the folder; null when the button carries none.
+let files = null;
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -63,7 +69,7 @@ function renderCell(iso) {
   if (iso === snapshot.today) {
     cell.classList.add("today");
   }
-  if (!logic.inWindow(snapshot, iso)) {
+  if (logic.isOutside(snapshot, iso)) {
     cell.classList.add("outside");
   }
   if (logic.pastTheEnd(snapshot, iso)) {
@@ -105,17 +111,66 @@ function renderMonth() {
   }
   ui.endNote.hidden = !logic.endNoteShown(snapshot, month);
   ui.endNote.textContent = logic.END_NOTE;
+  const note = logic.monthNote(snapshot, month);
+  ui.monthNote.hidden = !note;
+  ui.monthNote.textContent = note;
+  renderLegend(month);
 }
 
-function renderLegend() {
+function renderLegend(month) {
   ui.legend.replaceChildren();
-  (snapshot.meso || []).forEach((meso, index) => {
+  for (const { meso, index } of logic.legendFor(snapshot, month)) {
     const row = element("li");
     row.append(element("span", `swatch meso-${index % STRIPS}`));
     row.append(element("span", "", `${meso.n} · ${logic.shortDay(meso.s)} – `
       + logic.shortDay(meso.e)));
     ui.legend.append(row);
-  });
+  }
+}
+
+function renderHead() {
+  ui.goal.textContent = snapshot.goal || "";
+  ui.stamp.textContent = logic.stamp(snapshot.at);
+  renderStale();
+}
+
+async function loadIndex() {
+  let index;
+  try {
+    index = await storage.fetchFile(files, storage.INDEX);
+  } catch (problem) {
+    console.warn("the index file could not be had", problem);
+    return;
+  }
+  const month = months[shown];
+  snapshot = logic.withIndex(snapshot, index);
+  months = logic.reachableMonths(snapshot);
+  shown = logic.monthOf(months, `${logic.monthKey(month)}-01`);
+  renderHead();
+  renderMonth();
+}
+
+async function loadMonth(month) {
+  // A file that arrives for a month she has left changes nothing on screen.
+  const key = logic.monthKey(month);
+  const state = snapshot.loaded[key];
+  if (state === logic.LOADED || state === logic.LOADING) {
+    return;
+  }
+  snapshot = logic.withMonthState(snapshot, key, logic.LOADING);
+  if (logic.monthKey(months[shown]) === key) {
+    renderMonth();
+  }
+  try {
+    const file = await storage.fetchFile(files, logic.monthLabel(month));
+    snapshot = logic.withMonth(snapshot, key, file);
+  } catch (problem) {
+    console.warn("a month's file could not be had", problem);
+    snapshot = logic.withMonthState(snapshot, key, logic.FAILED);
+  }
+  if (logic.monthKey(months[shown]) === key) {
+    renderMonth();
+  }
 }
 
 function openSheet(iso) {
@@ -147,7 +202,9 @@ function openSheet(iso) {
 
 function renderStale() {
   // An old copy says so and offers the phone's today in the chat, whose reply brings a fresh
-  // button (§5).
+  // button (§5). Drawn again when the index file brings a later today (storage §7.1).
+  ui.stale.replaceChildren();
+  ui.stale.hidden = true;
   const phoneDay = logic.isoDay(new Date());
   const note = logic.staleNote(snapshot, phoneDay);
   if (!note) {
@@ -170,6 +227,9 @@ function turn(step) {
   }
   shown = target;
   renderMonth();
+  if (files) {
+    loadMonth(months[shown]);
+  }
 }
 
 function wire() {
@@ -220,13 +280,16 @@ async function start() {
     fail("Open the calendar from the bot's 🗓 Calendar button.");
     return;
   }
-  ui.goal.textContent = snapshot.goal || "";
-  ui.stamp.textContent = logic.stamp(snapshot.at);
-  renderStale();
-  months = logic.monthsBetween(snapshot.from, snapshot.to);
+  snapshot.loaded = {};
+  months = logic.reachableMonths(snapshot);
   shown = logic.monthOf(months, snapshot.today);
-  renderLegend();
+  renderHead();
   renderMonth();
+  files = storage.storageFromHash(window.location.hash);
+  if (files) {
+    loadIndex();
+    loadMonth(months[shown]);
+  }
 }
 
 start();

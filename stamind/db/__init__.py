@@ -20,6 +20,7 @@ from stamind.db.analysis import AnalysisCacheMixin
 from stamind.db.periodization import PeriodizationMixin
 from stamind.db.mesocycles import MesocyclesMixin
 from stamind.db.queue import QueueMixin
+from stamind.db.page_files import PageFilesMixin
 from stamind.db.strength import StrengthMixin
 from stamind.db.wipes import WipesMixin
 
@@ -39,6 +40,7 @@ class Database(
     MesocyclesMixin,
     SettingsMixin,
     QueueMixin,
+    PageFilesMixin,
     StrengthMixin,
     WipesMixin,
     SchemaMixin,

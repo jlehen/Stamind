@@ -146,6 +146,8 @@ class TestCommandPrefixResolution(unittest.TestCase):
         # ARCHITECTURE.md documents.
         self.assertEqual(self._xlate("w t"), ["workout", "tweak"])
         self.assertEqual(self._xlate("w a"), ["workout", "adapt"])
+        # `data publish` shares the `p`: an alias keeps `d p` on `pull`.
+        self.assertEqual(self._xlate("d p"), ["data", "pull"])
 
     def test_surviving_aliases_normalize_to_canonical(self):
         # Kept because they are not prefixes ('lm') or are ambiguous ones ('s').

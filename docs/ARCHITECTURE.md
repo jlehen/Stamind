@@ -102,7 +102,10 @@ classes themselves.
   imports this module. `run_once` — the one function both `main` and the REPL call —
   brackets each command with a journal run (`run.start`/`run.end`), just inside the two
   existing error boundaries, so a failed command records its own traceback with no new
-  handler anywhere (DESIGN_logging.md §3/§5.4).
+  handler anywhere (DESIGN_logging.md §3/§5.4). After the command, whatever its outcome,
+  it calls `page_files.sync.after_command`, which uploads the pages' files that changed
+  ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)); a line that only printed help
+  skips it.
 - **`stamind/cli/`** — per-command-family handler modules (`run_*()`): `status`,
   `goals`, `constraints`, `benchmarks`, `signals`, `learnings`,
   `settings`, `queue`, `progress` with `progress_load` (the fitness line and the
@@ -118,7 +121,7 @@ classes themselves.
   the `workouts/` package
   (`parser`/`adapt`/`generate`/`rollback`/`listing`/`compare`/`calendar_sync`/`revisions`/
   `heads_up`/`strength_only`/`session_line`), the `data/` package (`parser`/`cache`/`show`/
-  `analysis`) and the `journal/` package (`parser`/`runs`/`views`), plus the shared modules:
+  `analysis`/`publish`) and the `journal/` package (`parser`/`runs`/`views`), plus the shared modules:
   `common` (the renderers two command families share), `selectors` (the range grammar) with
   `windows` (the resolvers that turn it into dates by reading the database),
   `argparse_ext` (parser/help extensions), the `render/` package (the two voices and the
@@ -419,7 +422,8 @@ classes themselves.
 | `learning_confidence.py` | —                | What a coach learning's confidence means and how its evidence sets it: the ordered levels, `derive_confidence` over supporting and contradicting weeks, `step_down`, and when a learning goes dormant. Pure rules; `db/learnings.py` keeps only the rows (DESIGN_evidence_based_confidence.md §3, DESIGN_learning_doubt_nudge.md §3.2). |
 | `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, `learning` from `learning_doubts.py`, and `test_result` from `cli/bot/test_result.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. `waiting()` hangs `touches_today` on each row, and `sends_after_delay` is the single place that says whether a change goes out after `change-delay` minutes or at a morning time. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workout_change.py` imports it safely. |
-| `calendar_days.py`   | —                    | The one list of days the calendar page and `sm calendar` are built on (DESIGN_calendar_miniapp.md §4): `gather(dbh, start, end, today)` returns a `Calendar` holding one `Day` per date — the day's `adherence_window`/`compare_days` rows each graded by `classify_adherence`, every activity that matched no session with its `unplanned_kind`, the constraints and signals covering it — plus the governing mesocycles from `start` to the last goal, the goals not archived, and the schedule's last day (`analytics.runway.plan_end`). Facts only, no text; reads, never writes, never pulls from Garmin. `next_goal` is the nearest goal still ahead ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)). |
+| `calendar_days.py`   | —                    | The one list of days the calendar page and `sm calendar` are built on (DESIGN_calendar_miniapp.md §4): `gather(dbh, start, end, today)` returns a `Calendar` holding one `Day` per date — the day's `adherence_window`/`compare_days` rows each graded by `classify_adherence`, every activity that matched no session with its `unplanned_kind`, the constraints and signals covering it — plus the governing mesocycles from the first day of `start`'s month to the last goal, the goals not archived, and the schedule's last day (`analytics.runway.plan_end`). Facts only, no text; reads, never writes, never pulls from Garmin. `next_goal` is the nearest goal still ahead ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)). |
+| `page_files/`        | —                    | The pages' files: the calendar and "Goals & plan" read their data from encrypted files in a bucket at Google Cloud Storage (DESIGN_miniapp_storage.md). `recipe.py` is the key, the names and the encryption, word for word as `miniapp/storage.js` does them: the page key is HKDF of the bot token, a file's name HKDF of the page key and its label (`calendar/2026-09`, `calendar/index`, `plan`), its content zlib then AES-GCM with 12 fresh bytes at its head. `bucket.py` is the four requests to Google (upload with "do not cache", download as a page does, list, delete) behind one `Bucket` class the tests replace; `requests`, `cryptography` and the Google libraries are imported inside the functions that use them. `sync.py` is the step after every command (`after_command`: stop unless the record holds the index file's address with a fingerprint, build the months the window touches with the index and plan files, upload what differs from the record or failed last time within 3 seconds, write the record), and the guard, the fill and the removal of `data publish` and `data unpublish`. The files' content is built by `cli/render/calendar_page.py` and `plan_page.py`; the record is `db/page_files.py`. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
 | `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
 | `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class, listing the Garmin names that mean it (Connect's catalog and the FIT SDK names), and naming the Free Exercise DB entry whose photos the gym logger shows, for the exercises that have an exact one ([§16](#16-gym-logger-telegram-mini-app)). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push; a gym log is handed over the same day, [§16](#16-gym-logger-telegram-mini-app)), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the recent strength days (`strength.recent_days`, 8), what was prescribed beside what was done, then the days the prescription was not followed, then `## SESSIONS AS DONE` — the same days as whole sessions, each activity's length, set count and RPE over its exercises in order, the ones the athlete alternated joined by "+" (read from overlapping runs of sets), a "(not prescribed)" mark on what the day's session did not hold, and under each day what the athlete said about its session (DESIGN_session_notes.md §4). `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — which sessions the call is about, the call, and folding the answers back into the proposal — and `planner_prompt.py` is what that call tells the model and the checks a returned exercise passes before it becomes a prescribed set; `progression.md` is the shipped science only this call reads. Each session it is asked about carries the equipment and constraints of its day and the mesocycle covering it — name, span and which week of it the date is, from `get_covering_mesocycle` — so the plan's boundary reaches the call as a fact rather than as the brief's prose. `logger.py` is the gym logger's two payloads — the session encoded into the Mini App button's address and the log the page sends back — and holds no database access ([§16](#16-gym-logger-telegram-mini-app)). `comparison.py` is a past session planned against done: which lifted sets count against which planned lines, one mark per exercise, the totals, and the one reason a logged session is partial (DESIGN_strength_planned_vs_done.md); pure, like `logger.py`. Rows in `db/strength.py`; surgery in `cli/strength.py`, the gym log in `cli/strength_ingest.py`. |
@@ -1252,7 +1256,7 @@ only through `runtime.db`; the package exports nothing else. `base.py` (`BaseDB`
 connection and the transaction that joins several, and `schema.py` (`SchemaMixin`) owns the
 DDL and the version stamp. The domains are `objectives.py`, `constraints.py`, `signals.py`,
 `benchmarks.py`, `activities.py`, `learnings.py`, `analysis.py`, `periodization.py`,
-`mesocycles.py`, `queue.py`, `strength.py` and `wipes.py`. The `workouts` table takes three,
+`mesocycles.py`, `queue.py`, `strength.py`, `page_files.py` and `wipes.py`. The `workouts` table takes three,
 because one file for the append-only log ran past a thousand lines: `workout_change.py` is
 the only way to write a session and the one way to undo one, `workouts.py` reads a session
 as it stands today, and `workout_history.py` answers what happened to it — every form it has
@@ -1823,6 +1827,22 @@ Garmin's activity when the pull takes the log over. Rows cascade with their
 | `received_at` | TEXT    | When `strength ingest` read the file (UTC ISO)                |
 | `payload`     | TEXT    | The page's message verbatim, as it was sent                   |
 
+### page_files
+The record: what Stamind remembers of each file it uploaded for the calendar and "Goals &
+plan" pages (DESIGN_miniapp_storage.md §6). The step after every command uploads nothing
+unless this table holds the index file's address with a fingerprint (a first upload that
+failed leaves a row with only its error), so a database `data publish` never
+published, a worktree's or the test suite's, uploads nothing. `data unpublish` empties it.
+Untouched by every `wipe`.
+
+| Column        | Type    | Notes                                                        |
+|---------------|---------|---------------------------------------------------------------|
+| `address`     | TEXT PK | The file's full address, bucket, folder and name. The name is computed from the bot token, so another token or bucket finds no row of its own |
+| `label`       | TEXT    | What the file holds: `calendar/2026-09`, `calendar/index` or `plan` |
+| `fingerprint` | TEXT    | SHA-256 of the content last uploaded, before encryption and without the stamp; NULL until one upload succeeded |
+| `uploaded_at` | TEXT    | When that upload succeeded (UTC ISO)                          |
+| `error`       | TEXT    | The last attempt's HTTP status or error type when it failed, else NULL; `sm status` shows it |
+
 ### activity_match_decisions
 The athlete's answer to a planned-vs-completed pairing the matcher had to guess at
 ([§15](#a-pairing-the-matcher-had-to-guess-at-is-a-question-not-a-fact)). Keyed by
@@ -2310,7 +2330,7 @@ note's extracted constraints and signals into rows, shared by `workout adapt -m`
 plus the
 `workouts/` **package** —
 `parser`/`adapt`/`generate`/`rollback`/`listing`/`compare`/`calendar_sync`/`revisions`/
-`heads_up`/`strength_only`/`session_line` — the `data/` package (`parser`/`cache`/`show`/`analysis`)
+`heads_up`/`strength_only`/`session_line` — the `data/` package (`parser`/`cache`/`show`/`analysis`/`publish`)
 and the `journal/` package (`parser`/`runs`/`views`);
 the `plans/` package (`parser`/`generate`/`show`/`versions`/`feedback`) and
 `progress.py` with `progress_load.py` and `progress_zones.py`;
@@ -2425,6 +2445,8 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `data`       | `show-activities` | `d sa` | Show completed activities over a date range (default 7-day lookback). Selectors `-d`/`-m`/`-M`/`-g` plus `-a`/`--all`, `-t/--type` filter, `--no-pull`, `--csv`. |
 | `data`       | `show-analysis` | `d san` | Show the reconstruction stored by the last `bootstrap` — inferred macro focus, the mesocycles `progress` draws as `~` bands, physiological insights. Strictly read-only (renders the slot; never calls the LLM, unlike `bootstrap --inspect-only`). `--short` reads `reflect`'s slot instead; flags when activities post-date the slot's window. |
 | `data`       | `backfill-tss` | —      | Recompute the measured `tss` for all stored activities under the current zone model (no Garmin calls), then refresh derived workload |
+| `data`       | `publish`    | `--force` | Check the bucket's setup step by step (bucket and token known, service account accepted, write and rewrite a test file, download it with no credential and fresh, no listing), then upload every file of the pages, every month from the first, and delete any other file in this bot's folder. Refuses a folder holding files this database never uploaded unless `--force` (DESIGN_miniapp_storage.md §9) |
+| `data`       | `unpublish`  | `--force` | Delete this bot's files from the bucket, the index file first, and empty `page_files`; same guard as `publish` |
 | `data`       | `wipe`       | `--garmin`, `--calendar`, `-d RANGE`, `-y` | Delete cached data. No scope flag = everything (Garmin evidence + daily signals) and reset watermarks; `--garmin`/`--calendar` narrow the scope; date flags restrict to a window |
 | `settings`   | `list`       | `se l`   | Every preference with its value and where that value came from — the stored row, `config.yaml`, or the built-in default. With a NAME, that one setting in detail: the numbered model menu for `coach-model`, the local clock for `timezone`. A bare `settings` lists — the read-only-family exception (DESIGN_cli_noargs.md §a3, applied by DESIGN_settings.md §4) |
 | `settings`   | `set`        | `se s`, `se use` | Change one preference: `settings set coach-model 3`, `settings set timezone Europe/Paris`, `settings set morning-time 07:00`. The name takes any unambiguous prefix. Validated by the setting's own parser — a value it cannot read is refused and nothing is written. Stored in `settings`; survives restarts |
@@ -2606,6 +2628,7 @@ but the credentials is optional and falls back to the default shown:
 | `llm.api_key`          | str  | OpenRouter key; the `OPENROUTER_API_KEY` env var wins when set |
 | `llm.models`           | list | Models both model roles pick from, in display order; the first entry is the default until `settings set coach-model` picks another. Absent/empty → `google/gemini-3.5-flash` alone (DESIGN_model_selection.md §1) |
 | `google.calendar_id`   | str  | Target calendar ID                                            |
+| `google.storage_bucket` | str | Optional. The Google Cloud Storage bucket the pages read their files from; unset, nothing is built or uploaded and the buttons are as before (DESIGN_miniapp_storage.md §3, §11) |
 | `garmin.email` / `garmin.password` | str | Garmin login; config.yaml only (kept out of the environment) |
 | `garmin.token_dir`     | str  | Garmin token store (default `.garminconnect` beside the config, or under `data_dir:`) |
 | `refresh_minutes`      | int | Throttle window shared by Garmin pulls **and** Calendar-signal syncs; reads inside it reuse the cache. Top-level, default 120; read as `config.data_refresh_minutes` |
@@ -4429,7 +4452,9 @@ ones), and whether a constraint or a signal covers it. Its sheet is built only f
 builders: `simple_day_lines` without verdicts for "Planned" (the rest line on an empty day
 inside the schedule), that day's `simple_compare_lines` lines for "Done", and
 `simple_metric_words` with the value and text, or a constraint's title and description,
-for "Signals and constraints". The header goal is `simple_goal_line`. `end` is the
+for "Signals and constraints". The header goal is `simple_goal_line`. The mesocycles are
+gathered from the first day of the window's first month, so the button's list and the
+index file's are one list and no colour shifts between the two draws. `end` is the
 schedule's last day when it falls in the window, and the page prints `SIMPLE_END_NOTE`
 under every month that runs past it. `at` is `clock.now()`, the "as of" stamp.
 
@@ -4463,6 +4488,26 @@ turns into `plan show --macrocycle <id>` (`plan_page.why_plan`); `--macrocycle` 
 its goal from the plan, since the mesocycle may serve a later goal than the next one. `plan_page.plan_url` packs `meso` and `goals` from the
 same `Calendar`; past its 2 KB budget the summaries and descriptions are dropped
 (DESIGN_calendar_miniapp.md §3.7).
+
+**The files in a bucket.** With `google.storage_bucket` set and `data publish` run once,
+the pages also read encrypted files from Google Cloud Storage (DESIGN_miniapp_storage.md).
+`page_files/sync.button_params` adds `k=` (the page key, HKDF of the bot token), `b=` (the
+bucket) and `f=` (the folder, the bot's number) to both buttons, out of each page's budget.
+`calendar_page.month_files` builds one file per month, every day's marks and whole sheet with
+the workout text as stored (`simple_day_lines(..., wrap=False)`, so the content never
+depends on who ran the command); `index_file` is the payload without days and `fit`, plus
+`first` and `last`, the months that have a file; `plan_page.plan_file` adds each
+mesocycle's `focus` as `f`. After every command, `run_once` uploads what changed, the month
+holding today first. The page (`miniapp/storage.js`, shared by both) draws at once from the
+button, then downloads the index file and the month shown and draws again: the index's
+fields replace the button's, the arrows reach every month from `first` to `last`, and a
+month file's days replace that month's (`withIndex` and `withMonth` in
+`calendar_logic.js`). A month is loading, loaded or failed, which the note under the grid
+says; the chat buttons show only while the text they fetch is missing; the stamp is the
+later of the button's time and the file's; the legend lists the mesocycles that touch the
+month shown. Any file that cannot be had within 10 seconds counts as missing, and the page
+is then what it was before. The example both languages open lives in `tests/test_page_files.py` and
+`miniapp/tests/storage.test.mjs`.
 
 **The way back.** The sheet has no workout text, so under a day with a session the page
 offers "💬 Full day in chat". Tapping it calls `sendData` with

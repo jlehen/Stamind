@@ -1,6 +1,6 @@
 # Mini app storage: the pages read their data from encrypted files
 
-**Status:** Designed, not implemented · **Date:** 2026-09-28 ·
+**Status:** Implemented 2026-09-29, not yet tried on a real bucket (§15) · **Date:** 2026-09-28 ·
 **Branch:** `worktree-miniapp-storage`
 
 This design comes out of an interview with the author (twelve decisions, §14), then a
@@ -149,8 +149,11 @@ functions their platform already has: the `cryptography` package, and the browse
   answers a page from another site on this address without any rule set on the bucket. The
   plain address does not.
 
-The page keeps the page key and the decrypted data in memory only. It writes neither to
-the browser's storage.
+The page keeps the page key and the decrypted data in memory only. Its own code writes
+neither to the browser's storage. Telegram's script, which every mini app loads first, does:
+it copies every parameter of the address into the tab's session storage, the page key
+included, until the webview closes. Only a page of the same site can read it there, and
+the operator trusts that site already (§16).
 
 **Who can read what.** Anyone who holds a file's name can download the file, and see its
 size and the time it was last written. Only the page key opens it. Anyone who holds a
@@ -163,13 +166,16 @@ the bot starts, one the scheduler starts. When a command has run, whatever its o
 Stamind takes five steps.
 
 1. **It checks that this database was published.** It looks in the record for the index
-   file's address. If the record has none, Stamind stops here, silently. Only `sm data
+   file's address, with a fingerprint: the index file went up at least once. If the record
+   has none, Stamind stops here, silently. A first `sm data publish` whose index upload
+   failed leaves a row with an error and no fingerprint, so it stops here too. Only `sm data
    publish` starts the uploads (§9).
 2. **It builds** the months the window touches, as whole months, then the index file and
    the plan file. It is Sunday 27 September: the window runs from 30 August to 8 November,
    so Stamind builds August, September, October and November.
 3. **It compares** each file with the record. What is compared is the content before
-   encryption, without the stamp.
+   encryption, without the stamp. A file whose last upload failed differs whatever its
+   content, so a failed upload is tried again by the next command that builds the file.
 4. **It uploads** the files that differ, the month that holds today first. When any file
    of the calendar was uploaded, the index file is uploaded too, with the time of this
    command as its stamp. Each upload is one request, which carries the instruction "do not
@@ -240,8 +246,10 @@ the same way, with "This month could not be loaded." under the grid. Turning awa
 tries again.
 
 **A file that cannot be used counts as missing.** That covers a file that cannot be
-downloaded, one that cannot be decrypted, and one that says another version than the page
-reads. The page never shows an error in place of the calendar because of a file.
+downloaded within 10 seconds, one that cannot be decrypted, and one that says another
+version than the page reads. Without the 10 seconds, a request that never answers, in a
+train tunnel, would leave "Loading…" up until the phone gives up. The page never shows an
+error in place of the calendar because of a file.
 
 **The chat button (D4).** "💬 Full day in chat" sits under a day with a session for as long
 as that month's file has not arrived. The message "This day's details did not fit" is for
@@ -385,7 +393,9 @@ woken.
 
 `sm status` shows one line in two cases, both only when the config names a bucket:
 
-- the last upload failed;
+- the last upload failed. The line says the next command uploads it again when every
+  failed file is one a command builds (§6 step 2). A month older than the window is built
+  only by `sm data publish`, so then the line names that command;
 - this database was never published under this bot token, and `sm data publish` has to be
   run.
 
@@ -426,9 +436,10 @@ token with BotFather, write the new one in the config, restart the bot, run
 
 ## 12. Where things live
 
-- A new package under `stamind/` holds three jobs: the key, the names and the encryption
-  (§5); the four requests to Google, which are upload, download, list and delete; and the
-  step after a command (§6) together with the fill (§9).
+- `stamind/page_files/` holds three jobs: the key, the names and the encryption (§5) in
+  `recipe.py`; the four requests to Google, which are upload, download, list and delete,
+  in `bucket.py`; and the step after a command (§6) together with the fill (§9) in
+  `sync.py`.
 - `stamind/cli/render/calendar_page.py` and `plan_page.py` build the files' content from
   the list of days, beside the buttons' data.
 - `stamind_cli.py`: `run_once` calls the step after a command.
@@ -436,8 +447,8 @@ token with BotFather, write the new one in the config, restart the bot, run
   the line of §10.
 - `stamind/chat/app.py`: `_page_buttons` adds the three parts to each address (§8).
 - `stamind/config.py` and `config_template.yaml`: `google.storage_bucket`.
-- `stamind/db/schema.py`: the `page_files` table, with `SCHEMA_VERSION` 23. A one-off
-  script under `scripts/` creates the table in both live databases.
+- `stamind/db/schema.py`: the `page_files` table, with `SCHEMA_VERSION` 24. The bump
+  creates the table on each database's next start, so no script is needed.
 - `miniapp/`: one new file for the key, the names, the download and the decryption, shared
   by both pages. `calendar_logic.js`, `calendar.js` and `plan.js` get the rules of §7.
 - `requirements.txt` lists `cryptography`, which is installed and not listed. No new
@@ -565,6 +576,18 @@ browser runs the recipe of §5, which is a web standard and was not tried inside
   does so today.
 - **Two commands in the same second.** Google allows one write per second to one name. The
   second upload fails, and the next command uploads again.
+- **Two plans that overlap before the window.** Which one counts on a day depends on the
+  range built, so the step after `sm data publish` itself can upload a window month a
+  second time, with different rest-day lines. It happens once per publish.
+- **The 3 seconds running out between a month and the index file.** The month went up and
+  the index file did not, with no error written. The stamp then reads older than the data
+  until the index file next changes, at midnight at the latest.
+- **A process that does not know the bot token**, such as a terminal when the token lives
+  only in the bot's environment. It uploads nothing, and its `sm status` cannot see the
+  bot's failed uploads, because the folder's name comes from the token.
+- **An index file older than the button.** When its months stop before the month on
+  screen, after a failed upload near a month's edge, the calendar jumps to the first month
+  of the history when the index file arrives.
 - **Keeping Google's token between commands.** Each command that uploads asks Google for
   one. Measure first.
 - **Writing more than 4,096 bytes from a page**, and editing a session from the calendar.

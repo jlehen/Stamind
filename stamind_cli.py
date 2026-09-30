@@ -10,6 +10,7 @@ import sys
 import traceback
 
 from stamind import clock, journal
+from stamind.page_files import sync as _page_files
 from stamind.prompt import PromptCancelled
 from stamind.text import bold, cyan, dim, red
 from stamind.output import aside, notice
@@ -183,7 +184,7 @@ def run_once(argv, parser, named_subparsers, source=None) -> None:
     journal.start_run(argv, source=source, defer=True)
     clock.start_command()
     try:
-        _dispatch(argv, parser, named_subparsers)
+        _dispatch_then_refresh(argv, parser, named_subparsers)
     except UsageExit:
         # Not an outcome: nothing happened but the help now on screen, so the run is
         # dropped rather than closed (DESIGN_logging.md §3).
@@ -204,6 +205,19 @@ def run_once(argv, parser, named_subparsers, source=None) -> None:
     finally:
         clock.end_command()
     journal.end_run("ok")
+
+
+def _dispatch_then_refresh(argv, parser, named_subparsers) -> None:
+    """Runs the command, then refreshes the pages' files whatever its outcome, unless the
+    line only printed help (DESIGN_miniapp_storage.md §6)."""
+    try:
+        _dispatch(argv, parser, named_subparsers)
+    except UsageExit:
+        raise
+    except BaseException:
+        _page_files.after_command()
+        raise
+    _page_files.after_command()
 
 
 def _dispatch(argv, parser, named_subparsers) -> None:

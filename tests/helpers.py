@@ -80,6 +80,7 @@ def started_from(testcase, where: str) -> None:
 # `wipe_workouts`, which also clears its changes and Calendar state
 # (DESIGN_workout_revisions.md §14).
 _ALL_TABLES = [
+    "page_files",
     "plan_feedback",
     "mesocycles",
     "macrocycles",
