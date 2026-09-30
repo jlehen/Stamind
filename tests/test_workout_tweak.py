@@ -3,8 +3,9 @@ the days the request is about may change (DESIGN_workout_tweak.md §3, §4).
 
 The week is the design's own. It is Monday 21 September. Thursday holds intervals on the
 bike, Friday an endurance ride, Saturday the long ride. The mesocycle ends on Sunday 4
-October. Everything goes through the real propose/apply pair against a canned week planner
-reply, because what matters is what lands in the log.
+October and the next one starts on Monday 5. Everything goes through the real
+propose/apply pair against a canned week planner reply, because what matters is what lands
+in the log.
 """
 import io
 import os
@@ -46,6 +47,7 @@ TUESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY = (
 )
 MESO_END = "2026-10-04"
 PAST_THE_MESOCYCLE = "2026-10-10"
+NEXT_MONDAY, NEXT_TUESDAY = "2026-10-05", "2026-10-06"
 
 HIKE = {
     "date": SATURDAY, "sport_type": "hiking", "title": "Hike with friends",
@@ -81,7 +83,9 @@ class _TweakCase(unittest.TestCase):
             objective_id=objective, strategy="Build.", goals_hash="g",
             constraints_hash="c",
             mesocycles=[{"name": "Build 2", "start_date": "2026-09-14",
-                         "end_date": MESO_END, "focus": "Threshold"}],
+                         "end_date": MESO_END, "focus": "Threshold"},
+                        {"name": "Build 3", "start_date": NEXT_MONDAY,
+                         "end_date": "2026-10-25", "focus": "VO2max"}],
         )
         self.ride(THURSDAY, "Intervals", 60, 70)
         self.ride(FRIDAY, "Endurance ride", 90, 80)
@@ -94,13 +98,16 @@ class _TweakCase(unittest.TestCase):
             duration_minutes=minutes, rpe=5, tss=load,
         )
 
-    def tweak(self, answer, days=(), message="Saturday: a 4 hour hike instead of the ride"):
+    def tweak(
+        self, answer, days=(), message="Saturday: a 4 hour hike instead of the ride",
+        today=TODAY,
+    ):
         """The proposal a tweak makes against `answer`, and the week planner's client."""
         with patch("stamind.coach.engine.openrouter_client") as client, \
                 redirect_stdout(io.StringIO()):
             client.complete.return_value = answer
             self.client = client
-            return coach_service.workout_tweak(message, tweak_dates=days, today_str=TODAY)
+            return coach_service.workout_tweak(message, tweak_dates=days, today_str=today)
 
     @staticmethod
     def apply(proposal):
@@ -178,6 +185,53 @@ class WhichDaysTest(_TweakCase):
         proposal = self.tweak(reply(to_sunday), days=[THURSDAY])
         self.assertEqual(proposal.workouts, [])
         self.assertEqual(proposal.removals, ())
+
+
+class LastDayOfTheMesocycleTest(_TweakCase):
+    """§3.2: a tweak reaches at least a week ahead, into the next mesocycle. It is Sunday 4
+    October, the last day of Build 2. Monday holds the gym and Tuesday a rest day, both in
+    Build 3. The athlete swaps them."""
+
+    def setUp(self):
+        super().setUp()
+        skip_strength_planner(self)
+        pin_clock(self, MESO_END)
+        save_workout(
+            test_db, NEXT_MONDAY, "strength_training", "Full-body strength",
+            "[Full-body strength]\nHeavy, non-failure.", duration_minutes=65, rpe=7, tss=50,
+        )
+        save_workout(
+            test_db, NEXT_TUESDAY, "rest", "Rest Day", "[Rest Day]\nRest.",
+            duration_minutes=0, rpe=1, tss=0,
+        )
+
+    def test_tomorrow_and_the_day_after_swap(self):
+        gym = test_db.get_workout(NEXT_MONDAY, "strength_training")["id"]
+        answer = reply(
+            {"date": NEXT_MONDAY, "sport_type": "rest", "title": "Rest Day",
+             "description": "[Rest Day]\nRest.", "duration_minutes": 0, "rpe": 1,
+             "tss": 0, "change_reason": "On request: swapped with Tuesday.",
+             "replaces": {"date": NEXT_TUESDAY, "sport_type": "rest"}},
+            {"date": NEXT_TUESDAY, "sport_type": "strength_training",
+             "title": "Full-body strength",
+             "description": "[Full-body strength]\nHeavy, non-failure.",
+             "duration_minutes": 65, "rpe": 7, "tss": 50,
+             "change_reason": "On request: swapped with Monday.",
+             "replaces": {"date": NEXT_MONDAY, "sport_type": "strength_training"}},
+            days=[NEXT_MONDAY, NEXT_TUESDAY],
+        )
+        self.apply(self.tweak(answer, message="swap tomorrow's gym and Tuesday's rest",
+                              today=MESO_END))
+
+        self.assertEqual(test_db.get_workout(NEXT_TUESDAY, "strength_training")["id"], gym)
+        self.assertIsNone(test_db.get_workout(NEXT_MONDAY, "strength_training"))
+        self.assertIsNotNone(test_db.get_workout(NEXT_MONDAY, "rest"))
+
+    def test_a_day_past_the_week_ahead_is_refused(self):
+        with self.assertRaises(ValueError) as refused:
+            self.tweak(reply(HIKE), days=["2026-10-12"], today=MESO_END)
+        self.assertIn("2026-10-11", str(refused.exception))
+        self.client.complete.assert_not_called()
 
 
 class WhatItWritesTest(_TweakCase):

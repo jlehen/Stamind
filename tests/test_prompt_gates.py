@@ -83,7 +83,7 @@ BASE = dict(
                        "duration_minutes": 40, "rpe": 6, "tss": 45}],
     completed_activities=[],
     target_date_str="2026-06-03",
-    meso_end_date_str="2026-06-28",
+    range_end_str="2026-06-28",
     objectives=[{"id": 1, "title": "Race", "target_date": "2026-09-01",
                  "sport_type": "running"}],
     guidelines="Guidelines text.",

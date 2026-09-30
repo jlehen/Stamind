@@ -1,6 +1,9 @@
 # Design: `workout tweak`, and the end of the four hand-edit commands
 
-**Status:** Implemented (rev. 3), not reviewed · **Date:** 2026-09-18 (rev. 3)
+**Status:** Implemented (rev. 4), not reviewed · **Date:** 2026-09-30 (rev. 4)
+
+Revision 4 lets a tweak reach past the end of the current mesocycle, up to a week ahead
+(§3.2, §8). On the last day of a mesocycle, a tweak could only change that day.
 
 Revision 3 changes §4 after a first review comment. The week planner no longer quotes the
 athlete's message at the end of the brief. It writes what the athlete asked for into the
@@ -135,13 +138,30 @@ and Stamind does not take its word for it:
 
 - The days are the ones given with `-d`, else `tweak_dates`. When the reply changes sessions
   and names no usable day, the run stops and says: name the day with `-d`.
-- Every day must lie between today and the end of the current mesocycle. That is as far as
-  `workout adapt` reaches (DESIGN_mesocycle_boundary.md §1). Past that, the command refuses.
+- Every day must lie between today and the end of the tweak's reach. Past it, the command
+  refuses. The reach ends with the current mesocycle, or seven days from today when that is
+  later. The reason for the seven days is below.
 - Every proposed session on another date is dropped. So is a move whose other end is on
   another date.
 - The strength planner runs over those days only.
 - A tweak marks no constraint as honoured. That mark means "a coach pass had authority over
   every remaining day of this constraint", and a tweak has authority over a few days.
+
+**Why a tweak reaches past the end of the mesocycle.** `workout adapt` stops at the end of
+the mesocycle for a reason about load (DESIGN_mesocycle_boundary.md §2). It cuts sessions
+from recovery metrics, and those lag. A cut made in the last days of a mesocycle has no
+room to rebound before the mesocycle ends. A tweak makes no load decision: the athlete
+decides, and only the days they name change. So that reason does not hold for a tweak.
+
+It is Wednesday 30 September, the last day of a mesocycle. Thursday holds the gym and
+Friday a rest day. Both are in the next mesocycle. The athlete asks to swap them. If a
+tweak stopped at the end of the mesocycle, it would reach Wednesday only, and the athlete
+could not change tomorrow. With the seven days, it reaches up to Wednesday 7 October, and
+the swap goes through.
+
+The reach is seven days and not every planned day, because the week planner is shown every
+session in the reach. A schedule written months ahead would put months of sessions in the
+prompt. Seven days covers "tomorrow", "Friday" and "this weekend".
 
 ### 3.3 What a tweak leaves behind
 
@@ -335,8 +355,8 @@ the past.
 
 ## 8. Not handled
 
-- **A tweak past the end of the current mesocycle.** `workout adapt` does not reach there
-  either. The athlete adds a constraint, or waits for the mesocycle to start.
+- **A tweak past its reach (§3.2).** On the last day of a mesocycle, a day eight or more
+  days away is refused. The athlete adds a constraint, or asks again once the day is closer.
 - **A session with exact numbers the athlete typed.** The coach writes the session. The
   athlete who wants "exactly 52 minutes" says so in the message.
 - **An edit with no model call.** Every change to a session now costs one week planner call,
@@ -369,7 +389,8 @@ removed with `coverage_end`.
 ## 10. Tests
 
 - `workout tweak` end to end: the days from `-d`, the days from `tweak_dates`, no usable
-  day, a day past the mesocycle, sessions on other dates dropped, a swap of two named days
+  day, a day past the reach, a swap on the last day of a mesocycle of two days in the next
+  one, sessions on other dates dropped, a swap of two named days
   kept, kind `tweak` recorded, rollback.
 - The tweak prompt: the request section and its TASK text appear together, and the
   fatigue-reading sections are absent.

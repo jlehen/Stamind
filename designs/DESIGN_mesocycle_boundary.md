@@ -100,6 +100,8 @@ it only once it was too late to act on.
   re-plans those days outright rather than carrying today's load judgement across to them.
   The athlete is told the gap exists rather than left to notice it
   (DESIGN_constraint_honoring.md §1). This entry stands: nothing extends *adapt's* range.
+  `workout tweak` does reach past the boundary, because it changes only the days the athlete
+  names and makes no load judgement (DESIGN_workout_tweak.md §3.2).
 - **Feeding the next mesocycle's concrete sessions to the model as read-only context.** The system
   prompt already lists every mesocycle's name, date range and focus
   (`coach/service/athlete_context.py::_get_active_strategy_and_meso_text`), which is enough to

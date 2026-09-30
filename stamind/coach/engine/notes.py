@@ -11,7 +11,7 @@ from typing import Optional, Sequence
 
 
 def tweak_task(
-    target_date_str: str, meso_end_date_str: str, tweak_dates: Sequence[str], watching: bool
+    target_date_str: str, range_end_str: str, tweak_dates: Sequence[str], watching: bool
 ) -> str:
     """The head of the `workout tweak` TASK: the days the request is about, changed as
     asked (DESIGN_workout_tweak.md §3.2).
@@ -27,7 +27,7 @@ def tweak_task(
         days_line = (
             'Read them off the request ("Friday", "tomorrow", "swap Thursday and Friday").\n'
             "  The Evaluation Date is today, and every day must fall between "
-            f"{target_date_str} and\n  {meso_end_date_str}. If you cannot tell which days "
+            f"{target_date_str} and\n  {range_end_str}. If you cannot tell which days "
             "are meant, or one falls outside that\n"
             '  range, return "change_needed": false and "tweak_dates": [], and say why in\n'
             '  "reason".'

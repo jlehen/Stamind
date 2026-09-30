@@ -141,7 +141,7 @@ class WorkoutAdaptMixin:
         self, target_date_str: str, history_days: int, start_date_str: str,
         metrics: List[Dict[str, Any]], completed_activities: List[CompletedActivity],
         planned_workouts: List[Workout], baseline_str: str,
-        meso_end_date_str: str, objectives: List[Objective], constraints: List[Constraint],
+        range_end_str: str, objectives: List[Objective], constraints: List[Constraint],
         guidelines: str, profile: Optional[Dict[str, Any]], strategy: str,
         meso_text: str, learnings: str, discrepancies: List[str],
         informational: Optional[List[CompletedActivity]] = None,
@@ -237,7 +237,7 @@ discrepancies (misses, workload/duration differences, sets short, rest violation
 rolling baseline against the daily metrics sequence for signs of accumulated fatigue.
 
 Based on this, determine if we need to adapt the sessions for the remainder of
-the active mesocycle (from {target_date_str} to {meso_end_date_str}).
+the active mesocycle (from {target_date_str} to {range_end_str}).
 - If they are showing high fatigue or injury risk (e.g. elevated RHR, depressed HRV,
   poor sleep, or ATL:CTL > 1.3 without a planned overload reason), replace hard workouts
   with recovery or rest.
@@ -249,7 +249,7 @@ the active mesocycle (from {target_date_str} to {meso_end_date_str}).
 """
         if tweak:
             custom_task = tweak_task(
-                target_date_str, meso_end_date_str, tweak_dates, athlete_watching()
+                target_date_str, range_end_str, tweak_dates, athlete_watching()
             )
             custom_task += LOCKED_HISTORY_TASK
         else:
@@ -280,10 +280,11 @@ the active mesocycle (from {target_date_str} to {meso_end_date_str}).
         custom_task += planned_zone_task(zone_currencies)
 
         # Inside the mesocycle's terminal window a cut cannot rebound before the mesocycle ends
-        # (DESIGN_mesocycle_boundary.md §3). Outside it the prompt is unchanged.
-        days_left = days_between(target_date_str, meso_end_date_str)
+        # (DESIGN_mesocycle_boundary.md §3). Outside it the prompt is unchanged. Adapt's range
+        # ends with the mesocycle; a tweak's may not, and a tweak never gets this section.
+        days_left = days_between(target_date_str, range_end_str)
         if not tweak and 0 <= days_left <= config.adapt_terminal_window_days:
-            custom_task += _terminal_window_task(days_left, meso_end_date_str)
+            custom_task += _terminal_window_task(days_left, range_end_str)
 
         # A run the athlete does not watch sends its reason to them later, so the note is
         # presented as their coach's and the reason is written to them, never as a reply
@@ -483,7 +484,7 @@ evidence-backed observations are authored only by the weekly history analysis
             )
         user_content = f"""
 Evaluation Date: {target_date_str}
-Adaptation Range: {target_date_str} to {meso_end_date_str}
+Adaptation Range: {target_date_str} to {range_end_str}
 {message_section}{intensity_section}
 
 ## ATHLETE'S METRICS HISTORY (PAST {history_days} DAYS)
@@ -523,7 +524,7 @@ session over largely as-is. {descriptions_note}
                 wait_notice="Making the change you asked for",
             )
         step(f"Querying OpenRouter to evaluate adaptation for the remainder of the mesocycle "
-             f"({target_date_str} -> {meso_end_date_str})...", cyan)
+             f"({target_date_str} -> {range_end_str})...", cyan)
         decision = _eng.openrouter_client.complete(
             system_prompt, user_content, label="workout_adapt",
             wait_notice="Reviewing your coming sessions",

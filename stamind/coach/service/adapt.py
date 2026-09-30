@@ -32,14 +32,20 @@ from stamind.db.workout_change import ATHLETE_VOID_KINDS
 from stamind.strength import planner as strength_planner
 
 
-def _outside_tweak_reach(days: Sequence[str], meso_end: str) -> str:
-    """The refusal for days a tweak cannot reach: it goes as far as `workout adapt`, from
-    today to the end of the current mesocycle (DESIGN_workout_tweak.md §3.2)."""
+# The least a tweak reaches past today, whatever mesocycle the days fall in
+# (DESIGN_workout_tweak.md §3.2).
+TWEAK_REACH_DAYS = 7
+
+
+def _outside_tweak_reach(days: Sequence[str], range_end: str) -> str:
+    """The refusal for days a tweak cannot reach: from today to the end of the current
+    mesocycle, or a week ahead when that is later (DESIGN_workout_tweak.md §3.2)."""
     return (
-        f"A tweak reaches from today to the end of the current mesocycle "
-        f"({fmt_date(meso_end)}). Outside that: {', '.join(fmt_date(d) for d in days)}. "
+        f"A tweak reaches from today to {fmt_date(range_end)}. "
+        f"Outside that: {', '.join(fmt_date(d) for d in days)}. "
         f"To plan around a day further out, add a constraint with {cmd('constraint add')}."
     )
+
 
 class AdaptMixin:
     @staticmethod
@@ -154,7 +160,7 @@ class AdaptMixin:
             start_date=signal_start_str, end_date=target_date_str
         )
 
-        # Workouts are fetched across the whole span (lookback start -> mesocycle end), not
+        # Workouts are fetched across the whole span (lookback start -> range end), not
         # just the backward window: otherwise the LLM never sees already-scheduled future
         # sessions and reinvents them, overwriting the athlete's plan. And no plan means no
         # adaptation — there is nothing to adapt *towards* (DESIGN_mesocycle_boundary.md §6).
@@ -164,18 +170,24 @@ class AdaptMixin:
                 "No active periodization strategy found. Run "
                 + cmd("plan generate") + " first."
             )
-        meso_end_date_str = active_meso['end_date']
+        # `workout adapt` stops at the mesocycle's end (DESIGN_mesocycle_boundary.md §2). A
+        # tweak changes only the days it names, so it reaches at least a week ahead
+        # (DESIGN_workout_tweak.md §3.2).
+        range_end = active_meso['end_date']
+        if tweak:
+            week_ahead = target_date_obj + timedelta(days=TWEAK_REACH_DAYS)
+            range_end = max(range_end, week_ahead.strftime("%Y-%m-%d"))
         outside = sorted(
             day for day in tweak_dates
-            if not target_date_str <= day <= meso_end_date_str
+            if not target_date_str <= day <= range_end
         )
         if outside:
-            raise ValueError(_outside_tweak_reach(outside, meso_end_date_str))
+            raise ValueError(_outside_tweak_reach(outside, range_end))
 
         # The BACKWARD window — from the adherence lookback start, removed rows included —
         # not the forward one the proposal carries. Two different ranges, so two names.
         lookback_workouts = self._db.get_workouts(
-            start_date=start_date_str, end_date=meso_end_date_str, include_removed=True
+            start_date=start_date_str, end_date=range_end, include_removed=True
         )
         planned_workouts = [w for w in lookback_workouts if not w.get('removed')]
         # Only the cancellations the ATHLETE made. A day the plan simply stopped
@@ -189,7 +201,7 @@ class AdaptMixin:
             # A tweak may bring any of them back, so it is shown every one ahead, whoever
             # cancelled it (DESIGN_workout_tweak.md §3.1).
             removed_workouts = self._db.get_cancelled_workouts(
-                target_date_str, meso_end_date_str
+                target_date_str, range_end
             )
 
         baseline = self._db.get_baseline(target_date_str)
@@ -243,7 +255,7 @@ class AdaptMixin:
 
         # Active constraints overlapping the adaptation window (target date → mesocycle
         # end), the single directive read path shared with generate (§6).
-        constraints = self._db.get_constraints(target_date_str, meso_end_date_str)
+        constraints = self._db.get_constraints(target_date_str, range_end)
         ctx = self._coach_context(
             constraints, objectives=objectives,
             objective_id=next_goal['id'] if next_goal else None,
@@ -272,7 +284,7 @@ class AdaptMixin:
             completed_activities=completed_activities,
             planned_workouts=planned_workouts,
             baseline_str=baseline_str,
-            meso_end_date_str=meso_end_date_str,
+            range_end_str=range_end,
             objectives=objectives,
             guidelines=guidelines,
             profile=profile,
@@ -316,16 +328,16 @@ class AdaptMixin:
         tweak_days: Set[str] = set(tweak_dates)
         if tweak and adapted:
             tweak_days = self._tweak_days(
-                decision, tweak_dates, target_date_str, meso_end_date_str
+                decision, tweak_dates, target_date_str, range_end
             )
 
         # Integers, before the no-op backstop and the preview both read these numbers.
         normalize_load_fields(adapted)
 
-        # Drop any proposal dated past the adaptation range: the next mesocycle is out of reach
-        # and was never shown to the model, so a post-boundary date is a hallucination
+        # Drop any proposal dated past the adaptation range: the days after it were never
+        # shown to the model, so such a date is a hallucination
         # (DESIGN_mesocycle_boundary.md §1).
-        adapted = [w for w in adapted if str(w.get("date", "")) <= meso_end_date_str]
+        adapted = [w for w in adapted if str(w.get("date", "")) <= range_end]
 
         # Drop any proposal that targets an already-completed session — those are locked
         # history (see completed_keys above). This is the load-bearing guard: it holds even
@@ -387,7 +399,7 @@ class AdaptMixin:
         # re-derive the pairing for its preview and rebuild a narrower range from the
         # proposal dates, so the two could disagree about which sessions disappear.
         window_workouts = self._db.get_workouts(
-            start_date=target_date_str, end_date=meso_end_date_str
+            start_date=target_date_str, end_date=range_end
         )
         # A tweak writes its days only, whatever came back and whatever the passes above
         # added. Cut before the moves are resolved, so a move left half out writes no rest
@@ -410,7 +422,7 @@ class AdaptMixin:
         # A tweak shows the strength planner its own days only, and nothing when the week
         # planner changed nothing (DESIGN_workout_tweak.md §3.2).
         strength_sessions = window_workouts
-        strength_span = (target_date_str, meso_end_date_str)
+        strength_span = (target_date_str, range_end)
         if tweak:
             strength_sessions = [w for w in window_workouts if w['date'] in tweak_days]
             strength_span = ("", "")
@@ -436,7 +448,7 @@ class AdaptMixin:
         # Decided at proposal time so apply stamps this list rather than re-deriving
         # it from a set that may have been edited since (§8). A tweak had authority over
         # a few days, so it may stamp nothing (DESIGN_workout_tweak.md §3.2).
-        covered = honoring.covered_ids(constraints, target_date_str, meso_end_date_str)
+        covered = honoring.covered_ids(constraints, target_date_str, range_end)
         if tweak:
             covered = ()
         return RevisionProposal(
@@ -445,7 +457,7 @@ class AdaptMixin:
             new_constraints=tuple(new_constraints),
             new_signals=tuple(new_signals),
             range_start=target_date_str,
-            range_end=meso_end_date_str,
+            range_end=range_end,
             kind="tweak" if tweak else "adapt",
             pairs=pairs,
             removals=removals,
