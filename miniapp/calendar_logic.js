@@ -82,6 +82,15 @@ export function stamp(at) {
   return `as of ${DAYS[parseDay(day).getDay()]} ${time}`;
 }
 
+export function staleNote(snapshot, phoneDay) {
+  // A copy from an earlier day than the phone's marks the wrong day as today (§5).
+  if (phoneDay <= snapshot.today) {
+    return null;
+  }
+  return `This calendar is from ${DAYS[parseDay(snapshot.today).getDay()]} `
+    + `${shortDay(snapshot.today)}.`;
+}
+
 export function monthsBetween(from, to) {
   // The months the page can swipe through: those of the window, no further (§1).
   const months = [];

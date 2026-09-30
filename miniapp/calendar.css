@@ -132,6 +132,16 @@ h1 {
   color: var(--hint);
 }
 
+/* A copy from an earlier day than the phone's (§5). */
+.stale-note {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
+.stale .full-day {
+  margin-top: 8px;
+}
+
 /* ----- the month grid (§3.1) ----- */
 
 .weekdays, .grid {

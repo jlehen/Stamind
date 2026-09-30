@@ -368,8 +368,16 @@ descriptions just keeps fewer days of sheets.
 (DESIGN_gym_logger.md §6), so the button always carries the snapshot of the bot's last
 message. It is Friday afternoon. The morning message went out at 07:02, and she ran at
 noon. The calendar still shows the run as not done yet, and the stamp says "as of Fri
-07:02". Any message to the bot brings a fresh button. A refresh button on the page is not
-handled.
+07:02". Any message to the bot brings a fresh button.
+
+A copy from an earlier day is worse: it marks the wrong day as today. It is Thursday 1
+October, 06:30, and the bot's last message went out on Wednesday. The calendar would open on
+September with Wednesday marked as today. So when the phone's date is later than the copy's
+today, the page says "This calendar is from Wed 30 Sep." and offers "📅 Today's sessions".
+That button sends the phone's date the way "💬 Full day in chat" does (§6): the page closes,
+the bot posts Thursday in the chat, and that message brings a fresh button. The page cannot
+fetch a fresh copy by itself, because Telegram lets it send one message and then closes it.
+A copy from earlier the same day gets no note.
 
 ## 6. The button
 

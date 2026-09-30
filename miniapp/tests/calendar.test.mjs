@@ -124,3 +124,10 @@ test("a day with a session can be asked for in full in the chat", async () => {
   assert.equal(logic.fullDayMessage("2026-09-22"), '{"calendar_day":"2026-09-22"}');
 });
 
+test("a copy from an earlier day than the phone's says so", async () => {
+  const snapshot = await logic.snapshotFromHash(`#c=${PACKED}`);
+  assert.equal(logic.staleNote(snapshot, "2026-09-25"), null);
+  assert.equal(logic.staleNote(snapshot, "2026-09-24"), null);
+  assert.equal(logic.staleNote(snapshot, "2026-09-26"), "This calendar is from Fri 25 Sep.");
+});
+

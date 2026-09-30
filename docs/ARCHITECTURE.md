@@ -4469,3 +4469,6 @@ offers "💬 Full day in chat". Tapping it calls `sendData` with
 `{"calendar_day": "<date>"}`, and Telegram closes the page. `ChatBot.on_web_app_data`
 reads the date with `calendar_page.requested_day` and runs `workout list -d <date>`, the
 command behind "📅 Today". Any other page message is still a gym log for `strength ingest`.
+A copy whose `today` is earlier than the phone's date says so (`staleNote`) and offers
+"📅 Today's sessions", which sends the phone's date the same way; the bot's answer carries a
+fresh button (DESIGN_calendar_miniapp.md §5).

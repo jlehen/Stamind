@@ -11,6 +11,7 @@ const ui = {
   next: document.getElementById("next"),
   goal: document.getElementById("goal"),
   stamp: document.getElementById("stamp"),
+  stale: document.getElementById("stale"),
   gridView: document.getElementById("grid-view"),
   grid: document.getElementById("grid"),
   endNote: document.getElementById("end-note"),
@@ -144,6 +145,24 @@ function openSheet(iso) {
   ui.sheet.hidden = false;
 }
 
+function renderStale() {
+  // An old copy says so and offers the phone's today in the chat, whose reply brings a fresh
+  // button (§5).
+  const phoneDay = logic.isoDay(new Date());
+  const note = logic.staleNote(snapshot, phoneDay);
+  if (!note) {
+    return;
+  }
+  ui.stale.append(element("p", "stale-note", note));
+  if (tg) {
+    const ask = element("button", "full-day", "📅 Today's sessions");
+    ask.type = "button";
+    ask.addEventListener("click", () => tg.sendData(logic.fullDayMessage(phoneDay)));
+    ui.stale.append(ask);
+  }
+  ui.stale.hidden = false;
+}
+
 function turn(step) {
   const target = shown + step;
   if (target < 0 || target >= months.length) {
@@ -203,6 +222,7 @@ async function start() {
   }
   ui.goal.textContent = snapshot.goal || "";
   ui.stamp.textContent = logic.stamp(snapshot.at);
+  renderStale();
   months = logic.monthsBetween(snapshot.from, snapshot.to);
   shown = logic.monthOf(months, snapshot.today);
   renderLegend();
