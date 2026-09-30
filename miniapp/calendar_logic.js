@@ -1,6 +1,6 @@
 // The calendar page's pure logic (DESIGN_calendar_miniapp.md §3, §5): reading the snapshot out
-// of the address, the month grid, the tint and the day sheet. No DOM here, so
-// `node --test` runs it.
+// of the address, the month grid, the tint and the day sheet, and folding in the files from
+// the bucket (DESIGN_miniapp_storage.md §7.1). No DOM here, so `node --test` runs it.
 
 export const VERSION = 1;
 
@@ -91,6 +91,11 @@ export function staleNote(snapshot, phoneDay) {
     + `${shortDay(snapshot.today)}.`;
 }
 
+export function later(one, other) {
+  // The stamp a page shows: the later of the button's time and the file's (storage §7.1).
+  return one > other ? one : other;
+}
+
 export function monthsBetween(from, to) {
   // The months the page can swipe through: those of the window, no further (§1).
   const months = [];
@@ -107,6 +112,15 @@ export function monthsBetween(from, to) {
     }
   }
   return months;
+}
+
+export function reachableMonths(data) {
+  // The window's months, or every month that has a file once the index file arrived
+  // (storage §7.1).
+  if (data.first && data.last) {
+    return monthsBetween(`${data.first}-01`, `${data.last}-01`);
+  }
+  return monthsBetween(data.from, data.to);
 }
 
 export function monthOf(months, iso) {
@@ -190,6 +204,15 @@ export function cellContent(day) {
   };
 }
 
+export function legendFor(snapshot, month) {
+  // The mesocycles that touch the month shown, each with its place in the one list
+  // (storage §4).
+  const first = isoDay(new Date(month.year, month.month, 1, 12));
+  const last = isoDay(new Date(month.year, month.month + 1, 0, 12));
+  return (snapshot.meso || []).map((meso, index) => ({ meso, index }))
+    .filter(({ meso }) => meso.s <= last && first <= meso.e);
+}
+
 export function mesoIndex(snapshot, iso) {
   // The strip's colour is the mesocycle's place in the one list (§4); -1 outside them all.
   return (snapshot.meso || []).findIndex((meso) => meso.s <= iso && iso <= meso.e);
@@ -220,6 +243,12 @@ export function inWindow(snapshot, iso) {
   return snapshot.from <= iso && iso <= snapshot.to;
 }
 
+export function isOutside(snapshot, iso) {
+  // A day the page holds no data for: outside the button's window, in a month whose file
+  // has not arrived.
+  return !inWindow(snapshot, iso) && !monthLoaded(snapshot, iso);
+}
+
 // The heading of the part a goal's day opens with (§3.5).
 export const GOAL = "Goal";
 
@@ -240,6 +269,10 @@ function daySheet(snapshot, iso) {
   if (day && day.sheet) {
     return { parts: day.sheet };
   }
+  // A month's file holds every sheet, so a day without one has nothing to say (storage §4).
+  if (monthLoaded(snapshot, iso)) {
+    return null;
+  }
   // An empty day past the end of the schedule never had anything to fit.
   if (!inWindow(snapshot, iso) || (!day && pastTheEnd(snapshot, iso))) {
     return null;
@@ -256,9 +289,10 @@ function daySheet(snapshot, iso) {
 export const DAY_REQUEST = "calendar_day";
 
 export function asksForFullDay(snapshot, iso) {
-  // "💬 Full day in chat" sits under a day that holds a session (§6).
+  // "💬 Full day in chat" sits under a day that holds a session (§6), for as long as its
+  // month's file has not arrived (storage §7.1, D4).
   const day = snapshot.days[iso];
-  return Boolean(day && day.x && day.x.length);
+  return Boolean(day && day.x && day.x.length) && !monthLoaded(snapshot, iso);
 }
 
 export function fullDayMessage(iso) {
@@ -272,4 +306,61 @@ export function didNotFit(fit) {
   }
   return `This day's details did not fit. Days from ${shortDay(fit[0])} to `
     + `${shortDay(fit[1])} have them.`;
+}
+
+// ---------------------------------------------------------------------------------------
+// The files from the bucket (DESIGN_miniapp_storage.md §7.1). The page keeps one set of
+// data, which starts as the button's; `loaded` holds the state of each month's file.
+// ---------------------------------------------------------------------------------------
+
+export const LOADING = "loading";
+export const LOADED = "loaded";
+export const FAILED = "failed";
+
+export function monthKey(month) {
+  return `${month.year}-${String(month.month + 1).padStart(2, "0")}`;
+}
+
+export function monthLabel(month) {
+  // Word for word `calendar_page.month_label`: the label September's file is named from.
+  return `calendar/${monthKey(month)}`;
+}
+
+function monthLoaded(snapshot, iso) {
+  return (snapshot.loaded || {})[iso.slice(0, 7)] === LOADED;
+}
+
+export function withIndex(data, index) {
+  // The index file's fields replace the button's: today, the goals, the mesocycles, the
+  // last day of the schedule, and the months it has files for. The stamp keeps the later
+  // of the two times.
+  return { ...data, ...index, end: index.end, at: later(data.at, index.at) };
+}
+
+export function withMonthState(data, key, state) {
+  return { ...data, loaded: { ...data.loaded, [key]: state } };
+}
+
+export function withMonth(data, key, file) {
+  // A month file's days replace that month's days.
+  const days = {};
+  for (const [iso, day] of Object.entries(data.days)) {
+    if (iso.slice(0, 7) !== key) {
+      days[iso] = day;
+    }
+  }
+  return withMonthState({ ...data, days: { ...days, ...file.days } }, key, LOADED);
+}
+
+export function monthNote(data, month) {
+  // What sits under the grid while a month's file is on its way, or when it could not be
+  // had; nothing once it arrived, or when the page has no files at all.
+  const state = (data.loaded || {})[monthKey(month)];
+  if (state === LOADING) {
+    return "Loading…";
+  }
+  if (state === FAILED) {
+    return "This month could not be loaded.";
+  }
+  return "";
 }

@@ -69,3 +69,14 @@ test("the why names the tapped mesocycle's plan, not the next goal's", () => {
   assert.equal(logic.whyMessage(base), '{"plan_why":10}');
   assert.equal(logic.whyMessage(build), '{"plan_why":6}');
 });
+
+test("from the plan file, a mesocycle shows its long text and no chat button", () => {
+  const file = { ...SNAPSHOT, meso: SNAPSHOT.meso.map((meso) => ({ ...meso, f: "Why it is." })) };
+  const row = logic.planRows(file).find((r) => r.kind === "meso" && r.name === "Aerobic base");
+  assert.deepEqual(logic.rowSheet(row, true), {
+    title: "Aerobic base", why: false,
+    lines: ["29 Sep – 25 Oct", "Rebuild the aerobic base and start sprint intervals.",
+            "Why it is."],
+  });
+  assert.equal(logic.rowSheet(row).why, true);
+});

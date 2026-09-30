@@ -11,6 +11,7 @@ written by `sm settings set timezone`; with no row the machine's own zone rules 
 time — importing this module must never open the database.
 """
 
+import calendar
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
@@ -218,6 +219,17 @@ def date_range(start: str, end: str) -> List[str]:
 def shift(date_str: str, days: int) -> str:
     """`date_str` moved `days` forward (backward when negative), as an ISO date."""
     return (parse_date(date_str) + timedelta(days=days)).isoformat()
+
+
+def month_start(date_str: str) -> str:
+    """The first day of the month holding `date_str`."""
+    return date_str[:8] + "01"
+
+
+def month_end(date_str: str) -> str:
+    """The last day of the month holding `date_str`."""
+    day = parse_date(date_str)
+    return day.replace(day=calendar.monthrange(day.year, day.month)[1]).isoformat()
 
 
 def resolve(token: str) -> str:

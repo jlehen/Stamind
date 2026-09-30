@@ -1,5 +1,6 @@
 """The calendar page's snapshot: the list of days in companion words, packed into the
-button's address (DESIGN_calendar_miniapp.md §3, §5).
+button's address (DESIGN_calendar_miniapp.md §3, §5), and the content of the calendar's
+files in the bucket (DESIGN_miniapp_storage.md §4).
 
 `calendar_url` is what the bot calls. Every line of a day's sheet comes from a companion
 line builder the chat already uses; nothing here writes new wording (§5). The marks the
@@ -163,12 +164,15 @@ def _in_schedule(cal: Calendar, day: str) -> bool:
     return any(str(m["start_date"]) <= day <= str(m["end_date"]) for m in cal.mesocycles)
 
 
-def sheet(cal: Calendar, day: Day) -> List[Any]:
-    """The day's sheet as [heading, lines] pairs; empty when there is nothing to say."""
+def sheet(cal: Calendar, day: Day, texts: bool = False) -> List[Any]:
+    """The day's sheet as [heading, lines] pairs; empty when there is nothing to say.
+    `texts` adds each workout's text as stored, for the month files
+    (DESIGN_miniapp_storage.md §4)."""
     parts: List[Any] = []
     planned = [r["planned"] for r in day.results]
     if planned or _in_schedule(cal, day.date):
-        parts.append([PLANNED, simple_day_lines(planned, day.date, descriptions=False)])
+        parts.append([PLANNED, simple_day_lines(planned, day.date, descriptions=texts,
+                                                wrap=False)])
     done = _done_lines(day, cal.today)
     if done:
         parts.append([DONE, done])
@@ -178,8 +182,8 @@ def sheet(cal: Calendar, day: Day) -> List[Any]:
     return parts
 
 
-def snapshot(cal: Calendar, at: datetime) -> Tuple[Dict[str, Any], Dict[str, list]]:
-    """The payload without its sheets, and the sheets by date (§5)."""
+def header(cal: Calendar, at: datetime) -> Dict[str, Any]:
+    """Everything the payload holds but its days (§5)."""
     goal = next_goal(cal.goals, cal.today)
     payload: Dict[str, Any] = {
         "v": VERSION,
@@ -192,10 +196,15 @@ def snapshot(cal: Calendar, at: datetime) -> Tuple[Dict[str, Any], Dict[str, lis
                   for g in cal.goals],
         "meso": [{"n": m["name"], "s": str(m["start_date"]), "e": str(m["end_date"])}
                  for m in cal.mesocycles],
-        "days": {},
     }
-    if cal.schedule_end and cal.start <= cal.schedule_end <= cal.end:
+    if cal.schedule_end and cal.schedule_end <= cal.end:
         payload["end"] = cal.schedule_end
+    return payload
+
+
+def snapshot(cal: Calendar, at: datetime) -> Tuple[Dict[str, Any], Dict[str, list]]:
+    """The payload without its sheets, and the sheets by date (§5)."""
+    payload = {**header(cal, at), "days": {}}
     sheets: Dict[str, list] = {}
     for day in cal.days:
         marks = _marks(day, cal.today)
@@ -266,11 +275,42 @@ def _drop_sheet(payload: Dict[str, Any], day: str) -> None:
         del payload["days"][day]
 
 
-def calendar_url(cal: Calendar, at: datetime) -> str:
+def calendar_url(cal: Calendar, at: datetime, storage: str = "") -> str:
     """The page's address with the snapshot after `#c=`, a part of the address a browser
-    never sends to the host serving the page (§5)."""
+    never sends to the host serving the page (§5). `storage` is what the files add to it,
+    and comes out of the budget (DESIGN_miniapp_storage.md §8)."""
     payload, sheets = snapshot(cal, at)
-    return f"{PAGE_URL}#c={fit(payload, sheets)}"
+    return f"{PAGE_URL}#c={fit(payload, sheets, BUDGET_BYTES - len(storage))}{storage}"
+
+
+def month_label(month: str) -> str:
+    """The label of a month's file, such as `calendar/2026-09`."""
+    return f"calendar/{month}"
+
+
+def month_files(cal: Calendar) -> Dict[str, Dict[str, Any]]:
+    """Each month `cal` spans as its file's content, by label: every day with its marks and
+    its whole sheet, workout text included. A month with nothing on it still has a file
+    (DESIGN_miniapp_storage.md §4): `cal.days` holds every date of the range."""
+    files = {month_label(m): {"v": VERSION, "days": {}}
+             for m in dict.fromkeys(day.date[:7] for day in cal.days)}
+    for day in cal.days:
+        entry = _marks(day, cal.today)
+        parts = sheet(cal, day, texts=True)
+        if parts:
+            entry["sheet"] = parts
+        elif not (entry["x"] or entry["u"] or entry["c"] or entry["s"]):
+            continue
+        files[month_label(day.date[:7])]["days"][day.date] = entry
+    return files
+
+
+def index_file(cal: Calendar, at: datetime, window_days: Tuple[str, str], first: str,
+               last: str) -> Dict[str, Any]:
+    """The index file: the payload without its days, for the window, plus the first and
+    the last month that have a file (DESIGN_miniapp_storage.md §4)."""
+    return {**header(cal, at), "from": window_days[0], "to": window_days[1],
+            "first": first, "last": last}
 
 
 

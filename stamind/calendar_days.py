@@ -11,7 +11,7 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 from stamind.analytics.adherence import MINOR, classify_adherence, unplanned_kind
 from stamind.analytics.compare import adherence_window, compare_days
 from stamind.analytics.runway import plan_end
-from stamind.clock import date_range, parse_date
+from stamind.clock import date_range, month_end, month_start, parse_date
 from stamind.config import config
 from stamind.db.objectives import ARCHIVED
 
@@ -37,8 +37,9 @@ class Day(NamedTuple):
 class Calendar(NamedTuple):
     """The days of `[start, end]`, and what surrounds them.
 
-    `mesocycles` are the plans' mesocycles from `start` to `end` or the last goal,
-    whichever is later, in date order, so the plan view can run to the last goal (§5).
+    `mesocycles` are the plans' mesocycles from the first day of `start`'s month to the
+    last day of `end`'s month or the last goal, whichever is later, in date order, so the
+    plan view can run to the last goal (§5).
     `goals` are every goal not archived, in date order. `schedule_end` is the last day
     the written schedule covers, the date `workout list` marks as its end."""
     start: str
@@ -83,7 +84,11 @@ def gather(dbh, start: str, end: str, today: str) -> Calendar:
 
     goals = [g for g in dbh.get_objectives() if g.get("status") != ARCHIVED]
     last_goal = max([str(g["target_date"]) for g in goals], default=end)
-    mesocycles, _dropped = dbh.get_governing_mesocycles(start, max(end, last_goal))
+    # Whole months, so the button's list and the files' list are one list
+    # (DESIGN_miniapp_storage.md §4).
+    mesocycles, _dropped = dbh.get_governing_mesocycles(
+        month_start(start), max(month_end(end), last_goal)
+    )
     return Calendar(
         start=start, end=end, today=today, days=days,
         mesocycles=sorted(mesocycles, key=lambda m: str(m["start_date"])),

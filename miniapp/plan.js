@@ -1,8 +1,10 @@
 // The "Goals & plan" page's DOM layer (DESIGN_calendar_miniapp.md §3.7): it draws the
-// snapshot the bot packed into the address, and hands every question to `plan_logic.js`.
+// snapshot the bot packed into the address, draws again from the plan file when it arrives
+// (DESIGN_miniapp_storage.md §7.2), and hands every question to `plan_logic.js`.
 // "?v=dev" becomes the commit at deploy, like the addresses in plan.html.
 import * as calendar from "./calendar_logic.js?v=dev";
 import * as logic from "./plan_logic.js?v=dev";
+import * as storage from "./storage.js?v=dev";
 
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 
@@ -19,6 +21,9 @@ const ui = {
 // The calendar's strip colours, numbered along the same list of mesocycles (§4).
 const STRIPS = 6;
 
+// Whether the plan file arrived, which holds every long text.
+let fromFile = false;
+
 function element(tag, className, text) {
   const node = document.createElement(tag);
   if (className) {
@@ -31,7 +36,7 @@ function element(tag, className, text) {
 }
 
 function openSheet(row) {
-  const found = logic.rowSheet(row);
+  const found = logic.rowSheet(row, fromFile);
   ui.sheetTitle.textContent = found.title;
   ui.sheetBody.replaceChildren();
   for (const line of found.lines) {
@@ -119,6 +124,21 @@ async function start() {
   }
   ui.stamp.textContent = calendar.stamp(snapshot.at);
   renderPlan(snapshot);
+  const files = storage.storageFromHash(window.location.hash);
+  if (!files) {
+    return;
+  }
+  let file;
+  try {
+    file = await storage.fetchFile(files, storage.PLAN);
+  } catch (problem) {
+    console.warn("the plan file could not be had", problem);
+    return;
+  }
+  const at = calendar.later(snapshot.at, file.at);
+  fromFile = true;
+  ui.stamp.textContent = calendar.stamp(at);
+  renderPlan({ ...file, at });
 }
 
 start();

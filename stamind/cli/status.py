@@ -18,6 +18,7 @@ from stamind.cli import staleness
 from stamind.cli.runway import current_runway
 from stamind.coach import honoring
 from stamind.db.objectives import goal_state, GOAL_UPCOMING
+from stamind.page_files import sync as page_files
 
 
 def _ago(iso_utc: str) -> str:
@@ -49,6 +50,27 @@ def _days_ago_str(date_str: str) -> str:
     if days == 0:
         return ", today"
     return f", {days}d ago"
+
+
+def _page_files_line():
+    """The pages' files when something needs doing: never published under this bot token,
+    or the last upload failed. None otherwise, and with no bucket configured
+    (DESIGN_miniapp_storage.md §10)."""
+    where = page_files.target()
+    if where is None:
+        return None
+    if not page_files.published(runtime.db, where):
+        return ("Pages' files: this database was never published under this bot token. Run "
+                + cmd("sm data publish") + ".")
+    failed = page_files.failures(runtime.db, where)
+    if not failed:
+        return None
+    labels = ", ".join(sorted(row["label"] for row in failed))
+    line = f"Pages' files: the last upload of {labels} failed ({failed[0]['error']})."
+    today = _today_str()
+    if all(page_files.rebuilt(row["label"], today) for row in failed):
+        return line + " The next command uploads it again."
+    return line + " Run " + cmd("sm data publish") + " to upload it again."
 
 
 def run_status(args) -> None:
@@ -337,6 +359,9 @@ def run_status(args) -> None:
     from stamind.openrouter import openrouter_client
     print(gray(f"  LLM model:    {openrouter_client.model} · change with "
                + cmd("settings set coach-model")))
+    files_line = _page_files_line()
+    if files_line:
+        notice(files_line)
 
     if verbose:
         goals = runtime.db.get_objectives()

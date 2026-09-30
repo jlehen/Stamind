@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Bump when the DDL below changes, so an existing database picks the change up once.
 # Reusing a number a previous commit already stamped is silent (ARCHITECTURE.md §5).
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 
 # The append-only rule, as the database enforces it (DESIGN_workout_revisions.md §14).
 # `wipe_workouts` drops both triggers to clear the table and puts them back from here, so
@@ -567,6 +567,18 @@ class SchemaMixin:
                     payload      TEXT NOT NULL,
                     FOREIGN KEY (activity_id) REFERENCES completed_activities(activity_id)
                         ON DELETE CASCADE
+                )
+            """)
+
+            # What Stamind remembers of each file it uploaded for the pages, keyed by the
+            # file's full address (DESIGN_miniapp_storage.md §6).
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS page_files (
+                    address      TEXT PRIMARY KEY,
+                    label        TEXT NOT NULL,
+                    fingerprint  TEXT,
+                    uploaded_at  TEXT,
+                    error        TEXT
                 )
             """)
 

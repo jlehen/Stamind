@@ -7,6 +7,9 @@ requests>=2.31
 google-api-python-client>=2.0
 google-auth>=2.0
 
+# The pages' files in a bucket: their key, names and encryption
+cryptography>=42.0
+
 # Garmin Connect (direct daily-metrics & activity sync)
 garminconnect>=0.2.0
 

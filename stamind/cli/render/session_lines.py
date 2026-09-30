@@ -77,6 +77,7 @@ def simple_session_line(w: Dict[str, Any], lead: Optional[str] = None) -> str:
 def simple_day_lines(
     workouts: List[Dict[str, Any]], date_str: str,
     verdicts: Optional[Dict[int, Dict[str, Any]]] = None, descriptions: bool = True,
+    wrap: bool = True,
 ) -> List[str]:
     """Simple rendering of one day's schedule: session line(s) plus the wrapped
     description (the week planner's actual prescription), or the one-line rest message.
@@ -86,7 +87,9 @@ def simple_day_lines(
     `verdicts` is `adherence_verdicts`' map; a session already trained gets the done
     line, and every other verdict renders as it did before (§6 tone rule).
     `descriptions=False` keeps the session lines only, for the calendar's day sheet
-    (DESIGN_calendar_miniapp.md §5)."""
+    (DESIGN_calendar_miniapp.md §5). `wrap=False` keeps the description and the athlete's
+    notes as stored, for the pages' files, which the browser wraps
+    (DESIGN_miniapp_storage.md §4)."""
     if not workouts:
         return [REST_DAY_LINE]
     day_word = "Today" if date_str == _today_str() else fmt_date(date_str)
@@ -98,14 +101,15 @@ def simple_day_lines(
         status = ((verdicts or {}).get(w.get("id")) or {}).get("status")
         if status in SIMPLE_DONE_STATUSES:
             lines.append(SIMPLE_DONE_LINE)
+        if not descriptions:
+            continue
         description = (w.get("description") or "").strip()
-        if description and descriptions:
-            lines.append(wrap_text(description))
-        if descriptions:
-            # What the athlete told the coach about it (DESIGN_session_notes.md §2).
-            lines.extend(
-                wrap_text(f"You said: “{note['text']}”") for note in w.get("athlete_notes") or []
-            )
+        texts = [description] if description else []
+        # What the athlete told the coach about it (DESIGN_session_notes.md §2).
+        texts += [f"You said: “{note['text']}”" for note in w.get("athlete_notes") or []]
+        if wrap:
+            texts = [wrap_text(text) for text in texts]
+        lines.extend(texts)
     return lines
 
 

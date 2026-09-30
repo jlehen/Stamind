@@ -35,6 +35,7 @@ from stamind.chat.scheduler import SchedulerMixin
 from stamind.cli.render import calendar_page, plan_page
 from stamind.config import config
 from stamind.output import warn
+from stamind.page_files import sync as page_files
 from stamind.strength import logger
 
 # What the chat that sent /restart hears once the new worker is up (DESIGN_bot_restart.md
@@ -117,13 +118,15 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
     def _page_buttons(self) -> Tuple[Tuple[str, str], Tuple[str, str]]:
         """The calendar's and the "Goals & plan" page's (label, address) cells, both
         carrying this moment's snapshot of one list of days (DESIGN_calendar_miniapp.md §5,
-        §3.7)."""
+        §3.7), and the way to the pages' files once they are published
+        (DESIGN_miniapp_storage.md §8)."""
         today = clock.today_str()
         start, end = calendar_page.window(today)
         cal = calendar_days.gather(runtime.db, start, end, today)
         now = clock.now()
-        return ((CALENDAR_LABEL, calendar_page.calendar_url(cal, now)),
-                (PLAN_LABEL, plan_page.plan_url(cal, now)))
+        storage = page_files.button_params(runtime.db)
+        return ((CALENDAR_LABEL, calendar_page.calendar_url(cal, now, storage)),
+                (PLAN_LABEL, plan_page.plan_url(cal, now, storage)))
 
     def _keyboard(self):
         """The §5.1 reply keyboard, rebuilt on every send so the gym button follows the week

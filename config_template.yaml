@@ -28,6 +28,9 @@ google:
   service_account_file: "service_account.json"
   # The calendar planned workouts are written to and read back from.
   calendar_id: "YOUR_CALENDAR_ID@group.calendar.google.com"
+  # Optional: the bucket the calendar and "Goals & plan" pages read their files from
+  # (README, "The pages' files in a bucket").
+  #storage_bucket: "stamind-pages"
 
 garmin:
   email: "you@example.com"

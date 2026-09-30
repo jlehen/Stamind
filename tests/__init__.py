@@ -78,6 +78,11 @@ _config.data.setdefault("logging", {})["dir"] = _TEST_LOG_DIR
 os.environ.setdefault("STAMIND_SOURCE", "test")
 atexit.register(shutil.rmtree, _TEST_LOG_DIR, True)
 
+# Every command a test runs ends with the pages' upload step, and `status` reports on it
+# (DESIGN_miniapp_storage.md §6, §10). Keep the operator's bucket out of both; a test of
+# the feature names its own bucket with `patch.dict`.
+_config.data.setdefault("google", {})["storage_bucket"] = None
+
 _LOOPBACK = {"127.0.0.1", "::1", "localhost", ""}
 _real_connect = socket.socket.connect
 

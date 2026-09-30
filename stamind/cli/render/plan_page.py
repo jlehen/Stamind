@@ -1,5 +1,6 @@
 """The "Goals & plan" page's snapshot: the mesocycles and the goals in companion words,
-packed into the button's address like the calendar's (DESIGN_calendar_miniapp.md §3.7).
+packed into the button's address like the calendar's (DESIGN_calendar_miniapp.md §3.7), and
+the content of the plan file in the bucket (DESIGN_miniapp_storage.md §4).
 
 `plan_url` is what the bot calls, with the same list of days the calendar is built from.
 """
@@ -45,17 +46,29 @@ def snapshot(cal: Calendar, at: datetime) -> Dict[str, Any]:
             "meso": meso, "goals": goals}
 
 
-def plan_url(cal: Calendar, at: datetime) -> str:
+def plan_url(cal: Calendar, at: datetime, storage: str = "") -> str:
     """The page's address with the snapshot after `#c=`. Past the budget the summaries and
-    descriptions go, and the page offers the chat for them (§3.7)."""
+    descriptions go, and the page offers the chat for them (§3.7). `storage` is what the
+    files add to it, and comes out of the budget (DESIGN_miniapp_storage.md §8)."""
     payload = snapshot(cal, at)
     packed = pack(payload)
-    if len(packed) > BUDGET_BYTES:
+    if len(packed) > BUDGET_BYTES - len(storage):
         for row in payload["meso"] + payload["goals"]:
             row.pop("m", None)
             row.pop("x", None)
         packed = pack(payload)
-    return f"{PAGE_URL}#c={packed}"
+    return f"{PAGE_URL}#c={packed}{storage}"
+
+
+def plan_file(cal: Calendar, at: datetime) -> Dict[str, Any]:
+    """The plan file: the button's data, where each mesocycle also carries as `f` its whole
+    long text, the one `bot mesocycle` prints (DESIGN_miniapp_storage.md §4, §7.2)."""
+    payload = snapshot(cal, at)
+    for row, m in zip(payload["meso"], cal.mesocycles):
+        focus = (m.get("focus") or "").strip()
+        if focus:
+            row["f"] = focus
+    return payload
 
 
 def why_plan(data: str) -> Optional[int]:
