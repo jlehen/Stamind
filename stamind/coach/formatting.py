@@ -5,6 +5,7 @@ from stamind.analytics.load import activity_load, rpe_divergence
 from stamind.analytics.pmc import PMC_TSB_LAG_NOTE, load_ratio
 from stamind.sports import canonical_sport
 from stamind.analytics.adherence import Performed
+from stamind.clock import fmt_timestamp
 from stamind.analytics import intensity
 from stamind.plan_inputs import science_documents
 from stamind.strength.prescription import brief_of
@@ -21,6 +22,21 @@ def _for_the_week_planner(workout: Workout) -> str:
     if not workout.get('prescribed_sets'):
         return description
     return brief_of(description)
+
+
+def athlete_note_lines(workout: Workout, indent: str = "  ") -> List[str]:
+    """What the athlete said about a session, one line per message, as every prompt that
+    lists the session prints it (DESIGN_session_notes.md §4)."""
+    return [
+        f"{indent}The athlete said ({fmt_timestamp(note['sent_at'])}): "
+        f"\"{' '.join(note['text'].split())}\""
+        for note in workout.get('athlete_notes') or []
+    ]
+
+
+def _with_notes(block: str, workout: Workout) -> str:
+    """A session's rendering with the athlete's words under it."""
+    return "\n".join([block, *athlete_note_lines(workout)])
 
 
 def _first_form(workout: Workout) -> str:
@@ -233,7 +249,8 @@ def format_standing_workouts(
     standing: List[Workout], eval_date: Optional[str] = None,
 ) -> str:
     """The SESSIONS ALREADY STANDING section of the generate prompt
-    (DESIGN_plan_change_continuity.md §4.6).
+    (DESIGN_plan_change_continuity.md §4.6), and its RECENT SESSIONS THE ATHLETE SPOKE ABOUT
+    (DESIGN_session_notes.md §4).
 
     Each session also carries its full description, so a revision can be minimal rather
     than re-invented."""
@@ -242,10 +259,10 @@ def format_standing_workouts(
         header = _planned_summary(w, eval_date, _standing_markers(w))
         desc = _for_the_week_planner(w)
         if not desc:
-            sections.append(header)
+            sections.append(_with_notes(header, w))
             continue
         indented = "\n".join("    " + ln for ln in desc.splitlines())
-        sections.append(f"{header}\n  Full description:\n{indented}")
+        sections.append(_with_notes(f"{header}\n  Full description:\n{indented}", w))
     return "\n\n".join(sections)
 
 
@@ -255,7 +272,7 @@ def format_neighbour_workouts(
     """The SESSIONS JUST OUTSIDE THE SPAN section of the generate prompt: one summary per
     session and no description, since the week planner only counts them
     (DESIGN_mesocycle_boundary.md §7)."""
-    return "\n".join(_planned_summary(w, eval_date) for w in neighbours)
+    return "\n".join(_with_notes(_planned_summary(w, eval_date), w) for w in neighbours)
 
 
 def _performed_marker(p: Performed) -> str:
@@ -316,9 +333,9 @@ def format_planned_workouts_detailed(
         desc = _for_the_week_planner(w)
         if desc:
             indented = "\n".join("    " + ln for ln in desc.splitlines())
-            sections.append(f"{header}\n  Full description:\n{indented}")
+            sections.append(_with_notes(f"{header}\n  Full description:\n{indented}", w))
         else:
-            sections.append(header)
+            sections.append(_with_notes(header, w))
     return "\n\n".join(sections)
 
 

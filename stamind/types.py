@@ -109,6 +109,9 @@ class Workout(TypedDict):
     # (DESIGN_strength_tracking.md §9). The description is rendered from them, so the two
     # cannot disagree.
     prescribed_sets: List[Dict[str, Any]]
+    # What the athlete said about the session, oldest first: `sent_at` (UTC ISO) and
+    # `text` (DESIGN_session_notes.md §2).
+    athlete_notes: List[Dict[str, Any]]
 
 class CompletedActivity(TypedDict):
     """Represents a completed Garmin activity synced from Sheets."""

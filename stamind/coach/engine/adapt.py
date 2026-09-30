@@ -13,8 +13,8 @@ from stamind.coach.engine.notes import (
     note_for_today_task, signal_extraction_task, tweak_task,
 )
 from stamind.coach.engine.sessions import (
-    LOCKED_HISTORY_TASK, SPORT_TYPE_ENUM, benchmark_task, move_task, planned_zone_fields,
-    planned_zone_task, replaces_field, strength_brief_task,
+    LOCKED_HISTORY_TASK, SPORT_TYPE_ENUM, athlete_words_task, benchmark_task, move_task,
+    planned_zone_fields, planned_zone_task, replaces_field, strength_brief_task,
 )
 from stamind.coach.formatting import (
     format_completed_activities, format_daily_signals, format_metrics_history,
@@ -254,6 +254,7 @@ the active mesocycle (from {target_date_str} to {meso_end_date_str}).
             custom_task += LOCKED_HISTORY_TASK
         else:
             custom_task = adapt_task + LOCKED_HISTORY_TASK + _FATIGUE_READING_TASK
+        custom_task += athlete_words_task(planned_workouts)
 
         # A strength day's description is a brief, here as in generate: the same rule has
         # to reach every call that writes one (DESIGN_strength_tracking.md §9).

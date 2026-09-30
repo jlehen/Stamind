@@ -56,6 +56,9 @@ PAST_CONSTRAINTS_DATA = "## CONSTRAINTS EARLIER IN THIS MESOCYCLE"
 NEIGHBOUR_INSTRUCTIONS = "### THE DAYS JUST OUTSIDE THE SPAN"
 NEIGHBOUR_DATA = "## SESSIONS JUST OUTSIDE THE SPAN"
 
+SPOKEN_INSTRUCTIONS = "### WHAT THE ATHLETE SAID ABOUT A SESSION"
+SPOKEN_DATA = "## RECENT SESSIONS THE ATHLETE SPOKE ABOUT"
+
 STRENGTH_BRIEF_INSTRUCTIONS = "### WRITING A STRENGTH DAY"
 STRENGTH_KEEP_THE_REQUEST = "A brief names an exercise in one case only"
 STRENGTH_REQUEST_INSTRUCTIONS = "asks for something INSIDE a strength session"
@@ -100,7 +103,7 @@ def build_prompt(**extra):
             "change_needed": False, "reason": "ok", "adapted_workouts": [],
         }
         with patch("builtins.print"):
-            engine._workout_adapt_logic(**BASE, **extra)
+            engine._workout_adapt_logic(**{**BASE, **extra})
         system, user = client.complete.call_args[0][0], client.complete.call_args[0][1]
     return system, user
 
@@ -561,10 +564,50 @@ class TestNeighbourSessionsGate(unittest.TestCase):
         self.assertNotIn(NEIGHBOUR_DATA, whole)
 
 
+class TestSpokenSessionsGate(unittest.TestCase):
+    """What the athlete said about a session reaches both week-level calls, with the rule
+    that says how to read it (DESIGN_session_notes.md §4)."""
+
+    NOTE = {"sent_at": "2026-06-02T09:53:00+00:00", "text": "Tough. ERG at 235w."}
+    RIDE = {
+        "date": "2026-06-02", "sport_type": "cycling", "title": "Climb-Pace 2x15",
+        "description": "[Climb-Pace 2x15]\n2x15 min at 232-242 W.", "duration_minutes": 90,
+        "rpe": 7, "tss": 95, "athlete_notes": [NOTE],
+    }
+
+    def test_a_spoken_session_reaches_both_regions_of_generate(self):
+        system, user = build_generate_prompt(spoken_workouts=[self.RIDE])
+        self.assertIn(SPOKEN_INSTRUCTIONS, system)
+        self.assertIn(SPOKEN_DATA, user)
+        self.assertIn("2x15 min at 232-242 W.", user)
+        self.assertIn('"Tough. ERG at 235w."', user)
+
+    def test_without_one_neither_appears(self):
+        system, user = build_generate_prompt()
+        whole = system + user
+        self.assertNotIn(SPOKEN_INSTRUCTIONS, whole)
+        self.assertNotIn(SPOKEN_DATA, whole)
+
+    def test_a_note_on_a_neighbour_brings_the_rule_without_the_section(self):
+        system, user = build_generate_prompt(neighbour_workouts=[self.RIDE])
+        self.assertIn(SPOKEN_INSTRUCTIONS, system)
+        self.assertNotIn(SPOKEN_DATA, user)
+        self.assertIn('"Tough. ERG at 235w."', user)
+
+    def test_adapt_prints_the_words_under_the_session_and_the_rule_with_them(self):
+        system, user = build_prompt(planned_workouts=[self.RIDE])
+        self.assertIn(SPOKEN_INSTRUCTIONS, system)
+        self.assertIn('"Tough. ERG at 235w."', user)
+
+    def test_adapt_without_a_note_has_no_rule(self):
+        system, _ = build_prompt()
+        self.assertNotIn(SPOKEN_INSTRUCTIONS, system)
+
+
 # The optional inputs whose regions are asserted above.
 GATES_WITH_A_TEST = {
     "athlete_message", "intensity_context", "standing_workouts", "past_constraints",
-    "neighbour_workouts", "tweak", "tweak_dates", "terse",
+    "neighbour_workouts", "spoken_workouts", "tweak", "tweak_dates", "terse",
 }
 
 # The rest of the two builders' optional inputs. Being here is not a claim that an input

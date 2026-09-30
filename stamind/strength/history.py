@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Set
 
 from stamind import runtime, settings
+from stamind.coach.formatting import athlete_note_lines
 from stamind.config import config
 from stamind.db.strength import STRENGTH_TYPE
 from stamind.strength import prescription, sets, vocabulary
@@ -33,7 +34,8 @@ SESSIONS_HEADING = (
     "The same {days} strength days, each activity as a whole: its length, how many sets were\n"
     "lifted in it, named or not, and its RPE, then its named exercises in the order they first\n"
     "came. Exercises joined by \"+\" were alternated. \"(not prescribed)\" marks an exercise the\n"
-    "session planned for that day did not hold."
+    "session planned for that day did not hold. \"The athlete said\" is their own words about\n"
+    "that day's session, typed into the chat."
 )
 NOT_PRESCRIBED = " (not prescribed)"
 
@@ -87,6 +89,18 @@ def _activities_by_day(since: str) -> Dict[str, List[_Activity]]:
         if row["exercise"]:
             activity.rows.append(row)
     return by_day
+
+
+def _notes_by_day(since: str, until: str) -> Dict[str, List[str]]:
+    """Per date, what the athlete said about that day's strength session
+    (DESIGN_session_notes.md §4)."""
+    workouts = runtime.db.get_workouts(
+        start_date=since, end_date=until, sport_type=STRENGTH_TYPE
+    )
+    return {
+        w["date"]: athlete_note_lines(w, indent="    ")
+        for w in workouts if w["athlete_notes"]
+    }
 
 
 def _prescriptions(since: str, until: str) -> Dict[str, _Prescription]:
@@ -271,10 +285,11 @@ def _session_head(day: str, activity: _Activity, split: bool) -> str:
 
 def _session_lines(
     recent: Sequence[str], by_day: Dict[str, List[_Activity]],
-    prescriptions: Dict[str, _Prescription],
+    prescriptions: Dict[str, _Prescription], notes: Dict[str, List[str]],
 ) -> List[str]:
     """The recent strength days as whole sessions, newest first (§8): each activity's head
-    line, then one line per group of alternated exercises."""
+    line, then one line per group of alternated exercises, then what the athlete said
+    about the day's session."""
     lines: List[str] = []
     for day in recent:
         activities = by_day[day]
@@ -285,6 +300,7 @@ def _session_lines(
             marked = prescribed if activity is attempt else None
             for group in _alternated(activity):
                 lines.append("    " + " + ".join(_done(activity, name, marked) for name in group))
+        lines.extend(notes.get(day, []))
     return lines
 
 
@@ -354,5 +370,5 @@ def build(today: str) -> History:
 
     lines.append("")
     lines.append(SESSIONS_HEADING.format(days=recent_days))
-    lines.extend(_session_lines(recent, by_day, prescriptions))
+    lines.extend(_session_lines(recent, by_day, prescriptions, _notes_by_day(since, today)))
     return History("\n".join(lines), on_record)

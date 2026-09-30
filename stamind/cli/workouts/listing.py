@@ -202,6 +202,10 @@ def print_workout_table(
         if summary and summary not in seen_summaries:
             seen_summaries.add(summary)
             print(format_labeled_paragraph("  Adapt summary:", summary, color_fn=gray))
+        # What the athlete said about it (DESIGN_session_notes.md §2).
+        for note in w.get('athlete_notes') or []:
+            label = f"  You said ({fmt_timestamp(note['sent_at'])}):"
+            print(format_labeled_paragraph(label, note['text'], color_fn=cyan))
         _print_history(w, getattr(args, "history", None))
         print(gray("-" * 40))
     # Where the schedule stops, when the listed range runs past it (§4). A listing with

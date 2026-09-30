@@ -2,15 +2,16 @@
 
 The prompt sections about a single session rather than about the span: the sport enum
 both schemas list, the intensity target, its two schema members, the `replaces` field,
-the strength brief, what may not be rewritten, how a move is written, and what a
-benchmark entry must keep. The first five of those are sent by `workout generate` and
-`workout adapt` both, and a second copy of one would slowly stop meaning the same thing
-in the two prompts (DESIGN_adapt_task_prompt.md §1). The last three only adapt sends
-today; they live here because they are about the entry, not about adapting.
+the strength brief, what the athlete said about a session, what may not be rewritten, how a
+move is written, and what a benchmark entry must keep. The first six of those are sent by
+`workout generate` and `workout adapt` both, and a second copy of one would slowly stop
+meaning the same thing in the two prompts (DESIGN_adapt_task_prompt.md §1). The last three
+only adapt sends today; they live here because they are about the entry, not about adapting.
 """
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 from stamind.sports import CANONICAL_SPORTS
+from stamind.types import Workout
 
 
 def _sport_type_enum() -> str:
@@ -168,6 +169,28 @@ shape: salvage what remains of it, move the exposure to another day, or — if t
 tells you the day is gone — write that day off to rest so the calendar records what
 actually happened. Do not leave a session standing that the athlete has told you they
 abandoned.
+"""
+
+
+def athlete_words_task(sessions: Sequence[Workout]) -> str:
+    """The WHAT THE ATHLETE SAID ABOUT A SESSION section, sent by `workout adapt` and the
+    week planner when a session they list carries the athlete's words
+    (DESIGN_session_notes.md §4)."""
+    if not any(w.get("athlete_notes") for w in sessions):
+        return ""
+    return _ATHLETE_WORDS_TASK
+
+
+_ATHLETE_WORDS_TASK = """
+### WHAT THE ATHLETE SAID ABOUT A SESSION
+A session the user content lists may carry lines starting "The athlete said", each with the
+time it was sent: the athlete's own words about that session, typed into the chat. They hold
+what Garmin cannot record: how hard it felt, whether they stopped by choice, the setup (ERG
+mode, a Zwift climb, the real road), a time or a wattage read off the head unit. Read them
+beside the session's prescription and that day's Garmin activity, and pitch the next
+comparable session from all three. The words are how the session felt and the numbers are
+what it measured; when they disagree, weigh both. A request in those words was about that
+day and has already been answered: it asks nothing of today.
 """
 
 

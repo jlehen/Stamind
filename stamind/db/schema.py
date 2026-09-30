@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Bump when the DDL below changes, so an existing database picks the change up once.
 # Reusing a number a previous commit already stamped is silent (ARCHITECTURE.md §5).
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 # The append-only rule, as the database enforces it (DESIGN_workout_revisions.md §14).
 # `wipe_workouts` drops both triggers to clear the table and puts them back from here, so
@@ -539,6 +539,21 @@ class SchemaMixin:
                     checked_against  TEXT NOT NULL
                 )
             """)
+
+            # What the athlete said about a session, word for word. Keyed by lineage: it
+            # follows the session through its revisions (DESIGN_session_notes.md §2).
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS session_notes (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    lineage_id  INTEGER NOT NULL,
+                    sent_at     TEXT NOT NULL, -- UTC ISO
+                    text        TEXT NOT NULL
+                )
+            """)
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_session_notes_lineage "
+                "ON session_notes(lineage_id)"
+            )
 
             # The raw gym log the Mini App sent, kept beside the sets it was turned into,
             # so a later grading step has the departures without deriving them again

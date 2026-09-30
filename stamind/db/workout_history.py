@@ -17,6 +17,7 @@ class WorkoutHistoryMixin:
     Three things that are all the same question asked at different scales: every form one
     session has ever had, the log of the changes that wrote them, and which Calendar event
     a lineage currently holds (DESIGN_workout_revisions.md §5, DESIGN_calendar_lineage.md).
+    And what the athlete said about a session (DESIGN_session_notes.md).
     """
 
     def get_lineage_head(self, lineage_id: int) -> Optional[Workout]:
@@ -358,5 +359,15 @@ class WorkoutHistoryMixin:
         with self._get_connection() as conn:
             conn.execute(
                 "DELETE FROM workout_calendar_state WHERE lineage_id = ?", (lineage_id,)
+            )
+            conn.commit()
+
+    def add_session_note(self, lineage_id: int, text: str) -> None:
+        """Keeps the athlete's words with a session, exactly as typed
+        (DESIGN_session_notes.md §2)."""
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO session_notes (lineage_id, sent_at, text) VALUES (?, ?, ?)",
+                (lineage_id, datetime.now(timezone.utc).isoformat(), text),
             )
             conn.commit()

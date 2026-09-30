@@ -7,9 +7,13 @@ A tweak is that flow with a narrower job (DESIGN_workout_tweak.md §3.2).
 """
 import argparse
 from datetime import datetime, timedelta
+from typing import Optional
 from stamind import athlete_queue, runtime
 from stamind.analytics.compare import format_actual
 from stamind.config import config
+from stamind.prompt import Choice
+from stamind.sports import canonical_sport
+from stamind.types import Workout
 from stamind.text import gray, red
 from stamind.output import notice, step, warn
 from stamind.clock import fmt_date, today_str as _today_str
@@ -59,6 +63,26 @@ def _resolve_ambiguous_matches(date_str: str, auto: bool) -> None:
             print(gray("  Counted as that session, partially performed."))
         else:
             print(gray("  Discarded — the session reads as not done."))
+
+
+def _session_for_note(date_str: str, message: Optional[str]) -> Optional[Workout]:
+    """The session the athlete's note is about: the day's only one, or the one they pick
+    when there are several. None when the day has none (DESIGN_session_notes.md §3)."""
+    if not (message or "").strip():
+        return None
+    sessions = [
+        w for w in runtime.db.get_workouts(start_date=date_str, end_date=date_str)
+        if canonical_sport(w['sport_type']) != canonical_sport('rest')
+    ]
+    if len(sessions) < 2:
+        return sessions[0] if sessions else None
+    picked = runtime.prompt.choose(
+        "Which session is this about?",
+        [Choice(str(w['id']), w['title']) for w in sessions]
+        + [Choice("none", "Not about a session")],
+        default="none",
+    )
+    return next((w for w in sessions if str(w['id']) == picked), None)
 
 
 def _adapt_date(args: argparse.Namespace, tweak: bool) -> str:
@@ -129,6 +153,9 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
 
     # Before the week planner is told anything: settle any pairing the matcher had to guess at.
     _resolve_ambiguous_matches(date_str, auto=args.auto)
+    # Asked now, kept once the coach has answered (DESIGN_session_notes.md §3). A tweak's
+    # request is acted on at once and is not kept.
+    note_session = None if tweak else _session_for_note(date_str, getattr(args, 'message', None))
 
     try:
         if tweak:
@@ -143,6 +170,9 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
             )
         reason = proposal.reason
         proposed_workouts = proposal.workouts
+        if note_session is not None:
+            runtime.db.add_session_note(note_session['id'], args.message)
+            runtime.render.session_note_kept(note_session, date_str)
 
         # §8 two-confirmation flow, step 1: confirm any constraint(s) extracted from the
         # athlete's note BEFORE the adaptation preview below — an independent commit that

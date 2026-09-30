@@ -8,8 +8,8 @@ calls share come from `sessions.py`.
 from typing import Any, Dict, List, Optional
 
 from stamind.coach.engine.sessions import (
-    SPORT_TYPE_ENUM, planned_zone_fields, planned_zone_task, replaces_field,
-    strength_brief_task,
+    SPORT_TYPE_ENUM, athlete_words_task, planned_zone_fields, planned_zone_task,
+    replaces_field, strength_brief_task,
 )
 from stamind.coach.formatting import (
     format_baseline, format_completed_activities, format_metrics_history,
@@ -255,6 +255,7 @@ class WorkoutGenerateMixin:
         standing_workouts: Optional[List[Workout]] = None,
         past_constraints: Optional[List[Constraint]] = None,
         neighbour_workouts: Optional[List[Workout]] = None,
+        spoken_workouts: Optional[List[Workout]] = None,
         terse: bool = False,
     ) -> Dict[str, Any]:
         """Queries LLM to generate workouts for a given number of days based on active strategy.
@@ -267,8 +268,10 @@ class WorkoutGenerateMixin:
         would rewrite (DESIGN_plan_change_continuity.md §4.2). `past_constraints` ended
         earlier in the current mesocycle and explain its record (§6.1).
         `neighbour_workouts` are the sessions planned in the week either side of the span,
-        shown and never written (DESIGN_mesocycle_boundary.md §7). `terse` halves the
-        summary (DESIGN_output_verbosity.md §9).
+        shown and never written (DESIGN_mesocycle_boundary.md §7). `spoken_workouts` are
+        the past sessions of the look back the athlete said something about
+        (DESIGN_session_notes.md §4). `terse` halves the summary
+        (DESIGN_output_verbosity.md §9).
         """
         start_str = start_str or today_str
         starting_phrase = "today" if start_str == today_str else start_str
@@ -329,6 +332,10 @@ class WorkoutGenerateMixin:
             + _standing_sessions_task(standing_workouts)
             + _past_constraints_task(past_constraints)
             + _neighbour_sessions_task(neighbour_workouts)
+            + athlete_words_task(
+                [*(spoken_workouts or []), *(standing_workouts or []),
+                 *(neighbour_workouts or [])]
+            )
             + planned_zone_task(zone_currencies)
             + "\n"
             "## RESPONSE FORMAT\n"
@@ -421,6 +428,14 @@ class WorkoutGenerateMixin:
             completed_text = format_completed_activities(completed_activities)
             history_text_parts.append(
                 f"## ACTUAL COMPLETED GARMIN ACTIVITIES IN WINDOW\n{completed_text}"
+            )
+        if spoken_workouts:
+            history_text_parts.append(
+                "## RECENT SESSIONS THE ATHLETE SPOKE ABOUT\n"
+                "Past sessions with the athlete's words about them — see WHAT THE ATHLETE "
+                "SAID ABOUT A SESSION.\nEach one's Garmin record is its day's line under "
+                "ACTUAL COMPLETED GARMIN ACTIVITIES IN WINDOW.\n"
+                + format_standing_workouts(spoken_workouts, eval_date=today_str)
             )
 
         # Why a week in this mesocycle went quiet, for a coach that can no longer see the

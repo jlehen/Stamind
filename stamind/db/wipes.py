@@ -54,11 +54,12 @@ class WipesMixin:
             cursor.execute("DELETE FROM workouts")
             cursor.execute("DELETE FROM workout_changes")
             cursor.execute("DELETE FROM workout_calendar_state")
-            # The prescribed sets ride on a revision and cascade with it; the checks are
-            # keyed by lineage and have no cascade to ride on
-            # (DESIGN_strength_tracking.md §9).
+            # The prescribed sets ride on a revision and cascade with it; the checks and the
+            # athlete's notes are keyed by lineage and have no cascade to ride on
+            # (DESIGN_strength_tracking.md §9, DESIGN_session_notes.md §2).
             cursor.execute("DELETE FROM prescribed_sets")
             cursor.execute("DELETE FROM strength_checks")
+            cursor.execute("DELETE FROM session_notes")
             for statement in WORKOUTS_APPEND_ONLY_TRIGGERS:
                 cursor.execute(statement)
 

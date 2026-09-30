@@ -27,7 +27,7 @@ from stamind.cli.render.plan_lines import (
 )
 from stamind.cli.render.session_lines import (
     SIMPLE_SESSION_RULE, simple_benchmark_question, simple_compare_lines, simple_day_lines,
-    simple_revision_lines, simple_span_words, simple_week_lines,
+    simple_day_word, simple_revision_lines, simple_span_words, simple_week_lines,
 )
 
 
@@ -59,6 +59,11 @@ class CompanionRenderer(ExpertRenderer):
 
     def adapt_applied(self) -> None:
         print(green("Done — your week is updated. 💪"))
+
+    def session_note_kept(self, session: Dict[str, Any], day: str) -> None:
+        when = simple_day_word(day, _today_str())
+        owner = "today's" if when == "today" else f"{when}'s"
+        print(f"Kept with {owner} “{session['title']}”.")
 
     # -- confirming a note's candidates --
     # The companion's main felt surface once notes stop riding the coach: she says

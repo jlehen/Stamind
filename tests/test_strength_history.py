@@ -273,6 +273,16 @@ class SessionsAsDoneTest(_HistoryCase):
         self.lifted("2026-09-15", lift(*self.LEG_PRESS, 12, 70))
         self.assertNotIn(history.NOT_PRESCRIBED, self.text())
 
+    def test_what_the_athlete_said_comes_under_the_day(self):
+        """Their words about the day's session, after its exercises
+        (DESIGN_session_notes.md §4)."""
+        session = self.planned("2026-09-15", row("leg press", 3, 10, 12, 70.0))
+        self.lifted("2026-09-15", lift(*self.LEG_PRESS, 12, 70))
+        test_db.add_session_note(session["id"], "Leg press felt\nheavy today.")
+        last = self.sessions()[-1]
+        self.assertTrue(last.startswith("    The athlete said (2026-"), last)
+        self.assertTrue(last.endswith('"Leg press felt heavy today."'), last)
+
     def test_on_a_split_day_the_activity_holding_most_of_the_session_gets_the_marks(self):
         """The morning is the gym session; the evening's kettlebell work at home is the
         athlete's own, not an attempt at it, so it stays bare (§8)."""

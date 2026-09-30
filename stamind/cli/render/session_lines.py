@@ -101,6 +101,11 @@ def simple_day_lines(
         description = (w.get("description") or "").strip()
         if description and descriptions:
             lines.append(wrap_text(description))
+        if descriptions:
+            # What the athlete told the coach about it (DESIGN_session_notes.md §2).
+            lines.extend(
+                wrap_text(f"You said: “{note['text']}”") for note in w.get("athlete_notes") or []
+            )
     return lines
 
 

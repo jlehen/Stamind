@@ -126,6 +126,27 @@ class WorkoutsMixin:
         return {row["lineage_id"]: dict(row) for row in rows}
 
     @staticmethod
+    def _session_note_rows(
+        conn, lineage_ids: Sequence[int]
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """What the athlete said about these sessions, oldest first, keyed by lineage
+        (DESIGN_session_notes.md §4)."""
+        if not lineage_ids:
+            return {}
+        placeholders = ",".join("?" * len(lineage_ids))
+        rows = conn.execute(
+            "SELECT lineage_id, sent_at, text FROM session_notes "
+            f"WHERE lineage_id IN ({placeholders}) ORDER BY id",
+            tuple(lineage_ids),
+        ).fetchall()
+        grouped: Dict[int, List[Dict[str, Any]]] = {}
+        for row in rows:
+            grouped.setdefault(row["lineage_id"], []).append(
+                {"sent_at": row["sent_at"], "text": row["text"]}
+            )
+        return grouped
+
+    @staticmethod
     def _prescribed_set_rows(
         conn, revision_ids: Sequence[int]
     ) -> Dict[int, List[Dict[str, Any]]]:
@@ -150,6 +171,7 @@ class WorkoutsMixin:
         row: Dict[str, Any], revisions: List[Dict[str, Any]],
         calendar: Optional[Dict[str, Any]],
         prescribed: Optional[List[Dict[str, Any]]] = None,
+        notes: Optional[List[Dict[str, Any]]] = None,
     ) -> Workout:
         """One live revision as the dict the rest of the app reads (§5).
 
@@ -202,6 +224,8 @@ class WorkoutsMixin:
             # session. The description is rendered from these, so the week planner is shown
             # only the brief above them (DESIGN_strength_tracking.md §9).
             "prescribed_sets": list(prescribed or []),
+            # What the athlete said about the session (DESIGN_session_notes.md §4).
+            "athlete_notes": list(notes or []),
         }
 
     def _hydrate(self, conn, rows: List[Dict[str, Any]]) -> List[Workout]:
@@ -211,11 +235,13 @@ class WorkoutsMixin:
         revisions = self._lineage_revisions(conn, lineage_ids)
         calendar = self._calendar_state_rows(conn, lineage_ids)
         prescribed = self._prescribed_set_rows(conn, [r["id"] for r in rows])
+        notes = self._session_note_rows(conn, lineage_ids)
         return [
             self._hydrated(
                 row, revisions.get(row["lineage_id"], []),
                 calendar.get(row["lineage_id"]),
                 prescribed.get(row["id"]),
+                notes.get(row["lineage_id"]),
             )
             for row in rows
         ]

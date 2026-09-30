@@ -71,6 +71,10 @@ class ExpertRenderer:
     def adapt_applied(self) -> None:
         print(green("Adaptations applied and synced to calendar successfully."))
 
+    def session_note_kept(self, session: Dict[str, Any], day: str) -> None:
+        """The note was kept with this session (DESIGN_session_notes.md §3)."""
+        print(gray(f"Note kept with session {session['id']}, “{session['title']}” ({day})."))
+
     # -- confirming a note's candidates (cli/candidates.py) --
 
     def constraint_candidate_question(

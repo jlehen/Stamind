@@ -301,13 +301,13 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     w_adapt.add_argument(
         "-m", "--message", dest="message",
         help=(
-            "Ad-hoc, one-off signal to the coach for THIS adaptation run only (e.g. "
-            "'knee is sore, keep impact low', 'no bike access Thursday'). Advisory: it "
-            "won't override clear fatigue signals. The note itself isn't stored, but if "
-            "it drives a session change its cause is recorded in that session's reason so "
-            "a later run understands the tactical change; it stays a one-off and never "
-            "becomes durable mesocycle evidence. For persistent signals (alcohol, sleep, "
-            "stress) use 'signal add' instead."
+            "Ad-hoc signal to the coach for THIS adaptation run (e.g. 'knee is sore, keep "
+            "impact low', 'that was tough, I stopped halfway through rep 2'). Advisory: it "
+            "won't override clear fatigue signals. The note is also kept with the day's "
+            "session, word for word, and the coach reads it under that session for as long "
+            "as the session is in its look back; when the day has several sessions you are "
+            "asked which one. It never becomes durable mesocycle evidence. For persistent "
+            "signals (alcohol, sleep, stress) use 'signal add' instead."
         )
     )
     w_adapt.add_argument(

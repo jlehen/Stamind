@@ -173,6 +173,14 @@ class WorkoutGenMixin:
         ) + self._db.get_workouts(
             start_date=shift(gen_end_str, 1), end_date=shift(gen_end_str, 7)
         )
+        # The past sessions of the look back the athlete spoke about: no other list here
+        # shows a day before today (DESIGN_session_notes.md §4).
+        spoken_sessions = [
+            w for w in self._db.get_workouts(
+                start_date=start_date_str, end_date=shift(today_str, -1)
+            )
+            if w['athlete_notes']
+        ]
         planner_reply = self.engine._workout_generate_logic(
             objectives=objectives,
             constraints=constraints,
@@ -196,6 +204,7 @@ class WorkoutGenMixin:
             standing_workouts=standing_sessions,
             past_constraints=past_constraints,
             neighbour_workouts=neighbour_sessions,
+            spoken_workouts=spoken_sessions,
             terse=settings.terse(),
         )
 
