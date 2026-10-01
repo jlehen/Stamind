@@ -3,7 +3,7 @@
   "specPath": "designs/DESIGN_cycle_retrospective.md",
   "timestamp": "2026-09-27T19:44:50+00:00",
   "status": "spec-written",
-  "capturedAtCommit": "e657030",
+  "capturedAtCommit": "65fff0e",
   "qaLog": [
     {
       "id": "Q1",
@@ -170,8 +170,8 @@
   },
   "baseline": {
     "derivedFrom": "phase1-analysis",
-    "capturedAtCommit": "e657030",
-    "note": "The code was analysed on main at e657030. main moved to a147df9 during the interview (calendar mini app merged, SCHEMA_VERSION 22).",
+    "capturedAtCommit": "65fff0e",
+    "note": "The code was analysed on main at e657030. main moved to a147df9 during the interview (calendar mini app merged, SCHEMA_VERSION 22). Rebased on main at 65fff0e on 2026-09-30 (SCHEMA_VERSION 25), and the spec updated: the bot's expert persona is removed, `plan show` is short by default with -v for the long text, session notes exist, `plan wipe` was missing. D26-D29.",
     "claims": [
       {
         "id": "C1",
@@ -434,7 +434,56 @@
   "driftLedger": [],
   "previewUrl": null,
   "sourceIssue": null,
-  "feedbackRounds": [],
+  "feedbackRounds": [
+    {
+      "date": "2026-09-30",
+      "source": "rebase on main 65fff0e",
+      "changes": [
+        "§4, §8: the question's two wordings are the terminal's and the chat's; §8 split by place",
+        "§5: the writer reads the athlete's words about the mesocycle's sessions (D27)",
+        "§8: plan show prints one line per record, the full record under -v (D28)",
+        "§6, §11: plan wipe empties the records (D29)",
+        "§15: the Goals & plan page bullet restated now that it replaced 🧭 My plan"
+      ]
+    },
+    {
+      "date": "2026-10-01",
+      "source": "discussion",
+      "changes": [
+        "§5: the writer's call is logged under the label retrospective_writer (D30)"
+      ]
+    },
+    {
+      "date": "2026-10-01",
+      "source": "technical review, skeptic pass, corner-case pass on the undo rule",
+      "changes": [
+        "§3, §11: identity is goal and start date; the name leaves the key (D31)",
+        "§3: the date check works a cut out from the replaced versions and removes a record the current plan contradicts; no undo in plan rollback or goal_reinstate (D32)",
+        "§3: an ended mesocycle always gets a record; a cut-short one needs seven trained days (D33)",
+        "§3, §6: the date check skips called-off goals; a called-off plan record goes when the goal is live again (D34)",
+        "§4: only an ended mesocycle or plan gets a question; subject is the record's id; no question means a seven-day wait (D35)",
+        "§7: mesocycle records of every goal, unless a written plan record covers them (D36)",
+        "§5, §7, §8, §9, §11: cuts — retry and failed_at, question_subject, planned_end_date, date check in status and plan_apply, the shorter listing, the sentence in the chat's plan view, plan retro words (D37)",
+        "§10: no backfill script; the first date check records what has ended in the current plans (D38)",
+        "kept: the whole-plan record, the cut-short record, the Garmin refresh (D39)"
+      ]
+    },
+    {
+      "date": "2026-10-01",
+      "source": "fourth review, then a second reader weighing each fix against over-engineering",
+      "changes": [
+        "§7: the mesocycle that finished most recently keeps its full detail, also under a written plan record (D40)",
+        "§4, §5, §8: a record is due seven days after its end, or sooner when it holds the athlete's words and no lines; the rule no longer reads the athlete queue; after Nothing to say the record waits its seven days; changes the decline of D14 (D41)",
+        "§2, §5: only the first line's values are stored; a plan's numbers are the sums of its mesocycle records (D42)",
+        "§3, §13: cut — the date check at the end of plan rollback, and the amendment to DESIGN_plan_rollback.md §5 (D43)",
+        "§3: the day of a replacement is read on the athlete's clock (D44)",
+        "§10, §15: the cut-short rule reads old replaced versions too; what is lost is a mesocycle that finished inside one (D45)",
+        "§3, §5, §13, §14: the morning routine runs the two steps after its once-a-day test",
+        "§3: the sentence on a plan version that lived ten minutes, shortened",
+        "§15: a rollback more than a week after plan generate also leaves two records that share days"
+      ]
+    }
+  ],
   "redTeamStatus": "completed",
   "redTeamFindings": [
     {
