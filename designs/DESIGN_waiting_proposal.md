@@ -25,9 +25,9 @@ and asks "Shall I make these changes?". The athlete is in the shower. At 07:11 t
 "Prompt timed out — command cancelled." The proposal is gone, and the week planner's answer was
 paid for.
 
-**A second message is thrown away.** At 07:06, while the coach is still thinking, the athlete
-adds "move Saturday's ride to Sunday". The bot answers "A command is still running. Use the
-buttons above, or /cancel." Those words reach nobody.
+**The chat is held the whole time.** From 07:05 to 07:11 the bot answers everything with "A
+command is still running. Use the buttons above, or /cancel." It refuses "show my week". It
+also refuses "move Saturday's ride to Sunday", and those words reach nobody.
 
 The three have one cause. A proposal exists only in the memory of a running command, so the
 command must either write it at once or hold the chat until the athlete answers.
@@ -59,9 +59,7 @@ The new kind is `proposal`. Its item holds:
   asks about itself (§6.1);
 - the days it changes;
 - the newest change that wrote a session, at the moment the run read the week (§4, rule 1);
-- when it was made, and whether the run had last night's sleep score;
-- the athlete's messages it answers, with their times. A proposal that replaces another (§6.2)
-  also holds the messages of the one it replaces.
+- when it was made, and whether the run had last night's sleep score.
 
 **How it is sent.** The reason and the preview go out as ordinary text, which the bot already
 cuts into several messages when it is long. A proposal that rewrites four sessions can pass
@@ -77,8 +75,8 @@ A proposal **stands alone**, which is new for the queue and is one property of t
   in a round that the morning message opens, oldest first, one at a time (the queue design
   calls a round a "walk"). A proposal about today cannot sit behind three questions about
   Tuesday's gym sets.
-- It is left out of the rounds the bot sends. `sm queue answer` in a terminal still shows it,
-  because the terminal's hint "1 question is waiting" counts it.
+- It is in no round, in the chat or in a terminal, and the terminal's hint "1 question is
+  waiting" does not count it. `sm queue list` shows it and `sm queue answer <id>` answers it.
 - It has no "🕐 Not now". Not answering already means "not now", and "in 1 day" would bring back
   a proposal that is out of date.
 
@@ -109,10 +107,10 @@ as it is." A tap on a proposal that is already closed gets the same line, whatev
 It is Thursday, the proposal came at 08:00, the athlete rode the 90 minutes at noon and taps
 "Change it" at 15:00: rule 3 stops the tap from rewriting a ride already done.
 
-Rule 3 needs the noon ride to be in the database, and a tap reads the database only. So a tap
-on a proposal that changes today first pulls today's activities from Garmin, even inside the
-two hours during which Stamind normally does not pull again. If Garmin cannot be reached, the
-check uses what is stored.
+Rule 3 needs the noon ride to be in the database, and a tap reads the database only. So
+"Change it" on a proposal that changes today first pulls today's activities from Garmin, even
+inside the two hours during which Stamind normally does not pull again. If Garmin cannot be
+reached, it uses what is stored. "Keep it as planned" pulls nothing and answers at once.
 
 ## 5. The morning push
 
@@ -127,9 +125,9 @@ With `adapt-first` on, the push asks the week planner as it does today. Then:
 On the Thursday of §1 the athlete reads the 90-minute ride, then: "Rough night. Here's what I'd
 change: 60 easy minutes." They tap **Keep it as planned** and ride the 90 minutes.
 
-On a morning with a proposal the briefing's row loses "👍 Got it". The athlete could not tell it
-from "Keep it as planned": both leave the week alone. "😴 Feeling tired" and "🕐 Can't today"
-stay, because the proposal may be about something else than today's fatigue.
+The briefing keeps its row of buttons, "👍 Got it" included. "Got it" answers the briefing and
+"Keep it as planned" answers the proposal. An athlete who taps only "Got it" has not answered
+the proposal, and the week stays as planned.
 
 **Once a morning.** The push skips the week planner when it already ran this morning with the
 night's sleep score. Today it reads that from the newest change that `workout adapt`
@@ -138,10 +136,10 @@ also counts an `adapt` proposal saved this morning with the sleep score, whateve
 declined proposal then no longer makes the push ask again, which
 DESIGN_bot_simple_frontend.md §4.2 lists as not handled.
 
-The change that a tap writes does not say that the sleep score was seen. The proposal says it,
-by the time it was made. It is Thursday 21:00 and a proposal about Saturday is made, with
-Thursday's sleep score. The athlete taps "Change it" on Friday at 07:00. If the tap's change
-carried the mark, the 08:00 push would believe Friday's night was already read, and skip it.
+What a tap writes is saved without the mark that the sleep score was seen, so a tap's change
+never carries it. It is Thursday 21:00 and a proposal about Saturday is made, with Thursday's
+sleep score. The athlete taps "Change it" on Friday at 07:00. If the tap's change carried the
+mark, the 08:00 push would believe Friday's night was already read, and skip it.
 
 ## 6. A message to the coach from the chat
 
@@ -159,66 +157,67 @@ The run itself changes little:
 
 - The echo ("→ passing that on to your coach") and the wait notice with its ✋ Stop button stay.
   Stop ends the coach's run. `/cancel` and `/restart` end the command in both places.
-- "Was that the session, cut short?" is still asked before the week planner is called, with its
-  buttons, because the week planner reads the answer. The chat is free while it waits.
+- The two questions asked before the week planner is called stay where they are, with their
+  buttons: "Was that the session, cut short?" and "Which session is this about?". The chat is
+  free while they wait.
 - When the week planner answers, the proposal is saved and sent (§3). The saved item replaces
   the confirm that holds the chat today.
-- Three questions come after the proposal. Today they come before the preview. They are "Which
-  session is this about?", asked on a day with two sessions, and the questions about a rule or
-  a signal found in the message, "Shall I remember…?" (DESIGN_constraints.md §8). The first
-  one only says which session keeps the athlete's words as a note, so the week planner does not
-  need its answer. A question nobody answers must not hold the proposal back.
-- A question left unanswered for five minutes is dropped, as today. Its line changes from
-  "Prompt timed out — command cancelled." to "No answer, so I dropped that question.", because
-  the proposal above it still waits.
+- In the chat, the questions about a rule or a signal found in the message ("Shall I
+  remember…?") come after the proposal. Today they come before the preview
+  (DESIGN_constraints.md §8). A question nobody answers must not hold the proposal back. A tap
+  on "Change it" runs in the chat's own place, so it works while such a question still waits.
+- A question left unanswered for five minutes ends the run, as today. The line changes from
+  "Prompt timed out — command cancelled." to "No answer, so I stopped there.", which is true
+  whether or not a proposal waits above it.
 - When the week planner changes nothing, the athlete is told so, as today.
 
 The morning push, a reminder and a heads-up wait while the coach is thinking, the way they
 already wait for a busy chat. The reverse holds too: while the morning push runs, a message to
 the coach gets the busy line.
 
-### 6.2 Everything said since the last answer, in one proposal
+### 6.2 The next message to the coach
 
-One proposal about the week is open at a time. The coach answers everything the athlete has
-said since they last accepted or declined one.
+What happens to a message to the coach depends on what the coach's run is doing.
 
-**A message while the coach is thinking.** The coach is thinking from the moment its run starts
-until the run has saved a proposal or said that nothing changes.
+**No run.** The run starts.
 
-It is Thursday. 07:05: "I'm tired". 07:06: "move Saturday's ride to Sunday". The run that
-started at 07:05 knows only the first message, so its answer is already out of date. The bot
-stops it and starts one run with both messages, oldest first, each on its own line. At about
-07:07 one proposal arrives that eases today and moves Saturday. The joined run is a `workout
-adapt` when any of the messages was one, and a `workout tweak` only when all of them were: an
-adaptation may change the whole week, a tweak only the days it names.
+**The coach is thinking.** The coach is thinking from the moment the week planner is asked
+until the run has saved a proposal or said that nothing changes. A message to the coach in
+that time is not taken. It is Thursday. 07:05: "I'm tired". 07:06: "move Saturday's ride to
+Sunday". The bot answers "I'm still working on your last message — send that again in a
+minute." At about 07:07 a proposal arrives that eases today. The athlete sends the Saturday
+message again. At about 07:08 one proposal replaces the first and covers both, as the next
+paragraphs explain.
 
-Stop and `/cancel` forget the messages of the run they end. "Move it to Friday", Stop, "move it
-to Saturday" reaches the week planner as the last message only.
+**The run waits on a question.** The question is dropped with its line, "No answer, so I
+stopped there.", the run ends, and the new message starts its own run. At 07:07 the proposal
+arrives, then "Shall I remember that you sleep badly before a race?". At 07:30 the athlete
+writes "no, shorten it instead" and ignores the question.
 
-**A message while a proposal waits.** At 07:07 the coach proposes to skip today's ride. The
-athlete does not tap. At 07:30 they write "no, shorten it instead". The new run carries only
-this message. If the earlier run still has a question open, such as "Shall I remember…?", that
-question is cancelled.
-
-The new run looks for the open proposal (§3). A proposal that still waits but is out of date is
-closed on the way, and the week planner is not shown it. The open one is shown to the week
-planner the way the athlete's note is: the data in a section of its own, and how to read it in
-a sub-section of `## TASK` (DESIGN_prompt_structure.md). The data is what the athlete had said
-and the proposal as the athlete read it. The sub-section says that it was not accepted and that
-the answer replaces it. When the new proposal is saved, the old one is closed (§3). The new one
-opens with "This replaces my earlier proposal." This is also how the earlier messages travel:
-they are part of the proposal being replaced.
+**A proposal waits.** At 07:07 the coach proposes to skip today's ride. The athlete does not
+tap. At 07:30 they write "no, shorten it instead". The new run looks for the open proposal
+(§3). A proposal that still waits but is out of date is closed on the way, and the week planner
+is not shown it. The open one is shown to the week planner the way the athlete's note is: the
+data in a section of its own, and how to read it in a sub-section of `## TASK`
+(DESIGN_prompt_structure.md). The data is the proposal as the athlete read it. The sub-section
+says that it was not accepted and that the answer replaces it. When the new proposal is saved,
+the old one is closed (§3). The new one opens with "This replaces my earlier proposal."
 
 A run that proposes nothing leaves the open proposal open. Writing "what's tomorrow's swim
 about?" must not withdraw the offer to ease today.
 
-The morning push follows the same rule. A proposal from Thursday evening about Saturday is
-still open on Friday at 08:00. The morning run is shown it, and its proposal replaces it.
+Every run is shown the open proposal: a chat run, the morning push and a terminal run. A
+proposal from Thursday evening about Saturday is still open on Friday at 08:00. The morning run
+is shown it, and its proposal replaces it. A terminal run asks and writes as before, and what
+it writes puts the open proposal out of date by rule 1 of §4.
 
 **The week changed while the coach was thinking.** The run compares the newest change that
 wrote a session when it started and when it is about to save. If they differ, it saves nothing
 and says "Your week changed while I was thinking. Tell me again if you still want a change."
-This is rule 1 of §4, checked one step earlier.
+This is rule 1 of §4, checked one step earlier. The second place makes it needed: at 07:30 the
+athlete writes "also move Saturday's ride", and at 07:30:30, while that run thinks, they tap
+"Change it" on the 07:07 proposal. Without the check, the 07:31 proposal would arrive already
+out of date.
 
 ## 7. Gym sessions
 
@@ -241,38 +240,25 @@ fact a proposal carries.
 
 - An athlete who is tired and does not read the message trains the planned session. Silence
   used to mean the eased one. There is no setting to bring the old behaviour back.
-- A terminal run is not shown the open proposal. If it writes, the proposal is out of date.
 - A kilograms-only update (§7) is a change that wrote a session. It puts an open proposal out of
   date by rule 1 of §4, and the athlete asks again.
-- An activity that started before a proposal was made, but reached Garmin after it, is not seen
-  by rule 3 of §4. The athlete who trained at 06:30 and synced at 09:00 can still accept the
-  08:00 proposal about that session.
-- A bot restart while the coach is thinking loses the message, as a restart loses a running
-  command today. A saved proposal survives it.
-- "Was that the session, cut short?" left unanswered for five minutes still loses the message.
-- A replaced proposal keeps its buttons in the chat. A tap on them gets the line of §4.
-- A tap removes the buttons before its command runs. If that command fails, the proposal waits
-  without buttons. `sm queue answer` in a terminal still answers it.
+- When a proposal is declined or not answered, a gym session in it keeps the kilograms it had
+  until the next run. Writing those kilograms at once would be a second way to apply half a
+  proposal.
 - On later days the week planner is not told that the athlete declined. It sees what was
   trained.
-- The morning push itself still holds the chat for the minute it runs.
-- An adaptation that follows a goal or rule edit runs inside that edit's command. It saves its
-  proposal like any chat run, but the chat is busy while it thinks.
-- The other commands that ask before they write (a new goal, a rule, a test result) still hold
-  the chat for their one confirm. So does `workout generate` started from its button, which also
-  waits for the week planner, and whose confirm still times out after five minutes.
+- A message to the coach sent while the coach is thinking is not kept. The athlete is asked to
+  send it again (§6.2).
+- A question asked before the week planner is called still ends the run when nobody answers
+  it for five minutes, or when another message to the coach arrives. The first message is then
+  lost. Nothing was asked of the week planner yet.
+- Only a message to the coach runs beside the chat. The morning push, `workout generate` from
+  its button, and the adaptation after a goal or rule edit still hold the chat while they run.
+  Freeing them is a later design, which reuses the second place.
+- Only `workout adapt` and `workout tweak` save their proposal. Every other confirm in the chat
+  still times out after five minutes.
 
-## 9. Open questions
-
-1. **Kilograms on a declined or unanswered proposal (§7).** A gym session today keeps the
-   kilograms it had until the next run. The alternative is to split the proposal and write the
-   kilograms of the sessions the week planner left alone at once. It is more faithful, and it is
-   a second way to apply half a proposal. Left out until a real week shows the gap.
-2. **Should a kilograms-only update ask too?** §7 says no.
-3. **"Got it" on a proposal morning (§5).** Dropped here. Keeping it is harmless and one button
-   more.
-
-## 10. Build order
+## 9. Build order
 
 Each step works on its own.
 
@@ -280,28 +266,30 @@ Each step works on its own.
    stand-alone property, the push. Until step 2, a chat run started while the morning proposal
    is open asks and writes as today, and the proposal goes out of date by rule 1.
 2. **Chat runs save their proposal** (§6.1's saved proposal, §6.2's open proposal, and §7 for
-   chat runs). There is still one place per chat, so every question stays before the preview,
-   as today: a run parked on "Shall I remember…?" would make the bot refuse the tap on "Change
-   it". The chat is busy while the week planner thinks and while one of those questions waits.
-   The five-minute death of the final confirm is gone.
-3. **The run works beside the chat** (the rest of §6): the second place per chat, the three
-   questions moved after the proposal, and the stop and restart with joined messages.
+   chat runs). There is still one place per chat, so the rule and signal questions stay before
+   the preview, as today: a run parked on "Shall I remember…?" would make the bot refuse the
+   tap on "Change it". The chat is busy while the week planner thinks and while a question
+   waits. The five-minute death of the final confirm is gone. A run whose "Shall I remember…?"
+   gets no answer for five minutes still ends before its proposal is saved, as today. Step 3
+   removes this.
+3. **The run works beside the chat** (the rest of §6): the second place per chat, the rule and
+   signal questions moved after the proposal, the line for a message sent while the coach
+   thinks, and the check before saving.
 
-## 11. Touch points
+## 10. Touch points
 
 No table and no column are added: a proposal is a row of `athlete_queue`.
 
 | Where | What |
 |---|---|
 | `stamind/queue_kind.py` | `Kind` gains the stand-alone property and its own line for a tap that comes too late |
-| `stamind/athlete_queue.py`, `stamind/cli/queue.py` | a stand-alone item is sent when queued, by a function the push and `workout adapt` call; it is left out of the bot's rounds; it is drawn without the "🙋 Quick question" lead, without "Not now", and in the terminal without "skip" and "later"; a tap on a closed one prints the kind's own line |
-| `stamind/cli/workouts/proposal.py` (new) | the `proposal` kind and nothing that sends: wording, the three out-of-date rules with the Garmin pull, what each answer does, finding the open one. It must not import `cli/queue.py`, which imports the list of kinds. The item's subject, the key the queue uses to refuse a duplicate, is the instant it was saved, as for the `message` kind |
-| `stamind/coach/proposals.py` | whether the week planner changed a session; what a tap writes, to and from JSON |
-| `stamind/coach/service/revision_apply.py` | a tap's change carries no sleep mark (§5) |
+| `stamind/athlete_queue.py`, `stamind/cli/queue.py` | a stand-alone item is sent when queued, by a function the push and `workout adapt` call; it is in no round and not counted in the terminal's hint; it is drawn without the "🙋 Quick question" lead and without "Not now"; a tap on a closed one prints the kind's own line |
+| `stamind/cli/workouts/proposal.py` (new) | the `proposal` kind and nothing that sends: wording, the three out-of-date rules, what each answer does with the Garmin pull in "Change it", finding the open one. It must not import `cli/queue.py`, which imports the list of kinds. The item's subject, the key the queue uses to refuse a duplicate, is the instant it was saved, as for the `message` kind |
+| `stamind/coach/proposals.py` | whether the week planner changed a session; what a tap writes, to and from JSON, without the sleep mark |
 | `stamind/coach/service/adapt.py`, `stamind/coach/engine/adapt.py` | the open proposal as a data section and a sub-section of `## TASK` (DESIGN_prompt_structure.md) |
-| `stamind/cli/workouts/adapt.py` | a chat run saves and sends in place of the confirm; three questions move after it; the check before saving |
-| `stamind/cli/bot/views.py` | the push saves a proposal when a session would change; the briefing's row; the once-a-morning read |
-| `stamind/chat/` | the second place per chat, stop and restart with joined messages, prompt and Stop taps found by the run that raised them, `/cancel` and `/restart` over both places, the scheduler's busy test, the time-out line |
+| `stamind/cli/workouts/adapt.py` | a chat run saves and sends in place of the confirm; in the chat the rule and signal questions move after it; the check before saving |
+| `stamind/cli/bot/views.py` | the push saves a proposal when a session would change; the once-a-morning read, whose test on today's activities rule 3 shares |
+| `stamind/chat/` | the second place per chat for the coach's run, prompt and Stop taps found by the run that raised them, `/cancel` and `/restart` over both places, the three cases of §6.2 for a message to the coach, the scheduler's busy test, the time-out line |
 | `docs/ARCHITECTURE.md` | the bot section and the adaptation flow |
 
 Implemented designs amended when each step lands: DESIGN_athlete_queue.md §2 (its example
@@ -315,7 +303,8 @@ the coach's run).
 Tests, one per rule: each out-of-date rule refuses the tap and writes nothing; accept writes
 what was saved and not what asking the week planner again would return; the push writes nothing
 when a session would change and writes at once when only kilograms moved; a stand-alone item is
-in no round and has no "Not now"; a second message stops the run and the next one carries both;
-a run started with a proposal open replaces it, and a run that proposes nothing leaves it open;
-a run that changes nothing does not put an open proposal out of date; saving a proposal closes
-the others that wait.
+in no round and has no "Not now"; a message sent while the coach thinks gets its line and
+starts nothing, and one sent while the run waits on a question ends that run and starts its
+own; a run started with a proposal open replaces it, and a run that proposes nothing leaves it
+open; a run that changes nothing does not put an open proposal out of date; saving a proposal
+closes the others that wait.
