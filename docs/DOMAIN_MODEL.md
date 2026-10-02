@@ -19,9 +19,9 @@ question, and each level is written by a different command.
 |---|---|---|---|
 | **Goal** | What are we training for, and by when? | `objectives` table | The athlete (`goal add/edit`) |
 | **Macrocycle** | What is the overall strategy from now until that goal? | `macrocycles` table | `plan generate` (one LLM call) |
-| **Mesocycle** | What is this mesocycle of weeks *for*? | `mesocycles` table | `plan generate`, in the same call |
+| **Mesocycle** | What is this stretch of weeks *for*? | `mesocycles` table | `plan generate`, in the same call |
 | **Microcycle** | What does a typical week look like? | **Nothing. It is not stored.** | Implied by the workouts |
-| **Workout** | What do I actually do on Tuesday? | `workouts` table | `workout generate`, then `adapt` / hand edits |
+| **Workout** | What do I actually do on Tuesday? | `workouts` table | `workout generate`, then `workout adapt` and `workout tweak` |
 
 Two things in that table are worth pausing on, because they are the two facts that
 explain most of the design.
@@ -47,13 +47,21 @@ one macrocycle plus its mesocycles. The scheduled sessions are *workouts*, never
 
   workouts (one row = one REVISION of one session)
       │  macrocycle_id  ── a plain INTEGER tag, NOT a foreign key
-      └╌╌╌╌╌╌╌╌╌╌╌╌╌╌► macrocycles
+      ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌► macrocycles
+      │
+      │  by revision (workouts.id)
+      ├──────────────► prescribed_sets          a strength session's exercises
+      │
+      │  by session (workouts.lineage_id)
+      ├──────────────► workout_calendar_state   its Google Calendar event
+      ├──────────────► strength_checks          the lifting its kilograms were weighed against
+      └──────────────► session_notes            what the athlete said about it
 ```
 
 Read it top to bottom:
 
-- A **goal** owns its plan versions. There can be many, because every regeneration
-  makes a new one, but exactly one is active.
+- A **goal** owns its plan versions. There can be many, because every `plan generate`
+  that writes a new strategy makes a new one, but exactly one is active.
 - A **macrocycle** owns its mesocycles and its feedback notes. They are created with it and
   deleted with it. Nothing else creates or deletes a mesocycle.
 - A **workout** points at the plan version that wrote it, but only as a label. The
@@ -62,6 +70,10 @@ Read it top to bottom:
   is why deleting is not what `goal rm` does — it calls the goal off instead, which
   stands those sessions down properly. The delete survives as `goal rm --purge`, and it
   counts the sessions it would strand and warns before it runs (§9.7).
+- Four small tables hang off a workout. One hangs off a single **revision**, because it
+  is part of what that revision prescribes. The other three hang off the **session** —
+  the lineage, the identity that survives every revision — because they are facts about
+  the session and not about one form of it (§6).
 
 ### How they relate — the shape of time
 
@@ -97,7 +109,7 @@ Each level has its own notion of "alive", and they are deliberately different:
 | Macrocycle | `plan generate` accepted | `status = 'active'` — the one version the workouts follow | a newer version supersedes it | Yes — `plan rollback` makes a superseded version active again |
 | Mesocycle | with its macrocycle | its macrocycle is active and its goal is not archived | with its macrocycle | Only with its macrocycle |
 | Microcycle | — | — | — | — (not an entity) |
-| Workout | first revision of a lineage (a `generate`, `adapt` or `tweak` writing a new session) | its newest revision is the newest thing in its `(date, sport)` slot, and is not a void | a void revision is appended (`generate`, `adapt`, `tweak`, a goal stood down) | Yes — `rollback`, `reinstate` append a copy of an earlier revision |
+| Workout | first revision of a lineage (`workout generate`, `workout adapt` or `workout tweak` writing a new session) | its newest revision is the newest thing in its `(date, sport)` slot, and is not a void | a void revision is appended (`workout generate`, `workout adapt`, `workout tweak`, a goal stood down) | Yes — `workout rollback`, `plan rollback` and reinstating a goal append a copy of an earlier revision |
 
 Sections 2 to 6 take each level in turn. Section 7 says who may write what. Section 8 is
 a worked example. Section 9 lists what happens when something upstream changes.
@@ -137,7 +149,8 @@ race" loses that argument every time (`ARCHITECTURE.md §15 "Goal dates"`).
 **There is no priority field, and deliberately so.** One existed: it was stored,
 displayed and fingerprinted, but no code ever branched on it and the goal renderer never
 emitted it, so the coach never saw the number. All it did was change the `goals_hash` —
-marking the plan stale for a regeneration from a byte-identical prompt. Goals are
+marking the plan stale, for a `plan generate` that would send a byte-identical prompt.
+Goals are
 ordered by date, and the system prompt says so: *"Focus scheduling on the NEXT
 CHRONOLOGICAL GOAL only."* A goal that matters more than its neighbours says so in
 `description`, which the model does read.
@@ -189,8 +202,9 @@ decision and the Calendar says so.
 `goal edit ID --status active` reinstates it: every lineage whose live revision is still
 that stand-down void gets a copy of the session the void ended, floored at today, and
 the copies are re-pushed. A goal reinstated months later recovers only the sessions still
-ahead. A slot that was regenerated or edited in the meantime no longer shows the
-stand-down void, so it is left alone — something else owns it now.
+ahead. A slot that `workout generate`, `workout adapt` or `workout tweak` wrote to in the
+meantime no longer shows the stand-down void, so it is left alone — something else owns
+it now.
 
 The sweep is scoped by `macrocycle_id`, not by date, and it covers **every** plan version
 the goal owns, superseded ones included, because a superseded version can still own live
@@ -240,14 +254,14 @@ one by accident:
 ### What it is
 
 The overall periodization strategy for one goal: a prose `strategy` field plus the set
-of mesocycles hanging off it. **Every regeneration creates a new row.** The
-previous row is marked `superseded` and kept, never deleted.
+of mesocycles hanging off it. **Every `plan generate` that writes a new strategy creates
+a new row.** The previous row is marked `superseded` and kept, never deleted.
 
 So "macrocycle" and "plan version" are the same thing. `plan versions` lists them;
 `plan show -M <id>` renders a specific one; `plan rollback` makes an old one active
 again.
 
-### The fields, in three groups
+### The fields, in four groups
 
 **The content:**
 
@@ -255,6 +269,7 @@ again.
 |---|---|
 | `objective_id` | FK → `objectives`, cascade delete. |
 | `strategy` | The LLM's prose explanation of the whole approach. |
+| `summary` | The strategy in at most two sentences, written by the same call. `plan show` prints it in place of `strategy` unless `-v`. NULL when the model leaves it out. |
 | `created_at`, `status`, `superseded_at` | `status` is `active` or `superseded`. |
 
 **The fingerprints** — SHA-256 of the inputs the strategy was generated from:
@@ -263,13 +278,27 @@ again.
 |---|---|
 | `goals_hash` | Every upcoming goal, cleaned and stably ordered. |
 | `constraints_hash` | Only the **plan-shaping** (`replan = 1`) constraints. |
-| `config_hash` | The plan-shaping `user_profile` fields (thresholds, `name` and equipment excluded). |
+| `config_hash` | The plan-shaping `user_profile` fields. Left out: the thresholds, which are judged by drift instead (§9.4), and `name`, `equipment`, `preferences` and each day's own equipment, which shape a session but not the periodization. |
 
 **The snapshots** — the inputs themselves, kept as JSON so a stale plan can say *what*
-changed rather than only *that* something did: `goals_snapshot`, `constraints_snapshot`,
-`all_constraints_snapshot`, `config_snapshot`, `profile_snapshot`.
+changed rather than only *that* something did:
+
+| Field | Holds |
+|---|---|
+| `goals_snapshot` | The goals the hash covers. |
+| `constraints_snapshot` | The plan-shaping constraints the hash covers. |
+| `all_constraints_snapshot` | Every active constraint the strategy was shown, tactical ones included. For display only: `plan show -v` lists what the coach saw. |
+| `profile_snapshot` | The plan-shaping profile fields. |
+| `config_snapshot` | The threshold anchors in force: `max_hr` and each kind in the benchmark logbook. |
+| `science_snapshot` | The athlete's own science documents, as `{filename: text}`. It has no hash beside it: the text itself is compared. |
 
 The hash detects the change; the snapshot names the field that moved.
+
+**The cached verdict** — `reshape_verdict` and `reshape_verdict_key`. When an input has
+changed, Stamind asks the model one short question before it asks the athlete: would this
+change have reshaped the plan? That is the **verdict call**. Its answer is stored here,
+keyed on the edit it was asked about, so the same edit is asked about once
+(`DESIGN_plan_change_continuity.md §7`).
 
 ### Lifecycle
 
@@ -308,8 +337,8 @@ so the sessions match the plan again (§6 "Undo"). The version that was active a
 ago is now superseded, and can itself be rolled back to.
 
 **Deletion is rare and total.** `plan rm` deletes *every* version the goal has, active
-and superseded, and their mesocycles and notes go with them by cascade. Regeneration never
-deletes anything.
+and superseded, and their mesocycles and notes go with them by cascade. `plan generate`
+never deletes anything.
 
 ### The plan window
 
@@ -327,21 +356,47 @@ app. The only check is that the window exists.
 
 ### Derived state: is the plan stale?
 
+A plan is **stale** when an input it was written from has changed since. One function,
+`config_changed()`, makes that call, and it checks five inputs:
+
+| Input | Stale when |
+|---|---|
+| The profile | `config_hash` no longer matches. |
+| The thresholds | One has moved more than `coach.threshold_replan_pct` from its value in `config_snapshot`. `e1rm` is never checked: it is one number shared by every lift, so a squat record would flag the whole plan. |
+| The goals | `goals_hash` no longer matches. |
+| The plan-shaping constraints | `constraints_hash` no longer matches. |
+| The athlete's science documents | A file was added, removed or edited since `science_snapshot` (`DESIGN_plan_staleness.md §11`). |
+
+It collects every reason, not the first one it finds, so `plan show` names everything
+that moved.
+
 `plan generate` reuses the existing macrocycle — no LLM call — when **all** of these hold:
 
-- `goals_hash` matches, **and**
-- `constraints_hash` matches, **and**
-- `config_changed()` reports no drift (thresholds only past `coach.threshold_replan_pct`),
-  **and**
+- `config_changed()` reports nothing, **and**
 - no plan feedback is pending, **and**
 - neither `--force` nor `--fresh` was passed.
 
 Pending feedback opens the gate on its own: notes are a plan input, so they apply without
 `--force` (`DESIGN_plan_feedback.md §7`).
 
+**A stale plan has two ways out.** `plan generate` writes a new version from the inputs
+as they are now. `plan keep` does the opposite: it records the current inputs against
+the active version and writes no new one, so the flag clears without a strategy call.
+It is the answer for a change that would not have altered the periodization, such as a
+reworded profile field. The change still reaches the sessions at the next
+`workout generate`. `plan keep` rewrites every fingerprint and snapshot except
+`all_constraints_snapshot`: that one lists what the strategy was shown when it was
+written, and keeping a plan does not rewrite its strategy.
+
+Run from the terminal, `plan generate` on a stale plan asks before it writes: the changed
+inputs are shown, with the verdict call's read on them, then "Would you like to
+regenerate the periodization strategy?". A no is the same as `plan keep`. The question is
+skipped when feedback is pending, because the notes would bring a new plan whatever the
+answer.
+
 **Pending** has no flag of its own. A note is pending when its `macrocycle_id` is the
 goal's *currently active* version. Supersession *is* the consumption event — which gives
-two behaviours for free: a regeneration previewed and declined leaves the notes pending,
+two behaviours for free: a new plan previewed and declined leaves the notes pending,
 and a `plan rollback` makes an earlier version's notes pending again.
 
 ### Invariants
@@ -349,7 +404,7 @@ and a `plan rollback` makes an earlier version's notes pending again.
 1. **Exactly one active version per goal.** `save_macrocycle` supersedes the current
    active row before inserting; `set_active_macrocycle` supersedes every other active row
    before promoting its target. Readers filter on `COALESCE(status,'active') = 'active'`.
-2. **Regenerating never deletes.** The old version and its mesocycles survive so
+2. **`plan generate` never deletes.** The old version and its mesocycles survive so
    `plan rollback` can restore them (`DESIGN_plan_rollback.md`).
 3. **The plan window must be non-empty** (above).
 4. **Stamind never invents intermediate goals.** An athlete who wants a tune-up race as
@@ -357,14 +412,16 @@ and a `plan rollback` makes an earlier version's notes pending again.
 5. **Fingerprints are computed when the strategy is generated and carried verbatim to
    apply.** They are never recomputed at accept time — a goal edited between generating
    and accepting would otherwise be recorded as though the strategy had seen it, silently
-   defeating the staleness detector.
+   defeating the staleness detector. `plan keep` is the one deliberate re-stamp: there
+   the athlete has seen the change and said the plan stands.
 6. **Only `replan = 1` constraints fingerprint the plan.** All active constraints reach
-   the prompt; a tactical "no run Thursday" must not trip the reuse-vs-regenerate decision
-   (`DESIGN_constraints.md §7`).
+   the prompt; a tactical "no run Thursday" must not decide whether the plan is reused or
+   written again (`DESIGN_constraints.md §7`).
 
-### Three readers, three different "previous plans"
+### Four readers, four different plans
 
-These are easy to confuse, so they are named apart:
+These are easy to confuse, so they are named apart. The second and the third are both
+"the previous plan", in two different senses:
 
 | Reader | Answers |
 |---|---|
@@ -377,12 +434,13 @@ These are easy to confuse, so they are named apart:
 
 | Command | What it does |
 |---|---|
-| `plan generate` | Generate or reuse. `-f` forces. `--fresh` withholds the plan in place from the prompt (a clean slate, not a revision — implies `-f`). `-g` targets a goal. `-y` applies without the preview. `--show-llm-context` also prints the planned-vs-actual review it feeds the model. |
-| `plan show` | The strategy's summary, and the mesocycle timeline with each mesocycle's one-line summary and session count / duration / load. `-v` shows the full strategy and focus instead, plus the snapshotted inputs. `-M ID` for a superseded version, `-a` for every goal, `-w` to list each mesocycle's sessions. |
+| `plan generate` | Generate or reuse. `-f` forces. `--fresh` withholds the plan in place from the prompt (a clean slate, not a revision — implies `-f`). `--feedback "TEXT"` saves a note exactly as `plan feedback` does, then writes the new plan. `-g` targets a goal, or a range of goals (`-g ..2`), with one strategy call per goal. `-y` applies without the preview. `--show-llm-context` also prints the planned-vs-actual review it feeds the model. |
+| `plan show` | The strategy's summary, and the mesocycle timeline with each mesocycle's one-line summary and session count / duration / load. Flags any input that changed since, and says what to do about it. `-v` shows the full strategy and focus instead, plus the feedback notes and the snapshotted inputs. `-M ID` for a superseded version, `-a` for every goal, `-w` to list each mesocycle's sessions. |
+| `plan keep` | Keep a stale plan: record the current inputs against the active version, so the flag clears with no strategy call (above). |
 | `plan versions` | Every kept version for a goal, active and superseded, with IDs and dates. |
 | `plan diff [A] [B]` | Compare two versions: strategy prose, attached feedback, mesocycles added/removed/renamed/re-dated, snapshot deltas. |
 | `plan rollback` | Make a superseded version active again, and put the workouts back the way they were when it last wrote. `-M` names a version other than the previous one. |
-| `plan feedback` | Append a note to the append-only log for the next version. `-m` files it to one mesocycle. `--rm ID` deletes one. `--replan` regenerates immediately. Bare `plan feedback` lists what is pending. |
+| `plan feedback` | Append a note to the append-only log for the next version. `-m` files it to one mesocycle. `--rm ID` deletes one. `--replan` runs `plan generate` straight away. Bare `plan feedback` lists what is pending. |
 | `plan rm` / `plan wipe` | Delete every version of one goal's plan / every plan. |
 
 What `plan generate` reads before it calls the model: the science guidelines, the athlete
@@ -390,22 +448,26 @@ profile, every upcoming goal, every active constraint, a 15-day training and met
 summary (including the current CTL / ATL / TSB lines), a planned-vs-actual review of the
 plans the athlete trained through, the active coach learnings, the mesocycle the athlete is
 mid-way through (offered so the new plan may let it finish rather than cut it at today),
-and the pending feedback log — which it **must** address note by note.
+the inputs that changed since the plan in place was written, how each threshold was
+obtained, and the pending feedback log — which it **must** address note by note.
+
+What it writes back: the `strategy`, its two-sentence `summary`, and for each mesocycle
+a name, two dates, a `focus` and a one-line `summary`.
 
 What it does *not* do: touch coach learnings (read-only), or write any workouts.
-Generating a new strategy leaves the existing sessions exactly where they are until
+A new strategy leaves the existing sessions exactly where they are until
 `workout generate` runs.
 
 ---
 
-## 4. Mesocycle (`mesocycles`) — the mesocycle
+## 4. Mesocycle (`mesocycles`) — a phase of the plan
 
 ### What it is
 
 A phase of training with one job: *"Base Building, 2026-09-01 to 2026-10-05, Zone 2
 aerobic base, high volume."*
 
-That is genuinely all it is. The table has four meaningful columns:
+That is genuinely all it is. The table has five meaningful columns:
 
 | Field | Notes |
 |---|---|
@@ -413,6 +475,7 @@ That is genuinely all it is. The table has four meaningful columns:
 | `name` | e.g. "Base Building", "Peak & Taper". |
 | `start_date`, `end_date` | Inclusive `YYYY-MM-DD` bounds. |
 | `focus` | Prose: what this mesocycle is for. |
+| `summary` | One plain sentence saying the same thing, shorter. `plan show` prints it in place of `focus` unless `-v`, and the "Goals & plan" page shows it. NULL when the model leaves it out. |
 
 There is **no** stored load target, no weekly hours, no intensity distribution, no deload
 flag. A mesocycle states what it is for, and the week planner derives the rest from that
@@ -447,8 +510,9 @@ today's date, not of anything stored. A bare `-m` on any selector-taking command
    `save_macrocycle` repairs what comes back rather than trusting it
    (`repair_mesocycle_contiguity`): end dates are authoritative, a start that disagrees with
    its predecessor's end is re-dated to the day after it, and a mesocycle that ends inside
-   its predecessor is dropped. `plan apply` runs the same repair first and prints a note
-   per fix, so a repaired plan is never silently different from the one shown.
+   its predecessor is dropped. `plan_apply`, the method that saves an accepted plan, runs
+   the same repair first and prints a note per fix, so a repaired plan is never silently
+   different from the one shown.
 
 **Asked of the model, but not enforced anywhere:**
 
@@ -459,8 +523,8 @@ today's date, not of anything stored. A bare `-m` on any selector-taking command
    best-effort: planning goals out of chronological order still produces two active
    plans over the same dates. That state is legitimate and transient — adding the
    earlier goal flags the later plan stale (its `goals_hash` covers every goal), and
-   regenerating it re-pins its start — and the readers settle it by recency in the
-   meantime (below).
+   running `plan generate` on it re-pins its start — and the readers settle it by recency
+   in the meantime (below).
 
 Point 5 lives in the planning prompt only; the readers absorb a plan that starts late or
 ends early by falling back (below).
@@ -549,7 +613,14 @@ over a session four weeks out, where it has no predictive claim. Periodization i
 by `plan generate` and `workout generate`; a daily readiness check must not rewrite it
 (`DESIGN_mesocycle_boundary.md §2`).
 
-Rather than widening the firewall, both sides are made aware of it. Inside
+**`workout tweak` is not held to the boundary.** It reads no recovery metrics into its
+decision: the athlete decides, and only the days they name change. So it reaches from
+today to the end of the current mesocycle, or seven days ahead when that is later. It is
+Wednesday, the last day of a mesocycle. Thursday holds the gym and Friday a rest day,
+both in the next mesocycle. The athlete asks to swap them, and the swap goes through
+(`DESIGN_workout_tweak.md §3.2`).
+
+For `workout adapt`, rather than widening the firewall, both sides are made aware of it. Inside
 `config.adapt_terminal_window_days` of a mesocycle's end, the adapt prompt gains a
 `THIS MESOCYCLE IS ENDING` section. On the CLI side, the runway detector watches for the
 schedule running out: inside `config.runway_warning_days` of the last scheduled session,
@@ -558,9 +629,10 @@ schedule on — `-m ..<id>` at a mesocycle boundary, a bare `workout generate` o
 (`DESIGN_runway_nudge.md §3`). When every mesocycle of the plan has already ended,
 `workout adapt` refuses outright: there is nothing to adapt towards.
 
-Nothing crosses that boundary. A constraint dated past it is built in by the next
-`workout generate` whose span reaches it — which re-plans those days against the mesocycles
-that govern them, rather than carrying today's readings across to them. What the athlete
+`workout adapt` carries nothing across that boundary. A constraint dated past it is built
+in by the next `workout generate` whose span reaches it — which re-plans those days
+against the mesocycles that govern them, rather than carrying today's readings across to
+them. What the athlete
 gets in the meantime is *notice*: `constraints.honored_at` records whether any pass has had
 the directive in scope, so `status`, `constraint list`/`show` and the message printed at add
 time can say the schedule does not reflect it yet and name the run that would
@@ -615,12 +687,13 @@ So the concept lives in exactly three places:
 
 1. **The workout-generation prompt**, which asks for it by name: *"Ensure the microcycles
    — one week, or longer where the athlete's guidelines alternate weeks — are designed
-   specifically to match the focus, target volume, and intensity of the active mesocycle
-   mesocycle(s)."* The model's `reasoning` field is asked to describe *"the shape of the
-   microcycle and why"* — that is the microcycle design, returned as prose rather than as
-   data. A two-week alternation is a microcycle the prompt allows and the mesocycle-progress
-   deload rule knows about (`DESIGN_mesocycle_progress.md` §3.2); the app still aggregates by
-   Monday week (point 3), so the alternation shows there as a sawtooth, not as a unit.
+   specifically to match the focus, target volume, and intensity of the active
+   mesocycle(s) the athlete is in during this period."* The model's `reasoning` field is
+   asked to describe *"the shape of the microcycle and why"* — that is the microcycle
+   design, returned as prose rather than as data. A two-week alternation is a microcycle
+   the prompt allows and the mesocycle-progress deload rule knows about
+   (`DESIGN_mesocycle_progress.md` §3.2); the app still aggregates by Monday week
+   (point 3), so the alternation shows there as a sawtooth, not as a unit.
 2. **The science guidelines**, as the defaults above.
 3. **`progression.weekly_aggregates`**, the one place the app makes weeks concrete. It
    aggregates planned-vs-actual load into **Monday-commencing** weeks and labels each week
@@ -669,30 +742,83 @@ ended, the new one begun).
 `duration_minutes`, `rpe`, `tss`, `benchmark_type`, and the seven `planned_zone*_sec`
 slots with their `planned_zone_currency` (`hr` or `power`).
 
+**The label** — `short_name`, at most five characters naming the kind of session ("Easy",
+"Hills", "Z2"). The calendar page shows it in the day's cell. The week planner writes it
+with the title. It sits on the revision but is not part of the prescription: a revision
+that differs from the live one only in its short name is not written
+(`DESIGN_calendar_miniapp.md §3.6`).
+
 **What this revision is:**
 
 | Field | Meaning |
 |---|---|
 | `lineage_id` | The session this revision is a form of. Equal to `id` on a first revision. |
-| `change_id` | The command invocation that wrote it — a row in `workout_changes`, carrying its `kind`, its `summary` and its timestamp. |
+| `change_id` | The command invocation that wrote it — a row in `workout_changes` (below). |
 | `void` | 1 ⇔ this slot holds **no session** as of this revision. The way a cancellation, a departure and a dropped day are all recorded. |
 | `reason` | Why *this session* changed — or, on a void, why it went. |
-| `restored_from` | Set when the revision is a copy of an earlier one, put back by `rollback` or `reinstate`. |
+| `restored_from` | Set when the revision is a copy of an earlier one, put back by a `rollback` or a `reinstate` change. |
 | `macrocycle_id` | The plan version that wrote this revision. |
 | `created_at` | When the *session* first entered the plan, carried across its lineage. Distinct from `date` and from the change's own timestamp. |
 
-The change `kind` is one of six words, fixed at write time: `generate`, `adapt`, `tweak`,
-`rollback`, `stand-down`, `reinstate`. A `tweak` is a change the athlete asked for
-(`DESIGN_workout_tweak.md` §3.3).
+**The change row** (`workout_changes`) — one per command invocation that wrote sessions:
 
-**Nothing else is stored, because nothing else needs to be.** `original_*`,
-`adapted_at`, `adaptation_count` and the modification kind are all **derived from the
-lineage** at read time and handed to callers on the hydrated row (below).
+| Field | Meaning |
+|---|---|
+| `kind` | One of six words, fixed at write time: `generate`, `adapt`, `tweak`, `rollback`, `stand-down`, `reinstate`. A `tweak` is a change the athlete asked for (`DESIGN_workout_tweak.md §3.3`). |
+| `summary` | Why the whole batch was written. |
+| `created_at` | When the command ran. |
+| `macrocycle_id` | The plan version in force when it ran. Context for `workout batches`, distinct from the tag on each revision. |
+| `note` | The coach's one line to the athlete about this change. NULL when there is nothing the athlete would notice. |
+| `told_at` | When the athlete was told. Stamped as the change is written when they watched the run, else when the bot sends the line (`DESIGN_change_heads_up.md §6`). |
+| `commitment_end` | The last day of the commitment window (§7) a `workout generate` ran under. It decides whether a void that run wrote keeps its Calendar event (below). |
+| `sleep_seen` | Whether a `workout adapt` read a sleep score for its day. It lets the morning message skip an adaptation that already ran with the night in hand. |
 
-**Calendar state lives in its own table**, `workout_calendar_state`, keyed by
-`lineage_id`: `google_event_id`, `pushed_signature`, `adherence_pushed_signature`. It is
-sync bookkeeping, not prescription — on the row it would make a push have to append a
-revision.
+**Nothing else is stored on the revision, because nothing else needs to be.**
+`original_*`, `adapted_at`, `adaptation_count` and the modification kind are all
+**derived from the lineage** at read time and handed to callers on the hydrated row
+(below).
+
+### What hangs off a session
+
+Four tables hold facts about a session that are not columns of `workouts`. The key each
+one uses is the point. A fact about one form of the session is keyed by revision. A fact
+about the session itself is keyed by lineage, so it follows the session through every
+revision and through a move to another day.
+
+| Table | Keyed by | Holds |
+|---|---|---|
+| `prescribed_sets` | revision | A strength session's exercises: for each, a number of sets, a rep range and a load in kilograms (next heading). |
+| `workout_calendar_state` | lineage | `google_event_id`, `pushed_signature`, `adherence_pushed_signature`. Sync bookkeeping, not prescription — on the row it would make a push have to append a revision. |
+| `strength_checks` | lineage | Which lifting the strength planner last weighed this session's kilograms against (next heading). |
+| `session_notes` | lineage | What the athlete said about the session, word for word. `workout adapt -m` writes it, and every prompt that lists the session prints the notes under it. Never edited (`DESIGN_session_notes.md §2`). |
+
+### A strength session is written by two calls
+
+Every other session is written whole by the **week planner**, the model call inside
+`workout generate`, `workout adapt` and `workout tweak`. A strength session is not
+(`DESIGN_strength_tracking.md §9`).
+
+1. The week planner writes a **brief**: what the session is for and what the plan asks of
+   it, with no exercise, set, rep or load in it.
+2. The **strength planner**, a second model call, writes the session under that brief:
+   the exercises, the sets, the rep ranges and the kilograms. It works from the brief,
+   the sets the athlete recently did, the strength science and the day's equipment.
+
+The strength planner's answer is stored as `prescribed_sets` rows. The session's
+`description` keeps the brief at the top, and the exercise lines under it are rendered
+from those rows. So the kilograms the athlete reads and the kilograms stored as data
+cannot disagree.
+
+The rows belong to one revision and travel with it. They are written in the same
+transaction. A revision that continues the session keeps them when it is given none. A
+rollback copies them with the revision it restores.
+
+A session that already has its sets is not written again every morning. The strength
+planner *checks* it instead, and keeps it unless the lifting done since, the brief or the
+duration has moved. `strength_checks` records what it was last checked against, so a
+session kept on Thursday is not asked about again on Friday from the same lifting.
+`workout generate --fresh` and `--strength-only` ask for every strength session of the
+span to be written again.
 
 ### Lifecycle of one session
 
@@ -726,11 +852,15 @@ revision.
         lineage now speaks for that slot
 ```
 
+The words on the arrows are change kinds: the `kind` of the `workout_changes` row that
+wrote the revision. A `generate` change is written by `workout generate`, never by
+`plan generate`, which writes no session.
+
 Nothing in that diagram is a flag being set. A session is live because its revision is
 the newest in its slot; it is void because that newest revision says so; it is superseded
 because something newer exists. Every earlier revision is still there, which is what makes
-`workout list -vv` able to show a session's history and what makes undo a copy rather than
-an un-delete.
+`workout show --history` able to show a session's earlier forms and what makes undo a copy
+rather than an un-delete.
 
 A few transitions deserve a sentence each:
 
@@ -741,16 +871,20 @@ A few transitions deserve a sentence each:
   would cut an already-cut session again.
 - **A void is always the last chapter of the lineage it ends**, never a first revision.
 - **A no-op is not written.** A revision prescribing exactly what the live one already
-  does is dropped, so an `adapt` on a settled day leaves no trace and re-running a
-  generation does not double the table. The change row is still written, flagged `held`.
+  does is dropped, so a `workout adapt` on a settled day appends no revision and
+  re-running `workout generate` does not double the table. "Exactly" means the
+  prescription fields: a different `reason` or `short_name` alone is not a change. The
+  change row is still written, and `workout batches` lists it as `(held)`. That word is
+  not stored: a change is held when no revision points at it.
 
 ### Reading — the hydrated row
 
 `get_workouts` and friends return the live revision **plus the lineage-derived fields**, so
 every caller above `db/workouts.py` sees one dict shape: `id` (the lineage),
 `revision_id` (the physical row), `original_*`, `adapted_at`, `adaptation_count`,
-`change_kind`, `removed`, and the Calendar columns joined in. The revision model stops at
-that boundary.
+`change_kind`, `removed`, the Calendar columns joined in, the revision's
+`prescribed_sets` and the session's `athlete_notes`. The revision model stops at that
+boundary.
 
 Two derivations are worth naming:
 
@@ -782,9 +916,11 @@ Voids come in two kinds, and the Calendar tells them apart: a void from a goal
 stand-down is the athlete cancelling, and its Calendar event is kept, retitled
 `[Deleted]`; a void from a `generate`, an `adapt` or a `tweak` is the coach writing the
 week, and the event goes with it. The one exception is a `generate` void inside the
-commitment window, whose event stays, retitled `[Cancelled]`.
+commitment window (§7), whose event stays, retitled `[Cancelled]`: a day the athlete was
+counting on is marked, not made to disappear. `workout generate --fresh` runs with no
+commitment window, so its voids delete their events.
 
-The rationale for deriving rather than storing is in `ARCHITECTURE.md §15 "Workout
+The rationale for deriving rather than storing is in `ARCHITECTURE.md §5 "Workout
 state"`. The short version: a stored enum has to be updated by every writer, and the day
 one writer forgets, the enum is lying with no way to tell.
 
@@ -793,13 +929,17 @@ one writer forgets, the enum is lying with no way to tell.
 1. **The log is append-only.** Two SQL triggers refuse every `UPDATE` and every `DELETE`
    on `workouts`, with one exception: seeding a first revision's `lineage_id` to its own
    id, which cannot be known until the insert assigns it. There is no other way in.
+   `workout wipe` is a reset, not a write: it lifts the triggers, empties the log together
+   with its changes and everything keyed to a session, and puts the triggers back.
 2. **At most one *live* session per (date, canonical sport)** — by construction, not by a
    lookup: the live row is the highest `id` in the slot, and there is exactly one. The
    slot key is the **canonical** sport, so a revision spelled `strength` and one spelled
    `strength_training` are the same slot; the stored row keeps its own spelling.
 3. **Creation-time facts carry forward.** A revision that continues a session is the
    slot's live one merged with what the writer supplied, so a partial re-save cannot read
-   an omission as a deletion. `benchmark_type` has one escape hatch —
+   an omission as a deletion. `title`, `description` and `short_name` are always taken
+   as given; every other field, and a strength session's prescribed sets, carry forward
+   when omitted. `benchmark_type` has one escape hatch —
    `clear_benchmark=True` — for an adaptation that replaces a test with something that is
    no longer that test. A revision that starts a **new** lineage deliberately inherits
    nothing.
@@ -809,11 +949,12 @@ one writer forgets, the enum is lying with no way to tell.
    it reads stale without any writer remembering to reset a flag.
 6. **`macrocycle_id` is a tag, not a foreign key.** No cascade. See §9.7.
 7. **Nothing is written by a `propose` method.** `workout_generate` returns a
-   `GenerateProposal`, `workout_adapt` a `RevisionProposal`; only the matching `*_apply`
-   writes. This is enforced structurally: `tests/test_service_invariants.py` parses the
-   source and fails any method returning a `*Proposal` that calls a database write, any
-   proposal-taking method that fails to record the pass, and any revision preview that
-   reads the database instead of drawing the proposal it was handed.
+   `GenerateProposal`; `workout_adapt`, `workout_tweak` and `workout_generate_strength`
+   return a `RevisionProposal`; only the matching `*_apply` writes. This is enforced
+   structurally: `tests/test_service_invariants.py` parses the source and fails any method
+   returning a `*Proposal` that calls a database write, any proposal-taking method that
+   fails to record the pass, and any revision preview that reads the database instead of
+   drawing the proposal it was handed.
 
 ### Undo
 
@@ -834,15 +975,16 @@ change after the restored version's newest write.
 | Command | What it does |
 |---|---|
 | `workout list` | Show planned sessions. Default 7-day forward window. `-v` adds each session's short form: its exercises and kilograms, or its zone target. `-vv` shows each session in full, lifecycle included. |
-| `workout show` | The same listing with `-vv` always on: `workout show 12` details one session. |
+| `workout show` | The same listing with `-vv` always on: `workout show 12` details one session. `-H/--history [DEPTH]` also shows the earlier forms the session had, newest first. |
 | `workout compare` | Planned vs completed, with misses, rest violations and unplanned high load. Today's untrained sessions read *"not yet"* and are **not** misses. |
-| `workout generate` | Write the sessions for a span, from the mesocycles governing those days (details in §7). |
-| `workout adapt` | Daily readiness adjustment, within the current mesocycle only. `-m "note"` passes a free-text note in the same call. The coach decides what changes. |
+| `workout generate` | Write the sessions for a span, from the mesocycles governing those days (details in §7). `--fresh` rewrites every day of the span, holding no session. `--strength-only` writes only the span's strength sessions again, and no other session changes. |
+| `workout adapt` | Daily readiness adjustment, within the current mesocycle only. `-m "note"` passes a free-text note in the same call, and the note is then kept with that day's session (`session_notes`). The coach decides what changes. |
 | `workout tweak "…"` | A change the athlete decided: shorter, another sport, other exercises, a session added, dropped or brought back, moved, two days swapped. The same path as `workout adapt`, with a narrower job: the week planner writes the change and only the days the request is about may change (`-d` names them, else the week planner reads them off the message). Recorded as kind `tweak`. |
 | `workout rollback` / `batches` | Undo (above). The only undo. |
+| `workout notify` | Companion mode only. Lists the changes whose `note` the athlete has not been sent yet, and asks the bot to send them. `--all` and `--sent` list the lines without sending. |
 | `workout push` | Sync to Google Calendar. Only stale rows unless `-f`. |
 | `workout prune-calendar` | Delete Calendar events no local row references. |
-| `workout wipe` | Delete all. |
+| `workout wipe` | Delete all: the revisions, their changes, and everything keyed to a session. |
 
 ---
 
@@ -853,11 +995,16 @@ level may never rewrite a higher one.
 
 | Command | Writes | Span | Reads recovery metrics? | LLM calls |
 |---|---|---|---|---|
-| `plan generate` | macrocycle + mesocycles | plan start → goal date (`-g <id>` opens it at the goal's own span) | 15-day summary + PMC lines | 1 |
-| `workout generate` | workout revisions | the span `-d`/`-m`/`-M`/`-g` names; by default, the day after the schedule stops, for 28 days | Yes — full `metrics_lookback_days` window | 1 |
-| `workout adapt` | workout revisions | evaluation date → **end of the current mesocycle** | Yes — full window, plus daily signals | 1 |
-| `workout tweak` | workout revisions | the days the request names, between today and the end of the current mesocycle, or a week ahead when that is later | Yes — as `workout adapt` | 1 |
+| `plan generate` | macrocycle + mesocycles | plan start → goal date (`-g <id>` opens it at the goal's own span) | 15-day summary + PMC lines | 1 per goal planned |
+| `workout generate` | workout revisions | the span `-d`/`-m`/`-M`/`-g` names; by default, the day after the schedule stops, for 28 days | Yes — full `metrics_lookback_days` window | 1, plus the strength planner |
+| `workout generate --strength-only` | revisions of the span's strength sessions only | the span the selectors name; by default, today to the last scheduled day | No | the strength planner only |
+| `workout adapt` | workout revisions | evaluation date → **end of the current mesocycle** | Yes — full window, plus daily signals | 1, plus the strength planner |
+| `workout tweak` | workout revisions | the days the request names, between today and the end of the current mesocycle, or a week ahead when that is later | Yes — as `workout adapt` | 1, plus the strength planner |
 | `goal rm` / `goal edit --status` | `stand-down` / `reinstate` revisions | today → the goal's last session | No | 0 |
+
+"Plus the strength planner" is one more call, made only when the run has a strength
+session to write or to check against new lifting (§6). A week with no gym day costs none.
+`plan generate` can also make the short verdict call first, when an input has changed (§3).
 
 Read that table top to bottom as an authority ladder:
 
@@ -886,10 +1033,18 @@ spelling out:
   span opens tomorrow and today's row is left alone.
 - **Within the span, the proposal is the schedule.** Every live session in the span that the
   proposal does not name is voided ("Your coach replaced this day.", unless the week planner
-  wrote its own sentence); every proposed
-  session is appended; a session the model marks `keep` is neither. Days outside the span
-  are untouched. Sessions a prior `adapt` already eased are shown to the model so it does
-  not hand back the load adapt took off.
+  wrote its own sentence); every proposed session is appended; a session the model marks
+  `keep` is neither. Days outside the span are untouched.
+- **The next few days are the athlete's: the commitment window.** It runs from today for
+  `commitment-days` days, a setting, 7 by default. The athlete has read those sessions
+  and may have arranged their week around them. So the week planner is shown each one
+  standing in the span and must answer for it: keep it, change it or drop it. A session
+  no answer mentions is kept. A session eased by an earlier `workout adapt` is shown with
+  what it was first prescribed as, so the load adapt took off is not handed back.
+  `--fresh` empties the window for that run (`DESIGN_plan_change_continuity.md §4`).
+- **A strength day comes back as a brief, and the strength planner writes it** (§6). A
+  session whose brief or duration the week planner changed is written again under the
+  new one.
 - **Every date in the span gets a row**, so a hole means the schedule ended, not that a
   rest day was skipped — which is what lets the runway detector tell the two apart.
 - **Each session is tagged with the plan version governing its date**, so a span that
@@ -965,10 +1120,13 @@ repaired for contiguity if the model left a gap. **No workouts yet.**
 
 Nothing is scheduled yet, so the span opens today and runs 28 days — that lands entirely
 in Base Building. Stamind resolves the governing mesocycles, reads the metrics window,
-builds the mesocycle-progress context, and asks the model for a schedule. It prints the
-proposed sessions and asks. On `y`, it opens one `generate` change, appends one revision
-per session (each a first revision, `lineage_id = id`, tagged with the active
-`macrocycle_id`), and the change handle's reconcile pass pushes them to Calendar.
+builds the mesocycle-progress context, and asks the week planner for a schedule. The
+athlete lifts on Thursdays, so each Thursday comes back as a brief, and the strength
+planner — a second call — writes the exercises, sets and kilograms under each one.
+Stamind prints the proposed sessions and asks. On `y`, it opens one `generate` change,
+appends one revision per session (each a first revision, `lineage_id = id`, tagged with
+the active `macrocycle_id`, the Thursdays with their `prescribed_sets` rows), and the
+change handle's reconcile pass pushes them to Calendar.
 
 The weekly shape those 28 rows fall into *is* the microcycle. It is visible in the rows and
 described in the model's `reasoning` prose. It is stored as neither.
@@ -986,7 +1144,8 @@ session it eases, carrying the session's lineage and a per-session `reason`; the
 rationale is the change's `summary`. Reading those sessions back, `adaptation_count` is
 1 and `adapted_at` is set — but only for the ones whose duration or TSS actually fell, so
 a pure rewording does not raise the "already eased" bar for next time. If the week planner
-decides nothing needs to change, the change row is still written, flagged `held`.
+decides nothing needs to change, the change row is still written, and `workout batches`
+lists it as `(held)`.
 
 **5. Three weeks later, the schedule runs out.**
 
@@ -1011,10 +1170,10 @@ the mesocycle.)
 The constraint is dated inside Specific Preparation — too far off for adapt to reach, too
 small to trip the replan heuristic. So `constraint add` says so, naming the mesocycle it lands
 in and the run that would cover it; until then `status` and `constraint list` both mark it
-*not yet in the schedule*. The generate re-plans that mesocycle's remaining days, building around
-the trip like any other stored directive: the sessions already there are voided ("Your coach
-replaced this day."), the new ones appended, and the constraint's `honored_at` is stamped
-because its whole remaining window sat inside what was written.
+*not yet in the schedule*. That `workout generate` re-plans the mesocycle's remaining days,
+building around the trip like any other stored directive: the sessions already there are
+voided ("Your coach replaced this day."), the new ones appended, and the constraint's
+`honored_at` is stamped because its whole remaining window sat inside what was written.
 
 **7. Second thoughts about the plan.**
 
@@ -1024,9 +1183,11 @@ because its whole remaining window sat inside what was written.
 ```
 
 The note goes into the append-only log against the active version. Because a note is
-pending, `plan generate` regenerates without `--force`, and the prompt requires the model
-to address every note. The result is macrocycle **version 2**, active; version 1 is now
-`superseded`, kept, and its feedback log is consumed by that supersession.
+pending, `plan generate` writes a new plan without `--force`, and the prompt requires the
+model to address every note. The result is macrocycle **version 2**, active; version 1 is
+now `superseded`, kept, and its feedback log is consumed by that supersession.
+(`plan generate --feedback "…"` does both steps in one command, for a note about the
+plan as a whole.)
 
 The existing workouts are still tagged with version 1 and still sitting on the calendar.
 They only change when `workout generate` runs again.
@@ -1060,9 +1221,9 @@ and re-pushes them.
 
 ### 9.1 The goal's date, title, description or sport moves
 
-`goals_hash` changes → the plan reads stale → the next `plan generate` regenerates instead
-of reusing, and the staleness message names the field that moved (from `goals_snapshot`).
-Nothing happens automatically.
+`goals_hash` changes → the plan reads stale → the next `plan generate` offers a new plan
+instead of reusing the old one, and the staleness message shows the edit (from
+`goals_snapshot`). Nothing happens automatically.
 
 ### 9.2 `date_type` flips between `event` and `horizon`
 
@@ -1099,14 +1260,25 @@ deliberately *not* a claim that the plan changed. Editing a constraint's window 
 clears it, and so does any undo that restores sessions older than the honouring —
 `workout rollback`, `plan rollback`, or reinstating a goal.
 
-### 9.4 A threshold or profile field changes
+### 9.4 A threshold, a profile field or a science document changes
 
-`config_hash` changes, but thresholds are compared against `coach.threshold_replan_pct`
-drift rather than exact equality — a one-watt FTP change is not a reason to re-plan.
-Profile fields that cannot reshape a plan (`name`, equipment) are excluded from the hash
-entirely.
+A profile field that shapes the plan changes `config_hash`, and the plan reads stale.
+Fields that cannot reshape a plan are left out of the hash entirely: `name`, `equipment`,
+`preferences`, and each day's own equipment. They still reach the sessions at the next
+`workout generate`.
 
-### 9.5 The plan is regenerated
+A threshold is not in the hash. It is compared with its value in `config_snapshot`, and
+the plan reads stale only past `coach.threshold_replan_pct` of drift — a one-watt FTP
+change is not a reason to re-plan. `e1rm` is never compared.
+
+The athlete's own science documents are compared as text with `science_snapshot`. A file
+added, removed or edited makes the plan stale, and the message names the file and shows
+the edit.
+
+In each case the athlete chooses: `plan generate` for a new plan, or `plan keep` when the
+change would not have altered the periodization (§3).
+
+### 9.5 `plan generate` writes a new plan
 
 The old macrocycle is superseded and kept, with its mesocycles and its feedback. A new active
 macrocycle is inserted. **Workouts are untouched** — they still carry the old version's
@@ -1154,21 +1326,22 @@ the progress timeline still labels the weeks just trained.
 |---|---|---|
 | 1 | A goal's `status` is only `active` or `archived`; completion is derived from the date | `db/objectives.goal_state()`, one-off migration |
 | 2 | Exactly one active macrocycle per goal | `save_macrocycle`, `set_active_macrocycle`, every reader's `status` filter |
-| 3 | Regeneration supersedes, never deletes | `save_macrocycle` |
+| 3 | `plan generate` supersedes, never deletes | `save_macrocycle` |
 | 4 | The plan window must be non-empty (`goal date > plan start`) | `plan_generate` raises |
-| 5 | Plan fingerprints are computed at generate time and carried to apply | `PlanFingerprints` passed through `plan_apply` |
+| 5 | Plan fingerprints are computed at generate time and carried to apply; `plan keep` is the one deliberate re-stamp | `PlanFingerprints` passed through `plan_apply`; `stamp` |
 | 6 | Only `replan = 1` constraints fingerprint the plan | `plan_generate` filters before hashing |
 | 7 | A mesocycle belongs to one macrocycle and dies with it | FK `ON DELETE CASCADE` |
 | 8 | Adapt may not write past the end of the current mesocycle | Read bound + write-side filter |
 | 9 | A pass may stamp `honored_at` only for a constraint whose whole remaining window it wrote | `honoring.covered_ids`, decided at proposal time, stamped at apply |
 | 10 | At most one live workout per (date, canonical sport) | By construction: the live row is the highest `id` in the slot (`live_workouts`) |
-| 11 | `workouts` is append-only — no row is ever updated or deleted | Two SQL triggers, `RAISE(ABORT)` |
+| 11 | `workouts` is append-only — no row is ever updated or deleted, short of `workout wipe` resetting the whole log | Two SQL triggers, `RAISE(ABORT)` |
 | 12 | A session's identity is its `lineage_id`, and it survives both edits and date moves | `WorkoutChange._lineage_for`; the adaptation tally walks it |
 | 13 | A `propose` method never writes; an apply method always records the pass | `tests/test_service_invariants.py` (source-level) |
 | 14 | Workout state is derived from orthogonal axes, never a stored enum | The change `kind`, the lineage tally, `workout_calendar_state` |
-| 15 | Weeks are Monday-commencing everywhere | `progression.weekly_aggregates`, `workout_swap_validate` |
+| 15 | Weeks are Monday-commencing wherever the app counts by week | `progression.weekly_aggregates` |
 | 16 | Within one plan, mesocycles are contiguous — no gaps, no overlaps | `save_macrocycle` via `repair_mesocycle_contiguity` |
 | 17 | Every date of a generated span carries a row | `_fill_coverage_gaps` in `workout_generate` |
+| 18 | What hangs off a session is keyed by what it is a fact about: the prescribed sets by revision; the Calendar state, the strength check and the athlete's notes by lineage | `WorkoutChange.append` and `.restore` carry the sets; the other three tables' `lineage_id` key |
 
 ## 11. Deliberately not enforced
 
@@ -1179,7 +1352,7 @@ Worth knowing, because each of these is a decision rather than an oversight:
   consequences instead: the lenient readers fall back, and overlapping plans are settled
   by recency. Enforcing it on save would mean rejecting the new plan or destructively
   editing another goal's already-saved one; read-time recency keeps both intact and lets
-  regeneration heal the overlap.
+  the next `plan generate` heal the overlap.
 - **The relationship between a session's planned zone seconds and its duration.** Stored
   exactly as the model emitted them. A session whose zone seconds do not sum to
   `duration_minutes` is a prescription, not an accounting identity — silently scaling it
@@ -1217,6 +1390,12 @@ Worth knowing, because each of these is a decision rather than an oversight:
 | Whether the schedule reflects a constraint | `designs/DESIGN_constraint_honoring.md` |
 | Constraints and the replan escalation | `designs/DESIGN_constraints.md` |
 | Plan feedback log | `designs/DESIGN_plan_feedback.md` |
+| When a plan is stale, and `plan keep` | `designs/DESIGN_plan_staleness.md` |
+| The commitment window, and which voids keep their Calendar event | `designs/DESIGN_plan_change_continuity.md` §4, §5.2 |
 | Goal states, calling a goal off | `designs/DESIGN_backward_evaluation.md` §12, §14 |
 | Why `workouts` is an append-only log | `designs/DESIGN_workout_revisions.md` |
+| `workout tweak` and its reach | `designs/DESIGN_workout_tweak.md` |
+| The brief, the strength planner and the prescribed sets | `designs/DESIGN_strength_tracking.md` §9 |
+| Notes the athlete leaves on a session | `designs/DESIGN_session_notes.md` |
+| Telling the athlete about a change they did not watch | `designs/DESIGN_change_heads_up.md` |
 | What a Calendar event shows of a session's history | `designs/DESIGN_calendar_lineage.md` |
