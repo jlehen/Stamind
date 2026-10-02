@@ -169,6 +169,7 @@ The run itself changes little:
   remember…?") come after the proposal. Today they come before the preview
   (DESIGN_constraints.md §8). A question nobody answers must not hold the proposal back. A tap
   on "Change it" runs in the chat's own place, so it works while such a question still waits.
+  A terminal run keeps today's order, because nothing changes for a terminal (§2).
 - A question left unanswered for five minutes ends the run, as today. The line changes from
   "Prompt timed out — command cancelled." to "No answer, so I stopped there.", which is true
   whether or not a proposal waits above it. The command's own "Cancelled." is not sent after
@@ -176,9 +177,8 @@ The run itself changes little:
 - When the week planner changes nothing, the athlete is told so, as today.
 
 The morning push, a reminder and a heads-up wait while the coach's run is alive, the way they
-already wait for a busy chat. A run parked on a question at 08:00 delays the morning message
-by a few minutes, as any parked question does today. The reverse holds too: while the morning
-push runs, a message to the coach gets the busy line.
+already wait for a busy chat. The reverse holds too: while the morning push runs, a message to
+the coach gets the busy line.
 
 ### 6.2 The next message to the coach
 
@@ -256,6 +256,10 @@ fact a proposal carries.
   used to mean the eased one. There is no setting to bring the old behaviour back.
 - A kilograms-only update (§7) is a change that wrote a session. It puts an open proposal out of
   date by rule 1 of §4, and the athlete asks again.
+- A proposal that replaces another is written by the kind of run that made it. An easing that a
+  `workout tweak` keeps is recorded as a tweak, so its Calendar title has no "[Adapted]". A
+  `workout adapt` that replaces a tweak's proposal cannot keep a move past the end of the
+  mesocycle, which a tweak can reach.
 - A question asked before the week planner is called still ends the run when nobody answers
   it for five minutes. The message is then lost. Nothing was asked of the week planner yet.
 - Only a message to the coach runs beside the chat. The morning push, `workout generate` from
@@ -288,13 +292,13 @@ No table and no column are added: a proposal is a row of `athlete_queue`.
 | Where | What |
 |---|---|
 | `stamind/queue_kind.py` | `Kind` gains the stand-alone property and its own line for a tap that comes too late |
-| `stamind/athlete_queue.py`, `stamind/cli/queue.py` | a stand-alone item is sent when queued, by a function the push and `workout adapt` call; it is in no round and not counted in the terminal's hint; it is drawn without the "🙋 Quick question" lead and without "Not now", with the buttons of a round of one; a tap on a closed one prints the kind's own line |
-| `stamind/cli/workouts/proposal.py` (new) | the `proposal` kind and nothing that sends: wording, the three out-of-date rules, what each answer does with the Garmin pull in "Change it", finding the open one. It holds the test on today's activities that rule 3 and the push's once-a-morning read share. It must not import `cli/queue.py`, which imports the list of kinds. The item's subject, the key the queue uses to refuse a duplicate, is the instant it was saved, as for the `message` kind |
+| `stamind/athlete_queue.py`, `stamind/cli/queue.py` | a stand-alone item is sent when queued, by a function the push and `workout adapt` call; it is in no round and not counted in the terminal's hint; it is drawn without the "🙋 Quick question" lead and without "Not now"; a tap on a closed one prints the kind's own line |
+| `stamind/cli/workouts/proposal.py` (new) | the `proposal` kind and nothing that sends: wording, the three out-of-date rules, what each answer does with the Garmin pull in "Change it", finding the open one. It must not import `cli/queue.py`, which imports the list of kinds. The item's subject, the key the queue uses to refuse a duplicate, is the instant it was saved, as for the `message` kind |
 | `stamind/coach/proposals.py` | whether the week planner changed a session; what a tap writes, to and from JSON, without the sleep mark |
 | `stamind/coach/service/adapt.py`, `stamind/coach/engine/adapt.py` | the open proposal as a data section and a sub-section of `## TASK` (DESIGN_prompt_structure.md); a tweak may also write the days the open proposal changes |
 | `stamind/cli/workouts/adapt.py` | a chat run saves and sends in place of the confirm; in the chat the rule and signal questions move after it; the check before saving a proposal or writing kilograms |
-| `stamind/cli/bot/views.py` | the push saves a proposal when a session would change; the once-a-morning read also counts a saved proposal |
-| `stamind/chat/` | the second place per chat for the coach's run, at the three places that start one; prompt and Stop taps found by the run that raised them; `/cancel` and `/restart` over both places; the two refusals of §6.2, sent before the echo and before a button's row is removed; the scheduler's busy test; the time-out line without "Cancelled." after it |
+| `stamind/cli/bot/views.py` | the push saves a proposal when a session would change; the once-a-morning read also counts a saved proposal, and shares its test on today's activities with rule 3 |
+| `stamind/chat/` | the second place per chat for the coach's run; prompt and Stop taps found by the run that raised them; `/cancel` and `/restart` over both places; the two refusals of §6.2; the scheduler's busy test; the time-out line |
 | `docs/ARCHITECTURE.md` | the bot section and the adaptation flow |
 
 Implemented designs amended when each step lands: DESIGN_athlete_queue.md §2 (its example
