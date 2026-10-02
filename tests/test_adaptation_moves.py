@@ -289,18 +289,20 @@ class TestAdaptMoves(unittest.TestCase):
         )
 
     @patch("stamind.coach.engine.openrouter_client")
-    def test_a_move_onto_a_day_that_already_carries_work_keeps_that_day(
+    def test_a_move_onto_a_day_that_already_carries_work_takes_that_day(
         self, mock_client
     ):
-        """Friday already holds its own gym session. Moving Thursday's onto it would
-        write one session over another and hand Thursday's history to Friday's — so the
-        move is refused, Friday is revised where it stands and Thursday is left alone."""
-        self._eased_thursday_gym()
+        """Friday already holds its own gym session. Thursday's moves onto it: Thursday
+        becomes a rest day, Friday holds the moved session with its history, and Friday's
+        own session ends there rather than being written over
+        (DESIGN_workout_revisions.md §4)."""
+        thursday = self._eased_thursday_gym()
         save_workout(test_db,
             "2026-06-12", "strength_training", "Gym: Upper",
             "[Gym: Upper]\nBench and rows.",
             duration_minutes=50, rpe=6, tss=40,
         )
+        upper = test_db.get_workout("2026-06-12", "strength_training")
         proposal = self._adapt_returning(
             mock_client, "Consolidating the gym days.",
             [{
@@ -313,19 +315,27 @@ class TestAdaptMoves(unittest.TestCase):
         )
         self.assertEqual(
             [(w["date"], w["sport_type"]) for w in proposal.workouts],
-            [("2026-06-12", "strength_training")],
+            [("2026-06-12", "strength_training"), ("2026-06-11", "rest")],
         )
-        self.assertIsNone(proposal.workouts[0]["replaces_slot"])
+        # The preview pairs Friday's entry with the session it takes the place of.
+        self.assertEqual(proposal.pairs[0].original["title"], "Gym: Upper")
 
         service = CoachService(db_instance=test_db)
         with redirect_stdout(io.StringIO()):
             service.workout_revision_apply(proposal)
 
-        thursday = test_db.get_workout("2026-06-11", "strength_training")
-        self.assertEqual(thursday["title"], "Gym: Lower", "left where it stands")
+        self.assertIsNone(test_db.get_workout("2026-06-11", "strength_training"))
+        self.assertEqual(test_db.get_workout("2026-06-11", "rest")["title"], "Rest Day")
         friday = test_db.get_workout("2026-06-12", "strength_training")
         self.assertEqual(friday["title"], "Gym: Full Body")
-        self.assertEqual(friday["original_duration_minutes"], 50, "Friday's own lineage")
+        self.assertEqual(friday["id"], thursday["id"], "Thursday's session, on Friday")
+        self.assertEqual(friday["original_duration_minutes"], 65)
+        with test_db._get_connection() as conn:
+            last = conn.execute(
+                "SELECT void FROM workouts WHERE lineage_id = ? ORDER BY id DESC LIMIT 1",
+                (upper["id"],),
+            ).fetchone()
+        self.assertTrue(last["void"], "Friday's own session ended")
 
     @patch("stamind.coach.engine.openrouter_client")
     def test_a_move_from_a_day_with_no_session_writes_the_new_one_and_nothing_else(

@@ -48,19 +48,18 @@ class RevisionApplyMixin:
     @staticmethod
     def _move_source(
         entry: Dict[str, Any], by_slot: Dict[Tuple[str, str], Workout],
-        completed_keys: set, claimed: set, leaving: set,
+        completed_keys: set, claimed: set,
     ) -> Optional[Workout]:
         """The session an entry's `replaces` takes out of another slot, or None.
 
-        Four answers are refused, each with a notice, because honouring half of one loses
-        a session: a source no session stands in, a source the athlete has already
-        trained, a destination that already holds a same-sport session, and a second
-        entry claiming a source the first one took. A refused entry is still written
-        where it stands — only its claim on the other day is dropped.
+        Three answers are refused, each with a notice, because honouring half of one
+        loses a session: a source no session stands in, a source the athlete has already
+        trained, and a second entry claiming a source the first one took. A refused entry
+        is still written where it stands — only its claim on the other day is dropped.
 
-        A destination whose session is itself `leaving`, moved out by another entry, is
-        free: that is a swap of two sessions of the same sport (DESIGN_workout_tweak.md
-        §3.1).
+        A destination that already holds a same-sport session is not refused: the moved
+        session takes the slot, and apply ends the one standing there
+        (DESIGN_workout_revisions.md §4).
         """
         source = replaces_source(entry)
         if source is None:
@@ -77,14 +76,6 @@ class RevisionApplyMixin:
                 f"The coach moved the {source[0]} session to {entry.get('date')}, but "
                 f"you have already trained it — writing the new session and leaving "
                 f"{source[0]} alone.",
-            )
-            return None
-        slot = (entry.get('date'), canonical_sport(entry.get('sport_type', '')))
-        if slot in by_slot and slot not in leaving:
-            notice(
-                f"The coach moved the {source[0]} session onto {entry.get('date')}, "
-                f"where a session of yours already stands — revising that one and "
-                f"leaving {source[0]} alone.",
             )
             return None
         if source in claimed:
@@ -107,18 +98,10 @@ class RevisionApplyMixin:
         by_slot = {
             (w['date'], canonical_sport(w['sport_type'])): w for w in window_workouts
         }
-        # The sessions some entry carries out of their slot, and could: the other half of
-        # a swap lands where one of them stood.
-        leaving = {
-            source for source in map(replaces_source, adapted)
-            if source in by_slot and source not in completed_keys
-        }
         out: List[Dict[str, Any]] = []
         movers: Dict[Tuple[str, str], Dict[str, Any]] = {}   # source slot -> its mover
         for entry in adapted:
-            occupant = self._move_source(
-                entry, by_slot, completed_keys, set(movers), leaving
-            )
+            occupant = self._move_source(entry, by_slot, completed_keys, set(movers))
             if occupant is None:
                 out.append(entry)
                 continue
@@ -209,6 +192,15 @@ class RevisionApplyMixin:
             if named:
                 moved_out[(named[0], canonical_sport(named[1]))] = pw
 
+        # The session standing where a move lands, unless it moves out itself (a swap).
+        # The moved session takes the slot, so this one ends there (§4).
+        landing = sorted(
+            {(pw['date'], canonical_sport(pw['sport_type'])) for pw in moved_out.values()}
+        )
+        taken_over = [
+            by_slot[slot] for slot in landing if slot in by_slot and slot not in moved_out
+        ]
+
         # The session displaced on each date, so a cross-sport substitution can carry its
         # lineage to the sport it becomes.
         displaced_by_date: Dict[str, Dict[str, Any]] = {}
@@ -245,7 +237,7 @@ class RevisionApplyMixin:
                     reason=mover.get('modification_reason') or proposal.reason,
                 )
 
-            for ew in displaced_by_date.values():
+            for ew in [*displaced_by_date.values(), *taken_over]:
                 notice(
                     f"Removing overridden workout: {ew['title']} ({ew['sport_type']}) "
                     f"on {ew['date']}",

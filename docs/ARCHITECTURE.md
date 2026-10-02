@@ -1130,9 +1130,11 @@ called by the UIs.
   entry on another date is dropped, and so is a move whose other end is on another date,
   before the moves are resolved. The strength planner is shown those days only. The proposal carries
   `kind="tweak"` and covers no constraint.
-- **Moves and swaps** (`_resolve_moves` / `_move_source`): a move may land on a slot
-  whose session is itself moving out in the same reply, which is how two sessions of the
-  same sport swap days (DESIGN_workout_tweak.md §3.1).
+- **Moves and swaps** (`_resolve_moves` / `_move_source`): a move may land on a slot that
+  already holds a session of the same sport. When that session moves out in the same reply,
+  the two swap days (DESIGN_workout_tweak.md §3.1). Otherwise `workout_revision_apply` ends
+  it there with a void, and the moved session takes the slot
+  (DESIGN_workout_revisions.md §4).
 - **`workout_revision_apply(proposal)`** — the accepted half of `workout_adapt` and
   `workout_tweak`. Opens one change of the proposal's `kind` (`adapt` or `tweak`): a
   session the pass drops becomes a **void** revision (never a
@@ -2910,12 +2912,13 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
 5b. `_resolve_moves` reads each entry's `replaces` — the same field `workout generate`
    uses (§4b) — and turns an accepted one into `replaces_slot`/`replaces_lineage` on the
    entry. It is refused, with a notice and the entry still written where it stands, when
-   no session stands in the named slot, when the athlete has already trained it, when the
-   destination already holds a same-sport session, or when a second entry claims the same
-   source. A date a move empties gets a rest day carrying the coach's sentence, unless
-   another entry covers it or another session still stands there — adapt has no coverage
-   backstop, and a hole and a planned rest day mean different things to the adherence
-   record.
+   no session stands in the named slot, when the athlete has already trained it, or when a
+   second entry claims the same source. A destination that already holds a same-sport
+   session is not refused: the moved session takes the slot and apply ends the one standing
+   there (DESIGN_workout_revisions.md §4). A date a move empties gets a rest day carrying
+   the coach's sentence, unless another entry covers it or another session still stands
+   there — adapt has no coverage backstop, and a hole and a planned rest day mean different
+   things to the adherence record.
 5c. **The strength planner** runs next, after the moves are resolved and the reply has been
    structured, and before the revisions are paired against the window
    (DESIGN_strength_tracking.md §9; the same `strength/planner.py::run` generate calls at

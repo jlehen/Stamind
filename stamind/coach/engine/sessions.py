@@ -214,6 +214,9 @@ Return an entry for the day it left ONLY when that day should still carry work: 
 session in place of the one that moved. Never return the same session on both days, and
 never write it on its new date without "replaces" — the day it left would keep the session
 it already has, and the work would be scheduled twice.
+When its new date already holds a session of the same sport, the moved session takes that
+session's place and that session is removed. Say so in "change_reason", and move that
+session too if it should survive.
 """
 
 

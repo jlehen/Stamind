@@ -283,6 +283,21 @@ of saying out loud that two slots became empty — the old table left that fact 
 unrecorded. Two rides trading days append the same four rows, each copy landing in the slot
 the other ride's void just emptied.
 
+A move may also land on a day whose session of the same sport is staying. It is Friday. The
+5 k test is today, and Tuesday holds an easy run. The athlete is tired, so `workout adapt`
+moves the test to Tuesday:
+
+```
+Fri / running  ← void       (the test left),      lineage = the test's lineage
+Tue / running  ← void       (the easy run ends),  lineage = the easy run's lineage
+Tue / running  ← copy of the test, date=Tue,      lineage = the test's lineage
+```
+
+A slot holds one session, so the easy run ends. Its void records that, where writing the
+test over it would have left no trace. The test keeps its history, and the app writes a rest
+day on Friday. The preview shows Tuesday as the test, "was Easy Run". Refusing this move, as
+the first build did, left Friday's test in place and wrote a second one on Tuesday.
+
 ## 5. Reading — the live view and the hydrated row
 
 ### The view

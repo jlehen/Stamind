@@ -380,7 +380,8 @@ moved to another day and still stands there.
 **Two rides could not swap days.** "Swap Thursday and Friday" with a ride on each day comes
 back as two moves. The move check refused both, because each lands on a day that holds a
 ride. It now lets a move land there when the ride standing there is moving away in the same
-reply. `workout adapt` gains the same swap.
+reply. `workout adapt` gains the same swap. The move check has since stopped refusing any
+move onto a day that holds a session of the same sport (DESIGN_workout_revisions.md §4).
 
 **One warning could no longer fire.** The progress timeline warned about "workouts beyond
 plan end". Only a manual session could stand past the plan's last day, so the warning is
