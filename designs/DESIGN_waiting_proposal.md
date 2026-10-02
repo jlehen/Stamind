@@ -166,10 +166,11 @@ The run itself changes little:
 - When the week planner answers, the proposal is saved and sent (§3). The saved item replaces
   the confirm that holds the chat today.
 - In the chat, the questions about a rule or a signal found in the message ("Shall I
-  remember…?") come after the proposal. Today they come before the preview
-  (DESIGN_constraints.md §8). A question nobody answers must not hold the proposal back. A tap
-  on "Change it" runs in the chat's own place, so it works while such a question still waits.
-  A terminal run keeps today's order, because nothing changes for a terminal (§2).
+  remember…?") come after the proposal, or after the line that says nothing changes. Today
+  they come before the preview (DESIGN_constraints.md §8). A question nobody answers must not
+  hold the proposal back. A tap on "Change it" runs in the chat's own place, so it works while
+  such a question still waits. A terminal run keeps today's order, because nothing changes for
+  a terminal (§2).
 - A question left unanswered for five minutes ends the run, as today. The line changes from
   "Prompt timed out — command cancelled." to "No answer, so I stopped there.", which is true
   whether or not a proposal waits above it. The command's own "Cancelled." is not sent after
@@ -194,10 +195,11 @@ that again in a minute." At about 07:07 a proposal arrives that eases today. The
 the Saturday message again. At about 07:08 one proposal replaces the first and covers both, as
 "A proposal waits" explains below.
 
-**The run waits on a question.** The message is not taken either. The bot answers "I asked you
-something above. Answer it, then send that again." It is a day with two sessions. 07:05: "I'm
-tired". The bot asks "Which session is this about?". At 07:05:40 the athlete adds "and move
-Saturday's ride to Sunday". The first message is not lost: its question still waits.
+**The run waits on a question.** The message is not taken either, and gets no echo. The bot
+answers "I asked you something above. Answer it, then send that again." It is a day with two
+sessions. 07:05: "I'm tired". The bot asks "Which session is this about?". At 07:05:40 the
+athlete adds "and move Saturday's ride to Sunday". The first message is not lost: its question
+still waits.
 
 A button that sends a fixed sentence follows the same two rules. It is refused before its row
 of buttons is removed, so the athlete can tap it again.
@@ -214,7 +216,9 @@ the old one is closed (§3). The new one opens with "This replaces my earlier pr
 A `workout tweak` writes only the days its request names. When it replaces an open proposal, it
 may also write the days that proposal changes, so its answer can keep them. Without this, "move
 Saturday's ride to Sunday" at 07:08 would replace the 07:07 proposal that eases Thursday with
-one that holds the move only, and the easing would be lost.
+one that holds the move only, and the easing would be lost. The sub-section also says that a
+session kept from the open proposal keeps that proposal's reason, and is not marked "On
+request".
 
 A run that proposes nothing leaves the open proposal open. Writing "what's tomorrow's swim
 about?" must not withdraw the offer to ease today.
@@ -257,9 +261,10 @@ fact a proposal carries.
 - A kilograms-only update (§7) is a change that wrote a session. It puts an open proposal out of
   date by rule 1 of §4, and the athlete asks again.
 - A proposal that replaces another is written by the kind of run that made it. An easing that a
-  `workout tweak` keeps is recorded as a tweak, so its Calendar title has no "[Adapted]". A
-  `workout adapt` that replaces a tweak's proposal cannot keep a move past the end of the
-  mesocycle, which a tweak can reach.
+  `workout tweak` keeps is recorded as a tweak. Its Calendar title has no "[Adapted]", and it
+  is not counted as an easing: the next `workout adapt` is not shown what the session was eased
+  from. A `workout adapt` that replaces a tweak's proposal cannot keep a move past the end of
+  the mesocycle, which a tweak can reach.
 - A question asked before the week planner is called still ends the run when nobody answers
   it for five minutes. The message is then lost. Nothing was asked of the week planner yet.
 - Only a message to the coach runs beside the chat. The morning push, `workout generate` from
@@ -282,8 +287,8 @@ Each step works on its own.
    gets no answer for five minutes still ends before its proposal is saved, as today. Step 3
    removes this.
 3. **The run works beside the chat** (the rest of §6): the second place per chat, the rule and
-   signal questions moved after the proposal, the two refusals of §6.2, and the check before
-   saving.
+   signal questions moved after the proposal, the two refusals of §6.2, the time-out line, and
+   the check before saving.
 
 ## 10. Touch points
 
