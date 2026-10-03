@@ -21,6 +21,7 @@ from stamind.coach.proposals import RevisionProposal
 from stamind.sentinels import BUTTONS_SENTINEL, QUEUE_SENTINEL
 from stamind.athlete_queue import QUEUE_LATER_BACK, QUEUE_LATER_DAY, QUEUE_LATER_HOUR
 from stamind.clock import today_str
+from stamind import cycle_records, retrospective_question
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)
@@ -562,6 +563,135 @@ class HintTest(_QueueCase):
             for argv in (["status"], ["workout", "adapt"]):
                 _, out, _ = run_cli(argv)
                 self.assertNotIn("waiting for you", out, argv)
+
+
+class RetrospectiveQuestionTest(_QueueCase):
+    """How did it go? One question per mesocycle that reached its end
+    (DESIGN_cycle_retrospective.md §4). The clock stands on Wednesday 16 September, and the
+    mesocycle ended on Sunday 13."""
+
+    WRITTEN = {
+        "record": "For: easy volume.\nHappened: on target.\nCame out: fitness rose.",
+        "athlete_line": "You kept your training steady these three weeks.",
+    }
+
+    def setUp(self):
+        super().setUp()
+        self.goal = test_db.add_objective("Alpe du Zwift", "2026-12-22", "cycling")
+        self.first = self._plan(
+            ("Aerobic base 2", "2026-08-24", "2026-09-13"), ("Build", "2026-09-14", "2026-10-04")
+        )
+        garmin = patch("stamind.runtime.garmin")
+        garmin.start()
+        self.addCleanup(garmin.stop)
+
+    def _plan(self, *mesocycles):
+        return test_db.save_macrocycle(self.goal, "strategy", "g", "c", [
+            {"name": name, "start_date": start, "end_date": end, "focus": "easy volume"}
+            for name, start, end in mesocycles
+        ])
+
+    def _question(self):
+        cycle_records.date_check(test_db, today_str())
+        [item] = test_db.waiting_queue_items()
+        return item
+
+    def _record(self):
+        [record] = test_db.get_retrospectives(self.goal)
+        return record
+
+    def test_the_terminal_and_the_chat_each_have_their_wording(self):
+        item = self._question()
+        self.assertEqual((item["kind"], item["subject"]),
+                         ("retrospective", str(self._record()["id"])))
+        self.assertEqual(
+            athlete_queue.wording(item),
+            "How did “Aerobic base 2” (Aug 24 to Sep 13) go for you?",
+        )
+        self.assertEqual(
+            athlete_queue.wording(item, companion=True),
+            "Your last three weeks of training are done. How did they go for you?",
+        )
+        self.assertEqual([a["label"] for a in athlete_queue.answers(item)], ["tell me"])
+        self.assertEqual(athlete_queue.drop_label(item), "nothing to say")
+
+    @patch("stamind.coach.engine.openrouter_client")
+    def test_the_answer_stores_the_words_and_returns_the_sentence(self, client):
+        client.complete.return_value = dict(self.WRITTEN)
+        item = self._question()
+        line = athlete_queue.act(item, "a1", self.now, text="felt fresh all the way")
+        self.assertEqual(line, self.WRITTEN["athlete_line"])
+        record = self._record()
+        self.assertEqual(record["athlete_words"], "felt fresh all the way")
+        self.assertEqual(record["body"], self.WRITTEN["record"])
+        self.assertIn("felt fresh all the way", client.complete.call_args[0][1])
+        self.assertEqual(self.item(item["id"])["outcome"], athlete_queue.ANSWERED)
+
+    @patch("stamind.coach.engine.openrouter_client")
+    def test_a_failed_write_keeps_the_words_and_thanks_the_athlete(self, client):
+        client.complete.side_effect = ValueError("no answer")
+        item = self._question()
+        line = athlete_queue.act(item, "a1", self.now, text="felt fresh")
+        self.assertEqual(line, retrospective_question.THANKS_LINE)
+        record = self._record()
+        self.assertEqual((record["athlete_words"], record["body"]), ("felt fresh", None))
+        self.assertTrue(cycle_records.is_due(record, today_str()))
+
+    def test_nothing_to_say_leaves_the_record_to_wait_its_seven_days(self):
+        item = self._question()
+        athlete_queue.act(item, athlete_queue.DROP, self.now)
+        self.assertEqual(self.item(item["id"])["outcome"], athlete_queue.DROPPED)
+        self.assertFalse(cycle_records.is_due(self._record(), today_str()))
+        self.assertTrue(cycle_records.is_due(self._record(), "2026-09-20"))
+
+    def test_the_question_goes_stale_seven_days_after_the_end_of_its_record(self):
+        item = self._question()
+        self.at(8, days=3)
+        self.assertEqual(ids(athlete_queue.walk(self.now)), [item["id"]])
+        self.at(8, days=4)
+        self.assertEqual(athlete_queue.walk(self.now), [])
+        self.assertEqual(self.item(item["id"])["outcome"], athlete_queue.STALE)
+
+    def test_the_question_goes_stale_when_its_record_is_removed(self):
+        item = self._question()
+        test_db.delete_retrospective(self._record()["id"])
+        self.assertEqual(athlete_queue.walk(self.now), [])
+
+    def test_the_chat_offers_tell_me_nothing_to_say_and_not_now(self):
+        self._question()
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
+            _, out, _ = run_cli(["queue", "answer"])
+        [sent] = queue_lines(out)
+        self.assertIn("Your last three weeks of training are done.", sent["text"])
+        self.assertEqual([b["label"] for b in sent["buttons"]],
+                         ["Tell me", "Nothing to say", "🕐 Not now"])
+
+    def test_a_record_cut_short_queues_no_question(self):
+        """On Wednesday 23 September `plan generate` drops the mesocycle under way, nine
+        days into it. The only question is the one about the mesocycle that ended."""
+        asked = self._question()
+        self._plan(("Rebuild", "2026-09-23", "2026-10-11"))
+        with test_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE macrocycles SET superseded_at = '2026-09-23T06:00:00+00:00' "
+                "WHERE id = ?", (self.first,),
+            )
+            conn.commit()
+        self.at(8, days=8)
+        cycle_records.date_check(test_db, today_str())
+        self.assertEqual(
+            [(r["name"], r["end_date"], r["ended_by"])
+             for r in test_db.get_retrospectives(self.goal)],
+            [("Aerobic base 2", "2026-09-13", "finished"),
+             ("Build", "2026-09-22", "replaced")],
+        )
+        self.assertEqual(ids(test_db.waiting_queue_items()), [asked["id"]])
+
+    def test_a_mesocycle_that_ended_a_week_ago_queues_no_question(self):
+        self.at(8, days=4)
+        cycle_records.date_check(test_db, today_str())
+        self.assertEqual(len(test_db.get_retrospectives(self.goal)), 1)
+        self.assertEqual(test_db.waiting_queue_items(), [])
 
 
 if __name__ == "__main__":

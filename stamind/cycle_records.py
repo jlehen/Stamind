@@ -8,7 +8,7 @@ creates the missing ones. Writing a record's lines is `coach/service/retrospecti
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from stamind import clock
+from stamind import clock, retrospective_question
 from stamind.analytics.zone_tables import PROMPT_WIDTH, fmt_duration
 from stamind.benchmarks import format_value, label_for_kind
 from stamind.db.objectives import ARCHIVED
@@ -112,14 +112,19 @@ def _remove_contradicted(
 def _record_finished(
     dbh, goal_id: int, mesocycles: List[Dict[str, Any]], today: str
 ) -> None:
-    """Records each mesocycle of the current plan whose end date has passed."""
+    """Records each mesocycle of the current plan whose end date has passed, and asks the
+    athlete about the ones that ended less than seven days ago (§4)."""
     for m in mesocycles:
         if m['end_date'] >= today:
             continue
-        dbh.add_retrospective(
+        record_id = dbh.add_retrospective(
             goal_id, MESOCYCLE, m['name'], m['start_date'], m['end_date'], FINISHED,
             m['focus'],
         )
+        if record_id is None:
+            continue
+        if clock.days_between(m['end_date'], today) < DUE_AFTER_DAYS:
+            retrospective_question.ask_about(dbh.get_retrospective(record_id))
 
 
 def _replaced_on(version: Dict[str, Any]) -> str:
