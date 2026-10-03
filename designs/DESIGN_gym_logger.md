@@ -33,7 +33,7 @@ A warm-up has its own card. The strength planner writes it as a lighter entry of
 exercise ahead of the main sets (`stamind/strength/progression.md`), and the page draws one
 card per entry. A line at the top of the page says so, and each card carries a tag,
 "Warm-up" or "Main", that a tap switches. Here is an example. It is Thursday, and the
-session holds "Belt squat 1×5 @ 120, 3×4–6 @ 140" and a leg press at 200 kg. The 120 kg
+session holds "Squat: belt squat 1×5 @ 120, 3×4–6 @ 140" and a leg press at 200 kg. The 120 kg
 card opens as "Warm-up", because a heavier belt squat card exists; the other two open as
 "Main". The athlete wants a warm-up on the leg press too. They tap Dup on it, lower the
 copy to 100 kg, move it up, and tap its tag to make it "Warm-up". The tag stays on the page
@@ -88,7 +88,7 @@ it are stamped at the finish time.
 The athlete also keeps their own training notes in a text file. Under "Add an exercise" is
 "Export to Markdown", which copies the session to the clipboard as a few lines of Markdown:
 a `### 2026-09-24 [Gym: lower body strength]` heading, the clock times, the coach's note,
-then one line per exercise such as "- Belt squat: 1x5 (120 kg), 2x6 (140 kg)", with the
+then one line per exercise such as "- Squat: belt squat: 1x5 (120 kg), 2x6 (140 kg)", with the
 exercise's note after a dash and the session note last. Before any set is ticked it copies
 the session as the page holds it, so the athlete can paste the day's workout ahead of time;
 once a set is ticked it copies only the ticked sets, the way the log does. A phone that
@@ -190,7 +190,7 @@ table (the page offers keys only, DESIGN_exercise_table.md §8), and then:
    `workout compare` read these rows unchanged.
 3. Keeps the raw log in `gym_logs` (`activity_id`, `revision_id`, `received_at`,
    `payload`), so a later grading step has the departures without re-deriving them.
-4. Prints the summary: one line per exercise, "Belt squat 5 @ 120, 6 @ 140, 5 @ 140
+4. Prints the summary: one line per exercise, "Squat: belt squat 5 @ 120, 6 @ 140, 5 @ 140
    (written 3×4–6 @ 140)", then the prescribed exercises not done and the exercises added.
 
 **The takeover.** `sets.read_new_activities` runs before every pull reads Garmin's sets.
@@ -284,8 +284,10 @@ Not handled:
 - A log in a month the calendar's window no longer touches. A send from there is stored,
   but that month's file is built again only by `sm data publish`
   (DESIGN_miniapp_storage.md §4), so the calendar keeps showing the earlier log.
-- A month's file built before the exercise names became keys. Its gym logs open on "This
-  button is out of date…" until the file is built again (DESIGN_exercise_table.md §8, §9).
+- A month's file built before the exercise names became keys. Its gym logs do not open
+  until the file is built again. The page says "This log is out of date and cannot be
+  opened." and shows one button, "‹ Calendar", which goes back (DESIGN_exercise_table.md
+  §8, §9).
 - Not verified on a phone: `sendData` from a page reached by a link inside the Mini App.
   The page was opened from the calendar's keyboard button, which is what `sendData` asks
   for, and Telegram's script keeps its launch parameters across the link. The browser test

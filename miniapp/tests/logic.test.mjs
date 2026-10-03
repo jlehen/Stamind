@@ -293,7 +293,9 @@ test("the page draws a session only when it is version 2", () => {
   assert.equal(logic.isCurrent(null), false);
   assert.equal(logic.isCurrent(logic.sessionFromHash(EXAMPLE_HASH)), true);
   assert.equal(logic.isCurrent(logic.demoSession()), true);
-  assert.equal(logic.OUT_OF_DATE,
+  // The page was opened from the gym button, so no log rides in its address.
+  assert.equal(logic.logFromHash(EXAMPLE_HASH), null);
+  assert.equal(logic.outOfDateLine(null),
                "This button is out of date. Send your coach any message and tap the new one.");
 });
 
@@ -563,6 +565,9 @@ test("a past log from a month file built before the names became keys is out of 
   });
   const hash = address.slice(address.indexOf("#"));
   assert.equal(logic.isCurrent(logic.sessionFromHash(hash)), false);
+  // The athlete tapped a day in the calendar, not a button, so the line says another thing.
+  assert.equal(logic.outOfDateLine(logic.logFromHash(hash)),
+               "This log is out of date and cannot be opened.");
 });
 
 test("an opened log that ran over midnight started the day before", () => {

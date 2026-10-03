@@ -4549,7 +4549,8 @@ The notes are found by counting: as many lines are dropped off the front of the 
 session has exercise lines, so a session written before the names became keys does not show
 its old exercise lines as notes. The page draws a session only when it is version 2
 (`logic.isCurrent`); a button drawn before the conversion opens on "This button is out of
-date. Send your coach any message and tap the new one." The state the page saves on the
+date. Send your coach any message and tap the new one." (`logic.outOfDateLine`, which has
+other words for a past log opened from the calendar). The state the page saves on the
 phone has a version of its own, `logic.STATE_VERSION`, which is in the name it is saved
 under, so a state saved under the old names is never read.
 `session_url(base_url, workout)` packs that JSON base64url into the address's hash
@@ -4627,8 +4628,10 @@ over", so a log sent again keeps its day and replaces that day's log
 (DESIGN_gym_logger.md §8). The session and the log both name exercises by their keys, and
 the cards show the words. The page checks the session's version and never the stored log's,
 so a log stored before the names became keys opens once `scripts/migrate_exercise_names.py`
-has rewritten its names; a month file built before then carries a version 1 session and
-opens on the "out of date" line (DESIGN_exercise_table.md §8, §9).
+has rewritten its names. A month file built before then carries a version 1 session, and
+its gym logs do not open: `showOutOfDate` says "This log is out of date and cannot be
+opened." and keeps the "‹ Calendar" button, which goes back like the Back of an opened log
+(`backToCalendar`) (DESIGN_exercise_table.md §8, §9).
 
 **The comparison.** It is Saturday, and the athlete looks back at Thursday. `workout show`
 draws a table under the "Actual:" line: one row per planned exercise with its planned lines,

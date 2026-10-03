@@ -17,6 +17,8 @@ export const PAYLOAD_VERSION = 2;
 export const STATE_VERSION = 3;
 export const OUT_OF_DATE = "This button is out of date. Send your coach any message and tap "
   + "the new one.";
+// The same for a past log opened from the calendar: the athlete tapped a day there, not a button.
+export const LOG_OUT_OF_DATE = "This log is out of date and cannot be opened.";
 // How many changes Undo can take back, so the saved history stays small.
 export const UNDO_DEPTH = 50;
 
@@ -78,6 +80,12 @@ export function loggedAddress(gym) {
 // past log from a month file built before then: its session is version 1 too.
 export function isCurrent(session) {
   return Boolean(session) && session.v === PAYLOAD_VERSION;
+}
+
+// What the page says in place of a session it does not draw. `opened` is the past log the
+// calendar opened the page on, or null when the gym button did.
+export function outOfDateLine(opened) {
+  return opened ? LOG_OUT_OF_DATE : OUT_OF_DATE;
 }
 
 export function demoSession() {

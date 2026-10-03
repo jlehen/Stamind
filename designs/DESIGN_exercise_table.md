@@ -414,8 +414,10 @@ is version 2 and holds keys, and the page checks its version like any session's.
 holds keys once the conversion of §9 has run. The page does not read the log's own version. It
 takes the log's entries, its day and its two clock times, shows each key's words, and the log it
 sends again is a new one of version 2. A month's file built before the conversion carries a
-version 1 session and the old names, so its gym logs open on the "out of date" line until the
-file is built again (§9).
+version 1 session and the old names, so the page does not draw its gym logs until the file is
+built again (§9). The athlete came from a day of the calendar and not from a button, so the page
+says "This log is out of date and cannot be opened." and shows one button, "‹ Calendar", which
+goes back.
 
 The page's notes are the text under the exercise lines of the description. Today they are found
 by comparing each stored line with the line a fresh render would give. A session written before

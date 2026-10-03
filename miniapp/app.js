@@ -669,13 +669,7 @@ function wire() {
   ui.undo.addEventListener("click", () => undo(logic.undoAll(history, state)));
   ui.finish.addEventListener("click", onFinish);
   ui.reset.addEventListener("click", startOver);
-  ui.back.addEventListener("click", () => {
-    // The bottom button is Telegram's own, so it would stay up over the calendar.
-    if (inTelegram) {
-      tg.MainButton.hide();
-    }
-    window.history.back();
-  });
+  ui.back.addEventListener("click", backToCalendar);
   ui.edit.addEventListener("click", () => {
     locked = !locked;
     render();
@@ -724,25 +718,45 @@ async function restoreHistory() {
   }
 }
 
-// What a button drawn before the exercise names became keys opens on: one line, no session
-// drawn and nothing saved on the phone (DESIGN_exercise_table.md §8). A past log from a month
-// file built before then opens on the same line.
+// Back to the calendar from a past log (§8).
+function backToCalendar() {
+  // The bottom button is Telegram's own, so it would stay up over the calendar.
+  if (inTelegram) {
+    tg.MainButton.hide();
+  }
+  window.history.back();
+}
+
+// What a session of another version opens on: one line, no session drawn and nothing saved on
+// the phone (DESIGN_exercise_table.md §8). A past log opened from the calendar gets its own
+// line and the Back button, since the athlete came from a day's sheet and not from a button.
 function showOutOfDate() {
   if (tg) {
     tg.ready();
     tg.expand();
   }
-  document.body.replaceChildren(el("p", "head-notes", logic.OUT_OF_DATE));
+  const line = el("p", "head-notes", logic.outOfDateLine(opened));
+  if (!opened) {
+    document.body.replaceChildren(line);
+    return;
+  }
+  const actions = el("div", "head-actions");
+  ui.back.hidden = false;
+  ui.back.addEventListener("click", backToCalendar);
+  actions.append(ui.back);
+  document.body.replaceChildren(line, actions);
 }
 
 async function start() {
   const session = sessionFromUrl();
+  // Read before the version check, which says other words for a past log, and before
+  // `wireTelegram`, which leaves the bottom button out for one.
+  opened = logFromUrl();
   if (!logic.isCurrent(session)) {
     showOutOfDate();
     return;
   }
   wire();
-  opened = logFromUrl();
   wireTelegram();
   catalog = await loadCatalog();
   if (opened) {
