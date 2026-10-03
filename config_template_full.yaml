@@ -206,8 +206,9 @@ telegram:
     # If the machine or the bot was down at morning_time, still catch up until this local
     # time; after it, skip the day — a workout briefing at 9 PM is just noise.
     morning_deadline: "15:00"
-    # Re-run the daily adaptation (workout adapt -y, no questions asked) before writing
-    # the push, so it accounts for overnight signals. Costs one LLM call every morning.
+    # Ask the coach before writing the push, so it accounts for overnight signals. A session
+    # it would change follows the push as a proposal the athlete accepts or declines with a
+    # tap. Costs one LLM call every morning.
     adapt_first: false
   # A change you make to the athlete's week from the terminal reaches them at their next
   # morning time (DESIGN_change_heads_up.md §4). A change to one of today's sessions cannot

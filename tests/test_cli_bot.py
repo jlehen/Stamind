@@ -283,11 +283,14 @@ class MorningPushTest(unittest.TestCase):
             patch("stamind.cli.bot.views.ensure_recent_data"),
         )
 
-    def test_adapt_first_applies_and_surfaces_the_reason(self):
-        save_workout(test_db, today_str(), "running", "Easy run")
+    def test_adapt_first_writes_moved_kilograms_and_surfaces_the_reason(self):
+        """Only the strength planner changed something, so the push writes it without
+        asking. A session the week planner would change is saved as a proposal instead,
+        which `test_waiting_proposal.py` covers (DESIGN_waiting_proposal.md §5, §7)."""
+        save_workout(test_db, today_str(), "strength_training", "Gym")
         proposal = MagicMock(
-            workouts=[{"date": today_str()}], reason="Eased today — rough night.",
-            strength_notice=None,
+            workouts=[{"date": today_str()}], reason="Belt squat goes up 5 kg.",
+            strength_notice=None, week_planner_changed=False,
         )
         coach = MagicMock()
         coach.workout_adapt.return_value = proposal
@@ -296,7 +299,7 @@ class MorningPushTest(unittest.TestCase):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         coach.workout_revision_apply.assert_called_once_with(proposal)
-        self.assertIn("Eased today", out)
+        self.assertIn("Belt squat goes up 5 kg.", out)
 
     def test_adapt_first_no_change_records_and_adds_no_reason(self):
         proposal = MagicMock(workouts=[], reason="All green.", strength_notice=None)

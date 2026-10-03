@@ -52,6 +52,16 @@ class QueueMixin:
             ).fetchall()
             return [_item(row) for row in rows]
 
+    def queue_items_since(self, kind: str, since: datetime) -> List[Dict[str, Any]]:
+        """Every item of one kind queued from `since` on, waiting or closed, oldest first."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM athlete_queue WHERE kind = ? AND queued_at >= ? "
+                "ORDER BY queued_at, id",
+                (kind, queue_stamp(since)),
+            ).fetchall()
+            return [_item(row) for row in rows]
+
     def closed_queue_items(self) -> List[Dict[str, Any]]:
         """Every closed item, in the order they closed (§5.1)."""
         with self._get_connection() as conn:

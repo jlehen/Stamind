@@ -7,12 +7,13 @@ changes to the athlete's week they have not been told about yet
 
 The three views run fixed argv and write nothing: the only mutation they reach is what a
 tapped picker leaf later runs as a command of its own (§12.1). The two unasked messages do
-write — `bot morning` stamps its per-day marker and, with `adapt-first` on, runs the
-adaptation before it renders; `bot changes` marks each line told as it prints it.
+write — `bot morning` stamps its per-day marker and, with `adapt-first` on, asks the week
+planner before it renders and saves what it would change as a proposal
+(DESIGN_waiting_proposal.md §5); `bot changes` marks each line told as it prints it.
 """
 import argparse
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from stamind import clock, heads_up, runtime, settings
 from stamind.analytics.compare import adherence_verdicts
@@ -25,8 +26,10 @@ from stamind.cli.render.plan_lines import (
     simple_mesocycle_lines, simple_runway_lines,
 )
 from stamind.cli.render.session_lines import SIMPLE_DONE_STATUSES, simple_day_lines
-from stamind.cli.queue import send_walk_step
+from stamind.cli.queue import send_alone, send_walk_step
 from stamind.cli.runway import current_runway, runway_buttons, schedule_exhausted
+from stamind.cli.workouts import proposal as saved_proposal
+from stamind.cli.workouts.heads_up import newest_written
 from stamind.db.objectives import GOAL_ARCHIVED, GOAL_UPCOMING, goal_state
 from stamind.sentinels import emit_buttons, emit_flush
 from stamind.sports import canonical_sport
@@ -144,46 +147,51 @@ def run_bot_mesocycle(args: argparse.Namespace) -> None:
 
 def _adapted_this_morning(date_str: str) -> bool:
     """Whether the daily adaptation already ran today with last night's sleep score in hand
-    and nothing has been trained since — then the push does not run it again (§4.2)."""
+    and nothing has been trained since — then the push does not run it again (§4.2). A run
+    that saved a proposal counts like one that recorded a change, whatever the proposal's
+    answer (DESIGN_waiting_proposal.md §5)."""
+    ran = saved_proposal.saw_the_night_on(date_str)
     change = runtime.db.newest_adapt()
-    if not change or not change.get("sleep_seen"):
-        return False
-    ran_at = clock.to_local(datetime.fromisoformat(change["created_at"]))
-    if ran_at.strftime("%Y-%m-%d") != date_str:
-        return False
-    # Garmin stamps an activity with its local start time, the clock `ran_at` is now in.
-    since = ran_at.strftime("%Y-%m-%d %H:%M:%S")
-    activities = runtime.db.get_completed_activities(start_date=date_str, end_date=date_str)
-    return all((a.get("start_time") or "") <= since for a in activities)
+    if change and change.get("sleep_seen"):
+        ran.append(datetime.fromisoformat(change["created_at"]))
+    return any(
+        clock.to_local(ran_at).strftime("%Y-%m-%d") == date_str
+        and not saved_proposal.trained_since(date_str, ran_at)
+        for ran_at in ran
+    )
 
 
-def _auto_adapt_note(date_str: str) -> Optional[str]:
-    """Runs the daily adaptation non-interactively (the `workout adapt -y` flow minus
-    its preview) and returns the reason line when a change was applied, unless one already
-    ran this morning with the night in hand (§4.2). A failure must not sink the push: the
-    schedule then renders as stored, and the error surfaces only as a terminal aside —
-    never in the athlete's chat.
+def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """Asks the week planner about today, unless it already ran this morning with the night
+    in hand (§4.2), and returns (the line for the briefing, the saved proposal's item).
 
-    The strength planner's notice joins the line whether or not anything else changed,
-    which is what covers the morning of the gym day itself
-    (DESIGN_strength_tracking.md §9)."""
+    A session that would change is saved as a proposal and nothing is written. Kilograms
+    that moved alone are written at once, with their sentence as the line
+    (DESIGN_waiting_proposal.md §5, §7). A failure must not sink the push: the schedule
+    then renders as stored, and the error surfaces only as a terminal aside — never in the
+    athlete's chat.
+
+    The strength planner's notice is the line when nothing changed, which is what covers
+    the morning of the gym day itself (DESIGN_strength_tracking.md §9)."""
     try:
         if _adapted_this_morning(date_str):
-            return None
+            return None, None
         # A pull that found no sleep score yet leaves a row for today that the refresh
         # throttle would keep; the night is what this run is for, so fetch again (§4.2).
         ensure_recent_data(date_str, force_pull=runtime.db.get_sleep_score(date_str) is None)
+        written_upto = newest_written()
         proposal = runtime.coach_service.workout_adapt(date_str)
         if not proposal.workouts:
             runtime.coach_service.workout_revision_record_no_change(proposal)
-            return proposal.strength_notice
+            return proposal.strength_notice, None
+        if proposal.week_planner_changed:
+            return None, saved_proposal.save(proposal, written_upto)
         runtime.coach_service.workout_revision_apply(proposal)
-        return " ".join(
-            part for part in (proposal.reason, proposal.strength_notice) if part
-        )
+        note = " ".join(part for part in (proposal.reason, proposal.strength_notice) if part)
+        return note, None
     except Exception as e:
         step(f"Morning adaptation failed, rendering the stored schedule: {e}")
-        return None
+        return None, None
 
 
 def _refresh_garmin(date_str: str) -> None:
@@ -269,7 +277,9 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     _refresh_garmin(today)
     _ask_about_tests(today)
 
-    adapt_note = _auto_adapt_note(today) if settings.adapt_first() else None
+    adapt_note, proposal_item = None, None
+    if settings.adapt_first():
+        adapt_note, proposal_item = _morning_adaptation(today)
     # After the adaptation, so the verdicts grade the sessions this push is about to show.
     workouts = runtime.db.get_workouts(start_date=today, end_date=today)
     verdicts = _trained_today(today) if workouts else {}
@@ -298,7 +308,10 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     if buttons:
         emit_buttons(buttons)
     runtime.db.set_setting(MORNING_MARKER, today)
-    # After the briefing, the first item of the athlete queue, as a message of its own
+    # After the briefing, what the week planner would change, as a message of its own
+    # (DESIGN_waiting_proposal.md §5), then the first item of the athlete queue
     # (DESIGN_athlete_queue.md §6.1).
+    if proposal_item is not None:
+        send_alone(proposal_item)
     send_walk_step(clock.command_start())
 
