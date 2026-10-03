@@ -94,10 +94,10 @@ category:
   implements only: `glute bridge` is a band and a suspension-trainer exercise, and `chest press`
   a band, a sled and a suspension-trainer one.
 - **7 lines hold one exercise Garmin files under two categories**, such as
-  `LATERAL_RAISE/ARM_CIRCLES` and `WARM_UP/ARM_CIRCLES`. Kept together under the first name, the
-  companion athlete's warm-up arm circles would read "Lateral raise: arm circles" and count as
-  isolation work. Split, an athlete who logs arm circles under both filings has two histories of
-  a movement with no load.
+  `LATERAL_RAISE/ARM_CIRCLES` and `WARM_UP/ARM_CIRCLES`. Kept together, the line has one key, and
+  the other filing takes its words and its pattern: arm circles done as a warm-up would read
+  "Lateral raise: arm circles" and count as isolation work. Split, an athlete who logs arm
+  circles under both filings has two histories of a movement with no load.
 
 The table goes from 1,487 lines with a Garmin name to 1,539.
 
@@ -116,7 +116,7 @@ When a Garmin exercise comes close, a comment line above the exercise names it:
 `# nearest Garmin exercise: SQUAT/STEP_UP`. Nothing reads it. It is recorded so that an export to
 Garmin, when one is designed, finds a target beside every added exercise (§12).
 
-The table starts with 24 added exercises. Their pattern, muscles and gear were set by hand and
+The table starts with 23 added exercises. Their pattern, muscles and gear were set by hand and
 not reviewed.
 
 | Key | Nearest Garmin exercise | Pattern | Gear |
@@ -134,7 +134,6 @@ not reviewed.
 | `SQUAT/SINGLE_LEG_LEG_PRESS` | `SQUAT/LEG_PRESS` | single_leg | Machine |
 | `SQUAT/STEP_DOWN` | `SQUAT/STEP_UP` | single_leg | Box |
 | `HIP_RAISE/HIP_THRUST_MACHINE` | `HIP_RAISE/BARBELL_HIP_THRUST_WITH_BENCH` | hinge | Machine |
-| `OLYMPIC_LIFT/KETTLEBELL_CLEAN_AND_PRESS` | `OLYMPIC_LIFT/CLEAN_AND_PRESS` | hinge | Kettlebells |
 | `HIP_RAISE/CABLE_GLUTE_KICKBACK` | `BANDED_EXERCISES/HIP_EXTENSION` | accessory | Cable Machine, Cable Attachment |
 | `HIP_STABILITY/HIP_ABDUCTION_MACHINE` | `BANDED_EXERCISES/LEG_ABDUCTION` | accessory | Machine |
 | `HIP_STABILITY/HIP_ADDUCTION_MACHINE` | `BANDED_EXERCISES/LEG_ADDUCTION` | accessory | Machine |
@@ -151,13 +150,13 @@ among them: its line today claims `BANDED_EXERCISES/LEG_EXTENSION`, which is the
 and becomes a line of its own. The hip thrust machine is what the athlete lifts under "glute
 bridge" (§9). The suitcase carry and the two plank drags were added on 2 October in a worktree
 that was never committed, together with one fix this design also takes:
-`SANDBAG/PLANK_PULL_THROUGH` is `core_carry`, not `hinge`. Twelve are common gym exercises
-Garmin lacks, picked by the athlete. The kettlebell clean and press is what the athlete lifts
-under "clean and press" (§9): Garmin has one clean and press, read as the barbell lift, and none
-with dumbbells.
+`SANDBAG/PLANK_PULL_THROUGH` is `core_carry`, not `hinge`. The other twelve are common gym
+exercises Garmin lacks, picked by the athlete.
 
 A kettlebell press is not added. It is `SHOULDER_PRESS/DUMBBELL_SHOULDER_PRESS` done with
-kettlebells (§7).
+kettlebells (§7). A kettlebell clean and press is not added either. Garmin has
+`OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_STRICT_PRESS` and
+`OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_PUSH_PRESS`, and it is one of those done with kettlebells.
 
 ### 3.4 Pattern
 
@@ -176,8 +175,8 @@ get no pattern: `POSE`, `MOVE`, `CARDIO`, `WARM_UP`, `RUN`, `RUN_INDOOR`, `BIKE`
 No code asks whether an exercise is progressed by rule. The rule is prose the strength planner
 reads, under "Accessories" in `strength/progression.md`: an accessory is written at what the
 athlete last did. That section gains one sentence: an exercise with no pattern is written the
-same way. Without it, the companion athlete's squat jacks, a `CARDIO` exercise prescribed every
-week, would fall under the rule that adds load.
+same way. Without it, a cardio drill written into a strength session, such as the squat jacks
+the companion athlete does every week, would fall under the rule that adds load.
 
 Not handled: the patterns of the other lines are not reviewed.
 
@@ -216,11 +215,11 @@ Where each list comes from:
 | A review by two model personas, a gym-floor coach and a minimal-kit trainer, on two different models, looping until they agreed (`~/garmin_gear_review.tsv`) | 1,154 |
 | Today's equipment word, carried over: yoga, Pilates and pure cardio, which the review skipped | 218 |
 | Today's equipment word, carried over: exercises the reviewers did not recognise | 13 |
-| Set by hand: the added exercises (§3.3) | 24 |
+| Set by hand: the added exercises (§3.3) | 23 |
 
 The review was run with the 30 implement lines already split. The ten classes that come from
 splitting an exercise Garmin files twice take the list of the class they were split from:
-`POSE/PLANK` takes the plain plank's. That makes 1,563 classes in all.
+`POSE/PLANK` takes the plain plank's. That makes 1,562 classes in all.
 
 Carried over means `barbell` becomes Barbell, `dumbbell` Dumbbells, `kettlebell` Kettlebells,
 `cable` "Cable Machine, Cable Attachment", `machine` Machine and `bodyweight` Nothing. Three of
@@ -234,9 +233,9 @@ guess of a bodyweight exercise at more than 50 kg as not that exercise
 (DESIGN_strength_tracking.md §6), and the page gives a card added for a bodyweight exercise no
 load. After this design an exercise is bodyweight when none of its gear is a load. A pull-up needs
 a Pull-up Bar, which is not a load, so it is bodyweight. A leg curl needs a Machine, so it is not.
-For the exercises the two athletes do, the rule gives today's answer, except for two. The plain
-calf raise was `machine` and needs nothing. The leg curl was `bodyweight` and needs a Machine,
-which is right: the athlete lifts 55 to 65 kg on it.
+The rule gives another answer than today's word on about 120 of the 1,487 lines. Two of those are
+exercises the athletes do: the plain calf raise was `machine` and needs nothing, and the leg curl
+was `bodyweight` and needs a Machine, which is right, since it is lifted at 55 to 65 kg.
 
 Not handled: the rule misreads an exercise whose gear holds a load that is not the thing lifted,
 such as an inverted row under a racked barbell.
@@ -399,8 +398,7 @@ it from the session as written. The refused log is still in `logs/gym_logs/`.
 
 **The queue.** A waiting "are the sets final?" question holds the watch's guesses, and a waiting
 "what was this?" question holds its answers. Both hold keys when the new code wrote them. An
-answer carries the key to store and is shown as its words. Today the label is both. An "are the
-sets final?" question queued before the conversion shows its old names as they are (§9).
+answer carries the key to store and is shown as its words. Today the label is both.
 
 ## 9. The one-off conversion
 
@@ -412,10 +410,10 @@ The script rewrites three places: `exercise_sets.exercise`, `prescribed_sets.exe
 `n` of every entry in `gym_logs.payload`. It leaves `workouts.description` alone.
 
 **It stops before anything while a "what was this?" question or a proposal waits in the queue**,
-and lists them. A tap on either would write the old names into the database. `sm queue` lists
-them. `sm queue answer` goes through the questions, and `sm queue answer ID` answers a proposal,
-which no walk shows. Then the script is run again. A waiting "are the sets final?" question is
-left alone: its names are only shown, and "yes, final" reads the sets from Garmin again.
+and lists each with its id. A tap on either would write the old names into the database. Step 1
+below settles them before main is landed; this stop catches one that was missed. A waiting "are
+the sets final?" question is left alone: its names are only shown, and "yes, final" reads the
+sets from Garmin again.
 
 **It changes a value only while that value is still an old name.** Old names are lower case and
 keys are upper case, so a second run changes nothing.
@@ -429,12 +427,12 @@ name, the first of these that applies:
 2. **One key in the list:** that key.
 3. **Several keys:** the key of the class holding the set's own `garmin_name`, when it is one of
    them. A set Garmin tagged `SANDBAG/CLEAN` goes to the sandbag clean.
-4. **Otherwise the name is not settled.** The script lists every such name with its sets and
-   loads, writes nothing, and stops. The operator gives a rename for each. The script never
-   picks one of several classes itself.
+4. **Otherwise the name is not settled**, and the script never picks one of several classes
+   itself.
 
-Before it writes, the script prints every distinct stored name with the key it becomes, its
-number of sets and its loads. It writes after a yes.
+The script prints every distinct stored name with the key it becomes, its number of sets and its
+loads. A name that is not settled has no key there. If one is left, the script writes nothing and
+stops, and the operator gives a rename for each. Otherwise it writes after a yes.
 
 **The athlete's own answers.** Where a stored word can mean several exercises, or the table gave
 it another meaning than the athlete's, only the athlete knows what was lifted. A rename is given
@@ -451,18 +449,26 @@ as `--rename "back squat=SQUAT/BARBELL_BACK_SQUAT"`. The main athlete answered o
 | `ab twist` | Russian twists | `CORE/RUSSIAN_TWIST` |
 | `wheel` | Ab wheel rollout | `CORE/KNEELING_AB_WHEEL` |
 | `plank` | The plain plank | `PLANK/PLANK` |
-| `clean and press` | With kettlebells | `OLYMPIC_LIFT/KETTLEBELL_CLEAN_AND_PRESS` |
+| `row` | Seated cable row | `ROW/SEATED_CABLE_ROW` |
 
-By today's data the script still stops on one word of the main athlete: `row`, lifted at 95 to
-120 kg and prescribed 41 times. Its line was split, and the athlete has yet to say which row it
-is. It stops on two of the companion athlete: `push up` and `arm circles`.
+The companion athlete's two words were answered the same day:
+
+| Stored under | Lifted | Key |
+|---|---|---|
+| `push up` | The ordinary push-up | `PUSH_UP/PUSH_UP` |
+| `arm circles` | The warm-up drill | `WARM_UP/ARM_CIRCLES` |
+
+One word still waits. The main athlete's `clean and press` is done with kettlebells, so it is one
+of Garmin's two dumbbell lines (§3.3), and the athlete has yet to say whether the press is strict
+or a push press. The script stops on it until then.
 
 **The steps for the operator.** They run when step 1 of §11 lands; step 2 needs no conversion.
 
 1. Pick an evening when nobody trains. First run `sm queue` on each instance. A waiting "what
    was this?" question or proposal is answered now, in the chat or in the terminal, while the
-   old code still runs. Once main is landed, a listed answer of an old question has no key and
-   cannot be applied. Then stop both bots: every command a bot starts is a fresh process read
+   old code still runs. A proposal is in no walk of the queue: `sm queue answer ID` answers it.
+   Once main is landed, a listed answer of an old question has no key and cannot be applied.
+   Then stop both bots: every command a bot starts is a fresh process read
    from the checkout, so the new code runs as soon as main is landed there.
 2. Land the branch on main in the live checkout and push it. Wait until the page's deployment is
    done.
