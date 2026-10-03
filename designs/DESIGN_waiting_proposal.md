@@ -1,6 +1,6 @@
 # Design: A proposal that waits for the athlete's answer
 
-**Status:** Proposed, not implemented · **Date:** 2026-10-02
+**Status:** Implemented · **Date:** 2026-10-02 (implemented 2026-10-03)
 
 The week planner is the model call inside `workout adapt` and `workout tweak` that writes the
 sessions. A **proposal** is what it would change, before anything is written. Today a proposal

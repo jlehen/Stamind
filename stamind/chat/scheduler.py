@@ -123,7 +123,7 @@ class SchedulerMixin:
         """Sends the changes to the athlete's week not told yet, before acting on their own
         tap or message, whatever the hour and however young the change
         (DESIGN_change_heads_up.md §4)."""
-        if chat_id != self.push_chat_id or self.sessions.get(chat_id) is not None:
+        if chat_id != self.push_chat_id or self._runs(chat_id):
             return
         if not heads_up.waiting():
             return
@@ -168,7 +168,7 @@ class SchedulerMixin:
         while True:
             try:
                 pause = await scheduler_wake(
-                    last_run, lambda: self.sessions.get(self.push_chat_id) is not None,
+                    last_run, lambda: bool(self._runs(self.push_chat_id)),
                     self._run_scheduled, self._start_reflect,
                 )
             except Exception as exc:

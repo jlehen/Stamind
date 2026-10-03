@@ -30,6 +30,10 @@ from stamind.text import strip_ansi
 # the hard limit.
 MAX_MESSAGE_CHARS = 3800
 
+# What a question left unanswered for the prompt timeout is told. True whether or not a
+# proposal waits above it (DESIGN_waiting_proposal.md §6.1).
+PROMPT_TIMED_OUT = "No answer, so I stopped there."
+
 
 def format_prompt_message(req: dict) -> str:
     """The plain-text question shown above a prompt's buttons (ANSI stripped)."""
@@ -233,9 +237,8 @@ class RepliesMixin:
                 session.answer_future, timeout=self.prompt_timeout
             )
         except asyncio.TimeoutError:
-            await self.bot.send_message(
-                chat_id=session.chat_id, text="Prompt timed out — command cancelled."
-            )
+            session.timed_out = True
+            await self.bot.send_message(chat_id=session.chat_id, text=PROMPT_TIMED_OUT)
             return prompt_answer(req.get("id"), cancelled=True)
         finally:
             session.awaiting = None

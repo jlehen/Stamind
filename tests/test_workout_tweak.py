@@ -278,28 +278,52 @@ class WhatItWritesTest(_TweakCase):
         super().setUp()
         skip_strength_planner(self)
 
+    SWAP = (
+        {"date": THURSDAY, "sport_type": "cycling", "title": "Endurance ride",
+         "description": "[Endurance ride]\n90 min.", "duration_minutes": 90,
+         "rpe": 5, "tss": 80, "change_reason": "On request: swapped with Friday.",
+         "replaces": {"date": FRIDAY, "sport_type": "cycling"}},
+        {"date": FRIDAY, "sport_type": "cycling", "title": "Intervals",
+         "description": "[Intervals]\n60 min.", "duration_minutes": 60,
+         "rpe": 5, "tss": 70, "change_reason": "On request: swapped with Thursday.",
+         "replaces": {"date": THURSDAY, "sport_type": "cycling"}},
+    )
+
+    def swap(self):
+        """The proposal for "swap Thursday and Friday, it rains on Thursday"."""
+        answer = reply(*self.SWAP, days=[THURSDAY, FRIDAY])
+        return self.tweak(answer, message="swap Thursday and Friday, rain Thursday")
+
+    def assert_swapped(self, intervals, endurance):
+        thursday = test_db.get_workout(THURSDAY, "cycling")
+        friday = test_db.get_workout(FRIDAY, "cycling")
+        self.assertEqual((thursday["title"], thursday["id"]), ("Endurance ride", endurance))
+        self.assertEqual((friday["title"], friday["id"]), ("Intervals", intervals))
+
     def test_two_rides_swap_days_and_each_keeps_its_id(self):
         """"Swap Thursday and Friday, it rains on Thursday." Both are rides: each lands
         where the other stood, which the move check used to refuse (§3.1)."""
         intervals = test_db.get_workout(THURSDAY, "cycling")["id"]
         endurance = test_db.get_workout(FRIDAY, "cycling")["id"]
-        answer = reply(
-            {"date": THURSDAY, "sport_type": "cycling", "title": "Endurance ride",
-             "description": "[Endurance ride]\n90 min.", "duration_minutes": 90,
-             "rpe": 5, "tss": 80, "change_reason": "On request: swapped with Friday.",
-             "replaces": {"date": FRIDAY, "sport_type": "cycling"}},
-            {"date": FRIDAY, "sport_type": "cycling", "title": "Intervals",
-             "description": "[Intervals]\n60 min.", "duration_minutes": 60,
-             "rpe": 5, "tss": 70, "change_reason": "On request: swapped with Thursday.",
-             "replaces": {"date": THURSDAY, "sport_type": "cycling"}},
-            days=[THURSDAY, FRIDAY],
-        )
-        self.apply(self.tweak(answer, message="swap Thursday and Friday, rain Thursday"))
+        self.apply(self.swap())
+        self.assert_swapped(intervals, endurance)
 
-        thursday = test_db.get_workout(THURSDAY, "cycling")
-        friday = test_db.get_workout(FRIDAY, "cycling")
-        self.assertEqual((thursday["title"], thursday["id"]), ("Endurance ride", endurance))
-        self.assertEqual((friday["title"], friday["id"]), ("Intervals", intervals))
+    def test_the_swap_saved_as_a_proposal_is_written_the_same_by_the_tap(self):
+        """The chat saves the proposal and the athlete taps "Change it" later: the swap
+        goes to JSON and back, and each ride still lands where the other stood
+        (DESIGN_waiting_proposal.md §3, §4)."""
+        from stamind import athlete_queue, clock
+        from stamind.cli.workouts import proposal as saved_proposal
+        from stamind.cli.workouts.heads_up import newest_written
+        intervals = test_db.get_workout(THURSDAY, "cycling")["id"]
+        endurance = test_db.get_workout(FRIDAY, "cycling")["id"]
+        proposal = self.swap()
+        with patch("stamind.runtime.calendar_syncer"), redirect_stdout(io.StringIO()):
+            item = saved_proposal.save(proposal, newest_written())
+            line = athlete_queue.act(item, "a1", clock.now())
+        self.assertEqual(line, saved_proposal.APPLIED_LINE)
+        self.assert_swapped(intervals, endurance)
+        self.assertEqual(test_db.get_workout_changes()[0]["kind"], "tweak")
 
     def test_a_tweak_is_its_own_kind_and_a_rollback_undoes_it(self):
         self.apply(self.tweak(reply(HIKE, days=[SATURDAY])))

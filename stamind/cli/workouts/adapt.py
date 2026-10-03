@@ -122,6 +122,77 @@ def run_workout_tweak(args: argparse.Namespace) -> None:
         _adapt(args, tweak=True)
 
 
+# What a chat run says when a session was written while the week planner was thinking: it
+# saves and writes nothing (DESIGN_waiting_proposal.md §6.2).
+WEEK_CHANGED_LINE = (
+    "Your week changed while I was thinking. Tell me again if you still want a change."
+)
+
+
+def _confirm_candidates(proposal, date_str: str, message: Optional[str]) -> None:
+    """Asks about each rule and each daily signal the note produced (DESIGN_constraints.md
+    §8, DESIGN_signal_extraction.md §2). The same call that wrote the proposal extracted
+    them, so the note informed this run whatever the answers; a signal confirmed here
+    informs the next run. `bot capture note` asks the same questions through
+    `cli/candidates.py` (DESIGN_bot_simple_frontend.md §12.10)."""
+    confirm_new_constraints(proposal.new_constraints, date_str, message or "")
+    confirm_new_signals(proposal.new_signals, date_str)
+
+
+def _settle(
+    args: argparse.Namespace, tweak: bool, proposal, in_chat: bool, replaces: bool,
+    written_upto: int,
+) -> None:
+    """What becomes of the week planner's answer. A terminal run shows the preview, asks and
+    applies. A run started from the athlete's chat never asks and never waits: it saves its
+    proposal and sends it, and `-y` writes without asking wherever it was typed
+    (DESIGN_waiting_proposal.md §2).
+
+    `replaces` says a proposal was open when the run started, and `written_upto` is the
+    newest change that wrote a session at that moment (§6.2)."""
+    saves = in_chat and not args.auto
+    if saves and proposal.workouts and newest_written() != written_upto:
+        print(f"\n{WEEK_CHANGED_LINE}")
+        return
+    if saves and proposal.week_planner_changed:
+        # In place of the confirm: the reason and the preview, then the two answers (§3).
+        send_alone(saved_proposal.save(proposal, written_upto, replaces=replaces))
+        return
+
+    runtime.render.adapt_reason(proposal.reason)
+
+    if not proposal.workouts and tweak:
+        runtime.render.tweak_no_change()
+    elif not proposal.workouts:
+        runtime.render.adapt_no_change()
+    if not proposal.workouts:
+        # The pass still had its constraints in scope, which is all `honored_at`
+        # claims — requiring a *change* would flag them forever (§8). A proposal that
+        # waits stays open (DESIGN_waiting_proposal.md §6.2).
+        runtime.coach_service.workout_revision_record_no_change(proposal)
+        return
+    print_send_notice(revision_dates(proposal))
+
+    if saves:
+        # Only the kilograms moved: written at once, with the strength planner's
+        # sentences as the reason above (DESIGN_waiting_proposal.md §7).
+        if proposal.strength_notice:
+            print(f"\n{wrap_text(proposal.strength_notice)}")
+    else:
+        # The renderer draws the preview, the prompt asks the question: voice and
+        # transport are two objects and neither calls the other
+        # (DESIGN_render_persona.md §4).
+        heading, question = runtime.render.adapt_confirm_words()
+        runtime.render.revision_preview(proposal, heading)
+        if not (args.auto or runtime.prompt.confirm(question)):
+            runtime.render.adapt_discarded()
+            return
+
+    step("\nApplying adaptations...")
+    runtime.coach_service.workout_revision_apply(proposal)
+    runtime.render.adapt_applied()
+
+
 def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
     date_str = _adapt_date(args, tweak)
     if not tweak and not args.date:
@@ -161,10 +232,9 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
     # Asked now, kept once the coach has answered (DESIGN_session_notes.md §3). A tweak's
     # request is acted on at once and is not kept.
     note_session = None if tweak else _session_for_note(date_str, getattr(args, 'message', None))
-    # A run started from the athlete's chat never asks and never waits: it saves its
-    # proposal (DESIGN_waiting_proposal.md §2). `-y` writes without asking, wherever typed.
-    saves = athlete_watching() and not args.auto
-    # Every run shows the week planner the proposal that still waits (§6.2).
+    in_chat = athlete_watching()
+    # Every run shows the week planner the proposal that still waits
+    # (DESIGN_waiting_proposal.md §6.2).
     still_open = saved_proposal.open_proposal()
     written_upto = newest_written()
 
@@ -181,67 +251,20 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
                 date_str, message=getattr(args, 'message', None),
                 **saved_proposal.shown_to_week_planner(still_open),
             )
-        reason = proposal.reason
-        proposed_workouts = proposal.workouts
         if note_session is not None:
             runtime.db.add_session_note(note_session['id'], args.message)
             runtime.render.session_note_kept(note_session, date_str)
 
-        # §8 two-confirmation flow, step 1: confirm any constraint(s) extracted from the
-        # athlete's note BEFORE the adaptation preview below — an independent commit that
-        # runs even when no workout changes are proposed. Declining discards the
-        # extraction; the note still informed this run's adaptation via the advisory text
-        # (already baked into `reason`/`proposed_workouts` from the same LLM call).
-        # Step 1b: the same note may also carry daily signals, confirmed one at a time and
-        # written the same way (DESIGN_signal_extraction.md §2). A signal confirmed here
-        # informs the NEXT run, not this one — the call that proposed it has returned.
-        # Both loops live in cli/candidates.py: `bot capture note` asks the same questions
-        # about the same candidates (DESIGN_bot_simple_frontend.md §12.10).
-        confirm_new_constraints(
-            proposal.new_constraints, date_str, getattr(args, 'message', None) or ""
-        )
-        confirm_new_signals(proposal.new_signals, date_str)
-
-        if saves and proposal.week_planner_changed:
-            # Saved and sent in place of the confirm, the reason and the preview with it.
-            # It replaces the proposal that waited (DESIGN_waiting_proposal.md §3, §6.2).
-            send_alone(saved_proposal.save(
-                proposal, written_upto, replaces=still_open is not None
-            ))
-            return
-
-        runtime.render.adapt_reason(reason)
-
-        if not proposed_workouts and tweak:
-            runtime.render.tweak_no_change()
-        elif not proposed_workouts:
-            runtime.render.adapt_no_change()
-        if not proposed_workouts:
-            # The pass still had its constraints in scope, which is all `honored_at`
-            # claims — requiring a *change* would flag them forever (§8). A proposal that
-            # waits stays open (DESIGN_waiting_proposal.md §6.2).
-            runtime.coach_service.workout_revision_record_no_change(proposal)
-            return
-        print_send_notice(revision_dates(proposal))
-
-        if saves:
-            # Only the kilograms moved: written at once, with the strength planner's
-            # sentences as the reason above (DESIGN_waiting_proposal.md §7).
-            if proposal.strength_notice:
-                print(f"\n{wrap_text(proposal.strength_notice)}")
-        else:
-            # The renderer draws the preview, the prompt asks the question: voice and
-            # transport are two objects and neither calls the other
-            # (DESIGN_render_persona.md §4).
-            heading, question = runtime.render.adapt_confirm_words()
-            runtime.render.revision_preview(proposal, heading)
-            if not (args.auto or runtime.prompt.confirm(question)):
-                runtime.render.adapt_discarded()
-                return
-
-        step("\nApplying adaptations...")
-        runtime.coach_service.workout_revision_apply(proposal)
-        runtime.render.adapt_applied()
+        # The questions about a rule or a signal found in the note. A terminal asks them
+        # before the preview (DESIGN_constraints.md §8). The chat asks them after the
+        # proposal, or after the line that says nothing changes, so a question nobody
+        # answers cannot hold the proposal back (DESIGN_waiting_proposal.md §6.1).
+        message = getattr(args, 'message', None)
+        if not in_chat:
+            _confirm_candidates(proposal, date_str, message)
+        _settle(args, tweak, proposal, in_chat, still_open is not None, written_upto)
+        if in_chat:
+            _confirm_candidates(proposal, date_str, message)
 
     except ValueError as e:
         # A domain refusal (no active plan to adapt towards), not a failure: say it

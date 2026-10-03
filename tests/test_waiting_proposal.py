@@ -19,6 +19,7 @@ import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before
 from stamind import athlete_queue, runtime
 from stamind.cli import queue as queue_cli
 from stamind.cli.workouts import proposal as saved_proposal
+from stamind.cli.workouts.adapt import WEEK_CHANGED_LINE
 from stamind.cli.workouts.heads_up import newest_written
 from stamind.coach.proposals import RevisionProposal
 from stamind.coach.revisions import pair_revisions
@@ -234,6 +235,8 @@ class StandAloneTest(_Case):
                 run_cli(["queue", "answer", str(item["id"])])
         self.assertIn(f"#{item['id']}", listed)
         self.assertIn("Rough night.", listed)
+        self.assertNotIn("Go through them", listed)
+        self.assertIn("queue answer <id>", listed)
         _message, choices = prompt.choose.call_args.args
         self.assertEqual([c.value for c in choices], ["a1", "a2", athlete_queue.SKIP])
         self.assertEqual(self.ride()["duration_minutes"], 60)
@@ -318,10 +321,19 @@ class MorningPushTest(_Case):
 class ChatRunTest(_Case):
     """A run started from the chat saves its proposal and never asks (§2, §6.2, §7)."""
 
-    def coach_run(self, proposal, argv=("workout", "adapt", "-m", "I'm tired")):
+    def coach_run(
+        self, proposal, argv=("workout", "adapt", "-m", "I'm tired"), on_confirm=None,
+        think=None,
+    ):
+        """One run of the coach. `on_confirm` answers its questions, and `think` stands in
+        for the week planner when something must happen while it thinks."""
         coach, prompt = MagicMock(), MagicMock()
+        self.coach = coach
         coach.workout_adapt.return_value = proposal
+        coach.workout_adapt.side_effect = think
         coach.workout_tweak.return_value = proposal
+        coach.capture_message_constraint.return_value = (None, None)
+        prompt.confirm.side_effect = on_confirm
         with patch.object(runtime, "coach_service", coach, create=True), \
                 patch.object(runtime, "prompt", prompt, create=True), \
                 patch("stamind.cli.workouts.adapt.ensure_recent_data"):
@@ -392,6 +404,62 @@ class ChatRunTest(_Case):
         self.at(8, 30)
         self.coach_run(self.nothing_to_change())
         self.assertEqual([item["id"] for item in saved_proposal.waiting()], [first["id"]])
+
+    RULE = ({"title": "no run on Fridays", "start_date": FRIDAY, "end_date": FRIDAY},)
+
+    def test_in_the_chat_the_rule_question_comes_after_the_proposal(self):
+        """A question nobody answers must not hold the proposal back (§6.1)."""
+        waiting_when_asked = []
+
+        def decline(*_args, **_kwargs):
+            waiting_when_asked.append(len(saved_proposal.waiting()))
+            return False
+
+        self.coach_run(self.eased(new_constraints=self.RULE), on_confirm=decline)
+        self.assertEqual(waiting_when_asked, [1])
+
+    def test_with_nothing_to_change_the_rule_question_comes_after_that_line(self):
+        recorded_when_asked = []
+
+        def decline(*_args, **_kwargs):
+            recorded_when_asked.append(self.coach.workout_revision_record_no_change.called)
+            return False
+
+        proposal = RevisionProposal(**{
+            **self.nothing_to_change().__dict__, "new_constraints": self.RULE,
+        })
+        self.coach_run(proposal, on_confirm=decline)
+        self.assertEqual(recorded_when_asked, [True])
+
+    def test_a_terminal_run_keeps_the_rule_question_before_the_preview(self):
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "", "STAMIND_RENDER": ""}):
+            _coach, prompt, _out = self.coach_run(
+                self.eased(new_constraints=self.RULE), on_confirm=lambda *a, **k: False
+            )
+        rule_question, apply_question = prompt.confirm.call_args_list
+        self.assertIn("no run on Fridays", rule_question.args[0])
+        self.assertNotIn("no run on Fridays", apply_question.args[0])
+
+    def test_a_week_that_changed_while_the_coach_was_thinking_saves_nothing(self):
+        """07:30 "also move Saturday's ride". At 07:30:30, while that run thinks, a tap on
+        the 07:07 proposal writes a session (§6.2)."""
+        def think(*_args, **_kwargs):
+            save_workout(test_db, SATURDAY, "running", "Long run", duration_minutes=100)
+            return self.eased()
+
+        coach, _prompt, out = self.coach_run(None, think=think)
+        self.assertIn(WEEK_CHANGED_LINE, out)
+        self.assertEqual(saved_proposal.waiting(), [])
+        coach.workout_revision_apply.assert_not_called()
+
+    def test_kilograms_are_not_written_either_when_the_week_changed(self):
+        def think(*_args, **_kwargs):
+            save_workout(test_db, SATURDAY, "running", "Long run", duration_minutes=100)
+            return self.eased(title="Intervals", minutes=90, week_planner_changed=False)
+
+        coach, _prompt, out = self.coach_run(None, think=think)
+        self.assertIn(WEEK_CHANGED_LINE, out)
+        coach.workout_revision_apply.assert_not_called()
 
     def test_a_proposal_out_of_date_is_closed_and_not_shown(self):
         first = self.save()

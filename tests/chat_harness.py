@@ -103,6 +103,22 @@ class _FakeProc:
         self.returncode = -9
 
 
+class _ScriptedProc(_FakeProc):
+    """Stand-in for a CLI subprocess that prints `lines`, then exits."""
+
+    def __init__(self, lines=()) -> None:
+        super().__init__(exits_on_its_own=True)
+        self._lines = [line.encode() for line in lines]
+        self.stdout = SimpleNamespace(readline=self._readline)
+        self.stdin = SimpleNamespace(write=lambda data: None, drain=self._drain)
+
+    async def _readline(self) -> bytes:
+        return self._lines.pop(0) if self._lines else b""
+
+    async def _drain(self) -> None:
+        return None
+
+
 class _FakeQuery:
     """Stands in for a `telegram.CallbackQuery`: one tap, and what the bot did to it."""
 

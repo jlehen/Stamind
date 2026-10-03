@@ -91,7 +91,8 @@ def print_queue_list(items: List[Dict[str, Any]], now: datetime) -> None:
             line += gray(f"  · hidden until {short_when(back, now)}")
         print(line)
     summary = f"{len(waiting)} waiting" + (f", {len(hidden)} hidden" if hidden else "") + "."
-    if waiting:
+    # A stand-alone item is in no walk, so it is answered by its id.
+    if any(not athlete_queue.kind_of(item).stands_alone for item in waiting):
         summary += (" Go through them with " + cmd("queue answer") + ", or one with "
                     + cmd("queue answer <id>") + ".")
     else:

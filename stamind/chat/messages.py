@@ -63,6 +63,9 @@ class MessagesMixin:
         # adaptation. A misroute across that line degrades gracefully both ways (§12.3).
         if intent in ROUTER_MESSAGE_ARGV:
             argv = [*ROUTER_MESSAGE_ARGV[intent], text]
+            # Not taken while a run of the coach is alive, and it gets no echo.
+            if await self._coach_busy(chat_id, argv):
+                return None
         elif intent in ROUTER_CAPTURE_INTENTS:
             argv = ["bot", "capture", ROUTER_CAPTURE_INTENTS[intent], text]
         elif intent in ROUTER_INTENT_ARGV:
@@ -94,27 +97,37 @@ class MessagesMixin:
         armed_at = self.armed.pop(chat_id, None)
         return armed_at is not None and (time.monotonic() - armed_at) <= self.prompt_timeout
 
-    async def _cancel(self, chat_id: int) -> str:
-        self.armed.pop(chat_id, None)  # /cancel also drops a "💬 Talk to me" tap (§5.2)
-        session = self.sessions.get(chat_id)
-        if session is None:
-            return "Nothing to cancel."
+    @staticmethod
+    def _end(session: runner.Session) -> None:
+        """Ends one live command: the prompt it waits on is answered "cancelled", and a
+        command that is computing is killed, which `_drive` cleans up after."""
         fut = session.answer_future
         if session.awaiting and fut is not None and not fut.done():
             fut.set_result(
                 prompt_answer(session.awaiting.get("id"), cancelled=True)
             )
-        else:  # mid-compute: kill the process; _drive cleans up
-            try:
-                session.proc.kill()
-            except ProcessLookupError:
-                pass
+            return
+        try:
+            session.proc.kill()
+        except ProcessLookupError:
+            pass
+
+    async def _cancel(self, chat_id: int) -> str:
+        """/cancel: ends the command in both places of the chat."""
+        self.armed.pop(chat_id, None)  # /cancel also drops a "💬 Talk to me" tap (§5.2)
+        runs = self._runs(chat_id)
+        if not runs:
+            return "Nothing to cancel."
+        for session in runs:
+            self._end(session)
         return "Cancelling…"
 
     async def _restart(self, chat_id: int) -> None:
         """Tears down, replies, then hard-exits with RESTART_EXIT_CODE for the sm-bot
         supervisor to relaunch us. See DESIGN_bot_restart.md §5.2."""
-        await runner.restart_teardown(self.sessions.get(chat_id), self._pause_polling)
+        await runner.restart_teardown(
+            self.sessions.get(chat_id), self._pause_polling, self.coach_runs.get(chat_id)
+        )
         runner.leave_restart_note(chat_id)
         await self.bot.send_message(chat_id=chat_id, text="Restarting…")
         os._exit(runner.RESTART_EXIT_CODE)
@@ -149,8 +162,7 @@ class MessagesMixin:
             await self._restart(chat.id)
             return
 
-        session = self.sessions.get(chat.id)
-        if session is not None:
+        for session in self._runs(chat.id):
             awaiting = session.awaiting
             fut = session.answer_future
             if (awaiting and awaiting.get("type") == "text"
@@ -158,6 +170,9 @@ class MessagesMixin:
                 fut.set_result(prompt_answer(awaiting.get("id"), answer=text))
                 self._log(chat.id, "  ", "text answer")
                 return
+        # Only the chat's own place makes it busy: the coach's run works beside it
+        # (DESIGN_waiting_proposal.md §6.1).
+        if self.sessions.get(chat.id) is not None:
             await message.reply_text(BUSY_NOTICE)
             return
 
@@ -199,7 +214,7 @@ class MessagesMixin:
         except ValueError:
             await message.reply_text("Couldn't parse that — check your quotes.")
             return
-        if not argv:
+        if not argv or await self._coach_busy(chat.id, argv):
             return
 
         self._log(chat.id, "  ", f"run: {shlex.join(argv)}")

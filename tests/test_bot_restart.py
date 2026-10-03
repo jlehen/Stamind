@@ -67,6 +67,13 @@ class RestartTeardownTest(unittest.IsolatedAsyncioTestCase):
         await runner.restart_teardown(session, self._stop_polling)
         self.assertFalse(session.proc.killed)
 
+    async def test_the_coachs_run_is_ended_too(self):
+        """A chat has a second place, for the coach's run (DESIGN_waiting_proposal.md
+        §6.1)."""
+        own, coach = self._session(), self._session()
+        await runner.restart_teardown(own, self._stop_polling, coach)
+        self.assertTrue(own.proc.killed and coach.proc.killed)
+
     async def test_releases_the_long_poll(self):
         # Without this, the abandoned getUpdates never confirms its offset and the
         # relaunched worker is served the same /restart again (§7).

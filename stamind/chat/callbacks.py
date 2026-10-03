@@ -59,6 +59,16 @@ class CallbacksMixin:
             # Busy chat: leave the buttons alive so the tap can be retried.
             await self.bot.send_message(chat_id=chat_id, text=BUSY_TAP)
             return
+        argv = None
+        if utterance:
+            try:
+                argv = parse_message_to_argv(str(utterance))
+            except ValueError:
+                argv = None
+        # A fixed sentence for the coach is refused like a typed one, and before its row
+        # goes, so it can be tapped again (DESIGN_waiting_proposal.md §6.2).
+        if argv and await self._coach_busy(chat_id, argv):
+            return
         self._log(chat_id, "  ", f"ui tap: {action.get('label')}")
         try:  # a decided row is spent: drop the buttons
             await query.edit_message_reply_markup(reply_markup=None)
@@ -70,10 +80,6 @@ class CallbacksMixin:
             if ack:
                 await self.bot.send_message(chat_id=chat_id, text=str(ack))
             return
-        try:
-            argv = parse_message_to_argv(str(utterance))
-        except ValueError:
-            argv = None
         if not argv:
             return
         self._log(chat_id, "  ", f"run: {shlex.join(argv)}")
@@ -116,12 +122,13 @@ class CallbacksMixin:
         await self._start_command(chat_id, argv, quiet=True)
 
     async def _handle_stop_callback(self, query, chat_id: int, data: str) -> None:
-        """A tap on the §3 Stop button: ends the command it was raised for, the same
-        kill /cancel does. A tap left over from a command that already finished says so
-        rather than reaching whatever started since (DESIGN_bot_stop_button.md §7)."""
+        """A tap on the §3 Stop button: ends the command it was raised for, in whichever
+        place it runs, the way /cancel would. A tap left over from a command that already
+        finished says so rather than reaching whatever started since
+        (DESIGN_bot_stop_button.md §7)."""
         nonce = decode_stop_callback(data)
-        session = self.sessions.get(chat_id)
-        if nonce is None or session is None or session.nonce != nonce:
+        session = self._run_by_nonce(chat_id, nonce)
+        if nonce is None or session is None:
             try:  # the command is over: drop the dead button
                 await query.edit_message_reply_markup(reply_markup=None)
             except Exception as exc:
@@ -130,7 +137,7 @@ class CallbacksMixin:
             return
         self._log(chat_id, "  ", "stop tap")
         await self._retire_stop(session)
-        await self._cancel(chat_id)  # its reply line is /cancel's wording; a tap gets §6's
+        self._end(session)
         await self._send_keyed(chat_id, STOP_DONE)
 
     async def on_callback(self, update, context) -> None:
@@ -159,10 +166,11 @@ class CallbacksMixin:
         if decoded is None:
             return
         nonce, pid, value = decoded
-        session = self.sessions.get(chat.id)
+        # Found by the run that raised it: the coach's run asks from the second place.
+        session = self._run_by_nonce(chat.id, nonce)
         awaiting = session.awaiting if session else None
         fut = session.answer_future if session else None
-        if (session is None or session.nonce != nonce or awaiting is None
+        if (session is None or awaiting is None
                 or awaiting.get("id") != pid or fut is None or fut.done()):
             try:  # stale tap (session replaced/expired): drop the dead buttons
                 await query.edit_message_reply_markup(reply_markup=None)

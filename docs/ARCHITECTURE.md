@@ -120,7 +120,7 @@ classes themselves.
   (`parser`/`generate`/`show`/`versions`/`feedback`/`retro`),
   the `workouts/` package
   (`parser`/`adapt`/`generate`/`rollback`/`listing`/`compare`/`calendar_sync`/`revisions`/
-  `heads_up`/`strength_only`/`session_line`), the `data/` package (`parser`/`cache`/`show`/
+  `heads_up`/`proposal`/`strength_only`/`session_line`), the `data/` package (`parser`/`cache`/`show`/
   `analysis`/`publish`) and the `journal/` package (`parser`/`runs`/`views`), plus the shared modules:
   `common` (the renderers two command families share), `selectors` (the range grammar) with
   `windows` (the resolvers that turn it into dates by reading the database),
@@ -148,11 +148,23 @@ classes themselves.
     as an inline keyboard (confirm → Yes/No, ⚠️ for `danger`; choose → one button per
     option) or an awaited text reply, then writes the answer back to the child's stdin
     so the command resumes.
-  - **State / safety:** one in-flight `chat.runner.Session` per chat holds the process +
-    pending-prompt state; a per-prompt `nonce` (in the button `callback_data`) rejects
-    stale taps. `/cancel` and an idle `telegram.prompt_timeout_seconds` send a
-    cancellation the CLI turns into a clean abort; a between-output
-    `telegram.command_timeout_seconds` kills a silent runaway.
+  - **State / safety:** a chat has two places, each holding at most one in-flight
+    `chat.runner.Session` (the process + pending-prompt state). Its own place
+    (`ChatBot.sessions`) takes every command, and the chat is busy while one runs there.
+    The second (`ChatBot.coach_runs`) takes the coach's run only: any `workout adapt` or
+    `workout tweak` the chat starts (`routing.is_coach_argv`). So while the coach thinks,
+    "show my week" answers at once and a tap on a proposal's "Change it" is applied
+    (DESIGN_waiting_proposal.md §6.1). The bot never ends one run of the coach to start
+    another: while one is alive, a message to the coach is not taken and gets one line
+    (`runner._coach_busy`), "I'm still working on your last message — send that again in a
+    minute." or, when the run waits on a question of its own, "I asked you something
+    above. Answer it, then send that again." (§6.2). The morning push, a reminder and a
+    heads-up wait for both places. A per-command `nonce` (in the button `callback_data`)
+    finds the run that raised a prompt or a Stop button and rejects stale taps. `/cancel`
+    ends the command in both places, and an idle `telegram.prompt_timeout_seconds` ends
+    the run that asked with "No answer, so I stopped there."; both send a cancellation
+    the CLI turns into a clean abort. A between-output `telegram.command_timeout_seconds`
+    kills a silent runaway.
   - **Telegram having a bad minute:** every call the bot makes goes through
     `telegram_api.retrying_request`, which tries a 5xx, a dropped connection or a timeout
     again after a growing pause for `telegram.send_retry_seconds` (180; 0 = off), then lets
@@ -176,8 +188,9 @@ classes themselves.
   - **Stopping a coach call.** Every model call emits `SM-FLUSH` right after its wait
     notice ("Reviewing your coming sessions — this usually takes about 40 seconds.");
     the bot attaches a `✋ Stop` inline button to the message that flush sends, with
-    `callback_data` `stop:{nonce}` naming the running command. Tapping it kills the
-    subprocess (the same kill `/cancel` does) and replies "Stopped."; the button is
+    `callback_data` `stop:{nonce}` naming the running command. Tapping it kills that
+    command's subprocess, in whichever place of the chat it runs, and replies "Stopped.";
+    the button is
     retired by the next output, by the command ending, or by the tap itself, and a tap on
     a retired one is told the command already finished (DESIGN_bot_stop_button.md).
   - **Self-restart.** `./sm-bot` is a **supervisor**, not just the venv bootstrap: it
@@ -192,7 +205,8 @@ classes themselves.
     passes it on to the worker and waits again, and the worker's `_serve` stops the way it
     does on SIGTERM, then `run` exits 75. No chat is told (DESIGN_bot_restart.md §5.3).
     `/restart` is a bot command beside `/cancel` and `/start`, under
-    the same allowlist: it kills any running command's subprocess and stops the Updater
+    the same allowlist: it kills the running command's subprocess in both places of the
+    chat and stops the Updater
     (`runner.restart_teardown`, a module function so it can be driven without a client),
     leaves a `restart_chat` note under `data_dir` (`runner.leave_restart_note`), replies,
     then `os._exit(75)`. The new worker's `_say_back` takes the note once polling is up
@@ -209,11 +223,13 @@ classes themselves.
     `ChatBot` against stand-ins (`tests/chat_harness.py`). `tests/test_layering.py` holds
     that rule. The files:
     - `app` is `ChatBot` itself: the configuration it reads, the client it builds, the
-      state the rest reaches through `self` (the live sessions, the allowlist, the armed
-      chats, the button row a chat was last offered), and
+      state the rest reaches through `self` (the live sessions of both places, the
+      allowlist, the armed chats, the button row a chat was last offered), and
       `_serve`, the Application/Updater lifetime.
-    - `runner` is one CLI subprocess per chat: `Session`, the environment the child gets,
-      `_drive` reading its stdout to the end, `_route_intent`, and `restart_teardown`.
+    - `runner` is one CLI subprocess per place of a chat: `Session`, the environment the
+      child gets, `_start_command` choosing the place, `_drive` reading its stdout to the
+      end, `_runs` and `_run_by_nonce` reading both places, `_coach_busy`, `_route_intent`,
+      and `restart_teardown`.
     - `replies` is what goes back into the chat for that command: prose, a chart, an
       offer row, a queued item, a question — and the ✋ Stop button the flushes raise and
       retire. `_send_keyed` is the one way the companion keyboard is attached to a send:
@@ -226,7 +242,8 @@ classes themselves.
     - `routing` is what one chat message means — both halves of the router's intent table
       (`ROUTER_INTENTS`, which `sm bot route` builds its prompt from, and the intent→argv,
       intent→capture and echo tables the bot maps a returned name onto), plus
-      `parse_message_to_argv`.
+      `parse_message_to_argv` and `is_coach_argv`, which says whether a command line is a
+      message to the coach.
     - `keyboards` is every button the bot draws and every tap it decodes — the reply
       keyboard with what each label runs, the gym button that opens the Mini App
       (`gym_button`, §16), the calendar cell's place in the layout (`CALENDAR_LABEL`,
@@ -238,7 +255,8 @@ classes themselves.
       drives them.
 
     The pure modules are unit-tested in `tests/test_bot.py`, the process in
-    `tests/test_chat_process.py` and the handlers in `tests/test_chat_handlers.py`.
+    `tests/test_chat_process.py`, the handlers in `tests/test_chat_handlers.py` and the coach's
+    run beside the chat in `tests/test_chat_coach_run.py`.
     Reading a frame off the CLI's stdout and building the answer sent back are
     `stamind/sentinels.py` (`parse_frame`, `prompt_answer`), tested in
     `tests/test_sentinels.py`.
@@ -745,7 +763,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A preference the athlete can change at runtime | `stamind/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | Cycle retrospectives (the stored record of a finished mesocycle or plan) | `stamind/cycle_records.py` (which records exist, when one is due, how one reads), `db/retrospectives.py` (the rows), `coach/service/retrospective.py` (the write step and the numbers), `coach/engine/retrospective.py` (the writer's prompt), `stamind/retrospective_question.py` (the question and its answer), `coach/service/history_context.py` (what `plan generate` reads), `cli/plans/show.py` and `cli/plans/retro.py` (the two views), DESIGN_cycle_retrospective.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`stamind/queue_kind.py`) added to `KINDS` in `stamind/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label, and whether its items stand alone — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
-| A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` queue kind: its wording, the three rules that put it out of date, what "Change it" and "Keep it as planned" do, `save`, `open_proposal`, `shown_to_week_planner`), `coach/proposals.py` (`week_planner_changed`; `revision_to_json`/`revision_from_json`, what a tap writes, without the sleep mark), `coach/engine/notes.py:open_proposal_task` (how the week planner reads the open one), `cli/queue.py:send_alone` (the sending), `cli/workouts/adapt.py:_adapt` (a chat run saves one in place of the confirm), `cli/bot/views.py:_morning_adaptation` (the push saves one). DESIGN_waiting_proposal.md |
+| A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` queue kind: its wording, the three rules that put it out of date, what "Change it" and "Keep it as planned" do, `save`, `open_proposal`, `shown_to_week_planner`), `coach/proposals.py` (`week_planner_changed`; `revision_to_json`/`revision_from_json`, what a tap writes, without the sleep mark), `coach/engine/notes.py:open_proposal_task` (how the week planner reads the open one), `cli/queue.py:send_alone` (the sending), `cli/workouts/adapt.py:_settle` (a chat run saves one in place of the confirm), `chat/runner.py` (the second place per chat for the coach's run), `cli/bot/views.py:_morning_adaptation` (the push saves one). DESIGN_waiting_proposal.md |
 | A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `activity_lines`, `logbook`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`, and `strength log`/`exercises` which read the record and the vocabulary back), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
 | A gym session logged on the phone | `miniapp/` (the page), `strength/logger.py` (the two payloads), `cli/strength_ingest.py` (`strength ingest`), `strength/sets.py::take_over_logs` (the pull handing the log to Garmin's activity), `gym_logs` + `upsert_logged_activity`/`save_gym_log`/`gym_log_for_day`/`move_gym_log` in `db/strength.py`. The bot's button and the handler for the page's message are DESIGN_gym_logger.md §6 and not wired yet. DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
 | A past strength session against its planned lines | `strength/comparison.py` (the counting, the marks, the totals, the §6 reason), `db/strength.py::attach_lifted` (what `get_completed_activities` puts on a strength activity: `lifted`, and `gym_log`), `analytics/adherence.py` (`_discrepancy_reasons` grades a logged session by its sets, `_pairing_order` and `is_ambiguous_match` put the logged activity first), `cli/common.py` (`strength_table` for `workout list -vv` and `workout compare`, `simple_comparison_lines` for "Done lately" and `strength ingest`), `strength/sets.py::done_text` (the Done cell). DESIGN_strength_planned_vs_done.md |
@@ -3047,6 +3065,12 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    made. A tap on a proposal that changes today first pulls today's activities from Garmin,
    past the refresh throttle. A terminal run and `-y` keep step 6 as it is. Kilograms that
    moved alone (`RevisionProposal.week_planner_changed` false) are written at once (§7).
+   In the chat the questions about a rule or a signal found in the note come after the
+   proposal, or after the line that says nothing changes (`_confirm_candidates` around
+   `_settle`); a terminal asks them before the preview. Before a chat run saves a proposal
+   or writes kilograms, it compares the newest change that wrote a session with the one it
+   read at its start. If a session was written meanwhile, it saves and writes nothing and
+   says "Your week changed while I was thinking." (§6.2).
 8. **One proposal is open at a time** (§3, §6.2). Every run — chat, morning push, terminal —
    reads the open one before it asks the week planner (`proposal.open_proposal`, which
    closes a proposal that waits and is out of date) and hands the service what
@@ -3567,7 +3591,7 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | activity, `strength log`/`exercises` reading the record back,    |
 |                                | the morning push reading sets before its walk                    |
 | `tests/test_strength_comparison.py` | a past strength session planned against done (DESIGN_strength_planned_vs_done.md), on the design's Thursday: which sets count, the marks and totals, the verdict by sets and the one kept by time and load, the logged activity pairing first and never asked about, the sets on the activity, the same-day takeover, the table, the companion lines, `workout show` and `workout compare` |
-| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (no round, no "Not now", saving one closes the others), the morning push that proposes a session change and writes kilograms at once, and the chat run that saves its proposal, is shown the open one and replaces it. The tweak that keeps the open proposal's days is in `test_workout_tweak.py`, the prompt gate in `test_prompt_gates.py` |
+| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (no round, no "Not now", saving one closes the others), the morning push that proposes a session change and writes kilograms at once, and the chat run that saves its proposal, is shown the open one and replaces it, asks its rule question after the proposal and saves nothing when the week changed while it thought. The tweak that keeps the open proposal's days is in `test_workout_tweak.py`, the prompt gate in `test_prompt_gates.py`, and the second place per chat with its two refusals and the time-out line in `test_chat_coach_run.py` |
 | `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the line for a change to today, who is watching, the replace question and its ways out, `workout notify` with `--all` and `--sent` and their tags, `workout batches`. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.started_from` pins where the run started, the terminal or the athlete's chat |
 | `tests/test_constraints*.py`   | the constraint object: DB windowing, the §8 message capture and |
 |                                | the hard-rest pre-pass (`test_constraints.py`); the §7          |
