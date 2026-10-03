@@ -486,6 +486,7 @@ the script stops. The main athlete answered on 2026-10-03:
 | `wheel` | Ab wheel rollout | `CORE/KNEELING_AB_WHEEL` |
 | `plank` | The plain plank | `PLANK/PLANK` |
 | `row` | Seated cable row | `ROW/SEATED_CABLE_ROW` |
+| `clean and press` | A plain clean and press, for the sessions to come | `OLYMPIC_LIFT/CLEAN_AND_PRESS` |
 
 The companion athlete's two words were answered the same day:
 
@@ -494,9 +495,13 @@ The companion athlete's two words were answered the same day:
 | `push up` | The ordinary push-up | `PUSH_UP/PUSH_UP` |
 | `arm circles` | The warm-up drill | `WARM_UP/ARM_CIRCLES` |
 
-One word still waits. The main athlete's `clean and press` is done with kettlebells, so it is one
-of Garmin's two dumbbell lines (§3.3), and the athlete has yet to say whether the press is strict
-or a push press. The script stops on it until then.
+`clean and press` has two answers. The sets the main athlete did, on 10 and 17 September, were
+strict presses with kettlebells, which is `OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_STRICT_PRESS`
+(§3.3). The sessions to come stay as they are written, a plain clean and press, since the press
+varies by session. A rename gives a word one key, so the rename sends the word to the plain
+clean and press. After the conversion, `sm strength name 2026-09-10` and
+`sm strength name 2026-09-17` move the sets done to the strict press. The sets done and the
+sessions to come are then two exercises, with two histories.
 
 **The steps for the operator.** They run when step 1 of §11 lands; step 2 needs no conversion.
 
