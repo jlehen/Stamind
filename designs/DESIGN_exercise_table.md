@@ -225,7 +225,11 @@ Carried over means `barbell` becomes Barbell, `dumbbell` Dumbbells, `kettlebell`
 `cable` "Cable Machine, Cable Attachment", `machine` Machine and `bodyweight` Nothing. Three of
 Garmin's own lists are made more exact: the two incline dumbbell exercises say Adjustable Bench
 where Garmin says Bench, and `SQUAT/BACK_SQUAT_WITH_BODY_BAR` says Body Bar where Garmin says
-Barbell.
+Barbell. Garmin's words have no Smith machine and no EZ bar, so two more lists are corrected:
+`SHOULDER_PRESS/SMITH_MACHINE_OVERHEAD_PRESS` says "Smith Machine, Bench" where Garmin says
+"Squat Rack, Bench", and `TRICEPS_EXTENSION/EZ_BAR_OVERHEAD_TRICEPS_EXTENSION` says "EZ Bar"
+where Garmin says "Cable Attachment". Left as Garmin wrote it: `CURL/DEAD_HANG_BICEPS_CURL`,
+"Cable Attachment, Bench", which the rule below reads as bodyweight.
 
 **Bodyweight.** Today the word `bodyweight` in the equipment column answers a second question:
 is the load of this exercise a weight added to the body? Two places ask it. A pull reads a watch
@@ -233,7 +237,7 @@ guess of a bodyweight exercise at more than 50 kg as not that exercise
 (DESIGN_strength_tracking.md §6), and the page gives a card added for a bodyweight exercise no
 load. After this design an exercise is bodyweight when none of its gear is a load. A pull-up needs
 a Pull-up Bar, which is not a load, so it is bodyweight. A leg curl needs a Machine, so it is not.
-The rule gives another answer than today's word on about 120 of the 1,487 lines. Two of those are
+The rule gives another answer than today's word for 141 of the 1,539 classes. Two of those are
 exercises the athletes do: the plain calf raise was `machine` and needs nothing, and the leg curl
 was `bodyweight` and needs a Machine, which is right, since it is lifted at 55 to 65 kg.
 
@@ -385,6 +389,10 @@ today and 1,927 with keys. Telegram allows the whole keyboard about 9.9 kB, shar
 calendar and the plan buttons, and it fits with about 500 bytes left. The largest log goes from
 1,395 to 1,561 bytes of the 4,096 allowed.
 
+In general a line costs about 84 characters where it costs 71 today, so the keyboard holds a
+session of about 22 lines where it holds about 26 today. Not handled: a longer session makes
+Telegram refuse the keyboard, and the message goes out without it, as today.
+
 A log from a page still on version 1 is refused, as a log of a version the bot does not know is
 today.
 
@@ -411,7 +419,10 @@ The script rewrites three places: `exercise_sets.exercise`, `prescribed_sets.exe
 
 **It stops before anything while a "what was this?" question or a proposal waits in the queue**,
 and lists each with its id. A tap on either would write the old names into the database. Step 1
-below settles them before main is landed; this stop catches one that was missed. A waiting "are
+below settles them before main is landed; this stop catches one that was missed. A missed
+proposal is answered with `sm queue answer ID` as usual: its rows are converted by the next run.
+A missed question is answered through "something else…" or left unnamed, since its listed
+answers have no key. A waiting "are
 the sets final?" question is left alone: its names are only shown, and "yes, final" reads the
 sets from Garmin again.
 
@@ -431,12 +442,14 @@ name, the first of these that applies:
    itself.
 
 The script prints every distinct stored name with the key it becomes, its number of sets and its
-loads. A name that is not settled has no key there. If one is left, the script writes nothing and
-stops, and the operator gives a rename for each. Otherwise it writes after a yes.
+loads. A name is settled only when every stored occurrence of it is. One that is not has no key
+there. If one is left, the script writes nothing and stops, and the operator gives a rename for
+each. Otherwise it writes after a yes.
 
 **The athlete's own answers.** Where a stored word can mean several exercises, or the table gave
 it another meaning than the athlete's, only the athlete knows what was lifted. A rename is given
-as `--rename "back squat=SQUAT/BARBELL_BACK_SQUAT"`. The main athlete answered on 2026-10-03:
+as `--rename "back squat=SQUAT/BARBELL_BACK_SQUAT"`. Its key must be a key of the new table, or
+the script stops. The main athlete answered on 2026-10-03:
 
 | Stored under | Lifted | Key |
 |---|---|---|
@@ -466,7 +479,8 @@ or a push press. The script stops on it until then.
 
 1. Pick an evening when nobody trains. First run `sm queue` on each instance. A waiting "what
    was this?" question or proposal is answered now, in the chat or in the terminal, while the
-   old code still runs. A proposal is in no walk of the queue: `sm queue answer ID` answers it.
+   old code still runs. A proposal, and a question put off until later, are
+   in no walk of the queue: `sm queue answer ID` answers them.
    Once main is landed, a listed answer of an old question has no key and cannot be applied.
    Then stop both bots: every command a bot starts is a fresh process read
    from the checkout, so the new code runs as soon as main is landed there.
@@ -531,7 +545,5 @@ DESIGN_gym_logger.md §2 to §4.
 - **A line never holds two categories.** The athlete asked for the implements to be split. The
   seven lines that hold one exercise under two of Garmin's categories are split as well (§3.2),
   so that a warm-up keeps Garmin's warm-up category in its words and in its pattern.
-- **The words of §4 land in step 1**, not with the rest of what the athlete sees, because a key
-  cannot be stored before something can show it.
 - **The `+` is not stored.** If Garmin later adds the same name, the line drops its mark and
   nothing stored changes.
