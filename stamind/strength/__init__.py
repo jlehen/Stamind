@@ -1,7 +1,8 @@
 """Strength tracking (DESIGN_strength_tracking.md): what the athlete lifted, and what the
 next session asks them to lift.
 
-- `vocabulary.py` — the exercise names Stamind knows, read from `exercises.tsv`.
+- `vocabulary.py` — the exercise table, read from `exercises.tsv`: the key the database
+  stores for an exercise, and the words a person reads (DESIGN_exercise_table.md).
 - `sets.py` — a strength activity's sets, read from Garmin once and then frozen.
 - `questions.py` — the two questions the athlete is queued: are these sets final, and what
   was this group the watch could not name.

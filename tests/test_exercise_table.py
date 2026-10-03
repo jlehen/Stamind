@@ -1,0 +1,160 @@
+"""The exercise table and the words worked out from a key (DESIGN_exercise_table.md §3, §4,
+§11): the five checks on the table as written, the words rule, and what the vocabulary module
+gives for a key and for a Garmin name."""
+import unittest
+from collections import Counter
+
+from stamind.strength import vocabulary
+
+
+def table_lines():
+    """The table's lines as written, the `+` mark dropped: (names, pattern, muscles, gear)."""
+    lines = []
+    with open(vocabulary.TABLE_PATH, encoding="utf-8") as table:
+        for line in table:
+            if line.startswith("#") or not line.strip():
+                continue
+            names, pattern, muscles, gear = (line.rstrip("\n").split("\t") + [""] * 3)[:4]
+            lines.append((names.lstrip(vocabulary.ADDED_MARK).split(), pattern, muscles, gear))
+    return lines
+
+
+class TableTest(unittest.TestCase):
+    """The five checks of §11, read from the file itself: the loader would let a name on two
+    lines pass, the second line winning."""
+
+    def test_a_garmin_name_is_on_one_line_only(self):
+        counts = Counter(name for names, *_ in table_lines() for name in names)
+        self.assertEqual([name for name, count in counts.items() if count > 1], [])
+
+    def test_the_names_of_a_line_share_one_category(self):
+        mixed = [names for names, *_ in table_lines()
+                 if len({name.split("/")[0] for name in names}) > 1]
+        self.assertEqual(mixed, [])
+
+    def test_every_gear_word_is_one_of_the_46(self):
+        self.assertEqual(len(set(vocabulary.GEAR)), 46)
+        for names, _pattern, _muscles, gear in table_lines():
+            self.assertTrue(gear, f"{names[0]} has no gear")
+            for word in gear.split(", "):
+                self.assertIn(word, vocabulary.GEAR, names[0])
+
+    def test_no_two_classes_show_the_same_words(self):
+        counts = Counter(vocabulary.words(key) for key in vocabulary.keys())
+        self.assertEqual([words for words, count in counts.items() if count > 1], [])
+
+    def test_a_weighted_twin_sits_on_the_line_of_its_exercise(self):
+        """§3.2: `C/WEIGHTED_X` shares the line of `C/X`, or of `C/_X`, since Garmin drops a
+        leading underscore after `WEIGHTED_`. A weighted name whose exercise the table lacks
+        keeps a line of its own."""
+        line_of = {name: index for index, (names, *_) in enumerate(table_lines())
+                   for name in names}
+        apart = []
+        for name, index in line_of.items():
+            category, _, exercise = name.partition("/")
+            if not exercise.startswith("WEIGHTED_"):
+                continue
+            rest = exercise[len("WEIGHTED_"):]
+            for plain in (f"{category}/{rest}", f"{category}/_{rest}"):
+                if line_of.get(plain, index) != index:
+                    apart.append((name, plain))
+        self.assertEqual(apart, [])
+
+    def test_a_pattern_is_one_of_the_nine_or_empty(self):
+        for names, pattern, _muscles, _gear in table_lines():
+            self.assertIn(pattern, vocabulary.PATTERNS + ("",), names[0])
+
+
+class WordsTest(unittest.TestCase):
+    """The words rule of §4."""
+
+    def test_the_category_a_colon_and_the_name(self):
+        self.assertEqual(vocabulary.words("SQUAT/BELT_SQUAT"), "squat: belt squat")
+        self.assertEqual(vocabulary.words("PULL_UP/LAT_PULLDOWN"), "pull up: lat pulldown")
+
+    def test_a_name_equal_to_its_category_shows_once(self):
+        self.assertEqual(vocabulary.words("DEADLIFT/DEADLIFT"), "deadlift")
+        self.assertEqual(vocabulary.words("LEG_CURL/LEG_CURL"), "leg curl")
+
+    def test_a_bare_category_shows_once(self):
+        self.assertEqual(vocabulary.words("ROW"), "row")
+        self.assertEqual(vocabulary.words("TRICEPS_EXTENSION"), "triceps extension")
+
+    def test_a_leading_underscore_is_dropped(self):
+        self.assertEqual(vocabulary.words("PULL_UP/_30_DEGREE_LAT_PULLDOWN"),
+                         "pull up: 30 degree lat pulldown")
+
+    def test_an_added_exercise_reads_like_any_other(self):
+        self.assertEqual(vocabulary.words("SQUAT/STEP_DOWN"), "squat: step down")
+
+    def test_a_key_the_table_lacks_has_words_too(self):
+        self.assertEqual(vocabulary.words("SQUAT/MOON_SQUAT"), "squat: moon squat")
+
+
+class ClassTest(unittest.TestCase):
+    """What the module gives for a key, and for any Garmin name (§11)."""
+
+    def test_a_key_gives_its_class(self):
+        pull_up = vocabulary.get("PULL_UP/PULL_UP")
+        self.assertEqual(pull_up.names,
+                         ("PULL_UP/PULL_UP", "PULL_UP/WEIGHTED_PULL_UP", "PULL_UP"))
+        self.assertEqual(pull_up.pattern, "pull_vertical")
+        self.assertEqual(pull_up.muscles, ("LATS", "TRAPS"))
+        self.assertEqual(pull_up.secondary, ("BICEPS", "FOREARM", "SHOULDERS"))
+        self.assertEqual(pull_up.gear, ("Pull-up Bar",))
+        self.assertEqual(pull_up.photos, "Pullups")
+        self.assertEqual(pull_up.words, "pull up")
+        self.assertFalse(pull_up.added)
+
+    def test_a_garmin_name_gives_the_key_of_its_class(self):
+        """A key, a weighted twin, a bare category, and a name the table lacks."""
+        self.assertEqual(vocabulary.key_of("SQUAT/BELT_SQUAT"), "SQUAT/BELT_SQUAT")
+        self.assertEqual(vocabulary.key_of("PULL_UP/WEIGHTED_PULL_UP"), "PULL_UP/PULL_UP")
+        self.assertEqual(vocabulary.key_of("ROW"), "ROW/ROW")
+        self.assertIsNone(vocabulary.key_of("SQUAT/MOON_SQUAT"))
+        # Only a key names a class: the twin is found through `key_of`.
+        self.assertIsNone(vocabulary.get("PULL_UP/WEIGHTED_PULL_UP"))
+
+    def test_an_implement_is_a_class_of_its_own(self):
+        """The barbell squat and the sandbag squat no longer share a line (§1)."""
+        self.assertEqual(vocabulary.get("SANDBAG/BACK_SQUAT").gear, ("Sandbag",))
+        self.assertEqual(vocabulary.get("SQUAT/BARBELL_BACK_SQUAT").gear,
+                         ("Barbell", "Squat Rack"))
+
+    def test_a_class_can_have_no_pattern_and_no_muscles(self):
+        wheel = vocabulary.get("POSE/WHEEL")
+        self.assertEqual((wheel.pattern, wheel.muscles, wheel.secondary), ("", (), ()))
+        self.assertEqual(wheel.gear, ("Nothing",))
+
+    def test_an_added_exercise_is_marked_and_its_key_has_no_mark(self):
+        step_down = vocabulary.get("SQUAT/STEP_DOWN")
+        self.assertTrue(step_down.added)
+        self.assertEqual(vocabulary.key_of("SQUAT/STEP_DOWN"), "SQUAT/STEP_DOWN")
+        self.assertIsNone(vocabulary.get("+SQUAT/STEP_DOWN"))
+        self.assertEqual(sum(1 for one in vocabulary.all_exercises() if one.added), 23)
+
+    def test_an_exercise_is_bodyweight_when_none_of_its_gear_is_a_load(self):
+        """§3.6: a pull-up bar is not a load, a machine is."""
+        self.assertTrue(vocabulary.get("PULL_UP/PULL_UP").bodyweight)
+        self.assertTrue(vocabulary.get("CALF_RAISE/CALF_RAISE").bodyweight)
+        self.assertTrue(vocabulary.get("CURL/DEAD_HANG_BICEPS_CURL").bodyweight)
+        self.assertFalse(vocabulary.get("LEG_CURL/LEG_CURL").bodyweight)
+        self.assertFalse(vocabulary.get("SQUAT/BARBELL_BACK_SQUAT").bodyweight)
+
+    def test_a_heavy_load_on_a_bodyweight_exercise_is_implausible(self):
+        self.assertTrue(vocabulary.implausible("SIT_UP/SIT_UP", 100.0))
+        self.assertFalse(vocabulary.implausible("SIT_UP/SIT_UP", 20.0))
+        self.assertFalse(vocabulary.implausible("SIT_UP/SIT_UP", None))
+        self.assertFalse(vocabulary.implausible("LEG_CURL/LEG_CURL", 100.0))
+        self.assertFalse(vocabulary.implausible("SQUAT/MOON_SQUAT", 100.0))
+
+    def test_the_line_the_strength_planner_is_shown(self):
+        """§7: the key, then the pattern, the main muscles and the gear."""
+        self.assertEqual(vocabulary.model_line("SQUAT/BARBELL_BACK_SQUAT"),
+                         "SQUAT/BARBELL_BACK_SQUAT (squat; QUADS, GLUTES; Barbell, Squat Rack)")
+        self.assertEqual(vocabulary.model_line("POSE/WHEEL"), "POSE/WHEEL (Nothing)")
+        self.assertEqual(vocabulary.model_line("SQUAT/MOON_SQUAT"), "SQUAT/MOON_SQUAT")
+
+
+if __name__ == "__main__":
+    unittest.main()

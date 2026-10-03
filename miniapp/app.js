@@ -277,7 +277,8 @@ function exerciseCard(exercise, xi) {
 
   const head = el("div", "card-head");
   const name = el("div", "card-name");
-  name.append(el("div", "card-title", logic.capitalise(exercise.n)));
+  const words = logic.wordsOf(catalog, exercise.n);
+  name.append(el("div", "card-title", logic.capitalise(words)));
   const line = el("div", "card-line");
   const kind = button(exercise.warmup ? "Warm-up" : "Main",
     exercise.warmup ? "kind warmup" : "kind", () => apply(logic.toggleWarmup(state, xi), id));
@@ -300,7 +301,7 @@ function exerciseCard(exercise, xi) {
     for (const address of photos) {
       const photo = el("img");
       photo.src = address;
-      photo.alt = `${exercise.n}, photo`;
+      photo.alt = `${words}, photo`;
       photo.loading = "lazy";
       strip.append(photo);
     }
@@ -312,7 +313,7 @@ function exerciseCard(exercise, xi) {
   const tools = el("div", "tools");
   const undoCard = button("↶", "pill undo", () => undo(logic.undoCard(history, state, id)));
   undoCard.disabled = !logic.canUndoCard(history, id);
-  undoCard.setAttribute("aria-label", `Undo the last change to ${exercise.n}`);
+  undoCard.setAttribute("aria-label", `Undo the last change to ${words}`);
   tools.append(undoCard);
   tools.append(button("+ Set", "pill", () => apply(logic.addSet(state, xi), id)));
   tools.append(button("− Set", "pill", () => apply(logic.removeSet(state, xi), id)));
@@ -452,7 +453,7 @@ function searchTitle(mode, xi) {
     return "Swap exercise";
   }
   if (mode === "insert") {
-    return `Insert after ${state.x[xi].n}`;
+    return `Insert after ${logic.wordsOf(catalog, state.x[xi].n)}`;
   }
   return "Add an exercise";
 }
@@ -470,8 +471,9 @@ function renderResults() {
   }
   ui.searchResults.replaceChildren(...hits.map((row) => {
     const hit = button("", "result", () => choose(row));
-    hit.append(el("span", "result-name", logic.capitalise(row.n)));
-    hit.append(el("span", "result-kind", `${row.p.replace(/_/g, " ")} · ${row.e}`));
+    hit.append(el("span", "result-name", logic.capitalise(row.w)));
+    const kind = [row.p.replace(/_/g, " "), row.g].filter(Boolean).join(" · ");
+    hit.append(el("span", "result-kind", kind));
     return hit;
   }));
 }
@@ -479,14 +481,14 @@ function renderResults() {
 function choose(row) {
   closeSearch();
   if (searchMode === "swap") {
-    apply(logic.swapExercise(state, searchIndex, row.n), state.x[searchIndex].id);
+    apply(logic.swapExercise(state, searchIndex, row.k), state.x[searchIndex].id);
     return;
   }
   if (searchMode === "insert") {
-    apply(logic.addExercise(state, row.n, row.e, searchIndex + 1));
+    apply(logic.addExercise(state, row.k, row.b, searchIndex + 1));
     return;
   }
-  apply(logic.addExercise(state, row.n, row.e));
+  apply(logic.addExercise(state, row.k, row.b));
 }
 
 // ---------------------------------------------------------------------------------------
@@ -541,7 +543,7 @@ function showSheet(title, text, note, hint) {
 
 // The Markdown goes straight to the clipboard; a phone that refuses it gets the sheet (§1).
 function exportMarkdown() {
-  const text = toMarkdown(state, Date.now());
+  const text = toMarkdown(state, Date.now(), catalog);
   const refused = () => showSheet("Markdown", text, "Select the text and copy it.");
   if (!navigator.clipboard || !navigator.clipboard.writeText) {
     refused();
@@ -630,7 +632,8 @@ function showOpened() {
 
 async function loadCatalog() {
   try {
-    const answer = await fetch("./exercises.json");
+    // "?v=dev" becomes the commit at deploy, like the imports above (DESIGN_exercise_table.md §8).
+    const answer = await fetch("./exercises.json?v=dev");
     return await answer.json();
   } catch (problem) {
     console.warn("exercises.json could not be read", problem);
@@ -646,7 +649,8 @@ async function restore(session) {
   try {
     const parsed = JSON.parse(saved);
     // A saved state for this revision wins over the URL, so a reopened app carries on (§1).
-    if (parsed && parsed.v === 2 && parsed.r === session.r && Array.isArray(parsed.x)) {
+    if (parsed && parsed.v === logic.STATE_VERSION && parsed.r === session.r
+        && Array.isArray(parsed.x)) {
       return parsed;
     }
   } catch (problem) {
@@ -720,12 +724,27 @@ async function restoreHistory() {
   }
 }
 
+// What a button drawn before the exercise names became keys opens on: one line, no session
+// drawn and nothing saved on the phone (DESIGN_exercise_table.md §8). A past log from a month
+// file built before then opens on the same line.
+function showOutOfDate() {
+  if (tg) {
+    tg.ready();
+    tg.expand();
+  }
+  document.body.replaceChildren(el("p", "head-notes", logic.OUT_OF_DATE));
+}
+
 async function start() {
+  const session = sessionFromUrl();
+  if (!logic.isCurrent(session)) {
+    showOutOfDate();
+    return;
+  }
   wire();
   opened = logFromUrl();
   wireTelegram();
   catalog = await loadCatalog();
-  const session = sessionFromUrl();
   if (opened) {
     state = logic.stateFromLog(session, opened);
     showOpened();

@@ -8,7 +8,7 @@ is above, so it never meets a kilogram and never copies one into a revision.
 """
 from typing import Any, Dict, List, Optional, Sequence
 
-from stamind.strength import sets
+from stamind.strength import sets, vocabulary
 from stamind.text import capitalized
 
 
@@ -39,15 +39,20 @@ def body_of(description: Optional[str]) -> str:
     return parts[1].strip() if len(parts) == 2 else ""
 
 
-def exercise_lines(rows: Sequence[Dict[str, Any]]) -> List[str]:
-    """One line per exercise: "Belt squat 1×5 @ 120, 3×4–6 @ 140 kg". A warm-up ramp and
-    the working sets are one exercise at several loads, so they share a line (§9, §10)."""
+def exercise_lines(rows: Sequence[Dict[str, Any]], keys: bool = False) -> List[str]:
+    """One line per exercise: "Squat: belt squat 1×5 @ 120, 3×4–6 @ 140 kg". A warm-up ramp
+    and the working sets are one exercise at several loads, so they share a line (§9, §10).
+    With `keys`, the line names the exercise by its key, which is how the strength planner is
+    shown it (DESIGN_exercise_table.md §7)."""
     lines: List[str] = []
     run: List[Dict[str, Any]] = []
     for row in list(rows) + [None]:
         if run and (row is None or row["exercise"] != run[0]["exercise"]):
             unit = " kg" if any(r.get("load_kg") is not None for r in run) else ""
-            lines.append(f"{capitalized(run[0]['exercise'])} {spec(run)}{unit}")
+            name = run[0]["exercise"]
+            if not keys:
+                name = capitalized(vocabulary.words(name))
+            lines.append(f"{name} {spec(run)}{unit}")
             run = []
         if row is not None:
             run.append(row)

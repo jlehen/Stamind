@@ -15,16 +15,17 @@ from stamind.strength import prescription, vocabulary
 PAGE_URL = "https://jlehen.github.io/Stamind/miniapp/"
 from stamind.types import Workout
 
-# The payload version both sides write and check (§3, §4).
-VERSION = 1
+# The payload version both sides write and check (§3, §4). Version 2 names an exercise by
+# its key (DESIGN_exercise_table.md §8).
+VERSION = 2
 
 # How much of the session's notes the button's address carries (§3).
 NOTES_LIMIT = 300
 
 
 class LogError(ValueError):
-    """A log the page should never have sent: the wrong shape, or an exercise the
-    vocabulary does not know (§5)."""
+    """A log the page should never have sent: the wrong shape, or an exercise the table
+    does not know (§5)."""
 
 
 class LoggedSet(NamedTuple):
@@ -35,8 +36,8 @@ class LoggedSet(NamedTuple):
 
 
 class Entry(NamedTuple):
-    """One exercise of a log. `position` is the prescribed row it stands for, and None for
-    an exercise the session did not ask for (§4)."""
+    """One exercise of a log. `name` is its key. `position` is the prescribed row it stands
+    for, and None for an exercise the session did not ask for (§4)."""
     name: str
     position: Optional[int]
     sets: List[LoggedSet]
@@ -58,13 +59,11 @@ def _notes(workout: Workout) -> str:
     """The text under the exercise lines of the description, cut to 300 characters (§3).
 
     `prescription.render_description` writes the exercise lines first and the notes after
-    them, so the lines it would write again are dropped off the front of the body."""
+    them, so as many lines are dropped off the front of the body as the session has
+    exercise lines (DESIGN_exercise_table.md §8)."""
     body = prescription.body_of(workout.get("description")).splitlines()
     written = prescription.exercise_lines(workout.get("prescribed_sets") or [])
-    while body and written and body[0] == written[0]:
-        body.pop(0)
-        written.pop(0)
-    return "\n".join(body).strip()[:NOTES_LIMIT]
+    return "\n".join(body[len(written):]).strip()[:NOTES_LIMIT]
 
 
 def session_payload(workout: Workout) -> Dict[str, Any]:
@@ -96,7 +95,7 @@ def session_url(workout: Workout) -> str:
 def parse_log(text: str) -> Log:
     """The page's message as a `Log`, or `LogError` (§4, §5).
 
-    Strict on purpose: the page builds the shape itself and offers vocabulary names only,
+    Strict on purpose: the page builds the shape itself and offers the table's keys only,
     so anything else is a bug on that side rather than an athlete's typo."""
     try:
         payload = json.loads(text)
@@ -117,7 +116,7 @@ def parse_log(text: str) -> Log:
             unknown.append(entry.name)
     if unknown:
         raise LogError("The log names exercises Stamind does not know: "
-                       + ", ".join(unknown) + ".")
+                       + ", ".join(vocabulary.words(name) for name in unknown) + ".")
     return Log(
         revision_id=_revision(payload.get("r")),
         date=_day(payload.get("d")),
@@ -169,14 +168,16 @@ def _entry(entry: Any, place: int) -> Entry:
     if not isinstance(name, str) or not name.strip():
         raise LogError(f"Exercise {place} of the log has no name.")
     name = name.strip()
+    # What the error texts call the exercise (DESIGN_exercise_table.md §4).
+    shown = vocabulary.words(name)
     done = entry.get("sets")
     if not isinstance(done, list) or not done:
-        raise LogError(f"'{name}' has no sets.")
+        raise LogError(f"'{shown}' has no sets.")
     return Entry(
         name=name,
-        position=_position(entry.get("p"), name),
-        sets=[_set(one, name) for one in done],
-        note=_text(entry.get("note"), f"the note on '{name}'"),
+        position=_position(entry.get("p"), shown),
+        sets=[_set(one, shown) for one in done],
+        note=_text(entry.get("note"), f"the note on '{shown}'"),
     )
 
 

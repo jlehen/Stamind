@@ -23,6 +23,10 @@ that could be that exercise, the most likely first. Copy each name exactly as it
 there. Prefer the plainest name that fits over a variant the athlete did not mention. Return an
 empty list when no name fits.
 
+A name is written CATEGORY/EXERCISE, in capitals: SQUAT/BELT_SQUAT is the belt squat. The
+category says what the exercise is done with or what family it belongs to:
+BANDED_EXERCISES/GLUTE_BRIDGE is the glute bridge done with a band.
+
 ## EXERCISE NAMES
 {names}
 
@@ -74,7 +78,7 @@ def _sets_final_wording(item: Dict[str, Any]) -> str:
     if guesses:
         halves.append(
             f"guessed {len(guesses)} exercise{'s' if len(guesses) != 1 else ''} "
-            f"({', '.join(guesses)})"
+            f"({', '.join(vocabulary.words(guess) for guess in guesses)})"
         )
     if spans:
         listed = ", ".join(sets.positions(first, last) for first, last in spans)
@@ -176,19 +180,22 @@ def _apply_set_names(item: Dict[str, Any], index: int, text: Optional[str]) -> s
     if answer.get("ask"):
         exercise = choose_proposed(text or "")
     else:
-        exercise = answer["label"]
+        # The key the answer carries; its label is the words (DESIGN_exercise_table.md §8).
+        exercise = answer["exercise"]
     runtime.db.name_exercise_sets(payload["activity_id"], payload["seqs"], exercise)
-    return f"Named {sets.set_span(payload['first'], payload['last'])}: {exercise}."
+    return (f"Named {sets.set_span(payload['first'], payload['last'])}: "
+            f"{vocabulary.words(exercise)}.")
 
 
 def propose(text: str) -> List[str]:
-    """Up to three vocabulary names for what the athlete typed: the one model call in the
-    naming path, and every name it returns is checked against the vocabulary (§7)."""
+    """Up to three keys for what the athlete typed: the one model call in the naming path.
+    Every name it returns is checked against the table, and a Garmin name that is not a key
+    is taken as the key of its class (§7, DESIGN_exercise_table.md §7)."""
     # At call time, not at the top: `athlete_queue` imports this module and every CLI
     # command imports `athlete_queue`, so a top-level import would put `requests` on
     # every command's startup path (ARCHITECTURE.md §14, which layer may load which).
     from stamind.openrouter import openrouter_client
-    system = PROPOSE_SYSTEM_PROMPT.format(names="\n".join(vocabulary.names()))
+    system = PROPOSE_SYSTEM_PROMPT.format(names="\n".join(vocabulary.keys()))
     result = openrouter_client.complete(
         system, f"## WHAT THE ATHLETE TYPED\n{text}\n", label="strength_name",
         wait_notice="Looking up the exercise you typed",
@@ -197,15 +204,16 @@ def propose(text: str) -> List[str]:
     for name in result.get("names") or []:
         if not isinstance(name, str):
             continue
-        name = name.strip().lower()
-        if vocabulary.get(name) and name not in proposed:
-            proposed.append(name)
+        key = vocabulary.key_of(name.strip().upper())
+        if key and key not in proposed:
+            proposed.append(key)
     return proposed[:MAX_PROPOSALS]
 
 
 def choose_proposed(text: str) -> str:
-    """The exercise the athlete picks among the names proposed for `text`, on the spot: she
-    has just typed, and nothing is named without her choice. Raises NotApplied otherwise."""
+    """The key of the exercise the athlete picks among those proposed for `text`, on the
+    spot: she has just typed, and nothing is named without her choice. The choices show the
+    words (DESIGN_exercise_table.md §7). Raises NotApplied otherwise."""
     if not text.strip():
         raise NotApplied("Nothing named.")
     try:
@@ -214,7 +222,7 @@ def choose_proposed(text: str) -> str:
         raise NotApplied(f"Couldn't look up “{text}” ({e}). Nothing named.")
     if not proposed:
         raise NotApplied(f"No exercise Stamind knows matches “{text}”. Nothing named.")
-    choices = [Choice(name, name) for name in proposed]
+    choices = [Choice(key, vocabulary.words(key)) for key in proposed]
     choices.append(Choice(NONE_OF_THESE, "none of these"))
     picked = runtime.prompt.choose(
         f"Which exercise is “{text}”?", choices, default=NONE_OF_THESE

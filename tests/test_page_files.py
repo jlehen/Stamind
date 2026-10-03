@@ -218,17 +218,25 @@ class BuildTest(FilesTestCase):
         gym logger opens that log from (DESIGN_gym_logger.md §8)."""
         save_workout(test_db, date="2026-09-24", sport_type="strength_training", title="Gym",
                      duration_minutes=50, prescribed_sets=[
-                         {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
-                          "load_kg": 140.0}])
+                         {"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 4,
+                          "reps_high": 6, "load_kg": 140.0}])
         session = test_db.get_workout("2026-09-24", "strength_training")
-        log = {"v": 1, "r": session["revision_id"], "d": "2026-09-24", "st": "18:02",
-               "en": "19:05", "x": [{"n": "belt squat", "p": 1, "sets": [[5, 140, 40]]}]}
+        log = {"v": 2, "r": session["revision_id"], "d": "2026-09-24", "st": "18:02",
+               "en": "19:05",
+               "x": [{"n": "SQUAT/BELT_SQUAT", "p": 1, "sets": [[5, 140, 40]]}]}
         _gym_log("2026-09-24", log)
         day = sync.build(test_db, TODAY)["calendar/2026-09"]["days"]["2026-09-24"]
         self.assertEqual(day["gym"]["l"], log)
         self.assertEqual(day["gym"]["s"]["r"], session["revision_id"])
+        # Both name the exercise by its key, and the session is the version the page draws
+        # (DESIGN_exercise_table.md §8).
+        self.assertEqual(day["gym"]["s"]["v"], 2)
         self.assertEqual(day["gym"]["s"]["x"],
-                         [{"n": "belt squat", "s": 3, "lo": 4, "hi": 6, "kg": 140.0}])
+                         [{"n": "SQUAT/BELT_SQUAT", "s": 3, "lo": 4, "hi": 6, "kg": 140.0}])
+        # The sheet beside it is for a person, so it names the exercise in words.
+        sheet = json.dumps(day["sheet"], ensure_ascii=False)
+        self.assertIn("Squat: belt squat", sheet)
+        self.assertNotIn("SQUAT/BELT_SQUAT", sheet)
         # The button's own data does not carry it: a log would eat its budget.
         cal = calendar_days.gather(test_db, *calendar_page.window(TODAY), TODAY)
         payload, _sheets = calendar_page.snapshot(cal, datetime(2026, 9, 30, 7, 2))
@@ -241,6 +249,28 @@ class BuildTest(FilesTestCase):
         _gym_log("2026-09-24", {**log, "r": session["revision_id"] + 1})
         day = sync.build(test_db, TODAY)["calendar/2026-09"]["days"]["2026-09-24"]
         self.assertNotIn("gym", day)
+
+    def test_a_log_stored_before_the_names_became_keys_still_opens_once_converted(self):
+        """The conversion rewrites a stored log's names and leaves its version at 1
+        (DESIGN_exercise_table.md §9). The month file carries the log as stored, beside a
+        session built now at version 2, which is the version the page checks."""
+        save_workout(test_db, date="2026-09-24", sport_type="strength_training", title="Gym",
+                     duration_minutes=50, prescribed_sets=[
+                         {"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 4,
+                          "reps_high": 6, "load_kg": 140.0}])
+        session = test_db.get_workout("2026-09-24", "strength_training")
+        converted = {"v": 1, "r": session["revision_id"], "d": "2026-09-24", "st": "18:02",
+                     "en": "19:05",
+                     "x": [{"n": "SQUAT/BELT_SQUAT", "p": 1, "sets": [[5, 140, 40]]}]}
+        _gym_log("2026-09-24", converted)
+        gym = sync.build(test_db, TODAY)["calendar/2026-09"]["days"]["2026-09-24"]["gym"]
+        self.assertEqual(gym["l"], converted)
+        self.assertEqual(gym["s"]["v"], 2)
+        # The page never reads the log's own version: it checks the session's.
+        logic = _read("miniapp", "logic.js")
+        opening = logic.split("export function stateFromLog")[1].split("\nexport function")[0]
+        self.assertNotIn("log.v", opening)
+        self.assertIn("if (!logic.isCurrent(session))", _read("miniapp", "app.js"))
 
     def test_the_content_is_the_same_whatever_width_the_process_wraps_at(self):
         with patch.dict(os.environ, {"STAMIND_WRAP_WIDTH": "80"}):

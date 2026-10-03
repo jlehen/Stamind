@@ -295,23 +295,33 @@ def tapped_label(rows: List[List[Tuple[str, str]]], data: str) -> Optional[str]:
 def prompt_buttons(req: dict, nonce: str) -> List[List[Tuple[str, str]]]:
     """Inline-keyboard layout for a prompt request: rows of ``(label, callback_data)``.
 
-    callback_data is ``"{nonce}:{prompt_id}:{value}"`` — well under Telegram's 64-byte
-    cap, with the nonce letting the bot reject taps from a stale/replaced session. A
-    ``text`` prompt has no buttons (the athlete just replies), so this returns []."""
+    callback_data is ``"{nonce}:{prompt_id}:{answer}"``, with the nonce letting the bot
+    reject taps from a stale/replaced session. A confirm answers ``y`` or ``n``. A choice
+    answers its position among the choices, never its value, so the data stays inside
+    Telegram's 64 bytes whatever the value is (DESIGN_exercise_table.md §7). A ``text``
+    prompt has no buttons (the athlete just replies), so this returns []."""
     pid = req.get("id", "")
     ptype = req.get("type")
     if ptype == "confirm":
         yes = "⚠️ Confirm" if req.get("danger") else "✅ Yes"
         return [[(yes, f"{nonce}:{pid}:y"), ("✖️ No", f"{nonce}:{pid}:n")]]
     if ptype == "choose":
-        return [[(c["label"], f"{nonce}:{pid}:{c['value']}")]
-                for c in req.get("choices", [])]
+        return [[(c["label"], f"{nonce}:{pid}:{position}")]
+                for position, c in enumerate(req.get("choices", []))]
     return []
 
 
 def decode_callback(data: str) -> Optional[Tuple[str, str, str]]:
-    """Splits ``"{nonce}:{prompt_id}:{value}"`` back into its parts, or None if malformed."""
+    """Splits ``"{nonce}:{prompt_id}:{answer}"`` back into its parts, or None if malformed."""
     parts = (data or "").split(":", 2)
     if len(parts) != 3:
         return None
     return parts[0], parts[1], parts[2]
+
+
+def tapped_choice(req: dict, answer: str) -> Optional[dict]:
+    """The choice of a choose prompt a tap's position names, or None when it names none."""
+    choices = req.get("choices", [])
+    if not answer.isdecimal() or int(answer) >= len(choices):
+        return None
+    return choices[int(answer)]

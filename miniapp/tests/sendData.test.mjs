@@ -78,7 +78,7 @@ test("a log Telegram does not take comes back as a sheet to copy", async (t) => 
     // The log reaches Telegram, and the sheet is not up yet.
     const sent = await page.evaluate(() => window.__sent);
     assert.equal(sent.length, 1);
-    assert.equal(JSON.parse(sent[0]).x[0].n, "belt squat");
+    assert.equal(JSON.parse(sent[0]).x[0].n, "SQUAT/BELT_SQUAT");
     assert.equal(await page.locator("#output-sheet").isVisible(), false);
 
     // The app is still open after the watchdog, so the athlete is given the log to copy.
@@ -102,22 +102,22 @@ const LOGGED_DAY = {
   sheet: [["Done", ["✅ 🏋️ Gym: lower body strength — 60 min"]]],
   gym: {
     s: {
-      v: 1,
+      v: 2,
       r: 727,
       d: "2026-09-24",
       t: "Gym: lower body strength",
-      x: [{ n: "belt squat", s: 3, lo: 4, hi: 6, kg: 140 },
-          { n: "pull up", s: 3, lo: 6, hi: 8, kg: null }],
+      x: [{ n: "SQUAT/BELT_SQUAT", s: 3, lo: 4, hi: 6, kg: 140 },
+          { n: "PULL_UP/PULL_UP", s: 3, lo: 6, hi: 8, kg: null }],
       notes: "",
     },
     l: {
-      v: 1,
+      v: 2,
       r: 727,
       d: "2026-09-24",
       st: "18:02",
       en: "19:05",
-      x: [{ n: "barbell curl", sets: [[10, 30, 60]] },
-          { n: "leg press", p: 1, sets: [[5, 120, 200], [6, 140, 400]] }],
+      x: [{ n: "CURL/BARBELL_BICEPS_CURL", sets: [[10, 30, 60]] },
+          { n: "SQUAT/LEG_PRESS", p: 1, sets: [[5, 120, 200], [6, 140, 400]] }],
     },
   },
 };
@@ -152,8 +152,9 @@ test("a gym log opens from the calendar locked, and Edit lets it be sent again",
     assert.match(page.url(), /index\.html#s=/);
 
     // Locked: the sets as done, no stepper, no bottom button, and a tick that does nothing.
+    // The log holds keys, and the cards show their words (DESIGN_exercise_table.md §8).
     assert.deepEqual(await page.locator(".card-title").allTextContents(),
-                     ["Barbell curl", "Leg press", "Pull up"]);
+                     ["Curl: barbell biceps curl", "Squat: leg press", "Pull up"]);
     assert.equal(await page.locator("#tally").textContent(), "· 3 sets done");
     assert.match(await page.locator("#opened-note").textContent(), /Tap Edit/);
     assert.equal(await page.locator(".step").first().isVisible(), false);

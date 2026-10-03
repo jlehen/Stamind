@@ -152,8 +152,8 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
     itself, because every write goes through the CLI."""
 
     LOG = json.dumps({
-        "v": 1, "r": 727, "d": "2026-09-24", "st": "18:02", "en": "19:05",
-        "x": [{"n": "belt squat", "p": 1, "sets": [[5, 120, 40], [6, 140, 210]]}],
+        "v": 2, "r": 727, "d": "2026-09-24", "st": "18:02", "en": "19:05",
+        "x": [{"n": "SQUAT/BELT_SQUAT", "p": 1, "sets": [[5, 120, 40], [6, 140, 210]]}],
     })
 
     def setUp(self):
@@ -261,6 +261,27 @@ class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
         await chat_bot.on_callback(callback_update(query), None)
         self.assertTrue(session.answer_future.result()["answer"])
         self.assertEqual(query.edited_text, "Proceed?\n\n→ Yes")
+
+    async def test_a_choice_tap_answers_the_value_at_the_position_it_carries(self):
+        """The button carries the position of the choice, and the command is answered the
+        choice's value: here the key to store (DESIGN_exercise_table.md §7)."""
+        chat_bot = build_chat_bot(self)
+        session = runner.Session(42, _FakeProc(), "n0nce")
+        session.awaiting = {
+            "id": "p1", "type": "choose", "message": "Which exercise is “butterfly”?",
+            "choices": [{"value": "FLYE/PEC_DECK", "label": "flye: pec deck"},
+                        {"value": "none", "label": "none of these"}],
+        }
+        session.answer_future = asyncio.get_running_loop().create_future()
+        chat_bot.sessions[42] = session
+        # A position that names no choice answers nothing.
+        await chat_bot.on_callback(callback_update(_FakeQuery("n0nce:p1:5")), None)
+        self.assertFalse(session.answer_future.done())
+        query = _FakeQuery("n0nce:p1:0")
+        await chat_bot.on_callback(callback_update(query), None)
+        self.assertEqual(session.answer_future.result()["answer"], "FLYE/PEC_DECK")
+        self.assertEqual(query.edited_text,
+                         "Which exercise is “butterfly”?\n\n→ flye: pec deck")
 
     async def test_a_tap_from_a_replaced_session_is_dropped_not_answered(self):
         chat_bot = build_chat_bot(self)

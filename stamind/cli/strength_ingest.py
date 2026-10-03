@@ -13,7 +13,7 @@ from stamind import clock, runtime
 from stamind.clock import fmt_date
 from stamind.db.strength import ACTIVE, ATHLETE, REST, logged_sets
 from stamind.output import fail, notice
-from stamind.strength import comparison, logger, sets
+from stamind.strength import comparison, logger, sets, vocabulary
 from stamind.text import capitalized, wrap_text
 from stamind.types import Workout
 from stamind.cli.common import simple_comparison_lines
@@ -92,7 +92,8 @@ def _summary(
         compared = comparison.compare(planned, logged_sets(text))
         lines.extend(simple_comparison_lines(compared, by_sets=True))
     else:
-        lines.extend(f"{capitalized(entry.name)} {_done(entry)}" for entry in log.exercises)
+        lines.extend(f"{capitalized(vocabulary.words(entry.name))} {_done(entry)}"
+                     for entry in log.exercises)
     print(wrap_text("\n".join(lines)))
 
 

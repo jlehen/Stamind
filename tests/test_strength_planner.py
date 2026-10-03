@@ -116,18 +116,20 @@ class WhenItRunsTest(_PlannerCase):
         """A session written before phase 2 keeps its title line and loses the prose under
         it, which named sets and reps the exercise lines now replace (§9)."""
         self.gym("2026-09-17", brief="[Gym]\nSquat 4x4, RDL 4x4 at 8RM load. Press 3x5.")
-        self.replies = [{"sessions": [answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0))]}]
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0)),
+        ]}]
         result = self.strength_pass([])
         self.assertEqual(len(result.added), 1)
         self.assertEqual(result.added[0]["description"], "\n".join([
-            "[Gym]", "", "Belt squat 3×4–6 @ 140 kg", "2–3 min rests.",
+            "[Gym]", "", "Squat: belt squat 3×4–6 @ 140 kg", "2–3 min rests.",
         ]))
         self.assertNotIn("8RM", result.added[0]["description"])
 
     def test_a_kept_session_is_not_asked_again_without_new_evidence(self):
         """Tuesday weighs Thursday and keeps it; Wednesday, with the stamp where it was,
         does not ask, so the randomness gets no second draw (§9)."""
-        session = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        session = self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
         self.replies = [{"sessions": [answer("2026-09-17", keep=True)]}]
         first = self.strength_pass([])
@@ -140,7 +142,7 @@ class WhenItRunsTest(_PlannerCase):
         """The week planner moves Thursday's gym to Friday for the rain: it returns Thursday
         as rest and Friday as a gym day. Writing kilograms for Thursday would put the
         session the athlete was told had moved back on the calendar (§9)."""
-        self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
         thursday_rest = {"date": "2026-09-17", "sport_type": "rest", "title": "Rest Day",
                          "description": "[Rest Day]\nGym moved to Friday — rain."}
@@ -148,18 +150,18 @@ class WhenItRunsTest(_PlannerCase):
                   "description": "[Gym]\nHeavy full-body, moved from Thursday.",
                   "duration_minutes": 70}
         self.replies = [{"sessions": [
-            answer("2026-09-18", row("belt squat", 3, 4, 6, 140.0)),
+            answer("2026-09-18", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0)),
         ]}]
         result = self.strength_pass([thursday_rest, friday])
         self.assertEqual(result.added, [])
         self.assertEqual(result.checked, [("2026-09-18", "strength_training")])
-        self.assertIn("Belt squat 3×4–6 @ 140 kg", friday["description"])
+        self.assertIn("Squat: belt squat 3×4–6 @ 140 kg", friday["description"])
 
     def test_a_session_that_says_where_it_came_from_keeps_its_kilograms(self):
         """The sets follow the lineage (§9). `workout adapt` now names the slot a moved
         session came from, so Friday opens with Thursday's kilograms rather than being
         written from scratch at the same numbers."""
-        self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
         thursday_rest = {"date": "2026-09-17", "sport_type": "rest", "title": "Rest Day",
                          "description": "[Rest Day]\nGym moved to Friday — rain."}
@@ -171,13 +173,13 @@ class WhenItRunsTest(_PlannerCase):
         self.replies = [{"sessions": [answer("2026-09-18", keep=True)]}]
         result = self.strength_pass([thursday_rest, friday])
         self.assertEqual(result.checked, [("2026-09-18", "strength_training")])
-        self.assertIn("Belt squat 3×4–6 @ 140 kg", friday["description"])
+        self.assertIn("Squat: belt squat 3×4–6 @ 140 kg", friday["description"])
         self.assertEqual([r["load_kg"] for r in friday["prescribed_sets"]], [140.0])
 
     def test_a_session_held_on_a_mentioned_date_is_still_checked(self):
         """The other half of the same rule: the week planner changed the run and kept the
         gym, so the gym stands and its kilograms are still weighed (§9)."""
-        self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
         run_entry = {"date": "2026-09-17", "sport_type": "running", "title": "Easy hour",
                      "description": "[Easy hour]\n60 min easy."}
@@ -193,18 +195,18 @@ class WhenItRunsTest(_PlannerCase):
 class CheckingTest(_PlannerCase):
     def setUp(self):
         super().setUp()
-        self.session = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.session = self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
 
     def test_new_sets_move_the_load_and_the_reason_reaches_the_athlete(self):
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 145.0),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0),
                    reason="Monday's sets all reached 6 at 140; add 5."),
         ]}]
         result = self.strength_pass([])
         self.assertEqual(result.reasons, ["Monday's sets all reached 6 at 140; add 5."])
         [added] = result.added
-        self.assertIn("Belt squat 3×4–6 @ 145 kg", added["description"])
+        self.assertIn("Squat: belt squat 3×4–6 @ 145 kg", added["description"])
         self.assertEqual(added["modification_reason"],
                          "Monday's sets all reached 6 at 140; add 5.")
         self.assertEqual(result.held_dates, ["2026-09-17"])
@@ -213,7 +215,7 @@ class CheckingTest(_PlannerCase):
         """Code decides whether an answer changes a session, from the sets and not from the
         words (§9)."""
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0),
                    reason="Holding at 140.", notes="Different wording entirely."),
         ]}]
         result = self.strength_pass([])
@@ -229,16 +231,20 @@ class CheckingTest(_PlannerCase):
                  "title": "Full-Body Strength", "description": BRIEF,
                  "duration_minutes": 40, "rpe": 7, "tss": 30}
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0),
-                   row("chin up", 3, 3, 5), reason="Forty minutes: the two main lifts."),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0),
+                   row("PULL_UP/CHIN_UP", 3, 3, 5), reason="Forty minutes: the two main lifts."),
         ]}]
         result = self.strength_pass([entry])
         # The strength planner is told, or it answers "keep" to a change code would apply.
         self.assertIn(planner_prompt.MOVED_ON, self.asked[0][1])
         self.assertEqual(result.added, [])
-        self.assertIn("Chin up 3×3–5", entry["description"])
+        self.assertIn("Pull up: chin up 3×3–5", entry["description"])
         self.assertEqual([r["exercise"] for r in entry["prescribed_sets"]],
-                         ["belt squat", "chin up"])
+                         ["SQUAT/BELT_SQUAT", "PULL_UP/CHIN_UP"])
+        # The session as it stands is shown to the strength planner by its keys
+        # (DESIGN_exercise_table.md §7).
+        self.assertIn("  Written now as:\n      SQUAT/BELT_SQUAT 3×4–6 @ 140 kg",
+                      self.asked[0][1])
 
     def test_a_revision_with_the_brief_and_duration_standing_keeps_its_sets(self):
         test_db.record_strength_check(self.session["id"],
@@ -249,12 +255,12 @@ class CheckingTest(_PlannerCase):
                                 "week of the build.",
                  "duration_minutes": 70, "rpe": 7, "tss": 50}
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 150.0), reason="Jump."),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 150.0), reason="Jump."),
         ]}]
         result = self.strength_pass([entry])
         self.assertNotIn(planner_prompt.MOVED_ON, self.asked[0][1])
         self.assertEqual(result.added, [])
-        self.assertIn("Belt squat 3×4–6 @ 140 kg", entry["description"])
+        self.assertIn("Squat: belt squat 3×4–6 @ 140 kg", entry["description"])
         self.assertEqual([r["load_kg"] for r in entry["prescribed_sets"]], [140.0])
 
 
@@ -264,7 +270,7 @@ class WriteAgainTest(_PlannerCase):
 
     def setUp(self):
         super().setUp()
-        self.session = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.session = self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.record_strength_check(self.session["id"],
                                       test_db.strength_history_stamp())
 
@@ -274,21 +280,21 @@ class WriteAgainTest(_PlannerCase):
 
     def test_it_is_asked_and_its_answer_is_written_with_the_reason(self):
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0),
-                   row("barbell push press", 3, 5, 7, 50.0),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0),
+                   row("SHOULDER_PRESS/BARBELL_PUSH_PRESS", 3, 5, 7, 50.0),
                    reason="Your gym days alternate the belt squat and the push press."),
         ]}]
         result = self.strength_pass([], write_again=True)
         self.assertIn(planner_prompt.ASKED_AGAIN, self.asked[0][1])
         [added] = result.added
         self.assertEqual([r["exercise"] for r in added["prescribed_sets"]],
-                         ["belt squat", "barbell push press"])
+                         ["SQUAT/BELT_SQUAT", "SHOULDER_PRESS/BARBELL_PUSH_PRESS"])
         self.assertEqual(added["modification_reason"],
                          "Your gym days alternate the belt squat and the push press.")
 
     def test_the_same_sets_back_change_nothing(self):
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0), reason="Same."),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0), reason="Same."),
         ]}]
         result = self.strength_pass([], write_again=True)
         self.assertEqual(result.added, [])
@@ -303,7 +309,7 @@ class OutputChecksTest(_PlannerCase):
             "exercises": [
                 {"exercise": "Nordic curl", "sets": 3, "reps_low": 6, "reps_high": 8,
                  "load_kg": None},
-                {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
+                {"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 4, "reps_high": 6,
                  "load_kg": 140},
             ],
         }]}]
@@ -311,13 +317,35 @@ class OutputChecksTest(_PlannerCase):
         self.assertEqual(result.dropped, [
             "2026-09-17: 'Nordic curl' is not an exercise Stamind knows, left out"
         ])
-        self.assertIn("Belt squat 3×4–6 @ 140 kg", result.added[0]["description"])
+        self.assertIn("Squat: belt squat 3×4–6 @ 140 kg", result.added[0]["description"])
+
+    def test_a_garmin_name_that_is_not_a_key_is_taken_as_the_key_of_its_class(self):
+        """The strength planner answers the weighted twin of the pull-up: the row is the
+        pull-up's, and its load says the rest (DESIGN_exercise_table.md §7)."""
+        self.gym("2026-09-17")
+        self.replies = [{"sessions": [{
+            "date": "2026-09-17", "notes": "Rests 2 min.",
+            "exercises": [
+                {"exercise": "PULL_UP/WEIGHTED_PULL_UP", "sets": 3, "reps_low": 5,
+                 "reps_high": 5, "load_kg": 10},
+                {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
+                 "load_kg": 140},
+            ],
+        }]}]
+        result = self.strength_pass([])
+        self.assertEqual([r["exercise"] for r in result.added[0]["prescribed_sets"]],
+                         ["PULL_UP/PULL_UP"])
+        self.assertIn("Pull up 3×5 @ 10 kg", result.added[0]["description"])
+        # A made-up name of the old table is a name the table lacks, like any other.
+        self.assertEqual(result.dropped, [
+            "2026-09-17: 'belt squat' is not an exercise Stamind knows, left out"
+        ])
 
     def test_nonsense_numbers_drop_the_entry(self):
         for bad in (
-            {"exercise": "belt squat", "sets": 0, "reps_low": 4, "reps_high": 6},
-            {"exercise": "belt squat", "sets": 3, "reps_low": 6, "reps_high": 4},
-            {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
+            {"exercise": "SQUAT/BELT_SQUAT", "sets": 0, "reps_low": 4, "reps_high": 6},
+            {"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 6, "reps_high": 4},
+            {"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 4, "reps_high": 6,
              "load_kg": -5},
         ):
             self.assertIsNone(planner_prompt._clean_exercise(bad), bad)
@@ -325,7 +353,7 @@ class OutputChecksTest(_PlannerCase):
     def test_a_light_session_marks_every_row(self):
         self.gym("2026-09-17")
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 2, 4, 6, 125.0), light=True),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 2, 4, 6, 125.0), light=True),
         ]}]
         result = self.strength_pass([])
         self.assertTrue(all(r["light"] for r in result.added[0]["prescribed_sets"]))
@@ -342,7 +370,7 @@ class FailureTest(_PlannerCase):
         self.gym("2026-09-17")
         self.replies = [
             RuntimeError("timeout"),
-            {"sessions": [answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0))]},
+            {"sessions": [answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))]},
         ]
         result = self.strength_pass([])
         self.assertEqual(len(self.asked), 2)
@@ -351,7 +379,7 @@ class FailureTest(_PlannerCase):
     def test_only_sessions_to_check_keep_their_sets_and_tell_the_athlete(self):
         """Tuesday's easing reaches the athlete; nothing about Thursday's belt squat needed
         deciding before Thursday (§9)."""
-        self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
         self.replies = [RuntimeError("timeout"), RuntimeError("timeout")]
         result = self.strength_pass([])
@@ -383,7 +411,7 @@ class InAdaptTest(_PlannerCase):
         reads a named date as holding only what is proposed for it — so the intervals would
         be voided over a kilogram (§9)."""
         save_workout(test_db, "2026-09-17", "running", "Intervals", duration_minutes=60)
-        self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
         held = coach_service._hold_around(
             ["2026-09-17"], test_db.get_workouts(start_date=TODAY, end_date=MESO_END)
@@ -409,10 +437,10 @@ class ThroughAdaptTest(_PlannerCase):
 
     def test_only_the_strength_planner_changing_something_still_makes_a_proposal(self):
         save_workout(test_db, "2026-09-17", "running", "Intervals", duration_minutes=60)
-        self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 145.0),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0),
                    reason="Monday's sets all reached 6 at 140; add 5."),
         ]}]
         with patch("stamind.coach.engine.openrouter_client") as week_planner:
@@ -430,17 +458,17 @@ class ThroughAdaptTest(_PlannerCase):
         coach_service.workout_revision_apply(proposal)
         gym = test_db.get_workout("2026-09-17", "strength_training")
         self.assertEqual([r["load_kg"] for r in gym["prescribed_sets"]], [145.0])
-        self.assertIn("Belt squat 3×4–6 @ 145 kg", gym["description"])
+        self.assertIn("Squat: belt squat 3×4–6 @ 145 kg", gym["description"])
         self.assertIsNotNone(test_db.get_workout("2026-09-17", "running"))
         self.assertEqual(test_db.get_strength_check(gym["id"]), proposal.strength_stamp)
 
     def test_a_gym_the_strength_planner_writes_again_keeps_its_short_name(self):
         """The week planner holds Thursday, so the strength planner builds the new row
         from the live session, short name included (DESIGN_calendar_miniapp.md §3.6)."""
-        self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0), short_name="Gym")
+        self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0), short_name="Gym")
         test_db.bump_strength_history()
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 145.0), reason="Add 5."),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0), reason="Add 5."),
         ]}]
         with patch("stamind.coach.engine.openrouter_client") as week_planner:
             week_planner.complete.return_value = {
@@ -458,7 +486,7 @@ class ThroughAdaptTest(_PlannerCase):
     def test_the_preview_prints_the_kilograms(self):
         from stamind.cli.workouts.generate import print_generate_preview
         from stamind.coach.proposals import GenerateProposal
-        session = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        session = self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         proposal = GenerateProposal(
             reasoning="Second week of the build.", workouts=(session,),
             strength_dropped=("2026-09-21: 'Nordic curl' is not an exercise Stamind "
@@ -467,7 +495,7 @@ class ThroughAdaptTest(_PlannerCase):
         with patch("builtins.print") as printed:
             print_generate_preview(proposal)
         shown = "\n".join(str(call.args[0]) if call.args else "" for call in printed.mock_calls)
-        self.assertIn("Belt squat 3×4–6 @ 140 kg", shown)
+        self.assertIn("Squat: belt squat 3×4–6 @ 140 kg", shown)
         self.assertIn("Nordic curl", shown)
 
 
@@ -488,7 +516,7 @@ class ThroughGenerateTest(_PlannerCase):
                          "end_date": MESO_END, "focus": "Build"}],
         )
         save_workout(test_db, "2026-09-17", "running", "Intervals", duration_minutes=60)
-        gym = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        gym = self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.record_strength_check(gym["id"], test_db.strength_history_stamp())
 
     def strength_only(self):
@@ -503,8 +531,8 @@ class ThroughGenerateTest(_PlannerCase):
     def test_the_gym_is_written_again_and_the_intervals_stand(self):
         reason = "Your gym days alternate the belt squat and the push press."
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0),
-                   row("barbell push press", 3, 5, 7, 50.0), reason=reason),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0),
+                   row("SHOULDER_PRESS/BARBELL_PUSH_PRESS", 3, 5, 7, 50.0), reason=reason),
         ]}]
         proposal = self.strength_only()
         self.assertIn(planner_prompt.ASKED_AGAIN, self.asked[0][1])
@@ -513,13 +541,13 @@ class ThroughGenerateTest(_PlannerCase):
         self.assertIn(("2026-09-17", "running"), proposal.held)
         gym = test_db.get_workout("2026-09-17", "strength_training")
         self.assertEqual([r["exercise"] for r in gym["prescribed_sets"]],
-                         ["belt squat", "barbell push press"])
+                         ["SQUAT/BELT_SQUAT", "SHOULDER_PRESS/BARBELL_PUSH_PRESS"])
         self.assertEqual(gym["modification_reason"], reason)
         self.assertEqual(test_db.get_workout("2026-09-17", "running")["title"], "Intervals")
 
     def test_the_same_sets_back_write_nothing(self):
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0), reason="Same."),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0), reason="Same."),
         ]}]
         proposal = self.strength_only()
         self.assertEqual(proposal.workouts, [])
@@ -539,7 +567,7 @@ class ThroughGenerateTest(_PlannerCase):
         """The week planner writes Thursday again with the brief it had, so only `--fresh`
         makes the strength planner write it again."""
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("goblet squat", 3, 8, 10, 32.0), reason="New."),
+            answer("2026-09-17", row("SQUAT/GOBLET_SQUAT", 3, 8, 10, 32.0), reason="New."),
         ]}]
         thursday = {"date": "2026-09-17", "sport_type": "strength_training",
                     "title": "Full-Body Strength", "description": BRIEF,
@@ -562,24 +590,25 @@ class ThroughGenerateTest(_PlannerCase):
             2400.0, 6.0, None, 140, 155, 3, 28.0,
         )
         self.replies = [{"sessions": [
-            answer(TODAY, row("goblet squat", 4, 8, 12, 12.0)),
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0), reason="Same."),
+            answer(TODAY, row("SQUAT/GOBLET_SQUAT", 4, 8, 12, 12.0)),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0), reason="Same."),
         ]}]
         proposal = self.strength_only()
         self.assertEqual(proposal.range_start, TODAY)
         self.assertIn((TODAY, "running"), proposal.held)
         gym = test_db.get_workout(TODAY, "strength_training")
-        self.assertEqual([r["exercise"] for r in gym["prescribed_sets"]], ["goblet squat"])
+        self.assertEqual([r["exercise"] for r in gym["prescribed_sets"]],
+                         ["SQUAT/GOBLET_SQUAT"])
 
     def test_a_gym_done_this_morning_is_left_as_history(self):
-        self.gym(TODAY, row("goblet squat", 4, 8, 12, 12.0), title="Morning Circuit",
+        self.gym(TODAY, row("SQUAT/GOBLET_SQUAT", 4, 8, 12, 12.0), title="Morning Circuit",
                  duration=15)
         test_db.save_completed_activity(
             "act_gym", TODAY, f"{TODAY} 07:00:00", "Strength", "strength_training",
             900.0, 0.0, None, 110, 130, 5, 11.0,
         )
         self.replies = [{"sessions": [
-            answer("2026-09-17", row("belt squat", 3, 4, 6, 140.0), reason="Same."),
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0), reason="Same."),
         ]}]
         proposal = self.strength_only()
         self.assertEqual(proposal.range_start, "2026-09-16")
@@ -587,7 +616,7 @@ class ThroughGenerateTest(_PlannerCase):
 
 class RecordingTest(_PlannerCase):
     def test_the_check_row_holds_the_stamp_the_history_was_built_from(self):
-        session = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        session = self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
         self.replies = [{"sessions": [answer("2026-09-17", keep=True)]}]
         result = self.strength_pass([])
@@ -604,7 +633,7 @@ class RecordingTest(_PlannerCase):
                         test_db.strength_history_stamp())
 
     def test_a_declined_proposal_leaves_no_row(self):
-        session = self.gym("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        session = self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         test_db.bump_strength_history()
         self.replies = [{"sessions": [answer("2026-09-17", keep=True)]}]
         self.strength_pass([])
@@ -617,7 +646,7 @@ class PromptTest(_PlannerCase):
                  "description": "[Gym]\n\nModerate full-body at home, 45 min.",
                  "duration_minutes": 45}
         self.replies = [{"sessions": [
-            answer("2026-09-16", row("goblet squat", 3, 8, 10, 48.0)),
+            answer("2026-09-16", row("SQUAT/GOBLET_SQUAT", 3, 8, 10, 48.0)),
         ]}]
         profile = {"equipment": ["kettlebells up to 24 kg"],
                    "weekly_schedule": {"Wednesday": {"equipment": ["pull-up bar"]}}}
@@ -628,7 +657,7 @@ class PromptTest(_PlannerCase):
         self.assertIn("START OF HOW TO PROGRESS", system)
         self.assertIn("Every exercise is written as a rep range at one load", system)
         self.assertIn("## EXERCISES STAMIND KNOWS", system)
-        self.assertIn("belt squat (squat, machine)", system)
+        self.assertIn("SQUAT/BELT_SQUAT (squat; GLUTES, QUADS; Machine)", system)
         self.assertIn("## STRENGTH HISTORY", user)
         self.assertIn("Equipment that day: pull-up bar, kettlebells up to 24 kg", user)
         self.assertIn("Constraints that day: Hotel gym — dumbbells only", user)
@@ -640,12 +669,27 @@ class PromptTest(_PlannerCase):
             "[Gym]\nModerate full-body at home, 45 min.",
         )
 
-    def test_the_accessory_names_shown_are_the_ones_the_athlete_does(self):
+    def test_the_accessories_shown_are_the_ones_the_athlete_does(self):
         """The full accessory list would double the region with names nobody lifts (§9)."""
-        listed = planner_prompt._exercise_list({"cable biceps curl"})
-        self.assertIn("cable biceps curl (accessory, cable)", listed)
-        self.assertIn("belt squat (squat, machine)", listed)
-        self.assertNotIn("barbell biceps curl (accessory", listed)
+        listed = planner_prompt._exercise_list({"CURL/CABLE_BICEPS_CURL"}).split("\n")
+        self.assertIn(
+            "CURL/CABLE_BICEPS_CURL (accessory; BICEPS; Cable Machine, Cable Attachment)",
+            listed,
+        )
+        self.assertIn("SQUAT/BELT_SQUAT (squat; GLUTES, QUADS; Machine)", listed)
+        self.assertFalse([line for line in listed if line.startswith("CURL/BARBELL_BICEPS_CURL")])
+
+    def test_a_class_with_no_pattern_is_shown_only_when_the_athlete_does_it(self):
+        """Left out the way an accessory is (DESIGN_exercise_table.md §11): the yoga poses
+        stay out, and the squat jacks the athlete does every week are in."""
+        listed = planner_prompt._exercise_list({"CARDIO/SQUAT_JACKS"}).split("\n")
+        self.assertIn("CARDIO/SQUAT_JACKS (QUADS, GLUTES, CALVES; Nothing)", listed)
+        self.assertFalse([line for line in listed if line.startswith("POSE/")])
+
+    def test_the_list_holds_one_line_per_class_named_by_its_key(self):
+        listed = planner_prompt._exercise_list(set()).split("\n")
+        self.assertIn("PULL_UP/PULL_UP (pull_vertical; LATS, TRAPS; Pull-up Bar)", listed)
+        self.assertFalse([line for line in listed if "WEIGHTED_PULL_UP" in line])
 
 
 class MesocycleLineTest(_PlannerCase):
@@ -665,7 +709,7 @@ class MesocycleLineTest(_PlannerCase):
 
     def _ask_about(self, day):
         self.gym(day)
-        self.replies = [{"sessions": [answer(day, row("belt squat", 3, 4, 6, 140.0))]}]
+        self.replies = [{"sessions": [answer(day, row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))]}]
         self.strength_pass([])
         return self.asked[0][1]
 

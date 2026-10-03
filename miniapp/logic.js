@@ -10,6 +10,13 @@ export const ADDED_SETS = 3;
 export const ADDED_REPS = 8;
 export const ADDED_KG = 20;
 export const SEARCH_LIMIT = 40;
+// The version of both payloads: version 2 names an exercise by its key
+// (DESIGN_exercise_table.md §8). The page draws no other session and sends no other log.
+export const PAYLOAD_VERSION = 2;
+// The version of the state saved on the phone. A state saved under another one is not read.
+export const STATE_VERSION = 3;
+export const OUT_OF_DATE = "This button is out of date. Send your coach any message and tap "
+  + "the new one.";
 // How many changes Undo can take back, so the saved history stays small.
 export const UNDO_DEPTH = 50;
 
@@ -66,22 +73,29 @@ export function loggedAddress(gym) {
   return `./index.html#s=${encodeSession(gym.s)}&l=${encodeSession(gym.l)}`;
 }
 
+// A button drawn before the exercise names became keys still carries a version 1 session, and
+// the page tells the athlete so instead of drawing it (DESIGN_exercise_table.md §8). So does a
+// past log from a month file built before then: its session is version 1 too.
+export function isCurrent(session) {
+  return Boolean(session) && session.v === PAYLOAD_VERSION;
+}
+
 export function demoSession() {
   // What the bare URL shows, so the page is testable without the bot (§2).
   return {
-    v: 1,
+    v: PAYLOAD_VERSION,
     r: 0,
     d: "2026-09-24",
     t: "Gym: lower body strength",
     x: [
-      { n: "belt squat", s: 3, lo: 4, hi: 6, kg: 140 },
-      { n: "romanian deadlift", s: 3, lo: 6, hi: 8, kg: 90 },
-      { n: "leg press", s: 3, lo: 8, hi: 10, kg: 200 },
-      { n: "pull up", s: 3, lo: 6, hi: 8, kg: null },
-      { n: "seated cable row", s: 3, lo: 10, hi: 12, kg: 57.5 },
-      { n: "walking lunge", s: 2, lo: 12, hi: 12, kg: 16 },
-      { n: "leg extension", s: 3, lo: 12, hi: 15, kg: 45 },
-      { n: "calf raise", s: 3, lo: 12, hi: 15, kg: 60 },
+      { n: "SQUAT/BELT_SQUAT", s: 3, lo: 4, hi: 6, kg: 140 },
+      { n: "DEADLIFT/ROMANIAN_DEADLIFT", s: 3, lo: 6, hi: 8, kg: 90 },
+      { n: "SQUAT/LEG_PRESS", s: 3, lo: 8, hi: 10, kg: 200 },
+      { n: "PULL_UP/PULL_UP", s: 3, lo: 6, hi: 8, kg: null },
+      { n: "ROW/SEATED_CABLE_ROW", s: 3, lo: 10, hi: 12, kg: 57.5 },
+      { n: "LUNGE/WALKING_LUNGE", s: 2, lo: 12, hi: 12, kg: 16 },
+      { n: "SQUAT/LEG_EXTENSION", s: 3, lo: 12, hi: 15, kg: 45 },
+      { n: "CALF_RAISE/CALF_RAISE", s: 3, lo: 12, hi: 15, kg: 60 },
     ],
     notes: "Alternate the belt squat and the pull-ups. Stop two reps short on the last set.",
   };
@@ -103,7 +117,7 @@ export function newState(session, firstId = 1) {
       (other) => other.n === exercise.n && other.kg !== null && other.kg > exercise.kg);
   }
   return {
-    v: 2,
+    v: STATE_VERSION,
     r: session.r,
     d: session.d,
     t: session.t || "Gym session",
@@ -182,7 +196,7 @@ function clockMs(iso, clock, days = 0) {
 }
 
 export function storageKey(revision) {
-  return `stamind-gym-v2-r${revision}`;
+  return `stamind-gym-v${STATE_VERSION}-r${revision}`;
 }
 
 export function prescriptionLine(exercise) {
@@ -309,9 +323,9 @@ export function swapExercise(state, xi, name) {
 }
 
 // `at` is the index the new card takes: the end for "Add an exercise", the place after a card
-// for that card's "Insert".
-export function addExercise(state, name, equipment, at = state.x.length) {
-  const kg = equipment === "bodyweight" ? null : ADDED_KG;
+// for that card's "Insert". `bodyweight` is the catalog's word on the exercise.
+export function addExercise(state, name, bodyweight, at = state.x.length) {
+  const kg = bodyweight ? null : ADDED_KG;
   const sets = [];
   for (let i = 0; i < ADDED_SETS; i += 1) {
     sets.push({ reps: ADDED_REPS, kg, done: false, t: null });
@@ -482,7 +496,7 @@ export function undoCard(history, state, card) {
 export function buildLog(state, now) {
   const end = clockAt(state, now);
   const log = {
-    v: 1,
+    v: PAYLOAD_VERSION,
     r: state.r,
     // The day the athlete lifted, from the phone's clock, which can differ from the session's
     // date when they train early or late; `r` still says which session this stood for.
@@ -549,49 +563,77 @@ export function lastSetSeconds(state) {
 }
 
 // ---------------------------------------------------------------------------------------
-// The exercise search, over `exercises.json` (§2).
+// The exercise catalog, `exercises.json` (DESIGN_exercise_table.md §8): one row per class, with
+// its key `k`, its words `w`, its pattern `p`, its gear `g`, whether it is bodyweight `b`, and
+// its photos id `f`. The page shows and searches the words, and stores and sends the key.
 // ---------------------------------------------------------------------------------------
 
+// The words of "squat: belt squat" after the category, or all of them when there is none.
+function nameAfterCategory(words) {
+  const colon = words.indexOf(": ");
+  return colon < 0 ? words : words.slice(colon + 2);
+}
+
+// A name that starts with the first typed word comes first, then a name that holds it, then an
+// entry that matched through its category only.
+function nameRank(name, first) {
+  if (name.startsWith(first)) {
+    return 0;
+  }
+  return name.includes(first) ? 1 : 2;
+}
+
+// The word "weighted" is left out of what is typed: a weighted twin is its class with a load.
+// The hits are ranked on the name after the category, because every entry starts with its
+// category and "curl" would otherwise fill the list with the curl category and hide "leg curl".
 export function searchExercises(catalog, query, pattern) {
-  const tokens = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
+  const tokens = String(query || "").toLowerCase().split(/\s+/)
+    .filter((token) => token && token !== "weighted");
   const scoped = pattern ? catalog.filter((row) => row.p === pattern) : catalog;
   if (!tokens.length && !pattern) {
     return [];
   }
-  const hits = scoped.filter((row) => tokens.every((token) => row.n.includes(token)));
   const first = tokens.length ? tokens[0] : "";
+  const hits = scoped.filter((row) => tokens.every((token) => row.w.includes(token)))
+    .map((row) => {
+      const name = nameAfterCategory(row.w);
+      return { row, name, rank: nameRank(name, first) };
+    });
   hits.sort((a, b) => {
-    const starts = Number(b.n.startsWith(first)) - Number(a.n.startsWith(first));
-    if (starts) {
-      return starts;
+    if (a.rank !== b.rank) {
+      return a.rank - b.rank;
     }
-    if (a.n.length !== b.n.length) {
-      return a.n.length - b.n.length;
+    if (a.name.length !== b.name.length) {
+      return a.name.length - b.name.length;
     }
-    return a.n < b.n ? -1 : 1;
+    if (a.row.w.length !== b.row.w.length) {
+      return a.row.w.length - b.row.w.length;
+    }
+    return a.row.w < b.row.w ? -1 : 1;
   });
-  return hits.slice(0, SEARCH_LIMIT);
+  return hits.slice(0, SEARCH_LIMIT).map((hit) => hit.row);
 }
 
 // Free Exercise DB serves its photos from its public repository (DESIGN_gym_logger.md §2).
 export const PHOTO_BASE = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/";
 
-export function photosOf(catalog, name) {
-  const row = catalog.find((entry) => entry.n === name);
+// The words the page shows for a key. A key the catalog lacks shows as it is.
+export function wordsOf(catalog, key) {
+  const row = catalog.find((entry) => entry.k === key);
+  return row ? row.w : key;
+}
+
+export function photosOf(catalog, key) {
+  const row = catalog.find((entry) => entry.k === key);
   if (!row || !row.f) {
     return [];
   }
   return [0, 1].map((index) => `${PHOTO_BASE}${row.f}/${index}.jpg`);
 }
 
-export function patternOf(catalog, name) {
-  const row = catalog.find((entry) => entry.n === name);
+export function patternOf(catalog, key) {
+  const row = catalog.find((entry) => entry.k === key);
   return row ? row.p : null;
-}
-
-export function equipmentOf(catalog, name) {
-  const row = catalog.find((entry) => entry.n === name);
-  return row ? row.e : null;
 }
 
 // ---------------------------------------------------------------------------------------

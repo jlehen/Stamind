@@ -38,25 +38,26 @@ def tearDownModule():
 GYM_DAY = "2026-09-24"
 NEXT_MORNING = datetime(2026, 9, 25, 8, 0).astimezone()
 
-BELT_SQUAT = {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
+BELT_SQUAT = {"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 4, "reps_high": 6,
               "load_kg": 140.0}
-PULL_UP = {"exercise": "pull up", "sets": 3, "reps_low": 6, "reps_high": 8,
+PULL_UP = {"exercise": "PULL_UP/PULL_UP", "sets": 3, "reps_low": 6, "reps_high": 8,
            "load_kg": None}
 
-# DESIGN_gym_logger.md §4, with "barbell curl" spelled the way the vocabulary spells it.
+# DESIGN_gym_logger.md §4 at version 2: `n` holds a key (DESIGN_exercise_table.md §8).
 EXAMPLE_LOG = {
-    "v": 1, "r": 727, "d": GYM_DAY, "st": "18:02", "en": "19:05",
+    "v": 2, "r": 727, "d": GYM_DAY, "st": "18:02", "en": "19:05",
     "x": [
-        {"n": "belt squat", "p": 1, "sets": [[5, 120, 40], [6, 140, 210], [5, 140, 390]]},
-        {"n": "leg press", "p": 2, "sets": [[8, 200, 600]],
+        {"n": "SQUAT/BELT_SQUAT", "p": 1,
+         "sets": [[5, 120, 40], [6, 140, 210], [5, 140, 390]]},
+        {"n": "SQUAT/LEG_PRESS", "p": 2, "sets": [[8, 200, 600]],
          "note": "swapped, squat rack busy"},
-        {"n": "barbell biceps curl", "sets": [[10, 30, 900], [10, 30, 990]]},
+        {"n": "CURL/BARBELL_BICEPS_CURL", "sets": [[10, 30, 900], [10, 30, 990]]},
     ],
     "note": "left knee felt off on the squat",
 }
 
 
-def a_session(description="Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg",
+def a_session(description="Heavy lower body.\n\nSquat: belt squat 3×4–6 @ 140 kg",
               prescribed=(BELT_SQUAT,), day=GYM_DAY):
     """One strength session written by the strength planner, read back hydrated."""
     save_workout(
@@ -75,35 +76,56 @@ class PayloadTest(unittest.TestCase):
 
     def test_the_payload_carries_the_prescribed_sets_in_position_order(self):
         workout = a_session(
-            description=("Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg\n"
+            description=("Heavy lower body.\n\nSquat: belt squat 3×4–6 @ 140 kg\n"
                          "Pull up 3×6–8\nAlternate the squat and the pull-ups."),
             prescribed=(BELT_SQUAT, PULL_UP),
         )
         payload = logger.session_payload(workout)
-        self.assertEqual(payload["v"], 1)
+        self.assertEqual(payload["v"], 2)
         self.assertEqual(payload["r"], workout["revision_id"])
         self.assertEqual((payload["d"], payload["t"]),
                          (GYM_DAY, "Gym: lower body strength"))
         self.assertEqual(payload["x"], [
-            {"n": "belt squat", "s": 3, "lo": 4, "hi": 6, "kg": 140.0},
-            {"n": "pull up", "s": 3, "lo": 6, "hi": 8, "kg": None},
+            {"n": "SQUAT/BELT_SQUAT", "s": 3, "lo": 4, "hi": 6, "kg": 140.0},
+            {"n": "PULL_UP/PULL_UP", "s": 3, "lo": 6, "hi": 8, "kg": None},
         ])
 
     def test_the_notes_are_what_sits_under_the_exercise_lines(self):
         """The brief above the seam is left out, and so are the exercise lines (§3)."""
         workout = a_session(
-            description=("Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg\n"
+            description=("Heavy lower body.\n\nSquat: belt squat 3×4–6 @ 140 kg\n"
                          "Alternate the squat and the pull-ups."),
         )
         self.assertEqual(logger.session_payload(workout)["notes"],
                          "Alternate the squat and the pull-ups.")
+
+    def test_the_notes_are_found_by_counting_the_exercise_lines(self):
+        """A session written before the names became keys keeps its old exercise lines in
+        its description. As many lines are dropped as the session has exercises, so they are
+        not shown as notes (DESIGN_exercise_table.md §8)."""
+        workout = a_session(
+            description=("Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg\n"
+                         "Pull up 3×6–8\nAlternate the squat and the pull-ups."),
+            prescribed=(BELT_SQUAT, PULL_UP),
+        )
+        self.assertEqual(logger.session_payload(workout)["notes"],
+                         "Alternate the squat and the pull-ups.")
+
+    def test_a_warm_up_ramp_and_its_working_sets_count_as_one_line(self):
+        ramp = {**BELT_SQUAT, "sets": 1, "reps_low": 5, "reps_high": 5, "load_kg": 120.0}
+        workout = a_session(
+            description=("Heavy lower body.\n\nSquat: belt squat 1×5 @ 120, 3×4–6 @ 140 kg\n"
+                         "Rest three minutes."),
+            prescribed=(ramp, BELT_SQUAT),
+        )
+        self.assertEqual(logger.session_payload(workout)["notes"], "Rest three minutes.")
 
     def test_a_session_with_nothing_under_its_exercises_has_no_notes(self):
         self.assertEqual(logger.session_payload(a_session())["notes"], "")
 
     def test_long_notes_are_cut_to_three_hundred_characters(self):
         workout = a_session(
-            description="Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg\n" + "x" * 400,
+            description="Heavy lower body.\n\nSquat: belt squat 3×4–6 @ 140 kg\n" + "x" * 400,
         )
         self.assertEqual(len(logger.session_payload(workout)["notes"]), 300)
 
@@ -127,20 +149,20 @@ class ParseLogTest(unittest.TestCase):
                          (727, GYM_DAY, "18:02", "19:05"))
         self.assertEqual(log.note, "left knee felt off on the squat")
         self.assertEqual([entry.name for entry in log.exercises],
-                         ["belt squat", "leg press", "barbell biceps curl"])
+                         ["SQUAT/BELT_SQUAT", "SQUAT/LEG_PRESS", "CURL/BARBELL_BICEPS_CURL"])
         self.assertEqual([entry.position for entry in log.exercises], [1, 2, None])
         self.assertEqual(log.exercises[0].sets[1], logger.LoggedSet(6, 140.0, 210.0))
         self.assertEqual(log.exercises[1].note, "swapped, squat rack busy")
 
     def test_a_bodyweight_set_has_no_load(self):
         log = logger.parse_log(json.dumps(
-            {**EXAMPLE_LOG, "x": [{"n": "pull up", "sets": [[8, None, 60]]}]}
+            {**EXAMPLE_LOG, "x": [{"n": "PULL_UP/PULL_UP", "sets": [[8, None, 60]]}]}
         ))
         self.assertIsNone(log.exercises[0].sets[0].load_kg)
 
-    def test_an_exercise_the_vocabulary_does_not_know_is_refused_by_name(self):
+    def test_an_exercise_the_table_does_not_know_is_refused_by_name(self):
         payload = {**EXAMPLE_LOG, "x": [
-            {"n": "belt squat", "sets": [[5, 120, 40]]},
+            {"n": "SQUAT/BELT_SQUAT", "sets": [[5, 120, 40]]},
             {"n": "moon press", "sets": [[5, 20, 90]]},
             {"n": "space row", "sets": [[5, 20, 180]]},
         ]}
@@ -150,9 +172,27 @@ class ParseLogTest(unittest.TestCase):
         self.assertIn("space row", str(refused.exception))
         self.assertNotIn("belt squat", str(refused.exception))
 
-    def test_a_log_of_another_version_is_refused(self):
-        with self.assertRaises(logger.LogError):
-            logger.parse_log(json.dumps({**EXAMPLE_LOG, "v": 2}))
+    def test_a_name_of_the_table_that_is_not_a_key_is_refused(self):
+        """The page sends keys only: a weighted twin is its class with a load."""
+        payload = {**EXAMPLE_LOG, "x": [{"n": "PULL_UP/WEIGHTED_PULL_UP",
+                                         "sets": [[5, 10, 40]]}]}
+        with self.assertRaises(logger.LogError) as refused:
+            logger.parse_log(json.dumps(payload))
+        self.assertIn("pull up: weighted pull up", str(refused.exception))
+
+    def test_a_log_from_a_page_still_on_version_1_is_refused(self):
+        """DESIGN_exercise_table.md §8: its `n` holds the old names."""
+        old = {**EXAMPLE_LOG, "v": 1, "x": [{"n": "belt squat", "sets": [[5, 120, 40]]}]}
+        for payload in (old, {**EXAMPLE_LOG, "v": 3}):
+            with self.assertRaises(logger.LogError) as refused:
+                logger.parse_log(json.dumps(payload))
+            self.assertIn("this is version 2", str(refused.exception))
+
+    def test_an_error_names_the_exercise_in_words(self):
+        payload = {**EXAMPLE_LOG, "x": [{"n": "SQUAT/BELT_SQUAT", "sets": []}]}
+        with self.assertRaises(logger.LogError) as refused:
+            logger.parse_log(json.dumps(payload))
+        self.assertEqual(str(refused.exception), "'squat: belt squat' has no sets.")
 
     def test_a_broken_shape_is_refused(self):
         for payload in (
@@ -161,8 +201,8 @@ class ParseLogTest(unittest.TestCase):
             json.dumps({**EXAMPLE_LOG, "x": []}),
             json.dumps({**EXAMPLE_LOG, "d": "the 24th"}),
             json.dumps({**EXAMPLE_LOG, "st": "6pm"}),
-            json.dumps({**EXAMPLE_LOG, "x": [{"n": "belt squat", "sets": []}]}),
-            json.dumps({**EXAMPLE_LOG, "x": [{"n": "belt squat", "sets": [[5, 120]]}]}),
+            json.dumps({**EXAMPLE_LOG, "x": [{"n": "SQUAT/BELT_SQUAT", "sets": []}]}),
+            json.dumps({**EXAMPLE_LOG, "x": [{"n": "SQUAT/BELT_SQUAT", "sets": [[5, 120]]}]}),
             json.dumps({**EXAMPLE_LOG, "x": [{"sets": [[5, 120, 40]]}]}),
         ):
             with self.assertRaises(logger.LogError, msg=payload):
@@ -217,9 +257,9 @@ class IngestTest(_IngestCase):
         self.assertEqual([row["seq"] for row in rows], list(range(1, len(rows) + 1)))
         self.assertEqual(
             [(row["exercise"], row["reps"], row["load_kg"]) for row in active],
-            [("belt squat", 5, 120.0), ("belt squat", 6, 140.0), ("belt squat", 5, 140.0),
-             ("leg press", 8, 200.0),
-             ("barbell biceps curl", 10, 30.0), ("barbell biceps curl", 10, 30.0)],
+            [("SQUAT/BELT_SQUAT", 5, 120.0), ("SQUAT/BELT_SQUAT", 6, 140.0),
+             ("SQUAT/BELT_SQUAT", 5, 140.0), ("SQUAT/LEG_PRESS", 8, 200.0),
+             ("CURL/BARBELL_BICEPS_CURL", 10, 30.0), ("CURL/BARBELL_BICEPS_CURL", 10, 30.0)],
         )
         self.assertEqual({row["named_by"] for row in active}, {"athlete"})
         self.assertEqual({row["garmin_name"] for row in active}, {None})
@@ -235,7 +275,7 @@ class IngestTest(_IngestCase):
     def test_a_set_with_no_time_gets_no_rest_row_around_it(self):
         workout = a_session()
         self.ingest(self.example_for(workout, x=[
-            {"n": "belt squat", "sets": [[5, 120, None], [5, 120, 300]]},
+            {"n": "SQUAT/BELT_SQUAT", "sets": [[5, 120, None], [5, 120, 300]]},
         ]))
         rows = test_db.get_exercise_sets("log:" + GYM_DAY)
         self.assertEqual([row["set_type"] for row in rows], ["active", "active"])
@@ -255,33 +295,36 @@ class IngestTest(_IngestCase):
         """The companion lines of DESIGN_strength_planned_vs_done.md §2, under the head
         line (§7). The set at 120 kg is not near 140, so the squat reads lighter."""
         workout = a_session(
-            description=("Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg\nPull up 3×6–8"),
+            description=("Heavy lower body.\n\nSquat: belt squat 3×4–6 @ 140 kg\nPull up 3×6–8"),
             prescribed=(BELT_SQUAT, PULL_UP),
         )
-        out = self.ingest(self.example_for(workout))
+        # The words make the squat's line longer than the 80 columns prose wraps at.
+        with patch.dict(os.environ, {"STAMIND_WRAP_WIDTH": "100"}):
+            out = self.ingest(self.example_for(workout))
         lines = [line for line in out.splitlines() if line.strip()]
         self.assertEqual(lines, [
             "Logged 2026-09-24 Thu, 18:02–19:05: 3 exercises, 6 sets.",
             "3 of 6 planned sets · 2 of 2 exercises",
-            "❌ Belt squat, lighter: 1×5 @ 120, 1×6 @ 140, 1×5 @ 140 (planned 3×4–6 @ 140)",
-            "❌ Leg press instead of pull up, 1 of 3 sets",
-            "➕ Barbell biceps curl 2×10 @ 30",
+            "❌ Squat: belt squat, lighter: 1×5 @ 120, 1×6 @ 140, 1×5 @ 140 (planned 3×4–6 "
+            "@ 140)",
+            "❌ Squat: leg press instead of pull up, 1 of 3 sets",
+            "➕ Curl: barbell biceps curl 2×10 @ 30",
         ])
 
     def test_a_prescribed_exercise_nothing_stood_for_reads_not_done(self):
         workout = a_session(
-            description=("Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg\nPull up 3×6–8"),
+            description=("Heavy lower body.\n\nSquat: belt squat 3×4–6 @ 140 kg\nPull up 3×6–8"),
             prescribed=(BELT_SQUAT, PULL_UP),
         )
         out = self.ingest(self.example_for(workout, x=[
-            {"n": "belt squat", "p": 1, "sets": [[5, 140, 60]]},
+            {"n": "SQUAT/BELT_SQUAT", "p": 1, "sets": [[5, 140, 60]]},
         ]))
         self.assertIn("❌ Pull up, not done", out)
 
     def test_a_log_whose_session_is_gone_is_still_ingested(self):
         out = self.ingest({**EXAMPLE_LOG, "r": 9999})
         self.assertIn("cannot", out)
-        self.assertIn("Belt squat 5 @ 120, 6 @ 140, 5 @ 140", out)
+        self.assertIn("Squat: belt squat 5 @ 120, 6 @ 140, 5 @ 140", out)
         self.assertNotIn("not written", out)
         self.assertEqual(len(test_db.get_exercise_sets("log:" + GYM_DAY)), 11)
 
@@ -305,7 +348,7 @@ class IngestTest(_IngestCase):
         first = self.ingest(self.example_for(workout))
         self.assertIn("Logged 2026-09-24 Thu", first)
         second = self.ingest(self.example_for(workout, st="19:00", en="19:30", x=[
-            {"n": "belt squat", "p": 1, "sets": [[5, 150, 60], [5, 150, 300]]},
+            {"n": "SQUAT/BELT_SQUAT", "p": 1, "sets": [[5, 150, 60], [5, 150, 300]]},
         ]))
         self.assertIn("Updated the log of 2026-09-24 Thu, 19:00–19:30: 1 exercise, 2 sets.",
                       second)
@@ -372,7 +415,7 @@ class TakeoverTest(_IngestCase):
         self.activity("gym1")
         sets.read_new_activities(self.garmin)
         again = self.ingest(self.example_for(workout, x=[
-            {"n": "belt squat", "p": 1, "sets": [[5, 150, 60], [5, 150, 300]]},
+            {"n": "SQUAT/BELT_SQUAT", "p": 1, "sets": [[5, 150, 60], [5, 150, 300]]},
         ]))
         self.assertIn("Updated the log of 2026-09-24 Thu", again)
         self.assertIsNone(test_db.get_completed_activity("log:" + GYM_DAY))

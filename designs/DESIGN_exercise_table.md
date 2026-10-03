@@ -1,6 +1,7 @@
 # The exercise table: Garmin's names are the names of exercises
 
-**Status:** Draft · **Date:** 2026-10-03 · **Branch:** worktree-exercise-table
+**Status:** Step 1 of §11 implemented (the table and what is stored); step 2 (what is
+offered) not built · **Date:** 2026-10-03 · **Branch:** worktree-exercise-table
 
 Stamind keeps one shipped table of strength exercises, `stamind/strength/exercises.tsv`. Today
 each line has a name Stamind made up from a Garmin name, and that made-up name is what the
@@ -56,7 +57,7 @@ Five columns, separated by tabs. Lines starting with `#` are comments.
 # names	pattern	muscles	gear	photos
 SQUAT/BARBELL_BACK_SQUAT	squat	QUADS,GLUTES|HAMSTRINGS	Barbell, Squat Rack	Barbell_Squat
 PULL_UP/PULL_UP PULL_UP/WEIGHTED_PULL_UP PULL_UP	pull_vertical	LATS,TRAPS|BICEPS,FOREARM,SHOULDERS	Pull-up Bar
-SANDBAG/BACK_SQUAT	squat	QUADS,GLUTES	Sandbag
+SANDBAG/BACK_SQUAT	squat	QUADS,GLUTES|HAMSTRINGS	Sandbag
 POSE/WHEEL			Nothing
 +FLYE/PEC_DECK	accessory	CHEST|SHOULDERS	Machine
 # nearest Garmin exercise: SQUAT/STEP_UP
@@ -80,7 +81,9 @@ to its line, or gets a line of its own.
 Two things, and only these, put two Garmin names on one line:
 
 - **A weighted twin.** Garmin has `X` and `WEIGHTED_X` for about 360 bodyweight exercises. The
-  load of the class is the added load.
+  load of the class is the added load. Garmin drops a leading underscore after `WEIGHTED_`: the
+  twin of `PLANK/_45_DEGREE_PLANK` is `PLANK/WEIGHTED_45_DEGREE_PLANK`. Four `WEIGHTED_` names
+  have no plain exercise in Garmin's lists, and each has a line of its own.
 - **A bare category.** `BENCH_PRESS/BENCH_PRESS` and the bare `BENCH_PRESS` are the same generic
   bench press.
 
@@ -99,10 +102,13 @@ category:
   "Lateral raise: arm circles" and count as isolation work. Split, an athlete who logs arm
   circles under both filings has two histories of a movement with no load.
 
-The table goes from 1,487 lines with a Garmin name to 1,539.
+The table goes from 1,487 lines with a Garmin name to 1,532. The splits add 52 lines. Seven
+lines go: each held a weighted twin apart from its exercise, and the twin joins that exercise's
+line.
 
-Both of Garmin's lists stay in the table: the 1,531 names of Garmin Connect's catalog and the 352
-names only the FIT SDK has. The FIT SDK alone lacks 37 Connect names, among them
+Both of Garmin's lists stay in the table: the 1,531 names of Garmin Connect's catalog and the 356
+names only the FIT SDK has, which are 352 exercises and four bare categories (`BIKE`,
+`INDOOR_ROW`, `MOVE`, `POSE`). The FIT SDK alone lacks 37 Connect names, among them
 `SQUAT/BELT_SQUAT`, which the athlete logs every week.
 
 ### 3.3 An added exercise
@@ -187,6 +193,7 @@ The main muscles, then a `|`, then the secondary ones, in Garmin's words: `ABDUC
 `LOWER_BACK`, `OBLIQUES`, `QUADS`, `SHOULDERS`, `TRAPS`, `TRICEPS`. They are copied from Garmin
 Connect's catalog, which gives them for 1,496 of its 1,531 exercises. A class takes the muscles of
 its key, or of its first name that has any. A FIT-only name has none and the column stays empty.
+Two of the catalog's lists repeat a muscle, and the table writes it once.
 
 Muscles tell apart what `accessory` lumps together. A dumbbell fly, a cable crossover and the pec
 deck all have `CHEST`, and a curl has `BICEPS`. They do not replace the pattern: a pull-up and a
@@ -212,14 +219,16 @@ Where each list comes from:
 | Source | Classes |
 |---|---|
 | Garmin's own lists, from its exercise pages (`~/garmin_exercises.tsv`) | 144 |
-| A review by two model personas, a gym-floor coach and a minimal-kit trainer, on two different models, looping until they agreed (`~/garmin_gear_review.tsv`) | 1,154 |
+| A review by two model personas, a gym-floor coach and a minimal-kit trainer, on two different models, looping until they agreed (`~/garmin_gear_review.tsv`) | 1,150 |
 | Today's equipment word, carried over: yoga, Pilates and pure cardio, which the review skipped | 218 |
-| Today's equipment word, carried over: exercises the reviewers did not recognise | 13 |
+| Today's equipment word, carried over: exercises the reviewers did not recognise | 10 |
 | Set by hand: the added exercises (§3.3) | 23 |
 
-The review was run with the 30 implement lines already split. The ten classes that come from
-splitting an exercise Garmin files twice take the list of the class they were split from:
-`POSE/PLANK` takes the plain plank's. That makes 1,562 classes in all.
+The review was run with the 30 implement lines already split. It also took the seven weighted
+twins of §3.2 as classes of their own. They now sit on their exercise's line and take its list,
+so the counts above leave them out. The ten classes that come from splitting an exercise Garmin
+files twice take the list of the class they were split from: `POSE/PLANK` takes the plain
+plank's. That makes 1,555 classes in all.
 
 Carried over means `barbell` becomes Barbell, `dumbbell` Dumbbells, `kettlebell` Kettlebells,
 `cable` "Cable Machine, Cable Attachment", `machine` Machine and `bodyweight` Nothing. Three of
@@ -237,7 +246,7 @@ guess of a bodyweight exercise at more than 50 kg as not that exercise
 (DESIGN_strength_tracking.md §6), and the page gives a card added for a bodyweight exercise no
 load. After this design an exercise is bodyweight when none of its gear is a load. A pull-up needs
 a Pull-up Bar, which is not a load, so it is bodyweight. A leg curl needs a Machine, so it is not.
-The rule gives another answer than today's word for 141 of the 1,539 classes. Two of those are
+The rule gives another answer than today's word for 135 of the 1,532 classes. Two of those are
 exercises the athletes do: the plain calf raise was `machine` and needs nothing, and the leg curl
 was `bodyweight` and needs a Machine, which is right, since it is lifted at 55 to 65 kg.
 
@@ -290,6 +299,7 @@ pulldown; shoulder press: seated barbell shoulder press; row".
 | `exercise_sets.garmin_name` | What Garmin said. Unchanged |
 | `prescribed_sets.exercise` | The key |
 | `gym_logs.payload`, the page's log kept as sent | Keys, in each entry's `n` |
+| A logged day's `gym` in the calendar's month files (DESIGN_gym_logger.md §8) | Keys. It is the session and the stored log, built again from the two places above |
 | `athlete_queue.payload` of a question about sets, or of a proposal | Keys, once written by the new code. None is converted (§9) |
 | `workouts.description` | Words. Written once and never rewritten |
 
@@ -354,7 +364,7 @@ from the session, as an unknown name is today. The notes it writes under a sessi
 exercises in plain words, as today.
 
 Today the list leaves out the accessory exercises the athlete has never done: about 690 lines
-and 31 kB. The athlete chose to be offered everything. The full list is about 1,560 lines and
+and 31 kB. The athlete chose to be offered everything. The full list is 1,555 lines and
 97 kB, three times the size, because each line is also longer.
 
 It is told one new rule: an exercise whose gear holds Dumbbells can be done with kettlebells of
@@ -397,6 +407,15 @@ Telegram refuse the keyboard, and the message goes out without it, as today.
 A log from a page still on version 1 is refused, as a log of a version the bot does not know is
 today.
 
+**A past log opened from the calendar** (DESIGN_gym_logger.md §8). The calendar hands the page a
+day's session beside its stored log. The session is built when the month's file is built, so it
+is version 2 and holds keys, and the page checks its version like any session's. The stored log
+holds keys once the conversion of §9 has run. The page does not read the log's own version. It
+takes the log's entries, its day and its two clock times, shows each key's words, and the log it
+sends again is a new one of version 2. A month's file built before the conversion carries a
+version 1 session and the old names, so its gym logs open on the "out of date" line until the
+file is built again (§9).
+
 The page's notes are the text under the exercise lines of the description. Today they are found
 by comparing each stored line with the line a fresh render would give. A session written before
 the conversion would fail that comparison and show its old exercise lines as notes. They are found
@@ -416,7 +435,9 @@ answer carries the key to store and is shown as its words. Today the label is bo
 code: the new code reads keys only.
 
 The script rewrites three places: `exercise_sets.exercise`, `prescribed_sets.exercise`, and the
-`n` of every entry in `gym_logs.payload`. It leaves `workouts.description` alone.
+`n` of every entry in `gym_logs.payload`. It leaves `workouts.description` alone. It also leaves
+a stored log's `v` at 1. Nothing reads it: a past log opened from the calendar is drawn from its
+entries, and the version the page checks is the session's (§8).
 
 **It stops before anything while a "what was this?" question or a proposal waits in the queue**,
 and lists each with its id. A tap on either would write the old names into the database. Step 1
@@ -488,7 +509,8 @@ or a push press. The script stops on it until then.
 2. Land the branch on main in the live checkout and push it. Wait until the page's deployment is
    done.
 3. Copy each database file, and its `-wal` file if it is not empty. Then run the script once per
-   instance, with its renames.
+   instance, with its renames. Then run `sm data publish` on each instance that has a bucket: it
+   builds every month's file again, so no logged day keeps the old names (§8).
 4. Start the bots. The next morning's message redraws each keyboard.
 
 Not handled: new code started on a database that was not converted reads every old name as an
@@ -518,9 +540,9 @@ conversion script. The tests' fixtures move to keys.
 **Step 2: what is offered.** The strength planner is shown every class and told the dumbbell and
 kettlebell rule, and the terminal's exercise listing shows muscles and gear (§7).
 
-Tests that read the table check four things: a Garmin name is on one line only, the names of a
-line share one category, every gear word is one of the 46, and no two classes show the same
-words.
+Tests that read the table check five things: a Garmin name is on one line only, the names of a
+line share one category, a weighted twin sits on the line of its exercise, every gear word is
+one of the 46, and no two classes show the same words.
 
 When the code lands, `docs/ARCHITECTURE.md` is updated, and the passages that describe the old
 table are replaced by a pointer here: DESIGN_strength_tracking.md §4, §6 (the bodyweight check),

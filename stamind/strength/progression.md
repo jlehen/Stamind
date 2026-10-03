@@ -87,7 +87,8 @@ own is not a light day — it is a day under its range, and the load holds.
 Curls, lateral raises, triceps work, leg curls and the rest carry volume and fatigue, and
 nothing progresses them by rule. Write them at the reps and the load the athlete last did
 them at. The athlete moves them in the gym when they are ready, Connect records it, and the
-history follows.
+history follows. An exercise with no movement pattern, such as a cardio drill, a warm-up or
+a yoga pose, is written the same way: at what the athlete last did.
 
 ## An exercise with no history
 

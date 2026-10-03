@@ -305,8 +305,9 @@ def _session_lines(
 
 
 def _done(activity: _Activity, name: str, marked: Optional[_Prescription]) -> str:
-    """'leg press 3×12 @ 70 (not prescribed)': one exercise as the activity held it, marked
-    when `marked` is the day's session and did not hold it (§8)."""
+    """'SQUAT/LEG_PRESS 3×12 @ 70 (not prescribed)': one exercise as the activity held it,
+    named by its key and marked when `marked` is the day's session and did not hold it (§8,
+    DESIGN_exercise_table.md §7)."""
     text = f"{name} {sets.set_chunks(activity.of(name))}"
     if marked is None or name in marked.by_exercise:
         return text
@@ -353,9 +354,7 @@ def build(today: str) -> History:
     lines = [HEADING.format(days=recent_days)]
     shown: List[str] = []
     for exercise in listed:
-        known = vocabulary.get(exercise)
-        tags = f" ({known.pattern}, {known.equipment})" if known else ""
-        lines.append(f"  {exercise}{tags}")
+        lines.append(f"  {vocabulary.model_line(exercise)}")
         for day in _days_to_show(exercise, days, by_day, prescriptions):
             shown.append(day)
             lines.extend(_day_lines(exercise, day, by_day[day], prescriptions.get(day)))

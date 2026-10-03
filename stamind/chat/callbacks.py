@@ -3,7 +3,7 @@
 Every inline button in the chat comes back through `on_callback`, which reads the
 namespace the tap's callback data opens with and hands it on: `q:` is a queued item's
 answer, `ui:` is a SM-BUTTONS offer, `stop:` ends the command being waited on, and a bare
-`nonce:id:value` is the answer to the prompt a running command is parked on. The four
+`nonce:id:answer` is the answer to the prompt a running command is parked on. The four
 namespaces share one Telegram channel, so each decoder rejects the other three — a stale
 tap must never turn into an action meant for something else (DESIGN_bot_stop_button.md §7,
 DESIGN_athlete_queue.md §6.2, DESIGN_bot_simple_frontend.md §4.4).
@@ -16,7 +16,7 @@ from stamind.chat import telegram_api
 from stamind.chat.keyboards import (
     BUSY_TAP, STOP_ALREADY_DONE, STOP_DONE, UI_STALE_TAP, decode_callback,
     decode_queue_callback, decode_stop_callback, decode_ui_callback, queue_later_rows,
-    resolve_ui_action, tapped_label, ui_menu_rows,
+    resolve_ui_action, tapped_choice, tapped_label, ui_menu_rows,
 )
 from stamind.chat.replies import format_prompt_message
 from stamind.chat.routing import parse_message_to_argv
@@ -183,9 +183,11 @@ class CallbacksMixin:
             chosen = "Yes" if answer else "No"
             fut.set_result(prompt_answer(pid, answer=answer))
         else:
-            chosen = next((c["label"] for c in awaiting.get("choices", [])
-                           if c["value"] == value), value)
-            fut.set_result(prompt_answer(pid, answer=value))
+            choice = tapped_choice(awaiting, value)
+            if choice is None:
+                return
+            chosen = choice["label"]
+            fut.set_result(prompt_answer(pid, answer=choice["value"]))
         self._log(chat.id, "  ", f"answer: {chosen}")
         try:  # echo the choice in place of the buttons
             await query.edit_message_text(
