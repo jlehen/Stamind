@@ -144,8 +144,9 @@ coach:
 #    morning_time: "08:00"
 #    # A push missed while the bot was down is still sent until this time, then skipped.
 #    morning_deadline: "15:00"
-#    # Run `workout adapt -y` first, so the push accounts for overnight signals. Costs one
-#    # LLM call every morning.
+#    # Ask the coach first, so the push accounts for overnight signals. A session it would
+#    # change follows as a proposal the athlete answers with a tap. Costs one LLM call
+#    # every morning.
 #    adapt_first: false
 #  # When you change the athlete's week from the terminal, they are told at their next
 #  # morning time. A change to one of today's sessions cannot wait that long, so it goes

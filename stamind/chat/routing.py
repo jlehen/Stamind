@@ -11,7 +11,7 @@ checks that they do. Pure data and pure parsing: nothing here imports the telegr
 library, and `sm bot route` reads `ROUTER_INTENTS` from here to build its prompt.
 """
 import shlex
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 # The names the model may pick from, and what each one means to it (§5.3, widened by the
 # writes pass — §12.8 is the authoritative table). `sm bot route` builds its prompt from
@@ -125,6 +125,12 @@ ROUTER_MESSAGE_ARGV = {
     "coach_message": ["workout", "adapt", "-m"],
     "tweak_session": ["workout", "tweak"],
 }
+
+
+def is_coach_argv(argv: Sequence[str]) -> bool:
+    """Whether a command line is a message to the coach: any `workout adapt` or `workout
+    tweak`, whichever way the chat started it (DESIGN_waiting_proposal.md §6)."""
+    return list(argv[:2]) in [message[:2] for message in ROUTER_MESSAGE_ARGV.values()]
 
 
 # The intents that need values out of the message: each runs `bot capture <intent>` with

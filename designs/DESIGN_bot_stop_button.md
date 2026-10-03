@@ -99,7 +99,11 @@ is unchanged; the pause only meant it ran a few seconds later than the tap.
 
 - A **Stop tap** — §3.
 - A **new command** ("show my week") — answered "A command is still running. Use the
-  buttons above, or /cancel."
+  buttons above, or /cancel." Amended 2026-10-03 (DESIGN_waiting_proposal.md §6.1): not
+  while the coach thinks. A `workout adapt` or a `workout tweak` runs in a second place
+  of the chat, so "show my week" is answered at once. A second message to the coach is
+  not taken: it gets "I'm still working on your last message — send that again in a
+  minute."
 - **`/cancel`** — kills the subprocess. This is the pre-`/restart` behaviour, restored.
 - **`/restart`** — tears down whatever session is live, computing or not. The restart
   design already handles the mid-compute case (§5.2 steps 1-2); it called that case
@@ -140,6 +144,10 @@ Two cases fall out of that, both wanted:
   athlete is told "That's already finished — nothing to stop." A late tap must never
   reach whatever is running *now*, which is why the nonce is in the data rather than
   just "stop the current command".
+
+Amended 2026-10-03 (DESIGN_waiting_proposal.md §6.1): a chat can hold two commands, one in
+its own place and the coach's run in the second. The nonce finds the run that raised the
+button, in either place, and Stop ends that run only. `/cancel` and `/restart` end both.
 
 ## 8. Decisions
 

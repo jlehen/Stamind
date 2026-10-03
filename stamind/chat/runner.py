@@ -1,9 +1,13 @@
-"""One CLI subprocess per chat, from launch to exit.
+"""One CLI subprocess per place of a chat, from launch to exit.
 
 The bot answers a chat message by running `stamind_cli.py` as a child process. `Session` is
 that child plus the state needed to route a pending prompt's answer back into its stdin;
 `_drive` reads its stdout line by line, hands the sentinel frames to the senders in
 `replies.py` and sends the rest as prose.
+
+A chat has two places. Its own holds one command at a time, and the chat is busy while it
+runs. The second holds the coach's run, a `workout adapt` or a `workout tweak`, so the chat
+stays free while the coach thinks (DESIGN_waiting_proposal.md §6.1).
 
 The child is launched with `STAMIND_FRONTEND=json`, so a `confirm`/`choose`/`text`
 prompt arrives as a framed request line instead of blocking on `input()`
@@ -19,7 +23,7 @@ from typing import Dict, List, Optional
 
 from stamind import journal
 from stamind.chat import telegram_api
-from stamind.chat.routing import ROUTER_TIMEOUT_SECONDS
+from stamind.chat.routing import ROUTER_TIMEOUT_SECONDS, is_coach_argv
 from stamind.config import config
 from stamind.sentinels import (
     BUTTONS_SENTINEL, FLUSH_SENTINEL, PHOTO_SENTINEL, PROMPT_SENTINEL, QUEUE_SENTINEL,
@@ -52,6 +56,12 @@ RESTART_NOTE = "restart_chat"
 # (DESIGN_bot_simple_frontend.md §6).
 WRAP_WIDTH = 900
 
+# What a message to the coach is told while a run of the coach is alive: it is not taken,
+# whether the coach is thinking or waits on a question of its own
+# (DESIGN_waiting_proposal.md §6.2).
+COACH_THINKING = "I'm still working on your last message — send that again in a minute."
+COACH_ASKED = "I asked you something above. Answer it, then send that again."
+
 
 def leave_restart_note(chat_id: int) -> None:
     """Writes the chat that asked for the restart. A failure is journalled and stepped
@@ -82,10 +92,14 @@ class Session:
     """One in-flight command for a chat: the live CLI subprocess plus the state
     needed to route a pending prompt's answer back to it."""
 
-    def __init__(self, chat_id: int, proc, nonce: str, quiet: bool = False) -> None:
+    def __init__(
+        self, chat_id: int, proc, nonce: str, quiet: bool = False, coach: bool = False
+    ) -> None:
         self.chat_id = chat_id
         self.proc = proc
         self.nonce = nonce
+        self.coach = coach                        # the coach's run, in the second place
+        self.timed_out = False                    # a prompt of it went unanswered
         self.awaiting: Optional[dict] = None      # the prompt request awaiting an answer
         self.answer_future: Optional["asyncio.Future"] = None
         self.task: Optional["asyncio.Task"] = None
@@ -132,24 +146,36 @@ async def _exited_within_grace(proc) -> bool:
         return False
 
 
-async def restart_teardown(session: Optional[Session], stop_polling) -> None:
-    """Ends any live command and closes the Telegram long-poll, so /restart's hard exit
-    strands neither an orphaned subprocess nor an unconfirmed getUpdates offset.
+async def _end_for_restart(session: Optional[Session]) -> None:
+    """Ends one live command: an open prompt is answered "cancelled" and given a moment to
+    exit, anything else is killed."""
+    if session is None or session.proc.returncode is not None:
+        return
+    fut = session.answer_future
+    answered = session.awaiting is not None and fut is not None and not fut.done()
+    if answered:
+        fut.set_result(
+            prompt_answer(session.awaiting.get("id"), cancelled=True)
+        )
+    if answered and await _exited_within_grace(session.proc):
+        return
+    try:
+        session.proc.kill()
+    except ProcessLookupError:
+        pass
+
+
+async def restart_teardown(
+    session: Optional[Session], stop_polling, coach_run: Optional[Session] = None
+) -> None:
+    """Ends the live command in each place of the chat and closes the Telegram long-poll,
+    so /restart's hard exit strands neither an orphaned subprocess nor an unconfirmed
+    getUpdates offset.
 
     Both halves are bounded and failure-tolerant: reaching os._exit(RESTART_EXIT_CODE)
     matters more than a tidy teardown. See DESIGN_bot_restart.md §5.2."""
-    if session is not None and session.proc.returncode is None:
-        fut = session.answer_future
-        answered = session.awaiting is not None and fut is not None and not fut.done()
-        if answered:
-            fut.set_result(
-                prompt_answer(session.awaiting.get("id"), cancelled=True)
-            )
-        if not answered or not await _exited_within_grace(session.proc):
-            try:
-                session.proc.kill()
-            except ProcessLookupError:
-                pass
+    for live in (session, coach_run):
+        await _end_for_restart(live)
     try:
         await asyncio.wait_for(stop_polling(), timeout=RESTART_GRACE_SECONDS)
     except Exception as e:
@@ -158,6 +184,27 @@ async def restart_teardown(session: Optional[Session], stop_polling) -> None:
 
 class RunnerMixin:
     """`ChatBot`'s half that starts a CLI subprocess and reads it to the end."""
+
+    def _runs(self, chat_id: int) -> List[Session]:
+        """The live commands of a chat: the one in its own place, then the coach's run."""
+        places = (self.sessions.get(chat_id), self.coach_runs.get(chat_id))
+        return [session for session in places if session is not None]
+
+    def _run_by_nonce(self, chat_id: int, nonce: Optional[str]) -> Optional[Session]:
+        """The live command that raised a prompt or a Stop button, in either place."""
+        return next((s for s in self._runs(chat_id) if s.nonce == nonce), None)
+
+    async def _coach_busy(self, chat_id: int, argv: List[str]) -> bool:
+        """Whether `argv` is a message to the coach that is not taken, because a run of the
+        coach is alive: the bot never ends one to start another. It says which of the two
+        lines applies (DESIGN_waiting_proposal.md §6.2)."""
+        run = self.coach_runs.get(chat_id)
+        if run is None or not is_coach_argv(argv):
+            return False
+        line = COACH_ASKED if run.awaiting else COACH_THINKING
+        await self.bot.send_message(chat_id=chat_id, text=line)
+        self._log(chat_id, "<<", repr(line))
+        return True
 
     async def _drive(self, session: Session) -> None:
         """Reads the CLI's stdout, streaming prose to the chat and handling each
@@ -184,6 +231,10 @@ class RunnerMixin:
                     break
                 if not line:
                     break
+                if session.timed_out:
+                    # The bot has said its line, so the command's own "Cancelled." is not
+                    # sent after it (DESIGN_waiting_proposal.md §6.1).
+                    continue
                 raw = line.decode("utf-8", "replace")
                 frame = parse_frame(raw)
                 if frame is None:
@@ -230,7 +281,8 @@ class RunnerMixin:
         except Exception as e:  # pragma: no cover - defensive
             await self._report_drive_failure(session, e)
         finally:
-            self.sessions.pop(session.chat_id, None)
+            place = self.coach_runs if session.coach else self.sessions
+            place.pop(session.chat_id, None)
             if session.proc.returncode is None:
                 try:
                     session.proc.kill()
@@ -272,8 +324,12 @@ class RunnerMixin:
             env=cli_env(WRAP_WIDTH, simple=True, source=source),
             cwd=os.path.dirname(CLI_PATH),
         )
-        session = Session(chat_id, proc, secrets.token_hex(4), quiet=quiet)
-        self.sessions[chat_id] = session
+        # The coach's run takes the second place, and the chat stays free
+        # (DESIGN_waiting_proposal.md §6.1).
+        coach = is_coach_argv(argv)
+        session = Session(chat_id, proc, secrets.token_hex(4), quiet=quiet, coach=coach)
+        place = self.coach_runs if coach else self.sessions
+        place[chat_id] = session
         session.task = asyncio.create_task(self._drive(session))
         return session
 

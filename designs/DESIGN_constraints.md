@@ -623,6 +623,11 @@ what `constraint add` itself accepts:
    step 1 does not stop step 2, and vice versa — they are independent
    commits.
 
+Amended 2026-10-03 (DESIGN_waiting_proposal.md §6.1): in the chat the order is reversed.
+The run saves and sends its proposal first, or says that nothing changes, and asks about
+the constraint after it. A question nobody answers must not hold the proposal back. A
+terminal run keeps the order above.
+
 This makes §11's "echo what was created" fall out for free (the confirmation
 *is* the echo) and means a misfiled extraction is caught before any row exists,
 not after. `new_constraints` requires a new return channel from `workout_adapt`

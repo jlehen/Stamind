@@ -16,6 +16,7 @@ from stamind.queue_kind import (  # noqa: F401
     ANSWERED, DROPPED, MESSAGE, QUESTION, STALE, Kind, NotApplied, queue,
 )
 from stamind.cli.bot.test_result import TEST_RESULT_KIND
+from stamind.cli.workouts.proposal import PROPOSAL_KIND
 from stamind.learning_doubts import LEARNING_KIND
 from stamind.retrospective_question import RETROSPECTIVE_KIND
 from stamind.strength.questions import SET_NAMES_KIND, SETS_FINAL_KIND
@@ -63,11 +64,12 @@ MESSAGE_KIND = Kind(
 # learning kind whether a doubted learning still fits (DESIGN_learning_doubt_nudge.md §5),
 # the test-result kind what a test done yesterday gave (DESIGN_benchmark_from_chat.md §4),
 # and the retrospective kind how a finished mesocycle went (DESIGN_cycle_retrospective.md §4).
+# The proposal kind holds what the week planner would change (DESIGN_waiting_proposal.md §3).
 KINDS: Dict[str, Kind] = {
     kind.name: kind
     for kind in (
         MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND, LEARNING_KIND, TEST_RESULT_KIND,
-        RETROSPECTIVE_KIND,
+        RETROSPECTIVE_KIND, PROPOSAL_KIND,
     )
 }
 
@@ -124,8 +126,12 @@ def settle_if_stale(item: Dict[str, Any]) -> bool:
 
 def walk(since: datetime, after: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """The items the walk that started at `since` still has to show after `after`, the
-    next one first. Stale items met on the way are closed without being shown (§4)."""
-    items = runtime.db.queue_walk(since, clock.now(), after)
+    next one first. Stale items met on the way are closed without being shown (§4). A
+    stand-alone item is in no walk (DESIGN_waiting_proposal.md §3)."""
+    items = [
+        item for item in runtime.db.queue_walk(since, clock.now(), after)
+        if not kind_of(item).stands_alone
+    ]
     while items and settle_if_stale(items[0]):
         items.pop(0)
     return items
@@ -181,11 +187,12 @@ def act(
 
 
 def waiting_counts() -> Tuple[int, int]:
-    """(questions, messages) waiting and not hidden: what the terminal hint counts (§5.2)."""
+    """(questions, messages) waiting and not hidden: what the terminal hint counts (§5.2).
+    A stand-alone item is not counted (DESIGN_waiting_proposal.md §3)."""
     now = clock.now()
     questions = messages = 0
     for item in runtime.db.waiting_queue_items():
-        if is_hidden(item, now):
+        if is_hidden(item, now) or kind_of(item).stands_alone:
             continue
         if kind_of(item).shape == MESSAGE:
             messages += 1

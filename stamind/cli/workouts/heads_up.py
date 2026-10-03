@@ -34,7 +34,7 @@ def _is_waiting(change_id: int) -> bool:
     return any(c["id"] == change_id for c in heads_up.waiting())
 
 
-def _newest_written() -> int:
+def newest_written() -> int:
     """The id of the newest change that wrote a session, 0 when none has."""
     newest = runtime.db.newest_change_with_sessions()
     return newest["id"] if newest else 0
@@ -83,7 +83,7 @@ def _replace_unsent(window: Window) -> Optional[int]:
         return None
     runtime.coach_service.workout_rollback(change_id=newest["id"])
     print(green("Undid it: this run starts from the week the athlete knows."))
-    return _newest_written()
+    return newest_written()
 
 
 @contextmanager
@@ -100,7 +100,7 @@ def replacing_unsent(skip: bool, window: Window) -> Iterator[bool]:
     try:
         yield written_upto is not None
     finally:
-        if written_upto is not None and _newest_written() <= written_upto:
+        if written_upto is not None and newest_written() <= written_upto:
             notice(
                 "The earlier attempt stays undone. " + cmd("workout rollback")
                 + " brings it back, and its message with it."

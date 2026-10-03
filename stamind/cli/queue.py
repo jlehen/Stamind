@@ -24,6 +24,7 @@ from stamind.clock import fmt_span, fmt_timestamp
 
 QUEUE_DONE_LINE = "That's all for now — thanks!"
 QUEUE_SETTLED_LINE = "Already settled — thanks!"
+STAYS_OPEN_LABEL = "skip — it stays open"
 NOTHING_WAITING_LINE = "Nothing is waiting."
 NOT_NOW_LABEL = "🕐 Not now"
 
@@ -90,7 +91,8 @@ def print_queue_list(items: List[Dict[str, Any]], now: datetime) -> None:
             line += gray(f"  · hidden until {short_when(back, now)}")
         print(line)
     summary = f"{len(waiting)} waiting" + (f", {len(hidden)} hidden" if hidden else "") + "."
-    if waiting:
+    # A stand-alone item is in no walk, so it is answered by its id.
+    if any(not athlete_queue.kind_of(item).stands_alone for item in waiting):
         summary += (" Go through them with " + cmd("queue answer") + ", or one with "
                     + cmd("queue answer <id>") + ".")
     else:
@@ -139,7 +141,8 @@ def _button_label(text: str) -> str:
 
 def queue_buttons(item: Dict[str, Any]) -> List[dict]:
     """An item's chat buttons: its answers, its drop when its kind has one, and "Not now",
-    which the bot turns into the three later choices (§6.2, §6.4)."""
+    which the bot turns into the three later choices (§6.2, §6.4). A stand-alone item has
+    no "Not now" (DESIGN_waiting_proposal.md §3)."""
     kind = athlete_queue.kind_of(item)
     buttons = [
         {"label": _button_label(answer["label"]), "action": f"a{number}"}
@@ -151,7 +154,8 @@ def queue_buttons(item: Dict[str, Any]) -> List[dict]:
         dropped = athlete_queue.drop_label(item)
         if dropped:
             buttons.append({"label": _button_label(dropped), "action": DROP})
-    buttons.append({"label": NOT_NOW_LABEL, "action": QUEUE_NOT_NOW})
+    if not kind.stands_alone:
+        buttons.append({"label": NOT_NOW_LABEL, "action": QUEUE_NOT_NOW})
     return buttons
 
 
@@ -160,6 +164,8 @@ def queue_chat_message(item: Dict[str, Any], left: Optional[int]) -> Tuple[str, 
     counts the walk from this item on, and None marks a reminder (§6.5)."""
     text = athlete_queue.wording(item, companion=True)
     buttons = queue_buttons(item)
+    if athlete_queue.kind_of(item).stands_alone:
+        return text, buttons
     if left is None:
         return f"⏰ You asked me to come back to this:\n{text}", buttons
     if athlete_queue.kind_of(item).shape == MESSAGE:
@@ -191,6 +197,26 @@ def send_item(item: Dict[str, Any], since: str, left: Optional[int]) -> None:
     emit_queue_item(item["id"], text, buttons, since)
 
 
+def send_alone(item: Dict[str, Any]) -> None:
+    """Sends a stand-alone item: its wording as ordinary text, then a message of its own
+    that asks and carries the answers, as a walk of one (DESIGN_waiting_proposal.md §3).
+    On a terminal the text is followed by the command that answers it."""
+    print(athlete_queue.wording(item))
+    if not is_json_frontend():
+        notice(f"Saved as #{item['id']}. Answer it with "
+               + cmd(f"queue answer {item['id']}") + ".")
+        return
+    text, buttons = queue_chat_message(item, 1)
+    emit_queue_item(item["id"], text, buttons, since_token(clock.now(), single=True))
+
+
+def settled_line(item: Optional[Dict[str, Any]]) -> str:
+    """What a tap on a closed item is told: its kind's own line when it has one."""
+    if item is None:
+        return QUEUE_SETTLED_LINE
+    return athlete_queue.kind_of(item).closed_line or QUEUE_SETTLED_LINE
+
+
 def send_walk_step(since: datetime, after: Optional[Dict[str, Any]] = None) -> bool:
     """Sends the next item of the walk that started at `since`, or the closing line once a
     walk that has shown something runs out; a walk that finds nothing sends nothing (§4).
@@ -212,6 +238,8 @@ def terminal_choices(item: Dict[str, Any], since: datetime) -> List[Choice]:
         Choice(f"a{number}", answer["label"])
         for number, answer in enumerate(athlete_queue.answers(item), 1)
     ]
+    if kind.stands_alone:
+        return choices + [Choice(SKIP, STAYS_OPEN_LABEL)]
     if kind.shape == MESSAGE:
         choices.append(Choice(SKIP, "tell me again next time"))
         lead = "remind me"
@@ -307,7 +335,10 @@ def _answer_one(item_id: int, since: datetime) -> None:
                red)
         return
     if item["closed_at"] or athlete_queue.settle_if_stale(item):
-        print(QUEUE_SETTLED_LINE)
+        print(settled_line(item))
+        return
+    if is_json_frontend() and athlete_queue.kind_of(item).stands_alone:
+        send_alone(item)
         return
     if is_json_frontend():
         send_item(item, since_token(since, single=True), 1)
@@ -338,7 +369,7 @@ def run_bot_queue(args: argparse.Namespace) -> None:
     since, single = parse_since(args.since)
     item = runtime.db.get_queue_item(args.item_id)
     if item is None or item["closed_at"] or athlete_queue.settle_if_stale(item):
-        print(QUEUE_SETTLED_LINE)
+        print(settled_line(item))
     else:
         _apply(item, args.action, since)
     if single or item is None:

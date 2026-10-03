@@ -42,6 +42,12 @@ class Kind:
     # feature as well as in the queue — "leave it as it is" freezes an activity's sets as
     # they were first read (DESIGN_strength_tracking.md §7).
     on_drop: Optional[Callable[[Dict[str, Any]], None]] = None
+    # A stand-alone item is sent the moment it is queued, is in no walk and has no "Not
+    # now". `wording` goes out as ordinary text and `companion_wording` is what its own
+    # message asks under it (DESIGN_waiting_proposal.md §3).
+    stands_alone: bool = False
+    # What a tap on a closed item of this kind is told, in place of "Already settled" (§4).
+    closed_line: Optional[str] = None
 
 
 class NotApplied(Exception):

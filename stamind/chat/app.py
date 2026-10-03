@@ -75,7 +75,10 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
             self._on_error,
         )
 
+        # A chat's own place, and the second one that holds the coach's run
+        # (DESIGN_waiting_proposal.md §6.1).
         self.sessions: Dict[int, Session] = {}
+        self.coach_runs: Dict[int, Session] = {}
         # Chat state: chats that just tapped "💬 Talk to me" (chat_id →
         # monotonic arm time, cleared after one message, /cancel or the prompt timeout);
         # the tap only keeps an unroutable message from bouncing (§5.2). Plus the live

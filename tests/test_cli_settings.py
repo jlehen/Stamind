@@ -311,7 +311,8 @@ class TestMorningPushKnobs(SettingsTestCase):
             3600.0)
 
     def test_the_morning_command_adapts_only_when_the_switch_is_on(self):
-        with patch("stamind.cli.bot.views._auto_adapt_note", return_value="adapted") as note:
+        with patch("stamind.cli.bot.views._morning_adaptation",
+                   return_value=("adapted", None)) as note:
             self.run_cli(["bot", "morning", "--force"])
             self.assertFalse(note.called)
             self.run_cli(["settings", "set", "adapt-first", "on"])

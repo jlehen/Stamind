@@ -102,6 +102,11 @@ them. Tapping:
 - **Can't today** — a bot-level choose row (move it / shorten it / skip it), each option
   mapping to an `adapt -m` message. The week planner decides; the buttons only phrase the ask.
 
+Amended 2026-10-03 (DESIGN_waiting_proposal.md §5): the briefing always shows today as
+planned. When the week planner would change a session, the reason line is not in the
+briefing: the proposal follows as a message of its own, with "✅ Change it" and "💪 Keep it
+as planned". "Got it" answers the briefing and not the proposal.
+
 ### 4.2 Where the content comes from
 
 A new hidden CLI family (`sm bot ...`, hidden like other maintenance commands):
@@ -160,6 +165,14 @@ Amended 2026-10-01 (DESIGN_cycle_retrospective.md §3, §5): right after its onc
 retrospective records. The date check is a database lookup. The write step writes at most
 one due record, with one model call, and sends nothing to the chat. A failure prints one
 line on the terminal and the push carries on.
+
+Amended 2026-10-03 (DESIGN_waiting_proposal.md §5, §7): the push no longer writes a session
+change. It asks the week planner as before, without `-y`. A session that would change is
+saved as a proposal, an item of the athlete queue, and nothing is written until the athlete
+taps "Change it". Kilograms that moved alone are still written at once, with their sentence
+in the briefing. The once-a-morning read also counts a `workout adapt` proposal saved this
+morning with the sleep score, whatever its answer, so a declined proposal no longer makes
+the push ask again.
 
 ### 4.3 Scheduling
 

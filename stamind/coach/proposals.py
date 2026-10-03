@@ -7,7 +7,9 @@ fingerprinted at prompt time and ``plan_apply`` re-read at accept time, an edit 
 between silently defeated the staleness detector.
 
 So a proposal carries the facts it was computed from, and the consumer renders rather
-than recomputes. Records only: the logic that fills them in lives in `revisions.py`.
+than recomputes. Records only: the logic that fills them in lives in `revisions.py`. The one
+exception is a revision's trip to JSON and back, for a proposal saved until the athlete
+answers it (DESIGN_waiting_proposal.md §3).
 """
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
@@ -76,6 +78,29 @@ class RevisionProposal:
     # morning push can tell a run that saw the night from one that ran before the watch
     # synced (DESIGN_bot_simple_frontend.md §4.2).
     sleep_seen: Optional[bool] = None
+    # Whether the week planner itself changed a session, as against the strength planner
+    # moving the kilograms alone: only the first waits for the athlete's answer
+    # (DESIGN_waiting_proposal.md §7).
+    week_planner_changed: bool = False
+
+
+# What `workout_revision_apply` reads off a proposal, and so what a saved one keeps. What
+# only drew the preview is left out, and so is `sleep_seen`: a tap's change must not claim
+# a night it never read (DESIGN_waiting_proposal.md §3, §5).
+SAVED_REVISION_FIELDS = (
+    "reason", "workouts", "range_start", "range_end", "kind", "held",
+    "covered_constraint_ids", "strength_checks", "strength_stamp",
+)
+
+
+def revision_to_json(proposal: RevisionProposal) -> Dict[str, Any]:
+    """What a tap on a saved proposal writes, in a shape JSON can hold."""
+    return {field: getattr(proposal, field) for field in SAVED_REVISION_FIELDS}
+
+
+def revision_from_json(saved: Dict[str, Any]) -> RevisionProposal:
+    """The proposal a tap applies, read back from `revision_to_json`'s shape."""
+    return RevisionProposal(**{field: saved[field] for field in SAVED_REVISION_FIELDS})
 
 
 @dataclass(frozen=True)

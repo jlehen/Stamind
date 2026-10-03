@@ -458,6 +458,11 @@ The morning message's own adaptation is a run in her chat. Its change is recorde
 when it is written, and the briefing prints its reason after today's sessions, as it does
 today.
 
+Amended 2026-10-03 (DESIGN_waiting_proposal.md §5): the morning message's adaptation no
+longer writes a session change. It saves a proposal, and the change is written when she taps
+"Change it". That tap runs in her chat, so its change is recorded as told. Only a
+kilograms-only update is still written by the push itself, with its sentence in the briefing.
+
 ## 8. What the operator sees
 
 Until now the reason of a terminal `workout adapt` never left the terminal. From now on it

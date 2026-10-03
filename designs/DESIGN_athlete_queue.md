@@ -62,6 +62,11 @@ the same cause: Stamind has no place to put a question that can wait.
 athlete just typed or tapped. She is there, and the command cannot continue without her.
 Those stay blocking questions, exactly as today.
 
+Amended 2026-10-03 (DESIGN_waiting_proposal.md §2): "Apply this proposal?" no longer stops
+a `workout adapt` or a `workout tweak` started from the chat. Such a run saves its proposal
+as a queue item, sends it and ends, and she answers it with a tap whenever she likes. In a
+terminal the question still blocks.
+
 "What was that block of sets?" changes what the app knows, but nothing is stuck while the
 answer is missing: an unnamed set still counts as volume. That goes to the queue, even when
 she is watching.
@@ -128,6 +133,14 @@ the terminal. The operator's message of §5.1 is never stale. A stale item is cl
 outcome `stale` without being shown, and a tap on one replies "Already settled — thanks!"
 and moves on. A check reads the database only; whatever pull ran before it has already
 refreshed the data.
+
+Amended 2026-10-03 (DESIGN_waiting_proposal.md §3, §4): a kind may **stand alone**. Its
+item is sent the moment it is queued: its text as ordinary messages, then a message of its
+own that asks and carries the answers. It is in no walk, in the chat or in a terminal, and
+the terminal's hint of §5.2 does not count it. It has no "Not now". `sm queue list` shows it
+and `sm queue answer <id>` answers it. A tap on it ends there, the way a tap on a reminder
+does. A tap on a closed item of such a kind gets the kind's own line in place of "Already
+settled — thanks!".
 
 ## 4. The actions
 
@@ -520,6 +533,11 @@ Amended 2026-10-01 (DESIGN_cycle_retrospective.md §4): `retrospective`, from
 went. Its subject is the id of the record it is about. Its one answer asks for typed text,
 and its drop is "nothing to say". It goes stale when its record is removed, and seven days
 after the end of its record.
+
+Amended 2026-10-03 (DESIGN_waiting_proposal.md §3): `proposal`, from
+`stamind/cli/workouts/proposal.py`, is the next entry and the first kind that stands alone
+(§3). A kind says two more things when it does: that its items stand alone, and the line a
+tap on a closed one gets.
 
 ## 9. Guardrails
 
