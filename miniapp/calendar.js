@@ -3,6 +3,7 @@
 // (DESIGN_miniapp_storage.md §7.1), and hands every question to `calendar_logic.js`.
 // "?v=dev" becomes the commit at deploy, like the addresses in calendar.html.
 import * as logic from "./calendar_logic.js?v=dev";
+import { loggedAddress } from "./logic.js?v=dev";
 import * as storage from "./storage.js?v=dev";
 
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
@@ -196,6 +197,15 @@ function openSheet(iso) {
     ask.type = "button";
     ask.addEventListener("click", () => tg.sendData(logic.fullDayMessage(iso)));
     ui.sheetBody.append(ask);
+  }
+  // A day's gym log comes with its month's file, and opens in the gym logger, locked
+  // (DESIGN_gym_logger.md §8).
+  const logged = (snapshot.days[iso] || {}).gym;
+  if (logged) {
+    const open = element("button", "full-day", "🏋️ Open the gym log");
+    open.type = "button";
+    open.addEventListener("click", () => { window.location.href = loggedAddress(logged); });
+    ui.sheetBody.append(open);
   }
   ui.sheet.hidden = false;
 }

@@ -364,6 +364,30 @@ class TakeoverTest(_IngestCase):
             row = dict(conn.execute("SELECT * FROM gym_logs").fetchone())
         self.assertEqual(row["activity_id"], "gym1")
 
+    def test_a_log_sent_again_after_the_takeover_replaces_it_on_the_garmin_activity(self):
+        """Thursday's log is on Garmin's activity by Friday. On Saturday the athlete opens
+        it from the calendar, fixes a weight and sends it again (§8)."""
+        workout = a_session()
+        self.ingest(self.example_for(workout))
+        self.activity("gym1")
+        sets.read_new_activities(self.garmin)
+        again = self.ingest(self.example_for(workout, x=[
+            {"n": "belt squat", "p": 1, "sets": [[5, 150, 60], [5, 150, 300]]},
+        ]))
+        self.assertIn("Updated the log of 2026-09-24 Thu", again)
+        self.assertIsNone(test_db.get_completed_activity("log:" + GYM_DAY))
+        rows = test_db.get_exercise_sets("gym1")
+        self.assertEqual([row["load_kg"] for row in rows if row["set_type"] == "active"],
+                         [150.0, 150.0])
+        # Garmin's own start and length stay: the log replaces the sets, nothing else.
+        activity = test_db.get_completed_activity("gym1")
+        self.assertEqual(activity["start_time"], f"{GYM_DAY} 18:05:00")
+        self.assertEqual(activity["duration_sec"], 3600.0)
+        with test_db._get_connection() as conn:
+            logs = [dict(row) for row in conn.execute("SELECT * FROM gym_logs")]
+        self.assertEqual([log["activity_id"] for log in logs], ["gym1"])
+        self.assertEqual(len(json.loads(logs[0]["payload"])["x"]), 1)
+
     def test_a_day_split_in_two_gives_the_log_to_the_longer_activity(self):
         self.ingest(self.example_for(a_session()))
         self.activity("gym_long", duration_sec=3600.0)

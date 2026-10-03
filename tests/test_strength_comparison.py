@@ -350,7 +350,11 @@ class DatabaseTest(_DatabaseCase):
     def test_the_log_reaches_the_activity_with_its_cards(self):
         self.ingest()
         activity = test_db.get_completed_activities(GYM_DAY, GYM_DAY)[0]
-        self.assertEqual(activity["gym_log"], {"revision_id": self.workout["revision_id"]})
+        self.assertEqual(activity["gym_log"]["revision_id"], self.workout["revision_id"])
+        # The log as it was sent, which the calendar hands the gym logger
+        # (DESIGN_gym_logger.md §8).
+        self.assertEqual(json.loads(activity["gym_log"]["payload"]),
+                         {**THURSDAY_LOG, "r": self.workout["revision_id"]})
         self.assertEqual(activity["lifted"][0], {
             "exercise": "chest press", "reps": 5, "load_kg": 55.0, "duration_sec": None,
             "named_by": "athlete", "card": 1,

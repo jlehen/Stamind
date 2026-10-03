@@ -91,7 +91,7 @@ uploaded, and the buttons' addresses are the ones of today.
 
 | File | Label | What it holds | Built |
 |---|---|---|---|
-| A month file | `calendar/2026-09` | The days of that month: each day's cell and its sheet, workout text included. Nothing else. | After every command, for the months the window touches. Older months by `sm data publish` only (§9). |
+| A month file | `calendar/2026-09` | The days of that month: each day's cell, its sheet, workout text included, and its gym log when it has one. Nothing else. | After every command, for the months the window touches. Older months by `sm data publish` only (§9). |
 | The index file | `calendar/index` | Today's date, the stamp, the goals, the mesocycles, the last day of the schedule, and the first and last month that have a file. | After every command. |
 | The plan file | `plan` | What the "Goals & plan" button carries, plus each mesocycle's whole long text. | After every command. |
 
@@ -99,7 +99,9 @@ A file's name in the bucket never changes (D9). Writing a file again replaces it
 under the same name, so a page always finds the newest content under the name it computes.
 
 **The shape.** A month file is `{"v": 1, "days": {…}}`, with each day exactly as the
-button's data writes it (DESIGN_calendar_miniapp.md §5), and every day's sheet present. The
+button's data writes it (DESIGN_calendar_miniapp.md §5), and every day's sheet present. A
+day that has a gym log also carries `gym`, the log beside the session it was written
+against, which the day's sheet opens in the gym logger (DESIGN_gym_logger.md §8). The
 index file is the button's data without `days` and without `fit`, plus `first` and `last`,
 two months written as `"2025-03"`. The plan file is the plan button's data, where each
 mesocycle also carries its long text.

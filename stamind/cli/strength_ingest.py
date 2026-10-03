@@ -110,10 +110,15 @@ def run_strength_ingest(args: argparse.Namespace) -> None:
         fail(str(broken))
         return
     workout = _revision(log.revision_id)
-    replaced = runtime.db.gym_log_for_day(log.date) is not None
-    activity_id = runtime.db.upsert_logged_activity(
-        log.date, f"{log.date} {log.start}:00", _duration_sec(log)
-    )
+    taken = runtime.db.garmin_activity_with_log(log.date)
+    replaced = taken is not None or runtime.db.gym_log_for_day(log.date) is not None
+    if taken:
+        # Garmin's activity already holds the day's log, so the new one replaces it there.
+        activity_id = taken["activity_id"]
+    else:
+        activity_id = runtime.db.upsert_logged_activity(
+            log.date, f"{log.date} {log.start}:00", _duration_sec(log)
+        )
     now = clock.now()
     runtime.db.store_exercise_sets(activity_id, _set_rows(log), now, now)
     runtime.db.save_gym_log(activity_id, log.revision_id, text)

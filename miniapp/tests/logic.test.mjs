@@ -420,3 +420,64 @@ test("the undo history keeps the last fifty changes", () => {
   }
   assert.equal(history.length, logic.UNDO_DEPTH);
 });
+
+// A past log, opened from the calendar (DESIGN_gym_logger.md §8). The session is the §3 example:
+// belt squat 3×4–6 @ 140 and pull up 3×6–8.
+const SENT_LOG = {
+  v: 1,
+  r: 727,
+  d: "2026-09-24",
+  st: "18:02",
+  en: "19:05",
+  x: [
+    { n: "barbell curl", sets: [[10, 30, 60]] },
+    { n: "leg press", p: 1, sets: [[5, 120, 200], [6, 140, 400]], note: "rack busy" },
+  ],
+  note: "left knee felt off",
+};
+
+test("an opened log draws its cards in its order: done sets, then written ones not done", () => {
+  const state = logic.stateFromLog(logic.sessionFromHash(EXAMPLE_HASH), SENT_LOG);
+  assert.deepEqual(state.x.map((x) => x.n), ["barbell curl", "leg press", "pull up"]);
+  // The added exercise stands for no written line.
+  assert.equal(logic.prescriptionLine(state.x[0]), "added");
+  assert.deepEqual(state.x[0].sets, [{ reps: 10, kg: 30, done: true, t: 60 }]);
+  // The swap keeps the squat's line without its load, its two done sets and the third unticked.
+  assert.equal(logic.prescriptionLine(state.x[1]), "3×4–6");
+  assert.equal(state.x[1].note, "rack busy");
+  assert.deepEqual(state.x[1].sets.map((set) => [set.reps, set.kg, set.done]),
+                   [[5, 120, true], [6, 140, true], [6, 140, false]]);
+  // The pull-ups were not done: last, as written, nothing ticked.
+  assert.deepEqual(state.x[2].sets.map((set) => set.done), [false, false, false]);
+  assert.equal(new Set(state.x.map((x) => x.id)).size, 3);
+  assert.equal(logic.doneSetCount(state), 3);
+  assert.equal(state.note, "left knee felt off");
+});
+
+test("an opened log sent again with no change is the same log, whenever it is sent", () => {
+  const state = logic.stateFromLog(logic.sessionFromHash(EXAMPLE_HASH), SENT_LOG);
+  const tenDaysLater = new Date(2026, 9, 4, 9, 0, 0).getTime();
+  assert.equal(logic.finish(state, tenDaysLater).text, JSON.stringify(SENT_LOG));
+  // A set ticked while it is open is stamped at the session's end, on the session's day.
+  const more = logic.buildLog(logic.toggleDone(state, 2, 0, 3780), tenDaysLater);
+  assert.equal(more.d, "2026-09-24");
+  assert.deepEqual(more.x[2], { n: "pull up", p: 2, sets: [[8, null, 3780]] });
+});
+
+test("an opened log that ran over midnight started the day before", () => {
+  const state = logic.stateFromLog(logic.sessionFromHash(EXAMPLE_HASH),
+                                   { ...SENT_LOG, st: "23:40", en: "00:25" });
+  assert.equal(state.finishedAt - state.startedAt, 45 * 60 * 1000);
+  const log = logic.buildLog(state, END);
+  assert.deepEqual([log.d, log.st, log.en], ["2026-09-24", "23:40", "00:25"]);
+});
+
+test("the calendar's address carries the session and the log, and a gym address no log", () => {
+  const session = logic.sessionFromHash(EXAMPLE_HASH);
+  const address = logic.loggedAddress({ s: session, l: SENT_LOG });
+  assert.match(address, /^\.\/index\.html#s=/);
+  const hash = `${address.slice(address.indexOf("#"))}&tgWebAppVersion=8.0`;
+  assert.deepEqual(logic.sessionFromHash(hash), session);
+  assert.deepEqual(logic.logFromHash(hash), SENT_LOG);
+  assert.equal(logic.logFromHash(EXAMPLE_HASH), null);
+});

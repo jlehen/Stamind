@@ -765,7 +765,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A question or message for the athlete that no command waits on | A `Kind` (`stamind/queue_kind.py`) added to `KINDS` in `stamind/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label, and whether its items stand alone — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
 | A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` queue kind: its wording, the three rules that put it out of date, what "Change it" and "Keep it as planned" do, `save`, `open_proposal`, `shown_to_week_planner`), `coach/proposals.py` (`week_planner_changed`; `revision_to_json`/`revision_from_json`, what a tap writes, without the sleep mark), `coach/engine/notes.py:open_proposal_task` (how the week planner reads the open one), `cli/queue.py:send_alone` (the sending), `cli/workouts/adapt.py:_settle` (a chat run saves one in place of the confirm), `chat/runner.py` (the second place per chat for the coach's run), `cli/bot/views.py:_morning_adaptation` (the push saves one). DESIGN_waiting_proposal.md |
 | A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `activity_lines`, `logbook`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`, and `strength log`/`exercises` which read the record and the vocabulary back), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
-| A gym session logged on the phone | `miniapp/` (the page), `strength/logger.py` (the two payloads), `cli/strength_ingest.py` (`strength ingest`), `strength/sets.py::take_over_logs` (the pull handing the log to Garmin's activity), `gym_logs` + `upsert_logged_activity`/`save_gym_log`/`gym_log_for_day`/`move_gym_log` in `db/strength.py`. The bot's button and the handler for the page's message are DESIGN_gym_logger.md §6 and not wired yet. DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
+| A gym session logged on the phone | `miniapp/` (the page), `strength/logger.py` (the two payloads), `cli/strength_ingest.py` (`strength ingest`), `strength/sets.py::take_over_logs` (the pull handing the log to Garmin's activity), `gym_logs` + `upsert_logged_activity`/`save_gym_log`/`gym_log_for_day`/`garmin_activity_with_log`/`move_gym_log` in `db/strength.py`. The bot's button and the handler for the page's message are DESIGN_gym_logger.md §6 and not wired yet. DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
 | A past strength session against its planned lines | `strength/comparison.py` (the counting, the marks, the totals, the §6 reason), `db/strength.py::attach_lifted` (what `get_completed_activities` puts on a strength activity: `lifted`, and `gym_log`), `analytics/adherence.py` (`_discrepancy_reasons` grades a logged session by its sets, `_pairing_order` and `is_ambiguous_match` put the logged activity first), `cli/common.py` (`strength_table` for `workout list -vv` and `workout compare`, `simple_comparison_lines` for "Done lately" and `strength ingest`), `strength/sets.py::done_text` (the Done cell). DESIGN_strength_planned_vs_done.md |
 | What a strength session prescribes | `strength/planner.py` (the pass and the call), `strength/planner_prompt.py` (the prompt and the checks on the reply), `strength/progression.md` (the science it reads), `strength/history.py` (what the athlete lifted), `strength/prescription.py` (the description and its seam), `prescribed_sets` + `strength_checks` in `db/schema.py`, the carry in `db/workout_change.py::WorkoutChange`, and the pass's place in `coach/service/generate.py` and `coach/service/adapt.py`. DESIGN_strength_tracking.md §9 |
 | A CLI command                    | `stamind/cli/<family>.py` (`run_*`), dispatcher in `stamind_cli.py` ([§7](#7-cli-commands-reference)) |
@@ -4568,6 +4568,9 @@ active row per logged set with `named_by = athlete`, and a rest row between two 
 sets whose seconds are both known, carrying the gap. And it keeps the message verbatim in
 `gym_logs`. Because `store_exercise_sets` deletes by activity id and the activity row is an
 upsert, ingesting the same day twice replaces the earlier log rather than doubling it.
+Once a pull handed the day's log to Garmin's activity, `garmin_activity_with_log` finds that
+activity and the new log replaces the sets and the raw log there, with no placeholder
+(DESIGN_gym_logger.md §5).
 That placeholder is the one row in `completed_activities` Garmin did not supply, so
 `prune_completed_activities` skips it: the pull's deletion reconcile would otherwise take
 the log away the same evening it was written. The summary the command prints is one head
@@ -4585,6 +4588,17 @@ morning after; the takeover moves rows and asks Garmin nothing, so it runs on th
 the longest activity, and the others are read from Garmin as before. The function still
 logs into Garmin only when there is something left to read, so a morning whose every
 pending activity is covered by a log makes no Garmin call at all.
+
+**A past log.** It is Saturday, and the athlete taps Thursday in the calendar, then
+"🏋️ Open the gym log" under its sheet. The calendar's month file carries Thursday's `gym`,
+the session payload beside the stored log (`calendar_page.gym_log`, from the `payload`
+`attach_lifted` puts in the activity's `gym_log`). `logic.loggedAddress` turns it into
+`index.html#s=…&l=…`, and the gym logger, finding `l=`, builds its state with
+`logic.stateFromLog` instead of reading the phone's saved one. `app.js` keeps that page
+locked until "✏️ Edit" (`renderOpened`: the cards `inert`, the editing controls hidden by
+the `locked` class), saves nothing on the phone, and leaves out "Reset timer" and "Start
+over", so a log sent again keeps its day and replaces that day's log
+(DESIGN_gym_logger.md §8).
 
 **The comparison.** It is Saturday, and the athlete looks back at Thursday. `workout show`
 draws a table under the "Actual:" line: one row per planned exercise with its planned lines,
@@ -4692,7 +4706,9 @@ the pages also read encrypted files from Google Cloud Storage (DESIGN_miniapp_st
 bucket) and `f=` (the folder, the bot's number) to both buttons, out of each page's budget.
 `calendar_page.month_files` builds one file per month, every day's marks and whole sheet with
 the workout text as stored (`simple_day_lines(..., wrap=False)`, so the content never
-depends on who ran the command); `index_file` is the payload without days and `fit`, plus
+depends on who ran the command), and a logged gym day's `gym`, which the sheet's
+"🏋️ Open the gym log" opens in the gym logger ([§16](#16-gym-logger-telegram-mini-app));
+`index_file` is the payload without days and `fit`, plus
 `first` and `last`, the months that have a file; `plan_page.plan_file` adds each
 mesocycle's `focus` as `f`. After every command, `run_once` uploads what changed, the month
 holding today first. The page (`miniapp/storage.js`, shared by both) draws at once from the

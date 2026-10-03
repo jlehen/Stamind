@@ -83,8 +83,8 @@ class StrengthMixin:
 
     def attach_lifted(self, activities: Sequence[Dict[str, Any]]) -> None:
         """Puts on each strength activity whose sets are read what was lifted, as `lifted`,
-        and `gym_log` ({"revision_id"}, or None). A logged activity's sets come from the
-        log's cards, anything else's from its active rows with no card
+        and `gym_log` ({"revision_id", "payload"}, or None). A logged activity's sets come
+        from the log's cards, anything else's from its active rows with no card
         (DESIGN_strength_planned_vs_done.md §8)."""
         read = {a["activity_id"]: a for a in activities
                 if a["activity_type"] == STRENGTH_TYPE and a.get("sets_read_at")}
@@ -110,7 +110,8 @@ class StrengthMixin:
         for log in logs:
             activity = read[log["activity_id"]]
             activity["lifted"] = logged_sets(log["payload"])
-            activity["gym_log"] = {"revision_id": log["revision_id"]}
+            activity["gym_log"] = {"revision_id": log["revision_id"],
+                                   "payload": log["payload"]}
 
     def bump_strength_history(self) -> None:
         """Records that the strength history now shows something different, which is the
@@ -314,6 +315,18 @@ class StrengthMixin:
                 "JOIN gym_logs g ON g.activity_id = a.activity_id "
                 "WHERE a.activity_id = ?",
                 (LOG_PREFIX + date,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def garmin_activity_with_log(self, date: str) -> Optional[Dict[str, Any]]:
+        """Garmin's activity of that day once a pull handed it the gym log, or None while
+        the log still hangs off its placeholder, and on a day without one (§5)."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT a.* FROM completed_activities a "
+                "JOIN gym_logs g ON g.activity_id = a.activity_id "
+                "WHERE a.date = ? AND a.activity_id != ?",
+                (date, LOG_PREFIX + date),
             ).fetchone()
             return dict(row) if row else None
 

@@ -450,6 +450,13 @@ h1 {
   font-weight: 650;
 }
 
+/* ----- a past log opened from the calendar, until Edit unlocks it (§8) ----- */
+
+.locked .step, .locked .moves, .locked .tools, .locked .note:placeholder-shown,
+.locked #add-exercise, .locked #finish, .locked #undo {
+  display: none;
+}
+
 /* ----- the search and the log, both bottom sheets ----- */
 
 .sheet {

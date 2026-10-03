@@ -50,6 +50,22 @@ export function sessionFromHash(hash) {
   return decodeSession(match[1]);
 }
 
+// A past log rides after `l=`, encoded like the session, when the calendar opens the page on
+// a day already logged (§8).
+export function logFromHash(hash) {
+  const match = /(?:^|[#&])l=([^&]+)/.exec(hash || "");
+  if (!match) {
+    return null;
+  }
+  return decodeSession(match[1]);
+}
+
+// The address the calendar's day sheet opens: `gym` is the day's `{ s, l }`, the session and
+// the log the bot holds for it (§8).
+export function loggedAddress(gym) {
+  return `./index.html#s=${encodeSession(gym.s)}&l=${encodeSession(gym.l)}`;
+}
+
 export function demoSession() {
   // What the bare URL shows, so the page is testable without the bot (§2).
   return {
@@ -120,6 +136,49 @@ function prescribedExercise(row, position) {
     note: "",
     sets,
   };
+}
+
+// The state of a session already logged (§8): what the page would hold had the athlete just
+// sent `log`. The cards come in the log's order, each with its sets as done and then the
+// written sets that were not; the written exercises the log does not hold come last, unticked.
+export function stateFromLog(session, log) {
+  const state = newState(session);
+  const written = new Map(state.x.map((card) => [card.p, card]));
+  state.x = [];
+  for (const entry of log.x) {
+    const done = entry.sets.map(([reps, kg, t]) => ({ reps, kg, done: true, t }));
+    const card = written.get(entry.p);
+    if (!card) {
+      // An exercise the session did not ask for.
+      insertAdded(state, state.x.length, entry.n, done, false);
+      state.x[state.x.length - 1].note = entry.note || "";
+      continue;
+    }
+    written.delete(entry.p);
+    if (card.n !== entry.n) {
+      // A swap: the written load was the other exercise's, as in `swapExercise`.
+      card.n = entry.n;
+      card.kg = null;
+    }
+    card.note = entry.note || "";
+    card.sets = [...done, ...card.sets.slice(done.length)];
+    state.x.push(card);
+  }
+  state.x.push(...written.values());
+  state.note = log.note || "";
+  state.finishedAt = clockMs(log.d, log.en);
+  state.startedAt = clockMs(log.d, log.st);
+  if (state.startedAt > state.finishedAt) {
+    // The session ran over midnight, and `d` is the day it ended (§4).
+    state.startedAt = clockMs(log.d, log.st, -1);
+  }
+  return state;
+}
+
+function clockMs(iso, clock, days = 0) {
+  const [year, month, day] = iso.split("-").map(Number);
+  const [hours, minutes] = clock.split(":").map(Number);
+  return new Date(year, month - 1, day + days, hours, minutes).getTime();
 }
 
 export function storageKey(revision) {

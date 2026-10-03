@@ -3,6 +3,7 @@ hold, the files built from the database, the step after every command, the two c
 and their guard, the button and the status line. Google is an in-memory bucket here.
 """
 import base64
+import json
 import os
 import unittest
 from datetime import datetime
@@ -141,6 +142,14 @@ def _activity(activity_id, day):
     )
 
 
+def _gym_log(day, log):
+    """A gym log as `strength ingest` stores it, on the day's placeholder activity."""
+    activity_id = test_db.upsert_logged_activity(day, f"{day} 18:02:00", 3780.0)
+    now = datetime(2026, 9, 24, 19, 6).astimezone()
+    test_db.store_exercise_sets(activity_id, [], now, now)
+    test_db.save_gym_log(activity_id, log["r"], json.dumps(log))
+
+
 class RecipeTest(unittest.TestCase):
     """The key, the names and the encryption (§5)."""
 
@@ -203,6 +212,35 @@ class BuildTest(FilesTestCase):
         self.assertIn(EASY_TEXT, planned)
         # A day with nothing on it but inside the schedule says it is a rest day.
         self.assertIn("sheet", september["days"]["2026-09-30"])
+
+    def test_a_month_file_holds_a_days_gym_log_beside_its_session(self):
+        """Thursday's gym was logged from the page, so its day carries the two things the
+        gym logger opens that log from (DESIGN_gym_logger.md §8)."""
+        save_workout(test_db, date="2026-09-24", sport_type="strength_training", title="Gym",
+                     duration_minutes=50, prescribed_sets=[
+                         {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
+                          "load_kg": 140.0}])
+        session = test_db.get_workout("2026-09-24", "strength_training")
+        log = {"v": 1, "r": session["revision_id"], "d": "2026-09-24", "st": "18:02",
+               "en": "19:05", "x": [{"n": "belt squat", "p": 1, "sets": [[5, 140, 40]]}]}
+        _gym_log("2026-09-24", log)
+        day = sync.build(test_db, TODAY)["calendar/2026-09"]["days"]["2026-09-24"]
+        self.assertEqual(day["gym"]["l"], log)
+        self.assertEqual(day["gym"]["s"]["r"], session["revision_id"])
+        self.assertEqual(day["gym"]["s"]["x"],
+                         [{"n": "belt squat", "s": 3, "lo": 4, "hi": 6, "kg": 140.0}])
+        # The button's own data does not carry it: a log would eat its budget.
+        cal = calendar_days.gather(test_db, *calendar_page.window(TODAY), TODAY)
+        payload, _sheets = calendar_page.snapshot(cal, datetime(2026, 9, 30, 7, 2))
+        self.assertNotIn("gym", payload["days"]["2026-09-24"])
+        # The page reads the day's log under the name Python writes it.
+        self.assertIn("(snapshot.days[iso] || {}).gym", _read("miniapp", "calendar.js"))
+        self.assertIn("encodeSession(gym.s)}&l=${encodeSession(gym.l)}",
+                      _read("miniapp", "logic.js"))
+        # A log written against another revision has no session to open beside it.
+        _gym_log("2026-09-24", {**log, "r": session["revision_id"] + 1})
+        day = sync.build(test_db, TODAY)["calendar/2026-09"]["days"]["2026-09-24"]
+        self.assertNotIn("gym", day)
 
     def test_the_content_is_the_same_whatever_width_the_process_wraps_at(self):
         with patch.dict(os.environ, {"STAMIND_WRAP_WIDTH": "80"}):

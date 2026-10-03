@@ -26,16 +26,21 @@
   <p class="head-sub"><span id="day"></span> <span class="tally" id="tally"></span></p>
   <!-- The page's own actions stay in sight while the cards scroll (§1). -->
   <div class="head-actions">
+    <!-- Back and Edit show on a past log opened from the calendar, which has neither Reset
+         timer nor Start over (§8). -->
+    <button class="act" id="back" type="button" hidden>‹ Calendar</button>
     <button class="act" id="undo" type="button">↶ Undo</button>
     <button class="act" id="reset-clock" type="button" hidden>Reset timer</button>
     <button class="act danger" id="reset" type="button">Start over</button>
+    <button class="act" id="edit" type="button" hidden>✏️ Edit</button>
   </div>
 </header>
 
 <!-- The coach's note scrolls away: only the title, the date and the rest timer stay pinned.
      A warm-up is its own card, a lighter entry of the same exercise (DESIGN_gym_logger §1). -->
-<p class="head-notes">Warm-up sets have their own card, before the main sets. Tick a warm-up
-  set there, not as an extra set on the main card.</p>
+<p class="head-notes" id="opened-note" hidden></p>
+<p class="head-notes" id="warmup-hint">Warm-up sets have their own card, before the main sets.
+  Tick a warm-up set there, not as an extra set on the main card.</p>
 <p class="head-notes" id="head-notes" hidden></p>
 
 <main id="cards"></main>

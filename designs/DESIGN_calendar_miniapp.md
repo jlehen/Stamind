@@ -421,6 +421,11 @@ answer. The gym logger already uses this way back. The message is
 "📅 Today" writes it. Any other message is still a gym log. The button shows only under a
 day that has a session, and only when the page was opened from Telegram.
 
+**The gym log.** Under a day that has a gym log, the sheet offers "🏋️ Open the gym log"
+once that month's file has arrived. It opens the gym logger on that log, locked, in the
+same window. The calendar itself still changes nothing: an edit is made and sent from the
+gym logger (DESIGN_gym_logger.md §8).
+
 The page lives beside the gym logger: `miniapp/calendar.html`, `miniapp/calendar.js` and
 `miniapp/calendar.css`. The Pages deploy already copies `miniapp/` and stamps every
 `miniapp/*.html` and `miniapp/*.js` with the commit, so it needs no change for files at

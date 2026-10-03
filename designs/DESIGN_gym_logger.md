@@ -194,6 +194,13 @@ The pull ends by deleting every local activity Garmin did not return in the pull
 Garmin never returns a placeholder, so that reconcile skips the `log:` ids; without that,
 an evening pull would delete the log before the next morning's takeover.
 
+**A log sent again after the takeover.** It is Saturday, and Thursday's log has been on
+Garmin's activity since Thursday evening. The athlete fixes a weight and sends the log
+again, from the page reopened or from the calendar (§8). The ingest finds the Garmin
+activity that holds Thursday's log and replaces the sets and the raw log there. Garmin's
+start time and length stay, and no placeholder is made, so the day never holds two gym
+activities. The summary opens with "Updated the log of", as for any second send.
+
 ## 6. The bot
 
 - The companion keyboard is rebuilt on every send. When the `strength-logger` setting is on and
@@ -217,5 +224,57 @@ an evening pull would delete the log before the next morning's takeover.
 - A rest timer that alerts: the page cannot notify while the phone is locked.
 - Refreshing the button after a `workout adapt` run from the terminal; the log carries the
   revision id, so a stale button costs nothing but a mismatch in the summary.
-- A log sent again after the morning pull handed it to Garmin's activity: it lands on a
-  fresh placeholder, and the activity keeps the sets of the first send.
+
+## 8. A past log, opened from the calendar
+
+It is Saturday 3 October. The athlete opens the calendar and taps Thursday 24 September, a
+gym day. The sheet's "Done" part names the five exercises done as written on one line, so
+it does not say how many reps and kilograms each set had. Under the sheet is a button,
+"🏋️ Open the gym log". A tap opens the gym logger in the same window, on Thursday's log.
+
+The page draws one card per exercise, in the order the log holds them. Each set shows its
+reps and kilograms, ticked. A written set that was not done follows the done ones on its
+card, unticked. A written exercise that was not done at all comes after the last logged
+card, unticked. The header shows the session's length, "38:00 in total".
+
+The page opens locked. The steppers, the ticks, the card buttons and the notes are out of
+reach, and there is no button to send. The header has two buttons. "‹ Calendar" goes back
+to the calendar. "✏️ Edit" unlocks the page: it then works as it does in the gym, and the
+button to send reads "Send again". The athlete raises one set from 55 to 57.5 kg and taps
+it. Telegram closes the page, and the bot answers "Updated the log of 2026-09-24 Thu…"
+(§5). "🔒 Lock" locks the page again without sending.
+
+**Where the log comes from.** The calendar's month file carries, on each day that has a
+gym log, `gym`: `{"s": …, "l": …}`, the session as §3 writes it and the log as §4 stored
+it (DESIGN_miniapp_storage.md §4). The button's address is `index.html#s=…&l=…`, each part
+base64url of its JSON, like `s=` alone in the gym. The calendar button's own data carries
+no log: a log with its session is about 1.5 KB, and that button has 5 KB for ten weeks of
+days. So "🏋️ Open the gym log" shows once the month's file has arrived, and an instance
+with no bucket does not have it.
+
+**The bot's log wins.** An opened log is drawn from the address. The page does not read
+the state it saved on the phone during the session, and it saves nothing on the phone. A
+change that is not sent is lost when the page closes.
+
+**The day and the clock times stay.** A log sent again from here carries the `d`, `st` and
+`en` it was opened with, so it replaces that day's log. "Reset timer" and "Start over" are
+not offered on an opened log: both restart the clock, and the next send would be dated
+today. A set ticked here is stamped at the session's end, like any set ticked after Finish.
+
+**The "Warm-up" tags** are the ones the page gives a session it opens for the first time
+(§1), since the log does not carry them.
+
+Not handled:
+
+- A session the watch recorded alone has no log, so its day has no button.
+- A log written against another revision than the session the calendar shows on that day
+  has no button. It is Thursday. The athlete logs from a button built before a
+  `workout adapt` run rewrote the session. The log's positions point at lines the calendar's
+  session does not have, so the page would have nothing to hang the cards on.
+- A log in a month the calendar's window no longer touches. A send from there is stored,
+  but that month's file is built again only by `sm data publish`
+  (DESIGN_miniapp_storage.md §4), so the calendar keeps showing the earlier log.
+- Not verified on a phone: `sendData` from a page reached by a link inside the Mini App.
+  The page was opened from the calendar's keyboard button, which is what `sendData` asks
+  for, and Telegram's script keeps its launch parameters across the link. The browser test
+  drives the same path with a stub in Telegram's place.

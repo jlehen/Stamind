@@ -19,6 +19,10 @@ const ui = {
   day: document.getElementById("day"),
   tally: document.getElementById("tally"),
   headNotes: document.getElementById("head-notes"),
+  openedNote: document.getElementById("opened-note"),
+  warmupHint: document.getElementById("warmup-hint"),
+  back: document.getElementById("back"),
+  edit: document.getElementById("edit"),
   restValue: document.getElementById("rest-value"),
   restLabel: document.getElementById("rest-label"),
   rest: document.getElementById("rest"),
@@ -66,6 +70,14 @@ let state = null;
 // What Undo takes back, oldest first (`logic.record`). Saved beside the state.
 let history = [];
 let storeKey = "";
+// The log the calendar opened the page on, or null in the gym (§8). Such a page shows what the
+// bot holds, so it reads nothing from the phone and saves nothing on it.
+let opened = null;
+// Whether the cards are read-only: an opened log is, until Edit.
+let locked = false;
+const OPENED_LOCKED = "This is the log the bot holds for this session. Tap Edit to change it.";
+const OPENED_EDITING = "Send again replaces the log the bot holds. A change you do not send is "
+  + "lost when the page closes.";
 // What the search sheet is for: "swap" or "insert" the card at `searchIndex`, or "add" one.
 let searchMode = "add";
 let searchIndex = null;
@@ -135,6 +147,9 @@ const browserStore = {
 const store = deviceStore() || browserStore;
 
 function persist() {
+  if (opened) {
+    return;
+  }
   store.set(storeKey, JSON.stringify(state));
   store.set(`${storeKey}-undo`, JSON.stringify(history));
 }
@@ -223,7 +238,30 @@ function render() {
   }
   setFinishLabel(finished ? "Send again" : "Finish");
   ui.undo.disabled = !history.length;
+  renderOpened();
   tick();
+}
+
+// A log opened from the calendar (§8): its own two buttons and its note, the cards out of reach
+// while it is locked, and Telegram's bottom button only once Edit unlocked it.
+function renderOpened() {
+  if (!opened) {
+    return;
+  }
+  document.body.classList.toggle("locked", locked);
+  ui.cards.inert = locked;
+  ui.sessionNote.disabled = locked;
+  ui.edit.textContent = locked ? "✏️ Edit" : "🔒 Lock";
+  ui.openedNote.textContent = locked ? OPENED_LOCKED : OPENED_EDITING;
+  ui.sent.hidden = true;
+  if (!inTelegram) {
+    return;
+  }
+  if (locked) {
+    tg.MainButton.hide();
+  } else {
+    tg.MainButton.show();
+  }
 }
 
 function setFinishLabel(label) {
@@ -376,7 +414,8 @@ function tick() {
   const started = Boolean(state.startedAt);
   ui.startClock.hidden = started;
   ui.rest.hidden = !started;
-  ui.resetClock.hidden = !started;
+  // An opened log keeps its day and its clock times (§8).
+  ui.resetClock.hidden = !started || Boolean(opened);
   if (!started) {
     return;
   }
@@ -570,6 +609,25 @@ function sessionFromUrl() {
   return logic.demoSession();
 }
 
+function logFromUrl() {
+  try {
+    return logic.logFromHash(window.location.hash);
+  } catch (problem) {
+    console.warn("the log in the URL could not be read", problem);
+    return null;
+  }
+}
+
+// The page on a past log (§8): Back and Edit in the header, and no Start over.
+function showOpened() {
+  locked = true;
+  ui.back.hidden = false;
+  ui.edit.hidden = false;
+  ui.openedNote.hidden = false;
+  ui.warmupHint.hidden = true;
+  ui.reset.hidden = true;
+}
+
 async function loadCatalog() {
   try {
     const answer = await fetch("./exercises.json");
@@ -607,6 +665,17 @@ function wire() {
   ui.undo.addEventListener("click", () => undo(logic.undoAll(history, state)));
   ui.finish.addEventListener("click", onFinish);
   ui.reset.addEventListener("click", startOver);
+  ui.back.addEventListener("click", () => {
+    // The bottom button is Telegram's own, so it would stay up over the calendar.
+    if (inTelegram) {
+      tg.MainButton.hide();
+    }
+    window.history.back();
+  });
+  ui.edit.addEventListener("click", () => {
+    locked = !locked;
+    render();
+  });
   ui.searchInput.addEventListener("input", renderResults);
   ui.searchAll.addEventListener("change", renderResults);
   ui.searchClose.addEventListener("click", closeSearch);
@@ -635,7 +704,10 @@ function wireTelegram() {
   ui.finish.hidden = true;
   tg.MainButton.setText("Finish");
   tg.MainButton.onClick(onFinish);
-  tg.MainButton.show();
+  // An opened log gets the button once Edit unlocked it (§8).
+  if (!opened) {
+    tg.MainButton.show();
+  }
 }
 
 async function restoreHistory() {
@@ -650,13 +722,19 @@ async function restoreHistory() {
 
 async function start() {
   wire();
+  opened = logFromUrl();
   wireTelegram();
   catalog = await loadCatalog();
   const session = sessionFromUrl();
-  storeKey = logic.storageKey(session.r);
-  state = await restore(session);
-  history = await restoreHistory();
-  persist();
+  if (opened) {
+    state = logic.stateFromLog(session, opened);
+    showOpened();
+  } else {
+    storeKey = logic.storageKey(session.r);
+    state = await restore(session);
+    history = await restoreHistory();
+    persist();
+  }
   render();
   window.setInterval(tick, 1000);
 }

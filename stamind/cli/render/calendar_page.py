@@ -18,6 +18,7 @@ from stamind.analytics.adherence import (
 from stamind.calendar_days import Calendar, Day, next_goal
 from stamind.clock import day_str, parse_date, shift
 from stamind.sports import canonical_sport
+from stamind.strength import logger
 from stamind.cli.render.plan_lines import simple_goal_line, simple_metric_words
 from stamind.cli.render.session_lines import (
     simple_compare_lines, simple_day_lines, sport_emoji,
@@ -288,10 +289,21 @@ def month_label(month: str) -> str:
     return f"calendar/{month}"
 
 
+def gym_log(day: Day) -> Optional[Dict[str, Any]]:
+    """The day's gym log beside the session it was written against, the two things the gym
+    logger opens a past log from (DESIGN_gym_logger.md §8). None on a day without a log,
+    and when the log was written against another revision than the session the day shows."""
+    for r in day.results:
+        log = (r["completed"] or {}).get("gym_log")
+        if log and log["revision_id"] == r["planned"].get("revision_id"):
+            return {"s": logger.session_payload(r["planned"]), "l": json.loads(log["payload"])}
+    return None
+
+
 def month_files(cal: Calendar) -> Dict[str, Dict[str, Any]]:
-    """Each month `cal` spans as its file's content, by label: every day with its marks and
-    its whole sheet, workout text included. A month with nothing on it still has a file
-    (DESIGN_miniapp_storage.md §4): `cal.days` holds every date of the range."""
+    """Each month `cal` spans as its file's content, by label: every day with its marks, its
+    whole sheet, workout text included, and its gym log. A month with nothing on it still
+    has a file (DESIGN_miniapp_storage.md §4): `cal.days` holds every date of the range."""
     files = {month_label(m): {"v": VERSION, "days": {}}
              for m in dict.fromkeys(day.date[:7] for day in cal.days)}
     for day in cal.days:
@@ -301,6 +313,9 @@ def month_files(cal: Calendar) -> Dict[str, Dict[str, Any]]:
             entry["sheet"] = parts
         elif not (entry["x"] or entry["u"] or entry["c"] or entry["s"]):
             continue
+        logged = gym_log(day)
+        if logged:
+            entry["gym"] = logged
         files[month_label(day.date[:7])]["days"][day.date] = entry
     return files
 
