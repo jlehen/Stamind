@@ -68,13 +68,18 @@ def numbers_line(numbers: Dict[str, Any]) -> str:
     ])
 
 
+def record_name(record: Dict[str, Any]) -> str:
+    """What a record is called where it is listed: the mesocycle's name, or the plan
+    named after its goal."""
+    if record['level'] == PLAN:
+        return f"Plan toward \"{record['name']}\""
+    return record['name']
+
+
 def record_text(record: Dict[str, Any], width: int = PROMPT_WIDTH) -> str:
     """One written record, as a prompt and `plan show -v` print it (§2)."""
-    name = record['name']
-    if record['level'] == PLAN:
-        name = f"Plan toward \"{name}\""
     lines = [
-        f"{name} ({record['start_date']}..{record['end_date']}), "
+        f"{record_name(record)} ({record['start_date']}..{record['end_date']}), "
         f"{ENDED_LABELS[record['ended_by']]}",
         f"  {numbers_line(record['numbers'])}",
     ]

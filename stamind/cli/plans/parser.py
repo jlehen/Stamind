@@ -2,6 +2,7 @@
 from stamind.text import green
 from stamind.cli.plans.feedback import RM_NO_ID, run_plan_feedback
 from stamind.cli.plans.generate import run_plan_generate
+from stamind.cli.plans.retro import run_plan_retro
 from stamind.cli.plans.show import run_plan_keep, run_plan_show
 from stamind.cli.plans.versions import (
     run_plan_diff, run_plan_rm, run_plan_rollback, run_plan_versions, run_plan_wipe,
@@ -275,6 +276,39 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         "--replan", action="store_true",
         help="After saving, regenerate the plan straight away (same preview-and-confirm "
              "as 'plan generate'; no --force needed)"
+    )
+
+    # plan retro
+    p_retro = plan_subparsers.add_parser(
+        "retro", parents=[llm_debug_parser],
+        help="Have one retrospective record written again ('plan show' lists the IDs)",
+        description=(
+            "Correct the stored record of a finished mesocycle or plan. 'plan retro redo "
+            "ID' computes the record's numbers again and calls the retrospective writer at "
+            "once: the new lines and the new sentence replace the old ones. The athlete's "
+            "own words are kept and the athlete is not asked again. --words replaces those "
+            "words first, --clear-words removes them. The record is never deleted, and it "
+            "keeps what it held when the writer fails."
+        )
+    )
+    p_retro.set_defaults(func=run_plan_retro)
+    p_retro.add_argument(
+        "action", choices=["redo"],
+        help="redo: compute the numbers again and have the record written again"
+    )
+    p_retro.add_argument(
+        "id", type=int, help="Retrospective ID, as 'plan show' prints it"
+    )
+    retro_words = p_retro.add_mutually_exclusive_group()
+    retro_words.add_argument(
+        "--words", metavar="TEXT",
+        help="Replace the athlete's own words with TEXT before writing the record again: "
+             "for an answer typed by mistake, or one that came after the question left "
+             "the queue"
+    )
+    retro_words.add_argument(
+        "--clear-words", action="store_true", dest="clear_words",
+        help="Remove the athlete's own words before writing the record again"
     )
 
     # plan wipe

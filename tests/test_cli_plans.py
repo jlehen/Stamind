@@ -7,6 +7,7 @@ from unittest.mock import patch
 from tests.helpers import (
     clear_all_tables, pin_clock, rebind_test_db, run_cli, save_workout,
 )
+from stamind import cycle_records
 from stamind.coach.proposals import GenerateProposal
 from tests import test_db_path
 
@@ -650,3 +651,122 @@ class TestCliPlans(unittest.TestCase):
         self.assertIn("No goal to attach", stdout)
         mock_coach.plan_apply.assert_called_once()
         self.assertIsNone(mock_coach.plan_apply.call_args[0][0])
+
+
+class TestCliPlanRetrospectives(unittest.TestCase):
+    """`plan show` lists the retrospective records, `plan retro redo` has one written
+    again, and deleting a plan deletes them (DESIGN_cycle_retrospective.md §6, §8, §9).
+    It is Monday 2 November: two mesocycles are finished and a third is under way."""
+
+    NUMBERS = {
+        "sessions_done": 5, "sessions_planned": 6, "duration_sec": 36000.0,
+        "load_planned": 400.0, "load_done": 380.0, "fitness_start": 50.0,
+        "fitness_end": 53.0, "benchmarks": [],
+    }
+    WRITTEN = {
+        "record": "For: build easy volume.\nHappened: on target.\nCame out: fitness rose.",
+        "athlete_line": "You kept your training steady.",
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        global test_db
+        test_db = Database(db_path=TEST_DB_PATH)
+        rebind_test_db(test_db)
+
+    def setUp(self):
+        clear_all_tables(test_db)
+        pin_clock(self, "2026-11-02")
+        self.goal = test_db.add_objective("Alpe du Zwift", "2026-12-22", "cycling")
+        test_db.save_macrocycle(self.goal, "strategy", "gh", "ch", [
+            {"name": name, "start_date": start, "end_date": end, "focus": "easy volume"}
+            for name, start, end in (
+                ("Base 1", "2026-09-14", "2026-10-04"),
+                ("Base 2", "2026-10-05", "2026-10-25"),
+                ("Build", "2026-10-26", "2026-11-15"),
+            )
+        ])
+        cycle_records.date_check(test_db, "2026-11-02")
+        self.base1, self.base2 = [r["id"] for r in test_db.get_retrospectives(self.goal)]
+        test_db.write_retrospective(self.base1, self.NUMBERS, "For: the old lines.", "Old.")
+        test_db.set_retrospective_words(self.base1, "felt fresh")
+        for target in ("stamind.runtime.garmin", "stamind.runtime.calendar_syncer"):
+            patcher = patch(target)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        client = patch("stamind.coach.engine.openrouter_client")
+        self.client = client.start()
+        self.addCleanup(client.stop)
+        self.client.complete.return_value = dict(self.WRITTEN)
+
+    def test_plan_show_prints_one_line_per_record(self):
+        code, out, _ = run_cli(["plan", "show"])
+        self.assertEqual(code, 0)
+        self.assertIn("Retrospectives:", out)
+        self.assertIn("Base 1 · 2026-09-14 Mon -> 2026-10-04 Sun · finished", out)
+        self.assertIn(
+            "Base 2 · 2026-10-05 Mon -> 2026-10-25 Sun · finished, not written yet", out
+        )
+        self.assertNotIn("For: the old lines.", out)
+
+    def test_plan_show_v_prints_each_written_record_in_full(self):
+        code, out, _ = run_cli(["plan", "show", "-v"])
+        self.assertEqual(code, 0)
+        self.assertIn("Base 1 (2026-09-14..2026-10-04), finished", out)
+        self.assertIn("Sessions 5 of 6 · load 380 of 400 TSS · 10h00", out)
+        self.assertIn("For: the old lines.", out)
+        self.assertIn('Athlete: "felt fresh"', out)
+        self.assertIn('Said to the athlete: "Old."', out)
+        self.assertIn("finished, not written yet", out)
+
+    def test_redo_writes_the_record_again_and_keeps_the_words(self):
+        code, out, _ = run_cli(["plan", "retro", "redo", str(self.base1)])
+        self.assertEqual(code, 0)
+        record = test_db.get_retrospective(self.base1)
+        self.assertEqual(record["body"], self.WRITTEN["record"])
+        self.assertEqual(record["athlete_line"], self.WRITTEN["athlete_line"])
+        self.assertEqual(record["athlete_words"], "felt fresh")
+        self.assertEqual(record["numbers"]["sessions_planned"], 0)
+        self.assertIn(f"Retrospective {self.base1} written again.", out)
+        self.assertIn("For: build easy volume.", out)
+        self.assertEqual(test_db.waiting_queue_items(), [])
+
+    def test_redo_with_words_replaces_them_first(self):
+        code, _, _ = run_cli(
+            ["plan", "retro", "redo", str(self.base1), "--words", "I was ill in week 2"]
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            test_db.get_retrospective(self.base1)["athlete_words"], "I was ill in week 2"
+        )
+        self.assertIn("I was ill in week 2", self.client.complete.call_args[0][1])
+
+    def test_redo_with_clear_words_removes_them(self):
+        code, _, _ = run_cli(["plan", "retro", "redo", str(self.base1), "--clear-words"])
+        self.assertEqual(code, 0)
+        self.assertIsNone(test_db.get_retrospective(self.base1)["athlete_words"])
+        self.assertNotIn("THE ATHLETE'S WORDS", self.client.complete.call_args[0][1])
+
+    def test_a_failed_redo_keeps_what_the_record_held(self):
+        self.client.complete.side_effect = ValueError("no answer")
+        code, out, _ = run_cli(["plan", "retro", "redo", str(self.base1)])
+        self.assertEqual(code, 1)
+        self.assertIn("keeps what it held", out)
+        self.assertEqual(test_db.get_retrospective(self.base1)["body"], "For: the old lines.")
+
+    def test_redo_refuses_an_id_that_is_not_a_record(self):
+        code, out, _ = run_cli(["plan", "retro", "redo", "999"])
+        self.assertEqual(code, 1)
+        self.assertIn("not found", out)
+        self.client.complete.assert_not_called()
+
+    def test_plan_rm_names_the_records_and_deletes_them(self):
+        code, out, _ = run_cli(["plan", "rm", str(self.goal)], input_value="y")
+        self.assertEqual(code, 0)
+        self.assertIn("2 retrospective record(s)", out)
+        self.assertEqual(test_db.get_retrospectives(), [])
+
+    def test_plan_wipe_deletes_the_records(self):
+        code, _, _ = run_cli(["plan", "wipe", "-y"])
+        self.assertEqual(code, 0)
+        self.assertEqual(test_db.get_retrospectives(), [])

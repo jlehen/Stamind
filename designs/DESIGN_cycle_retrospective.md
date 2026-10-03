@@ -1,7 +1,8 @@
 # Design: a retrospective of each mesocycle and each plan
 
-**Status:** Draft · **Date:** 2026-09-27, brought up to date with `main` on 2026-09-30,
-revised after two reviews on 2026-10-01 · **Branch:** `worktree-cycle-retrospective`
+**Status:** Implemented on 2026-10-01 (D46-D49 record what the code had to decide) ·
+**Date:** 2026-09-27, brought up to date with `main` on 2026-09-30, revised after two
+reviews on 2026-10-01 · **Branch:** `worktree-cycle-retrospective`
 
 When a mesocycle or a plan is finished, Stamind keeps a short record of what it was for and
 what came out of it. The model call inside `plan generate` reads that record, this season and
@@ -673,6 +674,10 @@ tests call it directly.
 | D43 | Date check after a rollback | Cut. A rollback and a goal brought back both wait for the next date check | It only made `plan show` right a day sooner, and a goal brought back had no such step. `plan generate` runs the date check before it reads a record | Fourth review | 2026-10-01 |
 | D44 | Day of a replacement | Read on the athlete's clock | The time is stored in UTC, and one day decides whether seven days were trained | Fourth review | 2026-10-01 |
 | D45 | Old versions on the first day | The cut-short rule reads the versions replaced before the first date check too. What is lost is a mesocycle that finished inside one. It makes D38 exact | §10 said less than the rule of §3 does. In both live databases the rule records nothing there | Fourth review | 2026-10-01 |
+| D46 | A mesocycle that ended inside the version replaced last | It gets no cut-short record. When several replaced versions hold a mesocycle, the one replaced last decides alone: if the mesocycle had already ended on the day that version was replaced, nothing is recorded | An older version would otherwise call a mesocycle "cut short" that a later version let finish. It is the case §10 says is not recorded | Implementation | 2026-10-01 |
+| D47 | The write step under `--show-llm-prompt-only` | It writes nothing. The date check still runs | The writer would print its own prompt and exit before the prompt that the command was asked to show | Implementation | 2026-10-01 |
+| D48 | `plan retro redo` on the command line | `plan retro` takes the action as a word, with `redo` as its one value, then the ID | The command tree has two levels everywhere. `bot capture` takes its intent the same way | Implementation | 2026-10-01 |
+| D49 | A blank record in `plan show` | Its line says how it ended and "not written yet", both | A record cut short and not written yet would otherwise look like one that reached its end | Implementation | 2026-10-01 |
 
 ## Dependency Graph & Implementation Order
 
