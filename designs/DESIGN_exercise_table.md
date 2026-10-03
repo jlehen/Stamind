@@ -250,8 +250,9 @@ classes can show the same words, and the band glute bridge can no longer pass fo
 | `athlete_queue.payload` of a waiting proposal | Keys in its sessions' prescribed sets |
 | `workouts.description` | Words. Written once and never rewritten |
 
-No column is added or removed. `SCHEMA_VERSION` goes from 26 to 27 all the same, so that a
-database still holding the old names is one the conversion of §9 has to be run on.
+No column is added or removed, so `SCHEMA_VERSION` stays at 26. A version stamp would not guard
+the conversion of §9 anyway: opening an older database stamps it with the new version and changes
+nothing else (`db/schema.py`, `_init_db`).
 
 A session's description is frozen text. A session written before the conversion keeps "Belt squat
 3×4–6 @ 140 kg", and one written after it reads "Squat: belt squat 3×4–6 @ 140 kg". The step that
@@ -345,7 +346,6 @@ What it rewrites:
 2. `prescribed_sets.exercise`, by the old name.
 3. The `n` of every entry in `gym_logs.payload`.
 4. The payloads of the queue items still waiting (§5).
-5. The stamp: it writes version 27.
 
 It leaves `workouts.description` alone, and it prints every name it could not map, which is a
 set stored under a Garmin name the old table lacked.
@@ -377,8 +377,13 @@ The companion athlete's names need none.
    sessions again, so their descriptions and the calendar hold the new words.
 5. Start the bots.
 
-Not handled: a description written before the conversion keeps its old words for good, which
-matters only for past sessions; and a proposal waiting in the queue keeps its preview text.
+Not handled:
+
+- A description written before the conversion keeps its old words for good. That matters only
+  for past sessions.
+- A proposal waiting in the queue keeps its preview text.
+- New code started on a database that was not converted reads every old name as an exercise it
+  does not know. Nothing is lost, and the script can still be run then.
 
 ## 10. Building the table
 
