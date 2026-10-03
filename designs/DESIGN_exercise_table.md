@@ -59,7 +59,8 @@ PULL_UP/PULL_UP PULL_UP/WEIGHTED_PULL_UP PULL_UP	pull_vertical	LATS,TRAPS|BICEPS
 SANDBAG/BACK_SQUAT	squat	QUADS,GLUTES	Sandbag
 POSE/WHEEL			Nothing
 +FLYE/PEC_DECK	accessory	CHEST|SHOULDERS	Machine
-+SQUAT/STEP_DOWN~SQUAT/STEP_UP	single_leg	QUADS,GLUTES	Box
+# nearest Garmin exercise: SQUAT/STEP_UP
++SQUAT/STEP_DOWN	single_leg	QUADS,GLUTES	Box
 ```
 
 A line may stop after its last filled column. The loader pads what is missing, so an editor that
@@ -68,47 +69,52 @@ strips a trailing tab does no harm.
 ### 3.2 The names: a line is a class
 
 The first column lists the Garmin names of the class, separated by spaces. The first one is the
-key. The order on a line is: the plain exercise, then its weighted twin, then any other name,
-then the bare category. The pattern, muscles and gear of a line are those of its key:
-`PLANK/PLANK` needs nothing, even though its weighted twin needs a plate.
+key. The order on a line is: the plain exercise, then its weighted twin, then the bare category.
+The pattern, muscles and gear of a line are those of its key: `PLANK/PLANK` needs nothing, even
+though its weighted twin needs a plate.
 
 A key never changes once shipped, because stored sets hold it. The table's header comment says
 so: the first name of a line is stored, never reorder it. A name Garmin adds later is appended
 to its line, or gets a line of its own.
 
-Three things, and only these, put two Garmin names on one line:
+Two things, and only these, put two Garmin names on one line:
 
 - **A weighted twin.** Garmin has `X` and `WEIGHTED_X` for about 360 bodyweight exercises. The
   load of the class is the added load.
 - **A bare category.** `BENCH_PRESS/BENCH_PRESS` and the bare `BENCH_PRESS` are the same generic
   bench press.
-- **One exercise Garmin files twice.** `LATERAL_RAISE/ARM_CIRCLES` and `WARM_UP/ARM_CIRCLES`.
 
-Two implements are never one class. Today 30 lines hold Garmin names from more than one implement.
-28 of them mix a plain exercise with a band, sandbag, suspension-trainer, sled or battle-rope one:
-`OLYMPIC_LIFT/CLEAN` and `SANDBAG/CLEAN` share the line `clean`, so a 20 kg sandbag clean sits in
-the barbell clean's history. The other two hold implements only: `glute bridge` is a band and a
-suspension-trainer exercise, and `chest press` a band, a sled and a suspension-trainer one. Each
-of the 30 is split, one line per implement category and one for the plain exercise. The table
-goes from 1,487 lines with a Garmin name to 1,529.
+So every name on a line has the same category, and the words of §4 always say the category Garmin
+gave. Today 37 lines hold names from more than one category, and each is split, one line per
+category:
+
+- **30 lines hold more than one implement.** 28 mix a plain exercise with a band, sandbag,
+  suspension-trainer, sled or battle-rope one: `OLYMPIC_LIFT/CLEAN` and `SANDBAG/CLEAN` share the
+  line `clean`, so a 20 kg sandbag clean sits in the barbell clean's history. The other two hold
+  implements only: `glute bridge` is a band and a suspension-trainer exercise, and `chest press`
+  a band, a sled and a suspension-trainer one.
+- **7 lines hold one exercise Garmin files under two categories**, such as
+  `LATERAL_RAISE/ARM_CIRCLES` and `WARM_UP/ARM_CIRCLES`. Kept together under the first name, the
+  companion athlete's warm-up arm circles would read "Lateral raise: arm circles" and count as
+  isolation work. Split, an athlete who logs arm circles under both filings has two histories of
+  a movement with no load.
+
+The table goes from 1,487 lines with a Garmin name to 1,539.
 
 Both of Garmin's lists stay in the table: the 1,531 names of Garmin Connect's catalog and the 352
 names only the FIT SDK has. The FIT SDK alone lacks 37 Connect names, among them
 `SQUAT/BELT_SQUAT`, which the athlete logs every week.
 
-Not handled: a set stored under a new Garmin name before the table knew that name keeps it. If
-the name is later appended to another line, those sets are renamed by hand.
-
 ### 3.3 An added exercise
 
 An added exercise is written `+CATEGORY/NAME`. The category is one of Garmin's, chosen by hand,
 and it is the exercise's Garmin mapping: a set can be sent to Garmin under the category alone.
-When a Garmin exercise comes close, it follows after a `~`: `+SQUAT/STEP_DOWN~SQUAT/STEP_UP`.
-The `+` and what follows the `~` are marks in the file. The key is `SQUAT/STEP_DOWN`.
+The `+` is a mark in the file. The key is `SQUAT/STEP_DOWN`. A set read from Garmin never lands
+on an added exercise.
 
-A set read from Garmin never lands on an added exercise, and the name after `~` is not a member
-of the class. Nothing reads the mapping today. It is recorded so that an export to Garmin, when
-one is built, has a target for every exercise (§12).
+When a Garmin exercise comes close, a comment line above the exercise names it:
+`# nearest Garmin exercise: SQUAT/STEP_UP`. Nothing reads it. It is recorded so that an export to
+Garmin, when one is designed, finds a target beside every added exercise (§12).
 
 The table starts with 23 added exercises. Their pattern, muscles and gear were set by hand and
 not reviewed.
@@ -162,7 +168,7 @@ squat says nothing about a 140 kg belt squat.
 move, cardio drill, warm-up and conditioning drill landed. The lines of twenty Garmin categories
 get no pattern: `POSE`, `MOVE`, `CARDIO`, `WARM_UP`, `RUN`, `RUN_INDOOR`, `BIKE`, `BIKE_OUTDOOR`,
 `INDOOR_BIKE`, `INDOOR_ROW`, `ELLIPTICAL`, `FLOOR_CLIMB`, `STAIR_STEPPER`, `PLYO`, `BATTLE_ROPE`,
-`TOTAL_BODY`, `LADDER`, `SLED`, `TIRE` and `SLEDGE_HAMMER`. That is 431 classes.
+`TOTAL_BODY`, `LADDER`, `SLED`, `TIRE` and `SLEDGE_HAMMER`. That is 441 classes.
 
 No code asks whether an exercise is progressed by rule. The rule is prose the strength planner
 reads, under "Accessories" in `strength/progression.md`: an accessory is written at what the
@@ -209,6 +215,10 @@ Where each list comes from:
 | Today's equipment word, carried over: exercises the reviewers did not recognise | 13 |
 | Set by hand: the added exercises (§3.3) | 23 |
 
+The review was run with the 30 implement lines already split. The ten classes that come from
+splitting an exercise Garmin files twice take the list of the line they came from, which makes
+1,562 classes in all.
+
 Carried over means `barbell` becomes Barbell, `dumbbell` Dumbbells, `kettlebell` Kettlebells,
 `cable` "Cable Machine, Cable Attachment", `machine` Machine and `bodyweight` Nothing. Three of
 Garmin's own lists are made more exact: the two incline dumbbell exercises say Adjustable Bench
@@ -221,8 +231,9 @@ guess of a bodyweight exercise at more than 50 kg as not that exercise
 (DESIGN_strength_tracking.md §6), and the page gives a card added for a bodyweight exercise no
 load. After this design an exercise is bodyweight when none of its gear is a load. A pull-up needs
 a Pull-up Bar, which is not a load, so it is bodyweight. A leg curl needs a Machine, so it is not.
-For the exercises the two athletes do, the rule gives today's answer, except for the plain calf
-raise, which was `machine` and needs nothing.
+For the exercises the two athletes do, the rule gives today's answer, except for two. The plain
+calf raise was `machine` and needs nothing. The leg curl was `bodyweight` and needs a Machine,
+which is right: the athlete lifts 55 to 65 kg on it.
 
 Not handled: the rule misreads an exercise whose gear holds a load that is not the thing lifted,
 such as an inverted row under a racked barbell.
@@ -273,8 +284,7 @@ pulldown; shoulder press: seated barbell shoulder press; row".
 | `exercise_sets.garmin_name` | What Garmin said. Unchanged |
 | `prescribed_sets.exercise` | The key |
 | `gym_logs.payload`, the page's log kept as sent | Keys, in each entry's `n` |
-| `athlete_queue.payload` of a waiting question about sets | Keys (§8) |
-| `athlete_queue.payload` of a waiting proposal | Keys in its sessions' prescribed sets |
+| `athlete_queue.payload` of a question about sets, or of a proposal | Keys, once written by the new code. None is converted (§9) |
 | `workouts.description` | Words. Written once and never rewritten |
 
 No column is added or removed, so `SCHEMA_VERSION` stays at 26. A version stamp would not guard
@@ -297,17 +307,21 @@ made-up words that match nothing.
 
 A set in Garmin's `UNKNOWN` category stays unnamed, as today.
 
-Not handled: on a day recorded by the watch alone, a set lands on the Garmin name the athlete
-picked in Garmin Connect. The athlete who files the hip thrust machine under the band glute
-bridge there gets the band glute bridge, and moves it with `strength name`.
+Not handled:
+
+- On a day recorded by the watch alone, a set lands on the Garmin name the athlete picked in
+  Garmin Connect. The athlete who files the hip thrust machine under the band glute bridge there
+  gets the band glute bridge, and moves it with `strength name`.
+- A set stored under a new Garmin name before the table knew that name keeps it. If the name is
+  later appended to another line, those sets are renamed by hand.
 
 ## 7. What changes for the athlete and for the model calls
 
 **The athlete.** Every place that prints an exercise prints its words: the terminal's strength
 commands, the chat, the session's description, the page. `strength log` and `strength exercises`
-match what is typed against the whole words or against the part after the colon, so "leg press"
-still finds "squat: leg press", and they accept a key. Lists sort by the words. The index of
-`strength exercises` gains a group for the lines with no pattern.
+match what is typed against the words the way they match the names today: the exact words, or
+else every exercise whose words contain it. "leg press" still finds "squat: leg press". Lists
+sort by the words. The index of `strength exercises` gains a group for the lines with no pattern.
 
 The page's search lists one entry per class, under the words of its key, and searches those
 words. "Pull up" is one entry. Nothing is hidden: the yoga poses are in the list. Not handled:
@@ -333,17 +347,16 @@ from the session, as an unknown name is today. The notes it writes under a sessi
 exercises in plain words, as today.
 
 Today the list leaves out the accessory exercises the athlete has never done: about 690 lines
-and 31 kB. The athlete chose to be offered everything. The full list is 1,552 lines and about
-119 kB, nearly four times the size, because each line is also longer.
+and 31 kB. The athlete chose to be offered everything. The full list is about 1,560 lines and
+97 kB, three times the size, because each line is also longer. Keys alone would be 46 kB.
 
 It is told one new rule: an exercise whose gear holds Dumbbells can be done with kettlebells of
 the same weight, and the reverse. The exercise keeps its key and its history. This is why no
 kettlebell line is added for a dumbbell exercise.
 
 **The naming question.** The model call that proposes names for what the athlete typed
-(`strength/questions.py`) is given the words of every class and answers with words. No two
-classes share their words, so code turns each answer back into a key. Its list goes from 32 kB
-to 46 kB.
+(`strength/questions.py`) is given the key of every class and answers with keys, checked as the
+strength planner's are. The buttons show the words. Its list goes from 32 kB to 46 kB.
 
 **The week planner** writes no exercise into a brief and is given no list. Unchanged.
 
@@ -370,7 +383,8 @@ today and 1,927 with keys. Telegram allows the whole keyboard about 9.9 kB, shar
 calendar and the plan buttons, and it fits with about 500 bytes left. The largest log goes from
 1,395 to 1,561 bytes of the 4,096 allowed.
 
-A log from a page still on version 1 is refused with a line that says to reload the page.
+A log from a page still on version 1 is refused, as a log of a version the bot does not know is
+today.
 
 The page's notes are the text under the exercise lines of the description. Today they are found
 by comparing each stored line with the line a fresh render would give. A session written before
@@ -379,15 +393,10 @@ by counting instead: as many lines are dropped as the session has exercises.
 
 **The queue.** A waiting "are the sets final?" question holds the watch's guesses, and a waiting
 "what was this?" question holds its answers. Both hold keys. An answer carries the key to store
-and is shown as its words. Today the label is both. The buttons already in the chat name an
-answer by its position, so the conversion rewrites each answer in place and never removes or
-merges one.
+and is shown as its words. Today the label is both.
 
-Not handled:
-
-- A session open on the page across the conversion cannot be sent, and a reload starts it from
-  the session as written. The refused log is still in `logs/gym_logs/`.
-- A keyboard too large for Telegram is refused, and the message goes out without it, as today.
+Not handled: a session open on the page across the conversion cannot be sent, and a reload starts
+it from the session as written. The refused log is still in `logs/gym_logs/`.
 
 ## 9. The one-off conversion
 
@@ -395,32 +404,35 @@ Not handled:
 `STAMIND_CONFIG`. Every Stamind instance is operated by the author, so there is no compatibility
 code: the new code reads keys only.
 
-The script reads `scripts/exercise_name_migration.tsv`, which gives the key each old name
-becomes (§10). It rewrites four places: `exercise_sets.exercise`, `prescribed_sets.exercise`, the
-`n` of every entry in `gym_logs.payload`, and the payloads of the queue items still waiting (§5).
-It leaves `workouts.description` alone.
+The script rewrites three places: `exercise_sets.exercise`, `prescribed_sets.exercise`, and the
+`n` of every entry in `gym_logs.payload`. It leaves `workouts.description` alone.
+
+**It stops before anything while a "what was this?" question or a proposal waits in the queue**,
+and lists them. A tap on either would write the old names into the database. The operator has
+them answered with `sm queue`, then runs the script again. A waiting "are the sets final?"
+question is left alone: its names are only shown, and "yes, final" reads the sets from Garmin
+again.
 
 **It changes a value only while that value is still an old name.** Old names are lower case and
 keys are upper case, so a second run changes nothing.
 
-For each old name, the first of these that applies:
+`scripts/exercise_name_migration.tsv` gives, for each old name, the keys of the classes its line
+became: one key when the line was not split, several when it was (§10). For each stored old name,
+the first of these that applies:
 
-1. **A rename given on the command line** (below). It wins in all four places.
-2. **The set's own Garmin name.** A set whose stored name is the one the old table gave for its
-   `garmin_name` takes the key of the class holding that Garmin name. This is exact where a line
-   was split: a set Garmin tagged `SANDBAG/CLEAN` goes to the sandbag clean. A set stored under a
-   Garmin name the old table lacked takes that Garmin name as its key (§6).
-3. **The list.** Where a line was split, its old name takes the key of the plain exercise.
-   `row`, which the athlete lifts at 95 to 120 kg, becomes `ROW/ROW`. An old name whose line had
-   no plain exercise has no key in the list: `glute bridge` and `chest press`.
+1. **A rename given on the command line** (below). It wins in all three places.
+2. **One key in the list:** that key.
+3. **Several keys:** the key of the class holding the set's own `garmin_name`, when it is one of
+   them. A set Garmin tagged `SANDBAG/CLEAN` goes to the sandbag clean.
+4. **Otherwise the script stops** and lists the name with its sets and loads. The operator gives
+   a rename. The script never picks one of several classes itself.
 
 Before it writes, the script prints every distinct stored name with the key it becomes, its
-number of sets and its loads, and marks the names whose line was split. A stored name with no key
-stops it. It writes after a yes.
+number of sets and its loads. It writes after a yes.
 
-**The athlete's own answers.** Where the athlete named sets with a word the table gave another
-meaning, only the athlete knows what was lifted. A rename is given as
-`--rename "back squat=SQUAT/BARBELL_BACK_SQUAT"`. The main athlete answered on 2026-10-03:
+**The athlete's own answers.** Where a stored word can mean several exercises, or the table gave
+it another meaning than the athlete's, only the athlete knows what was lifted. A rename is given
+as `--rename "back squat=SQUAT/BARBELL_BACK_SQUAT"`. The main athlete answered on 2026-10-03:
 
 | Stored under | Lifted | Key |
 |---|---|---|
@@ -429,15 +441,14 @@ meaning, only the athlete knows what was lifted. A rename is given as
 | `glute bridge` | Hip thrust machine | `HIP_RAISE/HIP_THRUST_MACHINE` |
 | `chest fly` | Cable crossover | `FLYE/CABLE_CROSSOVER` |
 | `hamstring curls` | Leg curl machine | `LEG_CURL/LEG_CURL` |
+| `hamstring curl` | A warm-up set on the same leg curl machine | `LEG_CURL/LEG_CURL` |
 | `ab twist` | Russian twists | `CORE/RUSSIAN_TWIST` |
 | `wheel` | Ab wheel rollout | `CORE/KNEELING_AB_WHEEL` |
-| `hamstring curl` | Not answered yet | |
 
-`hamstring curl`, in the singular, is one set of 6 at 50 kg on Monday 28 September, beside the
-`hamstring curls` at 60 to 65 kg. The list sends it to the Pilates move of that name, which the
-printed list shows. The athlete gives the rename.
-
-The companion athlete's names need none.
+By today's data the script still stops on three words of the main athlete, whose line was split
+and which the athlete has not been asked about: `row` (lifted at 95 to 120 kg and prescribed 41
+times), `plank` and `clean and press`. It stops on two of the companion athlete: `push up` and
+`arm circles`.
 
 **The steps for the operator.** They run when step 1 of §11 lands; step 2 needs no conversion.
 
@@ -445,15 +456,12 @@ The companion athlete's names need none.
    process read from the checkout, so the new code runs as soon as main is landed there.
 2. Land the branch on main in the live checkout and push it. Wait until the page's deployment is
    done, then ten more minutes, the time a phone keeps a page file.
-3. Back up each database with `sqlite3 <database> ".backup <copy>"`, then run the script once
-   per instance, the main one with its renames.
+3. Copy each database file, and its `-wal` file if it is not empty. Then run the script once per
+   instance, with its renames.
 4. Start the bots. The next morning's message redraws each keyboard.
 
-Not handled:
-
-- A proposal waiting in the queue keeps its preview text in the old words.
-- New code started on a database that was not converted reads every old name as an exercise it
-  does not know. Nothing is lost, and the script can still be run then.
+Not handled: new code started on a database that was not converted reads every old name as an
+exercise it does not know. Nothing is lost, and the script can still be run then.
 
 ## 10. Building the table
 
@@ -470,16 +478,17 @@ and after this build it is edited by hand, as today.
 The vocabulary module reads it and gives, for a key, the class, pattern, muscles, gear, photos and
 words, and for any Garmin name its key. Everything that stores, compares or validates a name works
 on keys, and everything that prints one prints its words (§4). Both model calls change with it,
-since their answers are validated: the strength planner is shown keys and answers keys, its line
-takes the new form with today's selection of lines, and the naming question works on words (§7).
-The page's two payloads and its catalog carry keys (§8). The sentence on exercises with no
-pattern (§3.4). The conversion script. The tests' fixtures move to keys.
+since their answers are validated: each is shown keys and answers keys (§7). The strength
+planner's line takes the new form with today's selection of lines: an accessory the athlete has
+never done is left out, and a line with no pattern is left out the same way. The page's two
+payloads and its catalog carry keys (§8). The sentence on exercises with no pattern (§3.4). The
+conversion script. The tests' fixtures move to keys.
 
 **Step 2: what is offered.** The strength planner is shown every class and told the dumbbell and
 kettlebell rule, and the terminal's exercise listing shows muscles and gear (§7).
 
-Tests that read the table check four things: a Garmin name is on one line only, a `~` name is a
-Garmin name of the table, every gear word is one of the 46, and no two classes show the same
+Tests that read the table check four things: a Garmin name is on one line only, the names of a
+line share one category, every gear word is one of the 46, and no two classes show the same
 words.
 
 When the code lands, `docs/ARCHITECTURE.md` is updated, and the passages that describe the old
@@ -503,6 +512,9 @@ DESIGN_gym_logger.md §2 to §4.
   stored when a load is entered". Storing the key and reading the twin off the load gives the same
   answer for an export, and leaves every comparison in the code a comparison of two stored names,
   as today. Storing the twin would make about twenty of them compare classes instead.
+- **A line never holds two categories.** The athlete asked for the implements to be split. The
+  seven lines that hold one exercise under two of Garmin's categories are split as well (§3.2),
+  so that a warm-up keeps Garmin's warm-up category in its words and in its pattern.
 - **The words of §4 land in step 1**, not with the rest of what the athlete sees, because a key
   cannot be stored before something can show it.
 - **The `+` is not stored.** If Garmin later adds the same name, the line drops its mark and
