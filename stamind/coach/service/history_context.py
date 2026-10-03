@@ -20,7 +20,7 @@ from stamind.analytics import zone_tables
 from stamind.analytics.mesocycle_report import mesocycle_report
 from stamind.analytics.pmc import PMC_TSB_LAG_NOTE, load_ratio, pmc_data_caveat, pmc_ramp
 from stamind.db.objectives import ARCHIVED
-from stamind.db.retrospectives import MESOCYCLE
+from stamind.db.retrospectives import MESOCYCLE, PLAN
 from stamind.plan_versions import plan_lineage
 from stamind.sports import canonical_sport
 from stamind.text import wrap_text
@@ -219,8 +219,10 @@ class HistoryContextMixin:
 
         The finished mesocycles of every goal come from their records, so one that lives
         only in a replaced plan version is shown. A written record stands in for the full
-        detail, except for the mesocycle that finished most recently. The mesocycles under
-        way come from `macros`, in full detail.
+        detail, and a written record of a plan stands for the mesocycle records it covers.
+        The mesocycle that finished most recently is the exception to both: it keeps its
+        full detail and its record. The mesocycles under way come from `macros`, in full
+        detail.
 
         The delta baseline of a mesocycle shown in full is the one before it in this list,
         across goals too (DESIGN_intensity_distribution.md §4.1)."""
@@ -235,6 +237,11 @@ class HistoryContextMixin:
             if m['start_date'] <= today_str <= m['end_date']
         ]
         timeline = finished + under_way
+        stood_for = {
+            record['id']
+            for plan in self._written_plan_records()
+            for record in cycle_records.covered(self._db, plan)
+        }
         goals = {g['id']: g for g in self._db.get_objectives()}
         benchmarks = self._db.get_benchmark_results()
         reports: List[str] = []
@@ -242,6 +249,8 @@ class HistoryContextMixin:
         for i, meso in enumerate(timeline):
             written = meso.get('body') is not None
             latest = bool(finished) and meso is finished[-1]
+            if written and not latest and meso['id'] in stood_for:
+                continue
             parts = []
             if not written or latest:
                 parts.append(self._mesocycle_review(
@@ -260,6 +269,19 @@ class HistoryContextMixin:
                 reports.append(self._goal_line(goals[goal_id]))
             reports.extend(parts)
         return reports
+
+    def _written_plan_records(self) -> List[Dict[str, Any]]:
+        """The records of plans that have their lines, for every goal, oldest first."""
+        return [
+            record for record in self._db.get_retrospectives(level=PLAN)
+            if record['body'] is not None
+        ]
+
+    def _plan_retrospectives_text(self) -> Optional[str]:
+        """The records of past plans as the strategy prompt prints them, with no limit on
+        their number (DESIGN_cycle_retrospective.md §7)."""
+        records = self._written_plan_records()
+        return "\n\n".join(cycle_records.record_text(r) for r in records) or None
 
     @staticmethod
     def _indented_record(record: Dict[str, Any], indent: str, width: int) -> str:

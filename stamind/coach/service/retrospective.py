@@ -13,6 +13,7 @@ from stamind.analytics.adherence import PARTIAL
 from stamind.analytics.compare import adherence_verdicts
 from stamind.analytics.load import activity_load, planned_load
 from stamind.clock import today_str as _today_str
+from stamind.db.retrospectives import PLAN
 from stamind.output import step
 from stamind.sports import canonical_sport
 from stamind.text import cyan
@@ -47,6 +48,8 @@ class RetrospectiveMixin:
         the record's days, computes the numbers, calls the writer and stores the result.
 
         Raises when the writer fails, and the record then keeps what it held (§9)."""
+        if record['level'] == PLAN:
+            return self._write_plan_retrospective(record, wait_notice)
         today = _today_str()
         start, end = record['start_date'], record['end_date']
         step(f"Writing the retrospective of '{record['name']}' ({start} to {end})...", cyan)
@@ -69,12 +72,65 @@ class RetrospectiveMixin:
             ],
             wait_notice=wait_notice,
         )
+        return self._store_retrospective(record, numbers, result)
+
+    def _write_plan_retrospective(
+        self, record: Dict[str, Any], wait_notice: Optional[str]
+    ) -> str:
+        """Writes the record of a plan: first the records of its mesocycles that are still
+        blank, then its own, from theirs. Nothing is computed again (§5)."""
+        for mesocycle in cycle_records.covered(self._db, record):
+            if mesocycle['body'] is not None:
+                continue
+            self.write_retrospective(mesocycle, wait_notice)
+            # One notice is enough for the athlete who waits for the reply.
+            wait_notice = None
+        mesocycles = cycle_records.covered(self._db, record)
+        step(f"Writing the retrospective of the plan toward '{record['name']}'...", cyan)
+        result = self.engine._retrospective_writer(
+            record, _today_str(),
+            mesocycle_records="\n\n".join(cycle_records.record_text(m) for m in mesocycles),
+            wait_notice=wait_notice,
+        )
+        return self._store_retrospective(record, self._plan_numbers(mesocycles), result)
+
+    def _store_retrospective(
+        self, record: Dict[str, Any], numbers: Dict[str, Any], result: Dict[str, Any]
+    ) -> str:
+        """Stores what the writer returned, and hands back the sentence for the athlete."""
         body = str(result.get('record') or "").strip()
         if not body:
             raise ValueError("the retrospective writer returned no record")
         athlete_line = str(result.get('athlete_line') or "").strip()
         self._db.write_retrospective(record['id'], numbers, body, athlete_line)
         return athlete_line
+
+    @staticmethod
+    def _plan_numbers(mesocycles: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """The numbers of a plan: the sums of its mesocycle records, with the fitness and
+        each benchmark taken as first and last value (§5)."""
+        numbers = [m['numbers'] for m in mesocycles]
+        benchmarks: Dict[str, Dict[str, Any]] = {}
+        for one in numbers:
+            for test in one['benchmarks']:
+                seen = benchmarks.get(test['kind'])
+                if seen is None:
+                    benchmarks[test['kind']] = dict(test)
+                    continue
+                if seen['before'] is None:
+                    seen['before'] = seen['after']
+                seen['after'] = test['after']
+        totals = {
+            key: sum(one[key] for one in numbers)
+            for key in ('sessions_done', 'sessions_planned', 'duration_sec',
+                        'load_planned', 'load_done')
+        }
+        return {
+            **totals,
+            'fitness_start': numbers[0]['fitness_start'],
+            'fitness_end': numbers[-1]['fitness_end'],
+            'benchmarks': list(benchmarks.values()),
+        }
 
     def _retrospective_numbers(self, start: str, end: str, today: str) -> Dict[str, Any]:
         """The values a mesocycle record's first line shows, exact, as totals over its own

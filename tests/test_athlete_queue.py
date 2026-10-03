@@ -657,6 +657,21 @@ class RetrospectiveQuestionTest(_QueueCase):
         test_db.delete_retrospective(self._record()["id"])
         self.assertEqual(athlete_queue.walk(self.now), [])
 
+    def test_a_plan_is_asked_about_in_its_own_words(self):
+        """One question at the end of a plan, about the plan."""
+        test_db.wipe_plans()
+        self._plan(("Aerobic base 2", "2026-08-24", "2026-09-13"))
+        item = self._question()
+        self.assertEqual(test_db.get_retrospective(int(item["subject"]))["level"], "plan")
+        self.assertEqual(
+            athlete_queue.wording(item),
+            "Your plan toward “Alpe du Zwift” ended on Sep 13. How did it go?",
+        )
+        self.assertEqual(
+            athlete_queue.wording(item, companion=True),
+            "Your plan toward “Alpe du Zwift” is finished. How did it go for you?",
+        )
+
     def test_the_chat_offers_tell_me_nothing_to_say_and_not_now(self):
         self._question()
         with patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):

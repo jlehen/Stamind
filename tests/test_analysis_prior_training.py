@@ -3,8 +3,9 @@ prompt.
 """
 import os
 import unittest
+from unittest.mock import patch
 
-from tests.helpers import clear_all_tables, rebind_test_db, save_workout
+from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, save_workout
 from stamind.db import Database
 from tests import test_db_path
 
@@ -319,6 +320,60 @@ class TestTheReviewReadsRecords(unittest.TestCase):
                    ("Build", "2026-07-13", "2026-08-02"))
         text = self._review()
         self.assertIn('Re-entry — focus "Re-entry focus"', text)
+
+    def _spring(self) -> None:
+        """A plan of two mesocycles trained to its end on 21 June, every record written."""
+        goal = test_db.add_objective("Spring Hill Climb", "2026-06-21", "cycling")
+        self._plan(goal, ("Spring base", "2026-05-11", "2026-05-31"),
+                   ("Spring peak", "2026-06-01", "2026-06-21"))
+        cycle_records.date_check(test_db, "2026-06-22")
+        for name in ("Spring base", "Spring peak"):
+            self._write(name)
+
+    def test_a_written_record_of_a_plan_stands_for_its_mesocycles(self):
+        self._spring()
+        self._write("Spring Hill Climb")
+        self._season()
+        text = self._review()
+        self.assertNotIn("Spring base", text)
+        self.assertNotIn("Spring peak", text)
+        self.assertNotIn('Toward "Spring Hill Climb"', text)
+        self.assertIn(
+            'Plan toward "Spring Hill Climb" (2026-05-11..2026-06-21), finished',
+            coach_service._plan_retrospectives_text(),
+        )
+
+    def test_a_record_of_a_plan_without_lines_stands_for_nothing(self):
+        self._spring()
+        self._season()
+        text = self._review()
+        self.assertIn("Spring base (2026-05-11..2026-05-31), finished", text)
+        self.assertIn("Spring peak (2026-06-01..2026-06-21), finished", text)
+        self.assertIsNone(coach_service._plan_retrospectives_text())
+
+    def test_the_latest_mesocycle_keeps_its_detail_under_a_written_record_of_its_plan(self):
+        self._spring()
+        self._write("Spring Hill Climb")
+        text = self._review()
+        self.assertNotIn("Spring base", text)
+        self.assertIn('Spring peak — focus "Spring peak focus"', text)
+        self.assertIn("For: Spring peak aim.", text)
+
+    @patch("stamind.coach.engine.openrouter_client")
+    def test_the_records_of_plans_have_their_own_section_in_the_prompt(self, client):
+        pin_clock(self, self.TODAY)
+        self._spring()
+        self._write("Spring Hill Climb")
+        self._season()
+        client.complete.return_value = {"strategy": "New", "mesocycles": []}
+        coach_service.plan_generate(force=True, auto_apply=False)
+        prompt = client.complete.call_args[0][0]
+        self.assertIn("## RETROSPECTIVES OF PAST PLANS", prompt)
+        self.assertIn("For: Spring Hill Climb aim.", prompt)
+        self.assertLess(
+            prompt.index("## RETROSPECTIVES OF PAST PLANS"),
+            prompt.index("## PRIOR TRAINING REVIEW"),
+        )
 
     def test_every_goal_counts_under_a_line_that_names_it(self):
         called_off = test_db.add_objective("Spring Hill Climb", "2026-06-21", "cycling")

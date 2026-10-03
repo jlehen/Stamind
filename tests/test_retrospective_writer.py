@@ -12,7 +12,7 @@ test_db = bind_test_db(test_db_path("test_retrospective_writer.db"))
 
 from stamind import cycle_records
 from stamind.coach.service import coach_service
-from stamind.db.retrospectives import MESOCYCLE
+from stamind.db.retrospectives import MESOCYCLE, PLAN
 
 WRITTEN = {
     "record": "For: build easy volume.\nHappened: load on target.\nCame out: fitness rose.",
@@ -194,6 +194,86 @@ class TestTheWritersPrompt(WriterCase):
         _, user = self._prompts(client)
         self.assertIn("## THE ATHLETE'S WORDS", user)
         self.assertIn("felt fresh", user)
+
+
+class TestTheRecordOfAPlanIsWritten(unittest.TestCase):
+    """A plan of two mesocycles that ended on Sunday 22 November (§5, §6)."""
+
+    def setUp(self):
+        global test_db
+        test_db = bind_test_db(test_db_path("test_retrospective_writer.db"), fresh=False)
+        clear_all_tables(test_db)
+        self.goal = test_db.add_objective("Alpe du Zwift", "2026-11-22", "cycling")
+        test_db.save_macrocycle(self.goal, "Climb strategy", "gh", "ch", [
+            _meso("Base", "2026-10-05", "2026-11-01"),
+            _meso("Peak", "2026-11-02", "2026-11-22"),
+        ])
+        garmin = patch("stamind.runtime.garmin")
+        garmin.start()
+        self.addCleanup(garmin.stop)
+        cycle_records.date_check(test_db, "2026-11-23")
+
+    def _record(self, name: str) -> dict:
+        return next(r for r in test_db.get_retrospectives(self.goal) if r["name"] == name)
+
+    @patch("stamind.coach.engine.openrouter_client")
+    def test_the_answer_about_the_plan_first_writes_its_blank_mesocycle_records(self, client):
+        pin_clock(self, "2026-11-24")
+        client.complete.return_value = dict(WRITTEN)
+        plan = self._record("Alpe du Zwift")
+        test_db.set_retrospective_words(plan["id"], "the best autumn I had")
+        line = coach_service.write_retrospective(test_db.get_retrospective(plan["id"]))
+
+        self.assertEqual(line, WRITTEN["athlete_line"])
+        self.assertEqual(client.complete.call_count, 3)
+        for name in ("Base", "Peak", "Alpe du Zwift"):
+            self.assertEqual(self._record(name)["body"], WRITTEN["record"])
+        system, user = client.complete.call_args[0]
+        self.assertIn("training plan", system)
+        self.assertIn("within 600 characters", system)
+        self.assertEqual(re.findall(r"^## .*$", user, flags=re.M), [
+            "## THE PLAN", "## ITS MESOCYCLES", "## THE ATHLETE'S WORDS",
+        ])
+        self.assertIn("Climb strategy", user)
+        self.assertIn("Base (2026-10-05..2026-11-01), finished", user)
+        self.assertIn("the best autumn I had", user)
+
+    @patch("stamind.coach.engine.openrouter_client")
+    def test_the_numbers_of_a_plan_are_the_sums_of_its_mesocycle_records(self, client):
+        pin_clock(self, "2026-11-30")
+        client.complete.return_value = dict(WRITTEN)
+        test_db.write_retrospective(self._record("Base")["id"], {
+            "sessions_done": 10, "sessions_planned": 12, "duration_sec": 36000.0,
+            "load_planned": 500.0, "load_done": 450.5, "fitness_start": 48.0,
+            "fitness_end": 52.0, "benchmarks": [{"kind": "ftp", "before": None, "after": 250.0}],
+        }, "For: base.", "line")
+        test_db.write_retrospective(self._record("Peak")["id"], {
+            "sessions_done": 8, "sessions_planned": 9, "duration_sec": 18000.0,
+            "load_planned": 300.0, "load_done": 310.0, "fitness_start": 52.0,
+            "fitness_end": 55.5, "benchmarks": [{"kind": "ftp", "before": 250.0, "after": 262.0}],
+        }, "For: peak.", "line")
+
+        coach_service.retrospectives_step()
+        self.assertEqual(client.complete.call_count, 1)
+        self.assertEqual(self._record("Alpe du Zwift")["numbers"], {
+            "sessions_done": 18, "sessions_planned": 21, "duration_sec": 54000.0,
+            "load_planned": 800.0, "load_done": 760.5, "fitness_start": 48.0,
+            "fitness_end": 55.5, "benchmarks": [{"kind": "ftp", "before": 250.0, "after": 262.0}],
+        })
+
+    @patch("stamind.coach.engine.openrouter_client")
+    def test_the_write_step_writes_the_plan_with_its_last_mesocycle(self, client):
+        """Seven days after the end, three records are due. The first run writes the oldest
+        mesocycle. The second writes the last mesocycle, then the plan."""
+        pin_clock(self, "2026-11-30")
+        client.complete.return_value = dict(WRITTEN)
+        coach_service.retrospectives_step()
+        self.assertEqual(client.complete.call_count, 1)
+        self.assertIsNone(self._record("Alpe du Zwift")["body"])
+        coach_service.retrospectives_step()
+        self.assertEqual(client.complete.call_count, 3)
+        self.assertEqual(self._record("Alpe du Zwift")["body"], WRITTEN["record"])
+        self.assertEqual(self._record("Alpe du Zwift")["level"], PLAN)
 
 
 if __name__ == "__main__":

@@ -259,6 +259,7 @@ class PlanningMixin:
                 athlete_feedback=feedback_text,
                 history_summary=history_summary,
                 prior_training_text=prior_training_text,
+                plan_retrospectives=self._plan_retrospectives_text(),
                 learnings=learnings,
                 current_mesocycle=current_mesocycle,
                 changed_inputs=self._changed_inputs_text(prev_macro),

@@ -11,7 +11,7 @@ test_db = bind_test_db(test_db_path("test_cycle_records.db"))
 
 from stamind import clock, cycle_records
 from stamind.coach.service import coach_service
-from stamind.db.retrospectives import CALLED_OFF, FINISHED, MESOCYCLE, REPLACED
+from stamind.db.retrospectives import CALLED_OFF, FINISHED, MESOCYCLE, PLAN, REPLACED
 
 
 def _meso(name: str, start: str, end: str) -> dict:
@@ -29,6 +29,13 @@ def _replaced_at(version_id: int, stamp: str) -> None:
             "UPDATE macrocycles SET superseded_at = ? WHERE id = ?", (stamp, version_id)
         )
         conn.commit()
+
+
+def _plans(goal_id: int) -> list:
+    return [
+        (r["name"], r["start_date"], r["end_date"], r["ended_by"])
+        for r in test_db.get_retrospectives(goal_id, PLAN)
+    ]
 
 
 def _records(goal_id: int) -> list:
@@ -167,17 +174,92 @@ class TestCallingAGoalOff(unittest.TestCase):
             ("Build", "2026-09-28", "2026-10-09", CALLED_OFF),
         ])
 
+    def test_it_records_the_plan_as_called_off_ended_the_day_before(self):
+        self._call_off("2026-10-10")
+        self.assertEqual(
+            _plans(self.goal), [("Alpe du Zwift", "2026-09-07", "2026-10-09", CALLED_OFF)]
+        )
+        self.assertEqual(test_db.waiting_queue_items(), [])
+
+    def test_a_plan_with_no_recorded_mesocycle_gets_no_record(self):
+        """Called off three days into the first mesocycle."""
+        self._call_off("2026-09-10")
+        self.assertEqual(_records(self.goal), [])
+        self.assertEqual(_plans(self.goal), [])
+
     def test_a_called_off_goal_gets_no_later_record(self):
         self._call_off("2026-10-10")
         cycle_records.date_check(test_db, "2026-11-20")
         self.assertEqual(len(_records(self.goal)), 2)
+        self.assertEqual(len(_plans(self.goal)), 1)
 
-    def test_a_goal_brought_back_loses_its_cut_short_record(self):
+    def test_a_goal_brought_back_loses_its_called_off_records(self):
         self._call_off("2026-10-10")
         test_db.update_objective(self.goal, status="active")
         cycle_records.date_check(test_db, "2026-10-12")
         self.assertEqual(
             _records(self.goal), [("Base", "2026-09-07", "2026-09-27", FINISHED)]
+        )
+        self.assertEqual(_plans(self.goal), [])
+
+
+class TestTheRecordOfAPlan(unittest.TestCase):
+    """A plan ends when the end date of its last mesocycle has passed
+    (DESIGN_cycle_retrospective.md §6)."""
+
+    def setUp(self):
+        global test_db
+        test_db = bind_test_db(test_db_path("test_cycle_records.db"), fresh=False)
+        clear_all_tables(test_db)
+        self.goal = test_db.add_objective("Alpe du Zwift", "2026-12-22", "cycling")
+        self.first = _plan(
+            self.goal, _meso("Base", "2026-10-01", "2026-11-08"),
+            _meso("Build", "2026-11-09", "2026-12-06"),
+            _meso("Peak", "2026-12-07", "2026-12-22"),
+        )
+
+    def test_a_plan_trained_to_its_end_gets_a_record_over_its_mesocycles(self):
+        cycle_records.date_check(test_db, "2026-12-23")
+        self.assertEqual(
+            _plans(self.goal), [("Alpe du Zwift", "2026-10-01", "2026-12-22", FINISHED)]
+        )
+        [plan] = test_db.get_retrospectives(self.goal, PLAN)
+        self.assertEqual(plan["intent"], "strategy")
+        self.assertEqual(
+            [r["name"] for r in cycle_records.covered(test_db, plan)],
+            ["Base", "Build", "Peak"],
+        )
+        cycle_records.date_check(test_db, "2026-12-24")
+        self.assertEqual(len(_plans(self.goal)), 1)
+
+    def test_a_plan_under_way_gets_no_record(self):
+        cycle_records.date_check(test_db, "2026-12-07")
+        self.assertEqual(len(_records(self.goal)), 2)
+        self.assertEqual(_plans(self.goal), [])
+
+    def test_only_the_plan_is_asked_about_at_the_end_of_a_plan(self):
+        """The last mesocycle and the plan end on the same day."""
+        cycle_records.date_check(test_db, "2026-12-07")
+        [about_build] = test_db.waiting_queue_items()
+        cycle_records.date_check(test_db, "2026-12-23")
+        [plan] = test_db.get_retrospectives(self.goal, PLAN)
+        subjects = [item["subject"] for item in test_db.waiting_queue_items()]
+        self.assertEqual(subjects, [about_build["subject"], str(plan["id"])])
+
+    def test_a_goal_planned_again_gets_a_second_record_over_the_new_mesocycles(self):
+        """In January the athlete moves the goal to 20 January and runs `plan generate`."""
+        cycle_records.date_check(test_db, "2026-12-23")
+        test_db.update_objective(self.goal, target_date="2027-01-20")
+        _plan(self.goal, _meso("Sharpen", "2027-01-02", "2027-01-20"))
+        _replaced_at(self.first, "2027-01-02T09:00:00+00:00")
+        cycle_records.date_check(test_db, "2027-01-21")
+        self.assertEqual(_plans(self.goal), [
+            ("Alpe du Zwift", "2026-10-01", "2026-12-22", FINISHED),
+            ("Alpe du Zwift", "2027-01-02", "2027-01-20", FINISHED),
+        ])
+        second = test_db.get_retrospectives(self.goal, PLAN)[1]
+        self.assertEqual(
+            [r["name"] for r in cycle_records.covered(test_db, second)], ["Sharpen"]
         )
 
 
