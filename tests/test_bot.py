@@ -79,7 +79,27 @@ class PromptProtocolTest(unittest.TestCase):
                            {"value": "keep", "label": "Keep"}]}
         rows = keyboards.prompt_buttons(req, "n0nce")
         self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0][0], ("Demote", "n0nce:p2:demote"))
+        self.assertEqual(rows[0][0], ("Demote", "n0nce:p2:0"))
+        self.assertEqual(rows[1][0], ("Keep", "n0nce:p2:1"))
+
+    def test_a_choice_button_carries_its_position_and_fits_telegrams_64_bytes(self):
+        """A choice's value can be an exercise's key, and 65 Garmin names are too long for a
+        button. The position is not (DESIGN_exercise_table.md §7)."""
+        key = "SQUAT/PILATES_PLIE_SQUATS_PARALLEL_TURNED_OUT_FLAT_AND_HEELS"
+        self.assertGreater(len(f"a1b2c3d4:p12:{key}".encode("utf-8")), 64)
+        req = {"id": "p12", "type": "choose",
+               "choices": [{"value": key, "label": "squat: pilates plie squats"},
+                           {"value": "none", "label": "none of these"}]}
+        rows = keyboards.prompt_buttons(req, "a1b2c3d4")
+        for [(_label, data)] in rows:
+            self.assertLessEqual(len(data.encode("utf-8")), 64)
+        _nonce, _pid, answer = keyboards.decode_callback(rows[0][0][1])
+        self.assertEqual(keyboards.tapped_choice(req, answer)["value"], key)
+
+    def test_a_position_that_names_no_choice_is_no_choice(self):
+        req = {"id": "p2", "type": "choose", "choices": [{"value": "keep", "label": "Keep"}]}
+        for answer in ("1", "-1", "keep", ""):
+            self.assertIsNone(keyboards.tapped_choice(req, answer), answer)
 
     def test_text_prompt_has_no_buttons(self):
         self.assertEqual(keyboards.prompt_buttons({"id": "p3", "type": "text"}, "n"), [])
@@ -160,7 +180,7 @@ class GymButtonTest(unittest.TestCase):
     THURSDAY = "2026-09-24"
 
     def session(self, day, prescribed=True, sport="strength_training"):
-        sets = [{"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6}]
+        sets = [{"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 4, "reps_high": 6}]
         return {"date": day, "sport_type": sport, "title": "Gym: lower body strength",
                 "prescribed_sets": sets if prescribed else []}
 

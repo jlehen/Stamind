@@ -33,7 +33,7 @@ A warm-up has its own card. The strength planner writes it as a lighter entry of
 exercise ahead of the main sets (`stamind/strength/progression.md`), and the page draws one
 card per entry. A line at the top of the page says so, and each card carries a tag,
 "Warm-up" or "Main", that a tap switches. Here is an example. It is Thursday, and the
-session holds "Belt squat 1×5 @ 120, 3×4–6 @ 140" and a leg press at 200 kg. The 120 kg
+session holds "Squat: belt squat 1×5 @ 120, 3×4–6 @ 140" and a leg press at 200 kg. The 120 kg
 card opens as "Warm-up", because a heavier belt squat card exists; the other two open as
 "Main". The athlete wants a warm-up on the leg press too. They tap Dup on it, lower the
 copy to 100 kg, move it up, and tap its tag to make it "Warm-up". The tag stays on the page
@@ -88,7 +88,7 @@ it are stamped at the finish time.
 The athlete also keeps their own training notes in a text file. Under "Add an exercise" is
 "Export to Markdown", which copies the session to the clipboard as a few lines of Markdown:
 a `### 2026-09-24 [Gym: lower body strength]` heading, the clock times, the coach's note,
-then one line per exercise such as "- Belt squat: 1x5 (120 kg), 2x6 (140 kg)", with the
+then one line per exercise such as "- Squat: belt squat: 1x5 (120 kg), 2x6 (140 kg)", with the
 exercise's note after a dash and the session note last. Before any set is ticked it copies
 the session as the page holds it, so the athlete can paste the day's workout ahead of time;
 once a set is ticked it copies only the ticked sets, the way the log does. A phone that
@@ -107,13 +107,15 @@ supplies heart rate, duration and RPE; the log supplies the sets. Nothing is ask
   its files with `?v=dev`, and the deploy replaces `dev` with the commit. Telegram keeps a
   file for ten minutes, so without this a phone could run the old `app.js` under the new
   `index.html`, and the new header buttons would have no style and do nothing.
-  `exercises.json` is the vocabulary as the page searches it, written by
-  `miniapp/build_exercises.py`.
+  `exercises.json` is the exercise table as the page shows and searches it, written by
+  `miniapp/build_exercises.py`. What a row of it holds, and the commit mark it is fetched
+  with, are in DESIGN_exercise_table.md §8.
 - Photos. It is Thursday and the strength planner has written a Romanian deadlift the
   athlete has not done before. Its card has a "📷 Pic" button, and a tap shows two photos of
   the lift under its name. They come from Free Exercise DB, a public-domain set of about 870
   exercises with two photos each, loaded from its GitHub repository; nothing is copied into
-  this one. The vocabulary's fifth column holds the entry's id. A row gets one only when the
+  this one. The exercise table's fifth column holds the entry's id (DESIGN_exercise_table.md
+  §3.7). A row gets one only when the
   entry is the same exercise, so a belt squat, which the set lacks, has no button rather than
   a photo of another squat. The links came from a Gemini Flash and Sonnet comparison of the
   two lists, kept for the main movement patterns and checked by hand; an exercise without
@@ -131,17 +133,20 @@ The URL is `<PAGE_URL>#s=<base64url(JSON)>`. The hash fragment is never sent to 
 host serving the page.
 
 ```json
-{"v": 1, "r": 727, "d": "2026-09-24", "t": "Gym: lower body strength",
- "x": [{"n": "belt squat", "s": 3, "lo": 4, "hi": 6, "kg": 140},
-       {"n": "pull up", "s": 3, "lo": 6, "hi": 8, "kg": null}],
+{"v": 2, "r": 727, "d": "2026-09-24", "t": "Gym: lower body strength",
+ "x": [{"n": "SQUAT/BELT_SQUAT", "s": 3, "lo": 4, "hi": 6, "kg": 140},
+       {"n": "PULL_UP/PULL_UP", "s": 3, "lo": 6, "hi": 8, "kg": null}],
  "notes": "Alternate the squat and the pull-ups."}
 ```
 
 `r` is the revision id of the session (`workouts.id`), `d` its date, `t` its title, `x` the
-`prescribed_sets` rows in position order (`n` the vocabulary name, `s` the number of sets,
+`prescribed_sets` rows in position order (`n` the exercise's key, `s` the number of sets,
 `lo`/`hi` the rep range, `kg` the load or null), and `notes` the text under the exercise
 lines of the description, cut to 300 characters. The brief is left out: the page is for
 the gym, not for reading.
+
+Version 2, the key in `n`, the words the page shows for it, how the notes are found, and
+what the page shows for a session of another version are in DESIGN_exercise_table.md §8.
 
 ## 4. The log payload (page → bot)
 
@@ -149,12 +154,17 @@ Sent through `Telegram.WebApp.sendData`, so it is at most 4,096 bytes. Reference
 and position, never by copying the prescription back.
 
 ```json
-{"v": 1, "r": 727, "d": "2026-09-24", "st": "18:02", "en": "19:05",
- "x": [{"n": "belt squat", "p": 1, "sets": [[5, 120, 40], [6, 140, 210], [5, 140, 390]]},
-       {"n": "leg press", "p": 2, "sets": [[8, 200, 600]], "note": "swapped, squat rack busy"},
-       {"n": "barbell biceps curl", "sets": [[10, 30, 900], [10, 30, 990]]}],
+{"v": 2, "r": 727, "d": "2026-09-24", "st": "18:02", "en": "19:05",
+ "x": [{"n": "SQUAT/BELT_SQUAT", "p": 1,
+        "sets": [[5, 120, 40], [6, 140, 210], [5, 140, 390]]},
+       {"n": "SQUAT/LEG_PRESS", "p": 2, "sets": [[8, 200, 600]],
+        "note": "swapped, squat rack busy"},
+       {"n": "CURL/BARBELL_BICEPS_CURL", "sets": [[10, 30, 900], [10, 30, 990]]}],
  "note": "left knee felt off on the squat"}
 ```
+
+`n` is the exercise's key, and a log of another version is refused
+(DESIGN_exercise_table.md §8).
 
 Each set is `[reps, kg, seconds since the session started]`; `kg` is null for a
 bodyweight exercise. `p` is the position of the prescribed row this exercise stands for;
@@ -167,9 +177,8 @@ the same day's placeholder (§5). Forty-two sets of twelve exercises take about 
 
 ## 5. The ingest
 
-`sm strength ingest FILE` reads the log, refuses an exercise name the vocabulary does not
-know (the page offers vocabulary names only, so that is a bug, not an athlete's typo), and
-then:
+`sm strength ingest FILE` reads the log, refuses a name that is not a key of the exercise
+table (the page offers keys only, DESIGN_exercise_table.md §8), and then:
 
 1. Upserts a placeholder activity in `completed_activities`: `activity_id = "log:<date>"`,
    `activity_type = strength_training`, `start_time` and `duration_sec` from `st`/`en`,
@@ -181,7 +190,7 @@ then:
    `workout compare` read these rows unchanged.
 3. Keeps the raw log in `gym_logs` (`activity_id`, `revision_id`, `received_at`,
    `payload`), so a later grading step has the departures without re-deriving them.
-4. Prints the summary: one line per exercise, "Belt squat 5 @ 120, 6 @ 140, 5 @ 140
+4. Prints the summary: one line per exercise, "Squat: belt squat 5 @ 120, 6 @ 140, 5 @ 140
    (written 3×4–6 @ 140)", then the prescribed exercises not done and the exercises added.
 
 **The takeover.** `sets.read_new_activities` runs before every pull reads Garmin's sets.
@@ -246,11 +255,12 @@ it. Telegram closes the page, and the bot answers "Updated the log of 2026-09-24
 
 **Where the log comes from.** The calendar's month file carries, on each day that has a
 gym log, `gym`: `{"s": …, "l": …}`, the session as §3 writes it and the log as §4 stored
-it (DESIGN_miniapp_storage.md §4). The button's address is `index.html#s=…&l=…`, each part
-base64url of its JSON, like `s=` alone in the gym. The calendar button's own data carries
-no log: a log with its session is about 1.5 KB, and that button has 5 KB for ten weeks of
-days. So "🏋️ Open the gym log" shows once the month's file has arrived, and an instance
-with no bucket does not have it.
+it (DESIGN_miniapp_storage.md §4). Both name an exercise by its key, and the page shows
+its words (DESIGN_exercise_table.md §8). The button's address is `index.html#s=…&l=…`, each
+part base64url of its JSON, like `s=` alone in the gym. The calendar button's own data
+carries no log: a log with its session is 1.8 to 3.3 KB on the author's database, and that
+button has 5 KB for ten weeks of days. So "🏋️ Open the gym log" shows once the month's file
+has arrived, and an instance with no bucket does not have it.
 
 **The bot's log wins.** An opened log is drawn from the address. The page does not read
 the state it saved on the phone during the session, and it saves nothing on the phone. A
@@ -274,6 +284,10 @@ Not handled:
 - A log in a month the calendar's window no longer touches. A send from there is stored,
   but that month's file is built again only by `sm data publish`
   (DESIGN_miniapp_storage.md §4), so the calendar keeps showing the earlier log.
+- A month's file built before the exercise names became keys. Its gym logs do not open
+  until the file is built again. The page says "This log is out of date and cannot be
+  opened." and shows one button, "‹ Calendar", which goes back (DESIGN_exercise_table.md
+  §8, §9).
 - Not verified on a phone: `sendData` from a page reached by a link inside the Mini App.
   The page was opened from the calendar's keyboard button, which is what `sendData` asks
   for, and Telegram's script keeps its launch parameters across the link. The browser test

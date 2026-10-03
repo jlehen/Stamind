@@ -3,7 +3,7 @@
 `strength name` names a day's groups on the spot, `strength reset` reads a day's sets again
 from Garmin, and `strength discard` keeps a day's activity out of the strength history. On a
 day with two strength activities, reset and discard ask which one. `strength log` reads the
-record back, and `strength exercises` the vocabulary behind it. `strength ingest` is the
+record back, and `strength exercises` the exercise table behind it. `strength ingest` is the
 sixth command of the family and lives in `strength_ingest.py` (DESIGN_gym_logger.md §5).
 """
 import argparse
@@ -20,8 +20,8 @@ from stamind.text import bold, capitalized, cmd, gray, red, wrap_text
 from stamind.output import fail, notice
 from stamind.clock import fmt_date
 
-# The heading for a lift whose Garmin name the vocabulary lacks: stored verbatim, with
-# no pattern (§4).
+# The heading for a lift with no movement pattern: a class the table gives none, or a Garmin
+# name the table lacks (DESIGN_exercise_table.md §3.4, §6).
 NO_PATTERN = "no pattern"
 
 KEEP = "keep"
@@ -75,14 +75,15 @@ def _how_many(group: sets.Group, exercise: str) -> int:
         return 1
     choices = [Choice(ALL, f"all {count} sets")]
     choices += [Choice(str(n), f"the first {n}") for n in range(1, count)]
-    picked = runtime.prompt.choose(f"{exercise}: all {count} sets, or how many?", choices,
-                                   default=ALL)
+    picked = runtime.prompt.choose(
+        f"{vocabulary.words(exercise)}: all {count} sets, or how many?", choices, default=ALL
+    )
     return count if picked == ALL else int(picked)
 
 
 def _ask_group(activity_id: str, group: sets.Group, recent: List[str]) -> int:
     """Asks what one group was and applies the answer; returns the next position to ask."""
-    choices = [Choice(f"a{n}", name) for n, name in enumerate(recent, 1)]
+    choices = [Choice(f"a{n}", vocabulary.words(key)) for n, key in enumerate(recent, 1)]
     choices.append(Choice(OTHER, "something else…"))
     clear = "leave it unnamed" + (", clearing its name" if group.exercise else "")
     choices.append(Choice(CLEAR, clear))
@@ -94,7 +95,7 @@ def _ask_group(activity_id: str, group: sets.Group, recent: List[str]) -> int:
         if any(s["named_by"] == sets.WATCH for s in group.sets):
             runtime.db.name_exercise_sets(activity_id, group.seqs, group.exercise)
             print(f"{capitalized(sets.set_span(group.first, group.last))} confirmed: "
-                  f"{group.exercise}.")
+                  f"{vocabulary.words(group.exercise)}.")
         return group.last + 1
     if picked == CLEAR:
         runtime.db.name_exercise_sets(activity_id, group.seqs, None)
@@ -111,7 +112,8 @@ def _ask_group(activity_id: str, group: sets.Group, recent: List[str]) -> int:
         exercise = recent[int(picked[1:]) - 1]
     count = _how_many(group, exercise)
     runtime.db.name_exercise_sets(activity_id, group.seqs[:count], exercise)
-    print(f"Named {sets.set_span(group.first, group.first + count - 1)}: {exercise}.")
+    print(f"Named {sets.set_span(group.first, group.first + count - 1)}: "
+          f"{vocabulary.words(exercise)}.")
     return group.first + count
 
 
@@ -232,26 +234,51 @@ def _plural(count: int, word: str) -> str:
     return f"{count} {word}{'' if count == 1 else 's'}"
 
 
-def _pattern_of(name: str) -> str:
-    """A lift's movement pattern, or the heading for one the vocabulary lacks (§4)."""
-    known = vocabulary.get(name)
-    return known.pattern if known else NO_PATTERN
+def _pattern_of(key: str) -> str:
+    """A lift's movement pattern, or the heading for one that has none."""
+    known = vocabulary.get(key)
+    if known is None or not known.pattern:
+        return NO_PATTERN
+    return known.pattern
 
 
-def _matches(text: str, names: Sequence[str]) -> List[str]:
-    """The lifts `text` names: the exact name if there is one, else everything it is part
-    of, case ignored."""
+def _matches(text: str, keys: Sequence[str]) -> List[str]:
+    """The lifts `text` names: the one whose words are exactly it, else every one whose
+    words contain it, case ignored, sorted by their words (DESIGN_exercise_table.md §7)."""
     wanted = text.strip().lower()
-    exact = [name for name in names if name.lower() == wanted]
-    return exact or sorted(name for name in names if wanted in name.lower())
+    exact = [key for key in keys if vocabulary.words(key) == wanted]
+    if exact:
+        return exact
+    return sorted((key for key in keys if wanted in vocabulary.words(key)), key=vocabulary.words)
 
 
-def _sessions_block(name: str, days: List[sets.Logged]) -> None:
-    """One lift's record: its name, where it sits in the vocabulary, and a line per day."""
-    known = vocabulary.get(name)
-    where = f" — {known.pattern}, {known.equipment}" if known else ""
+def _muscles_and_gear(known: vocabulary.Exercise) -> str:
+    """'quads, glutes · Barbell, Squat Rack': a class's main muscles and its gear, as the
+    exercise listing shows them (DESIGN_exercise_table.md §7). A class with no muscles shows
+    its gear alone."""
+    muscles = ", ".join(muscle.lower().replace("_", " ") for muscle in known.muscles)
+    gear = ", ".join(known.gear)
+    if not muscles:
+        return gear
+    return f"{muscles} · {gear}"
+
+
+def _pattern_and_gear(key: str) -> str:
+    """' — squat · Machine': what follows a lift's words in the heading of its record. A lift
+    with no pattern shows its gear alone, and a key the table lacks shows nothing."""
+    known = vocabulary.get(key)
+    if known is None:
+        return ""
+    gear = ", ".join(known.gear)
+    if not known.pattern:
+        return f" — {gear}"
+    return f" — {known.pattern} · {gear}"
+
+
+def _sessions_block(key: str, days: List[sets.Logged]) -> None:
+    """One lift's record: its words, its movement pattern and its gear, and a line per day."""
     print()
-    print(bold(f"{name.upper()}{where}"))
+    print(bold(wrap_text(f"{vocabulary.words(key).upper()}{_pattern_and_gear(key)}")))
     for day, lifted in days:
         print(f"  {fmt_date(day)}   {lifted}")
 
@@ -261,18 +288,17 @@ def _log_index(logbook: Dict[str, List[sets.Logged]]) -> None:
     days = {day for entries in logbook.values() for day, _ in entries}
     print(bold(f"YOUR LIFTS — {_plural(len(logbook), 'exercise')} over "
                f"{_plural(len(days), 'session')}"))
-    width = max(len(name) for name in logbook)
+    width = max(len(vocabulary.words(key)) for key in logbook)
     for pattern in vocabulary.PATTERNS + (NO_PATTERN,):
-        named = sorted(name for name in logbook if _pattern_of(name) == pattern)
+        named = sorted((key for key in logbook if _pattern_of(key) == pattern),
+                       key=vocabulary.words)
         if not named:
             continue
         print()
         print(pattern)
-        for name in named:
-            entries = logbook[name]
-            known = vocabulary.get(name)
-            equipment = known.equipment if known else ""
-            print(f"  {name:<{width}}  {equipment:<10} "
+        for key in named:
+            entries = logbook[key]
+            print(f"  {vocabulary.words(key):<{width}}  "
                   + gray(f"{_plural(len(entries), 'session')}, last "
                          f"{fmt_date(entries[-1].date)}"))
     print()
@@ -311,18 +337,18 @@ def run_strength_log(args: argparse.Namespace) -> None:
     elif not args.pattern:
         _log_index(logbook)
         return
-    for name in sorted(wanted, key=lambda n: (_pattern_of(n), n)):
-        _sessions_block(name, logbook[name])
+    for key in sorted(wanted, key=lambda k: (_pattern_of(k), vocabulary.words(k))):
+        _sessions_block(key, logbook[key])
 
 
 def _pattern_index(mine: Dict[str, int]) -> None:
-    """The nine movement patterns, what the vocabulary holds for each, and what the athlete
-    has done in it (§4)."""
+    """The nine movement patterns and the group with none, what the table holds for each,
+    and what the athlete has done in it (§4, DESIGN_exercise_table.md §7)."""
     catalog = vocabulary.all_exercises()
     print(bold(f"MOVEMENT PATTERNS — {_plural(len(catalog), 'exercise')} Stamind can name"))
     print()
-    for pattern in vocabulary.PATTERNS:
-        known = [e for e in catalog if e.pattern == pattern]
+    for pattern in vocabulary.PATTERNS + (NO_PATTERN,):
+        known = [e for e in catalog if (e.pattern or NO_PATTERN) == pattern]
         yours = mine.get(pattern, 0)
         mine_here = gray(f"{yours} on your record") if yours else ""
         print(f"  {pattern:<16} {_plural(len(known), 'exercise'):<16} {mine_here}".rstrip())
@@ -332,8 +358,10 @@ def _pattern_index(mine: Dict[str, int]) -> None:
 
 
 def run_strength_exercises(args: argparse.Namespace) -> None:
-    """The shipped vocabulary: which movement patterns exist and which exercises are in them
-    (§4). It ships with the code and nobody configures it."""
+    """The shipped table: which movement patterns exist and which exercises are in them
+    (§4). It ships with the code and nobody configures it. An exercise is listed and searched
+    by its words, with its main muscles and its gear on a line under them
+    (DESIGN_exercise_table.md §7)."""
     mine = set(sets.logbook())
     if not args.pattern and not args.search:
         done: Dict[str, int] = {}
@@ -346,19 +374,20 @@ def run_strength_exercises(args: argparse.Namespace) -> None:
         listed = [e for e in listed if e.pattern == args.pattern]
     if args.search:
         wanted = args.search.strip().lower()
-        listed = [e for e in listed if wanted in e.name.lower()]
+        listed = [e for e in listed if wanted in e.words]
     if not listed:
         notice(f"No {args.pattern or ''} exercise Stamind knows is called "
                f"'{args.search}'.".replace("  ", " "))
         return
     title = args.pattern.upper() if args.pattern else f"'{args.search}'"
     print(bold(f"{title} — {_plural(len(listed), 'exercise')}"))
-    width = max(len(e.name) for e in listed)
-    for exercise in sorted(listed, key=lambda e: e.name):
-        mark = "•" if exercise.name in mine else " "
+    width = max(len(e.words) for e in listed)
+    for exercise in sorted(listed, key=lambda e: e.words):
+        mark = "•" if exercise.key in mine else " "
         pattern = "" if args.pattern else f"  {exercise.pattern}"
-        print(f"  {mark} {exercise.name:<{width}}  {exercise.equipment:<10}{pattern}".rstrip())
-    if mine & {e.name for e in listed}:
+        print(f"  {mark} {exercise.words:<{width}}{pattern}".rstrip())
+        print(gray(wrap_text(f"      {_muscles_and_gear(exercise)}")))
+    if mine & {e.key for e in listed}:
         print()
         print(gray("• on your record."))
 
@@ -372,7 +401,7 @@ def add_strength_parser(subparsers):
         description=(
             "Stamind reads your sets from Garmin the morning after you lift. Anything it "
             "can't name, it asks you about through the queue. `log` and `exercises` read "
-            "your record and the vocabulary behind it back, `ingest` stores a session you "
+            "your record and the exercise table behind it back, `ingest` stores a session you "
             "logged on your phone, and the other three fix a day by hand."
         ),
     )
@@ -444,10 +473,10 @@ def add_strength_parser(subparsers):
         "exercises",
         help="The exercises Stamind can name, and the movement patterns they sit in",
         description=(
-            "The shipped vocabulary: every exercise Stamind can name, each in one "
-            "movement pattern and one equipment class. It ships with the code and nobody "
-            "configures it. With no argument, the patterns and how many exercises each "
-            "holds."
+            "The shipped table: every exercise Stamind can name, each with its movement "
+            "pattern when it has one, its main muscles and the gear it needs. It ships with "
+            "the code and nobody configures it. With no argument, the patterns and how many "
+            "exercises each holds."
         ),
     )
     s_exercises.add_argument(

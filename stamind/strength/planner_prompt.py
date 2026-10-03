@@ -10,7 +10,7 @@ asked about, lives here because the prompt is written from it.
 import os
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import runtime
 from stamind.coach.formatting import BANNER_RULE, science_section
@@ -90,25 +90,35 @@ squats, as requested". Do what it says in that session, and keep everything else
 brief changes one exercise, not the session. For that session it outranks the athlete's
 habits. Only the day's equipment can rule it out, and then the notes say so.
 
-Use only names from EXERCISES STAMIND KNOWS, spelled exactly as they appear there. Each
-name carries its movement pattern and the equipment it usually needs. Pick exercises the
-day's equipment allows: a travel week with dumbbells only gets goblet squats and dumbbell
-Romanian deadlifts where the home gym had the belt squat and the barbell. A substitution is
-a different exercise doing the same pattern's job, and it keeps its own history.
+Use only exercises from EXERCISES STAMIND KNOWS, and name each by its key, spelled exactly as
+it appears there: SQUAT/BELT_SQUAT. A key is a category, a slash and a name, and the category
+is part of what the exercise is: BANDED_EXERCISES/GLUTE_BRIDGE is the glute bridge done with a
+band. The strength history and the sessions already written name exercises by the same keys.
+In the list, each key is followed, in brackets, by its movement pattern, its main muscles and
+the gear it needs. Every item of the gear is needed. Where an exercise has no movement
+pattern, or no muscles on record, the brackets leave that part out. Pick exercises the day's
+equipment allows: a travel week with dumbbells only gets goblet squats and dumbbell Romanian
+deadlifts where the home gym had the belt squat and the barbell. A substitution is a
+different exercise doing the same pattern's job, and it keeps its own history.
 
-Write an exercise more than once when it needs a warm-up ramp: the same name at a lighter
+An exercise whose gear holds Dumbbells can be done with kettlebells of the same weight, and
+an exercise whose gear holds Kettlebells can be done with dumbbells of the same weight. It is
+the same exercise either way: write it under its own key, and it keeps its history.
+
+Write an exercise more than once when it needs a warm-up ramp: the same key at a lighter
 load first, then the working sets.
 
 ### THE NOTES
 Each session's notes are one short paragraph for the athlete: the rests, the warm-up, which
 exercises to alternate ("alternate the belt squat and the push press, then the hamstring curl
 and the pulldown"), a cue where one is due, and the starting point for anything with no
-history. An exercise the athlete has not been doing gets one sentence saying what is new,
-why, and what it replaces: "Step-ups are new. The plan wants single-leg work for skiing.
-They take the place of the leg press." Do not restate the exercises — they are printed above
-your notes from the data you return. Do not restate the brief either — it is printed above the
-exercises. Where the brief already gives the warm-up, the RPE target or what is left out,
-leave it out of the notes.
+history. Name an exercise in plain words there, never by its key: "the belt squat", not
+"SQUAT/BELT_SQUAT". An exercise the athlete has not been doing gets one sentence saying what
+is new, why, and what it replaces: "Step-ups are new. The plan wants single-leg work for
+skiing. They take the place of the leg press." Do not restate the exercises — they are
+printed above your notes from the data you return. Do not restate the brief either — it is
+printed above the exercises. Where the brief already gives the warm-up, the RPE target or
+what is left out, leave it out of the notes.
 
 {science}
 
@@ -132,7 +142,8 @@ You MUST respond with a JSON object containing:
       "notes": "The rests, the warm-up and any cue, in one short paragraph.",
       "exercises": [
         {{
-          "exercise": "belt squat", (exactly as EXERCISES STAMIND KNOWS spells it)
+          "exercise": "SQUAT/BELT_SQUAT", (the key, exactly as EXERCISES STAMIND KNOWS
+            spells it)
           "sets": 3,
           "reps_low": 4,
           "reps_high": 6, (equal to "reps_low" for a fixed rep count)
@@ -204,17 +215,10 @@ def _athlete_science() -> str:
     )
 
 
-def _exercise_list(done: Set[str]) -> str:
-    """Every exercise outside the accessory pattern, plus the accessories the athlete
-    actually does. The full accessory list would double the region with names nobody on the
-    instance lifts (§9)."""
-    lines = []
-    for name in vocabulary.names():
-        known = vocabulary.get(name)
-        if known.pattern == vocabulary.ACCESSORY and name not in done:
-            continue
-        lines.append(f"{name} ({known.pattern}, {known.equipment})")
-    return "\n".join(lines)
+def _exercise_list() -> str:
+    """Every class of the table, one per line in table order, as its key and its tags
+    (DESIGN_exercise_table.md §7)."""
+    return "\n".join(vocabulary.model_line(key) for key in vocabulary.keys())
 
 
 def _equipment_for(day: str, profile: Optional[Dict[str, Any]]) -> str:
@@ -260,12 +264,11 @@ def _mesocycle_for(day: str, mesocycles: Dict[str, Any]) -> str:
             f"week {week} of {total}")
 
 
-def system_prompt(done: Set[str]) -> str:
-    """The strength planner's system prompt, with the vocabulary's accessories limited to
-    the ones in `done` (§9)."""
+def system_prompt() -> str:
+    """The strength planner's system prompt (§9)."""
     return SYSTEM_PROMPT.format(
         science=_shipped_science(), guidelines=_athlete_science(),
-        exercises=_exercise_list(done), habit_after=config.strength_habit_after,
+        exercises=_exercise_list(), habit_after=config.strength_habit_after,
     )
 
 
@@ -288,7 +291,7 @@ def _session_block(
         lines.append(f"  Constraints that day: {active}")
     if session.rows:
         lines.append("  Written now as:")
-        for line in prescription.exercise_lines(session.rows):
+        for line in prescription.exercise_lines(session.rows, keys=True):
             lines.append(f"      {line}")
     lines.append("  Brief:")
     lines.extend(f"      {line}" for line in session.brief.splitlines())
@@ -322,11 +325,13 @@ def user_content(
 # --- checking what comes back ---
 
 def _clean_exercise(raw: Any) -> Optional[Dict[str, Any]]:
-    """One returned exercise as a row, or None when it fails a check (§9)."""
+    """One returned exercise as a row, or None when it fails a check (§9). A Garmin name of
+    the table that is not a key is taken as the key of its class (DESIGN_exercise_table.md
+    §7)."""
     if not isinstance(raw, dict):
         return None
-    name = str(raw.get("exercise") or "").strip().lower()
-    if not vocabulary.get(name):
+    name = vocabulary.key_of(str(raw.get("exercise") or "").strip().upper())
+    if name is None:
         return None
     try:
         count = int(raw.get("sets"))

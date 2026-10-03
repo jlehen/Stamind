@@ -185,7 +185,7 @@ class GymKeyboardTest(unittest.TestCase):
     Today is a gym day here, so the first row is the button that opens the page with
     today's session packed into its address."""
 
-    BELT_SQUAT = {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
+    BELT_SQUAT = {"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 4, "reps_high": 6,
                   "load_kg": 140.0}
 
     CALENDAR = (keyboards.CALENDAR_LABEL, "https://x/calendar.html#c=eJw")
@@ -206,7 +206,7 @@ class GymKeyboardTest(unittest.TestCase):
         save_workout(
             self.db, date=day, sport_type="strength_training",
             title="Gym: lower body strength",
-            description="Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg",
+            description="Heavy lower body.\n\nSquat: belt squat 3×4–6 @ 140 kg",
             prescribed_sets=[self.BELT_SQUAT],
         )
 

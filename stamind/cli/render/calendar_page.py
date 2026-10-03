@@ -291,8 +291,9 @@ def month_label(month: str) -> str:
 
 def gym_log(day: Day) -> Optional[Dict[str, Any]]:
     """The day's gym log beside the session it was written against, the two things the gym
-    logger opens a past log from (DESIGN_gym_logger.md §8). None on a day without a log,
-    and when the log was written against another revision than the session the day shows."""
+    logger opens a past log from (DESIGN_gym_logger.md §8). Both name an exercise by its key
+    (DESIGN_exercise_table.md §8). None on a day without a log, and when the log was written
+    against another revision than the session the day shows."""
     for r in day.results:
         log = (r["completed"] or {}).get("gym_log")
         if log and log["revision_id"] == r["planned"].get("revision_id"):

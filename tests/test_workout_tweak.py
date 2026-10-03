@@ -404,7 +404,7 @@ class StrengthRequestTest(_TweakCase):
     """§4: the request travels in Friday's brief, and the strength planner is shown the
     tweak's days only."""
 
-    BELT_SQUAT = {"exercise": "belt squat", "sets": 3, "reps_low": 4, "reps_high": 6,
+    BELT_SQUAT = {"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 4, "reps_high": 6,
                   "load_kg": 140.0, "light": False}
 
     def setUp(self):
@@ -439,7 +439,7 @@ class StrengthRequestTest(_TweakCase):
             return {"sessions": [{
                 "date": FRIDAY, "keep": False, "light": False,
                 "notes": "Step-ups start light.",
-                "exercises": [{"exercise": "barbell step up", "sets": 3, "reps_low": 6,
+                "exercises": [{"exercise": "SQUAT/BARBELL_STEP_UP", "sets": 3, "reps_low": 6,
                                "reps_high": 8, "load_kg": 40.0}],
             }]}
 
@@ -451,8 +451,8 @@ class StrengthRequestTest(_TweakCase):
         self.assertEqual(len(asked), 1)
         self.assertIn("take the place of belt squats", asked[0])
         [friday] = proposal.workouts
-        self.assertIn("Barbell step up", friday["description"])
-        self.assertNotIn("Belt squat", friday["description"])
+        self.assertIn("Squat: barbell step up", friday["description"])
+        self.assertNotIn("Squat: belt squat", friday["description"])
 
     def test_a_request_about_another_day_never_reaches_fridays_session(self):
         """The athlete asked about Thursday. A reply that also rewrote Friday's brief is

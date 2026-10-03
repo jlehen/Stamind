@@ -191,9 +191,9 @@ class TestCliWorkoutsListing(unittest.TestCase):
         ).strftime("%Y-%m-%d")
         save_workout(test_db,
             date=today_str, sport_type="strength_training", title="Gym",
-            description="Heavy lower body.\n\nBelt squat 3×4–6 @ 140 kg",
+            description="Heavy lower body.\n\nSquat: belt squat 3×4–6 @ 140 kg",
             planned_zone_currency="hr", planned_zone_sec=[1200, 600, 0, 0, 0],
-            prescribed_sets=[{"exercise": "belt squat", "sets": 3, "reps_low": 4,
+            prescribed_sets=[{"exercise": "SQUAT/BELT_SQUAT", "sets": 3, "reps_low": 4,
                               "reps_high": 6, "load_kg": 140.0}],
         )
         save_workout(test_db,
@@ -210,12 +210,12 @@ class TestCliWorkoutsListing(unittest.TestCase):
 
         exit_code, plain, _ = self.run_cli(["workout", "list", "--no-pull"])
         self.assertEqual(exit_code, 0)
-        self.assertNotIn("Belt squat", plain)
+        self.assertNotIn("belt squat", plain)
         self.assertNotIn("Target:", plain)
 
         exit_code, short, _ = self.run_cli(["workout", "list", "-v", "--no-pull"])
         self.assertEqual(exit_code, 0)
-        self.assertIn("Belt squat 3×4–6 @ 140 kg", _line_after(short, "Gym"))
+        self.assertIn("Squat: belt squat 3×4–6 @ 140 kg", _line_after(short, "Gym"))
         self.assertIn(
             "Target: ~15min recovery, ~25min endurance, ~3min threshold, ~15min VO2max",
             _line_after(short, "Sharpener"),

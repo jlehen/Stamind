@@ -1,11 +1,12 @@
-"""Write `miniapp/exercises.json` from the exercise vocabulary (DESIGN_gym_logger.md §2).
+"""Write `miniapp/exercises.json` from the exercise table (DESIGN_exercise_table.md §8).
 
-The page searches the vocabulary to swap or add an exercise, so it needs the same names the
-CLI knows. Run it from the repository root after editing `stamind/strength/exercises.tsv`:
+The page shows and searches an exercise's words and sends its key, so it needs both for every
+class the CLI knows. Run it from the repository root after editing
+`stamind/strength/exercises.tsv`:
 
     venv/bin/python miniapp/build_exercises.py
 
-`tests/test_miniapp.py` fails when the file and the vocabulary disagree.
+`tests/test_miniapp.py` fails when the file and the table disagree.
 """
 import json
 import os
@@ -19,11 +20,14 @@ OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exercises.j
 
 
 def rows():
-    """Every vocabulary exercise as the page reads it: name, pattern, equipment, and the
-    Free Exercise DB id of its photos when it has one."""
+    """Every class as the page reads it: its key, its words, its pattern, its gear, whether
+    it is bodyweight, and the Free Exercise DB id of its photos when it has one."""
     listed = []
     for exercise in vocabulary.all_exercises():
-        row = {"n": exercise.name, "p": exercise.pattern, "e": exercise.equipment}
+        row = {
+            "k": exercise.key, "w": exercise.words, "p": exercise.pattern,
+            "g": ", ".join(exercise.gear), "b": exercise.bodyweight,
+        }
         if exercise.photos:
             row["f"] = exercise.photos
         listed.append(row)

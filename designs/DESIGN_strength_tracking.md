@@ -255,20 +255,16 @@ last because body weight is not stored (§8).
 
 ## 4. Vocabulary: movement patterns and equipment
 
-A shipped, static table maps every exercise Stamind knows about to one **movement
-pattern** and one **equipment** class. It ships with the code, like the zone tables in
-`analytics/load.py`; nobody configures it. Garmin's category/name pairs are aliases into it,
-and so are the plain-English names the athlete or the coach use.
+The shipped table of exercises is described in DESIGN_exercise_table.md §3 to §6: its
+lines, the Garmin names on them, the key the database stores, the words a person reads, the
+muscles, the gear, and what happens to a Garmin name the table lacks. It replaced the table
+this section described, where each exercise had a made-up name and one equipment class.
 
-Garmin's exercise vocabulary is finite and public. The table maps **all of it** at
-authoring time (§11.1 says which lists that turned out to be), so "a Garmin name the table
-does not know" cannot happen with today's firmware. If a later firmware adds one, the pull
-stores the Garmin name in words as the exercise with no pattern, the set counts as volume,
-and the pull output says "Garmin exercise names not in the vocabulary" so it gets added by
-hand. No model call names an exercise on its own at runtime: that would be a guess nobody
+No model call names an exercise on its own at runtime: that would be a guess nobody
 sees. The one model call in the naming path proposes names the athlete confirms (§7).
 
-Patterns are physiology, not preference, and there are nine:
+Patterns are physiology, not preference, and there are nine. An exercise can also have none
+(DESIGN_exercise_table.md §3.4):
 
 | Pattern | Examples |
 |---|---|
@@ -287,20 +283,20 @@ exercise (§8), and the strength planner writes it into the session at what the 
 lifted, without progressing it (§9, §10); the pattern exists so the science can tell the
 work it progresses from the work it carries along.
 
-Equipment is one of `barbell | dumbbell | kettlebell | cable | machine | bodyweight`: the
-equipment the exercise usually needs. It is read in two places:
+The one equipment class per exercise is replaced by the gear list of
+DESIGN_exercise_table.md §3.6, which also says when an exercise is bodyweight. The gear is
+read in the two places the class was:
 
 1. **The watch-guess check.** A watch guess of a bodyweight exercise at a heavy load is not
    that exercise (§6).
 2. **Substitution.** The strength planner picks exercises the day's equipment allows, and
-   it is shown the class beside every name for that (§9). A travel week whose constraint
+   it is shown the gear beside every exercise for that (§9). A travel week whose constraint
    says "hotel gym, dumbbells only" gets goblet squats and dumbbell RDLs where the home gym
    had the belt squat and the barbell. This is what makes a session survive a different
    gym.
 
-The class does not say how to read a set's load. The athlete files the pec deck under a
-suspension-trainer chest fly, a bodyweight exercise, and logs 60 kg on it (§11.1). The
-history shows 60 kg, as recorded, and nothing reinterprets it because of the class.
+The gear does not say how to read a set's load. The history shows the kilograms as
+recorded, and nothing reinterprets them because of the gear.
 
 The pattern says what a part of the session is for; the exercise says what was lifted. A
 goblet squat done instead of a back squat does the squat's job in the session, and its sets
@@ -434,9 +430,11 @@ and no counting of sets: rev. 6 had all three, and a rep corrected in Connect wh
 question waited, or a Garmin name the check below rejected, could lose an answer or a
 question through them.
 
-A watch guess gets one check at the read: **a guess whose equipment class is bodyweight,
-on a set with a heavy load, is not that exercise**. `SIT_UP` at 100 kg is stored unnamed
-with the Garmin name kept in `garmin_name`, and joins the naming question. The threshold is
+A watch guess gets one check at the read: **a guess of a bodyweight exercise, on a set
+with a heavy load, is not that exercise**. Which exercises are bodyweight is
+DESIGN_exercise_table.md §3.6: those none of whose gear is a load. `SIT_UP` at 100 kg is
+stored unnamed with the Garmin name kept in `garmin_name`, and joins the naming question.
+The threshold is
 a constant in the vocabulary, not a setting, and it sits above the 20–40 kg a strong
 athlete adds to dips and pull-ups: 50 kg. It reads the weight field as the added load,
 which it is (§11.1). A person's pick is never checked: people file loaded machines under
@@ -658,7 +656,7 @@ derived: no number per exercise is computed here or anywhere, because phase 2 st
 a training max belongs to the progress view §12 leaves for later. `strength exercises` is
 §4's vocabulary read out loud — the nine patterns and how many exercises each holds, then the
 exercises themselves under `--pattern` or a search term, with the athlete's own marked. It is
-how she finds the name to type, and it is what stops a shipped table of 1,493 exercises from
+how she finds the name to type, and it is what stops a shipped table of 1,555 exercises from
 being a file nobody can see.
 
 ## 8. The strength history
@@ -698,9 +696,12 @@ The planned half of the rule could not rescue it either, because the week planne
 names in a session what it was shown. Eight days of this athlete's lifting give about
 forty entries with the accessories, some 2,000 tokens, which a call of its own can afford.
 
-**What an entry shows.** The exercise with its pattern and equipment class from the
-vocabulary. Then one line per day, newest first: the day, what was prescribed for that
-exercise when a strength session planned that day had prescribed sets (§9), sets, rep range
+**What an entry shows.** The exercise the way the strength planner's list writes it: its
+key, then its pattern, its main muscles and its gear (DESIGN_exercise_table.md §7). The
+history names every exercise by its key. The examples of this section were written before
+that design and still show the old names and the old heading. Then one line per day, newest
+first: the day, what was prescribed for that exercise when a strength session planned that
+day had prescribed sets (§9), sets, rep range
 and load, marked "(light)" when the session was a light week's (§10), then the sets as the
 athlete did them with equal consecutive sets collapsed, and the activity's RPE. An exercise
 written at several loads, a warm-up set and the working sets, prints every entry in order,
@@ -936,10 +937,10 @@ prints, is the strength planner's reasons, one sentence per session it changed, 
   Revision 9 had them reach the second call through the week planner's prose, and the brief
   carries none of it. For this athlete that is three files, some 7,000 tokens; the science
   trim's tags are what cuts it later (§10).
-- The vocabulary: every exercise outside the accessory pattern, 692 names, plus the
-  accessory exercises in the athlete's history, each name with its pattern and equipment
-  class: about 4,500 tokens. The class is what substitution reads (§4). The full accessory
-  list would double the region with names nobody on the instance does.
+- The exercise list: every class of the exercise table, one per line, as its key with its
+  pattern, its main muscles and its gear, and the rule that dumbbells and kettlebells stand
+  in for each other (DESIGN_exercise_table.md §7). It replaced a list that left out the
+  accessory exercises the athlete had never done.
 - The strength history (§8): the entries per exercise, the not-done lines and the sessions
   as done.
 - For each date it writes: the equipment the athlete profile lists for that weekday and in
@@ -1306,13 +1307,13 @@ session today, without the description, so kilograms written before it would be 
 unseen. Phase 2 prints the exercise lines under each strength session, in both personas.
 `workout adapt`'s preview already shows how a description changed.
 
-**Cost.** About 4,500 tokens of names, 2,000 of entries per exercise, 1,500 of sessions as
-done, 1,000 of shipped science, the athlete's own science files, 7,000 for this athlete and
-nothing for one without them, and 200 to 300 per session. A `workout generate` over a
-five-week mesocycle with ten strength sessions sends about 18,500 tokens and gets about
-2,500 back, more when the sessions are as long as the athlete's own: a third of one
-`workout adapt` prompt. It uses the same model as every other call, since Stamind picks one
-model per process.
+**Cost.** About 97 kB of names, some 25,000 tokens (DESIGN_exercise_table.md §7), 2,000 of
+entries per exercise, 1,500 of sessions as done, 1,000 of shipped science, the athlete's own
+science files, 7,000 for this athlete and nothing for one without them, and 200 to 300 per
+session. A `workout generate` over a five-week mesocycle with ten strength sessions sends
+about 40,000 tokens and gets about 2,500 back, more when the sessions are as long as the
+athlete's own: about as much as one `workout adapt` prompt. It uses the same model as every
+other call, since Stamind picks one model per process.
 
 **What adherence becomes.** Revision 7 compared prescribed and done sets in code. It had
 three deviations and two thresholds, a load more than 10% off and reps more than half the
@@ -1472,17 +1473,14 @@ watch guessed "sit-up" at 100 kg, and that set is stored unnamed with Garmin's g
 
 **A set can name a category and no exercise.** On September 7 the athlete tagged three sets
 at 120 kg as "Row" and chose no row. Such a set takes the category's own generic exercise,
-"row", which Garmin's catalog also lists.
+which Garmin's catalog also lists: the bare category sits on the line of `ROW/ROW`
+(DESIGN_exercise_table.md §3.2).
 
 **The vocabulary is Garmin Connect's catalog, not the FIT file format's lists.** Connect
 uses names the FIT SDK lacks (`BELT_SQUAT`, which the athlete logs weekly), and it publishes
-its exercise catalog with a bodyweight flag per exercise
-(`connect.garmin.com/web-data/exercises/Exercises.json`, 1,531 names). The shipped table is
-that catalog, the FIT SDK names it lacks (mostly yoga, Pilates and wheelchair variants), and
-seven gym machines neither has, such as the pec deck and the machine chest press: 1,493
-exercises and 1,934 Garmin names in `stamind/strength/exercises.tsv`. A weighted variant
-of a bodyweight exercise is the same exercise, so a weighted pull-up adds to the pull-up's
-history, its load read as the added load.
+its exercise catalog (`connect.garmin.com/web-data/exercises/Exercises.json`, 1,531 names).
+What the shipped table holds of the two lists, and how a weighted variant shares the line
+of its exercise, is now DESIGN_exercise_table.md §3.
 
 **The lines under the activity group by exercise, not by consecutive sets.** The athlete
 alternates two exercises: belt squat, push press, belt squat, push press. Collapsing

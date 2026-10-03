@@ -66,11 +66,12 @@ class Group:
 
 
 def parse_sets(payload: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[str]]:
-    """Garmin's `exerciseSets` as rows to store, and the Garmin names the vocabulary lacks.
+    """Garmin's `exerciseSets` as rows to store, and the Garmin names the table lacks.
 
     The weight comes in grams; a negative or missing one means nothing was entered. The
     watch's guess of a bodyweight exercise at a heavy load is stored unnamed, its Garmin
-    name kept (§6)."""
+    name kept (§6). A set stores the key of its Garmin name's class, and a name the table
+    lacks is its own key (DESIGN_exercise_table.md §6)."""
     rows: List[Dict[str, Any]] = []
     unknown: List[str] = []
     for seq, entry in enumerate((payload or {}).get("exerciseSets") or [], 1):
@@ -91,15 +92,15 @@ def parse_sets(payload: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[str]
         category = top.get("category")
         if not category:
             continue
-        key = vocabulary.garmin_key(category, top.get("name"))
-        row["garmin_name"] = key
+        said = vocabulary.garmin_name(category, top.get("name"))
+        row["garmin_name"] = said
         if category == "UNKNOWN":
             continue
-        exercise = vocabulary.from_garmin(key)
+        exercise = vocabulary.key_of(said)
         if exercise is None:
-            exercise = vocabulary.humanize(key)
-            if key not in unknown:
-                unknown.append(key)
+            exercise = said
+            if said not in unknown:
+                unknown.append(said)
         named_by = GARMIN if (top.get("probability") or 0) >= 100 else WATCH
         if named_by == WATCH and vocabulary.implausible(exercise, row["load_kg"]):
             continue
@@ -193,12 +194,13 @@ def watch_mark(sets: Sequence[Dict[str, Any]]) -> str:
 def named_line(group: Group) -> str:
     """'deadlift 1×5 @ 40, 4×4 @ 80 (watch)': what was lifted, with a mark on a name only
     the watch guessed (§7)."""
-    return f"{group.exercise} {set_chunks(group.sets)}{watch_mark(group.sets)}"
+    return (f"{vocabulary.words(group.exercise)} {set_chunks(group.sets)}"
+            f"{watch_mark(group.sets)}")
 
 
 def done_text(lifted: Sequence[Dict[str, Any]], exercise: str) -> str:
-    """'1×6 @ 95, 2×6 @ 110', or 'chest press 1×5 @ 55, 2×7 @ 65' when another exercise was
-    lifted in its place: the sets lifted for one exercise of a session, each run under
+    """'1×6 @ 95, 2×6 @ 110', or 'squat: leg press 1×5 @ 55, 2×7 @ 65' when another exercise
+    was lifted in its place: the sets lifted for one exercise of a session, each run under
     another name headed by that name (DESIGN_strength_planned_vs_done.md §2)."""
     runs: List[List[Dict[str, Any]]] = []
     for one in lifted:
@@ -209,7 +211,7 @@ def done_text(lifted: Sequence[Dict[str, Any]], exercise: str) -> str:
     parts = []
     for run in runs:
         name = run[0]["exercise"]
-        head = "" if name == exercise else f"{name} "
+        head = "" if name == exercise else f"{vocabulary.words(name)} "
         parts.append(f"{head}{set_chunks(run)}{watch_mark(run)}")
     return ", ".join(parts)
 
@@ -364,7 +366,7 @@ def report(result: SetsRead) -> None:
         warn(f"Could not read the strength sets of {result.failure}. "
              "The rest are read on the next pull.")
     if result.unknown_names:
-        warn("Garmin exercise names not in the vocabulary, stored as they came: "
+        warn("Garmin exercise names not in the table, stored as they came: "
              + ", ".join(result.unknown_names)
              + ". Add them to stamind/strength/exercises.tsv.")
 
@@ -411,10 +413,12 @@ def read_again(activity: Dict[str, Any], client: Any) -> List[Group]:
 
 
 def ask_names(activity: Dict[str, Any], final_at: str, unnamed: Sequence[Group]) -> None:
-    """Queues one naming question per group, all offering the same answers (§7)."""
+    """Queues one naming question per group, all offering the same answers (§7). An answer
+    carries the key to store and is shown as its words (DESIGN_exercise_table.md §8)."""
     if not unnamed:
         return
-    answers = [{"label": name} for name in recent_exercises()] + [SOMETHING_ELSE]
+    answers = [{"label": vocabulary.words(key), "exercise": key}
+               for key in recent_exercises()] + [SOMETHING_ELSE]
     named = activity_ref(activity)
     for group in unnamed:
         subject = f"{activity['activity_id']}:{final_at}:{group.first}-{group.last}"

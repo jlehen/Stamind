@@ -1,6 +1,6 @@
-"""Strength tracking, phase 1 (DESIGN_strength_tracking.md): the vocabulary, reading and
-freezing a session's sets, the two naming questions, the three `strength` commands, and the
-sets under the activity line."""
+"""Strength tracking, phase 1 (DESIGN_strength_tracking.md): reading and freezing a
+session's sets, the two naming questions, the three `strength` commands, and the sets under
+the activity line. The exercise table itself is checked in `test_exercise_table.py`."""
 import json
 import os
 import unittest
@@ -154,40 +154,13 @@ class _StrengthCase(unittest.TestCase):
         return [i for i in test_db.waiting_queue_items() if i["kind"] == sets.SET_NAMES]
 
 
-class VocabularyTest(unittest.TestCase):
-    def test_every_exercise_has_a_known_pattern_and_equipment(self):
-        for name in vocabulary.names():
-            exercise = vocabulary.get(name)
-            self.assertIn(exercise.pattern, vocabulary.PATTERNS, name)
-            self.assertIn(exercise.equipment, vocabulary.EQUIPMENT, name)
-
-    def test_every_garmin_name_means_one_exercise(self):
-        seen = {}
-        with open(vocabulary.TABLE_PATH, encoding="utf-8") as table:
-            for line in table:
-                if line.startswith("#") or not line.strip():
-                    continue
-                name, _pattern, _equipment, aliases = line.rstrip("\n").split("\t")[:4]
-                for alias in aliases.split():
-                    self.assertNotIn(alias, seen, f"{alias} means {seen.get(alias)} and {name}")
-                    seen[alias] = name
-
-    def test_the_names_a_watch_sent_are_in_it(self):
-        """From the athlete's account on 2026-09-14: a name Connect has and the FIT SDK does
-        not, a category with no exercise, and a weighted variant of a bodyweight exercise."""
-        self.assertEqual(vocabulary.from_garmin("SQUAT/BELT_SQUAT"), "belt squat")
-        self.assertEqual(vocabulary.from_garmin("ROW"), "row")
-        self.assertEqual(vocabulary.from_garmin("PULL_UP/WEIGHTED_PULL_UP"), "pull up")
-        self.assertEqual(vocabulary.get("sit up").equipment, vocabulary.BODYWEIGHT)
-
-
 class ParseSetsTest(unittest.TestCase):
     def test_a_set_is_stored_in_kilograms_beside_its_rest(self):
         rows, unknown = sets.parse_sets(garmin_sets(lift("SQUAT", "BELT_SQUAT", reps=5, kg=140)))
         self.assertEqual([(row["seq"], row["set_type"]) for row in rows],
                          [(1, "active"), (2, "rest")])
         self.assertEqual((rows[0]["exercise"], rows[0]["reps"], rows[0]["load_kg"]),
-                         ("belt squat", 5, 140.0))
+                         ("SQUAT/BELT_SQUAT", 5, 140.0))
         self.assertEqual(rows[0]["garmin_name"], "SQUAT/BELT_SQUAT")
         self.assertEqual(unknown, [])
 
@@ -215,16 +188,32 @@ class ParseSetsTest(unittest.TestCase):
     def test_a_person_picking_a_bodyweight_name_keeps_it_at_any_load(self):
         """The athlete files the pec deck under the suspension trainer's chest fly."""
         rows, _ = sets.parse_sets(garmin_sets(lift("SUSPENSION", "CHEST_FLY", kg=60)))
-        self.assertEqual((rows[0]["exercise"], rows[0]["named_by"]), ("chest fly", sets.GARMIN))
+        self.assertEqual((rows[0]["exercise"], rows[0]["named_by"]),
+                         ("SUSPENSION/CHEST_FLY", sets.GARMIN))
 
-    def test_a_category_without_an_exercise_is_the_category(self):
+    def test_a_category_without_an_exercise_is_the_key_of_its_class(self):
         rows, _ = sets.parse_sets(garmin_sets(lift("ROW", None, kg=120)))
-        self.assertEqual(rows[0]["exercise"], "row")
+        self.assertEqual((rows[0]["exercise"], rows[0]["garmin_name"]), ("ROW/ROW", "ROW"))
 
-    def test_a_name_the_vocabulary_lacks_is_stored_in_words_and_reported(self):
+    def test_a_weighted_twin_is_stored_under_the_key_of_its_class(self):
+        """Weighted pull-ups and plain ones are one history; what Garmin said is kept
+        (DESIGN_exercise_table.md §4)."""
+        rows, unknown = sets.parse_sets(garmin_sets(
+            lift("PULL_UP", "WEIGHTED_PULL_UP", kg=10), lift("PULL_UP", "PULL_UP", kg=None),
+        ))
+        active = [row for row in rows if row["set_type"] == "active"]
+        self.assertEqual([row["exercise"] for row in active], ["PULL_UP/PULL_UP"] * 2)
+        self.assertEqual([row["garmin_name"] for row in active],
+                         ["PULL_UP/WEIGHTED_PULL_UP", "PULL_UP/PULL_UP"])
+        self.assertEqual(unknown, [])
+
+    def test_a_name_the_table_lacks_is_stored_as_its_own_key_and_reported(self):
+        """DESIGN_exercise_table.md §6: the Garmin name itself, shown in words like any
+        other."""
         rows, unknown = sets.parse_sets(garmin_sets(lift("SQUAT", "MOON_SQUAT")))
-        self.assertEqual(rows[0]["exercise"], "moon squat")
+        self.assertEqual(rows[0]["exercise"], "SQUAT/MOON_SQUAT")
         self.assertEqual(unknown, ["SQUAT/MOON_SQUAT"])
+        self.assertEqual(sets.named_line(sets.groups(rows)[0]), "squat: moon squat 1×10 @ 60")
 
     def test_unnamed_sets_at_one_load_are_one_block_whatever_the_reps(self):
         rows, _ = sets.parse_sets(garmin_sets(
@@ -295,7 +284,7 @@ class ReadingTest(_StrengthCase):
         self.assertEqual(
             athlete_queue.wording(item),
             "Tue Sep 15 18:10 gym session: the watch guessed 2 exercises "
-            "(barbell deadlift, lateral raise). Are the sets in Garmin final?",
+            "(deadlift: barbell deadlift, lateral raise). Are the sets in Garmin final?",
         )
         self.assertEqual(
             athlete_queue.wording(item, companion=True),
@@ -314,7 +303,7 @@ class ReadingTest(_StrengthCase):
         self.assertEqual(
             athlete_queue.wording(item),
             "Tue Sep 15 18:10 gym session: the watch guessed 1 exercise "
-            "(barbell deadlift) and couldn't name 1 group (set 2). "
+            "(deadlift: barbell deadlift) and couldn't name 1 group (set 2). "
             "Are the sets in Garmin final?",
         )
         self.assertEqual(
@@ -335,8 +324,8 @@ class ReadingTest(_StrengthCase):
         self.answer_final()
         named = [(row["exercise"], row["named_by"])
                  for row in test_db.get_exercise_sets("tue") if row["set_type"] == "active"]
-        self.assertEqual(named, [("barbell deadlift", "athlete"), (None, None)])
-        self.assertEqual(sets.recent_exercises(), ["barbell deadlift"])
+        self.assertEqual(named, [("DEADLIFT/BARBELL_DEADLIFT", "athlete"), (None, None)])
+        self.assertEqual(sets.recent_exercises(), ["DEADLIFT/BARBELL_DEADLIFT"])
 
     def test_the_drop_leaves_the_guesses_guesses(self):
         self.activity("tue", payload=garmin_sets(guess("SQUAT", "BELT_SQUAT", 5, 140)))
@@ -485,25 +474,33 @@ class SetNamesTest(_StrengthCase):
 
     def test_the_answers_are_the_recent_exercises_done_most_often_first(self):
         self.assertEqual([a["label"] for a in athlete_queue.answers(self.group)],
-                         ["seated cable row", "leg press", "something else…"])
+                         ["row: seated cable row", "squat: leg press", "something else…"])
+
+    def test_an_answer_shows_the_words_and_carries_the_key_to_store(self):
+        """DESIGN_exercise_table.md §8."""
+        self.assertEqual([a.get("exercise") for a in athlete_queue.answers(self.group)],
+                         ["ROW/SEATED_CABLE_ROW", "SQUAT/LEG_PRESS", None])
 
     def test_an_answer_names_every_set_of_the_block(self):
         line = athlete_queue.act(self.group, "a2", self.now)
-        self.assertEqual(line, "Named sets 1–2: leg press.")
+        self.assertEqual(line, "Named sets 1–2: squat: leg press.")
         named = [(row["exercise"], row["named_by"]) for row in test_db.get_exercise_sets("tue")
                  if row["seq"] in self.group["payload"]["seqs"]]
-        self.assertEqual(named, [("leg press", "athlete")] * 2)
+        self.assertEqual(named, [("SQUAT/LEG_PRESS", "athlete")] * 2)
 
     def test_something_else_names_the_block_with_the_proposal_she_picks(self):
-        runtime.prompt = _Prompt(picks=["pec deck"])
-        with patch.object(questions, "propose", return_value=["pec deck", "chest fly"]):
+        runtime.prompt = _Prompt(picks=["FLYE/PEC_DECK"])
+        with patch.object(questions, "propose",
+                          return_value=["FLYE/PEC_DECK", "SUSPENSION/CHEST_FLY"]):
             line = athlete_queue.act(self.group, "a3", self.now, text="butterfly machine")
-        self.assertEqual(line, "Named sets 1–2: pec deck.")
-        self.assertEqual(runtime.prompt.shown[0][1], ["pec deck", "chest fly", "none of these"])
+        self.assertEqual(line, "Named sets 1–2: flye: pec deck.")
+        self.assertEqual(runtime.prompt.shown[0][1],
+                         ["flye: pec deck", "suspension: chest fly", "none of these"])
+        self.assertEqual(test_db.get_exercise_sets("tue")[0]["exercise"], "FLYE/PEC_DECK")
 
     def test_none_of_the_proposals_leaves_the_question_waiting(self):
         runtime.prompt = _Prompt(picks=[questions.NONE_OF_THESE])
-        with patch.object(questions, "propose", return_value=["pec deck"]):
+        with patch.object(questions, "propose", return_value=["FLYE/PEC_DECK"]):
             athlete_queue.act(self.group, "a3", self.now, text="butterfly machine")
         with patch.object(questions, "propose", return_value=[]):
             line = athlete_queue.act(self.group, "a3", self.now, text="zzz")
@@ -511,15 +508,21 @@ class SetNamesTest(_StrengthCase):
         self.assertIsNone(test_db.get_queue_item(self.group["id"])["closed_at"])
         self.assertIsNone(test_db.get_exercise_sets("tue")[0]["exercise"])
 
-    def test_a_proposal_is_only_ever_a_name_the_vocabulary_has(self):
+    def test_a_proposal_is_only_ever_a_key_of_the_table(self):
+        """The model is shown keys and answers keys. A name the table lacks is left out, and
+        a weighted twin is taken as the key of its class (DESIGN_exercise_table.md §7)."""
         with patch("stamind.openrouter.openrouter_client.complete",
-                   return_value={"names": ["Pec Deck", "nordic curl", 7, "pec deck",
-                                           "chest fly", "leg press"]}):
+                   return_value={"names": ["flye/pec_deck", "LEG_CURL/NORDIC_CURL", 7,
+                                           "FLYE/PEC_DECK", "PULL_UP/WEIGHTED_PULL_UP",
+                                           "SQUAT/LEG_PRESS", "SUSPENSION/CHEST_FLY"]}
+                   ) as complete:
             self.assertEqual(questions.propose("butterfly machine"),
-                             ["pec deck", "chest fly", "leg press"])
+                             ["FLYE/PEC_DECK", "PULL_UP/PULL_UP", "SQUAT/LEG_PRESS"])
+        listed = complete.call_args[0][0].split("## EXERCISE NAMES\n")[1].split("\n\n")[0]
+        self.assertEqual(listed.split("\n"), vocabulary.keys())
 
     def test_a_name_given_another_way_settles_the_question(self):
-        test_db.name_exercise_sets("tue", self.group["payload"]["seqs"][:1], "leg press")
+        test_db.name_exercise_sets("tue", self.group["payload"]["seqs"][:1], "SQUAT/LEG_PRESS")
         self.assertNotIn(self.group["id"], [i["id"] for i in athlete_queue.walk(self.now)])
 
 
@@ -535,10 +538,14 @@ class CommandsTest(_StrengthCase):
         runtime.prompt = _Prompt(picks=["a1", "2", "keep"])
         code, out, _ = run_cli(["strength", "name", TUESDAY])
         self.assertEqual(code, 0)
-        self.assertIn("Named sets 1–2: leg press.", out)
+        self.assertIn("Named sets 1–2: squat: leg press.", out)
         self.assertEqual([row["exercise"] for row in test_db.get_exercise_sets("tue")
                           if row["set_type"] == "active"],
-                         ["leg press", "leg press", None, None])
+                         ["SQUAT/LEG_PRESS", "SQUAT/LEG_PRESS", None, None])
+        # The recent exercises are offered in words, and the split asks in words.
+        self.assertIn("squat: leg press", runtime.prompt.shown[0][1])
+        self.assertEqual(runtime.prompt.shown[1][0],
+                         "squat: leg press: all 4 sets, or how many?")
         self.assertIn("sets 3–4: 10, 10 reps @ 60 kg, unnamed", runtime.prompt.shown[-1][0])
         # Naming by hand declares the sets final, so "are they final?" is settled.
         self.assertTrue(self.row("tue")["sets_final_at"])
@@ -549,7 +556,7 @@ class CommandsTest(_StrengthCase):
         self.read()
         runtime.prompt = _Prompt(picks=["keep"])
         _, out, _ = run_cli(["strength", "name", TUESDAY])
-        self.assertIn("Set 1 confirmed: belt squat.", out)
+        self.assertIn("Set 1 confirmed: squat: belt squat.", out)
         self.assertEqual([row["named_by"] for row in test_db.get_exercise_sets("tue")
                           if row["set_type"] == "active"], ["athlete"])
 
@@ -589,7 +596,7 @@ class CommandsTest(_StrengthCase):
         self.assertEqual(sets.recent_exercises(), [])
         code, out, _ = run_cli(["strength", "discard", "2026-09-14", "--undo"])
         self.assertIn("back in the strength history", out)
-        self.assertEqual(sets.recent_exercises(), ["leg press"])
+        self.assertEqual(sets.recent_exercises(), ["SQUAT/LEG_PRESS"])
 
     def test_reset_on_a_day_with_two_sessions_reads_the_one_picked(self):
         self.activity("am", start="09:00:00", payload=garmin_sets(lift("SQUAT", "LEG_PRESS")))
@@ -634,9 +641,9 @@ class ShownTest(_StrengthCase):
         ))
         self.read()
         self.assertEqual(sets.activity_lines(self.row("sun")), [
-            "belt squat 1×5 @ 120, 1×5 @ 140",
-            "barbell push press 1×5 @ 60, 1×4 @ 70",
-            "barbell deadlift 2×4 @ 80 (watch)",
+            "squat: belt squat 1×5 @ 120, 1×5 @ 140",
+            "shoulder press: barbell push press 1×5 @ 60, 1×4 @ 70",
+            "deadlift: barbell deadlift 2×4 @ 80 (watch)",
             "set 5 unnamed",
         ])
 
@@ -656,16 +663,16 @@ class ShownTest(_StrengthCase):
         self.read()
         os.environ.pop("STAMIND_RENDER", None)
         _, out, _ = run_cli(["workout", "compare", "-d", TUESDAY, "--no-pull", "--no-mark"])
-        self.assertIn("leg press 1×10 @ 140", out)
+        self.assertIn("squat: leg press 1×10 @ 140", out)
         lines = simple_compare_lines([(TUESDAY, [], [self.row("tue")])], TUESDAY, TUESDAY,
                                      "2026-09-16")
-        self.assertIn("      leg press 1×10 @ 140", lines)
+        self.assertIn("      squat: leg press 1×10 @ 140", lines)
         self.assertTrue(activity)
 
 
 class LogTest(_StrengthCase):
-    """`strength log` reads the record back, `strength exercises` the vocabulary behind
-    it (§7)."""
+    """`strength log` reads the record back, `strength exercises` the table behind it
+    (§7). Both show and match an exercise's words (DESIGN_exercise_table.md §7)."""
 
     def setUp(self):
         super().setUp()
@@ -687,7 +694,7 @@ class LogTest(_StrengthCase):
 
     def test_a_lifts_sessions_read_oldest_first(self):
         _, out, _ = run_cli(["strength", "log", "belt squat"])
-        self.assertIn("BELT SQUAT — squat, machine", out)
+        self.assertIn("SQUAT: BELT SQUAT — squat · Machine\n", out)
         self.assertIn("2026-09-13 Sun   1×5 @ 120, 1×5 @ 140", out)
         self.assertIn("2026-09-14 Mon   1×5 @ 145", out)
         self.assertLess(out.index("2026-09-13"), out.index("2026-09-14"))
@@ -708,8 +715,8 @@ class LogTest(_StrengthCase):
 
     def test_a_pattern_groups_the_lifts_and_never_merges_them(self):
         _, out, _ = run_cli(["strength", "log", "--pattern", "squat"])
-        self.assertIn("BELT SQUAT — squat, machine", out)
-        self.assertIn("GOBLET SQUAT — squat, dumbbell", out)
+        self.assertIn("SQUAT: BELT SQUAT — squat · Machine\n", out)
+        self.assertIn("SQUAT: GOBLET SQUAT — squat · Dumbbells\n", out)
         self.assertNotIn("DEADLIFT", out)
         # One 140 kg belt squat and one 16 kg goblet squat, never one squat series.
         self.assertIn("1×12 @ 16", out)
@@ -720,6 +727,42 @@ class LogTest(_StrengthCase):
         self.assertIn("BELT SQUAT", out)
         self.assertIn("GOBLET SQUAT", out)
         self.assertNotIn("DEADLIFT", out)
+
+    def test_the_exact_words_find_that_lift_alone(self):
+        """"squat: belt squat" is one lift; "squat" alone is every lift whose words hold it."""
+        _, out, _ = run_cli(["strength", "log", "Squat: belt squat"])
+        self.assertIn("SQUAT: BELT SQUAT", out)
+        self.assertNotIn("GOBLET SQUAT", out)
+
+    def test_a_lift_with_no_pattern_has_its_own_group(self):
+        """Squat jacks are a cardio drill: no pattern in the table (§3.4 there)."""
+        self.activity("tue", payload=garmin_sets(lift("CARDIO", "SQUAT_JACKS", 20, None)))
+        self.read()
+        _, out, _ = run_cli(["strength", "log"])
+        self.assertLess(out.index("hinge\n"), out.index("no pattern\n"))
+        self.assertIn("cardio: squat jacks", out)
+        # Its heading has no pattern to show, so its gear stands alone.
+        _, out, _ = run_cli(["strength", "log", "squat jacks"])
+        self.assertIn("CARDIO: SQUAT JACKS — Nothing\n", out)
+
+    def test_a_heading_with_several_pieces_of_gear_lists_them_all(self):
+        self.activity("tue", payload=garmin_sets(lift("SQUAT", "BARBELL_BACK_SQUAT", 5, 70)))
+        self.read()
+        _, out, _ = run_cli(["strength", "log", "barbell back squat"])
+        self.assertIn("SQUAT: BARBELL BACK SQUAT — squat · Barbell, Squat Rack\n", out)
+
+    def test_the_heading_of_a_key_the_table_lacks_is_its_words_alone(self):
+        """A Garmin name from a later firmware is stored as its own key. The table has no
+        pattern and no gear for it, so nothing follows the words (DESIGN_exercise_table.md
+        §6)."""
+        self.activity("tue", payload=garmin_sets(lift("SQUAT", "FOO_BAR_SQUAT", 5, 20)))
+        self.read()
+        self.assertEqual(test_db.get_exercise_sets("tue")[0]["exercise"], "SQUAT/FOO_BAR_SQUAT")
+        _, out, _ = run_cli(["strength", "log", "foo bar squat"])
+        lines = out.split("\n")
+        self.assertIn("SQUAT: FOO BAR SQUAT", lines)
+        self.assertEqual(lines[lines.index("SQUAT: FOO BAR SQUAT") + 1],
+                         "  2026-09-15 Tue   1×5 @ 20")
 
     def test_a_name_off_the_record_says_where_to_look(self):
         _, out, _ = run_cli(["strength", "log", "bicep curl"])
@@ -744,7 +787,7 @@ class LogTest(_StrengthCase):
 
     def test_the_patterns_list_the_vocabulary_and_what_is_on_the_record(self):
         _, out, _ = run_cli(["strength", "exercises"])
-        for pattern in vocabulary.PATTERNS:
+        for pattern in vocabulary.PATTERNS + ("no pattern",):
             self.assertIn(pattern, out)
         self.assertIn(f"{len(vocabulary.all_exercises())} exercises Stamind can name", out)
         self.assertIn("2 on your record", out)  # belt squat and goblet squat
@@ -753,14 +796,37 @@ class LogTest(_StrengthCase):
         _, out, _ = run_cli(["strength", "exercises", "--pattern", "squat"])
         lines = [line for line in out.split("\n") if "goblet squat" in line]
         self.assertTrue(any(line.strip().startswith("•") for line in lines))
-        self.assertIn("barbell back squat", out)
+        self.assertIn("squat: barbell back squat", out)
         self.assertNotIn("barbell deadlift", out)
+
+    def test_the_listing_shows_each_exercises_main_muscles_and_gear(self):
+        """DESIGN_exercise_table.md §7: under the words, the main muscles and the gear."""
+        _, out, _ = run_cli(["strength", "exercises", "--pattern", "squat"])
+        lines = out.split("\n")
+        at = lines.index("    squat: barbell back squat")
+        self.assertEqual(lines[at + 1], "      quads, glutes · Barbell, Squat Rack")
+        at = lines.index("  • squat: belt squat")
+        self.assertEqual(lines[at + 1], "      glutes, quads · Machine")
+
+    def test_the_listing_of_an_exercise_with_no_muscles_shows_its_gear_alone(self):
+        _, out, _ = run_cli(["strength", "exercises", "pose: wheel"])
+        self.assertEqual(out.split("\n")[1:3], ["    pose: wheel", "      Nothing"])
+
+    def test_a_search_shows_the_pattern_beside_the_words_and_the_gear_under_them(self):
+        _, out, _ = run_cli(["strength", "exercises", "leg press"])
+        self.assertEqual(out.split("\n")[1:5], [
+            "    squat: leg press             squat",
+            "      quads · Machine",
+            "    squat: single leg leg press  single_leg",
+            "      quads, glutes · Machine",
+        ])
 
     def test_a_search_crosses_the_patterns(self):
         _, out, _ = run_cli(["strength", "exercises", "deadlift"])
-        self.assertIn("barbell deadlift", out)
+        self.assertIn("deadlift: barbell deadlift", out)
         self.assertIn("hinge", out)
         self.assertNotIn("belt squat", out)
+
 
 class MorningPushTest(_StrengthCase):
     """The push reads new sets before its walk, so the question comes with it (§11)."""

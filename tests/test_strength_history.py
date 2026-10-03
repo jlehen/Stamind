@@ -2,8 +2,9 @@
 
 What the strength planner is shown of the athlete's lifting: one entry per exercise a
 person named, what was prescribed beside what was done, the days the prescription was not
-followed, and the recent days as whole sessions. Plus the prescribed sets themselves, which
-ride on a revision and follow the session across a rollback.
+followed, and the recent days as whole sessions. It names every exercise by its key
+(DESIGN_exercise_table.md §7). Plus the prescribed sets themselves, which ride on a revision
+and follow the session across a rollback.
 """
 import os
 import unittest
@@ -110,7 +111,7 @@ class _HistoryCase(unittest.TestCase):
         return test_db.get_workout(day, "strength_training")
 
     def text(self):
-        return history.build(TODAY).text
+        return history.build(TODAY)
 
     def entries(self):
         """The history above the sessions as done: the entries and the not-done lines."""
@@ -126,8 +127,8 @@ class EntriesTest(_HistoryCase):
     def test_one_entry_per_exercise_with_what_was_prescribed_beside_what_was_done(self):
         self.planned(
             "2026-09-14",
-            row("belt squat", 1, 5, 5, 120.0), row("belt squat", 3, 4, 6, 140.0),
-            row("chin up", 3, 3, 5),
+            row("SQUAT/BELT_SQUAT", 1, 5, 5, 120.0), row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0),
+            row("PULL_UP/CHIN_UP", 3, 3, 5),
         )
         self.lifted(
             "2026-09-14",
@@ -137,20 +138,20 @@ class EntriesTest(_HistoryCase):
         )
         self.assertEqual(self.text(), "\n".join([
             history.HEADING.format(days=8),
-            "  belt squat (squat, machine)",
+            "  SQUAT/BELT_SQUAT (squat; GLUTES, QUADS; Machine)",
             "    Mon Sep 14, prescribed 1×5 @ 120, 3×4–6 @ 140: 1×5 @ 120, 3×6 @ 140 | RPE 7",
             "",
             "NOT DONE",
-            "  Mon Sep 14: chin up 3×3–5",
+            "  Mon Sep 14: PULL_UP/CHIN_UP 3×3–5",
             "",
             history.SESSIONS_HEADING.format(days=8),
             "  Mon Sep 14, 60 min, 4 sets, RPE 7",
-            "    belt squat 1×5 @ 120, 3×6 @ 140",
+            "    SQUAT/BELT_SQUAT 1×5 @ 120, 3×6 @ 140",
         ]))
 
     def test_a_day_the_watch_split_in_two_shows_each_activity_on_its_own_line(self):
         """Merged, the evening's light work reads as the morning's fading (§8)."""
-        self.planned("2026-09-15", row("goblet squat", 3, 8, 10, 44.0))
+        self.planned("2026-09-15", row("SQUAT/GOBLET_SQUAT", 3, 8, 10, 44.0))
         self.lifted("2026-09-15", lift("SQUAT", "GOBLET_SQUAT", 10, 44),
                     lift("SQUAT", "GOBLET_SQUAT", 10, 44),
                     lift("SQUAT", "GOBLET_SQUAT", 10, 44), start="09:00:00", rpe=6)
@@ -169,8 +170,8 @@ class EntriesTest(_HistoryCase):
                                      "probability": 36.0})
         self.lifted("2026-09-14", lift("SQUAT", "BELT_SQUAT", 5, 140), guessed)
         text = self.text()
-        self.assertIn("belt squat", text)
-        self.assertNotIn("barbell deadlift", text)
+        self.assertIn("SQUAT/BELT_SQUAT", text)
+        self.assertNotIn("BARBELL_DEADLIFT", text)
 
     def test_a_discarded_activity_leaves_the_history(self):
         activity_id = self.lifted("2026-09-14", lift("SQUAT", "BELT_SQUAT", 5, 140))
@@ -181,10 +182,10 @@ class EntriesTest(_HistoryCase):
         """A light week is not a step, so the day to resume from has to be on the page: an
         athlete who lifts three times a week would otherwise see only light days (§8)."""
         for day in ("2026-09-07", "2026-09-09", "2026-09-11"):
-            self.planned(day, row("belt squat", 3, 4, 6, 140.0))
+            self.planned(day, row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
             self.lifted(day, lift("SQUAT", "BELT_SQUAT", 5, 140))
         for day in ("2026-09-14", "2026-09-15"):
-            self.planned(day, row("belt squat", 2, 4, 6, 125.0, light=True))
+            self.planned(day, row("SQUAT/BELT_SQUAT", 2, 4, 6, 125.0, light=True))
             self.lifted(day, lift("SQUAT", "BELT_SQUAT", 6, 125))
         days = [line.strip().split(",")[0].split(":")[0]
                 for line in self.entries().splitlines() if line.startswith("    ")]
@@ -200,8 +201,8 @@ class EntriesTest(_HistoryCase):
             self.lifted(day, lift("SQUAT", "BELT_SQUAT", 5, 140 - offset))
         self.lifted("2026-09-07", lift("ROW", "SEATED_CABLE_ROW", 10, 60))
         text = self.text()
-        self.assertIn("belt squat", text)
-        self.assertNotIn("seated cable row", text)
+        self.assertIn("SQUAT/BELT_SQUAT", text)
+        self.assertNotIn("SEATED_CABLE_ROW", text)
 
 
 class SessionsAsDoneTest(_HistoryCase):
@@ -227,8 +228,8 @@ class SessionsAsDoneTest(_HistoryCase):
                     lift(*self.PULLDOWN, 6, 120), lift(*self.PULLDOWN, 6, 120), rpe=7)
         self.assertEqual(self.sessions(), [
             "  Mon Sep 14, 60 min, 6 sets, RPE 7",
-            "    belt squat 2×5 @ 140 + barbell push press 2×5 @ 75",
-            "    lat pulldown 2×6 @ 120",
+            "    SQUAT/BELT_SQUAT 2×5 @ 140 + SHOULDER_PRESS/BARBELL_PUSH_PRESS 2×5 @ 75",
+            "    PULL_UP/LAT_PULLDOWN 2×6 @ 120",
         ])
 
     def test_a_trio_and_a_circuit_each_come_out_as_one_line(self):
@@ -238,9 +239,11 @@ class SessionsAsDoneTest(_HistoryCase):
                     *[lift(*name, 5, 40) for name in trio + trio],
                     *[lift(*name, 10, 20) for name in circuit + circuit])
         self.assertEqual(self.sessions()[1:], [
-            "    belt squat 2×5 @ 40 + barbell push press 2×5 @ 40 + lat pulldown 2×5 @ 40",
-            "    leg press 2×10 @ 20 + romanian deadlift 2×10 @ 20 + one arm swing 2×10 @ 20"
-            " + dumbbell step up 2×10 @ 20 + glute bridge 2×10 @ 20",
+            "    SQUAT/BELT_SQUAT 2×5 @ 40 + SHOULDER_PRESS/BARBELL_PUSH_PRESS 2×5 @ 40"
+            " + PULL_UP/LAT_PULLDOWN 2×5 @ 40",
+            "    SQUAT/LEG_PRESS 2×10 @ 20 + DEADLIFT/ROMANIAN_DEADLIFT 2×10 @ 20"
+            " + HIP_SWING/ONE_ARM_SWING 2×10 @ 20 + SQUAT/DUMBBELL_STEP_UP 2×10 @ 20"
+            " + BANDED_EXERCISES/GLUTE_BRIDGE 2×10 @ 20",
         ])
 
     def test_an_unnamed_set_counts_on_the_head_line_and_does_not_split_a_run(self):
@@ -252,21 +255,21 @@ class SessionsAsDoneTest(_HistoryCase):
                     lift(*self.BELT, 5, 140), lift(*self.PRESS, 5, 75), rpe=7)
         self.assertEqual(self.sessions(), [
             "  Mon Sep 14, 60 min, 5 sets, RPE 7",
-            "    belt squat 2×5 @ 140 + barbell push press 2×5 @ 75",
+            "    SQUAT/BELT_SQUAT 2×5 @ 140 + SHOULDER_PRESS/BARBELL_PUSH_PRESS 2×5 @ 75",
         ])
 
     def test_an_exercise_the_days_session_did_not_hold_is_marked(self):
         """Tuesday prescribes step-ups and the athlete does the leg press in their place.
         The not-done line says one half and the mark the other (§8)."""
-        self.planned("2026-09-15", row("dumbbell step up", 3, 6, 8, 32.0),
-                     row("romanian deadlift", 3, 8, 10, 60.0))
+        self.planned("2026-09-15", row("SQUAT/DUMBBELL_STEP_UP", 3, 6, 8, 32.0),
+                     row("DEADLIFT/ROMANIAN_DEADLIFT", 3, 8, 10, 60.0))
         self.lifted("2026-09-15", lift(*self.LEG_PRESS, 12, 70),
                     lift(*self.RDL, 10, 60))
         self.assertEqual(self.sessions()[1:], [
-            "    leg press 1×12 @ 70 (not prescribed)",
-            "    romanian deadlift 1×10 @ 60",
+            "    SQUAT/LEG_PRESS 1×12 @ 70 (not prescribed)",
+            "    DEADLIFT/ROMANIAN_DEADLIFT 1×10 @ 60",
         ])
-        self.assertIn("  Tue Sep 15: dumbbell step up 3×6–8 @ 32", self.entries())
+        self.assertIn("  Tue Sep 15: SQUAT/DUMBBELL_STEP_UP 3×6–8 @ 32", self.entries())
 
     def test_a_day_with_no_prescription_has_no_marks(self):
         """Everything in it was the athlete's own choice."""
@@ -276,7 +279,7 @@ class SessionsAsDoneTest(_HistoryCase):
     def test_what_the_athlete_said_comes_under_the_day(self):
         """Their words about the day's session, after its exercises
         (DESIGN_session_notes.md §4)."""
-        session = self.planned("2026-09-15", row("leg press", 3, 10, 12, 70.0))
+        session = self.planned("2026-09-15", row("SQUAT/LEG_PRESS", 3, 10, 12, 70.0))
         self.lifted("2026-09-15", lift(*self.LEG_PRESS, 12, 70))
         test_db.add_session_note(session["id"], "Leg press felt\nheavy today.")
         last = self.sessions()[-1]
@@ -286,20 +289,20 @@ class SessionsAsDoneTest(_HistoryCase):
     def test_on_a_split_day_the_activity_holding_most_of_the_session_gets_the_marks(self):
         """The morning is the gym session; the evening's kettlebell work at home is the
         athlete's own, not an attempt at it, so it stays bare (§8)."""
-        self.planned("2026-09-15", row("goblet squat", 3, 8, 10, 44.0),
-                     row("belt squat", 3, 4, 6, 140.0))
+        self.planned("2026-09-15", row("SQUAT/GOBLET_SQUAT", 3, 8, 10, 44.0),
+                     row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         self.lifted("2026-09-15", lift(*self.GOBLET, 10, 44), lift(*self.BELT, 5, 140),
                     lift(*self.LEG_PRESS, 12, 70), start="09:00:00", rpe=6)
         self.lifted("2026-09-15", lift(*self.GOBLET, 12, 16), lift(*self.SWING, 20, 16),
                     start="20:10:00", rpe=2)
         self.assertEqual(self.sessions(), [
             "  Tue Sep 15, 09:00, 60 min, 3 sets, RPE 6",
-            "    goblet squat 1×10 @ 44",
-            "    belt squat 1×5 @ 140",
-            "    leg press 1×12 @ 70 (not prescribed)",
+            "    SQUAT/GOBLET_SQUAT 1×10 @ 44",
+            "    SQUAT/BELT_SQUAT 1×5 @ 140",
+            "    SQUAT/LEG_PRESS 1×12 @ 70 (not prescribed)",
             "  Tue Sep 15, 20:10, 60 min, 2 sets, RPE 2",
-            "    goblet squat 1×12 @ 16",
-            "    one arm swing 1×20 @ 16",
+            "    SQUAT/GOBLET_SQUAT 1×12 @ 16",
+            "    HIP_SWING/ONE_ARM_SWING 1×20 @ 16",
         ])
 
     def test_the_recent_days_key_decides_how_many_days_are_shown(self):
@@ -315,24 +318,24 @@ class SessionsAsDoneTest(_HistoryCase):
 
 class NotDoneTest(_HistoryCase):
     def test_a_day_with_no_strength_activity_lists_the_whole_session(self):
-        self.planned("2026-09-14", row("belt squat", 3, 4, 6, 145.0),
-                     row("glute bridge", 4, 4, 6, 130.0))
+        self.planned("2026-09-14", row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0),
+                     row("HIP_RAISE/HIP_THRUST_MACHINE", 4, 4, 6, 130.0))
         self.lifted("2026-09-13", lift("SQUAT", "BELT_SQUAT", 5, 140))
         self.lifted("2026-09-15", lift("SQUAT", "BELT_SQUAT", 5, 140))
         self.assertIn(
             "  Mon Sep 14: no strength activity "
-            "(belt squat 3×4–6 @ 145, glute bridge 4×4–6 @ 130)",
+            "(SQUAT/BELT_SQUAT 3×4–6 @ 145, HIP_RAISE/HIP_THRUST_MACHINE 4×4–6 @ 130)",
             self.text(),
         )
 
     def test_today_is_never_on_the_list(self):
         """A session planned for today can still be done, whatever the hour (§8)."""
-        self.planned(TODAY, row("belt squat", 3, 4, 6, 145.0))
+        self.planned(TODAY, row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0))
         self.lifted("2026-09-14", lift("SQUAT", "BELT_SQUAT", 5, 140))
         self.assertNotIn("Sep 16", self.text())
 
     def test_a_day_whose_sets_are_not_read_yet_says_so(self):
-        self.planned("2026-09-15", row("belt squat", 3, 4, 6, 145.0))
+        self.planned("2026-09-15", row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0))
         self.lifted("2026-09-13", lift("SQUAT", "BELT_SQUAT", 5, 140))
         # Added after the read, so Tuesday's sets are still to come.
         self.lifted("2026-09-15", read=False)
@@ -340,7 +343,7 @@ class NotDoneTest(_HistoryCase):
         self.assertNotIn("Tue Sep 15: no strength activity", self.text())
 
     def test_a_day_where_everything_prescribed_was_done_gets_no_line(self):
-        self.planned("2026-09-14", row("belt squat", 3, 4, 6, 140.0))
+        self.planned("2026-09-14", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         self.lifted("2026-09-14", lift("SQUAT", "BELT_SQUAT", 5, 140))
         self.assertNotIn(history.NOT_DONE_HEADING, self.text())
 
@@ -351,21 +354,21 @@ class PrescribedSetsTest(_HistoryCase):
     def test_the_description_is_rendered_from_the_rows(self):
         workout = self.planned(
             "2026-09-14",
-            row("belt squat", 1, 5, 5, 120.0), row("belt squat", 3, 4, 6, 140.0),
-            row("chin up", 3, 3, 5),
+            row("SQUAT/BELT_SQUAT", 1, 5, 5, 120.0), row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0),
+            row("PULL_UP/CHIN_UP", 3, 3, 5),
         )
         self.assertEqual(workout["description"], "\n".join([
             "[Full-Body Strength]",
             "Heavy full-body.",
             "",
-            "Belt squat 1×5 @ 120, 3×4–6 @ 140 kg",
-            "Chin up 3×3–5",
+            "Squat: belt squat 1×5 @ 120, 3×4–6 @ 140 kg",
+            "Pull up: chin up 3×3–5",
             "2–3 min rests.",
         ]))
         self.assertEqual(len(workout["prescribed_sets"]), 3)
 
     def test_a_revision_that_continues_the_session_keeps_its_rows(self):
-        self.planned("2026-09-14", row("belt squat", 3, 4, 6, 140.0))
+        self.planned("2026-09-14", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         with test_db.workout_change(kind="adapt") as change:
             change.append(
                 date="2026-09-14", sport_type="strength_training",
@@ -375,19 +378,19 @@ class PrescribedSetsTest(_HistoryCase):
         workout = test_db.get_workout("2026-09-14", "strength_training")
         self.assertEqual(workout["duration_minutes"], 40)
         self.assertEqual([r["exercise"] for r in workout["prescribed_sets"]],
-                         ["belt squat"])
+                         ["SQUAT/BELT_SQUAT"])
 
     def test_a_restore_brings_back_the_rows_of_the_revision_it_copies(self):
-        self.planned("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.planned("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         first = test_db.get_workout("2026-09-17", "strength_training")["revision_id"]
-        self.planned("2026-09-17", row("belt squat", 3, 4, 6, 145.0))
+        self.planned("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0))
         with test_db.workout_change(kind="rollback") as change:
             change.restore(test_db.get_workout_revision(first))
         back = test_db.get_workout("2026-09-17", "strength_training")
         self.assertEqual([r["load_kg"] for r in back["prescribed_sets"]], [140.0])
 
     def test_a_void_has_no_rows(self):
-        self.planned("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.planned("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         with test_db.workout_change(kind="tweak") as change:
             change.void(date="2026-09-17", sport_type="strength_training", reason="Away")
         [voided] = test_db.get_workouts(
@@ -403,7 +406,7 @@ class SeamTest(_HistoryCase):
         from stamind.coach.formatting import (
             format_planned_workouts_detailed, format_standing_workouts,
         )
-        self.planned("2026-09-17", row("belt squat", 3, 4, 6, 140.0))
+        self.planned("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
         workout = test_db.get_workout("2026-09-17", "strength_training")
         for text in (
             format_planned_workouts_detailed([workout]),

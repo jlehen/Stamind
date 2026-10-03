@@ -145,7 +145,7 @@ means one thing.
   the exercises, the sets, the rep ranges and the kilograms. It reads the sets
   your watch recorded, so it knows what you last lifted on every exercise. The
   week planner decides that Thursday is a 70-minute gym day and what that day is
-  for; the strength planner turns that into "belt squat 3×4–6 @ 140 kg".
+  for; the strength planner turns that into "Squat: belt squat 3×4–6 @ 140 kg".
 - **Brief.** What the week planner writes for a gym day: what the session is for
   and what the plan asks of it, with no exercise, set, rep or load in it. It is
   the first paragraph of the session's description, and the strength planner

@@ -48,35 +48,36 @@ def line(position, exercise, count, low, high, load_kg):
 
 # Thursday's session: 7 exercises in 17 sets (§2).
 THURSDAY = [
-    line(1, "barbell push press", 1, 5, 5, 55.0),
-    line(2, "barbell push press", 2, 4, 6, 67.5),
-    line(3, "lat pulldown", 1, 6, 6, 100.0),
-    line(4, "lat pulldown", 2, 4, 6, 110.0),
-    line(5, "seated barbell shoulder press", 2, 4, 6, 40.0),
-    line(6, "row", 2, 4, 6, 110.0),
-    line(7, "chest fly", 3, 5, 5, 55.0),
-    line(8, "glute bridge", 2, 4, 6, 115.0),
-    line(9, "ab twist", 2, 20, 20, 30.0),
+    line(1, "SHOULDER_PRESS/BARBELL_PUSH_PRESS", 1, 5, 5, 55.0),
+    line(2, "SHOULDER_PRESS/BARBELL_PUSH_PRESS", 2, 4, 6, 67.5),
+    line(3, "PULL_UP/LAT_PULLDOWN", 1, 6, 6, 100.0),
+    line(4, "PULL_UP/LAT_PULLDOWN", 2, 4, 6, 110.0),
+    line(5, "SHOULDER_PRESS/SEATED_BARBELL_SHOULDER_PRESS", 2, 4, 6, 40.0),
+    line(6, "ROW/SEATED_CABLE_ROW", 2, 4, 6, 110.0),
+    line(7, "FLYE/CABLE_CROSSOVER", 3, 5, 5, 55.0),
+    line(8, "HIP_RAISE/HIP_THRUST_MACHINE", 2, 4, 6, 115.0),
+    line(9, "CORE/RUSSIAN_TWIST", 2, 20, 20, 30.0),
 ]
 
 # What the athlete ticked on the logger page that Thursday: the chest press on both push
 # press cards, a light first set on the shoulder press and the row, and a plank no card
 # asked for.
 THURSDAY_LOG = {
-    "v": 1, "r": REVISION, "d": GYM_DAY, "st": "10:03", "en": "10:41",
+    "v": 2, "r": REVISION, "d": GYM_DAY, "st": "10:03", "en": "10:41",
     "x": [
-        {"n": "chest press", "p": 1, "sets": [[5, 55, None]]},
-        {"n": "chest press", "p": 2, "sets": [[7, 65, None], [7, 65, None]]},
-        {"n": "lat pulldown", "p": 3, "sets": [[6, 100, None]]},
-        {"n": "lat pulldown", "p": 4, "sets": [[6, 110, None], [6, 110, None]]},
-        {"n": "seated barbell shoulder press", "p": 5,
+        {"n": "BENCH_PRESS/MACHINE_CHEST_PRESS", "p": 1, "sets": [[5, 55, None]]},
+        {"n": "BENCH_PRESS/MACHINE_CHEST_PRESS", "p": 2, "sets": [[7, 65, None], [7, 65, None]]},
+        {"n": "PULL_UP/LAT_PULLDOWN", "p": 3, "sets": [[6, 100, None]]},
+        {"n": "PULL_UP/LAT_PULLDOWN", "p": 4, "sets": [[6, 110, None], [6, 110, None]]},
+        {"n": "SHOULDER_PRESS/SEATED_BARBELL_SHOULDER_PRESS", "p": 5,
          "sets": [[6, 30, None], [6, 40, None], [5, 40, None]]},
-        {"n": "row", "p": 6, "sets": [[6, 95, None], [6, 110, None], [6, 110, None]]},
-        {"n": "chest fly", "p": 7, "sets": [[5, 50, None]] * 3},
-        {"n": "glute bridge", "p": 8,
+        {"n": "ROW/SEATED_CABLE_ROW", "p": 6,
+         "sets": [[6, 95, None], [6, 110, None], [6, 110, None]]},
+        {"n": "FLYE/CABLE_CROSSOVER", "p": 7, "sets": [[5, 50, None]] * 3},
+        {"n": "HIP_RAISE/HIP_THRUST_MACHINE", "p": 8,
          "sets": [[6, 110, None], [6, 115, None], [6, 115, None]]},
-        {"n": "ab twist", "p": 9, "sets": [[20, 15, None], [20, 20, None]]},
-        {"n": "plank", "sets": [[120, None, None]]},
+        {"n": "CORE/RUSSIAN_TWIST", "p": 9, "sets": [[20, 15, None], [20, 20, None]]},
+        {"n": "PLANK/PLANK", "sets": [[120, None, None]]},
     ],
 }
 
@@ -122,63 +123,67 @@ class CountTest(unittest.TestCase):
     def test_each_exercise_gets_its_mark(self):
         marks = {name: row.mark for name, row in self.rows.items()}
         self.assertEqual(marks, {
-            "barbell push press": comparison.SWAPPED,
-            "lat pulldown": comparison.DONE,
-            "seated barbell shoulder press": comparison.DONE,
-            "row": comparison.DONE,
-            "chest fly": comparison.DONE,
-            "glute bridge": comparison.DONE,
-            "ab twist": comparison.LIGHTER,
-            "plank": comparison.NOT_PLANNED,
+            "SHOULDER_PRESS/BARBELL_PUSH_PRESS": comparison.SWAPPED,
+            "PULL_UP/LAT_PULLDOWN": comparison.DONE,
+            "SHOULDER_PRESS/SEATED_BARBELL_SHOULDER_PRESS": comparison.DONE,
+            "ROW/SEATED_CABLE_ROW": comparison.DONE,
+            "FLYE/CABLE_CROSSOVER": comparison.DONE,
+            "HIP_RAISE/HIP_THRUST_MACHINE": comparison.DONE,
+            "CORE/RUSSIAN_TWIST": comparison.LIGHTER,
+            "PLANK/PLANK": comparison.NOT_PLANNED,
         })
 
     def test_the_planned_exercises_come_first_in_the_sessions_order(self):
         self.assertEqual([row.exercise for row in self.compared.rows][-2:],
-                         ["ab twist", "plank"])
+                         ["CORE/RUSSIAN_TWIST", "PLANK/PLANK"])
 
     def test_a_light_first_set_is_an_extra_not_a_miss(self):
         """95 kg is not near 110 (the limit is 99); the two sets at 110 fill the line."""
-        row = self.rows["row"]
+        row = self.rows["ROW/SEATED_CABLE_ROW"]
         self.assertEqual((len(row.sets), row.counted, row.planned), (3, 2, 2))
 
     def test_a_swap_counts_on_its_cards_with_no_load_check(self):
-        row = self.rows["barbell push press"]
+        row = self.rows["SHOULDER_PRESS/BARBELL_PUSH_PRESS"]
         self.assertEqual((row.counted, row.planned), (3, 3))
         self.assertTrue(row.swapped)
 
     def test_nine_percent_under_counts(self):
-        self.assertEqual(self.rows["chest fly"].counted, 3)
+        self.assertEqual(self.rows["FLYE/CABLE_CROSSOVER"].counted, 3)
 
     def test_more_than_ten_percent_under_does_not(self):
-        row = self.rows["ab twist"]
+        row = self.rows["CORE/RUSSIAN_TWIST"]
         self.assertEqual((row.counted, row.planned), (0, 2))
 
     def test_a_set_with_no_card_counts_by_name_heaviest_first(self):
         """Monday's belt squat: the two sets at 130 fill the working line, and 110, not
         near 125, falls to the warm-up line (§3)."""
-        lines = [line(1, "belt squat", 1, 5, 5, 110.0), line(2, "belt squat", 2, 4, 6, 125.0)]
-        lifted = [watched("belt squat", 5, 110.0), watched("belt squat", 6, 130.0),
-                  watched("belt squat", 6, 130.0)]
+        lines = [line(1, "SQUAT/BELT_SQUAT", 1, 5, 5, 110.0),
+                 line(2, "SQUAT/BELT_SQUAT", 2, 4, 6, 125.0)]
+        lifted = [watched("SQUAT/BELT_SQUAT", 5, 110.0), watched("SQUAT/BELT_SQUAT", 6, 130.0),
+                  watched("SQUAT/BELT_SQUAT", 6, 130.0)]
         row = comparison.compare(lines, lifted).rows[0]
         self.assertEqual((row.counted, row.mark), (3, comparison.DONE))
 
     def test_a_set_with_no_load_recorded_counts(self):
-        compared = comparison.compare([line(1, "row", 2, 4, 6, 110.0)],
-                                      [watched("row", 6, None), watched("row", 6, None)])
+        compared = comparison.compare(
+            [line(1, "ROW/SEATED_CABLE_ROW", 2, 4, 6, 110.0)],
+            [watched("ROW/SEATED_CABLE_ROW", 6, None), watched("ROW/SEATED_CABLE_ROW", 6, None)],
+        )
         self.assertEqual(compared.counted, 2)
 
     def test_fewer_sets_than_planned_is_marked_sets(self):
-        compared = comparison.compare([line(1, "row", 2, 4, 6, 110.0)],
-                                      [watched("row", 6, 110.0)])
+        compared = comparison.compare([line(1, "ROW/SEATED_CABLE_ROW", 2, 4, 6, 110.0)],
+                                      [watched("ROW/SEATED_CABLE_ROW", 6, 110.0)])
         self.assertEqual(compared.rows[0].mark, comparison.SHORT)
 
     def test_nothing_lifted_is_not_done(self):
-        compared = comparison.compare([line(1, "row", 2, 4, 6, 110.0)], [])
+        compared = comparison.compare([line(1, "ROW/SEATED_CABLE_ROW", 2, 4, 6, 110.0)], [])
         self.assertEqual(compared.rows[0].mark, comparison.NOT_DONE)
 
     def test_unnamed_sets_are_kept_by_their_position(self):
-        compared = comparison.compare([line(1, "row", 1, 4, 6, 110.0)], [
-            watched("row", 6, 110.0), watched(None, 8, 40.0), watched(None, 8, 40.0),
+        compared = comparison.compare([line(1, "ROW/SEATED_CABLE_ROW", 1, 4, 6, 110.0)], [
+            watched("ROW/SEATED_CABLE_ROW", 6, 110.0), watched(None, 8, 40.0),
+            watched(None, 8, 40.0),
         ])
         self.assertEqual(compared.unnamed, [2, 3])
 
@@ -188,8 +193,8 @@ class CountTest(unittest.TestCase):
         compared = comparison.compare_session(thursday_session(revision_id=745),
                                               thursday_activity())
         rows = by_exercise(compared)
-        self.assertEqual(rows["barbell push press"].mark, comparison.NOT_DONE)
-        self.assertEqual(rows["chest press"].mark, comparison.NOT_PLANNED)
+        self.assertEqual(rows["SHOULDER_PRESS/BARBELL_PUSH_PRESS"].mark, comparison.NOT_DONE)
+        self.assertEqual(rows["BENCH_PRESS/MACHINE_CHEST_PRESS"].mark, comparison.NOT_PLANNED)
         self.assertEqual(compared.counted, 12)
 
     def test_the_totals_line(self):
@@ -265,10 +270,11 @@ class RenderTest(unittest.TestCase):
                          ["Exercise", "Planned", "Done"])
         rows = [[cell.strip() for cell in text.split(" | ")] for text in table[2:-1]]
         self.assertEqual(rows[0], [
-            "barbell push press", "1×5 @ 55, 2×4–6 @ 67.5",
-            "chest press 1×5 @ 55, 2×7 @ 65", "swapped",
+            "shoulder press: barbell push press", "1×5 @ 55, 2×4–6 @ 67.5",
+            "bench press: machine chest press 1×5 @ 55, 2×7 @ 65", "swapped",
         ])
-        self.assertEqual(rows[3], ["row", "2×4–6 @ 110", "1×6 @ 95, 2×6 @ 110", "✓"])
+        self.assertEqual(rows[3], ["row: seated cable row", "2×4–6 @ 110",
+                                   "1×6 @ 95, 2×6 @ 110", "✓"])
         self.assertEqual(rows[6][3], "lighter 0/2")
         self.assertEqual(rows[7], ["plank", "", "1×120", "not planned"])
         self.assertEqual(table[-1], "15 of 17 planned sets · 6 of 7 exercises")
@@ -287,17 +293,21 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(lines[1:7], [
             "Thu 24 · ✅ 🏋️ Strength — Light, Legs Fresh — 50 min (you did 38 min)",
             "      15 of 17 planned sets · 6 of 7 exercises",
-            "      ✅ Lat pulldown, seated barbell shoulder press, row, chest fly, glute bridge",
-            "      ✅ Chest press instead of barbell push press",
-            "      ❌ Ab twist, lighter: 1×20 @ 15, 1×20 @ 20 (planned 2×20 @ 30)",
+            # The words hold a colon, so the exercises done as planned are joined with
+            # semicolons (DESIGN_exercise_table.md §4).
+            "      ✅ Pull up: lat pulldown; shoulder press: seated barbell shoulder press; "
+            "row: seated cable row; flye: cable crossover; hip raise: hip thrust machine",
+            "      ✅ Bench press: machine chest press instead of shoulder press: barbell "
+            "push press",
+            "      ❌ Core: russian twist, lighter: 1×20 @ 15, 1×20 @ 20 (planned 2×20 @ 30)",
             "      ➕ Plank 1×120",
         ])
 
     def test_the_companion_names_a_short_exercise_with_its_sets(self):
-        compared = comparison.compare([line(1, "row", 2, 4, 6, 110.0)],
-                                      [watched("row", 6, 110.0)])
+        compared = comparison.compare([line(1, "ROW/SEATED_CABLE_ROW", 2, 4, 6, 110.0)],
+                                      [watched("ROW/SEATED_CABLE_ROW", 6, 110.0)])
         self.assertEqual(session_lines.simple_comparison_lines(compared, by_sets=False)[1:],
-                         ["❌ Row, 1 of 2 sets: 1×6 @ 110"])
+                         ["❌ Row: seated cable row, 1 of 2 sets: 1×6 @ 110"])
 
 
 class _DatabaseCase(unittest.TestCase):
@@ -356,22 +366,22 @@ class DatabaseTest(_DatabaseCase):
         self.assertEqual(json.loads(activity["gym_log"]["payload"]),
                          {**THURSDAY_LOG, "r": self.workout["revision_id"]})
         self.assertEqual(activity["lifted"][0], {
-            "exercise": "chest press", "reps": 5, "load_kg": 55.0, "duration_sec": None,
-            "named_by": "athlete", "card": 1,
+            "exercise": "BENCH_PRESS/MACHINE_CHEST_PRESS", "reps": 5, "load_kg": 55.0,
+            "duration_sec": None, "named_by": "athlete", "card": 1,
         })
         self.assertIsNone(activity["lifted"][-1]["card"])
 
     def test_a_watch_only_activity_carries_its_rows_and_no_log(self):
         self.garmin_activity()
         test_db.store_exercise_sets("g744", [
-            {"seq": 1, "set_type": "active", "exercise": "row", "reps": 6, "load_kg": 110.0,
-             "named_by": "watch"},
+            {"seq": 1, "set_type": "active", "exercise": "ROW/SEATED_CABLE_ROW", "reps": 6,
+             "load_kg": 110.0, "named_by": "watch"},
             {"seq": 2, "set_type": "rest", "duration_sec": 90.0},
         ], self.now, self.now)
         activity = test_db.get_completed_activities(GYM_DAY, GYM_DAY)[0]
         self.assertIsNone(activity["gym_log"])
         self.assertEqual(activity["lifted"], [
-            {"exercise": "row", "reps": 6, "load_kg": 110.0, "duration_sec": None,
+            {"exercise": "ROW/SEATED_CABLE_ROW", "reps": 6, "load_kg": 110.0, "duration_sec": None,
              "named_by": "watch", "card": None},
         ])
 
@@ -405,7 +415,7 @@ class CommandTest(_DatabaseCase):
         self.assertIn("[DONE]", out)
         self.assertIn("15 of 17 planned sets · 6 of 7 exercises", out)
         self.assertNotIn("Discrepancy:", out)
-        self.assertLess(out.index("Actual:"), out.index("barbell push press"))
+        self.assertLess(out.index("Actual:"), out.index("shoulder press: barbell push press"))
 
     def test_workout_compare_draws_the_table_in_place_of_the_set_lines(self):
         code, out, err = run_cli(
@@ -413,7 +423,7 @@ class CommandTest(_DatabaseCase):
         )
         self.assertEqual(code, 0, err)
         self.assertIn("15 of 17 planned sets · 6 of 7 exercises", out)
-        self.assertNotIn("chest press 1×5 @ 55, 2×7 @ 65 ", out.split("ACTUAL")[0])
+        self.assertNotIn("machine chest press 1×5 @ 55, 2×7 @ 65 ", out.split("ACTUAL")[0])
         self.assertIn("No discrepancies found", out)
 
 

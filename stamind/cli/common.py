@@ -16,7 +16,7 @@ from stamind.text import (
 )
 from stamind.output import notice
 from stamind.clock import fmt_date, today_str as _today_str
-from stamind.strength import comparison, prescription, sets
+from stamind.strength import comparison, prescription, sets, vocabulary
 
 
 def print_strength_notes(proposal) -> None:
@@ -61,8 +61,8 @@ def strength_table(w: Dict[str, Any], act: Dict[str, Any]) -> List[str]:
     if compared is None:
         return []
     rows = [
-        [row.exercise, prescription.spec(row.lines), sets.done_text(row.sets, row.exercise),
-         _mark(row)]
+        [vocabulary.words(row.exercise), prescription.spec(row.lines),
+         sets.done_text(row.sets, row.exercise), _mark(row)]
         for row in compared.rows
     ]
     if compared.unnamed:
@@ -77,12 +77,13 @@ def strength_table(w: Dict[str, Any], act: Dict[str, Any]) -> List[str]:
 def _difference_line(row: comparison.Row) -> Optional[str]:
     """One exercise that did not go as planned, in companion words; None for one that did
     (DESIGN_strength_planned_vs_done.md §2)."""
-    name = capitalized(row.exercise)
+    words = vocabulary.words(row.exercise)
+    name = capitalized(words)
     done = sets.done_text(row.sets, row.exercise)
     counts = f"{row.counted} of {row.planned} sets"
     if row.mark == comparison.SWAPPED:
         instead = next(one["exercise"] for one in row.sets if one["exercise"] != row.exercise)
-        head = f"{capitalized(instead)} instead of {row.exercise}"
+        head = f"{capitalized(vocabulary.words(instead))} instead of {words}"
         if row.counted >= row.planned:
             return f"✅ {head}"
         return f"❌ {head}, {counts}"
@@ -100,12 +101,14 @@ def _difference_line(row: comparison.Row) -> Optional[str]:
 def simple_comparison_lines(compared: comparison.Comparison, by_sets: bool) -> List[str]:
     """A strength session against its planned lines, in companion words: the totals, the
     exercises done as planned on one line, then each one that differed
-    (DESIGN_strength_planned_vs_done.md §2). Shared by "Done lately" and `strength
-    ingest`."""
+    (DESIGN_strength_planned_vs_done.md §2). The words hold a colon, so the exercises done as
+    planned are joined with semicolons (DESIGN_exercise_table.md §4). Shared by "Done lately"
+    and `strength ingest`."""
     lines = [comparison.totals_line(compared, by_sets)]
-    as_planned = [row.exercise for row in compared.rows if row.mark == comparison.DONE]
+    as_planned = [vocabulary.words(row.exercise) for row in compared.rows
+                  if row.mark == comparison.DONE]
     if as_planned:
-        lines.append("✅ " + capitalized(", ".join(as_planned)))
+        lines.append("✅ " + capitalized("; ".join(as_planned)))
     for row in compared.rows:
         line = _difference_line(row)
         if line:
