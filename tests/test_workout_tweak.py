@@ -100,14 +100,16 @@ class _TweakCase(unittest.TestCase):
 
     def tweak(
         self, answer, days=(), message="Saturday: a 4 hour hike instead of the ride",
-        today=TODAY,
+        today=TODAY, **open_proposal,
     ):
         """The proposal a tweak makes against `answer`, and the week planner's client."""
         with patch("stamind.coach.engine.openrouter_client") as client, \
                 redirect_stdout(io.StringIO()):
             client.complete.return_value = answer
             self.client = client
-            return coach_service.workout_tweak(message, tweak_dates=days, today_str=today)
+            return coach_service.workout_tweak(
+                message, tweak_dates=days, today_str=today, **open_proposal,
+            )
 
     @staticmethod
     def apply(proposal):
@@ -135,6 +137,43 @@ class CommandTest(_TweakCase):
         args, kwargs = service.workout_tweak.call_args
         self.assertEqual(args[0], "swap them")
         self.assertEqual(kwargs["tweak_dates"], [THURSDAY, FRIDAY])
+
+
+class OpenProposalTest(_TweakCase):
+    """A tweak that replaces a waiting proposal may keep the days that proposal changes
+    (DESIGN_waiting_proposal.md §6.2).
+
+    07:07 the coach proposes a shorter Thursday. 07:08 the athlete writes "move Saturday's
+    ride to Sunday". The answer holds the move and keeps Thursday."""
+
+    MOVE = {
+        "date": SUNDAY, "sport_type": "cycling", "title": "Long ride",
+        "description": "[Long ride]\n180 min.", "duration_minutes": 180, "rpe": 5, "tss": 160,
+        "change_reason": "On request: moved from Saturday.",
+        "replaces": {"date": SATURDAY, "sport_type": "cycling"},
+    }
+    KEPT = {**SHORTER_THURSDAY, "change_reason": "Rough night."}
+
+    def answer(self):
+        return reply(self.KEPT, self.MOVE, days=[SATURDAY, SUNDAY])
+
+    def test_the_tweak_keeps_the_day_the_open_proposal_changed(self):
+        proposal = self.tweak(
+            self.answer(), message="move Saturday's ride to Sunday",
+            open_proposal="Thursday: Intervals — 45 min (was 60 min)",
+            open_dates=(THURSDAY,),
+        )
+        self.assertIn((THURSDAY, "cycling"), self.written(proposal))
+        self.assertIn((SUNDAY, "cycling"), self.written(proposal))
+        system, user = self.client.complete.call_args[0][:2]
+        self.assertIn("### REPLACING THE WAITING PROPOSAL", system)
+        self.assertIn("the one exception to CHANGE ONLY THOSE DAYS", system)
+        self.assertIn("Thursday: Intervals — 45 min (was 60 min)", user)
+
+    def test_without_an_open_proposal_the_tweak_writes_its_own_days_only(self):
+        proposal = self.tweak(self.answer(), message="move Saturday's ride to Sunday")
+        self.assertNotIn((THURSDAY, "cycling"), self.written(proposal))
+        self.assertIn((SUNDAY, "cycling"), self.written(proposal))
 
 
 class WhichDaysTest(_TweakCase):

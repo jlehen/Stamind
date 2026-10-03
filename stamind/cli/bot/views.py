@@ -180,12 +180,20 @@ def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str
         # throttle would keep; the night is what this run is for, so fetch again (§4.2).
         ensure_recent_data(date_str, force_pull=runtime.db.get_sleep_score(date_str) is None)
         written_upto = newest_written()
-        proposal = runtime.coach_service.workout_adapt(date_str)
+        # The proposal that still waits is shown to the week planner, and a new one
+        # replaces it (DESIGN_waiting_proposal.md §6.2).
+        still_open = saved_proposal.open_proposal()
+        proposal = runtime.coach_service.workout_adapt(
+            date_str, **saved_proposal.shown_to_week_planner(still_open)
+        )
         if not proposal.workouts:
             runtime.coach_service.workout_revision_record_no_change(proposal)
             return proposal.strength_notice, None
         if proposal.week_planner_changed:
-            return None, saved_proposal.save(proposal, written_upto)
+            item = saved_proposal.save(
+                proposal, written_upto, replaces=still_open is not None
+            )
+            return None, item
         runtime.coach_service.workout_revision_apply(proposal)
         note = " ".join(part for part in (proposal.reason, proposal.strength_notice) if part)
         return note, None

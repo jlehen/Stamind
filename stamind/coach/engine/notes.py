@@ -5,7 +5,8 @@ the `workout tweak` TASK, how to weigh a note attached to one adaptation, and th
 extraction passes that read a note into candidate constraints and candidate signals with
 the schemas they answer in. `workout adapt -m` and `bot capture note` both ask for the
 extractions, so the rules and the schemas are one text on both paths
-(DESIGN_bot_simple_frontend.md §12.10).
+(DESIGN_bot_simple_frontend.md §12.10). The last section is about the coach's own words:
+how to read a proposal the athlete has not answered yet.
 """
 from typing import Optional, Sequence
 
@@ -109,6 +110,32 @@ The "reason" is sent to the athlete as a message about the change to their week.
 to the athlete: what changed and why, in plain words. Never write it as a reply to the
 note — the athlete asked for nothing, so "as you asked" or "as requested" is wrong.
 """
+
+
+def open_proposal_task(tweak: bool) -> str:
+    """The REPLACING THE WAITING PROPOSAL section: how to read the proposal the athlete has
+    not answered, shown in the user content (DESIGN_waiting_proposal.md §6.2).
+
+    A tweak may also write the days that proposal changes, so its answer can keep them."""
+    tweak_rule = ""
+    if tweak:
+        tweak_rule = """
+This is the one exception to CHANGE ONLY THOSE DAYS: beside the days the request is about,
+you may also write the days that proposal changes, so your answer can keep its changes. A
+session you keep from that proposal keeps the reason that proposal gave for it as its
+"change_reason". The athlete did not ask for it, so do not mark it "On request".
+"""
+    return f"""
+### REPLACING THE WAITING PROPOSAL
+The user content includes a section titled "PROPOSAL WAITING FOR THE ATHLETE'S ANSWER":
+changes the coach proposed earlier, as the athlete read them. The athlete has not accepted
+them, and none of them is written: PLANNED WORKOUTS shows the schedule as it stands, without
+them.
+Your answer replaces that proposal as a whole. Decide again, from the data and from what the
+athlete says now. A change from that proposal that you still want goes into
+"adapted_workouts" again, written in full. A change you leave out is dropped. If you return
+no change at all, that proposal stays open as it is.
+{tweak_rule}"""
 
 
 def constraint_extraction_task(lead: str) -> str:

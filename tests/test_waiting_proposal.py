@@ -54,7 +54,7 @@ class _Case(unittest.TestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
-        self.addCleanup(runtime.reset, "render")
+        self.addCleanup(runtime.reset, "render", "prompt")
         runtime.reset("render")
         save_workout(test_db, THURSDAY, "cycling", "Intervals",
                      description="[Intervals]\n90 minutes with intervals.",
@@ -297,6 +297,111 @@ class MorningPushTest(_Case):
         self.at(8, 30)
         coach, _out = self.push(self.eased())
         coach.workout_adapt.assert_called_once()
+
+    def test_the_push_is_shown_the_open_proposal_and_replaces_it(self):
+        """Thursday evening's proposal about Saturday is still open on Friday at 08:00."""
+        save_workout(test_db, SATURDAY, "cycling", "Long ride", duration_minutes=180)
+        self.at(21)
+        evening = self.save(day=SATURDAY)
+        self.at(8, days=1)
+        coach, _out = self.push(self.eased(day=SATURDAY, minutes=120))
+        shown = coach.workout_adapt.call_args.kwargs
+        self.assertTrue(shown["open_proposal"].startswith(
+            f"Proposed on {THURSDAY}. The days it changes: {SATURDAY}.\n"
+        ))
+        self.assertEqual(shown["open_dates"], (SATURDAY,))
+        self.assertEqual(self.outcome(evening), athlete_queue.STALE)
+        [item] = saved_proposal.waiting()
+        self.assertTrue(item["payload"]["text"].startswith(saved_proposal.REPLACES_LINE))
+
+
+class ChatRunTest(_Case):
+    """A run started from the chat saves its proposal and never asks (§2, §6.2, §7)."""
+
+    def coach_run(self, proposal, argv=("workout", "adapt", "-m", "I'm tired")):
+        coach, prompt = MagicMock(), MagicMock()
+        coach.workout_adapt.return_value = proposal
+        coach.workout_tweak.return_value = proposal
+        with patch.object(runtime, "coach_service", coach, create=True), \
+                patch.object(runtime, "prompt", prompt, create=True), \
+                patch("stamind.cli.workouts.adapt.ensure_recent_data"):
+            code, out, _err = run_cli(list(argv))
+        self.assertEqual(code, 0)
+        return coach, prompt, out
+
+    def nothing_to_change(self):
+        return RevisionProposal(
+            reason="All fine.", workouts=[], range_start=THURSDAY, range_end=THURSDAY,
+        )
+
+    def test_a_chat_run_saves_its_proposal_and_asks_nothing(self):
+        coach, prompt, out = self.coach_run(self.eased())
+        prompt.confirm.assert_not_called()
+        coach.workout_revision_apply.assert_not_called()
+        [sent] = queue_lines(out)
+        self.assertEqual(sent["text"], saved_proposal.QUESTION_LINE)
+        text = out[:out.index(QUEUE_SENTINEL)]
+        self.assertEqual(text.count("Rough night."), 1)
+        self.assertIn("Easy ride", text)
+        [item] = saved_proposal.waiting()
+        self.assertEqual(item["id"], sent["id"])
+
+    def test_a_terminal_run_still_asks_and_writes(self):
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "", "STAMIND_RENDER": ""}):
+            coach, prompt, _out = self.coach_run(self.eased())
+        prompt.confirm.assert_called_once()
+        coach.workout_revision_apply.assert_called_once()
+        self.assertEqual(saved_proposal.waiting(), [])
+
+    def test_yes_writes_without_asking_wherever_it_was_typed(self):
+        coach, prompt, _out = self.coach_run(self.eased(), ("workout", "adapt", "-y"))
+        prompt.confirm.assert_not_called()
+        coach.workout_revision_apply.assert_called_once()
+        self.assertEqual(saved_proposal.waiting(), [])
+
+    def test_kilograms_that_moved_alone_are_written_at_once(self):
+        proposal = self.eased(title="Intervals", minutes=90, week_planner_changed=False)
+        coach, prompt, out = self.coach_run(proposal)
+        prompt.confirm.assert_not_called()
+        coach.workout_revision_apply.assert_called_once_with(proposal)
+        self.assertIn("Rough night.", out)
+        self.assertEqual(saved_proposal.waiting(), [])
+
+    def test_a_run_with_a_proposal_open_is_shown_it_and_replaces_it(self):
+        """07:07 the coach proposes 60 easy minutes. 07:30: "no, shorten it instead"."""
+        first = self.save()
+        self.at(8, 30)
+        coach, _prompt, out = self.coach_run(
+            self.eased(title="Short intervals", minutes=45),
+            ("workout", "tweak", "no, shorten it instead"),
+        )
+        shown = coach.workout_tweak.call_args.kwargs
+        self.assertEqual(shown["open_proposal"], (
+            f"Proposed on {THURSDAY}. The days it changes: {THURSDAY}.\n"
+            + first["payload"]["text"]
+        ))
+        self.assertEqual(shown["open_dates"], (THURSDAY,))
+        self.assertEqual(self.outcome(first), athlete_queue.STALE)
+        [item] = saved_proposal.waiting()
+        self.assertTrue(item["payload"]["text"].startswith(saved_proposal.REPLACES_LINE))
+        self.assertIn(saved_proposal.REPLACES_LINE, out)
+
+    def test_a_run_that_proposes_nothing_leaves_it_open(self):
+        """"What's tomorrow's swim about?" must not withdraw the offer to ease today."""
+        first = self.save()
+        self.at(8, 30)
+        self.coach_run(self.nothing_to_change())
+        self.assertEqual([item["id"] for item in saved_proposal.waiting()], [first["id"]])
+
+    def test_a_proposal_out_of_date_is_closed_and_not_shown(self):
+        first = self.save()
+        save_workout(test_db, SATURDAY, "running", "Long run", duration_minutes=100)
+        self.at(8, 30)
+        coach, _prompt, _out = self.coach_run(self.eased())
+        self.assertNotIn("open_proposal", coach.workout_adapt.call_args.kwargs)
+        self.assertEqual(self.outcome(first), athlete_queue.STALE)
+        [item] = saved_proposal.waiting()
+        self.assertFalse(item["payload"]["text"].startswith(saved_proposal.REPLACES_LINE))
 
 
 if __name__ == "__main__":

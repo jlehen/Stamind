@@ -62,6 +62,11 @@ the same cause: Stamind has no place to put a question that can wait.
 athlete just typed or tapped. She is there, and the command cannot continue without her.
 Those stay blocking questions, exactly as today.
 
+Amended 2026-10-03 (DESIGN_waiting_proposal.md §2): "Apply this proposal?" no longer stops
+a `workout adapt` or a `workout tweak` started from the chat. Such a run saves its proposal
+as a queue item, sends it and ends, and she answers it with a tap whenever she likes. In a
+terminal the question still blocks.
+
 "What was that block of sets?" changes what the app knows, but nothing is stuck while the
 answer is missing: an unnamed set still counts as volume. That goes to the queue, even when
 she is watching.

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from stamind.clock import days_between
 from stamind.coach.engine.notes import (
     NEW_CONSTRAINTS_SCHEMA, NEW_SIGNALS_SCHEMA, constraint_extraction_task,
-    note_for_today_task, signal_extraction_task, tweak_task,
+    note_for_today_task, open_proposal_task, signal_extraction_task, tweak_task,
 )
 from stamind.coach.engine.sessions import (
     LOCKED_HISTORY_TASK, SPORT_TYPE_ENUM, athlete_words_task, benchmark_task, move_task,
@@ -158,6 +158,7 @@ class WorkoutAdaptMixin:
         tweak: bool = False,
         tweak_dates: Sequence[str] = (),
         terse: bool = False,
+        open_proposal: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Queries LLM to evaluate metrics/activities and adapt workouts if needed.
 
@@ -170,7 +171,9 @@ class WorkoutAdaptMixin:
         days it is about, `tweak_dates` when the caller already knows them, and the TASK
         asks for that and nothing else (DESIGN_workout_tweak.md §3.2). `removed_workouts`
         is then every cancelled session in the range, not only the athlete's (§3.1).
-        `terse` halves the summary (DESIGN_output_verbosity.md §9).
+        `terse` halves the summary (DESIGN_output_verbosity.md §9). `open_proposal` is the
+        proposal the athlete has not answered, which this answer replaces
+        (DESIGN_waiting_proposal.md §6.2).
         """
         # has_message gates SIX regions that sit hundreds of lines apart: the clause
         # spliced into the change_reason wording, the note-handling instructions, the
@@ -182,6 +185,9 @@ class WorkoutAdaptMixin:
         # Same gate discipline: the drift branch, the CORRECTING EXECUTION DRIFT
         # instructions and the drift DATA section move together.
         has_intensity = bool(intensity_context and intensity_context.strip())
+        # And again: the REPLACING THE WAITING PROPOSAL instructions and the proposal's DATA
+        # section move together.
+        has_open = bool(open_proposal and open_proposal.strip())
         # Shared change_reason wording, with the note-footprint clause spliced in only when
         # a note could actually have driven the change.
         note_clause = ''
@@ -292,6 +298,9 @@ the active mesocycle (from {target_date_str} to {range_end_str}).
         # head.
         if has_message and not tweak:
             custom_task += note_for_today_task(athlete_watching())
+
+        if has_open:
+            custom_task += open_proposal_task(tweak)
 
         if has_message:
             custom_task += constraint_extraction_task(
@@ -461,6 +470,15 @@ evidence-backed observations are authored only by the weekly history analysis
                 f"{athlete_message.strip()}\n"
             )
 
+        open_section = ""
+        if has_open:
+            open_section = (
+                "\n## PROPOSAL WAITING FOR THE ATHLETE'S ANSWER\n"
+                "Proposed earlier, not accepted and not written — see REPLACING THE WAITING\n"
+                "PROPOSAL.\n"
+                f"{open_proposal.strip()}\n"
+            )
+
         # The measured mesocycle summary (§9.3). Kept out of the metrics section on purpose:
         # this is an execution signal, not a readiness one, and the two must not blur.
         intensity_section = ""
@@ -485,7 +503,7 @@ evidence-backed observations are authored only by the weekly history analysis
         user_content = f"""
 Evaluation Date: {target_date_str}
 Adaptation Range: {target_date_str} to {range_end_str}
-{message_section}{intensity_section}
+{message_section}{open_section}{intensity_section}
 
 ## ATHLETE'S METRICS HISTORY (PAST {history_days} DAYS)
 {metrics_text}

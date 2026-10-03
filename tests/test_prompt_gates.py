@@ -63,6 +63,10 @@ STRENGTH_BRIEF_INSTRUCTIONS = "### WRITING A STRENGTH DAY"
 STRENGTH_KEEP_THE_REQUEST = "A brief names an exercise in one case only"
 STRENGTH_REQUEST_INSTRUCTIONS = "asks for something INSIDE a strength session"
 
+OPEN_PROPOSAL_INSTRUCTIONS = "### REPLACING THE WAITING PROPOSAL"
+OPEN_PROPOSAL_DATA = "## PROPOSAL WAITING FOR THE ATHLETE'S ANSWER"
+OPEN_PROPOSAL_TWEAK_RULE = "the one exception to CHANGE ONLY THOSE DAYS"
+
 TWEAK_TASK = "- FIND THE DAYS the request is about"
 TWEAK_SCHEMA_MEMBER = '"tweak_dates"'
 TWEAK_DATA = "## THE ATHLETE'S REQUEST"
@@ -210,6 +214,31 @@ class TestStrengthHabitsRegion(unittest.TestCase):
         ):
             with self.subTest(printed=printed):
                 self.assertIn(printed, system)
+
+
+class TestOpenProposalGate(unittest.TestCase):
+    """The proposal the athlete has not answered: its instructions and its data move
+    together (DESIGN_waiting_proposal.md §6.2)."""
+
+    WAITING = "Proposed on 2026-06-03.\nToday: Easy run — 30 min (was Tempo, 40 min)"
+
+    def test_an_open_proposal_reaches_both_regions(self):
+        system, user = build_prompt(open_proposal=self.WAITING)
+        self.assertIn(OPEN_PROPOSAL_INSTRUCTIONS, system)
+        self.assertIn(OPEN_PROPOSAL_DATA, user)
+        self.assertIn(self.WAITING, user)
+        self.assertNotIn(OPEN_PROPOSAL_TWEAK_RULE, system)
+
+    def test_without_one_neither_appears(self):
+        system, user = build_prompt()
+        self.assertNotIn(OPEN_PROPOSAL_INSTRUCTIONS, system + user)
+        self.assertNotIn(OPEN_PROPOSAL_DATA, system + user)
+
+    def test_a_tweak_is_told_it_may_keep_the_days_the_proposal_changes(self):
+        system, _user = build_prompt(
+            open_proposal=self.WAITING, tweak=True, athlete_message="move Saturday's ride",
+        )
+        self.assertIn(OPEN_PROPOSAL_TWEAK_RULE, system)
 
 
 class TestAthleteNoteGate(unittest.TestCase):
@@ -608,6 +637,7 @@ class TestSpokenSessionsGate(unittest.TestCase):
 GATES_WITH_A_TEST = {
     "athlete_message", "intensity_context", "standing_workouts", "past_constraints",
     "neighbour_workouts", "spoken_workouts", "tweak", "tweak_dates", "terse",
+    "open_proposal",
 }
 
 # The rest of the two builders' optional inputs. Being here is not a claim that an input

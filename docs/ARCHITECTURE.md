@@ -745,7 +745,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A preference the athlete can change at runtime | `stamind/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | Cycle retrospectives (the stored record of a finished mesocycle or plan) | `stamind/cycle_records.py` (which records exist, when one is due, how one reads), `db/retrospectives.py` (the rows), `coach/service/retrospective.py` (the write step and the numbers), `coach/engine/retrospective.py` (the writer's prompt), `stamind/retrospective_question.py` (the question and its answer), `coach/service/history_context.py` (what `plan generate` reads), `cli/plans/show.py` and `cli/plans/retro.py` (the two views), DESIGN_cycle_retrospective.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`stamind/queue_kind.py`) added to `KINDS` in `stamind/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label, and whether its items stand alone — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
-| A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` queue kind: its wording, the three rules that put it out of date, what "Change it" and "Keep it as planned" do, `save`), `coach/proposals.py` (`week_planner_changed`, and `revision_to_json`/`revision_from_json`: what a tap writes, without the sleep mark), `cli/queue.py:send_alone` (the sending), `cli/bot/views.py:_morning_adaptation` (the push saves one). DESIGN_waiting_proposal.md |
+| A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` queue kind: its wording, the three rules that put it out of date, what "Change it" and "Keep it as planned" do, `save`, `open_proposal`, `shown_to_week_planner`), `coach/proposals.py` (`week_planner_changed`; `revision_to_json`/`revision_from_json`, what a tap writes, without the sleep mark), `coach/engine/notes.py:open_proposal_task` (how the week planner reads the open one), `cli/queue.py:send_alone` (the sending), `cli/workouts/adapt.py:_adapt` (a chat run saves one in place of the confirm), `cli/bot/views.py:_morning_adaptation` (the push saves one). DESIGN_waiting_proposal.md |
 | A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `activity_lines`, `logbook`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`, and `strength log`/`exercises` which read the record and the vocabulary back), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
 | A gym session logged on the phone | `miniapp/` (the page), `strength/logger.py` (the two payloads), `cli/strength_ingest.py` (`strength ingest`), `strength/sets.py::take_over_logs` (the pull handing the log to Garmin's activity), `gym_logs` + `upsert_logged_activity`/`save_gym_log`/`gym_log_for_day`/`move_gym_log` in `db/strength.py`. The bot's button and the handler for the page's message are DESIGN_gym_logger.md §6 and not wired yet. DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
 | A past strength session against its planned lines | `strength/comparison.py` (the counting, the marks, the totals, the §6 reason), `db/strength.py::attach_lifted` (what `get_completed_activities` puts on a strength activity: `lifted`, and `gym_log`), `analytics/adherence.py` (`_discrepancy_reasons` grades a logged session by its sets, `_pairing_order` and `is_ambiguous_match` put the logged activity first), `cli/common.py` (`strength_table` for `workout list -vv` and `workout compare`, `simple_comparison_lines` for "Done lately" and `strength ingest`), `strength/sets.py::done_text` (the Done cell). DESIGN_strength_planned_vs_done.md |
@@ -1095,6 +1095,8 @@ called by the UIs.
   the rolling window, calls `CoachEngine._workout_adapt_logic()`, returns a
   `RevisionProposal` (`coach/proposals.py`) carrying `reason`, `workouts`, `pairs`/
   `removals` and the two candidate lists below; caller decides whether to apply.
+  `open_proposal` is the proposal the athlete has not answered yet, which the answer
+  replaces (DESIGN_waiting_proposal.md §6.2).
   - **`message`** (CLI `-m/--message`): a fast-capture inbox. There is no separate
     classification call — the same adapt call may return two kinds of candidate
     extracted from the note, both raw and **unconfirmed**, both gated on the same
@@ -3034,6 +3036,26 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    predecessor in the lineage: a drift correction that rewrites the prescription and holds
    the load never counts. That was the interim measure DESIGN_intensity_distribution.md
    §9.5 flagged; DESIGN_workout_revisions.md §7 is the fix it named.
+7. **A run started from the athlete's chat does not ask and apply**
+   (DESIGN_waiting_proposal.md §2). `_adapt` saves the proposal as an item of the athlete
+   queue (`cli/workouts/proposal.py:save`) and sends it (`cli/queue.py:send_alone`): the
+   reason and the preview as text, then "Shall I make these changes?" with "✅ Change it" and
+   "💪 Keep it as planned". The run ends there, so nothing times out. "Change it" writes the
+   saved proposal through `workout_revision_apply`, exactly as it was shown, unless the
+   proposal is out of date (`proposal.out_of_date`): a later change wrote a session, a day
+   it changes is over, or it changes today and an activity of today started after it was
+   made. A tap on a proposal that changes today first pulls today's activities from Garmin,
+   past the refresh throttle. A terminal run and `-y` keep step 6 as it is. Kilograms that
+   moved alone (`RevisionProposal.week_planner_changed` false) are written at once (§7).
+8. **One proposal is open at a time** (§3, §6.2). Every run — chat, morning push, terminal —
+   reads the open one before it asks the week planner (`proposal.open_proposal`, which
+   closes a proposal that waits and is out of date) and hands the service what
+   `proposal.shown_to_week_planner` builds from it: the day it was made and the days it
+   changes, then the text the athlete read.
+   The engine shows it under `## PROPOSAL WAITING FOR THE ATHLETE'S ANSWER`, with the TASK
+   sub-section `### REPLACING THE WAITING PROPOSAL`. Saving a proposal closes the others,
+   and the new text opens with "This replaces my earlier proposal." A run that proposes
+   nothing leaves the open one open. What a terminal run writes puts it out of date.
 
 ### A change on request (`workout tweak`)
 
@@ -3056,6 +3078,8 @@ what changes; with `workout tweak "…"` the athlete decides and the coach write
    stops the run with a message. Every entry on another date is dropped, and so is a move
    whose other end is on another date. This cut runs before the moves are resolved, so a
    move left half out writes no rest day. The strength planner is shown those days only.
+   A tweak that replaces an open proposal may also write the days that proposal changes,
+   so its answer can keep them (DESIGN_waiting_proposal.md §6.2).
 4. The proposal has `kind="tweak"` and covers no constraint. Apply records a `tweak`
    change: it has no `[Adapted]` title tag, "Changed on request" in the event's History,
    and it restarts the count of easings the way a `generate` does.
@@ -3543,7 +3567,7 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | activity, `strength log`/`exercises` reading the record back,    |
 |                                | the morning push reading sets before its walk                    |
 | `tests/test_strength_comparison.py` | a past strength session planned against done (DESIGN_strength_planned_vs_done.md), on the design's Thursday: which sets count, the marks and totals, the verdict by sets and the one kept by time and load, the logged activity pairing first and never asked about, the sets on the activity, the same-day takeover, the table, the companion lines, `workout show` and `workout compare` |
-| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (no round, no "Not now", saving one closes the others), and the morning push that proposes a session change and writes kilograms at once |
+| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (no round, no "Not now", saving one closes the others), the morning push that proposes a session change and writes kilograms at once, and the chat run that saves its proposal, is shown the open one and replaces it. The tweak that keeps the open proposal's days is in `test_workout_tweak.py`, the prompt gate in `test_prompt_gates.py` |
 | `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the line for a change to today, who is watching, the replace question and its ways out, `workout notify` with `--all` and `--sent` and their tags, `workout batches`. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.started_from` pins where the run started, the terminal or the athlete's chat |
 | `tests/test_constraints*.py`   | the constraint object: DB windowing, the §8 message capture and |
 |                                | the hard-rest pre-pass (`test_constraints.py`); the §7          |
@@ -4126,8 +4150,8 @@ is to keep the names parallel rather than to merge the files:
 names first; the service and the CLI carry them now too.
 
 ### `coach/engine/adapt.py` is over the 500-line rule, and the cut that fixes it is elsewhere
-The file is 509 lines and 370 of them are a single method, `_workout_adapt_logic`, which
-takes 27 parameters and assembles the whole adapt TASK, the response schema and the user
+The file is 550 lines and 410 of them are a single method, `_workout_adapt_logic`, which
+takes 31 parameters and assembles the whole adapt TASK, the response schema and the user
 content in one run. Every prompt section it appends already lives outside it — the shared
 ones in `sessions.py`, the ones about the athlete's words in `notes.py`, and adapt's own
 as constants beside it — so there is nothing left to move out. A fifth file holding those

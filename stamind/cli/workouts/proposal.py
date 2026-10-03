@@ -1,9 +1,9 @@
 """The `proposal` kind of the athlete queue: what the week planner would change, saved until
 the athlete answers it (DESIGN_waiting_proposal.md §3, §4).
 
-Its wording, the three rules that put it out of date, what each answer does, and how a
-proposal is saved. Nothing here sends: `cli/queue.py` does, and it imports the list of kinds
-this one is in.
+Its wording, the three rules that put it out of date, what each answer does, how a proposal
+is saved and how the open one is found. Nothing here sends: `cli/queue.py` does, and it
+imports the list of kinds this one is in.
 """
 import contextlib
 import io
@@ -28,6 +28,7 @@ ACCEPT = 0
 APPLIED_LINE = "Done — your week is updated. 💪"
 KEPT_LINE = "Okay — nothing changed."
 OUT_OF_DATE_LINE = "That proposal is out of date, so I left your week as it is."
+REPLACES_LINE = "This replaces my earlier proposal."
 
 
 def made_at(item: Dict[str, Any]) -> datetime:
@@ -105,15 +106,48 @@ def waiting() -> List[Dict[str, Any]]:
     return [item for item in runtime.db.waiting_queue_items() if item["kind"] == KIND]
 
 
-def save(proposal: RevisionProposal, written_upto: int) -> Dict[str, Any]:
+def open_proposal() -> Optional[Dict[str, Any]]:
+    """The proposal that waits and is not out of date, or None. One that waits and is out
+    of date is closed on the way (§6.2)."""
+    found = None
+    for item in waiting():
+        if out_of_date(item):
+            runtime.db.close_queue_item(item["id"], STALE, clock.now())
+            continue
+        found = item
+    return found
+
+
+def shown_to_week_planner(item: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """What a run hands `workout_adapt` about the open proposal, as keyword arguments, and
+    nothing when none is open (§6.2). The text is the day it was made and the days it
+    changes, then what the athlete read, whose day words count from that day."""
+    if item is None:
+        return {}
+    dates = tuple(item["payload"]["dates"])
+    made_on = clock.to_local(made_at(item)).strftime("%Y-%m-%d")
+    return {
+        "open_proposal": (
+            f"Proposed on {made_on}. The days it changes: {', '.join(dates)}.\n"
+            f"{item['payload']['text']}"
+        ),
+        "open_dates": dates,
+    }
+
+
+def save(proposal: RevisionProposal, written_upto: int, replaces: bool = False) -> Dict[str, Any]:
     """Saves a proposal and returns its item. Every other proposal that still waits is
     closed, so one is open at a time (§3). `written_upto` is the newest change that wrote a
-    session when the run read the week (§4, rule 1)."""
+    session when the run read the week (§4, rule 1). `replaces` says the run was shown an
+    open proposal, so the text opens by saying so (§6.2)."""
     now = clock.now()
     for other in waiting():
         runtime.db.close_queue_item(other["id"], STALE, now)
+    text = _shown_text(proposal)
+    if replaces:
+        text = f"{REPLACES_LINE}\n\n{text}"
     item_id = queue(KIND, queue_stamp(now), {
-        "text": _shown_text(proposal),
+        "text": text,
         "answers": list(ANSWERS),
         "proposal": revision_to_json(proposal),
         "dates": sorted(revision_dates(proposal)),

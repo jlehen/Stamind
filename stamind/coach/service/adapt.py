@@ -74,13 +74,15 @@ class AdaptMixin:
 
     def workout_tweak(
         self, message: str, tweak_dates: Sequence[str] = (),
-        today_str: Optional[str] = None,
+        today_str: Optional[str] = None, open_proposal: Optional[str] = None,
+        open_dates: Sequence[str] = (),
     ) -> RevisionProposal:
         """Changes the days a request is about: `workout adapt`'s path with a narrower job
         (DESIGN_workout_tweak.md §3.2). Empty `tweak_dates` lets the week planner read the
         days off the message."""
         return self.workout_adapt(
-            today_str, message=message, tweak=True, tweak_dates=tweak_dates
+            today_str, message=message, tweak=True, tweak_dates=tweak_dates,
+            open_proposal=open_proposal, open_dates=open_dates,
         )
 
     @staticmethod
@@ -120,6 +122,7 @@ class AdaptMixin:
     def workout_adapt(
         self, target_date_str: Optional[str] = None, message: Optional[str] = None,
         tweak: bool = False, tweak_dates: Sequence[str] = (),
+        open_proposal: Optional[str] = None, open_dates: Sequence[str] = (),
     ) -> RevisionProposal:
         """Evaluates metrics/activities over a rolling window and adapts mesocycle if needed.
 
@@ -132,6 +135,9 @@ class AdaptMixin:
         a constraint row or triggers a plan regen on its own.
 
         `tweak` narrows the job to the days a request is about; see `workout_tweak`.
+        `open_proposal` is the proposal the athlete has not answered, as the week planner is
+        shown it, and `open_dates` the days it changes: the answer replaces it
+        (DESIGN_waiting_proposal.md §6.2).
         """
         if not target_date_str:
             target_date_str = _today_str()
@@ -311,6 +317,7 @@ class AdaptMixin:
             tweak=tweak,
             tweak_dates=tweak_dates,
             terse=settings.terse(),
+            open_proposal=open_proposal,
         )
 
         # NOTE: daily adaptation is read-only w.r.t. coach learnings
@@ -330,6 +337,9 @@ class AdaptMixin:
             tweak_days = self._tweak_days(
                 decision, tweak_dates, target_date_str, range_end
             )
+            # A tweak that replaces an open proposal may keep the days that proposal
+            # changes (DESIGN_waiting_proposal.md §6.2).
+            tweak_days |= set(open_dates)
 
         # Integers, before the no-op backstop and the preview both read these numbers.
         normalize_load_fields(adapted)
