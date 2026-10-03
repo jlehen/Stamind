@@ -19,6 +19,7 @@ from stamind.db.learnings import LearningsMixin
 from stamind.db.analysis import AnalysisCacheMixin
 from stamind.db.periodization import PeriodizationMixin
 from stamind.db.mesocycles import MesocyclesMixin
+from stamind.db.retrospectives import RetrospectivesMixin
 from stamind.db.queue import QueueMixin
 from stamind.db.page_files import PageFilesMixin
 from stamind.db.strength import StrengthMixin
@@ -38,6 +39,7 @@ class Database(
     AnalysisCacheMixin,
     PeriodizationMixin,
     MesocyclesMixin,
+    RetrospectivesMixin,
     SettingsMixin,
     QueueMixin,
     PageFilesMixin,

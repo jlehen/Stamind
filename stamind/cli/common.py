@@ -199,6 +199,8 @@ def print_plan_cascade(objective_id: int) -> None:
     print(f"  - {len(versions)} periodization plan version(s)")
     print(f"  - {mesocycles} mesocycle(s)")
     print(f"  - {notes} plan feedback note(s)")
+    # They go with their plan (DESIGN_cycle_retrospective.md §6).
+    print(f"  - {len(runtime.db.get_retrospectives(objective_id))} retrospective record(s)")
     if orphaned:
         notice(
             f"  and leaves {orphaned} upcoming session(s) with no plan to explain "

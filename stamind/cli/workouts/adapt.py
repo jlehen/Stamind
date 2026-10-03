@@ -8,7 +8,7 @@ A tweak is that flow with a narrower job (DESIGN_workout_tweak.md §3.2).
 import argparse
 from datetime import datetime, timedelta
 from typing import Optional
-from stamind import athlete_queue, runtime
+from stamind import athlete_queue, cycle_records, runtime
 from stamind.analytics.compare import format_actual
 from stamind.config import config
 from stamind.prompt import Choice
@@ -106,6 +106,7 @@ def _adapt_window(args: argparse.Namespace, tweak: bool) -> Window:
 
 def run_workout_adapt(args: argparse.Namespace) -> None:
     # Executes the daily workout Garmin adaptation checks command.
+    cycle_records.date_check(runtime.db, _today_str())   # DESIGN_cycle_retrospective.md §3
     with replacing_unsent(skip=args.auto, window=_adapt_window(args, tweak=False)):
         _adapt(args)
 

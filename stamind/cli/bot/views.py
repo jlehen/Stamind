@@ -14,7 +14,7 @@ import argparse
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence
 
-from stamind import clock, heads_up, runtime, settings
+from stamind import clock, cycle_records, heads_up, runtime, settings
 from stamind.analytics.compare import adherence_verdicts
 from stamind.cli.bot import test_result
 from stamind.cli.common import ensure_recent_data
@@ -253,6 +253,9 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     today = _today_str()
     if not args.force and runtime.db.get_setting(MORNING_MARKER) == today:
         return
+    # Before the silence below, so a plan that has run out still gets its records
+    # (DESIGN_cycle_retrospective.md §3).
+    cycle_records.date_check(runtime.db, today)
     runway = current_runway(today)
 
     # An exhausted schedule past the passed-state window has nothing honest left to say on

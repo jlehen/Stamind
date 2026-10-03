@@ -366,10 +366,12 @@ class PeriodizationMixin:
             conn.commit()
 
     def delete_macrocycle_for_objective(self, objective_id: int) -> None:
-        """Deletes the macrocycle and its nested mesocycles for a specific objective."""
+        """Deletes every plan version of an objective, with its mesocycles, and the
+        goal's retrospectives, which go with their plan (DESIGN_cycle_retrospective.md §6)."""
         with self._get_connection() as conn:
-            conn.cursor().execute(
-                "DELETE FROM macrocycles WHERE objective_id = ?",
-                (objective_id,)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM macrocycles WHERE objective_id = ?", (objective_id,))
+            cursor.execute(
+                "DELETE FROM retrospectives WHERE objective_id = ?", (objective_id,)
             )
             conn.commit()
