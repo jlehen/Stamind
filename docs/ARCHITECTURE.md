@@ -1177,12 +1177,13 @@ called by the UIs.
   parts it could not use. See DESIGN_backward_evaluation.md §5, §8, §9, §13.
 - **`_build_prior_training_context(prior_macros, today)`** — builds the read-only
   "planned vs actual" review injected into the `plan generate` strategy prompt
-  (Option A). Anchored on the elapsed mesocycle windows of every plan handed in **and of
-  the plan the athlete is currently in** (it adds `get_governing_macrocycle()` itself) —
-  drift diagnosed only one macrocycle late is
-  history. The caller passes both the *preceding goal's* plan and the one being
+  (Option A). The finished mesocycles come from the stored records, for every goal; the
+  mesocycle under way comes from every plan handed in **and from the plan the athlete is
+  currently in** (it adds `get_governing_macrocycle()` itself) — drift diagnosed only one
+  macrocycle late is history (`_mesocycle_reviews`, below). The caller passes both the
+  *preceding goal's* plan and the one being
   *replaced*; they are different macrocycles whenever three or more planned goals chain
-  (DESIGN_backward_evaluation.md §6.1). Each mesocycle carries its volume/load line plus the per-sport per-zone intensity
+  (DESIGN_backward_evaluation.md §6.1). Each mesocycle shown in full carries its volume/load line plus the per-sport per-zone intensity
   table and the **mesocycle-over-mesocycle delta**, which is the intensity-creep check and lives
   here only: it is a periodization question, so `adapt` never sees it
   (DESIGN_intensity_distribution.md §4.1/§9.2) — beside **what the plan prescribed** over
@@ -1190,18 +1191,20 @@ called by the UIs.
   half-missed mesocycle reads exactly like a completed one. Folds in every cached
   reconstruction (`_cached_reconstructions()`): summary, inferred macrocycle and mesocycles,
   and physiological insights. Writes nothing anywhere — it is prompt context, never a
-  note in the plan's feedback log. The whole review is wrapped **once**, at build time, and printed
+  note in the plan's feedback log; the records it reads are written by the write step. The whole review is wrapped **once**, at build time, and printed
   verbatim — the zone tables are column-aligned and a screen-width re-wrap shreds them.
-- **`_intensity_history_context(macros, today)`** — the mesocycle walk behind the above.
-  Navigates **macrocycle-first**, orders the lineages by their first mesocycle's start date,
-  then flattens, so each mesocycle's predecessor is the previous element (including across a
-  plan boundary) and the delta baseline is the mesocycle that actually preceded it —
-  *argument* order is not chronological, since the plan being replaced can be for a later
-  goal than the governing one. Never a
-  date-ordered mesocycle query: every mesocycle accessor filters `mac.status = 'active'`,
-  which hides exactly the cross-plan case, and dropping that filter drags in superseded
-  rollback versions whose mesocycles overlap the live ones and describe training that never
-  happened.
+- **`_mesocycle_reviews(macros, today)`** — the list of mesocycles behind the above
+  (DESIGN_cycle_retrospective.md §7). The finished mesocycles are the mesocycle records of
+  every goal, a called-off one included, oldest first. So a mesocycle that lives only in a
+  replaced plan version is shown, which a walk over plan versions could not do. A written
+  record is printed in place of the full detail (`cycle_records.record_text`), about 0.5 KB
+  where the detail takes about 7 KB. Two kinds keep the full detail: the mesocycle that
+  finished most recently, which also prints its record under it, and a record that has no
+  lines yet. The mesocycles under way come from `macros` through `plan_lineage`, in full
+  detail. One line names the goal whenever it changes: `Toward "Gran Fondo" (goal dated
+  2026-10-15):`. The delta baseline of a mesocycle shown in full is the one before it in
+  this list, across goals too. `_mesocycle_review` renders one mesocycle in full, and the
+  retrospective writer reads the same text.
 - **`plan_rm(objective_id)`** — deletes macrocycle + mesocycles for that objective
   (cascades in DB; removes *all* versions, active and superseded).
 - **`plan_rollback(objective_id, target_macrocycle_id)`** — restores a superseded plan
@@ -2770,8 +2773,10 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    same reason `cli/plans/generate.py` skips the "an input changed, regenerate?" question when
    notes are pending: the answer could not stop the new plan.
 4. Otherwise: builds a read-only **planned-vs-actual review** via
-   `_build_prior_training_context()` (Option A — anchored on the elapsed mesocycle
-   windows of the prior plan and of the current one, each with its per-sport per-zone
+   `_build_prior_training_context()` (Option A — the finished mesocycles of every goal
+   from their stored records, where a written record stands in for the detail of all but
+   the latest one, then the mesocycle under way, each one shown in full with its
+   per-sport per-zone
    intensity table, mesocycle-over-mesocycle delta, prescribed-zone table and per-week
    planned-vs-actual load lines, plus every cached reconstruction's summary,
    reverse-engineered macrocycle and mesocycles, and physiological insights;
@@ -3488,7 +3493,7 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | a reply that parses but carries nothing (`_degenerate`), the    |
 |                                | weekly evidence (`_evidence`: per-week constraints and          |
 |                                | body-response z-scores, pure and in the prompt), and the cached |
-|                                | reconstruction `plan generate` reads (`_prior_training`)        |
+|                                | reconstruction `plan generate` reads (`_prior_training`), which also holds the review built from records (DESIGN_cycle_retrospective.md §7): a written record in place of the detail, the latest finished mesocycle with both, a blank record falling back to the detail, a mesocycle that lives only in a replaced version, and one line per goal |
 | `tests/test_athlete_queue.py`  | the athlete queue (DESIGN_athlete_queue.md): a subject queued once, |
 |                                | the order and "after the others", a walk showing each item once, |
 |                                | stale items, "in 1 day" from the walk start, reminders sent once, |

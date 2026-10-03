@@ -20,7 +20,7 @@ def _days_out(n: int) -> str:
 # Fixtures ride on today rather than on fixed dates; test_periodization.py says why.
 GOAL_DATE = _days_out(71)
 
-from stamind import plan_inputs
+from stamind import clock, cycle_records, plan_inputs
 from stamind.db import Database
 
 test_db = Database(db_path=TEST_DB_PATH)
@@ -255,6 +255,7 @@ class TestReplan(unittest.TestCase):
             avg_hr=140, max_hr=160, rpe=5, tss=60.0,
             zone1_sec=300, zone2_sec=2700, zone3_sec=400, zone4_sec=200, zone5_sec=0,
         )
+        cycle_records.date_check(test_db, clock.today_str())
         mock_client.complete.return_value = {
             "strategy": "New strategy", "mesocycles": [{
                 "name": "Build", "start_date": "2026-06-08",

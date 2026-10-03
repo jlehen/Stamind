@@ -27,6 +27,7 @@ from stamind.db import Database
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
+from stamind import clock, cycle_records
 from stamind.coach.service import coach_service
 
 
@@ -77,6 +78,9 @@ class TestPriorTrainingReview(unittest.TestCase):
             avg_hr=140, max_hr=160, rpe=5, tss=60.0,
             zone1_sec=300, zone2_sec=2700, zone3_sec=400, zone4_sec=200, zone5_sec=0,
         )
+        # The review reads a finished mesocycle from its record, which the date check
+        # creates at the start of `plan generate` (DESIGN_cycle_retrospective.md §7).
+        cycle_records.date_check(test_db, clock.today_str())
         mock_client.complete.return_value = {
             "strategy": "New strategy", "mesocycles": [{
                 "name": "Build", "start_date": "2026-06-08",
@@ -223,6 +227,7 @@ class TestCompletedSeasonsReachTheReview(unittest.TestCase):
                 distance_km=30.0, elevation_gain_m=200.0, avg_hr=140, max_hr=170,
                 rpe=5, tss=100.0, zone1_sec=600, zone2_sec=3000,
             )
+        cycle_records.date_check(test_db, self.TODAY)
 
     @patch("stamind.runtime.calendar_syncer")
     @patch("stamind.coach.engine.openrouter_client")
@@ -251,9 +256,11 @@ class TestCompletedSeasonsReachTheReview(unittest.TestCase):
 
     @patch("stamind.runtime.calendar_syncer")
     @patch("stamind.coach.engine.openrouter_client")
-    def test_an_archived_season_stays_out(self, mock_client, mock_calendar):
-        """`archived` is the athlete saying it did not happen — the one thing the date
-        cannot know, and the only reason the column still exists."""
+    def test_a_called_off_season_is_in_the_review_and_says_so(
+        self, mock_client, mock_calendar
+    ):
+        """The mesocycles trained toward a goal that was called off afterwards are what the
+        next plan most needs. They used to stay out (DESIGN_cycle_retrospective.md §7)."""
         self._last_season()
         test_db.update_objective(1, status="archived")
         test_db.add_objective(
@@ -269,7 +276,9 @@ class TestCompletedSeasonsReachTheReview(unittest.TestCase):
 
         coach_service.plan_generate(force=True)
 
-        self.assertNotIn("Spring Base", mock_client.complete.call_args_list[0][0][0])
+        prompt = mock_client.complete.call_args_list[0][0][0]
+        self.assertIn("Spring Base", prompt)
+        self.assertIn('Toward "Spring Hill Climb" (goal dated 2026-07-04, called off):', prompt)
 
 
 class TestLearningsReachTheStrategyPrompt(unittest.TestCase):
