@@ -178,16 +178,14 @@ def _print_lines(title: str, changes: List[Dict[str, Any]], waiting_ids: Set[int
         print(textwrap.indent(wrap_text(heads_up.message(change), width), "    "))
 
 
-def _made_day(change: Dict[str, Any]) -> str:
-    """The athlete's local day a change was made on, as YYYY-MM-DD."""
-    return clock.to_local(datetime.fromisoformat(change["created_at"])).strftime("%Y-%m-%d")
-
-
 def _print_history(args: argparse.Namespace) -> None:
     """The lines of the changes made on the days `-d` picks, oldest first: every one with
     `--all`, the ones already told with `--sent` (§6)."""
     start, end = resolve_window(args)
-    changes = [c for c in runtime.db.changes_with_lines() if start <= _made_day(c) <= end]
+    changes = [
+        c for c in runtime.db.changes_with_lines()
+        if start <= clock.local_day(c["created_at"]) <= end
+    ]
     title = "Lines for the athlete, oldest first:"
     if getattr(args, "sent", False):
         changes = [c for c in changes if c["told_at"]]

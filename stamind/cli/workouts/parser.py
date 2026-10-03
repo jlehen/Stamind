@@ -235,8 +235,10 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         "batches",
         help="List the workout changes that 'workout rollback' can undo",
         description=(
-            "List every command that wrote workouts, newest first: when it ran, what "
+            "List the commands that wrote workouts, newest first: when it ran, what "
             "kind of change it was, how many revisions it appended and over what dates. "
+            "Lists the changes made in the last 7 days unless -d picks the days. A row "
+            "keeps the number it has in the whole list, the one --batch takes. "
             f"'{green('workout rollback --batch N')}' undoes one, and everything after "
             "it. A pass that looked at the plan and changed nothing — an adapt that held "
             "— is listed too, marked '(held)'. Every entry is undoable, #1 included: it "
@@ -244,6 +246,7 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         )
     )
     _batches_parser.set_defaults(func=run_workout_batches)
+    add_selector_args(_batches_parser, direction="backward", default="7d")
 
     # workout notify
     w_notify = workout_subparsers.add_parser(

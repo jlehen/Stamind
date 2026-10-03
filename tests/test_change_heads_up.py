@@ -163,6 +163,19 @@ class _DbCase(unittest.TestCase):
             )
             return change.id
 
+    def _stamp(self, change_id: int, made: int, told: Optional[int] = None) -> None:
+        """Sets when the change was made, and when its line was told, at noon on those
+        September days; no `told` leaves the line unsent."""
+        told_at = None
+        if told is not None:
+            told_at = _noon_utc(told)
+        with test_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE workout_changes SET created_at = ?, told_at = ? WHERE id = ?",
+                (_noon_utc(made), told_at, change_id),
+            )
+            conn.commit()
+
 
 class WhoIsWatchingTest(_DbCase):
     """A change is told as it is written when the athlete watched the run (§6)."""
@@ -453,19 +466,6 @@ class NotifyTest(_DbCase):
         self.assertIn("Nothing is waiting", out)
         self.assertIsNone(test_db.get_setting(heads_up.NOTIFY_MARKER))
 
-    def _stamp(self, change_id: int, made: int, told: Optional[int] = None) -> None:
-        """Sets when the change was made, and when its line was told, at noon on those
-        September days; no `told` leaves the line unsent."""
-        told_at = None
-        if told is not None:
-            told_at = _noon_utc(told)
-        with test_db._get_connection() as conn:
-            conn.execute(
-                "UPDATE workout_changes SET created_at = ?, told_at = ? WHERE id = ?",
-                (_noon_utc(made), told_at, change_id),
-            )
-            conn.commit()
-
     @staticmethod
     def _row_above(out: str, text: str) -> str:
         """The row printed above the line holding `text`: when, kind and tag."""
@@ -514,8 +514,9 @@ class BatchesTest(_DbCase):
     """`workout batches` says what each change was, and which ones wait (§8)."""
 
     def _rows(self):
-        """Each listed change as (its row, the line under it)."""
-        _code, out, _ = run_cli(["workout", "batches"])
+        """Each listed change as (its row, the line under it). The range is wide because
+        a change is dated by the real clock, past the last week of the pinned one."""
+        _code, out, _ = run_cli(["workout", "batches", "-d", "2026-09-01..2099-12-31"])
         lines = out.splitlines()
         return [
             (line, lines[i + 1] if i + 1 < len(lines) else "")
@@ -538,6 +539,24 @@ class BatchesTest(_DbCase):
         self.assertIn("rollback", rollback)
         self.assertFalse(under.startswith(" "), under)
         self.assertNotIn("Undo of change", "\n".join(r + u for r, u in self._rows()))
+
+    def test_lists_the_last_week_unless_d_picks_the_days(self):
+        """The clock is pinned on Wednesday the 23rd, so the default week starts on the
+        17th. A row keeps its number in the whole list, the one `workout rollback` takes."""
+        self._stamp(self.change(note="Early in the month."), made=1)
+        self._stamp(self.change(note="Monday's change.", day="2026-09-25"), made=21)
+        _code, out, _ = run_cli(["workout", "batches"])
+        self.assertIn("#1", out)
+        self.assertIn("Monday's change.", out)
+        self.assertNotIn("Early in the month.", out)
+        self.assertIn("1 change(s) made on other days are not listed", out)
+        _code, out, _ = run_cli(["workout", "batches", "-d", "2026-09-01"])
+        self.assertIn("#2", out)
+        self.assertIn("Early in the month.", out)
+        self.assertNotIn("Monday's change.", out)
+        _code, out, _ = run_cli(["workout", "batches", "-d", "2026-09-10"])
+        self.assertIn("No command wrote workouts on 2026-09-10 Thu.", out)
+        self.assertIn("2 change(s) made on other days are not listed", out)
 
 
 if __name__ == "__main__":

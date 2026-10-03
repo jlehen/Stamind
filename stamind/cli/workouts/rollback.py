@@ -9,8 +9,9 @@ from stamind.text import (
     bold, cmd, cyan, gray, green, pad_visible, red, truncate_visible, wrap_text, yellow,
 )
 from stamind.output import aside, notice
-from stamind.clock import fmt_date, fmt_timestamp, today_str as _today_str
+from stamind.clock import fmt_date, fmt_timestamp, local_day, today_str as _today_str
 from stamind.cli.common import report_unhonored
+from stamind.cli.windows import resolve_window
 
 
 def _change_line(label: str, change: dict) -> str:
@@ -51,8 +52,16 @@ def _change_line(label: str, change: dict) -> str:
     return row + "\n" + gray(wrap_text("      " + truncate_visible(summary, 200)))
 
 
+def _made_days(start: str, end: str) -> str:
+    """The days `-d` picked, in words: 'on <day>' or 'from <day> to <day>'."""
+    if start == end:
+        return f"on {fmt_date(start)}"
+    return f"from {fmt_date(start)} to {fmt_date(end)}"
+
+
 def run_workout_batches(args: argparse.Namespace) -> None:
-    """Lists the workout changes a `workout rollback` can undo."""
+    """Lists the workout changes a `workout rollback` can undo: the ones made on the days
+    `-d` picks, the last 7 days by default."""
     today = _today_str()
     changes = runtime.db.get_workout_changes(from_date=today)
 
@@ -62,14 +71,33 @@ def run_workout_batches(args: argparse.Namespace) -> None:
             "Nothing has written workouts yet — so there is nothing to roll back to."
         ))
         return
+    start, end = resolve_window(args)
+    days = _made_days(start, end)
+    # Numbered before the days are picked: a row's number is the one --batch takes.
+    shown = [
+        (i, change) for i, change in enumerate(changes, start=1)
+        if start <= local_day(change['created_at']) <= end
+    ]
+    unlisted = ""
+    if len(shown) < len(changes):
+        unlisted = gray(
+            f"{len(changes) - len(shown)} change(s) made on other days are not listed. "
+            + cmd("workout batches -d 30d") + " goes back 30 days."
+        )
+    if not shown:
+        print(gray(f"No command wrote workouts {days}."))
+        print(unlisted)
+        return
     print(gray(wrap_text(
-        "Every command that wrote workouts, newest first. Undoing one puts the plan back "
-        "the way it was the moment before it ran, which also undoes every change made "
-        "after it."
+        f"Every command that wrote workouts {days}, newest first. Undoing one puts the "
+        "plan back the way it was the moment before it ran, which also undoes every change "
+        "made after it."
     ) + "\n"))
-    for i, change in enumerate(changes, start=1):
+    for i, change in shown:
         print(_change_line(cyan(f"#{i}"), change))
     print()
+    if unlisted:
+        print(unlisted)
     aside("Undo one with " + cmd("workout rollback [--batch N]")
          + " (defaults to #1, the newest). Numbering is positional and shifts after "
            "each change.",

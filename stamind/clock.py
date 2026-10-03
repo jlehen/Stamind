@@ -198,6 +198,11 @@ def fmt_timestamp(iso: Optional[str]) -> str:
         return iso
 
 
+def local_day(iso: str) -> str:
+    """The athlete's local day a stored UTC ISO timestamp falls on, as YYYY-MM-DD."""
+    return day_str(to_local(datetime.fromisoformat(iso)).date())
+
+
 def parse_date(date_str: str) -> date:
     """An ISO `YYYY-MM-DD` string as a date, raising ValueError on anything else.
 
