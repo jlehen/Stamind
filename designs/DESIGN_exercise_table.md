@@ -53,7 +53,7 @@ After this design, the first week reads: the athlete picks "Squat: barbell back 
 Five columns, separated by tabs. Lines starting with `#` are comments.
 
 ```
-names	pattern	muscles	gear	photos
+# names	pattern	muscles	gear	photos
 SQUAT/BARBELL_BACK_SQUAT	squat	QUADS,GLUTES|HAMSTRINGS	Barbell, Squat Rack	Barbell_Squat
 PULL_UP/PULL_UP PULL_UP/WEIGHTED_PULL_UP PULL_UP	pull_vertical	LATS,TRAPS|BICEPS,FOREARM,SHOULDERS	Pull-up Bar
 SANDBAG/BACK_SQUAT	squat	QUADS,GLUTES	Sandbag
@@ -70,8 +70,8 @@ strips a trailing tab does no harm.
 
 The first column lists the Garmin names of the class, separated by spaces. The first one is the
 key. The order on a line is: the plain exercise, then its weighted twin, then the bare category.
-The pattern, muscles and gear of a line are those of its key: `PLANK/PLANK` needs nothing, even
-though its weighted twin needs a plate.
+The pattern and gear of a line are those of its key: `PLANK/PLANK` needs nothing, even though its
+weighted twin needs a plate.
 
 A key never changes once shipped, because stored sets hold it. The table's header comment says
 so: the first name of a line is stored, never reorder it. A name Garmin adds later is appended
@@ -116,7 +116,7 @@ When a Garmin exercise comes close, a comment line above the exercise names it:
 `# nearest Garmin exercise: SQUAT/STEP_UP`. Nothing reads it. It is recorded so that an export to
 Garmin, when one is designed, finds a target beside every added exercise (§12).
 
-The table starts with 23 added exercises. Their pattern, muscles and gear were set by hand and
+The table starts with 24 added exercises. Their pattern, muscles and gear were set by hand and
 not reviewed.
 
 | Key | Nearest Garmin exercise | Pattern | Gear |
@@ -134,6 +134,7 @@ not reviewed.
 | `SQUAT/SINGLE_LEG_LEG_PRESS` | `SQUAT/LEG_PRESS` | single_leg | Machine |
 | `SQUAT/STEP_DOWN` | `SQUAT/STEP_UP` | single_leg | Box |
 | `HIP_RAISE/HIP_THRUST_MACHINE` | `HIP_RAISE/BARBELL_HIP_THRUST_WITH_BENCH` | hinge | Machine |
+| `OLYMPIC_LIFT/KETTLEBELL_CLEAN_AND_PRESS` | `OLYMPIC_LIFT/CLEAN_AND_PRESS` | hinge | Kettlebells |
 | `HIP_RAISE/CABLE_GLUTE_KICKBACK` | `BANDED_EXERCISES/HIP_EXTENSION` | accessory | Cable Machine, Cable Attachment |
 | `HIP_STABILITY/HIP_ABDUCTION_MACHINE` | `BANDED_EXERCISES/LEG_ABDUCTION` | accessory | Machine |
 | `HIP_STABILITY/HIP_ADDUCTION_MACHINE` | `BANDED_EXERCISES/LEG_ADDUCTION` | accessory | Machine |
@@ -150,8 +151,10 @@ among them: its line today claims `BANDED_EXERCISES/LEG_EXTENSION`, which is the
 and becomes a line of its own. The hip thrust machine is what the athlete lifts under "glute
 bridge" (§9). The suitcase carry and the two plank drags were added on 2 October in a worktree
 that was never committed, together with one fix this design also takes:
-`SANDBAG/PLANK_PULL_THROUGH` is `core_carry`, not `hinge`. The other twelve are common gym
-exercises Garmin lacks, picked by the athlete.
+`SANDBAG/PLANK_PULL_THROUGH` is `core_carry`, not `hinge`. Twelve are common gym exercises
+Garmin lacks, picked by the athlete. The kettlebell clean and press is what the athlete lifts
+under "clean and press" (§9): Garmin has one clean and press, read as the barbell lift, and none
+with dumbbells.
 
 A kettlebell press is not added. It is `SHOULDER_PRESS/DUMBBELL_SHOULDER_PRESS` done with
 kettlebells (§7).
@@ -213,11 +216,11 @@ Where each list comes from:
 | A review by two model personas, a gym-floor coach and a minimal-kit trainer, on two different models, looping until they agreed (`~/garmin_gear_review.tsv`) | 1,154 |
 | Today's equipment word, carried over: yoga, Pilates and pure cardio, which the review skipped | 218 |
 | Today's equipment word, carried over: exercises the reviewers did not recognise | 13 |
-| Set by hand: the added exercises (§3.3) | 23 |
+| Set by hand: the added exercises (§3.3) | 24 |
 
 The review was run with the 30 implement lines already split. The ten classes that come from
-splitting an exercise Garmin files twice take the list of the line they came from, which makes
-1,562 classes in all.
+splitting an exercise Garmin files twice take the list of the class they were split from:
+`POSE/PLANK` takes the plain plank's. That makes 1,563 classes in all.
 
 Carried over means `barbell` becomes Barbell, `dumbbell` Dumbbells, `kettlebell` Kettlebells,
 `cable` "Cable Machine, Cable Attachment", `machine` Machine and `bodyweight` Nothing. Three of
@@ -348,7 +351,7 @@ exercises in plain words, as today.
 
 Today the list leaves out the accessory exercises the athlete has never done: about 690 lines
 and 31 kB. The athlete chose to be offered everything. The full list is about 1,560 lines and
-97 kB, three times the size, because each line is also longer. Keys alone would be 46 kB.
+97 kB, three times the size, because each line is also longer.
 
 It is told one new rule: an exercise whose gear holds Dumbbells can be done with kettlebells of
 the same weight, and the reverse. The exercise keeps its key and its history. This is why no
@@ -391,12 +394,13 @@ by comparing each stored line with the line a fresh render would give. A session
 the conversion would fail that comparison and show its old exercise lines as notes. They are found
 by counting instead: as many lines are dropped as the session has exercises.
 
-**The queue.** A waiting "are the sets final?" question holds the watch's guesses, and a waiting
-"what was this?" question holds its answers. Both hold keys. An answer carries the key to store
-and is shown as its words. Today the label is both.
-
 Not handled: a session open on the page across the conversion cannot be sent, and a reload starts
 it from the session as written. The refused log is still in `logs/gym_logs/`.
+
+**The queue.** A waiting "are the sets final?" question holds the watch's guesses, and a waiting
+"what was this?" question holds its answers. Both hold keys when the new code wrote them. An
+answer carries the key to store and is shown as its words. Today the label is both. An "are the
+sets final?" question queued before the conversion shows its old names as they are (§9).
 
 ## 9. The one-off conversion
 
@@ -408,24 +412,26 @@ The script rewrites three places: `exercise_sets.exercise`, `prescribed_sets.exe
 `n` of every entry in `gym_logs.payload`. It leaves `workouts.description` alone.
 
 **It stops before anything while a "what was this?" question or a proposal waits in the queue**,
-and lists them. A tap on either would write the old names into the database. The operator has
-them answered with `sm queue`, then runs the script again. A waiting "are the sets final?"
-question is left alone: its names are only shown, and "yes, final" reads the sets from Garmin
-again.
+and lists them. A tap on either would write the old names into the database. `sm queue` lists
+them. `sm queue answer` goes through the questions, and `sm queue answer ID` answers a proposal,
+which no walk shows. Then the script is run again. A waiting "are the sets final?" question is
+left alone: its names are only shown, and "yes, final" reads the sets from Garmin again.
 
 **It changes a value only while that value is still an old name.** Old names are lower case and
 keys are upper case, so a second run changes nothing.
 
 `scripts/exercise_name_migration.tsv` gives, for each old name, the keys of the classes its line
-became: one key when the line was not split, several when it was (§10). For each stored old name,
-the first of these that applies:
+became: one key when the line was not split, several when it was (§10). `leg extension` has two
+keys in the list: the band exercise its line claimed, and the added machine. For each stored old
+name, the first of these that applies:
 
 1. **A rename given on the command line** (below). It wins in all three places.
 2. **One key in the list:** that key.
 3. **Several keys:** the key of the class holding the set's own `garmin_name`, when it is one of
    them. A set Garmin tagged `SANDBAG/CLEAN` goes to the sandbag clean.
-4. **Otherwise the script stops** and lists the name with its sets and loads. The operator gives
-   a rename. The script never picks one of several classes itself.
+4. **Otherwise the name is not settled.** The script lists every such name with its sets and
+   loads, writes nothing, and stops. The operator gives a rename for each. The script never
+   picks one of several classes itself.
 
 Before it writes, the script prints every distinct stored name with the key it becomes, its
 number of sets and its loads. It writes after a yes.
@@ -444,18 +450,22 @@ as `--rename "back squat=SQUAT/BARBELL_BACK_SQUAT"`. The main athlete answered o
 | `hamstring curl` | A warm-up set on the same leg curl machine | `LEG_CURL/LEG_CURL` |
 | `ab twist` | Russian twists | `CORE/RUSSIAN_TWIST` |
 | `wheel` | Ab wheel rollout | `CORE/KNEELING_AB_WHEEL` |
+| `plank` | The plain plank | `PLANK/PLANK` |
+| `clean and press` | With kettlebells | `OLYMPIC_LIFT/KETTLEBELL_CLEAN_AND_PRESS` |
 
-By today's data the script still stops on three words of the main athlete, whose line was split
-and which the athlete has not been asked about: `row` (lifted at 95 to 120 kg and prescribed 41
-times), `plank` and `clean and press`. It stops on two of the companion athlete: `push up` and
-`arm circles`.
+By today's data the script still stops on one word of the main athlete: `row`, lifted at 95 to
+120 kg and prescribed 41 times. Its line was split, and the athlete has yet to say which row it
+is. It stops on two of the companion athlete: `push up` and `arm circles`.
 
 **The steps for the operator.** They run when step 1 of §11 lands; step 2 needs no conversion.
 
-1. Pick an evening when nobody trains, and stop both bots. Every command a bot starts is a fresh
-   process read from the checkout, so the new code runs as soon as main is landed there.
+1. Pick an evening when nobody trains. First run `sm queue` on each instance. A waiting "what
+   was this?" question or proposal is answered now, in the chat or in the terminal, while the
+   old code still runs. Once main is landed, a listed answer of an old question has no key and
+   cannot be applied. Then stop both bots: every command a bot starts is a fresh process read
+   from the checkout, so the new code runs as soon as main is landed there.
 2. Land the branch on main in the live checkout and push it. Wait until the page's deployment is
-   done, then ten more minutes, the time a phone keeps a page file.
+   done.
 3. Copy each database file, and its `-wal` file if it is not empty. Then run the script once per
    instance, with its renames.
 4. Start the bots. The next morning's message redraws each keyboard.
