@@ -330,8 +330,9 @@ else every exercise whose words contain it. "leg press" still finds "squat: leg 
 sort by the words. The index of `strength exercises` gains a group for the lines with no pattern.
 
 The page's search lists one entry per class, under the words of its key, and searches those
-words. "Pull up" is one entry. Nothing is hidden: the yoga poses are in the list. Not handled:
-"weighted pull up" finds nothing, because the entry is "pull up".
+words. "Pull up" is one entry. Nothing is hidden: the yoga poses are in the list. The search
+leaves the word "weighted" out of what is typed, so "weighted pull up" finds "pull up": a weighted
+twin is its class with a load.
 
 **Buttons.** When the athlete types an exercise in the chat, Stamind offers up to three names as
 buttons. Today each button carries the name itself, and Telegram allows a button 64 bytes. 65
