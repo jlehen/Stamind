@@ -1,7 +1,8 @@
 """The coach engine: the prompts, the model call, and the patch seam the tests use.
 
 The files are `prompt.py` (the shared system prompt), `planning.py` (`plan generate`),
-`analysis.py` (the weekly history analysis), and the week planner's four:
+`analysis.py` (the weekly history analysis), `retrospective.py` (the retrospective
+writer), and the week planner's four:
 `sessions.py` (the sections both week-planner prompts share), `notes.py` (the sections
 about the athlete's words), `generate.py` (`workout generate`) and `adapt.py`
 (`workout adapt` and `workout tweak`).
@@ -17,10 +18,11 @@ from stamind.coach.engine.planning import PlanStrategyMixin
 from stamind.coach.engine.generate import WorkoutGenerateMixin
 from stamind.coach.engine.adapt import WorkoutAdaptMixin
 from stamind.coach.engine.analysis import AnalysisLogicMixin
+from stamind.coach.engine.retrospective import RetrospectiveWriterMixin
 
 
 class CoachEngine(
     PromptBuildMixin, PlanStrategyMixin, WorkoutGenerateMixin, WorkoutAdaptMixin,
-    AnalysisLogicMixin,
+    AnalysisLogicMixin, RetrospectiveWriterMixin,
 ):
     """Pure business logic coach that builds prompts, computes hashes, and makes LLM calls."""

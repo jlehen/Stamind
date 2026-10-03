@@ -247,6 +247,23 @@ class MorningPushTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")
 
+    def test_the_retrospectives_step_runs_once_a_day_even_on_a_silent_morning(self):
+        """After the once-a-day test, and before the test that keeps the push silent once
+        the schedule has run out (DESIGN_cycle_retrospective.md §3)."""
+        ended = (clock.today_date() - timedelta(days=20)).isoformat()
+        started = (clock.today_date() - timedelta(days=60)).isoformat()
+        goal = test_db.add_objective("Zurich Marathon", ended, "running")
+        test_db.save_macrocycle(goal, "Build.", "g", "c", [
+            {"name": "Base", "start_date": started, "end_date": ended, "focus": "Endurance"},
+        ])
+        save_workout(test_db, ended, "running", "Race")
+        with patch.object(runtime.coach_service, "retrospectives_step") as retrospectives:
+            code, out, _ = run_cli(["bot", "morning"])
+            run_cli(["bot", "morning"])
+        self.assertEqual(code, 0)
+        self.assertEqual(out.strip(), "")
+        retrospectives.assert_called_once_with()
+
     def test_force_resends_despite_the_marker(self):
         run_cli(["bot", "morning"])
         code, out, _ = run_cli(["bot", "morning", "--force"])

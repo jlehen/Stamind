@@ -582,13 +582,18 @@ class MorningPushRunwayTest(unittest.TestCase):
 
     def test_past_the_window_the_push_sends_nothing_at_all(self):
         """Silence is the honest state for "no plan covers today" — not the rest-day lie,
-        not a stale celebration (§6)."""
+        not a stale celebration (§6). The record of the mesocycle that ended is written on
+        such a morning, and that sends nothing either (DESIGN_cycle_retrospective.md §3)."""
         self._plan([(-60, -20)], goal_offset=-20)
         self._sessions(-20)
-        code, out, _ = run_cli(["bot", "morning"])
+        with patch("stamind.coach.engine.openrouter_client") as client, \
+                patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
+            client.complete.return_value = {"record": "For: x", "athlete_line": "Done."}
+            code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")
         self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+        self.assertEqual(test_db.get_retrospectives()[0]["body"], "For: x")
 
     def test_a_silent_morning_spends_no_adaptation(self):
         """The silence is decided before `adapt-first` runs, so a dead plan does not burn

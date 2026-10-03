@@ -16,6 +16,10 @@ FINISHED = "finished"
 REPLACED = "replaced"
 CALLED_OFF = "called_off"
 
+# A record is written this many days after its end, so late Garmin data is in. Its
+# question stays open for the same days (§4).
+DUE_AFTER_DAYS = 7
+
 
 def _record(row) -> Dict[str, Any]:
     record = dict(row)

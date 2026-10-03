@@ -155,6 +155,12 @@ their push always runs the adaptation again; a proposal the athlete declined wri
 so the push runs again after it; and a held run started from the terminal leaves no line,
 so its strength notice reaches the operator only.
 
+Amended 2026-10-01 (DESIGN_cycle_retrospective.md §3, §5): right after its once-a-day test,
+`sm bot morning` runs the date check and then the write step, the two steps that keep the
+retrospective records. The date check is a database lookup. The write step writes at most
+one due record, with one model call, and sends nothing to the chat. A failure prints one
+line on the terminal and the push carries on.
+
 ### 4.3 Scheduling
 
 An asyncio task inside the bot (`python-telegram-bot` is installed without the

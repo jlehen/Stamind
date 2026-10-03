@@ -6,12 +6,12 @@ import argparse
 import sys
 from typing import Any, Dict, List, Optional, Tuple
 
-from stamind import cycle_records, runtime
+from stamind import runtime
 from stamind.text import (
     bold, cmd, cyan, default_wrap_width, format_labeled_paragraph, green, red, wrap_text,
 )
 from stamind.output import aside, notice, step, warn
-from stamind.clock import fmt_date, today_str as _today_str
+from stamind.clock import fmt_date
 from stamind.cli import staleness
 from stamind.cli.common import add_feedback_note, ensure_recent_data
 from stamind.cli.windows import goal_span_start, resolve_goal
@@ -190,7 +190,7 @@ def run_plan_generate(args: argparse.Namespace) -> None:
 
     # Before the new version is saved: afterwards a mesocycle that just ended would sit in
     # a replaced version only (DESIGN_cycle_retrospective.md §3).
-    cycle_records.date_check(runtime.db, _today_str())
+    runtime.coach_service.retrospectives_step()
 
     # Make sure we have latest metrics cached
     ensure_recent_data(no_pull=args.no_pull, force_pull=getattr(args, 'force_pull', False))

@@ -1,18 +1,84 @@
-"""The date check: which retrospective records exist (DESIGN_cycle_retrospective.md §3).
+"""The retrospective records: which ones exist, when one is due, and how one reads
+(DESIGN_cycle_retrospective.md §2, §3, §4).
 
-A database lookup with no model call. It compares the records with the plan versions that
-Stamind keeps, removes the records the current plan contradicts, then creates the missing
-ones. Writing a record's lines is `coach/service/retrospective.py`.
+The date check is a database lookup with no model call. It compares the records with the
+plan versions that Stamind keeps, removes the records the current plan contradicts, then
+creates the missing ones. Writing a record's lines is `coach/service/retrospective.py`.
 """
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from stamind import clock
+from stamind.analytics.zone_tables import PROMPT_WIDTH, fmt_duration
+from stamind.benchmarks import format_value, label_for_kind
 from stamind.db.objectives import ARCHIVED
-from stamind.db.retrospectives import CALLED_OFF, FINISHED, MESOCYCLE, REPLACED
+from stamind.db.retrospectives import (
+    CALLED_OFF, DUE_AFTER_DAYS, FINISHED, MESOCYCLE, REPLACED,
+)
+from stamind.text import wrap_text
 
 # A mesocycle cut short gets a record only when this many days of it were trained (§3).
 MIN_TRAINED_DAYS = 7
+
+ENDED_LABELS = {
+    FINISHED: "finished",
+    REPLACED: "cut short by a new plan",
+    CALLED_OFF: "cut short, the goal was called off",
+}
+
+
+def is_due(record: Dict[str, Any], today: str) -> bool:
+    """Whether the write step writes this record now. It reads the record alone: seven
+    days after its end, or sooner when it holds the athlete's words (§4)."""
+    if record['body'] is not None:
+        return False
+    if record['athlete_words']:
+        return True
+    return clock.days_between(record['end_date'], today) >= DUE_AFTER_DAYS
+
+
+def _fitness(numbers: Dict[str, Any]) -> str:
+    start, end = numbers.get('fitness_start'), numbers.get('fitness_end')
+    if start is None or end is None:
+        return "fitness not on record"
+    return f"fitness {start:.0f} -> {end:.0f}"
+
+
+def _tests(numbers: Dict[str, Any]) -> str:
+    """'FTP 250 W -> 262 W' for each benchmark with a result in the record's days."""
+    parts = []
+    for test in numbers.get('benchmarks') or []:
+        label = label_for_kind(test['kind'])
+        after = format_value(test['kind'], test['after'])
+        if test.get('before') is None:
+            parts.append(f"{label} {after} (first on record)")
+            continue
+        parts.append(f"{label} {format_value(test['kind'], test['before'])} -> {after}")
+    return ", ".join(parts) or "no test"
+
+
+def numbers_line(numbers: Dict[str, Any]) -> str:
+    """The first line of a record: its stored numbers, rounded for display (§2)."""
+    return " · ".join([
+        f"Sessions {numbers['sessions_done']} of {numbers['sessions_planned']}",
+        f"load {numbers['load_done']:.0f} of {numbers['load_planned']:.0f} TSS",
+        fmt_duration(numbers['duration_sec']),
+        _fitness(numbers),
+        _tests(numbers),
+    ])
+
+
+def record_text(record: Dict[str, Any], width: int = PROMPT_WIDTH) -> str:
+    """One written record, as a prompt and `plan show -v` print it (§2)."""
+    lines = [
+        f"{record['name']} ({record['start_date']}..{record['end_date']}), "
+        f"{ENDED_LABELS[record['ended_by']]}",
+        f"  {numbers_line(record['numbers'])}",
+    ]
+    lines += [f"  {line.strip()}" for line in record['body'].splitlines() if line.strip()]
+    if record['athlete_words']:
+        lines.append(f"  Athlete: \"{' '.join(record['athlete_words'].split())}\"")
+    return wrap_text("\n".join(lines), width)
 
 
 def date_check(dbh, today: str, objective_id: Optional[int] = None) -> None:

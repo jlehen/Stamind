@@ -223,26 +223,41 @@ class HistoryContextMixin:
         benchmarks = self._db.get_benchmark_results()
         reports = []
         for i, meso in enumerate(mesocycles):
-            text = mesocycle_report(
-                meso, today_str, self._db.get_completed_activities,
-                previous=mesocycles[i - 1] if i else None, benchmarks=benchmarks,
-                fetch_workouts=self._db.get_workouts, width=width,
+            text = self._mesocycle_review(
+                meso, today_str, mesocycles[i - 1] if i else None, benchmarks, width
             )
-            if not text:
-                continue
-            # Elapsed part only: a finished mesocycle ends where it ended, the current one at
-            # today. Both sides of every week line are cut to the same span.
-            elapsed_end = min(today_str, meso['end_date'])
-            weeks = self._mesocycle_week_lines(
-                meso, today_str, elapsed_end,
-                self._db.get_workouts(start_date=meso['start_date'], end_date=elapsed_end),
-                indent="      ",
-            )
-            if weeks:
-                text += "\n    Weekly load (what the plan asked -> what was produced)\n"
-                text += "\n".join(weeks)
-            reports.append(text)
+            if text:
+                reports.append(text)
         return reports
+
+    def _mesocycle_review(
+        self, meso: Dict[str, Any], today_str: str,
+        previous: Optional[Dict[str, Any]] = None,
+        benchmarks: Optional[List[Dict[str, Any]]] = None,
+        width: int = zone_tables.PROMPT_WIDTH,
+    ) -> Optional[str]:
+        """One mesocycle in full detail: its intensity report, then each week's planned
+        load beside the load produced. None when it has not started. The retrospective
+        writer reads the same text (DESIGN_cycle_retrospective.md §5)."""
+        text = mesocycle_report(
+            meso, today_str, self._db.get_completed_activities,
+            previous=previous, benchmarks=benchmarks,
+            fetch_workouts=self._db.get_workouts, width=width,
+        )
+        if not text:
+            return None
+        # Elapsed part only: a finished mesocycle ends where it ended, the current one at
+        # today. Both sides of every week line are cut to the same span.
+        elapsed_end = min(today_str, meso['end_date'])
+        weeks = self._mesocycle_week_lines(
+            meso, today_str, elapsed_end,
+            self._db.get_workouts(start_date=meso['start_date'], end_date=elapsed_end),
+            indent="      ",
+        )
+        if weeks:
+            text += "\n    Weekly load (what the plan asked -> what was produced)\n"
+            text += "\n".join(weeks)
+        return text
 
     def _build_prior_training_context(
         self, prior_macros: List[Optional[Dict[str, Any]]], today_str: str,

@@ -68,4 +68,8 @@ strength planner).
   in §1 shows it.
 - A fact that should outlive the look back, such as a climb record or "ERG feels harder than
   riding outdoors", has no home here. `plan generate` and `data reflect` do not read the notes.
+  Amended 2026-10-01 (DESIGN_cycle_retrospective.md §5): the retrospective writer reads the
+  notes of a mesocycle's sessions when it writes the record of that mesocycle. A reason
+  stated in a note can so outlive the look back, inside the record. A record is not a home
+  for a standing fact such as a climb record.
 - A note is never edited or removed on its own. `wipe_workouts` clears them with the sessions.

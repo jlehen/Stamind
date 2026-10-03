@@ -163,6 +163,13 @@ containing" is a peer of the task, not part of it, so it is `## RESPONSE FORMAT`
 commands. Previously it was an unheaded paragraph trailing whichever section happened to
 come last — which differed per command and per gate.
 
+Amended 2026-10-01 (DESIGN_cycle_retrospective.md §5): the retrospective writer is a fifth
+call under the same scheme. Its system message is the role line, `## TASK` and
+`## RESPONSE FORMAT`, with no sub-section. Its user message holds `## THE MESOCYCLE`,
+`## WHAT WAS MEASURED`, `## CONSTRAINTS AND SIGNALS IN THOSE WEEKS`, and two sections present
+only when they have content: `## SESSIONS THE ATHLETE SPOKE ABOUT` and
+`## THE ATHLETE'S WORDS`.
+
 ## 5. The log file
 
 `openrouter._log_exchange` writes each exchange to `logs/llm_exchanges/` as markdown, with
