@@ -937,10 +937,10 @@ prints, is the strength planner's reasons, one sentence per session it changed, 
   Revision 9 had them reach the second call through the week planner's prose, and the brief
   carries none of it. For this athlete that is three files, some 7,000 tokens; the science
   trim's tags are what cuts it later (§10).
-- The vocabulary: every exercise outside the accessory pattern, 692 names, plus the
-  accessory exercises in the athlete's history, each name with its pattern and equipment
-  class: about 4,500 tokens. The class is what substitution reads (§4). The full accessory
-  list would double the region with names nobody on the instance does.
+- The exercise list: every class of the exercise table, one per line, as its key with its
+  pattern, its main muscles and its gear, and the rule that dumbbells and kettlebells stand
+  in for each other (DESIGN_exercise_table.md §7). It replaced a list that left out the
+  accessory exercises the athlete had never done.
 - The strength history (§8): the entries per exercise, the not-done lines and the sessions
   as done.
 - For each date it writes: the equipment the athlete profile lists for that weekday and in
@@ -1307,13 +1307,13 @@ session today, without the description, so kilograms written before it would be 
 unseen. Phase 2 prints the exercise lines under each strength session, in both personas.
 `workout adapt`'s preview already shows how a description changed.
 
-**Cost.** About 4,500 tokens of names, 2,000 of entries per exercise, 1,500 of sessions as
-done, 1,000 of shipped science, the athlete's own science files, 7,000 for this athlete and
-nothing for one without them, and 200 to 300 per session. A `workout generate` over a
-five-week mesocycle with ten strength sessions sends about 18,500 tokens and gets about
-2,500 back, more when the sessions are as long as the athlete's own: a third of one
-`workout adapt` prompt. It uses the same model as every other call, since Stamind picks one
-model per process.
+**Cost.** About 97 kB of names, some 25,000 tokens (DESIGN_exercise_table.md §7), 2,000 of
+entries per exercise, 1,500 of sessions as done, 1,000 of shipped science, the athlete's own
+science files, 7,000 for this athlete and nothing for one without them, and 200 to 300 per
+session. A `workout generate` over a five-week mesocycle with ten strength sessions sends
+about 40,000 tokens and gets about 2,500 back, more when the sessions are as long as the
+athlete's own: about as much as one `workout adapt` prompt. It uses the same model as every
+other call, since Stamind picks one model per process.
 
 **What adherence becomes.** Revision 7 compared prescribed and done sets in code. It had
 three deviations and two thresholds, a load more than 10% off and reps more than half the

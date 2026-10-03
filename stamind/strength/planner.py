@@ -261,11 +261,10 @@ def run(
             and not write_again):
         return None
 
-    built = history.build(today)
-    system = system_prompt(built.exercises)
+    system = system_prompt()
     mesocycles = _mesocycles_for(to_write + to_check)
     user = user_content(
-        to_write, to_check, built.text, today, profile, constraints, mesocycles
+        to_write, to_check, history.build(today), today, profile, constraints, mesocycles
     )
     step(f"Querying OpenRouter to write {len(to_write)} strength session(s) and check "
          f"{len(to_check)}...", cyan)

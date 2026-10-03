@@ -252,13 +252,33 @@ def _matches(text: str, keys: Sequence[str]) -> List[str]:
     return sorted((key for key in keys if wanted in vocabulary.words(key)), key=vocabulary.words)
 
 
+def _muscles_and_gear(known: vocabulary.Exercise) -> str:
+    """'quads, glutes · Barbell, Squat Rack': a class's main muscles and its gear, as the
+    exercise listing shows them (DESIGN_exercise_table.md §7). A class with no muscles shows
+    its gear alone."""
+    muscles = ", ".join(muscle.lower().replace("_", " ") for muscle in known.muscles)
+    gear = ", ".join(known.gear)
+    if not muscles:
+        return gear
+    return f"{muscles} · {gear}"
+
+
+def _pattern_and_gear(key: str) -> str:
+    """' — squat · Machine': what follows a lift's words in the heading of its record. A lift
+    with no pattern shows its gear alone, and a key the table lacks shows nothing."""
+    known = vocabulary.get(key)
+    if known is None:
+        return ""
+    gear = ", ".join(known.gear)
+    if not known.pattern:
+        return f" — {gear}"
+    return f" — {known.pattern} · {gear}"
+
+
 def _sessions_block(key: str, days: List[sets.Logged]) -> None:
-    """One lift's record: its words, its movement pattern when it has one, and a line per
-    day."""
-    pattern = _pattern_of(key)
-    where = "" if pattern == NO_PATTERN else f" — {pattern}"
+    """One lift's record: its words, its movement pattern and its gear, and a line per day."""
     print()
-    print(bold(f"{vocabulary.words(key).upper()}{where}"))
+    print(bold(wrap_text(f"{vocabulary.words(key).upper()}{_pattern_and_gear(key)}")))
     for day, lifted in days:
         print(f"  {fmt_date(day)}   {lifted}")
 
@@ -340,7 +360,8 @@ def _pattern_index(mine: Dict[str, int]) -> None:
 def run_strength_exercises(args: argparse.Namespace) -> None:
     """The shipped table: which movement patterns exist and which exercises are in them
     (§4). It ships with the code and nobody configures it. An exercise is listed and searched
-    by its words (DESIGN_exercise_table.md §7)."""
+    by its words, with its main muscles and its gear on a line under them
+    (DESIGN_exercise_table.md §7)."""
     mine = set(sets.logbook())
     if not args.pattern and not args.search:
         done: Dict[str, int] = {}
@@ -365,6 +386,7 @@ def run_strength_exercises(args: argparse.Namespace) -> None:
         mark = "•" if exercise.key in mine else " "
         pattern = "" if args.pattern else f"  {exercise.pattern}"
         print(f"  {mark} {exercise.words:<{width}}{pattern}".rstrip())
+        print(gray(wrap_text(f"      {_muscles_and_gear(exercise)}")))
     if mine & {e.key for e in listed}:
         print()
         print(gray("• on your record."))
@@ -451,9 +473,10 @@ def add_strength_parser(subparsers):
         "exercises",
         help="The exercises Stamind can name, and the movement patterns they sit in",
         description=(
-            "The shipped table: every exercise Stamind can name, each under its movement "
-            "pattern when it has one. It ships with the code and nobody configures it. "
-            "With no argument, the patterns and how many exercises each holds."
+            "The shipped table: every exercise Stamind can name, each with its movement "
+            "pattern when it has one, its main muscles and the gear it needs. It ships with "
+            "the code and nobody configures it. With no argument, the patterns and how many "
+            "exercises each holds."
         ),
     )
     s_exercises.add_argument(

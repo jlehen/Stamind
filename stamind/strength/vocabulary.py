@@ -16,9 +16,6 @@ PATTERNS = (
     "squat", "hinge", "single_leg", "push_horizontal", "push_vertical", "pull_horizontal",
     "pull_vertical", "core_carry", "accessory",
 )
-# Isolation work: written into a session at what the athlete last lifted, never progressed
-# by rule (DESIGN_strength_tracking.md §4, §10).
-ACCESSORY = "accessory"
 
 # The 46 gear words (§3.6). An exercise none of whose gear is a load is a bodyweight one.
 NOT_LOADS = (

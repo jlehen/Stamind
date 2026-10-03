@@ -694,7 +694,7 @@ class LogTest(_StrengthCase):
 
     def test_a_lifts_sessions_read_oldest_first(self):
         _, out, _ = run_cli(["strength", "log", "belt squat"])
-        self.assertIn("SQUAT: BELT SQUAT — squat", out)
+        self.assertIn("SQUAT: BELT SQUAT — squat · Machine\n", out)
         self.assertIn("2026-09-13 Sun   1×5 @ 120, 1×5 @ 140", out)
         self.assertIn("2026-09-14 Mon   1×5 @ 145", out)
         self.assertLess(out.index("2026-09-13"), out.index("2026-09-14"))
@@ -715,8 +715,8 @@ class LogTest(_StrengthCase):
 
     def test_a_pattern_groups_the_lifts_and_never_merges_them(self):
         _, out, _ = run_cli(["strength", "log", "--pattern", "squat"])
-        self.assertIn("SQUAT: BELT SQUAT — squat", out)
-        self.assertIn("SQUAT: GOBLET SQUAT — squat", out)
+        self.assertIn("SQUAT: BELT SQUAT — squat · Machine\n", out)
+        self.assertIn("SQUAT: GOBLET SQUAT — squat · Dumbbells\n", out)
         self.assertNotIn("DEADLIFT", out)
         # One 140 kg belt squat and one 16 kg goblet squat, never one squat series.
         self.assertIn("1×12 @ 16", out)
@@ -741,8 +741,28 @@ class LogTest(_StrengthCase):
         _, out, _ = run_cli(["strength", "log"])
         self.assertLess(out.index("hinge\n"), out.index("no pattern\n"))
         self.assertIn("cardio: squat jacks", out)
+        # Its heading has no pattern to show, so its gear stands alone.
         _, out, _ = run_cli(["strength", "log", "squat jacks"])
-        self.assertIn("CARDIO: SQUAT JACKS\n", out)
+        self.assertIn("CARDIO: SQUAT JACKS — Nothing\n", out)
+
+    def test_a_heading_with_several_pieces_of_gear_lists_them_all(self):
+        self.activity("tue", payload=garmin_sets(lift("SQUAT", "BARBELL_BACK_SQUAT", 5, 70)))
+        self.read()
+        _, out, _ = run_cli(["strength", "log", "barbell back squat"])
+        self.assertIn("SQUAT: BARBELL BACK SQUAT — squat · Barbell, Squat Rack\n", out)
+
+    def test_the_heading_of_a_key_the_table_lacks_is_its_words_alone(self):
+        """A Garmin name from a later firmware is stored as its own key. The table has no
+        pattern and no gear for it, so nothing follows the words (DESIGN_exercise_table.md
+        §6)."""
+        self.activity("tue", payload=garmin_sets(lift("SQUAT", "FOO_BAR_SQUAT", 5, 20)))
+        self.read()
+        self.assertEqual(test_db.get_exercise_sets("tue")[0]["exercise"], "SQUAT/FOO_BAR_SQUAT")
+        _, out, _ = run_cli(["strength", "log", "foo bar squat"])
+        lines = out.split("\n")
+        self.assertIn("SQUAT: FOO BAR SQUAT", lines)
+        self.assertEqual(lines[lines.index("SQUAT: FOO BAR SQUAT") + 1],
+                         "  2026-09-15 Tue   1×5 @ 20")
 
     def test_a_name_off_the_record_says_where_to_look(self):
         _, out, _ = run_cli(["strength", "log", "bicep curl"])
@@ -778,6 +798,28 @@ class LogTest(_StrengthCase):
         self.assertTrue(any(line.strip().startswith("•") for line in lines))
         self.assertIn("squat: barbell back squat", out)
         self.assertNotIn("barbell deadlift", out)
+
+    def test_the_listing_shows_each_exercises_main_muscles_and_gear(self):
+        """DESIGN_exercise_table.md §7: under the words, the main muscles and the gear."""
+        _, out, _ = run_cli(["strength", "exercises", "--pattern", "squat"])
+        lines = out.split("\n")
+        at = lines.index("    squat: barbell back squat")
+        self.assertEqual(lines[at + 1], "      quads, glutes · Barbell, Squat Rack")
+        at = lines.index("  • squat: belt squat")
+        self.assertEqual(lines[at + 1], "      glutes, quads · Machine")
+
+    def test_the_listing_of_an_exercise_with_no_muscles_shows_its_gear_alone(self):
+        _, out, _ = run_cli(["strength", "exercises", "pose: wheel"])
+        self.assertEqual(out.split("\n")[1:3], ["    pose: wheel", "      Nothing"])
+
+    def test_a_search_shows_the_pattern_beside_the_words_and_the_gear_under_them(self):
+        _, out, _ = run_cli(["strength", "exercises", "leg press"])
+        self.assertEqual(out.split("\n")[1:5], [
+            "    squat: leg press             squat",
+            "      quads · Machine",
+            "    squat: single leg leg press  single_leg",
+            "      quads, glutes · Machine",
+        ])
 
     def test_a_search_crosses_the_patterns(self):
         _, out, _ = run_cli(["strength", "exercises", "deadlift"])

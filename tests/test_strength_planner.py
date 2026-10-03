@@ -20,7 +20,7 @@ import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before
 
 from stamind import runtime, settings
 from stamind.coach.service import coach_service
-from stamind.strength import planner, planner_prompt, prescription, sets
+from stamind.strength import planner, planner_prompt, prescription, sets, vocabulary
 
 if os.path.exists(TEST_DB_PATH):
     os.remove(TEST_DB_PATH)
@@ -669,27 +669,38 @@ class PromptTest(_PlannerCase):
             "[Gym]\nModerate full-body at home, 45 min.",
         )
 
-    def test_the_accessories_shown_are_the_ones_the_athlete_does(self):
-        """The full accessory list would double the region with names nobody lifts (§9)."""
-        listed = planner_prompt._exercise_list({"CURL/CABLE_BICEPS_CURL"}).split("\n")
-        self.assertIn(
-            "CURL/CABLE_BICEPS_CURL (accessory; BICEPS; Cable Machine, Cable Attachment)",
-            listed,
-        )
-        self.assertIn("SQUAT/BELT_SQUAT (squat; GLUTES, QUADS; Machine)", listed)
-        self.assertFalse([line for line in listed if line.startswith("CURL/BARBELL_BICEPS_CURL")])
-
-    def test_a_class_with_no_pattern_is_shown_only_when_the_athlete_does_it(self):
-        """Left out the way an accessory is (DESIGN_exercise_table.md §11): the yoga poses
-        stay out, and the squat jacks the athlete does every week are in."""
-        listed = planner_prompt._exercise_list({"CARDIO/SQUAT_JACKS"}).split("\n")
+    def test_the_list_holds_every_class_of_the_table_one_per_line(self):
+        """The athlete chose to be offered everything (DESIGN_exercise_table.md §7): nobody
+        on this instance has lifted anything, and no line is left out for it."""
+        listed = planner_prompt._exercise_list().split("\n")
+        self.assertEqual(len(listed), len(vocabulary.all_exercises()))
+        self.assertEqual([line.split(" (")[0] for line in listed], vocabulary.keys())
+        # An accessory nobody did, and a class with no pattern.
+        self.assertIn("CURL/BARBELL_BICEPS_CURL (accessory; BICEPS; Barbell)", listed)
+        self.assertIn("POSE/WHEEL (Nothing)", listed)
         self.assertIn("CARDIO/SQUAT_JACKS (QUADS, GLUTES, CALVES; Nothing)", listed)
-        self.assertFalse([line for line in listed if line.startswith("POSE/")])
-
-    def test_the_list_holds_one_line_per_class_named_by_its_key(self):
-        listed = planner_prompt._exercise_list(set()).split("\n")
+        # One line per class: a weighted twin has none of its own.
         self.assertIn("PULL_UP/PULL_UP (pull_vertical; LATS, TRAPS; Pull-up Bar)", listed)
-        self.assertFalse([line for line in listed if "WEIGHTED_PULL_UP" in line])
+        self.assertFalse([line for line in listed if line.startswith("PULL_UP/WEIGHTED_PULL_UP")])
+
+    def test_the_whole_list_is_in_the_system_prompt(self):
+        system = planner_prompt.system_prompt()
+        shown = system.split("## EXERCISES STAMIND KNOWS\n")[1].split("\n\n## ")[0]
+        self.assertEqual(shown, planner_prompt._exercise_list())
+
+    def test_the_prompt_says_dumbbells_and_kettlebells_stand_in_for_each_other(self):
+        """No kettlebell line is added for a dumbbell exercise: the exercise keeps its key
+        and its history (DESIGN_exercise_table.md §7)."""
+        system = " ".join(planner_prompt.system_prompt().split())
+        self.assertIn(
+            "An exercise whose gear holds Dumbbells can be done with kettlebells of the same "
+            "weight, and an exercise whose gear holds Kettlebells can be done with dumbbells "
+            "of the same weight. It is the same exercise either way: write it under its own "
+            "key, and it keeps its history.",
+            system,
+        )
+        choosing = system.split("### CHOOSING THE EXERCISES")[1].split("### THE NOTES")[0]
+        self.assertIn("can be done with kettlebells", choosing)
 
 
 class MesocycleLineTest(_PlannerCase):

@@ -1,7 +1,7 @@
 # The exercise table: Garmin's names are the names of exercises
 
-**Status:** Step 1 of §11 implemented (the table and what is stored); step 2 (what is
-offered) not built · **Date:** 2026-10-03 · **Branch:** worktree-exercise-table
+**Status:** Implemented, both steps of §11 · **Date:** 2026-10-03 · **Branch:**
+worktree-exercise-table
 
 Stamind keeps one shipped table of strength exercises, `stamind/strength/exercises.tsv`. Today
 each line has a name Stamind made up from a Garmin name, and that made-up name is what the
@@ -337,7 +337,8 @@ Not handled:
 commands, the chat, the session's description, the page. `strength log` and `strength exercises`
 match what is typed against the words the way they match the names today: the exact words, or
 else every exercise whose words contain it. "leg press" still finds "squat: leg press". Lists
-sort by the words. The index of `strength exercises` gains a group for the lines with no pattern.
+sort by the words. The heading of `strength log NAME` gives the lift's pattern and its gear. The
+index of `strength exercises` gains a group for the lines with no pattern.
 
 The page's search lists one entry per class, under the words of its key, and searches those
 words. "Pull up" is one entry. Nothing is hidden: the yoga poses are in the list. The search

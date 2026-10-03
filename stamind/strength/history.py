@@ -8,7 +8,7 @@ next session's kilograms; the second is what the next session's content is writt
 """
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import runtime, settings
 from stamind.coach.formatting import athlete_note_lines
@@ -314,29 +314,16 @@ def _done(activity: _Activity, name: str, marked: Optional[_Prescription]) -> st
     return text + NOT_PRESCRIBED
 
 
-@dataclass(frozen=True)
-class History:
-    """What the strength planner is shown of the athlete's lifting, and every exercise a
-    person named on record — the second is what the prompt's vocabulary adds its accessories
-    from (§9), and both come from the one pass over the sets."""
-    text: str
-    exercises: Set[str]
-
-
-def build(today: str) -> History:
-    """The whole history (§8). Its text is "" when no sets are read."""
+def build(today: str) -> str:
+    """The whole history as the strength planner is shown it (§8), or "" when no sets are
+    read."""
     since = settings.strength_sets_since()
     if not since:
-        return History("", set())
+        return ""
     by_day = _activities_by_day(since)
     days = sorted(by_day, reverse=True)
-    on_record = {
-        row["exercise"]
-        for activities in by_day.values() for activity in activities
-        for row in activity.rows
-    }
     if not days:
-        return History("", on_record)
+        return ""
     prescriptions = _prescriptions(since, today)
     recent_days = config.strength_recent_days
     recent = days[:recent_days]
@@ -370,4 +357,4 @@ def build(today: str) -> History:
     lines.append("")
     lines.append(SESSIONS_HEADING.format(days=recent_days))
     lines.extend(_session_lines(recent, by_day, prescriptions, _notes_by_day(since, today)))
-    return History("\n".join(lines), on_record)
+    return "\n".join(lines)

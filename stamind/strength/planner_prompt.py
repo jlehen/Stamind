@@ -10,7 +10,7 @@ asked about, lives here because the prompt is written from it.
 import os
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import runtime
 from stamind.coach.formatting import BANNER_RULE, science_section
@@ -95,11 +95,15 @@ it appears there: SQUAT/BELT_SQUAT. A key is a category, a slash and a name, and
 is part of what the exercise is: BANDED_EXERCISES/GLUTE_BRIDGE is the glute bridge done with a
 band. The strength history and the sessions already written name exercises by the same keys.
 In the list, each key is followed, in brackets, by its movement pattern, its main muscles and
-the gear it needs. Every item of the gear is needed. An exercise with no movement pattern
-shows none. Pick exercises the day's equipment allows: a travel week with dumbbells only gets
-goblet squats and dumbbell Romanian deadlifts where the home gym had the belt squat and the
-barbell. A substitution is a different exercise doing the same pattern's job, and it keeps
-its own history.
+the gear it needs. Every item of the gear is needed. Where an exercise has no movement
+pattern, or no muscles on record, the brackets leave that part out. Pick exercises the day's
+equipment allows: a travel week with dumbbells only gets goblet squats and dumbbell Romanian
+deadlifts where the home gym had the belt squat and the barbell. A substitution is a
+different exercise doing the same pattern's job, and it keeps its own history.
+
+An exercise whose gear holds Dumbbells can be done with kettlebells of the same weight, and
+an exercise whose gear holds Kettlebells can be done with dumbbells of the same weight. It is
+the same exercise either way: write it under its own key, and it keeps its history.
 
 Write an exercise more than once when it needs a warm-up ramp: the same key at a lighter
 load first, then the working sets.
@@ -211,15 +215,10 @@ def _athlete_science() -> str:
     )
 
 
-def _exercise_list(done: Set[str]) -> str:
-    """One class per line, as its key and its tags (DESIGN_exercise_table.md §7). An accessory
-    the athlete has never done is left out, and so is a class with no pattern (§11 there)."""
-    lines = []
-    for known in vocabulary.all_exercises():
-        if known.pattern in ("", vocabulary.ACCESSORY) and known.key not in done:
-            continue
-        lines.append(vocabulary.model_line(known.key))
-    return "\n".join(lines)
+def _exercise_list() -> str:
+    """Every class of the table, one per line in table order, as its key and its tags
+    (DESIGN_exercise_table.md §7)."""
+    return "\n".join(vocabulary.model_line(key) for key in vocabulary.keys())
 
 
 def _equipment_for(day: str, profile: Optional[Dict[str, Any]]) -> str:
@@ -265,12 +264,11 @@ def _mesocycle_for(day: str, mesocycles: Dict[str, Any]) -> str:
             f"week {week} of {total}")
 
 
-def system_prompt(done: Set[str]) -> str:
-    """The strength planner's system prompt, with the table's accessories and its classes
-    with no pattern limited to the ones in `done` (§9)."""
+def system_prompt() -> str:
+    """The strength planner's system prompt (§9)."""
     return SYSTEM_PROMPT.format(
         science=_shipped_science(), guidelines=_athlete_science(),
-        exercises=_exercise_list(done), habit_after=config.strength_habit_after,
+        exercises=_exercise_list(), habit_after=config.strength_habit_after,
     )
 
 

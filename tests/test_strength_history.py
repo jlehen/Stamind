@@ -111,7 +111,7 @@ class _HistoryCase(unittest.TestCase):
         return test_db.get_workout(day, "strength_training")
 
     def text(self):
-        return history.build(TODAY).text
+        return history.build(TODAY)
 
     def entries(self):
         """The history above the sessions as done: the entries and the not-done lines."""
