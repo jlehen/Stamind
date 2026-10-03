@@ -129,7 +129,8 @@ exactly this, and is a stronger domain commitment than a prompt vocabulary.
 
 **Situational categories stay in config**, not in the shipped list: `altitude`,
 `medication`, `menstrual_cycle` apply to some athletes and would otherwise be suggested to
-every one. They ship as commented examples in `config_template_full.yaml`. There is
+every one. The comment above `signal_metrics` in `config_template_full.yaml` names them, and
+`config_template.yaml` writes two of them out. There is
 deliberately no removal syntax — nothing shipped needs removing. If a situational category
 ever enters the shipped set, `metric: null` meaning *drop this one* becomes necessary.
 

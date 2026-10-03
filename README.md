@@ -452,7 +452,7 @@ schema at three lengths:
 | File | What it is |
 | --- | --- |
 | `config_template.yaml` | The short template: only what you must fill in. Start here. |
-| `config_template_full.yaml` | Every knob the app reads, commented out at its default, with the reasoning. Copy a section over when you want to change one. |
+| `config_template_full.yaml` | Every knob the app reads, set to its default, with the reasoning. Copy a section over when you want to change one. |
 | `config.sample.yaml` | A realistic filled-in config to imitate. All values fictional. |
 
 The sections you must fill:

@@ -1,6 +1,8 @@
 import os
 import unittest
 
+import yaml
+
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
 from tests import test_db_path
 
@@ -130,7 +132,7 @@ class TestCliLearnings(unittest.TestCase):
 
 class TestLearningTuningKnobsAreDocumented(unittest.TestCase):
     """`config_template_full.yaml` is the discovery surface for the learning knobs
-    (DESIGN_evidence_based_confidence.md §3): a loader with no commented example is
+    (DESIGN_evidence_based_confidence.md §3): a loader with no entry there is
     invisible to the user it exists for. The short `config_template.yaml` carries only
     the keys an install must fill in, so the knobs are documented in the full one."""
 
@@ -139,11 +141,11 @@ class TestLearningTuningKnobsAreDocumented(unittest.TestCase):
         "config_template_full.yaml",
     )
 
-    def test_both_learning_knobs_have_a_commented_example(self):
+    def test_both_learning_knobs_are_in_the_template(self):
         with open(self.TEMPLATE) as fh:
-            text = fh.read()
+            template = yaml.safe_load(fh)
         for key in ("learning_staleness_days", "learning_confidence_thresholds"):
-            self.assertIn(f"#{key}:", text, f"{key} has no commented example")
+            self.assertIn(key, template, f"{key} is missing from the template")
 
 
 if __name__ == "__main__":

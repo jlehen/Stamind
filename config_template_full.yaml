@@ -1,8 +1,9 @@
 # Stamind — the complete configuration reference.
 #
-# Every key the application reads appears below. The ones a working install must fill in
-# carry values; every tuning knob is commented out at the value the code already uses, so
-# deleting a commented line changes nothing and uncommenting one takes effect immediately.
+# Every key the application reads appears below, and none is commented out. The ones a
+# working install must fill in carry a placeholder. Every other key is set to the value the
+# code already uses, so deleting one of those lines changes nothing. A key whose default is
+# "not set" is written empty (`""`, `[]` or `{}`), which the app reads as absent.
 #
 # Three files describe the same settings at three lengths:
 #   config_template.yaml       the short template — only what you must fill in. Start here.
@@ -59,26 +60,27 @@ llm:
     - model: "google/gemini-3.5-flash"
   # Seconds one OpenRouter request may run before it is abandoned. Writing a whole plan
   # takes a while, so keep this generous. Default 120.
-  #request_timeout_seconds: 120
+  request_timeout_seconds: 120
   # The Telegram bot reads your free-text messages to work out which
   # command you meant (DESIGN_bot_simple_frontend.md §5.4). That job is small, so it can go
   # to a cheaper model than the coaching itself. Name one of the `models:` entries above —
   # one allowlist covers both roles. This only seeds the `router-model` setting;
-  # `settings set router-model` changes it live. Unset, the coaching model routes too.
-  # Recommended: Gemini Flash.
-  #router_model: "google/gemini-3.5-flash"
+  # `settings set router-model` changes it live. Empty, the coaching model routes too.
+  # Recommended: Gemini Flash, written "google/gemini-3.5-flash".
+  router_model: ""
 
 # Where this instance keeps its files. Every relative path in this file — the database,
 # science_dir, the logging directory, service_account_file, the Garmin token_dir — resolves
 # against it, and it is itself relative to the directory holding this config file. Leave it
-# unset and that config directory *is* the data directory, so all state lands beside the
-# config. Set it to move one instance's whole state under a single subdirectory instead of
-# prefixing each path key below by hand; an absolute path on an individual key still wins.
-#data_dir: "athlete2"
+# empty and that config directory *is* the data directory, so all state lands beside the
+# config. Set it, to "athlete2" for instance, to move one instance's whole state under a
+# single subdirectory instead of prefixing each path key below by hand; an absolute path on
+# an individual key still wins.
+data_dir: ""
 
 # The SQLite database this install operates on. A relative path resolves against this
 # config file's directory (or `data_dir:` when set); default stamind.db beside it.
-#database: "stamind.db"
+database: "stamind.db"
 
 # Your own sports-science guidelines: a directory of *.md files pasted into every coaching
 # prompt as the ATHLETE-PROVIDED section, so you can tell the coach how you want to be
@@ -87,25 +89,25 @@ llm:
 # directory to give them their own training philosophy, or point two instances at the same
 # absolute path to share one. Either way the guidelines the app itself ships
 # (stamind/science/) are still applied.
-#science_dir: "science"
+science_dir: "science"
 
 # Two trails the app writes for whoever runs it: the run journal (runs/YYYY-MM-DD.jsonl,
 # one line per event, read back with `sm journal`) and the full text of every exchange with
 # the model (llm_exchanges/*.md). They exist for you to read when something looks wrong —
-# the app never reads them back to make a decision (DESIGN_logging.md §2.1). Every key has
-# a working default, so leaving the whole section out behaves exactly as shown.
-#logging:
-#  # Where those two directories go, with gym_logs/ (the gym logger's messages). Relative
-#  # paths resolve like `database:` above, so a second instance keeps its own logs.
-#  # Default logs/ beside the config.
-#  #dir: "logs"
-#  # Lowest level that reaches the journal file: debug | info | warn | error.
-#  # `debug` additionally records the exceptions the app catches and hides on screen.
-#  #level: "info"
-#  # How many days each directory keeps. The clean-up runs at most once a day, off the
-#  # first command to finish after midnight UTC; `sm journal prune` forces one now.
-#  #retain_days: 90
-#  #retain_exchange_days: 90
+# the app never reads them back to make a decision (DESIGN_logging.md §2.1). Every key is
+# at its default, so leaving the whole section out behaves exactly as shown.
+logging:
+  # Where those two directories go, with gym_logs/ (the gym logger's messages). Relative
+  # paths resolve like `database:` above, so a second instance keeps its own logs.
+  # Default logs/ beside the config.
+  dir: "logs"
+  # Lowest level that reaches the journal file: debug | info | warn | error.
+  # `debug` additionally records the exceptions the app catches and hides on screen.
+  level: "info"
+  # How many days each directory keeps. The clean-up runs at most once a day, off the
+  # first command to finish after midnight UTC; `sm journal prune` forces one now.
+  retain_days: 90
+  retain_exchange_days: 90
 
 # ---------------------------------------------------------------------------
 # Two athletes, one checkout
@@ -123,7 +125,7 @@ llm:
 # How fresh cached data must be before a command re-pulls it. Within this many minutes of
 # the last pull, reads reuse the local copy instead of hitting Garmin or re-reading the
 # calendar for signals. `--force-pull` ignores it for a single run.
-#refresh_minutes: 120
+refresh_minutes: 120
 
 # How long a learning may go without fresh supporting evidence before the app stops showing
 # it to the coach ("dormant") and proposes knocking its confidence down one level. The
@@ -131,85 +133,89 @@ llm:
 # lapse as fast as a hunch from three weeks. Nothing is lost either way — a dormant learning
 # revives the moment new supporting evidence lands, and the demotion is only a proposal
 # (`sm learnings demote` accepts it, `sm learnings keep` refuses it).
-#learning_staleness_days:
-#  tentative: 21
-#  moderate: 60
-#  established: 180
+learning_staleness_days:
+  tentative: 21
+  moderate: 60
+  established: 180
 
 # Before it writes a plan, the coach reads a cached reconstruction of your training history.
 # That cache does not refresh itself: `data bootstrap` builds it once and `data reflect`
 # brings it forward. If the newest history in it is more than this many days behind today,
 # `plan generate` says so and points you at `data reflect`, rather than planning off a stale
 # picture in silence.
-#analysis_staleness_days: 14
+analysis_staleness_days: 14
 
 # How much evidence a learning needs to reach each confidence level, counted in distinct
 # weeks — weeks that support it, minus weeks that contradict it. Only these two levels are
 # adjustable — tentative is always >=1 net week, and a learning at 0 or below is proposed
 # for retirement. Change these and every learning is re-levelled on the next recompute; no
 # migration, nothing is lost.
-#learning_confidence_thresholds:
-#  moderate: 3
-#  established: 5
+learning_confidence_thresholds:
+  moderate: 3
+  established: 5
 
-# Flask web front-end (run stamind_web.py directly). Optional — omit to use defaults.
-#web:
-#  # Interface to bind. Loopback by default so the dev server isn't exposed on every
-#  # interface; set to 0.0.0.0 to serve the LAN.
-#  #host: "127.0.0.1"
-#  #port: 5000
-#  # Werkzeug's debugger/reloader. Leave off: its interactive debugger hands a remote
-#  # visitor code execution on any traceback, so it must never be on for a reachable bind.
-#  #debug: false
+# Flask web front-end (run stamind_web.py directly). Optional — omitting the section
+# behaves exactly as shown.
+web:
+  # Interface to bind. Loopback by default so the dev server isn't exposed on every
+  # interface; set to 0.0.0.0 to serve the LAN.
+  host: "127.0.0.1"
+  port: 5000
+  # Werkzeug's debugger/reloader. Leave off: its interactive debugger hands a remote
+  # visitor code execution on any traceback, so it must never be on for a reachable bind.
+  debug: false
 
-# Telegram chat front-end (run with ./sm-bot). Optional — omit the whole section to disable
-# it. Create a bot with @BotFather to get the token; message the bot once and check the
-# logs (or @userinfobot) for your numeric chat id.
-#telegram:
-#  # Bot token from @BotFather. May instead be set via the TELEGRAM_BOT_TOKEN env var.
-#  bot_token: "123456789:ABCdef..."
-#  # Allowlist of chat ids permitted to drive the bot. Empty/absent = nobody.
-#  allowed_chat_ids:
-#    - 123456789
-#  # Seconds a command may go silent before it's killed (generation is slow).
-#  #command_timeout_seconds: 180
-#  # Seconds to wait for you to answer an interactive prompt (tap a button or send text)
-#  # before the command is cancelled. Default 300.
-#  #prompt_timeout_seconds: 300
-#  # Seconds the bot keeps retrying a call Telegram failed to answer (a 502, a dropped
-#  # connection, a timeout) before it gives up and journals one warning. The poll has the
-#  # library's own retry and is not affected. 0 turns the retry off. Default 180.
-#  #send_retry_seconds: 180
-#  # Your name, as the companion says it to the athlete. The athlete
-#  # already calls the app "coach", so the person running the CLI needs a different word:
-#  # this is what fills the blank in "tell ___ — setting up a new goal happens from the
-#  # computer". Unset, that reads "the person who set this up for you".
-#  #operator_name: Alex
-#  # Morning push: the bot opens the day by itself with today's
-#  # session and a few follow-up buttons. It records what it has sent in the instance's
-#  # database, so restarting the bot never double-sends.
-#  # Each key below only seeds a setting; change any of them live with `settings set`
-#  # (`push`, `morning-time`, `morning-deadline`, `adapt-first`) and the running bot picks
-#  # the change up within five minutes. Quote the times — an unquoted 07:30 is not a time
-#  # as far as YAML is concerned.
-#  #push:
-#  #  # Off-switch for the push without leaving simple mode.
-#  #  #enabled: true
-#  #  # Local time the push fires.
-#  #  #morning_time: "08:00"
-#  #  # If the machine or the bot was down at morning_time, still catch up until this local
-#  #  # time; after it, skip the day — a workout briefing at 9 PM is just noise.
-#  #  #morning_deadline: "15:00"
-#  #  # Re-run the daily adaptation (workout adapt -y, no questions asked) before writing
-#  #  # the push, so it accounts for overnight signals. Costs one LLM call every morning.
-#  #  #adapt_first: false
-#  # A change you make to the athlete's week from the terminal reaches them at their next
-#  # morning time (DESIGN_change_heads_up.md §4). A change to one of today's sessions cannot
-#  # wait that long — by the next morning the day it is about is over — so it goes out the
-#  # same day, once you have left their week alone for this many minutes. Another change
-#  # restarts the wait, which is what keeps trial and error off their phone. 0 sends on the
-#  # bot's next wake. Seeds `settings set change-delay N`, which overrides it live.
-#  #change_delay_minutes: 20
+# Telegram chat front-end (run with ./sm-bot). Optional — it is off as shown, because the
+# token is empty, and omitting the whole section does the same. Create a bot with
+# @BotFather to get the token; message the bot once and check the logs (or @userinfobot)
+# for your numeric chat id.
+telegram:
+  # Bot token from @BotFather, which looks like "123456789:ABCdef...". May instead be set
+  # via the TELEGRAM_BOT_TOKEN env var. Empty, ./sm-bot refuses to start.
+  bot_token: ""
+  # Allowlist of chat ids permitted to drive the bot, written as a list of numbers:
+  # [123456789]. Empty/absent = nobody.
+  allowed_chat_ids: []
+  # Seconds a command may go silent before it's killed (generation is slow).
+  command_timeout_seconds: 180
+  # Seconds to wait for you to answer an interactive prompt (tap a button or send text)
+  # before the command is cancelled. Default 300.
+  prompt_timeout_seconds: 300
+  # Seconds the bot keeps retrying a call Telegram failed to answer (a 502, a dropped
+  # connection, a timeout) before it gives up and journals one warning. The poll has the
+  # library's own retry and is not affected. 0 turns the retry off. Default 180.
+  send_retry_seconds: 180
+  # Your name, as the companion says it to the athlete. The athlete
+  # already calls the app "coach", so the person running the CLI needs a different word:
+  # this is what fills the blank in "tell ___ — setting up a new goal happens from the
+  # computer". Set it to "Alex" and that reads "tell Alex". Empty, it reads "the person who
+  # set this up for you".
+  operator_name: ""
+  # Morning push: the bot opens the day by itself with today's
+  # session and a few follow-up buttons. It records what it has sent in the instance's
+  # database, so restarting the bot never double-sends.
+  # Each key below only seeds a setting; change any of them live with `settings set`
+  # (`push`, `morning-time`, `morning-deadline`, `adapt-first`) and the running bot picks
+  # the change up within five minutes. Quote the times — an unquoted 07:30 is not a time
+  # as far as YAML is concerned.
+  push:
+    # Off-switch for the push without leaving simple mode.
+    enabled: true
+    # Local time the push fires.
+    morning_time: "08:00"
+    # If the machine or the bot was down at morning_time, still catch up until this local
+    # time; after it, skip the day — a workout briefing at 9 PM is just noise.
+    morning_deadline: "15:00"
+    # Re-run the daily adaptation (workout adapt -y, no questions asked) before writing
+    # the push, so it accounts for overnight signals. Costs one LLM call every morning.
+    adapt_first: false
+  # A change you make to the athlete's week from the terminal reaches them at their next
+  # morning time (DESIGN_change_heads_up.md §4). A change to one of today's sessions cannot
+  # wait that long — by the next morning the day it is about is over — so it goes out the
+  # same day, once you have left their week alone for this many minutes. Another change
+  # restarts the wait, which is what keeps trial and error off their phone. 0 sends on the
+  # bot's next wake. Seeds `settings set change-delay N`, which overrides it live.
+  change_delay_minutes: 20
 
 google:
   # Service-account JSON file used to authenticate to the Google APIs.
@@ -217,12 +223,13 @@ google:
   # Google Calendar that planned workouts are written to / read from.
   calendar_id: "YOUR_CALENDAR_ID@group.calendar.google.com"
   # Source tag for calendar events containing daily signals.
-  #calendar_signal_tag: "stamind-context"
+  calendar_signal_tag: "stamind-context"
   # Optional. A Google Cloud Storage bucket the calendar and "Goals & plan" pages read their
-  # data from, encrypted, so they can show every workout's text and older months. Unset,
+  # data from, encrypted, so they can show every workout's text and older months. Empty,
   # the pages read only what their button carries. Setup: "The pages' files in a bucket" in
-  # the README. The bot reads this once, when it starts.
-  #storage_bucket: "stamind-pages"
+  # the README, which names the bucket "stamind-pages". The bot reads this once, when it
+  # starts.
+  storage_bucket: ""
 
 garmin:
   email: "you@example.com"
@@ -233,24 +240,24 @@ garmin:
   # WARNING for two-athlete setups: a valid token store beats the credentials above, so if
   # two configs share a directory the second one silently resumes the first athlete's
   # Garmin login. Give each instance its own token_dir.
-  #token_dir: ".garminconnect"
+  token_dir: ".garminconnect"
   # Garmin keeps revising the last day or two of data after the fact. Every forward refresh
   # therefore re-fetches this many trailing days rather than only what is new.
-  #mutable_days: 3
+  mutable_days: 3
   # A backward gap larger than this is not filled automatically — the app prints the
   # backfill command and lets you decide, since a long fetch is slow and rate-limited.
   # Gaps in the middle of your history are held to the same bar.
-  #backfill_prompt_days: 30
+  backfill_prompt_days: 30
   # How far back the first-run backfill command reaches, on a database with no history yet.
-  #initial_backfill_days: 90
+  initial_backfill_days: 90
   # Pause between Garmin API calls, to stay under their rate limit. `data pull --sleep`
   # overrides it for one run.
-  #throttle_seconds: 0.2
+  throttle_seconds: 0.2
   # How much of an activity must fall inside a known heart-rate zone before its hrTSS is
   # believed. Below this bar the effort mostly sat under zone 1, where hrTSS under-counts
   # it, so your RPE is used for the load instead. Default 0.5, calibrated against the
   # activity history.
-  #hr_zone_coverage_min: 0.5
+  hr_zone_coverage_min: 0.5
   # The key above decides the *load*. The next three only decide what `sm progress` says
   # about how patchy its zone coverage was.
   #
@@ -259,22 +266,24 @@ garmin:
   # evidence that a 340-TSS week was under-counted, nor evidence about the strap. Shorter
   # sessions still contribute their load and their zone minutes; they just lose their vote
   # on the markers. Default 20 minutes.
-  #zone_min_activity_minutes: 20
+  zone_min_activity_minutes: 20
   # How much of a sport's weekly duration must land inside a known zone before its row
   # stops flagging itself as patchy. Deliberately stricter than hr_zone_coverage_min: that
   # one decides whether the load can be trusted, this one only decides whether a table
   # admits the picture is incomplete. Default 0.8.
-  #zone_coverage_display_min: 0.8
+  zone_coverage_display_min: 0.8
   # Per-sport overrides of that bar, keyed by canonical sport name. Uncovered time is not
   # always a recording failure — it is also the rest between sets, the chairlift back up,
   # the flat walking on a hike, the held pose, all of which sit below zone 1 where no zone
-  # claims them. stamind/intensity.py already ships lower bars for the sports where that
-  # is structural (strength_training 0.45, downhill_skiing and indoor_climbing 0.15, hiking
-  # 0.10, yoga 0.05); every other sport uses the bar above. Add an entry here to override
-  # either.
-  #zone_coverage_display_min_by_sport:
-  #  strength_training: 0.45
-  #  hiking: 0.10
+  # claims them. stamind/analytics/intensity.py already ships lower bars for the sports
+  # where that is structural: they are the five entries below. Every other sport uses the
+  # bar above. Change an entry, or add a sport, to override either.
+  zone_coverage_display_min_by_sport:
+    strength_training: 0.45
+    downhill_skiing: 0.15
+    indoor_climbing: 0.15
+    hiking: 0.10
+    yoga: 0.05
   # How many days of load each moving average averages over: CTL is fitness, ATL fatigue.
   # FOR DELIBERATE EXPERIMENTS ONLY. The bands the app reads the results against (TSB
   # -30/+25, ramp 3-5/8, ATL:CTL 1.3/1.5) and the CLI's colouring are all calibrated to
@@ -283,77 +292,77 @@ garmin:
   # (DESIGN_pmc_fitness_fatigue.md §3.4). The defaults are the supported configuration.
   # Both must be positive integers. Editing them recomputes nothing on its own; the change
   # lands on the next data pull, wipe or backfill.
-  #pmc_ctl_days: 42
-  #pmc_atl_days: 7
+  pmc_ctl_days: 42
+  pmc_atl_days: 7
 
 # Strength tracking (DESIGN_strength_tracking.md).
-#strength:
-#  # First day whose strength sets are read from Garmin. Before it you did not correct the
-#  # watch's exercise names in Garmin Connect, so they were not checked. Unset, no sets are
-#  # read. Quote the date. This key only seeds a setting; change it live with
-#  # `settings set strength-sets-since 2026-09-03`.
-#  #sets_since: "2026-09-03"
-#  # How many of your recent strength days the coach reads when it writes a strength
-#  # session: what you lifted, and each of those days as a whole session. A strength day is
-#  # a day with at least one strength activity whose sets were read. The exercises a naming
-#  # question offers come from the same days.
-#  #recent_days: 8
-#  # How many times you do something other than what a strength session prescribed —
-#  # another exercise in place of one, an exercise skipped or added, a different number of
-#  # sets — before the coach writes it into your next sessions. Once is a one-off. The
-#  # coach only counts the days `recent_days` shows, so the two keys go together. Say this
-#  # is 4 and you swap an exercise that is prescribed on Thursdays only. Four Thursdays are
-#  # about ten strength days for someone who lifts two or three times a week. With
-#  # `recent_days` at 8, the first swap is no longer shown by the time you make the fourth,
-#  # so the count never gets there. Raise `recent_days` with it.
-#  #habit_after: 2
+strength:
+  # First day whose strength sets are read from Garmin. Before it you did not correct the
+  # watch's exercise names in Garmin Connect, so they were not checked. Empty, no sets are
+  # read. Write the day quoted, as "2026-09-03". This key only seeds a setting; change it
+  # live with `settings set strength-sets-since 2026-09-03`.
+  sets_since: ""
+  # How many of your recent strength days the coach reads when it writes a strength
+  # session: what you lifted, and each of those days as a whole session. A strength day is
+  # a day with at least one strength activity whose sets were read. The exercises a naming
+  # question offers come from the same days.
+  recent_days: 8
+  # How many times you do something other than what a strength session prescribed —
+  # another exercise in place of one, an exercise skipped or added, a different number of
+  # sets — before the coach writes it into your next sessions. Once is a one-off. The
+  # coach only counts the days `recent_days` shows, so the two keys go together. Say this
+  # is 4 and you swap an exercise that is prescribed on Thursdays only. Four Thursdays are
+  # about ten strength days for someone who lifts two or three times a week. With
+  # `recent_days` at 8, the first swap is no longer shown by the time you make the fourth,
+  # so the count never gets there. Raise `recent_days` with it.
+  habit_after: 2
 
 coach:
   # Days of recent metrics history fed to the coach as context.
-  #metrics_lookback_days: 15
+  metrics_lookback_days: 15
   # When working out where a new plan should start, the app looks for the goal that came
   # before it. This is how far back that search reaches.
-  #goals_lookback_days: 90
+  goals_lookback_days: 90
   # How many days of sessions `workout generate` writes when you don't say.
-  #workout_generation_span_days: 28
+  workout_generation_span_days: 28
   # Days from today the athlete is treated as already committed to: the sessions
   # standing in that window reach the `workout generate` prompt and the week planner must
   # account for each one, and a session it removes there keeps its Calendar event,
   # marked (DESIGN_plan_change_continuity.md §4.1). 0 disables both. Also a setting:
   # `settings set commitment-days N`.
-  #workout_commitment_days: 7
+  workout_commitment_days: 7
   # The last few days of a mesocycle are its terminal window: an adaptation made there has no
   # time left to rebound from, and the next mesocycle is not yet in reach. Inside it the week
   # planner is told to hold the planned load rather than shuffle it
   # (DESIGN_mesocycle_boundary.md §3).
   # This governs what the coach MODEL is told; the CLI's own "you're running out of
   # sessions" hint is runway_warning_days below, and is a different thing.
-  #adapt_terminal_window_days: 3
+  adapt_terminal_window_days: 3
   # How many days ahead `workout adapt`, `status` and the morning push start warning that
   # your scheduled sessions are about to run out — and how many days past the end they keep
   # saying it before giving up (DESIGN_runway_nudge.md §7). Wider than the terminal window
   # above on purpose: extending the schedule is a deliberate act you may reasonably sit on
   # for a few days, and a week gives the nudge room to be seen twice.
-  #runway_warning_days: 7
+  runway_warning_days: 7
   # When you add or edit a constraint, the app offers to replan if the constraint really
   # disrupts the plan (DESIGN_constraints.md §7). Two independent triggers, either alone
   # being enough. First: the planned load the constraint collides with is at least this
   # percentage of a typical recent week's planned load...
-  #replan_displaced_load_pct: 50
+  replan_displaced_load_pct: 50
   # ...second: a `rest` constraint runs at least this many days, however little load it
   # happened to displace. (A config using the old name `replan_hard_span_days` still works;
   # write the current name in a new one.)
-  #replan_rest_span_days: 3
+  replan_rest_span_days: 3
   # How far an anchor may drift, in percent, from the value the active plan was built on
   # before the plan is flagged stale — max_hr from this file, or a logbook anchor like FTP
   # or LTHR. Below this, a retest just flows into the workout targets: a 3% FTP bump is not
   # a reason to rethink the periodization.
-  #threshold_replan_pct: 5
+  threshold_replan_pct: 5
   # Which of your completed sessions get listed to the coach as a week's highlights when it
   # reviews your history. A session qualifies if its load reaches the TSS figure, OR its
   # RPE reaches the RPE figure, OR its name mentions a race, test, FTP or marathon.
-  #high_intensity_rpe_threshold: 8
-  #high_intensity_tss_threshold: 120.0
+  high_intensity_rpe_threshold: 8
+  high_intensity_tss_threshold: 120.0
   # How the app lines your signals up against the mornings around them, so the coach can
   # see what alcohol or a bad night actually did to you.
   # 'lookahead' does two jobs at once. It is the number of mornings shown either side of an
@@ -364,13 +373,16 @@ coach:
   # 'min_days' is a floor: a category with fewer total signal-days than this on record is
   # left out of the coach's view altogether, having too little behind it to read anything
   # into.
-  #signal_days_lookahead: 3
-  #signal_days_min_days: 1
+  signal_days_lookahead: 3
+  signal_days_min_days: 1
   # Extra signal categories to offer the coach, written as 'name: what counts as this'.
   # These ADD to the set the app ships (alcohol, disturbed_sleep, illness, heat, stress,
-  # travel, underfuelling); reuse a shipped name here to reword its description. The list
-  # is a suggestion rather than a whitelist — both you (`signal add`) and the coach may use
-  # a category outside it, and a new one is flagged for you to confirm, not refused.
+  # travel, underfuelling); reuse a shipped name here to reword its description. Empty, as
+  # shown, the coach is offered the shipped set alone. A category that suits some athletes
+  # and not others belongs here: altitude, medication, menstrual_cycle. config_template.yaml
+  # writes the first two out. The list is a suggestion rather than a whitelist — both you
+  # (`signal add`) and the coach may use a category outside it, and a new one is flagged
+  # for you to confirm, not refused.
   # Where a category has a natural unit, say so in the description: that is where the coach
   # learns the unit, and it fills in 'value' only from a number you actually stated.
   # WARNING: a category about sleep MUST have "sleep" in its name. The guard that stops the
@@ -378,30 +390,27 @@ coach:
   # substring, so a category called 'insomnia' would silently lose it
   # (DESIGN_signal_extraction.md §4). Renaming a category also splits its history in two:
   # the name is matched exactly, so old entries never join up with new ones.
-  #signal_metrics:
-  #  altitude: "sleeping or training above ~1500 m; value = altitude in metres"
-  #  medication: "a drug that moves recovery — antihistamine, steroid, decongestant"
-  #  menstrual_cycle: "cycle phase or symptoms affecting recovery"
+  signal_metrics: {}
   # Load below which an activity counts as "minor". Two effects: a matched session gets a
   # wider planned-vs-actual tolerance, and an unmatched one is labelled '(minor)' instead of
   # 'UNPLANNED' — a 20-minute walk should not read as a deviation from the plan.
-  #minor_activity_load_threshold: 25.0
+  minor_activity_load_threshold: 25.0
   # Sometimes a session measures easy and felt brutal: heat, sleep debt, muscular damage,
   # kettlebell HIIT the heart-rate strap simply cannot see. When the load your RPE implies
   # is at least this many times the measured (power/HR) load, the app takes that at face
   # value — it uses the RPE-derived load instead of the measured one, and tells the coach
   # the session felt harder than it measured. Set very high to disable.
-  #rpe_divergence_ratio: 1.5
+  rpe_divergence_ratio: 1.5
   # How far a session may stray from its plan, in duration and load, before it is called a
   # mismatch. The band is a sliding one: easy_pct applies to planned loads at or below
   # low_load, hard_pct at or above high_load, straight-line interpolation in between. Easy
   # sessions get the loose end because ten minutes either way is a big percentage of a small
   # session; hard sessions get the tight end because there the same ten minutes matters.
-  #adherence_tolerance:
-  #  easy_pct: 0.50
-  #  hard_pct: 0.15
-  #  low_load: 20.0
-  #  high_load: 100.0
+  adherence_tolerance:
+    easy_pct: 0.50
+    hard_pct: 0.15
+    low_load: 20.0
+    high_load: 100.0
 
 # Editing most of this section marks the active periodization stale and offers a replan. The
 # exceptions are `name`, `equipment`, and each day's `equipment`: they reach the coach but
