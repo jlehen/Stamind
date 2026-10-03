@@ -184,6 +184,11 @@ Stamind takes five steps.
 
 It never deletes a file. Only the two commands of §9 delete.
 
+**What the terminal shows.** When at least one file went up, a command typed in a terminal
+ends with one green line: `Pages' files updated: 2 file(s) uploaded to the bucket.` It is
+side information, like "Auto-syncing Garmin...", so the chat does not show it. A command
+that uploaded nothing prints nothing, and a failed upload still prints nothing (§10).
+
 **Why build after every command, and not after a write.** A command that only reads can
 still change the data, because it pulls from Garmin and from Google Calendar first.
 

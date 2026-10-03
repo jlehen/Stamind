@@ -10,7 +10,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from tests import test_db_path
-from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, run_cli, save_workout
+from tests.helpers import (
+    clear_all_tables, pin_clock, rebind_test_db, run_cli, save_workout, started_from,
+)
 
 from stamind import calendar_days
 from stamind.cli import status
@@ -104,6 +106,8 @@ def use_storage(testcase, token=TOKEN, bucket_name=BUCKET):
         patcher.start()
         testcase.addCleanup(patcher.stop)
     os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+    # The step after a command says what it uploaded; a test that reads the line unsets this.
+    os.environ["STAMIND_VERBOSE"] = "0"
 
 
 def the_month():
@@ -281,6 +285,21 @@ class AfterCommandTest(FilesTestCase):
         key = recipe.page_key(TOKEN)
         self.assertEqual(FakeBucket.uploads, [recipe.file_name(key, "calendar/2026-09"),
                                               recipe.file_name(key, sync.INDEX)])
+
+    def test_a_terminal_reads_one_line_about_the_upload_and_the_chat_none(self):
+        line = "Pages' files updated: 2 file(s) uploaded to the bucket."
+        use_storage(self)
+        os.environ.pop("STAMIND_VERBOSE", None)
+        self.publish()
+        started_from(self, "terminal")
+        _activity("a0930", TODAY)
+        self.assertIn(line, run_cli(["calendar", "--no-pull"])[1])
+        # Nothing changed since, so nothing went up and nothing is said.
+        self.assertNotIn("Pages' files updated", run_cli(["calendar", "--no-pull"])[1])
+        started_from(self, "chat")
+        _activity("a0929", "2026-09-29")
+        self.assertNotIn("Pages' files updated", run_cli(["calendar", "--no-pull"])[1])
+        self.assertEqual(len(FakeBucket.uploads), 4)
 
     def test_a_line_that_only_printed_help_uploads_nothing(self):
         use_storage(self)

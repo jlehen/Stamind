@@ -10,8 +10,10 @@ from stamind import calendar_days, clock, journal, runtime
 from stamind.clock import month_end, month_start
 from stamind.config import config
 from stamind.cli.render import calendar_page, plan_page
+from stamind.output import aside
 from stamind.page_files import bucket as _bucket
 from stamind.page_files import recipe
+from stamind.text import green
 
 # The labels of the two files that belong to no month (§4).
 INDEX = "calendar/index"
@@ -131,24 +133,27 @@ def _in_upload_order(labels, this_month: str) -> List[str]:
 
 def after_command() -> None:
     """The step after every command, whatever its outcome (§6). Never raises: a command
-    never fails because of an upload."""
+    never fails because of an upload. A terminal reads one line when files went up."""
     try:
         where = target()
         if where is None or not published(runtime.db, where):
             return
-        _upload_changes(runtime.db, where)
+        uploaded = _upload_changes(runtime.db, where)
+        if uploaded:
+            aside(f"Pages' files updated: {uploaded} file(s) uploaded to the bucket.", green)
     except Exception as exc:
         journal.note("the pages' files were not refreshed", lvl="warn",
                      error=_bucket.describe(exc))
 
 
-def _upload_changes(dbh, where: Target) -> None:
-    """Steps 2 to 5 of §6, within `UPLOAD_SECONDS`."""
+def _upload_changes(dbh, where: Target) -> int:
+    """Steps 2 to 5 of §6, within `UPLOAD_SECONDS`. Returns how many files went up."""
     today = clock.today_str()
     files = build(dbh, today)
     record = dbh.get_page_files()
     deadline = time.monotonic() + UPLOAD_SECONDS
     remote = where.remote()
+    count = 0
     calendar_uploaded = False
     for label in _in_upload_order(files, calendar_page.month_label(today[:7])):
         stored = record.get(where.address(where.name(label))) or {}
@@ -160,10 +165,13 @@ def _upload_changes(dbh, where: Target) -> None:
             continue
         left = deadline - time.monotonic()
         if left <= 0:
-            return
-        uploaded = _upload(dbh, where, remote, label, files[label], left)
-        if uploaded and label not in (INDEX, PLAN):
+            break
+        if not _upload(dbh, where, remote, label, files[label], left):
+            continue
+        count += 1
+        if label not in (INDEX, PLAN):
             calendar_uploaded = True
+    return count
 
 
 def strangers(dbh, where: Target, remote) -> List[str]:

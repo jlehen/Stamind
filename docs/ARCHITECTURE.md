@@ -104,8 +104,8 @@ classes themselves.
   existing error boundaries, so a failed command records its own traceback with no new
   handler anywhere (DESIGN_logging.md §3/§5.4). After the command, whatever its outcome,
   it calls `page_files.sync.after_command`, which uploads the pages' files that changed
-  ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)); a line that only printed help
-  skips it.
+  ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)) and, on a terminal, prints how
+  many went up; a line that only printed help skips it.
 - **`stamind/cli/`** — per-command-family handler modules (`run_*()`): `status`,
   `goals`, `constraints`, `benchmarks`, `signals`, `learnings`,
   `settings`, `queue`, `progress` with `progress_load` (the fitness line and the
