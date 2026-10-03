@@ -80,7 +80,7 @@ class TestSchemaStamping(unittest.TestCase):
         fingerprint = hashlib.sha256("\n".join(columns).encode()).hexdigest()[:16]
 
         self.assertEqual(
-            (SCHEMA_VERSION, fingerprint), (25, "dfc12a1a2571df6b"),
+            (SCHEMA_VERSION, fingerprint), (26, "562791e8a31b8249"),
             "the schema changed without a matching SCHEMA_VERSION bump — existing "
             "databases would skip the migration",
         )

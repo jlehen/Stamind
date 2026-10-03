@@ -1,0 +1,635 @@
+{
+  "specName": "DESIGN_cycle_retrospective",
+  "specPath": "designs/DESIGN_cycle_retrospective.md",
+  "timestamp": "2026-09-27T19:44:50+00:00",
+  "status": "spec-written",
+  "capturedAtCommit": "65fff0e",
+  "qaLog": [
+    {
+      "id": "Q1",
+      "area": "Problem",
+      "question": "Which problem should this feature solve first?",
+      "options": [
+        "Long memory",
+        "Smaller prompt",
+        "A verdict kept once",
+        "The athlete's voice"
+      ],
+      "answer": "1 and 2: long memory and smaller prompt"
+    },
+    {
+      "id": "Q2",
+      "area": "Author & content",
+      "question": "Who writes the retrospective of a finished mesocycle?",
+      "options": [
+        "A model call, once",
+        "Stamind computes it",
+        "The athlete's own words",
+        "Model, after the athlete"
+      ],
+      "answer": "A model call, once, with some stats computed by Stamind and optionally the athlete's own words"
+    },
+    {
+      "id": "Q3",
+      "area": "Author & content",
+      "question": "Should the model-written lines only record what happened, or also give advice?",
+      "options": [
+        "Record only",
+        "Record plus one advice line",
+        "Advice becomes a learning"
+      ],
+      "answer": "Advice becomes a learning",
+      "note": "Replaced by Q4."
+    },
+    {
+      "id": "Q4",
+      "area": "Author & content",
+      "question": "Which model call turns the lesson of a finished mesocycle into a learning?",
+      "options": [
+        "data reflect",
+        "The retrospective call",
+        "None for now"
+      ],
+      "answer": "None for now",
+      "note": "Asked three times. The user asked for pros and cons, then how and when a retrospective is written, before answering."
+    },
+    {
+      "id": "Q5",
+      "area": "Trigger",
+      "question": "When is the retrospective of a finished mesocycle written?",
+      "options": [
+        "When first needed",
+        "Next morning, by the bot",
+        "A command of its own",
+        "First needed, plus the bot"
+      ],
+      "answer": "First needed, plus the bot",
+      "note": "Replaced by finding F2."
+    },
+    {
+      "id": "Q6",
+      "area": "Readers",
+      "question": "Once retrospectives exist, how much detail does plan generate keep about finished mesocycles?",
+      "options": [
+        "Latest one in full",
+        "Retrospectives only",
+        "As today, all in full"
+      ],
+      "answer": "Latest one in full",
+      "note": "The user first asked what plan generate gets in context today."
+    },
+    {
+      "id": "Q7",
+      "area": "Readers",
+      "question": "Besides plan generate, which model calls read a retrospective?",
+      "options": [
+        "workout generate",
+        "None, plan generate only",
+        "Generate and adapt"
+      ],
+      "answer": "workout generate",
+      "note": "Reversed by finding F9."
+    },
+    {
+      "id": "Q8",
+      "area": "Storage",
+      "question": "A mesocycle is dropped halfway because plan generate replaced the plan. Does it get a retrospective?",
+      "options": [
+        "Yes, over the days trained",
+        "No, not handled",
+        "Fold into the next one"
+      ],
+      "answer": "Yes, over the days trained"
+    },
+    {
+      "id": "Q9",
+      "area": "Macrocycle level",
+      "question": "What is the job of the macrocycle retrospective?",
+      "options": [
+        "Stands for old plans",
+        "No macrocycle level",
+        "Both, always shown"
+      ],
+      "answer": "Stands for old plans"
+    },
+    {
+      "id": "Q10",
+      "area": "Macrocycle level",
+      "question": "When does Stamind ask the athlete for their own words?",
+      "options": [
+        "Each mesocycle and the goal",
+        "At the goal only",
+        "Never asked"
+      ],
+      "answer": "Each mesocycle and the goal"
+    },
+    {
+      "id": "Q11",
+      "area": "Companion mode",
+      "question": "What does the companion athlete see of a retrospective?",
+      "options": [
+        "The question only",
+        "One sentence for her",
+        "The retrospective as written"
+      ],
+      "answer": "One sentence for her",
+      "note": "The interviewer recommended the question only."
+    },
+    {
+      "id": "Q12",
+      "area": "Risks",
+      "question": "How does a wrong retrospective get corrected?",
+      "options": [
+        "Operator has it rewritten",
+        "Never rewritten",
+        "Operator edits the text"
+      ],
+      "answer": "Operator has it rewritten"
+    },
+    {
+      "id": "Q13",
+      "area": "Risks",
+      "question": "Are we ready to write the spec, and do you want an adversarial review?",
+      "options": [
+        "Yes, attack the design",
+        "No, write the spec",
+        "Not ready, cover more"
+      ],
+      "answer": "Yes, attack the design"
+    }
+  ],
+  "coverageMap": {
+    "Problem": "done",
+    "Author & content": "done",
+    "Trigger": "done",
+    "Storage": "done",
+    "Readers": "done",
+    "Macrocycle level": "done",
+    "Companion mode": "done",
+    "Risks": "done"
+  },
+  "baseline": {
+    "derivedFrom": "phase1-analysis",
+    "capturedAtCommit": "65fff0e",
+    "note": "The code was analysed on main at e657030. main moved to a147df9 during the interview (calendar mini app merged, SCHEMA_VERSION 22). Rebased on main at 65fff0e on 2026-09-30 (SCHEMA_VERSION 25), and the spec updated: the bot's expert persona is removed, `plan show` is short by default with -v for the long text, session notes exist, `plan wipe` was missing. D26-D29.",
+    "claims": [
+      {
+        "id": "C1",
+        "type": "data-model",
+        "area": "Storage",
+        "quote": "CREATE TABLE IF NOT EXISTS retrospectives (",
+        "expectedPaths": [
+          "stamind/db/schema.py"
+        ],
+        "searchTerms": [
+          "retrospectives",
+          "CREATE TABLE"
+        ]
+      },
+      {
+        "id": "C2",
+        "type": "data-model",
+        "area": "Storage",
+        "quote": "UNIQUE(objective_id, level, name, start_date),",
+        "expectedPaths": [
+          "stamind/db/schema.py"
+        ],
+        "searchTerms": [
+          "UNIQUE",
+          "objective_id",
+          "start_date"
+        ]
+      },
+      {
+        "id": "C3",
+        "type": "component",
+        "area": "Storage",
+        "quote": "`stamind/db/retrospectives.py` (new)",
+        "expectedPaths": [
+          "stamind/db/retrospectives.py"
+        ],
+        "searchTerms": [
+          "retrospectives"
+        ]
+      },
+      {
+        "id": "C4",
+        "type": "component",
+        "area": "Trigger",
+        "quote": "`stamind/cycle_records.py` (new)",
+        "expectedPaths": [
+          "stamind/cycle_records.py"
+        ],
+        "searchTerms": [
+          "cycle_records"
+        ]
+      },
+      {
+        "id": "C5",
+        "type": "component",
+        "area": "Author & content",
+        "quote": "`stamind/coach/engine/retrospective.py` (new)",
+        "expectedPaths": [
+          "stamind/coach/engine/retrospective.py"
+        ],
+        "searchTerms": [
+          "retrospective",
+          "Mixin"
+        ]
+      },
+      {
+        "id": "C6",
+        "type": "component",
+        "area": "Trigger",
+        "quote": "`stamind/coach/service/retrospective.py` (new)",
+        "expectedPaths": [
+          "stamind/coach/service/retrospective.py"
+        ],
+        "searchTerms": [
+          "retrospective",
+          "Mixin"
+        ]
+      },
+      {
+        "id": "C7",
+        "type": "component",
+        "area": "Companion mode",
+        "quote": "`stamind/retrospective_question.py` (new)",
+        "expectedPaths": [
+          "stamind/retrospective_question.py",
+          "stamind/athlete_queue.py"
+        ],
+        "searchTerms": [
+          "retrospective",
+          "Kind",
+          "KINDS"
+        ]
+      },
+      {
+        "id": "C8",
+        "type": "component",
+        "area": "Risks",
+        "quote": "`stamind/cli/plans/retro.py` (new)",
+        "expectedPaths": [
+          "stamind/cli/plans/retro.py",
+          "stamind/cli/plans/parser.py"
+        ],
+        "searchTerms": [
+          "retro",
+          "redo",
+          "words"
+        ]
+      },
+      {
+        "id": "C9",
+        "type": "component",
+        "area": "Risks",
+        "quote": "`scripts/backfill_retrospectives.py` (new)",
+        "expectedPaths": [
+          "scripts/backfill_retrospectives.py"
+        ],
+        "searchTerms": [
+          "backfill_retrospectives"
+        ]
+      },
+      {
+        "id": "C10",
+        "type": "constraint",
+        "area": "Trigger",
+        "quote": "The date check is the step that creates records.",
+        "expectedPaths": [
+          "stamind/cycle_records.py",
+          "stamind/coach/service/planning.py",
+          "stamind/coach/service/goals_constraints.py"
+        ],
+        "searchTerms": [
+          "plan_apply",
+          "plan_rollback",
+          "goal_archive"
+        ]
+      },
+      {
+        "id": "C11",
+        "type": "constraint",
+        "area": "Trigger",
+        "quote": "A run of the write step writes at most one record.",
+        "expectedPaths": [
+          "stamind/coach/service/retrospective.py"
+        ],
+        "searchTerms": [
+          "due",
+          "failed_at"
+        ]
+      },
+      {
+        "id": "C12",
+        "type": "constraint",
+        "area": "Readers",
+        "quote": "No other model call reads a record.",
+        "expectedPaths": [
+          "stamind/coach/engine/planning.py",
+          "stamind/coach/service/history_context.py"
+        ],
+        "searchTerms": [
+          "RETROSPECTIVES OF PAST PLANS",
+          "PRIOR TRAINING REVIEW"
+        ]
+      },
+      {
+        "id": "C13",
+        "type": "constraint",
+        "area": "Readers",
+        "quote": "`## RETROSPECTIVES OF PAST PLANS`, oldest first, with no limit on their number.",
+        "expectedPaths": [
+          "stamind/coach/engine/planning.py"
+        ],
+        "searchTerms": [
+          "RETROSPECTIVES OF PAST PLANS"
+        ]
+      },
+      {
+        "id": "C14",
+        "type": "constraint",
+        "area": "Companion mode",
+        "quote": "The question is a new kind in the athlete queue, `retrospective`",
+        "expectedPaths": [
+          "stamind/retrospective_question.py",
+          "stamind/athlete_queue.py"
+        ],
+        "searchTerms": [
+          "retrospective",
+          "KINDS"
+        ]
+      },
+      {
+        "id": "C15",
+        "type": "constraint",
+        "area": "Author & content",
+        "quote": "most 400 characters for a mesocycle and 600 for a plan.",
+        "expectedPaths": [
+          "stamind/coach/engine/retrospective.py"
+        ],
+        "searchTerms": [
+          "400",
+          "600"
+        ]
+      },
+      {
+        "id": "C16",
+        "type": "decision",
+        "area": "Macrocycle level",
+        "quote": "A retrospective is about the plan, not about the goal.",
+        "expectedPaths": [
+          "stamind/cycle_records.py"
+        ],
+        "searchTerms": [
+          "plan",
+          "end_date"
+        ]
+      },
+      {
+        "id": "C17",
+        "type": "decision",
+        "area": "Storage",
+        "quote": "A record is created when the mesocycle ends, keyed by goal, name and start date, free of plan versions",
+        "expectedPaths": [
+          "stamind/cycle_records.py",
+          "stamind/db/schema.py"
+        ],
+        "searchTerms": [
+          "objective_id",
+          "name",
+          "start_date"
+        ]
+      },
+      {
+        "id": "C18",
+        "type": "decision",
+        "area": "Trigger",
+        "quote": "Ask first, write after: on the answer, on a decline, or after seven days",
+        "expectedPaths": [
+          "stamind/coach/service/retrospective.py",
+          "stamind/retrospective_question.py"
+        ],
+        "searchTerms": [
+          "question_subject",
+          "7"
+        ]
+      },
+      {
+        "id": "C19",
+        "type": "decision",
+        "area": "Readers",
+        "quote": "Cut. Only `plan generate` reads records",
+        "expectedPaths": [
+          "stamind/coach/engine/generate.py",
+          "stamind/coach/engine/adapt.py"
+        ],
+        "searchTerms": [
+          "retrospective"
+        ]
+      }
+    ]
+  },
+  "driftLedger": [],
+  "previewUrl": null,
+  "sourceIssue": null,
+  "feedbackRounds": [
+    {
+      "date": "2026-09-30",
+      "source": "rebase on main 65fff0e",
+      "changes": [
+        "§4, §8: the question's two wordings are the terminal's and the chat's; §8 split by place",
+        "§5: the writer reads the athlete's words about the mesocycle's sessions (D27)",
+        "§8: plan show prints one line per record, the full record under -v (D28)",
+        "§6, §11: plan wipe empties the records (D29)",
+        "§15: the Goals & plan page bullet restated now that it replaced 🧭 My plan"
+      ]
+    },
+    {
+      "date": "2026-10-01",
+      "source": "discussion",
+      "changes": [
+        "§5: the writer's call is logged under the label retrospective_writer (D30)"
+      ]
+    },
+    {
+      "date": "2026-10-01",
+      "source": "technical review, skeptic pass, corner-case pass on the undo rule",
+      "changes": [
+        "§3, §11: identity is goal and start date; the name leaves the key (D31)",
+        "§3: the date check works a cut out from the replaced versions and removes a record the current plan contradicts; no undo in plan rollback or goal_reinstate (D32)",
+        "§3: an ended mesocycle always gets a record; a cut-short one needs seven trained days (D33)",
+        "§3, §6: the date check skips called-off goals; a called-off plan record goes when the goal is live again (D34)",
+        "§4: only an ended mesocycle or plan gets a question; subject is the record's id; no question means a seven-day wait (D35)",
+        "§7: mesocycle records of every goal, unless a written plan record covers them (D36)",
+        "§5, §7, §8, §9, §11: cuts — retry and failed_at, question_subject, planned_end_date, date check in status and plan_apply, the shorter listing, the sentence in the chat's plan view, plan retro words (D37)",
+        "§10: no backfill script; the first date check records what has ended in the current plans (D38)",
+        "kept: the whole-plan record, the cut-short record, the Garmin refresh (D39)"
+      ]
+    },
+    {
+      "date": "2026-10-01",
+      "source": "fourth review, then a second reader weighing each fix against over-engineering",
+      "changes": [
+        "§7: the mesocycle that finished most recently keeps its full detail, also under a written plan record (D40)",
+        "§4, §5, §8: a record is due seven days after its end, or sooner when it holds the athlete's words and no lines; the rule no longer reads the athlete queue; after Nothing to say the record waits its seven days; changes the decline of D14 (D41)",
+        "§2, §5: only the first line's values are stored; a plan's numbers are the sums of its mesocycle records (D42)",
+        "§3, §13: cut — the date check at the end of plan rollback, and the amendment to DESIGN_plan_rollback.md §5 (D43)",
+        "§3: the day of a replacement is read on the athlete's clock (D44)",
+        "§10, §15: the cut-short rule reads old replaced versions too; what is lost is a mesocycle that finished inside one (D45)",
+        "§3, §5, §13, §14: the morning routine runs the two steps after its once-a-day test",
+        "§3: the sentence on a plan version that lived ten minutes, shortened",
+        "§15: a rollback more than a week after plan generate also leaves two records that share days"
+      ]
+    }
+  ],
+  "redTeamStatus": "completed",
+  "redTeamFindings": [
+    {
+      "id": "F1",
+      "dimension": "Data Integrity",
+      "severity": "critical",
+      "title": "Nothing defines which finished mesocycles exist across plan versions",
+      "status": "resolved",
+      "resolution": "A record is created when the mesocycle ends, keyed by goal, name and start date. The cut-short case stays.",
+      "decisions": [
+        "D13",
+        "D8"
+      ],
+      "answer": "Record it when it ends"
+    },
+    {
+      "id": "F2",
+      "dimension": "Failure Modes",
+      "severity": "major",
+      "title": "Written the morning after, from data that has not settled",
+      "status": "resolved",
+      "resolution": "Ask first, write after.",
+      "decisions": [
+        "D14"
+      ],
+      "answer": "Ask first, write after"
+    },
+    {
+      "id": "F3",
+      "dimension": "Contradictory Decisions",
+      "severity": "major",
+      "title": "The companion's sentence is written before the answer",
+      "status": "resolved",
+      "resolution": "The sentence is written by the same call, after the answer.",
+      "decisions": [
+        "D14"
+      ],
+      "answer": "Ask first, write after"
+    },
+    {
+      "id": "F4",
+      "dimension": "Operational Concerns",
+      "severity": "major",
+      "title": "In expert mode the question is almost never asked",
+      "status": "resolved",
+      "resolution": "A date check in daily commands queues the question.",
+      "decisions": [
+        "D14"
+      ],
+      "answer": "Ask first, write after"
+    },
+    {
+      "id": "F5",
+      "dimension": "Data Integrity",
+      "severity": "major",
+      "title": "Horizon goals and re-dated goals",
+      "status": "resolved",
+      "resolution": "A retrospective is about the plan. One record per plan trained to its end.",
+      "decisions": [
+        "D15"
+      ],
+      "answer": "User: a changed goal date with an unadjusted plan is a user mistake; a retrospective is about the plan, not the goal. Then: yes, one per plan trained."
+    },
+    {
+      "id": "F6",
+      "dimension": "Data Integrity",
+      "severity": "major",
+      "title": "Which goals feed long memory, and goals called off",
+      "status": "resolved",
+      "resolution": "goal rm ends the plan that day.",
+      "decisions": [
+        "D16"
+      ],
+      "answer": "The plan ends that day"
+    },
+    {
+      "id": "F7",
+      "dimension": "Operational Concerns",
+      "severity": "major",
+      "title": "Backfill and retries run model calls inside slow commands",
+      "status": "resolved",
+      "resolution": "One-off script, date check before the plan changes, one record per run, one day between retries.",
+      "decisions": [
+        "D17"
+      ],
+      "answer": "Yes, with the date check"
+    },
+    {
+      "id": "F8",
+      "dimension": "wildcard",
+      "severity": "major",
+      "title": "The smaller prompt is not reached, and the same weeks are told twice",
+      "status": "resolved",
+      "resolution": "Keep both texts. Long memory is the goal.",
+      "decisions": [
+        "D18"
+      ],
+      "answer": "Keep both"
+    },
+    {
+      "id": "F9",
+      "dimension": "Contradictory Decisions",
+      "severity": "minor",
+      "title": "The week planner reading a retrospective",
+      "status": "resolved",
+      "resolution": "Cut.",
+      "decisions": [
+        "D19"
+      ],
+      "answer": "No, cut it"
+    },
+    {
+      "id": "F10",
+      "dimension": "Data Integrity",
+      "severity": "minor",
+      "title": "The athlete's words cannot be undone",
+      "status": "resolved",
+      "resolution": "Own field; the operator can replace or clear them.",
+      "decisions": [
+        "D20"
+      ],
+      "answer": "Accept all five"
+    },
+    {
+      "id": "F11",
+      "dimension": "Operational Concerns",
+      "severity": "minor",
+      "title": "The operator has no view of what was written",
+      "status": "resolved",
+      "resolution": "plan show prints the records in expert mode.",
+      "decisions": [
+        "D21"
+      ],
+      "answer": "Accept all five"
+    },
+    {
+      "id": "F12",
+      "dimension": "Dependency Risks",
+      "severity": "minor",
+      "title": "Schema version and the calendar mini app",
+      "status": "resolved",
+      "resolution": "No reliance on mesocycles.summary.",
+      "decisions": [
+        "D22"
+      ],
+      "answer": "Accept all five"
+    }
+  ]
+}

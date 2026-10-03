@@ -515,6 +515,12 @@ importing the list.
 Amended 2026-09-14 (DESIGN_learning_doubt_nudge.md §5): `learning`, from
 `stamind/learning_doubts.py`, is the next entry.
 
+Amended 2026-10-01 (DESIGN_cycle_retrospective.md §4): `retrospective`, from
+`stamind/retrospective_question.py`, is one more entry. It asks how a finished mesocycle
+went. Its subject is the id of the record it is about. Its one answer asks for typed text,
+and its drop is "nothing to say". It goes stale when its record is removed, and seven days
+after the end of its record.
+
 ## 9. Guardrails
 
 A queue button can only run one of the answers its item was queued with, on that item, after

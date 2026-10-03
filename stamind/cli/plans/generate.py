@@ -188,6 +188,10 @@ def run_plan_generate(args: argparse.Namespace) -> None:
     if feedback is not None and not _file_generate_feedback(feedback, targets):
         sys.exit(1)
 
+    # Before the new version is saved: afterwards a mesocycle that just ended would sit in
+    # a replaced version only (DESIGN_cycle_retrospective.md §3).
+    runtime.coach_service.retrospectives_step()
+
     # Make sure we have latest metrics cached
     ensure_recent_data(no_pull=args.no_pull, force_pull=getattr(args, 'force_pull', False))
     metrics = runtime.db.get_metrics_cache()

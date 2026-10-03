@@ -352,6 +352,16 @@ Diff output has a natural home in existing fields: macro diff →
 >   on the mis-designed case.
 >   The cached reconstruction's summary/cycles/insights are appended below it.
 
+Amended 2026-10-01 (DESIGN_cycle_retrospective.md §7): the review now reads the finished
+mesocycles from stored records. A record is written once, by the write step, seven days
+after the mesocycle ends or when the athlete answers "how did it go?". So "nothing is
+written" no longer holds for the whole of `plan generate`'s history: building the review
+still writes nothing, but what it reads was written before. The review prints the record
+in place of the full detail, except for the mesocycle that finished most recently, which
+keeps its detail, and for a record that has no lines yet. It prints the records of every
+goal, the called-off ones included, where it used to stop at the plans handed to it. The
+mesocycle under way is unchanged: it comes from those plans, in full detail.
+
 ### 6.1 Which macrocycles the review walks, and in what order
 
 `_build_prior_training_context` takes a **list** of macrocycles and adds the

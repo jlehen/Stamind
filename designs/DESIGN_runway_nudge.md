@@ -288,6 +288,11 @@ morning push **sends nothing at all** on an empty day — not the rest-day lie, 
 celebration. Silence is the honest state for "no plan covers today"; the push resumes the
 morning a schedule exists again.
 
+Amended 2026-10-01 (DESIGN_cycle_retrospective.md §3): the date check and the write step
+run before this test. A plan that has just run out is the plan whose last mesocycle needs
+its record, so a silent morning still keeps the retrospective records up to date. It still
+sends nothing.
+
 **Dedup with `adapt-first`.** When `adapt-first` is on, the push renders `workout adapt
 -y`'s output — which now carries §4's hint lines. The CLI suppresses the runway hint
 under `STAMIND_RENDER=simple`: on the simple surface the bot words the fact itself, and

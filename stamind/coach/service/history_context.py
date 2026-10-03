@@ -10,14 +10,17 @@ trained before Stamind was watching.
 The mesocycle currently under way is `mesocycle_context.py`. It is one mixin of
 :class:`CoachService` — see coach/service/__init__.py.
 """
+import textwrap
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from stamind.config import config
-from stamind import garmin
+from stamind import cycle_records, garmin
 from stamind.analytics import zone_tables
 from stamind.analytics.mesocycle_report import mesocycle_report
 from stamind.analytics.pmc import PMC_TSB_LAG_NOTE, load_ratio, pmc_data_caveat, pmc_ramp
+from stamind.db.objectives import ARCHIVED
+from stamind.db.retrospectives import MESOCYCLE, PLAN
 from stamind.plan_versions import plan_lineage
 from stamind.sports import canonical_sport
 from stamind.text import wrap_text
@@ -207,42 +210,119 @@ class HistoryContextMixin:
             lines.append(caveat)
         return cutoff, ("\n".join(lines) if lines else None)
 
-    def _intensity_history_context(
-        self, macros: List[Dict[str, Any]], today_str: str,
+    def _mesocycle_reviews(
+        self, macros: List[Optional[Dict[str, Any]]], today_str: str,
         width: int = zone_tables.PROMPT_WIDTH,
     ) -> List[str]:
-        """One intensity report per elapsed mesocycle across `macros`, each carrying the
-        delta against the mesocycle before it (DESIGN_intensity_distribution.md §4.1) —
-        the strategy prompt's view.
+        """The strategy prompt's view of the mesocycles behind the athlete, oldest first
+        and under one line per goal (DESIGN_cycle_retrospective.md §7).
 
-        Each mesocycle's delta baseline is the mesocycle before it in the flattened lineage —
-        across plan boundaries too, unlike `sm progress --mesocycles`: reviewing one season
-        against the last is what this prompt is for (DESIGN_plan_rollback.md §6.1).
-        """
-        mesocycles = plan_lineage(self._db, macros)
+        The finished mesocycles of every goal come from their records, so one that lives
+        only in a replaced plan version is shown. A written record stands in for the full
+        detail, and a written record of a plan stands for the mesocycle records it covers.
+        The mesocycle that finished most recently is the exception to both: it keeps its
+        full detail and its record. The mesocycles under way come from `macros`, in full
+        detail.
+
+        The delta baseline of a mesocycle shown in full is the one before it in this list,
+        across goals too (DESIGN_intensity_distribution.md §4.1)."""
+        finished = [
+            {**record, 'focus': record['intent']}
+            for record in self._db.get_retrospectives(level=MESOCYCLE)
+        ]
+        goal_of = {m['id']: m['objective_id'] for m in macros if m}
+        under_way = [
+            {**m, 'objective_id': goal_of[m['macrocycle_id']]}
+            for m in plan_lineage(self._db, macros)
+            if m['start_date'] <= today_str <= m['end_date']
+        ]
+        timeline = finished + under_way
+        stood_for = {
+            record['id']
+            for plan in self._written_plan_records()
+            for record in cycle_records.covered(self._db, plan)
+        }
+        goals = {g['id']: g for g in self._db.get_objectives()}
         benchmarks = self._db.get_benchmark_results()
-        reports = []
-        for i, meso in enumerate(mesocycles):
-            text = mesocycle_report(
-                meso, today_str, self._db.get_completed_activities,
-                previous=mesocycles[i - 1] if i else None, benchmarks=benchmarks,
-                fetch_workouts=self._db.get_workouts, width=width,
-            )
-            if not text:
+        reports: List[str] = []
+        goal_id = None
+        for i, meso in enumerate(timeline):
+            written = meso.get('body') is not None
+            latest = bool(finished) and meso is finished[-1]
+            if written and not latest and meso['id'] in stood_for:
                 continue
-            # Elapsed part only: a finished mesocycle ends where it ended, the current one at
-            # today. Both sides of every week line are cut to the same span.
-            elapsed_end = min(today_str, meso['end_date'])
-            weeks = self._mesocycle_week_lines(
-                meso, today_str, elapsed_end,
-                self._db.get_workouts(start_date=meso['start_date'], end_date=elapsed_end),
-                indent="      ",
-            )
-            if weeks:
-                text += "\n    Weekly load (what the plan asked -> what was produced)\n"
-                text += "\n".join(weeks)
-            reports.append(text)
+            parts = []
+            if not written or latest:
+                parts.append(self._mesocycle_review(
+                    meso, today_str, timeline[i - 1] if i else None, benchmarks, width
+                ))
+            if written and latest:
+                parts.append("    The record written when it ended:")
+                parts.append(self._indented_record(meso, "      ", width))
+            elif written:
+                parts.append(self._indented_record(meso, "  ", width))
+            parts = [part for part in parts if part]
+            if not parts:
+                continue
+            if meso['objective_id'] != goal_id:
+                goal_id = meso['objective_id']
+                reports.append(self._goal_line(goals[goal_id]))
+            reports.extend(parts)
         return reports
+
+    def _written_plan_records(self) -> List[Dict[str, Any]]:
+        """The records of plans that have their lines, for every goal, oldest first."""
+        return [
+            record for record in self._db.get_retrospectives(level=PLAN)
+            if record['body'] is not None
+        ]
+
+    def _plan_retrospectives_text(self) -> Optional[str]:
+        """The records of past plans as the strategy prompt prints them, with no limit on
+        their number (DESIGN_cycle_retrospective.md §7)."""
+        records = self._written_plan_records()
+        return "\n\n".join(cycle_records.record_text(r) for r in records) or None
+
+    @staticmethod
+    def _indented_record(record: Dict[str, Any], indent: str, width: int) -> str:
+        return textwrap.indent(
+            cycle_records.record_text(record, width - len(indent)), indent
+        )
+
+    @staticmethod
+    def _goal_line(goal: Dict[str, Any]) -> str:
+        """The line that names the goal the mesocycles under it were trained toward."""
+        called_off = ", called off" if goal.get('status') == ARCHIVED else ""
+        return f"Toward \"{goal['title']}\" (goal dated {goal['target_date']}{called_off}):"
+
+    def _mesocycle_review(
+        self, meso: Dict[str, Any], today_str: str,
+        previous: Optional[Dict[str, Any]] = None,
+        benchmarks: Optional[List[Dict[str, Any]]] = None,
+        width: int = zone_tables.PROMPT_WIDTH,
+    ) -> Optional[str]:
+        """One mesocycle in full detail: its intensity report, then each week's planned
+        load beside the load produced. None when it has not started. The retrospective
+        writer reads the same text (DESIGN_cycle_retrospective.md §5)."""
+        text = mesocycle_report(
+            meso, today_str, self._db.get_completed_activities,
+            previous=previous, benchmarks=benchmarks,
+            fetch_workouts=self._db.get_workouts, width=width,
+        )
+        if not text:
+            return None
+        # Elapsed part only: a finished mesocycle ends where it ended, the current one at
+        # today. Both sides of every week line are cut to the same span.
+        elapsed_end = min(today_str, meso['end_date'])
+        weeks = self._mesocycle_week_lines(
+            meso, today_str, elapsed_end,
+            self._db.get_workouts(start_date=meso['start_date'], end_date=elapsed_end),
+            indent="      ",
+        )
+        if weeks:
+            text += "\n    Weekly load (what the plan asked -> what was produced)\n"
+            text += "\n".join(weeks)
+        return text
 
     def _build_prior_training_context(
         self, prior_macros: List[Optional[Dict[str, Any]]], today_str: str,
@@ -251,9 +331,10 @@ class HistoryContextMixin:
         """Builds a read-only "planned vs actual" review for the strategy prompt
         (DESIGN_backward_evaluation.md §6, Option A).
 
-        Anchored on the *elapsed* mesocycle windows of every plan given AND of the plan the
-        athlete is currently in (§6, §6.1): each planned mesocycle's focus is shown beside what the
-        athlete actually did in that window — volume, load, the per-sport per-zone
+        The finished mesocycles of every goal, from their stored records, then the mesocycle
+        under way in each plan given and in the plan the athlete is currently in
+        (`_mesocycle_reviews`). A mesocycle shown in full has its planned focus beside what
+        the athlete actually did in that window — volume, load, the per-sport per-zone
         intensity distribution against both its mesocycle-over-mesocycle delta and what the plan
         prescribed (DESIGN_intensity_distribution.md §4.1/§9/§9.2a), and each week's
         planned load beside the load produced — so the model can judge whether the mesocycle's
@@ -261,8 +342,8 @@ class HistoryContextMixin:
         backward-evaluation reconstruction then follows, reused without another LLM call
         (§10, §10.2). Returns None if there is nothing to report.
 
-        This writes nothing — not a row in the plan's feedback log either: under Option A
-        the assessment is prompt context only, sidestepping the lifecycle collision (§11).
+        This writes nothing: the records are written by the write step
+        (DESIGN_cycle_retrospective.md §5).
         """
         sections: List[str] = []
 
@@ -271,16 +352,17 @@ class HistoryContextMixin:
         # `width` defaults to the model's prompt width; callers rendering this for a
         # narrower surface (e.g. Telegram) pass their own to keep the tables intact there.
 
-        # The current plan's elapsed mesocycles join the prior plans': drift diagnosed only
+        # The current plan's mesocycle under way joins the prior plans': drift diagnosed only
         # one macrocycle late is history (gap 2 of DESIGN_intensity_distribution.md §3).
-        reports = self._intensity_history_context(
+        reports = self._mesocycle_reviews(
             [*prior_macros, self._db.get_governing_macrocycle()], today_str, width=width,
         )
         if reports:
             sections.append(
                 wrap_text(
                     "PLANNED vs ACTUAL (elapsed mesocycles — judge whether each mesocycle's intent "
-                    "materialized). Each mesocycle shows its planned focus beside what the "
+                    "materialized). The mesocycle that finished most recently and the one "
+                    "under way are shown in full: the planned focus beside what the "
                     "athlete's activities ACTUALLY measured, per sport and per zone, as a "
                     "per-week rate over the mesocycle's completed weeks, plus the change "
                     "against the mesocycle before it. Read the delta as the intensity-creep "
@@ -294,7 +376,12 @@ class HistoryContextMixin:
                     "the easier mesocycle it drifted toward. Against the weekly load lines, "
                     "a mesocycle whose weeks came in far under what was asked was not the "
                     "mesocycle that was planned: build the next one from the load the athlete "
-                    "actually produced, not from the load they were prescribed.", width
+                    "actually produced, not from the load they were prescribed.\n"
+                    "An earlier mesocycle is given as a short record: its name, its dates and "
+                    "how it ended, one line of totals, then For / Happened / Came out. That "
+                    "record was written once, when the mesocycle ended, and is not rebuilt "
+                    "here. A quoted \"Athlete:\" line is the athlete's own answer to \"how did "
+                    "it go?\".", width
                 )
                 + "\n" + "\n".join(reports)
             )

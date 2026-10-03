@@ -117,7 +117,7 @@ classes themselves.
   two intents that change a row the athlete already has, and `test_result` a fitness-test
   result read into `benchmark record` plus the `test_result` queue kind that asks for one
   the morning after a test, DESIGN_benchmark_from_chat.md), the `plans/` package
-  (`parser`/`generate`/`show`/`versions`/`feedback`),
+  (`parser`/`generate`/`show`/`versions`/`feedback`/`retro`),
   the `workouts/` package
   (`parser`/`adapt`/`generate`/`rollback`/`listing`/`compare`/`calendar_sync`/`revisions`/
   `heads_up`/`strength_only`/`session_line`), the `data/` package (`parser`/`cache`/`show`/
@@ -420,11 +420,13 @@ classes themselves.
 | `plan_inputs.py`     | —                    | What shapes a periodization plan, how it is fingerprinted, and how it is diffed: the profile partition (`plan_profile`, `changed_plan_profile_fields`), the science documents (`athlete_science_documents`, `changed_science_documents`), the goal and constraint cleaners and their hashes, `plan_config_hash()`, and the unified-diff text a staleness reason is shown with. Flat and pure so the read-only dashboard can hash the config without importing the coach. The *judgment* over these inputs is `coach/service/staleness.py` (DESIGN_plan_staleness.md). |
 | `workout_state.py`   | —                    | Two of the three things that can be true of a planned session at once ([§5](#workout-state--three-orthogonal-axes-not-one-enum)): what the athlete changed about it (`modification_markers`) and how far its Calendar event has fallen behind (`calendar_status`, over `CALENDAR_FIELDS` and `calendar_signature`). Neither reads the database — both are derived from a workout row the caller already has — which is what lets the read-only web app import it without pulling the CLI in behind it. Was `calendar_state.py`. |
 | `learning_confidence.py` | —                | What a coach learning's confidence means and how its evidence sets it: the ordered levels, `derive_confidence` over supporting and contradicting weeks, `step_down`, and when a learning goes dormant. Pure rules; `db/learnings.py` keeps only the rows (DESIGN_evidence_based_confidence.md §3, DESIGN_learning_doubt_nudge.md §3.2). |
-| `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, `learning` from `learning_doubts.py`, and `test_result` from `cli/bot/test_result.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
+| `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, `learning` from `learning_doubts.py`, `test_result` from `cli/bot/test_result.py`, and `retrospective` from `retrospective_question.py`), the walk, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. `waiting()` hangs `touches_today` on each row, and `sends_after_delay` is the single place that says whether a change goes out after `change-delay` minutes or at a morning time. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workout_change.py` imports it safely. |
 | `calendar_days.py`   | —                    | The one list of days the calendar page and `sm calendar` are built on (DESIGN_calendar_miniapp.md §4): `gather(dbh, start, end, today)` returns a `Calendar` holding one `Day` per date — the day's `adherence_window`/`compare_days` rows each graded by `classify_adherence`, every activity that matched no session with its `unplanned_kind`, the constraints and signals covering it — plus the governing mesocycles from the first day of `start`'s month to the last goal, the goals not archived, and the schedule's last day (`analytics.runway.plan_end`). Facts only, no text; reads, never writes, never pulls from Garmin. `next_goal` is the nearest goal still ahead ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)). |
 | `page_files/`        | —                    | The pages' files: the calendar and "Goals & plan" read their data from encrypted files in a bucket at Google Cloud Storage (DESIGN_miniapp_storage.md). `recipe.py` is the key, the names and the encryption, word for word as `miniapp/storage.js` does them: the page key is HKDF of the bot token, a file's name HKDF of the page key and its label (`calendar/2026-09`, `calendar/index`, `plan`), its content zlib then AES-GCM with 12 fresh bytes at its head. `bucket.py` is the four requests to Google (upload with "do not cache", download as a page does, list, delete) behind one `Bucket` class the tests replace; `requests`, `cryptography` and the Google libraries are imported inside the functions that use them. `sync.py` is the step after every command (`after_command`: stop unless the record holds the index file's address with a fingerprint, build the months the window touches with the index and plan files, upload what differs from the record or failed last time within 3 seconds, write the record), and the guard, the fill and the removal of `data publish` and `data unpublish`. The files' content is built by `cli/render/calendar_page.py` and `plan_page.py`; the record is `db/page_files.py`. |
 | `queue_kind.py`      | —                    | What a feature brings to the queue and how it queues: the `Kind` shape, `queue(kind, subject, payload)`, and `NotApplied`, which an answer raises when it could not be applied so the item waits. Apart from `athlete_queue.py` so a feature can queue items while the list of kinds imports the feature. |
+| `retrospective_question.py` | —             | The question a finished mesocycle puts to the athlete (DESIGN_cycle_retrospective.md §4): the `retrospective` queue kind. Its terminal wording names the mesocycle and its dates, its chat wording says "Your last three weeks of training are done. How did they go for you?". One answer, "tell me", asks for typed text; the drop is "nothing to say". The answer stores the words with the record, runs `CoachService.write_retrospective` at once, and returns the sentence the writer wrote for the athlete. When the writer fails the words stay stored and the reply is a fixed line of thanks; the stored words make the record due, so the next write step tries again. The item is stale once its record is removed, and seven days after the end of its record. `ask_about(record)` queues it with the record's id as subject; the date check calls it for a mesocycle that reached its end date less than seven days ago, never for a record cut short. |
+| `cycle_records.py`   | —                    | The date check (DESIGN_cycle_retrospective.md §3): which retrospective records exist. `date_check(dbh, today)` reads every goal not called off. It first removes each mesocycle record whose mesocycle is in the current plan again, with the same start date, and has not ended. Then it creates a `finished` record for each mesocycle of the current plan whose end date has passed, and a `replaced` record for each mesocycle that a replaced plan version had under way on the day it was replaced, when the current plan does not hold it and seven days of it were trained. The day of a replacement is `macrocycles.superseded_at` read on the athlete's clock. `record_call_off` is what `goal_archive` runs: the date check for that goal, then a `called_off` record for the mesocycle under way, and for the plan when a mesocycle record exists to cover. When the last mesocycle of the current plan has ended, the date check also creates the record of the plan: it covers the goal's mesocycle records that end after its previous record of a plan, and starts where the earliest one starts (`covered` lists them). It removes a `called_off` record of a plan while that plan has not ended. At the end of a plan only the plan is asked about, not its last mesocycle. No model call. The module also holds the due rule (`is_due`: seven days after the record's end, or sooner when it holds the athlete's words and no lines) and how a record reads (`numbers_line`, `record_text`). Rows in `db/retrospectives.py`. See [Cycle retrospectives](#cycle-retrospectives). |
 | `learning_doubts.py` | —                    | The coach asks before it leans less on something it learned (DESIGN_learning_doubt_nudge.md): the `learning` queue kind (expert and companion wording, the check, "still fits" → `keep_learning`, "not really" → `demote_learning`, no drop) and `settle_doubts`, which every reflect and bootstrap run calls to queue one question per pending proposal, or to apply the proposals when `learning-questions` is off. The question's two sentences come from `CoachService.learning_question`. |
 | `strength/`          | —                    | Strength tracking (DESIGN_strength_tracking.md). `vocabulary.py` reads `exercises.tsv`, the shipped table giving every exercise a movement pattern and an equipment class, listing the Garmin names that mean it (Connect's catalog and the FIT SDK names), and naming the Free Exercise DB entry whose photos the gym logger shows, for the exercises that have an exact one ([§16](#16-gym-logger-telegram-mini-app)). `sets.py` parses Garmin's `exerciseSets`, reads each strength activity once the morning after (`read_new_activities`, run by `garmin.pull` and the morning push; a gym log is handed over the same day, [§16](#16-gym-logger-telegram-mini-app)), freezes it or queues "are the sets final?", groups sets, and renders the lines under the activity (`activity_lines`). `questions.py` holds the two queue kinds and the one model call that proposes names for a typed exercise. `history.py` builds the strength history the strength planner reads: one entry per exercise a person named in the recent strength days (`strength.recent_days`, 8), what was prescribed beside what was done, then the days the prescription was not followed, then `## SESSIONS AS DONE` — the same days as whole sessions, each activity's length, set count and RPE over its exercises in order, the ones the athlete alternated joined by "+" (read from overlapping runs of sets), a "(not prescribed)" mark on what the day's session did not hold, and under each day what the athlete said about its session (DESIGN_session_notes.md §4). `prescription.py` renders a strength session's description from its prescribed sets and owns the seam the week planner is cut at. `planner.py` is the strength planner itself — which sessions the call is about, the call, and folding the answers back into the proposal — and `planner_prompt.py` is what that call tells the model and the checks a returned exercise passes before it becomes a prescribed set; `progression.md` is the shipped science only this call reads. Each session it is asked about carries the equipment and constraints of its day and the mesocycle covering it — name, span and which week of it the date is, from `get_covering_mesocycle` — so the plan's boundary reaches the call as a fact rather than as the brief's prose. `logger.py` is the gym logger's two payloads — the session encoded into the Mini App button's address and the log the page sends back — and holds no database access ([§16](#16-gym-logger-telegram-mini-app)). `comparison.py` is a past session planned against done: which lifted sets count against which planned lines, one mark per exercise, the totals, and the one reason a logged session is partial (DESIGN_strength_planned_vs_done.md); pure, like `logger.py`. Rows in `db/strength.py`; surgery in `cli/strength.py`, the gym log in `cli/strength_ingest.py`. |
 | `db/`                | `db`                 | SQLite wrapper; `Database` composed from         |
@@ -734,6 +736,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence` + `STATUS_LABELS`, the vocabulary), `analytics/compare.py` (`adherence_window` — the one pairing that reads the database, handed the handle — `adherence_verdicts` keyed by workout id, `compare_days` for the day-by-day walk, and `format_actual` for the effort it graded against), `analytics/adherence.py::unplanned_kind` (what an activity nothing planned turns out to be: minor, unplanned or off-plan), `gcal/reconcile.py` (`mark_adherence_range` — stamping the verdict onto the Calendar event), `cli/workouts/session_line.py::adherence_marker` (the marker `workout list` prints), `cli/workouts/listing.py::_list_verdicts` (which span the listing grades, and the pull it needs), `gcal/event.py` (title tag), `/api/workouts` + `renderWorkoutCard` in `static/workouts.js` (the badge), `analytics/adherence.py::off_plan_gaps` (which measure was off and which way, the load held against the plan on the activity's own scale by `_planned_load_like`: the plan's RPE when the athlete's RPE gave the load, none for a gym session measured by heart rate alone: the grader's notes, the companion's "shorter/longer/easier/harder than planned" in `simple_gap_words`, and the calendar's blue or orange), `calendar_days.py` (the calendar page's tint and `sm calendar`'s marks, [§17](#17-calendar-telegram-mini-app-and-sm-calendar)) ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
 | Which timezone dates are read in | `stamind/clock.py` (the zone, the cache, the fallback), `clock.today_date`/`clock.fmt_timestamp`, the push window in `stamind/chat/scheduler.py`, DESIGN_user_timezone.md. Changing it is one row of `settings` |
 | A preference the athlete can change at runtime | `stamind/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
+| Cycle retrospectives (the stored record of a finished mesocycle or plan) | `stamind/cycle_records.py` (which records exist, when one is due, how one reads), `db/retrospectives.py` (the rows), `coach/service/retrospective.py` (the write step and the numbers), `coach/engine/retrospective.py` (the writer's prompt), `stamind/retrospective_question.py` (the question and its answer), `coach/service/history_context.py` (what `plan generate` reads), `cli/plans/show.py` and `cli/plans/retro.py` (the two views), DESIGN_cycle_retrospective.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`stamind/queue_kind.py`) added to `KINDS` in `stamind/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
 | A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `activity_lines`, `logbook`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is one line there), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`, and `strength log`/`exercises` which read the record and the vocabulary back), the `strength-sets-since` setting. DESIGN_strength_tracking.md |
 | A gym session logged on the phone | `miniapp/` (the page), `strength/logger.py` (the two payloads), `cli/strength_ingest.py` (`strength ingest`), `strength/sets.py::take_over_logs` (the pull handing the log to Garmin's activity), `gym_logs` + `upsert_logged_activity`/`save_gym_log`/`gym_log_for_day`/`move_gym_log` in `db/strength.py`. The bot's button and the handler for the page's message are DESIGN_gym_logger.md §6 and not wired yet. DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
@@ -774,7 +777,7 @@ The submodules:
   (renders the window's `daily_signals` rows into the adapt prompt),
   `format_baseline`, `_load_science_guidelines`.
 - `engine/` — `CoachEngine` (prompt construction, hashing, LLM calls), assembled
-  from mixins (`prompt`, `planning`, `generate`, `adapt`, `analysis`). It owns the
+  from mixins (`prompt`, `planning`, `generate`, `adapt`, `analysis`, `retrospective`). It owns the
   `openrouter_client` binding — **patch target for tests:**
   `stamind.coach.engine.openrouter_client`. Two of its files hold no mixin.
   `sessions.py` is the prompt sections about one session entry rather than about the
@@ -785,7 +788,7 @@ The submodules:
   `workout tweak` TASK head, the note section, and the constraint and signal extraction
   that `bot capture note` asks for too.
 - `service/` — `CoachService` + the `coach_service` singleton (data I/O, caching,
-  orchestration), assembled from thirteen mixins, one file per job; the package
+  orchestration), assembled from fourteen mixins, one file per job; the package
   `__init__.py` names each file and what it holds. Callers reach all of them through
   `coach_service`, so a method moving between these files is invisible outside the
   package. It holds no handles of its own: `_db` and `_prompt` are properties reading `runtime.db`
@@ -858,6 +861,9 @@ default the user layer overrides.
   stating which in the strategy. A mesocycle re-dated to today would contain none of the
   sessions already trained under it, since mesocycles own their sessions by date containment
   (`DESIGN_mesocycle_progress.md` §7).
+  Takes `plan_retrospectives`, the text of every written record of a plan, oldest first,
+  and prints it as `## RETROSPECTIVES OF PAST PLANS` before `## PRIOR TRAINING REVIEW`
+  (DESIGN_cycle_retrospective.md §7).
   Takes `anchor_history`, the same ANCHORS ON RECORD text `workout generate` gets
   (`CoachService._anchor_history_text()`): each threshold's latest value with its date,
   source and note, placed after the athlete profile so a value is never read without how
@@ -872,6 +878,17 @@ default the user layer overrides.
   cheap preliminary behind the staleness question: given what changed and the plan in
   force, would `plan generate` reshape the periodization? → `{reshaping, why}`. Label
   `plan_verdict`. Called only through `CoachService.plan_reshape_verdict` (below).
+- **`_retrospective_writer(record, today_str, measured, constraints, signals,
+  spoken_workouts, mesocycle_records, wait_notice)`** — the retrospective writer
+  (`engine/retrospective.py`, DESIGN_cycle_retrospective.md §5): the one model call that
+  writes a record's lines and the sentence for the athlete → `{record, athlete_line}`.
+  Label `retrospective_writer`. The system message is a role line, `## TASK` and
+  `## RESPONSE FORMAT`, with no science documents and no profile. For a mesocycle the user
+  message holds `## THE MESOCYCLE`, `## WHAT WAS MEASURED`, `## CONSTRAINTS AND SIGNALS IN
+  THOSE WEEKS`, then `## SESSIONS THE ATHLETE SPOKE ABOUT` and `## THE ATHLETE'S WORDS`
+  when there are any. The task asks for a record with no advice, a reason only where the
+  inputs state one, and 400 characters for a mesocycle. `wait_notice` is set only when the
+  athlete has just answered and waits for the reply.
 - **`_workout_generate_logic(...)`** — LLM call → `{reasoning, workouts[]}`. Accepts
   `num_days` (default 28) driving the horizon and `start_str` (defaults to today) for
   the first day to schedule — the prompt tells the model to begin there. When
@@ -1164,12 +1181,13 @@ called by the UIs.
   parts it could not use. See DESIGN_backward_evaluation.md §5, §8, §9, §13.
 - **`_build_prior_training_context(prior_macros, today)`** — builds the read-only
   "planned vs actual" review injected into the `plan generate` strategy prompt
-  (Option A). Anchored on the elapsed mesocycle windows of every plan handed in **and of
-  the plan the athlete is currently in** (it adds `get_governing_macrocycle()` itself) —
-  drift diagnosed only one macrocycle late is
-  history. The caller passes both the *preceding goal's* plan and the one being
+  (Option A). The finished mesocycles come from the stored records, for every goal; the
+  mesocycle under way comes from every plan handed in **and from the plan the athlete is
+  currently in** (it adds `get_governing_macrocycle()` itself) — drift diagnosed only one
+  macrocycle late is history (`_mesocycle_reviews`, below). The caller passes both the
+  *preceding goal's* plan and the one being
   *replaced*; they are different macrocycles whenever three or more planned goals chain
-  (DESIGN_backward_evaluation.md §6.1). Each mesocycle carries its volume/load line plus the per-sport per-zone intensity
+  (DESIGN_backward_evaluation.md §6.1). Each mesocycle shown in full carries its volume/load line plus the per-sport per-zone intensity
   table and the **mesocycle-over-mesocycle delta**, which is the intensity-creep check and lives
   here only: it is a periodization question, so `adapt` never sees it
   (DESIGN_intensity_distribution.md §4.1/§9.2) — beside **what the plan prescribed** over
@@ -1177,18 +1195,20 @@ called by the UIs.
   half-missed mesocycle reads exactly like a completed one. Folds in every cached
   reconstruction (`_cached_reconstructions()`): summary, inferred macrocycle and mesocycles,
   and physiological insights. Writes nothing anywhere — it is prompt context, never a
-  note in the plan's feedback log. The whole review is wrapped **once**, at build time, and printed
+  note in the plan's feedback log; the records it reads are written by the write step. The whole review is wrapped **once**, at build time, and printed
   verbatim — the zone tables are column-aligned and a screen-width re-wrap shreds them.
-- **`_intensity_history_context(macros, today)`** — the mesocycle walk behind the above.
-  Navigates **macrocycle-first**, orders the lineages by their first mesocycle's start date,
-  then flattens, so each mesocycle's predecessor is the previous element (including across a
-  plan boundary) and the delta baseline is the mesocycle that actually preceded it —
-  *argument* order is not chronological, since the plan being replaced can be for a later
-  goal than the governing one. Never a
-  date-ordered mesocycle query: every mesocycle accessor filters `mac.status = 'active'`,
-  which hides exactly the cross-plan case, and dropping that filter drags in superseded
-  rollback versions whose mesocycles overlap the live ones and describe training that never
-  happened.
+- **`_mesocycle_reviews(macros, today)`** — the list of mesocycles behind the above
+  (DESIGN_cycle_retrospective.md §7). The finished mesocycles are the mesocycle records of
+  every goal, a called-off one included, oldest first. So a mesocycle that lives only in a
+  replaced plan version is shown, which a walk over plan versions could not do. A written
+  record is printed in place of the full detail (`cycle_records.record_text`), about 0.5 KB
+  where the detail takes about 7 KB. Two kinds keep the full detail: the mesocycle that
+  finished most recently, which also prints its record under it, and a record that has no
+  lines yet. The mesocycles under way come from `macros` through `plan_lineage`, in full
+  detail. One line names the goal whenever it changes: `Toward "Gran Fondo" (goal dated
+  2026-10-15):`. The delta baseline of a mesocycle shown in full is the one before it in
+  this list, across goals too. `_mesocycle_review` renders one mesocycle in full, and the
+  retrospective writer reads the same text.
 - **`plan_rm(objective_id)`** — deletes macrocycle + mesocycles for that objective
   (cascades in DB; removes *all* versions, active and superseded).
 - **`plan_rollback(objective_id, target_macrocycle_id)`** — restores a superseded plan
@@ -1228,6 +1248,24 @@ called by the UIs.
   axis is the athlete's science documents: `"training guidelines changed: <file>, …"`
   when the `science_snapshot` no longer matches `science_dir`, and silence for a plan
   that carries no snapshot (§11).
+- **`retrospectives_step()`** — what `plan generate`, `workout adapt` and the morning
+  routine run at their start (`service/retrospective.py`, DESIGN_cycle_retrospective.md
+  §3, §5): the date check, then the write step. The write step writes one due record, the
+  oldest first. A failure prints one line and never stops the command; the next run tries
+  again. It writes nothing under `--show-prompt`, where the writer would print its own
+  prompt in place of the command's.
+- **`write_retrospective(record, wait_notice)`** — writes one record and returns its
+  sentence for the athlete. For the record of a plan it first writes the blank mesocycle
+  records the plan covers, then the plan's own from their text, and its numbers are their
+  sums, with the fitness and each benchmark taken as first and last value
+  (`_plan_numbers`). For a mesocycle it refreshes Garmin for the record's days with
+  `ensure_data`, computes the numbers, calls the writer and stores the result. The numbers
+  are totals over the record's own days: sessions done out of planned from
+  `adherence_verdicts` (rest days left out), hours and load produced from the activities,
+  load planned from `planned_load`, fitness from the CTL stored for the first and the last
+  day, and each benchmark with a result in those days beside its latest value before them.
+  `## WHAT WAS MEASURED` is `_mesocycle_review`, the text the review prints for a
+  mesocycle. It raises when the writer fails, and the record keeps what it held.
 - **`plan_reshape_verdict(macro, change_reason)`** — the verdict call's read on whether the
   change `config_changed` reported would have reshaped `macro`: `{reshaping, why}`, or
   `None`. Reached from `cli/staleness.py` when the changed-input question is put to the
@@ -1437,7 +1475,16 @@ methods whose behavior is *not* obvious from that convention are called out belo
   two accessors). The plan's feedback log lives here too: `add_plan_feedback` /
   `list_plan_feedback` (joined with mesocycle names, oldest first) / `get_plan_feedback` /
   `rm_plan_feedback`, replacing the `update_*_feedback` overwrite slots
-  (DESIGN_plan_feedback.md §6).
+  (DESIGN_plan_feedback.md §6). `delete_macrocycle_for_objective` deletes the goal's
+  retrospectives with its plan versions.
+- **Retrospectives** (`retrospectives.py`) — one record per finished mesocycle and per
+  finished plan (DESIGN_cycle_retrospective.md §11). `add_retrospective` inserts with
+  `INSERT OR IGNORE` and returns None when the goal already has a record of that level
+  starting that day, so running the date check twice creates nothing twice.
+  `get_retrospectives(objective_id, level)` lists oldest first and parses `numbers` from
+  JSON. `write_retrospective` stores what the write step produced,
+  `set_retrospective_words` the athlete's own words. The module also names the two levels
+  and the three ways a record ends.
 
 ---
 
@@ -1457,7 +1504,8 @@ to 19 adds `gym_logs`, which the CREATE below builds on the next start. The bump
 `workout_changes.sleep_seen`, a column a CREATE cannot add to a table that exists, so each
 live database gets it by hand with a one-off
 `ALTER TABLE workout_changes ADD COLUMN sleep_seen INTEGER`. The bump to 24 adds
-`session_notes`, which the CREATE builds on the next start. What they built is folded into the
+`session_notes`, and the bump to 26 adds `retrospectives`, which the CREATE builds on the
+next start. What they built is folded into the
 CREATE statements, in the column order they produced. Clearing the stamp still rebuilds
 a database that is missing a table; a database older than the squash cannot be upgraded
 by this code at all, and needs a checkout from before it. Bump `SCHEMA_VERSION` when the
@@ -2136,6 +2184,32 @@ and declined leaves the notes pending, and a `plan rollback` makes an earlier ve
 notes pending again. Pending notes are a plan input, so their presence alone makes
 `plan generate` regenerate without `--force` (DESIGN_plan_feedback.md §7).
 
+### retrospectives
+One record per finished mesocycle and per finished plan (DESIGN_cycle_retrospective.md
+§11). A record carries its own goal, name and dates and points at no plan version, so a
+later version of the plan cannot lose it. The date check creates and removes the rows
+(`stamind/cycle_records.py`).
+
+| Column          | Type                    | Notes                                   |
+|-----------------|-------------------------|-----------------------------------------|
+| `id`            | INTEGER PK              | The handle `plan retro redo` takes      |
+| `objective_id`  | INTEGER FK→objectives   | Cascade delete, so `goal rm --purge` removes the records. `plan rm` and `plan wipe` keep the goal and delete the records themselves |
+| `level`         | TEXT                    | `'mesocycle'` or `'plan'`               |
+| `name`          | TEXT                    | The mesocycle's name, or the goal's title for a plan. Shown, and not part of the key |
+| `start_date`    | TEXT                    | First day covered                       |
+| `end_date`      | TEXT                    | Last day trained                        |
+| `ended_by`      | TEXT                    | `'finished'` (reached its end date), `'replaced'` (`plan generate` dropped it) or `'called_off'` (the goal was called off) |
+| `intent`        | TEXT                    | The mesocycle's focus, or the plan's strategy, copied when the record is created |
+| `numbers`       | TEXT                    | JSON, exact values; NULL until written  |
+| `body`          | TEXT                    | The record lines; NULL until written    |
+| `athlete_line`  | TEXT                    | The sentence for the athlete            |
+| `athlete_words` | TEXT                    | The athlete's answer, as typed          |
+| `created_at`    | TEXT                    | ISO-8601 UTC                            |
+| `written_at`    | TEXT                    | ISO-8601 UTC; NULL until written        |
+
+`UNIQUE(objective_id, level, start_date)`: a mesocycle is the same mesocycle across plan
+versions when its goal and its start date are the same.
+
 ### analysis_cache
 Cached backward-evaluation reconstruction (inferred cycles + insights), keyed by
 an evidence fingerprint. One row per `horizon`; cleared by `wipe_metrics`. See
@@ -2334,7 +2408,7 @@ plus the
 `parser`/`adapt`/`generate`/`rollback`/`listing`/`compare`/`calendar_sync`/`revisions`/
 `heads_up`/`strength_only`/`session_line` — the `data/` package (`parser`/`cache`/`show`/`analysis`/`publish`)
 and the `journal/` package (`parser`/`runs`/`views`);
-the `plans/` package (`parser`/`generate`/`show`/`versions`/`feedback`) and
+the `plans/` package (`parser`/`generate`/`show`/`versions`/`feedback`/`retro`) and
 `progress.py` with `progress_load.py` and `progress_zones.py`;
 `selectors.py` holds the shared range grammar and `windows.py` the resolvers that turn
 it into dates, `argparse_ext.py` the parser/help extensions, the `render/` package the
@@ -2419,14 +2493,15 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `learnings`  | `keep`       | —        | Dismiss + affirm a pending downgrade by ID                             |
 | `learnings`  | `wipe`       | —        | Delete all coach learnings                                             |
 | `plan`       | `generate`   | `pl g`   | Generate/reuse macrocycle+mesocycles (`-f` to force, `-y/--auto` to apply without the preview, `--fresh` for a clean slate that withholds the plan in place from the prompt, `--show-llm-context` to also print the planned-vs-actual review the prompt carries — off by default, DESIGN_output_verbosity.md §7; `--feedback TEXT` first files TEXT as a plan-level note, exactly as `plan feedback "TEXT"` does, and refuses a goal range or a goal with no plan yet — DESIGN_plan_feedback.md §4). `-g/--goal [RANGE]` takes the shared range grammar: one ID plans that goal alone, bounded to its own span (opening the day after the goal before it); a range plans every upcoming goal it covers, in date order, one strategy call each — `-g ..2` is everything through goal 2 (DESIGN_cli_selectors.md §9) |
-| `plan`       | `show`       | `pl s`   | Show a periodization plan: the strategy's `summary` and the mesocycle timeline, each mesocycle with its workout count/duration/load and its one-line `summary`. `-v/--verbose` puts the full `strategy` and each mesocycle's full `focus` in place of the summaries, and adds the feedback notes and the snapshotted inputs (goals, constraints, threshold anchors). Also flags any of those inputs that have changed since the plan was generated, with the test to judge it by and both routes out — `plan generate` or `plan keep` (DESIGN_plan_staleness.md §9); a superseded version is never flagged. Flags: `-g/--goal ID` (any status, not just active), `-M/--macrocycle ID` for a superseded version — each plan version IS a macrocycle, `-a/--all` for every goal that has a plan, `-w/--workouts` to list each mesocycle's sessions |
+| `plan`       | `show`       | `pl s`   | Show a periodization plan: the strategy's `summary` and the mesocycle timeline, each mesocycle with its workout count/duration/load and its one-line `summary`. `-v/--verbose` puts the full `strategy` and each mesocycle's full `focus` in place of the summaries, and adds the feedback notes and the snapshotted inputs (goals, constraints, threshold anchors). Also flags any of those inputs that have changed since the plan was generated, with the test to judge it by and both routes out — `plan generate` or `plan keep` (DESIGN_plan_staleness.md §9); a superseded version is never flagged. Flags: `-g/--goal ID` (any status, not just active), `-M/--macrocycle ID` for a superseded version — each plan version IS a macrocycle, `-a/--all` for every goal that has a plan, `-w/--workouts` to list each mesocycle's sessions. Under the timeline it lists the goal's retrospective records, oldest first, one line each: the ID, the name, the dates, and how the record ended or that it is not written yet. `-v` prints each written record in full: its numbers, its lines, the athlete's words and the sentence said to them (DESIGN_cycle_retrospective.md §8) |
+| `plan`       | `retro`      | —        | `plan retro redo ID` has one retrospective record written again (`cli/plans/retro.py`, DESIGN_cycle_retrospective.md §9): it computes the numbers again and calls the retrospective writer at once, and the new lines and sentence replace the old ones. The athlete's words are kept and the athlete is not asked again. `--words "TEXT"` replaces those words first; `--clear-words` removes them. The record is never deleted, and it keeps what it held when the writer fails. `--show-llm-prompt-only` prints the writer's prompt |
 | `plan`       | `keep`       | —        | Record the current profile/goals/thresholds against the active plan **without** regenerating it (`-g/--goal ID`), clearing the changed-input flag `plan show` raises. The dismiss half of staleness: same write as declining at the `plan generate` prompt, reachable without spending a strategy call (DESIGN_plan_staleness.md §9) |
 | `plan`       | `versions`   | `pl v`   | List a goal's kept plan versions — active + superseded — with IDs and dates (`-g/--goal ID`) |
 | `plan`       | `diff`       | `pl df`  | Compare two plan versions (`[PLAN_ID_A] [PLAN_ID_B]`, `-g/--goal ID`): strategy prose, each version's attached feedback notes, mesocycles added/removed/renamed/re-dated, and snapshotted input deltas. No ID → previous vs active; one ID → that vs active. Prose rewritten wholesale collapses to a note unless `--full`. Comparison logic in `stamind/plan_versions.py`, shared with `/api/plan/diff` |
 | `plan`       | `rollback`   | `pl rb`  | Restore a superseded plan version + its workouts (`-g/--goal ID`, `-M/--macrocycle ID`, `-y`); defaults to the chronologically previous version. The inverse of eager generation (DESIGN_plan_rollback.md) |
-| `plan`       | `rm`         | `pl rm`  | Delete plan for a goal ID. The old `pl d` alias is gone — `d` now prefixes `diff` |
+| `plan`       | `rm`         | `pl rm`  | Delete plan for a goal ID, with the goal's retrospective records, which the inventory it prints before asking counts. The old `pl d` alias is gone — `d` now prefixes `diff` |
 | `plan`       | `feedback`   | `pl f`   | Append a note about the plan to its append-only log — bare text is plan-level, `-m [ATOM]` files it to one mesocycle of any upcoming goal's plan by name-infix / date / mesocycle ID (bare `-m` = the current mesocycle), and that mesocycle picks the plan. Bare run lists what is pending, `--rm ID [-y]` deletes one, `--replan` regenerates straight away (the same as `plan generate --feedback` for a plan-level note), `-g/--goal ID` targets another goal's plan (and confines `-m` to it). No LLM at capture; the next `plan generate` reads the whole log and must address every note (DESIGN_plan_feedback.md) |
-| `plan`       | `wipe`       | —        | Delete all plans                                                         |
+| `plan`       | `wipe`       | —        | Delete all plans, and every retrospective record with them               |
 | `progress`   | `[SPORT ...]` | `pr`    | Show the progress timeline: measured load to date, plan-projected forward (CTL/ATL/TSB), weekly planned-vs-actual bars (`-w/--weeks N`, `--chart [PATH]` for a PNG, `--explain` for the TSB-lag note; DESIGN_progress_timeline.md). `-z`/`--zones` (implied by naming a sport) adds one weekly time-in-zone table per sport — measured behind today, prescribed ahead of it (`--mesocycles` for mesocycle grain, `--power`/`--hr` to force the currency; DESIGN_intensity_distribution.md §9.6/§9.8). The sport argument scopes the **zone tables only**: CTL/ATL/TSB, the projection and the load table stay whole-athlete |
 | `workout`    | `list`       | `w l`    | Show planned workouts. Defaults to a 7-day window from today. Positional `TARGET…` (workout IDs and/or date selectors, e.g. `wo li 12 15 -vv`) plus the shared selectors `-d`/`-m`/`-M`/`-g` and `-t/--type TYPE`, `-l/--link` (each synced session's Calendar event link) (DESIGN_cli_selectors.md). Every listed session dated **today or earlier** also carries its adherence verdict — `[DONE]`/`[PARTIAL]`/`[MISSED]`/`[REST OK]`/`[REST BROKEN]`, or `[NOT YET]` for one still ahead today. `-v` adds each session's short form in gray under its line, the same lines the `workout generate` preview draws (`cli/workouts/session_line.py::prescription_lines`): a strength session's exercises and kilograms (none until the strength planner has written them), any other session's zone target (`Target: ~20min recovery, ~65min endurance`). `-vv` shows the full detail instead: the description, the zone target, the lifecycle stamps, the matched activity and the mismatch behind a `[PARTIAL]`. Under the listing, a gray legend glosses every bracket marker it printed and nothing else (`cli/workouts/session_line.py::print_marker_legend`). Freshens Garmin over that past span unless `--no-pull` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)). A listing whose range runs past the last scheduled session ends on one gray marker naming that — unconditional, a fact of the listing rather than a warning; an empty listing renders it alone (DESIGN_runway_nudge.md §4). |
 | `workout`    | `show`       | `w sh`   | `workout list -vv` under a name that says what it does: the same handler with the detail flag pinned on, the same positional targets and the same selectors. `wo sh 12` details one session; a bare `wo sh` details the same 7-day window `list` lists. |
@@ -2706,8 +2781,10 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    same reason `cli/plans/generate.py` skips the "an input changed, regenerate?" question when
    notes are pending: the answer could not stop the new plan.
 4. Otherwise: builds a read-only **planned-vs-actual review** via
-   `_build_prior_training_context()` (Option A — anchored on the elapsed mesocycle
-   windows of the prior plan and of the current one, each with its per-sport per-zone
+   `_build_prior_training_context()` (Option A — the finished mesocycles of every goal
+   from their stored records, where a written record stands in for the detail of all but
+   the latest one, then the mesocycle under way, each one shown in full with its
+   per-sport per-zone
    intensity table, mesocycle-over-mesocycle delta, prescribed-zone table and per-week
    planned-vs-actual load lines, plus every cached reconstruction's summary,
    reverse-engineered macrocycle and mesocycles, and physiological insights;
@@ -2715,6 +2792,9 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    `prior_training_text` into `CoachEngine._plan_generate_strategy()` →
    LLM → `{strategy, mesocycles}`. Active coach learnings ride alongside it as
    `learnings`, read-only. See DESIGN_backward_evaluation.md §6, §10.1.
+   The written records of past plans ride alongside too, as `plan_retrospectives`
+   (`_plan_retrospectives_text()`), printed under `## RETROSPECTIVES OF PAST PLANS` just
+   before the review (DESIGN_cycle_retrospective.md §7).
    The review is echoed to the screen only under `--show-llm-context`
    (`plan_generate(show_context=...)`): it runs to ~164 lines, 321 once re-laid-out at
    Telegram's width, and pushes the strategy below the fold. Off the flag the display
@@ -3095,6 +3175,61 @@ The shared core then:
    or, under `--auto`, applying staleness directly while leaving contradiction
    proposals queued. See DESIGN_evidence_based_confidence.md §7.
 
+### Cycle retrospectives
+
+When a mesocycle or a plan is finished, Stamind keeps a short record of what it was for and
+what came out of it (DESIGN_cycle_retrospective.md). Two steps keep the records.
+
+**The date check** (`stamind/cycle_records.py`) decides which records exist. It is a
+database lookup. It runs at the start of `plan generate` and of `workout adapt`, in the
+bot's morning routine after its once-a-day test, and inside `goal_archive` for the goal
+being called off. The first three call `CoachService.retrospectives_step`, which runs the
+date check and then the write step.
+
+It is Monday 26 October. A mesocycle ended on Sunday. The morning routine runs the date
+check, which sees a mesocycle of the current plan whose end date has passed and no record
+for it. It creates a blank record: the name, the dates and the focus, with no lines yet.
+
+It is Friday 18 September. `plan generate` writes a new plan version that starts that day
+and drops the mesocycle of 7 to 27 September. Nothing is recorded then. On Saturday the
+date check reads the version that was replaced and the mesocycle it had under way. The
+current plan does not hold that mesocycle, and eleven days of it were trained, so the date
+check records it as cut short, 7 to 17 September. If `plan rollback` brings the mesocycle
+back on Sunday, the next date check removes that record.
+
+**The write step** (`coach/service/retrospective.py`) fills a blank record. A record is
+due seven days after its end, so that a long ride synced late is in. On Sunday 1 November
+the record of the mesocycle that ended on 25 October is due. The next command that runs the
+write step refreshes Garmin for those three weeks, computes the numbers, and calls the
+retrospective writer (`coach/engine/retrospective.py`). That model call returns the record
+lines and one sentence for the athlete, and both are stored with the numbers. One run
+writes one record. When the call fails, the command carries on and the next run tries
+again.
+
+**The question** (`stamind/retrospective_question.py`) comes first. On Monday 26 October
+the date check creates the record and queues one question in the athlete queue: "Your last
+three weeks of training are done. How did they go for you?" On Tuesday the athlete taps
+"Tell me" and types an answer. The answer is stored with the record as typed, the writer
+runs at that moment with the answer in hand, and its sentence is the reply. If the athlete
+taps "Nothing to say" or does not answer, the record waits its seven days and is written
+without their words. The question leaves the queue on that seventh day.
+
+**The record of a plan.** A plan ends when the end date of its last mesocycle has passed.
+A plan runs from 1 October to 22 December. On 23 December the date check records the last
+mesocycle, then the plan, over the three mesocycle records of that goal. It queues one
+question, about the plan. The write step writes the plan's blank mesocycle records first,
+then the plan's own record, in the same run. The plan's numbers are the sums of its
+mesocycle records, and its writer prompt holds `## THE PLAN`, `## ITS MESOCYCLES` and
+`## THE ATHLETE'S WORDS`. A new plan version for the same goal is not an end, so it creates
+no record of the plan. Calling the goal off is an end: the plan is recorded as called off,
+ended the day before.
+
+**What `plan generate` reads.** The model call inside `plan generate` is the only reader.
+Its prompt prints every written record of a plan under `## RETROSPECTIVES OF PAST PLANS`,
+oldest first, with no limit. In `## PRIOR TRAINING REVIEW` a written record of a plan
+stands for the mesocycle records it covers, so those are left out. The mesocycle that
+finished most recently is the exception: it keeps its full detail and its record.
+
 ---
 
 ## 11. Terminology: Plans vs. Workouts
@@ -3385,12 +3520,14 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | a reply that parses but carries nothing (`_degenerate`), the    |
 |                                | weekly evidence (`_evidence`: per-week constraints and          |
 |                                | body-response z-scores, pure and in the prompt), and the cached |
-|                                | reconstruction `plan generate` reads (`_prior_training`)        |
+|                                | reconstruction `plan generate` reads (`_prior_training`), which also holds the review built from records (DESIGN_cycle_retrospective.md §7): a written record in place of the detail, the latest finished mesocycle with both, a blank record falling back to the detail, a mesocycle that lives only in a replaced version, one line per goal, a written record of a plan standing for its mesocycles, and the section of past plans in the prompt |
 | `tests/test_athlete_queue.py`  | the athlete queue (DESIGN_athlete_queue.md): a subject queued once, |
 |                                | the order and "after the others", a walk showing each item once, |
 |                                | stale items, "in 1 day" from the walk start, reminders sent once, |
 |                                | the chat and terminal surfaces, the closed list and its local     |
-|                                | days, the hint in `status` and `adapt`                           |
+|                                | days, the hint in `status` and `adapt`, and the `retrospective` kind (DESIGN_cycle_retrospective.md §4): its two wordings and its chat buttons, the answer that stores the words and returns the sentence, a failed write, "nothing to say", the two ways it goes stale, and who is asked |
+| `tests/test_cycle_records.py`  | the date check (DESIGN_cycle_retrospective.md §3), called directly on fixed days: a mesocycle that reached its end gets a record however short, a dropped one gets a cut-short record only when seven days of it were trained, a kept one gets none, a second run creates nothing, a replacement at 00:30 on the athlete's clock counts for that day, a record the current plan contradicts is removed and one it does not contradict stays, what calling a goal off records, the three deletes that take the records with their plan, and the record of a plan (§6): one per plan trained to its end, none for a plan under way, a second one when the goal is planned again, the call-off, and the single question at the end of a plan |
+| `tests/test_retrospective_writer.py` | the write step and the writer's prompt (DESIGN_cycle_retrospective.md §4, §5), with the model client stubbed: when a record is due, one record per run and the oldest first, a failed write tried again on the next run, the Garmin refresh over the record's days, the numbers as totals over those days, the prompt's sections, and a session the athlete spoke about reaching the prompt. For the record of a plan: its blank mesocycle records written first, its numbers as their sums, and its own prompt sections. The morning routine's call is in `test_cli_bot.py` |
 | `tests/test_strength.py`       | strength tracking phase 1 (DESIGN_strength_tracking.md): the     |
 |                                | vocabulary's integrity, parsing Garmin's sets (grams, watch guess |
 |                                | vs pick, the bodyweight check), read once and frozen, both queue |
@@ -3405,7 +3542,7 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | and `honored_at` across its four surfaces (`_honored`)          |
 | `tests/test_cli_*.py`          | One file per command family: output and argument handling, with |
 |                                | the service mocked. `test_dispatch.py` walks the parser tree     |
-|                                | itself (every leaf binds a handler, every bare group self-helps) |
+|                                | itself (every leaf binds a handler, every bare group self-helps). `test_cli_plans.py` also holds the retrospective views (DESIGN_cycle_retrospective.md §8, §9): `plan show` with and without `-v`, `plan retro redo` with `--words` and `--clear-words`, a failed redo, and `plan rm` and `plan wipe` deleting the records |
 | `tests/test_gcal_client.py`    | The push and its 404/410 retry, the signal ingest and its token  |
 |                                | expiry, the event listing, and `quiet_events`                    |
 | `tests/test_gcal_reconcile.py` | Which voids keep their event and the title it then carries, and  |

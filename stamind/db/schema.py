@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Bump when the DDL below changes, so an existing database picks the change up once.
 # Reusing a number a previous commit already stamped is silent (ARCHITECTURE.md §5).
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 
 # The append-only rule, as the database enforces it (DESIGN_workout_revisions.md §14).
 # `wipe_workouts` drops both triggers to clear the table and puts them back from here, so
@@ -579,6 +579,29 @@ class SchemaMixin:
                     fingerprint  TEXT,
                     uploaded_at  TEXT,
                     error        TEXT
+                )
+            """)
+
+            # One record per finished mesocycle and per finished plan. Its key holds no plan
+            # version, so a later version cannot lose it (DESIGN_cycle_retrospective.md §11).
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS retrospectives (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    objective_id INTEGER NOT NULL,
+                    level TEXT NOT NULL,             -- 'mesocycle' | 'plan'
+                    name TEXT NOT NULL,              -- the mesocycle's name; the goal's title
+                    start_date TEXT NOT NULL,        -- first day covered
+                    end_date TEXT NOT NULL,          -- last day trained
+                    ended_by TEXT NOT NULL,          -- 'finished' | 'replaced' | 'called_off'
+                    intent TEXT NOT NULL,            -- the focus, or the strategy, as it stood
+                    numbers TEXT,                    -- JSON, exact values; NULL until written
+                    body TEXT,                       -- the record lines; NULL until written
+                    athlete_line TEXT,               -- the sentence for the athlete
+                    athlete_words TEXT,              -- as typed
+                    created_at TEXT NOT NULL,
+                    written_at TEXT,
+                    UNIQUE(objective_id, level, start_date),
+                    FOREIGN KEY (objective_id) REFERENCES objectives(id) ON DELETE CASCADE
                 )
             """)
 

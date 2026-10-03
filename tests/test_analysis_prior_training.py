@@ -3,8 +3,9 @@ prompt.
 """
 import os
 import unittest
+from unittest.mock import patch
 
-from tests.helpers import clear_all_tables, rebind_test_db, save_workout
+from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, save_workout
 from stamind.db import Database
 from tests import test_db_path
 
@@ -12,6 +13,7 @@ TEST_DB_PATH = test_db_path("test_analysis_prior_training.db")
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
+from stamind import cycle_records
 from stamind.coach.service import coach_service
 
 
@@ -172,6 +174,7 @@ class TestPriorTrainingContext(unittest.TestCase):
         self._planned_session(macro_id, "2026-06-09", 100.0)
         self._planned_session(macro_id, "2026-06-16", 100.0)
         self._completed("2026-06-09", 100.0, "w1")
+        cycle_records.date_check(test_db, "2026-07-20")
 
     def test_elapsed_mesocycles_report_each_week_planned_against_actual(self):
         """Without this a half-missed mesocycle reads exactly like a completed one, and the
@@ -211,6 +214,7 @@ class TestPriorTrainingContext(unittest.TestCase):
         for i, day in enumerate(("2026-06-23", "2026-06-30")):
             self._planned_session(late, day, 100.0)
             self._completed(day, 100.0, f"l{i}")
+        cycle_records.date_check(test_db, "2026-07-20")
         return (
             test_db.get_macrocycle(early), test_db.get_macrocycle(late)
         )
@@ -227,6 +231,162 @@ class TestPriorTrainingContext(unittest.TestCase):
         self.assertIn("Change vs Base 3", text)
         self.assertNotIn("Change vs Build 1", text)
         self.assertLess(text.index("Base 3 —"), text.index("Build 1 —"))
+
+
+class TestTheReviewReadsRecords(unittest.TestCase):
+    """Finished mesocycles reach the review from their records, for every goal
+    (DESIGN_cycle_retrospective.md §7). Today is Monday 20 July."""
+
+    TODAY = "2026-07-20"
+    NUMBERS = {
+        "sessions_done": 5, "sessions_planned": 6, "duration_sec": 36000.0,
+        "load_planned": 400.0, "load_done": 380.0, "fitness_start": 50.0,
+        "fitness_end": 53.0, "benchmarks": [],
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        global test_db
+        test_db = Database(db_path=TEST_DB_PATH)
+        rebind_test_db(test_db)
+
+    def setUp(self):
+        clear_all_tables(test_db)
+
+    def _plan(self, goal: int, *mesocycles) -> int:
+        return test_db.save_macrocycle(goal, "strategy", "g", "c", [
+            {"name": name, "start_date": start, "end_date": end, "focus": f"{name} focus"}
+            for name, start, end in mesocycles
+        ])
+
+    def _season(self) -> None:
+        """Two finished mesocycles and one under way, each with its record."""
+        goal = test_db.add_objective("Gran Fondo", "2026-10-15", "cycling")
+        self._plan(
+            goal, ("Base 1", "2026-06-01", "2026-06-21"),
+            ("Base 2", "2026-06-22", "2026-07-12"), ("Build", "2026-07-13", "2026-08-02"),
+        )
+        cycle_records.date_check(test_db, self.TODAY)
+
+    def _write(self, name: str) -> None:
+        record = next(r for r in test_db.get_retrospectives() if r["name"] == name)
+        test_db.write_retrospective(
+            record["id"], self.NUMBERS,
+            f"For: {name} aim.\nHappened: on target.\nCame out: fitness rose.", "Well done.",
+        )
+        test_db.set_retrospective_words(record["id"], "felt fresh")
+
+    def _review(self) -> str:
+        return coach_service._build_prior_training_context([], self.TODAY)
+
+    def test_a_written_record_stands_in_for_the_detail(self):
+        self._season()
+        self._write("Base 1")
+        text = self._review()
+        self.assertIn("Base 1 (2026-06-01..2026-06-21), finished", text)
+        self.assertIn("Sessions 5 of 6 · load 380 of 400 TSS · 10h00", text)
+        self.assertIn("For: Base 1 aim.", text)
+        self.assertIn('Athlete: "felt fresh"', text)
+        self.assertNotIn('Base 1 — focus', text)
+
+    def test_the_latest_finished_mesocycle_keeps_its_detail_beside_its_record(self):
+        self._season()
+        self._write("Base 1")
+        self._write("Base 2")
+        text = self._review()
+        self.assertIn('Base 2 — focus "Base 2 focus"', text)
+        self.assertIn("The record written when it ended:", text)
+        self.assertIn("For: Base 2 aim.", text)
+        self.assertLess(text.index("For: Base 1 aim."), text.index("Base 2 — focus"))
+
+    def test_a_record_without_lines_falls_back_to_the_detail(self):
+        self._season()
+        text = self._review()
+        self.assertIn('Base 1 — focus "Base 1 focus"', text)
+        self.assertNotIn("Base 1 (2026-06-01..2026-06-21), finished", text)
+
+    def test_the_mesocycle_under_way_comes_from_the_current_plan(self):
+        self._season()
+        text = self._review()
+        self.assertIn('Build — focus "Build focus"', text)
+        self.assertLess(text.index("Base 2 — focus"), text.index("Build — focus"))
+
+    def test_a_mesocycle_that_lives_only_in_a_replaced_version_is_shown(self):
+        goal = test_db.add_objective("Gran Fondo", "2026-10-15", "cycling")
+        self._plan(goal, ("Re-entry", "2026-05-18", "2026-05-31"),
+                   ("Base 1", "2026-06-01", "2026-06-21"))
+        cycle_records.date_check(test_db, "2026-06-01")
+        self._plan(goal, ("Base 1", "2026-06-01", "2026-07-12"),
+                   ("Build", "2026-07-13", "2026-08-02"))
+        text = self._review()
+        self.assertIn('Re-entry — focus "Re-entry focus"', text)
+
+    def _spring(self) -> None:
+        """A plan of two mesocycles trained to its end on 21 June, every record written."""
+        goal = test_db.add_objective("Spring Hill Climb", "2026-06-21", "cycling")
+        self._plan(goal, ("Spring base", "2026-05-11", "2026-05-31"),
+                   ("Spring peak", "2026-06-01", "2026-06-21"))
+        cycle_records.date_check(test_db, "2026-06-22")
+        for name in ("Spring base", "Spring peak"):
+            self._write(name)
+
+    def test_a_written_record_of_a_plan_stands_for_its_mesocycles(self):
+        self._spring()
+        self._write("Spring Hill Climb")
+        self._season()
+        text = self._review()
+        self.assertNotIn("Spring base", text)
+        self.assertNotIn("Spring peak", text)
+        self.assertNotIn('Toward "Spring Hill Climb"', text)
+        self.assertIn(
+            'Plan toward "Spring Hill Climb" (2026-05-11..2026-06-21), finished',
+            coach_service._plan_retrospectives_text(),
+        )
+
+    def test_a_record_of_a_plan_without_lines_stands_for_nothing(self):
+        self._spring()
+        self._season()
+        text = self._review()
+        self.assertIn("Spring base (2026-05-11..2026-05-31), finished", text)
+        self.assertIn("Spring peak (2026-06-01..2026-06-21), finished", text)
+        self.assertIsNone(coach_service._plan_retrospectives_text())
+
+    def test_the_latest_mesocycle_keeps_its_detail_under_a_written_record_of_its_plan(self):
+        self._spring()
+        self._write("Spring Hill Climb")
+        text = self._review()
+        self.assertNotIn("Spring base", text)
+        self.assertIn('Spring peak — focus "Spring peak focus"', text)
+        self.assertIn("For: Spring peak aim.", text)
+
+    @patch("stamind.coach.engine.openrouter_client")
+    def test_the_records_of_plans_have_their_own_section_in_the_prompt(self, client):
+        pin_clock(self, self.TODAY)
+        self._spring()
+        self._write("Spring Hill Climb")
+        self._season()
+        client.complete.return_value = {"strategy": "New", "mesocycles": []}
+        coach_service.plan_generate(force=True, auto_apply=False)
+        prompt = client.complete.call_args[0][0]
+        self.assertIn("## RETROSPECTIVES OF PAST PLANS", prompt)
+        self.assertIn("For: Spring Hill Climb aim.", prompt)
+        self.assertLess(
+            prompt.index("## RETROSPECTIVES OF PAST PLANS"),
+            prompt.index("## PRIOR TRAINING REVIEW"),
+        )
+
+    def test_every_goal_counts_under_a_line_that_names_it(self):
+        called_off = test_db.add_objective("Spring Hill Climb", "2026-06-21", "cycling")
+        self._plan(called_off, ("Spring base", "2026-05-11", "2026-05-31"))
+        cycle_records.date_check(test_db, "2026-06-05")
+        test_db.update_objective(called_off, status="archived")
+        self._season()
+        text = self._review()
+        first = 'Toward "Spring Hill Climb" (goal dated 2026-06-21, called off):'
+        second = 'Toward "Gran Fondo" (goal dated 2026-10-15):'
+        self.assertLess(text.index(first), text.index("Spring base — focus"))
+        self.assertLess(text.index("Spring base — focus"), text.index(second))
+        self.assertEqual(text.count(second), 1)
 
 
 if __name__ == "__main__":

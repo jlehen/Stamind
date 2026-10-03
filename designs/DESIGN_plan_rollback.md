@@ -161,6 +161,14 @@ macrocycle id first, then compare dates.** `stamind/plan_versions.py`'s `plan_li
 is that walk, shared by `sm progress --mesocycles` (`cli/progress_zones.py`) and the strategy
 prompt's planned-vs-actual review (`coach/service/history_context.py`).
 
+Amended 2026-10-01 (DESIGN_cycle_retrospective.md §7): the strategy prompt's review no longer
+walks plan versions for the finished mesocycles. It reads them from the stored records,
+whose key is the goal and the start date, with no plan version in it. That removes both
+traps for this reader: a record is created once per mesocycle, so nothing is counted twice,
+and a mesocycle that was trained under a version replaced since still has its record. The
+review still uses `plan_lineage()` for the mesocycle under way. `sm progress --mesocycles`
+is unchanged.
+
 **`sm progress --mesocycles` stops the delta at the plan boundary; the strategy prompt does
 not.** Each mesocycle reports its change against the mesocycle before it, which within one plan is
 the periodization signal proper (DESIGN_intensity_distribution.md §4.1). Across a boundary

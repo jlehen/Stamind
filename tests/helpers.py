@@ -81,6 +81,7 @@ def started_from(testcase, where: str) -> None:
 # (DESIGN_workout_revisions.md §14).
 _ALL_TABLES = [
     "page_files",
+    "retrospectives",
     "plan_feedback",
     "mesocycles",
     "macrocycles",

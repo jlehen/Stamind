@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from stamind.config import config
 from stamind.analytics.load import planned_load
 from stamind.sports import canonical_sport
-from stamind import signals
+from stamind import cycle_records, signals
 from stamind.clock import today_str as _today_str
 
 
@@ -37,8 +37,12 @@ class GoalsConstraintsMixin:
         destroy its history (DESIGN_backward_evaluation.md §14). Past sessions stay put —
         a called-off race does not un-train the work already done.
 
+        It also records the mesocycle under way as cut short
+        (DESIGN_cycle_retrospective.md §3).
+
         Returns {archived_workouts, untagged, first_date, last_date}."""
         today_str = _today_str()
+        cycle_records.record_call_off(self._db, objective_id, today_str)
         sessions = self._db.live_workouts_for_macrocycles(
             self._objective_macrocycle_ids(objective_id), today_str
         )

@@ -106,6 +106,7 @@ def _adapt_window(args: argparse.Namespace, tweak: bool) -> Window:
 
 def run_workout_adapt(args: argparse.Namespace) -> None:
     # Executes the daily workout Garmin adaptation checks command.
+    runtime.coach_service.retrospectives_step()   # DESIGN_cycle_retrospective.md §3, §5
     with replacing_unsent(skip=args.auto, window=_adapt_window(args, tweak=False)):
         _adapt(args)
 

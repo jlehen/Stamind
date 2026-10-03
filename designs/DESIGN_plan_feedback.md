@@ -55,6 +55,12 @@ Where this sits among the real-world-context channels (the boundary lines do not
 | `workout adapt -m` | In-the-moment capture, classified into constraint or one-off nudge |
 | `plan feedback` | **Opinions about the plan itself**, consumed at the next regeneration |
 
+Amended 2026-10-01 (DESIGN_cycle_retrospective.md §4): the answer to "how did it go?" is one
+more channel from the athlete. Stamind asks it once, when a mesocycle reaches its end. The
+answer says how a finished stretch of training went. It is stored with the record of that
+mesocycle, and every later `plan generate` reads it there. A note of `plan feedback` is about
+the plan in force, and only the next `plan generate` reads it.
+
 ## 3. Goals / Non-goals
 
 Goals:

@@ -8,7 +8,7 @@ imports `cli/render/`.
 import textwrap
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
-from stamind import runtime
+from stamind import cycle_records, runtime
 from stamind.config import config
 from stamind.text import (
     capitalized, cmd, cyan, gray, green, magenta, render_table, visible_len, wrap_text,
@@ -199,11 +199,26 @@ def print_plan_cascade(objective_id: int) -> None:
     print(f"  - {len(versions)} periodization plan version(s)")
     print(f"  - {mesocycles} mesocycle(s)")
     print(f"  - {notes} plan feedback note(s)")
+    # They go with their plan (DESIGN_cycle_retrospective.md §6).
+    print(f"  - {len(runtime.db.get_retrospectives(objective_id))} retrospective record(s)")
     if orphaned:
         notice(
             f"  and leaves {orphaned} upcoming session(s) with no plan to explain "
             "them.",
         )
+
+
+def print_retrospective(record: Dict[str, Any], width: int, indent: str = "") -> None:
+    """One written retrospective record in full: its numbers, its lines, the athlete's
+    words and the sentence that was said to them (DESIGN_cycle_retrospective.md §8).
+    Shared by `plan show -v` and `plan retro redo`."""
+    text = cycle_records.record_text(record, width - len(indent))
+    if record['athlete_line']:
+        text += "\n" + wrap_text(
+            f"  Said to the athlete: \"{record['athlete_line']}\"", width - len(indent)
+        )
+    for line in text.splitlines():
+        print(indent + line)
 
 
 # --- The plan's hanging-indent block (DESIGN_plan_feedback.md §4, §8) ---

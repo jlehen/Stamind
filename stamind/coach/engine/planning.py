@@ -40,6 +40,7 @@ class PlanStrategyMixin:
         previous_plan: Optional[Tuple[str, List[Dict[str, Any]]]] = None,
         plan_start_str: Optional[str] = None, athlete_feedback: Optional[str] = None,
         history_summary: Optional[str] = None, prior_training_text: Optional[str] = None,
+        plan_retrospectives: Optional[str] = None,
         learnings: Optional[str] = None,
         current_mesocycle: Optional[Dict[str, Any]] = None,
         changed_inputs: Optional[str] = None,
@@ -205,6 +206,16 @@ You MUST respond with a JSON object containing:
         if history_summary:
             system_prompt += (
                 f"\n## ATHLETE RECENT TRAINING SUMMARY (PAST 15 DAYS)\n{history_summary}\n"
+            )
+        # The stored records of the plans already behind the athlete, however old
+        # (DESIGN_cycle_retrospective.md §7).
+        if plan_retrospectives:
+            system_prompt += (
+                "\n## RETROSPECTIVES OF PAST PLANS\n"
+                "One record per plan the athlete trained to its end or called off, oldest "
+                "first. Each record\nwas written once, when that plan ended. A quoted "
+                "\"Athlete:\" line is the athlete's own answer\nto \"how did it go?\".\n"
+                f"{plan_retrospectives}\n"
             )
         # Planned-vs-actual review of the prior plan + any inferred reconstruction, fed as
         # read-only context so the new plan is grounded in demonstrated reality rather than

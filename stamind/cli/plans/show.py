@@ -5,7 +5,7 @@ import argparse
 from datetime import datetime
 from typing import List
 
-from stamind import plan_versions, runtime
+from stamind import cycle_records, plan_versions, runtime
 from stamind.analytics.load import planned_load
 from stamind.text import (
     blue, bold, cmd, cyan, default_wrap_width, format_labeled_paragraph, gray, green, magenta, red,
@@ -15,7 +15,8 @@ from stamind.output import notice
 from stamind.clock import fmt_date, today_date as _today_date
 from stamind.cli import staleness
 from stamind.cli.common import (
-    print_feedback_notes, print_hanging, print_indented, print_segments,
+    print_feedback_notes, print_hanging, print_indented, print_retrospective,
+    print_segments,
 )
 from stamind.cli.windows import resolve_goal
 
@@ -180,6 +181,32 @@ def _print_mesocycle_workouts(
         print_hanging(
             f"{pad}  {cyan(fmt_date(w['date']))} ",
             f"[{w['sport_type']}] {w.get('title') or ''} ({' · '.join(tail)})", width, gray,
+        )
+
+
+def _print_retrospectives(goal_id: int, width: int, verbose: bool) -> None:
+    """The goal's retrospective records, oldest first: one line each, and the whole
+    record under `-v` (DESIGN_cycle_retrospective.md §8)."""
+    records = runtime.db.get_retrospectives(goal_id)
+    if not records:
+        return
+    print()
+    print(bold("Retrospectives:"))
+    for record in records:
+        head = f"  {gray('[' + str(record['id']) + ']')} "
+        written = record['body'] is not None
+        if verbose and written:
+            print(head.rstrip())
+            print_retrospective(record, width, indent="    ")
+            continue
+        ended = cycle_records.ENDED_LABELS[record['ended_by']]
+        if not written:
+            ended += ", not written yet"
+        print_hanging(
+            head,
+            f"{cycle_records.record_name(record)} · {fmt_date(record['start_date'])} -> "
+            f"{fmt_date(record['end_date'])} · {ended}",
+            width,
         )
 
 
@@ -352,6 +379,7 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
         if detail:
             print_indented(detail, pad, width)
         print(pad + gray("-" * min(40, max(10, width - len(pad)))))
+    _print_retrospectives(next_goal['id'], width, verbose)
 
 
 def run_plan_keep(args: argparse.Namespace) -> None:

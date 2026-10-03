@@ -1,6 +1,6 @@
 """The coach service: the layer that reads the database, drives a call, and writes back.
 
-Thirteen mixins compose one :class:`CoachService`, one file per job. The plan:
+Fourteen mixins compose one :class:`CoachService`, one file per job. The plan:
 `planning.py` (`plan generate`/`apply`/`rollback`), `goals_constraints.py` (standing a
 goal down, sizing a constraint, the message captures) and `staleness.py` (has the plan
 been overtaken by its own inputs). The sessions: `generate.py` (`workout generate`),
@@ -9,7 +9,8 @@ been overtaken by its own inputs). The sessions: `generate.py` (`workout generat
 planner wrote), `revision_apply.py` (how a revision lands, and the undo) and
 `matching.py` (which activity was which session). What a prompt is told:
 `athlete_context.py`, `history_context.py` and `mesocycle_context.py`. And
-`analysis.py`, for `data bootstrap` and `data reflect`.
+`analysis.py`, for `data bootstrap` and `data reflect`, and `retrospective.py`, which
+writes the record of a finished mesocycle.
 
 Callers reach every one of them through `coach_service`, so a method moving between
 these files is invisible outside the package.
@@ -31,12 +32,14 @@ from stamind.coach.service.adapt import AdaptMixin
 from stamind.coach.service.revision_apply import RevisionApplyMixin
 from stamind.coach.service.matching import MatchingMixin
 from stamind.coach.service.analysis import DataAnalysisMixin
+from stamind.coach.service.retrospective import RetrospectiveMixin
 
 
 class CoachService(HistoryContextMixin, MesocycleContextMixin, AthleteContextMixin,
                    StalenessMixin, PlanningMixin, GoalsConstraintsMixin,
                    WorkoutGenMixin, StandingMixin, GuardsMixin, AdaptMixin,
-                   RevisionApplyMixin, MatchingMixin, DataAnalysisMixin):
+                   RevisionApplyMixin, MatchingMixin, DataAnalysisMixin,
+                   RetrospectiveMixin):
     """Orchestrates sports science coaching by coordinating data I/O and business logic."""
 
     def __init__(
