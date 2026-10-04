@@ -286,10 +286,16 @@ The category is Garmin's filing, in Garmin's words, so some read oddly: "pull up
 "squat: leg press", "banded exercises: glute bridge". That is accepted. In exchange no two
 classes can show the same words, and the band glute bridge can no longer pass for a barbell one.
 
-The words hold a colon, and two places put them in a line that has its own punctuation. The
-page's Markdown export reads "- Squat: belt squat: 1x5 (120 kg)". The line that lists a past
-session's exercises joined them with commas; it joins them with semicolons: "✅ Pull up: lat
-pulldown; shoulder press: seated barbell shoulder press; row".
+The words hold a colon, and one place puts them in a line that has its own punctuation. The
+line that lists a past session's exercises joined them with commas; it joins them with
+semicolons: "✅ Pull up: lat pulldown; shoulder press: seated barbell shoulder press; row".
+
+The gym logger page prints the same words in another form: the category in brackets, then the
+name, each with a capital. `SQUAT/BELT_SQUAT` is "[Squat] Belt squat" on a card, in the
+search results and in the page's Markdown export, which reads
+"- [Squat] Belt squat: 1x5 (120 kg)". Words that show once have no brackets: "Deadlift".
+On a card the category is the same for many exercises, so the brackets set it apart from the
+name the athlete looks for.
 
 ## 5. Where a name lives
 
@@ -383,8 +389,9 @@ strength planner's are. The buttons show the words. Its list goes from 32 kB to 
 **The page.** Both payloads keep their shape (DESIGN_gym_logger.md §3, §4) and go to version 2:
 `n` holds a key. `miniapp/exercises.json` gives the page, for each class, the key, the words,
 the pattern, the gear and whether it is bodyweight, with the photos id when there is one. The page
-shows and searches the words and sends the key. The state the page saves on the phone changes its
-version too, so a state saved under the old names is not read.
+searches the words, prints them as "[Squat] Belt squat" (§4), and sends the key. The state the
+page saves on the phone changes its version too, so a state saved under the old names is not
+read.
 
 The page draws a session only when it is version 2. A button drawn before the conversion still
 sits in the chat with the old names in its address, and the keyboard is redrawn only when the bot

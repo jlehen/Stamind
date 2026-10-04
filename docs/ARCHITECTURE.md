@@ -4531,8 +4531,9 @@ and the handler that receives what the page sends back are in `stamind/chat/`:
 **The catalog.** `miniapp/exercises.json` is written from the exercise table by
 `miniapp/build_exercises.py`, and `tests/test_miniapp.py` fails when the two disagree. It
 holds one row per class: `k` the key, `w` the words, `p` the pattern, `g` the gear and `b`
-whether the exercise is bodyweight (DESIGN_exercise_table.md §8). The page shows and
-searches the words and stores and sends the key, so "pull up" is one entry.
+whether the exercise is bodyweight (DESIGN_exercise_table.md §8). The page searches the
+words and stores and sends the key, so "pull up" is one entry. It prints the words through
+`logic.shown`, the category in brackets and then the name: "[Squat] Belt squat".
 `logic.searchExercises` leaves the word "weighted" out of what is typed, and ranks a hit on
 the name after its category, so "curl" still shows "leg curl" above the fifty entries of the
 curl category. A card added for a bodyweight exercise starts with no load. The page fetches

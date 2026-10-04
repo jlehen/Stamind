@@ -154,7 +154,7 @@ test("a gym log opens from the calendar locked, and Edit lets it be sent again",
     // Locked: the sets as done, no stepper, no bottom button, and a tick that does nothing.
     // The log holds keys, and the cards show their words (DESIGN_exercise_table.md §8).
     assert.deepEqual(await page.locator(".card-title").allTextContents(),
-                     ["Curl: barbell biceps curl", "Squat: leg press", "Pull up"]);
+                     ["[Curl] Barbell biceps curl", "[Squat] Leg press", "Pull up"]);
     assert.equal(await page.locator("#tally").textContent(), "· 3 sets done");
     assert.match(await page.locator("#opened-note").textContent(), /Tap Edit/);
     assert.equal(await page.locator(".step").first().isVisible(), false);

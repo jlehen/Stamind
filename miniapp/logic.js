@@ -233,7 +233,7 @@ export function formatKg(kg) {
   return String(Math.round(kg * 100) / 100);
 }
 
-export function capitalise(name) {
+function capitalise(name) {
   if (!name) {
     return "";
   }
@@ -573,7 +573,8 @@ export function lastSetSeconds(state) {
 // ---------------------------------------------------------------------------------------
 // The exercise catalog, `exercises.json` (DESIGN_exercise_table.md §8): one row per class, with
 // its key `k`, its words `w`, its pattern `p`, its gear `g`, whether it is bodyweight `b`, and
-// its photos id `f`. The page shows and searches the words, and stores and sends the key.
+// its photos id `f`. The page searches the words, prints them as `shown` writes them, and
+// stores and sends the key.
 // ---------------------------------------------------------------------------------------
 
 // The words of "squat: belt squat" after the category, or all of them when there is none.
@@ -625,10 +626,20 @@ export function searchExercises(catalog, query, pattern) {
 // Free Exercise DB serves its photos from its public repository (DESIGN_gym_logger.md §2).
 export const PHOTO_BASE = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/";
 
-// The words the page shows for a key. A key the catalog lacks shows as it is.
+// The words as the page prints them (DESIGN_exercise_table.md §8): "squat: belt squat" is
+// "[Squat] Belt squat", and words with no category, "pull up", are "Pull up".
+export function shown(words) {
+  const colon = words.indexOf(": ");
+  if (colon < 0) {
+    return capitalise(words);
+  }
+  return `[${capitalise(words.slice(0, colon))}] ${capitalise(nameAfterCategory(words))}`;
+}
+
+// What the page prints for a key. A key the catalog lacks shows as it is.
 export function wordsOf(catalog, key) {
   const row = catalog.find((entry) => entry.k === key);
-  return row ? row.w : key;
+  return row ? shown(row.w) : key;
 }
 
 export function photosOf(catalog, key) {

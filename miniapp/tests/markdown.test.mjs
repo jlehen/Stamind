@@ -37,9 +37,9 @@ test("before any set is ticked, the export is the session as the page holds it",
     "",
     "Alternate the squat and the pull-ups.",
     "",
-    "- Squat: belt squat: 3x6 (140 kg)",
+    "- [Squat] Belt squat: 3x6 (140 kg)",
     "- Pull up: 3x8 (bodyweight)",
-    "- Squat: leg extension: 2x15 (45 kg)",
+    "- [Squat] Leg extension: 2x15 (45 kg)",
     "",
   ].join("\n"));
 });
@@ -61,7 +61,7 @@ test("after a set is ticked, the export holds the ticked sets, notes and the tim
     "",
     "Alternate the squat and the pull-ups.",
     "",
-    "- Squat: belt squat: 1x5 (120 kg), 2x6 (140 kg)",
+    "- [Squat] Belt squat: 1x5 (120 kg), 2x6 (140 kg)",
     "- Pull up: 1x8 (bodyweight) — grip gave out",
     "",
     "Note: left knee felt off",
@@ -72,5 +72,5 @@ test("after a set is ticked, the export holds the ticked sets, notes and the tim
 test("a card marked as a warm-up says so in the export", () => {
   const state = logic.toggleWarmup(logic.newState(SESSION), 2);
   assert.match(toMarkdown(state, START, CATALOG),
-               /^- Squat: leg extension \(warm-up\): 2x15 \(45 kg\)$/m);
+               /^- \[Squat\] Leg extension \(warm-up\): 2x15 \(45 kg\)$/m);
 });

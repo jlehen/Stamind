@@ -257,7 +257,7 @@ test("the search reads the words, category included, and gives back the row with
   assert.deepEqual(logic.searchExercises(CATALOG, "squat", null).map((r) => r.k),
                    ["CARDIO/SQUAT_JACKS", "SQUAT/BELT_SQUAT", "SQUAT/LEG_PRESS"]);
   assert.deepEqual(logic.searchExercises(CATALOG, "SQUAT/BELT_SQUAT", null), []);
-  assert.equal(logic.wordsOf(CATALOG, "SQUAT/BELT_SQUAT"), "squat: belt squat");
+  assert.equal(logic.wordsOf(CATALOG, "SQUAT/BELT_SQUAT"), "[Squat] Belt squat");
   // A key the catalog lacks shows as it is.
   assert.equal(logic.wordsOf(CATALOG, "SQUAT/MOON_SQUAT"), "SQUAT/MOON_SQUAT");
   assert.equal(logic.patternOf(CATALOG, "PULL_UP/PULL_UP"), "pull_vertical");
@@ -337,7 +337,8 @@ test("the first Finish stops the clock, and a log sent again ends at the same mo
 test("the header shows the session's own date in words", () => {
   assert.equal(logic.formatDay("2026-09-24"), "Thu Sep 24");
   assert.equal(logic.formatDay(""), "");
-  assert.equal(logic.capitalise("squat: belt squat"), "Squat: belt squat");
+  assert.equal(logic.shown("squat: belt squat"), "[Squat] Belt squat");
+  assert.equal(logic.shown("pull up"), "Pull up");
 });
 
 test("the saved state is keyed by its version and the session's revision id", () => {
@@ -502,7 +503,7 @@ test("an opened log draws its cards in its order: done sets, then written ones n
                    ["CURL/BARBELL_CURL", "SQUAT/LEG_PRESS", "PULL_UP/PULL_UP"]);
   // The cards are drawn in words.
   assert.deepEqual(state.x.map((x) => logic.wordsOf(CATALOG, x.n)),
-                   ["curl: barbell curl", "squat: leg press", "pull up"]);
+                   ["[Curl] Barbell curl", "[Squat] Leg press", "Pull up"]);
   // The added exercise stands for no written line.
   assert.equal(logic.prescriptionLine(state.x[0]), "added");
   assert.deepEqual(state.x[0].sets, [{ reps: 10, kg: 30, done: true, t: 60 }]);
@@ -537,7 +538,7 @@ test("an opened log shows a key the catalog lacks as it is, and sends every key 
   ] };
   const state = logic.stateFromLog(logic.sessionFromHash(EXAMPLE_HASH), log);
   assert.deepEqual(state.x.map((x) => logic.wordsOf(CATALOG, x.n)),
-                   ["squat: leg press", "SQUAT/MOON_SQUAT", "pull up"]);
+                   ["[Squat] Leg press", "SQUAT/MOON_SQUAT", "Pull up"]);
   // The leg press stood for the belt squat: a swap, told by comparing the two keys.
   assert.equal(logic.prescriptionLine(state.x[0]), "3×4–6");
   const sent = logic.buildLog(state, END);

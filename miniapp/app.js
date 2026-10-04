@@ -278,7 +278,7 @@ function exerciseCard(exercise, xi) {
   const head = el("div", "card-head");
   const name = el("div", "card-name");
   const words = logic.wordsOf(catalog, exercise.n);
-  name.append(el("div", "card-title", logic.capitalise(words)));
+  name.append(el("div", "card-title", words));
   const line = el("div", "card-line");
   const kind = button(exercise.warmup ? "Warm-up" : "Main",
     exercise.warmup ? "kind warmup" : "kind", () => apply(logic.toggleWarmup(state, xi), id));
@@ -471,7 +471,7 @@ function renderResults() {
   }
   ui.searchResults.replaceChildren(...hits.map((row) => {
     const hit = button("", "result", () => choose(row));
-    hit.append(el("span", "result-name", logic.capitalise(row.w)));
+    hit.append(el("span", "result-name", logic.shown(row.w)));
     const kind = [row.p.replace(/_/g, " "), row.g].filter(Boolean).join(" · ");
     hit.append(el("span", "result-kind", kind));
     return hit;

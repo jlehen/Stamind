@@ -1,7 +1,7 @@
 // The gym logger's "Export to Markdown" (DESIGN_gym_logger.md §1): the session as a few lines
 // of Markdown for the athlete's own training notes. No DOM here, so `node --test` runs it.
 // "?v=dev" becomes the commit at deploy, like the imports in app.js (DESIGN_gym_logger.md §2).
-import { capitalise, clockAt, doneSetCount, formatClock, formatKg, localDate, wordsOf }
+import { clockAt, doneSetCount, formatClock, formatKg, localDate, wordsOf }
   from "./logic.js?v=dev";
 
 const EN_DASH = "–";
@@ -28,7 +28,7 @@ export function toMarkdown(state, now, catalog) {
       continue;
     }
     const kind = exercise.warmup ? " (warm-up)" : "";
-    let line = `- ${capitalise(wordsOf(catalog, exercise.n))}${kind}: ${setRuns(sets)}`;
+    let line = `- ${wordsOf(catalog, exercise.n)}${kind}: ${setRuns(sets)}`;
     if (exercise.note && exercise.note.trim()) {
       line += ` ${EM_DASH} ${exercise.note.trim()}`;
     }
