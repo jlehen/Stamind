@@ -11,11 +11,11 @@ from typing import Any, Dict, List, Optional
 from stamind import cycle_records, runtime
 from stamind.config import config
 from stamind.text import (
-    capitalized, cmd, cyan, gray, green, magenta, render_table, visible_len, wrap_text,
-    yellow,
+    blue, bold, capitalized, cmd, cyan, gray, green, magenta, render_table, visible_len,
+    wrap_text, yellow,
 )
 from stamind.output import notice
-from stamind.clock import fmt_date, today_str as _today_str
+from stamind.clock import fmt_date, today_date, today_str as _today_str
 from stamind.strength import comparison, prescription, sets, vocabulary
 
 
@@ -211,23 +211,34 @@ def print_plan_cascade(objective_id: int) -> None:
         )
 
 
-def print_retrospective(record: Dict[str, Any], width: int, indent: str = "") -> None:
-    """One written retrospective record in full: its numbers, its lines, the athlete's
-    words and the sentence that was said to them (DESIGN_cycle_retrospective.md §8).
-    Shared by `plan show -v` and `plan retro redo`."""
-    text = cycle_records.record_text(record, width - len(indent))
+def print_retrospective(
+    label: str, record: Dict[str, Any], pad: str, width: int, show_id: bool = False
+) -> None:
+    """One retrospective record: a heading that says how the record ended, then what it
+    holds, indented under it. That is the numbers in gray, its lines, the athlete's words
+    and the sentence that was said to them; a blank record says so
+    (DESIGN_cycle_retrospective.md §8). `show_id` adds the ID that `plan retro redo` takes.
+    Shared by `plan show -vv`, `plan retrospective` and `plan retro redo`."""
+    heading = f"{bold(label)} ({cycle_records.ENDED_LABELS[record['ended_by']]})"
+    if show_id:
+        heading += f" [Retrospective ID: {record['id']}]"
+    print(f"{pad}{heading}:")
+    pad += "  "
+    if record['body'] is None:
+        print(pad + gray("not written yet"))
+        return
+    numbers, *lines = cycle_records.record_lines(record)
     if record['athlete_line']:
-        text += "\n" + wrap_text(
-            f"  Said to the athlete: \"{record['athlete_line']}\"", width - len(indent)
-        )
-    for line in text.splitlines():
-        print(indent + line)
+        lines.append(f"Said to the athlete: \"{record['athlete_line']}\"")
+    print_indented(numbers, pad, width, gray)
+    for line in lines:
+        print_indented(line, pad, width)
 
 
 # --- The plan's hanging-indent block (DESIGN_plan_feedback.md §4, §8) ---
-# `plan show` draws a mesocycle as a head line with its prose and metadata aligned under
-# it; `plan diff` draws a changed field the same way. Here rather than in either, because
-# whichever defined it first would own the other's layout.
+# `plan show` and `plan retrospective` draw a mesocycle as a head line with its prose and
+# metadata aligned under it; `plan diff` draws a changed field the same way. Here rather
+# than in any of them, because whichever defined it first would own the others' layout.
 
 def print_hanging(head: str, text: str, width: int, color_fn=None) -> str:
     """Prints ``text`` after ``head``, wrapped with continuation lines aligned under it.
@@ -267,6 +278,75 @@ def print_segments(pad: str, segments: list, width: int) -> None:
             line = candidate
     if line:
         print(pad + line)
+
+
+def print_plan_goal(goal: dict, width: int) -> None:
+    """The goal a plan is for, under the plan's header: its ID and title, then its sport
+    and its date."""
+    pad = print_hanging(
+        f"{bold('Planned for')} [Goal ID: {goal['id']}]: ", goal['title'], width, cyan,
+    )
+    print_segments(
+        pad, [magenta(goal['sport_type'].upper()), cyan(fmt_date(goal['target_date']))], width,
+    )
+
+
+def print_mesocycle_head(span: Dict[str, Any], id_label: str, width: int) -> str:
+    """One entry of a mesocycle timeline, down to its progress bar: the status and the
+    name, then the ID, the dates and the length, then the bar. `span` is a mesocycle or a
+    retrospective record: anything with a name and two dates. Shared by `plan show` and
+    `plan retrospective`. Returns the indent the entry's other lines align to."""
+    today = today_date()
+    start = datetime.strptime(span['start_date'], "%Y-%m-%d").date()
+    end = datetime.strptime(span['end_date'], "%Y-%m-%d").date()
+    total_days = max(1, (end - start).days + 1)
+
+    # The bar shares its line with the day counter, so it has to shrink on a
+    # narrow client rather than pushing the counter past the wrap width.
+    bar_length = min(20, max(8, width - 30))
+    is_active = start <= today <= end
+    if end < today:
+        status_str = gray("[DONE]  ")
+        bar = gray("=" * bar_length)
+        extra = ""
+    elif is_active:
+        status_str = green("[ACTIVE]")
+        days_passed = max(1, min((today - start).days + 1, total_days))
+        filled = max(0, min(round(bar_length * days_passed / total_days), bar_length))
+        bar = green("=" * filled) + gray("." * (bar_length - filled))
+        extra = green(f" Day {days_passed}/{total_days}")
+    else:
+        status_str = blue("[FUTURE]")
+        bar = gray("." * bar_length)
+        extra = ""
+
+    if total_days < 7:
+        duration_desc = f"{total_days} days"
+    elif total_days % 7 == 0:
+        duration_desc = f"{total_days // 7} weeks"
+    else:
+        duration_desc = f"{total_days / 7:.1f} weeks"
+
+    prefix = green("|->") if is_active else "|--"
+    pad = print_hanging(
+        f"{prefix} {status_str} ", span['name'], width, green if is_active else None
+    )
+    print_segments(
+        pad,
+        [
+            id_label,
+            f"{cyan(fmt_date(span['start_date']))} -> {cyan(fmt_date(span['end_date']))}",
+            duration_desc,
+        ],
+        width,
+    )
+    print(f"{pad}[{bar}]{extra}")
+    return pad
+
+
+def print_mesocycle_rule(pad: str, width: int) -> None:
+    """The line that closes one entry of a mesocycle timeline."""
+    print(pad + gray("-" * min(40, max(10, width - len(pad)))))
 
 
 def print_feedback_notes(notes: List[dict], width: int, indent: str = "") -> None:

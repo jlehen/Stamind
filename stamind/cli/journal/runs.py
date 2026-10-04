@@ -22,8 +22,8 @@ from stamind.clock import to_local
 # `list`, and a `show` added under a new group tomorrow is covered the day it lands.
 READ_ONLY_VERBS = frozenset({
     "list", "list-metrics", "show", "show-metrics", "show-activities", "show-analysis",
-    "status", "progress", "compare", "batches", "versions", "diff", "journal", "help",
-    "shell",
+    "status", "progress", "compare", "batches", "versions", "diff", "retrospective",
+    "journal", "help", "shell",
     # A bare `settings` is `settings list`: the one group that acts, read-only, when it is
     # given no sub-command (DESIGN_cli_noargs.md §a3).
     "settings",

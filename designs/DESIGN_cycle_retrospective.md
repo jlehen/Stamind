@@ -181,7 +181,8 @@ would sit in an old version only, and it would be missed.
 
 `plan rollback` does not run the date check, and neither does bringing a goal back. A record
 that became wrong stays until the next date check, which is the next morning for an athlete
-who uses the bot. Until then `plan show` can still list it. `plan generate` never reads it,
+who uses the bot. Until then `plan retrospective` can still show it. `plan generate` never
+reads it,
 because it runs the date check first.
 
 A plan version that lived ten minutes creates no record of its own: a mesocycle that it
@@ -432,11 +433,35 @@ private, because it can appear on a lock screen. It never opens with a miss
 The question appears in `sm queue answer`, in the terminal's wording. The reply is the same
 sentence as in the chat.
 
-`plan show` prints the records of the goal under their own heading, oldest first, one line
-each: its id, its name, its dates, and how it ended or that it is not written yet.
-`plan show -v` prints each record in full: its numbers, its lines, the sentence and the
-athlete's words. This is the rule `plan show` already follows for the strategy: short by
-default, the long text under `-v` (DESIGN_output_verbosity.md §5).
+Two commands show the records. Both print a record the same way. A heading says how the
+record ended: "Retrospective (finished):". What the record holds comes under it, indented:
+its numbers, its lines, the athlete's words and the sentence. A record with no lines yet
+says "not written yet".
+
+`plan show -vv` prints each record under the text it looks back on, after an empty line. The
+record of the plan stands under the strategy. The record of a mesocycle stands under its
+focus, inside the entry of that mesocycle in the timeline. `plan show` and `plan show -v`
+print no record: they show the plan, short and then in full (DESIGN_output_verbosity.md §5).
+`-vv` prints no id for a record. The entry already shows the id of the mesocycle.
+
+`plan retrospective` shows the records in the layout of `plan show`, and nothing else of the
+plan. The record of the plan stands where `plan show` prints the strategy. The timeline
+follows. Each mesocycle carries its record where `plan show` prints its focus.
+
+It is Monday 2 November. Base 1 and Base 2 are finished, and Build is under way. The
+timeline shows Base 1 with its record, Base 2 with "not written yet", and Build with "no
+retrospective yet". Above the timeline, the plan says "no retrospective yet" too.
+
+An entry shows the id of its mesocycle, as in `plan show`. The heading of a record adds the
+id of the record: "Retrospective (finished) [Retrospective ID: 1]:". That id is the one
+`plan retro redo` takes (§9), and this view is the one place that prints it.
+
+An entry that has a record takes its name and its days from the record. So a mesocycle cut
+short on 17 September shows the days that were trained, and its heading says "cut short by
+a new plan". A mesocycle recorded before `plan generate` wrote a new version keeps its
+entry. The current plan version does not hold it, so the entry says "not in this plan
+version" where the id of the mesocycle would stand. `plan show -vv` draws the mesocycles of
+the plan version it shows, so it leaves that record out. `-g` picks the goal.
 
 ## 9. Correcting a record
 
@@ -542,8 +567,8 @@ The operator can clear the athlete's words with `plan retro redo ID --clear-word
 | `stamind/athlete_queue.py` | the kind in `KINDS` |
 | `stamind/coach/service/history_context.py` | finished mesocycles come from records, of every goal; a record stands in for the detail |
 | `stamind/coach/engine/planning.py` | `## RETROSPECTIVES OF PAST PLANS`; the review's introduction |
-| `stamind/cli/plans/retro.py` (new), `stamind/cli/plans/parser.py` | `plan retro redo` |
-| `stamind/cli/plans/show.py`, `stamind/cli/common.py` | `plan show` prints one line per record, and the full record under `-v`; `print_plan_cascade` counts them |
+| `stamind/cli/plans/retro.py` (new), `stamind/cli/plans/parser.py` | `plan retro redo`, `plan retrospective` |
+| `stamind/cli/plans/show.py`, `stamind/cli/common.py` | `plan show -vv` prints each record under the strategy or the focus it looks back on; `print_plan_cascade` counts them |
 | `stamind/cli/workouts/adapt.py`, `stamind/cli/plans/generate.py`, `stamind/cli/bot/views.py` | the date check, then the write step, at the start of `run_workout_adapt` and of `plan generate`, and in the morning routine after its once-a-day test |
 | `docs/ARCHITECTURE.md` | the table, the writer, the two steps |
 
@@ -575,7 +600,7 @@ All tests use `unittest`. The writer is stubbed by patching
 | `tests/test_retrospective_writer.py` (new) | a record is due seven days after its end, and sooner when it holds the athlete's words and no lines; a dropped question does not make it due; the numbers of a plan are the sums of its mesocycle records; one record per run; a failed write is tried again on the next run; the record of a plan first writes its blank mesocycle records; the prompt follows the section rules; a session with the athlete's words in the record's days reaches the prompt |
 | `tests/test_athlete_queue.py` | the kind's terminal and chat wordings; the answer stores the words and returns the sentence; a record cut short queues no question; the question goes stale seven days after the end of its record |
 | `tests/test_analysis_prior_training.py` | finished mesocycles come from records, of every goal; the latest keeps its detail, also when a written record of a plan covers it; a record without lines falls back to the detail; a written record of a plan stands for its mesocycles; the plans section |
-| `tests/test_cli_plans.py` | `plan retro redo` with and without `--words`, `plan show` with and without `-v`, `plan rm`, `plan wipe` |
+| `tests/test_cli_plans.py` | `plan retro redo` with and without `--words`, `plan show` below `-vv` (no record) and at `-vv` (each record under its focus, the record of the plan under the strategy), `plan retrospective` (each record under its mesocycle, a mesocycle the plan no longer holds, the record of the plan first), `plan rm`, `plan wipe` |
 | `tests/test_cli_bot.py` | the morning routine runs the date check and the write step after its once-a-day test and before the test that keeps it silent |
 
 No test reads the source for an invariant. One function creates and removes records, and its
@@ -678,6 +703,9 @@ tests call it directly.
 | D47 | The write step under `--show-llm-prompt-only` | It writes nothing. The date check still runs | The writer would print its own prompt and exit before the prompt that the command was asked to show | Implementation | 2026-10-01 |
 | D48 | `plan retro redo` on the command line | `plan retro` takes the action as a word, with `redo` as its one value, then the ID | The command tree has two levels everywhere. `bot capture` takes its intent the same way | Implementation | 2026-10-01 |
 | D49 | A blank record in `plan show` | Its line says how it ended and "not written yet", both | A record cut short and not written yet would otherwise look like one that reached its end | Implementation | 2026-10-01 |
+| D50 | `plan retrospective` | A view of its own, laid out like `plan show`, with each record under its mesocycle. It is a command beside `plan retro redo`, not a mode of it | The records were hard to read at the foot of `plan show -v`, under the strategy and every focus. The run journal tells a view from a command that writes by the command's name, so the view and `redo` cannot share one | The author's request | 2026-10-04 |
+| D51 | The records in `plan show` | None below `-vv`. At `-vv` each record stands under the strategy or the focus it looks back on, with no id of its own. The list at the foot of `plan show` is gone. Replaces D28 and D49 | A record reads best next to the text it looks back on, and the list repeated the timeline. The id is for `plan retro redo` alone, so `plan retrospective` is the one view that prints it | The author's request | 2026-10-04 |
+| D52 | The ids in `plan retrospective` | An entry shows the id of its mesocycle, as in `plan show`. The id of the record stands in the heading of the record. The view prints a record the way `plan show -vv` does | One format to read in both views. The id of a mesocycle cannot replace the id of a record: a mesocycle recorded before a new plan version has no row in the current one, and the record of a plan belongs to no single version | The author's request | 2026-10-04 |
 
 ## Dependency Graph & Implementation Order
 
@@ -701,4 +729,4 @@ Each step is one commit. Each step updates `docs/ARCHITECTURE.md` and the design
    the fallback to the detail.
 5. **Plans.** The record of a plan, its call-off and its removal, one question at the end of
    a plan, `## RETROSPECTIVES OF PAST PLANS`.
-6. **Views.** `plan show`, `plan retro redo`.
+6. **Views.** `plan show -vv`, `plan retrospective`, `plan retro redo`.

@@ -2,7 +2,7 @@
 from stamind.text import green
 from stamind.cli.plans.feedback import RM_NO_ID, run_plan_feedback
 from stamind.cli.plans.generate import run_plan_generate
-from stamind.cli.plans.retro import run_plan_retro
+from stamind.cli.plans.retro import run_plan_retro, run_plan_retrospective
 from stamind.cli.plans.show import run_plan_keep, run_plan_show
 from stamind.cli.plans.versions import (
     run_plan_diff, run_plan_rm, run_plan_rollback, run_plan_versions, run_plan_wipe,
@@ -83,7 +83,9 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             "Show a periodization plan: the macrocycle strategy and its mesocycle timeline, "
             "each in a short summary. With -v, the full strategy and each mesocycle's full "
             "focus, plus the athlete feedback notes and the inputs the plan was generated "
-            "from (goals, constraints, threshold anchors). Flags any input that has changed "
+            "from (goals, constraints, threshold anchors). With -vv, the retrospective of "
+            "the plan and of each finished mesocycle too, each under the text it looks back "
+            "on. Flags any input that has changed "
             "since, and what to do about it. Defaults to the active plan of the next active "
             "goal; --goal reaches "
             "any goal including completed/archived ones, --macrocycle an earlier plan version, "
@@ -111,9 +113,11 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         help="List each mesocycle's scheduled workouts, not just their count/load summary"
     )
     p_show.add_argument(
-        "-v", "--verbose", action="store_true",
-        help="Print the full strategy and each mesocycle's full focus instead of their "
-             "summaries, plus the feedback notes and the inputs the plan was generated from"
+        "-v", "--verbose", action="count", default=0,
+        help="-v prints the full strategy and each mesocycle's full focus instead of their "
+             "summaries, plus the feedback notes and the inputs the plan was generated from. "
+             "-vv adds the retrospectives: the one of the plan under the strategy, and the "
+             "one of each finished mesocycle under its focus"
     )
 
     # plan keep
@@ -278,10 +282,34 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
              "as 'plan generate'; no --force needed)"
     )
 
+    # plan retrospective
+    p_retrospective = plan_subparsers.add_parser(
+        "retrospective",
+        help="Show the retrospectives of a plan and its mesocycles, laid out like 'plan show'",
+        description=(
+            "Show a goal's retrospectives in the layout of 'plan show': the retrospective "
+            "of the plan stands where 'plan show' prints the strategy, and the "
+            "retrospective of each mesocycle stands under its entry in the timeline. A "
+            "retrospective is the stored record of a finished mesocycle or plan: its "
+            "numbers, what it was for, what happened and what came out of it, then the "
+            "athlete's own words and the sentence the coach said to them. A mesocycle "
+            "that was recorded and that the plan no longer holds keeps its entry. Each "
+            "record shows the ID that 'plan retro redo' takes. Defaults to the next "
+            "active goal; --goal reaches any goal, including a completed or archived one."
+        )
+    )
+    p_retrospective.set_defaults(func=run_plan_retrospective)
+    p_retrospective.add_argument(
+        "-g", "--goal", "--goal-id", type=int, dest="goal_id",
+        help="Target goal ID to show the retrospectives of (defaults to the next active "
+             "goal)"
+    )
+
     # plan retro
     p_retro = plan_subparsers.add_parser(
         "retro", parents=[llm_debug_parser],
-        help="Have one retrospective record written again ('plan show' lists the IDs)",
+        help="Have one retrospective record written again ('plan retrospective' shows "
+             "the IDs)",
         description=(
             "Correct the stored record of a finished mesocycle or plan. 'plan retro redo "
             "ID' computes the record's numbers again and calls the retrospective writer at "
@@ -297,7 +325,7 @@ def add_plan_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         help="redo: compute the numbers again and have the record written again"
     )
     p_retro.add_argument(
-        "id", type=int, help="Retrospective ID, as 'plan show' prints it"
+        "id", type=int, help="Retrospective ID, as 'plan retrospective' prints it"
     )
     retro_words = p_retro.add_mutually_exclusive_group()
     retro_words.add_argument(

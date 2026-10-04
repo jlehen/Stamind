@@ -654,8 +654,9 @@ class TestCliPlans(unittest.TestCase):
 
 
 class TestCliPlanRetrospectives(unittest.TestCase):
-    """`plan show` lists the retrospective records, `plan retro redo` has one written
-    again, and deleting a plan deletes them (DESIGN_cycle_retrospective.md §6, §8, §9).
+    """`plan show -vv` and `plan retrospective` show the retrospective records, `plan
+    retro redo` has one written again, and deleting a plan deletes them
+    (DESIGN_cycle_retrospective.md §6, §8, §9).
     It is Monday 2 November: two mesocycles are finished and a third is under way."""
 
     NUMBERS = {
@@ -699,25 +700,96 @@ class TestCliPlanRetrospectives(unittest.TestCase):
         self.addCleanup(client.stop)
         self.client.complete.return_value = dict(self.WRITTEN)
 
-    def test_plan_show_prints_one_line_per_record(self):
-        code, out, _ = run_cli(["plan", "show"])
-        self.assertEqual(code, 0)
-        self.assertIn("Retrospectives:", out)
-        self.assertIn("Base 1 · 2026-09-14 Mon -> 2026-10-04 Sun · finished", out)
-        self.assertIn(
-            "Base 2 · 2026-10-05 Mon -> 2026-10-25 Sun · finished, not written yet", out
-        )
-        self.assertNotIn("For: the old lines.", out)
+    def _after(self, out, in_order):
+        """Checks that `out` holds every text of `in_order`, in that order, and returns
+        what follows the last one."""
+        at = 0
+        for text in in_order:
+            self.assertIn(text, out[at:], f"{text!r} is missing or out of place")
+            at = out.index(text, at) + len(text)
+        return out[at:]
 
-    def test_plan_show_v_prints_each_written_record_in_full(self):
-        code, out, _ = run_cli(["plan", "show", "-v"])
+    def _record_the_plan(self):
+        """Moves the clock to Monday 16 November: the last mesocycle ended yesterday, so
+        the date check records the plan. Writes that record and returns it."""
+        pin_clock(self, "2026-11-16")
+        cycle_records.date_check(test_db, "2026-11-16")
+        plan = test_db.get_retrospectives(self.goal, "plan")[0]
+        test_db.write_retrospective(plan["id"], self.NUMBERS, "For: the whole plan.", "Done.")
+        return plan
+
+    def test_plan_show_leaves_the_records_out_below_vv(self):
+        for flags in ([], ["-v"]):
+            code, out, _ = run_cli(["plan", "show"] + flags)
+            self.assertEqual(code, 0)
+            self.assertNotIn("Retrospective", out)
+            self.assertNotIn("For: the old lines.", out)
+
+    def test_plan_show_vv_puts_each_record_under_its_focus(self):
+        """Base 1 is written, Base 2 is not written yet, and Build is under way."""
+        code, out, _ = run_cli(["plan", "show", "-vv"])
         self.assertEqual(code, 0)
-        self.assertIn("Base 1 (2026-09-14..2026-10-04), finished", out)
-        self.assertIn("Sessions 5 of 6 · load 380 of 400 TSS · 10h00", out)
-        self.assertIn("For: the old lines.", out)
-        self.assertIn('Athlete: "felt fresh"', out)
-        self.assertIn('Said to the athlete: "Old."', out)
-        self.assertIn("finished, not written yet", out)
+        after_build = self._after(out, [
+            "Base 1", "[Mesocycle ID: ", "easy volume", "Retrospective (finished):",
+            "Sessions 5 of 6 · load 380 of 400 TSS · 10h00", "For: the old lines.",
+            'Athlete: "felt fresh"', 'Said to the athlete: "Old."',
+            "Base 2", "easy volume", "Retrospective (finished):", "not written yet",
+            "Build", "easy volume",
+        ])
+        self.assertNotIn("Retrospective", after_build)
+        self.assertNotIn("Retrospective ID", out)
+        # An empty line parts the focus from the record.
+        self.assertRegex(out, r"easy volume\n\n +Retrospective \(finished\):")
+
+    def test_plan_show_vv_prints_the_record_of_the_plan_under_the_strategy(self):
+        self._record_the_plan()
+        code, out, _ = run_cli(["plan", "show", "-v", "-v"])
+        self.assertEqual(code, 0)
+        self._after(out, [
+            "Macrocycle Strategy", "strategy\n\nPlan Retrospective (finished):",
+            "For: the whole plan.", "Mesocycle Timeline",
+        ])
+
+    def test_plan_retrospective_puts_each_record_under_its_mesocycle(self):
+        """Base 1 is written, Base 2 is not written yet, and Build is under way."""
+        code, out, _ = run_cli(["plan", "retrospective"])
+        self.assertEqual(code, 0)
+        self._after(out, [
+            "Plan Retrospective", "no retrospective yet", "Mesocycle Timeline",
+            "Base 1", "[Mesocycle ID: ",
+            f"Retrospective (finished) [Retrospective ID: {self.base1}]:",
+            "Sessions 5 of 6 · load 380 of 400 TSS · 10h00", "For: the old lines.",
+            'Athlete: "felt fresh"', 'Said to the athlete: "Old."',
+            "Base 2", "[Mesocycle ID: ",
+            f"Retrospective (finished) [Retrospective ID: {self.base2}]:", "not written yet",
+            "Build", "[Mesocycle ID: ", "Day 8/21", "no retrospective yet",
+        ])
+        # The plan's own descriptions stay out.
+        self.assertNotIn("easy volume", out)
+
+    def test_plan_retrospective_keeps_a_mesocycle_the_plan_no_longer_holds(self):
+        """`plan generate` wrote a new version that starts with Build: the two finished
+        mesocycles are not in it, and their records still open the timeline."""
+        test_db.save_macrocycle(self.goal, "strategy", "gh", "ch", [{
+            "name": "Build", "start_date": "2026-10-26", "end_date": "2026-11-15",
+            "focus": "easy volume",
+        }])
+        code, out, _ = run_cli(["plan", "retrospective"])
+        self.assertEqual(code, 0)
+        self._after(out, [
+            "Base 1", "not in this plan version", "For: the old lines.",
+            "Base 2", "not in this plan version", "Build", "[Mesocycle ID: ",
+        ])
+
+    def test_plan_retrospective_prints_the_record_of_the_plan_first(self):
+        """The plan's record stands where `plan show` prints the strategy."""
+        plan = self._record_the_plan()
+        code, out, _ = run_cli(["plan", "retrospective", "--goal", str(self.goal)])
+        self.assertEqual(code, 0)
+        self._after(out, [
+            f"Plan Retrospective (finished) [Retrospective ID: {plan['id']}]:",
+            "For: the whole plan.", "Mesocycle Timeline",
+        ])
 
     def test_redo_writes_the_record_again_and_keeps_the_words(self):
         code, out, _ = run_cli(["plan", "retro", "redo", str(self.base1)])

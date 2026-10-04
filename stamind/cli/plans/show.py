@@ -2,24 +2,24 @@
 
 `print_plan` is what `ExpertRenderer.plan` delegates to (DESIGN_render_persona.md §7)."""
 import argparse
-from datetime import datetime
 from typing import List
 
-from stamind import cycle_records, plan_versions, runtime
+from stamind import plan_versions, runtime
 from stamind.analytics.load import planned_load
 from stamind.text import (
-    blue, bold, cmd, cyan, default_wrap_width, format_labeled_paragraph, gray, green, magenta, red,
+    bold, cmd, cyan, default_wrap_width, format_labeled_paragraph, gray, green, magenta, red,
     wrap_text, yellow,
 )
 from stamind.output import notice
-from stamind.clock import fmt_date, today_date as _today_date
+from stamind.clock import fmt_date
 from stamind.cli import staleness
 from stamind.cli.common import (
-    print_feedback_notes, print_hanging, print_indented, print_retrospective,
-    print_segments,
+    print_feedback_notes, print_hanging, print_indented, print_mesocycle_head,
+    print_mesocycle_rule, print_plan_goal, print_retrospective, print_segments,
 )
 from stamind.cli.windows import resolve_goal
 from stamind.db.objectives import GOAL_UPCOMING, goal_state
+from stamind.db.retrospectives import MESOCYCLE, PLAN
 
 
 def _print_plan_feedback(macrocycle: dict, width: int) -> None:
@@ -185,32 +185,6 @@ def _print_mesocycle_workouts(
         )
 
 
-def _print_retrospectives(goal_id: int, width: int, verbose: bool) -> None:
-    """The goal's retrospective records, oldest first: one line each, and the whole
-    record under `-v` (DESIGN_cycle_retrospective.md §8)."""
-    records = runtime.db.get_retrospectives(goal_id)
-    if not records:
-        return
-    print()
-    print(bold("Retrospectives:"))
-    for record in records:
-        head = f"  {gray('[' + str(record['id']) + ']')} "
-        written = record['body'] is not None
-        if verbose and written:
-            print(head.rstrip())
-            print_retrospective(record, width, indent="    ")
-            continue
-        ended = cycle_records.ENDED_LABELS[record['ended_by']]
-        if not written:
-            ended += ", not written yet"
-        print_hanging(
-            head,
-            f"{cycle_records.record_name(record)} · {fmt_date(record['start_date'])} -> "
-            f"{fmt_date(record['end_date'])} · {ended}",
-            width,
-        )
-
-
 def run_plan_show(args: argparse.Namespace) -> None:
     """Displays the training macrocycle(s) and mesocycles periodization timeline."""
     # --macrocycle alone shows that plan under its own goal.
@@ -268,12 +242,15 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
     """Renders one plan version: header, goal, the strategy's summary, the staleness report
     and the mesocycle timeline with each mesocycle's summary. `-v` puts the full strategy
     and focus in place of the summaries, and adds the feedback notes and snapshotted inputs.
+    `-vv` adds the retrospective record of the plan under the strategy, and the record of
+    each mesocycle under its focus.
 
     The companion form of this is CompanionRenderer.plan (DESIGN_render_persona.md §5)."""
     mesocycles = runtime.db.get_mesocycles_for_macrocycle(macrocycle['id'])
     show_workouts = getattr(args, 'workouts', False)
-    verbose = getattr(args, 'verbose', False)
+    verbose = getattr(args, 'verbose', 0)
     workouts = _plan_workouts(macrocycle)
+    retrospectives = runtime.db.get_retrospectives(next_goal['id']) if verbose > 1 else []
 
     is_superseded = macrocycle.get('status') == 'superseded'
     if is_superseded:
@@ -293,20 +270,16 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
             f"\n=== ACTIVE MACROCYCLE STRATEGY [Macrocycle ID: {macrocycle['id']}] ==="
         )))
     width = default_wrap_width()
-    sport_str = next_goal['sport_type'].upper()
-    obj_pad = print_hanging(
-        f"{bold('Planned for')} [Goal ID: {next_goal['id']}]: ",
-        next_goal['title'], width, cyan,
-    )
-    print_segments(
-        obj_pad,
-        [magenta(sport_str), cyan(fmt_date(next_goal['target_date']))],
-        width,
-    )
+    print_plan_goal(next_goal, width)
     # A plan older than the summary columns has none; -v still shows its strategy and focus.
     strategy = macrocycle['strategy'] if verbose else macrocycle.get('summary')
     if strategy:
         print(format_labeled_paragraph(f"{bold('Macrocycle Strategy')}:", strategy))
+    for record in retrospectives:
+        if record['level'] != PLAN:
+            continue
+        print()
+        print_retrospective("Plan Retrospective", record, "", width)
     print()
     if verbose:
         _print_plan_feedback(macrocycle, width)
@@ -319,69 +292,19 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
         change_reason = staleness.reason(macrocycle)
         if change_reason:
             staleness.report(change_reason, macrocycle)
+    # A record is the mesocycle that starts on its first day (DESIGN_cycle_retrospective.md §3).
+    recorded = {r['start_date']: r for r in retrospectives if r['level'] == MESOCYCLE}
     print(bold("Mesocycle Timeline:"))
-    
-    today = _today_date()
-    
     for m in mesocycles:
-        start = datetime.strptime(m['start_date'], "%Y-%m-%d").date()
-        end = datetime.strptime(m['end_date'], "%Y-%m-%d").date()
-        
-        total_days = (end - start).days + 1
-        if total_days <= 0:
-            total_days = 1
-            
-        # The bar shares its line with the day counter, so it has to shrink on a
-        # narrow client rather than pushing the counter past the wrap width.
-        bar_length = min(20, max(8, width - 30))
-        is_active = start <= today <= end
-        if end < today:
-            status_str = gray("[DONE]  ")
-            bar = gray("=" * bar_length)
-            extra = ""
-        elif is_active:
-            status_str = green("[ACTIVE]")
-            days_passed = (today - start).days + 1
-            days_passed = max(1, min(days_passed, total_days))
-            filled = round(bar_length * days_passed / total_days)
-            filled = max(0, min(filled, bar_length))
-            bar = green("=" * filled) + gray("." * (bar_length - filled))
-            extra = green(f" Day {days_passed}/{total_days}")
-        else:
-            status_str = blue("[FUTURE]")
-            bar = gray("." * bar_length)
-            extra = ""
-
-        if total_days >= 7:
-            weeks = total_days / 7
-            if weeks.is_integer():
-                duration_desc = f"{int(weeks)} weeks"
-            else:
-                duration_desc = f"{weeks:.1f} weeks"
-        else:
-            duration_desc = f"{total_days} days"
-
-        prefix = green("|->") if is_active else "|--"
-        pad = print_hanging(
-            f"{prefix} {status_str} ", m['name'], width, green if is_active else None
-        )
-        print_segments(
-            pad,
-            [
-                f"[Mesocycle ID: {m['id']}]",
-                f"{cyan(fmt_date(m['start_date']))} -> {cyan(fmt_date(m['end_date']))}",
-                duration_desc,
-                (f"phase {m['phase']}" if m.get('phase') else ""),
-            ],
-            width,
-        )
-        print(f"{pad}[{bar}]{extra}")
+        pad = print_mesocycle_head(m, f"[Mesocycle ID: {m['id']}]", width)
         _print_mesocycle_workouts(m, workouts, pad, width, show_workouts)
         detail = m['focus'] if verbose else m.get('summary')
         if detail:
             print_indented(detail, pad, width)
-        print(pad + gray("-" * min(40, max(10, width - len(pad)))))
-    _print_retrospectives(next_goal['id'], width, verbose)
+        if m['start_date'] in recorded:
+            print()
+            print_retrospective("Retrospective", recorded[m['start_date']], pad, width)
+        print_mesocycle_rule(pad, width)
 
 
 def run_plan_keep(args: argparse.Namespace) -> None:

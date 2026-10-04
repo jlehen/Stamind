@@ -76,16 +76,22 @@ def record_name(record: Dict[str, Any]) -> str:
     return record['name']
 
 
+def record_lines(record: Dict[str, Any]) -> List[str]:
+    """What a written record holds: its numbers, its lines and the athlete's words (§2)."""
+    lines = [numbers_line(record['numbers'])]
+    lines += [line.strip() for line in record['body'].splitlines() if line.strip()]
+    if record['athlete_words']:
+        lines.append(f"Athlete: \"{' '.join(record['athlete_words'].split())}\"")
+    return lines
+
+
 def record_text(record: Dict[str, Any], width: int = PROMPT_WIDTH) -> str:
-    """One written record, as a prompt and `plan show -v` print it (§2)."""
+    """One written record, as a prompt prints it (§2)."""
     lines = [
         f"{record_name(record)} ({record['start_date']}..{record['end_date']}), "
         f"{ENDED_LABELS[record['ended_by']]}",
-        f"  {numbers_line(record['numbers'])}",
     ]
-    lines += [f"  {line.strip()}" for line in record['body'].splitlines() if line.strip()]
-    if record['athlete_words']:
-        lines.append(f"  Athlete: \"{' '.join(record['athlete_words'].split())}\"")
+    lines += [f"  {line}" for line in record_lines(record)]
     return wrap_text("\n".join(lines), width)
 
 
