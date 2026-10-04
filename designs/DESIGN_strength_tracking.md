@@ -612,10 +612,14 @@ personas.
 
 **Three commands do the surgery.** `strength name <date>` is the only command that asks
 on the spot, and the queue's rule allows it that: the operator typed it, and the answer is
-the whole of its work. It asks the naming question over any group of that day's activities,
-named or not (a named group is consecutive sets with the same name), with the same answers
-as the queued question and one more step after the name is picked: "all 6 sets, or how
-many?", and the rest are asked again. Keeping the name of a group the watch guessed
+the whole of its work. It shows the activity the way the lines under an activity do, one
+line per exercise wherever its sets came and one per unnamed group, and the athlete picks
+the line to name. The layout comes back after every answer, until "none, I am done", the
+default. Walking the groups in order would not do: on September 17 the clean and press
+alternated with the chest press, and changing its three sets took sixteen questions. A
+picked line gets the naming question, with the same answers as the queued question and one
+more step after the name is picked: "all 6 sets, or how many?", and the rest stay on a
+line of their own. Keeping the name of a line the watch guessed
 confirms it. It is the way to fix a name without going through Connect, the only place a
 group is split, and the way to name the backlog: the first pull with `sets_since` months
 back freezes hundreds of activities and asks nothing about them (§6). A waiting question
@@ -639,8 +643,8 @@ day. Acting on every activity of the date would also read the 20:45 activity aga
 the names given to it, and discarding a warm-up recorded under the strength profile would
 discard the activity beside it. The date stays the argument, because it is what the athlete
 remembers: Garmin's activity number is eleven digits that no Stamind screen shows.
-`strength name` does not ask: it goes through every activity of the day, each under its
-start time, and "keep it as it is" leaves a group alone.
+`strength name` does not ask: it shows every activity of the day in turn, each under its
+start time, and "none, I am done" leaves an activity alone.
 
 **Two commands read the record back.** `strength log` is the athlete's own logbook — the
 one §1 says she keeps by hand. With no argument it is the index: every lift on record under
@@ -1488,8 +1492,9 @@ consecutive equal sets turned September 7 into 42 one-set lines. Grouped by exer
 order the exercises first came, it is 12 lines, one per exercise; unnamed sets, when an
 activity has any, share one line listing their positions.
 
-**`strength name` on an activity still waiting for "are the sets final?" freezes it first.**
-Otherwise a later "yes, final" would read the sets again and drop the names just given.
+**`strength name` on an activity still waiting for "are the sets final?" freezes it when the
+first line is picked.** Otherwise a later "yes, final" would read the sets again and drop
+the names just given. Looking at the layout and leaving freezes nothing.
 
 **`sm st` is still `status`.** `strength` shares the prefix, so `st` became an alias, the
 way `s` already was.

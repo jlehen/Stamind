@@ -532,10 +532,10 @@ class CommandsTest(_StrengthCase):
         os.environ.pop("STAMIND_FRONTEND", None)
         self.activity("mon", day="2026-09-14", payload=garmin_sets(lift("SQUAT", "LEG_PRESS")))
 
-    def test_name_splits_a_block_and_asks_the_rest_again(self):
+    def test_name_splits_a_line_and_shows_the_rest_again(self):
         self.activity("tue", payload=garmin_sets(*[unnamed(10, 60)] * 4))
         self.read()
-        runtime.prompt = _Prompt(picks=["a1", "2", "keep"])
+        runtime.prompt = _Prompt(picks=["1", "a1", "2"])
         code, out, _ = run_cli(["strength", "name", TUESDAY])
         self.assertEqual(code, 0)
         self.assertIn("Named sets 1–2: squat: leg press.", out)
@@ -543,18 +543,46 @@ class CommandsTest(_StrengthCase):
                           if row["set_type"] == "active"],
                          ["SQUAT/LEG_PRESS", "SQUAT/LEG_PRESS", None, None])
         # The recent exercises are offered in words, and the split asks in words.
-        self.assertIn("squat: leg press", runtime.prompt.shown[0][1])
-        self.assertEqual(runtime.prompt.shown[1][0],
+        self.assertIn("squat: leg press", runtime.prompt.shown[1][1])
+        self.assertEqual(runtime.prompt.shown[2][0],
                          "squat: leg press: all 4 sets, or how many?")
-        self.assertIn("sets 3–4: 10, 10 reps @ 60 kg, unnamed", runtime.prompt.shown[-1][0])
+        # The layout comes back with the new name and what is left of the line.
+        self.assertEqual(runtime.prompt.shown[-1][1], [
+            "sets 1–2: squat: leg press 2×10 @ 60",
+            "sets 3–4: 10, 10 reps @ 60 kg, unnamed",
+            "none, I am done",
+        ])
         # Naming by hand declares the sets final, so "are they final?" is settled.
         self.assertTrue(self.row("tue")["sets_final_at"])
         self.assertEqual(athlete_queue.walk(self.now), [])
 
+    def test_name_reaches_an_exercise_that_alternates_with_another_in_one_pick(self):
+        self.activity("tue", payload=garmin_sets(
+            *[lift("BENCH_PRESS"), lift("OLYMPIC_LIFT", "CLEAN_AND_PRESS")] * 3))
+        self.read()
+        leg_press = sets.recent_exercises().index("SQUAT/LEG_PRESS") + 1
+        runtime.prompt = _Prompt(picks=["2", f"a{leg_press}"])
+        _, out, _ = run_cli(["strength", "name", TUESDAY])
+        self.assertEqual(runtime.prompt.shown[0][1][1],
+                         "sets 2, 4, 6: olympic lift: clean and press 3×10 @ 60")
+        self.assertIn("Named sets 2, 4, 6: squat: leg press.", out)
+        self.assertEqual([row["exercise"] for row in test_db.get_exercise_sets("tue")
+                          if row["set_type"] == "active"],
+                         ["BENCH_PRESS/BENCH_PRESS", "SQUAT/LEG_PRESS"] * 3)
+
+    def test_looking_at_the_layout_in_name_changes_nothing(self):
+        self.activity("tue", payload=garmin_sets(guess("SQUAT", "BELT_SQUAT", 5, 140)))
+        self.read()
+        runtime.prompt = _Prompt()
+        run_cli(["strength", "name", TUESDAY])
+        self.assertIsNone(self.row("tue")["sets_final_at"])
+        self.assertEqual([row["named_by"] for row in test_db.get_exercise_sets("tue")
+                          if row["set_type"] == "active"], ["watch"])
+
     def test_keeping_a_guess_in_name_confirms_it(self):
         self.activity("tue", payload=garmin_sets(guess("SQUAT", "BELT_SQUAT", 5, 140)))
         self.read()
-        runtime.prompt = _Prompt(picks=["keep"])
+        runtime.prompt = _Prompt(picks=["1", "keep"])
         _, out, _ = run_cli(["strength", "name", TUESDAY])
         self.assertIn("Set 1 confirmed: squat: belt squat.", out)
         self.assertEqual([row["named_by"] for row in test_db.get_exercise_sets("tue")

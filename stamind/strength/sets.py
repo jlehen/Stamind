@@ -127,6 +127,25 @@ def groups(sets: Sequence[Dict[str, Any]]) -> List[Group]:
     return found
 
 
+class Line(NamedTuple):
+    """What an activity shows on one line (§7): an exercise's sets wherever they came, or one
+    unnamed group. `positions` are those of its sets among the activity's active sets."""
+    exercise: Optional[str]
+    sets: List[Dict[str, Any]]
+    positions: List[int]
+
+
+def exercise_lines(sets: Sequence[Dict[str, Any]]) -> List[Line]:
+    """An activity's groups as lines, in the order the exercises first came, so alternating
+    two exercises still reads as two lines (§7)."""
+    found: Dict[Any, Line] = {}
+    for group in groups(sets):
+        line = found.setdefault(group.exercise or group.first, Line(group.exercise, [], []))
+        line.sets.extend(group.sets)
+        line.positions.extend(range(group.first, group.last + 1))
+    return list(found.values())
+
+
 def unnamed_groups(sets: Sequence[Dict[str, Any]]) -> List[Group]:
     return [group for group in groups(sets) if group.exercise is None]
 
@@ -191,11 +210,11 @@ def watch_mark(sets: Sequence[Dict[str, Any]]) -> str:
     return " (watch)" if any(s["named_by"] == WATCH for s in sets) else ""
 
 
-def named_line(group: Group) -> str:
+def named_line(line: Line) -> str:
     """'deadlift 1×5 @ 40, 4×4 @ 80 (watch)': what was lifted, with a mark on a name only
     the watch guessed (§7)."""
-    return (f"{vocabulary.words(group.exercise)} {set_chunks(group.sets)}"
-            f"{watch_mark(group.sets)}")
+    return (f"{vocabulary.words(line.exercise)} {set_chunks(line.sets)}"
+            f"{watch_mark(line.sets)}")
 
 
 def done_text(lifted: Sequence[Dict[str, Any]], exercise: str) -> str:
@@ -240,17 +259,13 @@ def activity_lines(activity: Dict[str, Any]) -> List[str]:
         return []
     if not activity.get("sets_read_at"):
         return [SETS_NOT_READ]
-    by_exercise: Dict[str, Group] = {}
+    lines: List[str] = []
     unnamed: List[int] = []
-    for group in groups(runtime.db.get_exercise_sets(activity["activity_id"])):
-        if group.exercise is None:
-            unnamed.extend(range(group.first, group.last + 1))
+    for line in exercise_lines(runtime.db.get_exercise_sets(activity["activity_id"])):
+        if line.exercise is None:
+            unnamed.extend(line.positions)
             continue
-        if group.exercise in by_exercise:
-            by_exercise[group.exercise].sets.extend(group.sets)
-            continue
-        by_exercise[group.exercise] = Group(group.exercise, list(group.sets), group.first)
-    lines = [named_line(group) for group in by_exercise.values()]
+        lines.append(named_line(line))
     if unnamed:
         lines.append(f"{position_list(unnamed)} unnamed")
     if lines and activity.get("discarded"):

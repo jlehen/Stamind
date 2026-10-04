@@ -1,13 +1,14 @@
 """`strength`: the surgery on a strength activity's sets (DESIGN_strength_tracking.md §7).
 
-`strength name` names a day's groups on the spot, `strength reset` reads a day's sets again
-from Garmin, and `strength discard` keeps a day's activity out of the strength history. On a
-day with two strength activities, reset and discard ask which one. `strength log` reads the
-record back, and `strength exercises` the exercise table behind it. `strength ingest` is the
-sixth command of the family and lives in `strength_ingest.py` (DESIGN_gym_logger.md §5).
+`strength name` shows a day's sets and names the ones picked, `strength reset` reads a day's
+sets again from Garmin, and `strength discard` keeps a day's activity out of the strength
+history. On a day with two strength activities, reset and discard ask which one. `strength
+log` reads the record back, and `strength exercises` the exercise table behind it. `strength
+ingest` is the sixth command of the family and lives in `strength_ingest.py`
+(DESIGN_gym_logger.md §5).
 """
 import argparse
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Sequence
 
 from stamind import clock, runtime, settings
 from stamind.cli.selectors import parse_single_date
@@ -29,6 +30,7 @@ CLEAR = "clear"
 OTHER = "other"
 ALL = "all"
 NONE = "none"
+DONE = "done"
 
 
 def _title(activity: Dict[str, Any]) -> str:
@@ -51,26 +53,18 @@ def _which(day: str, activities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [activity for activity in activities if activity["activity_id"] == picked]
 
 
-def _group_at(rows: List[Dict[str, Any]], position: int) -> Optional[sets.Group]:
-    """The group holding the active set at `position`, from that set on."""
-    for group in sets.groups(rows):
-        if group.last < position:
-            continue
-        start = max(position, group.first)
-        return sets.Group(group.exercise, group.sets[start - group.first:], start)
-    return None
+def _line_label(line: sets.Line) -> str:
+    """'sets 10, 12, 14: olympic lift: clean and press 3×16 @ 22': one line of the layout."""
+    span = sets.position_list(line.positions)
+    if line.exercise is None:
+        reps = [s["reps"] for s in line.sets]
+        return f"{span}: {sets.reps_and_load(reps, line.sets[0]['load_kg'])}, unnamed"
+    return f"{span}: {sets.named_line(line)}"
 
 
-def _group_prompt(group: sets.Group) -> str:
-    span = sets.set_span(group.first, group.last)
-    if group.exercise is None:
-        return f"{span}: {sets.reps_and_load(group.reps, group.load_kg)}, unnamed. What was it?"
-    return f"{span}: {sets.named_line(group)}. What was it?"
-
-
-def _how_many(group: sets.Group, exercise: str) -> int:
-    """"All 6 sets, or how many?": a group that was two exercises is split here (§7)."""
-    count = len(group.sets)
+def _how_many(line: sets.Line, exercise: str) -> int:
+    """"All 6 sets, or how many?": a line that was two exercises is split here (§7)."""
+    count = len(line.sets)
     if count == 1:
         return 1
     choices = [Choice(ALL, f"all {count} sets")]
@@ -81,60 +75,67 @@ def _how_many(group: sets.Group, exercise: str) -> int:
     return count if picked == ALL else int(picked)
 
 
-def _ask_group(activity_id: str, group: sets.Group, recent: List[str]) -> int:
-    """Asks what one group was and applies the answer; returns the next position to ask."""
+def _ask_line(activity_id: str, line: sets.Line, recent: List[str]) -> None:
+    """Asks what one line of the layout was and applies the answer."""
+    span = sets.position_list(line.positions)
+    seqs = [s["seq"] for s in line.sets]
     choices = [Choice(f"a{n}", vocabulary.words(key)) for n, key in enumerate(recent, 1)]
     choices.append(Choice(OTHER, "something else…"))
-    clear = "leave it unnamed" + (", clearing its name" if group.exercise else "")
+    clear = "leave it unnamed" + (", clearing its name" if line.exercise else "")
     choices.append(Choice(CLEAR, clear))
     choices.append(Choice(KEEP, "keep it as it is"))
-    picked = runtime.prompt.choose(wrap_text(_group_prompt(group)), choices, default=KEEP)
+    picked = runtime.prompt.choose(
+        f"{capitalized(_line_label(line))}. What was it?", choices, default=KEEP
+    )
     if picked == KEEP:
         # Keeping a name the watch guessed confirms it: the athlete has just looked at it,
         # which is the whole of what makes a guess count (§7).
-        if any(s["named_by"] == sets.WATCH for s in group.sets):
-            runtime.db.name_exercise_sets(activity_id, group.seqs, group.exercise)
-            print(f"{capitalized(sets.set_span(group.first, group.last))} confirmed: "
-                  f"{vocabulary.words(group.exercise)}.")
-        return group.last + 1
+        if any(s["named_by"] == sets.WATCH for s in line.sets):
+            runtime.db.name_exercise_sets(activity_id, seqs, line.exercise)
+            print(f"{capitalized(span)} confirmed: {vocabulary.words(line.exercise)}.")
+        return
     if picked == CLEAR:
-        runtime.db.name_exercise_sets(activity_id, group.seqs, None)
-        print(f"{capitalized(sets.set_span(group.first, group.last))} left unnamed.")
-        return group.last + 1
+        runtime.db.name_exercise_sets(activity_id, seqs, None)
+        print(f"{capitalized(span)} left unnamed.")
+        return
     if picked == OTHER:
         text = runtime.prompt.ask_text(sets.SOMETHING_ELSE["ask"]).strip()
         try:
             exercise = questions.choose_proposed(text)
         except NotApplied as not_applied:
             print(wrap_text(str(not_applied)))
-            return group.first
+            return
     else:
         exercise = recent[int(picked[1:]) - 1]
-    count = _how_many(group, exercise)
-    runtime.db.name_exercise_sets(activity_id, group.seqs[:count], exercise)
-    print(f"Named {sets.set_span(group.first, group.first + count - 1)}: "
-          f"{vocabulary.words(exercise)}.")
-    return group.first + count
+    count = _how_many(line, exercise)
+    runtime.db.name_exercise_sets(activity_id, seqs[:count], exercise)
+    print(f"Named {sets.position_list(line.positions[:count])}: {vocabulary.words(exercise)}.")
 
 
 def _name_activity(activity: Dict[str, Any], recent: List[str]) -> None:
-    """Goes through an activity's groups, named or not, in order. Naming by hand declares the
-    sets final, so a waiting "are the sets final?" question is settled first (§7)."""
+    """Shows an activity's layout, one line per exercise, and names the line the athlete
+    picks, until she is done. Naming by hand declares the sets final, so a waiting "are the
+    sets final?" question is settled at the first pick (§7)."""
     activity_id = activity["activity_id"]
-    if not activity["sets_final_at"]:
-        runtime.db.freeze_exercise_sets(activity_id, clock.now())
-    print()
-    print(bold(_title(activity)))
-    position = 1
+    frozen = bool(activity["sets_final_at"])
     while True:
-        group = _group_at(runtime.db.get_exercise_sets(activity_id), position)
-        if group is None:
+        layout = sets.exercise_lines(runtime.db.get_exercise_sets(activity_id))
+        choices = [Choice(str(n), _line_label(line)) for n, line in enumerate(layout, 1)]
+        choices.append(Choice(DONE, "none, I am done"))
+        print()
+        picked = runtime.prompt.choose(
+            f"{bold(_title(activity))}\nWhich sets do you want to name?", choices, default=DONE
+        )
+        if picked == DONE:
             return
-        position = _ask_group(activity_id, group, recent)
+        if not frozen:
+            runtime.db.freeze_exercise_sets(activity_id, clock.now())
+            frozen = True
+        _ask_line(activity_id, layout[int(picked) - 1], recent)
 
 
 def run_strength_name(args: argparse.Namespace) -> None:
-    """Names the groups of a day's strength activities on the spot (§7)."""
+    """Names the sets picked in a day's strength activities, on the spot (§7)."""
     day = args.date
     activities = runtime.db.strength_activities(day, date=day)
     with_sets = [
@@ -412,11 +413,11 @@ def add_strength_parser(subparsers):
 
     s_name = strength_subparsers.add_parser(
         "name",
-        help="Name the sets of a day's activity, group by group",
+        help="Show the sets of a day's activity and name the ones you pick",
         description=(
-            "Go through every group of the day's activities, named or not, and name it. After "
-            "a name, say whether it covers the whole group or only its first sets, and the "
-            "rest are asked again."
+            "Show the day's activity, one line per exercise, and pick the line to name; the "
+            "layout comes back after every name until you are done. After a name, say "
+            "whether it covers every set of the line or only its first ones."
         ),
     )
     s_name.add_argument("date", metavar="DATE", type=parse_single_date, help=date_help)
