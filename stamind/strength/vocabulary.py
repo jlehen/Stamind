@@ -10,7 +10,7 @@ added to the file by hand.
 import os
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Dict, List, Optional, Tuple
+from typing import Collection, Dict, List, Optional, Set, Tuple
 
 PATTERNS = (
     "squat", "hinge", "single_leg", "push_horizontal", "push_vertical", "pull_horizontal",
@@ -39,6 +39,10 @@ BODYWEIGHT_CEILING_KG = 50.0
 
 # The mark on a line of the table whose exercise Garmin has no name for (§3.3).
 ADDED_MARK = "+"
+
+# Words of a Garmin name that say nothing about the exercise, and what a leading underscore
+# leaves behind.
+LINK_WORDS = {"", "A", "AND", "AT", "FROM", "IN", "ON", "THE", "TO", "WITH"}
 
 TABLE_PATH = os.path.join(os.path.dirname(__file__), "exercises.tsv")
 
@@ -132,6 +136,31 @@ def words(key: str) -> str:
     if len(parts) == 1 or parts[0] == parts[1]:
         return parts[0]
     return f"{parts[0]}: {parts[1]}"
+
+
+def _name_words(key: str) -> Set[str]:
+    """The words of a key's name that its category does not already say: GOBLET for
+    SQUAT/GOBLET_SQUAT, nothing for a bare category."""
+    category, _, name = key.partition("/")
+    return set(name.split("_")) - set(category.split("_")) - LINK_WORDS
+
+
+def similar(key: str, own: Collection[str], most: int) -> List[str]:
+    """The exercises like `key`, `most` at the most (DESIGN_strength_tracking.md §7): its
+    Garmin category when all of it fits, otherwise only those among `own`, the athlete's, or
+    whose name shares a word with its name. The athlete's come first, then the names sharing
+    the most words."""
+    category = key.partition("/")[0]
+    mine = _name_words(key)
+    family = [other for other in keys()
+              if other != key and other.partition("/")[0] == category]
+    found = []
+    for other in family:
+        shared = len(mine & _name_words(other))
+        if len(family) > most and not shared and other not in own:
+            continue
+        found.append((other not in own, -shared, words(other), other))
+    return [other for *_, other in sorted(found)][:most]
 
 
 def model_line(key: str) -> str:

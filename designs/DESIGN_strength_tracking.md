@@ -617,9 +617,19 @@ line per exercise wherever its sets came and one per unnamed group, and the athl
 the line to name. The layout comes back after every answer, until "none, I am done", the
 default. Walking the groups in order would not do: on September 17 the clean and press
 alternated with the chest press, and changing its three sets took sixteen questions. A
-picked line gets the naming question, with the same answers as the queued question and one
-more step after the name is picked: "all 6 sets, or how many?", and the rest stay on a
-line of their own. Keeping the name of a line the watch guessed
+picked line gets the naming question. For unnamed sets its answers are those of the queued
+question. For a named line they are the exercises like its name, nine at most, taken from
+the same Garmin category, the word before the colon. A category that fits in the nine is
+offered whole: the hip swings are five, so a one arm swing is offered the four others. A
+larger one is cut down to the exercises the athlete has done and those whose name shares a
+word with it, where a word the category already says and a link word ("and", "with") do
+not count: every squat has "squat" in its name. The athlete's own come first, then the
+names sharing the most words. The recent
+exercises would not do there: on September 10 the line was a clean and press done with
+kettlebells, and the nine offered were the cable and machine lifts of late September. Not
+handled: an exercise like it that Garmin files under another category, which is typed under
+"something else…". One more step follows the name: "all 6 sets, or how many?", and the rest
+stay on a line of their own. Keeping the name of a line the watch guessed
 confirms it. It is the way to fix a name without going through Connect, the only place a
 group is split, and the way to name the backlog: the first pull with `sets_since` months
 back freezes hundreds of activities and asks nothing about them (§6). A waiting question

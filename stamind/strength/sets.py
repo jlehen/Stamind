@@ -5,7 +5,7 @@ name. Also the lines that show the sets under the activity.
 import time
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 from stamind import clock, runtime, settings
 from stamind.config import config
@@ -297,6 +297,12 @@ def recent_exercises() -> List[str]:
         last_seen.setdefault(row["exercise"], len(days))
     ranked = sorted(done_on, key=lambda name: (-len(done_on[name]), last_seen[name], name))
     return ranked[:MAX_ANSWERS]
+
+
+def own_exercises() -> Set[str]:
+    """Every exercise a person named on the athlete's record, discarded activities skipped."""
+    return {row["exercise"] for row in runtime.db.activity_exercises_by_day()
+            if row["exercise"]}
 
 
 class Logged(NamedTuple):

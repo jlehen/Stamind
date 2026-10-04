@@ -560,15 +560,29 @@ class CommandsTest(_StrengthCase):
         self.activity("tue", payload=garmin_sets(
             *[lift("BENCH_PRESS"), lift("OLYMPIC_LIFT", "CLEAN_AND_PRESS")] * 3))
         self.read()
-        leg_press = sets.recent_exercises().index("SQUAT/LEG_PRESS") + 1
-        runtime.prompt = _Prompt(picks=["2", f"a{leg_press}"])
+        runtime.prompt = _Prompt(picks=["2", "a2"])
         _, out, _ = run_cli(["strength", "name", TUESDAY])
         self.assertEqual(runtime.prompt.shown[0][1][1],
                          "sets 2, 4, 6: olympic lift: clean and press 3×10 @ 60")
-        self.assertIn("Named sets 2, 4, 6: squat: leg press.", out)
-        self.assertEqual([row["exercise"] for row in test_db.get_exercise_sets("tue")
-                          if row["set_type"] == "active"],
-                         ["BENCH_PRESS/BENCH_PRESS", "SQUAT/LEG_PRESS"] * 3)
+        strict_press = "olympic lift: dumbbell power clean and strict press"
+        self.assertIn(f"Named sets 2, 4, 6: {strict_press}.", out)
+        self.assertEqual(
+            [row["exercise"] for row in test_db.get_exercise_sets("tue")
+             if row["set_type"] == "active"],
+            ["BENCH_PRESS/BENCH_PRESS", "OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_STRICT_PRESS"] * 3)
+
+    def test_a_named_line_is_offered_the_exercises_like_it_and_not_the_recent_ones(self):
+        self.activity("sun", day="2026-09-13", payload=garmin_sets(lift("CARRY", "FARMERS_CARRY")))
+        self.activity("tue", payload=garmin_sets(lift("CARRY", "FARMERS_WALK")))
+        self.read()
+        runtime.prompt = _Prompt(picks=["1"])
+        run_cli(["strength", "name", TUESDAY])
+        offered = runtime.prompt.shown[1][1]
+        # Her own carry comes first, then the names nearest to "farmers walk".
+        self.assertEqual(offered[:3], ["carry: farmers carry", "carry: farmers carry walk lunge",
+                                       "carry: farmers walk on toes"])
+        # Monday's leg press is recent, and nothing like a carry.
+        self.assertNotIn("squat: leg press", offered)
 
     def test_looking_at_the_layout_in_name_changes_nothing(self):
         self.activity("tue", payload=garmin_sets(guess("SQUAT", "BELT_SQUAT", 5, 140)))

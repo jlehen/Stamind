@@ -156,5 +156,45 @@ class ClassTest(unittest.TestCase):
         self.assertEqual(vocabulary.model_line("SQUAT/MOON_SQUAT"), "SQUAT/MOON_SQUAT")
 
 
+class SimilarTest(unittest.TestCase):
+    """The exercises like a key (DESIGN_strength_tracking.md §7)."""
+
+    def test_the_names_sharing_the_most_words_come_first(self):
+        self.assertEqual(vocabulary.similar("OLYMPIC_LIFT/CLEAN_AND_PRESS", set(), 9)[:2], [
+            "OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_PUSH_PRESS",
+            "OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_STRICT_PRESS",
+        ])
+
+    def test_the_athletes_own_come_first_and_only_from_the_same_category(self):
+        own = {"SQUAT/LEG_PRESS", "ROW/RENEGADE_ROW"}
+        self.assertEqual(vocabulary.similar("SQUAT/GOBLET_SQUAT", own, 9),
+                         ["SQUAT/LEG_PRESS", "SQUAT/WIDE_STANCE_GOBLET_SQUAT"])
+
+    def test_a_word_the_category_already_says_makes_nothing_alike(self):
+        """Every squat has SQUAT in its name, so a bare squat is like the athlete's own only."""
+        self.assertEqual(vocabulary.similar("SQUAT/SQUAT", set(), 9), [])
+        self.assertEqual(vocabulary.similar("SQUAT/SQUAT", {"SQUAT/BELT_SQUAT"}, 9),
+                         ["SQUAT/BELT_SQUAT"])
+
+    def test_a_category_that_fits_is_offered_whole(self):
+        """The hip swings are five, so a one arm swing is offered the four others, the plain
+        hip swing among them, though the only word they share is the category's own."""
+        self.assertEqual(vocabulary.similar("HIP_SWING/ONE_ARM_SWING", set(), 9), [
+            "HIP_SWING/SINGLE_ARM_DUMBBELL_SWING", "HIP_SWING/SINGLE_ARM_KETTLEBELL_SWING",
+            "HIP_SWING/HIP_SWING", "HIP_SWING/STEP_OUT_SWING",
+        ])
+
+    def test_no_more_than_asked_for(self):
+        self.assertEqual(len(vocabulary.similar("OLYMPIC_LIFT/CLEAN_AND_PRESS", set(), 3)), 3)
+
+    def test_a_link_word_makes_nothing_alike(self):
+        alike = vocabulary.similar("OLYMPIC_LIFT/CLEAN_AND_PRESS", set(), 9)
+        self.assertNotIn("OLYMPIC_LIFT/SNATCH", alike)
+        self.assertEqual([key for key in alike if "CLEAN" not in key and "PRESS" not in key], [])
+
+    def test_a_key_the_table_lacks_is_like_nothing(self):
+        self.assertEqual(vocabulary.similar("SQUAT/MOON_SQUAT", set(), 9), [])
+
+
 if __name__ == "__main__":
     unittest.main()
