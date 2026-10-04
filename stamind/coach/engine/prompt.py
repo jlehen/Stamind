@@ -2,6 +2,7 @@ from typing import Any, List, Optional, Dict
 from stamind.types import Objective, Constraint
 from stamind.clock import today_date as _today_date
 from stamind.benchmarks import ANCHOR_KINDS, format_value
+from stamind.coach.formatting import preferences_text
 
 
 class PromptBuildMixin:
@@ -55,10 +56,8 @@ class PromptBuildMixin:
 
         # Session-level by contract: the science documents set the structure, the
         # preferences say how a session is written up (DESIGN_plan_staleness.md §11).
-        preferences = profile.get("preferences")
+        preferences = preferences_text(profile)
         if preferences:
-            if isinstance(preferences, list):
-                preferences = ', '.join(preferences)
             lines.append(f"- Preferences / Static Constraints: {preferences}")
             lines.append(
                 "  (Preferences describe how sessions are written up, where they happen, "

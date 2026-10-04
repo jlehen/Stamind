@@ -946,11 +946,11 @@ prints, is the strength planner's reasons, one sentence per session it changed, 
 
 - The shipped strength science (§10).
 - The athlete's own science files, whole, the way every coaching call gets them today. This
-  is where "3+ reps in reserve" and the athlete's preferences for how a session is built
-  live, and where a household's second athlete says what she wants a gym day to look like.
-  Revision 9 had them reach the second call through the week planner's prose, and the brief
-  carries none of it. For this athlete that is three files, some 7,000 tokens; the science
-  trim's tags are what cuts it later (§10).
+  is where "3+ reps in reserve" lives. Revision 9 had them reach the second call through the
+  week planner's prose, and the brief carries none of it. For this athlete that is three
+  files, some 7,000 tokens; the science trim's tags are what cuts it later (§10).
+- The profile's `preferences`, whole, when the profile has any. This is where an athlete
+  says what they want a strength session to look like (amended 2026-10-04, below).
 - The exercise list: every class of the exercise table, one per line, as its key with its
   pattern, its main muscles and its gear, and the rule that dumbbells and kettlebells stand
   in for each other (DESIGN_exercise_table.md §7). It replaced a list that left out the
@@ -981,6 +981,33 @@ prints, is the strength planner's reasons, one sentence per session it changed, 
 - Every strength session in the span is one of these two. A change the athlete asks for in
   one, through `workout tweak`, reaches the strength planner through the brief
   (DESIGN_workout_tweak.md §4).
+
+Amended 2026-10-04: the strength planner reads the profile's `preferences`. A wish about how
+a strength session is written is a preference: an exercise to have in every session, one to
+leave out, a load to stay above. DESIGN_plan_staleness.md §11 draws that line. A science file
+holds what the periodization or the weekly session count would come out different without,
+and a preference changes how a session is written. This section used to send such a wish to
+the science files, because the strength planner read nothing else of the athlete's.
+
+It is Sunday October 4. The second athlete of the household wants a kettlebell squat and a
+kettlebell deadlift in every circuit, and the deadlift never under 16 kg. Her `preferences`
+already say "the strength workouts should cover a push, a pull, a squat, hinge and core".
+That line reached the week planner only, and the week planner writes no exercise and no load
+(above). Written into a file under `science/`, the new lines would reach every coaching
+call, and her plan would be flagged stale although no mesocycle should change.
+
+So the strength planner's user message gains `## ATHLETE'S PREFERENCES`: the block whole,
+present when the profile has one. The block is about every sport the athlete does, and the
+line under the heading says to act on what concerns a strength session. The TASK ranks it
+with the athlete's own guidelines. It wins over the shipped science (§10) and over a habit
+(below), and only the day's equipment rules it out, in which case the notes say so. Nothing
+ranks a preference against a science file, for the reason DESIGN_plan_staleness.md §11
+gives: a config that follows the split holds no conflict between them.
+
+An edit to `preferences` is not new evidence (below), so the sessions already written follow
+it when the athlete asks: `workout generate --strength-only` writes them again. Not built: a
+second block for strength alone. The athlete would have to sort each sentence into one of
+two blocks, and "push, pull, squat, hinge and core" fits both.
 
 **What it returns.** For each session to write, its exercises in order: the name, the number
 of sets, the lowest and highest reps, and the load in kilograms, or no load for a bodyweight

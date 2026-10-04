@@ -669,6 +669,31 @@ class PromptTest(_PlannerCase):
             "[Gym]\nModerate full-body at home, 45 min.",
         )
 
+    def test_the_athletes_preferences_reach_the_call(self):
+        """The profile's `preferences` are where a wish about a strength session is written,
+        and the TASK ranks them with the athlete's own guidelines (§9)."""
+        def user(profile):
+            return planner_prompt.user_content([], [], "", TODAY, profile, [], {})
+
+        wish = "The kettlebell deadlift is never written under 16 kg."
+        self.assertIn(
+            "## ATHLETE'S PREFERENCES\n"
+            "The athlete's own words, about every sport they do. Act on what concerns a "
+            "strength session.\n" + wish,
+            user({"preferences": wish + "\n"}),
+        )
+        self.assertIn("\nNo jumps, No barbell\n", user({"preferences": ["No jumps", "No barbell"]}))
+        for without in (None, {}, {"preferences": ""}, {"equipment": ["kettlebells"]}):
+            self.assertNotIn("ATHLETE'S PREFERENCES", user(without))
+
+        system = " ".join(planner_prompt.system_prompt().split())
+        task = system.split("## TASK")[1].split("### WRITING THE LOADS")[0]
+        self.assertIn(
+            "It counts as part of the athlete's own guidelines: wherever those win, over HOW "
+            "TO PROGRESS or over a habit, the preferences win too.",
+            task,
+        )
+
     def test_the_list_holds_every_class_of_the_table_one_per_line(self):
         """The athlete chose to be offered everything (DESIGN_exercise_table.md §7): nobody
         on this instance has lifted anything, and no line is left out for it."""

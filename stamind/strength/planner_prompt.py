@@ -13,7 +13,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import runtime
-from stamind.coach.formatting import BANNER_RULE, science_section
+from stamind.coach.formatting import BANNER_RULE, preferences_text, science_section
 from stamind.config import config
 from stamind.strength import prescription, vocabulary
 
@@ -25,6 +25,12 @@ SCIENCE_PATH = os.path.join(os.path.dirname(__file__), "progression.md")
 MOVED_ON = "Its brief or its duration changed since these sets were written: write it again."
 # The line for the fourth ground, the athlete asking: `workout generate --strength-only` (§9).
 ASKED_AGAIN = "The athlete asked for this session to be written again: write it again."
+# The profile's `preferences`, whole. The block is about every sport the athlete does (§9).
+PREFERENCES_HEADING = (
+    "## ATHLETE'S PREFERENCES\n"
+    "The athlete's own words, about every sport they do. Act on what concerns a strength "
+    "session."
+)
 
 SYSTEM_PROMPT = """You are Stamind's strength planner. You write the exercises, sets, reps \
 and kilograms of one athlete's strength sessions.
@@ -37,6 +43,12 @@ asks of it; the duration says how long it lasts; the equipment says what the ath
 reach that day. The mesocycle names the phase of the plan the session falls in, its span and
 which week of it the session is; week 1 opens a new mesocycle, where the plan's character
 changes. The athlete's habits decide the rest (CHOOSING THE EXERCISES).
+
+When the user message holds ATHLETE'S PREFERENCES, it is what the athlete asked for in their
+own words: an exercise to have in every session, one to leave out, a load to stay above. Do
+what it says about a strength session. It counts as part of the athlete's own guidelines:
+wherever those win, over HOW TO PROGRESS or over a habit, the preferences win too. Only the
+day's equipment can rule a preference out, and then the notes say so.
 
 For each session under SESSIONS TO CHECK, the athlete has already been shown it. Answer
 "keep" unless one of these three is true:
@@ -304,6 +316,9 @@ def user_content(
     mesocycles: Dict[str, Any],
 ) -> str:
     parts = [f"Today's date is {today}."]
+    preferences = preferences_text(profile)
+    if preferences:
+        parts.append(f"{PREFERENCES_HEADING}\n{preferences.strip()}")
     parts.append(history_text or "## STRENGTH HISTORY\nNo sets on record yet.")
     if to_write:
         parts.append(

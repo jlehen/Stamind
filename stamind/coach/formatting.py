@@ -369,6 +369,17 @@ def format_baseline(baseline: Optional[Dict[str, Any]]) -> str:
     )
 
 
+def preferences_text(profile: Optional[Dict[str, Any]]) -> str:
+    """The profile's `preferences` as every prompt prints them: the block of prose, or a
+    list joined by commas, and "" when the profile has none (DESIGN_plan_staleness.md §11)."""
+    preferences = (profile or {}).get("preferences")
+    if not preferences:
+        return ""
+    if isinstance(preferences, list):
+        return ', '.join(preferences)
+    return str(preferences)
+
+
 BANNER_RULE = "=" * 80
 
 
