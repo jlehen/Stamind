@@ -156,20 +156,18 @@ class PlanningMixin:
         reused = False
         prior_training_review = None
         has_prior_training = False
-        if existing_macro and not force and not pending_feedback:
-            if (
-                existing_macro['goals_hash'] == fingerprints.goals_hash
-                and existing_macro['constraints_hash'] == fingerprints.constraints_hash
-                and self.config_changed(existing_macro) is None
-            ):
-                reused = True
-                strategy = existing_macro['strategy']
-                summary = existing_macro.get('summary') or ""
-                mesocycles = self._db.get_mesocycles_for_macrocycle(existing_macro['id'])
-                step(wrap_text(
-                    "Reusing existing periodization strategy (macrocycle and mesocycles) "
-                    "from database."
-                ), cyan)
+        if (
+            existing_macro and not force and not pending_feedback
+            and self.config_changed(existing_macro) is None
+        ):
+            reused = True
+            strategy = existing_macro['strategy']
+            summary = existing_macro.get('summary') or ""
+            mesocycles = self._db.get_mesocycles_for_macrocycle(existing_macro['id'])
+            step(wrap_text(
+                "Reusing existing periodization strategy (macrocycle and mesocycles) "
+                "from database."
+            ), cyan)
 
         if not reused:
             # The plan being replaced, for the "PREVIOUS PERIODIZATION STRATEGY" section —

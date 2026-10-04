@@ -453,6 +453,81 @@ class TestPlanStalenessSurfaces(unittest.TestCase):
         self.assertIn("goals changed", stdout)
         self.assertIn("goals (when the plan was generated)", stdout)
 
+    def _seed_with_an_earlier_goal(self, earlier_target: str) -> tuple:
+        """A plan toward "Winter Race", generated while an earlier goal, "Autumn Climb",
+        was among the goals it was written from. Returns both goal ids."""
+        earlier = test_db.add_objective(
+            title="Autumn Climb", target_date=earlier_target, sport_type="cycling"
+        )
+        later = test_db.add_objective(
+            title="Winter Race", target_date=self._days_out(60), sport_type="cycling"
+        )
+        seen = test_db.get_objectives()
+        test_db.save_macrocycle(
+            objective_id=later, strategy="strategy",
+            goals_hash=plan_inputs.goals_hash(seen),
+            constraints_hash=plan_inputs.constraints_hash([]),
+            mesocycles=[{
+                "name": "Base", "start_date": self._days_out(0),
+                "end_date": self._days_out(30), "focus": "aerobic",
+            }],
+            config_hash=plan_inputs.plan_config_hash(),
+            goals_snapshot=json.dumps(plan_inputs.clean_goals(seen)),
+            constraints_snapshot=json.dumps(plan_inputs.clean_constraints([])),
+        )
+        return earlier, later
+
+    @patch("stamind.runtime.garmin")
+    def test_a_goal_whose_date_has_passed_is_not_an_edit(self, _mock_garmin):
+        """The plan was written while "Autumn Climb" was still ahead. Its date is now
+        behind us: nobody edited anything, so nothing is flagged (§12)."""
+        from stamind import runtime
+
+        _earlier, later = self._seed_with_an_earlier_goal(self._days_out(-2))
+
+        _code, stdout, _ = run_cli(["plan", "show"])
+        self.assertNotIn("An input has changed", stdout)
+
+        # A real edit still flags, and its diff does not list the passed goal as removed.
+        runtime.db.update_objective(later, target_date=self._days_out(90))
+        with patch("stamind.coach.engine.openrouter_client") as client:
+            client.complete.return_value = {"reshaping": True, "why": "later peak"}
+            _code, stdout, _ = run_cli(["plan", "show"])
+        self.assertIn("goals changed", stdout)
+        self.assertNotIn("Autumn Climb", stdout)
+
+    @patch("stamind.runtime.garmin")
+    def test_a_goal_called_off_before_its_date_still_flags_the_plan(self, _mock_garmin):
+        """Calling a goal off is the athlete's edit; only a date that passes is not (§12)."""
+        from stamind import runtime
+        from stamind.db.objectives import ARCHIVED
+
+        earlier, _later = self._seed_with_an_earlier_goal(self._days_out(20))
+        runtime.db.update_objective(earlier, status=ARCHIVED)
+
+        with patch("stamind.coach.engine.openrouter_client") as client:
+            client.complete.return_value = {"reshaping": True, "why": "one goal fewer"}
+            _code, stdout, _ = run_cli(["plan", "show"])
+        self.assertIn("goals changed", stdout)
+        self.assertIn("Autumn Climb", stdout)
+
+    @patch("stamind.runtime.garmin")
+    def test_the_plan_of_a_finished_goal_is_not_flagged(self, _mock_garmin):
+        """There is nothing left to replan, so `plan show` neither reports the change nor
+        asks the verdict call about it (§12)."""
+        from stamind import runtime
+
+        oid, _mid = self._seed(stale=True)
+        runtime.db.update_objective(oid, target_date=self._days_out(-2))
+
+        with patch("stamind.coach.engine.openrouter_client") as client:
+            exit_code, stdout, _ = run_cli(["plan", "show", "--goal", str(oid)])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Spring Race", stdout)
+        self.assertNotIn("An input has changed", stdout)
+        client.complete.assert_not_called()
+
     @patch("stamind.runtime.garmin")
     def test_a_plan_shaping_constraint_flags_the_plan_and_a_tactical_one_does_not(
         self, _mock_garmin

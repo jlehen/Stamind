@@ -1277,7 +1277,10 @@ called by the UIs.
   "athlete profile changed" when it does not (`DESIGN_plan_staleness.md` §5). The fifth
   axis is the athlete's science documents: `"training guidelines changed: <file>, …"`
   when the `science_snapshot` no longer matches `science_dir`, and silence for a plan
-  that carries no snapshot (§11).
+  that carries no snapshot (§11). On the goals axis, a goal whose date has passed since
+  the plan was generated is not a change: `_goals_still_ahead` drops it from the stored
+  list before the comparison and before the diff (§12). `plan show` does not ask at all
+  for the plan of a goal that is completed or archived.
 - **`retrospectives_step()`** — what `plan generate`, `workout adapt` and the morning
   routine run at their start (`service/retrospective.py`, DESIGN_cycle_retrospective.md
   §3, §5): the date check, then the write step. The write step writes one due record, the
@@ -2807,8 +2810,8 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
 1. `CoachService.plan_generate()` fetches active objectives +
    constraints.
 2. Computes `goals_hash`, `constraints_hash` (plan-shaping constraints only), `config_hash`.
-3. If existing macrocycle has matching goals/constraints hashes,
-   `config_changed()` reports no drift, **no plan feedback is pending** and
+3. If `config_changed()` reports no drift on the existing macrocycle (goals and
+   constraints are two of its axes), **no plan feedback is pending** and
    `force=False` → reuse. Pending notes are a plan input, so they open the gate on
    their own — feedback applies without `--force` (DESIGN_plan_feedback.md §7). For the
    same reason `cli/plans/generate.py` skips the "an input changed, regenerate?" question when

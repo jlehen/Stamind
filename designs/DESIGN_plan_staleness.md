@@ -281,3 +281,36 @@ one level up.
 **Deliberately not done.** The web banner still reads `plan_config_hash()` alone and
 does not see the science axis (§8). No size cap on the snapshot: a science directory
 that is too big to snapshot is already too big to send with every prompt.
+
+## 12. A date that passes is not an edit
+
+**Date:** 2026-10-04
+
+A plan stores the goals it was written from: every goal that was still ahead that day.
+"Goals changed" used to mean "that list differs from the goals still ahead today". A goal
+leaves the list when the athlete calls it off, and also when its date passes. Only the
+first is an edit.
+
+It is Friday 18 September. The athlete has a hill climb dated Wednesday 30 September and a
+second goal in December. `plan generate` writes the December plan, and stores both goals
+with it. It is Thursday 1 October. The climb's date is behind us, so only the December goal
+is still ahead. Nobody touched anything, yet `status`, `plan show` and `workout generate`
+said "goals changed" on the December plan, and `plan generate` would not reuse its strategy.
+
+**The rule.** Before the comparison, the stored list drops every goal whose date has
+passed. What is left is compared with the goals still ahead today. The diff shown to the
+athlete and to the verdict call is built from the same reduced list, so a real edit made
+later does not also show the climb as removed.
+
+- A goal called off before its date still flags the plan. That is the athlete's edit.
+- A plan that carries no stored list is judged on the hash alone, as before.
+- `plan generate` asked the goals and constraints hashes itself, beside `config_changed`.
+  That second copy is gone: `config_changed` is the one judgment.
+
+**A finished plan is not flagged at all.** `plan show --goal` reaches the plan of a goal
+that is completed or called off, to read its retrospectives. There is nothing left to
+replan there, so `plan show` prints no staleness report for it and asks the verdict call
+nothing, whichever input moved. This is the rule a superseded version already follows (§9).
+
+**Not handled.** A goal whose date the athlete moves into the past. `plan keep --goal` on a
+finished plan still stamps it when asked.

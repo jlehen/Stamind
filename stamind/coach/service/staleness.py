@@ -125,8 +125,7 @@ class StalenessMixin:
         objectives = self._db.upcoming_objectives()
         # A hash the plan does not carry cannot be held to: there is nothing to compare
         # against, the same reading the profile snapshot gets above.
-        stored_goals = macro.get('goals_hash')
-        if stored_goals and stored_goals != plan_inputs.goals_hash(objectives):
+        if self._goals_changed(macro, objectives):
             reasons.append("goals changed")
         replan_constraints = [
             c for c in self._db.get_constraints(_today_str())
@@ -137,6 +136,26 @@ class StalenessMixin:
                 != plan_inputs.constraints_hash(replan_constraints)):
             reasons.append("plan-shaping constraints changed")
         return reasons
+
+    def _goals_still_ahead(self, macro: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+        """The goals `macro` was generated from, without those whose date has passed
+        since, or None when the plan carries no snapshot. A date that passes is not an
+        edit (DESIGN_plan_staleness.md §12)."""
+        old_goals = _snapshot_records(macro.get('goals_snapshot'))
+        if old_goals is None:
+            return None
+        today = _today_str()
+        return [g for g in old_goals if str(g.get('target_date')) >= today]
+
+    def _goals_changed(self, macro: Dict[str, Any], objectives: List[Dict[str, Any]]) -> bool:
+        """Whether the goals have been edited since `macro` was generated (§12)."""
+        stored_goals = macro.get('goals_hash')
+        if not stored_goals or stored_goals == plan_inputs.goals_hash(objectives):
+            return False
+        still_ahead = self._goals_still_ahead(macro)
+        if still_ahead is None:
+            return True
+        return still_ahead != plan_inputs.clean_goals(objectives)
 
     def profile_diff(self, macro: Dict[str, Any]) -> str:
         """What actually changed in the plan-shaping profile since `macro` was generated,
@@ -157,7 +176,7 @@ class StalenessMixin:
         honestly — and the threshold reasons already carry their own numbers."""
         chunks = [self.profile_diff(macro)]
 
-        old_goals = _snapshot_records(macro.get('goals_snapshot'))
+        old_goals = self._goals_still_ahead(macro)
         if old_goals is not None:
             chunks.append(records_diff_text(
                 old_goals, plan_inputs.clean_goals(self._db.upcoming_objectives()),

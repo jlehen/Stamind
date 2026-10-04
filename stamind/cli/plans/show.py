@@ -19,6 +19,7 @@ from stamind.cli.common import (
     print_segments,
 )
 from stamind.cli.windows import resolve_goal
+from stamind.db.objectives import GOAL_UPCOMING, goal_state
 
 
 def _print_plan_feedback(macrocycle: dict, width: int) -> None:
@@ -310,10 +311,11 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
     if verbose:
         _print_plan_feedback(macrocycle, width)
         _print_considered_inputs(macrocycle)
-    # Right under the inputs it contradicts, and only for the version in force: a
-    # superseded one is out of date by definition (DESIGN_plan_staleness.md §9). Expert
-    # only — the companion body is `simple_plan_lines`, and a replan is operator work.
-    if not is_superseded:
+    # Right under the inputs it contradicts, and only for the version in force of a goal
+    # still ahead: a superseded one is out of date by definition, a finished one has
+    # nothing left to replan (DESIGN_plan_staleness.md §9, §12). Expert only — the
+    # companion body is `simple_plan_lines`, and a replan is operator work.
+    if not is_superseded and goal_state(next_goal) == GOAL_UPCOMING:
         change_reason = staleness.reason(macrocycle)
         if change_reason:
             staleness.report(change_reason, macrocycle)
