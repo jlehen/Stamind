@@ -38,9 +38,7 @@ def _target() -> sync.Target:
         raise SetupError("This terminal does not know the bot token. Give it the "
                          "TELEGRAM_BOT_TOKEN the bot runs with, or write the token in "
                          "config.yaml as telegram.bot_token.")
-    where = sync.target()
-    _passed(f"The config names the bucket {where.bucket}, and the bot token is known.")
-    return where
+    return sync.target()
 
 
 def _sign_in(remote) -> None:
@@ -52,7 +50,6 @@ def _sign_in(remote) -> None:
                          f"{config.service_account_file} ({_bucket.describe(exc)}). It is "
                          "missing, or its key was revoked. See \"Google Calendar and the "
                          "service account\" in the README.")
-    _passed("Google accepts the service account's file.")
 
 
 def _guard(where: sync.Target, remote, force: bool) -> None:
@@ -86,8 +83,6 @@ def _check_the_bucket(where: sync.Target, remote) -> None:
         raise SetupError(f"The service account could not write a test file and write it "
                          f"again ({_bucket.describe(exc)}). Give it the role Storage Object "
                          f"User on this bucket (step 3 {GUIDE}).")
-    _passed("The service account writes a file, and writes it again.")
-
     try:
         response = remote.download(name, sync.PAGES_ORIGIN)
     except Exception as exc:
@@ -103,8 +98,6 @@ def _check_the_bucket(where: sync.Target, remote) -> None:
     if response.headers.get("Access-Control-Allow-Origin") not in ("*", sync.PAGES_ORIGIN):
         raise SetupError("Google did not send the header that lets a page from another "
                          "site read the file.")
-    _passed("Anyone can download a file by its name, fresh, from the pages' site.")
-
     try:
         listed = remote.open_to_listing()
     except Exception as exc:
@@ -113,7 +106,6 @@ def _check_the_bucket(where: sync.Target, remote) -> None:
         raise SetupError("Anyone can list the bucket. Everyone (allUsers) holds a role that "
                          "lists, such as Storage Object Viewer: give them Storage Legacy "
                          f"Object Reader instead (step 4 {GUIDE}).")
-    _passed("Nobody can list the bucket without a credential.")
 
 
 def run_data_publish(args: argparse.Namespace) -> None:
@@ -129,7 +121,7 @@ def run_data_publish(args: argparse.Namespace) -> None:
         notice(f"✗ {problem}", red)
         return
     try:
-        failed, deleted = sync.fill(runtime.db, where, remote)
+        failed, uploaded, deleted = sync.fill(runtime.db, where, remote)
     except Exception as exc:
         notice(f"✗ The upload stopped ({_bucket.describe(exc)}). Run "
                + cmd("sm data publish") + " again.", red)
@@ -138,8 +130,7 @@ def run_data_publish(args: argparse.Namespace) -> None:
         notice(f"✗ {len(failed)} files were not uploaded, {', '.join(failed)}, so nothing "
                "was deleted. Run " + cmd("sm data publish") + " again.", red)
         return
-    _passed(f"Every file is uploaded, and {deleted} other files are deleted.")
-    print("The bot's next message carries the buttons that open them.")
+    _passed(f"Updated {uploaded} files, removed {deleted} in GCS bucket {where.bucket}.")
 
 
 def run_data_unpublish(args: argparse.Namespace) -> None:

@@ -325,7 +325,7 @@ class AfterCommandTest(FilesTestCase):
 
     def publish(self):
         code, out, _err = run_cli(["data", "publish"])
-        self.assertIn("Every file is uploaded", out)
+        self.assertIn("Updated 9 files", out)
         FakeBucket.uploads.clear()
 
     def test_a_database_never_published_uploads_nothing(self):
@@ -442,8 +442,8 @@ class PublishTest(FilesTestCase):
     def test_publish_checks_the_setup_then_uploads_every_file(self):
         use_storage(self)
         _code, out, _err = run_cli(["data", "publish"])
-        self.assertEqual(out.count("✓"), 6, out)
-        # The test file of check 3 is gone with the fill.
+        # The test file of check 3 is gone with the fill, and is not counted.
+        self.assertEqual(out.strip(), f"✓ Updated 9 files, removed 0 in GCS bucket {BUCKET}.")
         self.assertEqual(self.names(), self.expected())
         self.assertEqual(len(test_db.get_page_files()), 9)
         self.assertNotIn(KEY, out)
@@ -472,8 +472,9 @@ class PublishTest(FilesTestCase):
     def test_force_goes_on_and_the_stranger_goes(self):
         use_storage(self)
         FakeBucket.files[(BUCKET, FOLDER, "someone-elses")] = b"x"
-        run_cli(["data", "publish", "--force"])
+        _code, out, _err = run_cli(["data", "publish", "--force"])
         self.assertEqual(self.names(), self.expected())
+        self.assertIn("removed 1 in GCS bucket", out)
 
     def test_after_a_new_bot_token_publish_passes_and_the_old_names_go(self):
         use_storage(self)

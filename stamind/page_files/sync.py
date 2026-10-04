@@ -183,10 +183,11 @@ def strangers(dbh, where: Target, remote) -> List[str]:
             if name != check and where.address(name) not in known]
 
 
-def fill(dbh, where: Target, remote) -> Tuple[List[str], int]:
+def fill(dbh, where: Target, remote) -> Tuple[List[str], int, int]:
     """Uploads every file with no time limit, then deletes every other file in the folder
-    and forgets its row (§9.2). Returns the labels that failed, and how many files were
-    deleted; nothing is deleted when an upload failed."""
+    and forgets its row (§9.2). Returns the labels that failed, how many files were
+    uploaded, and how many were deleted, the test file of `sm data publish` aside; nothing
+    is deleted when an upload failed."""
     files = build(dbh, clock.today_str(), every_month=True)
     written, failed = set(), []
     # The index file goes last: commands upload once its row exists (§6, step 1).
@@ -196,15 +197,17 @@ def fill(dbh, where: Target, remote) -> Tuple[List[str], int]:
             continue
         written.add(where.name(label))
     if failed:
-        return failed, 0
+        return failed, len(written), 0
+    check = where.name(CHECK)
     deleted = 0
     for name in remote.names():
         if name in written:
             continue
         remote.delete(name)
         dbh.forget_page_file(where.address(name))
-        deleted += 1
-    return [], deleted
+        if name != check:
+            deleted += 1
+    return [], len(written), deleted
 
 
 def remove(dbh, where: Target, remote) -> int:
