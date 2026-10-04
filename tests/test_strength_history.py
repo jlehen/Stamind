@@ -242,7 +242,7 @@ class SessionsAsDoneTest(_HistoryCase):
             "    SQUAT/BELT_SQUAT 2×5 @ 40 + SHOULDER_PRESS/BARBELL_PUSH_PRESS 2×5 @ 40"
             " + PULL_UP/LAT_PULLDOWN 2×5 @ 40",
             "    SQUAT/LEG_PRESS 2×10 @ 20 + DEADLIFT/ROMANIAN_DEADLIFT 2×10 @ 20"
-            " + HIP_SWING/ONE_ARM_SWING 2×10 @ 20 + SQUAT/DUMBBELL_STEP_UP 2×10 @ 20"
+            " + HIP_SWING/ONE_ARM_SWING 2×10/side @ 20 + SQUAT/DUMBBELL_STEP_UP 2×10/side @ 20"
             " + BANDED_EXERCISES/GLUTE_BRIDGE 2×10 @ 20",
         ])
 
@@ -269,7 +269,7 @@ class SessionsAsDoneTest(_HistoryCase):
             "    SQUAT/LEG_PRESS 1×12 @ 70 (not prescribed)",
             "    DEADLIFT/ROMANIAN_DEADLIFT 1×10 @ 60",
         ])
-        self.assertIn("  Tue Sep 15: SQUAT/DUMBBELL_STEP_UP 3×6–8 @ 32", self.entries())
+        self.assertIn("  Tue Sep 15: SQUAT/DUMBBELL_STEP_UP 3×6–8/side @ 32", self.entries())
 
     def test_a_day_with_no_prescription_has_no_marks(self):
         """Everything in it was the athlete's own choice."""
@@ -302,7 +302,7 @@ class SessionsAsDoneTest(_HistoryCase):
             "    SQUAT/LEG_PRESS 1×12 @ 70 (not prescribed)",
             "  Tue Sep 15, 20:10, 60 min, 2 sets, RPE 2",
             "    SQUAT/GOBLET_SQUAT 1×12 @ 16",
-            "    HIP_SWING/ONE_ARM_SWING 1×20 @ 16",
+            "    HIP_SWING/ONE_ARM_SWING 1×20/side @ 16",
         ])
 
     def test_the_recent_days_key_decides_how_many_days_are_shown(self):

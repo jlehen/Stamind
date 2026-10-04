@@ -23,6 +23,8 @@ export const LOG_OUT_OF_DATE = "This log is out of date and cannot be opened.";
 export const UNDO_DEPTH = 50;
 
 const EN_DASH = "–";
+// What follows the reps of an exercise done one side at a time, as in the coach's own lines.
+export const SIDE_MARK = "/side";
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
                 "Dec"];
@@ -207,7 +209,8 @@ export function storageKey(revision) {
   return `stamind-gym-v${STATE_VERSION}-r${revision}`;
 }
 
-export function prescriptionLine(exercise) {
+// "3×8–10/side @ 30 kg" when the exercise is done one side at a time (`perSideOf`).
+export function prescriptionLine(exercise, perSide = false) {
   if (exercise.s === null) {
     return "added";
   }
@@ -219,7 +222,8 @@ export function prescriptionLine(exercise) {
   } else if (lo !== null || hi !== null) {
     reps = String(hi ?? lo);
   }
-  const scheme = reps ? `${exercise.s}×${reps}` : `${exercise.s} sets`;
+  const side = perSide ? SIDE_MARK : "";
+  const scheme = reps ? `${exercise.s}×${reps}${side}` : `${exercise.s} sets`;
   if (exercise.kg === null) {
     return scheme;
   }
@@ -572,9 +576,9 @@ export function lastSetSeconds(state) {
 
 // ---------------------------------------------------------------------------------------
 // The exercise catalog, `exercises.json` (DESIGN_exercise_table.md §8): one row per class, with
-// its key `k`, its words `w`, its pattern `p`, its gear `g`, whether it is bodyweight `b`, and
-// its photos id `f`. The page searches the words, prints them as `shown` writes them, and
-// stores and sends the key.
+// its key `k`, its words `w`, its pattern `p`, its gear `g`, whether it is bodyweight `b`, its
+// photos id `f`, and `o` when it is done one side at a time. The page searches the words,
+// prints them as `shown` writes them, and stores and sends the key.
 // ---------------------------------------------------------------------------------------
 
 // The words of "squat: belt squat" after the category, or all of them when there is none.
@@ -653,6 +657,13 @@ export function photosOf(catalog, key) {
 export function patternOf(catalog, key) {
   const row = catalog.find((entry) => entry.k === key);
   return row ? row.p : null;
+}
+
+// Whether a key is done one side at a time: its reps are per side and a set is both sides
+// (DESIGN_strength_tracking.md §4).
+export function perSideOf(catalog, key) {
+  const row = catalog.find((entry) => entry.k === key);
+  return Boolean(row && row.o);
 }
 
 // ---------------------------------------------------------------------------------------

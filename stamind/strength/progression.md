@@ -9,11 +9,27 @@ Where this file and the athlete's own science guidelines disagree, the athlete's
 
 **A load is the weight moved in one rep.** Two 30 kg dumbbells pressed together is 60. One
 arm at a time is 30. A renegade row is 30, because only one dumbbell leaves the floor at a
-time. Reps on a one-sided exercise are per side.
+time.
 
 This is how the athletes on this instance log their sets, so the history is already written
 this way and what you prescribe has to be too. Name the pair when it helps: "dumbbell bench
 3×8 @ 60 (2×30)".
+
+## One side at a time
+
+Some exercises are done by one side of the body at a time: a one-arm row, a split squat, a
+side plank. EXERCISES STAMIND KNOWS marks them "per side". For these:
+
+- **The reps are per side.** 8 is 8 with the left and 8 with the right.
+- **A set is both sides.** `3×8` is three sets, and each set is 8 on one side and then 8 on
+  the other. It is never three sets shared out between the sides.
+- **The sides taking turns changes nothing.** An alternating curl, a lunge or a dead bug at
+  `3×8` is 8 on each side, 16 movements a set.
+
+The athlete reads such a line as `3×8/side @ 30`, and the history shows the sets done the
+same way. A rep range is read per side like any other range: 8 per side against `8–10` is
+the bottom of the range, not 16 above it. In the notes, say "per side" wherever you give a
+number of reps for one of these exercises.
 
 ## Double progression
 

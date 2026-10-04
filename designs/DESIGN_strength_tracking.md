@@ -305,13 +305,46 @@ stay the goblet squat's: nothing adds them to the back squat's history.
 **The load convention** is the athlete's, not Garmin's, because the athlete types or
 corrects the weight: **the load is the weight moved in one rep**. Two 30 kg dumbbells
 pressed together is 60; one arm at a time is 30; a renegade row is 30, because only one
-dumbbell leaves the floor at a time. Reps on a one-sided exercise are per side. Garmin's
-entry screen and most lifters write the weight of one dumbbell instead, and nothing in
-the data can tell the two apart, so this is a fact about the person: **both athletes on
-this instance log the pair.** It is not a setting until an athlete who logs per hand
-exists. The convention is stated once, here and in the shipped strength science file
-(§10), so the athlete logs and the strength planner writes the same way ("dumbbell bench
-3×8 @ 60 (2×30)").
+dumbbell leaves the floor at a time. Garmin's entry screen and most lifters write the
+weight of one dumbbell instead, and nothing in the data can tell the two apart, so this is
+a fact about the person: **both athletes on this instance log the pair.** It is not a
+setting until an athlete who logs per hand exists. The convention is stated once, here and
+in the shipped strength science file (§10), so the athlete logs and the strength planner
+writes the same way ("dumbbell bench 3×8 @ 60 (2×30)").
+
+**The sides convention.** An exercise is one-sided when one side of the body does the rep
+and the other side then does the same work: a one-arm row, a split squat, a side plank.
+Athletes read `4×8` on such an exercise in three ways: four sets of 8 with each arm, two
+sets with each arm, or four sets of 8 counting both arms together. The world has no single
+rule either. Strength coaches and strength logging apps mostly count per side and write
+"per side" to say so; bodyweight apps such as Freeletics count both sides together. So
+Stamind picks one rule and prints it on the line:
+
+- **The reps are per side.** 8 is 8 with the left and 8 with the right.
+- **A set is both sides.** `4×8` is four sets, each of them 8 on one side and then 8 on the
+  other.
+- **Sides that take turns follow the same rule.** An alternating curl, a lunge or a dead bug
+  at `4×8` is 8 on each side, 16 movements a set. A lunge can be done either way under one
+  Garmin name, so a rule that depended on the way would make one line mean two numbers.
+
+Per side is the count that compares with a two-sided exercise. Each arm does 8 reps at the
+load, so 8 is read against an `8–10` range; 16 would look far above the range and raise the
+load too early.
+
+It is Thursday. The session holds a one-arm row at `4×8–10/side @ 30 kg`. The athlete rows
+30 kg nine times with the left arm, then nine times with the right. That is set 1 of 4, and
+they log 9.
+
+The exercise table marks the one-sided exercises (DESIGN_exercise_table.md §3.8). Every
+place that prints reps for one of them adds `/side`: the session's exercise lines, the sets
+done, the strength history, the gym logger's card, the label under its reps number, and its
+Markdown export. The strength planner's list says "per side" on the same exercises, and the
+shipped strength science file states the three rules.
+
+Not handled: an exercise whose name fits both ways, such as a calf raise done on one leg.
+Its line is unmarked, and the athlete picks the one-leg name to have it marked. Not handled
+either: the count Garmin's watch gives. It counts what the arm wearing it does, and the
+athlete corrects it.
 
 ## 5. Data model
 
@@ -1769,8 +1802,9 @@ Decided:
   exercise written at the next one's numbers; the plan decides when a week is light, the
   file how much comes off, the rows remember it, and the week after resumes from the day
   before the light one.
-- The load is the weight moved in one rep; reps on one-sided exercises are per side; both
-  athletes on this instance log the pair.
+- The load is the weight moved in one rep; both athletes on this instance log the pair.
+- On an exercise done one side at a time the reps are per side and a set is both sides,
+  whether a side finishes first or the two take turns; the line says so as `4×8/side` (§4).
 
 Open:
 

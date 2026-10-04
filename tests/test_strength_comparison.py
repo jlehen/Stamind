@@ -299,7 +299,8 @@ class RenderTest(unittest.TestCase):
             "row: seated cable row; flye: cable crossover; hip raise: hip thrust machine",
             "      ✅ Bench press: machine chest press instead of shoulder press: barbell "
             "push press",
-            "      ❌ Core: russian twist, lighter: 1×20 @ 15, 1×20 @ 20 (planned 2×20 @ 30)",
+            "      ❌ Core: russian twist, lighter: 1×20/side @ 15, 1×20/side @ 20 "
+            "(planned 2×20/side @ 30)",
             "      ➕ Plank 1×120",
         ])
 

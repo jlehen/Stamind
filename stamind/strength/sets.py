@@ -187,8 +187,10 @@ def reps_and_load(
 
 
 def set_chunks(sets: Sequence[Dict[str, Any]]) -> str:
-    """'1×5 @ 40, 4×4 @ 80': the sets as they were done, consecutive equal ones collapsed.
-    A set with no reps is a timed one and shows its seconds (§7, §8)."""
+    """'1×5 @ 40, 4×4 @ 80': one exercise's sets as they were done, consecutive equal ones
+    collapsed. A set with no reps is a timed one and shows its seconds (§7, §8). An exercise
+    done one side at a time says so after its reps: '3×8/side @ 30' (§4)."""
+    side = vocabulary.side_mark(sets[0].get("exercise")) if sets else ""
     chunks: List[List[Any]] = []
     for s in sets:
         key = (s["reps"], s["load_kg"],
@@ -201,7 +203,7 @@ def set_chunks(sets: Sequence[Dict[str, Any]]) -> str:
     for (reps, load_kg, duration), count in chunks:
         amount = str(reps) if reps is not None else f"{round(duration or 0)}s"
         weight = f" @ {fmt_kg(load_kg)}" if load_kg else ""
-        parts.append(f"{count}×{amount}{weight}")
+        parts.append(f"{count}×{amount}{side}{weight}")
     return ", ".join(parts)
 
 

@@ -4,7 +4,7 @@ gives for a key and for a Garmin name."""
 import unittest
 from collections import Counter
 
-from stamind.strength import vocabulary
+from stamind.strength import prescription, sets, vocabulary
 
 
 def table_lines():
@@ -149,11 +149,59 @@ class ClassTest(unittest.TestCase):
         self.assertFalse(vocabulary.implausible("SQUAT/MOON_SQUAT", 100.0))
 
     def test_the_line_the_strength_planner_is_shown(self):
-        """§7: the key, then the pattern, the main muscles and the gear."""
+        """§7: the key, then the pattern, the main muscles and the gear, then "per side" on
+        an exercise done one side at a time."""
         self.assertEqual(vocabulary.model_line("SQUAT/BARBELL_BACK_SQUAT"),
                          "SQUAT/BARBELL_BACK_SQUAT (squat; QUADS, GLUTES; Barbell, Squat Rack)")
         self.assertEqual(vocabulary.model_line("POSE/WHEEL"), "POSE/WHEEL (Nothing)")
         self.assertEqual(vocabulary.model_line("SQUAT/MOON_SQUAT"), "SQUAT/MOON_SQUAT")
+        self.assertEqual(
+            vocabulary.model_line("ROW/ONE_ARM_BENT_OVER_ROW"),
+            "ROW/ONE_ARM_BENT_OVER_ROW (pull_horizontal; LATS, TRAPS; Dumbbells; per side)")
+
+
+class PerSideTest(unittest.TestCase):
+    """The reps column (§3.8) and the mark it puts after the reps
+    (DESIGN_strength_tracking.md §4)."""
+
+    def test_the_reps_column_is_per_side_or_empty(self):
+        with open(vocabulary.TABLE_PATH, encoding="utf-8") as table:
+            for line in table:
+                if line.startswith("#") or not line.strip():
+                    continue
+                fields = line.rstrip("\n").split("\t")
+                self.assertLessEqual(len(fields), 6, fields[0])
+                if len(fields) == 6:
+                    self.assertIn(fields[5], ("", vocabulary.PER_SIDE), fields[0])
+
+    def test_one_side_at_a_time_is_marked_whether_the_sides_take_turns_or_not(self):
+        for key in ("ROW/ONE_ARM_BENT_OVER_ROW", "LUNGE/DUMBBELL_BULGARIAN_SPLIT_SQUAT",
+                    "LUNGE/WALKING_LUNGE", "CURL/ALTERNATING_DUMBBELL_BICEPS_CURL",
+                    "PLANK/SIDE_PLANK"):
+            self.assertTrue(vocabulary.get(key).per_side, key)
+        for key in ("SQUAT/BARBELL_BACK_SQUAT", "PULL_UP/PULL_UP", "ROW/DUMBBELL_ROW",
+                    "CALF_RAISE/CALF_RAISE"):
+            self.assertFalse(vocabulary.get(key).per_side, key)
+
+    def test_the_mark_follows_the_reps_wherever_they_are_printed(self):
+        row = "ROW/ONE_ARM_BENT_OVER_ROW"
+        self.assertEqual(vocabulary.side_mark(row), "/side")
+        self.assertEqual(vocabulary.side_mark("SQUAT/BARBELL_BACK_SQUAT"), "")
+        self.assertEqual(vocabulary.side_mark("SQUAT/MOON_SQUAT"), "")
+        self.assertEqual(vocabulary.side_mark(None), "")
+        planned = [
+            {"exercise": row, "sets": 1, "reps_low": 8, "reps_high": 8, "load_kg": 20.0},
+            {"exercise": row, "sets": 3, "reps_low": 8, "reps_high": 10, "load_kg": 30.0},
+        ]
+        self.assertEqual(prescription.spec(planned), "1×8/side @ 20, 3×8–10/side @ 30")
+        done = [{"exercise": row, "reps": 9, "load_kg": 30.0, "duration_sec": 40.0}] * 3
+        self.assertEqual(sets.set_chunks(done), "3×9/side @ 30")
+        held = [{"exercise": "PLANK/SIDE_PLANK", "reps": None, "load_kg": None,
+                 "duration_sec": 30.0}] * 2
+        self.assertEqual(sets.set_chunks(held), "2×30s/side")
+        squat = [{"exercise": "SQUAT/BARBELL_BACK_SQUAT", "reps": 5, "load_kg": 100.0,
+                  "duration_sec": 20.0}]
+        self.assertEqual(sets.set_chunks(squat), "1×5 @ 100")
 
 
 class SimilarTest(unittest.TestCase):

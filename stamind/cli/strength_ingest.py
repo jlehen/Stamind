@@ -62,13 +62,15 @@ def _revision(revision_id: Optional[int]) -> Optional[Workout]:
 
 def _done(entry: logger.Entry) -> str:
     """'5 @ 120, 6 @ 140, 5 @ 140': one exercise's sets as they were done. A set with no
-    weight is its reps alone."""
+    weight is its reps alone. An exercise done one side at a time says so after its reps:
+    '8/side @ 30' (DESIGN_strength_tracking.md §4)."""
+    side = vocabulary.side_mark(entry.name)
     parts = []
     for done in entry.sets:
         if done.load_kg is None:
-            parts.append(str(done.reps))
+            parts.append(f"{done.reps}{side}")
             continue
-        parts.append(f"{done.reps} @ {sets.fmt_kg(done.load_kg)}")
+        parts.append(f"{done.reps}{side} @ {sets.fmt_kg(done.load_kg)}")
     return ", ".join(parts)
 
 

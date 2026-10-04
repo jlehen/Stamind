@@ -108,10 +108,12 @@ is part of what the exercise is: BANDED_EXERCISES/GLUTE_BRIDGE is the glute brid
 band. The strength history and the sessions already written name exercises by the same keys.
 In the list, each key is followed, in brackets, by its movement pattern, its main muscles and
 the gear it needs. Every item of the gear is needed. Where an exercise has no movement
-pattern, or no muscles on record, the brackets leave that part out. Pick exercises the day's
-equipment allows: a travel week with dumbbells only gets goblet squats and dumbbell Romanian
-deadlifts where the home gym had the belt squat and the barbell. A substitution is a
-different exercise doing the same pattern's job, and it keeps its own history.
+pattern, or no muscles on record, the brackets leave that part out. The brackets end with
+"per side" on an exercise done one side at a time: its reps are per side and one set is both
+sides (HOW TO PROGRESS). Pick exercises the day's equipment allows: a travel week with
+dumbbells only gets goblet squats and dumbbell Romanian deadlifts where the home gym had the
+belt squat and the barbell. A substitution is a different exercise doing the same pattern's
+job, and it keeps its own history.
 
 An exercise whose gear holds Dumbbells can be done with kettlebells of the same weight, and
 an exercise whose gear holds Kettlebells can be done with dumbbells of the same weight. It is
@@ -157,7 +159,7 @@ You MUST respond with a JSON object containing:
           "exercise": "SQUAT/BELT_SQUAT", (the key, exactly as EXERCISES STAMIND KNOWS
             spells it)
           "sets": 3,
-          "reps_low": 4,
+          "reps_low": 4, (per side on an exercise marked "per side")
           "reps_high": 6, (equal to "reps_low" for a fixed rep count)
           "load_kg": 140 (the weight moved in one rep; null for a bodyweight exercise with
             nothing added)

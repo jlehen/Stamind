@@ -69,6 +69,13 @@ test("after a set is ticked, the export holds the ticked sets, notes and the tim
   ].join("\n"));
 });
 
+test("an exercise done one side at a time says so after its reps in the export", () => {
+  const catalog = [{ k: "ROW/ONE_ARM_BENT_OVER_ROW", w: "row: one arm bent over row", o: true }];
+  const row = { n: "ROW/ONE_ARM_BENT_OVER_ROW", s: 3, lo: 8, hi: 10, kg: 30 };
+  assert.match(toMarkdown(logic.newState({ ...SESSION, x: [row] }), START, catalog),
+               /^- \[Row\] One arm bent over row: 3x10\/side \(30 kg\)$/m);
+});
+
 test("a card marked as a warm-up says so in the export", () => {
   const state = logic.toggleWarmup(logic.newState(SESSION), 2);
   assert.match(toMarkdown(state, START, CATALOG),

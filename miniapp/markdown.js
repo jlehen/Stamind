@@ -1,7 +1,7 @@
 // The gym logger's "Export to Markdown" (DESIGN_gym_logger.md §1): the session as a few lines
 // of Markdown for the athlete's own training notes. No DOM here, so `node --test` runs it.
 // "?v=dev" becomes the commit at deploy, like the imports in app.js (DESIGN_gym_logger.md §2).
-import { clockAt, doneSetCount, formatClock, formatKg, localDate, wordsOf }
+import { clockAt, doneSetCount, formatClock, formatKg, localDate, perSideOf, SIDE_MARK, wordsOf }
   from "./logic.js?v=dev";
 
 const EN_DASH = "–";
@@ -28,7 +28,8 @@ export function toMarkdown(state, now, catalog) {
       continue;
     }
     const kind = exercise.warmup ? " (warm-up)" : "";
-    let line = `- ${wordsOf(catalog, exercise.n)}${kind}: ${setRuns(sets)}`;
+    const side = perSideOf(catalog, exercise.n) ? SIDE_MARK : "";
+    let line = `- ${wordsOf(catalog, exercise.n)}${kind}: ${setRuns(sets, side)}`;
     if (exercise.note && exercise.note.trim()) {
       line += ` ${EM_DASH} ${exercise.note.trim()}`;
     }
@@ -41,7 +42,8 @@ export function toMarkdown(state, now, catalog) {
 }
 
 // Consecutive sets with the same reps and load read as one run: "1x5 (120 kg), 2x6 (140 kg)".
-function setRuns(sets) {
+// `side` follows the reps of an exercise done one side at a time: "3x8/side (30 kg)".
+function setRuns(sets, side) {
   const runs = [];
   for (const set of sets) {
     const last = runs[runs.length - 1];
@@ -53,6 +55,6 @@ function setRuns(sets) {
   }
   return runs.map((run) => {
     const load = run.kg === null ? "bodyweight" : `${formatKg(run.kg)} kg`;
-    return `${run.count}x${run.reps} (${load})`;
+    return `${run.count}x${run.reps}${side} (${load})`;
   }).join(", ");
 }

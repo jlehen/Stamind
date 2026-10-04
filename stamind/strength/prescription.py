@@ -77,13 +77,16 @@ def rebrief(description: Optional[str], brief: str) -> str:
 
 def spec(rows: Sequence[Dict[str, Any]]) -> str:
     """'1×5 @ 120, 3×4–6 @ 140': one exercise's entries, in the order they are done. An
-    exercise written at several loads prints every entry, warm-up and working sets alike."""
+    exercise written at several loads prints every entry, warm-up and working sets alike. An
+    exercise done one side at a time says so after its reps: '3×8–10/side @ 30'
+    (DESIGN_strength_tracking.md §4)."""
     parts = []
     for row in rows:
         low, high = row["reps_low"], row["reps_high"]
         reps = f"{low}–{high}" if low != high else str(low)
+        side = vocabulary.side_mark(row.get("exercise"))
         load = f" @ {sets.fmt_kg(row['load_kg'])}" if row.get("load_kg") is not None else ""
-        parts.append(f"{row['sets']}×{reps}{load}")
+        parts.append(f"{row['sets']}×{reps}{side}{load}")
     return ", ".join(parts)
 
 

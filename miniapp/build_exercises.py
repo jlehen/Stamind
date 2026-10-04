@@ -21,7 +21,8 @@ OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exercises.j
 
 def rows():
     """Every class as the page reads it: its key, its words, its pattern, its gear, whether
-    it is bodyweight, and the Free Exercise DB id of its photos when it has one."""
+    it is bodyweight, the Free Exercise DB id of its photos when it has one, and a mark when
+    it is done one side at a time."""
     listed = []
     for exercise in vocabulary.all_exercises():
         row = {
@@ -30,6 +31,8 @@ def rows():
         }
         if exercise.photos:
             row["f"] = exercise.photos
+        if exercise.per_side:
+            row["o"] = True
         listed.append(row)
     return listed
 

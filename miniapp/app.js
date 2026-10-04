@@ -286,7 +286,8 @@ function exerciseCard(exercise, xi) {
     ? "Warm-up sets, tap to mark them as the main sets"
     : "Main sets, tap to mark them as warm-up sets");
   line.append(kind);
-  line.append(el("span", "card-pres", logic.prescriptionLine(exercise)));
+  line.append(el("span", "card-pres",
+    logic.prescriptionLine(exercise, logic.perSideOf(catalog, exercise.n))));
   name.append(line);
   head.append(name);
   const moves = el("div", "moves");
@@ -351,9 +352,12 @@ function setRow(exercise, xi, set, si) {
   const row = el("div", set.done ? "set done" : "set");
   row.append(el("div", "set-index", String(si + 1)));
 
+  const perSide = logic.perSideOf(catalog, exercise.n);
   row.append(stepper({
     value: String(set.reps),
-    unit: "reps",
+    // A set of an exercise done one side at a time is both sides, and its reps are per side.
+    unit: perSide ? logic.SIDE_MARK : "reps",
+    label: perSide ? "reps per side" : "reps",
     onMinus: () => apply(logic.bumpReps(state, xi, si, -logic.REP_STEP), id),
     onPlus: () => apply(logic.bumpReps(state, xi, si, logic.REP_STEP), id),
     onType: (text, field) => {
@@ -392,7 +396,7 @@ function stepper(spec) {
   field.type = "text";
   field.inputMode = "decimal";
   field.value = spec.value;
-  field.setAttribute("aria-label", spec.unit);
+  field.setAttribute("aria-label", spec.label || spec.unit);
   field.addEventListener("focus", () => field.select());
   field.addEventListener("change", () => spec.onType(field.value, field));
   // The unit under the number, so reps and kilograms cannot be told apart by position only.

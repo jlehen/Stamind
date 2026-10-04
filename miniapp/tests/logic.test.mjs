@@ -85,6 +85,17 @@ test("the prescription line reads the way the coach wrote it", () => {
   assert.equal(logic.prescriptionLine(added.x[2]), "added");
 });
 
+test("an exercise done one side at a time says so after its reps", () => {
+  // `o` is the catalog's mark for it: the reps are per side and a set is both sides.
+  const catalog = [...CATALOG, { k: "ROW/ONE_ARM_BENT_OVER_ROW", o: true }];
+  assert.equal(logic.perSideOf(catalog, "ROW/ONE_ARM_BENT_OVER_ROW"), true);
+  assert.equal(logic.perSideOf(catalog, "SQUAT/BELT_SQUAT"), false);
+  assert.equal(logic.perSideOf(catalog, "SQUAT/MOON_SQUAT"), false);
+  const row = { s: 3, lo: 8, hi: 10, kg: 30 };
+  assert.equal(logic.prescriptionLine(row, true), "3×8–10/side @ 30 kg");
+  assert.equal(logic.prescriptionLine(row, false), "3×8–10 @ 30 kg");
+});
+
 test("the log holds the done sets only, and the day comes from the phone's clock", () => {
   let state = exampleState();
   state = tickSet(state, 0, 0, 40);

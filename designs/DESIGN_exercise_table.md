@@ -51,11 +51,12 @@ After this design, the first week reads: the athlete picks "Squat: barbell back 
 
 ### 3.1 A line
 
-Five columns, separated by tabs. Lines starting with `#` are comments.
+Six columns, separated by tabs. Lines starting with `#` are comments.
 
 ```
-# names	pattern	muscles	gear	photos
+# names	pattern	muscles	gear	photos	reps
 SQUAT/BARBELL_BACK_SQUAT	squat	QUADS,GLUTES|HAMSTRINGS	Barbell, Squat Rack	Barbell_Squat
+ROW/ONE_ARM_BENT_OVER_ROW	pull_horizontal	LATS,TRAPS|BICEPS,LOWER_BACK,SHOULDERS	Dumbbells	One-Arm_Dumbbell_Row	per side
 PULL_UP/PULL_UP PULL_UP/WEIGHTED_PULL_UP PULL_UP	pull_vertical	LATS,TRAPS|BICEPS,FOREARM,SHOULDERS	Pull-up Bar
 SANDBAG/BACK_SQUAT	squat	QUADS,GLUTES|HAMSTRINGS	Sandbag
 POSE/WHEEL			Nothing
@@ -260,6 +261,20 @@ The id of the same exercise in Free Exercise DB, for the lines that have one
 were given through a name that had lost its implement, and are dropped: those of today's `kneeling
 crunch`, `chest press` and `back squat`.
 
+### 3.8 Reps
+
+`per side` on an exercise done one side at a time, empty on every other. One side at a time
+means one side of the body does the rep and the other side then does the same work. A side may
+finish its reps first, as in a one-arm row, or the two may take turns, as in an alternating
+curl or a lunge: both are marked. What the mark changes is DESIGN_strength_tracking.md §4.
+
+A name that fits both ways is left unmarked: `ROW/DUMBBELL_ROW` is one arm on a bench or two
+dumbbells bent over, and `CALF_RAISE/CALF_RAISE` is one leg or two. The mark says how the
+exercise is done, and such a name does not say.
+
+No list Stamind reads carries this fact, so the column was filled by reading every name of the
+table twice, once by a person's rule and once blind, and settling where the two differed.
+
 ## 4. What is stored, and what is shown
 
 **Stored: the key.** Everywhere the database holds an exercise today, it holds the key of the
@@ -358,11 +373,13 @@ already do.
 
 **The strength planner.** Everything it is shown names an exercise by its key: its list, the
 history, and the lines that say how a session is written now. Its list holds one class per line,
-as the key, then the pattern, the main muscles and the gear:
+as the key, then the pattern, the main muscles and the gear, then "per side" on an exercise
+done one side at a time (§3.8):
 
 ```
 SQUAT/BELT_SQUAT (squat; QUADS, GLUTES; Machine)
 POSE/WHEEL (Nothing)
+ROW/ONE_ARM_BENT_OVER_ROW (pull_horizontal; LATS, TRAPS; Dumbbells; per side)
 ```
 
 It answers with keys. A Garmin name of the table that is not a key, such as
@@ -388,7 +405,8 @@ strength planner's are. The buttons show the words. Its list goes from 32 kB to 
 
 **The page.** Both payloads keep their shape (DESIGN_gym_logger.md §3, §4) and go to version 2:
 `n` holds a key. `miniapp/exercises.json` gives the page, for each class, the key, the words,
-the pattern, the gear and whether it is bodyweight, with the photos id when there is one. The page
+the pattern, the gear and whether it is bodyweight, with the photos id when there is one and a
+mark when it is done one side at a time (§3.8). The page
 searches the words, prints them as "[Squat] Belt squat" (§4), and sends the key. The state the
 page saves on the phone changes its version too, so a state saved under the old names is not
 read.

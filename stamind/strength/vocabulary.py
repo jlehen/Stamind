@@ -1,11 +1,11 @@
 """The exercise table (DESIGN_exercise_table.md §3, §4).
 
 `exercises.tsv` beside this module holds one class of exercises per line: the Garmin names
-whose kilograms compare, the class's movement pattern, its muscles, the gear it needs, and the
-Free Exercise DB entry whose photos show it. The first name of a line is the class's key, and
-the key is what the database stores. The words a person reads are worked out from the key by
-`words`. The table ships with the code and nobody configures it; a name Garmin adds later is
-added to the file by hand.
+whose kilograms compare, the class's movement pattern, its muscles, the gear it needs, the
+Free Exercise DB entry whose photos show it, and whether its reps are per side. The first name
+of a line is the class's key, and the key is what the database stores. The words a person reads
+are worked out from the key by `words`. The table ships with the code and nobody configures it;
+a name Garmin adds later is added to the file by hand.
 """
 import os
 from dataclasses import dataclass
@@ -44,6 +44,11 @@ ADDED_MARK = "+"
 # leaves behind.
 LINK_WORDS = {"", "A", "AND", "AT", "FROM", "IN", "ON", "THE", "TO", "WITH"}
 
+# The table's word for an exercise done one side at a time, and what follows its reps wherever
+# they are printed: "3×8/side" (DESIGN_strength_tracking.md §4).
+PER_SIDE = "per side"
+SIDE_MARK = "/side"
+
 TABLE_PATH = os.path.join(os.path.dirname(__file__), "exercises.tsv")
 
 
@@ -62,6 +67,9 @@ class Exercise:
     photos: Optional[str] = None
     # An exercise Garmin has no name for (§3.3).
     added: bool = False
+    # One side does the rep, then the other: its reps are per side and a set is both sides
+    # (DESIGN_strength_tracking.md §4).
+    per_side: bool = False
 
     @property
     def bodyweight(self) -> bool:
@@ -87,14 +95,15 @@ def _table() -> Tuple[Dict[str, Exercise], Dict[str, str]]:
         for line in table:
             if not line.strip() or line.startswith("#"):
                 continue
-            fields = (line.rstrip("\n").split("\t") + [""] * 4)[:5]
-            listed, pattern, muscles, gear, photos = fields
+            fields = (line.rstrip("\n").split("\t") + [""] * 5)[:6]
+            listed, pattern, muscles, gear, photos, reps = fields
             names = tuple(listed.lstrip(ADDED_MARK).split())
             main, _, secondary = muscles.partition("|")
             exercise = Exercise(
                 key=names[0], names=names, pattern=pattern, muscles=_listed(main, ","),
                 secondary=_listed(secondary, ","), gear=_listed(gear, ", "),
                 photos=photos or None, added=listed.startswith(ADDED_MARK),
+                per_side=reps == PER_SIDE,
             )
             classes[exercise.key] = exercise
             for name in names:
@@ -163,13 +172,25 @@ def similar(key: str, own: Collection[str], most: int) -> List[str]:
     return [other for *_, other in sorted(found)][:most]
 
 
+def side_mark(key: Optional[str]) -> str:
+    """What follows the reps of this exercise where they are printed: '/side' when it is done
+    one side at a time, nothing otherwise (DESIGN_strength_tracking.md §4)."""
+    known = get(key)
+    if known is None or not known.per_side:
+        return ""
+    return SIDE_MARK
+
+
 def model_line(key: str) -> str:
     """A class as the strength planner is shown it (§7): 'SQUAT/BELT_SQUAT (squat; QUADS,
-    GLUTES; Machine)'. A key the table lacks is the key alone."""
+    GLUTES; Machine)', with 'per side' last on an exercise done one side at a time. A key the
+    table lacks is the key alone."""
     known = get(key)
     if known is None:
         return key
     tags = [known.pattern, ", ".join(known.muscles), ", ".join(known.gear)]
+    if known.per_side:
+        tags.append(PER_SIDE)
     return f"{key} ({'; '.join(tag for tag in tags if tag)})"
 
 
