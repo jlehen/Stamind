@@ -2,13 +2,13 @@
 (DESIGN_progress_timeline.md §7.1).
 
 Pure formatting over the `assemble_timeline` payload — no database, no dispatch — laid
-out to the bot's 48-column budget so a TTY and Telegram render identically. Widths are
-measured with `visible_len` (emoji are double-width), never `len`. The zone grid drawn
-under this table is `cli/progress_zones.py`, which shares this file's week column, band
-walk and column budget."""
+out at a fixed `LOAD_TABLE_WIDTH`, whatever the terminal. Widths are measured with
+`visible_len` (emoji are double-width), never `len`. The zone grid drawn under this
+table is `cli/progress_zones.py`, which shares this file's week column and band walk
+and keeps its own narrower `TABLE_WIDTH`."""
 from typing import Any, Dict, List, Optional
 
-from stamind.analytics import progression
+from stamind.analytics import progression, zone_tables
 from stamind.analytics.pmc import color_tsb
 from stamind.text import bold, cmd, dim, gray, green, pad_visible, visible_len, yellow
 from stamind.clock import fmt_date, parse_date
@@ -18,8 +18,9 @@ SPARK_CHARS = "▁▂▃▄▅▆▇█"  # ▁..█
 BAR_WIDTH = 12
 WEEK_COL_WIDTH = 11
 NUM_COL_WIDTH = 4
-TABLE_WIDTH = 48  # the bot's column budget; the band rule may use all of it
-BAND_LABEL_WIDTH = TABLE_WIDTH - 5  # '── ' + label + ' ' + at least one closing '─'
+HOURS_COL_WIDTH = 6  # 'h.plan'; the widest value is '12h30'
+LOAD_TABLE_WIDTH = 54  # the load table's rows and band rules
+BAND_FRAME_WIDTH = 5  # '── ' + label + ' ' + at least one closing '─'
 
 # The load table's own marker, and a different claim from the zone table's `!`: the week
 # contains an activity whose HR recording was too sparse to trust AND carried no RPE, so
@@ -33,9 +34,9 @@ NO_BAND = object()  # sentinel: no band emitted yet (a real meso_label may be No
 def short_date(date_str: str) -> str:
     """'2026-07-31' -> '07-31'.
 
-    The one place a displayed day carries no weekday: this table is laid out to the
-    bot's 48-column budget, and four more characters per label does not fit. The
-    footer notes spell the weekday out where a plan edge actually matters."""
+    The one place a displayed day carries no weekday: the table's week column has no
+    room for four more characters per label. The footer notes spell the weekday out
+    where a plan edge actually matters."""
     return date_str[5:]
 
 
@@ -94,20 +95,21 @@ def render_bar(
     return "".join(bar)
 
 
-def truncate_label(label: str, width: int = BAND_LABEL_WIDTH) -> str:
+def truncate_label(label: str, width: int) -> str:
     """Truncates a mesocycle label to `width` with a trailing ellipsis."""
     if len(label) <= width:
         return label
     return label[: width - 1] + "…"
 
 
-def band_header(label: Optional[str], width: int = TABLE_WIDTH) -> str:
-    """A mesocycle band rule spanning the table — `── Base Consolidation ─────────`
-    (§7.1). Weeks the plan never governed band under 'unplanned' (§6.1 'no match')."""
-    text = truncate_label(label) if label else "unplanned"
+def band_header(label: Optional[str], width: int) -> str:
+    """A mesocycle band rule spanning a table `width` wide — `── Base Consolidation
+    ─────────` (§7.1). Weeks the plan never governed band under 'unplanned' (§6.1 'no
+    match')."""
+    text = truncate_label(label, width - BAND_FRAME_WIDTH) if label else "unplanned"
     prefix = f"── {text} "
     # At least one closing dash, so the table's right edge stays straight (§7.1);
-    # BAND_LABEL_WIDTH reserves the room.
+    # BAND_FRAME_WIDTH reserves the room.
     return prefix + "─" * max(1, width - visible_len(prefix))
 
 
@@ -123,7 +125,7 @@ def format_form_line(
 
     One decimal on all three, matching `sm status` — `color_tsb` has always printed
     TSB to 1 dp, so rounding CTL/ATL to whole numbers beside it made one line carry
-    two precisions. Single-space separation keeps the trio inside the 48-col budget."""
+    two precisions. Single-space separation keeps the trio on one short line."""
     if ctl is None or atl is None or tsb is None:
         return dim("FORM today   PMC still warming — not enough history yet")
     tag = f" ({source})" if source else ""
@@ -205,6 +207,13 @@ def format_no_plan_banner(lapsed_date: Optional[str]) -> List[str]:
     ]
 
 
+def _hours_cell(seconds: Optional[float]) -> str:
+    """A week's training time in an hours column: '7h10', '45m', '0m'. `—` is for no
+    figure at all, as in the plan column: a week no plan covered."""
+    text = "—" if seconds is None else zone_tables.fmt_duration(seconds)
+    return pad_visible(text, HOURS_COL_WIDTH, align_left=False)
+
+
 def _week_row(week: Dict[str, Any], scale_max: float, today: str) -> str:
     week_label = f"w/c {short_date(week['week_commencing'])}"
     # One marker, one meaning: this row's planned figure spans fewer than seven days —
@@ -220,12 +229,16 @@ def _week_row(week: Dict[str, Any], scale_max: float, today: str) -> str:
         "—" if denom is None else f"{denom:.0f}", NUM_COL_WIDTH, align_left=False
     )
 
+    # The hours planned follow the plan column's rule: the elapsed days of a running week.
+    hours_plan_col = _hours_cell(progression.week_plan_seconds(week))
+
     is_future = week["week_commencing"] > today and not week.get("in_progress")
     bar = render_bar(week["actual_load"], denom, scale_max, is_future)
     if is_future:
-        # No actual and no adherence yet — leave the columns off rather than filling
-        # them with em-dashes the eye has to skip.
-        return f"{week_col} {plan_col}  {bar}"
+        # Nothing done and no adherence yet — leave those columns blank rather than
+        # filling them with em-dashes the eye has to skip.
+        blank = " " * NUM_COL_WIDTH
+        return f"{week_col} {plan_col}  {bar} {blank} {blank} {hours_plan_col}"
 
     actual_col = pad_visible(
         f"{week['actual_load']:.0f}", NUM_COL_WIDTH, align_left=False
@@ -233,16 +246,21 @@ def _week_row(week: Dict[str, Any], scale_max: float, today: str) -> str:
     # A week the plan only half covers has no comparable pair to divide (§3): three
     # planned days over seven trained ones is the 477% the `*` now stands for.
     if denom and not week.get("partial_plan"):
-        pct = f"{round(week['actual_load'] / denom * 100)}%"
+        # Capped to the column's four characters, so the hours stay under their headers.
+        pct = f"{min(round(week['actual_load'] / denom * 100), 999)}%"
     else:
         pct = "—"
     pct_col = pad_visible(pct, NUM_COL_WIDTH, align_left=False)
-    return f"{week_col} {plan_col}  {bar} {actual_col} {pct_col}"
+    hours_done_col = _hours_cell(week.get("actual_seconds", 0.0))
+    return (
+        f"{week_col} {plan_col}  {bar} {actual_col} {pct_col} "
+        f"{hours_plan_col} {hours_done_col}"
+    )
 
 
 def table_rows(weeks: List[Dict[str, Any]], today: str) -> List[str]:
     """The fixed-width WEEKLY LOAD table rows only (header, band rules, one row per
-    week) — the part held to the 48-column budget (§7.1). Legend/warning lines are
+    week) — the part held to `LOAD_TABLE_WIDTH` (§7.1). Legend/warning lines are
     ordinary prose and wrap at the normal CLI width instead. Bar scale is the max
     weekly load among the displayed rows, so it doesn't jump when future weeks
     arrive."""
@@ -258,7 +276,9 @@ def table_rows(weeks: List[Dict[str, Any]], today: str) -> List[str]:
         f"{pad_visible('plan', NUM_COL_WIDTH, align_left=False)}  "
         f"{pad_visible('▓done ▒plan', BAR_WIDTH)} "
         f"{pad_visible('done', NUM_COL_WIDTH, align_left=False)} "
-        f"{pad_visible('adh', NUM_COL_WIDTH, align_left=False)}"
+        f"{pad_visible('adh', NUM_COL_WIDTH, align_left=False)} "
+        f"{pad_visible('h.plan', HOURS_COL_WIDTH, align_left=False)} "
+        f"{pad_visible('h.done', HOURS_COL_WIDTH, align_left=False)}"
     )
     lines = [bold(header)]
 
@@ -268,7 +288,7 @@ def table_rows(weeks: List[Dict[str, Any]], today: str) -> List[str]:
     for week in weeks:
         label = week.get("meso_label")
         if label != current_label:
-            lines.append(gray(band_header(label)))
+            lines.append(gray(band_header(label, LOAD_TABLE_WIDTH)))
             current_label = label
         lines.append(_week_row(week, scale_max, today))
     return lines

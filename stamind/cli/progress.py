@@ -20,7 +20,8 @@ from stamind.output import notice, warn
 from stamind.clock import parse_date, today_str as _today_str
 from stamind.cli.common import ensure_recent_data
 from stamind.cli.progress_load import (
-    format_form_line, format_no_plan_banner, format_objective_projection_lines,
+    LOAD_TABLE_WIDTH, format_form_line, format_no_plan_banner,
+    format_objective_projection_lines,
     format_plan_end_proj, format_plan_gap_banner, format_sparkline_line,
     format_weekly_table, short_date, warning_line, weekday,
 )
@@ -255,7 +256,7 @@ def print_progress_report(
     )
     for line in lines:
         # Table rows are already fixed-width; prose (banners, footnotes) wraps.
-        print(wrap_text(line) if visible_len(line) > 48 else line)
+        print(wrap_text(line) if visible_len(line) > LOAD_TABLE_WIDTH else line)
 
     if mesocycles:
         # Printed outside the loop above: `mesocycle_report` lays one zone cell per line at
@@ -302,7 +303,9 @@ def add_progress_parser(subparsers, pull_bypass_parser):
             "from completed activities, future days from the scheduled sessions, one "
             "fitness/fatigue model (CTL/ATL/TSB) run across the seam. Projects to plan "
             "end (or each objective the plan reaches) so you can see whether the plan "
-            "as written delivers peak fitness with positive form on race day. Add -z "
+            "as written delivers peak fitness with positive form on race day. The "
+            "weekly table ends with the hours planned (h.plan) and the hours done "
+            "(h.done), every recorded activity counted. Add -z "
             "for time-in-zone tables under the load table: TSS folds volume and "
             "intensity into one number, so easy days drifting to tempo read as flat "
             "weekly load and flat adherence. Naming sports implies -z and scopes those "

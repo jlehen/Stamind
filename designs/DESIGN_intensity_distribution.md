@@ -864,16 +864,17 @@ high-volume cycling weeks where the aerobic base is the whole question. Z3 and a
 reach ten hours in a week, so nothing above tempo loses precision anywhere.
 
 That lands the 7-zone power table at **48 columns** and the 5-zone HR table at **38**, both
-inside the budget, and the band rules span the full 48 in every table so the halves align.
-Against the existing `WEEK_COL_WIDTH = 11`: 11 + 6 + 6 + 5×5 = 48 and 11 + 6 + 6 + 3×5 = 38,
-beside a load row of 40. `mesocycle_report` keeps plain `fmt_duration`: it runs at `PROMPT_WIDTH`
-and lays one cell per line at phone width, so width is not its constraint.
+inside the budget, and the band rules span the full 48 in every zone table.
+Against the existing `WEEK_COL_WIDTH = 11`: 11 + 6 + 6 + 5×5 = 48 and 11 + 6 + 6 + 3×5 = 38.
+The load table above them is wider, 54 columns, since it carries the hours per week
+(DESIGN_progress_timeline.md §7.1). `mesocycle_report` keeps plain `fmt_duration`: it runs
+at `PROMPT_WIDTH` and lays one cell per line at phone width, so width is not its constraint.
 
 **The capped cell is a new formatter, and the grid lives with the load table.** `fmt_duration`
 is unchanged — `mesocycle_report` and both prompt paths want `12h30` — so the cap is its own
 function in `cli/progress_zones.py`, beside the grid. The grid belongs with the load table in
 `cli/progress_load.py`, not in `analytics/`: it has to align row for row with that table and
-it shares its week column, band walk and 48-column budget. `analytics/intensity.py` keeps
+it shares its week column and band walk. `analytics/intensity.py` keeps
 the aggregation (`zone_rows`) and `analytics/zone_tables.py` the prompt-width table the
 coach reads.
 
@@ -1049,9 +1050,9 @@ phone width `_lay_out` fits one zone per line, so a single mesocycle with one sp
 currency is about 25 lines, and three mesocycles is seventy-five. That is the opposite of what a
 reader reaching for a coarser grain expects, so the help text says so.
 
-**Width and length.** The HR zone table runs 38 columns, the 7-zone power table 48, the load
-row 40 — all inside the 48-column budget, so Telegram and a TTY render identically, the §7.1
-contract the load table already holds. The cost is vertical: `sm progress -z` over 8
+**Width and length.** The HR zone table runs 38 columns and the 7-zone power table 48, both
+inside the zone tables' 48-column budget; the load table above them runs 54
+(DESIGN_progress_timeline.md §7.1). The cost is vertical: `sm progress -z` over 8
 weeks goes from ~23 lines to ~38 for one sport, and roughly 13 more per additional sport,
 which is what the 10% volume floor exists to bound. That price is what put the tables behind
 `-z` rather than on every invocation. `--weeks` windows them for anyone who wants it shorter.
@@ -1110,8 +1111,8 @@ read row against row.
   header are bare appends, measuring 57 and 84 characters at `width=48` — the 48-column
   contract this section claims is false under `--mesocycles` today. Both are prose; route them
   through `_wrap`. The zone *rows* must not be.
-- **`run_progress` re-wraps any line over 48 columns**, which is exactly what `analytics/zone_tables.py`'s
-  module docstring forbids ("wrapped once here and never re-wrapped downstream — a
+- **`run_progress` re-wraps any line over the load table's 54 columns**, which is exactly
+  what `analytics/zone_tables.py`'s module docstring forbids ("wrapped once here and never re-wrapped downstream — a
   screen-width re-wrap would shred the columns"). **As shipped, only the `--mesocycles` section is
   printed outside that loop** — `mesocycle_report` lays one zone cell per line at phone width and
   genuinely can exceed 48. The weekly zone tables stay inside it, protected by width instead

@@ -235,6 +235,46 @@ class TestWeeklyAggregates(unittest.TestCase):
         week = next(w for w in weeks if w["week_commencing"] == "2026-06-29")
         self.assertEqual(week["planned_load"], 100.0)
 
+    def test_covered_week_sums_planned_time_and_skips_removed_sessions(self):
+        # Monday 90 min + Tuesday 45 min; the removed two-hour session does not count,
+        # and a session with no duration counts as none.
+        workouts = [
+            _w(-4, duration_minutes=90), _w(-3, duration_minutes=45),
+            _w(-2, duration_minutes=120, removed=True), _w(-1),
+        ]
+        weeks = progression.weekly_aggregates([], workouts, TODAY, [])
+        week = next(w for w in weeks if w["week_commencing"] == "2026-06-29")
+        self.assertEqual(week["planned_seconds"], 135 * 60.0)
+
+    def test_week_with_no_session_has_no_planned_time(self):
+        weeks = progression.weekly_aggregates([_act(-4, tss=30.0)], [], TODAY, [])
+        self.assertNotIn("planned_seconds", weeks[0])
+        self.assertIsNone(progression.week_plan_seconds(weeks[0]))
+
+    def test_time_done_counts_every_activity_of_the_week(self):
+        # A 5 h ride on Monday and a 2 h 10 run on Tuesday make a 7 h 10 week.
+        activities = [
+            _act(-4, tss=200.0, duration_sec=18000.0),
+            _act(-3, tss=90.0, duration_sec=7800.0, activity_type="running"),
+        ]
+        weeks = progression.weekly_aggregates(activities, [], TODAY, [])
+        self.assertEqual(weeks[0]["actual_seconds"], 25800.0)
+
+    def test_running_week_compares_against_the_planned_time_of_its_elapsed_days(self):
+        # It is Friday and today's session has not synced: Monday to Thursday asked
+        # for 4 hours, the whole week for 7.
+        workouts = [_w(o, duration_minutes=60) for o in (-4, -3, -2, -1, 0, 1, 2)]
+        weeks = progression.weekly_aggregates([], workouts, TODAY, [])
+        week = next(w for w in weeks if w["week_commencing"] == "2026-06-29")
+        self.assertEqual(week["planned_seconds"], 7 * 3600.0)
+        self.assertEqual(progression.week_plan_seconds(week), 4 * 3600.0)
+
+    def test_finished_week_compares_against_its_whole_planned_time(self):
+        workouts = [_w(o, duration_minutes=60) for o in (-11, -10, -9)]
+        weeks = progression.weekly_aggregates([], workouts, TODAY, [])
+        week = next(w for w in weeks if w["week_commencing"] == "2026-06-22")
+        self.assertEqual(progression.week_plan_seconds(week), 3 * 3600.0)
+
     def test_planned_load_is_label_independent(self):
         # An inferred label must not suppress the planned total (CODE_REVIEW #3).
         spans = [self._span(-4, 2, label="~Base", source="inferred")]

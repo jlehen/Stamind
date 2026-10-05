@@ -2,9 +2,10 @@
 (DESIGN_intensity_distribution.md §9.6).
 
 It lives here rather than in `analytics/zone_tables.py` because it aligns row for row
-with the load table in `cli/progress_load.py` and shares that table's week column, band
-walk and 48-column budget. `analytics/zone_tables.py` keeps the prompt-width table the
-coach reads, and `analytics/intensity.py` the aggregation under both."""
+with the load table in `cli/progress_load.py` and shares that table's week column and
+band walk, within its own `TABLE_WIDTH`. `analytics/zone_tables.py` keeps the
+prompt-width table the coach reads, and `analytics/intensity.py` the aggregation under
+both."""
 import textwrap
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -21,9 +22,11 @@ from stamind.sports import SPORT_MAPPING, canonical_sport
 from stamind.text import asides_enabled, bold, gray, pad_visible, yellow
 from stamind.clock import parse_date
 from stamind.cli.progress_load import (
-    NO_BAND, TABLE_WIDTH, WEEK_COL_WIDTH, band_header, short_date,
+    NO_BAND, WEEK_COL_WIDTH, band_header, short_date,
 )
 
+
+TABLE_WIDTH = 48  # the zone tables' rows, band rules and notes
 
 # Zone-table columns (DESIGN_intensity_distribution.md §9.6). Z1 and Z2 get a sixth
 # character so they keep their minutes past ten hours — the only two zones that ever get
@@ -148,7 +151,7 @@ def zone_table(
     for week in weeks:
         label = week.get("meso_label")
         if label != current_label:
-            lines.append(gray(band_header(label)))
+            lines.append(gray(band_header(label, TABLE_WIDTH)))
             current_label = label
         week_label = f"w/c {short_date(week['week_commencing'])}"
         is_future = (

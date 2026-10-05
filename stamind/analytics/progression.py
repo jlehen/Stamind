@@ -204,6 +204,11 @@ def _load_by_sport(
     return by_sport
 
 
+def _planned_seconds(workouts: List[Dict[str, Any]]) -> float:
+    """The time the given sessions ask for; a session with no duration counts as none."""
+    return sum((w.get("duration_minutes") or 0) * 60.0 for w in workouts)
+
+
 def _week_meso(week_dates: List[str], meso_spans: List[Dict[str, Any]]):
     """Majority-overlap mesocycle label/source for one Monday-aligned week (§6.1):
     the mesocycle covering the most of the week's 7 days wins; a tie favors the later
@@ -235,9 +240,10 @@ def weekly_aggregates(
     the earliest activity/workout date through plan end (or today):
 
         {week_commencing, planned_load, planned_load_by_sport, planned_load_elapsed?,
-         planned_load_elapsed_by_sport?, partial_plan?, in_progress, actual_load,
-         actual_load_by_sport, meso_label, meso_source, zone_rows, sport_seconds,
-         judged_sport_seconds, load_sparse, planned_zone_rows}
+         planned_load_elapsed_by_sport?, planned_seconds?, planned_seconds_elapsed?,
+         partial_plan?, in_progress, actual_load, actual_load_by_sport, actual_seconds,
+         meso_label, meso_source, zone_rows, sport_seconds, judged_sport_seconds,
+         load_sparse, planned_zone_rows}
 
     The `_by_sport` dicts (canonical sport -> load) let a caller tell WHICH sport drove a
     week's gap without re-deriving it — the raw material for DESIGN_mesocycle_progress.md
@@ -277,6 +283,7 @@ def weekly_aggregates(
         actual_load = sum(activity_load(a) for a in week_acts)
         actual_load_by_sport = _load_by_sport(week_acts, activity_load, "activity_type")
         week_workouts = [w for d in week_dates for w in workouts_by_date.get(d, [])]
+        sport_seconds = intensity.sport_durations(week_acts)
 
         meso_label, meso_source = _week_meso(week_dates, meso_spans)
 
@@ -284,6 +291,8 @@ def weekly_aggregates(
             "week_commencing": week_mon,
             "actual_load": actual_load,
             "actual_load_by_sport": actual_load_by_sport,
+            # The hours done, every recorded activity counted (§7.1).
+            "actual_seconds": sum(sport_seconds.values()),
             "in_progress": in_progress,
             "meso_label": meso_label,
             "meso_source": meso_source,
@@ -292,7 +301,7 @@ def weekly_aggregates(
             # activity bucketed by week, and `render_progress` is handed one payload and
             # reads no database — the property the one-payload rule exists to protect.
             "zone_rows": intensity.zone_rows(week_acts),
-            "sport_seconds": intensity.sport_durations(week_acts),
+            "sport_seconds": sport_seconds,
             # The same durations over activities big enough to grade: what the "trained but
             # nothing recorded" `!` reads, so the floor applies there too (§11).
             "judged_sport_seconds": intensity.sport_durations(
@@ -320,6 +329,7 @@ def weekly_aggregates(
             week["planned_load_by_sport"] = _load_by_sport(
                 week_workouts, planned_load, "sport_type"
             )
+            week["planned_seconds"] = _planned_seconds(week_workouts)
             # Elapsed = Mon..yesterday, plus today only once its load has synced
             # (today's §3 source is 'actual'). Including an unfinished today would
             # make an evening athlete read <100% all day (§3).
@@ -337,6 +347,7 @@ def weekly_aggregates(
                 week["planned_load_elapsed_by_sport"] = _load_by_sport(
                     elapsed_workouts, planned_load, "sport_type"
                 )
+                week["planned_seconds_elapsed"] = _planned_seconds(elapsed_workouts)
             else:
                 elapsed_end = week_sun
             # Comparable only if the plan speaks for every day already trained: the
@@ -369,6 +380,16 @@ def week_plan_denom(week: Dict[str, Any]) -> Optional[float]:
     if week.get("in_progress"):
         return week.get("planned_load_elapsed", 0.0)
     return week["planned_load"]
+
+
+def week_plan_seconds(week: Dict[str, Any]) -> Optional[float]:
+    """The time counterpart of `week_plan_denom`: same elapsed-vs-full rule, in seconds
+    of planned sessions. None for a week no plan covered, matching the scalar."""
+    if week.get("planned_seconds") is None:
+        return None
+    if week.get("in_progress"):
+        return week.get("planned_seconds_elapsed", 0.0)
+    return week["planned_seconds"]
 
 
 def week_plan_denom_by_sport(week: Dict[str, Any]) -> Optional[Dict[str, float]]:

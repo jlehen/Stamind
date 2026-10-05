@@ -195,5 +195,58 @@ class TestWeeklyBarsUseTheComparableSlice(unittest.TestCase):
         self.assertEqual(self._planned_heights(weeks), [0])
 
 
+class TestWeekHoursLabels(unittest.TestCase):
+    """§7.2: one hours label per week, in the colour of the bar it speaks for."""
+
+    def _labels(self, weeks):
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+        from stamind.analytics import chart
+
+        fig, ax = plt.subplots()
+        self.addCleanup(plt.close, fig)
+        chart._draw_weekly_bars(ax, mdates, weeks)
+        return [(t.get_text(), t.get_color()) for t in ax.texts]
+
+    def _week(self, monday="2026-06-22", **overrides):
+        week = {"week_commencing": monday, "planned_load": 320.0, "actual_load": 0.0}
+        week.update(overrides)
+        return week
+
+    def test_a_trained_week_shows_the_hours_done_not_the_hours_planned(self):
+        weeks = [self._week(actual_load=300.0, planned_seconds=32400.0,
+                            actual_seconds=25800.0)]
+        self.assertEqual(self._labels(weeks), [("7h10", "tab:blue")])
+
+    def test_a_week_with_nothing_done_shows_the_hours_planned(self):
+        weeks = [self._week(planned_seconds=30600.0, actual_seconds=0.0)]
+        self.assertEqual(self._labels(weeks), [("8h30", "tab:orange")])
+
+    def test_a_running_week_with_nothing_done_shows_the_hours_of_its_elapsed_days(self):
+        # Wednesday morning: Monday and Tuesday asked for 2 h 30 of the week's 8 h 10,
+        # the slice the planned bar under the label is drawn from (§3).
+        weeks = [self._week(in_progress=True, planned_load_elapsed=150.0,
+                            planned_seconds=29400.0, planned_seconds_elapsed=9000.0,
+                            actual_seconds=0.0)]
+        self.assertEqual(self._labels(weeks), [("2h30", "tab:orange")])
+
+    def test_a_week_with_no_plan_and_no_training_gets_no_label(self):
+        weeks = [self._week(planned_load=None, actual_seconds=0.0)]
+        self.assertEqual(self._labels(weeks), [])
+
+    def test_too_many_weeks_for_the_labels_to_stay_apart_draws_none(self):
+        from datetime import date, timedelta
+        from stamind.analytics.chart import MAX_HOURS_LABELS
+
+        first = date(2026, 1, 5)
+        weeks = [
+            self._week((first + timedelta(weeks=i)).isoformat(), actual_load=300.0,
+                       actual_seconds=25800.0)
+            for i in range(MAX_HOURS_LABELS + 1)
+        ]
+        self.assertEqual(self._labels(weeks), [])
+        self.assertEqual(len(self._labels(weeks[:-1])), MAX_HOURS_LABELS)
+
+
 if __name__ == "__main__":
     unittest.main()

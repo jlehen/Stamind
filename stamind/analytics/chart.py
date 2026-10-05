@@ -15,7 +15,8 @@ photo recompression has little to smear.
 from datetime import datetime
 from typing import Any, Dict, List
 
-from stamind.analytics.progression import week_plan_denom
+from stamind.analytics.progression import week_plan_denom, week_plan_seconds
+from stamind.analytics.zone_tables import fmt_duration
 from stamind.clock import fmt_date
 
 
@@ -111,8 +112,11 @@ def render_timeline_png(payload: Dict[str, Any]) -> bytes:
     _draw_weekly_bars(ax_bottom, mdates, weeks)
     _draw_meso_spans(ax_bottom, meso_bands)
     if weeks:
-        # Anchored below the meso label strip, which owns the top of this axis.
-        ax_bottom.legend(loc="upper left", bbox_to_anchor=(0, BAND_LABEL_FLOOR))
+        # Above the axes, on the title's row: inside them it covered the hours label
+        # of a tall first week (§7.2).
+        ax_bottom.legend(
+            loc="lower left", bbox_to_anchor=(0, 1), ncol=2, fontsize=7, frameon=False,
+        )
     ax_bottom.set_title("Weekly Load: Planned vs Actual")
     ax_bottom.grid(True, alpha=0.3)
 
@@ -177,6 +181,10 @@ def _draw_objective_flags(
             _vline_label(ax, mdates.date2num(target_dt), label, "black", "-.")
 
 
+HOURS_FONTSIZE = 6
+MAX_HOURS_LABELS = 26
+
+
 def _draw_weekly_bars(ax, mdates, weeks: List[Dict[str, Any]]) -> None:
     if not weeks:
         return
@@ -190,11 +198,39 @@ def _draw_weekly_bars(ax, mdates, weeks: List[Dict[str, Any]]) -> None:
            label="planned", color="tab:orange", alpha=0.6)
     ax.bar([xi + bar_w / 2 for xi in x], actual, width=bar_w,
            label="actual", color="tab:blue", alpha=0.8)
-    # Headroom for the meso label strip and the legend above the bars (§7.2).
+    _draw_week_hours(ax, x, weeks, planned, actual, bar_w)
+    # Headroom for the meso label strip and the hours labels above the bars (§7.2).
     peak = max(planned + actual, default=0)
     if peak > 0:
         ax.set_ylim(top=peak * 1.5)
     ax.xaxis_date()
+
+
+def _draw_week_hours(ax, x, weeks, planned, actual, bar_w: float) -> None:
+    """One hours label per week, in the colour of the bar it speaks for: the hours done
+    over the pair, or the hours planned over the planned bar of a week with nothing
+    done yet (§7.2)."""
+    # ponytail: a week count stands in for measuring the labels. Past it neighbouring
+    # labels start to touch, so none is drawn; measure or rotate them if the long
+    # ranges turn out to need their hours too.
+    if len(weeks) > MAX_HOURS_LABELS:
+        return
+    for xi, week, plan, done in zip(x, weeks, planned, actual):
+        seconds = week.get("actual_seconds")
+        if seconds:
+            _hours_label(ax, xi, max(plan, done), seconds, "tab:blue")
+            continue
+        seconds = week_plan_seconds(week)
+        if seconds:
+            _hours_label(ax, xi - bar_w / 2, plan, seconds, "tab:orange")
+
+
+def _hours_label(ax, x_num: float, y: float, seconds: float, color: str) -> None:
+    ax.annotate(
+        fmt_duration(seconds), xy=(x_num, y), xytext=(0, 1),
+        textcoords="offset points", ha="center", va="bottom",
+        fontsize=HOURS_FONTSIZE, color=color,
+    )
 
 
 BAND_FONTSIZE = 7

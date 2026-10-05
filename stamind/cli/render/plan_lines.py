@@ -11,11 +11,12 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from stamind.config import config
+from stamind.analytics import zone_tables
 from stamind.analytics.runway import (
     RUNWAY_MESOCYCLE, RUNWAY_PLAN_END_NEXT_GOAL, RUNWAY_SPAN,
 )
 from stamind.text import capitalized, wrap_text
-from stamind.clock import days_between
+from stamind.clock import days_between, parse_date, shift
 from stamind.cli.runway import crossing_the_end, current_runway, runway_buttons
 from stamind.cli.render.session_lines import (
     simple_date_word, simple_span_words, simple_when, sport_emoji,
@@ -43,10 +44,40 @@ def simple_constraint_lines(constraints: List[Dict[str, Any]], today: str) -> Li
     return lines
 
 
+def simple_hours_words(minutes: int) -> str:
+    """A week's training time as the companion says it: '45 min', '11h06'."""
+    if minutes < 60:
+        return f"{minutes} min"
+    return zone_tables.fmt_duration(minutes * 60.0)
+
+
+def simple_week_hours_line(weeks: List[Dict[str, Any]], today: str) -> Optional[str]:
+    """The hours trained last week and so far this week in one sentence; None when
+    neither week holds a minute of activity."""
+    this_monday = shift(today, -parse_date(today).weekday())
+    done = {
+        w["week_commencing"]: round((w.get("actual_seconds") or 0.0) / 60.0)
+        for w in weeks
+    }
+    last_week = done.get(shift(this_monday, -7))
+    this_week = done.get(this_monday)
+    if last_week and this_week:
+        return (
+            f"⏱ You trained {simple_hours_words(last_week)} last week, and "
+            f"{simple_hours_words(this_week)} so far this week."
+        )
+    if last_week:
+        return f"⏱ You trained {simple_hours_words(last_week)} last week."
+    if this_week:
+        return f"⏱ You've trained {simple_hours_words(this_week)} so far this week."
+    return None
+
+
 def simple_progress_lines(payload: Dict[str, Any], today: str) -> List[str]:
-    """The two-line simple `progress` summary: a fitness-trend sentence (from the
-    CTL series, ~28 days back) and a chart legend. Every branch keeps the §6 tone
-    rule — a falling CTL reads as freshening up, not as decay."""
+    """The simple `progress` summary: a fitness-trend sentence (from the CTL series,
+    ~28 days back), the hours trained last week and this week when there are any, and
+    a chart legend. Every branch keeps the §6 tone rule — a falling CTL reads as
+    freshening up, not as decay."""
     days = payload.get("days") or []
     dated = [(d["date"], d.get("ctl")) for d in days
              if d.get("ctl") is not None and d["date"] <= today]
@@ -68,11 +99,15 @@ def simple_progress_lines(payload: Dict[str, Any], today: str) -> List[str]:
                 trend = "You're freshening up — recent rest is banking energy 🔋"
             else:
                 trend = "Fitness is holding steady — consistency is doing its job 👍"
-    return [
-        trend,
+    lines = [trend]
+    hours = simple_week_hours_line(payload.get("weeks") or [], today)
+    if hours:
+        lines.append(hours)
+    lines.append(
         "The chart shows your fitness building up top, and week-by-week training "
-        "below — keep stacking those weeks 💪",
-    ]
+        "below, with each week's hours written over it — keep stacking those weeks 💪"
+    )
+    return lines
 
 
 def simple_goal_line(goal: Dict[str, Any], today: str) -> str:

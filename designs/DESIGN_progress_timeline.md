@@ -692,10 +692,15 @@ silently dropped.
   ],
   "weeks": [
     {"week_commencing": "2026-06-22", "planned_load": 320,
-     "actual_load": 214, "meso_label": "Build 2", "meso_source": "plan"},
+     "actual_load": 214, "planned_seconds": 27600, "actual_seconds": 19800,
+     "meso_label": "Build 2", "meso_source": "plan"},
     {"week_commencing": "2026-06-29", "planned_load": 340,
      "planned_load_elapsed": 150, "in_progress": true,
-     "actual_load": 138, "meso_label": "Build 3", "meso_source": "plan"}
+     "planned_seconds": 29400, "planned_seconds_elapsed": 9000,
+     "actual_load": 138, "actual_seconds": 9600,
+     "meso_label": "Build 3", "meso_source": "plan"}
+    // `*_seconds` are the week's hours (§7.1): the time its sessions ask for,
+    // and the duration of every activity recorded in it.
   ],
   "meso_bands": [   // chart band spans, layered per §6.1
     {"label": "~Base", "source": "inferred",
@@ -867,14 +872,14 @@ CTL 8w ▁▂▂▃▃▅▅▆   plan end 07-31: CTL 61 TSB +1
   🏁 2026-09-30 Trail marathon
   (workout generate -g)
 
-WEEKLY LOAD plan  ▓done ▒plan  done  adh
-── ~Base Accumulation ─────────────────────────
-w/c 05-25      —  ▓▓▓▓▓▓▓░░░░░  262    —
-── Build 2 ───────────────────────────────────
-w/c 06-22    320  ▓▓▓▓▓│░░░░░░  214   67%
-── Build 3 ───────────────────────────────────
-w/c 06-29*   150  ▓▓▓│░░░░░░░░  138   92%
-w/c 07-06    360  ▒▒▒▒▒▒▒▒▒▒░░
+WEEKLY LOAD plan  ▓done ▒plan  done  adh h.plan h.done
+── ~Base Accumulation ────────────────────────────────
+w/c 05-25      —  ▓▓▓▓▓▓▓▓▓░░░  262    —      —   6h50
+── Build 2 ───────────────────────────────────────────
+w/c 06-22    320  ▓▓▓▓▓▓▓░░░░│  214  67%   7h40   5h30
+── Build 3 ───────────────────────────────────────────
+w/c 06-29*   150  ▓▓▓▓▓│░░░░░░  138  92%   2h30   2h40
+w/c 07-06    360  ▒▒▒▒▒▒▒▒▒▒▒▒             8h30
 ~ inferred · * part week · +4 more (--weeks all)
 ⚠ 2 planned workouts lack TSS/RPE — count as 0
 ```
@@ -889,9 +894,9 @@ objective line, wrapped inside the same width budget:
   its place. Presentation conventions are `sm status`'s, reused not
   reimplemented: same `color_tsb`, same one-decimal CTL/ATL, same
   `PMC_TSB_LAG_NOTE` footnote wherever TSB is printed (the PMC design's §6.1
-  conventions). **No ramp figure**, though `sm status` prints one: the 48-column
-  line has no room for a fourth number, and the CTL trend it would summarise is
-  already the sparkline directly below it. The consistency contract with
+  conventions). **No ramp figure**, though `sm status` prints one: the CTL
+  trend it would summarise is already the sparkline directly below it. The
+  consistency contract with
   `sm status` (pinned by tests, §9): **TSB today is always identical** (it is
   day-entering — computed from yesterday's values, which both commands read
   from the same stored rows); **CTL/ATL today are identical whenever today's
@@ -954,28 +959,44 @@ objective line, wrapped inside the same width budget:
   no anchor) render blank, and a flat series (min = max) renders all cells
   at the floor glyph; `--weeks` must be ≥ 1, rejected at argparse (the
   rev-4 snapshot's `or 8` silently swallowed 0).
-- **Width-aware** via the existing `STAMIND_WRAP_WIDTH` mechanism
-  (`util.default_wrap_width`). Budget: the bot's `telegram_wrap_width`
-  default is **48** — column layout above is week 11 + plan 4 + bar 12 +
-  actual 4 + pct 4 + separators = 40, asserted by a renderer test (§9). The
-  band rule may spend the full 48 (its label is cut to
-  `TABLE_WIDTH - 5`, always leaving one closing `─` so the right edge stays
-  straight). The table (bar included) is **fixed-width**: it is
-  laid out once for the 48-column budget and does not widen on a wider
-  terminal — CLI and Telegram render identically (what you see on a TTY is
-  what the bot sends), and the width test stays a single assertion. Wider
-  terminals just get whitespace on the right. The budget covers **every**
-  line, not just the table (rev 5's own mock FORM line measured ~59 — the
-  doc seeded the violation): the FORM header is two lines (values, then
-  sparkline + projection), banner / per-objective / footnote lines wrap
-  through the existing `wrap_text`, and width is measured with
-  `visible_len` — `⚠`/`🏁` are double-width in most terminals — never
-  `len`.
+- **Fixed width, 54 columns** (`LOAD_TABLE_WIDTH`). Column layout above is
+  week 11 + plan 4 + bar 12 + actual 4 + pct 4 + two hours columns of 6 +
+  separators = 54, asserted by a renderer test (§9). The band rule spans the
+  same 54 (its label is cut to the width less 5, always leaving one closing
+  `─` so the right edge stays straight). The table (bar included) is laid out
+  once and does not widen on a wider terminal; wider terminals just get
+  whitespace on the right. Until the hours columns the table was held to
+  **48**, the bot's `telegram_wrap_width` default, because the bot sent this
+  same text. It no longer does: in chat `progress` is a few sentences and the
+  chart (DESIGN_bot_simple_frontend.md §6), so the table is read on a terminal
+  only. The zone tables under it keep their own 48 (`TABLE_WIDTH`). Prose
+  lines — banner / per-objective / footnote — wrap through the existing
+  `wrap_text` (`STAMIND_WRAP_WIDTH`), and width is measured with
+  `visible_len` — `⚠`/`🏁` are double-width in most terminals — never `len`.
 - Past weeks: bullet bar + percentage; `—` planned/percentage for ungoverned
   weeks (§3 empty states); future weeks: planned number + ghost bar, the
-  `done`/`adh` columns omitted rather than filled with em-dashes; current week
-  per the §3 in-progress rule. The plan figure a row bars and divides by is
+  `done`/`adh` columns left blank rather than filled with em-dashes; current
+  week per the §3 in-progress rule. The plan figure a row bars and divides by is
   `progression.week_plan_denom` (§5) on every surface, the PNG included.
+- **Hours per week, planned and done** (2026-10-05). Two columns close each
+  row. `h.done` is the duration of every activity recorded in the week,
+  whatever the sport (`actual_seconds`). `h.plan` is the time the week's
+  sessions ask for, on the plan column's own §3 rule
+  (`progression.week_plan_seconds`): the days already elapsed for the running
+  week, the whole week otherwise. A week ahead of today shows `h.plan` alone.
+  `—` in `h.plan` means what it means in the plan column, that no plan covered
+  the week; nothing planned so far, or nothing done, reads `0m`. Worked
+  example: it is Wednesday, Monday and Tuesday asked for 2 h 30 and the
+  athlete did 2 h 40, so the row ends `2h30   2h40` although the whole week
+  asks for 8 h 10. The `adh` cell before them is capped at `999%`: on a
+  Tuesday, a 200-load ride done on a 15-load strength Monday is 1333%, and a
+  fifth character would push the hours out from under their headers. Not
+  handled: hours per sport in this table (the zone tables give a sport's time,
+  `-z`); a percentage formed from the two hours figures (`adh` already
+  compares plan and done, in load); and an activity recorded today that
+  carries no load yet (no heart rate, no RPE), whose hours count in `h.done`
+  while today's session stays out of `h.plan` until tomorrow, because "today
+  has elapsed" is decided on load (§3).
 - **A second week-column marker, `?`** — the week holds an activity whose HR
   recording was too sparse to trust *and* carried no RPE, so the week's own
   **load** is undercounted and reads as an adherence miss it never was. It earns
@@ -1073,7 +1094,18 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
       entirely below `_MIN_BAND_LABEL_CHARS` (the tint still draws), and
       consecutive labels alternate between two heights so two that each just fit
       still cannot touch. `_draw_weekly_bars` reserves headroom (`ylim` top =
-      peak × 1.5) for that strip, and the bottom legend anchors below it.
+      peak × 1.5) for that strip.
+    - *Hours labels* (2026-10-05). Each week carries one small label over its
+      bars, in the colour of the bar it speaks for: the hours done over the
+      pair once anything is recorded, otherwise the hours planned
+      (`week_plan_seconds`, §7.1) over the planned bar. One label and not two,
+      because a week is too narrow for a pair. The legend moved out of the
+      axes, onto the title's row: inside them it covered the label of a tall
+      first week. Past `MAX_HOURS_LABELS` (26) weeks neighbouring labels start
+      to touch, so none is drawn: the chart sent in chat (8 weeks each side of
+      today) always has them, the web tab's 26-week and whole-history ranges
+      never do. The cap is a week count standing in for a measurement; it does
+      not see a mesocycle band that stretches the axis past the last bar.
     - *Measure last.* Fitting is a **separate pass** (`_draw_meso_spans` then,
       after `fig.canvas.draw()`, `_draw_meso_band_labels`) because both inputs
       move: `axvspan` feeds the x-autoscaler, so a band reaching past the bars
@@ -1246,14 +1278,18 @@ the §7.2 photo transport for free where they need a chart in chat.)*
   `PMC_TSB_LAG_NOTE` carried, the
   lapsed-plan banner, the partial-final-week marker, the degenerate inputs
   (zero-max bar scale, blank and flat sparklines, `--weeks 0` rejected), the
-  young-DB still-warming state; plus a narrow `STAMIND_WRAP_WIDTH` variant
-  asserting `visible_len(line) ≤ 48` for **every** output line (not `len` —
-  emoji are double-width).
+  young-DB still-warming state; the table held to `LOAD_TABLE_WIDTH` and its
+  band rule spanning it (measured with `visible_len`, not `len` — emoji are
+  double-width); and the hours columns: planned then done, the elapsed days of
+  the running week, `—` only where no plan covers the week, and the adherence
+  capped so it cannot push them out of line.
 - `tests/test_chart.py`: the pure helpers of the PNG — the §7.2 label-collision
   machinery (`_fit_label`, `_chars_per_axis`, `_span_dates`, the
   measure-after-`draw()` order), the plan-end marker suppressed outside the
-  drawn window, and `_draw_weekly_bars` barring the elapsed slice for the
-  in-progress week (§3 comparable days, so the PNG and the CLI table agree).
+  drawn window, `_draw_weekly_bars` barring the elapsed slice for the
+  in-progress week (§3 comparable days, so the PNG and the CLI table agree),
+  and the hours label of a week: done, else planned on that same slice, none
+  past `MAX_HOURS_LABELS` weeks.
   The pixels themselves stay untested, per the front-end stance below.
 - `tests/test_bot.py`: `parse_photo_request` round-trip with `emit_photo`
   framing (sentinel/JSON incl. the `caption` field, non-photo lines return

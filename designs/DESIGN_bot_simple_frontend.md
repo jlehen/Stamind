@@ -413,9 +413,11 @@ parity promise nobody re-checks.
 > this section says about the *words* still holds; only where they live has moved
 > (`cli/render/`).
 
-Initial opt-in set: `workout list` (today/week), `progress` (chart caption + two-line
-summary), the adapt result, and `bot morning`. The §11 breadth pass added `goal list`
-and `plan show`; the look back (2026-09-03) added `workout compare`.
+Initial opt-in set: `workout list` (today/week), `progress` (chart caption + a short
+summary: the fitness trend, the hours trained last week and so far this week when there
+are any, and what the chart shows), the adapt result, and `bot morning`. The §11 breadth
+pass added `goal list` and `plan show`; the look back (2026-09-03) added
+`workout compare`.
 
 **The look back is four glyphs.** `workout compare` in companion voice is the week
 view turned around: one dated line per planned session and per extra effort, and the

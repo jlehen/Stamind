@@ -9,14 +9,17 @@ import unittest
 
 os.environ.setdefault("NO_COLOR", "1")  # keep assertions ANSI-free
 
-from stamind.text import visible_len, wrap_text
+from stamind.text import visible_len
 from stamind.analytics import progression
 from stamind.analytics.pmc import compute_pmc, pmc_cells, pmc_display_values
 from stamind.cli.progress import render_progress
 from stamind.cli.progress_load import (
-    BAND_LABEL_WIDTH, BAR_WIDTH, TABLE_WIDTH, _week_row, band_header, format_form_line,
-    format_weekly_table, render_bar, sparkline, table_rows, truncate_label, warning_line,
+    BAND_FRAME_WIDTH, BAR_WIDTH, LOAD_TABLE_WIDTH, _week_row, band_header,
+    format_form_line, format_weekly_table, render_bar, sparkline, table_rows,
+    truncate_label, warning_line,
 )
+
+BAND_LABEL_WIDTH = LOAD_TABLE_WIDTH - BAND_FRAME_WIDTH  # the longest label a rule holds
 
 
 class TestSparkline(unittest.TestCase):
@@ -100,41 +103,44 @@ LONG_LABEL = "Specific Build II - Peak Specific Load & Fatigue Resistance"
 
 class TestTruncateLabel(unittest.TestCase):
     def test_short_label_unchanged(self):
-        self.assertEqual(truncate_label("Build 2"), "Build 2")
+        self.assertEqual(truncate_label("Build 2", BAND_LABEL_WIDTH), "Build 2")
 
     def test_long_label_truncated_with_ellipsis(self):
-        result = truncate_label(LONG_LABEL)
+        result = truncate_label(LONG_LABEL, BAND_LABEL_WIDTH)
         self.assertEqual(len(result), BAND_LABEL_WIDTH)
         self.assertTrue(result.endswith("…"))
 
     def test_label_at_exactly_the_budget_is_not_truncated(self):
         exact = "x" * BAND_LABEL_WIDTH
-        self.assertEqual(truncate_label(exact), exact)
+        self.assertEqual(truncate_label(exact, BAND_LABEL_WIDTH), exact)
 
 
 class TestBandHeader(unittest.TestCase):
-    def test_spans_the_table_width(self):
-        self.assertEqual(visible_len(band_header("Build 2")), TABLE_WIDTH)
+    def test_spans_the_width_it_is_given(self):
+        for width in (48, LOAD_TABLE_WIDTH):
+            self.assertEqual(visible_len(band_header("Build 2", width)), width)
 
     def test_writes_the_label_in_full(self):
         # The whole point of the band rule: no more `Specifi…` on every row.
-        self.assertIn("Specific Preparation", band_header("Specific Preparation"))
+        self.assertIn(
+            "Specific Preparation", band_header("Specific Preparation", LOAD_TABLE_WIDTH)
+        )
 
     def test_unlabelled_weeks_band_as_unplanned(self):
-        self.assertIn("unplanned", band_header(None))
+        self.assertIn("unplanned", band_header(None, LOAD_TABLE_WIDTH))
 
     def test_overlong_label_still_fits_the_width(self):
-        header = band_header(LONG_LABEL)
-        self.assertEqual(visible_len(header), TABLE_WIDTH)
+        header = band_header(LONG_LABEL, LOAD_TABLE_WIDTH)
+        self.assertEqual(visible_len(header), LOAD_TABLE_WIDTH)
         self.assertIn("…", header)
 
     def test_every_rule_closes_with_a_dash_so_the_right_edge_is_straight(self):
         # A label wide enough to consume the budget must still end in '─', not a
         # bare space — otherwise the band rules ended ragged against each other.
         for label in ["Build 2", LONG_LABEL, "x" * BAND_LABEL_WIDTH, None]:
-            header = band_header(label)
+            header = band_header(label, LOAD_TABLE_WIDTH)
             self.assertTrue(header.endswith("─"), msg=repr(header))
-            self.assertEqual(visible_len(header), TABLE_WIDTH, msg=repr(header))
+            self.assertEqual(visible_len(header), LOAD_TABLE_WIDTH, msg=repr(header))
 
 
 class TestFormLine(unittest.TestCase):
@@ -223,24 +229,98 @@ class TestWeekRow(unittest.TestCase):
         self.assertIn("344", row)
         self.assertNotIn("%", row)
 
+    def test_past_week_ends_with_the_hours_planned_then_the_hours_done(self):
+        row = _week_row(
+            self._week(planned_seconds=32400.0, actual_seconds=25800.0),
+            320.0, "2026-07-03",
+        )
+        self.assertTrue(row.endswith("   9h00   7h10"), msg=repr(row))
+
+    def test_future_week_ends_with_the_hours_planned_and_no_hours_done(self):
+        row = _week_row(
+            self._week(week_commencing="2026-07-13", actual_load=0.0,
+                       planned_seconds=30600.0),
+            320.0, "2026-07-03",
+        )
+        self.assertTrue(row.endswith("   8h30"), msg=repr(row))
+
+    def test_running_week_shows_the_hours_planned_for_its_elapsed_days(self):
+        # Wednesday: Monday and Tuesday asked for 2 h 30 of the week's 8 h 10.
+        row = _week_row(
+            self._week(week_commencing="2026-06-29", in_progress=True,
+                       planned_load_elapsed=150.0, planned_seconds=29400.0,
+                       planned_seconds_elapsed=9000.0, actual_seconds=9600.0),
+            360.0, "2026-07-01",
+        )
+        self.assertTrue(row.endswith("   2h30   2h40"), msg=repr(row))
+
+    def test_week_no_plan_covered_shows_a_dash_for_the_hours_planned(self):
+        row = _week_row(
+            self._week(planned_load=None, actual_load=0.0, actual_seconds=0.0),
+            320.0, "2026-07-03",
+        )
+        self.assertTrue(row.endswith("      —     0m"), msg=repr(row))
+
+    def test_monday_morning_of_a_planned_week_shows_zero_hours_not_a_dash(self):
+        # Nothing has elapsed yet: the plan column reads 0, and so do the hours.
+        row = _week_row(
+            self._week(week_commencing="2026-06-29", in_progress=True,
+                       planned_load_elapsed=0.0, planned_seconds=29400.0,
+                       planned_seconds_elapsed=0.0, actual_load=0.0,
+                       actual_seconds=0.0),
+            360.0, "2026-06-29",
+        )
+        self.assertTrue(row.endswith("     0m     0m"), msg=repr(row))
+
+    def test_a_runaway_adherence_is_capped_so_the_hours_stay_in_their_columns(self):
+        # Tuesday: Monday asked for a 15-load strength session, the athlete rode 200.
+        row = _week_row(
+            self._week(week_commencing="2026-06-29", in_progress=True,
+                       planned_load_elapsed=15.0, actual_load=200.0,
+                       planned_seconds=3600.0, planned_seconds_elapsed=3600.0,
+                       actual_seconds=14400.0),
+            360.0, "2026-06-30",
+        )
+        self.assertIn("999%", row)
+        self.assertEqual(visible_len(row), LOAD_TABLE_WIDTH)
+
+    def test_hours_planned_line_up_under_their_header_on_past_and_future_rows(self):
+        weeks = [
+            self._week(planned_seconds=45000.0, actual_seconds=45000.0),  # 12h30, past
+            self._week(week_commencing="2026-07-13", actual_load=0.0,
+                       planned_seconds=2700.0),                           # 45m, future
+        ]
+        header, _band, past, future = table_rows(weeks, "2026-07-03")
+        self.assertTrue(header.endswith("h.plan h.done"))
+        self.assertEqual(visible_len(header), LOAD_TABLE_WIDTH)
+        self.assertEqual(visible_len(past), LOAD_TABLE_WIDTH)
+        self.assertEqual(visible_len(future), LOAD_TABLE_WIDTH - len(" h.done"))
+
 
 class TestWeeklyTableWidth(unittest.TestCase):
     def _weeks(self):
         return [
             {"week_commencing": "2026-06-22", "planned_load": 320.0,
              "actual_load": 214.0, "in_progress": False,
+             "planned_seconds": 45000.0, "actual_seconds": 45000.0,  # 12h30, the widest
              "meso_label": "Build 2", "meso_source": "plan"},
             {"week_commencing": "2026-06-29", "planned_load": 340.0,
              "planned_load_elapsed": 150.0, "actual_load": 138.0,
              "in_progress": True, "meso_label": "Build 3", "meso_source": "plan"},
             {"week_commencing": "2026-07-06", "planned_load": 360.0,
-             "actual_load": 0.0, "in_progress": False,
+             "actual_load": 0.0, "in_progress": False, "planned_seconds": 45000.0,
              "meso_label": "Build 3", "meso_source": "plan"},
         ]
 
-    def test_table_stays_within_the_48_column_budget(self):
+    def test_table_stays_within_its_width(self):
         for line in table_rows(self._weeks(), "2026-06-30"):
-            self.assertLessEqual(visible_len(line), 48, msg=repr(line))
+            self.assertLessEqual(visible_len(line), LOAD_TABLE_WIDTH, msg=repr(line))
+
+    def test_band_rule_spans_the_table_and_keeps_the_longer_label_it_has_room_for(self):
+        label = "x" * (LOAD_TABLE_WIDTH - BAND_FRAME_WIDTH)
+        rule = table_rows([dict(self._weeks()[0], meso_label=label)], "2026-06-30")[1]
+        self.assertEqual(visible_len(rule), LOAD_TABLE_WIDTH)
+        self.assertIn(label, rule)
 
     def test_zero_max_scale_does_not_divide(self):
         weeks = [{"week_commencing": "2026-06-22", "planned_load": 0.0,
@@ -455,27 +535,6 @@ class TestRenderProgress(unittest.TestCase):
     def test_sparkline_label_matches_the_window_when_history_is_long_enough(self):
         text = "\n".join(render_progress(self._windowed_payload(), 3))
         self.assertIn("CTL 3w", text)
-
-    def test_every_line_within_48_columns(self):
-        os.environ["STAMIND_WRAP_WIDTH"] = "48"
-        try:
-            days = [_day("2026-07-03", 55, 61, -6, "actual"),
-                    _day("2026-07-31", 61, 60, 1, "planned")]
-            weeks = [{"week_commencing": "2026-06-22", "planned_load": 320.0,
-                      "actual_load": 262.0, "in_progress": False,
-                      "meso_label": "Build 2", "meso_source": "plan"}]
-            lines = render_progress(
-                _payload(days, weeks=weeks, plan_end="2026-07-31",
-                         objectives=[self.MARATHON], plan_gap=self.GAP,
-                         warnings=[_warn(
-                             "zero_load_workouts",
-                             "2 planned workouts lack TSS/RPE — count as 0")]), 8)
-            for line in lines:
-                wrapped = wrap_text(line) if visible_len(line) > 48 else line
-                for sub in wrapped.split("\n"):
-                    self.assertLessEqual(visible_len(sub), 48, msg=repr(sub))
-        finally:
-            del os.environ["STAMIND_WRAP_WIDTH"]
 
 
 class TestStatusConsistencyContract(unittest.TestCase):
