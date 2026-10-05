@@ -13,6 +13,7 @@ JSON object:
     \\x1eSM-BUTTONS {"buttons": [{"label": …, "send"|"ack"|"menu": …}]}   one-way
     \\x1eSM-FLUSH   {} or {"wait": false}                                one-way
     \\x1eSM-QUEUE   {"id": …, "text": …, "buttons": […], "since": …}      one-way
+                   and, on the morning's proposal only, "offer": a SM-BUTTONS list
 
 Both ends of every frame live here: the CLI writes with the `emit_*` functions, the bot
 reads with `parse_frame`, and the answer it sends back is built by `prompt_answer`. They
@@ -50,7 +51,8 @@ BUTTONS_SENTINEL = "\x1eSM-BUTTONS "
 FLUSH_SENTINEL = "\x1eSM-FLUSH "
 # One item of the athlete queue, sent as a message of its own whose buttons carry the
 # item id. It replaces no button row and no row replaces it, so the bot remembers nothing
-# about it (DESIGN_athlete_queue.md §6.2).
+# about it (DESIGN_athlete_queue.md §6.2). An `offer` it brings along is a SM-BUTTONS row
+# and lives as one (DESIGN_waiting_proposal.md §5).
 QUEUE_SENTINEL = "\x1eSM-QUEUE "
 
 _SENTINELS = (
@@ -105,16 +107,17 @@ def emit_flush(out=None, wait: bool = True) -> None:
 
 
 def emit_queue_item(
-    item_id: int, text: str, buttons: Sequence[dict], since: str, out=None
+    item_id: int, text: str, buttons: Sequence[dict], since: str, out=None,
+    offer: Sequence[dict] = (),
 ) -> None:
     """Sends one queued item. Its buttons are ``{"label", "action"}`` and `since` is the
     walk's start in epoch seconds, ``r``-prefixed for a walk of one
-    (DESIGN_athlete_queue.md §6.2)."""
-    _write(
-        QUEUE_SENTINEL,
-        {"id": item_id, "text": text, "buttons": list(buttons), "since": since},
-        out,
-    )
+    (DESIGN_athlete_queue.md §6.2). `offer` is buttons shaped as `emit_buttons` takes
+    them, drawn under the item's own (DESIGN_waiting_proposal.md §5)."""
+    payload = {"id": item_id, "text": text, "buttons": list(buttons), "since": since}
+    if offer:
+        payload["offer"] = list(offer)
+    _write(QUEUE_SENTINEL, payload, out)
 
 
 def parse_frame(line: str) -> Optional[Tuple[str, Any]]:

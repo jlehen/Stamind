@@ -392,6 +392,9 @@ the answers stored with the item, never the answer itself, so it always fits in 
 The bot stores nothing about these buttons. They do not replace the briefing's row, the
 briefing's row does not replace them, and a bot restart loses nothing.
 
+One item brings the briefing's row with it, drawn under its own buttons: the proposal the
+morning message makes (DESIGN_waiting_proposal.md §5).
+
 A tap runs `sm bot queue 12 a2 --since 1789538400`, a hidden command beside `bot morning`. It
 checks that item 12 is still waiting and still worth asking, applies the action, and sends
 the next item of the walk or the closing line. After a reminder's tap it sends nothing more.

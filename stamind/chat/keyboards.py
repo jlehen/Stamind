@@ -283,6 +283,14 @@ def queue_later_rows(item_id: str, since: str) -> List[List[Tuple[str, str]]]:
              for code, words, emoji in QUEUE_LATER_CHOICES]]
 
 
+def answers_kept(rows: List[List[Tuple[str, str]]]) -> List[List[Tuple[str, str]]]:
+    """A keyboard's rows without its SM-BUTTONS offer. A queued item's answers stay under
+    its text when the offer drawn below them is tapped or has expired
+    (DESIGN_waiting_proposal.md §5)."""
+    kept = [[cell for cell in row if not cell[1].startswith("ui:")] for row in rows]
+    return [row for row in kept if row]
+
+
 def tapped_label(rows: List[List[Tuple[str, str]]], data: str) -> Optional[str]:
     """The label of the button a tap came from, for the "→ …" line left under the item."""
     for row in rows:

@@ -14,13 +14,27 @@ from stamind import journal
 from stamind.athlete_queue import QUEUE_NOT_NOW
 from stamind.chat import telegram_api
 from stamind.chat.keyboards import (
-    BUSY_TAP, STOP_ALREADY_DONE, STOP_DONE, UI_STALE_TAP, decode_callback,
+    BUSY_TAP, STOP_ALREADY_DONE, STOP_DONE, UI_STALE_TAP, answers_kept, decode_callback,
     decode_queue_callback, decode_stop_callback, decode_ui_callback, queue_later_rows,
     resolve_ui_action, tapped_choice, tapped_label, ui_menu_rows,
 )
 from stamind.chat.replies import format_prompt_message
 from stamind.chat.routing import parse_message_to_argv
 from stamind.sentinels import prompt_answer
+
+
+def _keyboard_rows(message) -> list:
+    """The tapped message's inline keyboard, as rows of (label, callback data)."""
+    markup = getattr(message, "reply_markup", None)
+    return [[(b.text, b.callback_data) for b in row]
+            for row in (markup.inline_keyboard if markup else [])]
+
+
+def _keyboard_or_none(rows: list):
+    """An inline keyboard of `rows`, or None, which drops the message's keyboard."""
+    if not rows:
+        return None
+    return telegram_api.inline_keyboard(rows)
 
 
 class CallbacksMixin:
@@ -32,9 +46,12 @@ class CallbacksMixin:
         canned utterance through the normal command pipeline; `ack` just replies."""
         decoded = decode_ui_callback(data)
         current = self.ui_actions.get(chat_id)
+        # The answers of a queued item the offer was sent under: they stay whatever
+        # becomes of the offer (DESIGN_waiting_proposal.md §5).
+        answers = answers_kept(_keyboard_rows(query.message))
         if decoded is None or current is None or decoded[0] != current[0]:
             try:  # replaced by a newer row: drop the dead buttons
-                await query.edit_message_reply_markup(reply_markup=None)
+                await query.edit_message_reply_markup(reply_markup=_keyboard_or_none(answers))
             except Exception as exc:
                 journal.debug("bot.event", f"stale buttons not dropped: {exc}")
             # One live row per chat, so any newer row — the morning push included —
@@ -48,7 +65,9 @@ class CallbacksMixin:
             return
         menu = action.get("menu")
         if menu:
-            keyboard = telegram_api.inline_keyboard(ui_menu_rows(menu, token, path))
+            keyboard = telegram_api.inline_keyboard(
+                answers + ui_menu_rows(menu, token, path)
+            )
             try:
                 await query.edit_message_reply_markup(reply_markup=keyboard)
             except Exception as exc:
@@ -71,7 +90,7 @@ class CallbacksMixin:
             return
         self._log(chat_id, "  ", f"ui tap: {action.get('label')}")
         try:  # a decided row is spent: drop the buttons
-            await query.edit_message_reply_markup(reply_markup=None)
+            await query.edit_message_reply_markup(reply_markup=_keyboard_or_none(answers))
         except Exception as exc:
             journal.debug("bot.event", f"spent buttons not dropped: {exc}")
         self.ui_actions.pop(chat_id, None)
@@ -90,7 +109,8 @@ class CallbacksMixin:
         """A tap on a queued item's button (DESIGN_athlete_queue.md §6.2). "Not now" swaps
         in the three later choices; any other tap leaves the choice under the item's text
         and runs `bot queue`, which checks the item and sends the next one. The chat's live
-        SM-BUTTONS row is not touched."""
+        SM-BUTTONS row is not touched, unless it was sent under this item: then it goes
+        with the item's buttons (DESIGN_waiting_proposal.md §5)."""
         decoded = decode_queue_callback(data)
         if decoded is None:
             return
@@ -106,10 +126,7 @@ class CallbacksMixin:
             await self.bot.send_message(chat_id=chat_id, text=BUSY_TAP)
             return
         message = query.message
-        markup = getattr(message, "reply_markup", None)
-        rows = [[(b.text, b.callback_data) for b in row]
-                for row in (markup.inline_keyboard if markup else [])]
-        label = tapped_label(rows, data)
+        label = tapped_label(_keyboard_rows(message), data)
         try:  # the message keeps its text, gains the choice and loses its buttons (§6.1)
             if label and getattr(message, "text", None):
                 await query.edit_message_text(text=f"{message.text}\n\n→ {label}")

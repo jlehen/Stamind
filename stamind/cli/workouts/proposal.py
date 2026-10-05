@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from stamind import clock, runtime
+from stamind.analytics.compare import adherence_verdicts
 from stamind.cli.workouts.heads_up import newest_written, revision_dates
 from stamind.clock import today_str
 from stamind.coach.proposals import RevisionProposal, revision_from_json, revision_to_json
@@ -67,11 +68,13 @@ def _pull_today(today: str) -> None:
 
 def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
     """"Change it" writes the saved proposal under one change; "Keep it as planned" writes
-    nothing (§4)."""
+    nothing. A change to today is followed by today's sessions as they now stand, which
+    nothing in the chat shows yet (§4)."""
     if index != ACCEPT:
         return KEPT_LINE
     today = today_str()
-    if today in item["payload"]["dates"]:
+    changes_today = today in item["payload"]["dates"]
+    if changes_today:
         _pull_today(today)
         if out_of_date(item):
             runtime.db.close_queue_item(item["id"], STALE, clock.now())
@@ -79,7 +82,24 @@ def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
     runtime.coach_service.workout_revision_apply(
         revision_from_json(item["payload"]["proposal"])
     )
-    return APPLIED_LINE
+    if not changes_today:
+        return APPLIED_LINE
+    return f"{APPLIED_LINE}\n\n{_today_text(today)}".rstrip()
+
+
+def _today_text(today: str) -> str:
+    """Today's sessions as this run's voice draws them after a change. The change is
+    written by now, so a failure here must not keep the item open: it draws nothing."""
+    try:
+        workouts = runtime.db.get_workouts(start_date=today, end_date=today)
+        verdicts = adherence_verdicts(runtime.db, today, today, today)
+        drawn = io.StringIO()
+        with contextlib.redirect_stdout(drawn):
+            runtime.render.today_after_change(workouts, verdicts, today)
+        return strip_ansi(drawn.getvalue()).strip()
+    except Exception as e:
+        step(f"Could not draw today's sessions after the change: {e}")
+        return ""
 
 
 PROPOSAL_KIND = Kind(

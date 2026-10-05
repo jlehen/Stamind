@@ -332,7 +332,7 @@ class GuardrailTest(unittest.TestCase):
             self.assertIn(tuple(argv[:2]), self.ALLOWED_PREFIXES, intent)
 
     def test_morning_button_utterances_reach_only_adapt_m(self):
-        from stamind.cli.bot.views import MORNING_BUTTONS
+        from stamind.cli.bot.views import SESSION_BUTTONS
 
         def leaves(buttons):
             for b in buttons:
@@ -341,7 +341,7 @@ class GuardrailTest(unittest.TestCase):
                 else:
                     yield b
 
-        sends = [b["send"] for b in leaves(MORNING_BUTTONS) if b.get("send")]
+        sends = [b["send"] for b in leaves(SESSION_BUTTONS) if b.get("send")]
         self.assertTrue(sends)
         for utterance in sends:
             argv = routing.parse_message_to_argv(utterance)
@@ -433,10 +433,11 @@ class UiCallbackTest(unittest.TestCase):
         self.assertIsNone(keyboards.resolve_ui_action(buttons, "x"))
 
     def test_morning_buttons_fit_telegrams_64_byte_callback_cap(self):
-        from stamind.cli.bot.views import MORNING_BUTTONS
+        from stamind.cli.bot.views import GOT_IT_BUTTON, SESSION_BUTTONS
+        buttons = [GOT_IT_BUTTON] + SESSION_BUTTONS
         token = "aabbcc"  # secrets.token_hex(3) width
-        rows = keyboards.ui_button_rows(MORNING_BUTTONS, token)
-        for i, button in enumerate(MORNING_BUTTONS):
+        rows = keyboards.ui_button_rows(buttons, token)
+        for i, button in enumerate(buttons):
             for menu_row in keyboards.ui_menu_rows(button.get("menu") or [], token, str(i)):
                 rows.append(menu_row)
         for row in rows:

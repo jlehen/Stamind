@@ -7,7 +7,7 @@ nothing waits: each item goes out as a message of its own, and its buttons run `
 """
 import argparse
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from stamind import athlete_queue, clock, runtime
 from stamind.athlete_queue import ANSWERED, DROP, DROPPED, MESSAGE, SKIP, STALE
@@ -197,17 +197,20 @@ def send_item(item: Dict[str, Any], since: str, left: Optional[int]) -> None:
     emit_queue_item(item["id"], text, buttons, since)
 
 
-def send_alone(item: Dict[str, Any]) -> None:
+def send_alone(item: Dict[str, Any], offer: Sequence[dict] = ()) -> None:
     """Sends a stand-alone item: its wording as ordinary text, then a message of its own
     that asks and carries the answers, as a walk of one (DESIGN_waiting_proposal.md §3).
-    On a terminal the text is followed by the command that answers it."""
+    `offer` is the morning message's buttons, drawn under the answers (§5). On a terminal
+    the text is followed by the command that answers it."""
     print(athlete_queue.wording(item))
     if not is_json_frontend():
         notice(f"Saved as #{item['id']}. Answer it with "
                + cmd(f"queue answer {item['id']}") + ".")
         return
     text, buttons = queue_chat_message(item, 1)
-    emit_queue_item(item["id"], text, buttons, since_token(clock.now(), single=True))
+    emit_queue_item(
+        item["id"], text, buttons, since_token(clock.now(), single=True), offer=offer,
+    )
 
 
 def settled_line(item: Optional[Dict[str, Any]]) -> str:

@@ -60,6 +60,12 @@ class CompanionRenderer(ExpertRenderer):
     def adapt_applied(self) -> None:
         print(green("Done — your week is updated. 💪"))
 
+    def today_after_change(self, workouts: list, verdicts: dict, today: str) -> None:
+        """Today's sessions as the briefing draws them, once "Change it" rewrote one
+        (DESIGN_waiting_proposal.md §4)."""
+        for line in simple_day_lines(workouts, today, verdicts):
+            print(line)
+
     def session_note_kept(self, session: Dict[str, Any], day: str) -> None:
         when = simple_day_word(day, _today_str())
         owner = "today's" if when == "today" else f"{when}'s"

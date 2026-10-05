@@ -18,13 +18,14 @@ import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before
 
 from stamind import athlete_queue, runtime
 from stamind.cli import queue as queue_cli
+from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.workouts.adapt import WEEK_CHANGED_LINE
 from stamind.cli.workouts.heads_up import newest_written
 from stamind.coach.proposals import RevisionProposal
 from stamind.coach.revisions import pair_revisions
 from stamind.config import config
-from stamind.sentinels import BUTTONS_SENTINEL, QUEUE_SENTINEL
+from stamind.sentinels import BUTTONS_SENTINEL, FLUSH_SENTINEL, QUEUE_SENTINEL
 from stamind.clock import today_str
 
 THURSDAY_8AM = datetime(2026, 10, 8, 8, 0).astimezone()
@@ -119,6 +120,34 @@ class AnswerTest(_Case):
         # The athlete watched it happen, so no heads-up line waits (§4).
         self.assertEqual(test_db.waiting_changes(), [])
 
+    def test_change_it_on_today_shows_today_as_it_now_stands(self):
+        """The briefing above the proposal shows the 90 minutes, and the proposal may show
+        the new session as a summary only, so the reply is where the athlete reads it."""
+        out = self.tap(self.save())
+        reply = out[out.index(saved_proposal.APPLIED_LINE):]
+        self.assertIn("Today: Easy ride — 60 min", reply)
+        self.assertIn("60 easy minutes.", reply)
+
+    def test_a_session_done_before_the_change_keeps_its_done_line(self):
+        """A run at 06:30, then "Change it" on the proposal that eases the evening ride."""
+        save_workout(test_db, THURSDAY, "running", "Easy run", duration_minutes=30)
+        test_db.save_completed_activity(
+            activity_id="a-run", date=THURSDAY, start_time=f"{THURSDAY} 06:30:00",
+            activity_name="Run", activity_type="running", duration_sec=1800,
+            distance_km=5.0, elevation_gain_m=0.0, avg_hr=130, max_hr=150, rpe=None,
+            tss=25.0,
+        )
+        out = self.tap(self.save(held=((THURSDAY, "running"),)))
+        reply = out[out.index(saved_proposal.APPLIED_LINE):]
+        self.assertIn("Today: Easy run — 30 min\n" + SIMPLE_DONE_LINE, reply)
+        self.assertIn("Today: Easy ride — 60 min", reply)
+
+    def test_change_it_on_another_day_shows_no_session(self):
+        save_workout(test_db, SATURDAY, "cycling", "Long ride", duration_minutes=180)
+        out = self.tap(self.save(day=SATURDAY))
+        reply = out[out.index(saved_proposal.APPLIED_LINE):]
+        self.assertNotIn("Today:", reply)
+
     def test_a_taps_change_never_carries_the_sleep_mark(self):
         """Thursday evening's proposal read Thursday's night. Accepted on Friday at 07:00,
         its change must not tell the 08:00 push that Friday's night was read (§5)."""
@@ -129,6 +158,8 @@ class AnswerTest(_Case):
         item = self.save()
         out = self.tap(item, "a2")
         self.assertIn(saved_proposal.KEPT_LINE, out)
+        # The briefing already shows today as planned, so the reply does not repeat it.
+        self.assertNotIn("Today:", out)
         self.assertEqual(self.ride()["duration_minutes"], 90)
         self.assertEqual(self.outcome(item), athlete_queue.ANSWERED)
         self.garmin.ensure_data.assert_not_called()
@@ -232,7 +263,10 @@ class StandAloneTest(_Case):
             prompt = MagicMock()
             prompt.choose.return_value = "a1"
             with patch.object(runtime, "prompt", prompt, create=True):
-                run_cli(["queue", "answer", str(item["id"])])
+                _code, answered, _err = run_cli(["queue", "answer", str(item["id"])])
+        # A terminal gets the one line, without today's sessions under it (§4).
+        reply = answered[answered.index(saved_proposal.APPLIED_LINE):]
+        self.assertNotIn("60 easy minutes.", reply)
         self.assertIn(f"#{item['id']}", listed)
         self.assertIn("Rough night.", listed)
         self.assertNotIn("Go through them", listed)
@@ -260,8 +294,12 @@ class MorningPushTest(_Case):
         coach.workout_revision_apply.assert_not_called()
         self.assertEqual(self.ride()["duration_minutes"], 90)
         self.assertIsNone(test_db.newest_adapt())
-        # The briefing shows today as planned, with no reason line, then the proposal.
-        briefing, proposal = out.split(BUTTONS_SENTINEL)
+        # The briefing shows today as planned, with no reason line and no buttons of its
+        # own, then the proposal as another message.
+        self.assertNotIn(BUTTONS_SENTINEL, out)
+        briefing, proposal = out.split(FLUSH_SENTINEL, 1)
+        # The flush only ends the briefing's message: no wait follows, so no Stop button.
+        self.assertEqual(json.loads(proposal.split("\n", 1)[0]), {"wait": False})
         self.assertIn("Intervals — 90 min", briefing)
         self.assertNotIn("Rough night.", briefing)
         self.assertIn("Rough night.", proposal)
@@ -269,6 +307,44 @@ class MorningPushTest(_Case):
         self.assertEqual(sent["text"], saved_proposal.QUESTION_LINE)
         [item] = saved_proposal.waiting()
         self.assertEqual(item["payload"]["dates"], [THURSDAY])
+
+    def test_the_question_carries_the_two_answers_then_the_briefings_buttons(self):
+        """One keyboard on such a morning. The two answers stand where "Got it" would."""
+        _coach, out = self.push(self.eased())
+        [sent] = queue_lines(out)
+        self.assertEqual([b["label"] for b in sent["buttons"]],
+                         ["✅ Change it", "💪 Keep it as planned"])
+        self.assertEqual([b["label"] for b in sent["offer"]],
+                         ["😴 Feeling tired", "🕐 Can't today"])
+
+    def test_the_button_that_extends_the_schedule_joins_them(self):
+        extend = {"label": "📅 Plan more weeks", "send": "workout generate"}
+        with patch("stamind.cli.bot.views.runway_buttons", return_value=[extend]):
+            _coach, out = self.push(self.eased())
+        self.assertNotIn(BUTTONS_SENTINEL, out)
+        [sent] = queue_lines(out)
+        self.assertEqual([b["label"] for b in sent["offer"]],
+                         ["😴 Feeling tired", "🕐 Can't today", "📅 Plan more weeks"])
+
+    def test_a_proposal_on_a_day_already_trained_brings_no_button_about_today(self):
+        """Thursday's ride is done at noon and the push proposes to ease Saturday's."""
+        save_workout(test_db, SATURDAY, "cycling", "Long ride", duration_minutes=180)
+        self.trained_at_noon()
+        self.at(15)
+        _coach, out = self.push(self.eased(day=SATURDAY))
+        self.assertNotIn(BUTTONS_SENTINEL, out)
+        [sent] = queue_lines(out)
+        self.assertNotIn("offer", sent)
+
+    def test_a_morning_with_nothing_to_change_keeps_got_it_under_the_briefing(self):
+        _coach, out = self.push(RevisionProposal(
+            reason="", workouts=[], range_start=THURSDAY, range_end=THURSDAY, sleep_seen=True,
+        ))
+        self.assertEqual(queue_lines(out), [])
+        [row] = [json.loads(line[len(BUTTONS_SENTINEL):]) for line in out.split("\n")
+                 if line.startswith(BUTTONS_SENTINEL)]
+        self.assertEqual([b["label"] for b in row["buttons"]],
+                         ["👍 Got it", "😴 Feeling tired", "🕐 Can't today"])
 
     def test_the_proposal_comes_before_the_round_of_queued_questions(self):
         athlete_queue.tell("Charge your watch tonight.")

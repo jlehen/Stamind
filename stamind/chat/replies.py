@@ -177,14 +177,24 @@ class RepliesMixin:
 
     async def _send_queue_item(self, session: Session, req: dict) -> None:
         """Sends a queued item as a message of its own (DESIGN_athlete_queue.md §6.2). Its
-        buttons carry the item, so it neither replaces the chat's SM-BUTTONS row nor
-        anchors to the output above it."""
-        keyboard = telegram_api.inline_keyboard(queue_button_rows(req))
+        buttons carry the item, so they neither replace the chat's SM-BUTTONS row nor
+        anchor to the output above it. An `offer` is a SM-BUTTONS row sent with the item:
+        drawn under its answers, and stored as the chat's live row like any other
+        (DESIGN_waiting_proposal.md §5)."""
+        rows = queue_button_rows(req)
+        offer = [b for b in (req.get("offer") or []) if isinstance(b, dict)]
+        if offer:
+            token = secrets.token_hex(3)
+            self.ui_actions[session.chat_id] = (token, offer)
+            rows = rows + ui_button_rows(offer, token)
+        keyboard = telegram_api.inline_keyboard(rows)
         session.sent = True
         await self.bot.send_message(
             chat_id=session.chat_id, text=req.get("text") or "", reply_markup=keyboard,
         )
         self._log(session.chat_id, "<<", f"queue item #{req.get('id')}: {req.get('text')!r}")
+        if offer:
+            self._log(session.chat_id, "<<", f"buttons {[b.get('label') for b in offer]}")
 
     async def _send_photo(self, session: Session, req: dict) -> None:
         """Sends the chart PNG a `--chart` run pointed at, then unlinks the temp

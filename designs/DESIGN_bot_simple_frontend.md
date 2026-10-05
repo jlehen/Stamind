@@ -105,7 +105,9 @@ them. Tapping:
 Amended 2026-10-03 (DESIGN_waiting_proposal.md §5): the briefing always shows today as
 planned. When the week planner would change a session, the reason line is not in the
 briefing: the proposal follows as a message of its own, with "✅ Change it" and "💪 Keep it
-as planned". "Got it" answers the briefing and not the proposal.
+as planned". Amended 2026-10-05: on that morning the briefing has no buttons. "Feeling
+tired" and "Can't today" are drawn under the proposal's two answers, which stand where "Got
+it" would.
 
 ### 4.2 Where the content comes from
 
@@ -229,7 +231,7 @@ Amended 2026-09-14 (DESIGN_athlete_queue.md §6.2): a fifth sentinel, `\x1eSM-QU
 {json}`, carries one item of the athlete queue. Unlike this row it is sent as a message of
 its own, and each of its buttons carries its whole meaning (`q:<item id>:<action>:<walk
 start>`), so it neither replaces the live row nor is replaced by it, and the bot stores
-nothing about it.
+nothing about it. One item brings this row with it (DESIGN_waiting_proposal.md §5).
 
 ## 5. Simple-mode interaction
 

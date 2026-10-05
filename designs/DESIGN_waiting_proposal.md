@@ -88,6 +88,12 @@ reply is "Done — your week is updated. 💪". The athlete watched it happen, s
 waits for them (DESIGN_change_heads_up.md §6). `workout rollback` undoes it, as it undoes any
 change.
 
+When the proposal changes today, the reply in the chat goes on with today's sessions as they
+now stand, drawn as the briefing draws them (amended 2026-10-05). A terminal has `workout
+list` and gets the one line. On Monday 5 October the proposal described the new gym session
+as "the goblet squat and hip thrust are gone, every load a tenth lighter". After "Change it"
+the only list of exercises in the chat was the briefing's, with both exercises still in it.
+
 **Keep it as planned.** The item is closed. Nothing is written. The reply is "Okay — nothing
 changed."
 
@@ -127,9 +133,21 @@ With `adapt-first` on, the push asks the week planner as it does today. Then:
 On the Thursday of §1 the athlete reads the 90-minute ride, then: "Rough night. Here's what I'd
 change: 60 easy minutes." They tap **Keep it as planned** and ride the 90 minutes.
 
-The briefing keeps its row of buttons, "👍 Got it" included. "Got it" answers the briefing and
-"Keep it as planned" answers the proposal. An athlete who taps only "Got it" has not answered
-the proposal, and the week stays as planned.
+**One keyboard on such a morning** (amended 2026-10-05). The briefing first kept its row. On
+Monday 5 October the athlete read a 60-minute gym session with "👍 Got it" under it, and half
+a second later a second question that cut it to 45 minutes.
+
+- With nothing to change, the briefing has its row: "👍 Got it", "😴 Feeling tired",
+  "🕐 Can't today".
+- With a proposal, the briefing has no buttons. "Shall I make these changes?" carries them
+  all: "✅ Change it" and "💪 Keep it as planned", and under them "😴 Feeling tired" and
+  "🕐 Can't today". The two answers stand where "Got it" would. The button that offers to
+  extend a schedule about to run out goes there too.
+
+A tap on one of the two answers removes the whole keyboard. A tap on "Feeling tired" or on a
+choice of "Can't today" removes those and leaves the two answers, because the run it starts is
+shown the open proposal and may leave it open (§6.2). "Feeling tired" and "Can't today" are
+forgotten when the bot restarts, as under the briefing. The two answers are not (§3).
 
 **Once a morning.** The push skips the week planner when it already ran this morning with the
 night's sleep score. Today it reads that from the newest change that `workout adapt`

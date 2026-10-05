@@ -71,6 +71,9 @@ class ExpertRenderer:
     def adapt_applied(self) -> None:
         print(green("Adaptations applied and synced to calendar successfully."))
 
+    def today_after_change(self, workouts: list, verdicts: dict, today: str) -> None:
+        """Draws nothing: a terminal has `workout list` (DESIGN_waiting_proposal.md §4)."""
+
     def session_note_kept(self, session: Dict[str, Any], day: str) -> None:
         """The note was kept with this session (DESIGN_session_notes.md §3)."""
         print(gray(f"Note kept with session {session['id']}, “{session['title']}” ({day})."))

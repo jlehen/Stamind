@@ -58,6 +58,7 @@ class TestEachFrameRoundTrips(unittest.TestCase):
         self.assertEqual(payload["id"], 12)
         self.assertEqual(payload["text"], "🙋 Quick question (1 left)\nWhat was it?")
         self.assertEqual(payload["since"], "1789538400")
+        self.assertNotIn("offer", payload)
         # The buttons ride in the payload: a tap has to carry everything the bot
         # needs, because it stores nothing about the item (§6.2).
         self.assertEqual(payload["buttons"], [

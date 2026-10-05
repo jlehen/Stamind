@@ -402,9 +402,15 @@ classes themselves.
     Garmin pull first, past the refresh throttle (DESIGN_bot_simple_frontend.md §4.2).
     The push writes no session change. When the week planner would change a session,
     `_morning_adaptation` saves the proposal (`cli/workouts/proposal.py:save`), the briefing
-    shows today as planned, and `cli/queue.py:send_alone` sends the proposal after it: the
-    reason and the preview as text, then "Shall I make these changes?" with "✅ Change it"
-    and "💪 Keep it as planned". Kilograms that moved alone are written at once
+    shows today as planned with no buttons, and `cli/queue.py:send_alone` sends the proposal
+    after it: the reason and the preview as text, then "Shall I make these changes?" with
+    "✅ Change it" and "💪 Keep it as planned". The briefing's "Feeling tired" and "Can't
+    today" travel in the same `SM-QUEUE` line as its `offer` and are drawn under the two
+    answers, so the morning has one keyboard. The offer is the one part of a queued item
+    the bot stores: it is the chat's live `SM-BUTTONS` row, so a restart forgets it, and a
+    tap on it leaves the two answers (`chat/keyboards.py:answers_kept`). In the chat,
+    "Change it" on a proposal that changes today replies with today's sessions as they
+    now stand. Kilograms that moved alone are written at once
     (DESIGN_waiting_proposal.md §5, §7). Each scheduler wake (`scheduler_wake`) first asks
     the database whether a reminder time has passed and, if one has, runs `bot queue
     --remind` and waits for it before it considers the push, whatever the `push` switch

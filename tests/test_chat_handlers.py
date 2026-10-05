@@ -320,6 +320,8 @@ class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
             started, [(42, ["workout", "adapt", "-m", "too tired"], False, "bot")]
         )
         self.assertNotIn(42, chat_bot.ui_actions)
+        # A row under the briefing holds nothing else, so the message loses its keyboard.
+        self.assertEqual(query.markups, [None])
 
     async def test_a_tap_on_a_row_a_newer_one_replaced_says_the_offer_expired(self):
         """§12.3: the message behind a retired offer was already consumed, so silence
@@ -331,6 +333,7 @@ class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
         await chat_bot.on_callback(callback_update(query), None)
         self.assertEqual(started, [])
         self.assertEqual(chat_bot.bot.texts(), [keyboards.UI_STALE_TAP])
+        self.assertEqual(query.markups, [None])
 
     async def test_a_queue_tap_runs_bot_queue_quietly_and_echoes_the_choice(self):
         chat_bot = build_chat_bot(self)
@@ -345,6 +348,64 @@ class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
             (42, ["bot", "queue", "12", "a2", "--since", "1789538400"], True, "bot"),
         ])
         self.assertEqual(query.edited_text, "🙋 What was it?\n\n→ Leg press")
+
+    def proposal_keyboard(self):
+        """The morning's one keyboard: a proposal's two answers over the briefing's offer
+        (DESIGN_waiting_proposal.md §5)."""
+        answers = [("✅ Change it", keyboards.queue_callback_data(4, "a1", "r1789538400")),
+                   ("💪 Keep it as planned",
+                    keyboards.queue_callback_data(4, "a2", "r1789538400"))]
+        offer = [("😴 Feeling tired", keyboards.ui_callback_data("tok", "0")),
+                 ("🕐 Can't today", keyboards.ui_callback_data("tok", "1"))]
+        markup = SimpleNamespace(inline_keyboard=[
+            [SimpleNamespace(text=label, callback_data=data) for label, data in row]
+            for row in (answers, offer)
+        ])
+        return answers, markup
+
+    async def test_a_queue_item_sent_with_an_offer_is_one_keyboard(self):
+        chat_bot = build_chat_bot(self)
+        offer = [{"label": "😴 Feeling tired", "send": "workout adapt -m tired"}]
+        await chat_bot._send_queue_item(runner.Session(42, _FakeProc(), "n0nce"), {
+            "id": 4, "text": "Shall I make these changes?", "since": "r1789538400",
+            "buttons": [{"label": "✅ Change it", "action": "a1"}], "offer": offer,
+        })
+        token, live = chat_bot.ui_actions[42]
+        self.assertEqual(live, offer)
+        [(_chat, _text, sent)] = chat_bot.bot.sent
+        self.assertEqual(sent["reply_markup"], [
+            [("✅ Change it", "q:4:a1:r1789538400")],
+            [("😴 Feeling tired", keyboards.ui_callback_data(token, "0"))],
+        ])
+
+    async def test_an_offer_tapped_under_a_proposal_leaves_its_two_answers(self):
+        chat_bot = build_chat_bot(self)
+        started = record_commands(self, chat_bot)
+        chat_bot.ui_actions[42] = ("tok", [
+            {"label": "😴 Feeling tired", "send": "workout adapt -m tired"},
+            {"label": "🕐 Can't today", "menu": [{"label": "⏭️ Skip it", "send": "status"}]},
+        ])
+        answers, markup = self.proposal_keyboard()
+        # "Can't today" swaps its choices in under the answers.
+        query = _FakeQuery(keyboards.ui_callback_data("tok", "1"), markup=markup)
+        await chat_bot.on_callback(callback_update(query), None)
+        self.assertEqual(query.markups, [
+            [answers, [("⏭️ Skip it", keyboards.ui_callback_data("tok", "1.0"))]],
+        ])
+        # "Feeling tired" runs, and the answers are what is left.
+        query = _FakeQuery(keyboards.ui_callback_data("tok", "0"), markup=markup)
+        await chat_bot.on_callback(callback_update(query), None)
+        self.assertEqual(query.markups, [[answers]])
+        self.assertEqual(started, [(42, ["workout", "adapt", "-m", "tired"], False, "bot")])
+
+    async def test_an_expired_offer_under_a_proposal_leaves_its_two_answers(self):
+        """After a bot restart the offer is forgotten, and the proposal still answers."""
+        chat_bot = build_chat_bot(self)
+        answers, markup = self.proposal_keyboard()
+        query = _FakeQuery(keyboards.ui_callback_data("tok", "0"), markup=markup)
+        await chat_bot.on_callback(callback_update(query), None)
+        self.assertEqual(query.markups, [[answers]])
+        self.assertEqual(chat_bot.bot.texts(), [keyboards.UI_STALE_TAP])
 
 
 class SchedulerDriverTest(unittest.IsolatedAsyncioTestCase):

@@ -46,8 +46,10 @@ MORNING_MARKER = "push_morning_last"
 # renders. Each `send` is a canned utterance the bot feeds back through its normal
 # command pipeline when the button is tapped; `ack` runs nothing; `menu` nests a
 # choose-row at the bot level.
-MORNING_BUTTONS = [
-    {"label": "👍 Got it", "ack": "Nice — have a good one! 💪"},
+GOT_IT_BUTTON = {"label": "👍 Got it", "ack": "Nice — have a good one! 💪"}
+# The buttons about today's session. Under a proposal they follow its two answers, which
+# stand where "Got it" would (DESIGN_waiting_proposal.md §5).
+SESSION_BUTTONS = [
     {"label": "😴 Feeling tired",
      "send": 'workout adapt -m "feeling tired this morning"'},
     {"label": "🕐 Can't today", "menu": [
@@ -256,7 +258,8 @@ def run_bot_changes(args: argparse.Namespace) -> None:
 
 
 def run_bot_morning(args: argparse.Namespace) -> None:
-    """Renders the §4.1 morning message for today and emits its button row.
+    """Renders the §4.1 morning message for today and emits its button row, under the
+    briefing or under the proposal's question (DESIGN_waiting_proposal.md §5).
 
     Idempotent per day via the settings marker; the bot's scheduler may fire it
     repeatedly (catch-up after sleep, restarts) without double-sending. A day with no
@@ -312,14 +315,20 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     # resurrect the other's buttons (§6). A rest session is graded apart from done, but
     # there is nothing on it to ease or move.
     to_change = [w for w in ahead if canonical_sport(w["sport_type"]) != "rest"]
-    buttons = (MORNING_BUTTONS if to_change else []) + runway_buttons(runway)
-    if buttons:
+    buttons = (SESSION_BUTTONS if to_change else []) + runway_buttons(runway)
+    # With no proposal the row sits under the briefing and opens with "Got it". With one,
+    # the briefing has no row: the buttons go under the proposal's question
+    # (DESIGN_waiting_proposal.md §5).
+    if proposal_item is None and to_change:
+        buttons = [GOT_IT_BUTTON] + buttons
+    if proposal_item is None and buttons:
         emit_buttons(buttons)
     runtime.db.set_setting(MORNING_MARKER, today)
     # After the briefing, what the week planner would change, as a message of its own
     # (DESIGN_waiting_proposal.md §5), then the first item of the athlete queue
     # (DESIGN_athlete_queue.md §6.1).
     if proposal_item is not None:
-        send_alone(proposal_item)
+        emit_flush(wait=False)
+        send_alone(proposal_item, buttons)
     send_walk_step(clock.command_start())
 
