@@ -30,7 +30,7 @@ Three moving parts, each with one job:
 | DB → `settings` table | The **choice**: which menu entry is currently active |
 | `settings` command | Show the menu, change the choice (§4) |
 
-The numbers the athlete types (`settings set coach-model 3`) are *display positions*, never
+The numbers the athlete types (`settings set thinking-model 3`) are *display positions*, never
 stored. The database stores the model identifier string. Reorder the config list and an old
 stored choice still points at the same model.
 
@@ -45,7 +45,7 @@ shipped one — the list is meant to be edited freely, every install ends up wit
 llm:
   api_key: "sk-or-v1-…"
   # Models this install may use. `model list` numbers them in this order; the first entry is
-  # the default until `settings set coach-model` picks another.
+  # the default until `settings set thinking-model` picks another.
   models:
     - model: "moonshotai/kimi-k3"
     - model: "openai/gpt-5.5"
@@ -129,7 +129,7 @@ verbatim, and keeps the existing test (`tests/test_cli_misc.py::test_llm_model_o
 meaningful. Resolution happens on first use — after the DB exists, and after any
 `--llm-model` override has been applied.
 
-Because the resolved value is cached, the registry's `on_change` hook for `coach-model`
+Because the resolved value is cached, the registry's `on_change` hook for `thinking-model`
 calls `openrouter_client.reset_model()` to drop it — a set and a reset both change what the
 next call should resolve to. One CLI invocation is one process, so this matters only in the
 REPL (`sm shell`), where many commands share a process and the athlete reasonably expects a
@@ -160,7 +160,7 @@ still a perfectly valid OpenRouter identifier, so Stamind keeps using it rather 
 switching models behind the athlete's back. `model list` shows it as an extra, unnumbered line:
 
 ```
-  * moonshotai/kimi-k2   (active, not in config list — `settings set coach-model N` to move off)
+  * moonshotai/kimi-k2   (active, not in config list — `settings set thinking-model N` to move off)
 ```
 
 Unnumbered because the numbers are config positions; there is no position to give it. This is a
@@ -169,14 +169,14 @@ display state, not an error — nothing fails, nothing is auto-corrected.
 ## §4 — Choosing the model
 
 The `model` command this section described is gone: choosing the model is now one row of
-the `settings` command, `settings set coach-model <n | id>`, and the numbered menu is
-`settings list coach-model`. See DESIGN_settings.md §4 — a top-level command per
-preference did not scale once the morning push and the router role wanted one too.
+the `settings` command, `settings set thinking-model <n | id>`, and the numbered menu is
+`settings list thinking-model`. See DESIGN_settings.md §4 — a top-level command per
+preference did not scale once the morning push and the fast model wanted one too.
 
 What §1–§3 above define is unchanged: the menu is `llm.models`, the choice is the
 `settings.llm_model` row, the numbers are display positions and are never stored, and the
 resolution order is override → stored → config default. The registry entry for
-`coach-model` reuses `llm_models.resolve_token` as its validator, so an off-menu
+`thinking-model` reuses `llm_models.resolve_token` as its validator, so an off-menu
 identifier is still refused and `--llm-model` is still the escape hatch.
 
 Three display rules survived the move into the generic listing, because each answers a
@@ -187,7 +187,7 @@ question the athlete would otherwise have to guess at:
 - A stored model that has since left `llm.models` is listed unnumbered and flagged
   `not in config list` (§3.3). It is still what gets queried; nothing is auto-corrected.
 - The two no-op paths say so rather than reporting a change that did not happen:
-  `coach-model is X (unchanged).` and `Nothing stored for coach-model — already X.`
+  `thinking-model is X (unchanged).` and `Nothing stored for thinking-model — already X.`
 
 ## §5 — Visibility elsewhere
 
@@ -197,7 +197,7 @@ is after the fact. One line in `status` answers it before the fact.
 
 ## §6 — Tests
 
-`tests/test_cli_settings.py::TestCoachModel`: the identifier is stored rather than the
+`tests/test_cli_settings.py::TestThinkingModel`: the identifier is stored rather than the
 number, off-menu tokens are refused, `reset` returns to the config default, a stored model
 dropped from `llm.models` stays active and is flagged, and `--llm-model` still wins over a
 stored choice while writing nothing.

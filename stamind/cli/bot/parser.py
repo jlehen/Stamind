@@ -62,8 +62,8 @@ def add_bot_parser(subparsers):
         "route",
         help="Classify one free-text chat message into a fixed intent (JSON on stdout)",
         description=(
-            "Ask the router model (llm.router_model, falling back to the active "
-            "coaching model) which intent one chat message carries, and print "
+            "Ask the fast model (llm.fast_model, falling back to the active "
+            "thinking model) which intent one chat message carries, and print "
             "{\"intent\": ...} as one JSON line. Never fails: errors degrade to "
             "'unclear'."
         ),
@@ -77,7 +77,7 @@ def add_bot_parser(subparsers):
         help="Read one chat message into a typed proposal, preview it, and ask",
         description=(
             "The write path behind the free-text router: a second, domain-focused LLM "
-            "call (on the router model) extracts the values one intent can fill, the "
+            "call (on the fast model) extracts the values one intent can fill, the "
             "proposal is previewed in companion prose rendered from real rows, and a "
             "confirm makes it real. The model never authors a command — it fills typed "
             "fields and may nominate an object from rows this command gave it."

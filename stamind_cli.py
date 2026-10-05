@@ -88,7 +88,7 @@ def build_parser():
     )
     parser.add_argument(
         "--llm-model", dest="llm_model",
-        help="Override the coach model for this run; 'settings list coach-model' "
+        help="Override the thinking model for this run; 'settings list thinking-model' "
              "shows the menu"
     )
     parser.add_argument(

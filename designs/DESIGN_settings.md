@@ -4,7 +4,7 @@
 
 Two knobs had grown their own top-level command — `model` (DESIGN_model_selection.md) and
 `timezone` (DESIGN_user_timezone.md) — and three more were about to want one: the morning
-push time, its catch-up deadline, and the router model the simple chat front-end
+push time, its catch-up deadline, and the fast model the simple chat front-end
 classifies with. Those three lived only in `config.yaml`, which means they could not be
 changed from Telegram at all; the companion athlete has no editor and no shell.
 
@@ -92,11 +92,11 @@ Four fields carry the behaviour:
   validators are reused rather than re-written — `clock.resolve` for the zone (with its
   "did you mean Europe/Paris?" search), `llm_models.resolve_token` for both model roles.
 - **`config_path`** is the nested key in `config.yaml`, or `config_default` when the
-  default is not a plain key (the coaching model's default is the *first entry* of
+  default is not a plain key (the thinking model's default is the *first entry* of
   `llm.models`).
 - **`fallback`** is the built-in default; `None` means "unset" is itself a meaningful
   state, and `unset_label` then says what unset means — `(this machine)` for the timezone,
-  `(follows coach-model)` for the router.
+  `(follows thinking-model)` for the fast model.
 - **`on_change`** drops whatever cache the new value invalidates: the resolved zone
   (`clock.reset_cache`), the model the OpenRouter client resolved on first use.
 
@@ -118,10 +118,10 @@ which is what the listing's third column prints. `value(name)` coerces: a bool f
 on/off knob, the string otherwise.
 
 Config values go through the setting's own parser, which matters more than it sounds.
-An unquoted `morning_time: 07:30` is the integer 450 to PyYAML, and a `router_model:`
+An unquoted `morning_time: 07:30` is the integer 450 to PyYAML, and a `fast_model:`
 naming a model that is not on `llm.models` is off the one allowlist (§4). Neither takes
 the command down: the value is ignored, the built-in default applies, and the listing
-names the problem under "Ignored in config.yaml". A key emptied out (`router_model: ""`)
+names the problem under "Ignored in config.yaml". A key emptied out (`fast_model: ""`)
 says nothing at all, exactly like an absent one.
 
 The `settings` table needed no migration — it already existed for `llm_model` and
@@ -148,8 +148,8 @@ works, `settings set morning 12:00` lists the two it could mean.
 === SETTINGS ===
 
 Coach
-    coach-model       anthropic/claude-opus-5  set 3d ago
-    router-model      (follows coach-model)    default
+    thinking-model    anthropic/claude-opus-5  set 3d ago
+    fast-model        (follows thinking-model) default
 
 Clock
   * timezone          Europe/Paris             set today
@@ -161,7 +161,7 @@ Morning push
     adapt-first       off                      default
 ```
 
-`settings list <name>` adds what the generic listing cannot say: for `coach-model` the
+`settings list <name>` adds what the generic listing cannot say: for `thinking-model` the
 numbered menu, marked with which entry coaches and which one routes; for `timezone` the
 local date and time the zone produces, so it can be checked against a watch rather than
 trusted by name. Those renderers live in `stamind/cli/settings.py`, keyed by name, so
@@ -169,12 +169,12 @@ the registry stays free of display code.
 
 ### §4.1 — One allowlist for both model roles
 
-`llm.models` is the menu, and both `coach-model` and `router-model` pick from it by number
+`llm.models` is the menu, and both `thinking-model` and `fast-model` pick from it by number
 or identifier. An off-menu identifier is refused for either role; `--llm-model` remains the
-escape hatch for a one-off. The alternative — free-form identifiers for the router only —
+escape hatch for a one-off. The alternative — free-form identifiers for the fast model only —
 would have bought one less config edit at the cost of the rule that makes the menu an
-allowlist at all. Putting a cheap routing model on the menu is the price, and the
-`coach-model` detail view marks which role each entry currently holds.
+allowlist at all. Putting the cheap fast model on the menu is the price, and the
+`thinking-model` detail view marks which role each entry currently holds.
 
 ## §5 — The bot reads it live
 

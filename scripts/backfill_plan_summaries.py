@@ -4,7 +4,7 @@
 `plan generate` writes a `summary` of the strategy beside it, which `plan show` prints in
 place of the strategy unless `-v` is given (DESIGN_output_verbosity.md §5.1). A plan
 written before the column existed has none. This adds `macrocycles.summary` when it is
-missing, then asks the router model for the summary of every macrocycle without one,
+missing, then asks the fast model for the summary of every macrocycle without one,
 active or superseded, from its strategy, one call each.
 
 It opens the file with plain `sqlite3` to add the column: opening it through `Database`
@@ -28,7 +28,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from stamind import runtime  # noqa: E402
-from stamind.cli.bot.route import use_router_model  # noqa: E402
+from stamind.cli.bot.route import use_fast_model  # noqa: E402
 from stamind.config import CONFIG_PATH, config  # noqa: E402
 from stamind.openrouter import openrouter_client  # noqa: E402
 
@@ -76,7 +76,7 @@ def main() -> int:
         print(f"No database at {config.db_path}. Nothing to backfill.")
         return 0
     add_column(config.db_path)
-    use_router_model(argparse.Namespace())
+    use_fast_model(argparse.Namespace())
     print(f"Model: {openrouter_client.model}")
     with runtime.db.transaction() as conn:
         rows = conn.execute(

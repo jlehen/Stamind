@@ -348,7 +348,7 @@ class WhenWordsTest(unittest.TestCase):
 
 
 class CompanionConfigKnobsTest(unittest.TestCase):
-    """What config.yaml alone decides for the companion. The push window and the router
+    """What config.yaml alone decides for the companion. The push window and the fast
     model resolve through the registry, and are covered against it in
     tests/test_cli_settings.py (DESIGN_settings.md §3)."""
 

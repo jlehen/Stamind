@@ -39,8 +39,8 @@ read like a coach instead of a terminal.
 - Simple-mode replies are short prose with an encouraging frame, not `<pre>` dumps.
 - Expert mode is byte-for-byte unchanged, and the mode is chosen per instance
   (`telegram.ui:` in that instance's config).
-- The router runs on a configurable, cheaper model (the `router-model` setting), independent of
-  the coaching model the `coach-model` setting manages.
+- The router runs on a configurable, cheaper model (the `fast-model` setting), independent of
+  the thinking model the `thinking-model` setting manages.
 - Every simple-mode action still executes the real CLI as a subprocess. The simple
   layer maps chat onto argv; it never re-implements domain logic. That is the same
   parity principle the bot was built on, extended rather than abandoned.
@@ -286,7 +286,7 @@ not a documentation gap. Collapse the behaviours instead of writing better copy.
 
 Free text (anything that isn't a button label) goes to a small intent router
 instead of today's "Couldn't parse that". A new hidden command `sm bot route "<text>"`
-calls the router model with a fixed intent table and returns structured JSON; the bot
+calls the fast model with a fixed intent table and returns structured JSON; the bot
 maps the intent back to argv **from its own table** and runs it. The model picks an
 intent and slots; it never authors argv, so a hostile or confused message cannot reach
 flags the table doesn't expose.
@@ -315,15 +315,15 @@ Routing through a CLI subcommand rather than in-process keeps every OpenRouter c
 client, retries, exchange logs under `logs/llm_exchanges/` — on the one existing path,
 and keeps the bot importable without LLM plumbing.
 
-### 5.4 The router model
+### 5.4 The fast model
 
-A *role*, read by `sm bot route` only: the `router-model` setting, seeded by
-`llm.router_model` in config.yaml (DESIGN_settings.md). Unset → the active coaching model,
+A *role*, read by `sm bot route` only: the `fast-model` setting, seeded by
+`llm.fast_model` in config.yaml (DESIGN_settings.md). Unset → the active thinking model,
 so an install that never configured one gets no surprise second model.
 
-It picks from `llm.models`, the same menu the coaching model picks from — one allowlist for
-both roles (DESIGN_settings.md §4.1). `coach-model` and `settings set coach-model` keep
-meaning the coaching model; `settings list coach-model` marks which menu entry currently
+It picks from `llm.models`, the same menu the thinking model picks from — one allowlist for
+both roles (DESIGN_settings.md §4.1). `thinking-model` and `settings set thinking-model` keep
+meaning the thinking model; `settings list thinking-model` marks which menu entry currently
 holds which role.
 
 ### 5.5 Constraints and signals in chat
@@ -513,7 +513,7 @@ earns it is expert detail, and the chat surface does not audit.
 | `stamind/chat/` | ui-mode switch (config at start, `/ui` flips it live, §5.6, on `ChatBot.simple_ui`), reply keyboard + label→argv table (`keyboards.py`), capture-tap chat state (§5.2, `ChatBot.armed`), `ui:` callback namespace (`callbacks.py`), `SM-BUTTONS` parsing (`runner.py`/`replies.py`), push scheduler task (`scheduler.py`) |
 | `stamind/prompt.py` | `BUTTONS_SENTINEL` + `emit_buttons()` (mirror of `emit_photo`) |
 | `stamind/cli/bot.py` | new hidden family: `bot morning`, `bot route`, `bot constraints`, `bot mesocycle` (§11.2) |
-| `stamind/config.py` | `telegram_ui`; the push knobs and the router role resolve through `stamind/settings.py` |
+| `stamind/config.py` | `telegram_ui`; the push knobs and the fast model resolve through `stamind/settings.py` |
 | `stamind/cli/render/` | the companion voice: line builders (`session_lines.py`, `plan_lines.py`), `ExpertRenderer`/`CompanionRenderer`, `STAMIND_RENDER` interpretation (was a helper in `cli/common.py` — DESIGN_render_persona.md §7) |
 | `stamind/cli/candidates.py` | the confirm loops a note's candidates pass through, shared by `workout adapt -m` and `bot capture note` (§12.10, §12.11) |
 | `docs/ARCHITECTURE.md` | §2 entry points, §9 config keys, bot section |
@@ -531,7 +531,7 @@ Each phase ships alone; her onboarding starts at phase 1.
 
 **Resolved**
 - RPE stays Garmin's (§2 Non-goals) — decided 2026-08-25.
-- Router model is a config role, not a menu entry (§5.4).
+- Fast model is a config role, not a menu entry (§5.4).
 - Second athlete = second instance via `STAMIND_CONFIG`; no in-bot multi-athlete.
 - Bot-initiated messages are in scope (morning push first).
 - Push timing: send at 08:00, catch up until a 15:00 deadline (2026-08-25). A day with
@@ -563,7 +563,7 @@ Each phase ships alone; her onboarding starts at phase 1.
   guardrail posture is unchanged.
 - Writes are routable through three shapes — view, picker, capture — and an
   operation fitting none belongs to the expert vocabulary (2026-09-01, §12).
-  Capture is two router-model calls (route, then a domain-focused extraction);
+  Capture is two fast-model calls (route, then a domain-focused extraction);
   `add_constraint`/`add_signal` move off adapt onto `bot capture note`, with the
   adaptation offered as a button instead of ridden as a toll; edits nominate
   their object against CLI-given rows, previewed from the real row, tap-confirmed;
@@ -618,7 +618,7 @@ Each phase ships alone; her onboarding starts at phase 1.
 1. Router echo: always show "→ …", or only when confidence is low? Draft: always;
    applies unless objected to before phase 3 (rollout §9). Implemented as: always
    (`ROUTER_ECHO` in `stamind/chat/routing.py`); trivially revisitable.
-2. Whether the router model is enough for §12.2's extraction calls — transcription,
+2. Whether the fast model is enough for §12.2's extraction calls — transcription,
    not judgment, says yes; watched in practice, and the role is already a setting.
 3. Multi-intent messages and slotted views (§12.8): deferred until a real message
    demands them.
@@ -767,7 +767,7 @@ model returns an intent name and nothing else, so "move my marathon to October 1
 nowhere to put the date. It has **no way to name an object** — companion prose hides
 IDs, so "I'm not doing the 10k" cannot safely become `goal rm 3`. And **recording a
 rule rides the week planner** — `add_constraint` pays for a full adaptation call on the
-coaching model when all the athlete wanted was to be heard. This pass closes all three
+thinking model when all the athlete wanted was to be heard. This pass closes all three
 without giving the model any new authority.
 
 ### 12.1 Three shapes, and the extension rule
@@ -790,7 +790,7 @@ it is the §7 line, restated as a design test. `plan generate`, wipes, model rol
 `restart` fail the test by construction — no shape gives the model authority over
 anything plan-shaping, expensive, or irreversible.
 
-### 12.2 Capture: two calls, both on the router model
+### 12.2 Capture: two calls, both on the fast model
 
 `bot route` stays exactly as dumb as it is — one intent, no slots (it reads the goal
 and rule titles beside the message since 2026-09-09, §5.3, and still answers with one
@@ -802,7 +802,7 @@ from. Two small calls instead of one do-everything prompt, because the classifie
 must not get harder every time a domain is added, and because read intents — the
 overwhelming majority — keep paying for exactly one call.
 
-Both calls run on the `router-model` role (§5.4). Extraction is transcription, not
+Both calls run on the `fast-model` role (§5.4). Extraction is transcription, not
 coaching judgment, so the cheap model is the right default; whether it is *enough* is
 an open question to watch (§10), and the escape hatch already exists — the role is a
 setting.

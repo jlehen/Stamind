@@ -134,7 +134,7 @@ id, and **every** surface prints the same `-m ..<id>` command from the first day
 runway window. `_print_block_boundary_hint` retires into `_print_runway_hint` — one
 printer, one fact, one command. DESIGN_mesocycle_boundary.md §4's CLI hint is subsumed by
 this; its §3 prompt-side terminal window (`THIS MESOCYCLE IS ENDING`) is untouched and stays
-on `adapt_terminal_window_days` — that gate is about what the *coach model* is told, and
+on `adapt_terminal_window_days` — that gate is about what the *thinking model* is told, and
 must stay tight for the reasons that design gives.
 
 A plan cliff cannot coincide with a mesocycle cliff — the mesocycle kind requires a next

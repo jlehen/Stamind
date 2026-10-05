@@ -15,14 +15,14 @@
 
 llm:
   api_key: "sk-or-v1-EXAMPLEKEYEXAMPLEKEYEXAMPLEKEYEXAMPLEKEY"   # or OPENROUTER_API_KEY
-  # `settings list coach-model` numbers these; `settings set coach-model` switches;
-  # first is the default coach.
+  # `settings list thinking-model` numbers these; `settings set thinking-model` switches;
+  # first is the default thinking model.
   models:
     - model: "anthropic/claude-opus-5"
     - model: "openai/gpt-5.6-sol"
     - model: "google/gemini-3.1-pro-preview"
   # A cheap model is plenty for routing free-text chat messages to a command.
-  router_model: "google/gemini-3.1-pro-preview"
+  fast_model: "google/gemini-3.1-pro-preview"
 
 google:
   service_account_file: "service_account.json"

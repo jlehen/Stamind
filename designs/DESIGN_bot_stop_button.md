@@ -7,7 +7,7 @@
 
 It is Wednesday evening. The athlete opens Telegram and types "knee is sore, move
 tomorrow's run to Friday". The bot answers "Reviewing your coming sessions — this usually
-takes about 40 seconds." and goes quiet while the coach model writes the new session.
+takes about 40 seconds." and goes quiet while the thinking model writes the new session.
 
 Ten seconds in they realise they meant *Saturday*, not Friday. There is an answer they
 do not want on the way, and no way to stop it.

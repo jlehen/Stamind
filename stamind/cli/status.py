@@ -358,7 +358,7 @@ def run_status(args) -> None:
     # fact (DESIGN_model_selection.md §5).
     from stamind.openrouter import openrouter_client
     print(gray(f"  LLM model:    {openrouter_client.model} · change with "
-               + cmd("settings set coach-model")))
+               + cmd("settings set thinking-model")))
     files_line = _page_files_line()
     if files_line:
         notice(files_line)

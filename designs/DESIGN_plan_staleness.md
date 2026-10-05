@@ -181,7 +181,7 @@ companion voice draws nothing — regenerating is operator work, and the compani
 has no shell to run either command in (DESIGN_render_persona.md §5), the same silence
 `runway_hint` already takes.
 
-## 10. Showing the edit, and asking the coach model
+## 10. Showing the edit, and asking the thinking model
 
 **Date:** 2026-09-06 · **Branch:** worktree-staleness-diff-verdict
 
@@ -197,7 +197,7 @@ sorted JSON, so a reordered dict is not a change. Threshold drift shows no diff 
 reason already carries the numbers. One renderer in the service (`profile_diff`), one
 printer in `cli/staleness.py`, and `plan show`, `plan keep` and both questions use it.
 
-**The verdict call.** Before either question, the coach model is asked the §2 test itself: given
+**The verdict call.** Before either question, the thinking model is asked the §2 test itself: given
 this diff and the plan as it stands, would you have built a structurally different
 periodization? It answers `{"reshaping": bool, "why": str}` and the line prints as
 `Coach: keep the plan. …` or `Coach: re-shaping. …`.
@@ -211,7 +211,7 @@ periodization? It answers `{"reshaping": bool, "why": str}` and the line prints 
   motivation, what to listen to, which days), and demands the concrete structural change
   it would make — "cannot name one" is keep.
 - *On the coach's model, not the router's.* The verdict predicts what `plan generate` would do.
-  The router model exists because bot routing runs on every message and must be cheap;
+  The fast model exists because bot routing runs on every message and must be cheap;
   this runs only when an input changed. The gain from using the same model is
   consistency between the prediction and the regeneration, not accuracy — the model has
   no memory of building the plan and sees only what the prompt shows it. The decisive

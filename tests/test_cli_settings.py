@@ -80,7 +80,7 @@ class TestTheListing(SettingsTestCase):
     def test_a_row_names_its_source(self):
         _, stdout, _ = self.run_cli(["settings"])
         # Nothing stored: the model comes from the config menu, the push times are built in.
-        self.assertIn("config.yaml", self.row(stdout, settings.COACH_MODEL))
+        self.assertIn("config.yaml", self.row(stdout, settings.THINKING_MODEL))
         self.assertIn("default", self.row(stdout, settings.MORNING_TIME))
 
         self.run_cli(["settings", "set", settings.MORNING_TIME, "07:30"])
@@ -89,7 +89,7 @@ class TestTheListing(SettingsTestCase):
 
     def test_an_unset_knob_says_what_unset_means(self):
         _, stdout, _ = self.run_cli(["settings"])
-        self.assertIn("follows coach-model", self.row(stdout, settings.ROUTER_MODEL))
+        self.assertIn("follows thinking-model", self.row(stdout, settings.FAST_MODEL))
         self.assertIn("this machine", self.row(stdout, settings.TIMEZONE))
 
     def test_a_config_value_this_setting_cannot_read_is_reported_not_obeyed(self):
@@ -106,15 +106,15 @@ class TestTheListing(SettingsTestCase):
 class TestTheDetailView(SettingsTestCase):
     """`settings list <name>`: one knob, with the menu or the clock it needs (§4.2)."""
 
-    def test_the_coach_model_detail_is_the_numbered_menu(self):
-        exit_code, stdout, _ = self.run_cli(["settings", "list", "coach-model"])
+    def test_the_thinking_model_detail_is_the_numbered_menu(self):
+        exit_code, stdout, _ = self.run_cli(["settings", "list", "thinking-model"])
         self.assertEqual(exit_code, 0)
         for model in self.MODELS:
             self.assertIn(model, stdout)
         self.assertIn("llm.models (first entry)", stdout)
 
-    def test_the_router_model_detail_is_the_same_menu(self):
-        exit_code, stdout, _ = self.run_cli(["settings", "list", "router-model"])
+    def test_the_fast_model_detail_is_the_same_menu(self):
+        exit_code, stdout, _ = self.run_cli(["settings", "list", "fast-model"])
         self.assertEqual(exit_code, 0)
         for model in self.MODELS:
             self.assertIn(model, stdout)
@@ -141,44 +141,44 @@ class TestTheDetailView(SettingsTestCase):
         self.assertEqual(settings.morning_deadline(), "12:00")
 
 
-class TestCoachModel(SettingsTestCase):
-    """The coaching model: the config list, the stored choice and the per-invocation
+class TestThinkingModel(SettingsTestCase):
+    """The thinking model: the config list, the stored choice and the per-invocation
     override (DESIGN_model_selection.md §3)."""
 
     def _stored(self):
         return test_db.get_setting("llm_model")
 
     def test_set_by_number_stores_the_identifier(self):
-        exit_code, stdout, _ = self.run_cli(["settings", "set", "coach-model", "3"])
+        exit_code, stdout, _ = self.run_cli(["settings", "set", "thinking-model", "3"])
         self.assertEqual(exit_code, 0)
         self.assertIn(self.MODELS[2], stdout)
         # The identifier is stored, not the number — reordering config must not repoint it.
         self.assertEqual(self._stored(), self.MODELS[2])
 
     def test_set_by_identifier(self):
-        exit_code, _, _ = self.run_cli(["settings", "set", "coach-model", self.MODELS[1]])
+        exit_code, _, _ = self.run_cli(["settings", "set", "thinking-model", self.MODELS[1]])
         self.assertEqual(exit_code, 0)
         self.assertEqual(self._stored(), self.MODELS[1])
 
     def test_set_rejects_anything_off_the_menu(self):
         for token in ("0", "99", "garbage", "openai/not-on-the-menu"):
             with self.subTest(token=token):
-                exit_code, _, _ = self.run_cli(["settings", "set", "coach-model", token])
+                exit_code, _, _ = self.run_cli(["settings", "set", "thinking-model", token])
                 self.assertEqual(exit_code, 1)
                 self.assertIsNone(self._stored())
 
     def test_reset_falls_back_to_the_config_default(self):
-        self.run_cli(["settings", "set", "coach-model", "4"])
+        self.run_cli(["settings", "set", "thinking-model", "4"])
         self.assertEqual(self._stored(), self.MODELS[3])
 
-        exit_code, stdout, _ = self.run_cli(["settings", "reset", "coach-model"])
+        exit_code, stdout, _ = self.run_cli(["settings", "reset", "thinking-model"])
         self.assertEqual(exit_code, 0)
         self.assertIn(self.MODELS[0], stdout)
         self.assertIsNone(self._stored())
 
     def test_a_stored_model_dropped_from_config_stays_active(self):
         test_db.set_setting("llm_model", "anthropic/claude-opus-4.8")
-        _, stdout, _ = self.run_cli(["settings", "list", "coach-model"])
+        _, stdout, _ = self.run_cli(["settings", "list", "thinking-model"])
         self.assertIn("not in config list", stdout)
         # Still the model that would be queried — nothing is auto-corrected.
         from stamind.llm_models import active_model
@@ -186,7 +186,7 @@ class TestCoachModel(SettingsTestCase):
 
     def test_the_invocation_override_wins_and_stores_nothing(self):
         from stamind.openrouter import openrouter_client
-        self.run_cli(["settings", "set", "coach-model", "2"])
+        self.run_cli(["settings", "set", "thinking-model", "2"])
         exit_code, _, _ = self.run_cli(
             ["--llm-model", "google/gemini-2.5-pro", "goal", "list"])
         self.assertEqual(exit_code, 0)
@@ -195,49 +195,49 @@ class TestCoachModel(SettingsTestCase):
 
     def test_the_client_resolves_the_stored_model(self):
         from stamind.openrouter import openrouter_client
-        self.run_cli(["settings", "set", "coach-model", "3"])
+        self.run_cli(["settings", "set", "thinking-model", "3"])
         self.assertEqual(openrouter_client.model, self.MODELS[2])
 
 
-class TestRouterModel(SettingsTestCase):
-    """The router role: one allowlist with the coaching model, and 'unset' means 'follow
-    the coach' (DESIGN_bot_simple_frontend.md §5.4)."""
+class TestFastModel(SettingsTestCase):
+    """The fast model: one allowlist with the thinking model, and 'unset' means 'follow
+    it' (DESIGN_bot_simple_frontend.md §5.4)."""
 
-    def test_unset_follows_the_coaching_model(self):
-        self.assertIsNone(settings.router_model())
+    def test_unset_follows_the_thinking_model(self):
+        self.assertIsNone(settings.fast_model())
 
     def test_set_picks_from_the_same_menu_by_number(self):
-        exit_code, _, _ = self.run_cli(["settings", "set", "router-model", "2"])
+        exit_code, _, _ = self.run_cli(["settings", "set", "fast-model", "2"])
         self.assertEqual(exit_code, 0)
-        self.assertEqual(settings.router_model(), self.MODELS[1])
+        self.assertEqual(settings.fast_model(), self.MODELS[1])
 
     def test_an_off_menu_identifier_is_refused(self):
         exit_code, stdout, _ = self.run_cli(
-            ["settings", "set", "router-model", "cheap/not-on-the-menu"])
+            ["settings", "set", "fast-model", "cheap/not-on-the-menu"])
         self.assertEqual(exit_code, 1)
         self.assertIn("not in the config list", stdout)
-        self.assertIsNone(settings.router_model())
+        self.assertIsNone(settings.fast_model())
 
     def test_config_seeds_it_and_the_stored_row_overrides(self):
         from stamind.config import config
-        seeded = dict(self.CONFIG["llm"], router_model=self.MODELS[3])
+        seeded = dict(self.CONFIG["llm"], fast_model=self.MODELS[3])
         with patch.dict(config.data, {"llm": seeded}):
-            self.assertEqual(settings.router_model(), self.MODELS[3])
-            self.run_cli(["settings", "set", "router-model", "1"])
-            self.assertEqual(settings.router_model(), self.MODELS[0])
-            self.run_cli(["settings", "reset", "router-model"])
-            self.assertEqual(settings.router_model(), self.MODELS[3])
+            self.assertEqual(settings.fast_model(), self.MODELS[3])
+            self.run_cli(["settings", "set", "fast-model", "1"])
+            self.assertEqual(settings.fast_model(), self.MODELS[0])
+            self.run_cli(["settings", "reset", "fast-model"])
+            self.assertEqual(settings.fast_model(), self.MODELS[3])
 
     def test_a_config_key_emptied_out_reads_as_unset(self):
         from stamind.config import config
-        seeded = dict(self.CONFIG["llm"], router_model="   ")
+        seeded = dict(self.CONFIG["llm"], fast_model="   ")
         with patch.dict(config.data, {"llm": seeded}):
-            self.assertIsNone(settings.router_model())
+            self.assertIsNone(settings.fast_model())
             _, stdout, _ = self.run_cli(["settings"])
             self.assertNotIn("Ignored in config.yaml", stdout)
 
     def test_the_router_command_uses_it(self):
-        self.run_cli(["settings", "set", "router-model", "2"])
+        self.run_cli(["settings", "set", "fast-model", "2"])
         from stamind.openrouter import openrouter_client
         with patch.object(openrouter_client, "complete",
                           return_value={"intent": "show_today"}) as complete:
@@ -352,8 +352,8 @@ class TestRegistryShape(SettingsTestCase):
 
     def test_every_setting_round_trips_through_set_and_reset(self):
         samples = {
-            settings.COACH_MODEL: "2",
-            settings.ROUTER_MODEL: "3",
+            settings.THINKING_MODEL: "2",
+            settings.FAST_MODEL: "3",
             settings.TIMEZONE: "UTC",
             settings.PUSH: "off",
             settings.MORNING_TIME: "06:45",

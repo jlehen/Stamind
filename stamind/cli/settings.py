@@ -79,7 +79,7 @@ def run_settings_list(args: argparse.Namespace) -> None:
     aside(f"\nChange one with {cmd('settings set <name> <value>')}, or "
           f"{cmd('settings reset <name>')} to fall back to config.yaml. "
           f"{cmd('settings list <name>')} explains one setting; "
-          f"{cmd('settings list coach-model')} shows the model menu.")
+          f"{cmd('settings list thinking-model')} shows the model menu.")
 
 
 def _print_detail(name: str) -> None:
@@ -122,17 +122,17 @@ def _detail_model_menu() -> None:
     """The numbered menu both model roles pick from, with each role's holder marked
     (DESIGN_model_selection.md §4.1)."""
     print()
-    router = settings.router_model()
+    fast = settings.fast_model()
     for row in llm_models.list_models():
         marker = green("*") if row["active"] else " "
         number = f"{row['number']:>2} " if row["number"] is not None else " - "
         roles = []
         if row["active"]:
-            roles.append(green("coach"))
+            roles.append(green("thinking"))
             if row["number"] is None:
                 roles.append(dim("not in config list"))
-        if router and row["model"] == router:
-            roles.append(cyan("router"))
+        if fast and row["model"] == fast:
+            roles.append(cyan("fast"))
         annotation = "  " + "  ".join(roles) if roles else ""
         print(f"  {marker} {number} {row['model']}{annotation}")
 
@@ -150,8 +150,8 @@ def _detail_timezone() -> None:
 # Settings whose detail view carries more than the generic listing — a menu to pick from,
 # a clock to check. Keyed by name so the registry stays free of display code.
 DETAIL_EXTRAS = {
-    settings.COACH_MODEL: _detail_model_menu,
-    settings.ROUTER_MODEL: _detail_model_menu,
+    settings.THINKING_MODEL: _detail_model_menu,
+    settings.FAST_MODEL: _detail_model_menu,
     settings.TIMEZONE: _detail_timezone,
 }
 
@@ -236,7 +236,7 @@ def add_settings_parser(subparsers):
     settings_list.set_defaults(func=run_settings_list)
     settings_list.add_argument(
         "name", metavar="NAME", nargs="?",
-        help="Setting to explain (e.g. coach-model); omit for the whole list"
+        help="Setting to explain (e.g. thinking-model); omit for the whole list"
     )
 
     # settings set

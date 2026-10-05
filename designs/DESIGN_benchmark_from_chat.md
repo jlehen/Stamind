@@ -38,7 +38,7 @@ after a test; either way I read it back and ask before I write it down.
 
 ## 3. What the capture reads
 
-The extraction runs on the router model and sees today's date, the five kinds it may return
+The extraction runs on the fast model and sees today's date, the five kinds it may return
 (FTP, LTHR, threshold pace, CSS, MAS, spelled as the logbook stores them), and the benchmark
 sessions of the last fourteen days, each as id, date, title and sport. It returns the kind,
 the value as the athlete wrote it ("4:15" stays "4:15"), the sport if the message names one,
@@ -52,7 +52,7 @@ the protocol, the conditions or how it went, copied in the athlete's own words a
 or null when the message says nothing more. It becomes the row's `note`, which is the one place the
 protocol is written down: the anchors line that both `plan generate` and `workout generate` read
 carries it as "athlete's note", and a ramp test and a 20-minute test are not one series
-(DESIGN_benchmark_workouts.md rev. 5). The router model is up to this because copying is not
+(DESIGN_benchmark_workouts.md rev. 5). The fast model is up to this because copying is not
 judging; the same role already copies a goal's description and a rule's title out of free text. Its
 two ways of getting it wrong, a paraphrase or an invented protocol, both land in the read-back in
 quotes and die on "No". Storing the whole message as the note would need no model, and was not

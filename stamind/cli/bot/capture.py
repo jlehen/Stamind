@@ -20,7 +20,7 @@ from stamind.cli.bot.extraction import (
     CAPTURE_ROLE, NEVER_FILL_RULE, adjust_week_button, capture_call, dated_context,
     no_find, send_to_coach_button, valid_date,
 )
-from stamind.cli.bot.route import use_router_model
+from stamind.cli.bot.route import use_fast_model
 from stamind.cli.bot.test_result import capture_test_result
 from stamind.cli.bot.views import MORNING_MARKER
 from stamind.cli.candidates import (
@@ -347,7 +347,7 @@ def run_bot_capture(args: argparse.Namespace) -> None:
     """Dispatches one capture intent (§12.2). Runs as an ordinary routed command: its
     questions are SM-PROMPT confirms, its offers are SM-BUTTONS rows, its output is
     simple-rendered — nothing new crosses the CLI↔bot channel."""
-    use_router_model(args)
+    use_fast_model(args)
     text = args.text or ""
     if args.intent == "note":
         run_bot_capture_note(text)

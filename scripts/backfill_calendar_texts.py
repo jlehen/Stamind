@@ -3,7 +3,7 @@
 
 `workout generate` and `workout adapt` write a session's short name, and `plan generate` a
 mesocycle's summary (DESIGN_calendar_miniapp.md §3.6, §3.7). A session or a plan written
-before those columns existed has none. This asks the router model for them, once:
+before those columns existed has none. This asks the fast model for them, once:
 
 - every live session without a short name, rest days and cancelled sessions left out,
   from its title and the start of its description, 40 to a call;
@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from migrate_calendar_columns import add_columns  # noqa: E402
 
 from stamind import runtime  # noqa: E402
-from stamind.cli.bot.route import use_router_model  # noqa: E402
+from stamind.cli.bot.route import use_fast_model  # noqa: E402
 from stamind.config import CONFIG_PATH, config  # noqa: E402
 from stamind.db.schema import WORKOUTS_APPEND_ONLY_TRIGGERS  # noqa: E402
 from stamind.openrouter import openrouter_client  # noqa: E402
@@ -162,7 +162,7 @@ def main() -> int:
     # Before anything opens the database through `Database`, which would stamp version 22
     # over missing columns (migrate_calendar_columns.py).
     add_columns(config.db_path)
-    use_router_model(argparse.Namespace())
+    use_fast_model(argparse.Namespace())
     print(f"Model: {openrouter_client.model}")
     backfill_sessions(args.dry_run)
     backfill_summaries(args.dry_run)

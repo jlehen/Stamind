@@ -77,7 +77,7 @@ CAPTURE_ROLE = (
 
 
 def capture_call(system_prompt: str, text: str, label: str) -> Optional[dict]:
-    """One extraction call on the router model (§12.2), or None when it fails.
+    """One extraction call on the fast model (§12.2), or None when it fails.
 
     A failure lands the athlete in the same place a no-find does — nothing stored and the
     coach one tap away — so it degrades rather than raising: the message is hers, and

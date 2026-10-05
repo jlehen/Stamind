@@ -280,7 +280,7 @@ You MUST respond with a JSON object containing:
         self, change_reason: str, diff_text: str, strategy: str,
         mesocycles: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
-        """The verdict call: asks the coach model whether a changed input would have altered
+        """The verdict call: asks the thinking model whether a changed input would have altered
         the periodization — the DESIGN_plan_staleness.md §2 test, applied by the model that
         would do the rebuilding rather than by the athlete alone (§10).
 

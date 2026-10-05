@@ -56,16 +56,16 @@ def _router_context(today: str) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def use_router_model(args: argparse.Namespace) -> None:
-    """Pins this process's OpenRouter client to the router role (§5.4). Both the
+def use_fast_model(args: argparse.Namespace) -> None:
+    """Pins this process's OpenRouter client to the fast model (§5.4). Both the
     classifier and the §12.2 extraction calls run on it: extraction is transcription,
     not coaching judgement, so the cheap model is the right default and the escape
     hatch is a setting. The per-invocation --llm-model override (applied by the
     dispatcher before any handler runs) outranks the role."""
     from stamind.openrouter import openrouter_client
-    router_model = settings.router_model()
-    if router_model and not getattr(args, "llm_model", None):
-        openrouter_client.model = router_model
+    fast_model = settings.fast_model()
+    if fast_model and not getattr(args, "llm_model", None):
+        openrouter_client.model = fast_model
 
 
 def run_bot_route(args: argparse.Namespace) -> None:
@@ -73,7 +73,7 @@ def run_bot_route(args: argparse.Namespace) -> None:
     JSON line: {"intent": ...}. Never fails: a routing error degrades to 'unclear',
     which the bot renders as a gentle fallback (§5.3)."""
     from stamind.openrouter import openrouter_client
-    use_router_model(args)
+    use_fast_model(args)
     intent = "unclear"
     try:
         data = openrouter_client.complete(

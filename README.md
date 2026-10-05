@@ -70,7 +70,7 @@ You need:
 - A Google service account with access to one Google Calendar. The
   [setup section](#google-calendar-and-the-service-account) walks through it.
 
-What it costs to run: the coach model is called when you generate a plan, when
+What it costs to run: the thinking model is called when you generate a plan, when
 you generate workouts, and once a day when you adapt. Each of those is one large
 call with tens of thousands of tokens of context. Nothing else spends money.
 `./sm journal --cost` rolls up your own spend by model and by command, so after
@@ -151,7 +151,7 @@ means one thing.
   the first paragraph of the session's description, and the strength planner
   writes the rest underneath it.
 - **The coach.** Stamind talking to you, whichever model call wrote the words.
-  Every one of those calls runs on the coach model, see
+  Every one of those calls runs on the thinking model, see
   [Choosing a model](#choosing-a-model).
 
 ## A week with Stamind
@@ -401,7 +401,7 @@ subprocess, so it supports exactly what the CLI does. It is made for an athlete
 who does not want a command language. A persistent keyboard covers the daily
 surface: Today, Calendar (a month grid in a page), Done lately, Goals & plan (a
 timeline in a page), Progress, and Talk to me. Free text goes through a small
-intent router on a cheap model: "what's on today" shows the day, "I'm wrecked"
+intent router on the fast model: "what's on today" shows the day, "I'm wrecked"
 goes to the coach, "no running until Friday" is saved as a constraint after a
 confirmation. The bot opens each day with a morning message and three buttons,
 and replies read as short prose rather than tables. The two pages show ten weeks
@@ -436,7 +436,7 @@ Setup:
 
 Only allow-listed chat ids are served. Because the bot cannot ask for
 confirmation, destructive commands such as `wipe` and `rm` are declined unless
-you pass their `-y` flag. A command that calls the coach model first sends you
+you pass their `-y` flag. A command that calls the thinking model first sends you
 what it is working from, then tells you how long the wait usually is, then the
 answer. The estimate is the median of that command's recent runs on your own
 machine.
@@ -459,9 +459,9 @@ The sections you must fill:
 
 - **`llm:`** has `api_key` (an `OPENROUTER_API_KEY` environment variable
   overrides it) and `models`, the list of OpenRouter models this install may
-  use. The first entry is the default coach; `settings set coach-model`
-  switches at runtime. `router_model` names the cheap model the bot
-  routes chat with.
+  use. The first entry is the default thinking model; `settings set
+  thinking-model` switches at runtime. `fast_model` names the cheap model the
+  bot routes chat with.
 - **`google:`** has `calendar_id`, the calendar your workouts are written to, and
   `service_account_file`, the JSON key used to authenticate.
 - **`garmin:`** has your Garmin Connect `email` and `password`.
@@ -487,7 +487,7 @@ same command works from Telegram, which is the point: the phone has no editor.
 
 ```bash
 ./sm settings                             # the whole list
-./sm settings set coach-model 2           # switch the LLM behind the coach
+./sm settings set thinking-model 2        # switch the LLM behind the coach
 ./sm settings set timezone Europe/Paris   # what "today" means
 ./sm settings set morning-time 07:00      # when the bot opens your day
 ./sm settings set commitment-days 7       # how far ahead the week is settled
@@ -741,7 +741,7 @@ Three things to know when you regenerate:
 Stamind uses two model roles, both picked from the `llm.models` list in your
 config.
 
-- **The coach model** answers every call that coaches: it writes the plan, it is
+- **The thinking model** answers every call that coaches: it writes the plan, it is
   the week planner that writes and adapts the sessions, and it reads your
   history. This is where quality matters. **The recommendation is the most
   recent Claude Opus** (`anthropic/claude-opus-5` at the time of writing). In
@@ -753,22 +753,22 @@ config.
   it after planning, while Opus, like five others, adapted nothing in that
   scenario. The full measured comparison, with wall times, is in
   [docs/model_comparison_2026-08.md](docs/model_comparison_2026-08.md).
-- **The router** only classifies free-text chat messages into
+- **The fast model** only classifies free-text chat messages into
   one of a dozen intents. A cheap, fast model is plenty. **The recommendation is
-  Gemini Flash** (`google/gemini-3.5-flash`), set with `llm.router_model` or
-  `settings set router-model`. Unset, the coach model routes too, which works
+  Gemini Flash** (`google/gemini-3.5-flash`), set with `llm.fast_model` or
+  `settings set fast-model`. Unset, the thinking model routes too, which works
   but wastes money and seconds on every message.
 
 ```yaml
 llm:
   models:
-    - model: "anthropic/claude-opus-5"      # first entry: default coach model
+    - model: "anthropic/claude-opus-5"      # first entry: default thinking model
     - model: "google/gemini-3.5-flash"
-  router_model: "google/gemini-3.5-flash"
+  fast_model: "google/gemini-3.5-flash"
 ```
 
-`./sm settings list coach-model` prints the numbered menu and marks which entry
-holds which role. `--llm-model <id>` overrides the coach model for a single
+`./sm settings list thinking-model` prints the numbered menu and marks which entry
+holds which role. `--llm-model <id>` overrides the thinking model for a single
 command without storing anything.
 
 ## Going deeper

@@ -19,8 +19,8 @@ from stamind.config import config
 from stamind.text import cmd
 
 # Athlete-facing names — the vocabulary `settings set` accepts and every caller passes.
-COACH_MODEL = "coach-model"
-ROUTER_MODEL = "router-model"
+THINKING_MODEL = "thinking-model"
+FAST_MODEL = "fast-model"
 TIMEZONE = "timezone"
 PUSH = "push"
 MORNING_TIME = "morning-time"
@@ -151,7 +151,7 @@ def _reset_model_cache() -> None:
 # Registration order is listing order; the group heading breaks it up on screen.
 SETTINGS: List[Setting] = [
     Setting(
-        name=COACH_MODEL,
+        name=THINKING_MODEL,
         key=llm_models.LLM_MODEL_SETTING,
         group="Coach",
         summary="Model the coach reasons with",
@@ -163,7 +163,7 @@ SETTINGS: List[Setting] = [
         on_change=_reset_model_cache,
     ),
     Setting(
-        name=ROUTER_MODEL,
+        name=FAST_MODEL,
         key="router_llm_model",
         group="Coach",
         summary="Cheaper model that reads free-text messages in simple chat mode",
@@ -171,8 +171,8 @@ SETTINGS: List[Setting] = [
         # Off-menu identifiers are refused here too: `llm.models` is the one allowlist
         # both model roles pick from (§4).
         parse=llm_models.resolve_token,
-        config_path=("llm", "router_model"),
-        unset_label=f"(follows {COACH_MODEL})",
+        config_path=("llm", "fast_model"),
+        unset_label=f"(follows {THINKING_MODEL})",
     ),
     Setting(
         name=LEARNING_QUESTIONS,
@@ -384,8 +384,8 @@ def clear(name: str) -> bool:
 
 
 # --- Named readers, one per knob with no home module of its own ---
-# `coach-model` and `timezone` are read through llm_models/clock, which own the rest of
-# their behaviour; the morning-push knobs and the router role have no such module.
+# `thinking-model` and `timezone` are read through llm_models/clock, which own the rest of
+# their behaviour; the morning-push knobs and the fast model have no such module.
 
 def commitment_days() -> int:
     """How many days from today the week planner must account for session by session
@@ -435,10 +435,10 @@ def adapt_first() -> bool:
     return value(ADAPT_FIRST)
 
 
-def router_model() -> Optional[str]:
-    """The model `bot route` classifies with, or None to follow the coaching model
+def fast_model() -> Optional[str]:
+    """The model `bot route` classifies with, or None to follow the thinking model
     (DESIGN_bot_simple_frontend.md §5.4)."""
-    return value(ROUTER_MODEL)
+    return value(FAST_MODEL)
 
 
 def strength_sets_since() -> Optional[str]:

@@ -399,7 +399,7 @@ class MorningPushTest(unittest.TestCase):
 
 class RouteCommandTest(unittest.TestCase):
     """`bot route` — §5.3/§5.4: intent validation, graceful degradation, and the
-    router-model role."""
+    fast-model role."""
 
     def setUp(self):
         rebind_test_db(test_db)  # an earlier module may have rebound the handles
@@ -470,14 +470,14 @@ class RouteCommandTest(unittest.TestCase):
         self.assertEqual(self._intent(out), "show_week")
         self.assertIn("(none)", complete.call_args.args[1])
 
-    def test_router_model_role_pins_the_client(self):
+    def test_fast_model_role_pins_the_client(self):
         from stamind.openrouter import openrouter_client
-        # The router picks from the same menu the coach model does — one allowlist
+        # The router picks from the same menu the thinking model does — one allowlist
         # (DESIGN_settings.md §4), so the cheap model is listed under `llm.models` too.
         with patch.dict(
             config.data,
             {"llm": {"models": ["main/model", "cheap/model"],
-                     "router_model": "cheap/model"}},
+                     "fast_model": "cheap/model"}},
         ), patch(
             "stamind.openrouter.OpenRouterClient.complete",
             return_value={"intent": "help"},
@@ -485,11 +485,11 @@ class RouteCommandTest(unittest.TestCase):
             run_cli(["bot", "route", "hello"])
             self.assertEqual(openrouter_client.model, "cheap/model")
 
-    def test_an_off_menu_role_is_ignored_and_the_coach_model_routes(self):
+    def test_an_off_menu_role_is_ignored_and_the_thinking_model_routes(self):
         from stamind.openrouter import openrouter_client
         with patch.dict(
             config.data,
-            {"llm": {"models": ["main/model"], "router_model": "cheap/model"}},
+            {"llm": {"models": ["main/model"], "fast_model": "cheap/model"}},
         ), patch(
             "stamind.openrouter.OpenRouterClient.complete",
             return_value={"intent": "help"},

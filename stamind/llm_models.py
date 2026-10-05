@@ -2,7 +2,7 @@
 
 See DESIGN_model_selection.md. `config.llm_models` is the menu, the `settings.llm_model` row
 is the choice, and the display numbers are positions in the menu — never stored, so reordering
-the config cannot repoint an existing choice. Writing the choice is `settings set coach-model`
+the config cannot repoint an existing choice. Writing the choice is `settings set thinking-model`
 (DESIGN_settings.md); this module reads it. The database handle is read as `runtime.db`
 at call time; `stamind.settings` stays a function-local import, because it imports this
 module back for the menu validator.
@@ -34,13 +34,13 @@ def active_model() -> str:
     # Imported here, not at module scope: stamind.settings imports this module for the
     # menu validator, and it owns the one stored-then-config resolution (DESIGN_settings.md §3).
     from stamind import settings
-    return settings.value(settings.COACH_MODEL)
+    return settings.value(settings.THINKING_MODEL)
 
 
 def active_source() -> str:
     """Where `active_model` came from — 'db' (stored choice) or 'config' (first menu entry)."""
     from stamind import settings
-    return settings.resolve(settings.COACH_MODEL).source
+    return settings.resolve(settings.THINKING_MODEL).source
 
 
 def list_models() -> List[Dict[str, Any]]:
@@ -61,8 +61,8 @@ def list_models() -> List[Dict[str, Any]]:
 def resolve_token(token: str) -> str:
     """Maps a model token — a menu number or a full identifier — to a model id.
 
-    The validator behind `settings set coach-model` and `settings set router-model`, and the
-    reader for `llm.router_model` in config.yaml, so it takes whatever YAML produced. Raises
+    The validator behind `settings set thinking-model` and `settings set fast-model`, and the
+    reader for `llm.fast_model` in config.yaml, so it takes whatever YAML produced. Raises
     ValueError with a ready-to-print message if the token names nothing on the menu. Off-menu
     identifiers are refused on purpose: the menu is the one allowlist both model roles pick
     from, and `--llm-model` is the escape hatch for a one-off model you don't want to keep.
@@ -75,12 +75,12 @@ def resolve_token(token: str) -> str:
             raise ValueError(
                 f"No model numbered {number} — the list has {len(models)} "
                 f"{'entry' if len(models) == 1 else 'entries'}. Run "
-                f"{cmd('settings list coach-model')} to see them."
+                f"{cmd('settings list thinking-model')} to see them."
             )
         return models[number - 1]
     if token in models:
         return token
     raise ValueError(
-        f"'{token}' is not in the config list. Run {cmd('settings list coach-model')} to see "
+        f"'{token}' is not in the config list. Run {cmd('settings list thinking-model')} to see "
         "the list, or add it to `llm.models` in config.yaml."
     )

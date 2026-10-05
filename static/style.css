@@ -1442,7 +1442,7 @@ header {
     color: var(--accent-cyan);
 }
 
-/* --- COACHING MODEL (`model list`) --- */
+/* --- THINKING MODEL (`model list`) --- */
 .model-active { font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-secondary); }
 .model-active code, .model-row code { color: var(--accent-cyan); font-size: 0.78rem; }
 .model-row {

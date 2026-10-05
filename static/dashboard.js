@@ -255,7 +255,7 @@ async function fetchEvents() {
     }
 }
 
-// --- COACHING MODEL (`model list`) ---
+// --- THINKING MODEL (`model list`) ---
 
 async function fetchModels() {
     const el = document.getElementById("models-list");

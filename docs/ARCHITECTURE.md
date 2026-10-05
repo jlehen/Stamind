@@ -278,7 +278,7 @@ classes themselves.
     calendar page rather than a label with argv
     ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)); "💬 Talk to me" only shows
     the capture prompt — every non-label message, tapped or not, is classified by `sm bot route`
-    (a hidden CLI command calling `llm.router_model`) and mapped to argv from the bot's
+    (a hidden CLI command calling `llm.fast_model`) and mapped to argv from the bot's
     own `ROUTER_INTENT_ARGV` table — the model picks an intent, never argv. Two intents
     carry the athlete's words to the coach instead (`ROUTER_MESSAGE_ARGV`): how the
     athlete is (`coach_message`) goes to `workout adapt -m`, a change they decided
@@ -293,7 +293,7 @@ classes themselves.
     (`constraint rm <id>`, `goal rm <id>`, which archives); the model picks *that*
     something should change, the athlete's tap picks *which*. A **capture** —
     `sm bot capture <intent> "<text>" [--id N]` — is a second, domain-focused LLM call on
-    the same router role: it extracts typed fields, the CLI previews them in companion
+    the same fast model: it extracts typed fields, the CLI previews them in companion
     prose *rendered from real rows*, and a `SM-PROMPT` confirm makes it real. An
     operation fitting none of the three belongs to the expert vocabulary, which is why
     `plan generate`, wipes, `--purge`, model roles and `restart` stay typed. Notes
@@ -1634,7 +1634,7 @@ facts are **derived, not stored**. See DESIGN_workout_revisions.md.
 | `sport_canonical`       | TEXT       | The slot key (`stamind.sports.canonical_sport`). |
 | `sport_type`            | TEXT       | The spelling as written.                         |
 | `title`                 | TEXT       |                                                  |
-| `short_name`            | TEXT       | At most five characters naming the kind of session ("Easy", "Hills", "Z2"), which the calendar cell shows under its icon. The week planner writes it with the title in `workout generate`, `workout adapt` and `workout tweak`; stored as written. Taken as given like `title`: `WorkoutChange.append` never carries it forward, and the strength planner's hand-built rows copy it from the live session. Not a prescription field: a revision differing only in it is dropped, and Google Calendar never shows it. NULL on a rest day. `scripts/migrate_calendar_columns.py` added the column (`SCHEMA_VERSION` 22), and `scripts/backfill_calendar_texts.py` filled the sessions written before it once, from the router model, onto the live revision in place (DESIGN_calendar_miniapp.md §3.6). |
+| `short_name`            | TEXT       | At most five characters naming the kind of session ("Easy", "Hills", "Z2"), which the calendar cell shows under its icon. The week planner writes it with the title in `workout generate`, `workout adapt` and `workout tweak`; stored as written. Taken as given like `title`: `WorkoutChange.append` never carries it forward, and the strength planner's hand-built rows copy it from the live session. Not a prescription field: a revision differing only in it is dropped, and Google Calendar never shows it. NULL on a rest day. `scripts/migrate_calendar_columns.py` added the column (`SCHEMA_VERSION` 22), and `scripts/backfill_calendar_texts.py` filled the sessions written before it once, from the fast model, onto the live revision in place (DESIGN_calendar_miniapp.md §3.6). |
 | `description`           | TEXT       |                                                  |
 | `duration_minutes`      | INTEGER    |                                                  |
 | `rpe`                   | INTEGER    | Expected RPE 1–10 (excluded from `pushed_signature`) |
@@ -2005,7 +2005,7 @@ App preferences that outlive one invocation but aren't training data — a gener
 key/value store, so the next single-value preference needs no schema change.
 Untouched by every `wipe` (a data wipe is about training history). Every athlete-facing
 key is one entry in the `stamind/settings.py` registry, written only by `settings set`
-(DESIGN_settings.md): `llm_model` and `router_llm_model`, the coaching and routing model
+(DESIGN_settings.md): `llm_model` and `router_llm_model`, the thinking and fast model
 identifiers; `timezone`, the IANA zone every date is computed in;
 `workout_commitment_days` (`commitment-days`), how many days from today the athlete is
 treated as already committed to; `push_enabled`, `push_morning_time`,
@@ -2180,7 +2180,7 @@ guarantee (re-citing a counted week is an `INSERT OR IGNORE` no-op). Full model:
 |                   |                       | DESIGN_plan_rollback.md.                          |
 | `superseded_at`   | TEXT                  | ISO timestamp a version stopped being active;     |
 |                   |                       | NULL while active.                               |
-| `summary`         | TEXT                  | The strategy in at most two sentences, which `plan generate` writes beside it and `plan show` prints in its place unless `-v`; stored as given, NULL when the model leaves it out. `scripts/backfill_plan_summaries.py` added the column (`SCHEMA_VERSION` 23) and filled every plan written before it once, from the router model (DESIGN_output_verbosity.md §5.1) |
+| `summary`         | TEXT                  | The strategy in at most two sentences, which `plan generate` writes beside it and `plan show` prints in its place unless `-v`; stored as given, NULL when the model leaves it out. `scripts/backfill_plan_summaries.py` added the column (`SCHEMA_VERSION` 23) and filled every plan written before it once, from the fast model (DESIGN_output_verbosity.md §5.1) |
 
 Regenerating a plan **supersedes** the prior version (kept) rather than deleting it, so
 `plan rollback` can restore an earlier version and its workouts (DESIGN_plan_rollback.md).
@@ -2194,7 +2194,7 @@ Regenerating a plan **supersedes** the prior version (kept) rather than deleting
 | `start_date`    | TEXT                    | YYYY-MM-DD                              |
 | `end_date`      | TEXT                    | YYYY-MM-DD                              |
 | `focus`         | TEXT                    | E.g. "Zone 2 aerobic base, high volume" |
-| `summary`       | TEXT                    | One plain sentence on what the mesocycle is for, which `plan generate` writes for the "Goals & plan" page; stored as given, NULL when the model leaves it out. The active plans written before the column existed got theirs once from the router model (`scripts/backfill_calendar_texts.py`); `scripts/migrate_calendar_columns.py` added it (`SCHEMA_VERSION` 22, DESIGN_calendar_miniapp.md §3.7) |
+| `summary`       | TEXT                    | One plain sentence on what the mesocycle is for, which `plan generate` writes for the "Goals & plan" page; stored as given, NULL when the model leaves it out. The active plans written before the column existed got theirs once from the fast model (`scripts/backfill_calendar_texts.py`); `scripts/migrate_calendar_columns.py` added it (`SCHEMA_VERSION` 22, DESIGN_calendar_miniapp.md §3.7) |
 
 ### plan_feedback
 The plan's feedback log — an append-only list of notes the athlete addressed to the
@@ -2325,8 +2325,9 @@ self-alias no longer exists.
 `openrouter_client.model` is a lazily-resolved property, not a plain attribute: it reads
 the stored choice from the database on first use, so importing the module never opens the
 DB. Assigning to it pins a model for the invocation (how `--llm-model` overrides the stored
-choice); `reset_model()` drops the cache so the next call re-resolves — what `settings set coach-model`
-calls, since the REPL runs many commands in one process (DESIGN_model_selection.md §3.1).
+choice); `reset_model()` drops the cache so the next call re-resolves — what
+`settings set thinking-model` calls, since the REPL runs many commands in one process
+(DESIGN_model_selection.md §3.1).
 
 `clock.active_zone()` is the same shape for the athlete's timezone: the
 `settings.timezone` row is read on first use and cached for the process, since
@@ -2468,7 +2469,7 @@ letters lands; DESIGN_cli_noargs.md §d is the canonical authority on the distin
 **LLM commands share two flags** the table omits: `--show-llm-prompt-only` prints the
 prompt the command would send and exits before the call (`plan generate`, `workout
 generate`/`adapt`/`tweak`, `data bootstrap`/`reflect`), and the root `--llm-model MODEL`
-pins the coaching model for one invocation ([§6](#6-singletons)).
+pins the thinking model for one invocation ([§6](#6-singletons)).
 
 **Range filters** (DESIGN_cli_selectors.md): every command that filters by span takes the
 same four selectors — `-d/--date`, `-m/--mesocycle`, `-M/--macrocycle`, `-g/--goal` — over
@@ -2562,8 +2563,8 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `data`       | `publish`    | `--force` | Check the bucket's setup step by step (bucket and token known, service account accepted, write and rewrite a test file, download it with no credential and fresh, no listing), then upload every file of the pages, every month from the first, and delete any other file in this bot's folder. Refuses a folder holding files this database never uploaded unless `--force` (DESIGN_miniapp_storage.md §9) |
 | `data`       | `unpublish`  | `--force` | Delete this bot's files from the bucket, the index file first, and empty `page_files`; same guard as `publish` |
 | `data`       | `wipe`       | `--garmin`, `--calendar`, `-d RANGE`, `-y` | Delete cached data. No scope flag = everything (Garmin evidence + daily signals) and reset watermarks; `--garmin`/`--calendar` narrow the scope; date flags restrict to a window |
-| `settings`   | `list`       | `se l`   | Every preference with its value and where that value came from — the stored row, `config.yaml`, or the built-in default. With a NAME, that one setting in detail: the numbered model menu for `coach-model`, the local clock for `timezone`. A bare `settings` lists — the read-only-family exception (DESIGN_cli_noargs.md §a3, applied by DESIGN_settings.md §4) |
-| `settings`   | `set`        | `se s`, `se use` | Change one preference: `settings set coach-model 3`, `settings set timezone Europe/Paris`, `settings set morning-time 07:00`. The name takes any unambiguous prefix. Validated by the setting's own parser — a value it cannot read is refused and nothing is written. Stored in `settings`; survives restarts |
+| `settings`   | `list`       | `se l`   | Every preference with its value and where that value came from — the stored row, `config.yaml`, or the built-in default. With a NAME, that one setting in detail: the numbered model menu for `thinking-model`, the local clock for `timezone`. A bare `settings` lists — the read-only-family exception (DESIGN_cli_noargs.md §a3, applied by DESIGN_settings.md §4) |
+| `settings`   | `set`        | `se s`, `se use` | Change one preference: `settings set thinking-model 3`, `settings set timezone Europe/Paris`, `settings set morning-time 07:00`. The name takes any unambiguous prefix. Validated by the setting's own parser — a value it cannot read is refused and nothing is written. Stored in `settings`; survives restarts |
 | `settings`   | `reset`      | `se r`   | Forget one stored preference so `config.yaml`, or the built-in default, rules again |
 | `queue`      | `list`       | `q l`    | Every waiting question and message in queue order, then the ones put off until later with when they come back. `--closed` lists the closed ones instead, in the order they closed, each with its outcome; `-d RANGE` picks the days they closed on (default: the last 7). A bare `queue` lists — the second read-only family (DESIGN_cli_noargs.md §a3, DESIGN_athlete_queue.md §5.1) |
 | `queue`      | `answer`     | `q a`    | Go through the waiting items with the blocking chooser: each item's answers, then drop, skip (Enter), and later — in 1 hour, in 1 day, after the others. `queue answer <id>` shows that item alone. In chat it sends the first item with its buttons instead |
@@ -2648,7 +2649,7 @@ rules follow, and a new panel has to keep both.
 The six **top-level tabs** are all lazy-loaded on first show:
 
 - **Dashboard** — status, recovery/load metrics, sync freshness, coach-memory summary,
-  objective and constraint listings, the active LLM (`settings list coach-model`), and the
+  objective and constraint listings, the active LLM (`settings list thinking-model`), and the
   strategy card
   (philosophy, the goals/constraints snapshot the plan was generated from, the pending
   feedback log, the mesocycle timeline — a mesocycle's own notes appear in its details panel
@@ -2705,7 +2706,7 @@ exactly that reason.
 | GET    | `/api/daily-signals`            | Daily-signals (`signal list`; `?start_date=&end_date=&metric=`) |
 | GET    | `/api/daily-signals/metrics`    | Distinct signal metrics with counts + first/last date (`signal list-metrics`) |
 | GET    | `/api/metrics`                  | Cached metrics (range, else last 30 days)    |
-| GET    | `/api/models`                   | Configured LLM menu with the active entry marked (`settings list coach-model`) → `{models, active, source, set_at}` |
+| GET    | `/api/models`                   | Configured LLM menu with the active entry marked (`settings list thinking-model`) → `{models, active, source, set_at}` |
 
 Every other verb on every path returns **405** `{error, method, path}`.
 
@@ -2740,7 +2741,7 @@ but the credentials is optional and falls back to the default shown:
 | Key                    | Type | Description                                                   |
 |------------------------|------|---------------------------------------------------------------|
 | `llm.api_key`          | str  | OpenRouter key; the `OPENROUTER_API_KEY` env var wins when set |
-| `llm.models`           | list | Models both model roles pick from, in display order; the first entry is the default until `settings set coach-model` picks another. Absent/empty → `google/gemini-3.5-flash` alone (DESIGN_model_selection.md §1) |
+| `llm.models`           | list | Models both model roles pick from, in display order; the first entry is the default until `settings set thinking-model` picks another. Absent/empty → `google/gemini-3.5-flash` alone (DESIGN_model_selection.md §1) |
 | `google.calendar_id`   | str  | Target calendar ID                                            |
 | `google.storage_bucket` | str | Optional. The Google Cloud Storage bucket the pages read their files from; unset, nothing is built or uploaded and the buttons are as before (DESIGN_miniapp_storage.md §3, §11) |
 | `garmin.email` / `garmin.password` | str | Garmin login; config.yaml only (kept out of the environment) |
@@ -2756,7 +2757,7 @@ but the credentials is optional and falls back to the default shown:
 | `logging.dir`          | str  | Root of the operator log directories — `runs/` (the journal, read with `sm journal`), `llm_exchanges/` (the full prompts) and `gym_logs/` (each gym logger message, as `strength ingest` was given it). Relative to the config file's directory, like `database:` (default: `logs`). DESIGN_logging.md §6 |
 | `logging.level`        | str  | Lowest level that reaches the journal file: `debug`\|`info`\|`warn`\|`error` (default `info`). `debug` turns on the records for exceptions the app deliberately swallows on screen |
 | `logging.retain_days` / `logging.retain_exchange_days` | int | Days each directory keeps (default 90 each). The sweep runs at most once a UTC day, off the first command to finish; `sm journal prune` forces one |
-| `llm.router_model`     | str  | Cheaper model the bot's free-text router (`sm bot route`) and its capture extractions (`sm bot capture`) use; a role, not a `settings list coach-model` entry. Absent → the active coaching model (DESIGN_bot_simple_frontend.md §5.4, §12.2) |
+| `llm.fast_model`       | str  | Cheaper model the bot's free-text router (`sm bot route`) and its capture extractions (`sm bot capture`) use; a role, not a `settings list thinking-model` entry. Absent → the active thinking model (DESIGN_bot_simple_frontend.md §5.4, §12.2) |
 | `telegram.operator_name` | str | What the companion calls the human who runs the CLI. "Coach" is already the app in the athlete's vocabulary, so the operator gets a word of their own; absent → "the person who set this up for you" (DESIGN_render_persona.md §5) |
 | `telegram.push.*`      | —    | Morning push: `enabled` (default true), `morning_time` (`08:00`), `morning_deadline` (`15:00`), `adapt_first` (default false → ask the week planner before rendering, unless it already ran today with last night's sleep score in hand and nothing has been trained since; a session it would change is saved as a proposal the athlete answers with a tap, DESIGN_waiting_proposal.md §5) |
 | `telegram.bot_token` / `telegram.allowed_chat_ids` | — | The bot's token (or the `TELEGRAM_BOT_TOKEN` env var) and the numeric chat-id allowlist ([§2](#entry-points)) |
@@ -3833,7 +3834,7 @@ The CLI half of that hint has since been folded into the end-of-runway detector
 (`cli/runway.py`, DESIGN_runway_nudge.md §3): a mesocycle boundary with no fresh sessions
 after it is one of the four ways the schedule can run out, and it is now announced on
 every daily surface rather than on `workout adapt` alone. Only the *prompt* side still
-runs on `adapt_terminal_window_days` — that gate is about what the coach model is told
+runs on `adapt_terminal_window_days` — that gate is about what the thinking model is told
 and must stay tight.
 
 The firewall is enforced on **both** sides: the read bound (`get_workouts` capped at the

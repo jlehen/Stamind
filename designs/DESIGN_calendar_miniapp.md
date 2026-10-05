@@ -207,7 +207,7 @@ The rules:
 - **A session written before the field existed** had none. A later `workout generate` or
   `workout adapt` would not give it one unless it changed the session, because a rewrite
   that differs only in the short name is dropped (the rule above). So a one-off script,
-  `scripts/backfill_calendar_texts.py`, asks the router model once for the short name of
+  `scripts/backfill_calendar_texts.py`, asks the fast model once for the short name of
   every live session without one, from its title and description, and writes it onto the
   live revision in place. A session it misses shows its length.
 
@@ -243,7 +243,7 @@ description of it.
 in its answer format (`## RESPONSE FORMAT` in `coach/engine/planning.py`): one plain
 sentence of at most 90 characters, for the athlete.
 It is stored as given in `mesocycles.summary`, and NULL when the model leaves it out. The
-same one-off script (§3.6) asks the router model for the summary of each mesocycle of an
+same one-off script (§3.6) asks the fast model for the summary of each mesocycle of an
 active plan written before this, from its focus. A mesocycle without one shows its name
 and dates, and still offers the chat.
 

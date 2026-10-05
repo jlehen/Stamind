@@ -416,14 +416,14 @@ class CaptureSettingTest(_CaptureCase):
 
     def test_an_off_list_key_is_refused_honestly_and_names_the_operator(self):
         from stamind import settings
-        code, out, prompt = self._run({"key": "coach-model", "value": "3"},
+        code, out, prompt = self._run({"key": "thinking-model", "value": "3"},
                                       text="use a smarter model")
         self.assertEqual(code, 0)
         self.assertIn("not me", out)
         # A boundary, not the §5.3 unclear fallback, and nothing asked or written.
         self.assertNotIn("didn't quite get that", out)
         self.assertEqual(prompt.asked, [])
-        self.assertIsNone(settings.stored(settings.COACH_MODEL))
+        self.assertIsNone(settings.stored(settings.THINKING_MODEL))
 
     def test_an_operator_shaped_key_does_not_widen_the_guardrail(self):
         from stamind import settings

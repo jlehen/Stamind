@@ -16,7 +16,7 @@ from stamind.benchmarks import ANCHOR_KINDS, LOGBOOK_KINDS, SPORT_ANCHORS, ancho
 from stamind.cli.bot.extraction import (
     CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find, valid_date,
 )
-from stamind.cli.bot.route import use_router_model
+from stamind.cli.bot.route import use_fast_model
 from stamind.clock import to_local, today_str as _today_str
 from stamind.queue_kind import QUESTION, Kind, NotApplied, queue
 from stamind.sports import CANONICAL_SPORTS, canonical_sport
@@ -221,7 +221,7 @@ def _is_stale(item: Dict[str, Any]) -> bool:
 def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> None:
     """The typed answer goes to the capture with the session pinned. A "No" on the
     read-back leaves the item waiting (§4)."""
-    use_router_model(argparse.Namespace())
+    use_fast_model(argparse.Namespace())
     if capture_test_result(text or "", item["payload"]["workout_id"]) is None:
         raise NotApplied("I'll ask again next time.")
     return None
