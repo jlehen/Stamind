@@ -162,7 +162,7 @@ Morning push
 ```
 
 `settings list <name>` adds what the generic listing cannot say: for `thinking-model` the
-numbered menu, marked with which entry coaches and which one routes; for `timezone` the
+numbered menu, with the entry each role holds marked `thinking` or `fast`; for `timezone` the
 local date and time the zone produces, so it can be checked against a watch rather than
 trusted by name. Those renderers live in `stamind/cli/settings.py`, keyed by name, so
 the registry stays free of display code.

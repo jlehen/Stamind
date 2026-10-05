@@ -164,9 +164,9 @@ SETTINGS: List[Setting] = [
     ),
     Setting(
         name=FAST_MODEL,
-        key="router_llm_model",
+        key="fast_llm_model",
         group="Coach",
-        summary="Cheaper model that reads free-text messages in simple chat mode",
+        summary="Cheaper model that reads free-text chat messages",
         value_hint="NUMBER|ID",
         # Off-menu identifiers are refused here too: `llm.models` is the one allowlist
         # both model roles pick from (§4).

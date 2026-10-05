@@ -247,7 +247,7 @@ the record of the plan. The record of the last mesocycle is written with it (§5
 
 ## 5. The retrospective writer
 
-The retrospective writer is one model call. It uses the coach's model setting. It gets no
+The retrospective writer is one model call. It uses the thinking model. It gets no
 science documents.
 
 For a mesocycle, the user message holds five sections.

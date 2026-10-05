@@ -317,14 +317,14 @@ and keeps the bot importable without LLM plumbing.
 
 ### 5.4 The fast model
 
-A *role*, read by `sm bot route` only: the `fast-model` setting, seeded by
-`llm.fast_model` in config.yaml (DESIGN_settings.md). Unset → the active thinking model,
-so an install that never configured one gets no surprise second model.
+A *role*, read by `sm bot route` and by the capture calls of §12.2: the `fast-model`
+setting, seeded by `llm.fast_model` in config.yaml (DESIGN_settings.md). Unset → the
+active thinking model, so an install that never configured one gets no surprise second
+model.
 
 It picks from `llm.models`, the same menu the thinking model picks from — one allowlist for
-both roles (DESIGN_settings.md §4.1). `thinking-model` and `settings set thinking-model` keep
-meaning the thinking model; `settings list thinking-model` marks which menu entry currently
-holds which role.
+both roles (DESIGN_settings.md §4.1). `settings list thinking-model` marks which menu entry
+currently holds which role.
 
 ### 5.5 Constraints and signals in chat
 

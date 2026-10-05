@@ -1,6 +1,7 @@
 """The `settings` command and the registry behind it: how config.yaml, the stored row and
 the built-in default combine (DESIGN_settings.md §3), and what the command surface does
 with each knob (§4)."""
+import importlib.util
 import os
 import unittest
 from unittest.mock import patch
@@ -16,6 +17,14 @@ import stamind_cli
 
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
+
+_SCRIPT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "scripts", "migrate_fast_model_key.py",
+)
+_spec = importlib.util.spec_from_file_location("migrate_fast_model_key", _SCRIPT)
+migrate = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(migrate)
 
 
 class SettingsTestCase(unittest.TestCase):
@@ -246,6 +255,19 @@ class TestFastModel(SettingsTestCase):
         self.assertTrue(complete.called)
         self.assertEqual(openrouter_client.model, self.MODELS[1])
         self.assertIn("show_today", stdout)
+
+    def test_a_choice_under_the_old_row_key_is_read_once_migrated(self):
+        test_db.set_setting(migrate.OLD_KEY, self.MODELS[1])
+        self.assertIsNone(settings.fast_model())
+        self.assertTrue(migrate.rename_key(TEST_DB_PATH))
+        self.assertEqual(settings.fast_model(), self.MODELS[1])
+        self.assertFalse(migrate.rename_key(TEST_DB_PATH))
+
+    def test_the_migration_keeps_a_choice_already_under_the_new_row_key(self):
+        test_db.set_setting(migrate.OLD_KEY, self.MODELS[1])
+        self.run_cli(["settings", "set", "fast-model", "3"])
+        self.assertFalse(migrate.rename_key(TEST_DB_PATH))
+        self.assertEqual(settings.fast_model(), self.MODELS[2])
 
 
 class TestMorningPushKnobs(SettingsTestCase):

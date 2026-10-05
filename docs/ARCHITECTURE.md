@@ -2005,8 +2005,9 @@ App preferences that outlive one invocation but aren't training data — a gener
 key/value store, so the next single-value preference needs no schema change.
 Untouched by every `wipe` (a data wipe is about training history). Every athlete-facing
 key is one entry in the `stamind/settings.py` registry, written only by `settings set`
-(DESIGN_settings.md): `llm_model` and `router_llm_model`, the thinking and fast model
-identifiers; `timezone`, the IANA zone every date is computed in;
+(DESIGN_settings.md): `llm_model` and `fast_llm_model`, the thinking and fast model
+identifiers (`scripts/migrate_fast_model_key.py` renamed the second from
+`router_llm_model`); `timezone`, the IANA zone every date is computed in;
 `workout_commitment_days` (`commitment-days`), how many days from today the athlete is
 treated as already committed to; `push_enabled`, `push_morning_time`,
 `push_morning_deadline` and `push_adapt_first`, the morning-push window and its switches;
@@ -3732,7 +3733,8 @@ top-level import would put all five `garmin/` modules on every command's startup
 | `tests/test_learning_confidence.py` | the confidence a learning's evidence earns, and when it    |
 |                                | goes dormant — pure rules, no database                          |
 | `tests/test_cli_settings.py`   | the `settings` command and its registry: config vs stored row vs |
-|                                | `--llm-model` override (DESIGN_model_selection.md §3)            |
+|                                | `--llm-model` override (DESIGN_model_selection.md §3), and the   |
+|                                | one-off rename of the fast model's row key                       |
 | `tests/test_clock.py`          | the athlete timezone: how a name resolves, that `today_date`     |
 |                                | reads the stored zone (two zones 26h apart never share a         |
 |                                | calendar date), that stored UTC instants render local, and the   |

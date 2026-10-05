@@ -459,9 +459,9 @@ The sections you must fill:
 
 - **`llm:`** has `api_key` (an `OPENROUTER_API_KEY` environment variable
   overrides it) and `models`, the list of OpenRouter models this install may
-  use. The first entry is the default thinking model; `settings set
-  thinking-model` switches at runtime. `fast_model` names the cheap model the
-  bot routes chat with.
+  use. The first entry is the default thinking model;
+  `settings set thinking-model` switches at runtime. `fast_model` names the
+  cheap model the bot reads chat messages with.
 - **`google:`** has `calendar_id`, the calendar your workouts are written to, and
   `service_account_file`, the JSON key used to authenticate.
 - **`garmin:`** has your Garmin Connect `email` and `password`.
@@ -753,11 +753,12 @@ config.
   it after planning, while Opus, like five others, adapted nothing in that
   scenario. The full measured comparison, with wall times, is in
   [docs/model_comparison_2026-08.md](docs/model_comparison_2026-08.md).
-- **The fast model** only classifies free-text chat messages into
-  one of a dozen intents. A cheap, fast model is plenty. **The recommendation is
+- **The fast model** reads free-text chat messages: it sorts each one into one
+  of a dozen intents, and copies out the values a message carries (a goal, a
+  rule, a test result). A cheap, fast model is plenty. **The recommendation is
   Gemini Flash** (`google/gemini-3.5-flash`), set with `llm.fast_model` or
-  `settings set fast-model`. Unset, the thinking model routes too, which works
-  but wastes money and seconds on every message.
+  `settings set fast-model`. Unset, the thinking model does this too, which
+  works but wastes money and seconds on every message.
 
 ```yaml
 llm:

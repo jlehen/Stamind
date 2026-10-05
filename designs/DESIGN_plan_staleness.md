@@ -210,7 +210,8 @@ periodization? It answers `{"reshaping": bool, "why": str}` and the line prints 
   rubric names the three things that count, lists what does not (wording, tone,
   motivation, what to listen to, which days), and demands the concrete structural change
   it would make — "cannot name one" is keep.
-- *On the coach's model, not the router's.* The verdict predicts what `plan generate` would do.
+- *On the thinking model, not the fast model.* The verdict predicts what `plan generate`
+  would do.
   The fast model exists because bot routing runs on every message and must be cheap;
   this runs only when an input changed. The gain from using the same model is
   consistency between the prediction and the regeneration, not accuracy — the model has
