@@ -133,6 +133,11 @@ fix a number only that call can read. When the week is a light one, say so in th
 plan's mesocycle is where that is decided, and the brief is how it travels.
 The date, the duration, the RPE and the load stay yours: they are the week's budget and the
 fit against the endurance days.
+Set the duration from how long the athlete's own sessions of that kind took, under ACTUAL
+COMPLETED GARMIN ACTIVITIES IN WINDOW: an evening circuit that took 19 and 22 minutes is
+written at 20, even where the plan or an earlier session says 15. Go under or over that
+length only to ask for less or more work than those sessions held, as in a light week. With
+no such activity on record, the plan's minutes stand.
 A brief reads like this: "[Full-Body Strength (Heavy, Non-Failure)]\\nHeavy full-body
 strength, second week of the build, non-failure. 70 min at the gym. Keep the legs fresh for
 Saturday's long ride."

@@ -956,6 +956,19 @@ strength planner reads it there and nowhere else (§10). This is one instruction
 week planner's TASK, for strength sessions only, one prompt region with one test beside the
 regions `tests/test_prompt_gates.py` already pins. The reply schema does not change.
 
+**The duration is how long the athlete takes.** A run planned at 48 minutes takes 48
+minutes, because the clock is what was prescribed. A strength session is prescribed in sets,
+and its length is whatever those sets take this athlete. The companion athlete's evening
+circuit was planned eight times between September 3 and October 3, at 10 to 15 minutes. It
+took 15 to 22 minutes each time, 19 on average, and never less than 4 minutes over. The week
+planner was shown both numbers each time and kept writing 15, because the plan's mesocycle
+says "3 × 15 min" and no rule said which number to write. The strength planner then wrote
+the session from the one the athlete did (below), so Monday October 5 read "15 min" over 20
+sets, which had taken her 22 minutes two days before. The same instruction now says: set the
+duration from how long the athlete's own sessions of that kind took, and go under or over it
+only to ask for less or more work, as in a light week. With no strength activity on record,
+the plan's minutes stand. The strength planner does not change.
+
 **The strength planner writes the session.** It is labelled `strength_planner` and runs
 once per proposal, in the service, after the week planner's reply is parsed and before the
 proposal is built: in `workout_generate` before the `GenerateProposal`, and in
