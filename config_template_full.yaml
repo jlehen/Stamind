@@ -268,6 +268,11 @@ garmin:
   # sessions still contribute their load and their zone minutes; they just lose their vote
   # on the markers. Default 20 minutes.
   zone_min_activity_minutes: 20
+  # Load per hour an activity or a planned session must exceed for its time to count in
+  # the hours per week (`sm progress`, the chart, the chat summary). The default is what
+  # an hour logged at RPE 1 gives, so a walk, a warm-up with no heart rate or easy yoga
+  # adds nothing. Raise it to count less, lower it to count more.
+  hours_load_floor: 10
   # How much of a sport's weekly duration must land inside a known zone before its row
   # stops flagging itself as patchy. Deliberately stricter than hr_zone_coverage_min: that
   # one decides whether the load can be trusted, this one only decides whether a table

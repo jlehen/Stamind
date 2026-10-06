@@ -1,6 +1,7 @@
 import os
 import unittest
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from tests.helpers import rebind_test_db
 from stamind.db import Database
@@ -12,6 +13,7 @@ test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
 from stamind.analytics import progression  # noqa: E402
+from stamind.config import config  # noqa: E402
 
 
 def tearDownModule():
@@ -58,6 +60,12 @@ def _w(offset, sport_type="running", tss=None, rpe=None, duration_minutes=None,
 
 def _m(offset, ctl, atl, tsb=0.0):
     return {"date": _d(offset), "ctl": ctl, "atl": atl, "tsb": tsb}
+
+
+def _hours_floor(value):
+    """Pins `garmin.hours_load_floor`, leaving the section's other keys as they are."""
+    garmin_section = {**(config.data.get("garmin") or {}), "hours_load_floor": value}
+    return patch.dict(config.data, {"garmin": garmin_section})
 
 
 def _dp(offset, load, source="actual"):
@@ -239,39 +247,68 @@ class TestWeeklyAggregates(unittest.TestCase):
         # Monday 90 min + Tuesday 45 min; the removed two-hour session does not count,
         # and a session with no duration counts as none.
         workouts = [
-            _w(-4, duration_minutes=90), _w(-3, duration_minutes=45),
-            _w(-2, duration_minutes=120, removed=True), _w(-1),
+            _w(-4, tss=60, duration_minutes=90), _w(-3, tss=30, duration_minutes=45),
+            _w(-2, tss=80, duration_minutes=120, removed=True), _w(-1, tss=40),
         ]
-        weeks = progression.weekly_aggregates([], workouts, TODAY, [])
+        with _hours_floor(10):
+            weeks = progression.weekly_aggregates([], workouts, TODAY, [])
         week = next(w for w in weeks if w["week_commencing"] == "2026-06-29")
         self.assertEqual(week["planned_seconds"], 135 * 60.0)
+
+    def test_planned_time_leaves_out_a_session_too_easy_to_count(self):
+        # A 90 min ride at 40 load per hour, and 30 min of mobility yoga at 4 per hour.
+        workouts = [
+            _w(-4, sport_type="cycling", tss=60, duration_minutes=90),
+            _w(-3, sport_type="yoga", tss=2, duration_minutes=30),
+        ]
+        with _hours_floor(10):
+            weeks = progression.weekly_aggregates([], workouts, TODAY, [])
+        week = next(w for w in weeks if w["week_commencing"] == "2026-06-29")
+        self.assertEqual(week["planned_seconds"], 90 * 60.0)
 
     def test_week_with_no_session_has_no_planned_time(self):
         weeks = progression.weekly_aggregates([_act(-4, tss=30.0)], [], TODAY, [])
         self.assertNotIn("planned_seconds", weeks[0])
         self.assertIsNone(progression.week_plan_seconds(weeks[0]))
 
-    def test_time_done_counts_every_activity_of_the_week(self):
-        # A 5 h ride on Monday and a 2 h 10 run on Tuesday make a 7 h 10 week.
+    def test_time_done_counts_the_activities_hard_enough_and_no_other(self):
+        # A 5 h ride and a 2 h 10 run make a 7 h 10 week. The 2 h walk logged at RPE 1
+        # is worth exactly 10 load per hour, the yoga 4, the commute with no heart rate
+        # nothing: none of the three adds a minute.
         activities = [
             _act(-4, tss=200.0, duration_sec=18000.0),
             _act(-3, tss=90.0, duration_sec=7800.0, activity_type="running"),
+            _act(-3, rpe=1, duration_sec=7200.0, activity_type="walking"),
+            _act(-2, tss=2.0, duration_sec=1800.0, activity_type="yoga"),
+            _act(-1, duration_sec=2880.0),
         ]
-        weeks = progression.weekly_aggregates(activities, [], TODAY, [])
+        with _hours_floor(10):
+            weeks = progression.weekly_aggregates(activities, [], TODAY, [])
         self.assertEqual(weeks[0]["actual_seconds"], 25800.0)
+
+    def test_the_hours_floor_is_a_setting(self):
+        # At 50 load per hour the 40-per-hour ride stops counting too.
+        activities = [_act(-4, tss=200.0, duration_sec=18000.0)]
+        with _hours_floor(50):
+            weeks = progression.weekly_aggregates(activities, [], TODAY, [])
+        self.assertEqual(weeks[0]["actual_seconds"], 0.0)
 
     def test_running_week_compares_against_the_planned_time_of_its_elapsed_days(self):
         # It is Friday and today's session has not synced: Monday to Thursday asked
         # for 4 hours, the whole week for 7.
-        workouts = [_w(o, duration_minutes=60) for o in (-4, -3, -2, -1, 0, 1, 2)]
-        weeks = progression.weekly_aggregates([], workouts, TODAY, [])
+        workouts = [
+            _w(o, tss=40, duration_minutes=60) for o in (-4, -3, -2, -1, 0, 1, 2)
+        ]
+        with _hours_floor(10):
+            weeks = progression.weekly_aggregates([], workouts, TODAY, [])
         week = next(w for w in weeks if w["week_commencing"] == "2026-06-29")
         self.assertEqual(week["planned_seconds"], 7 * 3600.0)
         self.assertEqual(progression.week_plan_seconds(week), 4 * 3600.0)
 
     def test_finished_week_compares_against_its_whole_planned_time(self):
-        workouts = [_w(o, duration_minutes=60) for o in (-11, -10, -9)]
-        weeks = progression.weekly_aggregates([], workouts, TODAY, [])
+        workouts = [_w(o, tss=40, duration_minutes=60) for o in (-11, -10, -9)]
+        with _hours_floor(10):
+            weeks = progression.weekly_aggregates([], workouts, TODAY, [])
         week = next(w for w in weeks if w["week_commencing"] == "2026-06-22")
         self.assertEqual(progression.week_plan_seconds(week), 3 * 3600.0)
 

@@ -53,7 +53,7 @@ def simple_hours_words(minutes: int) -> str:
 
 def simple_week_hours_line(weeks: List[Dict[str, Any]], today: str) -> Optional[str]:
     """The hours trained last week and so far this week in one sentence; None when
-    neither week holds a minute of activity."""
+    neither week holds a minute that counts (DESIGN_progress_timeline.md §7.1)."""
     this_monday = shift(today, -parse_date(today).weekday())
     done = {
         w["week_commencing"]: round((w.get("actual_seconds") or 0.0) / 60.0)

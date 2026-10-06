@@ -415,7 +415,9 @@ parity promise nobody re-checks.
 
 Initial opt-in set: `workout list` (today/week), `progress` (chart caption + a short
 summary: the fitness trend, the hours trained last week and so far this week when there
-are any, and what the chart shows), the adapt result, and `bot morning`. The §11 breadth
+are any, and what the chart shows; the hours leave out time too easy to count, so they
+can sit under Garmin's own weekly total, DESIGN_progress_timeline.md §7.1), the adapt
+result, and `bot morning`. The §11 breadth
 pass added `goal list` and `plan show`; the look back (2026-09-03) added
 `workout compare`.
 

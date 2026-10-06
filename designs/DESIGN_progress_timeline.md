@@ -699,8 +699,8 @@ silently dropped.
      "planned_seconds": 29400, "planned_seconds_elapsed": 9000,
      "actual_load": 138, "actual_seconds": 9600,
      "meso_label": "Build 3", "meso_source": "plan"}
-    // `*_seconds` are the week's hours (§7.1): the time its sessions ask for,
-    // and the duration of every activity recorded in it.
+    // `*_seconds` are the week's hours (§7.1): the time its sessions ask for
+    // and the time of its activities, counting only what is hard enough.
   ],
   "meso_bands": [   // chart band spans, layered per §6.1
     {"label": "~Base", "source": "inferred",
@@ -979,28 +979,58 @@ objective line, wrapped inside the same width budget:
   week per the §3 in-progress rule. The plan figure a row bars and divides by is
   `progression.week_plan_denom` (§5) on every surface, the PNG included.
 - **Hours per week, planned and done** (2026-10-05). Two columns close each
-  row. `h.done` is the duration of every activity recorded in the week,
-  whatever the sport (`actual_seconds`). `h.plan` is the time the week's
-  sessions ask for, on the plan column's own §3 rule
-  (`progression.week_plan_seconds`): the days already elapsed for the running
-  week, the whole week otherwise. A week ahead of today shows `h.plan` alone.
-  `—` in `h.plan` means what it means in the plan column, that no plan covered
-  the week; nothing planned so far, or nothing done, reads `0m`. Worked
-  example: it is Wednesday, Monday and Tuesday asked for 2 h 30 and the
-  athlete did 2 h 40, so the row ends `2h30   2h40` although the whole week
-  asks for 8 h 10. The `adh` cell before them is capped at `999%`: on a
-  Tuesday, a 200-load ride done on a 15-load strength Monday is 1333%, and a
-  fifth character would push the hours out from under their headers. Not
-  handled: hours per sport in this table (the zone tables give a sport's time,
-  `-z`); a percentage formed from the two hours figures (`adh` already
-  compares plan and done, in load); and an activity recorded today that
-  carries no load yet (no heart rate, no RPE), whose hours count in `h.done`
-  while today's session stays out of `h.plan` until tomorrow, because "today
-  has elapsed" is decided on load (§3).
+  row. `h.done` is the time of the week's activities (`actual_seconds`).
+  `h.plan` is the time the week's sessions ask for, on the plan column's own
+  §3 rule (`progression.week_plan_seconds`): the days already elapsed for the
+  running week, the whole week otherwise. A week ahead of today shows `h.plan`
+  alone. `—` in `h.plan` means what it means in the plan column, that no plan
+  covered the week; nothing planned so far, or nothing done that counts, reads
+  `0m`. Worked example: it is Wednesday, Monday and Tuesday asked for 2 h 30
+  and the athlete did 2 h 40, so the row ends `2h30   2h40` although the whole
+  week asks for 8 h 10.
+  - **Only time hard enough counts**, on both sides, by one rule
+    (`load.counts_in_hours`): an activity or a planned session adds its time
+    when it is worth more than `garmin.hours_load_floor` of load per hour.
+    The default is 10, what an hour logged at RPE 1 gives, so a walk logged
+    "very light" sits on the floor and adds nothing, whatever its length.
+    Worked week, 7 to 13 September: 16 h 57 were recorded and 14 h 14 count.
+    Left out are a 2 h 19 walk at RPE 1 (10 per hour) and 25 minutes of yoga
+    (under 1 per hour). Kept are the rides, the strength sessions and 2 h 08
+    of inline skating (13 per hour). The planned side drops the same kind: a
+    30-minute mobility yoga planned at 4 per hour is not in `h.plan`, a
+    45-minute recovery spin planned at 24 per hour is.
+  - **What the floor means for a load read from heart rate.** An hour in
+    zone 1 is worth 19.8, and time under zone 1 is worth nothing, so the
+    default asks for about half the activity in a zone. A routine that sits
+    near that line falls on either side from one day to the next: of the
+    author's ten-minute warm-ups, 16 count and 7 do not. An RPE settles it,
+    since a load taken from RPE is exactly ten times the RPE per hour.
+  - This is not the "minor" activity of the adherence views
+    (`coach.minor_activity_load_threshold`, a total load under 25). That one
+    asks how big an activity is; the hours ask how hard it was. A 45-minute
+    recovery spin worth 18 load is minor and still counts here.
+  - The `adh` cell before the hours is capped at `999%`: on a Tuesday, a
+    200-load ride done on a 15-load strength Monday is 1333%, and a fifth
+    character would push the hours out from under their headers.
+  - Not handled, each for the reason given:
+    - A long outing with a heart rate under zone 1, or none recorded, and no
+      RPE adds nothing: a 3 h 16 hike read at 12% in zone is worth 8 load.
+      The `?` marker below flags the week only when some heart rate was
+      recorded; with none at all nothing flags it. An RPE entered for the
+      activity brings its load and its hours back.
+    - A session planned with a tiny TSS and done with an RPE can count on
+      one side only: mobility yoga planned at TSS 2 is out of `h.plan`, and
+      the same 25 minutes logged at RPE 2 are in `h.done`.
+    - The other hours Stamind prints still count every activity: the zone
+      tables' header under `-z` ("19h08 of 26h10 total"), `plan show`, the
+      retrospective records and the volume line the week planner reads.
+    - Hours per sport in this table, and a percentage formed from the two
+      hours figures (`adh` already compares plan and done, in load).
 - **A second week-column marker, `?`** — the week holds an activity whose HR
   recording was too sparse to trust *and* carried no RPE, so the week's own
   **load** is undercounted and reads as an adherence miss it never was. It earns
-  its own legend line (`? load undercounted — recording gap, no RPE`) and is a
+  its own legend line (`? load undercounted, maybe hours too — recording gap,
+  no RPE`; the hours follow because they count on load, above) and is a
   different claim from the zone tables' `!`, which is only about zone minutes
   (DESIGN_intensity_distribution.md §11).
 - **Objective lines are clipped to today..plan end.** The payload carries
@@ -1097,7 +1127,8 @@ No bot-native command; both paths ride the CLI-as-subprocess parity model
       peak × 1.5) for that strip.
     - *Hours labels* (2026-10-05). Each week carries one small label over its
       bars, in the colour of the bar it speaks for: the hours done over the
-      pair once anything is recorded, otherwise the hours planned
+      pair of a week that has a done bar (`0m` for a week of walks, which has
+      load and no hour that counts), otherwise the hours planned
       (`week_plan_seconds`, §7.1) over the planned bar. One label and not two,
       because a week is too narrow for a pair. The legend moved out of the
       axes, onto the title's row: inside them it covered the label of a tall

@@ -4,8 +4,10 @@ Pure maths over an activity row — no database, no Garmin client. The ingestion
 feeds it rows is tested in test_garmin.py (ARCHITECTURE §12).
 """
 import unittest
+from unittest.mock import patch
 
 from stamind.analytics import load as load_math
+from stamind.config import config
 
 
 class TestTheLoadModel(unittest.TestCase):
@@ -111,6 +113,39 @@ class TestTheLoadModel(unittest.TestCase):
         # hrTSS 40 and RPE 4 -> sRPE 40 (ratio 1.0 < 1.5): no divergence, keep it.
         act = self._hr_activity(zone2_sec=3600, tss=40.0, rpe=4)
         self.assertAlmostEqual(load_math.activity_load(act), 40.0)
+
+
+class TestCountsInHours(unittest.TestCase):
+    """DESIGN_progress_timeline.md §7.1: time counts in a week's hours when it is worth
+    more than `garmin.hours_load_floor` of load per hour."""
+
+    def setUp(self):
+        pin = patch.dict(config.data, {"garmin": {"hours_load_floor": 10}})
+        pin.start()
+        self.addCleanup(pin.stop)
+
+    def test_time_logged_at_rpe_1_sits_on_the_floor_and_does_not_count(self):
+        # sRPE at RPE 1 is 10 per hour whatever the length. Every whole minute up to
+        # three hours, because `rpe_tss` rounds the load: 10, 25 and 40 minutes come
+        # out at 10.1 or 10.2 per hour and must not slip over the floor.
+        for minutes in range(1, 181):
+            seconds = minutes * 60.0
+            load = load_math.rpe_tss(1, seconds)
+            self.assertFalse(load_math.counts_in_hours(load, seconds), msg=minutes)
+
+    def test_time_logged_at_rpe_2_counts(self):
+        for minutes in range(1, 181):
+            seconds = minutes * 60.0
+            load = load_math.rpe_tss(2, seconds)
+            self.assertTrue(load_math.counts_in_hours(load, seconds), msg=minutes)
+
+    def test_a_short_hard_session_counts_and_a_long_soft_one_does_not(self):
+        # 25 min of strength worth 6 load is 14.4 per hour; a 3 h stroll worth 24 is 8.
+        self.assertTrue(load_math.counts_in_hours(6.0, 25 * 60.0))
+        self.assertFalse(load_math.counts_in_hours(24.0, 3 * 3600.0))
+
+    def test_nothing_without_a_duration_counts(self):
+        self.assertFalse(load_math.counts_in_hours(50.0, 0.0))
 
 
 if __name__ == "__main__":

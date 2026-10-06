@@ -310,7 +310,9 @@ def format_weekly_table(
         legend_parts.append("~ inferred")
     legend_parts.append("* part week")
     if any(w.get("load_sparse") for w in weeks):
-        legend_parts.append(f"{LOAD_SPARSE} load undercounted — recording gap, no RPE")
+        legend_parts.append(
+            f"{LOAD_SPARSE} load undercounted, maybe hours too — recording gap, no RPE"
+        )
     if partial_note:
         legend_parts.append(partial_note)
     if hidden_weeks:

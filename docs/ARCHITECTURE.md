@@ -615,10 +615,13 @@ classes themselves.
 |                      |                      | in-progress week, full planned total otherwise),  |
 |                      |                      | shared by `cli/progress_load.py` and `analytics/chart.py` so the |
 |                      |                      | table and the chart cannot disagree. Each week    |
-|                      |                      | also carries its hours: `actual_seconds` (every   |
-|                      |                      | recorded activity) and `planned_seconds` (what    |
-|                      |                      | its sessions ask for); `week_plan_seconds` applies |
-|                      |                      | the same §3 rule to the planned figure.           |
+|                      |                      | also carries its hours: `actual_seconds` (its     |
+|                      |                      | activities) and `planned_seconds` (what its       |
+|                      |                      | sessions ask for), both counting only what        |
+|                      |                      | `load.counts_in_hours` lets through: more than    |
+|                      |                      | `garmin.hours_load_floor` of load per hour.       |
+|                      |                      | `week_plan_seconds` applies the same §3 rule to   |
+|                      |                      | the planned figure.                               |
 |                      |                      | (see §12, §15, DESIGN_progress_timeline.md).      |
 | `analytics/timeline.py` | —                 | The payload every front-end draws: `meso_bands`,  |
 |                      |                      | the `_warning` codes, `assemble_timeline` that    |
@@ -2763,6 +2766,7 @@ but the credentials is optional and falls back to the default shown:
 | `garmin.mutable_days` / `garmin.backfill_prompt_days` / `garmin.initial_backfill_days` / `garmin.throttle_seconds` | — | Auto-ensure tuning (defaults 3 / 30 / 90 / 0.2; see [§10 Data Pull](#data-pull-data-pull-and-auto-ensure)) |
 | `garmin.pmc_ctl_days` / `garmin.pmc_atl_days` | int | PMC time constants (42 / 7 — the supported configuration, [§12](#fitnessfatigueform-pmc-model)) |
 | `garmin.hr_zone_coverage_min` / `garmin.zone_min_activity_minutes` / `garmin.zone_coverage_display_min` / `garmin.zone_coverage_display_min_by_sport` | — | Load-model coverage gate (0.5), the too-short-to-judge cut-off (20 min) and the display coverage bars (0.8, per canonical sport) — [§12](#load-model-per-activity), DESIGN_intensity_distribution.md |
+| `garmin.hours_load_floor` | float | Load per hour an activity or a planned session must exceed for its time to count in the week's hours (10, what an hour at RPE 1 gives) — DESIGN_progress_timeline.md §7.1 |
 | `google.service_account_file` | str | Path to service account JSON (default: `service_account.json`) |
 | `data_dir`             | str  | Directory every relative path key below resolves against, replacing the config file's directory as the base; itself config-file-relative. Absent → the config file's directory (the pre-`data_dir` rule) |
 | `database`             | str  | SQLite file this instance operates on; a relative value resolves against the config file's directory / `data_dir:` (default: `stamind.db`) |
@@ -3735,7 +3739,8 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | invariants (no bare `print(yellow(...))`, no message spelling   |
 |                                | `Warning: ` itself)                                             |
 | `tests/test_load.py`           | `analytics/load.py`: the measured TSS, the power→HR→RPE         |
-|                                | fallback and the RPE-divergence rescue                          |
+|                                | fallback, the RPE-divergence rescue, and which time counts in   |
+|                                | the week's hours                                                |
 | `tests/test_sentinels.py`      | `sentinels.py`: every frame the CLI writes and the bot reads    |
 |                                | back, what is and is not framing, and the answer shape          |
 | `tests/test_workout_state.py`  | the two derived axes: the calendar signature over exactly the   |

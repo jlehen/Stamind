@@ -208,16 +208,17 @@ def _draw_weekly_bars(ax, mdates, weeks: List[Dict[str, Any]]) -> None:
 
 def _draw_week_hours(ax, x, weeks, planned, actual, bar_w: float) -> None:
     """One hours label per week, in the colour of the bar it speaks for: the hours done
-    over the pair, or the hours planned over the planned bar of a week with nothing
-    done yet (§7.2)."""
+    over the pair of a week with a done bar, or the hours planned over the planned bar
+    of a week without one (§7.2)."""
     # ponytail: a week count stands in for measuring the labels. Past it neighbouring
     # labels start to touch, so none is drawn; measure or rotate them if the long
     # ranges turn out to need their hours too.
     if len(weeks) > MAX_HOURS_LABELS:
         return
     for xi, week, plan, done in zip(x, weeks, planned, actual):
-        seconds = week.get("actual_seconds")
-        if seconds:
+        if done:
+            # A week of walks has a done bar and no hour that counts: it reads '0m'.
+            seconds = week.get("actual_seconds", 0.0)
             _hours_label(ax, xi, max(plan, done), seconds, "tab:blue")
             continue
         seconds = week_plan_seconds(week)

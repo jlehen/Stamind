@@ -218,6 +218,12 @@ class TestWeekHoursLabels(unittest.TestCase):
                             actual_seconds=25800.0)]
         self.assertEqual(self._labels(weeks), [("7h10", "tab:blue")])
 
+    def test_a_week_of_walks_reads_zero_hours_done_not_the_hours_planned(self):
+        # Two walks gave the week a done bar, and no hour hard enough to count.
+        weeks = [self._week(actual_load=25.0, planned_seconds=10800.0,
+                            actual_seconds=0.0)]
+        self.assertEqual(self._labels(weeks), [("0m", "tab:blue")])
+
     def test_a_week_with_nothing_done_shows_the_hours_planned(self):
         weeks = [self._week(planned_seconds=30600.0, actual_seconds=0.0)]
         self.assertEqual(self._labels(weeks), [("8h30", "tab:orange")])

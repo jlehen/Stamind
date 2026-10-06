@@ -413,6 +413,13 @@ class Config:
         return float(self.get("garmin", {}).get("zone_min_activity_minutes", 20))
 
     @property
+    def hours_load_floor(self) -> float:
+        """Load per hour an activity or a planned session must exceed for its time to
+        count in the week's hours (DESIGN_progress_timeline.md §7.1). Under `garmin:`.
+        Default 10, what an hour logged at RPE 1 gives."""
+        return float(self.get("garmin", {}).get("hours_load_floor", 10))
+
+    @property
     def zone_coverage_display_min(self) -> float:
         """Default share of a sport's duration that must land in a known zone before its
         weekly row stops marking itself incomplete. Under `garmin:`. Default 0.8.

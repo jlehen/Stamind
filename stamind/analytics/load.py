@@ -201,6 +201,17 @@ def rpe_divergence(act: Dict[str, Any]) -> Optional[float]:
     return round(ratio, 2) if ratio >= _divergence_threshold() else None
 
 
+def counts_in_hours(load: float, duration_sec: float) -> bool:
+    """Whether an activity or a planned session is hard enough for its time to count in
+    the week's hours: more than `config.hours_load_floor` of load per hour
+    (DESIGN_progress_timeline.md §7.1)."""
+    if duration_sec <= 0:
+        return False
+    # The floor as `rpe_tss` would round it for this duration, so time logged at RPE 1
+    # lands exactly on a floor of 10 whatever its length.
+    return load > rpe_tss(config.hours_load_floor / 10.0, duration_sec)
+
+
 def planned_load(w: Dict[str, Any]) -> float:
     """Expected load of a planned workout as a single value (mirrors the actual
     side): the week planner's planned TSS, or sRPE (RPE x 10 x hours) when no TSS was

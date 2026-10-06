@@ -21,7 +21,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from stamind.analytics import intensity
 from stamind.analytics import pmc as pmc_math
-from stamind.analytics.load import activity_load, load_method, planned_load
+from stamind.analytics.load import (
+    activity_load, counts_in_hours, load_method, planned_load,
+)
 from stamind.analytics.runway import plan_dates, plan_end
 from stamind.clock import day_str, parse_date
 from stamind.sports import canonical_sport
@@ -204,9 +206,16 @@ def _load_by_sport(
     return by_sport
 
 
+def _done_seconds(activities: List[Dict[str, Any]]) -> float:
+    """The time of the given activities that counts in a week's hours (§7.1)."""
+    timed = [(activity_load(a), float(a.get("duration_sec") or 0.0)) for a in activities]
+    return sum(seconds for load, seconds in timed if counts_in_hours(load, seconds))
+
+
 def _planned_seconds(workouts: List[Dict[str, Any]]) -> float:
-    """The time the given sessions ask for; a session with no duration counts as none."""
-    return sum((w.get("duration_minutes") or 0) * 60.0 for w in workouts)
+    """The time the given sessions ask for, counted on the rule `_done_seconds` uses."""
+    timed = [(planned_load(w), (w.get("duration_minutes") or 0) * 60.0) for w in workouts]
+    return sum(seconds for load, seconds in timed if counts_in_hours(load, seconds))
 
 
 def _week_meso(week_dates: List[str], meso_spans: List[Dict[str, Any]]):
@@ -283,7 +292,6 @@ def weekly_aggregates(
         actual_load = sum(activity_load(a) for a in week_acts)
         actual_load_by_sport = _load_by_sport(week_acts, activity_load, "activity_type")
         week_workouts = [w for d in week_dates for w in workouts_by_date.get(d, [])]
-        sport_seconds = intensity.sport_durations(week_acts)
 
         meso_label, meso_source = _week_meso(week_dates, meso_spans)
 
@@ -291,8 +299,8 @@ def weekly_aggregates(
             "week_commencing": week_mon,
             "actual_load": actual_load,
             "actual_load_by_sport": actual_load_by_sport,
-            # The hours done, every recorded activity counted (§7.1).
-            "actual_seconds": sum(sport_seconds.values()),
+            # The hours done, of the activities hard enough to count (§7.1).
+            "actual_seconds": _done_seconds(week_acts),
             "in_progress": in_progress,
             "meso_label": meso_label,
             "meso_source": meso_source,
@@ -301,7 +309,7 @@ def weekly_aggregates(
             # activity bucketed by week, and `render_progress` is handed one payload and
             # reads no database — the property the one-payload rule exists to protect.
             "zone_rows": intensity.zone_rows(week_acts),
-            "sport_seconds": sport_seconds,
+            "sport_seconds": intensity.sport_durations(week_acts),
             # The same durations over activities big enough to grade: what the "trained but
             # nothing recorded" `!` reads, so the floor applies there too (§11).
             "judged_sport_seconds": intensity.sport_durations(
