@@ -863,6 +863,14 @@ class LogTest(_StrengthCase):
             "      quads, glutes · Machine",
         ])
 
+    def test_a_search_finds_an_exercise_by_the_name_people_use(self):
+        """DESIGN_exercise_table.md §3.2: Garmin's cable core press is the Pallof press."""
+        _, out, _ = run_cli(["strength", "exercises", "pallof"])
+        self.assertEqual(out.split("\n")[1:3], [
+            "    core: cable core press  core_carry",
+            "      also pallof press · abs · Cable Machine, Cable Attachment",
+        ])
+
     def test_a_search_crosses_the_patterns(self):
         _, out, _ = run_cli(["strength", "exercises", "deadlift"])
         self.assertIn("deadlift: barbell deadlift", out)

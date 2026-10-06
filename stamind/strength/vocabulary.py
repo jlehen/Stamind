@@ -37,7 +37,8 @@ GEAR = NOT_LOADS + LOADS
 # §6).
 BODYWEIGHT_CEILING_KG = 50.0
 
-# The mark on a line of the table whose exercise Garmin has no name for (§3.3).
+# The mark on a name Garmin does not have: at the start of a line, an exercise Garmin has no
+# name for (§3.3); on a later name, one people use for the line's exercise (§3.2).
 ADDED_MARK = "+"
 
 # Words of a Garmin name that say nothing about the exercise, and what a leading underscore
@@ -70,6 +71,8 @@ class Exercise:
     # One side does the rep, then the other: its reps are per side and a set is both sides
     # (DESIGN_strength_tracking.md §4).
     per_side: bool = False
+    # The names people use for it that Garmin lacks, among `names` (§3.2).
+    also: Tuple[str, ...] = ()
 
     @property
     def bodyweight(self) -> bool:
@@ -79,6 +82,11 @@ class Exercise:
     @property
     def words(self) -> str:
         return words(self.key)
+
+    @property
+    def also_words(self) -> Tuple[str, ...]:
+        """The names people use as they are read, the category left out: 'pallof press'."""
+        return tuple(words(name).rpartition(": ")[2] for name in self.also)
 
 
 def _listed(text: str, separator: str) -> Tuple[str, ...]:
@@ -97,13 +105,15 @@ def _table() -> Tuple[Dict[str, Exercise], Dict[str, str]]:
                 continue
             fields = (line.rstrip("\n").split("\t") + [""] * 5)[:6]
             listed, pattern, muscles, gear, photos, reps = fields
-            names = tuple(listed.lstrip(ADDED_MARK).split())
+            written = listed.split()
+            names = tuple(name.lstrip(ADDED_MARK) for name in written)
             main, _, secondary = muscles.partition("|")
             exercise = Exercise(
                 key=names[0], names=names, pattern=pattern, muscles=_listed(main, ","),
                 secondary=_listed(secondary, ","), gear=_listed(gear, ", "),
                 photos=photos or None, added=listed.startswith(ADDED_MARK),
                 per_side=reps == PER_SIDE,
+                also=tuple(name[1:] for name in written[1:] if name.startswith(ADDED_MARK)),
             )
             classes[exercise.key] = exercise
             for name in names:
@@ -133,8 +143,8 @@ def garmin_name(category: str, name: Optional[str]) -> str:
 
 
 def key_of(name: Optional[str]) -> Optional[str]:
-    """The key of the class holding a Garmin name, or None when the table lacks the name. A
-    weighted twin gives the key of its class (§6, §7)."""
+    """The key of the class holding a name, or None when the table lacks the name. A weighted
+    twin gives the key of its class, and so does a name people use (§3.2, §6, §7)."""
     return _table()[1].get(name) if name else None
 
 
@@ -145,6 +155,13 @@ def words(key: str) -> str:
     if len(parts) == 1 or parts[0] == parts[1]:
         return parts[0]
     return f"{parts[0]}: {parts[1]}"
+
+
+def searched(key: str) -> str:
+    """What a typed name is matched against: the key's words, then the words of the names
+    people use for it (§3.2)."""
+    known = get(key)
+    return " ".join((words(key),) + (known.also_words if known else ()))
 
 
 def _name_words(key: str) -> Set[str]:

@@ -9,6 +9,8 @@
 # gets a line of its own.
 # A line starting with "+" is an exercise Garmin has no name for (§3.3). The "+" is a mark in
 # this file, not part of the key. The comment above it names the nearest Garmin exercise.
+# A later name starting with "+" is one people use for the line's exercise and Garmin lacks
+# (§3.2): it is searched and understood, never stored and never shown as the exercise.
 # pattern: the job the exercise does in a session, or empty when it has none (§3.4).
 # muscles: the main ones, then "|", then the secondary ones, in Garmin's words (§3.5).
 # gear: everything the exercise needs, from the 46 words of §3.6, separated by ", ".
@@ -71,6 +73,8 @@
 +CARRY/SUITCASE_CARRY	core_carry	OBLIQUES,FOREARM|ABS	Dumbbells		per side
 +PLANK/PLANK_KETTLEBELL_DRAG	core_carry	ABS,OBLIQUES|SHOULDERS	Kettlebells		per side
 +PLANK/PLANK_DUMBBELL_DRAG	core_carry	ABS,OBLIQUES|SHOULDERS	Dumbbells		per side
+# nearest Garmin exercise: PLANK/SIDE_PLANK_WITH_FEET_ON_BENCH
++PLANK/COPENHAGEN_PLANK	core_carry	ADDUCTORS,OBLIQUES|ABS,SHOULDERS	Bench		per side
 # nearest Garmin exercise: CALF_RAISE/SEATED_CALF_RAISE
 +CALF_RAISE/SINGLE_LEG_SEATED_CALF_RAISE	accessory	CALVES	Bench	Dumbbell_Seated_One-Leg_Calf_Raise	per side
 # nearest Garmin exercise: DEADLIFT/SINGLE_LEG_ROMANIAN_DEADLIFT_WITH_DUMBBELL
@@ -559,7 +563,7 @@ CORE/ALTERNATING_PLATE_REACH	core_carry	ABS|OBLIQUES,SHOULDERS	Weight Plates		pe
 CORE/ALTERNATING_SLIDE_OUT CORE/WEIGHTED_ALTERNATING_SLIDE_OUT	core_carry	ABS|OBLIQUES,SHOULDERS	Sliding Discs		per side
 CORE/BARBELL_ROLLOUT CORE/WEIGHTED_BARBELL_ROLLOUT	core_carry	ABS|LOWER_BACK,TRAPS,OBLIQUES,SHOULDERS	Barbell, Mat	Barbell_Ab_Rollout
 CORE/BODY_BAR_OBLIQUE_TWIST	core_carry	OBLIQUES|ABS	Body Bar		per side
-CORE/CABLE_CORE_PRESS	core_carry	ABS|SHOULDERS	Cable Machine, Cable Attachment	Pallof_Press	per side
+CORE/CABLE_CORE_PRESS +CORE/PALLOF_PRESS	core_carry	ABS|SHOULDERS	Cable Machine, Cable Attachment	Pallof_Press	per side
 CORE/CABLE_SIDE_BEND	core_carry	OBLIQUES	Cable Machine, Cable Attachment		per side
 CORE/CORE CORE	core_carry	ABS,OBLIQUES|ABDUCTORS	Nothing
 CORE/CRESCENT_CIRCLE CORE/WEIGHTED_CRESCENT_CIRCLE	accessory	ABS|OBLIQUES	Nothing

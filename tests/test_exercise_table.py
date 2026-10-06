@@ -15,7 +15,8 @@ def table_lines():
             if line.startswith("#") or not line.strip():
                 continue
             names, pattern, muscles, gear = (line.rstrip("\n").split("\t") + [""] * 3)[:4]
-            lines.append((names.lstrip(vocabulary.ADDED_MARK).split(), pattern, muscles, gear))
+            names = [name.lstrip(vocabulary.ADDED_MARK) for name in names.split()]
+            lines.append((names, pattern, muscles, gear))
     return lines
 
 
@@ -40,7 +41,9 @@ class TableTest(unittest.TestCase):
                 self.assertIn(word, vocabulary.GEAR, names[0])
 
     def test_no_two_classes_show_the_same_words(self):
-        counts = Counter(vocabulary.words(key) for key in vocabulary.keys())
+        """Nor does a name people use read like another class (§3.2)."""
+        counts = Counter(vocabulary.words(name) for one in vocabulary.all_exercises()
+                         for name in (one.key,) + one.also)
         self.assertEqual([words for words, count in counts.items() if count > 1], [])
 
     def test_a_weighted_twin_sits_on_the_line_of_its_exercise(self):
@@ -131,7 +134,22 @@ class ClassTest(unittest.TestCase):
         self.assertTrue(step_down.added)
         self.assertEqual(vocabulary.key_of("SQUAT/STEP_DOWN"), "SQUAT/STEP_DOWN")
         self.assertIsNone(vocabulary.get("+SQUAT/STEP_DOWN"))
-        self.assertEqual(sum(1 for one in vocabulary.all_exercises() if one.added), 35)
+        self.assertEqual(sum(1 for one in vocabulary.all_exercises() if one.added), 36)
+
+    def test_a_name_people_use_finds_its_class_and_is_never_a_key(self):
+        """§3.2: Garmin's cable core press is what people call the Pallof press."""
+        press = vocabulary.get("CORE/CABLE_CORE_PRESS")
+        self.assertEqual(press.also, ("CORE/PALLOF_PRESS",))
+        self.assertEqual(press.also_words, ("pallof press",))
+        self.assertFalse(press.added)
+        self.assertEqual(press.words, "core: cable core press")
+        self.assertEqual(vocabulary.key_of("CORE/PALLOF_PRESS"), "CORE/CABLE_CORE_PRESS")
+        self.assertIsNone(vocabulary.get("CORE/PALLOF_PRESS"))
+        self.assertEqual(vocabulary.searched("CORE/CABLE_CORE_PRESS"),
+                         "core: cable core press pallof press")
+        # A class with no such name, and a key the table lacks, are matched on their words.
+        self.assertEqual(vocabulary.searched("SQUAT/BELT_SQUAT"), "squat: belt squat")
+        self.assertEqual(vocabulary.searched("SQUAT/MOON_SQUAT"), "squat: moon squat")
 
     def test_an_exercise_is_bodyweight_when_none_of_its_gear_is_a_load(self):
         """§3.6: a pull-up bar is not a load, a machine is."""

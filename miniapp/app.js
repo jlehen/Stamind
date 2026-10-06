@@ -476,7 +476,8 @@ function renderResults() {
   ui.searchResults.replaceChildren(...hits.map((row) => {
     const hit = button("", "result", () => choose(row));
     hit.append(el("span", "result-name", logic.shown(row.w)));
-    const kind = [row.p.replace(/_/g, " "), row.g].filter(Boolean).join(" · ");
+    const also = row.a ? `also ${row.a}` : "";
+    const kind = [also, row.p.replace(/_/g, " "), row.g].filter(Boolean).join(" · ");
     hit.append(el("span", "result-kind", kind));
     return hit;
   }));

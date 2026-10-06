@@ -30,23 +30,24 @@ def _pattern_of(key: str) -> str:
 
 def _matches(text: str, keys: Sequence[str]) -> List[str]:
     """The lifts `text` names: the one whose words are exactly it, else every one whose
-    words contain it, case ignored, sorted by their words (DESIGN_exercise_table.md §7)."""
+    words, or the name people use for it, contain it, case ignored, sorted by their words
+    (DESIGN_exercise_table.md §7)."""
     wanted = text.strip().lower()
     exact = [key for key in keys if vocabulary.words(key) == wanted]
     if exact:
         return exact
-    return sorted((key for key in keys if wanted in vocabulary.words(key)), key=vocabulary.words)
+    return sorted((key for key in keys if wanted in vocabulary.searched(key)),
+                  key=vocabulary.words)
 
 
 def _muscles_and_gear(known: vocabulary.Exercise) -> str:
     """'quads, glutes · Barbell, Squat Rack': a class's main muscles and its gear, as the
     exercise listing shows them (DESIGN_exercise_table.md §7). A class with no muscles shows
-    its gear alone."""
-    muscles = ", ".join(muscle.lower().replace("_", " ") for muscle in known.muscles)
-    gear = ", ".join(known.gear)
-    if not muscles:
-        return gear
-    return f"{muscles} · {gear}"
+    its gear alone, and one people call by another name says it first: 'also pallof press'."""
+    parts = [f"also {name}" for name in known.also_words]
+    parts.append(", ".join(muscle.lower().replace("_", " ") for muscle in known.muscles))
+    parts.append(", ".join(known.gear))
+    return " · ".join(part for part in parts if part)
 
 
 def _pattern_and_gear(key: str) -> str:
@@ -160,7 +161,7 @@ def run_strength_exercises(args: argparse.Namespace) -> None:
         listed = [e for e in listed if e.pattern == args.pattern]
     if args.search:
         wanted = args.search.strip().lower()
-        listed = [e for e in listed if wanted in e.words]
+        listed = [e for e in listed if wanted in vocabulary.searched(e.key)]
     if not listed:
         notice(f"No {args.pattern or ''} exercise Stamind knows is called "
                f"'{args.search}'.".replace("  ", " "))

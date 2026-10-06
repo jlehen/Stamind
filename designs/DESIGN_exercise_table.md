@@ -88,6 +88,16 @@ Two things, and only these, put two Garmin names on one line:
 - **A bare category.** `BENCH_PRESS/BENCH_PRESS` and the bare `BENCH_PRESS` are the same generic
   bench press.
 
+A third thing puts a name on a line, and it is not a Garmin name:
+
+- **A name people use.** Garmin calls the Pallof press `CORE/CABLE_CORE_PRESS`, and an athlete
+  who types "pallof" finds nothing. The name people use is written after the key, in Garmin's
+  shape and with the `+` of §3.3: `CORE/CABLE_CORE_PRESS +CORE/PALLOF_PRESS`. It is never
+  stored, and it is never the exercise's words. A typed name is matched against it (§7), the
+  page's search finds the class by it and prints "also pallof press" under the hit (§8), and a
+  model call that answers with it is given the class's key. One was written, the one an athlete
+  reported; others are added as they are met.
+
 So every name on a line has the same category, and the words of §4 always say the category Garmin
 gave. Today 37 lines hold names from more than one category, and each is split, one line per
 category:
@@ -193,6 +203,10 @@ for the dumbbell and hold the kettlebell lift too (§7).
 
 Left out on purpose: the alternating front raise, the one-arm cable curl facing the stack, the
 one-arm triceps pressdown, and a calf raise machine.
+
+`PLANK/COPENHAGEN_PLANK` was added the same day: a side plank held up by the top leg on a
+bench, which loads the inner thigh. Garmin has no name for it. Its nearest Garmin exercise is
+`PLANK/SIDE_PLANK_WITH_FEET_ON_BENCH`, which rests both feet on the bench.
 
 ### 3.4 Pattern
 
@@ -387,12 +401,13 @@ Not handled:
 **The athlete.** Every place that prints an exercise prints its words: the terminal's strength
 commands, the chat, the session's description, the page. `strength log` and `strength exercises`
 match what is typed against the words the way they match the names today: the exact words, or
-else every exercise whose words contain it. "leg press" still finds "squat: leg press". Lists
+else every exercise whose words contain it. "leg press" still finds "squat: leg press", and
+"pallof" finds "core: cable core press" through the name people use (§3.2). Lists
 sort by the words. The heading of `strength log NAME` gives the lift's pattern and its gear. The
 index of `strength exercises` gains a group for the lines with no pattern.
 
 The page's search lists one entry per class, under the words of its key, and searches those
-words. "Pull up" is one entry. Nothing is hidden: the yoga poses are in the list. The search
+words and the names people use (§3.2). "Pull up" is one entry. Nothing is hidden: the yoga poses are in the list. The search
 leaves the word "weighted" out of what is typed, so "weighted pull up" finds "pull up": a weighted
 twin is its class with a load.
 
@@ -436,8 +451,9 @@ strength planner's are. The buttons show the words. Its list goes from 32 kB to 
 **The page.** Both payloads keep their shape (DESIGN_gym_logger.md §3, §4) and go to version 2:
 `n` holds a key. `miniapp/exercises.json` gives the page, for each class, the key, the words,
 the pattern, the gear and whether it is bodyweight, with the photos id when there is one and a
-mark when it is done one side at a time (§3.8). The page
-searches the words, prints them as "[Squat] Belt squat" (§4), and sends the key. The state the
+mark when it is done one side at a time (§3.8), and the names people use for it (§3.2). The
+page searches the words and those names, prints the words as "[Squat] Belt squat" (§4), and
+sends the key. The state the
 page saves on the phone changes its version too, so a state saved under the old names is not
 read.
 

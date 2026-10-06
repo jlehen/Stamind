@@ -297,6 +297,18 @@ test("the search ranks on the name after the category", async () => {
   assert.equal(logic.searchExercises(catalog, "weighted pull up", null)[0].k, "PULL_UP/PULL_UP");
 });
 
+test("the search finds a class by the name people use for it", async () => {
+  // Garmin's "cable core press" is what people call the Pallof press.
+  const { readFile } = await import("node:fs/promises");
+  const catalog = JSON.parse(
+    await readFile(new URL("../exercises.json", import.meta.url), "utf8"));
+  assert.deepEqual(logic.searchExercises(catalog, "pallof", null).map((r) => r.k),
+                   ["CORE/CABLE_CORE_PRESS"]);
+  assert.deepEqual(logic.searchExercises(catalog, "Pallof press", null).map((r) => r.k),
+                   ["CORE/CABLE_CORE_PRESS"]);
+  assert.equal(logic.searchExercises(catalog, "copenhagen", null)[0].k, "PLANK/COPENHAGEN_PLANK");
+});
+
 test("the page draws a session only when it is version 2", () => {
   // A button drawn before the names became keys still carries a version 1 session.
   const old = { v: 1, r: 727, d: "2026-09-24", x: [{ n: "belt squat", s: 3, lo: 4, hi: 6 }] };

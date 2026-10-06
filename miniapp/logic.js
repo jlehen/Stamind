@@ -577,8 +577,9 @@ export function lastSetSeconds(state) {
 // ---------------------------------------------------------------------------------------
 // The exercise catalog, `exercises.json` (DESIGN_exercise_table.md §8): one row per class, with
 // its key `k`, its words `w`, its pattern `p`, its gear `g`, whether it is bodyweight `b`, its
-// photos id `f`, and `o` when it is done one side at a time. The page searches the words,
-// prints them as `shown` writes them, and stores and sends the key.
+// photos id `f`, `o` when it is done one side at a time, and `a`, the names people use for it
+// (§3.2). The page searches the words and those names, prints the words as `shown` writes
+// them, and stores and sends the key.
 // ---------------------------------------------------------------------------------------
 
 // The words of "squat: belt squat" after the category, or all of them when there is none.
@@ -607,7 +608,8 @@ export function searchExercises(catalog, query, pattern) {
     return [];
   }
   const first = tokens.length ? tokens[0] : "";
-  const hits = scoped.filter((row) => tokens.every((token) => row.w.includes(token)))
+  const holds = (row, token) => row.w.includes(token) || (row.a || "").includes(token);
+  const hits = scoped.filter((row) => tokens.every((token) => holds(row, token)))
     .map((row) => {
       const name = nameAfterCategory(row.w);
       return { row, name, rank: nameRank(name, first) };
