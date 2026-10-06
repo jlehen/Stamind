@@ -131,7 +131,7 @@ class ClassTest(unittest.TestCase):
         self.assertTrue(step_down.added)
         self.assertEqual(vocabulary.key_of("SQUAT/STEP_DOWN"), "SQUAT/STEP_DOWN")
         self.assertIsNone(vocabulary.get("+SQUAT/STEP_DOWN"))
-        self.assertEqual(sum(1 for one in vocabulary.all_exercises() if one.added), 23)
+        self.assertEqual(sum(1 for one in vocabulary.all_exercises() if one.added), 35)
 
     def test_an_exercise_is_bodyweight_when_none_of_its_gear_is_a_load(self):
         """§3.6: a pull-up bar is not a load, a machine is."""

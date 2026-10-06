@@ -165,6 +165,35 @@ kettlebells (§7). A kettlebell clean and press is not added either. Garmin has
 `OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_STRICT_PRESS` and
 `OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_PUSH_PRESS`, and it is one of those done with kettlebells.
 
+**Twelve one-sided exercises, added on 2026-10-06.** Each is the one-sided form of a class the
+table already had, where no class marked `per side` (§3.8) held that form. Logged under the
+two-sided class, such a set prints no `/side`, and its load sits in one history with loads
+about twice as large. A read of the 1,114 classes with a pattern found them. It kept the forms
+an athlete who lifts two or three times a week plausibly does, and left the rarer ones out.
+
+| Key | Nearest Garmin exercise | Pattern | Gear |
+|---|---|---|---|
+| `LEG_CURL/SINGLE_LEG_LEG_CURL` | `LEG_CURL/LEG_CURL` | accessory | Machine |
+| `SQUAT/SINGLE_LEG_LEG_EXTENSION` | `BANDED_EXERCISES/LEG_EXTENSION` | accessory | Machine |
+| `HIP_RAISE/SINGLE_LEG_HIP_THRUST` | `HIP_RAISE/SINGLE_LEG_HIP_RAISE` | hinge | Bench |
+| `CALF_RAISE/SINGLE_LEG_SEATED_CALF_RAISE` | `CALF_RAISE/SEATED_CALF_RAISE` | accessory | Bench |
+| `DEADLIFT/STAGGERED_STANCE_ROMANIAN_DEADLIFT_WITH_DUMBBELL` | `DEADLIFT/SINGLE_LEG_ROMANIAN_DEADLIFT_WITH_DUMBBELL` | hinge | Dumbbells |
+| `PULL_UP/SINGLE_ARM_LAT_PULLDOWN` | `PULL_UP/LAT_PULLDOWN` | pull_vertical | Cable Machine, Cable Attachment |
+| `ROW/SINGLE_ARM_MACHINE_ROW` | `ROW/SINGLE_ARM_CABLE_ROW` | pull_horizontal | Machine |
+| `SHOULDER_PRESS/SINGLE_ARM_STANDING_LANDMINE_PRESS` | `SHOULDER_PRESS/STANDING_LANDMINE_PRESS` | push_vertical | Barbell, Landmine |
+| `OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN` | `OLYMPIC_LIFT/DUMBBELL_CLEAN` | hinge | Dumbbells |
+| `OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN_AND_PRESS` | `OLYMPIC_LIFT/DUMBBELL_POWER_CLEAN_AND_STRICT_PRESS` | hinge | Dumbbells |
+| `CURL/ALTERNATING_DUMBBELL_HAMMER_CURL` | `CURL/DUMBBELL_HAMMER_CURL` | accessory | Dumbbells |
+| `TRICEPS_EXTENSION/SINGLE_ARM_DUMBBELL_KICKBACK` | `TRICEPS_EXTENSION/DUMBBELL_KICKBACK` | accessory | Dumbbells |
+
+One leg curl class stands for the three two-leg ones: the one-leg form is done on whichever
+machine the gym has. The single-leg hip thrust has the shoulders on a bench; the one-leg bridge
+on the floor is Garmin's `HIP_RAISE/SINGLE_LEG_HIP_RAISE`. The two clean exercises are named
+for the dumbbell and hold the kettlebell lift too (§7).
+
+Left out on purpose: the alternating front raise, the one-arm cable curl facing the stack, the
+one-arm triceps pressdown, and a calf raise machine.
+
 ### 3.4 Pattern
 
 The pattern says what job an exercise does in a session: `squat`, `hinge`, `single_leg`,
@@ -270,7 +299,8 @@ curl or a lunge: both are marked. What the mark changes is DESIGN_strength_track
 
 A name that fits both ways is left unmarked: `ROW/DUMBBELL_ROW` is one arm on a bench or two
 dumbbells bent over, and `CALF_RAISE/CALF_RAISE` is one leg or two. The mark says how the
-exercise is done, and such a name does not say.
+exercise is done, and such a name does not say. The athlete who does it one side at a time
+picks the one-sided class, and where Garmin had none for a common form, one was added (§3.3).
 
 No list Stamind reads carries this fact, so the column was filled by reading every name of the
 table twice, once by a person's rule and once blind, and settling where the two differed.
