@@ -85,8 +85,9 @@ class _Case(unittest.TestCase):
     def save(self, **kwargs):
         return saved_proposal.save(self.eased(**kwargs), newest_written())
 
-    def tap(self, item, action="a1"):
-        token = queue_cli.since_token(self.now, single=True)
+    def tap(self, item, action="a1", since=None):
+        """A tap on an item's button: a walk of one, unless `since` is what its buttons carry."""
+        token = since or queue_cli.since_token(self.now, single=True)
         _code, out, _err = run_cli(["bot", "queue", str(item["id"]), action, "--since", token])
         return out
 
@@ -346,40 +347,49 @@ class MorningPushTest(_Case):
         self.assertEqual([b["label"] for b in row["buttons"]],
                          ["👍 Got it", "😴 Feeling tired", "🕐 Can't today"])
 
-    def answer(self, sent, action):
-        """A tap on the message the push sent, with the walk start its buttons carry."""
-        _code, out, _err = run_cli(
-            ["bot", "queue", str(sent["id"]), action, "--since", sent["since"]]
-        )
-        return out
+    def proposed(self, **kwargs):
+        """The push with a message queued behind its proposal: the question it sent."""
+        athlete_queue.tell("Charge your watch tonight.")
+        _coach, out = self.push(self.eased(**kwargs))
+        [sent] = queue_lines(out)
+        self.assertEqual(sent["text"], saved_proposal.QUESTION_LINE)
+        return sent
 
     def test_the_round_of_queued_questions_waits_for_the_answer(self):
         """One question at a time: the push sends the proposal and stops."""
-        athlete_queue.tell("Charge your watch tonight.")
-        _coach, out = self.push(self.eased())
-        [proposal] = queue_lines(out)
-        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
-        out = self.answer(proposal, "a2")
+        proposal = self.proposed()
+        self.at(8, 30)
+        out = self.tap(proposal, "a2", proposal["since"])
         [message] = queue_lines(out)
         self.assertIn("Charge your watch tonight.", message["text"])
         self.assertLess(out.index(saved_proposal.KEPT_LINE), out.index(QUEUE_SENTINEL))
+        # The round is the morning's: it started at 08:00, not at the tap.
+        self.assertEqual(message["since"], queue_cli.since_token(THURSDAY_8AM))
 
     def test_with_nothing_queued_the_answer_ends_there(self):
         _coach, out = self.push(self.eased())
         [proposal] = queue_lines(out)
-        out = self.answer(proposal, "a2")
+        out = self.tap(proposal, "a2", proposal["since"])
         self.assertEqual(queue_lines(out), [])
         self.assertNotIn(queue_cli.QUEUE_DONE_LINE, out)
 
     def test_a_late_tap_on_the_mornings_proposal_still_starts_the_round(self):
-        athlete_queue.tell("Charge your watch tonight.")
-        _coach, out = self.push(self.eased())
-        [proposal] = queue_lines(out)
+        proposal = self.proposed()
         save_workout(test_db, SATURDAY, "running", "Long run", duration_minutes=100)
-        out = self.answer(proposal, "a1")
+        out = self.tap(proposal, "a1", proposal["since"])
         self.assertIn(saved_proposal.OUT_OF_DATE_LINE, out)
         [message] = queue_lines(out)
         self.assertIn("Charge your watch tonight.", message["text"])
+
+    def test_a_tap_the_next_day_starts_no_round(self):
+        """Thursday's proposal eases Saturday and gets no answer until Friday 09:00. By then
+        Friday's morning message has sent the queued message itself."""
+        save_workout(test_db, SATURDAY, "cycling", "Long ride", duration_minutes=180)
+        proposal = self.proposed(day=SATURDAY)
+        self.at(9, days=1)
+        out = self.tap(proposal, "a1", proposal["since"])
+        self.assertIn(saved_proposal.APPLIED_LINE, out)
+        self.assertEqual(queue_lines(out), [])
 
     def test_kilograms_that_moved_alone_are_written_at_once(self):
         proposal = self.eased(title="Intervals", minutes=90, week_planner_changed=False)

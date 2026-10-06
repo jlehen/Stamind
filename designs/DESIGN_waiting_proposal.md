@@ -158,8 +158,15 @@ open and the second has nothing to do with the first.
 
 Now the push sends the proposal and stops. A tap on "Change it" or on "Keep it as planned"
 gets its reply, and then the first queued question, as the briefing would have sent it. A tap
-on a proposal that is out of date starts the round too. With no answer the round does not
-start that morning, and the questions come with the next morning message.
+on a proposal that is out of date starts the round too. A tap that comes on a later day
+starts nothing: that day's morning message has sent the questions itself.
+
+Not handled, on purpose. In each case the queued questions are not lost. They come with the
+next morning message that makes no proposal, or whose proposal is answered.
+
+- The athlete answers nothing.
+- The athlete taps "Feeling tired" or "Can't today", which makes a second proposal in place of
+  the first, and answers that one. Only the morning's own proposal brings the round with it.
 
 **Once a morning.** The push skips the week planner when it already ran this morning with the
 night's sleep score. Today it reads that from the newest change that `workout adapt`

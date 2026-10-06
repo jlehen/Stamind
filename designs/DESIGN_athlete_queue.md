@@ -139,7 +139,8 @@ item is sent the moment it is queued: its text as ordinary messages, then a mess
 own that asks and carries the answers. It is in no walk, in the chat or in a terminal, and
 the terminal's hint of §5.2 does not count it. It has no "Not now". `sm queue list` shows it
 and `sm queue answer <id>` answers it. A tap on it ends there, the way a tap on a reminder
-does. A tap on a closed item of such a kind gets the kind's own line in place of "Already
+does, unless the morning message sent it ahead of its walk (DESIGN_waiting_proposal.md §5). A
+tap on a closed item of such a kind gets the kind's own line in place of "Already
 settled — thanks!".
 
 ## 4. The actions
@@ -189,8 +190,8 @@ waiting items A, B and C. Putting A after the others moves it behind C, so after
 would show A again. With A alone in the queue, it would come straight back, forever. A walk
 ends with "That's all for now — thanks!". A walk that finds nothing to show sends nothing.
 
-"Next time" means the next walk. The morning push starts one every day it runs (§6.1), and
-`sm queue answer` starts one (§5.1).
+"Next time" means the next walk. The morning push starts one every day it runs, or leaves it
+to the answer to its proposal (§6.1), and `sm queue answer` starts one (§5.1).
 
 **A reminder brings back one item on its own.** Acting on it ends there: it does not
 continue into the rest of the queue, which waits for the next walk. For "in 1 day", a
@@ -601,7 +602,8 @@ item's place in the queue. `sm queue tell` is a terminal command, not a tap.
 - `stamind/cli/queue.py`: `sm queue` (bare runs `list`), `list`, `answer [id]`, `tell`, and
   the hidden `bot queue` with `--remind`, whose parser entry sits with the other `bot`
   commands in `cli/bot/parser.py`.
-- `stamind/cli/bot/views.py`: `run_bot_morning` starts a walk at its end.
+- `stamind/cli/bot/views.py`: `run_bot_morning` starts a walk at its end, or sends a
+  proposal whose answer starts it.
 - `stamind/cli/status.py` and `workout adapt` (`cli/workouts/adapt.py`): the hint, beside
   the end-of-schedule hint.
 - `stamind/cli/render/`: the list, the item, reminder and hint renderers, expert and
