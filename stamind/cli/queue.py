@@ -197,20 +197,24 @@ def send_item(item: Dict[str, Any], since: str, left: Optional[int]) -> None:
     emit_queue_item(item["id"], text, buttons, since)
 
 
-def send_alone(item: Dict[str, Any], offer: Sequence[dict] = ()) -> None:
+def send_alone(
+    item: Dict[str, Any], offer: Sequence[dict] = (), round_start: Optional[datetime] = None,
+) -> None:
     """Sends a stand-alone item: its wording as ordinary text, then a message of its own
     that asks and carries the answers, as a walk of one (DESIGN_waiting_proposal.md §3).
-    `offer` is the morning message's buttons, drawn under the answers (§5). On a terminal
-    the text is followed by the command that answers it."""
+    `offer` is the morning message's buttons, drawn under the answers, and `round_start`
+    is the morning's round, which then starts when this item is answered (§5). On a
+    terminal the text is followed by the command that answers it."""
     print(athlete_queue.wording(item))
     if not is_json_frontend():
         notice(f"Saved as #{item['id']}. Answer it with "
                + cmd(f"queue answer {item['id']}") + ".")
         return
     text, buttons = queue_chat_message(item, 1)
-    emit_queue_item(
-        item["id"], text, buttons, since_token(clock.now(), single=True), offer=offer,
-    )
+    since = since_token(clock.now(), single=True)
+    if round_start is not None:
+        since = since_token(round_start)
+    emit_queue_item(item["id"], text, buttons, since, offer=offer)
 
 
 def settled_line(item: Optional[Dict[str, Any]]) -> str:
@@ -376,6 +380,11 @@ def run_bot_queue(args: argparse.Namespace) -> None:
     else:
         _apply(item, args.action, since)
     if single or item is None:
+        return
+    # A stand-alone item is in no round: the one it was sent ahead of starts here
+    # (DESIGN_waiting_proposal.md §5).
+    if athlete_queue.kind_of(item).stands_alone:
+        send_walk_step(since)
         return
     send_walk_step(since, after=item)
 

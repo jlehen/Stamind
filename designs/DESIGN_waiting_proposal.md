@@ -78,6 +78,8 @@ A proposal **stands alone**, which is new for the queue and is one property of t
 - It is in no round, in the chat or in a terminal, and the terminal's hint "1 question is
   waiting" does not count it. `sm queue list` shows it and `sm queue answer <id>` answers it.
   A tap on it does not go on to the next queued question, the way a tap on a reminder does not.
+  The proposal the morning message makes is the exception: the morning's round starts when it
+  is answered (§5).
 - It has no "🕐 Not now". Not answering already means "not now", and "in 1 day" would bring back
   a proposal that is out of date.
 
@@ -127,8 +129,8 @@ With `adapt-first` on, the push asks the week planner as it does today. Then:
 - **Nothing to change.** As today.
 - **Only kilograms moved.** Written at once, with its sentence in the briefing, as today (§7).
 - **A session would change.** Nothing is written. The briefing shows today as planned, with no
-  reason line. The proposal follows as its own message. Then the round of queued questions
-  starts, as today.
+  reason line. The proposal follows as its own message. The round of queued questions starts
+  when the athlete answers it.
 
 On the Thursday of §1 the athlete reads the 90-minute ride, then: "Rough night. Here's what I'd
 change: 60 easy minutes." They tap **Keep it as planned** and ride the 90 minutes.
@@ -148,6 +150,16 @@ A tap on one of the two answers removes the whole keyboard. A tap on "Feeling ti
 choice of "Can't today" removes those and leaves the two answers, because the run it starts is
 shown the open proposal and may leave it open (§6.2). "Feeling tired" and "Can't today" are
 forgotten when the bot restarts, as under the briefing. The two answers are not (§3).
+
+**One question at a time** (amended 2026-10-06). The round of queued questions used to start
+right after the proposal went out. It is Thursday 08:03. "Shall I make these changes?" arrives,
+and under it, before the athlete has answered, "Are Tuesday's sets final?". Two questions stand
+open and the second has nothing to do with the first.
+
+Now the push sends the proposal and stops. A tap on "Change it" or on "Keep it as planned"
+gets its reply, and then the first queued question, as the briefing would have sent it. A tap
+on a proposal that is out of date starts the round too. With no answer the round does not
+start that morning, and the questions come with the next morning message.
 
 **Once a morning.** The push skips the week planner when it already ran this morning with the
 night's sleep score. Today it reads that from the newest change that `workout adapt`

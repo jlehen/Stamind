@@ -347,7 +347,9 @@ be noise.
 ### 6.1 The push starts a walk
 
 At the end of `bot morning`, after the briefing and its row of buttons, the first item of
-the queue arrives as a separate message with its own buttons:
+the queue arrives as a separate message with its own buttons. On a morning when the week
+planner proposes a change, it arrives once that proposal is answered
+(DESIGN_waiting_proposal.md §5):
 
 > 🙋 Quick question (7 left)
 > Tuesday's 18:10 gym session, sets 1–4: 10, 10, 10, 9 reps at 100 kg. What was it?

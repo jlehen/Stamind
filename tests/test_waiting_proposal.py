@@ -346,11 +346,39 @@ class MorningPushTest(_Case):
         self.assertEqual([b["label"] for b in row["buttons"]],
                          ["👍 Got it", "😴 Feeling tired", "🕐 Can't today"])
 
-    def test_the_proposal_comes_before_the_round_of_queued_questions(self):
+    def answer(self, sent, action):
+        """A tap on the message the push sent, with the walk start its buttons carry."""
+        _code, out, _err = run_cli(
+            ["bot", "queue", str(sent["id"]), action, "--since", sent["since"]]
+        )
+        return out
+
+    def test_the_round_of_queued_questions_waits_for_the_answer(self):
+        """One question at a time: the push sends the proposal and stops."""
         athlete_queue.tell("Charge your watch tonight.")
         _coach, out = self.push(self.eased())
-        proposal, message = queue_lines(out)
+        [proposal] = queue_lines(out)
         self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
+        out = self.answer(proposal, "a2")
+        [message] = queue_lines(out)
+        self.assertIn("Charge your watch tonight.", message["text"])
+        self.assertLess(out.index(saved_proposal.KEPT_LINE), out.index(QUEUE_SENTINEL))
+
+    def test_with_nothing_queued_the_answer_ends_there(self):
+        _coach, out = self.push(self.eased())
+        [proposal] = queue_lines(out)
+        out = self.answer(proposal, "a2")
+        self.assertEqual(queue_lines(out), [])
+        self.assertNotIn(queue_cli.QUEUE_DONE_LINE, out)
+
+    def test_a_late_tap_on_the_mornings_proposal_still_starts_the_round(self):
+        athlete_queue.tell("Charge your watch tonight.")
+        _coach, out = self.push(self.eased())
+        [proposal] = queue_lines(out)
+        save_workout(test_db, SATURDAY, "running", "Long run", duration_minutes=100)
+        out = self.answer(proposal, "a1")
+        self.assertIn(saved_proposal.OUT_OF_DATE_LINE, out)
+        [message] = queue_lines(out)
         self.assertIn("Charge your watch tonight.", message["text"])
 
     def test_kilograms_that_moved_alone_are_written_at_once(self):

@@ -393,7 +393,8 @@ classes themselves.
     tap runs the hidden `sm bot queue <id> <action> --since <walk start>`, which checks the
     item is still waiting and still worth asking, applies the action and sends the next
     item of the walk; "🕐 Not now" swaps in the three later choices from the tap itself.
-    `bot morning` ends by starting a walk, and first refreshes Garmin and reads new strength
+    `bot morning` ends by starting a walk, or by sending a proposal whose answer starts it
+    (DESIGN_waiting_proposal.md §5), and first refreshes Garmin and reads new strength
     sets whatever `adapt-first` says, so a question about yesterday's sets joins that walk
     (DESIGN_strength_tracking.md §11). With `adapt-first` on it runs the adaptation only
     when none has run today with last night's sleep score in hand and nothing trained

@@ -324,11 +324,12 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     if proposal_item is None and buttons:
         emit_buttons(buttons)
     runtime.db.set_setting(MORNING_MARKER, today)
-    # After the briefing, what the week planner would change, as a message of its own
-    # (DESIGN_waiting_proposal.md §5), then the first item of the athlete queue
-    # (DESIGN_athlete_queue.md §6.1).
-    if proposal_item is not None:
-        emit_flush(wait=False)
-        send_alone(proposal_item, buttons)
-    send_walk_step(clock.command_start())
+    # After the briefing, the first item of the athlete queue (DESIGN_athlete_queue.md
+    # §6.1). What the week planner would change goes first, as a message of its own, and
+    # the round then starts when the athlete answers it (DESIGN_waiting_proposal.md §5).
+    if proposal_item is None:
+        send_walk_step(clock.command_start())
+        return
+    emit_flush(wait=False)
+    send_alone(proposal_item, buttons, clock.command_start())
 
