@@ -763,8 +763,11 @@ the phone re-flowed every line, so the sign survived only on the first line of e
 sentence and the reader could not tell old from new. Even on a terminal a sentence-level
 `-`/`+` listing interleaves three dropped lines with four added ones and reads as noise. So
 the diff is grouped — each run of dropped sentences with the run that replaced
-it, joined back into a paragraph — and labelled in words: `Was:` / `Now:`, or `Dropped:` /
-`Added:` when a group has one side only. The text hangs under its label at the client's
+it — and labelled in words: `Was:` / `Now:`, or `Dropped:` /
+`Added:` when a group has one side only. Each side keeps the lines its sentences stood on.
+Observed 2026-10-04: joined into one paragraph, a gym day's exercise lines and a ride's
+bullets ran together into a single line ("Goblet squat 2×10 @ 44 kg Romanian deadlift
+3×10 @ 22 kg One arm swing…"). The text hangs under its label at the client's
 wrap width, so a narrow client keeps the label on every group. Simple mode
 (DESIGN_bot_simple_frontend.md §6) renders the whole preview as prose and reuses the same
 groups, unwrapped, since that client flows text itself.

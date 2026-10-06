@@ -202,8 +202,9 @@ class WorkoutAdaptMixin:
                 '        day.\"'
             )
         change_reason_field = (
-            '      "change_reason": "One short sentence on why THIS specific session\n'
-            '        changed, e.g. \"Cut to easy Z2 to shed intensity.\"'
+            '      "change_reason": "One short sentence for the athlete, in plain words, on\n'
+            '        what changes in THIS session and why, e.g. \"I made this an easy ride\n'
+            '        because your resting heart rate is still raised.\"'
             + note_clause
             + '\n        Keep it to a single sentence of at most 20 words; do not restate\n'
               '        the overall reason.",\n'

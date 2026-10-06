@@ -285,6 +285,16 @@ things: lead with the decision, name only the signals that drove it, and do not 
 what the athlete's screen already shows. It also states that a length limit on a field is
 a hard limit rather than a target.
 
+A fourth rule came on 2026-10-06: plain words, full sentences, one idea in each. The three
+rules above only shorten, and the week planner met its caps by packing. On 2026-10-04 an
+athlete read "Route choice and a breach rule now carry the cap, and extra appetite goes
+into extra easy minutes". "Appetite" is the adapt prompt's own word, and "breach rule" was
+a label the week planner had coined in a description the preview did not show. The rule
+says the athlete has not read the prompt, and that a limit is met by saying fewer things.
+`change_reason` is asked for "the athlete, in plain words", with a full sentence as its
+example, for the same reason: its old example, "Cut to easy Z2 to shed intensity.", taught
+the clipped style.
+
 Crucially it scopes itself: **it governs rationale and summary prose only.** A workout
 `description` is the prescription the athlete trains from — intervals, zones, rest — and
 shortening that would be a training regression, not a UX win. The section says so out loud

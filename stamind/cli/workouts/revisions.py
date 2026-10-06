@@ -6,7 +6,7 @@ The expert table lives here; the companion prose form of the same proposal is
 """
 import difflib
 import re
-from typing import List, Tuple
+from typing import List, Set, Tuple
 
 from stamind import settings
 from stamind.text import (
@@ -18,8 +18,8 @@ from stamind.coach.revisions import RevisionPair
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
-# A group of the wording diff: the sentences dropped and the sentences that took their
-# place, in reading order. Either side may be empty.
+# A group of the wording diff: the passage dropped and the passage that took its place, each
+# as the lines it stood on. Either side may be empty.
 WordingGroup = Tuple[List[str], List[str]]
 
 
@@ -53,14 +53,29 @@ def quotes_wording(proposal: dict, original: dict) -> bool:
     return rewritten_text_only(proposal, original) and not settings.terse()
 
 
-def _sentences(text) -> List[str]:
-    """A description as sentences. Blank lines are layout, so the diff ignores them."""
+def _sentences(text) -> Tuple[List[str], Set[int]]:
+    """A description as sentences, and which of them open a line. Blank lines are layout, so
+    the diff ignores them."""
     out: List[str] = []
+    opens: Set[int] = set()
     for line in str(text or "").splitlines():
+        opens.add(len(out))
         for sentence in _SENTENCE_END.split(line.strip()):
             if sentence.strip():
                 out.append(sentence.strip())
-    return out
+    return out, opens
+
+
+def _passage(sentences: List[str], opens: Set[int], start: int, end: int) -> List[str]:
+    """Sentences `start` to `end` on the lines they stood on, so a list of exercises or of
+    bullets keeps one item per line instead of running together."""
+    lines: List[str] = []
+    for index in range(start, end):
+        if index in opens or not lines:
+            lines.append(sentences[index])
+            continue
+        lines[-1] += f" {sentences[index]}"
+    return lines
 
 
 def wording_groups(proposal: dict, original: dict) -> List[WordingGroup]:
@@ -69,10 +84,10 @@ def wording_groups(proposal: dict, original: dict) -> List[WordingGroup]:
     Groups rather than a line-per-sentence `-`/`+` listing: a reader wants "this passage
     became that passage", and sign-prefixed lines lose their sign the moment a phone
     re-flows them (DESIGN_workout_revisions.md §9.1)."""
-    a = _sentences(original.get('description'))
-    b = _sentences(proposal.get('description'))
+    a, a_opens = _sentences(original.get('description'))
+    b, b_opens = _sentences(proposal.get('description'))
     return [
-        (a[i1:i2], b[j1:j2])
+        (_passage(a, a_opens, i1, i2), _passage(b, b_opens, j1, j2))
         for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b).get_opcodes()
         if tag != 'equal'
     ]
@@ -85,10 +100,10 @@ def wording_group_lines(group: WordingGroup, indent: str = "") -> List[str]:
     lines: List[str] = []
     if dropped:
         label = "Was: " if added else "Dropped: "
-        lines.append(format_labeled_text(indent + label, " ".join(dropped), color_fn=red))
+        lines.append(format_labeled_text(indent + label, "\n".join(dropped), color_fn=red))
     if added:
         label = "Now: " if dropped else "Added: "
-        lines.append(format_labeled_text(indent + label, " ".join(added), color_fn=green))
+        lines.append(format_labeled_text(indent + label, "\n".join(added), color_fn=green))
     return lines
 
 

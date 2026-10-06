@@ -218,6 +218,11 @@ sessions this command prints beside your words. Write accordingly:
   details that are already on the athlete's screen.
 - Say a thing once. A rationale that reads well after deleting half its words was twice as
   long as it needed to be.
+- Use plain words, in full sentences, with one idea in each. The athlete has not read this
+  prompt: its names for things (a "guard rail", an "appetite", a "brief") and any label you
+  coin in a description mean nothing to them, so say what the thing is, with its number.
+  Fit a length limit by saying fewer things, never by dropping the small words or by
+  stacking several ideas into one clause.
 Any length limit stated on a field in RESPONSE FORMAT is a hard limit, not a target. This
 section governs rationale and summary prose only: a workout "description" is the
 prescription the athlete trains from, and stays as complete as the session requires.

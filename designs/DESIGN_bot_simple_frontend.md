@@ -445,7 +445,9 @@ the session line in the day-view form, a parenthetical saying what it replaces (
 Strength — Deload Volume, 55 min", "was a rest day", "same session, wording updated"),
 the week planner's per-session reason when it adds to the batch reason, and for a wording-only
 revision the changed passages as `Was:` / `Now:` pairs (DESIGN_workout_revisions.md
-§9.1). The confirm asks "Shall I make these changes?"; the outcome lines are companion
+§9.1). A session whose reason and changed passages are word for word those of an earlier
+day says "Same change as Fri Oct 09." in their place: two gym days a week share one
+session, and the strength planner rewrites both alike (observed 2026-10-04). The confirm asks "Shall I make these changes?"; the outcome lines are companion
 words as well. Expert mode keeps the table, whose narrow-client form already stacks
 into records.
 

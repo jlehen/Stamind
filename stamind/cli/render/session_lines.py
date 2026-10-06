@@ -364,7 +364,10 @@ def simple_revision_lines(proposal: RevisionProposal) -> List[str]:
     per-session reason is skipped when it merely repeats the batch reason printed above."""
     today = _today_str()
     entries = []
-    for pair in proposal.pairs:
+    # The day that first quoted a given change, so a second gym day rewritten the same way
+    # points at it instead of quoting the same passages again.
+    first_quoted: Dict[str, str] = {}
+    for pair in sorted(proposal.pairs, key=lambda pair: pair.proposal['date']):
         pw, existing = pair.proposal, pair.original
         day = "Today" if pw['date'] == today else simple_date_word(pw['date'])
         entry_lines = [
@@ -374,13 +377,17 @@ def simple_revision_lines(proposal: RevisionProposal) -> List[str]:
         why = (pw.get('modification_reason') or '').strip()
         if why and why != (proposal.reason or '').strip():
             entry_lines.append(why)
-        paragraphs = ["\n".join(entry_lines)]
+        quoted = []
         if quotes_wording(pw, existing):
-            # A blank line between pairs, so each Was/Now pair reads as one passage.
-            paragraphs.extend(
-                "\n".join(wording_group_lines(b)) for b in wording_groups(pw, existing)
-            )
-        entries.append((pw['date'], "\n\n".join(paragraphs)))
+            quoted = ["\n".join(wording_group_lines(b)) for b in wording_groups(pw, existing)]
+        change = "\n\n".join(entry_lines[1:] + quoted)
+        if quoted and change in first_quoted:
+            same = f"Same change as {first_quoted[change]}."
+            entries.append((pw['date'], f"{entry_lines[0]}\n{same}"))
+            continue
+        first_quoted[change] = simple_day_word(pw['date'], today)
+        # A blank line between pairs, so each Was/Now pair reads as one passage.
+        entries.append((pw['date'], "\n\n".join(["\n".join(entry_lines)] + quoted)))
     for ew in proposal.removals:
         day = "Today" if ew['date'] == today else simple_date_word(ew['date'])
         entries.append((ew['date'], f"🗑 {day}: {ew['title']} — dropped"))

@@ -254,6 +254,63 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
 
     @patch("stamind.cli.workouts.adapt.ensure_recent_data")
     @patch("stamind.runtime.coach_service")
+    def test_quoted_wording_keeps_its_lines_and_is_not_quoted_twice(
+        self, mock_coach, _mock_ensure
+    ):
+        """A gym day's exercises stand one to a line, and the quote used to run them into
+        one. Two gym days rewritten the same way used to be quoted in full twice. Seen
+        2026-10-04, in a 1,237-word reply."""
+        friday = {
+            "date": "2026-06-12", "sport_type": "strength_training", "title": "Gym: Heavy",
+            "description": (
+                "[Gym: Heavy]\nHeavy day.\n\n"
+                "Squat: belt squat 3×5 @ 140 kg\n"
+                "Lunge: split squat 3×5–8 @ 40 kg\n"
+                "Carry: farmers carry 3×1 @ 72 kg\n"
+                "Rest 2–3 minutes between sets."
+            ),
+            "duration_minutes": 65, "rpe": 7, "tss": 55,
+        }
+        monday = dict(friday, date="2026-06-15")
+        why = "The split squats stopped at 5 per side at 40, so they are now at 36."
+        rewritten = (
+            "[Gym: Heavy]\nHeavy day.\n\n"
+            "Squat: belt squat 3×5 @ 140 kg\n"
+            "Lunge: split squat 3×6–8/side @ 36 kg\n"
+            "Carry: farmers carry 3×1 @ 78 kg\n"
+            "Rest 2–3 minutes between sets."
+        )
+        lighter = [
+            dict(day, description=rewritten, modification_reason=why)
+            for day in (friday, monday)
+        ]
+        mock_coach.workout_adapt.return_value = RevisionProposal(
+            reason="Friday's log moved two loads.", workouts=lighter, new_constraints=[],
+            range_start="2026-06-08", range_end="2026-06-30",
+            pairs=(
+                RevisionPair(proposal=lighter[0], original=friday, is_swap=False),
+                RevisionPair(proposal=lighter[1], original=monday, is_swap=False),
+            ),
+        )
+
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
+            exit_code, stdout, _stderr = self.run_cli(["workout", "adapt"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn(
+            "Was: Lunge: split squat 3×5–8 @ 40 kg\n"
+            "     Carry: farmers carry 3×1 @ 72 kg\n"
+            "Now: Lunge: split squat 3×6–8/side @ 36 kg\n"
+            "     Carry: farmers carry 3×1 @ 78 kg", stdout,
+        )
+        self.assertIn(
+            "Mon Jun 15: Gym: Heavy — 65 min (same session, wording updated)\n"
+            "Same change as Fri Jun 12.", stdout,
+        )
+        self.assertEqual(stdout.count("Was: "), 1)
+
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
     def test_terse_names_a_reworded_session_without_quoting_it(
         self, mock_coach, _mock_ensure
     ):
