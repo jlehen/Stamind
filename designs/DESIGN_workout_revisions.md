@@ -762,15 +762,41 @@ Telegram: the diff was wrapped at a fixed 88 columns whatever the client had ask
 the phone re-flowed every line, so the sign survived only on the first line of each
 sentence and the reader could not tell old from new. Even on a terminal a sentence-level
 `-`/`+` listing interleaves three dropped lines with four added ones and reads as noise. So
-the diff is grouped — each run of dropped sentences with the run that replaced
-it — and labelled in words: `Was:` / `Now:`, or `Dropped:` /
-`Added:` when a group has one side only. Each side keeps the lines its sentences stood on.
-Observed 2026-10-04: joined into one paragraph, a gym day's exercise lines and a ride's
-bullets ran together into a single line ("Goblet squat 2×10 @ 44 kg Romanian deadlift
-3×10 @ 22 kg One arm swing…"). The text hangs under its label at the client's
-wrap width, so a narrow client keeps the label on every group. Simple mode
-(DESIGN_bot_simple_frontend.md §6) renders the whole preview as prose and reuses the same
-groups, unwrapped, since that client flows text itself.
+the diff is grouped — each run of dropped lines with the run that replaced it — and
+labelled in words: `Was:` / `Now:`, or `Dropped:` / `Added:` when a group has one side
+only. The text hangs under its label at the client's wrap width, so a narrow client keeps
+the label on every group. Simple mode (DESIGN_bot_simple_frontend.md §6) renders the whole
+preview as prose and reuses the same groups, unwrapped, since that client flows text
+itself.
+
+**A quoted passage is whole lines, with the blank lines that stood between them.** The
+diff first compared sentences, and that went wrong twice.
+
+Observed 2026-10-04: the sentences of a passage were joined into one paragraph, so a gym
+day's exercises ran together ("Goblet squat 2×10 @ 44 kg Romanian deadlift 3×10 @ 22 kg
+One arm swing…").
+
+Observed 2026-10-07: it is Wednesday morning, and the week planner rewrites Sunday's
+sprint ride from five bullets into six named sections. One sentence in the middle of a
+bullet is the same in both texts: "Priority 1: go as hard as you safely can." It cut the
+quote in two. The first pair stopped in the middle of that bullet. The second pair opened
+with "Priority 2: hold it to the end.", under no section name, and the athlete could not
+tell which part of the ride it was about. The blank lines between the sections were
+dropped as well, so the six sections stood glued together.
+
+So the diff compares lines. A bullet, an exercise or a section is quoted whole, and a
+section whose name is on its line comes with its name. The blank lines between two quoted
+lines are kept. When either side holds one, a blank line also parts `Was:` from `Now:`.
+Sunday's ride now reads as one pair: the five bullets, then the six sections.
+
+The cost: a sentence changed inside a long paragraph quotes that paragraph on both sides.
+Replayed on 2026-10-07 over the 100 wording-only revisions the two instances held, whole
+lines quote 3% more words in all. 82 revisions quote the same words either way. 12 had a
+passage that ran over several lines and started or stopped in the middle of one. Two grew
+by more than 100 words.
+
+Not handled: a bullet changed under a section name that stands on a line of its own
+("PROTOCOL:") is quoted without that name.
 
 **What a text revision costs, precisely.** Nothing that matters. It appends a revision row
 and re-pushes the Calendar event, and that is all: `_eased` (§7) counts a revision only when
@@ -1039,7 +1065,7 @@ migration function.
   mirror image is pinned too: with nothing named, the same-day session IS a removal, so the
   test says the hold is what saves it rather than passing for an unrelated reason.
 - A text-only revision is applied like any other change, does not bump `adaptation_count`,
-  and the preview prints the sentences that moved (§9.1). The backstop is exact, not fuzzy:
+  and the preview prints the lines that moved (§9.1). The backstop is exact, not fuzzy:
   the keep marker is what separates a hold from a rewrite, not a similarity threshold.
 - A completed session survives a rest day proposed for its date (§9.2): the ride stays live
   with a zero tally, the rest entry pairs with the lift instead, and the day reports no rest

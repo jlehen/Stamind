@@ -114,7 +114,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
 
     @patch("stamind.cli.workouts.adapt.ensure_recent_data")
     @patch("stamind.runtime.coach_service")
-    def test_a_text_revision_shows_the_sentences_that_moved(
+    def test_a_text_revision_shows_the_lines_that_moved(
         self, mock_coach, _mock_ensure
     ):
         """Title and load are the only columns the table can show, so a session the week planner
@@ -148,7 +148,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         self.assertIn("[text revised]", stdout)
         # The passage that moved, both halves labelled in words rather than as a
         # `-`/`+` diff (which loses its signs once a phone re-flows the lines), and
-        # not the sentence that stayed put.
+        # not the line that stayed put.
         self.assertIn("TEXT REVISED", stdout)
         self.assertIn("Was: Even power beats a good average", stdout)
         self.assertIn("Now: Wednesday's execution was exactly right", stdout)
@@ -187,8 +187,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         revised = stdout.split("TEXT REVISED")[1]
-        self.assertIn("Was: Even power", revised)
-        self.assertIn("Now: Wednesday's execution", revised)
+        self.assertIn("Was: 2x20 at threshold", revised)
+        self.assertIn("Now: 2x20 at threshold", revised)
         passages = [line for line in revised.splitlines() if line.startswith("    ")]
         self.assertTrue(passages and all(len(line) <= 48 for line in passages), revised)
 
@@ -237,8 +237,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         self.assertIn(
             "🚴 Wed Jun 10: Climb Threshold — 85 min (same session, wording updated)\n"
             "Cue now references Wednesday.\n\n"
-            "Was: Even power beats a good average.\n"
-            "Now: Wednesday's execution was exactly right.", stdout,
+            "Was: 2x20 at threshold, seated. Even power beats a good average.\n"
+            "Now: 2x20 at threshold, seated. Wednesday's execution was exactly right.", stdout,
         )
         # The wording diff puts blank lines inside a session's own entry, so the day
         # boundary needs a mark of its own (DESIGN_bot_simple_frontend.md §6).
@@ -246,7 +246,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         before, after = stdout.split(SIMPLE_SESSION_RULE)
         self.assertIn("Rest Day (was Strength — Deload Volume", before)
         self.assertNotIn("Climb Threshold", before)
-        self.assertIn("Was: Even power beats a good average.", after)
+        self.assertIn("Even power beats a good average.", after)
         self.assertNotIn("PROPOSED WORKOUT ADAPTATIONS", stdout)
         self.assertNotIn("Duration/RPE/TSS", stdout)
         self.assertNotIn("TEXT REVISED", stdout)
@@ -306,6 +306,56 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         self.assertIn(
             "Mon Jun 15: Gym: Heavy — 65 min (same session, wording updated)\n"
             "Same change as Fri Jun 12.", stdout,
+        )
+        self.assertEqual(stdout.count("Was: "), 1)
+
+    @patch("stamind.cli.workouts.adapt.ensure_recent_data")
+    @patch("stamind.runtime.coach_service")
+    def test_quoted_wording_is_whole_lines_with_their_blank_lines(
+        self, mock_coach, _mock_ensure
+    ):
+        """The quote used to be cut by sentence. One sentence left alone in the middle of a
+        rewritten bullet split it in two, so the second half opened mid-bullet, under no
+        section name, and the blank lines between the sections were dropped. Seen
+        2026-10-07 (DESIGN_workout_revisions.md §9.1)."""
+        original = {
+            "date": "2026-06-14", "sport_type": "cycling", "title": "Easy Ride + SIT",
+            "description": (
+                "[Easy Ride + SIT]\n"
+                "- Warm up at 150–170 W.\n"
+                "- Then 4 × 30 s all-out. Priority 1: go hard. Priority 2: hold on.\n"
+                "- Everything else stays under 175 W."
+            ),
+            "duration_minutes": 75, "rpe": 6, "tss": 60,
+        }
+        sectioned = dict(original, description=(
+            "[Easy Ride + SIT]\n"
+            "WARM-UP: ride at 150–170 W.\n\n"
+            "SPRINTS: 4 × 30 s all-out.\n"
+            "- No power target. Priority 1: go hard. Priority 2: hold on to the end.\n\n"
+            "EVERYTHING ELSE: 155–175 W."
+        ))
+        mock_coach.workout_adapt.return_value = RevisionProposal(
+            reason="Only the sprints go hard.", workouts=[sectioned], new_constraints=[],
+            range_start="2026-06-08", range_end="2026-06-30",
+            pairs=(RevisionPair(proposal=sectioned, original=original, is_swap=False),),
+        )
+
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
+            exit_code, stdout, _stderr = self.run_cli(["workout", "adapt"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn(
+            "Was: - Warm up at 150–170 W.\n"
+            "     - Then 4 × 30 s all-out. Priority 1: go hard. Priority 2: hold on.\n"
+            "     - Everything else stays under 175 W.\n"
+            "\n"
+            "Now: WARM-UP: ride at 150–170 W.\n"
+            "\n"
+            "     SPRINTS: 4 × 30 s all-out.\n"
+            "     - No power target. Priority 1: go hard. Priority 2: hold on to the end.\n"
+            "\n"
+            "     EVERYTHING ELSE: 155–175 W.", stdout,
         )
         self.assertEqual(stdout.count("Was: "), 1)
 

@@ -5,7 +5,6 @@ The expert table lives here; the companion prose form of the same proposal is
 (DESIGN_render_persona.md §7).
 """
 import difflib
-import re
 from typing import List, Set, Tuple
 
 from stamind import settings
@@ -16,10 +15,8 @@ from stamind.cli.common import print_strength_notes
 from stamind.coach.proposals import RevisionProposal
 from stamind.coach.revisions import RevisionPair
 
-_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
-
-# A group of the wording diff: the passage dropped and the passage that took its place, each
-# as the lines it stood on. Either side may be empty.
+# A group of the wording diff: the lines dropped and the lines that took their place, with
+# the blank lines that stood between them. Either side may be empty.
 WordingGroup = Tuple[List[str], List[str]]
 
 
@@ -53,41 +50,38 @@ def quotes_wording(proposal: dict, original: dict) -> bool:
     return rewritten_text_only(proposal, original) and not settings.terse()
 
 
-def _sentences(text) -> Tuple[List[str], Set[int]]:
-    """A description as sentences, and which of them open a line. Blank lines are layout, so
-    the diff ignores them."""
+def _lines(text) -> Tuple[List[str], Set[int]]:
+    """A description's lines, and which of them stand under a blank line. A blank line is
+    layout, so the diff does not compare it."""
     out: List[str] = []
-    opens: Set[int] = set()
+    spaced: Set[int] = set()
     for line in str(text or "").splitlines():
-        opens.add(len(out))
-        for sentence in _SENTENCE_END.split(line.strip()):
-            if sentence.strip():
-                out.append(sentence.strip())
-    return out, opens
-
-
-def _passage(sentences: List[str], opens: Set[int], start: int, end: int) -> List[str]:
-    """Sentences `start` to `end` on the lines they stood on, so a list of exercises or of
-    bullets keeps one item per line instead of running together."""
-    lines: List[str] = []
-    for index in range(start, end):
-        if index in opens or not lines:
-            lines.append(sentences[index])
+        if not line.strip():
+            spaced.add(len(out))
             continue
-        lines[-1] += f" {sentences[index]}"
-    return lines
+        out.append(" ".join(line.split()))
+    return out, spaced
+
+
+def _passage(lines: List[str], spaced: Set[int], start: int, end: int) -> List[str]:
+    """Lines `start` to `end`, with the blank lines that stood between them."""
+    out: List[str] = []
+    for index in range(start, end):
+        if index in spaced and out:
+            out.append("")
+        out.append(lines[index])
+    return out
 
 
 def wording_groups(proposal: dict, original: dict) -> List[WordingGroup]:
-    """What moved between two descriptions, as (dropped, replacement) sentence groups.
+    """What moved between two descriptions, as (dropped, replacement) groups of whole lines.
 
-    Groups rather than a line-per-sentence `-`/`+` listing: a reader wants "this passage
-    became that passage", and sign-prefixed lines lose their sign the moment a phone
-    re-flows them (DESIGN_workout_revisions.md §9.1)."""
-    a, a_opens = _sentences(original.get('description'))
-    b, b_opens = _sentences(proposal.get('description'))
+    Whole lines, and never a sentence cut out of one: a quoted bullet or section then comes
+    with its name and reads on its own (DESIGN_workout_revisions.md §9.1)."""
+    a, a_spaced = _lines(original.get('description'))
+    b, b_spaced = _lines(proposal.get('description'))
     return [
-        (_passage(a, a_opens, i1, i2), _passage(b, b_opens, j1, j2))
+        (_passage(a, a_spaced, i1, i2), _passage(b, b_spaced, j1, j2))
         for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b).get_opcodes()
         if tag != 'equal'
     ]
@@ -95,7 +89,8 @@ def wording_groups(proposal: dict, original: dict) -> List[WordingGroup]:
 
 def wording_group_lines(group: WordingGroup, indent: str = "") -> List[str]:
     """One group as a labelled 'Was:' / 'Now:' pair (or 'Dropped:' / 'Added:' when one
-    side is empty), wrapped at the client's width with the text hanging under its label."""
+    side is empty), wrapped at the client's width with the text hanging under its label.
+    A blank line parts the two when either side holds one."""
     dropped, added = group
     lines: List[str] = []
     if dropped:
@@ -104,6 +99,8 @@ def wording_group_lines(group: WordingGroup, indent: str = "") -> List[str]:
     if added:
         label = "Now: " if dropped else "Added: "
         lines.append(format_labeled_text(indent + label, "\n".join(added), color_fn=green))
+    if len(lines) == 2 and "" in dropped + added:
+        lines.insert(1, "")
     return lines
 
 

@@ -373,7 +373,8 @@ def format_labeled_text(
     wrapped_text = wrap_text(text, width=wrapped_width)
     if color_fn:
         wrapped_text = color_fn(wrapped_text)
-    indented_text = wrapped_text.replace('\n', '\n' + ' ' * indent_len)
+    # A blank line stays blank, with no indent on it.
+    indented_text = re.sub(r'\n(?!\n)', '\n' + ' ' * indent_len, wrapped_text)
     return f"{label}{indented_text}"
 
 
