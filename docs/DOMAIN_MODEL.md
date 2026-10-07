@@ -975,7 +975,7 @@ change after the restored version's newest write.
 | Command | What it does |
 |---|---|
 | `workout list` | Show planned sessions. Default 7-day forward window. `-v` adds each session's short form: its exercises and kilograms, or its zone target. `-vv` shows each session in full, lifecycle included. |
-| `workout show` | The same listing with `-vv` always on: `workout show 12` details one session. `-H/--history [DEPTH]` also shows the earlier forms the session had, newest first. |
+| `workout show` | The same listing with `-vv` always on: `workout show 12` details one session. With no argument it details today's sessions. `-H/--history [DEPTH]` also shows the earlier forms the session had, newest first. |
 | `workout compare` | Planned vs completed, with misses, rest violations and unplanned high load. Today's untrained sessions read *"not yet"* and are **not** misses. |
 | `workout generate` | Write the sessions for a span, from the mesocycles governing those days (details in §7). `--fresh` rewrites every day of the span, holding no session. `--strength-only` writes only the span's strength sessions again, and no other session changes. |
 | `workout adapt` | Daily readiness adjustment, within the current mesocycle only. `-m "note"` passes a free-text note in the same call, and the note is then kept with that day's session (`session_notes`). The coach decides what changes. |

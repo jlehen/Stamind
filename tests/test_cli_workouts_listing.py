@@ -259,6 +259,28 @@ class TestCliWorkoutsListing(unittest.TestCase):
         self.assertIn("Today Run", span_out)
         self.assertIn("30 mins easy", span_out)
 
+    def test_bare_workout_show_details_today_only(self):
+        """With no ID and no filter, `workout show` covers today, where `workout list`
+        covers seven days."""
+        today_date = datetime.now(timezone.utc).date()
+        save_workout(test_db,
+            date=today_date.strftime("%Y-%m-%d"), sport_type="running", title="Today Run",
+            description="30 mins easy",
+        )
+        save_workout(test_db,
+            date=(today_date + timedelta(days=1)).strftime("%Y-%m-%d"),
+            sport_type="cycling", title="Tomorrow Ride", description="60 mins",
+        )
+
+        exit_code, stdout, _ = self.run_cli(["workout", "show", "--no-pull"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("30 mins easy", stdout)
+        self.assertNotIn("Tomorrow Ride", stdout)
+
+        exit_code, stdout, _ = self.run_cli(["workout", "list", "--no-pull"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Tomorrow Ride", stdout)
+
     def test_workout_show_history_walks_the_lineage_to_the_depth_asked(self):
         """`workout show --history N` prints the session's earlier forms, newest first,
         and at most N of them; with no N it prints them all."""

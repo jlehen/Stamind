@@ -28,16 +28,17 @@ def _history_depth(value: str) -> int:
         raise argparse.ArgumentTypeError(f"expected a number or 'all', got '{value}'")
 
 
-def _add_listing_args(parser):
+def _add_listing_args(parser, default):
     """The targets, selectors and filters `workout list` and `workout show` share: one
-    listing, and only the per-workout detail lines differ (`show` always prints it)."""
+    listing, where `show` always prints the per-workout detail lines. `default` is the
+    days each one covers when the athlete names none."""
     parser.add_argument(
         "targets", nargs="*", metavar="TARGET", type=parse_target,
         help="Workout IDs and/or date selectors to show (e.g. '12 15', '2026-06-01..')"
     )
     add_selector_args(
         parser, meso=True, macro=True, goal=True, sport=True,
-        direction="forward", default="7d",
+        direction="forward", default=default,
     )
     parser.add_argument(
         "--link", "-l", action="store_true",
@@ -61,10 +62,11 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         parents=[pull_bypass_parser],
         help="Show all planned workouts",
         description=(
-            "List planned workouts chronologically. With no filter at all, shows a 7-day "
-            "window from today; with only --type, shows today onward. Name workout IDs or "
-            "dates as arguments to show just those (handy with -vv). Every listed session "
-            "dated today or earlier also carries what became of it — "
+            "List planned workouts chronologically. With no ID and no date, mesocycle, "
+            "macrocycle or goal filter, shows a 7-day window from today; --type alone keeps "
+            "one sport of that same window. Name workout IDs or dates as arguments to show "
+            "just those (handy with -vv). Every listed session dated today or earlier also "
+            "carries what became of it — "
             "[DONE]/[PARTIAL]/[MISSED]/[REST OK]/[REST BROKEN], or [NOT YET] for one still "
             "ahead of you today — and -vv names the effort it matched and what a [PARTIAL] "
             "differed by. Garmin data is freshened over that past span first unless "
@@ -72,7 +74,7 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         )
     )
     w_list.set_defaults(func=run_workout_list)
-    _add_listing_args(w_list)
+    _add_listing_args(w_list, default="7d")
     w_list.add_argument(
         "--verbose", "-v", action="count", default=0,
         help="-v adds a short form in gray under each session: the exercises and kilograms "
@@ -84,19 +86,18 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
     w_show = workout_subparsers.add_parser(
         "show",
         parents=[pull_bypass_parser],
-        help="Show named workouts in full detail",
+        help="Show today's workouts, or the named ones, in full detail",
         description=(
             "Show workouts with their full details: the description, when the session "
             "was planned and last adapted, the effort a past session was graded against, "
             f"and any adapt notes. Same output as '{green('workout list')} -vv', under a "
             "name that says what it does. Name workout IDs or dates as arguments "
             f"('{green('workout show')} 12'), and every filter '{green('workout list')}' "
-            "takes works here too. With no argument at all, it details the same 7-day "
-            "window that command lists."
+            "takes works here too. With no argument at all, it details today's sessions."
         )
     )
     w_show.set_defaults(func=run_workout_show)
-    _add_listing_args(w_show)
+    _add_listing_args(w_show, default="today")
     w_show.add_argument(
         "--history", "-H", nargs="?", type=_history_depth, const=0, default=None,
         metavar="DEPTH",
