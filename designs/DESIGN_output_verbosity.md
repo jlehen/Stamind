@@ -499,13 +499,28 @@ read of a few tens of KB rather than the whole retention window. The whole looku
 wrapped: an estimate is a courtesy, so a journal that cannot be read costs the athlete
 the number and never the call.
 
-### 8.4 The one call with no notice
+### 8.4 The calls with no notice
 
 `sm bot route` classifies free text before the real command starts. Its stdout is
 captured by `chat/runner.py`'s `_route_intent` and discarded but for the last JSON line, so a
 notice there reaches nobody and the journal read is pure waste on the hot path of every
 chat message. `complete(..., wait_notice=None)` turns it off, and that value is the
 place to say "nobody is waiting on this output" if a second such call ever appears.
+
+`bot morning` is the other case, and there the output does reach the athlete. The bot's
+scheduler starts it at the morning time, and with `adapt-first` on it asks the week
+planner, then the strength planner. The athlete did not ask for anything, so they are
+not waiting. It is 08:00 on Wednesday: the phone used to buzz with "Reviewing your
+coming sessions", buzz again with "Checking 4 strength sessions", and only then show the
+morning message. Now it shows the morning message alone.
+
+The same two calls keep their notice when the athlete starts them, for instance by
+tapping "Feeling tired" under that morning message. So the call site cannot decide with
+`wait_notice=None`. `bot morning` wraps its call in `openrouter_client.unannounced()`,
+which silences every notice made inside it.
+
+With no notice the flush of §7.3 sends no message, so the morning run has no Stop button
+either (`DESIGN_bot_stop_button.md` §4). The command timeout is what bounds it.
 
 ### 8.5 The terminal during the wait, and the keys pressed in it
 

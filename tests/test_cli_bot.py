@@ -313,6 +313,25 @@ class MorningPushTest(unittest.TestCase):
         coach.workout_revision_apply.assert_not_called()
         self.assertNotIn("All green.", out)
 
+    def test_the_morning_calls_are_not_announced_in_the_chat(self):
+        """The scheduler starts the push, so nobody is waiting on the week planner or the
+        strength planner: no "Reviewing your coming sessions" (DESIGN_output_verbosity.md
+        §8.4)."""
+        from stamind.openrouter import openrouter_client
+        announced = []
+
+        def adapt(*_args, **_kwargs):
+            announced.append(openrouter_client.announces_wait)
+            return MagicMock(workouts=[], reason="", strength_notice=None)
+
+        coach = MagicMock()
+        coach.workout_adapt.side_effect = adapt
+        cfg, svc, pull = self._adapt_first_env(coach)
+        with cfg, svc, pull:
+            run_cli(["bot", "morning"])
+        self.assertEqual(announced, [False])
+        self.assertTrue(openrouter_client.announces_wait)
+
     def test_adapt_failure_does_not_sink_the_push(self):
         save_workout(test_db, today_str(), "running", "Easy run")
         coach = MagicMock()

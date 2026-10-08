@@ -31,6 +31,7 @@ from stamind.cli.runway import current_runway, runway_buttons, schedule_exhauste
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.workouts.heads_up import newest_written
 from stamind.db.objectives import GOAL_ARCHIVED, GOAL_UPCOMING, goal_state
+from stamind.openrouter import openrouter_client
 from stamind.sentinels import emit_buttons, emit_flush
 from stamind.sports import canonical_sport
 from stamind.strength.sets import read_new_activities
@@ -185,9 +186,12 @@ def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str
         # The proposal that still waits is shown to the week planner, and a new one
         # replaces it (DESIGN_waiting_proposal.md §6.2).
         still_open = saved_proposal.open_proposal()
-        proposal = runtime.coach_service.workout_adapt(
-            date_str, **saved_proposal.shown_to_week_planner(still_open)
-        )
+        # Nobody asked for this run, so the chat is not told it is waiting
+        # (DESIGN_output_verbosity.md §8.4).
+        with openrouter_client.unannounced():
+            proposal = runtime.coach_service.workout_adapt(
+                date_str, **saved_proposal.shown_to_week_planner(still_open)
+            )
         if not proposal.workouts:
             runtime.coach_service.workout_revision_record_no_change(proposal)
             return proposal.strength_notice, None

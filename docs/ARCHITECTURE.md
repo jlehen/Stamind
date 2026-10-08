@@ -187,7 +187,8 @@ classes themselves.
     instead of the library's full traceback.
   - **Stopping a coach call.** Every model call emits `SM-FLUSH` right after its wait
     notice ("Reviewing your coming sessions — this usually takes about 40 seconds.");
-    the bot attaches a `✋ Stop` inline button to the message that flush sends, with
+    the bot attaches a `✋ Stop` inline button to the message that flush sends (none
+    in `bot morning`, which prints no notice), with
     `callback_data` `stop:{nonce}` naming the running command. Tapping it kills that
     command's subprocess, in whichever place of the chat it runs, and replies "Stopped.";
     the button is
@@ -383,7 +384,10 @@ classes themselves.
     all until two past calls exist. A terminal gets the same number folded into the aside
     it already prints, then `output.Spinner` ticks a clock on one self-erasing line until
     the reply lands (§8.5). `complete(..., wait_notice=None)` suppresses it for
-    `sm bot route`, whose output nobody reads (DESIGN_output_verbosity.md §8, §8.6).
+    `sm bot route`, whose output nobody reads. `bot morning` makes its calls inside
+    `openrouter_client.unannounced()`, which suppresses it too: the scheduler started
+    that run, so the athlete is not waiting on it, and the same calls stay announced when
+    the athlete starts them (DESIGN_output_verbosity.md §8, §8.4, §8.6).
   - **The athlete queue:** a fifth one-way sentinel, `QUEUE_SENTINEL`/`emit_queue_item`
     (`\x1eSM-QUEUE {json}`), carries one queued question or message
     (`stamind/athlete_queue.py`, DESIGN_athlete_queue.md). Its text and buttons have one

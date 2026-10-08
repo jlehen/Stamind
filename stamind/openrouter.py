@@ -4,8 +4,9 @@ import os
 import re
 import statistics
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 from stamind import journal
 from stamind.config import config
 from stamind.sentinels import emit_flush, is_json_frontend
@@ -48,6 +49,8 @@ class OpenRouterClient:
         # call would send and stop, rather than spend the call. Declared here so the two
         # readers ask an attribute that exists instead of guarding with a default.
         self.show_prompt_only: bool = False
+        # False while a run the athlete did not start makes its calls (`unannounced`).
+        self.announces_wait: bool = True
 
     @property
     def model(self) -> str:
@@ -232,6 +235,16 @@ class OpenRouterClient:
             return None
         return statistics.median(samples) / 1000.0
 
+    @contextmanager
+    def unannounced(self) -> Iterator[None]:
+        """Makes the calls inside it without the chat's wait notice, for a run the athlete
+        did not start and so is not waiting on (DESIGN_output_verbosity.md §8.4)."""
+        self.announces_wait = False
+        try:
+            yield
+        finally:
+            self.announces_wait = True
+
     def _announce_wait(self, label: str, notice: Optional[str]) -> None:
         """Says the command is about to go quiet, and for roughly how long
         (DESIGN_output_verbosity.md §8).
@@ -248,7 +261,7 @@ class OpenRouterClient:
             seconds = None
         took = f" (past runs: ~{_human_wait(seconds)})" if seconds else ""
         aside(f"Querying OpenRouter with model: {self.model}{took}")
-        if not notice or not is_json_frontend():
+        if not notice or not self.announces_wait or not is_json_frontend():
             return
         if seconds:
             print(f"{notice} — this usually takes about {_human_wait(seconds)}.")

@@ -339,6 +339,14 @@ class TestWaitNotice(unittest.TestCase):
         self.assertNotIn(self.NOTICE, out)
         self.assertNotIn("this usually takes", out)
 
+    def test_a_run_nobody_started_says_nothing_to_the_chat(self):
+        # `bot morning`: the scheduler started it, so no athlete is waiting on it (§8.4).
+        with self.client.unannounced():
+            out = self._announce("json", [40000, 44000])
+        self.assertNotIn(self.NOTICE, out)
+        # The next call the athlete starts is announced again.
+        self.assertIn(self.NOTICE, self._announce("json", [40000, 44000]))
+
     def test_one_sample_is_not_history(self):
         # A single past call is as likely to be an outlier as a typical one.
         self.assertIsNone(self._wait_estimate([40000]))
