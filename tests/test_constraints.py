@@ -248,7 +248,7 @@ class TestRestWindowPrePass(unittest.TestCase):
         )
 
     def test_generate_advisory_is_untouched(self):
-        """An advisory constraint (rest=0) — which is every non-rest directive, including
+        """An advisory constraint (rest=0) — which is every non-rest constraint, including
         the old hard+sport case — is left entirely to the LLM; the pre-pass never rewrites
         the generated list for it (§5/§6)."""
         workouts = [

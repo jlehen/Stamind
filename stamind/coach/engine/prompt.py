@@ -112,10 +112,10 @@ class PromptBuildMixin:
 
     @staticmethod
     def _render_constraints(constraints: List[Constraint]) -> str:
-        """Renders active directives for the prompt, one per line (DESIGN_constraints.md
-        §6): `title | dates | [enforcement] | description`. A `rest` directive is already
+        """Renders active constraints for the prompt, one per line (DESIGN_constraints.md
+        §6): `title | dates | [enforcement] | description`. A `rest` constraint is already
         enforced deterministically before the LLM runs (the rest pre-pass forces those
-        dates to rest), so it appears here only as context; every other directive is
+        dates to rest), so it appears here only as context; every other constraint is
         advisory prose the coach honors via judgement — the title says what to work
         around, and the LLM is trusted to honor it and choose any substitute itself."""
         lines = ""
@@ -207,7 +207,7 @@ principles.
 ## ACTIVE ATHLETE GOALS (CHRONOLOGICAL)
 {obj_text if obj_text else "No active goals."}
 
-## ACTIVE CONSTRAINTS (athlete-declared directives to work around)
+## ACTIVE CONSTRAINTS (what the athlete asked the coach to work around)
 {c_text if c_text else "No active constraints."}
 
 ## WRITING FOR THE ATHLETE

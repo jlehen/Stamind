@@ -83,7 +83,7 @@ Three rules go with them:
   message now agree on more than the words.
 
 A parenthetical gloss may ride on the heading line where it says what the section *is*
-(`## ACTIVE CONSTRAINTS (athlete-declared directives to work around)`). Anything that does
+(`## ACTIVE CONSTRAINTS (what the athlete asked the coach to work around)`). Anything that does
 not fit the project's 100-character wrap is body text, on its own line below the heading —
 `## PLANNED WORKOUTS` used to carry three paragraphs of instruction inside its heading, and
 `## ATHLETE-SPECIFIC OBSERVATIONS` carried a line break, which is not a heading at all.

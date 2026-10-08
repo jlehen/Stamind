@@ -90,7 +90,7 @@ def _past_constraints_task(past_constraints: Optional[List[Constraint]]) -> str:
         return ""
     return """
 ### WHAT ALREADY HAPPENED IN THIS MESOCYCLE
-The user content includes a section titled "CONSTRAINTS EARLIER IN THIS MESOCYCLE": directives
+The user content includes a section titled "CONSTRAINTS EARLIER IN THIS MESOCYCLE": constraints
 whose dates have passed but which fall inside the mesocycle the athlete is in. They are not
 yours to work around any more — they explain the mesocycle's record. A week that shows far less
 training than it was planned was often a week under one of these, and reading it as the

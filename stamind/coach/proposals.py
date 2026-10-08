@@ -51,7 +51,7 @@ class RevisionProposal:
     kind: str = "adapt"
     pairs: Tuple[RevisionPair, ...] = ()
     removals: Tuple[Dict[str, Any], ...] = ()
-    # Candidate directives extracted from the athlete's note, raw and unconfirmed
+    # Candidate constraints extracted from the athlete's note, raw and unconfirmed
     # (DESIGN_constraints.md §8).
     new_constraints: Tuple[Dict[str, Any], ...] = ()
     # Candidate daily signals extracted from the same note, raw and unconfirmed

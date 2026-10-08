@@ -4,7 +4,7 @@ from stamind.types import Constraint
 
 
 class ConstraintsMixin:
-    """Constraints CRUD — the single directive object (DESIGN_constraints.md §5).
+    """Constraints CRUD (DESIGN_constraints.md §5).
 
     A constraint is anything the athlete asks the coach to work around, at any
     horizon. Deterministic code reads `start_date`/`end_date` (window queries),
@@ -108,7 +108,7 @@ class ConstraintsMixin:
             conn.commit()
 
     def clear_honored(self, constraint_id: int) -> None:
-        """Re-arms the sweep: the window moved or the directive changed (§8)."""
+        """Re-arms the sweep: the window moved or the constraint changed (§8)."""
         with self._get_connection() as conn:
             conn.cursor().execute(
                 "UPDATE constraints SET honored_at = NULL WHERE id = ?", (constraint_id,)

@@ -174,7 +174,7 @@ def clean_constraints(constraints: List[Constraint]) -> List[Dict[str, Any]]:
 
     Single source of truth for both the constraints_hash fingerprint and the snapshot
     persisted on the macrocycle (see `clean_goals`). Fed only the plan-shaping
-    (`replan = 1`) constraints by the caller, so tactical directives don't flag the
+    (`replan = 1`) constraints by the caller, so tactical constraints don't flag the
     plan stale (DESIGN_constraints.md §7).
     """
     cleaned = []
@@ -195,7 +195,7 @@ def clean_constraints_all(constraints: List[Constraint]) -> List[Dict[str, Any]]
     """Every active constraint, tagged with its `replan` flag — display only.
 
     `clean_constraints` above is fed only the `replan = 1` subset, so the plan's
-    staleness fingerprint and snapshot never see a tactical directive. But the prompt
+    staleness fingerprint and snapshot never see a tactical constraint. But the prompt
     (`_plan_generate_strategy`) renders *every* active constraint, so a `plan show`
     that reads only the fingerprinted subset can print "Constraints considered: None"
     while a tactical constraint plainly shaped the strategy. This is the same cleaning

@@ -75,9 +75,9 @@ unstamped — so the nudge re-offered it forever. `tests/test_service_invariants
 method returning a `*Proposal` that touches the database, so the shape cannot come back.
 
 **Cleared** by `constraint edit` whenever `start_date`, `end_date`, `rest`, `title` or
-`description` changes. The window moved, or the directive changed — and for an advisory
+`description` changes. The window moved, or the constraint changed — and for an advisory
 constraint the prose *is* the enforcement mechanism (DESIGN_constraints.md §5), so new words are
-a new directive a previous honoring says nothing about.
+a new constraint a previous honoring says nothing about.
 
 **Cleared, too, by a rollback that resurrects sessions older than the honoring.** Both rollbacks
 restore a batch keyed by its stamp, and a constraint honored into sessions *newer* than the ones
@@ -112,7 +112,7 @@ stop.
 
 ## 4. One predicate, four surfaces
 
-*Does the schedule reflect this directive yet, and is there anything to be done about it?* —
+*Does the schedule reflect this constraint yet, and is there anything to be done about it?* —
 `honoring.needs_a_pass`, read by the `status` line, `constraint list`, `constraint show` and
 the add-time nudge. Four terms, cheapest first:
 
@@ -124,7 +124,7 @@ the add-time nudge. Four terms, cheapest first:
 | **the window holds at least one session** | **nothing to reshuffle** |
 
 The window is the constraint's own dates clipped to **tomorrow**: today is the day
-`workout adapt` judges with the full metrics picture, and a directive whose last day is today
+`workout adapt` judges with the full metrics picture, and a constraint whose last day is today
 belongs to that run, not to a nudge about the future.
 
 The last term is what keeps the nudge honest. A window with no sessions in it has nothing to
@@ -135,7 +135,7 @@ window, because nothing has been generated there yet.
 **That these surfaces ask one function is the whole point, and the first pass did not do it.**
 The rule was written out at each site — a SQL `WHERE` in one reader, an early return in the
 nudge, a date comparison in each of the two renderers — and the renderers were written without
-the `replan` term, so `constraint show` flagged exactly the directives the others deliberately
+the `replan` term, so `constraint show` flagged exactly the constraints the others deliberately
 skip. The predicate has one owner in `coach/honoring.py`; there is deliberately no SQL half-copy
 of it in `db/constraints.py`, since that layer cannot see `coach` and a partial copy is what went
 wrong. `tests/test_constraints_honored.py` drives all four surfaces over the same three
@@ -195,7 +195,7 @@ the case is not re-argued from scratch.
 **`workout generate` already honors constraints, by the same two mechanisms.** Rest windows are
 forced deterministically by `_enforce_rest_windows_generate`; advisory constraints reach the model
 through the shared ACTIVE CONSTRAINTS prompt section; and `get_constraints(gen_start)` is
-open-ended, so every stored directive from today onward is in scope. That is not a weaker
+open-ended, so every stored constraint from today onward is in scope. That is not a weaker
 honoring than a dedicated tier's — it is the same one.
 
 **On the quality of the sessions it is the stronger tool.** A window pass was metric-blind on

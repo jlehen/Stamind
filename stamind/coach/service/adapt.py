@@ -128,7 +128,7 @@ class AdaptMixin:
 
         `message` is an optional free-text note from the athlete, passed to the SAME LLM
         call as advisory intent for today (DESIGN_constraints.md §8 — no separate
-        classification pass). That one call may also extract constraint-shaped directives
+        classification pass). That one call may also extract constraint candidates
         from the note; they come back as the third element, raw and UNCONFIRMED — the
         caller must confirm each with the athlete (echo + y/N) before persisting it via
         `capture_message_constraint`, per the two-confirmation flow. Nothing here creates
@@ -260,7 +260,7 @@ class AdaptMixin:
             next_goal = objectives[0]
 
         # Active constraints overlapping the adaptation window (target date → mesocycle
-        # end), the single directive read path shared with generate (§6).
+        # end), the single constraint read path shared with generate (§6).
         constraints = self._db.get_constraints(target_date_str, range_end)
         ctx = self._coach_context(
             constraints, objectives=objectives,
@@ -271,7 +271,7 @@ class AdaptMixin:
 
         # §8: the athlete's note is passed straight through as advisory intent — no
         # separate classification pass. The same LLM call also extracts any
-        # constraint-shaped directives from it (see `new_constraints` below).
+        # constraint candidates from it (see `new_constraints` below).
         pmc_cutoff, pmc_context = self._pmc_prompt_context(target_date_str)
         # The mesocycle's measured intensity distribution — adapt's primary view, since drift
         # caught in week 2 is correctable and drift diagnosed at plan-generation time is
@@ -396,7 +396,7 @@ class AdaptMixin:
             if date not in forced_rest or (date, sport) in completed_keys
         ]
 
-        # §8: constraint-shaped directives the same LLM call extracted from the athlete's
+        # §8: constraint candidates the same LLM call extracted from the athlete's
         # note, if any — raw and UNCONFIRMED. The caller must confirm each with the
         # athlete before persisting it (via capture_message_constraint); nothing here
         # writes a row.

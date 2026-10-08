@@ -1,10 +1,9 @@
-"""Handlers for the `constraint` command — the single directive object
-(DESIGN_constraints.md). A constraint is anything the athlete asks the coach to work
-around, at any horizon: hard availability, capacity/intensity caps, soft preferences,
-or big disruptions. It replaces `lifeevent` and gives `workout adapt --message` a typed
-home to land in.
+"""Handlers for the `constraint` command (DESIGN_constraints.md). A constraint is anything
+the athlete asks the coach to work around, at any horizon: hard availability,
+capacity/intensity caps, soft preferences, or big disruptions. It replaces `lifeevent` and
+gives `workout adapt --message` a typed home to land in.
 
-Plan-invalidation is never an authoring-time category: `add`/`edit` derive a directive's
+Plan-invalidation is never an authoring-time category: `add`/`edit` derive a constraint's
 magnitude against the active plan and, when it crosses a conservative threshold, *propose*
 a human-confirmed replan (§7). Nothing here regenerates a plan without a `y`.
 """
@@ -126,7 +125,7 @@ def _maybe_replan(constraint_id: int, title: str, replan_flag: Optional[bool]) -
     """Handles the §7 plan-invalidation decision after an add/edit.
 
     `replan_flag` pre-answers the proposal: True (--replan) escalates and enters the
-    regen flow; False (--no-replan) declines. When it is None, the directive's magnitude
+    regen flow; False (--no-replan) declines. When it is None, the constraint's magnitude
     against the active plan decides whether to *ask*; only a human `y` sets replan = 1 and
     regenerates."""
     if replan_flag is False:
@@ -170,7 +169,7 @@ def _maybe_replan(constraint_id: int, title: str, replan_flag: Optional[bool]) -
 
 
 def _replan_targets(constraint: dict) -> Optional[IdRange]:
-    """The goals a replan of this directive would rebuild — the ones whose own span holds
+    """The goals a replan of this constraint would rebuild — the ones whose own span holds
     the disrupted days (DESIGN_constraints.md §7). None when no goal's span does."""
     return goal_range_for_window(constraint['start_date'], constraint['end_date'])
 
@@ -194,7 +193,7 @@ def _report_nothing_to_replan(constraint: dict) -> None:
 
 
 def _run_replan_flow(title: str, constraint: dict) -> None:
-    """Escalates a directive to plan-shaping and runs the existing plan-generate confirm
+    """Escalates a constraint to plan-shaping and runs the existing plan-generate confirm
     flow (each step of which still confirms before applying).
 
     It rebuilds the goals whose own span holds the disrupted days, so a window straddling
@@ -217,7 +216,7 @@ def _run_replan_flow(title: str, constraint: dict) -> None:
 
 
 def run_constraint_add(args: argparse.Namespace) -> None:
-    """Authors a directive over a day or range (DESIGN_constraints.md §4)."""
+    """Authors a constraint over a day or range (DESIGN_constraints.md §4)."""
     title = args.title
     start, end = _resolve_dates(args)
 
@@ -236,7 +235,7 @@ def run_constraint_add(args: argparse.Namespace) -> None:
 
 
 def run_constraint_edit(args: argparse.Namespace) -> None:
-    """Adjusts scope / rest / text / replan of an existing directive."""
+    """Adjusts scope / rest / text / replan of an existing constraint."""
     constraint = runtime.db.get_constraint(args.id)
     if not constraint:
         notice(f"Constraint with ID {args.id} not found.", red)
@@ -264,9 +263,9 @@ def run_constraint_edit(args: argparse.Namespace) -> None:
         kwargs['replan'] = 1 if args.replan else 0
 
     runtime.db.update_constraint(args.id, **kwargs)
-    # The window moved, or the directive itself changed — and for an advisory constraint
+    # The window moved, or the constraint itself changed — and for an advisory constraint
     # the prose IS the enforcement mechanism (DESIGN_constraints.md §5), so new words are a
-    # new directive a previous honoring says nothing about (§8). `replan` alone does not
+    # new constraint a previous honoring says nothing about (§8). `replan` alone does not
     # clear: it escalates the tier, it does not restate what to work around.
     if any(k in kwargs for k in ('start_date', 'end_date', 'rest', 'title', 'description')):
         runtime.db.clear_honored(args.id)
@@ -282,9 +281,9 @@ def run_constraint_edit(args: argparse.Namespace) -> None:
 
 
 def run_constraint_list(args: argparse.Namespace) -> None:
-    """Lists directives from the start of the current mesocycle onward — the training mesocycle
+    """Lists constraints from the start of the current mesocycle onward — the training mesocycle
     being planned — plus everything upcoming (open-ended). --all drops the lower bound and
-    shows every directive, past included; a selector (-d/-m/-M/-g) sets the window
+    shows every constraint, past included; a selector (-d/-m/-M/-g) sets the window
     explicitly (§4). With no active mesocycle to anchor on (no plan yet), every constraint
     is shown."""
     if getattr(args, 'all', False):
@@ -310,7 +309,7 @@ def run_constraint_list(args: argparse.Namespace) -> None:
 
 
 def run_constraint_show(args: argparse.Namespace) -> None:
-    """Displays a directive in detail, including whether it is plan-shaping (§7)."""
+    """Displays a constraint in detail, including whether it is plan-shaping (§7)."""
     constraint = runtime.db.get_constraint(args.id)
     if not constraint:
         notice(f"Constraint with ID {args.id} not found.", red)
@@ -340,7 +339,7 @@ def run_constraint_show(args: argparse.Namespace) -> None:
 
 
 def run_constraint_rm(args: argparse.Namespace) -> None:
-    """Removes a directive by ID."""
+    """Removes a constraint by ID."""
     if not runtime.db.get_constraint(args.id):
         notice(f"No constraint with ID {args.id}.")
         return
@@ -362,12 +361,11 @@ def run_constraint_wipe(args: argparse.Namespace) -> None:
 
 
 def add_constraint_parser(subparsers):
-    # constraint command & subparsers — the single directive object
-    # (DESIGN_constraints.md). Everything the athlete asks the coach to work around, at
-    # any horizon; supersedes `lifeevent`.
+    # constraint command & subparsers (DESIGN_constraints.md). Everything the athlete asks
+    # the coach to work around, at any horizon; supersedes `lifeevent`.
     constraint_parser = subparsers.add_parser(
         "constraint",
-        help="Author/list directives the coach works around (availability, caps, "
+        help="Author/list constraints the coach works around (availability, caps, "
              "preferences, disruptions)",
         description=(
             "Manage constraints — anything you ask the coach to work around, at any "
@@ -410,10 +408,10 @@ def add_constraint_parser(subparsers):
 
     # constraint add
     cons_add = constraint_subparsers.add_parser(
-        "add", help="Author a directive over a day or range"
+        "add", help="Author a constraint over a day or range"
     )
     cons_add.set_defaults(func=run_constraint_add)
-    cons_add.add_argument("title", help="The directive, stated short "
+    cons_add.add_argument("title", help="The constraint, stated short "
                           "(e.g. 'no run Thursday')")
     cons_add.add_argument("--start", help="Start date (YYYY-MM-DD; default: today)")
     cons_add.add_argument("--end", help="End date (YYYY-MM-DD; default: --start)")
@@ -428,7 +426,7 @@ def add_constraint_parser(subparsers):
     )
     cons_edit.set_defaults(func=run_constraint_edit)
     cons_edit.add_argument("id", type=int, help="Constraint ID to edit")
-    cons_edit.add_argument("--title", help="New directive title")
+    cons_edit.add_argument("--title", help="New constraint title")
     cons_edit.add_argument("--start", help="New start date (YYYY-MM-DD)")
     cons_edit.add_argument("--end", help="New end date (YYYY-MM-DD)")
     cons_edit.add_argument("--desc", "--description", dest="desc",
@@ -439,20 +437,20 @@ def add_constraint_parser(subparsers):
     # constraint list
     cons_list = constraint_subparsers.add_parser(
         "list",
-        help="List directives from the current mesocycle onward",
+        help="List constraints from the current mesocycle onward",
         description=(
-            "List directives the coach works around. By default, shows everything from the "
+            "List constraints the coach works around. By default, shows everything from the "
             "start of the current mesocycle onward, plus "
-            "all upcoming directives. With no active mesocycle to anchor on (no plan yet), "
-            "shows every constraint. Use --all to include past directives too, or "
+            "all upcoming constraints. With no active mesocycle to anchor on (no plan yet), "
+            "shows every constraint. Use --all to include past constraints too, or "
             "-d/-m/-M/-g to set the window explicitly."
         ),
     )
     cons_list.set_defaults(func=run_constraint_list)
     cons_list.add_argument("-v", "--verbose", action="store_true",
-                           help="Show details for each directive")
+                           help="Show details for each constraint")
     cons_list.add_argument("-a", "--all", action="store_true",
-                           help="Show every directive, past ones included (drop the "
+                           help="Show every constraint, past ones included (drop the "
                                 "mesocycle lower bound)")
     # No default window here: with no selector at all the handler anchors on the current
     # mesocycle, which is not a date the parser could name (DESIGN_constraints.md §4).
@@ -460,14 +458,14 @@ def add_constraint_parser(subparsers):
 
     # constraint show
     cons_show = constraint_subparsers.add_parser(
-        "show", help="Show one directive in detail (incl. plan-shaping)"
+        "show", help="Show one constraint in detail (incl. plan-shaping)"
     )
     cons_show.set_defaults(func=run_constraint_show)
     cons_show.add_argument("id", type=int, help="Constraint ID to display")
 
     # constraint rm
     cons_rm = constraint_subparsers.add_parser(
-        "rm", help="Remove a directive by ID"
+        "rm", help="Remove a constraint by ID"
     )
     cons_rm.set_defaults(func=run_constraint_rm)
     cons_rm.add_argument("id", type=int, help="Constraint ID to remove")

@@ -15,7 +15,7 @@ class Objective(TypedDict):
     date_type: str  # 'event' | 'horizon'
 
 class Constraint(TypedDict):
-    """A single directive — anything the athlete asks the coach to work around, at
+    """A single constraint — anything the athlete asks the coach to work around, at
     any horizon (DESIGN_constraints.md §5).
 
     `rest` (1 = a deterministic full no-training window, the one enforced edge) and

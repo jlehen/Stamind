@@ -456,7 +456,7 @@ class RouteCommandTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(self._intent(out), "unclear")
 
-    def test_the_router_reads_goal_and_rule_titles_beside_the_message(self):
+    def test_the_router_reads_goal_and_constraint_titles_beside_the_message(self):
         from datetime import date, timedelta
         soon = (date.fromisoformat(today_str()) + timedelta(days=4)).isoformat()
         test_db.add_objective(
@@ -559,9 +559,9 @@ class ConstraintsViewTest(unittest.TestCase):
         self.assertIn(f"constraint rm {cid}", out)
 
     def test_past_constraints_stay_out_of_the_view(self):
-        self._add("old rule", start="2020-01-01", end="2020-01-02")
+        self._add("old constraint", start="2020-01-01", end="2020-01-02")
         _, out, _ = run_cli(["bot", "constraints"])
-        self.assertNotIn("old rule", out)
+        self.assertNotIn("old constraint", out)
         self.assertIn("Nothing on the list", out)
 
     def test_picker_leaves_reach_only_single_id_rm(self):

@@ -15,6 +15,10 @@
   planner** is the call inside `workout generate` and `workout adapt` that writes the sessions,
   the **strength planner** is the call that writes a strength session. "The coach" is Stamind
   speaking to the athlete, whichever call wrote the words.
+- A **constraint** is what the athlete asks the coach to work around from one date to
+  another (the `constraints` table, `sm constraint add`). Never say "rule" or "directive"
+  for it, in the chat's texts included. A sentence with no end date ("no gym on Fridays,
+  ever") is not a constraint: it is a **preference**, kept in the athlete's profile.
 - A **brief** is the week planner's description of a strength day: what the session is for
   and what the plan asks of it, with no exercise, set, rep or load in it. The strength
   planner writes the session under it (DESIGN_strength_tracking.md §9).

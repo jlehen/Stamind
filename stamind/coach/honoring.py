@@ -1,6 +1,6 @@
 """Whether the schedule reflects a constraint yet, and who may say that it does.
 
-`constraints.honored_at` means: *a coach pass had this directive in scope, with authority
+`constraints.honored_at` means: *a coach pass had this constraint in scope, with authority
 over every day of it still ahead* (DESIGN_constraint_honoring.md §2). Two rules follow
 from it and both live here rather than being restated at each site:
 
@@ -8,7 +8,7 @@ from it and both live here rather than being restated at each site:
   different ranges (`covers`/`covered_ids`/`stamp`).
 * **whether the schedule is missing it** — `needs_a_pass`, asked by the `status` line,
   `constraint list`/`show` and the add-time nudge. Hand-written copies of that rule are
-  how `constraint show` came to flag exactly the plan-shaping directives the `status`
+  how `constraint show` came to flag exactly the plan-shaping constraints the `status`
   line deliberately skips.
 """
 from datetime import datetime, timedelta
@@ -41,11 +41,11 @@ def constraint_window(
 
 
 def needs_a_pass(db: Any, constraint: Constraint, today: str) -> bool:
-    """Whether the schedule is missing this directive and something could still be done about
+    """Whether the schedule is missing this constraint and something could still be done about
     it (DESIGN_constraint_honoring.md §2).
 
     Four terms, cheapest first. Already stamped and there is nothing to report. A
-    `replan = 1` directive is built into the plan by `plan generate`, so it is unstamped
+    `replan = 1` constraint is built into the plan by `plan generate`, so it is unstamped
     but not unhandled. A window with nothing left of it is adapt's day only. And a window
     holding no sessions has nothing to reshuffle, so naming it would be a nudge the
     athlete can act on in no way at all.
@@ -61,7 +61,7 @@ def needs_a_pass(db: Any, constraint: Constraint, today: str) -> bool:
 
 
 def constraints_needing_a_pass(db: Any, today: str) -> List[Constraint]:
-    """Every directive the schedule does not reflect yet, oldest first.
+    """Every constraint the schedule does not reflect yet, oldest first.
 
     The `status` count comes from this one call, so every screen that reports the gap
     reports the same set.

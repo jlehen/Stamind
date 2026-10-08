@@ -1,7 +1,7 @@
 """`bot capture <intent>`: the write path behind the free-text router (§12.2).
 
 The intents this command answers, and the dispatch between them. `note` is the inbox for
-a rule or a signal the athlete states (§12.3), `add_goal` sets up a new goal (§12.5), and
+a constraint or a signal the athlete states (§12.3), `add_goal` sets up a new goal (§12.5), and
 `change_setting` changes one of the chat knobs on the `ROUTABLE_SETTINGS` allowlist
 (§12.7). The two edit intents are the long ones and live in `edit.py`, and `test_result`
 lives with its queue kind in `test_result.py` (DESIGN_benchmark_from_chat.md).
@@ -64,7 +64,7 @@ def _note_capture_prompt(today: str, earliest: str) -> str:
         + dated_context(today) + "\n\n"
         + "Write down the durable records this message states, and nothing else. A message\n"
         "that states no durable record leaves BOTH lists empty — that is a correct answer\n"
-        "and the app handles it. Do not stretch a passing remark into a rule.\n"
+        "and the app handles it. Do not stretch a passing remark into a constraint.\n"
         + NEVER_FILL_RULE
         + constraint_extraction_task("This is one half of the job.")
         + signal_extraction_task(vocabulary, earliest)
@@ -97,7 +97,7 @@ def run_bot_capture_note(text: str) -> None:
     captured = confirm_new_constraints(constraints, today, text)
     logged = confirm_new_signals(signal_rows, today)
     if not captured and not logged:
-        # A rule for good was handed to the operator and nothing else was stored: today's
+        # A preference for good was handed to the operator and nothing else was stored: today's
         # half of it is still the coach's, one tap away (§12.3, 2026-09-16).
         if any(open_ended(c) for c in constraints):
             emit_buttons([send_to_coach_button(text)])

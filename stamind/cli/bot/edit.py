@@ -84,9 +84,9 @@ GOAL_EDIT_FIELDS = (
 )
 
 CONSTRAINT_EDIT_FIELDS = (
-    '  "title": the rule restated, "start_date"/"end_date": "YYYY-MM-DD",\n'
-    '  "description": free text. Whether a rule forces rest, or reshapes the plan, is NOT\n'
-    "  yours to change here — leave those out entirely."
+    '  "title": the constraint restated, "start_date"/"end_date": "YYYY-MM-DD",\n'
+    '  "description": free text. Whether a constraint forces rest, or reshapes the plan, is\n'
+    "  NOT yours to change here — leave those out entirely."
 )
 
 
@@ -231,7 +231,7 @@ def _offer_session_handoff(
         no_find(text)
         return
     named = simple_session_line(session, lead=simple_day_word(session["date"], today))
-    noun = "goal" if domain == "goal" else "rule"
+    noun = "goal" if domain == "goal" else "constraint"
     if not runtime.prompt.confirm(SESSION_HANDOFF_ASK.format(noun=noun, named=named)):
         print("Okay — I'll leave it.")
         return

@@ -130,7 +130,7 @@ WEEK_CHANGED_LINE = (
 
 
 def _confirm_candidates(proposal, date_str: str, message: Optional[str]) -> None:
-    """Asks about each rule and each daily signal the note produced (DESIGN_constraints.md
+    """Asks about each constraint and each daily signal the note produced (DESIGN_constraints.md
     §8, DESIGN_signal_extraction.md §2). The same call that wrote the proposal extracted
     them, so the note informed this run whatever the answers; a signal confirmed here
     informs the next run. `bot capture note` asks the same questions through
@@ -255,7 +255,7 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
             runtime.db.add_session_note(note_session['id'], args.message)
             runtime.render.session_note_kept(note_session, date_str)
 
-        # The questions about a rule or a signal found in the note. A terminal asks them
+        # The questions about a constraint or a signal found in the note. A terminal asks them
         # before the preview (DESIGN_constraints.md §8). The chat asks them after the
         # proposal, or after the line that says nothing changes, so a question nobody
         # answers cannot hold the proposal back (DESIGN_waiting_proposal.md §6.1).

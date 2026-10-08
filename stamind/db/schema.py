@@ -73,7 +73,7 @@ class SchemaMixin:
                 )
             """)
 
-            # Unified directives — everything the athlete asks the coach to work around, at
+            # Constraints — everything the athlete asks the coach to work around, at
             # any horizon (DESIGN_constraints.md §5). A constraint is advisory prose the coach
             # reads unless `rest = 1`, the single deterministic edge: a no-training window
             # whose dates skip the LLM and are forced to rest. `replan` marks one escalated to

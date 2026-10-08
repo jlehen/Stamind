@@ -634,7 +634,7 @@ in by the next `workout generate` whose span reaches it — which re-plans those
 against the mesocycles that govern them, rather than carrying today's readings across to
 them. What the athlete
 gets in the meantime is *notice*: `constraints.honored_at` records whether any pass has had
-the directive in scope, so `status`, `constraint list`/`show` and the message printed at add
+the constraint in scope, so `status`, `constraint list`/`show` and the message printed at add
 time can say the schedule does not reflect it yet and name the run that would
 (`DESIGN_constraint_honoring.md`).
 
@@ -1171,7 +1171,7 @@ The constraint is dated inside Specific Preparation — too far off for adapt to
 small to trip the replan heuristic. So `constraint add` says so, naming the mesocycle it lands
 in and the run that would cover it; until then `status` and `constraint list` both mark it
 *not yet in the schedule*. That `workout generate` re-plans the mesocycle's remaining days,
-building around the trip like any other stored directive: the sessions already there are
+building around the trip like any other stored constraint: the sessions already there are
 voided ("Your coach replaced this day."), the new ones appended, and the constraint's
 `honored_at` is stamped because its whole remaining window sat inside what was written.
 

@@ -1,4 +1,4 @@
-# Design: Unified Directives (`constraint` command)
+# Design: Unified Constraints (`constraint` command)
 
 **Status:** Draft (rev 6) · **Date:** 2026-07-10 · **Supersedes:** the `lifeevent`
 command · **Companion to:** `DESIGN_signal_authoring.md`,
@@ -98,8 +98,8 @@ of *the input against the current plan*, not a property of the input, so the
 classification is a guess with an expensive, near-irreversible consequence
 (a regen) riding on it.
 
-This design keeps the one **principled** split (observation vs directive, §2),
-gives directives a single typed object (§4–§5), and turns plan-invalidation from
+This design keeps the one **principled** split (observation vs constraint, §2),
+gives constraints a single typed object (§4–§5), and turns plan-invalidation from
 an authoring-time category into a **derived, human-confirmed action** (§7).
 
 ---
@@ -108,7 +108,7 @@ an authoring-time category into a **derived, human-confirmed action** (§7).
 
 Every way the world touches the plan is a point in a 2-D space:
 
-- **Observation vs Directive.** Did something *happen / is true about me* (the
+- **Observation vs Constraint.** Did something *happen / is true about me* (the
   coach **interprets** it — it may even become cited evidence behind a coach
   learning), or am I *asking the coach to respect* something (it **bounds** what
   the coach may prescribe)?
@@ -117,22 +117,22 @@ Every way the world touches the plan is a point in a 2-D space:
 Storage medium (SQLite vs Google Calendar) and entry method (CLI, calendar,
 message) are an **orthogonal I/O concern**, never a property of meaning.
 
-| | Observation (evidence) | Directive (bound) |
+| | Observation (evidence) | Constraint (bound) |
 |---|---|---|
 | **home** | `signal` / `daily_signals` (+ Garmin) | **`constraint`** (this doc) |
 | **coach uses it to** | interpret readiness; feed learnings | bound `generate` + `adapt`; discount anomalies (§6) |
 | **may become evidence?** | yes (cited weeks) | **no** — may only *discount* it (§6) |
 
-**We keep the observation/directive split.** It is not cosmetic: observations
-feed the evidence/confidence machinery, directives feed the solver, and a
-directive must *never* become physiological evidence ("I couldn't train Thursday"
+**We keep the observation/constraint split.** It is not cosmetic: observations
+feed the evidence/confidence machinery, constraints feed the solver, and a
+constraint must *never* become physiological evidence ("I couldn't train Thursday"
 is not data that the mesocycle is too hard). The one sanctioned crossing runs the
-*other* way: the weekly analysis may read a directive to **explain an anomaly
+*other* way: the weekly analysis may read a constraint to **explain an anomaly
 away** (a travel week is not a fitness-loss signal), never to *support* a
 learning — this is what life events already do for the backward evaluation
 today, and constraints inherit that feed unchanged (§6). Any object that blurred
 the supporting direction would be wrong. So this doc unifies **only**
-directives; `signal` is untouched.
+constraints; `signal` is untouched.
 
 ---
 
@@ -140,7 +140,7 @@ directives; `signal` is untouched.
 
 **Goals**
 
-- One directive object spanning hard availability, capacity/intensity caps, soft
+- One constraint object spanning hard availability, capacity/intensity caps, soft
   preferences, and big disruptions — at any horizon.
 - Consumed uniformly by **both** `workout generate` and `workout adapt`, and fed
   to the weekly analysis as discounting context (§6).
@@ -151,7 +151,7 @@ directives; `signal` is untouched.
 
 **Non-Goals**
 
-- Merging observations (`signal`) into directives (§2).
+- Merging observations (`signal`) into constraints (§2).
 - Decoupling `daily_signals` from Google Calendar storage — a separate refactor.
 - Per-type intelligence. `type` is an **opaque, user-vocabulary label** (like
   `daily_signals.metric` — `DESIGN_signal_authoring.md` §1); no code ever
@@ -187,8 +187,8 @@ registered second name.
 
 | Subcommand | Shortest prefix | Purpose |
 |---|---|---|
-| `add`  | `a` | Author a directive over a day or range |
-| `list` | `l` | List active/upcoming directives (date-windowed) |
+| `add`  | `a` | Author a constraint over a day or range |
+| `list` | `l` | List active/upcoming constraints (date-windowed) |
 | `show` | `s` | One in detail — incl. whether it is plan-shaping (§7) |
 | `edit` | `e` | Adjust scope / rest / text / replan |
 | `rm`   | `r` | Remove by id |
@@ -199,7 +199,7 @@ constraint add TITLE [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--desc TEXT]
                      [--rest] [--replan | --no-replan]
 ```
 
-- `TITLE` (positional) is **the directive itself, stated short** — "no run
+- `TITLE` (positional) is **the constraint itself, stated short** — "no run
   Thursday", "only 45 min today". Mandatory, and positional because it is
   mandatory (DESIGN_cli_noargs.md §a2): omitting it is a usage error, not a
   prompt. It doubles as the `list` display string. Quick capture stays flag-free:
@@ -211,18 +211,18 @@ constraint add TITLE [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--desc TEXT]
 - `--rest` is the **only structured knob** (rev 6, §5): it forces a full
   no-training window whose dates skip the LLM. Omitted = advisory, the
   conservative default, since `rest` deterministically nulls out training. On
-  `edit` the flag is a pair (`--rest` / `--no-rest`) so a directive can be toggled
+  `edit` the flag is a pair (`--rest` / `--no-rest`) so a constraint can be toggled
   back to advisory; on `add` absence already means advisory. Which sport, "only 45
   min", injury nuance are prose in `TITLE`/`--desc`, not flags — rev 6 removed
   `--sport`, `--hard`/`--soft` and `--type`.
 - `--replan` / `--no-replan` pre-answer the plan-shaping proposal (§7); omitted =
   let the magnitude heuristic decide whether to *ask*. Independent of `--rest`
   (§5, §7).
-- `constraint list` defaults to directives **from the start of the current
+- `constraint list` defaults to constraints **from the start of the current
   mesocycle** (`get_active_mesocycle(today)['start_date']` — the training mesocycle
   being planned) plus everything upcoming (open-ended into the future). This
   anchors the list on the mesocycle the coach is actively reasoning over rather than
-  a rolling calendar window. `--all`/`-a` drops the lower bound (past directives
+  a rolling calendar window. `--all`/`-a` drops the lower bound (past constraints
   included); a selector (`-d`/`-m`/`-M`/`-g`, DESIGN_cli_selectors.md) overrides the
   bounds explicitly. When no active
   mesocycle exists to anchor on (no plan yet), the lower bound is dropped and
@@ -254,7 +254,7 @@ CREATE TABLE IF NOT EXISTS constraints (
     start_date  TEXT NOT NULL,
     end_date    TEXT NOT NULL,          -- == start_date for a single day
     rest        INTEGER NOT NULL DEFAULT 0, -- 1 <=> full no-training window (skips the LLM)
-    title       TEXT NOT NULL,          -- the directive, stated short; list display string
+    title       TEXT NOT NULL,          -- the constraint, stated short; list display string
     description TEXT,                   -- optional richer context, read by the LLM
     replan      INTEGER NOT NULL DEFAULT 0, -- 1 <=> plan-shaping (built into the plan, §7)
     source      TEXT,                   -- 'manual' | 'message' | 'lifeevent' (migration)
@@ -287,11 +287,11 @@ constraints, so there is no reason to take that judgement away from it:
 | `1` | No training at all on those dates | **Deterministic** — `generate`/`adapt` place an explicit `Rest` entry on every date in the window, bypassing the LLM (§6) |
 | `0` | Anything else: a sport unavailable, a capacity cap, a preference | **Advisory** — prose in the prompt, honored by judgement; the LLM picks any substitute |
 
-`replan` records whether a directive is currently escalated to plan-shaping; it
+`replan` records whether a constraint is currently escalated to plan-shaping; it
 is set by the §7 flow, surfaced in `constraint show`, and read by `plan generate`
 (§7). It is **not** an authoring-time category the user picks blind.
 
-**`rest` and `replan` are independent axes.** `rest` answers *how the directive is
+**`rest` and `replan` are independent axes.** `rest` answers *how the constraint is
 enforced when a plan is built* (code-enforced rest vs advisory prose); `replan`
 answers *whether we rebuild the macrocycle around it now*. Neither implies the
 other, and no flag couples them: "prefer easy this whole build mesocycle" is advisory
@@ -303,7 +303,7 @@ and `replan = 0`; "broke my ankle, out 6 weeks" is `rest = 1` **and** `replan = 
 
 ## 6. Consumption — one read path for `generate` and `adapt`, a discounting feed for analysis
 
-All three consumers fetch the **active** directives overlapping their own
+All three consumers fetch the **active** constraints overlapping their own
 window through one shared function, `get_constraints(start, end)`, replacing
 the old `get_lifeevents(start_after=…)` call (and, for analysis, the manual
 tail-end filter it currently needs bolted on top). "Overlapping" means a real
@@ -324,7 +324,7 @@ window:
   `c['start_date'] <= until_str` filter the analysis path currently has to add
   on top of `get_lifeevents` becomes unnecessary and can be deleted.
 
-For each directive in the fetched set:
+For each constraint in the fetched set:
 
 - **`rest = 1`** over a date → that date is forced to an explicit **`Rest`**
   entry, deterministically, without asking the LLM. This is a
@@ -373,7 +373,7 @@ The rendered section replaces the old life-events section of both prompts:
 the deterministic rest pre-pass.
 
 **Analysis (third consumer — discounting only).** The weekly backward
-evaluation reads directives so the model doesn't misattribute an anomalous week to
+evaluation reads constraints so the model doesn't misattribute an anomalous week to
 training (illness/travel/work explain a load or recovery anomaly;
 `coach/service/analysis.py` window fetch + per-week tagging in `_week_constraints`,
 and the constraints digest inside the analysis-window hash,
@@ -408,13 +408,13 @@ special work.
 
 Plan-invalidation is **not** a property of a constraint the user declares. Flow:
 
-1. On `constraint add`/`edit`, compute the directive's **magnitude against the
+1. On `constraint add`/`edit`, compute the constraint's **magnitude against the
    active plan** (the heuristic below).
 2. If magnitude crosses the threshold and neither `--replan` nor `--no-replan`
    was given, **propose**: *"This overlaps your build mesocycle and displaces a big
    chunk of planned load — replan around it? [y/N]"*. On `y`, set `replan = 1`
    and run the existing `plan generate` → `workout generate` confirm flow. On
-   `n`, `replan = 0`; the directive is still honored by daily `adapt` (§6), just
+   `n`, `replan = 0`; the constraint is still honored by daily `adapt` (§6), just
    not built into the plan.
 3. `--replan` / `--no-replan` **pre-answer** step 2 (the front door a big,
    obviously-plan-shaping disruption uses). `--replan` sets `replan = 1` **and**
@@ -461,7 +461,7 @@ was read from, or the proposal and its action describe two different plans.
 
 **Between the two fates above there is a gap, and it is named rather than filled.**
 Honoring by daily `adapt` reaches only the current mesocycle, and a replan rewrites a whole
-plan; a directive that is too far off for the first and too small for the second waits for
+plan; a constraint that is too far off for the first and too small for the second waits for
 the next `workout generate` whose horizon reaches it. `constraints.honored_at` records
 whether any pass has had it in scope yet, so `status`, `constraint list`/`show` and the
 add-time message can say the schedule does not reflect it and name the run that would
@@ -518,7 +518,7 @@ to `lifeevents_snapshot`), so "inputs this plan was built on" stays inspectable
 built from
 *every* active constraint, not just the `replan = 1` subset — so a `plan show`
 reading `constraints_snapshot` alone could print "Constraints considered: None"
-while a tactical directive plainly shaped the strategy text, which misleads
+while a tactical constraint plainly shaped the strategy text, which misleads
 exactly when someone is auditing why a plan reads the way it does. A second
 column, `all_constraints_snapshot`, therefore also records every active
 constraint at generation time, each tagged with its `replan` flag
@@ -529,7 +529,7 @@ plan-shaping section. The staleness fingerprint moves with the first column: the
 macrocycle's `lifeevents_hash` (compared on every `plan generate` to decide
 reuse vs regen — the `coach/service/planning.py` reuse check) becomes
 `constraints_hash`, computed over the **`replan = 1` constraints only**. Tactical
-directives ("no run Thursday") must *not* flag the plan stale — hashing every
+constraints ("no run Thursday") must *not* flag the plan stale — hashing every
 constraint would make each quick capture trip the "inputs changed" regen proposal
 and fight the magnitude flow above; plan-level staleness is exactly what `replan`
 escalation is for.
@@ -562,7 +562,7 @@ of invalidation; it does not change the pre-existing ambient behavior that the
 regardless of which objective a constraint actually bears on. With two concurrent
 objectives in different sports, a plan-shaping constraint that concerns only one of
 them still flags *every* active macrocycle stale. Since rev 6 there is not even a
-`sport` column to scope by — which sport a directive touches is prose the LLM reads
+`sport` column to scope by — which sport a constraint touches is prose the LLM reads
 (§5) — so scoping would mean asking a model, at hash time, which goals a constraint
 affects: a far bigger change than the fix is worth, and the imprecision is inherited
 unchanged from `lifeevents_hash`. Accepted as-is: a `replan = 1` constraint (an
@@ -583,7 +583,7 @@ what `constraint add` itself accepts:
 
 ```
 "new_constraints": [
-  // Optional. Directives extracted from the athlete's message this run. Every
+  // Optional. Constraints extracted from the athlete's message this run. Every
   // entry is created exactly as if the athlete had run `constraint add`.
   {
     "title": "no run Thursday",   // required
@@ -698,7 +698,7 @@ the LLM to weigh, exactly like a `soft` constraint is today; nothing
 deterministically forced rest on its account. Migrating it as `hard` would
 therefore *strengthen* it past what it ever did, making every migrated life
 event suddenly bypass the LLM and force an explicit `Rest` entry — a behavior
-change, not a faithful carry-over. `soft` preserves continuity: the directive
+change, not a faithful carry-over. `soft` preserves continuity: the constraint
 still reaches `generate`/`adapt`/analysis exactly as before, honored by
 judgement. Since `event_type` survived verbatim in `type`, a later per-`type`
 refinement could still be run after the fact without re-migrating.

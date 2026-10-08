@@ -519,9 +519,9 @@ class ChatRunTest(_Case):
         self.coach_run(self.nothing_to_change())
         self.assertEqual([item["id"] for item in saved_proposal.waiting()], [first["id"]])
 
-    RULE = ({"title": "no run on Fridays", "start_date": FRIDAY, "end_date": FRIDAY},)
+    CONSTRAINT = ({"title": "no run on Fridays", "start_date": FRIDAY, "end_date": FRIDAY},)
 
-    def test_in_the_chat_the_rule_question_comes_after_the_proposal(self):
+    def test_in_the_chat_the_constraint_question_comes_after_the_proposal(self):
         """A question nobody answers must not hold the proposal back (§6.1)."""
         waiting_when_asked = []
 
@@ -529,10 +529,10 @@ class ChatRunTest(_Case):
             waiting_when_asked.append(len(saved_proposal.waiting()))
             return False
 
-        self.coach_run(self.eased(new_constraints=self.RULE), on_confirm=decline)
+        self.coach_run(self.eased(new_constraints=self.CONSTRAINT), on_confirm=decline)
         self.assertEqual(waiting_when_asked, [1])
 
-    def test_with_nothing_to_change_the_rule_question_comes_after_that_line(self):
+    def test_with_nothing_to_change_the_constraint_question_comes_after_that_line(self):
         recorded_when_asked = []
 
         def decline(*_args, **_kwargs):
@@ -540,18 +540,18 @@ class ChatRunTest(_Case):
             return False
 
         proposal = RevisionProposal(**{
-            **self.nothing_to_change().__dict__, "new_constraints": self.RULE,
+            **self.nothing_to_change().__dict__, "new_constraints": self.CONSTRAINT,
         })
         self.coach_run(proposal, on_confirm=decline)
         self.assertEqual(recorded_when_asked, [True])
 
-    def test_a_terminal_run_keeps_the_rule_question_before_the_preview(self):
+    def test_a_terminal_run_keeps_the_constraint_question_before_the_preview(self):
         with patch.dict(os.environ, {"STAMIND_FRONTEND": "", "STAMIND_RENDER": ""}):
             _coach, prompt, _out = self.coach_run(
-                self.eased(new_constraints=self.RULE), on_confirm=lambda *a, **k: False
+                self.eased(new_constraints=self.CONSTRAINT), on_confirm=lambda *a, **k: False
             )
-        rule_question, apply_question = prompt.confirm.call_args_list
-        self.assertIn("no run on Fridays", rule_question.args[0])
+        constraint_question, apply_question = prompt.confirm.call_args_list
+        self.assertIn("no run on Fridays", constraint_question.args[0])
         self.assertNotIn("no run on Fridays", apply_question.args[0])
 
     def test_a_week_that_changed_while_the_coach_was_thinking_saves_nothing(self):

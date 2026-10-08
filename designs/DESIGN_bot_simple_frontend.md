@@ -21,7 +21,7 @@ progress. Three assets already in the code cover most of the machinery:
 - The structured-prompt protocol (`stamind/prompt.py`, `STAMIND_FRONTEND=json`)
   already renders decisions as tappable inline buttons.
 - `workout adapt -m "…"` is already a free-text inbox: one LLM call classifies the
-  message and extracts constraint-shaped directives (`coach/service/adapt.py`).
+  message and extracts constraint candidates (`coach/service/adapt.py`).
 - Per-athlete instances already work: `STAMIND_CONFIG` selects a config file, and the
   instance's `database:` lives beside it (ARCHITECTURE.md §9). One checkout, two bots,
   two tokens, zero routing code.
@@ -303,9 +303,9 @@ widens this table with capture and picker intents; §12.8 is now the authoritati
 table.
 
 **What the router sees (2026-09-09).** The message, and beside it the athlete's goals
-and rules — titles and dates, no ids, no descriptions — in the user content, so the
+and constraints — titles and dates, no ids, no descriptions — in the user content, so the
 system prompt stays static. From wording alone "the Klausen ride got bigger" read as an
-event changing (`edit_goal`) when the only Klausen row was a rule and the ask was
+event changing (`edit_goal`) when the only Klausen row was a constraint and the ask was
 coach territory. The rows cost a few lines per call; one intent stays the only output.
 Two prompt rules go with them: a name that matches a row means that row, and a
 planned ride, event or session changing in size, route or date is `coach_message`
@@ -331,14 +331,14 @@ currently holds which role.
 ### 5.5 Constraints and signals in chat
 
 "Show my rules" / "I can run again" route to a hidden `sm bot constraints`: the
-current-and-upcoming directives in companion prose (day words, no IDs or tier tags)
+current-and-upcoming constraints in companion prose (day words, no IDs or tier tags)
 plus a §4.4 button picker whose leaves each send the deterministic `constraint rm
 <id>`. The model only ever picks the *intent*; which row is removed is decided by the
 athlete's tap on a button the CLI built from real IDs.
 
 Adding needs no new machinery, for either kind. `add_constraint` and `add_signal` land
 in the same `workout adapt -m` inbox as `coach_message`, and the one call there extracts
-both: the two-confirmation capture flow asks before persisting a rule
+both: the two-confirmation capture flow asks before persisting a constraint
 (DESIGN_constraints.md §8) or a signal (DESIGN_signal_extraction.md §2). The three
 intents build identical argv and differ only in the echo line, so a misroute among them
 changes what the athlete is told the coach heard, never what is stored. A kind of note
@@ -774,7 +774,7 @@ drops the message into `adapt -m`. Three things it cannot do. It has **no slots*
 model returns an intent name and nothing else, so "move my marathon to October 12" has
 nowhere to put the date. It has **no way to name an object** — companion prose hides
 IDs, so "I'm not doing the 10k" cannot safely become `goal rm 3`. And **recording a
-rule rides the week planner** — `add_constraint` pays for a full adaptation call on the
+constraint rides the week planner** — `add_constraint` pays for a full adaptation call on the
 thinking model when all the athlete wanted was to be heard. This pass closes all three
 without giving the model any new authority.
 
@@ -801,7 +801,7 @@ anything plan-shaping, expensive, or irreversible.
 ### 12.2 Capture: two calls, both on the fast model
 
 `bot route` stays exactly as dumb as it is — one intent, no slots (it reads the goal
-and rule titles beside the message since 2026-09-09, §5.3, and still answers with one
+and constraint titles beside the message since 2026-09-09, §5.3, and still answers with one
 intent). A write intent then
 runs a second hidden command, `sm bot capture <intent> "<text>"`, whose one LLM call is
 domain-focused: it sees only the fields its intent can fill, plus today's date and
@@ -865,14 +865,14 @@ tapping 💬 no longer changes what the next message does (§5.2). So the surfac
 exactly two teachers left, and uses both: the help card names the lanes in athlete
 words — your messages talk to the app, which routes, records and offers; what reads
 as state or feelings goes to your coach in your own words — and the router echoes
-carry the same lesson per message ("noting that rule for your coach" vs "passing
+carry the same lesson per message ("noting that constraint for your coach" vs "passing
 that on to your coach"). No line of copy promises verbatim delivery on a tap,
 because no tap delivers it.
 
-**A rule for good is not a constraint** (2026-09-16). "I have no time to do two
+**A preference for good is not a constraint** (2026-09-16). "I have no time to do two
 workouts in a day" reached this inbox and came out as a constraint dated today, because
 the extraction was told never to omit the dates and to default them to today. Honored
-for one day, expired by morning, and the double is back next week. The rule has a home
+for one day, expired by morning, and the double is back next week. The preference has a home
 already — the profile: a session cap in `weekly_schedule`, or a sentence in
 `preferences` — and the profile is what the staleness check watches, so recording it
 there flags the plan when it should. Neither is writable from chat, and this pass does
@@ -880,16 +880,16 @@ not make them so: an open-ended constraint would need every consumer that does d
 arithmetic (the §7 replan heuristic, the honoring stamp, the analysis feed, the list) to
 learn that some windows never close, which is a second kind of object hidden in a column;
 a chat-writable profile is a second kind of object from her chair, one she could neither
-see nor take back. Both are more than a rule she states a few times a year has earned.
+see nor take back. Both are more than a preference she states a few times a year has earned.
 So the extraction gains one answer: a note with no time bound at all comes back with
 `open_ended: true` and no dates. The app stores nothing for it and says so in one
-forwardable message — the rule is for good, not for the next few days; ask ⟨operator⟩
+forwardable message — the preference is for good, not for the next few days; ask ⟨operator⟩
 to record it in your preferences; and her words, quoted, so a Telegram forward carries
 them to the operator without retyping. The "📨 Send it to your coach as written" button
-follows when nothing else was stored, because today's half of the rule is still the week
+follows when nothing else was stored, because today's half of the preference is still the week
 planner's. On the terminal the same candidate prints a one-line "not saved" naming the
 config keys. `workout adapt -m` shares the extraction text, so it gets the same answer
-and the same skip. If the rules she states turn out to be structure more often than
+and the same skip. If the preferences she states turn out to be structure more often than
 flavour, a settable session cap is the next step; if flavour, open-ended constraints
 are; this pass records the question rather than guessing at it.
 
@@ -905,9 +905,9 @@ only in their echo — a misroute between `add_constraint` and `add_signal` stil
 what the athlete is told, never what is stored, and `RouterTablesTest` keeps pinning
 that. What changes is that `coach_message` now genuinely differs: state and
 availability go to the coach, records go to capture. A misroute across *that* line
-degrades gracefully in both directions — a rule misread as state still lands in adapt,
+degrades gracefully in both directions — a constraint misread as state still lands in adapt,
 whose inbox still extracts it (just paying for the week planner call the athlete would have been
-offered anyway); state misread as a rule is caught at the capture confirm, and the
+offered anyway); state misread as a constraint is caught at the capture confirm, and the
 no-find fallback's button walks it to the coach. The §5.2 rescue window lands here
 too: while a 💬 tap is live, text the router returns `unclear` for rides this capture
 inbox rather than `adapt -m` — she was just asked what the coach should know, so an
@@ -919,8 +919,13 @@ Wednesday Oct 7 and the athlete writes "No training on November 12th". The route
 as availability and ran `workout adapt -m`, which reaches Oct 18, the end of the mesocycle.
 It cost a week planner call and could not touch November 12. The router's table now says
 `coach_message` is for today or the next few days, and `add_constraint` is for a later day
-or period, or a rule to keep for good. The router is not told today's date, so a date that
+or period, or a preference to keep for good. The router is not told today's date, so a date that
 happens to be tomorrow goes to capture too, where the coach is one tap away.
+
+Amended 2026-10-08: the chat says "constraint" where it said "rule" ("Your constraint …",
+"showing your constraints"), and "preference" for the sentence with no end date. "Rule" used
+to name both, so "noting that rule" could be followed by "that sounds like a rule", meaning
+it was not noted (AGENTS.md, Communication).
 From the terminal, `workout adapt -m`
 is untouched — the CLI inbox keeps its extraction exactly as DESIGN_constraints.md §8
 and DESIGN_signal_extraction.md §2 describe it.

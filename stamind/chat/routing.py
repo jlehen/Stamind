@@ -46,8 +46,8 @@ ROUTER_INTENTS = {
     ),
     "add_constraint": (
         "the athlete names a later day or period that training has to work around, or a "
-        "rule to keep for good ('I can't train on the 24th', 'on holiday from July 5 to "
-        "19', 'I can't swim until June', 'no training on Wednesdays')"
+        "preference to keep for good ('I can't train on the 24th', 'on holiday from July "
+        "5 to 19', 'I can't swim until June', 'no training on Wednesdays')"
     ),
     "add_signal": (
         "the athlete reports an outside cause that acted on their body on given days, "
@@ -55,15 +55,15 @@ ROUTER_INTENTS = {
         "was up all night', 'it was 35 degrees all week')"
     ),
     "show_constraints": (
-        "the athlete wants to see the rules or restrictions the coach is working around"
+        "the athlete wants to see the constraints the coach is working around"
     ),
     "edit_constraint": (
-        "the athlete changes one of those rules rather than adding or dropping it — its "
-        "wording or its dates ('the knee thing runs to the end of the month', 'make it "
-        "Tuesdays instead')"
+        "the athlete changes one of those constraints rather than adding or dropping it — "
+        "its wording or its dates ('the knee thing runs to the end of the month', 'make "
+        "it Tuesdays instead')"
     ),
     "remove_constraint": (
-        "the athlete wants to drop or cancel one of those rules ('I can run again', "
+        "the athlete wants to drop or cancel one of those constraints ('I can run again', "
         "'forget the Wednesday rule')"
     ),
     "add_goal": (
@@ -151,7 +151,7 @@ ROUTER_CAPTURE_INTENTS = {
 
 # One short italic echo per routed intent, so the athlete learns the vocabulary and a
 # misroute is visible immediately (§5.3, open question 1: always shown). They are also
-# the per-message half of teaching the two lanes: "noting that rule for your coach" and
+# the per-message half of teaching the two lanes: "noting that constraint for your coach" and
 # "passing that on to your coach" say which inbox took the message (§12.3).
 ROUTER_ECHO = {
     "show_today": "showing today",
@@ -162,13 +162,13 @@ ROUTER_ECHO = {
     "show_progress": "showing your progress",
     "coach_message": "passing that on to your coach",
     "tweak_session": "asking your coach to change that",
-    "add_constraint": "noting that rule for your coach",
+    "add_constraint": "noting that constraint for your coach",
     "add_signal": "logging that for your coach",
     "show_constraints": "showing what I'm working around",
     # The two edit echoes are readings, not actions: the capture call that follows may
     # find the name is a session and hand it to the coach instead (§12.4).
-    "edit_constraint": "sounds like a change to a rule — checking",
-    "remove_constraint": "showing your rules — tap the one to drop",
+    "edit_constraint": "sounds like a change to a constraint — checking",
+    "remove_constraint": "showing your constraints — tap the one to drop",
     "add_goal": "setting up a new goal",
     "edit_goal": "sounds like a change to a goal — checking",
     "remove_goal": "showing your goals — tap the one to call off",

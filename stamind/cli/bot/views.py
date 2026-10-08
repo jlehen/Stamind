@@ -102,7 +102,7 @@ def goal_rm_buttons(goals: list) -> list:
 
 
 def run_bot_constraints(args: argparse.Namespace) -> None:
-    """Renders the athlete's current-and-upcoming directives in companion prose and
+    """Renders the athlete's current-and-upcoming constraints in companion prose and
     offers the remove picker (§5.5). Read-only itself; the only mutation reachable is
     what a tapped leaf later runs."""
     today = _today_str()

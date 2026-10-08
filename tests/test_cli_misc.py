@@ -94,7 +94,7 @@ class TestCliMisc(unittest.TestCase):
             exit_code, stdout, stderr = self.run_cli(["constraint", "add"])
         self.assertEqual(exit_code, 2)
         self.assertIn("positional arguments:", stderr)
-        self.assertIn("The directive, stated short", stderr)
+        self.assertIn("The constraint, stated short", stderr)
         self.assertIn(
             "the following arguments are required: title",
             stderr.strip().splitlines()[-1],

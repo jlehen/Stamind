@@ -103,7 +103,7 @@ class GoalsConstraintsMixin:
         }
 
     def constraint_plan_impact(self, constraint: Dict[str, Any]) -> Dict[str, Any]:
-        """Magnitude of a directive against the active plan (DESIGN_constraints.md §7,
+        """Magnitude of a constraint against the active plan (DESIGN_constraints.md §7,
         concrete formula): the planned load it displaces, expressed as a percentage of the
         plan's trailing weekly planned load (a self-scaling ratio — no absolute TSS number
         rots as the athlete's fitness changes), plus its span in days. The trailing week is

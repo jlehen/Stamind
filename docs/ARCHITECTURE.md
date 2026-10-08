@@ -479,7 +479,7 @@ classes themselves.
 |                      |                      | `honored_at`, and the one write), and            |
 |                      |                      | `constraint_window`/`needs_a_pass`/              |
 |                      |                      | `constraints_needing_a_pass` (whether the        |
-|                      |                      | schedule reflects a directive yet — the `status` |
+|                      |                      | schedule reflects a constraint yet; the `status` |
 |                      |                      | line, `constraint list`/`show` and the add-time  |
 |                      |                      | nudge all ask HERE, so they cannot disagree).    |
 |                      |                      | DESIGN_constraint_honoring.md §2/§4.             |
@@ -771,7 +771,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Telling the athlete a plan-shaping input changed since the plan was built | `plan_inputs.py` (**canonical** for what shapes a plan and how it is hashed: the partition `plan_profile`/`changed_plan_profile_fields`/`plan_config_hash`, the science files `athlete_science_documents`/`changed_science_documents`, the goal and constraint cleaners, and the diff text), `coach/service/staleness.py` (the judgment — every axis of `config_changed`, the diff, the verdict call, the one `plan_fingerprints()` builder and the `plan keep` stamp), **`cli/staleness.py`** (canonical for everything the athlete *reads*: the reason, the §2 test said out loud, and the four surfaces' shared wording), and the surfaces that draw it: `cli/plans/` (`show.py` reports and `plan keep` dismisses, `generate.py` offers), `cli/workouts/generate.py`, `cli/status.py` (a pointer to `plan show`, nothing more), `stamind_web.py` (a read-only banner off `plan_config_hash()`, deliberately not through the engine — §8). Built in **one** place for the same reason the runway nudge is: three call sites each phrasing a two-sentence explanation is how they drift (DESIGN_plan_staleness.md §9) |
 | Telling the athlete the schedule is running out | `analytics/runway.py` (`plan_end`, `runway` — the pure detector and its four kinds), `cli/runway.py` (the row fetch, every wording, the morning-push button), and the four surfaces that draw it: `cli/workouts/adapt.py` (the hint and the refusal), `cli/workouts/listing.py` (`workout list`'s marker), `cli/status.py`, `cli/bot/views.py::run_bot_morning`, `config.runway_warning_days`, DESIGN_runway_nudge.md. The wording is built in **one** place on purpose — the hint used to live on `workout adapt` alone, which is how `status` came to answer differently on the same morning (§3 of that doc) |
 | Generation covering every date of its span | `coach/engine/generate.py` (the TASK sentence), `coach/service/guards.py:_fill_coverage_gaps` (the deterministic backstop, over the same `_rest_workout` factory the rest-window pre-pass uses), DESIGN_runway_nudge.md §2.1. The invariant is what lets the end of the schedule be read straight off the rows, with no margin |
-| Knowing whether the schedule reflects a constraint | `coach/honoring.py` (**canonical** for `honored_at`: what it means, who may stamp it, the write, and `needs_a_pass` — whether the schedule is missing a directive at all), `coach/proposals.py` (`covered_constraint_ids`, decided at proposal time on both proposal types so apply never re-derives it), `coach/service/generate.py` + `coach/service/revision_apply.py` (the two places that stamp), `cli/constraints.py:_maybe_point_at_honor` (the add-time message naming the mesocycle and the run that would build it in), `cli/status.py`, `cli/common.py:constraint_line`/`report_unhonored`, `db/constraints.py` (`mark_honored`, `clear_honored`, `clear_honored_after`), DESIGN_constraint_honoring.md. There is deliberately **no dedicated command** and no SQL half-copy of the predicate in `db/` — §5 of that doc records why |
+| Knowing whether the schedule reflects a constraint | `coach/honoring.py` (**canonical** for `honored_at`: what it means, who may stamp it, the write, and `needs_a_pass` — whether the schedule is missing a constraint at all), `coach/proposals.py` (`covered_constraint_ids`, decided at proposal time on both proposal types so apply never re-derives it), `coach/service/generate.py` + `coach/service/revision_apply.py` (the two places that stamp), `cli/constraints.py:_maybe_point_at_honor` (the add-time message naming the mesocycle and the run that would build it in), `cli/status.py`, `cli/common.py:constraint_line`/`report_unhonored`, `db/constraints.py` (`mark_honored`, `clear_honored`, `clear_honored_after`), DESIGN_constraint_honoring.md. There is deliberately **no dedicated command** and no SQL half-copy of the predicate in `db/` — §5 of that doc records why |
 | Coach-learnings / confidence     | `db/learnings.py`, `coach/service/athlete_context.py` (`_apply_learning_updates`, `_review_learning_proposals`), `learning_doubts.py` (the athlete's question about a doubt), model is **canonical** in [§3](#3-coach-package-architecture) |
 | Backward analysis (bootstrap/reflect) | `coach/service/analysis.py:_run_workout_analysis`, `coach/engine/analysis.py:_data_analyze_logic` ([§10](#data-analysis-data-bootstrap--data-reflect)) |
 | Garmin pull / metrics / load model | `stamind/garmin/sync.py` (`pull`, `ensure_data`), `garmin/derived.py` (`recompute_derived`, `backfill_tss`, `warmup_cutoff` — the database side), `analytics/load.py` (`activity_load`) and `analytics/pmc.py` (the PMC maths), see [§12](#12-sports-science--coaching-mathematics) |
@@ -886,7 +886,7 @@ default the user layer overrides.
   system and user message alike — uses one section hierarchy: `## NAME` for a top-level
   section, `### NAME` for a sub-section of `## TASK`, and a `====` banner only around a
   verbatim quoted document (`DESIGN_prompt_structure.md` §2). `_render_constraints`
-  renders the active directives section (`title | dates | enforcement | description`, where
+  renders the active constraints section (`title | dates | enforcement | description`, where
   enforcement is "no training (rest enforced)" or "advisory").
 - **`_format_athlete_profile(profile)`** — formats the (effective) profile into a
   readable prompt segment. Threshold anchors render generically from
@@ -966,7 +966,7 @@ default the user layer overrides.
   `THIS MESOCYCLE IS ENDING` section biasing the model toward holding load, since a cut
   there cannot rebound (DESIGN_mesocycle_boundary.md §3). There is **no separate
   classification pass** for `--message`: the same call also extracts any
-  constraint-shaped directives from the note and returns them as `new_constraints`
+  constraint candidates from the note and returns them as `new_constraints`
   (DESIGN_constraints.md §8). Label `workout_adapt`.
 - **`_data_analyze_logic(...)`** — LLM call → `{macrocycle_summary,
   inferred_macrocycle, inferred_mesocycles[], physiological_insights[],
@@ -1141,7 +1141,7 @@ called by the UIs.
     classification call — the same adapt call may return two kinds of candidate
     extracted from the note, both raw and **unconfirmed**, both gated on the same
     `has_message` flag:
-    - `new_constraints` — constraint-shaped directives (DESIGN_constraints.md §8). The
+    - `new_constraints` — constraint candidates (DESIGN_constraints.md §8). The
       CLI confirms each with the athlete, then persists it via
       `capture_message_constraint` (singular, one call per confirmed candidate) as a
       `constraint` row (`source='message'`, `replan=0`, honored this run and every
@@ -1432,7 +1432,7 @@ domain). The convention: `add_*`/`save_*` (writers; `save_*` is an upsert),
 methods whose behavior is *not* obvious from that convention are called out below.
 
 - **Objectives** (`objectives.py`) — plain CRUD; nothing beyond the convention.
-- **Constraints** (`constraints.py`) — the unified directive object. Beyond the CRUD
+- **Constraints** (`constraints.py`). Beyond the CRUD
   convention: `get_constraints(start, end)` returns rows overlapping a window (open-ended
   when `end` is None — the plan form).
 - **Daily Signals** (`signals.py`) — external signals are reconciled **by
@@ -1614,7 +1614,7 @@ the point of the lookup. `runway.plan_gap()` filters only `!= archived` — its
 `target_date > plan_end_date` comparison already answers the date question.
 
 ### constraints
-The single directive object — everything the athlete asks the coach to work around,
+Everything the athlete asks the coach to work around,
 at any horizon (DESIGN_constraints.md). Supersedes `lifeevents`.
 | Column        | Type       | Notes                                                     |
 |---------------|------------|-----------------------------------------------------------|
@@ -1622,12 +1622,12 @@ at any horizon (DESIGN_constraints.md). Supersedes `lifeevents`.
 | `start_date`  | TEXT       | YYYY-MM-DD                                                 |
 | `end_date`    | TEXT       | YYYY-MM-DD (== start for a single day)                     |
 | `rest`        | INTEGER    | 0/1 — the **single** deterministic edge (rev 6): 1 = a no-training window whose dates skip the LLM and are forced to rest. Everything else is advisory prose the coach honors by judgement |
-| `title`       | TEXT       | The directive, stated short; the `list` display string    |
+| `title`       | TEXT       | The constraint, stated short; the `list` display string   |
 | `description` | TEXT       | Optional richer context, read by the LLM                  |
 | `replan`      | INTEGER    | 1 = escalated to plan-shaping (built into the plan, §7)    |
 | `source`      | TEXT       | `manual` \| `message` \| `lifeevent` (migration)          |
 | `created`     | TEXT       | UTC ISO                                                    |
-| `honored_at`  | TEXT       | UTC ISO of the last coach pass that had this directive in scope **with authority over every day of it still ahead** — `workout generate` or `workout adapt`. NULL ⟺ the schedule does not reflect it yet. Deliberately NOT a claim that the schedule changed. Two rules, both owned by `coach/honoring.py` and nowhere else: who may stamp (`covers`), and whether the schedule is missing the directive at all (`needs_a_pass` — unstamped, `replan = 0`, a non-empty window, and **at least one session scheduled in that window**, since a window with nothing in it is nothing to reshuffle). `status`, `constraint list`/`show` and the add-time message all call that one predicate; there is deliberately no SQL half-copy of it in `db/constraints.py`, because that is how they came to disagree (DESIGN_constraint_honoring.md §2/§4). Cleared by a `constraint edit` that moves the window or rewrites the directive, and by a rollback restoring a plan older than the honoring |
+| `honored_at`  | TEXT       | UTC ISO of the last coach pass that had this constraint in scope **with authority over every day of it still ahead** — `workout generate` or `workout adapt`. NULL ⟺ the schedule does not reflect it yet. Deliberately NOT a claim that the schedule changed. Two rules, both owned by `coach/honoring.py` and nowhere else: who may stamp (`covers`), and whether the schedule is missing the constraint at all (`needs_a_pass` — unstamped, `replan = 0`, a non-empty window, and **at least one session scheduled in that window**, since a window with nothing in it is nothing to reshuffle). `status`, `constraint list`/`show` and the add-time message all call that one predicate; there is deliberately no SQL half-copy of it in `db/constraints.py`, because that is how they came to disagree (DESIGN_constraint_honoring.md §2/§4). Cleared by a `constraint edit` that moves the window or rewrites the constraint, and by a rollback restoring a plan older than the honoring |
 
 Index: `idx_constraints_start` on `start_date`. Rev 6 dropped the pre-rev-6
 `binding`/`sport`/`type` columns (a hard/soft × sport matrix plus an opaque label) in
@@ -2529,11 +2529,11 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `goal`       | `rm`         | `g r`    | Call the goal off — the same action as `goal edit --status archived`, under the verb people reach for: it stands the goal's upcoming sessions down, keeps the plan, its versions and its feedback, and does not ask, because `goal edit --status active` brings it all back. `--purge` is the destructive form for a goal entered by mistake: it deletes the objective and everything the cascade takes with it, printing that inventory plus the count of sessions it would strand and asking first; `-y` skips that prompt (DESIGN_backward_evaluation.md §14.5) |
 | `goal`       | `list`       | `g l`    | List the goals that matter — upcoming and completed. Called-off goals are hidden and counted in a footer; `-a/--all` shows them (§14.5) |
 | `goal`       | `wipe`       | —        | Delete all objectives                                                    |
-| `constraint` | `add`        | `cons a` | Author a directive (positional `TITLE`, `--start`, `--end`, `--desc`, `--rest`, `--replan`/`--no-replan`; never prompts — see DESIGN_cli_noargs.md §a2) |
+| `constraint` | `add`        | `cons a` | Author a constraint (positional `TITLE`, `--start`, `--end`, `--desc`, `--rest`, `--replan`/`--no-replan`; never prompts — see DESIGN_cli_noargs.md §a2) |
 | `constraint` | `edit`       | `cons e` | Adjust scope / rest / text / replan by ID (`--rest`/`--no-rest`)        |
-| `constraint` | `rm`         | `cons r` | Remove a directive by ID                                                |
-| `constraint` | `list`       | `cons l` | List directives from the current mesocycle onward (`-a`/`--all`, `-v`, selectors `-d`/`-m`/`-M`/`-g`; default anchor: active mesocycle start, else show all) |
-| `constraint` | `show`       | `cons s` | Show a directive in detail (incl. plan-shaping status and whether a coach pass has honored it) |
+| `constraint` | `rm`         | `cons r` | Remove a constraint by ID                                               |
+| `constraint` | `list`       | `cons l` | List constraints from the current mesocycle onward (`-a`/`--all`, `-v`, selectors `-d`/`-m`/`-M`/`-g`; default anchor: active mesocycle start, else show all) |
+| `constraint` | `show`       | `cons s` | Show a constraint in detail (incl. plan-shaping status and whether a coach pass has honored it) |
 | `constraint` | `wipe`       | —        | Delete all constraints                                                  |
 | `benchmark`  | `record`     | `be rec` | Log a fitness-test result to the `benchmark_results` logbook: positional `SPORT` plus one anchor flag (`--ftp`, `--lthr`, `--threshold-pace`, `--css`, `--e1rm`, `--mas`), `-d/--date` (default today), `--note`, `--source` (`manual` default), `--session ID` (the planned test it satisfies, stored as `workout_id`). The confirm and the lines after it speak through `runtime.render`, since `bot capture test_result` reaches this command from chat (DESIGN_benchmark_from_chat.md §3). An implausible sport/anchor pair (`SPORT_ANCHORS`) warns and asks; `-y` skips that prompt ([§5](#benchmark_results)). `b` alone is ambiguous with `bot` |
 | `benchmark`  | `list`       | `be l`   | The logbook newest first, each row with its delta against the previous row of the same kind |
@@ -2711,7 +2711,7 @@ exactly that reason.
 |--------|---------------------------------|----------------------------------------------|
 | GET    | `/api/status`                   | Active goal, latest metrics, coach learnings (under `coach_learnings.learnings` + `.summary`), macrocycle+mesocycles, `config_mismatch`, `sync_state` (data freshness) |
 | GET    | `/api/objectives`               | All objectives (`goal list`)                 |
-| GET    | `/api/constraints`              | Active + upcoming directives — the read view of `constraint list`. Its window is a rolling `metrics_lookback_days` plus everything upcoming, **not** the CLI's active-mesocycle anchor |
+| GET    | `/api/constraints`              | Active + upcoming constraints — the read view of `constraint list`. Its window is a rolling `metrics_lookback_days` plus everything upcoming, **not** the CLI's active-mesocycle anchor |
 | GET    | `/api/workouts`                 | List workouts (`?start_date=&end_date=&sport_type=&include_removed=`). Rows carry derived `calendar_status` + `modification_status`, plus `adherence` (`{status, label, reasons, completed}`, null for a row still ahead of us) from `analytics/compare.py::adherence_verdicts` — the same grader the CLI asks, and not through the CLI, which §14's layering rule forbids. No pull — §8. |
 | GET    | `/api/workouts/compare`         | Plan-vs-actual adherence (`workout compare`); no `ensure_data`. `?start_date=&end_date=&sport=` (default 14-day lookback, end capped at today) → `{filters, days[], discrepancies[], informational[]}` |
 | GET    | `/api/workouts/batches`         | Workout changes, newest first (`{batches:[{id, created_at, kind, summary, workouts, held, restorable, first_date, last_date, macrocycle_ids}]}`); undoing one is `workout rollback` |
@@ -3098,8 +3098,8 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    made. A tap on a proposal that changes today first pulls today's activities from Garmin,
    past the refresh throttle. A terminal run and `-y` keep step 6 as it is. Kilograms that
    moved alone (`RevisionProposal.week_planner_changed` false) are written at once (§7).
-   In the chat the questions about a rule or a signal found in the note come after the
-   proposal, or after the line that says nothing changes (`_confirm_candidates` around
+   In the chat the questions about a constraint or a signal found in the note come after
+   the proposal, or after the line that says nothing changes (`_confirm_candidates` around
    `_settle`); a terminal asks them before the preview. Before a chat run saves a proposal
    or writes kilograms, it compares the newest change that wrote a session with the one it
    read at its start. If a session was written meanwhile, it saves and writes nothing and
@@ -3642,7 +3642,7 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | lines under the activity, `strength log`/`exercises` reading the |
 |                                | record back, the morning push reading sets before its walk       |
 | `tests/test_strength_comparison.py` | a past strength session planned against done (DESIGN_strength_planned_vs_done.md), on the design's Thursday: which sets count, the marks and totals, the verdict by sets and the one kept by time and load, the logged activity pairing first and never asked about, the sets on the activity, the same-day takeover, the table, the companion lines, `workout show` and `workout compare` |
-| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (no round, no "Not now", saving one closes the others), the morning push that proposes a session change and writes kilograms at once, and the chat run that saves its proposal, is shown the open one and replaces it, asks its rule question after the proposal and saves nothing when the week changed while it thought. The tweak that keeps the open proposal's days is in `test_workout_tweak.py`, the prompt gate in `test_prompt_gates.py`, and the second place per chat with its two refusals and the time-out line in `test_chat_coach_run.py` |
+| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (no round, no "Not now", saving one closes the others), the morning push that proposes a session change and writes kilograms at once, and the chat run that saves its proposal, is shown the open one and replaces it, asks its constraint question after the proposal and saves nothing when the week changed while it thought. The tweak that keeps the open proposal's days is in `test_workout_tweak.py`, the prompt gate in `test_prompt_gates.py`, and the second place per chat with its two refusals and the time-out line in `test_chat_coach_run.py` |
 | `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the line for a change to today, who is watching, the replace question and its ways out, `workout notify` with `--all` and `--sent` and their tags, `workout batches`. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.started_from` pins where the run started, the terminal or the athlete's chat |
 | `tests/test_constraints*.py`   | the constraint object: DB windowing, the §8 message capture and |
 |                                | the hard-rest pre-pass (`test_constraints.py`); the §7          |
@@ -3877,7 +3877,7 @@ claim. A constraint dated past the boundary is therefore built in by the next
 the mesocycles that govern them, rather than carrying today's load judgement across to them.
 
 What was missing was not reach but *notice*: nothing said the plan had yet to reflect a
-directive already on record. `constraints.honored_at` is that signal, and one predicate
+constraint already on record. `constraints.honored_at` is that signal, and one predicate
 (`coach/honoring.py:needs_a_pass`) answers it for the `status` line, `constraint
 list`/`show` and the message printed when the constraint is added — which names the
 landing mesocycle and the `workout generate -m <id>` that would cover it. See

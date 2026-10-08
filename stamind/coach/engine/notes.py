@@ -153,15 +153,15 @@ Decide whether the note states something the coach must work around beyond today
 unavailability, a time/intensity cap, an injury layoff, a venue/equipment limit, or a
 stated preference with a date or date range (e.g. "no run Thursday", "only 45 min today",
 "broke my ankle, out 6 weeks"). If so, return it in "new_constraints" below — one entry per
-distinct directive, exactly as if the athlete had run `constraint add`. A note only about
+distinct constraint, exactly as if the athlete had run `constraint add`. A note only about
 how they feel right now ("felt flat, ease today") is NOT a constraint — leave
 "new_constraints" empty for it (it may still be a signal, below). When unsure, leave it
-out: a durable-looking note mis-filed as a constraint is worse than a missed one. A rule
-with no time bound at all — "I never have time for two workouts in a day", "no gym on
-Fridays, ever" — is OPEN-ENDED: return it with "open_ended": true and both dates null.
-The app does not store those as constraints; it tells the athlete where such a rule
-belongs. Everything else is dated: never omit "start_date"/"end_date" for it (default
-both to today when the note is about the days at hand but names none). This is
+out: a durable-looking note mis-filed as a constraint is worse than a missed one. A
+preference with no time bound at all — "I never have time for two workouts in a day", "no
+gym on Fridays, ever" — is OPEN-ENDED: return it with "open_ended": true and both dates
+null. The app does not store those as constraints; it tells the athlete where such a
+preference belongs. Everything else is dated: never omit "start_date"/"end_date" for it
+(default both to today when the note is about the days at hand but names none). This is
 extraction only — never invent a plan-shaping escalation. Extracted constraints are
 always advisory; the deterministic-rest and plan-shaping escalations are deliberate human
 actions and the app, not you, decides those.
@@ -184,8 +184,8 @@ days and would help explain their recovery readings: a heavy night's drinking, a
 night, a heatwave, illness, life stress. If so, return it in "new_signals" below, one entry
 per category per span.
 
-Tell it apart from a constraint by what the coach must do with it. A CONSTRAINT is a rule to
-plan around ("no run Thursday"). A SIGNAL is an external cause acting on the body on given
+Tell it apart from a constraint by what the coach must do with it. A CONSTRAINT is something
+to plan around ("no run Thursday"). A SIGNAL is an external cause acting on the body on given
 days, which the coach reads beside the HRV/sleep/RHR numbers. A note that is only a mood
 report with no cause ("felt flat today") is NEITHER — leave both lists empty for it.
 
@@ -211,15 +211,15 @@ fabricated number is read as a measurement.
 # stored two different ways depending on which inbox read it (§12.10).
 NEW_CONSTRAINTS_SCHEMA = (
     '  "new_constraints": [\n'
-    "    // Optional. Directives extracted from the athlete's note this run (see\n"
+    "    // Optional. Constraints extracted from the athlete's note this run (see\n"
     "    // EXTRACTING A DURABLE CONSTRAINT above). Every entry is created exactly as\n"
     "    // if the athlete had run `constraint add`. Omit entirely, or leave empty, if\n"
     "    // the note was only a one-off nudge about today.\n"
     "    {\n"
-    '      "title": "the directive, stated short (required)",\n'
+    '      "title": "the constraint, stated short (required)",\n'
     '      "start_date": "YYYY-MM-DD (required; default today)",\n'
     '      "end_date": "YYYY-MM-DD (required; == start for a single day)",\n'
-    '      "open_ended": "true ONLY for a rule with no time bound at all (dates null)",\n'
+    '      "open_ended": "true ONLY for a preference with no time bound (dates null)",\n'
     '      "description": "optional richer context or null/omit"\n'
     "    }\n"
     "  ]"

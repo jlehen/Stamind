@@ -23,7 +23,7 @@ threshold axis sitting immediately beside it already produced `"ftp changed 250 
 to diff `config.yaml` by hand to find out what it meant.
 
 The same argument was already made and accepted for constraints
-(`DESIGN_constraints.md` §7): *"Tactical directives ('no run Thursday') must not flag the
+(`DESIGN_constraints.md` §7): *"Tactical constraints ('no run Thursday') must not flag the
 plan stale — hashing every constraint would make each quick capture trip the 'inputs
 changed' regen proposal."* The profile fingerprint simply never got the same treatment.
 

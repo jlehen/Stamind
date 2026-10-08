@@ -122,7 +122,7 @@ def run_status(args) -> None:
                 )
 
             # Constraints the schedule does not reflect yet are the same kind of fact — a
-            # directive on record that nothing has acted on
+            # constraint on record that nothing has acted on
             # (DESIGN_constraint_honoring.md §4), so it belongs beside the staleness
             # warning too. Counted through `honoring`, so this nag and the surfaces that
             # render the same question cannot disagree (§2).

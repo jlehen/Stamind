@@ -95,7 +95,7 @@ class AnalysisLogicMixin:
                "claim about periodization structure — do not infer macro/mesocycles.\n")
             + "\n"
             "### READING THE PER-WEEK CONTEXT FIELDS\n"
-            "- 'constraints': athlete-declared directives overlapping the week (illness,\n"
+            "- 'constraints': what the athlete asked the coach to work around that week (illness,\n"
             "  travel, work crunch, capacity caps, etc.). Consider them as a possible\n"
             "  explanation for load, performance, or recovery anomalies before attributing\n"
             "  those to training adaptation; avoid authoring a training learning from a week\n"

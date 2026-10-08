@@ -195,9 +195,9 @@ class TestHonoredAt(unittest.TestCase):
             prompt.confirm.return_value = False
             run_constraint_edit(ns)
 
-    def test_editing_the_window_or_the_directive_clears_the_honoring(self):
-        # The window moved, or the directive changed — and for an advisory constraint the
-        # prose IS the enforcement mechanism, so new words are a new directive a previous
+    def test_editing_the_window_or_the_constraint_clears_the_honoring(self):
+        # The window moved, or the constraint changed — and for an advisory constraint the
+        # prose IS the enforcement mechanism, so new words are a new constraint a previous
         # honoring says nothing about.
         for flags in ({"start": "2026-06-11"}, {"end": "2026-06-21"}, {"rest": True},
                       {"title": "Away, but shorter"}, {"desc": "richer context"}):
@@ -335,13 +335,13 @@ class TestHonoredAt(unittest.TestCase):
         under_way = {"start_date": "2026-05-20", "end_date": "2026-06-10"}
         self.assertTrue(honoring.covers(under_way, "2026-06-01", "2026-07-31"))
 
-    def test_every_surface_agrees_on_which_tier_owns_a_directive(self):
+    def test_every_surface_agrees_on_which_tier_owns_a_constraint(self):
         """A rule that spans files gets a test that spans them (AGENTS.md).
 
         The `status` count, the one-line rendering, the `show` detail and the add-time
         nudge each answer "does the schedule reflect this yet?" — and each one used to answer
         it for itself, which is how `constraint show` came to flag a plan-shaping
-        directive the count deliberately skips (§2).
+        constraint the count deliberately skips (§2).
         """
         from stamind.cli.constraints import point_at_honor, run_constraint_show
         self._plan_mesocycles([("Base 2", "2026-06-01", "2026-06-30"),

@@ -66,7 +66,7 @@ report with no cause is neither, and stays the ephemeral nudge it is today.
 `DESIGN_constraints.md` §8 draws the line at *reversible, advisory state*: an extracted
 constraint is always `rest=0`, `replan=0`, enforced server-side whatever the model said.
 
-Signals need a second line, because a signal carries **data**, not a directive. `value`
+Signals need a second line, because a signal carries **data**, not a constraint. `value`
 feeds `_signal_days` as a dose magnitude. A model that turns "slept badly" into
 `"value": 7` has invented a measurement and dressed it as observation.
 

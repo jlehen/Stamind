@@ -154,7 +154,7 @@ def constraint_line(c: Dict[str, Any], needs_a_pass: bool = False) -> str:
     hand-rolled copy had already drifted (DESIGN_constraint_honoring.md §4).
 
     `needs_a_pass` is `coach/honoring.py`'s answer, passed in rather than re-derived: this
-    stays a renderer, and the one place that decides which tier owns a directive stays the
+    stays a renderer, and the one place that decides which tier owns a constraint stays the
     one place. Deciding it here is how the tag came to contradict the sweep (§8).
     """
     tags = ("no training" if c.get('rest') else "advisory") + (

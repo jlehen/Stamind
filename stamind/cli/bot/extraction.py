@@ -111,7 +111,7 @@ def valid_date(raw: Any) -> Optional[str]:
 
 
 def nominate_rows(domain: str, today: str) -> List[Dict[str, Any]]:
-    """The goals or the rules, as the athlete could mean them. `bot route` shows both
+    """The goals or the constraints, as the athlete could mean them. `bot route` shows both
     beside the message; an edit nominates one of them (§5.3, §12.4)."""
     if domain == "goal":
         return [g for g in runtime.db.get_objectives()

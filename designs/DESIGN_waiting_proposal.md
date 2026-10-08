@@ -55,8 +55,8 @@ The new kind is `proposal`. Its item holds:
 - the text the athlete is shown: the coach's reason, then the preview the chat already prints
   under "Here's what I'd change:";
 - what a tap writes, as the run resolved it, so a tap writes exactly what was shown. What only
-  drew the preview is not saved, and neither are the rule and signal candidates, which the run
-  asks about itself (§6.1);
+  drew the preview is not saved, and neither are the constraint and signal candidates, which
+  the run asks about itself (§6.1);
 - the days it changes;
 - the newest change that wrote a session, at the moment the run read the week (§4, rule 1);
 - when it was made, and whether the run had last night's sleep score.
@@ -202,7 +202,7 @@ The run itself changes little:
   free while they wait.
 - When the week planner answers, the proposal is saved and sent (§3). The saved item replaces
   the confirm that holds the chat today.
-- In the chat, the questions about a rule or a signal found in the message ("Shall I
+- In the chat, the questions about a constraint or a signal found in the message ("Shall I
   remember…?") come after the proposal, or after the line that says nothing changes. Today
   they come before the preview (DESIGN_constraints.md §8). A question nobody answers must not
   hold the proposal back. A tap on "Change it" runs in the chat's own place, so it works while
@@ -305,8 +305,8 @@ fact a proposal carries.
 - A question asked before the week planner is called still ends the run when nobody answers
   it for five minutes. The message is then lost. Nothing was asked of the week planner yet.
 - Only a message to the coach runs beside the chat. The morning push, `workout generate` from
-  its button, and the adaptation after a goal or rule edit still hold the chat while they run.
-  The confirm of `workout generate`, like every other confirm in the chat, still times out
+  its button, and the adaptation after a goal or constraint edit still hold the chat while they
+  run. The confirm of `workout generate`, like every other confirm in the chat, still times out
   after five minutes. Freeing them is a later design, which reuses the second place.
 
 ## 9. Build order
@@ -317,15 +317,15 @@ Each step works on its own.
    stand-alone property, the push. Until step 2, a chat run started while the morning proposal
    is open asks and writes as today, and the proposal goes out of date by rule 1.
 2. **Chat runs save their proposal** (§6.1's saved proposal, §6.2's open proposal, and §7 for
-   chat runs). There is still one place per chat, so the rule and signal questions stay before
-   the preview, as today: a run parked on "Shall I remember…?" would make the bot refuse the
+   chat runs). There is still one place per chat, so the constraint and signal questions stay
+   before the preview, as today: a run parked on "Shall I remember…?" would make the bot refuse the
    tap on "Change it". The chat is busy while the week planner thinks and while a question
    waits. The five-minute death of the final confirm is gone. A run whose "Shall I remember…?"
    gets no answer for five minutes still ends before its proposal is saved, as today. Step 3
    removes this.
-3. **The run works beside the chat** (the rest of §6): the second place per chat, the rule and
-   signal questions moved after the proposal, the two refusals of §6.2, the time-out line, and
-   the check before saving.
+3. **The run works beside the chat** (the rest of §6): the second place per chat, the constraint
+   and signal questions moved after the proposal, the two refusals of §6.2, the time-out line,
+   and the check before saving.
 
 ## 10. Touch points
 
@@ -338,7 +338,7 @@ No table and no column are added: a proposal is a row of `athlete_queue`.
 | `stamind/cli/workouts/proposal.py` (new) | the `proposal` kind and nothing that sends: wording, the three out-of-date rules, what each answer does with the Garmin pull in "Change it", finding the open one. It must not import `cli/queue.py`, which imports the list of kinds. The item's subject, the key the queue uses to refuse a duplicate, is the instant it was saved, as for the `message` kind |
 | `stamind/coach/proposals.py` | whether the week planner changed a session; what a tap writes, to and from JSON, without the sleep mark |
 | `stamind/coach/service/adapt.py`, `stamind/coach/engine/adapt.py` | the open proposal as a data section and a sub-section of `## TASK` (DESIGN_prompt_structure.md); a tweak may also write the days the open proposal changes |
-| `stamind/cli/workouts/adapt.py` | a chat run saves and sends in place of the confirm; in the chat the rule and signal questions move after it; the check before saving a proposal or writing kilograms |
+| `stamind/cli/workouts/adapt.py` | a chat run saves and sends in place of the confirm; in the chat the constraint and signal questions move after it; the check before saving a proposal or writing kilograms |
 | `stamind/cli/bot/views.py` | the push saves a proposal when a session would change; the once-a-morning read also counts a saved proposal, and shares its test on today's activities with rule 3 |
 | `stamind/chat/` | the second place per chat for the coach's run; prompt and Stop taps found by the run that raised them; `/cancel` and `/restart` over both places; the two refusals of §6.2; the scheduler's busy test; the time-out line |
 | `docs/ARCHITECTURE.md` | the bot section and the adaptation flow |
@@ -347,7 +347,7 @@ Implemented designs amended when each step lands: DESIGN_athlete_queue.md §2 (i
 "Apply this proposal?" no longer blocks in chat), §3 and §8 (the stand-alone property, the new
 kind); DESIGN_bot_simple_frontend.md §4.1 and §4.2 (the push proposes);
 DESIGN_change_heads_up.md §7 (the push no longer writes a session change);
-DESIGN_constraints.md §8 (in chat the rule question comes after the proposal);
+DESIGN_constraints.md §8 (in chat the constraint question comes after the proposal);
 DESIGN_bot_stop_button.md §5 ("show my week" no longer gets the busy line) and §7 (Stop finds
 the coach's run).
 

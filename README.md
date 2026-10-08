@@ -197,8 +197,8 @@ The distinction matters. A rough morning that has an explanation does not get
 read as "the mesocycle is too hard", so your volume is not cut on a false
 signal.
 
-**Thursday.** Work drops a trip on you. That is a directive, not a report, so
-it becomes a constraint the coach has to work around:
+**Thursday.** Work drops a trip on you. That is something you ask for, not a
+report, so it becomes a constraint the coach has to work around:
 
 ```
 $ ./sm constraint add "away, no bike" --start 2027-05-16 --end 2027-05-18
@@ -688,7 +688,7 @@ have to be about performance at all.
 When life gets in the way, the tool you reach for depends on whether the change
 is strategic (it should reshape the plan) or tactical (it affects a day or a
 few). Stamind keeps two kinds of record apart: **observations** are things
-that happened to you, **directives** are things you ask the coach to work
+that happened to you, **constraints** are things you ask the coach to work
 around.
 
 | Channel | Reach for it when |

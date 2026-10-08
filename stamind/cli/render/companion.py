@@ -91,11 +91,11 @@ class CompanionRenderer(ExpertRenderer):
 
     def constraints_open_ended(self, titles: List[str], text: str) -> None:
         """One forwardable message: her words are quoted so a Telegram forward carries
-        the rule to the operator without retyping (§12.3, 2026-09-16)."""
+        the preference to the operator without retyping (§12.3, 2026-09-16)."""
         print(wrap_text(
-            "That sounds like a rule, not something for the next few days. Ask "
-            f"{config.telegram_operator_name} to record this in your preferences for "
-            "good. You can just forward this message:"
+            "That sounds like a preference for good, not something for the next few days. Ask "
+            f"{config.telegram_operator_name} to record this in your preferences. You can just "
+            "forward this message:"
         ))
         print()
         print(f"“{text.strip()}”")

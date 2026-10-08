@@ -244,7 +244,7 @@ You MUST respond with a JSON object containing:
         system_prompt += (
             f"\n## ACTIVE ATHLETE GOALS (CHRONOLOGICAL)\n"
             f"{obj_text if obj_text else 'No active goals.'}\n\n"
-            f"## ACTIVE CONSTRAINTS (athlete-declared directives to work around)\n"
+            f"## ACTIVE CONSTRAINTS (what the athlete asked the coach to work around)\n"
             f"{c_text if c_text else 'No active constraints.'}\n\n"
             f"{custom_task}\n"
         )

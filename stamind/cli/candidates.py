@@ -29,7 +29,7 @@ def _stated_value(candidate: Dict[str, Any]) -> Optional[float]:
 
 
 def open_ended(candidate: Dict[str, Any]) -> bool:
-    """A rule with no time bound — "never two workouts in a day" — which the extraction
+    """A preference with no time bound — "never two workouts in a day" — which the extraction
     marks rather than dates. It has no home in the constraints table
     (DESIGN_bot_simple_frontend.md §12.3, 2026-09-16)."""
     return bool(candidate.get('open_ended')) and bool((candidate.get('title') or '').strip())
@@ -38,12 +38,12 @@ def open_ended(candidate: Dict[str, Any]) -> bool:
 def confirm_new_constraints(
     candidates: Sequence[Dict[str, Any]], date_str: str, text: str = ""
 ) -> List[int]:
-    """Asks about each directive the note produced and stores the confirmed ones
+    """Asks about each constraint the note produced and stores the confirmed ones
     (DESIGN_constraints.md §8 two-confirmation flow, step 1).
 
     Returns the ids created. Declining discards the extraction — on the adapt path the
     note has already informed that run's adaptation regardless, since the same LLM call
-    produced both. An open-ended rule is never stored: the athlete is told where it
+    produced both. An open-ended preference is never stored: the athlete is told where it
     belongs instead, quoting `text`, the note as written, so it can be passed on."""
     captured: List[int] = []
     for candidate in candidates:
@@ -68,9 +68,11 @@ def confirm_new_constraints(
             # chat the same fact is said without commands, and the plan-adjusting tap
             # is the offer the capture ends on (DESIGN_bot_simple_frontend.md §12.10).
             runtime.render.constraint_plan_shaping(cid, shaping)
-    rules = [candidate['title'].strip() for candidate in candidates if open_ended(candidate)]
-    if rules:
-        runtime.render.constraints_open_ended(rules, text)
+    preferences = [
+        candidate['title'].strip() for candidate in candidates if open_ended(candidate)
+    ]
+    if preferences:
+        runtime.render.constraints_open_ended(preferences, text)
     return captured
 
 

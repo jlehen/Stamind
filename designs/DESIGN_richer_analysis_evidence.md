@@ -106,8 +106,8 @@ one-directional. It can lower confidence in a would-be learning ("that HRV crash
 flu, not the mesocycle"), but it can never raise confidence in one ("the athlete adapts well
 under work stress" is not something a `work crunch` constraint may be used to argue).
 
-The reason is the observation/directive split in `DESIGN_constraints.md` §2/§6. A
-constraint is a **directive** — something the athlete asked the coach to work around. It
+The reason is the observation/constraint split in `DESIGN_constraints.md` §2/§6. A
+constraint is something the athlete asked the coach to work around. It
 records an intention, not a measurement. "I couldn't train Thursday" is not physiological
 data that the mesocycle is too hard, so letting it flow into the evidence/confidence machinery
 would manufacture durable learnings out of scheduling. Discounting is the one sanctioned

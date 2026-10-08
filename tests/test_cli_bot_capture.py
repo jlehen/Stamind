@@ -166,7 +166,7 @@ class CaptureNoteTest(_CaptureCase):
         self.assertEqual(code, 0)
         self.assertIn("Send it to your coach as written", out)
 
-    def test_a_rule_for_good_is_handed_to_the_operator_not_stored(self):
+    def test_a_preference_for_good_is_handed_to_the_operator_not_stored(self):
         """2026-09-16: "never two workouts in a day" has no dates, so it is not a
         constraint. She is told whose it is, her words are quoted so she can forward the
         message, and today's half stays one tap away (§12.3)."""
@@ -185,7 +185,7 @@ class CaptureNoteTest(_CaptureCase):
         self.assertIn(f"“{self.NOTE}”", said)
         self.assertIn("Send it to your coach as written", out)
 
-    def test_a_dated_rule_beside_an_open_ended_one_is_still_stored(self):
+    def test_a_dated_constraint_beside_an_open_ended_one_is_still_stored(self):
         code, out, _ = self._run({"new_constraints": [
             {"title": "never two workouts in a day", "open_ended": True},
         ] + self._constraint()["new_constraints"]})
@@ -376,7 +376,7 @@ class CaptureEditTest(_CaptureCase):
         }, "the knee thing runs to the end of the month")
         self.assertEqual(code, 0)
         self.assertEqual(test_db.get_constraint(cid)["end_date"], moved)
-        self.assertIn("Your rule", out + prompt.text)
+        self.assertIn("Your constraint", out + prompt.text)
         self.assertNotIn("constraint edit", out)
         self.assertNotIn("plan generate", out)
 

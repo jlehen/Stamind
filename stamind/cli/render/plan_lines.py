@@ -30,11 +30,11 @@ def simple_metric_words(metric: str) -> str:
 
 
 def simple_constraint_lines(constraints: List[Dict[str, Any]], today: str) -> List[str]:
-    """Simple rendering of the directives the coach works around: one bullet per
+    """Simple rendering of the constraints the coach works around: one bullet per
     constraint, dates as day words, no IDs or tier tags (the expert `constraint list`
     keeps those). Empty reads as a clean slate, not a gap (§6 tone rule)."""
     if not constraints:
-        return ["Nothing on the list — no rules to work around right now. "
+        return ["Nothing on the list — no constraints to work around right now. "
                 "Just tell me when something comes up 💬"]
     lines = ["📌 I'm working around:"]
     for c in constraints:
@@ -180,10 +180,10 @@ def simple_goal_edit_lines(
 def simple_constraint_edit_lines(
     constraint: Dict[str, Any], changes: Dict[str, Any], today: str
 ) -> List[str]:
-    """A proposed change to one of the rules the coach works around (§12.4), rendered
+    """A proposed change to one of the constraints the coach works around (§12.4), rendered
     from the stored row the same way `simple_constraint_lines` renders the list."""
     span = simple_span_words(constraint["start_date"], constraint["end_date"], today)
-    lines = [f"Your rule “{constraint['title']}” — {span}"]
+    lines = [f"Your constraint “{constraint['title']}” — {span}"]
     if "title" in changes:
         lines.append(f"→ restate it as “{changes['title']}”")
     if "start_date" in changes or "end_date" in changes:
@@ -196,7 +196,7 @@ def simple_constraint_edit_lines(
 
 
 def simple_plan_shaping_line(impact: Dict[str, Any]) -> str:
-    """How big a directive just captured turns out to be, without the commands that would
+    """How big a constraint just captured turns out to be, without the commands that would
     escalate it: building it into the plan is `plan generate`, which is operator work, and
     the adjust offer beside this capture is what the athlete can actually do (§12.10)."""
     return (

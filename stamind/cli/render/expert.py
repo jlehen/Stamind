@@ -96,16 +96,16 @@ class ExpertRenderer:
         print("Discarded — not saved as a constraint.")
 
     def constraints_open_ended(self, titles: List[str], text: str) -> None:
-        """A rule with no time bound has no home in the constraints table; the profile is
+        """A preference with no time bound has no home in the constraints table; the profile is
         where it belongs (DESIGN_bot_simple_frontend.md §12.3, 2026-09-16)."""
         quoted = ", ".join(f"“{t}”" for t in titles)
         notice(
-            f"Not saved: {quoted} — a rule for good, not a dated constraint. Record it "
+            f"Not saved: {quoted} — a preference for good, not a dated constraint. Record it "
             "in config.yaml under user_profile.preferences, or the weekly schedule."
         )
 
     def constraint_plan_shaping(self, constraint_id: int, impact: Dict[str, Any]) -> None:
-        """What a capture says when the directive it just stored is big enough to
+        """What a capture says when the constraint it just stored is big enough to
         reshape the plan (DESIGN_constraints.md §7). Names the escalation commands,
         which is the operator's next step and no one else's."""
         notice(
@@ -221,7 +221,7 @@ class ExpertRenderer:
     # -- constraints an edit can reach (§12.4) --
 
     def constraint_replan_offer(self, impact: Dict[str, Any]) -> Optional[str]:
-        """States a directive's magnitude and returns the question that offers to build
+        """States a constraint's magnitude and returns the question that offers to build
         it into the plan — or None where that escalation is not the reader's to make.
 
         Returning the question rather than asking it keeps voice and transport apart
@@ -234,7 +234,7 @@ class ExpertRenderer:
         return "Replan around it?"
 
     def constraint_honor_hint(self, constraint_id: int) -> None:
-        """Where a plan-shaping directive lands, and what would build it in
+        """Where a plan-shaping constraint lands, and what would build it in
         (DESIGN_constraint_honoring.md §4)."""
         from stamind.cli.constraints import point_at_honor
         point_at_honor(constraint_id)

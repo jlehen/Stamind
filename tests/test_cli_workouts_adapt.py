@@ -49,7 +49,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
 
     @patch("stamind.runtime.garmin")
     @patch("stamind.runtime.coach_service")
-    def test_adapt_message_open_ended_rule_is_named_not_stored(self, mock_coach, _garmin):
+    def test_adapt_message_open_ended_preference_is_named_not_stored(self, mock_coach, _garmin):
         """A note with no time bound is not a dated constraint: the terminal says where it
         belongs and asks nothing (DESIGN_bot_simple_frontend.md §12.3, 2026-09-16)."""
         mock_coach.workout_adapt.return_value = RevisionProposal(
