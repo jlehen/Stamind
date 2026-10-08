@@ -913,6 +913,14 @@ too: while a 💬 tap is live, text the router returns `unclear` for rides this 
 inbox rather than `adapt -m` — she was just asked what the coach should know, so an
 unreadable answer is likelier a note than a coaching brief, and this is the inbox
 that asks before storing, costs no adaptation, and still offers the coach on a miss.
+
+Amended 2026-10-08: availability goes to the coach only when it is about now. It is
+Wednesday Oct 7 and the athlete writes "No training on November 12th". The router read it
+as availability and ran `workout adapt -m`, which reaches Oct 18, the end of the mesocycle.
+It cost a week planner call and could not touch November 12. The router's table now says
+`coach_message` is for today or the next few days, and `add_constraint` is for a later day
+or period, or a rule to keep for good. The router is not told today's date, so a date that
+happens to be tomorrow goes to capture too, where the coach is one tap away.
 From the terminal, `workout adapt -m`
 is untouched — the CLI inbox keeps its extraction exactly as DESIGN_constraints.md §8
 and DESIGN_signal_extraction.md §2 describe it.

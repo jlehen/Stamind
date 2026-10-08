@@ -45,8 +45,9 @@ ROUTER_INTENTS = {
         "Thursday and Friday')"
     ),
     "add_constraint": (
-        "the athlete states a standing rule or restriction to remember going forward "
-        "('no training on Wednesdays', 'I can't swim until June', 'keep Sundays free')"
+        "the athlete names a later day or period that training has to work around, or a "
+        "rule to keep for good ('I can't train on the 24th', 'on holiday from July 5 to "
+        "19', 'I can't swim until June', 'no training on Wednesdays')"
     ),
     "add_signal": (
         "the athlete reports an outside cause that acted on their body on given days, "
