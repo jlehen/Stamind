@@ -79,14 +79,38 @@ A key never changes once shipped, because stored sets hold it. The table's heade
 so: the first name of a line is stored, never reorder it. A name Garmin adds later is appended
 to its line, or gets a line of its own.
 
-Two things, and only these, put two Garmin names on one line:
+Four things, and only these, put two Garmin names on one line:
 
 - **A weighted twin.** Garmin has `X` and `WEIGHTED_X` for about 360 bodyweight exercises. The
   load of the class is the added load. Garmin drops a leading underscore after `WEIGHTED_`: the
-  twin of `PLANK/_45_DEGREE_PLANK` is `PLANK/WEIGHTED_45_DEGREE_PLANK`. Four `WEIGHTED_` names
-  have no plain exercise in Garmin's lists, and each has a line of its own.
+  twin of `PLANK/_45_DEGREE_PLANK` is `PLANK/WEIGHTED_45_DEGREE_PLANK`. It spells seven twins
+  another way, such as `SIT_UP/THE_TEASER_WEIGHTED`. The `counterpart` field of Garmin Connect's
+  catalog names the exercise each belongs to, and each sits on that exercise's line.
 - **A bare category.** `BENCH_PRESS/BENCH_PRESS` and the bare `BENCH_PRESS` are the same generic
   bench press.
+- **A double.** Garmin lists some exercises twice: `CARRY/FARMERS_CARRY` and
+  `CARRY/FARMERS_WALK` are one carry. Two names are a double when they are the same movement,
+  with the same implement, in the same position, so that a set logged under one could have
+  been logged under the other. Another grip, stance, implement or tempo, or an alternating
+  form, is another exercise. A pair with any real doubt stays two lines: a wrong merge puts
+  two lifts in one history, and a missed one only leaves two lines. 44 names were merged this
+  way on 2026-10-09, after a read of the whole table and a strength-coach review: 29 judged
+  sure, and 15 judged probable that the author approved one by one. The key of a merged line
+  is the name that held the most stored sets, otherwise the one that says the implement,
+  otherwise the more usual one.
+- **A general name and its usual exercise.** Garmin has a general name in most categories:
+  `DEADLIFT/DEADLIFT`, `ROW/ROW`. It is merged with one exercise only where every other form
+  is always named, so that an athlete who logs a plain "deadlift" lifted a barbell. Eight
+  were merged on 2026-10-09: bench press, deadlift, squat (the air squat), calf raise (the
+  standing one), carry (the farmer's carry), chop (the cable woodchop), snatch and leg raise
+  (the lying straight one). The bare category goes with its general name, so a set tagged
+  `DEADLIFT` and nothing else is read as a barbell deadlift. Six stay apart, because the plain
+  word is as often another exercise: row, curl, shrug, upright row, clean and muscle-up.
+
+A double never crosses two categories: `CARRY/OVERHEAD_CARRY` and `CORE/OVERHEAD_WALK` stay two
+lines, for the reason below. When two lines are merged, `scripts/migrate_exercise_names.py` is
+run again on each instance: it moves what is stored under the name that stopped being a key
+to the key of its line (§9).
 
 A third thing puts a name on a line, and it is not a Garmin name:
 
@@ -523,7 +547,9 @@ the sets final?" question is left alone: its names are only shown, and "yes, fin
 sets from Garmin again.
 
 **It changes a value only while that value is still an old name.** Old names are lower case and
-keys are upper case, so a second run changes nothing.
+keys are upper case, so a second run changes nothing. A name whose line was merged into another
+(§3.2) is an old name too: the table holds it as a later name of that line, and it becomes that
+line's key.
 
 `scripts/exercise_name_migration.tsv` gives, for each old name, the keys of the classes its line
 became: one key when the line was not split, several when it was (§10). `leg extension` has two

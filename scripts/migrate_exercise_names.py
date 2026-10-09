@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """One-off conversion: the exercise names stored before the exercise table become keys
-(DESIGN_exercise_table.md §9).
+(DESIGN_exercise_table.md §9). Run again after two lines of the table are merged, it moves
+what is stored under the name that stopped being a key to the key of its line (§3.2).
 
 It rewrites three places: `exercise_sets.exercise`, `prescribed_sets.exercise`, and the `n`
 of every entry in `gym_logs.payload`. It leaves `workouts.description` alone, and a stored
@@ -56,8 +57,14 @@ class Stored:
 
 
 def is_old(name: Optional[str]) -> bool:
-    """Whether a stored value is still an old name: those are lower case, keys upper case."""
-    return bool(name) and any(letter.islower() for letter in name)
+    """Whether a stored value is still an old name: those are lower case, keys upper case. So
+    is a name whose line was merged into another, which the table now holds as a later name
+    of that line (§3.2)."""
+    if not name:
+        return False
+    if any(letter.islower() for letter in name):
+        return True
+    return vocabulary.key_of(name) not in (None, name)
 
 
 def read_migration(path: str = MIGRATION_PATH) -> Dict[str, List[str]]:
@@ -86,10 +93,13 @@ def parse_renames(given: List[str]) -> Dict[str, str]:
 def new_key(
     old: str, said: Optional[str], renames: Dict[str, str], listed: Dict[str, List[str]]
 ) -> Optional[str]:
-    """The four rules, in order: a rename, the one key of the list, the class holding the
-    set's own Garmin name `said` when it is one of several keys, else not settled."""
+    """The five rules, in order: a rename, the key of the line a merged name now sits on, the
+    one key of the list, the class holding the set's own Garmin name `said` when it is one of
+    several keys, else not settled."""
     if old in renames:
         return renames[old]
+    if vocabulary.key_of(old):
+        return vocabulary.key_of(old)
     keys = listed.get(old, [])
     if len(keys) == 1:
         return keys[0]

@@ -573,14 +573,13 @@ class CommandsTest(_StrengthCase):
 
     def test_a_named_line_is_offered_the_exercises_like_it_and_not_the_recent_ones(self):
         self.activity("sun", day="2026-09-13", payload=garmin_sets(lift("CARRY", "FARMERS_CARRY")))
-        self.activity("tue", payload=garmin_sets(lift("CARRY", "FARMERS_WALK")))
+        self.activity("tue", payload=garmin_sets(lift("CARRY", "FARMERS_CARRY_ON_TOES")))
         self.read()
         runtime.prompt = _Prompt(picks=["1"])
         run_cli(["strength", "name", TUESDAY])
         offered = runtime.prompt.shown[1][1]
-        # Her own carry comes first, then the names nearest to "farmers walk".
-        self.assertEqual(offered[:3], ["carry: farmers carry", "carry: farmers carry walk lunge",
-                                       "carry: farmers walk on toes"])
+        # Her own carry comes first, then the name nearest to "farmers carry on toes".
+        self.assertEqual(offered[:2], ["carry: farmers carry", "carry: farmers carry walk lunge"])
         # Monday's leg press is recent, and nothing like a carry.
         self.assertNotIn("squat: leg press", offered)
 

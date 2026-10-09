@@ -98,7 +98,21 @@ class _ConversionCase(unittest.TestCase):
 
 
 class RulesTest(_ConversionCase):
-    """The four rules, in order."""
+    """The five rules, in order."""
+
+    def test_a_name_whose_line_was_merged_takes_the_key_of_its_line(self):
+        """§3.2: the farmer's walk is the farmer's carry, and its line is gone."""
+        self.store(lifted(1, "CARRY/FARMERS_WALK", "CARRY/FARMERS_WALK", 40.0),
+                   lifted(2, "CARRY/FARMERS_CARRY", None, 40.0))
+        self.plan(planned("CARRY/FARMERS_WALK", 40.0))
+        self.log({**OLD_LOG, "x": [{"n": "CARRY/FARMERS_WALK", "sets": [[20, 40, 60]]}]})
+        code, out = self.convert()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stored(), (["CARRY/FARMERS_CARRY"] * 2,
+                                         ["CARRY/FARMERS_CARRY"], ["CARRY/FARMERS_CARRY"]))
+        self.assertIn("CARRY/FARMERS_WALK  →  CARRY/FARMERS_CARRY   (1 set, 1 planned line, "
+                      "1 log entry; 40 kg)", out)
+        self.assertEqual(self.convert()[1], "No old name is stored. Nothing to convert.\n")
 
     def test_a_name_with_one_key_in_the_list_takes_it_in_all_three_places(self):
         self.store(lifted(1, "belt squat", "SQUAT/BELT_SQUAT", 140.0))
@@ -154,9 +168,9 @@ class RulesTest(_ConversionCase):
         code, out = self.convert()
         self.assertEqual(code, 1)
         self.assertIn("moon squat  →  NOT SETTLED", out)
-        code, _ = self.convert("moon squat=SQUAT/SQUAT")
+        code, _ = self.convert("moon squat=SQUAT/AIR_SQUAT")
         self.assertEqual(code, 0)
-        self.assertEqual(self.stored()[0], ["SQUAT/SQUAT"])
+        self.assertEqual(self.stored()[0], ["SQUAT/AIR_SQUAT"])
 
     def test_a_renames_key_must_be_a_key_of_the_table(self):
         """A weighted twin is a Garmin name of the table and not a key."""

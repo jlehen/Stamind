@@ -237,17 +237,17 @@ class SimilarTest(unittest.TestCase):
                          ["SQUAT/LEG_PRESS", "SQUAT/WIDE_STANCE_GOBLET_SQUAT"])
 
     def test_a_word_the_category_already_says_makes_nothing_alike(self):
-        """Every squat has SQUAT in its name, so a bare squat is like the athlete's own only."""
-        self.assertEqual(vocabulary.similar("SQUAT/SQUAT", set(), 9), [])
-        self.assertEqual(vocabulary.similar("SQUAT/SQUAT", {"SQUAT/BELT_SQUAT"}, 9),
-                         ["SQUAT/BELT_SQUAT"])
+        """Every curl has CURL in its name, so a bare curl is like the athlete's own only."""
+        self.assertEqual(vocabulary.similar("CURL/CURL", set(), 9), [])
+        self.assertEqual(vocabulary.similar("CURL/CURL", {"CURL/CABLE_BICEPS_CURL"}, 9),
+                         ["CURL/CABLE_BICEPS_CURL"])
 
     def test_a_category_that_fits_is_offered_whole(self):
-        """The hip swings are five, so a one arm swing is offered the four others, the plain
+        """The hip swings are four, so a one arm swing is offered the three others, the plain
         hip swing among them, though the only word they share is the category's own."""
         self.assertEqual(vocabulary.similar("HIP_SWING/ONE_ARM_SWING", set(), 9), [
-            "HIP_SWING/SINGLE_ARM_DUMBBELL_SWING", "HIP_SWING/SINGLE_ARM_KETTLEBELL_SWING",
-            "HIP_SWING/HIP_SWING", "HIP_SWING/STEP_OUT_SWING",
+            "HIP_SWING/SINGLE_ARM_DUMBBELL_SWING", "HIP_SWING/HIP_SWING",
+            "HIP_SWING/STEP_OUT_SWING",
         ])
 
     def test_no_more_than_asked_for(self):
@@ -255,7 +255,7 @@ class SimilarTest(unittest.TestCase):
 
     def test_a_link_word_makes_nothing_alike(self):
         alike = vocabulary.similar("OLYMPIC_LIFT/CLEAN_AND_PRESS", set(), 9)
-        self.assertNotIn("OLYMPIC_LIFT/SNATCH", alike)
+        self.assertNotIn("OLYMPIC_LIFT/BARBELL_SNATCH", alike)
         self.assertEqual([key for key in alike if "CLEAN" not in key and "PRESS" not in key], [])
 
     def test_a_key_the_table_lacks_is_like_nothing(self):
