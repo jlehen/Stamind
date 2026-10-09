@@ -3,7 +3,7 @@
 **Status:** Designed, not implemented · **Date:** 2026-10-06
 
 This design comes out of an interview with the author on 2026-10-06 (five decisions, §13),
-a review by two reviewers, and three rulings of the author on 2026-10-07 (§13).
+a review by two reviewers, and the author's rulings of 2026-10-07 and 2026-10-09 (§13).
 What the author did not decide is listed apart, in §14, so it can be reviewed.
 
 The words this document uses:
@@ -124,7 +124,8 @@ rides, as DESIGN_waiting_proposal.md §7 says.
 **What the proposal keeps for later.** The saved proposal keeps three things beside what a
 tap writes: the short text above, the long text of today, and the content of its page (§6).
 The long text is what the terminal shows, what the week planner is shown when the proposal
-is still open at its next run, and what the chat sends when there is no page (§5).
+is still open at its next run, and what the chat shows where the pages are not published
+(§5).
 
 ## 4. A session in the chat
 
@@ -154,14 +155,11 @@ beside each mesocycle's long text (DESIGN_output_verbosity.md §5.1).
 planner writes it for a gym day, because only it knows the exercises and the kilograms. A
 session a run keeps as it is keeps its short line.
 
-**Where it shows.** In the two texts the bot sends unasked: the briefing, and the day's
-sessions after "Change it" on a proposal that changed today. Under the title come the done
-line when the session is trained, the short line, and what the athlete said about the
-session ("You said: …"), as today.
-
-"📅 Today" is a day the athlete asks for. With a bucket it prints the short line too, with
-"Tell me more" under it. Without a bucket it prints the full description, as today: there is
-no page to put the long text on, and asking for the day is itself the way to it (§5).
+**Where it shows.** Wherever the chat draws one day: the briefing, "📅 Today", and the
+day's sessions after "Change it" on a proposal that changed today. Under the title come the
+done line when the session is trained, the short line, and what the athlete said about the
+session ("You said: …"), as today. All of this holds where the pages are published, and
+only there (§5).
 
 **Where the full description still shows.** On the page (§6), on the Calendar page's day
 sheet for today and the days ahead, on Google Calendar, and in `workout show` of one day.
@@ -203,7 +201,7 @@ for the moment the page could not load the full text, runs `workout show -d <day
 `workout list` and `workout list -v` are unchanged (§14, A24).
 
 `-l` is `--link` today, on both `workout list` and `workout show`. `--long` takes the
-letter, and `--link` keeps its long name only (§14, A23).
+letter, and the Calendar link moves to `-L` (§13, D10).
 
 ## 5. "🔎 Tell me more"
 
@@ -213,25 +211,21 @@ Under a day's sessions it opens that day. Under a proposal it opens that proposa
 under a message only when that message left something out: a day whose sessions all show
 their full description has no such button.
 
-The button comes in two forms. The function that makes it picks one. It asks the test the
-keyboard already uses: the config names a bucket, and this database was published
-(DESIGN_miniapp_storage.md §8).
+**Only where the pages are published** (§13, D9). The short form and "Tell me more" come
+together. The command asks the test the keyboard already uses: the config names a bucket,
+and this database was published (DESIGN_miniapp_storage.md §8). Where the test fails, the
+chat is as it is today: the long proposal, the full description in the briefing and under
+"📅 Today", and no "Tell me more". Without the bucket there is no page to hold the long
+text, so nothing can be shortened.
 
-**With a bucket: a page button.** The button opens the page of §6. It carries the page's
-address and nothing else, so the bot remembers nothing about it. Three things follow:
+**A page button.** The button opens the page of §6. It carries the page's address and
+nothing else, so the bot remembers nothing about it. Three things follow:
 
 - It does not count as the chat's live row. Tapping "📅 Today" at 09:00 does not retire
   "😴 Feeling tired" under the 08:00 briefing.
 - It stays under its message for good. Tapping "👍 Got it" removes the other buttons of
   the row and leaves this one. Under a proposal it stays after the answer too.
 - A tap on it is not a message to the bot. Nothing runs, and the journal sees nothing.
-
-**Without a bucket: the text in the chat.** The button is an ordinary button of the row,
-like "Tell me more" under the plan view, which sends `bot mesocycle <id>`. Under the
-briefing it sends `workout show -d <day>`, which prints the full description (§4).
-Under a proposal it sends `bot proposal <id>`, a new hidden command that prints the
-proposal's long text and changes nothing. This is the long message of today, asked for
-instead of sent.
 
 **The files go up before the button does.** Stamind uploads the pages' files when a command
 ends (DESIGN_miniapp_storage.md §6). The bot sends a row the moment the command prints it,
@@ -250,10 +244,6 @@ such a briefing has no row, because the proposal's message carries every button
 so it can sit under the briefing without bringing a second question. The athlete can then
 read today's session in full, as planned, before she answers the proposal under it. The
 proposal's own "Tell me more" shows what would change.
-
-Without a bucket the briefing gets no button on such a morning. A chat button there would
-be replaced by the proposal's row half a second later, and a tap on it would answer "That
-offer expired".
 
 ## 6. The page
 
@@ -419,10 +409,8 @@ The stored value is left in each database. Nothing reads it.
   `workout generate` writes them again, except the sessions of the next `commitment-days`
   (7 by default) that it keeps as promised (DESIGN_plan_change_continuity.md §4). Those
   show their full text until they pass or a run changes them.
-- **Without a bucket, "Tell me more" is an ordinary button of its row.** Tapping it removes
-  the row's other buttons, "😴 Feeling tired" among them. Under a proposal the athlete asked
-  for, it is also the chat's one live row, so the morning's buttons expire the moment the
-  proposal arrives. A bot restart forgets it. With a bucket none of this happens (§5).
+- **An instance whose pages are not published** gets no short form (§5). None is in that
+  state today. The long proposal it keeps is made easier to read apart from this design.
 - **A failed upload.** The page then shows the file of the command before, and the short
   line in the chat is newer than the page, until the next command uploads
   (DESIGN_miniapp_storage.md §16).
@@ -457,8 +445,8 @@ did not hold, and the prompt is where it is fixed.
 | `stamind/cli/render/companion.py` | a requested day (§4); the proposal's short text |
 | `stamind/cli/workouts/proposal.py` | what the saved proposal keeps (§3); the item's message |
 | `stamind/cli/queue.py` | `send_alone` prints the long text in a terminal only; the row under today's sessions after "Change it" |
-| `stamind/cli/bot/views.py`, `parser.py` | the briefing's row, also on a morning with a proposal (§5); `bot proposal <id>` |
-| `stamind/cli/workouts/parser.py`, `listing.py` | `workout show`: the rule of §4, `--long`/`-l` and `--short`/`-s`; `--link` loses `-l` |
+| `stamind/cli/bot/views.py` | the briefing's row, also on a morning with a proposal (§5) |
+| `stamind/cli/workouts/parser.py`, `listing.py` | `workout show`: the rule of §4, `--long`/`-l` and `--short`/`-s`; `--link` moves to `-L` |
 | `stamind/cli/render/calendar_page.py` | a day that is over is drawn short (§4) |
 | `stamind/sentinels.py`, `stamind/chat/keyboards.py`, `replies.py`, `callbacks.py`, `telegram_api.py` | the page button (§5) |
 | `stamind/chat/messages.py` | "💬 Full day in chat" runs `workout show -d <day>` |
@@ -467,7 +455,7 @@ did not hold, and the prompt is where it is fixed.
 | `stamind/cli/render/` | a small module that builds the proposal file's content |
 | `miniapp/details.html`, `details.js` | the page of §6, over `storage.js` and `calendar_logic.js` |
 | `stamind/settings.py`, `stamind/cli/bot/capture.py`, `stamind/chat/routing.py`, `stamind/coach/service/adapt.py`, `stamind/coach/service/generate.py`, `stamind/coach/engine/`, `stamind/cli/workouts/revisions.py` | `terse` and `quotes_wording` go, with every reader of the setting |
-| `docs/ARCHITECTURE.md` | the bot section, the pages, the schema, and the `workout list` / `workout show` rows of the command reference (`-l` moves, `-s` arrives) |
+| `docs/ARCHITECTURE.md` | the bot section, the pages, the schema, and the `workout list` / `workout show` rows of the command reference (`-l` becomes `--long`, `--link` moves to `-L`, `-s` arrives) |
 
 Implemented designs amended when each step lands: DESIGN_output_verbosity.md §5 (the
 limits), §9 (`terse` is removed); DESIGN_bot_simple_frontend.md §4.1, §4.4 and §6 (the
@@ -484,17 +472,14 @@ a morning with a proposal); DESIGN_settings.md (one setting fewer).
   when a planner gave no change line.
 - The briefing prints the short line when the session has one and the full description when
   it has none; a day with no short line gets no button.
-- A requested day prints the short line when the database was published, and the full
-  description otherwise.
+- An instance that was never published prints the texts of today, with no button.
 - `workout show` prints the full description for one day, and the short line for several
   days and with `-H`; `--long` and `--short` override both; a session with no short line
   prints its description.
 - The Calendar's file for a month holds the full description for today and the days ahead,
   and none for a day that is over.
-- On a morning with a proposal, the briefing has a page button when the database was
-  published, and no button otherwise.
+- On a morning with a proposal, the briefing has its page button.
 - A gym session whose brief changed and whose kilograms stand keeps its short line.
-- The row holds a page button when the database was published, and a chat button otherwise.
 - A page button is not the chat's live row, survives a tap on another button of its row,
   and its address is in no journal line.
 - Making a "Tell me more" button runs the upload step first, with the `proposal` file first
@@ -526,6 +511,15 @@ The author ruled on these on 2026-10-07, after reading the review.
 | D7 | `workout show` | It shows the long text by default only when it displays one day, and the short text otherwise. `--short`/`-s` and `--long`/`-l` override. With `-H` it defaults to the short text even for one day. |
 | D8 | "Tell me more" on a morning with a proposal | The athlete must be able to read the full text before accepting. This overrules A10. |
 
+The author ruled on these on 2026-10-09, after the choices of §14 were explained to him.
+
+| ID | Topic | Ruling |
+|---|---|---|
+| D9 | An instance with no bucket | "Without the bucket, we cannot abbreviate." Where the pages are not published, the chat stays as it is today. This overrules A8, and A20 goes with it. |
+| D10 | The letters of `workout show` | `-l` is `--long`, and `-L` is the Calendar link. This changes A23. |
+
+He also accepted A22 and A24 as proposed.
+
 ## 14. Decided without asking the author
 
 The interview had seven minutes. These choices were made after it, by Claude, to make the
@@ -546,7 +540,7 @@ A choice the author overruled keeps its row, with the ruling beside it.
 | A5 | A session's "Tell me more" shows the day's whole sheet, as the Calendar does: what is planned, what was done, signals and constraints. | The month file holds it already, so nothing new is built or uploaded. | A page that shows the planned session only. | Thorough: one line differs. On a goal's day the Calendar opens the sheet with the goal, read from another file. This page does not show it (§6.1). Pragmatic: right-sized. **Author, 2026-10-07 (D6):** a day that is over shows the short line, on the Calendar and on this page alike. |
 | A6 | One `proposal` file, replaced by each new proposal. An older proposal's button gets "replaced by a newer one". | One proposal is open at a time. One file never needs a deletion. | One file per proposal, kept or cleaned up. | Pragmatic: needed. What a tap writes does not hold the old sessions that the "Was" side needs, so the proposal has to keep its page's content. |
 | A7 | The proposal's page shows, per session, the reason, the changed passages, and the whole new description folded. | The passages point at what changed. The whole text was missing on 4 October for a session with a new title. | Old and new description side by side in full. The passages only. | Pragmatic: right-sized. |
-| A8 | With no bucket, "Tell me more" sends the long text in the chat (§5). | The short form must not depend on a Google bucket. This is also the long text of today, so nothing new is written. | No short form at all without a bucket. No details at all without a bucket. | Thorough objected. As first written, "📅 Today" without a bucket carried its own chat button, which retired "😴 Feeling tired" under the morning briefing. Answered by A20. **Pragmatic objects and would drop this form.** Both of the author's instances are published, so it serves no athlete today. Its shape: where the pages are not published, the chat stays exactly as it is today, long texts and no "Tell me more". That removes the hidden command `bot proposal`, three chat buttons and two tests, and leaves one difference to explain in place of three. The price: an operator with no bucket gets no short messages. Its second choice, if the short form must work without a bucket: no button under a day, and `bot proposal` under a proposal only. **Thorough, second pass, would drop it too,** and found a second hole: under a proposal the athlete asked for, the chat button is the chat's one live row, so the morning's buttons expire when the proposal arrives, with no tap (§10). Pragmatic, second pass: that hole makes its second choice weaker than it first rated it. **Not applied: the author rules.** What each ruling changes in the build is under this table. **Pragmatic, after D8:** the ruling adds weight to the objection. With A8 kept, an instance with no bucket has no button under the briefing on a morning with a proposal, so D8 is met there only through "📅 Today". With the form dropped, the briefing there is the long text of today, and D8 is met with no code. |
+| A8 | With no bucket, "Tell me more" sends the long text in the chat (§5). | The short form must not depend on a Google bucket. This is also the long text of today, so nothing new is written. | No short form at all without a bucket. No details at all without a bucket. | **Overruled by the author, 2026-10-09 (D9):** "Without the bucket, we cannot abbreviate." Where the pages are not published, the chat stays as it is today (§5). Both reviewers had asked for this. The thorough reviewer had found two flaws in the chat button: "📅 Today" and a proposal asked for at 08:30 each made the buttons under the 08:00 briefing expire. |
 | A9 | The short text and "Shall I make these changes?" are one message, and it keeps its text after the answer. | The buttons sit under what they answer, and the chat keeps what was accepted. | Two messages, as today. | Thorough: the message is sent whole, so Telegram refuses one over 4,096 characters. That takes more than 50 changed sessions; listed in §10. Pragmatic: no more code than two messages. "Kept with today's …" is printed earlier in the run, so it stays a message of its own; §3 now says so. |
 | A10 | On a morning with a proposal, the briefing has no "Tell me more" (§5). | The author decided on 2026-10-05 that such a morning has one keyboard. | A lone "Tell me more" under the briefing. | Pragmatic: right-sized. **Overruled by the author, 2026-10-07 (D8):** the briefing has its "Tell me more" on such a morning too, as a page button, which asks nothing and is not the chat's live row (§5). |
 | A11 | A gym day's short line is written by the strength planner only. | One writer per field. Only the strength planner knows the exercises and kilograms. | The week planner writing a first short line from the brief, replaced later. | Thorough objected. A gym day whose brief the week planner changed, and whose kilograms the strength planner kept, was written again with no short line. Fixed: the short line is copied with the sets (§7). The choice itself stands. Pragmatic: the fix is needed, and it is one line. |
@@ -558,27 +552,11 @@ A choice the author overruled keeps its row, with the ruling beside it.
 | A17 | The list never groups two sessions changed the same way (§3). | One line per session is the rule the athlete can rely on. | "Fri 09, Mon 12 · split squats 40 → 36 kg" on one line. | Pragmatic: right-sized. |
 | A18 | The terminal changes in one place only: `terse` no longer hides the quotes there (§8, §9). | AGENTS.md exempts the terminal from the companion's rules. | A short form in the terminal too. | Pragmatic: right-sized. **Changed by the author, 2026-10-07 (D7):** `workout show` in a terminal follows the new rule of §4. |
 | A19 | No red-team pass and no visual preview were run before this document was written. The author asked for a review by two reviewers instead, on 2026-10-06. | The interview's time was up. | Asking two more questions after the seven minutes. | — |
-| A20 | Added in the review. Without a bucket, "📅 Today" prints the full description, as today, with no button. Only the texts the bot sends unasked are short there (§4). | A chat button under "📅 Today" would become the chat's one live row and retire the morning's buttons. Asking for the day is already a request for its text. | The short line with a chat button under it. A "not handled" line. | Thorough, second pass: accepted; it closes the "📅 Today" hole. Pragmatic: better than a "not handled" line, and less code. But it fixes half: without a bucket, a tap on the briefing's own "Tell me more" still removes "😴 Feeling tired" (§10). It would fold this choice into its objection to A8. **Not applied: the author rules.** |
+| A20 | Added in the review. Without a bucket, "📅 Today" prints the full description, as today, with no button. Only the texts the bot sends unasked are short there (§4). | A chat button under "📅 Today" would become the chat's one live row and retire the morning's buttons. Asking for the day is already a request for its text. | The short line with a chat button under it. A "not handled" line. | **Dropped with A8 by the author's ruling of 2026-10-09 (D9).** It patched one flaw of A8's chat button. |
 | A21 | Added in the review. A session whose only difference is its short line is not written again (§7). | `short_name` already works this way. A reworded short line would otherwise make a new form of the session, and a Google Calendar update with it. | Counting the short line among the fields that make a session changed. | Pragmatic: costs no code. The list of fields that make a session count as changed simply does not gain the new column. |
-| A22 | Added with D6. On the Calendar, a past session with no short line shows its title and its length only, never its long text (§4). | The author asked that the Calendar stop showing the long text of past sessions. Every session written before this lands has no short line, and a past session is never written again. | Falling back to the long text, which keeps the whole past long for good. | Thorough: no objection from the code; what the athlete told the coach about a session stays on a past day (§4). Pragmatic: right-sized, and the same code as the fallback. With the fallback nothing would change on the day it lands, because no past session has a short line and none is written again. The price: for a session written before step 1, the long text is then only in `workout show -d <day>` and on Google Calendar. |
-| A23 | Added with D7. `--long` takes the letter `-l`, and `--link` keeps its long name only (§4). | The author asked for `--long`/`-l`. Today `-l` is `--link`, on `workout list` and on `workout show`. | `--long` with another letter, or with none. | Thorough: no objection; one parser line and one row of docs/ARCHITECTURE.md, no test and no bot table. Pragmatic: right-sized. `-l` for `--long` is the author's own letter. |
-| A24 | Added with D7. "💬 Full day in chat", and "Tell me more" without a bucket, run `workout show -d <day>`. `-v` gets no new meaning (§4, §5). This replaces A14. | The author's rule for `workout show` already gives the long text of one day, in the chat as in a terminal. | A14: `-v` meaning "the full text" in the chat and something else in a terminal. | Thorough: no objection; nothing stands between the Calendar's button and `workout show`. Pragmatic: right-sized, and no more code than A14. `workout list -vv` follows the rule too, because `workout show` is that listing (§4). |
-
-**What each ruling on A8 changes in the build.** Both reviewers would drop the form for an
-instance with no bucket. The author has three ways to rule:
-
-- **A8 kept, as this document is written.** Step 2 builds `bot proposal <id>` and the chat
-  button under a proposal. Step 6 builds the chat button under the briefing and after
-  "Change it", and keeps "📅 Today" long without a bucket (A20). The two flaws of §10's
-  second line stay, and the briefing gets no button on a morning with a proposal (§5). No
-  athlete of today meets any of this: both instances are published.
-- **The form dropped.** Where the pages are not published, the chat is exactly as it is
-  today: long texts and no "Tell me more". Gone from this document: `bot proposal <id>`, the
-  chat buttons, A20, §10's second line, and the "Without a bucket" paragraph of §5. D1, D2
-  and D4 then hold only on a published instance.
-- **In between.** No chat button under a day, and `bot proposal <id>` under a proposal
-  only. A proposal the athlete asks for at 08:30 still expires the buttons under the 08:00
-  briefing.
+| A22 | Added with D6. On the Calendar, a past session with no short line shows its title and its length only, never its long text (§4). | The author asked that the Calendar stop showing the long text of past sessions. Every session written before this lands has no short line, and a past session is never written again. | Falling back to the long text, which keeps the whole past long for good. | Thorough: no objection from the code; what the athlete told the coach about a session stays on a past day (§4). Pragmatic: right-sized, and the same code as the fallback. With the fallback nothing would change on the day it lands, because no past session has a short line and none is written again. The price: for a session written before step 1, the long text is then only in `workout show -d <day>` and on Google Calendar. **Accepted by the author, 2026-10-09.** |
+| A23 | Added with D7. `--long` takes the letter `-l`, and `--link` keeps its long name only (§4). | The author asked for `--long`/`-l`. Today `-l` is `--link`, on `workout list` and on `workout show`. | `--long` with another letter, or with none. | Thorough: no objection; one parser line and one row of docs/ARCHITECTURE.md, no test and no bot table. Pragmatic: right-sized. `-l` for `--long` is the author's own letter. **Changed by the author, 2026-10-09 (D10):** `-l` is `--long`, and the Calendar link moves to `-L`. |
+| A24 | Added with D7. "💬 Full day in chat", and "Tell me more" without a bucket, run `workout show -d <day>`. `-v` gets no new meaning (§4, §5). This replaces A14. | The author's rule for `workout show` already gives the long text of one day, in the chat as in a terminal. | A14: `-v` meaning "the full text" in the chat and something else in a terminal. | Thorough: no objection; nothing stands between the Calendar's button and `workout show`. Pragmatic: right-sized, and no more code than A14. `workout list -vv` follows the rule too, because `workout show` is that listing (§4). **Accepted by the author, 2026-10-09.** With D9 there is no "Tell me more" without a bucket, so only "Full day in chat" is left of it. |
 
 ## 15. Not verified
 
@@ -606,6 +584,8 @@ instance with no bucket. The author has three ways to rule:
 | D6 | The Calendar's past | The day sheet of a day that is over shows a session's short line, not its long description. | The author's ruling. On a past day, what was done is what the sheet is read for. | Interview | 2026-10-07 |
 | D7 | `workout show` | The long text by default for one day, the short line for several days and with `-H`. `--long`/`-l` and `--short`/`-s` override. | The author's ruling. It also gives the chat its way to a day's long text, so `-v` gets no second meaning. | Interview | 2026-10-07 |
 | D8 | "Tell me more" on a morning with a proposal | The briefing has its "Tell me more" on such a morning too. | The author's ruling, which overrules A10: the athlete must be able to read the full text before accepting. | Interview | 2026-10-07 |
+| D9 | An instance with no bucket | Where the pages are not published, the chat stays as it is today: no short form and no "Tell me more". | The author's ruling, which overrules A8 and drops A20: "Without the bucket, we cannot abbreviate." Both reviewers had asked for it. | Interview | 2026-10-09 |
+| D10 | The letters of `workout show` | `-l` is `--long`, and the Calendar link moves from `-l` to `-L`. | The author's ruling, which changes A23. Nothing but the parser and one row of docs/ARCHITECTURE.md uses `-l` for the link. | Interview | 2026-10-09 |
 
 ## Dependency Graph & Implementation Order
 
@@ -621,14 +601,13 @@ Each step from 1 on works on its own, and each can be landed alone.
 
 0. **The check on a phone** (§15): a button under a message opens a page, and the page
    reads its address after the `#`. D3 hangs on it. If it fails, the design needs another
-   answer before anything is built. Step 2 also waits for the author's ruling on A8 and A20
-   (§14): it decides whether the chat form and `bot proposal <id>` are built at all.
+   answer before anything is built.
 1. **The short line is written and stored** (§4, §7): the column, and `summary` in both
    planners' answers. The chat does not change yet. It lands early on purpose: there is no
    backfill, so every session written from then on has its short line when the later steps
    land.
 2. **The short proposal, with its page** (§3, §5, §6.2, §7): `change`; the two-sentence
-   `reason`; the short text and the question as one message; "Tell me more" in both forms;
+   `reason`; the short text and the question as one message; the "Tell me more" page button;
    `details` with its proposal form; the `proposal` file; the upload before a button.
    First, `make_renderer` moves out of `cli/render/__init__.py` into `companion.py`. Today
    `page_files/sync.py` imports `cli/render`, whose `__init__.py` loads both renderers, and
@@ -639,8 +618,8 @@ Each step from 1 on works on its own, and each can be landed alone.
    page shows the "Was" and "Now" pairs whatever `terse` says.
 3. **`terse` is removed** (§8), straight after step 2. From then on the setting would
    switch nothing the athlete can see.
-4. **`workout show`** (§4, D7): the rule, `--long`/`-l` and `--short`/`-s`; `--link` loses
-   `-l`; "Full day in chat" runs `workout show -d <day>`. Needs step 1 only. Nothing changes
+4. **`workout show`** (§4, D7): the rule, `--long`/`-l` and `--short`/`-s`; `--link` moves
+   to `-L`; "Full day in chat" runs `workout show -d <day>`. Needs step 1 only. Nothing changes
    in the chat yet: there `workout show` of a day and "📅 Today" still print the same text.
 5. **The Calendar's short past** (§4, D6). Needs step 1 only. After it lands,
    `sm data publish` is run once per instance, so the months older than the Calendar's ten
