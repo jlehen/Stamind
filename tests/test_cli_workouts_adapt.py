@@ -237,8 +237,9 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         self.assertIn(
             "🚴 Wed Jun 10: Climb Threshold — 85 min (same session, wording updated)\n"
             "Cue now references Wednesday.\n\n"
-            "Was: 2x20 at threshold, seated. Even power beats a good average.\n"
-            "Now: 2x20 at threshold, seated. Wednesday's execution was exactly right.", stdout,
+            "🔴 Was: 2x20 at threshold, seated. Even power beats a good average.\n"
+            "🟢 Now: 2x20 at threshold, seated. Wednesday's execution was exactly right.",
+            stdout,
         )
         # The wording diff puts blank lines inside a session's own entry, so the day
         # boundary needs a mark of its own (DESIGN_bot_simple_frontend.md §6).
@@ -259,7 +260,8 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
     ):
         """A gym day's exercises stand one to a line, and the quote used to run them into
         one. Two gym days rewritten the same way used to be quoted in full twice. Seen
-        2026-10-04, in a 1,237-word reply."""
+        2026-10-04, in a 1,237-word reply. Each exercise that changed stands beside the
+        line it replaced (DESIGN_workout_revisions.md §9.1)."""
         friday = {
             "date": "2026-06-12", "sport_type": "strength_training", "title": "Gym: Heavy",
             "description": (
@@ -298,26 +300,28 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertIn(
-            "Was: Lunge: split squat 3×5–8 @ 40 kg\n"
-            "     Carry: farmers carry 3×1 @ 72 kg\n"
-            "Now: Lunge: split squat 3×6–8/side @ 36 kg\n"
-            "     Carry: farmers carry 3×1 @ 78 kg", stdout,
+            "🔴 Was: Lunge: split squat 3×5–8 @ 40 kg\n"
+            "🟢 Now: Lunge: split squat 3×6–8/side @ 36 kg\n"
+            "\n"
+            "🔴 Was: Carry: farmers carry 3×1 @ 72 kg\n"
+            "🟢 Now: Carry: farmers carry 3×1 @ 78 kg", stdout,
         )
         self.assertIn(
             "Mon Jun 15: Gym: Heavy — 65 min (same session, wording updated)\n"
             "Same change as Fri Jun 12.", stdout,
         )
-        self.assertEqual(stdout.count("Was: "), 1)
+        self.assertEqual(stdout.count("Was: "), 2)
 
     @patch("stamind.cli.workouts.adapt.ensure_recent_data")
     @patch("stamind.runtime.coach_service")
-    def test_quoted_wording_is_whole_lines_with_their_blank_lines(
+    def test_a_rewritten_line_stands_beside_the_line_it_replaced(
         self, mock_coach, _mock_ensure
     ):
-        """The quote used to be cut by sentence. One sentence left alone in the middle of a
-        rewritten bullet split it in two, so the second half opened mid-bullet, under no
-        section name, and the blank lines between the sections were dropped. Seen
-        2026-10-07 (DESIGN_workout_revisions.md §9.1)."""
+        """The quote is whole lines: cut by sentence, one sentence left alone in the middle
+        of a rewritten bullet split it in two (seen 2026-10-07). And each `Was:` is one line
+        with its own `Now:` under it: three old lines followed by four new ones, with blank
+        lines inside, could not be told apart from the next pair (seen 2026-10-09,
+        DESIGN_workout_revisions.md §9.1)."""
         original = {
             "date": "2026-06-14", "sport_type": "cycling", "title": "Easy Ride + SIT",
             "description": (
@@ -346,18 +350,54 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertIn(
-            "Was: - Warm up at 150–170 W.\n"
-            "     - Then 4 × 30 s all-out. Priority 1: go hard. Priority 2: hold on.\n"
-            "     - Everything else stays under 175 W.\n"
+            "🔴 Was: - Warm up at 150–170 W.\n"
+            "🟢 Now: WARM-UP: ride at 150–170 W.\n"
             "\n"
-            "Now: WARM-UP: ride at 150–170 W.\n"
+            "🟢 Added: SPRINTS: 4 × 30 s all-out.\n"
             "\n"
-            "     SPRINTS: 4 × 30 s all-out.\n"
-            "     - No power target. Priority 1: go hard. Priority 2: hold on to the end.\n"
+            "🔴 Was: - Then 4 × 30 s all-out. Priority 1: go hard. Priority 2: hold on.\n"
+            "🟢 Now: - No power target. Priority 1: go hard. Priority 2: hold on to the end.\n"
             "\n"
-            "     EVERYTHING ELSE: 155–175 W.", stdout,
+            "🔴 Was: - Everything else stays under 175 W.\n"
+            "🟢 Now: EVERYTHING ELSE: 155–175 W.", stdout,
         )
-        self.assertEqual(stdout.count("Was: "), 1)
+
+    def test_no_quoted_group_holds_a_blank_line(self):
+        """Lines added with nothing standing for them are quoted together as long as they
+        followed one another, and a blank line starts a new group. So a blank line in the
+        chat always parts two groups. A line that shares little with any other is still
+        paired when it is the only one left on each side (DESIGN_workout_revisions.md
+        §9.1)."""
+        from stamind.cli.workouts.revisions import wording_groups
+        old = {"description": (
+            "[Ride]\nEasy, before tomorrow's sprints.\n\n"
+            "CAP: 155–175 W. Use the recomputed cap after the test.\n\n"
+            "Fuel: 60 g carbs per hour."
+        )}
+        new = {"description": (
+            "[Ride]\nEasy, before Sunday's sprints.\n\n"
+            "MORNING CHECK: look at your resting heart rate.\n"
+            "- If it is 52 or higher, ride 90 min.\n\n"
+            "ROUTE: stay on the valley floor.\n\n"
+            "CAP: 155–175 W. These numbers are final.\n\n"
+            "Fuel: 60 g carbs per hour."
+        )}
+        self.assertEqual(wording_groups(new, old), [
+            (["Easy, before tomorrow's sprints."], ["Easy, before Sunday's sprints."]),
+            ([], ["MORNING CHECK: look at your resting heart rate.",
+                  "- If it is 52 or higher, ride 90 min."]),
+            ([], ["ROUTE: stay on the valley floor."]),
+            (["CAP: 155–175 W. Use the recomputed cap after the test."],
+             ["CAP: 155–175 W. These numbers are final."]),
+        ])
+        unlike = wording_groups(
+            {"description": "Spin the hill home in your easiest gear."},
+            {"description": "No surges on the rollers."},
+        )
+        self.assertEqual(
+            unlike,
+            [(["No surges on the rollers."], ["Spin the hill home in your easiest gear."])],
+        )
 
     @patch("stamind.cli.workouts.adapt.ensure_recent_data")
     @patch("stamind.runtime.coach_service")

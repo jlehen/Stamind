@@ -5,7 +5,7 @@ The expert table lives here; the companion prose form of the same proposal is
 (DESIGN_render_persona.md §7).
 """
 import difflib
-from typing import List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 from stamind import settings
 from stamind.text import (
@@ -15,9 +15,13 @@ from stamind.cli.common import print_strength_notes
 from stamind.coach.proposals import RevisionProposal
 from stamind.coach.revisions import RevisionPair
 
-# A group of the wording diff: the lines dropped and the lines that took their place, with
-# the blank lines that stood between them. Either side may be empty.
+# A group of the wording diff: one line and the line that took its place, or a run of lines
+# that were dropped or added with nothing standing for them. No group holds a blank line.
 WordingGroup = Tuple[List[str], List[str]]
+
+# How alike two lines must be for one to count as the other rewritten: a third of their
+# words, in the same order (DESIGN_workout_revisions.md §9.1).
+SAME_LINE = 1 / 3
 
 
 def _stats(w: dict) -> str:
@@ -63,44 +67,102 @@ def _lines(text) -> Tuple[List[str], Set[int]]:
     return out, spaced
 
 
-def _passage(lines: List[str], spaced: Set[int], start: int, end: int) -> List[str]:
-    """Lines `start` to `end`, with the blank lines that stood between them."""
-    out: List[str] = []
-    for index in range(start, end):
-        if index in spaced and out:
-            out.append("")
-        out.append(lines[index])
-    return out
+def _alike(old: str, new: str) -> float:
+    """How much of two lines is the same words in the same order, from 0 to 1."""
+    return difflib.SequenceMatcher(None, old.lower().split(), new.lower().split()).ratio()
+
+
+def _rewrites(old: List[str], new: List[str]) -> Dict[int, int]:
+    """Which old line each new line is a rewrite of, by position in the two lists. The pairs
+    most alike are taken first, and a line is paired once. When one line is then left on
+    each side, the one took the place of the other, however little they share."""
+    scored = sorted(
+        (-_alike(o, n), j, i) for i, o in enumerate(old) for j, n in enumerate(new)
+    )
+    pairs: Dict[int, int] = {}
+    taken: Set[int] = set()
+    for score, j, i in scored:
+        if -score < SAME_LINE:
+            break
+        if j in pairs or i in taken:
+            continue
+        pairs[j] = i
+        taken.add(i)
+    left_old = [i for i in range(len(old)) if i not in taken]
+    left_new = [j for j in range(len(new)) if j not in pairs]
+    if len(left_old) == 1 and len(left_new) == 1:
+        pairs[left_new[0]] = left_old[0]
+    return pairs
+
+
+def _runs(lines: List[str], spaced: Set[int], start: int, alone: List[int]) -> List[List[str]]:
+    """The lines at the positions `alone`, as runs of lines that followed one another with
+    no blank line between them. `start` is where position 0 stands in the description."""
+    runs: List[List[str]] = []
+    last = None
+    for index in alone:
+        if last is None or index != last + 1 or start + index in spaced:
+            runs.append([])
+        runs[-1].append(lines[start + index])
+        last = index
+    return runs
+
+
+def _line_by_line(
+    a: List[str], a_spaced: Set[int], i1: int, i2: int,
+    b: List[str], b_spaced: Set[int], j1: int, j2: int,
+) -> List[WordingGroup]:
+    """One changed stretch as groups, in the order of the new text: a rewritten line beside
+    the line it replaced, the added lines where they stand, and last the lines dropped."""
+    pairs = _rewrites(a[i1:i2], b[j1:j2])
+    groups: List[WordingGroup] = []
+    added: List[int] = []
+    for j in range(j2 - j1):
+        if j not in pairs:
+            added.append(j)
+            continue
+        groups += [([], run) for run in _runs(b, b_spaced, j1, added)]
+        added = []
+        groups.append(([a[i1 + pairs[j]]], [b[j1 + j]]))
+    groups += [([], run) for run in _runs(b, b_spaced, j1, added)]
+    dropped = [i for i in range(i2 - i1) if i not in pairs.values()]
+    return groups + [(run, []) for run in _runs(a, a_spaced, i1, dropped)]
 
 
 def wording_groups(proposal: dict, original: dict) -> List[WordingGroup]:
-    """What moved between two descriptions, as (dropped, replacement) groups of whole lines.
+    """What moved between two descriptions, as groups of whole lines.
 
-    Whole lines, and never a sentence cut out of one: a quoted bullet or section then comes
-    with its name and reads on its own (DESIGN_workout_revisions.md §9.1)."""
+    Whole lines, and never a sentence cut out of one. A line that was rewritten stands
+    beside the line it replaced, so each `Was:` is followed by its own `Now:`
+    (DESIGN_workout_revisions.md §9.1)."""
     a, a_spaced = _lines(original.get('description'))
     b, b_spaced = _lines(proposal.get('description'))
-    return [
-        (_passage(a, a_spaced, i1, i2), _passage(b, b_spaced, j1, j2))
-        for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b).get_opcodes()
-        if tag != 'equal'
-    ]
+    groups: List[WordingGroup] = []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b).get_opcodes():
+        if tag != 'equal':
+            groups += _line_by_line(a, a_spaced, i1, i2, b, b_spaced, j1, j2)
+    return groups
 
 
-def wording_group_lines(group: WordingGroup, indent: str = "") -> List[str]:
+def wording_group_lines(
+    group: WordingGroup, indent: str = "", gone: str = "", new: str = "",
+) -> List[str]:
     """One group as a labelled 'Was:' / 'Now:' pair (or 'Dropped:' / 'Added:' when one
     side is empty), wrapped at the client's width with the text hanging under its label.
-    A blank line parts the two when either side holds one."""
+    `gone` and `new` are marks put before the two labels, for a client that shows no
+    colour."""
     dropped, added = group
     lines: List[str] = []
     if dropped:
         label = "Was: " if added else "Dropped: "
-        lines.append(format_labeled_text(indent + label, "\n".join(dropped), color_fn=red))
+        lines.append(
+            format_labeled_text(indent + gone + label, "\n".join(dropped), color_fn=red)
+        )
     if added:
         label = "Now: " if dropped else "Added: "
-        lines.append(format_labeled_text(indent + label, "\n".join(added), color_fn=green))
-    if len(lines) == 2 and "" in dropped + added:
-        lines.insert(1, "")
+        lines.append(
+            format_labeled_text(indent + new + label, "\n".join(added), color_fn=green)
+        )
     return lines
 
 

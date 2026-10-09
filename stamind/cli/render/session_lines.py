@@ -61,6 +61,11 @@ def sport_emoji(sport_type: Optional[str]) -> str:
 # (DESIGN_bot_simple_frontend.md §6).
 SIMPLE_SESSION_RULE = "———"
 
+# The marks before a quoted change: the text that goes, and the text that comes. A terminal
+# says it with colour, and the chat has none (DESIGN_workout_revisions.md §9.1).
+SIMPLE_GONE_MARK = "🔴 "
+SIMPLE_NEW_MARK = "🟢 "
+
 
 def simple_session_line(w: Dict[str, Any], lead: Optional[str] = None) -> str:
     """One simple-mode line for a session: '🏃 Today: Easy run — 40 min'.
@@ -379,7 +384,10 @@ def simple_revision_lines(proposal: RevisionProposal) -> List[str]:
             entry_lines.append(why)
         quoted = []
         if quotes_wording(pw, existing):
-            quoted = ["\n".join(wording_group_lines(b)) for b in wording_groups(pw, existing)]
+            quoted = [
+                "\n".join(wording_group_lines(b, gone=SIMPLE_GONE_MARK, new=SIMPLE_NEW_MARK))
+                for b in wording_groups(pw, existing)
+            ]
         change = "\n\n".join(entry_lines[1:] + quoted)
         if quoted and change in first_quoted:
             same = f"Same change as {first_quoted[change]}."

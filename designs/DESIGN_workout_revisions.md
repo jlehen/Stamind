@@ -785,9 +785,7 @@ tell which part of the ride it was about. The blank lines between the sections w
 dropped as well, so the six sections stood glued together.
 
 So the diff compares lines. A bullet, an exercise or a section is quoted whole, and a
-section whose name is on its line comes with its name. The blank lines between two quoted
-lines are kept. When either side holds one, a blank line also parts `Was:` from `Now:`.
-Sunday's ride now reads as one pair: the five bullets, then the six sections.
+section whose name is on its line comes with its name.
 
 The cost: a sentence changed inside a long paragraph quotes that paragraph on both sides.
 Replayed on 2026-10-07 over the 100 wording-only revisions the two instances held, whole
@@ -795,8 +793,48 @@ lines quote 3% more words in all. 82 revisions quote the same words either way. 
 passage that ran over several lines and started or stopped in the middle of one. Two grew
 by more than 100 words.
 
+**Each rewritten line stands beside the line it replaced.** Whole lines were first quoted
+in runs: every line of a changed stretch under one `Was:`, and every line that replaced
+them under one `Now:`, with the blank lines that stood between them.
+
+Observed 2026-10-09: it is Friday morning, and the week planner rewrites Saturday's long
+ride. The ride's text is ten short parts: an opening, then "CAP:", "ROUTE:", "RAMP RULE:"
+and so on. Four parts in a row changed a little, and a "MORNING CHECK:" part came in
+between them. The athlete read one `Was:` of four paragraphs, then one `Now:` of five. A
+blank line stood between two paragraphs of one quote, between `Was:` and `Now:`, and
+between one pair and the next. Nothing showed where a quote ended, and he could not tell
+which `Now:` answered which `Was:`.
+
+So a changed stretch is quoted line by line, in the order of the new text. A line that was
+rewritten is one `Was:` with its own `Now:` under it. Lines added with nothing standing for
+them are an `Added:`. Lines dropped are a `Dropped:`, after the pairs of their stretch. No
+quote holds a blank line, so a blank line always parts two quotes.
+
+In the chat a red mark stands before what goes, and a green one before what comes:
+`🔴 Was:` and `🔴 Dropped:`, `🟢 Now:` and `🟢 Added:`. A terminal says the same with
+colour. Read on a phone the same day, the bare labels were hard to spot among a session's
+own "CAP:" and "ROUTE:".
+
+Two lines are a pair when a third of their words are the same, in the same order
+(`SAME_LINE`). The pairs most alike are taken first. When one line is then left on each
+side of a stretch, the one took the place of the other, however little they share. A
+"Kettlebell windmill" line replaced by a "Goblet squat" line is still a `Was:` and a
+`Now:`.
+
+Saturday's ride now reads as seven pairs and one `Added:`. "Was: CAP: 155–175 W … Use the
+recomputed cap …" stands directly over "Now: CAP: 155–175 W … these numbers are final …".
+
+Replayed on 2026-10-09 over the 111 wording-only revisions the two instances held. The
+words quoted are the same, since every changed line is still quoted once on its side. 96
+of the 111 had a quote with several lines on both sides. The 195 quotes become 716: 440
+pairs, 157 `Added:` and 119 `Dropped:`. The cutoff was read off the pairs that score
+between a quarter and a half. Above a third they are one part rewritten: "CAP:" at 0.39, a
+gym day's notes at 0.33 to 0.39. Under it they are mostly two different exercises that
+share "@" and "kg".
+
 Not handled: a bullet changed under a section name that stands on a line of its own
-("PROTOCOL:") is quoted without that name.
+("PROTOCOL:") is quoted without that name. A line dropped from the middle of a stretch is
+quoted after that stretch's pairs, away from where it stood.
 
 **What a text revision costs, precisely.** Nothing that matters. It appends a revision row
 and re-pushes the Calendar event, and that is all: `_eased` (§7) counts a revision only when
