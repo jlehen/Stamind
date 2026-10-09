@@ -39,6 +39,10 @@
 - In the companion (the Telegram bot), a difference between two paths that cannot be
   explained in one sentence is a design bug. Collapse the behaviours; do not keep the
   affordance and write better copy for it. The CLI is exempt.
+- In the companion, every question goes through the athlete queue: the command saves it and
+  ends, and a tap answers it whenever the athlete likes. No command waits on the athlete.
+  When a question needs another look or another moment, adapt its queue kind; do not ask on
+  the spot (DESIGN_athlete_queue.md §2). The CLI is exempt.
 - A destructive command defaults to the reversible action (archive) and keeps the hard
   cascade behind `--purge`. If the docs warn the reader off a default every time it is
   mentioned, the default is wrong; fix it rather than repeat the caveat.

@@ -56,7 +56,7 @@ The new kind is `proposal`. Its item holds:
   under "Here's what I'd change:";
 - what a tap writes, as the run resolved it, so a tap writes exactly what was shown. What only
   drew the preview is not saved, and neither are the constraint and signal candidates, which
-  the run asks about itself (§6.1);
+  the run saves as queued questions of their own (§6.3);
 - the days it changes;
 - the newest change that wrote a session, at the moment the run read the week (§4, rule 1);
 - when it was made, and whether the run had last night's sleep score.
@@ -203,15 +203,13 @@ The run itself changes little:
 - When the week planner answers, the proposal is saved and sent (§3). The saved item replaces
   the confirm that holds the chat today.
 - In the chat, the questions about a constraint or a signal found in the message ("Shall I
-  remember…?") come after the proposal, or after the line that says nothing changes. Today
-  they come before the preview (DESIGN_constraints.md §8). A question nobody answers must not
-  hold the proposal back. A tap on "Change it" runs in the chat's own place, so it works while
-  such a question still waits. A terminal run keeps today's order, because nothing changes for
-  a terminal (§2).
-- A question left unanswered for five minutes ends the run, as today. The line changes from
-  "Prompt timed out — command cancelled." to "No answer, so I stopped there.", which is true
-  whether or not a proposal waits above it. The command's own "Cancelled." is not sent after
-  it: the bot has already said its line.
+  remember…?") are not asked by the run. It saves them as queued questions and ends (§6.3,
+  amended 2026-10-08). A terminal run asks them before the preview
+  (DESIGN_constraints.md §8), because nothing changes for a terminal (§2).
+- One of the two questions asked before the week planner is called, left unanswered for five
+  minutes, ends the run, as today. The line changes from "Prompt timed out — command
+  cancelled." to "No answer, so I stopped there." The command's own "Cancelled." is not sent
+  after it: the bot has already said its line.
 - When the week planner changes nothing, the athlete is told so, as today.
 
 The morning push, a reminder and a heads-up wait while the coach's run is alive, the way they
@@ -273,6 +271,160 @@ This is rule 1 of §4, checked one step earlier. The second place makes it neede
 athlete writes "also move Saturday's ride", and at 07:30:30, while that run thinks, they tap
 "Change it" on the 07:07 proposal. Without the check, the 07:31 proposal would arrive already
 out of date.
+
+### 6.3 The questions about what the athlete wrote
+
+Amended 2026-10-08, ruled on and built 2026-10-09. Before it, the run asked these questions
+itself, right after the proposal, and waited five minutes for each.
+
+A message to the coach can hold a constraint or a signal. A **constraint** is a stored fact
+with dates that the coach works around, such as "no training on November 12th"
+(DESIGN_constraints.md). A **signal** is something that acted on the athlete's body on given
+days, such as "three beers last night" (DESIGN_signal_extraction.md). A model reads them out
+of the message, so the athlete is asked before either is stored: "Shall I remember this
+constraint?" and "Shall I log this signal?". Until 2026-10-09 the two questions read "Shall I
+remember that?" and "Shall I log that?".
+
+**The problem.** It is Wednesday 7 October. At 18:33 the athlete writes "No training on
+November 12th, I bring my child to work". At 18:35 the proposal arrives with "Shall I make
+these changes?". In the same second "Shall I remember that? … Thu Nov 12" arrives under it.
+Two questions stand open, which §5 stopped for the morning message only. The athlete has put
+the phone down. At 18:40 the bot says "No answer, so I stopped there." and the constraint is
+forgotten. From 18:35 to 18:40 the run was still alive, so a second message to the coach
+would have got "I asked you something above. Answer it, then send that again." (§6.2).
+
+For those five minutes the run had nothing left to do but wait. The queue's rule already
+covers this: a question is asked on the spot only when the command cannot go on without the
+answer (DESIGN_athlete_queue.md §2).
+
+**The rule.** In the chat, the run saves each of these questions as a queued question and
+ends. The athlete answers with a tap whenever they like. A terminal run is unchanged: it asks
+before the preview and waits (§2).
+
+**Two kinds of queued question**, `constraint` and `signal`. An item holds what the model read
+out of the message, the day the message was sent, and its answers. A date the model left out
+is counted from the day the message was sent, not from the day of the tap.
+
+- A constraint question has two answers. "Yes" stores the constraint with the call that
+  stores it today, so it is still advisory and never a forced rest (DESIGN_constraints.md
+  §8). The reply is "Noted — I'll work around that 👍". "No" stores nothing, and the reply is
+  "Okay — I won't note that one."
+- A signal question has the same two answers. When the model's category is close to one
+  already in use, a terminal asks two questions in a row, the category in use first
+  (DESIGN_signal_extraction.md §6). The queued question offers both in one message, with
+  three answers: the category in use, the new one, and "No".
+
+Each is drawn bare, as the reply to what the athlete wrote: the question and its answers. It
+has no "🙋 Quick question" line above it, no "🕐 Not now" button, and no closing line after
+the answer. A kind of queued question says so about itself, the way the proposal says that it
+stands alone (§3).
+
+**When a question is sent.**
+
+- **The run made a proposal.** The proposal goes out alone. When the athlete answers it, with
+  either button, the reply comes and then the first question. A tap on a proposal that is out
+  of date brings the question too. A tap on a later day brings nothing, as in §5.
+- **The run made no proposal.** Nothing changes, or only kilograms moved (§7). The first
+  question follows the coach's line at once.
+
+A second question from the same message comes when the first is answered.
+
+Only the questions of this run come, not the whole round. The morning's round is every
+waiting question, oldest first, and the next one comes only on a tap. A question about
+Tuesday's gym sets that the athlete has left unanswered since the morning would stand in front
+of the question about what they wrote a minute ago.
+
+**No answer.** Nothing is stored and nothing is lost. The buttons keep working. The question
+comes again in the next morning's round, like any queued question.
+
+**Closed without being asked.** A constraint question is closed once the last day of its
+constraint is behind. A signal question is closed once its last day is further back than the
+days of metrics the coach reads, 15 by default.
+
+**The same Wednesday.** At 18:33 the athlete writes the message. At 18:35 the proposal arrives
+with "Shall I make these changes?", and nothing under it. The run has ended, so a new message
+to the coach is taken. At 19:10 the athlete taps "Keep it as planned". The bot answers "Okay —
+nothing changed.", and then:
+
+> Shall I remember this constraint? “No training — bringing child to work” — Thu Nov 12
+>
+> `[Yes]` `[No]`
+
+They tap "Yes". The bot answers "Noted — I'll work around that 👍". Had they left the phone
+alone all Wednesday, Thursday's morning round would bring the question.
+
+**The same questions outside a message to the coach.** The router sends a message that only
+states a constraint or a signal to `bot capture note`, which calls no week planner
+(DESIGN_bot_simple_frontend.md §12.3). It asks the same two questions with the same code, so
+they are queued there too, and the first one is its reply.
+
+**The offer to adjust the week.** After its questions, `bot capture note` offered one button,
+"🔄 Adjust my week around it", which runs `workout adapt`. The button now comes under the
+reply to a "Yes", because the command that showed it has ended by the time of the tap. Two
+cases bring no button:
+
+- A "Yes" after a message to the coach. The coach has just read that message.
+- A constraint the coach cannot reach. `workout adapt` stops at the end of the mesocycle
+  under way (DESIGN_mesocycle_boundary.md §2). On 7 October that is 18 October, so the button
+  under "no training on November 12th" would cost two minutes and change nothing about
+  November 12. The constraint is stored, and the run that reaches that day reads it.
+
+A logged signal always brings the button: it is about days the coach reads.
+
+**Choices**, each made without the author, all ruled on 2026-10-09.
+
+1. Only the questions of the run follow the answer to its proposal. The other way was the
+   whole round, as after the morning's proposal. **Kept.**
+2. The questions were drawn as ordinary queued questions, with the "🙋 Quick question" line,
+   "🕐 Not now" and the closing line. **Overruled: they are drawn bare.**
+3. A question nobody answers comes back in every morning's round until it is answered or
+   closed by its dates. It has no button to drop it, because "No" already settles it.
+   **Kept, with new words.** A question that comes back on a later morning has no message
+   above it for "that" to point at, so the two questions name what they ask about: "Shall I
+   remember this constraint?" and "Shall I log this signal?".
+4. The signal question moves with the constraint question. A message that holds both would
+   otherwise leave one question that waits and one that ends its run after five minutes.
+   **Kept.**
+5. `bot capture note` queues its questions too, though they arrive a few seconds after the
+   message. **Kept, and made the rule for every question in the chat**
+   (DESIGN_athlete_queue.md §2).
+6. The offer to adjust the week was to appear wherever it appeared before. **Overruled: no
+   button for a constraint the coach cannot reach.**
+7. The two dates that close a question without asking it, above. **Kept.**
+
+**Not handled.**
+
+- The same fact written twice before the first question is answered is asked twice, and two
+  "Yes" store it twice.
+- A proposal replaced by a newer one before it is answered (§6.2): the questions of its run
+  come with the next morning's round, not with the answer to the newer proposal.
+- The questions the chat still asks on the spot. DESIGN_athlete_queue.md §2 lists them.
+
+**Touch points.** No table, no column, and nothing in the bot (`stamind/chat/`).
+
+| Where | What |
+|---|---|
+| `stamind/cli/candidates.py` | the two kinds: the wording, the check on the dates, what each answer does, and whether the coach reaches a constraint. `queue_candidates` queues what a chat run found; the confirm loops stay for a terminal. An item's subject is the start of the run and the candidate's place in the model's list |
+| `stamind/queue_kind.py`, `stamind/athlete_queue.py` | a kind may be drawn bare; the two kinds join the list |
+| `stamind/cli/queue.py` | a bare item's drawing; `send_own_questions`, which sends the first question a command queued; `send_questions_behind`, which `bot queue` calls after a tap on a proposal that a chat run sent, on the day it was sent |
+| `stamind/cli/workouts/adapt.py` | in the chat the candidates are queued once the proposal is saved; with no proposal the first question is sent |
+| `stamind/cli/bot/capture.py` | `bot capture note` queues, sends the first question, and leaves the offer to the answer |
+| `stamind/cli/render/` | the two questions' new words; a signal question that offers two categories |
+| `stamind/signals.py` | `metric_words`, moved from the renderers so that a kind can name a category on a button |
+| `docs/ARCHITECTURE.md` | the adaptation flow, the note capture, the queue's kinds |
+
+Implemented designs amended with it: DESIGN_athlete_queue.md §2 and §8, DESIGN_constraints.md
+§8, DESIGN_signal_extraction.md §2 and §6, DESIGN_bot_simple_frontend.md §12.3.
+
+Tests, one per rule: a chat run that makes a proposal sends the proposal and no other
+question; a tap on that proposal sends the run's question and not an older one that waits; a
+run with no proposal sends its question at once; the question has its two answers and no
+other line or button; a second question comes after the first is answered; "Yes" stores a
+constraint whose dates count from the day the message was sent; "No" stores nothing; a
+question past its dates is closed without being shown; a signal close to a category in use
+offers three answers; `bot capture note` gives the offer with the "Yes", and none for a
+constraint the coach cannot reach; a terminal run still asks on the spot; a tap on a later
+day sends nothing.
 
 ## 7. Gym sessions
 

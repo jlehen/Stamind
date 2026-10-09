@@ -50,6 +50,10 @@ before the adaptation preview; signals are confirmed straight after them, each c
 its own `[y/N]`, still before the preview. Independent commits, as before: declining a
 signal does not stop the adaptation, and vice versa.
 
+Amended 2026-10-08 (DESIGN_waiting_proposal.md §6.3): in the chat the run no longer asks
+about a signal. It saves the question as a queued question, like the constraint question. A
+terminal keeps step 1b.
+
 **A signal confirmed here informs the NEXT run, not this one.** The LLM call that proposed
 it has already returned. This is already true of constraints, but it is more
 counter-intuitive for signals, which look like they should explain today's numbers. They
@@ -174,6 +178,10 @@ answer. Declining both logs nothing, which gives the full three-way outcome out 
 calls — no widening of `runtime.prompt.confirm`, which the Telegram frontend also
 implements. Capped at one candidate: a second near-miss should be declined and typed by
 hand.
+
+Amended 2026-10-08 (DESIGN_waiting_proposal.md §6.3): the chat's queued question offers both
+categories in one message with three answers, the existing category first. A terminal keeps
+the ladder.
 
 **Detection never rewrites the stored value.** Auto-mapping `sleep_debt` onto `sleep`
 would not merely rename it — it would pull the row into the §4 exclusion and change which

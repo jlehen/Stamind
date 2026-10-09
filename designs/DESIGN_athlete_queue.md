@@ -67,6 +67,34 @@ a `workout adapt` or a `workout tweak` started from the chat. Such a run saves i
 as a queue item, sends it and ends, and she answers it with a tap whenever she likes. In a
 terminal the question still blocks.
 
+Amended 2026-10-08 (DESIGN_waiting_proposal.md §6.3): "Shall I remember this constraint?" and
+"Shall I log this signal?" ask before what was found in her message is stored. A run started
+from the chat could always go on without their answer, so it now queues them and ends. In a
+terminal they still block.
+
+Amended 2026-10-09: **in the chat, every question goes through the queue.** The rule above
+lets a command ask on the spot when it cannot go on without the answer. For a command the
+chat starts, that exception is withdrawn. Such a command saves its question and ends, or goes
+on with a default and queues the question for the next time. A question asked on the spot
+holds the chat and is lost after five minutes; a queued one waits for a tap. When a question
+needs another look or another moment than "🙋 Quick question", its kind says so: the proposal
+stands alone, and the constraint question is drawn bare (DESIGN_waiting_proposal.md §3,
+§6.3). A terminal keeps the rule above, because someone sits there.
+
+These questions do not follow it yet. Each still holds the chat for up to five minutes:
+
+- "Was that the session, cut short?" and "Which session is this about?", which `workout adapt
+  -m` asks before it calls the week planner.
+- "Shall I set that up?", after a message that names a new goal.
+- "Shall I make that change?", after a message that changes a goal or a constraint, and the
+  question that offers to pass such a message on to the coach.
+- The "… OK?" that reads back a change of setting.
+- The question that reads back a test result.
+- The question `workout generate` asks when its button started it.
+
+A typed answer is not one of them (§6.3): the bot waits for it only after a tap, and an answer
+that never comes leaves the item waiting.
+
 "What was that block of sets?" changes what the app knows, but nothing is stuck while the
 answer is missing: an unnamed set still counts as volume. That goes to the queue, even when
 she is watching.
@@ -544,6 +572,13 @@ Amended 2026-10-03 (DESIGN_waiting_proposal.md §3): `proposal`, from
 `stamind/cli/workouts/proposal.py`, is the next entry and the first kind that stands alone
 (§3). A kind says two more things when it does: that its items stand alone, and the line a
 tap on a closed one gets.
+
+Amended 2026-10-08 (DESIGN_waiting_proposal.md §6.3): `constraint` and `signal`, from
+`stamind/cli/candidates.py`, are the next two entries. Their subject is the start of the run
+that read the message and the candidate's place in the model's list. The run that queues them
+sends them itself, ahead of the morning's walk: at once, or when its proposal is answered. A
+kind says one more thing when its items are drawn bare, as these two are: the question and
+its answers, with no "🙋 Quick question" line, no "Not now" and no closing line after it.
 
 ## 9. Guardrails
 

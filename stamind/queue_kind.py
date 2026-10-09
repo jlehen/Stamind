@@ -48,6 +48,10 @@ class Kind:
     stands_alone: bool = False
     # What a tap on a closed item of this kind is told, in place of "Already settled" (§4).
     closed_line: Optional[str] = None
+    # A bare item is drawn in chat as the reply to what the athlete wrote: no "🙋 Quick
+    # question" lead, no "Not now", and no closing line after its answer
+    # (DESIGN_waiting_proposal.md §6.3).
+    bare: bool = False
 
 
 class NotApplied(Exception):

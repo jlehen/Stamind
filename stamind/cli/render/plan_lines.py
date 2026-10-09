@@ -23,12 +23,6 @@ from stamind.cli.render.session_lines import (
 )
 
 
-def simple_metric_words(metric: str) -> str:
-    """A signal category as prose: `disturbed_sleep` reads 'disturbed sleep'. The
-    underscore form is the storage key and stays expert detail (§6)."""
-    return (metric or "").replace("_", " ").strip()
-
-
 def simple_constraint_lines(constraints: List[Dict[str, Any]], today: str) -> List[str]:
     """Simple rendering of the constraints the coach works around: one bullet per
     constraint, dates as day words, no IDs or tier tags (the expert `constraint list`

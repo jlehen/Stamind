@@ -521,29 +521,70 @@ class ChatRunTest(_Case):
 
     CONSTRAINT = ({"title": "no run on Fridays", "start_date": FRIDAY, "end_date": FRIDAY},)
 
-    def test_in_the_chat_the_constraint_question_comes_after_the_proposal(self):
-        """A question nobody answers must not hold the proposal back (§6.1)."""
-        waiting_when_asked = []
+    def proposed_with_a_constraint(self, constraint=CONSTRAINT):
+        """08:30, with a message waiting since 08:00: the run finds a constraint in what
+        the athlete wrote and proposes a change. Returns the one question it sent."""
+        athlete_queue.tell("Charge your watch tonight.")
+        self.at(8, 30)
+        _coach, prompt, out = self.coach_run(self.eased(new_constraints=constraint))
+        prompt.confirm.assert_not_called()
+        [proposal] = queue_lines(out)
+        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
+        return proposal
 
-        def decline(*_args, **_kwargs):
-            waiting_when_asked.append(len(saved_proposal.waiting()))
-            return False
+    def test_in_the_chat_the_constraint_question_waits_for_the_proposals_answer(self):
+        """One question at a time: the run sends its proposal and ends. The answer brings
+        the question about what the athlete wrote, and not the one waiting since the
+        morning (§6.3)."""
+        proposal = self.proposed_with_a_constraint()
+        out = self.tap(proposal, "a2", proposal["since"])
+        [question] = queue_lines(out)
+        self.assertLess(out.index(saved_proposal.KEPT_LINE), out.index(QUEUE_SENTINEL))
+        self.assertEqual(
+            question["text"],
+            "Shall I remember this constraint? “no run on Fridays” — Fri Oct 09",
+        )
+        self.assertEqual([b["label"] for b in question["buttons"]], ["Yes", "No"])
 
-        self.coach_run(self.eased(new_constraints=self.CONSTRAINT), on_confirm=decline)
-        self.assertEqual(waiting_when_asked, [1])
+        out = self.tap(question, "a1", question["since"])
+        self.assertEqual(
+            [c["title"] for c in test_db.get_constraints(FRIDAY, FRIDAY)], ["no run on Fridays"]
+        )
+        self.assertIn("Noted — I'll work around that", out)
+        # The coach has just read the message: no offer, no next question, no closing line.
+        self.assertNotIn(BUTTONS_SENTINEL, out)
+        self.assertEqual(queue_lines(out), [])
+        self.assertNotIn(queue_cli.QUEUE_DONE_LINE, out)
 
-    def test_with_nothing_to_change_the_constraint_question_comes_after_that_line(self):
-        recorded_when_asked = []
+    def test_a_date_the_model_left_out_counts_from_the_day_of_the_message(self):
+        proposal = self.proposed_with_a_constraint(
+            ({"title": "no run", "start_date": None, "end_date": SATURDAY},)
+        )
+        [question] = queue_lines(self.tap(proposal, "a2", proposal["since"]))
+        self.at(9, days=1)
+        self.tap(question, "a1", question["since"])
+        [constraint] = test_db.get_constraints(THURSDAY, SATURDAY)
+        self.assertEqual(constraint["start_date"], THURSDAY)
 
-        def decline(*_args, **_kwargs):
-            recorded_when_asked.append(self.coach.workout_revision_record_no_change.called)
-            return False
+    def test_a_tap_on_the_proposal_the_next_day_brings_no_question(self):
+        """Friday's morning message has sent the question itself by then (§5, §6.3)."""
+        proposal = self.proposed_with_a_constraint()
+        self.at(9, days=1)
+        out = self.tap(proposal, "a2", proposal["since"])
+        self.assertEqual(queue_lines(out), [])
+        self.assertEqual(
+            [item["kind"] for item in athlete_queue.walk(self.now)], ["message", "constraint"]
+        )
 
+    def test_with_nothing_to_change_the_constraint_question_goes_out_at_once(self):
         proposal = RevisionProposal(**{
             **self.nothing_to_change().__dict__, "new_constraints": self.CONSTRAINT,
         })
-        self.coach_run(proposal, on_confirm=decline)
-        self.assertEqual(recorded_when_asked, [True])
+        _coach, prompt, out = self.coach_run(proposal)
+        prompt.confirm.assert_not_called()
+        [question] = queue_lines(out)
+        self.assertIn("no run on Fridays", question["text"])
+        self.assertLess(out.index("All fine."), out.index(QUEUE_SENTINEL))
 
     def test_a_terminal_run_keeps_the_constraint_question_before_the_preview(self):
         with patch.dict(os.environ, {"STAMIND_FRONTEND": "", "STAMIND_RENDER": ""}):

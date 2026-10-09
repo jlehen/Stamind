@@ -24,10 +24,13 @@ from stamind.cli.bot.route import use_fast_model
 from stamind.cli.bot.test_result import capture_test_result
 from stamind.cli.bot.views import MORNING_MARKER
 from stamind.cli.candidates import (
-    confirm_new_constraints, confirm_new_signals, open_ended,
+    coach_reaches, confirm_new_constraints, confirm_new_signals, open_ended,
+    queue_candidates,
 )
 from stamind.cli.render.plan_lines import simple_goal_line
+from stamind.cli.queue import send_own_questions
 from stamind.config import config
+from stamind.prompt import athlete_watching
 from stamind.sentinels import emit_buttons
 from stamind.sports import CANONICAL_SPORTS, canonical_sport
 from stamind.text import wrap_text
@@ -75,12 +78,15 @@ def _note_capture_prompt(today: str, earliest: str) -> str:
 
 
 def run_bot_capture_note(text: str) -> None:
-    """The note inbox (§12.3): one extraction, the shared confirms, then the offer.
+    """The note inbox (§12.3): one extraction, the shared questions, then the offer.
 
     Recording becomes instant and cheap and the coach becomes an offer — she is heard
     immediately, and invoking the coach is her call, not a toll. The trust boundary does
     not move: the candidates are the same shapes `workout adapt -m` yields and they are
-    persisted through the same confirmed-candidate service paths."""
+    persisted through the same confirmed-candidate service paths.
+
+    Started from the chat, the questions are queued and the first one is the reply; the
+    offer then comes with a "Yes" (DESIGN_waiting_proposal.md §6.3)."""
     today = _today_str()
     earliest = (datetime.strptime(today, "%Y-%m-%d")
                 - timedelta(days=max(config.metrics_lookback_days, 1) - 1)
@@ -94,11 +100,18 @@ def run_bot_capture_note(text: str) -> None:
         no_find(text)
         return
 
+    if athlete_watching():
+        questions = queue_candidates(constraints, signal_rows, today, text, offer=True)
+        send_own_questions(questions)
+        # A preference for good was handed to the operator and nothing else is asked:
+        # today's half of it is still the coach's, one tap away (§12.3, 2026-09-16).
+        if not questions and any(open_ended(c) for c in constraints):
+            emit_buttons([send_to_coach_button(text)])
+        return
+
     captured = confirm_new_constraints(constraints, today, text)
     logged = confirm_new_signals(signal_rows, today)
     if not captured and not logged:
-        # A preference for good was handed to the operator and nothing else was stored: today's
-        # half of it is still the coach's, one tap away (§12.3, 2026-09-16).
         if any(open_ended(c) for c in constraints):
             emit_buttons([send_to_coach_button(text)])
         # Otherwise she said no to everything the note offered. Nothing was stored and
@@ -107,8 +120,14 @@ def run_bot_capture_note(text: str) -> None:
     # Signals get the offer too (amended 2026-09-02): the record points backward and
     # adapts nothing, but the athlete REPORTING one expects forward notice, and a row
     # filed behind a cheerful confirm otherwise reads as heard-and-acted-on while
-    # nothing about today changes. The offer makes that gap one visible tap wide.
-    emit_buttons([adjust_week_button()])
+    # nothing about today changes. The offer makes that gap one visible tap wide. A
+    # constraint the coach cannot reach yet brings none (DESIGN_waiting_proposal.md §6.3).
+    reachable = any(
+        coach_reaches(runtime.db.get_constraint(cid)['start_date'], today)
+        for cid in captured
+    )
+    if logged or reachable:
+        emit_buttons([adjust_week_button()])
 
 
 # --- capture: add_goal (§12.5) ---

@@ -140,6 +140,12 @@ def signal_metrics() -> Dict[str, str]:
     return merged
 
 
+def metric_words(metric: str) -> str:
+    """A signal category as prose: `disturbed_sleep` reads 'disturbed sleep'. The underscore
+    form is the storage key and stays expert detail (DESIGN_bot_simple_frontend.md §6)."""
+    return (metric or "").replace("_", " ").strip()
+
+
 def known_metrics(vocabulary: Dict[str, str], usage: List[dict]) -> List[str]:
     """Every category the athlete might reasonably reuse: the config-merged vocabulary plus
     anything already logged (DESIGN_signal_extraction.md §5).

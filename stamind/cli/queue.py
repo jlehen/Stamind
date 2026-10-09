@@ -154,7 +154,7 @@ def queue_buttons(item: Dict[str, Any]) -> List[dict]:
         dropped = athlete_queue.drop_label(item)
         if dropped:
             buttons.append({"label": _button_label(dropped), "action": DROP})
-    if not kind.stands_alone:
+    if not (kind.stands_alone or kind.bare):
         buttons.append({"label": NOT_NOW_LABEL, "action": QUEUE_NOT_NOW})
     return buttons
 
@@ -170,6 +170,8 @@ def queue_chat_message(item: Dict[str, Any], left: Optional[int]) -> Tuple[str, 
         return f"⏰ You asked me to come back to this:\n{text}", buttons
     if athlete_queue.kind_of(item).shape == MESSAGE:
         return f"📬 {text}", buttons
+    if athlete_queue.kind_of(item).bare:
+        return text, buttons
     return f"🙋 Quick question ({left} left)\n{text}", buttons
 
 
@@ -232,9 +234,26 @@ def send_walk_step(since: datetime, after: Optional[Dict[str, Any]] = None) -> b
     if items:
         send_item(items[0], since_token(since), len(items))
         return True
-    if after is not None:
+    if after is not None and not athlete_queue.kind_of(after).bare:
         print(QUEUE_DONE_LINE)
     return False
+
+
+def send_own_questions(items: Sequence[Dict[str, Any]]) -> None:
+    """Sends the first of the questions this command just queued, as a walk over them
+    alone: the next goes out when it is answered (DESIGN_waiting_proposal.md §6.3)."""
+    if items:
+        send_item(items[0], since_token(clock.command_start()), len(items))
+
+
+def send_questions_behind(item: Dict[str, Any]) -> None:
+    """Sends the first waiting question that the command which queued `item` queued after
+    it: what a chat run asks once its proposal is answered (DESIGN_waiting_proposal.md
+    §6.3)."""
+    since = datetime.fromisoformat(item["queued_at"])
+    items = athlete_queue.walk(since, item)
+    if items:
+        send_item(items[0], since_token(since), len(items))
 
 
 def terminal_choices(item: Dict[str, Any], since: datetime) -> List[Choice]:
@@ -379,15 +398,21 @@ def run_bot_queue(args: argparse.Namespace) -> None:
         print(settled_line(item))
     else:
         _apply(item, args.action, since)
-    if single or item is None:
+    if item is None:
         return
     if not athlete_queue.kind_of(item).stands_alone:
-        send_walk_step(since, after=item)
+        if not single:
+            send_walk_step(since, after=item)
         return
-    # A stand-alone item is in no walk: the one it was sent ahead of starts here, on the
-    # day it was sent only (DESIGN_waiting_proposal.md §5).
-    if clock.to_local(since).date() == clock.to_local(clock.now()).date():
-        send_walk_step(since)
+    # A stand-alone item is in no walk. What it was sent ahead of starts here, on the day
+    # it was sent only: the morning's walk, or the questions of its own run
+    # (DESIGN_waiting_proposal.md §5, §6.3).
+    if clock.to_local(since).date() != clock.to_local(clock.now()).date():
+        return
+    if single:
+        send_questions_behind(item)
+        return
+    send_walk_step(since)
 
 
 def _send_reminders() -> None:

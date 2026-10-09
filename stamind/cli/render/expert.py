@@ -125,6 +125,18 @@ class ExpertRenderer:
             return f"Log as NEW category '{metric}'{shown} on {span}?"
         return f"Log signal: {metric}{shown} on {span}?"
 
+    def signal_candidate_choice(
+        self, near: str, metric: str, value: Optional[float], start: str, end: str,
+        today: str,
+    ) -> str:
+        """The queued question for a category close to one in use: both are offered at
+        once, as its answers (DESIGN_waiting_proposal.md §6.3)."""
+        shown = "" if value is None else f" = {value}"
+        return (
+            f"Log signal{shown} on {_iso_span(start, end)}: as '{near}', or as NEW "
+            f"category '{metric}'?"
+        )
+
     def signal_logged(
         self, metric: str, days: int, start: str, end: str, today: str
     ) -> None:

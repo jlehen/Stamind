@@ -19,9 +19,11 @@ from stamind.types import Workout
 from stamind.text import gray, red, wrap_text
 from stamind.output import notice, step, warn
 from stamind.clock import fmt_date, today_str as _today_str
-from stamind.cli.candidates import confirm_new_constraints, confirm_new_signals
+from stamind.cli.candidates import (
+    confirm_new_constraints, confirm_new_signals, queue_candidates,
+)
 from stamind.cli.common import ensure_recent_data
-from stamind.cli.queue import send_alone
+from stamind.cli.queue import send_alone, send_own_questions
 from stamind.cli.runway import current_runway, plan_is_behind
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.workouts.heads_up import (
@@ -130,11 +132,11 @@ WEEK_CHANGED_LINE = (
 
 
 def _confirm_candidates(proposal, date_str: str, message: Optional[str]) -> None:
-    """Asks about each constraint and each daily signal the note produced (DESIGN_constraints.md
-    §8, DESIGN_signal_extraction.md §2). The same call that wrote the proposal extracted
-    them, so the note informed this run whatever the answers; a signal confirmed here
-    informs the next run. `bot capture note` asks the same questions through
-    `cli/candidates.py` (DESIGN_bot_simple_frontend.md §12.10)."""
+    """On a terminal, asks about each constraint and each daily signal the note produced
+    (DESIGN_constraints.md §8, DESIGN_signal_extraction.md §2). The same call that wrote
+    the proposal extracted them, so the note informed this run whatever the answers; a
+    signal confirmed here informs the next run. `bot capture note` asks the same questions
+    through `cli/candidates.py` (DESIGN_bot_simple_frontend.md §12.10)."""
     confirm_new_constraints(proposal.new_constraints, date_str, message or "")
     confirm_new_signals(proposal.new_signals, date_str)
 
@@ -142,22 +144,22 @@ def _confirm_candidates(proposal, date_str: str, message: Optional[str]) -> None
 def _settle(
     args: argparse.Namespace, tweak: bool, proposal, in_chat: bool, replaces: bool,
     written_upto: int,
-) -> None:
+) -> bool:
     """What becomes of the week planner's answer. A terminal run shows the preview, asks and
     applies. A run started from the athlete's chat never asks and never waits: it saves its
     proposal and sends it, and `-y` writes without asking wherever it was typed
-    (DESIGN_waiting_proposal.md §2).
+    (DESIGN_waiting_proposal.md §2). True when a proposal was saved and now waits.
 
     `replaces` says a proposal was open when the run started, and `written_upto` is the
     newest change that wrote a session at that moment (§6.2)."""
     saves = in_chat and not args.auto
     if saves and proposal.workouts and newest_written() != written_upto:
         print(f"\n{WEEK_CHANGED_LINE}")
-        return
+        return False
     if saves and proposal.week_planner_changed:
         # In place of the confirm: the reason and the preview, then the two answers (§3).
         send_alone(saved_proposal.save(proposal, written_upto, replaces=replaces))
-        return
+        return True
 
     runtime.render.adapt_reason(proposal.reason)
 
@@ -170,7 +172,7 @@ def _settle(
         # claims — requiring a *change* would flag them forever (§8). A proposal that
         # waits stays open (DESIGN_waiting_proposal.md §6.2).
         runtime.coach_service.workout_revision_record_no_change(proposal)
-        return
+        return False
     print_send_notice(revision_dates(proposal))
 
     if saves:
@@ -186,11 +188,12 @@ def _settle(
         runtime.render.revision_preview(proposal, heading)
         if not (args.auto or runtime.prompt.confirm(question)):
             runtime.render.adapt_discarded()
-            return
+            return False
 
     step("\nApplying adaptations...")
     runtime.coach_service.workout_revision_apply(proposal)
     runtime.render.adapt_applied()
+    return False
 
 
 def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
@@ -256,15 +259,20 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
             runtime.render.session_note_kept(note_session, date_str)
 
         # The questions about a constraint or a signal found in the note. A terminal asks them
-        # before the preview (DESIGN_constraints.md §8). The chat asks them after the
-        # proposal, or after the line that says nothing changes, so a question nobody
-        # answers cannot hold the proposal back (DESIGN_waiting_proposal.md §6.1).
+        # before the preview (DESIGN_constraints.md §8). The chat queues them: they go out
+        # at once, or behind the proposal when its answer comes
+        # (DESIGN_waiting_proposal.md §6.3).
         message = getattr(args, 'message', None)
         if not in_chat:
             _confirm_candidates(proposal, date_str, message)
-        _settle(args, tweak, proposal, in_chat, still_open is not None, written_upto)
+        proposed = _settle(args, tweak, proposal, in_chat, still_open is not None, written_upto)
         if in_chat:
-            _confirm_candidates(proposal, date_str, message)
+            questions = queue_candidates(
+                proposal.new_constraints, proposal.new_signals, date_str, message or "",
+                offer=False,
+            )
+            if not proposed:
+                send_own_questions(questions)
 
     except ValueError as e:
         # A domain refusal (no active plan to adapt towards), not a failure: say it

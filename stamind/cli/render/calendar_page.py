@@ -12,6 +12,7 @@ import zlib
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+from stamind import signals
 from stamind.analytics.adherence import (
     DURATION, LOAD, MISSED, PARTIAL, REST_VIOLATION, SETS, off_plan_gaps,
 )
@@ -19,7 +20,7 @@ from stamind.calendar_days import Calendar, Day, next_goal
 from stamind.clock import day_str, parse_date, shift
 from stamind.sports import canonical_sport
 from stamind.strength import logger
-from stamind.cli.render.plan_lines import simple_goal_line, simple_metric_words
+from stamind.cli.render.plan_lines import simple_goal_line
 from stamind.cli.render.session_lines import (
     simple_compare_lines, simple_day_lines, sport_emoji,
 )
@@ -143,7 +144,7 @@ def _note_lines(day: Day) -> List[str]:
     """Each signal as its words, value and text; each constraint as title and description."""
     lines = []
     for s in day.signals:
-        line = simple_metric_words(s["metric"])
+        line = signals.metric_words(s["metric"])
         if s.get("value") is not None:
             line += f": {s['value']:g}"
         if s.get("text"):

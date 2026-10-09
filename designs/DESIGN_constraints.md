@@ -628,6 +628,10 @@ The run saves and sends its proposal first, or says that nothing changes, and as
 the constraint after it. A question nobody answers must not hold the proposal back. A
 terminal run keeps the order above.
 
+Amended 2026-10-08 (DESIGN_waiting_proposal.md §6.3): in the chat the run no longer asks
+about the constraint. It saves the question as a queued question and ends, and the athlete's
+tap on "Yes" creates the row. A terminal run keeps the order above.
+
 This makes §11's "echo what was created" fall out for free (the confirmation
 *is* the echo) and means a misfiled extraction is caught before any row exists,
 not after. `new_constraints` requires a new return channel from `workout_adapt`

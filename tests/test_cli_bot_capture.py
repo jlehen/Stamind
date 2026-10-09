@@ -4,11 +4,14 @@ One extraction per run, mocked; what the capture ASKED is read off a scripted pr
 because for a capture the question is the preview (DESIGN_bot_simple_frontend.md §12.2).
 The views and the router itself are in `test_cli_bot.py`.
 """
+import json
 import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
+from tests.helpers import (
+    clear_all_tables, run_cli, rebind_test_db, save_workout, started_from,
+)
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_stamind_cli_bot_capture.db")
@@ -16,11 +19,12 @@ TEST_DB_PATH = test_db_path("test_stamind_cli_bot_capture.db")
 from stamind.db import Database
 import stamind_cli  # noqa: F401  (registers the bot parser)
 
-from stamind import athlete_queue, runtime
+from stamind import athlete_queue, clock, runtime
 from stamind.cli.bot import test_result
-from stamind.cli.queue import queue_chat_message
+from stamind.cli.candidates import queue_candidates
+from stamind.cli.queue import QUEUE_DONE_LINE, queue_chat_message
 from stamind.config import config
-from stamind.sentinels import BUTTONS_SENTINEL
+from stamind.sentinels import BUTTONS_SENTINEL, QUEUE_SENTINEL
 from stamind.clock import today_str
 
 # One database for the whole module: the classes below share it and clear its tables per
@@ -106,9 +110,9 @@ class _CaptureCase(unittest.TestCase):
 
 
 
-class CaptureNoteTest(_CaptureCase):
-    """`bot capture note` — §12.3: the note inbox that asks before storing, and offers
-    the coach instead of riding it."""
+class _NoteCase(_CaptureCase):
+    """`bot capture note` with a mesocycle under way for three more weeks: the days the
+    coach can still change."""
 
     NOTE = "sore knee, no running for two weeks"
 
@@ -121,15 +125,36 @@ class CaptureNoteTest(_CaptureCase):
         )
         runtime.calendar_syncer = syncer
         self.addCleanup(runtime.reset, "calendar_syncer")
+        goal = test_db.add_objective("Zurich Marathon", self.future(60), "running")
+        test_db.save_macrocycle(goal, "Build.", "g", "c", [{
+            "name": "Base", "start_date": self.future(-7), "end_date": self.future(21),
+            "focus": "Endurance",
+        }])
 
     def _run(self, extraction, answers=True):
         return self.capture(["bot", "capture", "note", self.NOTE], extraction, answers)
 
-    def _constraint(self):
+    def _constraint(self, days=0):
         return {"new_constraints": [
-            {"title": "no running", "start_date": today_str(),
-             "end_date": today_str()},
+            {"title": "no running", "start_date": self.future(days),
+             "end_date": self.future(days)},
         ]}
+
+
+class CaptureNoteTest(_NoteCase):
+    """`bot capture note` — §12.3: the note inbox that asks before storing, and offers
+    the coach instead of riding it. Typed in a terminal, it asks on the spot."""
+
+    def test_a_constraint_the_coach_cannot_reach_brings_no_offer(self):
+        """It is stored, and it starts after the mesocycle under way ends: `workout adapt`
+        could change nothing about it (DESIGN_waiting_proposal.md §6.3)."""
+        code, out, _ = self._run(self._constraint(days=40))
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            [c["title"] for c in test_db.get_constraints(today_str(), None)],
+            ["no running"],
+        )
+        self.assertNotIn(BUTTONS_SENTINEL, out)
 
     def test_a_confirmed_constraint_is_stored_and_the_coach_is_offered(self):
         code, out, _ = self._run(self._constraint())
@@ -176,7 +201,7 @@ class CaptureNoteTest(_CaptureCase):
         ]})
         self.assertEqual(code, 0)
         self.assertEqual(test_db.get_constraints(today_str(), None), [])
-        self.assertNotIn("Shall I remember that?", prompt.text)
+        self.assertNotIn("Shall I remember this constraint?", prompt.text)
         # The reply is wrapped for the chat; compare on one logical line.
         said = " ".join(out.split())
         self.assertIn("not something for the next few days", said)
@@ -208,11 +233,120 @@ class CaptureNoteTest(_CaptureCase):
         """The shared helper (§12.10) asks the same question `workout adapt -m` asks,
         worded by the active renderer — here the companion one (§6: no IDs, no ISO)."""
         code, out, prompt = self._run(self._constraint())
-        self.assertIn("Shall I remember that?", prompt.text)
+        self.assertIn("Shall I remember this constraint?", prompt.text)
         self.assertNotIn("Add constraint:", prompt.text)
         self.assertNotIn(today_str(), prompt.text)
         self.assertIn("Noted — I'll work around that", out)
         self.assertNotIn("Captured constraint [", out)
+
+
+class CaptureNoteFromChatTest(_NoteCase):
+    """Started from the chat, `bot capture note` asks nothing on the spot: each question is
+    queued, the first one is the reply, and a tap answers it
+    (DESIGN_waiting_proposal.md §6.3)."""
+
+    SIGNAL = {"metric": "disturbed_sleep", "date": today_str(), "end_date": today_str()}
+
+    def setUp(self):
+        super().setUp()
+        started_from(self, "chat")
+
+    def frames(self, out):
+        """The queued questions a run sent, in order."""
+        return [json.loads(line[len(QUEUE_SENTINEL):]) for line in out.split("\n")
+                if line.startswith(QUEUE_SENTINEL)]
+
+    def asked(self, extraction):
+        """One capture: (the question it sent, the prompt nobody was asked through)."""
+        code, out, prompt = self._run(extraction)
+        self.assertEqual(code, 0)
+        [question] = self.frames(out)
+        return question, prompt
+
+    def tap(self, question, action):
+        _code, out, _err = run_cli(
+            ["bot", "queue", str(question["id"]), action, "--since", question["since"]]
+        )
+        return out
+
+    def test_the_question_is_queued_and_drawn_bare(self):
+        question, prompt = self.asked(self._constraint())
+        self.assertEqual(prompt.asked, [])
+        self.assertEqual(
+            question["text"], "Shall I remember this constraint? “no running” — today"
+        )
+        self.assertEqual([b["label"] for b in question["buttons"]], ["Yes", "No"])
+        self.assertEqual(test_db.get_constraints(today_str(), None), [])
+        # Unanswered, it is in the next morning's walk like any queued question.
+        self.assertEqual(
+            [item["id"] for item in athlete_queue.walk(clock.now())], [question["id"]]
+        )
+
+    def test_yes_stores_it_and_brings_the_offer(self):
+        question, _prompt = self.asked(self._constraint())
+        out = self.tap(question, "a1")
+        self.assertEqual(
+            [c["title"] for c in test_db.get_constraints(today_str(), None)],
+            ["no running"],
+        )
+        self.assertIn("Noted — I'll work around that", out)
+        self.assertIn("Adjust my week around it", out)
+        self.assertNotIn(QUEUE_DONE_LINE, out)
+
+    def test_no_stores_nothing_and_offers_nothing(self):
+        question, _prompt = self.asked(self._constraint())
+        out = self.tap(question, "a2")
+        self.assertIn("Okay — I won't note that one.", out)
+        self.assertEqual(test_db.get_constraints(today_str(), None), [])
+        self.assertNotIn(BUTTONS_SENTINEL, out)
+
+    def test_a_constraint_the_coach_cannot_reach_brings_no_offer(self):
+        question, _prompt = self.asked(self._constraint(days=40))
+        out = self.tap(question, "a1")
+        self.assertIn("Noted — I'll work around that", out)
+        self.assertNotIn(BUTTONS_SENTINEL, out)
+
+    def test_a_second_question_comes_when_the_first_is_answered(self):
+        first, _prompt = self.asked({**self._constraint(), "new_signals": [self.SIGNAL]})
+        self.assertIn("this constraint?", first["text"])
+        [second] = self.frames(self.tap(first, "a2"))
+        self.assertEqual(second["text"], "Shall I log this signal? “disturbed sleep” — today")
+        out = self.tap(second, "a1")
+        self.assertTrue(test_db.get_daily_signals(today_str(), today_str()))
+        self.assertIn("Adjust my week around it", out)
+        self.assertEqual(self.frames(out), [])
+
+    def test_a_category_close_to_one_in_use_is_offered_beside_it(self):
+        """The terminal's ladder of two questions is one message with three answers
+        (DESIGN_signal_extraction.md §6)."""
+        question, _prompt = self.asked({"new_signals": [
+            {"metric": "heatwave", "date": today_str(), "end_date": today_str(), "value": 38},
+        ]})
+        self.assertEqual(
+            [b["label"] for b in question["buttons"]], ["Heat", "Heatwave (new)", "No"]
+        )
+        self.assertIn("“heat”, which I already use", question["text"])
+        self.tap(question, "a1")
+        [row] = test_db.get_daily_signals(today_str(), today_str())
+        self.assertEqual(row["metric"], "heat")
+
+    def test_a_question_past_its_dates_is_closed_without_being_asked(self):
+        yesterday = self.future(-1)
+        [item] = queue_candidates(
+            [{"title": "no running", "start_date": yesterday, "end_date": yesterday}], [],
+            yesterday, "", offer=True,
+        )
+        self.assertTrue(athlete_queue.settle_if_stale(item))
+        self.assertEqual(test_db.get_queue_item(item["id"])["outcome"], athlete_queue.STALE)
+
+    def test_a_preference_for_good_is_handed_to_the_operator_not_stored(self):
+        code, out, _prompt = self._run({"new_constraints": [
+            {"title": "never two workouts in a day", "open_ended": True},
+        ]})
+        self.assertEqual(code, 0)
+        self.assertEqual(self.frames(out), [])
+        self.assertIn("forward this message", out)
+        self.assertIn("Send it to your coach as written", out)
 
 
 class CaptureAddGoalTest(_CaptureCase):

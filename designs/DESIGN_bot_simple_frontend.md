@@ -855,6 +855,11 @@ no durable note at all, the reply says so gently and offers one button — "📨
 to your coach as written" (`adapt -m` with the original text) — so a miss costs one
 tap, not the message.
 
+Amended 2026-10-08 (DESIGN_waiting_proposal.md §6.3): the capture no longer waits on its
+questions. It saves each as a queued question, sends the first, and ends. The offer
+"🔄 Adjust my week around it" comes with the reply to a "Yes", and not at all for a
+constraint that starts after the mesocycle under way ends, which `workout adapt` cannot reach.
+
 **The two lanes are taught, not discovered** (2026-09-02; reworked the same day when
 §5.2 retired the armed channel this paragraph first hung its copy on). The offer runs
 bare `workout adapt`, so the week planner reads the stored row, not the original words —

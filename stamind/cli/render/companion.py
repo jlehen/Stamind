@@ -6,7 +6,7 @@ to the expert form. Each override is the *when* — which line builder in
 `session_lines.py` or `plan_lines.py` says this, and with what."""
 from typing import Any, Dict, List, Optional, Tuple
 
-from stamind import runtime
+from stamind import runtime, signals
 from stamind.analytics import timeline
 from stamind.analytics.adherence import MINOR, unplanned_kind
 from stamind.coach.proposals import RevisionProposal
@@ -21,7 +21,7 @@ from stamind.cli.progress import emit_chart
 from stamind.cli.render.expert import ExpertRenderer
 from stamind.cli.render.plan_lines import (
     SIMPLE_NO_PLAN_LINE, simple_end_buttons, simple_end_note, simple_goal_line,
-    simple_goal_lines, simple_mesocycle_buttons, simple_metric_words, simple_plan_lines,
+    simple_goal_lines, simple_mesocycle_buttons, simple_plan_lines,
     simple_plan_setup_line, simple_plan_shaping_line, simple_plan_wrapped_line,
     simple_progress_lines, simple_runway_lines,
 )
@@ -79,7 +79,10 @@ class CompanionRenderer(ExpertRenderer):
     def constraint_candidate_question(
         self, title: str, start: str, end: str, today: str
     ) -> str:
-        return f"Shall I remember that? “{title}” — {simple_span_words(start, end, today)}"
+        return (
+            f"Shall I remember this constraint? “{title}” — "
+            f"{simple_span_words(start, end, today)}"
+        )
 
     def constraint_captured(
         self, constraint_id: int, title: str, start: str, end: str, today: str
@@ -110,14 +113,26 @@ class CompanionRenderer(ExpertRenderer):
         self, metric: str, value: Optional[float], start: str, end: str, today: str,
         *, new_category: bool,
     ) -> str:
-        words = simple_metric_words(metric)
+        words = signals.metric_words(metric)
         shown = "" if value is None else f" ({value:g})"
         when = simple_span_words(start, end, today)
         if new_category:
             # The ladder's second rung still reads as one question, but says plainly that
             # this is a kind of note she has not logged before (§6 of the signal design).
             return f"That's a new one for me — log it as “{words}”{shown}, {when}?"
-        return f"Shall I log that? “{words}”{shown} — {when}"
+        return f"Shall I log this signal? “{words}”{shown} — {when}"
+
+    def signal_candidate_choice(
+        self, near: str, metric: str, value: Optional[float], start: str, end: str,
+        today: str,
+    ) -> str:
+        shown = "" if value is None else f" ({value:g})"
+        when = simple_span_words(start, end, today)
+        return (
+            f"Shall I log this signal?{shown} — {when}\n"
+            f"As “{signals.metric_words(near)}”, which I already use, or as "
+            f"“{signals.metric_words(metric)}”, which is new?"
+        )
 
     def signal_logged(
         self, metric: str, days: int, start: str, end: str, today: str
