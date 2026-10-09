@@ -147,6 +147,27 @@ class TestMessageCapture(unittest.TestCase):
         _reason, _proposed, new_constraints = _p.reason, _p.workouts, _p.new_constraints
         self.assertEqual(new_constraints, ())
 
+    @patch("stamind.coach.engine.openrouter_client")
+    def test_the_session_the_note_is_about_comes_back_with_a_note_only(self, mock_client):
+        """The same call says which session the note is about, on the evaluated day or the
+        one before (DESIGN_session_notes.md §3). With no note there is nothing to keep,
+        and an answer for any other day counts as none."""
+        test_db.save_metric_cache("2026-07-02", 56, 42, 60, 35, 14.0, 8.0, 1.0)
+        test_db.save_baseline("2026-07-02", 50.0, 2.0, 60.0, 5.0, 80.0, 5.0)
+
+        def told(day, message="not on my normal bike"):
+            mock_client.complete.return_value = {
+                "change_needed": False, "reason": "On track.", "adapted_workouts": [],
+                "note_session": {"date": day, "sport_type": " Cycling "},
+            }
+            proposal = coach_service.workout_adapt("2026-07-02", message=message)
+            return proposal.note_date, proposal.note_session
+
+        self.assertEqual(told("2026-07-02"), ("2026-07-02", "cycling"))
+        self.assertEqual(told("2026-07-01"), ("2026-07-01", "cycling"))
+        self.assertEqual(told("2026-06-30"), (None, None))
+        self.assertEqual(told("2026-07-02", message=None), (None, None))
+
     def test_capture_creates_row_and_always_advisory(self):
         """Trust boundary (§8): the LLM can never mark an extracted constraint as a
         deterministic rest window — capture_message_constraint ignores any `rest` the

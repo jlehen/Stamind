@@ -83,8 +83,8 @@ stands alone, and the constraint question is drawn bare (DESIGN_waiting_proposal
 
 These questions do not follow it yet. Each still holds the chat for up to five minutes:
 
-- "Was that the session, cut short?" and "Which session is this about?", which `workout adapt
-  -m` asks before it calls the week planner.
+- "Was that the session, cut short?", which `workout adapt -m` asks before it calls the week
+  planner.
 - "Shall I set that up?", after a message that names a new goal.
 - "Shall I make that change?", after a message that changes a goal or a constraint, and the
   question that offers to pass such a message on to the coach.
@@ -579,6 +579,10 @@ that read the message and the candidate's place in the model's list. The run tha
 sends them itself, ahead of the morning's walk: at once, or when its proposal is answered. A
 kind says one more thing when its items are drawn bare, as these two are: the question and
 its answers, with no "🙋 Quick question" line, no "Not now" and no closing line after it.
+
+Amended 2026-10-09 (DESIGN_session_notes.md §3): `session_note`, from the same file, is one
+more entry, drawn bare and sent the same way. It asks which of a day's sessions the athlete's
+message is about, when the week planner could not tell.
 
 ## 9. Guardrails
 

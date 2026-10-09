@@ -78,6 +78,13 @@ class ExpertRenderer:
         """The note was kept with this session (DESIGN_session_notes.md §3)."""
         print(gray(f"Note kept with session {session['id']}, “{session['title']}” ({day})."))
 
+    def session_note_question(self, text: str, day: str, today: str) -> str:
+        """The queued question for a note the week planner could not place."""
+        return f"Which session of {day} is this note about? “{text.strip()}”"
+
+    def session_note_not_kept(self) -> None:
+        print(gray("Note not kept with a session."))
+
     # -- confirming a note's candidates (cli/candidates.py) --
 
     def constraint_candidate_question(

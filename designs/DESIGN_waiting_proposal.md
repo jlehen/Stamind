@@ -197,19 +197,20 @@ The run itself changes little:
 
 - The echo ("→ passing that on to your coach") and the wait notice with its ✋ Stop button stay.
   Stop ends the coach's run. `/cancel` and `/restart` end the command in both places.
-- The two questions asked before the week planner is called stay where they are, with their
-  buttons: "Was that the session, cut short?" and "Which session is this about?". The chat is
-  free while they wait.
+- The question asked before the week planner is called stays where it is, with its buttons:
+  "Was that the session, cut short?". The chat is free while it waits. "Which session is this
+  about?" was asked there too until 2026-10-09; the week planner now answers it, and the chat
+  asks through the queue when it cannot (DESIGN_session_notes.md §3).
 - When the week planner answers, the proposal is saved and sent (§3). The saved item replaces
   the confirm that holds the chat today.
 - In the chat, the questions about a constraint or a signal found in the message ("Shall I
   remember…?") are not asked by the run. It saves them as queued questions and ends (§6.3,
   amended 2026-10-08). A terminal run asks them before the preview
   (DESIGN_constraints.md §8), because nothing changes for a terminal (§2).
-- One of the two questions asked before the week planner is called, left unanswered for five
-  minutes, ends the run, as today. The line changes from "Prompt timed out — command
-  cancelled." to "No answer, so I stopped there." The command's own "Cancelled." is not sent
-  after it: the bot has already said its line.
+- The question asked before the week planner is called, left unanswered for five minutes,
+  ends the run, as today. The line changes from "Prompt timed out — command cancelled." to
+  "No answer, so I stopped there." The command's own "Cancelled." is not sent after it: the
+  bot has already said its line.
 - When the week planner changes nothing, the athlete is told so, as today.
 
 The morning push, a reminder and a heads-up wait while the coach's run is alive, the way they
@@ -231,10 +232,10 @@ the Saturday message again. At about 07:08 one proposal replaces the first and c
 "A proposal waits" explains below.
 
 **The run waits on a question.** The message is not taken either, and gets no echo. The bot
-answers "I asked you something above. Answer it, then send that again." It is a day with two
-sessions. 07:05: "I'm tired". The bot asks "Which session is this about?". At 07:05:40 the
-athlete adds "and move Saturday's ride to Sunday". The first message is not lost: its question
-still waits.
+answers "I asked you something above. Answer it, then send that again." Yesterday's only ride
+was twelve minutes long. 07:05: "I'm tired". The bot asks "Was that the session, cut short?".
+At 07:05:40 the athlete adds "and move Saturday's ride to Sunday". The first message is not
+lost: its question still waits.
 
 A button that sends a fixed sentence follows the same two rules. It is refused before its row
 of buttons is removed, so the athlete can tap it again.

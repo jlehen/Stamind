@@ -7,10 +7,11 @@ athlete's words from `notes.py`.
 """
 from typing import Any, Dict, List, Optional, Sequence
 
-from stamind.clock import days_between
+from stamind.clock import days_between, shift
 from stamind.coach.engine.notes import (
-    NEW_CONSTRAINTS_SCHEMA, NEW_SIGNALS_SCHEMA, constraint_extraction_task,
-    note_for_today_task, open_proposal_task, signal_extraction_task, tweak_task,
+    NEW_CONSTRAINTS_SCHEMA, NEW_SIGNALS_SCHEMA, NOTE_SESSION_SCHEMA,
+    constraint_extraction_task, note_for_today_task, note_session_task, open_proposal_task,
+    signal_extraction_task, tweak_task,
 )
 from stamind.coach.engine.sessions import (
     LOCKED_HISTORY_TASK, SPORT_TYPE_ENUM, athlete_words_task, benchmark_task, move_task,
@@ -175,10 +176,11 @@ class WorkoutAdaptMixin:
         proposal the athlete has not answered, which this answer replaces
         (DESIGN_waiting_proposal.md §6.2).
         """
-        # has_message gates SIX regions that sit hundreds of lines apart: the clause
+        # has_message gates EIGHT regions that sit hundreds of lines apart: the clause
         # spliced into the change_reason wording, the note-handling instructions, the
         # constraint- and signal-extraction instructions, the "new_constraints" and
-        # "new_signals" schema members, and the note DATA section. They must appear
+        # "new_signals" schema members, the note DATA section, and outside a tweak the
+        # instructions and schema member for "note_session". They must appear
         # together or the model is told about a section that isn't present.
         # tests/test_prompt_gates.py asserts that, so the invariant survives edits here.
         has_message = bool(athlete_message and athlete_message.strip())
@@ -310,6 +312,9 @@ the active mesocycle (from {target_date_str} to {range_end_str}).
             custom_task += signal_extraction_task(
                 signal_vocabulary, signal_earliest_date or target_date_str
             )
+        # A tweak's request is acted on at once and is not kept (DESIGN_session_notes.md §2).
+        if has_message and not tweak:
+            custom_task += note_session_task(target_date_str, shift(target_date_str, -1))
 
         custom_task += """
 ### DURABLE OBSERVATIONS ARE READ-ONLY HERE
@@ -397,6 +402,8 @@ evidence-backed observations are authored only by the weekly history analysis
         if has_message:
             schema_members.append(NEW_CONSTRAINTS_SCHEMA)
             schema_members.append(NEW_SIGNALS_SCHEMA)
+        if has_message and not tweak:
+            schema_members.append(NOTE_SESSION_SCHEMA)
         custom_task += (
             "\n## RESPONSE FORMAT\n"
             "You MUST respond with a JSON object containing:\n{\n"

@@ -29,6 +29,8 @@ NOTE_CLAUSE = "constraint from the athlete's note drove the change"
 NOTE_DATA = "## ATHLETE'S NOTE FOR THIS ADAPTATION"
 NOTE_SIGNAL_INSTRUCTIONS = "### RECORDING A DAILY SIGNAL FROM THE NOTE"
 NOTE_SIGNAL_SCHEMA_MEMBER = '"new_signals"'
+NOTE_SESSION_INSTRUCTIONS = "### SAYING WHICH SESSION THE NOTE IS ABOUT"
+NOTE_SESSION_SCHEMA_MEMBER = '  "note_session": '
 
 from stamind.coach.engine.adapt import RULE_MESOCYCLE_NOT_YOURS, RULE_MOVE_FIRST
 from stamind.coach.engine.sessions import benchmark_task, replaces_field
@@ -138,6 +140,7 @@ def build_generate_prompt(**extra):
 NOTE_REGIONS = (
     NOTE_INSTRUCTIONS, NOTE_SCHEMA_MEMBER, NOTE_CLAUSE, NOTE_DATA,
     NOTE_SIGNAL_INSTRUCTIONS, NOTE_SIGNAL_SCHEMA_MEMBER,
+    NOTE_SESSION_INSTRUCTIONS, NOTE_SESSION_SCHEMA_MEMBER,
 )
 
 
@@ -304,6 +307,11 @@ class TestTheTweakGate(unittest.TestCase):
                 self.assertNotIn(section, system)
         self.assertNotIn(NOTE_INSTRUCTIONS, system)
         self.assertNotIn(NOTE_DATA, user)
+
+    def test_a_request_is_not_kept_so_nothing_asks_which_session_it_is_about(self):
+        system, _user = build_prompt(tweak=True, athlete_message=self.REQUEST)
+        self.assertNotIn(NOTE_SESSION_INSTRUCTIONS, system)
+        self.assertNotIn(NOTE_SESSION_SCHEMA_MEMBER, system)
 
     def test_the_shared_sections_stay(self):
         system, _user = build_prompt(tweak=True, athlete_message=self.REQUEST)

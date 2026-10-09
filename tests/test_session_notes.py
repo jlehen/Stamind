@@ -33,10 +33,16 @@ TODAY = "2026-09-30"
 WORDS = "This was tough. ERG at 235w,\nstopped at ~12:30 of rep 2."
 
 
-def _proposal():
+YESTERDAY = "2026-09-29"
+
+
+def _proposal(about="cycling", day=TODAY):
+    """The week planner's answer, with what it says the note is about: a sport or "unclear"
+    on `day`, or None (§3)."""
     return RevisionProposal(
         reason="Stopping early was sensible.", workouts=[], new_constraints=[],
         range_start=TODAY, range_end="2026-10-04", pairs=(),
+        note_date=day if about else None, note_session=about,
     )
 
 
@@ -83,43 +89,90 @@ class TestTheNoteFollowsTheSession(_Case):
 @patch("stamind.runtime.garmin")
 @patch("stamind.runtime.coach_service")
 class TestWorkoutAdaptKeepsTheNote(_Case):
-    """The date rule of §3, on the terminal: `--auto`, so the only question asked is which
-    session the note is about."""
+    """The week planner says which session of the day the note is about (§3). On the
+    terminal, with `--auto`, so the only question that can be asked is which session."""
 
-    def adapt(self, mock_coach, answer="n", words=WORDS):
-        mock_coach.workout_adapt.return_value = _proposal()
+    def adapt(self, mock_coach, answer="n", words=WORDS, about="cycling", day=TODAY):
+        mock_coach.workout_adapt.return_value = _proposal(about, day)
         return run_cli(["workout", "adapt", "--auto", "-m", words], answer)
 
-    def test_the_days_only_session_gets_the_note_and_the_line_says_so(self, mock_coach, _g):
-        ride = save_workout(test_db, TODAY, "cycling", "Climb-Pace 2x15")
-        save_workout(test_db, TODAY, "rest", "Rest")
+    def two_sessions(self):
+        return (
+            save_workout(test_db, TODAY, "cycling", "Climb-Pace 2x15"),
+            save_workout(test_db, TODAY, "strength_training", "Full-Body Strength"),
+        )
+
+    def test_the_session_it_names_gets_the_note_and_the_line_says_so(self, mock_coach, _g):
+        ride, lift = self.two_sessions()
         exit_code, stdout, _ = self.adapt(mock_coach)
         self.assertEqual(exit_code, 0)
         self.assertEqual(self.notes(ride), [WORDS])
+        self.assertEqual(self.notes(lift), [])
         self.assertIn(f"Note kept with session {ride}, “Climb-Pace 2x15” ({TODAY}).", stdout)
         self.assertNotIn("Which session is this about?", stdout)
         # The note still reaches this run's coach, as it always did.
         self.assertEqual(mock_coach.workout_adapt.call_args.kwargs["message"], WORDS)
 
-    def test_two_sessions_ask_which_one(self, mock_coach, _g):
+    def test_a_note_about_something_else_is_not_kept(self, mock_coach, _g):
+        """"No training on November 12th" on a day with one ride: the ride is not what the
+        words are about."""
         ride = save_workout(test_db, TODAY, "cycling", "Climb-Pace 2x15")
-        lift = save_workout(test_db, TODAY, "strength_training", "Full-Body Strength")
-        _, stdout, _ = self.adapt(mock_coach, answer="2")
+        _, stdout, _ = self.adapt(mock_coach, about=None)
+        self.assertEqual(self.notes(ride), [])
+        self.assertNotIn("Note kept", stdout)
+        self.assertNotIn("Which session is this about?", stdout)
+
+    def test_a_sport_with_no_session_that_day_keeps_nothing(self, mock_coach, _g):
+        ride = save_workout(test_db, TODAY, "cycling", "Climb-Pace 2x15")
+        _, stdout, _ = self.adapt(mock_coach, about="running")
+        self.assertEqual(self.notes(ride), [])
+        self.assertNotIn("Note kept", stdout)
+
+    def test_unclear_with_two_sessions_asks_which_one(self, mock_coach, _g):
+        ride, lift = self.two_sessions()
+        _, stdout, _ = self.adapt(mock_coach, answer="2", about="unclear")
         self.assertIn("Which session is this about?", stdout)
         self.assertIn("Not about a session", stdout)
         self.assertEqual(self.notes(ride), [])
         self.assertEqual(self.notes(lift), [WORDS])
 
-    def test_not_about_a_session_keeps_nothing(self, mock_coach, _g):
+    def test_unclear_with_one_session_keeps_it_there(self, mock_coach, _g):
         ride = save_workout(test_db, TODAY, "cycling", "Climb-Pace 2x15")
-        lift = save_workout(test_db, TODAY, "strength_training", "Full-Body Strength")
-        _, stdout, _ = self.adapt(mock_coach, answer="3")
+        save_workout(test_db, TODAY, "rest", "Rest")
+        _, stdout, _ = self.adapt(mock_coach, about="unclear")
+        self.assertEqual(self.notes(ride), [WORDS])
+        self.assertNotIn("Which session is this about?", stdout)
+
+    def test_a_note_about_yesterday_is_kept_with_yesterdays_session(self, mock_coach, _g):
+        """Saturday morning: "yesterday's ride was tough". Today's ride is not what the
+        words are about."""
+        today_ride = save_workout(test_db, TODAY, "cycling", "Easy Spin")
+        ride = save_workout(test_db, YESTERDAY, "cycling", "Climb-Pace 2x15")
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
+            _, stdout, _ = self.adapt(mock_coach, day=YESTERDAY)
+        self.assertEqual(self.notes(ride), [WORDS])
+        self.assertEqual(self.notes(today_ride), [])
+        self.assertIn("Kept with yesterday's “Climb-Pace 2x15”.", stdout)
+
+    def test_unclear_about_yesterday_asks_among_yesterdays_sessions(self, mock_coach, _g):
+        save_workout(test_db, TODAY, "cycling", "Easy Spin")
+        ride = save_workout(test_db, YESTERDAY, "cycling", "Climb-Pace 2x15")
+        lift = save_workout(test_db, YESTERDAY, "strength_training", "Full-Body Strength")
+        _, stdout, _ = self.adapt(mock_coach, answer="1", about="unclear", day=YESTERDAY)
+        self.assertIn("Which session is this about?", stdout)
+        self.assertNotIn("Easy Spin", stdout)
+        self.assertEqual(self.notes(ride), [WORDS])
+        self.assertEqual(self.notes(lift), [])
+
+    def test_not_about_a_session_keeps_nothing(self, mock_coach, _g):
+        ride, lift = self.two_sessions()
+        _, stdout, _ = self.adapt(mock_coach, answer="3", about="unclear")
         self.assertEqual(self.notes(ride) + self.notes(lift), [])
         self.assertNotIn("Note kept", stdout)
 
     def test_a_day_with_no_session_keeps_nothing(self, mock_coach, _g):
         rest = save_workout(test_db, TODAY, "rest", "Rest")
-        _, stdout, _ = self.adapt(mock_coach)
+        _, stdout, _ = self.adapt(mock_coach, about="unclear")
         self.assertEqual(self.notes(rest), [])
         self.assertNotIn("Note kept", stdout)
 

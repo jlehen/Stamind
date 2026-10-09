@@ -15,7 +15,7 @@ from stamind.sentinels import emit_buttons
 from stamind.strength.prescription import exercise_lines
 from stamind.text import green, wrap_text
 from stamind.output import notice
-from stamind.clock import today_date as _today_date, today_str as _today_str
+from stamind.clock import shift, today_date as _today_date, today_str as _today_str
 from stamind.cli.common import print_strength_notes
 from stamind.cli.progress import emit_chart
 from stamind.cli.render.expert import ExpertRenderer
@@ -29,6 +29,15 @@ from stamind.cli.render.session_lines import (
     SIMPLE_SESSION_RULE, simple_benchmark_question, simple_compare_lines, simple_day_lines,
     simple_day_word, simple_revision_lines, simple_span_words, simple_week_lines,
 )
+
+
+def _whose_day(day: str, today: str) -> str:
+    """Whose session a note is about: "today's", "yesterday's", else the day word's."""
+    if day == today:
+        return "today's"
+    if day == shift(today, -1):
+        return "yesterday's"
+    return f"{simple_day_word(day, today)}'s"
 
 
 class CompanionRenderer(ExpertRenderer):
@@ -67,9 +76,16 @@ class CompanionRenderer(ExpertRenderer):
             print(line)
 
     def session_note_kept(self, session: Dict[str, Any], day: str) -> None:
-        when = simple_day_word(day, _today_str())
-        owner = "today's" if when == "today" else f"{when}'s"
-        print(f"Kept with {owner} “{session['title']}”.")
+        print(f"Kept with {_whose_day(day, _today_str())} “{session['title']}”.")
+
+    def session_note_question(self, text: str, day: str, today: str) -> str:
+        return (
+            f"You wrote: “{text.strip()}”\n"
+            f"Which of {_whose_day(day, today)} sessions was that about?"
+        )
+
+    def session_note_not_kept(self) -> None:
+        print("Okay — I won't keep it with a session.")
 
     # -- confirming a note's candidates --
     # The companion's main felt surface once notes stop riding the coach: she says

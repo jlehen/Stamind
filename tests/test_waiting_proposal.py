@@ -576,6 +576,77 @@ class ChatRunTest(_Case):
             [item["kind"] for item in athlete_queue.walk(self.now)], ["message", "constraint"]
         )
 
+    def test_in_the_chat_a_note_that_names_its_session_is_kept_at_once(self):
+        _coach, _prompt, out = self.coach_run(
+            self.eased(note_date=THURSDAY, note_session="cycling"),
+            ("workout", "adapt", "-m", "not on my normal bike"),
+        )
+        self.assertIn("Kept with today's “Intervals”.", out)
+        self.assertEqual(
+            [note["text"] for note in self.ride()["athlete_notes"]], ["not on my normal bike"]
+        )
+        [proposal] = queue_lines(out)
+        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
+
+    def unclear_note(self, day=THURSDAY):
+        """`day` has a ride and a gym session, and "had to cut it short" does not say
+        which. Returns the gym session and the question the proposal's answer brings."""
+        if day != THURSDAY:
+            save_workout(test_db, day, "cycling", "Hill reps", duration_minutes=60)
+        gym = save_workout(test_db, day, "strength_training", "Gym", duration_minutes=45)
+        _coach, prompt, out = self.coach_run(
+            self.eased(
+                new_constraints=self.CONSTRAINT, note_date=day, note_session="unclear"
+            ),
+            ("workout", "adapt", "-m", "had to cut it short"),
+        )
+        prompt.choose.assert_not_called()
+        self.assertNotIn("Kept with", out)
+        [proposal] = queue_lines(out)
+        [question] = queue_lines(self.tap(proposal, "a2", proposal["since"]))
+        return gym, question
+
+    def test_in_the_chat_an_unclear_note_is_asked_about_once_the_proposal_is_answered(self):
+        """The question quotes the words, offers each session of the day, and comes before
+        the constraint question (DESIGN_session_notes.md §3)."""
+        gym, question = self.unclear_note()
+        self.assertEqual(
+            question["text"],
+            "You wrote: “had to cut it short”\nWhich of today's sessions was that about?",
+        )
+        labels = [b["label"] for b in question["buttons"]]
+        self.assertCountEqual(labels[:-1], ["Intervals", "Gym"])
+        self.assertEqual(labels[-1], "Not about a session")
+
+        out = self.tap(question, f"a{labels.index('Gym') + 1}", question["since"])
+        self.assertIn("Kept with today's “Gym”.", out)
+        self.assertEqual(
+            [note["text"] for note in test_db.get_lineage_head(gym)["athlete_notes"]],
+            ["had to cut it short"],
+        )
+        self.assertEqual(self.ride()["athlete_notes"], [])
+        [constraint] = queue_lines(out)
+        self.assertIn("this constraint?", constraint["text"])
+
+    def test_an_unclear_note_about_yesterday_offers_yesterdays_sessions(self):
+        gym, question = self.unclear_note(day="2026-10-07")
+        self.assertIn("Which of yesterday's sessions was that about?", question["text"])
+        labels = [b["label"] for b in question["buttons"]]
+        self.assertCountEqual(labels[:-1], ["Hill reps", "Gym"])
+        out = self.tap(question, f"a{labels.index('Gym') + 1}", question["since"])
+        self.assertIn("Kept with yesterday's “Gym”.", out)
+        self.assertEqual(
+            [note["text"] for note in test_db.get_lineage_head(gym)["athlete_notes"]],
+            ["had to cut it short"],
+        )
+
+    def test_not_about_a_session_keeps_the_words_nowhere(self):
+        gym, question = self.unclear_note()
+        out = self.tap(question, "a3", question["since"])
+        self.assertIn("Okay — I won't keep it with a session.", out)
+        self.assertEqual(test_db.get_lineage_head(gym)["athlete_notes"], [])
+        self.assertEqual(self.ride()["athlete_notes"], [])
+
     def test_with_nothing_to_change_the_constraint_question_goes_out_at_once(self):
         proposal = RevisionProposal(**{
             **self.nothing_to_change().__dict__, "new_constraints": self.CONSTRAINT,

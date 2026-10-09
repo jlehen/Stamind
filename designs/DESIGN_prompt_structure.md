@@ -171,6 +171,10 @@ only when they have content: `## SESSIONS THE ATHLETE SPOKE ABOUT` and
 `## THE ATHLETE'S WORDS`. For the record of a plan the user message holds `## THE PLAN`,
 `## ITS MESOCYCLES` and `## THE ATHLETE'S WORDS`.
 
+Amended 2026-10-09 (DESIGN_session_notes.md §3): `workout adapt` gains one sub-section of
+`## TASK`, `SAYING WHICH SESSION THE NOTE IS ABOUT`, and one member of `## RESPONSE FORMAT`,
+`"note_session"`. Both are present when the run has a note and is not a `workout tweak`.
+
 Amended 2026-10-01 (DESIGN_cycle_retrospective.md §7): the system message of `plan generate`
 gains one top-level section, `## RETROSPECTIVES OF PAST PLANS`, placed just before
 `## PRIOR TRAINING REVIEW`. It is present only when a record of a plan has been written.

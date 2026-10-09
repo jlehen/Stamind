@@ -5,10 +5,13 @@ the `workout tweak` TASK, how to weigh a note attached to one adaptation, and th
 extraction passes that read a note into candidate constraints and candidate signals with
 the schemas they answer in. `workout adapt -m` and `bot capture note` both ask for the
 extractions, so the rules and the schemas are one text on both paths
-(DESIGN_bot_simple_frontend.md §12.10). The last section is about the coach's own words:
-how to read a proposal the athlete has not answered yet.
+(DESIGN_bot_simple_frontend.md §12.10). One section asks which session the note is about
+(DESIGN_session_notes.md §3), and one is about the coach's own words: how to read a
+proposal the athlete has not answered yet.
 """
 from typing import Optional, Sequence
+
+from stamind.coach.proposals import NOTE_SESSION_UNCLEAR
 
 
 def tweak_task(
@@ -204,6 +207,39 @@ Set "value" ONLY when the note states a number, in the unit named by the categor
 severity score: a category with free text and no number is complete and useful, and a
 fabricated number is read as a measurement.
 """
+
+
+def note_session_task(target_date_str: str, day_before_str: str) -> str:
+    """The SAYING WHICH SESSION THE NOTE IS ABOUT section: the week planner names the
+    session the note talks about, on the evaluation date or the day before, says it cannot
+    tell which, or says none (DESIGN_session_notes.md §3)."""
+    return f"""
+### SAYING WHICH SESSION THE NOTE IS ABOUT
+One more job, separate from the others. The app keeps the athlete's words with the session
+they are about, so that later runs read them beside it. It can only keep them with a session
+planned on {target_date_str}, or on {day_before_str} when the note says it is about that day
+("yesterday's ride", "last night's session"). A note that names no day is about
+{target_date_str}. Answer in "note_session":
+- that session's "date" and "sport_type", when the note is about it: how it went or will go,
+  what was done differently, what got in its way, the equipment or the place ("not much time
+  today, had to cut it short", "after a long warm-up", "not on my normal bike").
+- its "date" with "sport_type": "{NOTE_SESSION_UNCLEAR}", when the note is about a session of
+  that day, several are planned on it, and the note does not say which. Never pick one for
+  the athlete, and do not work it out from the recorded activities.
+- null, when the note is about anything else: another day ("no training on November 12th",
+  "tomorrow I have no access to the gym"), how the athlete feels with no word about a
+  session, a question, a request.
+"""
+
+
+NOTE_SESSION_SCHEMA = (
+    '  "note_session": {\n'
+    "    // The whole member is null when the note is about no session of those two days\n"
+    "    // (see SAYING WHICH SESSION THE NOTE IS ABOUT above).\n"
+    '    "date": "YYYY-MM-DD, the evaluation date or the day before",\n'
+    f'    "sport_type": "the sport_type of that session" | "{NOTE_SESSION_UNCLEAR}"\n'
+    "  } | null"
+)
 
 
 # The two candidate members, written once. `workout adapt -m` and `bot capture note` both

@@ -20,7 +20,7 @@ from stamind.analytics.adherence import (
 from stamind.sports import canonical_sport
 from stamind import settings, signals
 from stamind.text import cmd
-from stamind.clock import fmt_date, today_str as _today_str
+from stamind.clock import fmt_date, shift, today_str as _today_str
 from stamind.coach.formatting import format_baseline
 from stamind.coach import honoring
 from stamind.coach.proposals import RevisionProposal
@@ -404,6 +404,16 @@ class AdaptMixin:
         # Same gate, same rule: candidates only, confirmed and written by the caller via
         # `capture_message_signal` (DESIGN_signal_extraction.md §2).
         new_signals = (decision.get("new_signals") or []) if message else []
+        # Which session the note is about, on the evaluated day or the one before; the
+        # caller keeps the words with it (DESIGN_session_notes.md §3). A tweak's request is
+        # not kept, and an answer for any other day counts as none.
+        note_date = note_session = None
+        about = decision.get("note_session")
+        if message and not tweak and isinstance(about, dict):
+            day = str(about.get("date") or "").strip()
+            sport = str(about.get("sport_type") or "").strip().lower()
+            if sport and day in (target_date_str, shift(target_date_str, -1)):
+                note_date, note_session = day, sport
 
         # Read once, against the same range apply will act on — the CLI used to
         # re-derive the pairing for its preview and rebuild a narrower range from the
@@ -466,6 +476,8 @@ class AdaptMixin:
             workouts=structured,
             new_constraints=tuple(new_constraints),
             new_signals=tuple(new_signals),
+            note_date=note_date,
+            note_session=note_session,
             range_start=target_date_str,
             range_end=range_end,
             kind="tweak" if tweak else "adapt",

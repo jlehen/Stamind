@@ -7,6 +7,9 @@ job (DESIGN_bot_simple_frontend.md §12.3). A terminal asks on the spot, through
 confirms below, the signal ladder included (§12.10). A run started from the chat queues
 each question and ends, and a tap answers it (DESIGN_waiting_proposal.md §6.3). Nothing
 here writes before a `yes`: the service's `capture_message_*` do, in both cases.
+
+A third question is queued the same way: which of the day's sessions the note is about,
+when the week planner could not tell (DESIGN_session_notes.md §3).
 """
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -22,6 +25,7 @@ from stamind.sentinels import emit_buttons
 # The answers of a queued question, as its item stores them (DESIGN_athlete_queue.md §3).
 YES = "yes"
 NO = "no"
+NOT_ABOUT_A_SESSION = "not about a session"
 
 
 def _span(candidate: Dict[str, Any], start_key: str, default_date: str) -> Tuple[str, str]:
@@ -217,12 +221,16 @@ def _signal_wording(item: Dict[str, Any]) -> str:
     )
 
 
+def _out_of_look_back(day: str) -> bool:
+    """Whether `day` is further back than the days the coach's prompts look back over."""
+    earliest = clock.today_date() - timedelta(days=max(config.metrics_lookback_days, 1) - 1)
+    return datetime.strptime(day, "%Y-%m-%d").date() < earliest
+
+
 def _signal_stale(item: Dict[str, Any]) -> bool:
     """Its last day is further back than the days of metrics the coach reads."""
     payload = item['payload']
-    earliest = clock.today_date() - timedelta(days=max(config.metrics_lookback_days, 1) - 1)
-    last_day = _span(payload['candidate'], 'date', payload['date'])[1]
-    return datetime.strptime(last_day, "%Y-%m-%d").date() < earliest
+    return _out_of_look_back(_span(payload['candidate'], 'date', payload['date'])[1])
 
 
 def _apply_signal(item: Dict[str, Any], index: int, text: Optional[str]) -> None:
@@ -247,6 +255,55 @@ SIGNAL_KIND = Kind(
     wording=_signal_wording, companion_wording=_signal_wording,
     is_stale=_signal_stale, apply=_apply_signal, bare=True,
 )
+
+
+def keep_note(session: Dict[str, Any], day: str, text: str) -> None:
+    """Keeps the athlete's words with a session, given by its id and title, and says so
+    (DESIGN_session_notes.md §3)."""
+    runtime.db.add_session_note(session['id'], text)
+    runtime.render.session_note_kept(session, day)
+
+
+def _note_wording(item: Dict[str, Any]) -> str:
+    payload = item['payload']
+    return runtime.render.session_note_question(payload['text'], payload['date'], today_str())
+
+
+def _note_stale(item: Dict[str, Any]) -> bool:
+    """Its day is out of every prompt's look back: nobody would read the note."""
+    return _out_of_look_back(item['payload']['date'])
+
+
+def _apply_note(item: Dict[str, Any], index: int, text: Optional[str]) -> None:
+    """An answer that names a session keeps the words with it; the last one keeps nothing."""
+    payload = item['payload']
+    answer = payload['answers'][index]
+    if 'session' not in answer:
+        runtime.render.session_note_not_kept()
+        return
+    session = {'id': answer['session'], 'title': answer['label']}
+    keep_note(session, payload['date'], payload['text'])
+
+
+# Asks which of a day's sessions a note is about, when the week planner could not tell.
+NOTE_KIND = Kind(
+    name="session_note", shape=QUESTION,
+    wording=_note_wording, companion_wording=_note_wording,
+    is_stale=_note_stale, apply=_apply_note, bare=True,
+)
+
+
+def queue_note_question(
+    sessions: Sequence[Dict[str, Any]], day: str, text: str
+) -> List[Dict[str, Any]]:
+    """Queues "which session is this about?" with one answer per session of `day` and one
+    for none of them, and returns the item in a list, as `queue_candidates` does."""
+    item_id = queue(NOTE_KIND.name, f"{queue_stamp(clock.command_start())}:note", {
+        'text': text, 'date': day,
+        'answers': [{'label': w['title'], 'session': w['id']} for w in sessions]
+        + [{'label': NOT_ABOUT_A_SESSION}],
+    })
+    return [runtime.db.get_queue_item(item_id)] if item_id is not None else []
 
 
 def _signal_answers(metric: str, near: Optional[str]) -> List[Dict[str, Any]]:

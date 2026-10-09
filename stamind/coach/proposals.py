@@ -16,6 +16,10 @@ from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 from stamind.types import Objective
 
+# The week planner's answer for a note about a session of a day that does not say which of
+# several (DESIGN_session_notes.md §3).
+NOTE_SESSION_UNCLEAR = "unclear"
+
 
 @dataclass(frozen=True)
 class RevisionPair:
@@ -57,6 +61,11 @@ class RevisionProposal:
     # Candidate daily signals extracted from the same note, raw and unconfirmed
     # (DESIGN_signal_extraction.md §2).
     new_signals: Tuple[Dict[str, Any], ...] = ()
+    # Which session the same note is about, as the week planner read it: its day, which is
+    # the evaluated day or the one before, and its sport or `NOTE_SESSION_UNCLEAR`. Both
+    # None for a note about something else (DESIGN_session_notes.md §3).
+    note_date: Optional[str] = None
+    note_session: Optional[str] = None
     # Constraints this pass had authority over every remaining day of, so apply stamps
     # exactly the set decided at proposal time (DESIGN_constraint_honoring.md §3). See
     # `coach/honoring.py`.

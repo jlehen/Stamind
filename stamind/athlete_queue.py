@@ -16,7 +16,7 @@ from stamind.queue_kind import (  # noqa: F401
     ANSWERED, DROPPED, MESSAGE, QUESTION, STALE, Kind, NotApplied, queue,
 )
 from stamind.cli.bot.test_result import TEST_RESULT_KIND
-from stamind.cli.candidates import CONSTRAINT_KIND, SIGNAL_KIND
+from stamind.cli.candidates import CONSTRAINT_KIND, NOTE_KIND, SIGNAL_KIND
 from stamind.cli.workouts.proposal import PROPOSAL_KIND
 from stamind.learning_doubts import LEARNING_KIND
 from stamind.retrospective_question import RETROSPECTIVE_KIND
@@ -66,12 +66,13 @@ MESSAGE_KIND = Kind(
 # the test-result kind what a test done yesterday gave (DESIGN_benchmark_from_chat.md §4),
 # and the retrospective kind how a finished mesocycle went (DESIGN_cycle_retrospective.md §4).
 # The proposal kind holds what the week planner would change (DESIGN_waiting_proposal.md §3).
-# The constraint and signal kinds ask whether to store what a message stated (§6.3 there).
+# The constraint and signal kinds ask whether to store what a message stated (§6.3 there),
+# and the session-note kind which session the message is about (DESIGN_session_notes.md §3).
 KINDS: Dict[str, Kind] = {
     kind.name: kind
     for kind in (
         MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND, LEARNING_KIND, TEST_RESULT_KIND,
-        RETROSPECTIVE_KIND, PROPOSAL_KIND, CONSTRAINT_KIND, SIGNAL_KIND,
+        RETROSPECTIVE_KIND, PROPOSAL_KIND, NOTE_KIND, CONSTRAINT_KIND, SIGNAL_KIND,
     )
 }
 

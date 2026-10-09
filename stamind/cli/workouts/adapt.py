@@ -9,9 +9,10 @@ the athlete's chat does not ask and apply: it saves the proposal, sends it and e
 """
 import argparse
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 from stamind import athlete_queue, runtime
 from stamind.analytics.compare import format_actual
+from stamind.coach.proposals import NOTE_SESSION_UNCLEAR
 from stamind.config import config
 from stamind.prompt import Choice, athlete_watching
 from stamind.sports import canonical_sport
@@ -20,7 +21,8 @@ from stamind.text import gray, red, wrap_text
 from stamind.output import notice, step, warn
 from stamind.clock import fmt_date, today_str as _today_str
 from stamind.cli.candidates import (
-    confirm_new_constraints, confirm_new_signals, queue_candidates,
+    confirm_new_constraints, confirm_new_signals, keep_note, queue_candidates,
+    queue_note_question,
 )
 from stamind.cli.common import ensure_recent_data
 from stamind.cli.queue import send_alone, send_own_questions
@@ -71,24 +73,31 @@ def _resolve_ambiguous_matches(date_str: str, auto: bool) -> None:
             print(gray("  Discarded — the session reads as not done."))
 
 
-def _session_for_note(date_str: str, message: Optional[str]) -> Optional[Workout]:
-    """The session the athlete's note is about: the day's only one, or the one they pick
-    when there are several. None when the day has none (DESIGN_session_notes.md §3)."""
-    if not (message or "").strip():
-        return None
+def _note_candidates(proposal, message: Optional[str]) -> List[Workout]:
+    """The sessions that the athlete's note may be kept with, as the week planner read it:
+    on the day it names, the one it names, every one when it cannot tell which, and none
+    when the note is about something else (DESIGN_session_notes.md §3)."""
+    day, about = proposal.note_date, proposal.note_session
+    if not day or not about or not (message or "").strip():
+        return []
     sessions = [
-        w for w in runtime.db.get_workouts(start_date=date_str, end_date=date_str)
+        w for w in runtime.db.get_workouts(start_date=day, end_date=day)
         if canonical_sport(w['sport_type']) != canonical_sport('rest')
     ]
-    if len(sessions) < 2:
-        return sessions[0] if sessions else None
+    if about == NOTE_SESSION_UNCLEAR:
+        return sessions
+    return [w for w in sessions if canonical_sport(w['sport_type']) == canonical_sport(about)]
+
+
+def _pick_note_session(sessions: List[Workout]) -> List[Workout]:
+    """On a terminal: asks on the spot which of the day's sessions the note is about."""
     picked = runtime.prompt.choose(
         "Which session is this about?",
         [Choice(str(w['id']), w['title']) for w in sessions]
         + [Choice("none", "Not about a session")],
         default="none",
     )
-    return next((w for w in sessions if str(w['id']) == picked), None)
+    return [w for w in sessions if str(w['id']) == picked]
 
 
 def _adapt_date(args: argparse.Namespace, tweak: bool) -> str:
@@ -232,9 +241,6 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
 
     # Before the week planner is told anything: settle any pairing the matcher had to guess at.
     _resolve_ambiguous_matches(date_str, auto=args.auto)
-    # Asked now, kept once the coach has answered (DESIGN_session_notes.md §3). A tweak's
-    # request is acted on at once and is not kept.
-    note_session = None if tweak else _session_for_note(date_str, getattr(args, 'message', None))
     in_chat = athlete_watching()
     # Every run shows the week planner the proposal that still waits
     # (DESIGN_waiting_proposal.md §6.2).
@@ -254,20 +260,29 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
                 date_str, message=getattr(args, 'message', None),
                 **saved_proposal.shown_to_week_planner(still_open),
             )
-        if note_session is not None:
-            runtime.db.add_session_note(note_session['id'], args.message)
-            runtime.render.session_note_kept(note_session, date_str)
+        # The note is kept with the session the week planner says it is about, once its
+        # call has returned (DESIGN_session_notes.md §3). When it cannot tell which of
+        # several, a terminal asks on the spot and the chat queues the question. A tweak's
+        # request is acted on at once and is not kept.
+        message = getattr(args, 'message', None)
+        about = [] if tweak else _note_candidates(proposal, message)
+        if len(about) > 1 and not in_chat:
+            about = _pick_note_session(about)
+        if len(about) == 1:
+            keep_note(about[0], proposal.note_date, message)
 
         # The questions about a constraint or a signal found in the note. A terminal asks them
         # before the preview (DESIGN_constraints.md §8). The chat queues them: they go out
         # at once, or behind the proposal when its answer comes
         # (DESIGN_waiting_proposal.md §6.3).
-        message = getattr(args, 'message', None)
         if not in_chat:
             _confirm_candidates(proposal, date_str, message)
         proposed = _settle(args, tweak, proposal, in_chat, still_open is not None, written_upto)
         if in_chat:
-            questions = queue_candidates(
+            questions = []
+            if len(about) > 1:
+                questions = queue_note_question(about, proposal.note_date, message)
+            questions += queue_candidates(
                 proposal.new_constraints, proposal.new_signals, date_str, message or "",
                 offer=False,
             )
