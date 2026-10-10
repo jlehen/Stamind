@@ -16,7 +16,8 @@ from typing import Any, Dict, List, Optional, Sequence
 from stamind import clock, runtime, settings
 
 # Nothing is sent after this hour: a change the bot could not send at the morning time
-# waits for the next morning (§4).
+# waits for the next morning (§4). The athlete queue sends on its own inside the same
+# hours (DESIGN_athlete_queue.md §13.2).
 EVENING = "21:00"
 
 # The id of the newest change `workout notify` asked the bot to send at once (§4).
@@ -54,7 +55,7 @@ def message(change: Dict[str, Any]) -> str:
     return f"{CHANGE_LEAD} {change['note']}"
 
 
-def _at(moment: datetime, hhmm: str) -> datetime:
+def at_time(moment: datetime, hhmm: str) -> datetime:
     """`moment`'s day at the local time `hhmm`."""
     hours, minutes = settings.parse_hhmm(hhmm).split(":")
     return moment.replace(hour=int(hours), minute=int(minutes), second=0, microsecond=0)
@@ -79,8 +80,8 @@ def due(
         return False
     if notify_upto is not None and any(c["id"] <= notify_upto for c in waiting):
         return True
-    morning_at = _at(now, morning)
-    if not morning_at <= now < _at(now, EVENING):
+    morning_at = at_time(now, morning)
+    if not morning_at <= now < at_time(now, EVENING):
         return False
     if any(_made_at(c) < morning_at for c in waiting):
         return True
@@ -97,9 +98,9 @@ def sends_after_delay(
 
     Only a change to one of today's sessions does, and only when the wait ends before the
     evening: past it the day the change is about is over, so it waits like any other."""
-    if now < _at(now, morning):
+    if now < at_time(now, morning):
         return False
-    return touches_today and now + timedelta(minutes=delay_minutes) < _at(now, EVENING)
+    return touches_today and now + timedelta(minutes=delay_minutes) < at_time(now, EVENING)
 
 
 def sends_at(
@@ -110,7 +111,7 @@ def sends_at(
     while it is still ahead, else tomorrow's."""
     if sends_after_delay(now, morning, touches_today, delay_minutes):
         return now + timedelta(minutes=delay_minutes)
-    morning_at = _at(now, morning)
+    morning_at = at_time(now, morning)
     if now < morning_at:
         return morning_at
     return morning_at + timedelta(days=1)

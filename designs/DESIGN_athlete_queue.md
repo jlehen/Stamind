@@ -1,11 +1,10 @@
 # Design: The queue of things Stamind wants to tell or ask the athlete
 
-**Status:** Implemented · **Date:** 2026-09-14 (rev. 3) · rev. 4 designed 2026-10-10, not
-built (§13)
+**Status:** Implemented · **Date:** 2026-09-14 (rev. 3) · rev. 4, 2026-10-10 (§13)
 
 Revision 4 replaces the round the morning message opens with one line that the bot sends from
-on its own, in the order items become ready. It is §13. Sections 1 to 12 still describe the
-code as it runs.
+on its own, in the order items become ready. It is §13. Sections 1 to 12 keep their text, and
+each one that the line changes ends with a note dated 2026-10-10 that says what.
 
 Revision 3 settles the terminal command: a bare `sm queue` lists, `sm queue answer` goes
 through the items, and `sm queue tell` leaves a message, which is also the first thing that
@@ -176,6 +175,14 @@ does, unless the morning message sent it ahead of its walk (DESIGN_waiting_propo
 tap on a closed item of such a kind gets the kind's own line in place of "Already
 settled — thanks!".
 
+Amended 2026-10-10 (§13.2): the table has two more columns and one less. `ready_at` is the
+time from which the item may be sent. It starts as `queued_at` and is never empty. `sent_at`
+is when the item was last put in front of the athlete. `remind_at` is gone, and `queued_at`
+is never rewritten. The order is no longer the order things were queued. The line is the
+waiting items whose `ready_at` has passed, the earliest first, and items with the same
+`ready_at` keep the order of their ids. The check runs before an item is sent and when it is
+tapped. No reminder is sent any more, so the third moment is gone.
+
 ## 4. The actions
 
 For a **question**:
@@ -233,6 +240,14 @@ after its time has passed but before the reminder went out, for instance because
 down, the walk shows it in its place and no reminder follows. On an instance without a bot
 nothing can send a reminder, so the item simply shows up again in the terminal once its time
 has passed.
+
+Amended 2026-10-10 (§13.2, §13.5): there is no walk and no reminder. One item is out at a
+time, and the tap on it sends the next. **In 1 hour** makes the item ready one hour after the
+tap. **In 1 day** is now **tomorrow**: the item is ready at the athlete's morning time on the
+next day. **After the others** makes it ready now, which puts it last in the line. In each
+case the item takes its turn in the line once its time has passed. It is not sent on its own
+ahead of the others. **Skip** still writes nothing. An answer the kind could not apply puts
+the item off until the next morning (§13.5, choice 14).
 
 ## 5. The terminal
 
@@ -349,6 +364,13 @@ Amended 2026-09-28: the expert persona is removed (DESIGN_bot_simple_frontend.md
 same commands still work in the chat when typed with a leading `/`, and `queue answer`
 sends the item in the companion's words.
 
+Amended 2026-10-10 (§13.4): `sm queue answer` goes through the line, each item once. Its later
+choices read "later — in 1 hour (22:12)", "later — tomorrow (Thu 08:00)" and "later — after
+the others". An item shown here counts as sent, so the bot does not send it again the same
+day. In the listing, an item is hidden while its ready time is ahead. `sm queue tell` answers
+"Queued #19. It goes out when its turn comes: within minutes between 08:00 and 21:00, and at
+08:00 otherwise."
+
 ### 5.2 When the terminal reads the queue
 
 The terminal shows the queue in four places and never starts a walk on its own.
@@ -405,6 +427,12 @@ A message from `sm queue tell` arrives the same way:
 >
 > `[👍 Got it]` `[🕐 Not now]`
 
+Amended 2026-10-10 (§13.2): the push no longer starts a walk. It ends with the queue's one
+step: if no item is out, the first item of the line goes out. The same step runs after every
+tap on a queued item, and on a wake of the scheduler between the morning time and 21:00. So a
+message from `sm queue tell` at 14:00 arrives by 14:05 when nothing is out. "7 left" counts the
+line. An item left unanswered is sent again from the next morning time on.
+
 ### 6.2 Buttons that carry their item
 
 This is the main change to the bot. It needs a new sentinel, meaning a new kind of line the
@@ -440,6 +468,11 @@ alive.
 
 In a terminal, the helper that would print this line prints the hint of §5.2 instead, so a
 raw sentinel never reaches a terminal.
+
+Amended 2026-10-10 (§13.7): a button is `q:<item id>:<action>`, for example `q:12:a2`, and the
+`SM-QUEUE` line no longer carries the start of a walk. A button sent before this change has a
+fourth part, which the bot reads past. A tap runs `sm bot queue 12 a2`. After it, the step of
+§13.2 sends the next item, or the closing line when the line has run out.
 
 ### 6.3 Answers typed as text
 
@@ -478,6 +511,10 @@ from the one-sentence rule.
 Amended 2026-09-28: the expert persona is removed (DESIGN_bot_simple_frontend.md §3), so no
 chat message shows skip. The terminal still does.
 
+Amended 2026-10-10 (§13.5): "Not now" swaps in two choices, "⏰ In 1 hour" and "⏰ Ask me
+tomorrow". "↩️ After the others" is the terminal's alone: in the chat both others already put
+the item behind the rest.
+
 ### 6.5 Reminders
 
 The bot's scheduler already wakes at least every five minutes to see whether the morning push
@@ -505,6 +542,12 @@ once:
 A reminder is sent whatever the persona and whether or not the morning push is switched on:
 the athlete asked for this one herself. A reminder set from the terminal arrives in Telegram
 when the instance runs a bot.
+
+Amended 2026-10-10 (§13.2): this section no longer holds. Nothing is sent as a reminder. On a
+wake with no morning message to run, the scheduler asks the database whether it is between
+the morning time and 21:00, an item is ready and none is out. If so it runs the hidden `bot
+queue --next`, which sends the first item of the line. An item the athlete put off comes back
+in its turn, under "⏰ You asked me to come back to this:".
 
 ## 7. The same week, with the queue
 
@@ -538,6 +581,10 @@ reminder first, just before the briefing. She taps "Shoulder press". Then the pu
 pulls Garmin, and the new name for block 6 arrives. Its walk starts with block 6, finds it
 stale and closes it without a word. Nothing else is waiting, so the walk sends nothing, and
 Thursday's push is the briefing alone.
+
+Amended 2026-10-10: §13.3 tells a Wednesday under the line. In the week above, the learning
+question put off until 09:00 no longer arrives at 09:00 on its own, because block 6 is out.
+It follows the tap on block 6, or Thursday's briefing.
 
 ## 8. How a feature uses the queue
 
@@ -617,6 +664,12 @@ item's place in the queue. `sm queue tell` is a terminal command, not a tap.
 - Deleting closed rows.
 - The web UI.
 
+Amended 2026-10-10 (§13.2, §13.5): three of these changed. The companion still cannot open the
+queue, but the bot sends from it through the day and not only in the morning. A morning when
+the push stays silent no longer holds the queue: the next wake sends from the line. Quiet
+hours exist: nothing goes out on its own between 21:00 and the morning time, so "In 1 hour"
+tapped at 23:30 arrives in the morning. A tap at night still brings the next item at once.
+
 ## 11. Open questions
 
 - **Skip in the companion.** §6.4 leaves skip out of the companion and keeps it for the
@@ -668,10 +721,12 @@ item's place in the queue. `sm queue tell` is a terminal command, not a tap.
   DESIGN_runway_nudge.md §4 (the queue hint shares its touchpoints). ARCHITECTURE.md: the
   queue, the sentinel and the reminder check. Designs still in progress are not edited.
 
+Amended 2026-10-10: §13.7 lists what revision 4 touched.
+
 ## 13. Revision 4: one line, in the order items become ready
 
-Designed 2026-10-10 and not built. Sections 1 to 12 describe the code as it runs today. They
-are amended when this lands (§13.7).
+Designed and built on 2026-10-10. Sections 1 to 12 describe the queue before it. Each one that
+the line changes ends with a note that says what (§13.7).
 
 ### 13.1 The problem
 
@@ -863,6 +918,16 @@ rulings left open.
 13. **Two columns.** `ready_at` replaces `remind_at` and is never empty. `sent_at` is new.
     `queued_at` keeps the time the item was queued and is never rewritten: "after the others"
     used to overwrite it.
+14. **An answer that could not be applied puts the item off until the next morning.** Added
+    when the design was built: the rulings did not cover it. It is Wednesday 08:10. The
+    athlete names a block of sets "butterfly", and Stamind knows no such exercise: "No
+    exercise Stamind knows matches “butterfly”. Nothing named." The item still waits, and its
+    message has lost its buttons. Before the line, the round went on to the next question and
+    this one came back the next morning. That is kept: the item is ready again on Thursday at
+    08:00, and the next question arrives at once. The other way is to leave it out. It would
+    then hold back every question behind it until Thursday morning, with no button left to
+    tap. The cost: it comes back under "⏰ You asked me to come back to this:", which is not
+    what happened.
 
 ### 13.6 Not handled
 
@@ -879,30 +944,34 @@ rulings left open.
 - The replies are still sent by their own commands, `workout adapt` and `bot capture note`.
   Moving those sends into the step is a later change.
 - A copy of an unanswered question arrives each morning, as today (§10).
+- A typed answer that never comes. The athlete taps "Tell me" and types nothing. The command
+  ends after five minutes, the item stays out, and the line waits until the next morning.
+  Before the line, the round stopped there too.
 
 ### 13.7 Touch points
 
 | Where | What |
 |---|---|
 | `stamind/db/schema.py`, `scripts/migrate_queue_ready.py` (new) | `athlete_queue` gains `ready_at` and `sent_at` and loses `remind_at`; schema 27. The script sets `ready_at` to `remind_at` where one was set and to `queued_at` elsewhere. It runs once per instance, before the bots restart |
-| `stamind/db/queue.py` | the line, whether something is out, setting a ready time, recording a send. The walk's query, "move to the back" and the due reminders go |
-| `stamind/athlete_queue.py` | the line with expired items closed on the way; the step's test; "tomorrow" as the next day's morning time, with its chat label "Ask me tomorrow"; the check the scheduler makes on a wake. `walk`, `shown` and the reminders go |
+| `stamind/db/queue.py` | the waiting items in the order they become ready, setting a ready time (which ends the item's turn), recording a send. The walk's query, "move to the back" and the due reminders go |
+| `stamind/athlete_queue.py` | the line with expired items closed on the way; whether an item is out; the questions a run still has to ask; "tomorrow" as the next day's morning time, with its chat label "Ask me tomorrow"; the check the scheduler makes on a wake. `walk`, `shown` and the reminders go |
 | `stamind/cli/queue.py` | one function for the step, called after a tap and by the hidden `bot queue --next`; `send_item` and `send_alone` record the send; after a tap on a reply, the next question of the same run. The walk-start token, `send_walk_step`, `--remind`, `--since` and the test on the day a proposal was sent go |
 | `stamind/cli/bot/views.py` | `bot morning` ends with the step; `send_alone` no longer takes a walk's start |
 | `stamind/chat/scheduler.py` | a wake tells the changes, then runs the morning message when it is due, and otherwise `bot queue --next` when the check says so. The reminder run goes |
 | `stamind/chat/keyboards.py`, `callbacks.py`, `replies.py`, `stamind/sentinels.py` | a queue button is `q:<id>:<action>`. A button sent before this change has a fourth part and still works. "Not now" swaps in two choices |
-| `stamind/heads_up.py` | the 21:00 constant and the helper that places a time of day on a date move where the queue can read them |
+| `stamind/heads_up.py` | the helper that places a time of day on a date becomes public (`at_time`). The queue reads it and the 21:00 constant where they are, so neither moved |
 | `stamind/cli/render/` | `queue list` reads `ready_at`; the "⏰" lead stands on an item the athlete put off |
 | `docs/ARCHITECTURE.md` | the bot section, the scheduler's wake, the `athlete_queue` table |
 
 It is built in one step. The round and the line read the same rows, so they cannot run side by
 side.
 
-Sections amended when it lands: §3 (the columns, the order), §4 (the later choices, the round),
-§5.1 (`queue tell`, the later choices), §6.1, §6.2, §6.4 and §6.5, §7, §10 (quiet hours, the silent
-morning) and §12. In DESIGN_waiting_proposal.md: §3 and §5 (the round after a proposal) and
-§6.3 (what follows a run's questions, the tap on a later day). In DESIGN_change_heads_up.md
-§4: the wake's order. Designs still in progress are not edited. For them the contract is that
+Sections amended on 2026-10-10, each with a dated note at its end: §3 (the columns, the order),
+§4 (the later choices, the round), §5.1 (`queue tell`, the later choices), §6.1, §6.2, §6.4 and
+§6.5, §7, §10 (quiet hours, the silent morning) and §12. In DESIGN_waiting_proposal.md: §3 and
+§5 (the round after a proposal) and §6.3 (what follows a run's questions, the tap on a later
+day). In DESIGN_change_heads_up.md §4: the wake's order. Designs still in progress are not
+edited. For them the contract is that
 `send_item` and `send_alone` stay the two functions that put an item in the chat, and that
 both record the send.
 

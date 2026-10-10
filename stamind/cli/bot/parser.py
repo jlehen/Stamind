@@ -132,12 +132,12 @@ def add_bot_parser(subparsers):
     # bot queue — the handler lives with the rest of the queue (DESIGN_athlete_queue.md §6.2)
     b_queue = bot_subparsers.add_parser(
         "queue",
-        help="Act on one tapped queue item, or send the reminders that are due",
+        help="Act on one tapped queue item, or send the next item of the line",
         description=(
             "Run by a tap on a queued item's button: check the item is still waiting and "
-            "still worth asking, apply the action, then send the next item of the walk "
-            "that started at --since. With --remind, send each item whose reminder time "
-            "has passed."
+            "still worth asking, apply the action, then send the next item when none is "
+            "out. With --next, run by the bot's scheduler, only send the next item when "
+            "none is out."
         ),
     )
     b_queue.add_argument("item_id", metavar="ID", type=int, nargs="?", help="The tapped item")
@@ -146,10 +146,8 @@ def add_bot_parser(subparsers):
         help="The tapped button: a<n> for an answer, d, s, h, t or b",
     )
     b_queue.add_argument(
-        "--since", help="When the walk started, in epoch seconds; r-prefixed for a walk of one",
-    )
-    b_queue.add_argument(
-        "--remind", action="store_true", help="Send the reminders that are due",
+        "--next", action="store_true",
+        help="Send the first item of the line, unless an item is out",
     )
     b_queue.set_defaults(func=run_bot_queue)
     return bot_parser

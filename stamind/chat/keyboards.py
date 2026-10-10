@@ -20,7 +20,7 @@ import datetime
 import re
 from typing import Any, List, Optional, Tuple
 
-from stamind.athlete_queue import QUEUE_LATER_CHOICES, queue_later_label
+from stamind.athlete_queue import QUEUE_LATER_CHOICES
 from stamind.clock import day_str, parse_date
 from stamind.sports import canonical_sport
 from stamind.types import Workout
@@ -209,24 +209,27 @@ def decode_stop_callback(data: str) -> Optional[str]:
     return parts[1]
 
 
-def queue_callback_data(item_id: Any, action: str, since: str) -> str:
-    """callback_data for a queued item's button: ``"q:{item id}:{action}:{walk start}"``.
-    The action names a position among the answers stored with the item, never the answer
-    itself, so it stays inside Telegram's 64 bytes (DESIGN_athlete_queue.md §6.2)."""
-    return f"q:{item_id}:{action}:{since}"
+def queue_callback_data(item_id: Any, action: str) -> str:
+    """callback_data for a queued item's button: ``"q:{item id}:{action}"``. The action
+    names a position among the answers stored with the item, never the answer itself, so
+    it stays inside Telegram's 64 bytes (DESIGN_athlete_queue.md §6.2)."""
+    return f"q:{item_id}:{action}"
 
 
-def decode_queue_callback(data: str) -> Optional[Tuple[str, str, str]]:
-    """Splits ``"q:{item id}:{action}:{walk start}"`` back into its parts, or None when it
-    is not one. Each part becomes a word of `bot queue`'s argv, so each is held to its
-    shape."""
+def decode_queue_callback(data: str) -> Optional[Tuple[str, str]]:
+    """Splits ``"q:{item id}:{action}"`` back into its parts, or None when it is not one.
+    Each part becomes a word of `bot queue`'s argv, so each is held to its shape. A button
+    sent before 2026-10-10 carries a fourth part, the start of its round, which is read
+    past (§13.7)."""
     parts = (data or "").split(":")
-    if len(parts) != 4 or parts[0] != "q":
+    if len(parts) not in (3, 4) or parts[0] != "q":
         return None
-    _, item_id, action, since = parts
-    if not (item_id.isdigit() and action.isalnum() and re.fullmatch(r"r?\d+", since)):
+    item_id, action = parts[1], parts[2]
+    if not (item_id.isdigit() and action.isalnum()):
         return None
-    return item_id, action, since
+    if len(parts) == 4 and not re.fullmatch(r"r?\d+", parts[3]):
+        return None
+    return item_id, action
 
 
 def resolve_ui_action(buttons: List[Any], path: str) -> Optional[dict]:
@@ -269,18 +272,17 @@ def ui_menu_rows(menu: List[dict], token: str, parent: str) -> List[List[Tuple[s
 def queue_button_rows(req: dict) -> List[List[Tuple[str, str]]]:
     """A queued item's buttons, laid out like the morning row they arrive under (§6.1)."""
     cells = [
-        (b.get("label", ""),
-         queue_callback_data(req.get("id"), b.get("action", ""), req.get("since", "")))
+        (b.get("label", ""), queue_callback_data(req.get("id"), b.get("action", "")))
         for b in req.get("buttons") or [] if isinstance(b, dict)
     ]
     return [cells[i:i + UI_BUTTONS_PER_ROW] for i in range(0, len(cells), UI_BUTTONS_PER_ROW)]
 
 
-def queue_later_rows(item_id: str, since: str) -> List[List[Tuple[str, str]]]:
-    """What "Not now" swaps in: the three later choices, built from the tap itself, so the
-    bot still remembers nothing (DESIGN_athlete_queue.md §6.4)."""
-    return [[(queue_later_label(words, emoji), queue_callback_data(item_id, code, since))
-             for code, words, emoji in QUEUE_LATER_CHOICES]]
+def queue_later_rows(item_id: str) -> List[List[Tuple[str, str]]]:
+    """What "Not now" swaps in: the later choices that have a chat button, built from the
+    tap itself, so the bot still remembers nothing (DESIGN_athlete_queue.md §6.4)."""
+    return [[(button, queue_callback_data(item_id, code))
+             for code, _words, button in QUEUE_LATER_CHOICES if button]]
 
 
 def answers_kept(rows: List[List[Tuple[str, str]]]) -> List[List[Tuple[str, str]]]:

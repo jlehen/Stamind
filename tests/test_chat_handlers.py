@@ -338,23 +338,39 @@ class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_queue_tap_runs_bot_queue_quietly_and_echoes_the_choice(self):
         chat_bot = build_chat_bot(self)
         started = record_commands(self, chat_bot)
-        data = keyboards.queue_callback_data(12, "a2", "1789538400")
+        data = keyboards.queue_callback_data(12, "a2")
         markup = SimpleNamespace(inline_keyboard=[[
             SimpleNamespace(text="Leg press", callback_data=data),
         ]])
         query = _FakeQuery(data, text="🙋 What was it?", markup=markup)
         await chat_bot.on_callback(callback_update(query), None)
-        self.assertEqual(started, [
-            (42, ["bot", "queue", "12", "a2", "--since", "1789538400"], True, "bot"),
-        ])
+        self.assertEqual(started, [(42, ["bot", "queue", "12", "a2"], True, "bot")])
         self.assertEqual(query.edited_text, "🙋 What was it?\n\n→ Leg press")
+
+    async def test_a_tap_on_a_button_sent_before_the_line_runs_the_same_command(self):
+        """Its fourth part, the start of its round, is read past
+        (DESIGN_athlete_queue.md §13.7)."""
+        chat_bot = build_chat_bot(self)
+        started = record_commands(self, chat_bot)
+        query = _FakeQuery("q:12:a2:r1789538400", text="🙋 What was it?")
+        await chat_bot.on_callback(callback_update(query), None)
+        self.assertEqual(started, [(42, ["bot", "queue", "12", "a2"], True, "bot")])
+
+    async def test_not_now_swaps_in_the_two_later_choices_and_runs_nothing(self):
+        chat_bot = build_chat_bot(self)
+        started = record_commands(self, chat_bot)
+        query = _FakeQuery(keyboards.queue_callback_data(12, "n"), text="🙋 What was it?")
+        await chat_bot.on_callback(callback_update(query), None)
+        self.assertEqual(started, [])
+        self.assertEqual(query.markups, [[
+            [("⏰ In 1 hour", "q:12:h"), ("⏰ Ask me tomorrow", "q:12:t")],
+        ]])
 
     def proposal_keyboard(self):
         """The morning's one keyboard: a proposal's two answers over the briefing's offer
         (DESIGN_waiting_proposal.md §5)."""
-        answers = [("✅ Change it", keyboards.queue_callback_data(4, "a1", "r1789538400")),
-                   ("💪 Keep it as planned",
-                    keyboards.queue_callback_data(4, "a2", "r1789538400"))]
+        answers = [("✅ Change it", keyboards.queue_callback_data(4, "a1")),
+                   ("💪 Keep it as planned", keyboards.queue_callback_data(4, "a2"))]
         offer = [("😴 Feeling tired", keyboards.ui_callback_data("tok", "0")),
                  ("🕐 Can't today", keyboards.ui_callback_data("tok", "1"))]
         markup = SimpleNamespace(inline_keyboard=[
@@ -367,14 +383,14 @@ class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
         chat_bot = build_chat_bot(self)
         offer = [{"label": "😴 Feeling tired", "send": "workout adapt -m tired"}]
         await chat_bot._send_queue_item(runner.Session(42, _FakeProc(), "n0nce"), {
-            "id": 4, "text": "Shall I make these changes?", "since": "r1789538400",
+            "id": 4, "text": "Shall I make these changes?",
             "buttons": [{"label": "✅ Change it", "action": "a1"}], "offer": offer,
         })
         token, live = chat_bot.ui_actions[42]
         self.assertEqual(live, offer)
         [(_chat, _text, sent)] = chat_bot.bot.sent
         self.assertEqual(sent["reply_markup"], [
-            [("✅ Change it", "q:4:a1:r1789538400")],
+            [("✅ Change it", "q:4:a1")],
             [("😴 Feeling tired", keyboards.ui_callback_data(token, "0"))],
         ])
 

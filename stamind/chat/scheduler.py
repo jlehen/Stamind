@@ -1,9 +1,10 @@
 """What the bot does without being asked, and when.
 
 The top half is the arithmetic: how long to sleep before the next wake, whether the
-nightly `data reflect` may start, and the wake itself — reminders that are due, then the
-changes to the athlete's week, then the morning push (DESIGN_bot_simple_frontend.md §4.3,
-DESIGN_athlete_queue.md §6.5, DESIGN_learning_doubt_nudge.md §3.1). It takes the callbacks
+nightly `data reflect` may start, and the wake itself — the changes to the athlete's week,
+then the morning push, or else the next item of the athlete queue
+(DESIGN_bot_simple_frontend.md §4.3, DESIGN_athlete_queue.md §13.2,
+DESIGN_learning_doubt_nudge.md §3.1). It takes the callbacks
 that run a command as arguments, so it decides everything and touches nothing.
 
 The bottom half is `SchedulerMixin`, which is what `ChatBot` passes in: the push chat, one
@@ -72,21 +73,19 @@ async def scheduler_wake(
     5 minutes, so a laptop suspend (which stalls the monotonic clock asyncio sleeps on) can't
     oversleep the window.
 
-    Reminders that are due go first, and `run` waits for them: a push due on the same wake
-    would otherwise find the chat busy. They go out whether or not the push is on
-    (DESIGN_athlete_queue.md §6.5). The changes to the athlete's week that are due go next,
-    waited for too, so they come before the push; the `push` switch does not stop them
-    (DESIGN_change_heads_up.md §4). `reflect` starts `data reflect --auto` outside the chat
-    once a day, and nothing waits for it (DESIGN_learning_doubt_nudge.md §3.1). The push
-    fires inside the [morning_time, deadline] window once per bot-day
-    (DESIGN_bot_simple_frontend.md §4.3)."""
+    The changes to the athlete's week that are due go first, and `run` waits for them: a
+    push due on the same wake would otherwise find the chat busy. The `push` switch does
+    not stop them (DESIGN_change_heads_up.md §4). `reflect` starts `data reflect --auto`
+    outside the chat once a day, and nothing waits for it (DESIGN_learning_doubt_nudge.md
+    §3.1). The push fires inside the [morning_time, deadline] window once per bot-day, and
+    ends by sending from the athlete queue itself (DESIGN_bot_simple_frontend.md §4.3). On
+    a wake with no push to run, the next item of the queue goes out when one is ready and
+    none is out, whether or not the push is on (DESIGN_athlete_queue.md §13.2 rule 4)."""
     # The athlete's wall clock, not the machine's: morning-time/morning-deadline are the
     # hours they wake up in (DESIGN_user_timezone.md §2). Every knob here is re-read each
     # wake — `settings set` runs in a CLI subprocess, so this long-lived process would
     # otherwise hold its first answer until a restart (DESIGN_settings.md §5).
     forget_timezone()
-    if not busy() and athlete_queue.reminders_due():
-        await run(["bot", "queue", "--remind"], True)
     if not busy() and heads_up.changes_due():
         await run(["bot", "changes"], True)
     now = athlete_now()
@@ -97,6 +96,8 @@ async def scheduler_wake(
     delay = next_push_delay(now, settings.morning_time(), settings.morning_deadline())
     pushed = last_run.get("push") == today
     if delay > 0 or not settings.push_enabled() or pushed:
+        if not busy() and athlete_queue.next_due():
+            await run(["bot", "queue", "--next"], True)
         return min(max(delay, 60), 300)
     if busy():
         # §4.3: never collide with an in-flight command — retry shortly.

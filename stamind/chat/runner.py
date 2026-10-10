@@ -122,7 +122,7 @@ def cli_env(
 
     `source` is a parameter rather than a constant beside STAMIND_FRONTEND because
     this one function serves three callers with three different answers: a chat message
-    is `bot`, the scheduler firing the push or a reminder is `push`, and the intent router is
+    is `bot`, the scheduler firing the push or a queued item is `push`, and the intent router is
     `route` (DESIGN_logging.md §3). The child also gets this process's run id as its
     parent, so the push and the subprocess it launched read as one story."""
     env = dict(os.environ)

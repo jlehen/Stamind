@@ -42,7 +42,7 @@ class Kind:
     # feature as well as in the queue — "leave it as it is" freezes an activity's sets as
     # they were first read (DESIGN_strength_tracking.md §7).
     on_drop: Optional[Callable[[Dict[str, Any]], None]] = None
-    # A stand-alone item is sent the moment it is queued, is in no walk and has no "Not
+    # A stand-alone item is sent the moment it is queued, is in no line and has no "Not
     # now". `wording` goes out as ordinary text and `companion_wording` is what its own
     # message asks under it (DESIGN_waiting_proposal.md §3).
     stands_alone: bool = False
@@ -62,6 +62,6 @@ class NotApplied(Exception):
 def queue(kind: str, subject: str, payload: Dict[str, Any]) -> Optional[int]:
     """Queues an item once per kind and subject, and returns its id (§3).
 
-    Dated by the command that queues it, so an item the morning push queues while it runs
-    belongs to the walk the push opens at its end (§4)."""
+    Dated by the command that queues it, and ready from then on: the items one run
+    queues share that instant, which is how a tap on one finds the others (§13.2)."""
     return runtime.db.queue_item(kind, subject, payload, clock.command_start())

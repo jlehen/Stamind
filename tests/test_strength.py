@@ -148,7 +148,7 @@ class _StrengthCase(unittest.TestCase):
         """Reads the sessions and answers "yes, final" to the question about one of them."""
         self.read()
         [item] = [i for i in test_db.waiting_queue_items() if i["subject"] == activity_id]
-        return athlete_queue.act(item, "a1", self.now)
+        return athlete_queue.act(item, "a1")
 
     def names_asked(self):
         return [i for i in test_db.waiting_queue_items() if i["kind"] == sets.SET_NAMES]
@@ -331,7 +331,7 @@ class ReadingTest(_StrengthCase):
         self.activity("tue", payload=garmin_sets(guess("SQUAT", "BELT_SQUAT", 5, 140)))
         self.read()
         [item] = test_db.waiting_queue_items()
-        athlete_queue.act(item, athlete_queue.DROP, self.now)
+        athlete_queue.act(item, athlete_queue.DROP)
         self.assertEqual([row["named_by"] for row in test_db.get_exercise_sets("tue")
                           if row["set_type"] == "active"], ["watch"])
         self.assertEqual(sets.recent_exercises(), [])
@@ -411,7 +411,7 @@ class SetsFinalTest(_StrengthCase):
             lift("SQUAT", "BELT_SQUAT"), unnamed(10, 60), unnamed(10, 60),
             lift("ROW", "SEATED_CABLE_ROW", 12, 30),
         )
-        line = athlete_queue.act(self.item, "a1", self.now)
+        line = athlete_queue.act(self.item, "a1")
         self.assertEqual(line, "Sets read again and frozen. 1 group still without a name: "
                                "I'll ask about it next time.")
         self.assertEqual(test_db.get_queue_item(self.item["id"])["outcome"],
@@ -426,24 +426,24 @@ class SetsFinalTest(_StrengthCase):
 
     def test_garmin_out_of_reach_leaves_the_question_waiting(self):
         self.garmin.down = True
-        line = athlete_queue.act(self.item, "a1", self.now)
+        line = athlete_queue.act(self.item, "a1")
         self.assertIn("nothing changed", line)
         self.assertIsNone(test_db.get_queue_item(self.item["id"])["closed_at"])
         self.assertIsNone(self.row("tue")["sets_final_at"])
 
     def test_leave_it_unnamed_asks_no_names(self):
-        athlete_queue.act(self.item, athlete_queue.DROP, self.now)
+        athlete_queue.act(self.item, athlete_queue.DROP)
         self.assertEqual(test_db.waiting_queue_items(), [])
         self.assertEqual(self.garmin.calls, ["tue"])
 
     def test_a_discard_settles_it(self):
         run_cli(["strength", "discard", TUESDAY])
-        self.assertEqual(athlete_queue.walk(self.now), [])
+        self.assertEqual(athlete_queue.line(), [])
         self.assertEqual(test_db.get_queue_item(self.item["id"])["outcome"], athlete_queue.STALE)
 
     def test_the_activity_going_settles_it(self):
         test_db.prune_completed_activities(TUESDAY, TUESDAY, [])
-        self.assertEqual(athlete_queue.walk(self.now), [])
+        self.assertEqual(athlete_queue.line(), [])
 
 
 class SetNamesTest(_StrengthCase):
@@ -482,7 +482,7 @@ class SetNamesTest(_StrengthCase):
                          ["ROW/SEATED_CABLE_ROW", "SQUAT/LEG_PRESS", None])
 
     def test_an_answer_names_every_set_of_the_block(self):
-        line = athlete_queue.act(self.group, "a2", self.now)
+        line = athlete_queue.act(self.group, "a2")
         self.assertEqual(line, "Named sets 1–2: squat: leg press.")
         named = [(row["exercise"], row["named_by"]) for row in test_db.get_exercise_sets("tue")
                  if row["seq"] in self.group["payload"]["seqs"]]
@@ -492,7 +492,7 @@ class SetNamesTest(_StrengthCase):
         runtime.prompt = _Prompt(picks=["FLYE/PEC_DECK"])
         with patch.object(questions, "propose",
                           return_value=["FLYE/PEC_DECK", "SUSPENSION/CHEST_FLY"]):
-            line = athlete_queue.act(self.group, "a3", self.now, text="butterfly machine")
+            line = athlete_queue.act(self.group, "a3", text="butterfly machine")
         self.assertEqual(line, "Named sets 1–2: flye: pec deck.")
         self.assertEqual(runtime.prompt.shown[0][1],
                          ["flye: pec deck", "suspension: chest fly", "none of these"])
@@ -501,9 +501,9 @@ class SetNamesTest(_StrengthCase):
     def test_none_of_the_proposals_leaves_the_question_waiting(self):
         runtime.prompt = _Prompt(picks=[questions.NONE_OF_THESE])
         with patch.object(questions, "propose", return_value=["FLYE/PEC_DECK"]):
-            athlete_queue.act(self.group, "a3", self.now, text="butterfly machine")
+            athlete_queue.act(self.group, "a3", text="butterfly machine")
         with patch.object(questions, "propose", return_value=[]):
-            line = athlete_queue.act(self.group, "a3", self.now, text="zzz")
+            line = athlete_queue.act(self.group, "a3", text="zzz")
         self.assertIn("Nothing named", line)
         self.assertIsNone(test_db.get_queue_item(self.group["id"])["closed_at"])
         self.assertIsNone(test_db.get_exercise_sets("tue")[0]["exercise"])
@@ -523,7 +523,7 @@ class SetNamesTest(_StrengthCase):
 
     def test_a_name_given_another_way_settles_the_question(self):
         test_db.name_exercise_sets("tue", self.group["payload"]["seqs"][:1], "SQUAT/LEG_PRESS")
-        self.assertNotIn(self.group["id"], [i["id"] for i in athlete_queue.walk(self.now)])
+        self.assertNotIn(self.group["id"], [i["id"] for i in athlete_queue.line()])
 
 
 class CommandsTest(_StrengthCase):
@@ -554,7 +554,7 @@ class CommandsTest(_StrengthCase):
         ])
         # Naming by hand declares the sets final, so "are they final?" is settled.
         self.assertTrue(self.row("tue")["sets_final_at"])
-        self.assertEqual(athlete_queue.walk(self.now), [])
+        self.assertEqual(athlete_queue.line(), [])
 
     def test_name_reaches_an_exercise_that_alternates_with_another_in_one_pick(self):
         self.activity("tue", payload=garmin_sets(
@@ -613,14 +613,14 @@ class CommandsTest(_StrengthCase):
         self.activity("tue", payload=garmin_sets(unnamed(10, 60), unnamed(12, 30)))
         self.answer_final()
         first, _ = self.names_asked()
-        athlete_queue.act(first, "a1", self.now)
+        athlete_queue.act(first, "a1")
         self.now = WEDNESDAY_8AM.replace(hour=9)
         code, out, _ = run_cli(["strength", "reset", TUESDAY])
         self.assertEqual(code, 0)
         self.assertIn("2 groups without a name", " ".join(out.split()))
         self.assertEqual([row["exercise"] for row in test_db.get_exercise_sets("tue")
                           if row["set_type"] == "active"], [None, None])
-        subjects = [item["subject"] for item in athlete_queue.walk(self.now)]
+        subjects = [item["subject"] for item in athlete_queue.line()]
         final_at = self.row("tue")["sets_final_at"]
         self.assertEqual(subjects, [f"tue:{final_at}:1-1", f"tue:{final_at}:2-2"])
 

@@ -48,16 +48,14 @@ class TestEachFrameRoundTrips(unittest.TestCase):
         self.assertEqual(tag, BUTTONS_SENTINEL)
         self.assertEqual(payload["buttons"], [{"label": "A", "send": "status"}])
 
-    def test_a_queued_item_carries_its_id_text_buttons_and_walk_start(self):
+    def test_a_queued_item_carries_its_id_text_and_buttons(self):
         tag, payload = parse_frame(_emitted(
             emit_queue_item, 12, "🙋 Quick question (1 left)\nWhat was it?",
             [{"label": "Leg press", "action": "a2"}, {"label": "🕐 Not now", "action": "n"}],
-            "1789538400",
         ))
         self.assertEqual(tag, QUEUE_SENTINEL)
         self.assertEqual(payload["id"], 12)
         self.assertEqual(payload["text"], "🙋 Quick question (1 left)\nWhat was it?")
-        self.assertEqual(payload["since"], "1789538400")
         self.assertNotIn("offer", payload)
         # The buttons ride in the payload: a tap has to carry everything the bot
         # needs, because it stores nothing about the item (§6.2).

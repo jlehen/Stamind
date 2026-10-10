@@ -264,9 +264,7 @@ class CaptureNoteFromChatTest(_NoteCase):
         return question, prompt
 
     def tap(self, question, action):
-        _code, out, _err = run_cli(
-            ["bot", "queue", str(question["id"]), action, "--since", question["since"]]
-        )
+        _code, out, _err = run_cli(["bot", "queue", str(question["id"]), action])
         return out
 
     def test_the_question_is_queued_and_drawn_bare(self):
@@ -277,10 +275,10 @@ class CaptureNoteFromChatTest(_NoteCase):
         )
         self.assertEqual([b["label"] for b in question["buttons"]], ["Yes", "No"])
         self.assertEqual(test_db.get_constraints(today_str(), None), [])
-        # Unanswered, it is in the next morning's walk like any queued question.
-        self.assertEqual(
-            [item["id"] for item in athlete_queue.walk(clock.now())], [question["id"]]
-        )
+        # It is out, so the line waits for its answer. Unanswered, it stands in the line
+        # like any queued question and comes back the next morning.
+        self.assertTrue(athlete_queue.anything_out())
+        self.assertEqual([item["id"] for item in athlete_queue.line()], [question["id"]])
 
     def test_yes_stores_it_and_brings_the_offer(self):
         question, _prompt = self.asked(self._constraint())
@@ -705,8 +703,7 @@ class TestResultQuestionTest(_CaptureCase):
         extraction = {"kind": "ftp", "value": "250", "performed": False,
                       "session_id": None, "note": None}
         with patch("stamind.openrouter.OpenRouterClient.complete", return_value=extraction):
-            code, out, _ = run_cli(["bot", "queue", str(self.item["id"]), "a1",
-                                    "--since", "r1"])
+            code, out, _ = run_cli(["bot", "queue", str(self.item["id"]), "a1"])
         return code, out
 
     def test_the_companion_asks_with_the_three_buttons(self):

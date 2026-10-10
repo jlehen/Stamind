@@ -1,23 +1,22 @@
 """`queue`: the questions and messages waiting for the athlete (DESIGN_athlete_queue.md §5),
 and `bot queue`, the hidden command a tap on one of them runs (§6.2).
 
-`stamind/athlete_queue.py` holds the kinds, the walk and the actions; this file shows
-them. On a terminal a walk asks through the blocking chooser, one item at a time. In chat
-nothing waits: each item goes out as a message of its own, and its buttons run `bot queue`.
+`stamind/athlete_queue.py` holds the kinds, the line and the actions; this file shows
+them. On a terminal `queue answer` asks through the blocking chooser, one item at a time. In
+chat nothing waits: one item at a time goes out as a message of its own, its buttons run
+`bot queue`, and the tap sends the next (§13.2).
 """
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from stamind import athlete_queue, clock, runtime
+from stamind import athlete_queue, clock, heads_up, runtime, settings
 from stamind.athlete_queue import ANSWERED, DROP, DROPPED, MESSAGE, SKIP, STALE
 from stamind.cli.selectors import add_selector_args
 from stamind.cli.windows import has_selector, resolve_window
 from stamind.prompt import Choice
 from stamind.sentinels import emit_queue_item, is_json_frontend
-from stamind.athlete_queue import (
-    QUEUE_LATER_BACK, QUEUE_LATER_CHOICES, QUEUE_LATER_DAY, QUEUE_LATER_HOUR, QUEUE_NOT_NOW,
-)
+from stamind.athlete_queue import QUEUE_LATER_BACK, QUEUE_LATER_CHOICES, QUEUE_NOT_NOW
 from stamind.text import bold, capitalized, cmd, cyan, gray, red, wrap_text
 from stamind.output import notice
 from stamind.clock import fmt_span, fmt_timestamp
@@ -28,27 +27,8 @@ STAYS_OPEN_LABEL = "skip — it stays open"
 NOTHING_WAITING_LINE = "Nothing is waiting."
 NOT_NOW_LABEL = "🕐 Not now"
 
-# A walk of one, a reminder or `queue answer <id>` in chat, carries its start with this
-# mark, and acting on its item ends there (§4).
-WALK_OF_ONE = "r"
-
-
-def since_token(since: datetime, single: bool = False) -> str:
-    """A walk's start as its buttons carry it: epoch seconds, marked for a walk of one."""
-    return (WALK_OF_ONE if single else "") + str(int(since.timestamp()))
-
-
-def parse_since(token: str) -> Tuple[datetime, bool]:
-    """(the walk's start, whether it is a walk of one) from a button's `--since`."""
-    single = token.startswith(WALK_OF_ONE)
-    digits = token[1:] if single else token
-    if not digits.isdigit():
-        raise ValueError(f"'{token}' is not the start of a walk")
-    return datetime.fromtimestamp(int(digits), timezone.utc), single
-
-
 def short_when(moment: datetime, now: datetime) -> str:
-    """'22:12' today and 'Thu 07:58' on another day: when a put-off item comes back."""
+    """'22:12' today and 'Thu 08:00' on another day: when a put-off item is ready again."""
     local = clock.to_local(moment)
     if local.date() == clock.to_local(now).date():
         return local.strftime("%H:%M")
@@ -71,27 +51,24 @@ def queue_hint_lines(questions: int, messages: int) -> List[str]:
 
 
 def print_queue_list(items: List[Dict[str, Any]], now: datetime) -> None:
-    """The whole queue: the waiting items in order, then the hidden ones with the time they
-    come back (§5.1)."""
+    """The whole queue: the waiting items in order, then the hidden ones, whose ready time
+    is still ahead, with that time (§5.1, §13.4)."""
     print(bold(cyan("=== QUEUE ===")))
     print()
     if not items:
         print(NOTHING_WAITING_LINE)
         return
     waiting = [item for item in items if not athlete_queue.is_hidden(item, now)]
-    hidden = sorted(
-        (item for item in items if athlete_queue.is_hidden(item, now)),
-        key=lambda item: item["remind_at"],
-    )
+    hidden = [item for item in items if athlete_queue.is_hidden(item, now)]
     id_width = max(len(f"#{item['id']}") for item in items)
     for item in waiting + hidden:
         line = _list_row(item, id_width, item["queued_at"])
         if athlete_queue.is_hidden(item, now):
-            back = datetime.fromisoformat(item["remind_at"])
+            back = datetime.fromisoformat(item["ready_at"])
             line += gray(f"  · hidden until {short_when(back, now)}")
         print(line)
     summary = f"{len(waiting)} waiting" + (f", {len(hidden)} hidden" if hidden else "") + "."
-    # A stand-alone item is in no walk, so it is answered by its id.
+    # A stand-alone item is in no line, so it is answered by its id.
     if any(not athlete_queue.kind_of(item).stands_alone for item in waiting):
         summary += (" Go through them with " + cmd("queue answer") + ", or one with "
                     + cmd("queue answer <id>") + ".")
@@ -141,7 +118,7 @@ def _button_label(text: str) -> str:
 
 def queue_buttons(item: Dict[str, Any]) -> List[dict]:
     """An item's chat buttons: its answers, its drop when its kind has one, and "Not now",
-    which the bot turns into the three later choices (§6.2, §6.4). A stand-alone item has
+    which the bot turns into the two later choices (§6.2, §6.4). A stand-alone item has
     no "Not now" (DESIGN_waiting_proposal.md §3)."""
     kind = athlete_queue.kind_of(item)
     buttons = [
@@ -159,14 +136,14 @@ def queue_buttons(item: Dict[str, Any]) -> List[dict]:
     return buttons
 
 
-def queue_chat_message(item: Dict[str, Any], left: Optional[int]) -> Tuple[str, List[dict]]:
+def queue_chat_message(item: Dict[str, Any], left: int) -> Tuple[str, List[dict]]:
     """One item as a chat message, in the companion's words and without skip (§6.4). `left`
-    counts the walk from this item on, and None marks a reminder (§6.5)."""
+    counts the line from this item on. An item the athlete put off says so (§13.3)."""
     text = athlete_queue.wording(item, companion=True)
     buttons = queue_buttons(item)
     if athlete_queue.kind_of(item).stands_alone:
         return text, buttons
-    if left is None:
+    if athlete_queue.was_put_off(item):
         return f"⏰ You asked me to come back to this:\n{text}", buttons
     if athlete_queue.kind_of(item).shape == MESSAGE:
         return f"📬 {text}", buttons
@@ -183,40 +160,36 @@ def print_queue_acted(item: Dict[str, Any], action: str, line: Optional[str]) ->
         print(f"#{item['id']} dropped — it won't be asked again.")
     elif action == QUEUE_LATER_BACK:
         print(f"#{item['id']} moved behind the others.")
-    elif action in (QUEUE_LATER_HOUR, QUEUE_LATER_DAY) and item["remind_at"]:
-        back = datetime.fromisoformat(item["remind_at"])
+    elif athlete_queue.later_time(action, clock.now()):
+        back = datetime.fromisoformat(item["ready_at"])
         print(f"#{item['id']} comes back at {short_when(back, clock.now())}.")
 
 
-def send_item(item: Dict[str, Any], since: str, left: Optional[int]) -> None:
-    """Sends one item to chat as a message of its own (§6.2). On a terminal it prints the
-    hint of §5.2 in its place, so a raw sentinel never reaches one."""
+def send_item(item: Dict[str, Any], left: int) -> None:
+    """Sends one item to chat as a message of its own and records the send (§6.2, §13.2).
+    On a terminal it prints the hint of §5.2 in its place, so a raw sentinel never reaches
+    one."""
     if not is_json_frontend():
         runtime.render.queue_hint(*athlete_queue.waiting_counts())
         return
-    athlete_queue.shown(item)
     text, buttons = queue_chat_message(item, left)
-    emit_queue_item(item["id"], text, buttons, since)
+    emit_queue_item(item["id"], text, buttons)
+    athlete_queue.sent(item)
 
 
-def send_alone(
-    item: Dict[str, Any], offer: Sequence[dict] = (), walk_start: Optional[datetime] = None,
-) -> None:
-    """Sends a stand-alone item: its wording as ordinary text, then a message of its own
-    that asks and carries the answers (DESIGN_waiting_proposal.md §3). It is a walk of
-    one, unless `walk_start` gives the morning's walk, which then starts when this item is
-    answered. `offer` is the morning message's buttons, drawn under the answers (§5). On a
-    terminal the text is followed by the command that answers it."""
+def send_alone(item: Dict[str, Any], offer: Sequence[dict] = ()) -> None:
+    """Sends a stand-alone item and records the send: its wording as ordinary text, then a
+    message of its own that asks and carries the answers (DESIGN_waiting_proposal.md §3).
+    `offer` is the morning message's buttons, drawn under the answers (§5). On a terminal
+    the text is followed by the command that answers it."""
     print(athlete_queue.wording(item))
     if not is_json_frontend():
         notice(f"Saved as #{item['id']}. Answer it with "
                + cmd(f"queue answer {item['id']}") + ".")
         return
     text, buttons = queue_chat_message(item, 1)
-    since = since_token(clock.now(), single=True)
-    if walk_start is not None:
-        since = since_token(walk_start)
-    emit_queue_item(item["id"], text, buttons, since, offer=offer)
+    emit_queue_item(item["id"], text, buttons, offer=offer)
+    athlete_queue.sent(item)
 
 
 def settled_line(item: Optional[Dict[str, Any]]) -> str:
@@ -226,38 +199,36 @@ def settled_line(item: Optional[Dict[str, Any]]) -> str:
     return athlete_queue.kind_of(item).closed_line or QUEUE_SETTLED_LINE
 
 
-def send_walk_step(since: datetime, after: Optional[Dict[str, Any]] = None) -> bool:
-    """Sends the next item of the walk that started at `since`, or the closing line once a
-    walk that has shown something runs out; a walk that finds nothing sends nothing (§4).
-    True when an item went out."""
-    items = athlete_queue.walk(since, after)
+def send_next(after: Optional[Dict[str, Any]] = None) -> bool:
+    """The one step that sends from the line: if nothing is out, the first item of the line
+    goes out (§13.2 rules 3 and 4). After a tap on `after`, a line that has run out gets the
+    closing line, unless `after` is a reply to what the athlete wrote. True when an item
+    went out."""
+    if athlete_queue.anything_out():
+        return False
+    items = athlete_queue.line()
     if items:
-        send_item(items[0], since_token(since), len(items))
+        send_item(items[0], len(items))
         return True
-    if after is not None and not athlete_queue.kind_of(after).bare:
+    if after is None:
+        return False
+    kind = athlete_queue.kind_of(after)
+    if not (kind.bare or kind.stands_alone):
         print(QUEUE_DONE_LINE)
     return False
 
 
 def send_own_questions(items: Sequence[Dict[str, Any]]) -> None:
-    """Sends the first of the questions this command just queued, as a walk over them
-    alone: the next goes out when it is answered (DESIGN_waiting_proposal.md §6.3)."""
+    """Sends the first of the questions this command just queued, whatever is out: a reply
+    does not wait in the line. The next goes out when it is answered (§13.2 rule 6,
+    DESIGN_waiting_proposal.md §6.3)."""
     if items:
-        send_item(items[0], since_token(clock.command_start()), len(items))
+        send_item(items[0], len(items))
 
 
-def send_questions_behind(item: Dict[str, Any]) -> None:
-    """Sends the first waiting question that the command which queued `item` queued after
-    it: what a chat run asks once its proposal is answered (DESIGN_waiting_proposal.md
-    §6.3)."""
-    since = datetime.fromisoformat(item["queued_at"])
-    items = athlete_queue.walk(since, item)
-    if items:
-        send_item(items[0], since_token(since), len(items))
-
-
-def terminal_choices(item: Dict[str, Any], since: datetime) -> List[Choice]:
-    """The chooser's options for one item; the later ones name the time they mean (§5.1)."""
+def terminal_choices(item: Dict[str, Any]) -> List[Choice]:
+    """The chooser's options for one item; the later ones name the time they mean (§5.1,
+    §13.4)."""
     now = clock.now()
     kind = athlete_queue.kind_of(item)
     choices = [
@@ -275,14 +246,14 @@ def terminal_choices(item: Dict[str, Any], since: datetime) -> List[Choice]:
             choices.append(Choice(DROP, f"{dropped} — drop, never asked again"))
         choices.append(Choice(SKIP, "skip — first in line next time"))
         lead = "later —"
-    for code, words, _emoji in QUEUE_LATER_CHOICES:
-        when = athlete_queue.later_time(code, now, since)
+    for code, words, _button in QUEUE_LATER_CHOICES:
+        when = athlete_queue.later_time(code, now)
         suffix = f" ({short_when(when, now)})" if when else ""
         choices.append(Choice(code, f"{lead} {words}{suffix}"))
     return choices
 
 
-def _apply(item: Dict[str, Any], action: str, since: datetime) -> None:
+def _apply(item: Dict[str, Any], action: str) -> None:
     """Acts on a waiting item, asking for the text first when the answer is typed (§5.1,
     §6.3). An empty text leaves the item as it was."""
     text = None
@@ -292,21 +263,22 @@ def _apply(item: Dict[str, Any], action: str, since: datetime) -> None:
         text = runtime.prompt.ask_text(ask).strip()
         if not text:
             return
-    line = athlete_queue.act(item, action, since, text)
+    line = athlete_queue.act(item, action, text)
     runtime.render.queue_acted(runtime.db.get_queue_item(item["id"]), action, line)
 
 
-def _ask_on_terminal(item: Dict[str, Any], since: datetime, position: Optional[str]) -> None:
-    """Shows one item with the blocking chooser and applies the choice (§5.1)."""
-    athlete_queue.shown(item)
+def _ask_on_terminal(item: Dict[str, Any], position: Optional[str]) -> None:
+    """Shows one item with the blocking chooser and applies the choice (§5.1). Shown here
+    counts as sent, so the bot does not send it again the same day (§13.4)."""
+    athlete_queue.sent(item)
     shape = athlete_queue.kind_of(item).shape.capitalize()
     lead = f"{shape} {position}" if position else shape
     print()
     print(bold(f"{lead} · #{item['id']} · queued {fmt_timestamp(item['queued_at'])}"))
     action = runtime.prompt.choose(
-        wrap_text(athlete_queue.wording(item)), terminal_choices(item, since), default=SKIP,
+        wrap_text(athlete_queue.wording(item)), terminal_choices(item), default=SKIP,
     )
-    _apply(item, action, since)
+    _apply(item, action)
 
 
 def run_queue_list(args: argparse.Namespace) -> None:
@@ -327,34 +299,36 @@ def run_queue_list(args: argparse.Namespace) -> None:
 
 
 def run_queue_answer(args: argparse.Namespace) -> None:
-    """Goes through the waiting items with the chooser, or item ID alone (§5.1). In chat it
-    sends the first item with its buttons instead of waiting on a chooser."""
-    since = clock.command_start()
+    """Goes through the line with the chooser, each item once, or item ID alone (§5.1,
+    §13.4). In chat it sends the first item of the line with its buttons, whatever is out,
+    instead of waiting on a chooser."""
     if args.id is not None:
-        _answer_one(args.id, since)
+        _answer_one(args.id)
         return
     if is_json_frontend():
-        if not send_walk_step(since):
+        items = athlete_queue.line()
+        if not items:
             print(NOTHING_WAITING_LINE)
+            return
+        send_item(items[0], len(items))
         return
-    shown = 0
-    after = None
+    # "After the others" makes an item ready again at once, so each is asked about once.
+    asked = set()
     while True:
-        items = athlete_queue.walk(since, after)
+        items = [item for item in athlete_queue.line() if item["id"] not in asked]
         if not items:
             break
-        shown += 1
-        _ask_on_terminal(items[0], since, f"{shown} of {shown + len(items) - 1}")
-        after = items[0]
-    if not shown:
+        asked.add(items[0]["id"])
+        _ask_on_terminal(items[0], f"{len(asked)} of {len(asked) + len(items) - 1}")
+    if not asked:
         print(NOTHING_WAITING_LINE)
         return
     print()
     print(QUEUE_DONE_LINE)
 
 
-def _answer_one(item_id: int, since: datetime) -> None:
-    """`queue answer <id>`: that item alone, whatever its place, and nothing after it."""
+def _answer_one(item_id: int) -> None:
+    """`queue answer <id>`: that item alone, whatever its place."""
     item = runtime.db.get_queue_item(item_id)
     if item is None:
         notice(f"Nothing in the queue has id #{item_id} — " + cmd("queue") + " lists them.",
@@ -367,9 +341,9 @@ def _answer_one(item_id: int, since: datetime) -> None:
         send_alone(item)
         return
     if is_json_frontend():
-        send_item(item, since_token(since, single=True), 1)
+        send_item(item, 1)
         return
-    _ask_on_terminal(item, since, None)
+    _ask_on_terminal(item, None)
 
 
 def run_queue_tell(args: argparse.Namespace) -> None:
@@ -379,51 +353,37 @@ def run_queue_tell(args: argparse.Namespace) -> None:
         notice("Write the message after " + cmd("queue tell") + ".", red)
         return
     item_id = athlete_queue.tell(text)
-    print(f"Queued #{item_id}. It goes out with the next morning message, or with "
-          + cmd("queue answer") + ".")
+    morning = settings.morning_time()
+    print(wrap_text(
+        f"Queued #{item_id}. It goes out when its turn comes: within minutes between "
+        f"{morning} and {heads_up.EVENING}, and at {morning} otherwise."
+    ))
 
 
 def run_bot_queue(args: argparse.Namespace) -> None:
-    """A tap on a queued item's button, or `--remind` from the bot's scheduler (§6.2,
-    §6.5). Spawned by the bot, never typed."""
-    if args.remind:
-        _send_reminders()
+    """A tap on a queued item's button, or `--next` from the bot's scheduler (§6.2,
+    §13.2). Spawned by the bot, never typed."""
+    if args.next:
+        send_next()
         return
-    if args.item_id is None or args.action is None or args.since is None:
-        notice("Give an item id, an action and --since, or --remind.", red)
+    if args.item_id is None or args.action is None:
+        notice("Give an item id and an action, or --next.", red)
         return
-    since, single = parse_since(args.since)
     item = runtime.db.get_queue_item(args.item_id)
     if item is None or item["closed_at"] or athlete_queue.settle_if_stale(item):
         print(settled_line(item))
     else:
-        _apply(item, args.action, since)
+        _apply(item, args.action)
     if item is None:
         return
-    if not athlete_queue.kind_of(item).stands_alone:
-        if not single:
-            send_walk_step(since, after=item)
+    # A reply is followed by the next question of its own run, whatever is out. Any other
+    # tap, and the last reply of a run, is followed by the step (§13.2 rule 6).
+    kind = athlete_queue.kind_of(item)
+    behind = athlete_queue.run_questions(item) if kind.stands_alone or kind.bare else []
+    if behind:
+        send_item(behind[0], len(behind))
         return
-    # A stand-alone item is in no walk. What it was sent ahead of starts here, on the day
-    # it was sent only: the morning's walk, or the questions of its own run
-    # (DESIGN_waiting_proposal.md §5, §6.3).
-    if clock.to_local(since).date() != clock.to_local(clock.now()).date():
-        return
-    if single:
-        send_questions_behind(item)
-        return
-    send_walk_step(since)
-
-
-def _send_reminders() -> None:
-    """Sends each item whose reminder time has passed, as a walk of one that starts now
-    (§4, §6.5)."""
-    if not is_json_frontend():
-        runtime.render.queue_hint(*athlete_queue.waiting_counts())
-        return
-    sent_at = since_token(clock.now(), single=True)
-    for item in athlete_queue.due_reminders():
-        send_item(item, sent_at, None)
+    send_next(after=item)
 
 
 def add_queue_parser(subparsers):
@@ -433,8 +393,8 @@ def add_queue_parser(subparsers):
         help="List, answer or leave the questions and messages waiting for the athlete",
         description=(
             "Questions and messages Stamind holds until the athlete is there to answer. "
-            "In Telegram the morning message sends them; here 'queue answer' goes through "
-            "them, and 'queue tell' leaves the athlete a message."
+            "In Telegram the bot sends them one at a time; here 'queue answer' goes "
+            "through them, and 'queue tell' leaves the athlete a message."
         ),
     )
     # Read-only at the top level, so a bare `queue` lists (DESIGN_cli_noargs.md §a3).
@@ -466,7 +426,8 @@ def add_queue_parser(subparsers):
         help="Go through the waiting items one at a time, or one item by its id",
         description=(
             "Show each waiting item with its answers and the choices to drop it, skip it, "
-            "or put it off: in 1 hour, in 1 day, or after the others. Enter skips, and "
+            "or put it off: in 1 hour, until tomorrow, or after the others. Enter skips, "
+            "and "
             "every answer given is written at once. With an ID, show that item alone."
         ),
     )
@@ -480,8 +441,8 @@ def add_queue_parser(subparsers):
         "tell",
         help="Leave the athlete a message",
         description=(
-            "Queue a message for the athlete. It goes out with the next morning message "
-            "in Telegram, or with 'queue answer'."
+            "Queue a message for the athlete. In Telegram it goes out when its turn "
+            "comes, within minutes in the daytime; here 'queue answer' shows it."
         ),
     )
     q_tell.add_argument("text", metavar="TEXT", nargs="+", help="The message")

@@ -107,16 +107,16 @@ class CallbacksMixin:
 
     async def _handle_queue_callback(self, query, chat_id: int, data: str) -> None:
         """A tap on a queued item's button (DESIGN_athlete_queue.md §6.2). "Not now" swaps
-        in the three later choices; any other tap leaves the choice under the item's text
+        in the two later choices; any other tap leaves the choice under the item's text
         and runs `bot queue`, which checks the item and sends the next one. The chat's live
         SM-BUTTONS row is not touched, unless it was sent under this item: then it goes
         with the item's buttons (DESIGN_waiting_proposal.md §5)."""
         decoded = decode_queue_callback(data)
         if decoded is None:
             return
-        item_id, action, since = decoded
+        item_id, action = decoded
         if action == QUEUE_NOT_NOW:
-            keyboard = telegram_api.inline_keyboard(queue_later_rows(item_id, since))
+            keyboard = telegram_api.inline_keyboard(queue_later_rows(item_id))
             try:
                 await query.edit_message_reply_markup(reply_markup=keyboard)
             except Exception as exc:
@@ -134,7 +134,7 @@ class CallbacksMixin:
                 await query.edit_message_reply_markup(reply_markup=None)
         except Exception as exc:
             journal.debug("bot.event", f"queue choice not echoed: {exc}")
-        argv = ["bot", "queue", item_id, action, "--since", since]
+        argv = ["bot", "queue", item_id, action]
         self._log(chat_id, "  ", f"run: {shlex.join(argv)}")
         await self._start_command(chat_id, argv, quiet=True)
 

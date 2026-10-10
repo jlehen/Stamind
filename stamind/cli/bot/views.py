@@ -26,7 +26,7 @@ from stamind.cli.render.plan_lines import (
     simple_mesocycle_lines, simple_runway_lines,
 )
 from stamind.cli.render.session_lines import SIMPLE_DONE_STATUSES, simple_day_lines
-from stamind.cli.queue import send_alone, send_walk_step
+from stamind.cli.queue import send_alone, send_next
 from stamind.cli.runway import current_runway, runway_buttons, schedule_exhausted
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.workouts.heads_up import newest_written
@@ -210,8 +210,8 @@ def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str
 
 def _refresh_garmin(date_str: str) -> None:
     """The recent-data refresh a read command runs, then the strength sets: the push is the
-    companion's whole delivery path, so their questions have to join its walk
-    (DESIGN_strength_tracking.md §11). A failure briefs what is stored."""
+    morning message reads them, so their questions are in the line it sends from at its
+    end (DESIGN_strength_tracking.md §11). A failure briefs what is stored."""
     try:
         runtime.garmin.ensure_data(date_str, date_str)
         read_new_activities()
@@ -328,12 +328,12 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     if proposal_item is None and buttons:
         emit_buttons(buttons)
     runtime.db.set_setting(MORNING_MARKER, today)
-    # After the briefing, the first item of the athlete queue (DESIGN_athlete_queue.md
-    # §6.1). What the week planner would change goes first, as a message of its own, and
-    # the walk then starts when the athlete answers it (DESIGN_waiting_proposal.md §5).
-    if proposal_item is None:
-        send_walk_step(clock.command_start())
-        return
-    emit_flush(wait=False)
-    send_alone(proposal_item, buttons, clock.command_start())
+    # The last act is the queue's step: the first item of the line, unless an item is
+    # out (DESIGN_athlete_queue.md §13.2). What the week planner would change goes first,
+    # as a message of its own. It is then out, so the line starts when the athlete answers
+    # it (DESIGN_waiting_proposal.md §5).
+    if proposal_item is not None:
+        emit_flush(wait=False)
+        send_alone(proposal_item, buttons)
+    send_next()
 

@@ -12,7 +12,7 @@ JSON object:
     \\x1eSM-PHOTO   {"path": …, "caption": …}                            one-way
     \\x1eSM-BUTTONS {"buttons": [{"label": …, "send"|"ack"|"menu": …}]}   one-way
     \\x1eSM-FLUSH   {} or {"wait": false}                                one-way
-    \\x1eSM-QUEUE   {"id": …, "text": …, "buttons": […], "since": …}      one-way
+    \\x1eSM-QUEUE   {"id": …, "text": …, "buttons": […]}                   one-way
                    and, on the morning's proposal only, "offer": a SM-BUTTONS list
 
 Both ends of every frame live here: the CLI writes with the `emit_*` functions, the bot
@@ -107,14 +107,12 @@ def emit_flush(out=None, wait: bool = True) -> None:
 
 
 def emit_queue_item(
-    item_id: int, text: str, buttons: Sequence[dict], since: str, out=None,
-    offer: Sequence[dict] = (),
+    item_id: int, text: str, buttons: Sequence[dict], out=None, offer: Sequence[dict] = (),
 ) -> None:
-    """Sends one queued item. Its buttons are ``{"label", "action"}`` and `since` is the
-    walk's start in epoch seconds, ``r``-prefixed for a walk of one
+    """Sends one queued item. Its buttons are ``{"label", "action"}``
     (DESIGN_athlete_queue.md §6.2). `offer` is buttons shaped as `emit_buttons` takes
     them, drawn under the item's own (DESIGN_waiting_proposal.md §5)."""
-    payload = {"id": item_id, "text": text, "buttons": list(buttons), "since": since}
+    payload = {"id": item_id, "text": text, "buttons": list(buttons)}
     if offer:
         payload["offer"] = list(offer)
     _write(QUEUE_SENTINEL, payload, out)

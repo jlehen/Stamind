@@ -204,6 +204,13 @@ each one as told. If a command is already running in her chat, the scheduler tri
 the next wake, as it does for reminders and the morning message. A change made while the bot
 is down is sent when the bot comes back.
 
+Amended 2026-10-10 (DESIGN_athlete_queue.md §13): the reminders are gone. A wake sends the
+waiting changes first, and then runs the morning message when it is due. On a wake with no
+morning message to run, it sends the next item of the athlete queue when one is ready and
+none is out, between her morning time and 21:00, the hours of this section. So a question she
+put off is now held overnight too, which §12 had left out, and a `queue tell` message goes out
+the same day.
+
 **A change waits for her morning time.** Her morning time (the `morning-time` setting, 08:00
 for her) is when she learns what a day holds: the morning message's own adaptation already
 changes today's session at that moment, and she reads the result then. A change to her week

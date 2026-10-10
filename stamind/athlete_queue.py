@@ -1,17 +1,19 @@
 """The queue of things Stamind wants to tell or ask the athlete (DESIGN_athlete_queue.md).
 
-The list of kinds, the walk and the actions. The queue knows nothing about what an item
+The list of kinds, the line and the actions. The queue knows nothing about what an item
 asks: each kind brings its wording, its check and what its answers do (§8). `message`, the
 operator's note from `sm queue tell`, is the first kind and the smallest one.
+
+Every waiting item has a ready time. The line is the waiting items whose ready time has
+passed, the earliest first, and one item is out at a time (§13.2).
 """
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from stamind import clock, runtime
+from stamind import clock, heads_up, runtime, settings
 from stamind.db.queue import queue_stamp
 # Re-exported: what a feature needs lives in queue_kind, so a feature can queue items
 # without importing the list of kinds that imports it.
-from stamind.text import capitalized
 from stamind.queue_kind import (  # noqa: F401
     ANSWERED, DROPPED, MESSAGE, QUESTION, STALE, Kind, NotApplied, queue,
 )
@@ -27,23 +29,19 @@ from stamind.strength.questions import SET_NAMES_KIND, SETS_FINAL_KIND
 DROP = "d"
 SKIP = "s"
 
-# The "later" choices of a queued item: action code, words, and the emoji a chat button
-# adds. One definition for the terminal's chooser and the bot's "Not now" row, which the bot
-# swaps in from the tap itself (DESIGN_athlete_queue.md §6.4).
+# The "later" choices of a queued item: action code, the terminal chooser's words, and the
+# chat button "Not now" swaps in, which the bot builds from the tap itself. "After the
+# others" has no button: in the chat both others already put the item behind the rest
+# (§13.4, §13.5).
 QUEUE_LATER_HOUR = "h"
 QUEUE_LATER_DAY = "t"
 QUEUE_LATER_BACK = "b"
 QUEUE_NOT_NOW = "n"
 QUEUE_LATER_CHOICES = (
-    (QUEUE_LATER_HOUR, "in 1 hour", "⏰"),
-    (QUEUE_LATER_DAY, "in 1 day", "⏰"),
-    (QUEUE_LATER_BACK, "after the others", "↩️"),
+    (QUEUE_LATER_HOUR, "in 1 hour", "⏰ In 1 hour"),
+    (QUEUE_LATER_DAY, "tomorrow", "⏰ Ask me tomorrow"),
+    (QUEUE_LATER_BACK, "after the others", None),
 )
-
-
-def queue_later_label(words: str, emoji: str) -> str:
-    """A "later" choice as a chat button: '⏰ In 1 hour'."""
-    return f"{emoji} {capitalized(words)}"
 
 
 # A message is a question whose only answer is "got it", and it has no drop (§4).
@@ -115,8 +113,34 @@ def tell(text: str) -> Optional[int]:
 
 
 def is_hidden(item: Dict[str, Any], now: datetime) -> bool:
-    """Whether an item is put off until a time that has not come yet (§4)."""
-    return bool(item.get("remind_at")) and item["remind_at"] > queue_stamp(now)
+    """Whether an item's ready time is still ahead (§13.2)."""
+    return item["ready_at"] > queue_stamp(now)
+
+
+def was_put_off(item: Dict[str, Any]) -> bool:
+    """Whether a later choice moved the item's ready time: it then comes back under "You
+    asked me to come back to this" (§13.3)."""
+    return item["ready_at"] != item["queued_at"]
+
+
+def morning_of(now: datetime) -> datetime:
+    """The athlete's morning time on `now`'s day."""
+    return heads_up.at_time(now, settings.morning_time())
+
+
+def is_out(item: Dict[str, Any], now: datetime) -> bool:
+    """Whether a waiting item was sent and not tapped since. At the athlete's morning time
+    nothing counts as out any more (§13.2, rules 3 and 5)."""
+    morning = morning_of(now)
+    if now < morning:
+        morning -= timedelta(days=1)
+    return bool(item["sent_at"]) and item["sent_at"] >= queue_stamp(morning)
+
+
+def anything_out() -> bool:
+    """Whether an item is out, a stand-alone one included: the line waits for it (§13.2)."""
+    now = clock.now()
+    return any(is_out(item, now) for item in runtime.db.waiting_queue_items())
 
 
 def settle_if_stale(item: Dict[str, Any]) -> bool:
@@ -127,42 +151,53 @@ def settle_if_stale(item: Dict[str, Any]) -> bool:
     return True
 
 
-def walk(since: datetime, after: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-    """The items the walk that started at `since` still has to show after `after`, the
-    next one first. Stale items met on the way are closed without being shown (§4). A
-    stand-alone item is in no walk (DESIGN_waiting_proposal.md §3)."""
-    items = [
-        item for item in runtime.db.queue_walk(since, clock.now(), after)
-        if not kind_of(item).stands_alone
+def _ready(now: datetime) -> List[Dict[str, Any]]:
+    """The waiting items whose ready time has passed, the earliest first. A stand-alone
+    item is in no line (§13.2 rule 2, DESIGN_waiting_proposal.md §3)."""
+    return [
+        item for item in runtime.db.waiting_queue_items()
+        if not is_hidden(item, now) and not kind_of(item).stands_alone
     ]
-    while items and settle_if_stale(items[0]):
-        items.pop(0)
-    return items
 
 
-def shown(item: Dict[str, Any]) -> None:
-    """Records that a walk showed an item: one whose reminder time has passed is not
-    reminded as well (§4)."""
-    if item.get("remind_at"):
-        runtime.db.set_queue_reminder(item["id"], None)
+def line() -> List[Dict[str, Any]]:
+    """The line, the next item first. Items no longer worth asking are closed on the way
+    and not shown (§13.2 rules 2 and 7)."""
+    return [item for item in _ready(clock.now()) if not settle_if_stale(item)]
 
 
-def later_time(action: str, now: datetime, since: datetime) -> Optional[datetime]:
-    """When a "later" action brings an item back; None for any other action (§4)."""
+def run_questions(item: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The questions about what the athlete wrote that the run which queued `item` has
+    not asked yet: its bare items that wait and are not out. They follow a tap on a reply
+    of that run (§13.2 rule 6)."""
+    now = clock.now()
+    return [
+        other for other in _ready(now)
+        if other["queued_at"] == item["queued_at"] and other["id"] != item["id"]
+        and kind_of(other).bare and not is_out(other, now) and not settle_if_stale(other)
+    ]
+
+
+def sent(item: Dict[str, Any]) -> None:
+    """Records that an item was put in front of the athlete: it is out (§13.2 rule 3)."""
+    runtime.db.mark_queue_sent(item["id"], clock.now())
+
+
+def later_time(action: str, now: datetime) -> Optional[datetime]:
+    """The ready time "in 1 hour" or "tomorrow" gives an item; None for any other action.
+    Tomorrow is the athlete's morning time on the next day, whatever the hour (§13.2)."""
     if action == QUEUE_LATER_HOUR:
         return now + timedelta(hours=1)
     if action == QUEUE_LATER_DAY:
-        # On the walk's wall clock, so what the push put off comes back ahead of the next push.
-        return clock.to_local(since) + timedelta(days=1, minutes=-2)
+        return morning_of(now) + timedelta(days=1)
     return None
 
 
-def act(
-    item: Dict[str, Any], action: str, since: datetime, text: Optional[str] = None
-) -> Optional[str]:
+def act(item: Dict[str, Any], action: str, text: Optional[str] = None) -> Optional[str]:
     """Applies one action to a waiting item and returns the kind's line for an answer (§4).
-    An action the item was not queued with writes nothing (§9), and an answer its kind could
-    not apply leaves the item waiting, with the kind's line saying why."""
+    An action the item was not queued with writes nothing (§9). An answer its kind could
+    not apply puts the item off until the next morning, with the kind's line saying why
+    (§13.5, choice 14)."""
     now = clock.now()
     kind = kind_of(item)
     # A question kind without a drop label refuses one (§4).
@@ -171,22 +206,20 @@ def act(
             kind.on_drop(item)
         runtime.db.close_queue_item(item["id"], DROPPED, now)
         return None
-    if action == QUEUE_LATER_BACK:
-        runtime.db.requeue_queue_item(item["id"], now)
-        return None
-    remind_at = later_time(action, now, since)
-    if remind_at is not None:
-        runtime.db.set_queue_reminder(item["id"], remind_at)
+    ready_at = now if action == QUEUE_LATER_BACK else later_time(action, now)
+    if ready_at is not None:
+        runtime.db.set_queue_ready(item["id"], ready_at)
         return None
     index = answer_index(item, action)
     if index is None:
         return None
     try:
-        line = kind.apply(item, index, text)
+        line_said = kind.apply(item, index, text)
     except NotApplied as not_applied:
+        runtime.db.set_queue_ready(item["id"], later_time(QUEUE_LATER_DAY, now))
         return str(not_applied)
     runtime.db.close_queue_item(item["id"], ANSWERED, now)
-    return line
+    return line_said
 
 
 def waiting_counts() -> Tuple[int, int]:
@@ -204,19 +237,12 @@ def waiting_counts() -> Tuple[int, int]:
     return questions, messages
 
 
-def reminders_due() -> bool:
-    """Whether any item's reminder time has passed: the bot's scheduler asks on every wake,
-    so no command runs unless one has (§6.5)."""
-    return bool(runtime.db.due_queue_items(clock.now()))
-
-
-def due_reminders() -> List[Dict[str, Any]]:
-    """The items to send as reminders now. Stale ones are closed, and the others have their
-    reminder time cleared, so each reminder is sent once (§6.5)."""
-    items = []
-    for item in runtime.db.due_queue_items(clock.now()):
-        if settle_if_stale(item):
-            continue
-        runtime.db.set_queue_reminder(item["id"], None)
-        items.append(item)
-    return items
+def next_due() -> bool:
+    """Whether a wake of the bot's scheduler sends from the line: between the athlete's
+    morning time and the evening, with an item ready and none out. It reads the rows and
+    runs no kind's check, so no command starts unless something can be sent (§13.2 rule 4,
+    §13.6)."""
+    now = clock.now()
+    if not morning_of(now) <= now < heads_up.at_time(now, heads_up.EVENING):
+        return False
+    return bool(_ready(now)) and not anything_out()

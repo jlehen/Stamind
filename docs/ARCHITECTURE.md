@@ -394,14 +394,30 @@ classes themselves.
     (`\x1eSM-QUEUE {json}`), carries one queued question or message
     (`stamind/athlete_queue.py`, DESIGN_athlete_queue.md). Its text and buttons have one
     form, `queue_chat_message` in `cli/queue.py` (§6.4). The bot sends it as a message
-    of its own whose buttons carry all a tap needs — `q:<item id>:<action>:<walk start>` —
+    of its own whose buttons carry all a tap needs — `q:<item id>:<action>` —
     so it stores nothing, replaces no `SM-BUTTONS` row and loses nothing on a restart. A
-    tap runs the hidden `sm bot queue <id> <action> --since <walk start>`, which checks the
-    item is still waiting and still worth asking, applies the action and sends the next
-    item of the walk; "🕐 Not now" swaps in the three later choices from the tap itself.
-    `bot morning` ends by starting a walk, or by sending a proposal whose answer starts it
-    (DESIGN_waiting_proposal.md §5), and first refreshes Garmin and reads new strength
-    sets whatever `adapt-first` says, so a question about yesterday's sets joins that walk
+    button sent before 2026-10-10 carries a fourth part, which the bot reads past. A
+    tap runs the hidden `sm bot queue <id> <action>`, which checks the
+    item is still waiting and still worth asking, applies the action and runs the step;
+    "🕐 Not now" swaps in the two later choices from the tap itself, "⏰ In 1 hour" and
+    "⏰ Ask me tomorrow".
+    **One step sends from the queue** (`cli/queue.py:send_next`, §13.2): if no item is out,
+    the first item of the line goes out. Every waiting item has a ready time (`ready_at`):
+    the start of the command that queued it, then whatever a later choice sets. The line
+    (`athlete_queue.line`) is the waiting items whose ready time has passed, the earliest
+    first, without the stand-alone ones. An item is out (`athlete_queue.is_out`) from the
+    moment it is sent (`sent_at`) until its tap, and at the latest until the athlete's next
+    `morning-time`, so an unanswered item is sent again each morning. The step runs at
+    three moments: as the last act of `bot morning`, after every tap on a queued item at
+    any hour, and from the scheduler (below). A reply does not wait for it: the run that
+    queued a proposal or a question about what the athlete wrote sends it itself, whatever
+    is out (`send_alone`, `send_own_questions`), and a tap on a reply first brings the next
+    question of the same run (`athlete_queue.run_questions`, the bare items that share its
+    `queued_at`).
+    `bot morning` sends a proposal before its step, so the step finds it out and the line
+    starts when the proposal is answered (DESIGN_waiting_proposal.md §5). It first
+    refreshes Garmin and reads new strength
+    sets whatever `adapt-first` says, so a question about yesterday's sets is in the line
     (DESIGN_strength_tracking.md §11). With `adapt-first` on it runs the adaptation only
     when none has run today with last night's sleep score in hand and nothing trained
     since, reading that from the newest `adapt` row's `sleep_seen` and from the `adapt`
@@ -418,16 +434,18 @@ classes themselves.
     tap on it leaves the two answers (`chat/keyboards.py:answers_kept`). In the chat,
     "Change it" on a proposal that changes today replies with today's sessions as they
     now stand. Kilograms that moved alone are written at once
-    (DESIGN_waiting_proposal.md §5, §7). Each scheduler wake (`scheduler_wake`) first asks
-    the database whether a reminder time has passed and, if one has, runs `bot queue
-    --remind` and waits for it before it considers the push, whatever the `push` switch
-    says. On a terminal the item's line becomes the two-line hint that `status` and
+    (DESIGN_waiting_proposal.md §5, §7). On a scheduler wake (`scheduler_wake`) with no push
+    to run, `athlete_queue.next_due()` asks the database whether it is between
+    `morning-time` and 21:00, an item is ready and none is out. When it says yes, the wake
+    runs `bot queue --next`, whatever the `push` switch says. So a question queued at
+    03:00 goes out after the 08:00 briefing, and one queued at 14:00 within five minutes.
+    On a terminal the item's line becomes the two-line hint that `status` and
     `workout adapt` print.
   - **Changes to the athlete's week** (DESIGN_change_heads_up.md). A `workout generate`
     or `workout adapt` the athlete did not watch — any run not started
     from their chat — leaves its line waiting in `workout_changes` (`note` set, `told_at`
-    NULL). After the reminders, each wake asks `heads_up.changes_due()` (a database read,
-    like `reminders_due`) and, when it says yes, runs the hidden `bot changes` and waits for
+    NULL). Each wake first asks `heads_up.changes_due()` (a database read, like
+    `athlete_queue.next_due`) and, when it says yes, runs the hidden `bot changes` and waits for
     it, so the changes come before the push on the same wake. The rule lives in
     `stamind/heads_up.py`: from `morning-time` to 21:00, once one waiting change was
     either made before this morning's `morning-time`, or wrote a session dated today
@@ -459,7 +477,7 @@ classes themselves.
 | `plan_inputs.py`     | —                    | What shapes a periodization plan, how it is fingerprinted, and how it is diffed: the profile partition (`plan_profile`, `changed_plan_profile_fields`), the science documents (`athlete_science_documents`, `changed_science_documents`), the goal and constraint cleaners and their hashes, `plan_config_hash()`, and the unified-diff text a staleness reason is shown with. Flat and pure so the read-only dashboard can hash the config without importing the coach. The *judgment* over these inputs is `coach/service/staleness.py` (DESIGN_plan_staleness.md). |
 | `workout_state.py`   | —                    | Two of the three things that can be true of a planned session at once ([§5](#workout-state--three-orthogonal-axes-not-one-enum)): what the athlete changed about it (`modification_markers`) and how far its Calendar event has fallen behind (`calendar_status`, over `CALENDAR_FIELDS` and `calendar_signature`). Neither reads the database — both are derived from a workout row the caller already has — which is what lets the read-only web app import it without pulling the CLI in behind it. Was `calendar_state.py`. |
 | `learning_confidence.py` | —                | What a coach learning's confidence means and how its evidence sets it: the ordered levels, `derive_confidence` over supporting and contradicting weeks, `step_down`, and when a learning goes dormant. Pure rules; `db/learnings.py` keeps only the rows (DESIGN_evidence_based_confidence.md §3, DESIGN_learning_doubt_nudge.md §3.2). |
-| `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, `learning` from `learning_doubts.py`, `test_result` from `cli/bot/test_result.py`, `retrospective` from `retrospective_question.py`, `proposal` from `cli/workouts/proposal.py`, the one kind that stands alone, and `session_note`, `constraint` and `signal` from `cli/candidates.py`, the three kinds drawn bare), the walk, which leaves a stand-alone item out, the actions with the "in 1 day" time, and the due reminders. Rows in `db/queue.py`; shown by `cli/queue.py`. |
+| `athlete_queue.py`   | —                    | The queue of questions and messages held for the athlete (DESIGN_athlete_queue.md): the list of kinds (`message`, the operator's note from `queue tell`, then `sets_final` and `set_names` from `strength/questions.py`, `learning` from `learning_doubts.py`, `test_result` from `cli/bot/test_result.py`, `retrospective` from `retrospective_question.py`, `proposal` from `cli/workouts/proposal.py`, the one kind that stands alone, and `session_note`, `constraint` and `signal` from `cli/candidates.py`, the three kinds drawn bare), the line, which leaves a stand-alone item out, what is out, the questions a run still has to ask, the actions with the "tomorrow" time, and the check the scheduler makes on a wake (§13.2). Rows in `db/queue.py`; shown and sent by `cli/queue.py`. |
 | `heads_up.py`        | —                    | Telling the athlete when the week changes out of their sight (DESIGN_change_heads_up.md): the wording of a change and of an undo (`message`, `undone_note`), the scheduler's send rule (`due`, `changes_due`, the 21:00 constant), when the terminal says the line goes out (`sends_at`), and the `changes_notify_upto` marker. `waiting()` hangs `touches_today` on each row, and `sends_after_delay` is the single place that says whether a change goes out after `change-delay` minutes or at a morning time. Pure but for `waiting()`/`changes_due()`, which read the database at call time, so `db/workout_change.py` imports it safely. |
 | `calendar_days.py`   | —                    | The one list of days the calendar page and `sm calendar` are built on (DESIGN_calendar_miniapp.md §4): `gather(dbh, start, end, today)` returns a `Calendar` holding one `Day` per date — the day's `adherence_window`/`compare_days` rows each graded by `classify_adherence`, every activity that matched no session with its `unplanned_kind`, the constraints and signals covering it — plus the governing mesocycles from the first day of `start`'s month to the last goal, the goals not archived, and the schedule's last day (`analytics.runway.plan_end`). Facts only, no text; reads, never writes, never pulls from Garmin. `next_goal` is the nearest goal still ahead ([§17](#17-calendar-telegram-mini-app-and-sm-calendar)). |
 | `page_files/`        | —                    | The pages' files: the calendar and "Goals & plan" read their data from encrypted files in a bucket at Google Cloud Storage (DESIGN_miniapp_storage.md). `recipe.py` is the key, the names and the encryption, word for word as `miniapp/storage.js` does them: the page key is HKDF of the bot token, a file's name HKDF of the page key and its label (`calendar/2026-09`, `calendar/index`, `plan`), its content zlib then AES-GCM with 12 fresh bytes at its head. `bucket.py` is the four requests to Google (upload with "do not cache", download as a page does, list, delete) behind one `Bucket` class the tests replace; `requests`, `cryptography` and the Google libraries are imported inside the functions that use them. `sync.py` is the step after every command (`after_command`: stop unless the record holds the index file's address with a fingerprint, build the months the window touches with the index and plan files, upload what differs from the record or failed last time within 3 seconds, write the record), and the guard, the fill and the removal of `data publish` and `data unpublish`. The files' content is built by `cli/render/calendar_page.py` and `plan_page.py`; the record is `db/page_files.py`. |
@@ -1563,7 +1581,10 @@ live database gets it by hand with a one-off
 `session_notes`, and the bump to 26 adds `retrospectives`, which the CREATE builds on the
 next start. The exercise table (DESIGN_exercise_table.md) changed what three places hold and
 no column, so the version stayed at 26: `scripts/migrate_exercise_names.py` rewrote the
-exercise names stored before it into keys, once per instance (§9 there). What they built is
+exercise names stored before it into keys, once per instance (§9 there). The bump to 27
+gives `athlete_queue` the columns `ready_at` and `sent_at` in place of `remind_at`:
+`scripts/migrate_queue_ready.py` rebuilds the table, once per instance, before the bots
+restart (DESIGN_athlete_queue.md §13.7). What they built is
 folded into the
 CREATE statements, in the column order they produced. Clearing the stamp still rebuilds
 a database that is missing a table; a database older than the squash cannot be upgraded
@@ -2059,7 +2080,7 @@ athlete heard of a change is `workout_changes.told_at` now.
 ### athlete_queue
 Questions and messages held for the athlete until she is there to answer
 (DESIGN_athlete_queue.md §3). A `(kind, subject)` is queued once, ever, so a dropped
-question is never asked again. The queue's order is `queued_at, id`. Every instant is a UTC
+question is never asked again. The line's order is `ready_at, id` (§13.2). Every instant is a UTC
 ISO string to the microsecond, in one form, so the columns compare as strings. Untouched by
 every `wipe`, and closed rows are kept; `queue list --closed` lists them.
 
@@ -2069,8 +2090,9 @@ every `wipe`, and closed rows are kept; `queue list --closed` lists them.
 | `kind`      | TEXT    | The feature that asks (`message`), a key of `athlete_queue.KINDS`   |
 | `subject`   | TEXT    | What it asks about, in that feature's own terms                    |
 | `payload`   | TEXT    | JSON written at queue time: what to show and the fixed answers     |
-| `queued_at` | TEXT    | The start of the command that queued it; "after the others" sets now |
-| `remind_at` | TEXT    | Hidden until this instant and reminded at it; NULL otherwise       |
+| `queued_at` | TEXT    | The start of the command that queued it; never rewritten           |
+| `ready_at`  | TEXT    | From when the item may be sent: `queued_at`, then what "in 1 hour", "tomorrow" or "after the others" set. Never NULL |
+| `sent_at`   | TEXT    | When it was last put in front of the athlete, in the chat or in a terminal; NULL before that and after a later choice |
 | `closed_at` | TEXT    | NULL while the item waits                                          |
 | `outcome`   | TEXT    | `answered`, `dropped` or `stale`                                   |
 
@@ -2594,8 +2616,8 @@ single read-only view that is its whole state (`settings`, `queue`), which acts 
 | `settings`   | `set`        | `se s`, `se use` | Change one preference: `settings set thinking-model 3`, `settings set timezone Europe/Paris`, `settings set morning-time 07:00`. The name takes any unambiguous prefix. Validated by the setting's own parser — a value it cannot read is refused and nothing is written. Stored in `settings`; survives restarts |
 | `settings`   | `reset`      | `se r`   | Forget one stored preference so `config.yaml`, or the built-in default, rules again |
 | `queue`      | `list`       | `q l`    | Every waiting question and message in queue order, then the ones put off until later with when they come back. `--closed` lists the closed ones instead, in the order they closed, each with its outcome; `-d RANGE` picks the days they closed on (default: the last 7). A bare `queue` lists — the second read-only family (DESIGN_cli_noargs.md §a3, DESIGN_athlete_queue.md §5.1) |
-| `queue`      | `answer`     | `q a`    | Go through the waiting items with the blocking chooser: each item's answers, then drop, skip (Enter), and later — in 1 hour, in 1 day, after the others. `queue answer <id>` shows that item alone. In chat it sends the first item with its buttons instead |
-| `queue`      | `tell`       | `q t`    | Queue a message for the athlete: `queue tell "Charge your watch tonight."` It goes out with the next morning push, or with `queue answer` |
+| `queue`      | `answer`     | `q a`    | Go through the line with the blocking chooser, each item once: its answers, then drop, skip (Enter), and later — in 1 hour, tomorrow (the athlete's morning time), after the others. An item shown here counts as sent, so the bot leaves it until the next morning. `queue answer <id>` shows that item alone. In chat it sends the first item with its buttons instead |
+| `queue`      | `tell`       | `q t`    | Queue a message for the athlete: `queue tell "Charge your watch tonight."` The bot sends it when its turn comes, within minutes between `morning-time` and 21:00; `queue answer` shows it in a terminal |
 | `strength`   | `name`       | `str n`  | `strength name DATE`: show each of that day's strength activities as a layout, one line per exercise wherever its sets came and one per unnamed group (`sets.exercise_lines`, the grouping the lines under an activity use), and name the line the athlete picks, on the spot: unnamed sets from the recent exercises, a named line from the exercises like its name (`vocabulary.similar`: the same Garmin category, whole when it fits in the nine, otherwise the athlete's own and the names sharing a word with it), either from a typed name the model matches to the exercise table; after a name, "all 6 sets, or how many?" splits the line, and the layout comes back until "none, I am done". Keeping a name the watch guessed confirms it. The first pick freezes an activity still waiting for "are the sets final?" (DESIGN_strength_tracking.md §7) |
 | `strength`   | `reset`      | `str r`  | `strength reset DATE`: read that day's sets again from Garmin, dropping the names given in Stamind, freeze them anew, make the watch's guesses still standing the athlete's, and queue a question for every group still unnamed. How a name fixed in Connect after the freeze comes in. On a day with two strength activities it asks which one |
 | `strength`   | `discard`    | `str d`  | `strength discard DATE [--undo]`: keep that day's activity out of the strength history; it still counts as training. The sets stay stored; its waiting questions are settled. On a day with two strength activities it asks which one |
@@ -3638,22 +3660,22 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | body-response z-scores, pure and in the prompt), and the cached |
 |                                | reconstruction `plan generate` reads (`_prior_training`), which also holds the review built from records (DESIGN_cycle_retrospective.md §7): a written record in place of the detail, the latest finished mesocycle with both, a blank record falling back to the detail, a mesocycle that lives only in a replaced version, one line per goal, a written record of a plan standing for its mesocycles, and the section of past plans in the prompt |
 | `tests/test_athlete_queue.py`  | the athlete queue (DESIGN_athlete_queue.md): a subject queued once, |
-|                                | the order and "after the others", a walk showing each item once, |
-|                                | stale items, "in 1 day" from the walk start, reminders sent once, |
+|                                | the line ordered by ready time, an item put off standing behind what became ready before it, "tomorrow" as the next day's morning time, one item out at a time until its tap or the next morning, the scheduler's check inside and outside the day's hours, an answer that could not be applied, expired items, |
 |                                | the chat and terminal surfaces, the closed list and its local     |
 |                                | days, the hint in `status` and `adapt`, and the `retrospective` kind (DESIGN_cycle_retrospective.md §4): its two wordings and its chat buttons, the answer that stores the words and returns the sentence, a failed write, "nothing to say", the two ways it goes stale, and who is asked |
 | `tests/test_cycle_records.py`  | the date check (DESIGN_cycle_retrospective.md §3), called directly on fixed days: a mesocycle that reached its end gets a record however short, a dropped one gets a cut-short record only when seven days of it were trained, a kept one gets none, a second run creates nothing, a replacement at 00:30 on the athlete's clock counts for that day, a record the current plan contradicts is removed and one it does not contradict stays, what calling a goal off records, the three deletes that take the records with their plan, and the record of a plan (§6): one per plan trained to its end, none for a plan under way, a second one when the goal is planned again, the call-off, and the single question at the end of a plan |
 | `tests/test_retrospective_writer.py` | the write step and the writer's prompt (DESIGN_cycle_retrospective.md §4, §5), with the model client stubbed: when a record is due, one record per run and the oldest first, a failed write tried again on the next run, the Garmin refresh over the record's days, the numbers as totals over those days, the prompt's sections, and a session the athlete spoke about reaching the prompt. For the record of a plan: its blank mesocycle records written first, its numbers as their sums, and its own prompt sections. The morning routine's call is in `test_cli_bot.py` |
 | `tests/test_exercise_table.py` | the exercise table (DESIGN_exercise_table.md §3, §4, §11): the five checks on the file as written (a Garmin name on one line only, one category per line, a weighted twin on the line of its exercise, every gear word one of the 46, no two classes showing the same words), the words rule with its edge cases, and what `vocabulary` gives for a key and for a Garmin name |
+| `tests/test_migrate_queue_ready.py` | the one-off rebuild of `athlete_queue` with `ready_at` and `sent_at` (DESIGN_athlete_queue.md §13.7): run once, a put-off item keeping its time, and the migrated file taking new items |
 | `tests/test_migrate_exercise_names.py` | the one-off conversion of stored names to keys (DESIGN_exercise_table.md §9), on a small database: the four rules in order, a name not settled writing nothing, the rename whose key is not a key, the three places rewritten and the description left alone, a second run changing nothing, the yes, the stop on a waiting question or proposal, and the list the script reads |
 | `tests/test_strength.py`       | strength tracking phase 1 (DESIGN_strength_tracking.md): parsing |
 |                                | Garmin's sets (grams, the key of a class, a name the table       |
 |                                | lacks, watch guess vs pick, the bodyweight check), read once and |
 |                                | frozen, both queue kinds, `strength name`/`reset`/`discard`, the |
 |                                | lines under the activity, `strength log`/`exercises` reading the |
-|                                | record back, the morning push reading sets before its walk       |
+|                                | record back, the morning push reading sets before it sends from the queue |
 | `tests/test_strength_comparison.py` | a past strength session planned against done (DESIGN_strength_planned_vs_done.md), on the design's Thursday: which sets count, the marks and totals, the verdict by sets and the one kept by time and load, the logged activity pairing first and never asked about, the sets on the activity, the same-day takeover, the table, the companion lines, `workout show` and `workout compare` |
-| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (no round, no "Not now", saving one closes the others), the morning push that proposes a session change and writes kilograms at once, and the chat run that saves its proposal, is shown the open one and replaces it, queues its constraint question, which goes out when the proposal is answered or at once when nothing changes, and saves nothing when the week changed while it thought. The tweak that keeps the open proposal's days is in `test_workout_tweak.py`, the prompt gate in `test_prompt_gates.py`, and the second place per chat with its two refusals and the time-out line in `test_chat_coach_run.py` |
+| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (in no line, no "Not now", saving one closes the others, out like any item), the morning push that proposes a session change and writes kilograms at once, and the chat run that saves its proposal, is shown the open one and replaces it, queues its constraint question, which goes out when the proposal is answered or at once when nothing changes, and saves nothing when the week changed while it thought. Also the queue's rule for replies (DESIGN_athlete_queue.md §13.2 rule 6): a run's proposal going out while an item is out, the line waiting for it, what follows the run's last question, and a tap on a later day. The tweak that keeps the open proposal's days is in `test_workout_tweak.py`, the prompt gate in `test_prompt_gates.py`, and the second place per chat with its two refusals and the time-out line in `test_chat_coach_run.py` |
 | `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the line for a change to today, who is watching, the replace question and its ways out, `workout notify` with `--all` and `--sent` and their tags, `workout batches`. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.started_from` pins where the run started, the terminal or the athlete's chat |
 | `tests/test_constraints*.py`   | the constraint object: DB windowing, the §8 message capture and |
 |                                | the hard-rest pre-pass (`test_constraints.py`); the §7          |

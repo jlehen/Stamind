@@ -320,7 +320,7 @@ class WhatItWritesTest(_TweakCase):
         proposal = self.swap()
         with patch("stamind.runtime.calendar_syncer"), redirect_stdout(io.StringIO()):
             item = saved_proposal.save(proposal, newest_written())
-            line = athlete_queue.act(item, "a1", clock.now())
+            line = athlete_queue.act(item, "a1")
         self.assertEqual(line, saved_proposal.APPLIED_LINE)
         self.assert_swapped(intervals, endurance)
         self.assertEqual(test_db.get_workout_changes()[0]["kind"], "tweak")

@@ -89,9 +89,9 @@ def now() -> datetime:
     return datetime.now(zone) if zone else datetime.now().astimezone()
 
 
-# When the running command started, to the second; None between commands. A walk of the
-# athlete queue and every item a command queues are dated by it, and the queue's buttons
-# carry it in whole seconds (DESIGN_athlete_queue.md §4, §6.2).
+# When the running command started, to the second; None between commands. Every item a
+# command queues is dated by it, and is ready from then on (DESIGN_athlete_queue.md §3,
+# §13.2).
 _command_start: Optional[datetime] = None
 
 

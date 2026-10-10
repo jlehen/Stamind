@@ -379,7 +379,7 @@ class CompanionRenderer(ExpertRenderer):
             print(wrap_text(line))
 
     def queue_hint(self, questions: int, messages: int) -> None:
-        """Draws nothing: the morning message brings the questions, and a hint about a
+        """Draws nothing: the bot brings the questions itself, and a hint about a
         command she cannot type is noise (DESIGN_athlete_queue.md §5.2)."""
 
     def queue_acted(self, item: Dict[str, Any], action: str, line: Optional[str]) -> None:

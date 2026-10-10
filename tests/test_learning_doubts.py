@@ -159,7 +159,7 @@ class QueuingTest(_DoubtCase):
         self.doubt()
         self.run_end()
         [item] = self.questions()
-        athlete_queue.act(item, QUEUE_LATER_DAY, self.now)
+        athlete_queue.act(item, QUEUE_LATER_DAY)
         self.later(hours=1)
         self.assertTrue(athlete_queue.is_hidden(test_db.get_queue_item(item["id"]), self.now))
         self.run_end()
@@ -215,7 +215,7 @@ class CheckTest(_DoubtCase):
                 self.run_end()
                 [item] = self.questions()
                 settle(lid)
-                self.assertEqual(athlete_queue.walk(self.now), [])
+                self.assertEqual(athlete_queue.line(), [])
                 self.assertEqual(
                     test_db.get_queue_item(item["id"])["outcome"], athlete_queue.STALE
                 )
@@ -277,11 +277,11 @@ class WordingTest(_DoubtCase):
         self.doubt()
         self.run_end()
         [item] = self.questions()
-        codes = [choice.value for choice in queue_cli.terminal_choices(item, self.now)]
+        codes = [choice.value for choice in queue_cli.terminal_choices(item)]
         self.assertEqual(codes, [
             "a1", "a2", athlete_queue.SKIP, QUEUE_LATER_HOUR, QUEUE_LATER_DAY, QUEUE_LATER_BACK,
         ])
-        athlete_queue.act(item, athlete_queue.DROP, self.now)
+        athlete_queue.act(item, athlete_queue.DROP)
         self.assertIsNone(test_db.get_queue_item(item["id"])["closed_at"])
 
 
@@ -295,8 +295,7 @@ class AnswerTest(_DoubtCase):
         self.addCleanup(env.stop)
 
     def tap(self, item, action):
-        since = queue_cli.since_token(self.now, single=True)
-        code, out, _ = run_cli(["bot", "queue", str(item["id"]), action, "--since", since])
+        code, out, _ = run_cli(["bot", "queue", str(item["id"]), action])
         self.assertEqual(code, 0)
         self.assertNotIn(QUEUE_SENTINEL, out)
         return out

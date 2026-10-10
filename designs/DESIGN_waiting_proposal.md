@@ -83,6 +83,13 @@ A proposal **stands alone**, which is new for the queue and is one property of t
 - It has no "🕐 Not now". Not answering already means "not now", and "in 1 day" would bring back
   a proposal that is out of date.
 
+Amended 2026-10-10 (DESIGN_athlete_queue.md §13): the queue no longer sends in a round. It
+sends from one line, one item at a time, in the order the items become ready. A proposal is
+still in no line and is still sent the moment it is saved. From then until its answer it is
+**out**, like any item, so the line waits for it. A tap on it is followed by the questions of
+its own run (§6.3), and then by the next item of the line. That holds for every proposal, not
+only the morning's.
+
 ## 4. What the athlete can do with it
 
 **Change it.** The saved proposal is written under one change, and Google Calendar follows. The
@@ -167,6 +174,16 @@ next morning message that makes no proposal, or whose proposal is answered.
 - The athlete answers nothing.
 - The athlete taps "Feeling tired" or "Can't today", which makes a second proposal in place of
   the first, and answers that one. Only the morning's own proposal brings the round with it.
+
+Amended 2026-10-10 (DESIGN_athlete_queue.md §13.2, §13.5): the push ends with the queue's one
+step, which sends the first item of the line unless an item is out. The proposal is out, so
+the step sends nothing and the line starts when the proposal is answered, as above. A tap on a
+later day is now a tap like any other. It is Friday 09:00 and the athlete taps Thursday's
+proposal. At 08:00 nothing counted as out any more, so the first queued question went out on
+its own. If it is still unanswered, the tap brings nothing more. If nothing went out, because
+the bot was down, the tap brings that question. Of the two cases not handled, the second is
+gone: the answer to any proposal lets the line go on. The first stays: a proposal nobody
+answers holds the line until the next morning time.
 
 **Once a morning.** The push skips the week planner when it already ran this morning with the
 night's sleep score. Today it reads that from the newest change that `workout adapt`
@@ -337,6 +354,17 @@ of the question about what they wrote a minute ago.
 
 **No answer.** Nothing is stored and nothing is lost. The buttons keep working. The question
 comes again in the next morning's round, like any queued question.
+
+Amended 2026-10-10 (DESIGN_athlete_queue.md §13.2 rule 6, §13.5): a proposal and the questions
+about what the athlete wrote are **replies**. The run sends them itself, whatever is out. After
+the last question of the run, the line goes on: an item that was not sent yet follows. An item
+that is out does not, so the question about Tuesday's sets, left since the morning, still does
+not come up again. That keeps the reason for choice 1 below and widens what follows. A tap on
+a later day brings the questions of the run that are not out, and then the next item of the
+line. A question nobody answers stands in the line like any item, and is sent again from the
+next morning time on, when its turn comes. The questions of a run whose proposal was replaced
+(the second case not handled, below) now follow the answer to the newer proposal, after that
+run's own questions.
 
 **Closed without being asked.** A constraint question is closed once the last day of its
 constraint is behind. A signal question is closed once its last day is further back than the
