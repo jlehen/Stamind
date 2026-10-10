@@ -1,6 +1,11 @@
 # Design: The queue of things Stamind wants to tell or ask the athlete
 
-**Status:** Implemented · **Date:** 2026-09-14 (rev. 3)
+**Status:** Implemented · **Date:** 2026-09-14 (rev. 3) · rev. 4 designed 2026-10-10, not
+built (§13)
+
+Revision 4 replaces the round the morning message opens with one line that the bot sends from
+on its own, in the order items become ready. It is §13. Sections 1 to 12 still describe the
+code as it runs.
 
 Revision 3 settles the terminal command: a bare `sm queue` lists, `sm queue answer` goes
 through the items, and `sm queue tell` leaves a message, which is also the first thing that
@@ -662,3 +667,254 @@ item's place in the queue. `sm queue tell` is a terminal command, not a tap.
   tap); DESIGN_cli_noargs.md §a3 (`queue` is the second group whose bare run lists);
   DESIGN_runway_nudge.md §4 (the queue hint shares its touchpoints). ARCHITECTURE.md: the
   queue, the sentinel and the reminder check. Designs still in progress are not edited.
+
+## 13. Revision 4: one line, in the order items become ready
+
+Designed 2026-10-10 and not built. Sections 1 to 12 describe the code as it runs today. They
+are amended when this lands (§13.7).
+
+### 13.1 The problem
+
+The queue has no rule of its own for when an item is sent. An item goes out because a command
+sends it. The morning message opens a round. A tap sends the next item of that round. `workout
+adapt` and `bot capture note` send the questions about what the athlete wrote. The scheduler
+sends the reminders. Each of them is right. The gaps are between them.
+
+**A question the athlete's own message queued waited 20 hours.** It is Saturday 3 October
+2026, 12:15. The athlete writes "I'm tired today…". The `workout adapt` run this starts does
+two things. It finds that a mesocycle has ended and queues "Your last three weeks of training
+are done. How did they go for you?". It also saves a proposal. The proposal arrives at 12:17
+and the athlete taps "Change it". The question does not follow. It arrives on Sunday at 08:00,
+with the morning message. The athlete was in the chat and nothing stood in front of the
+question. It waited because that run sends only the questions about the athlete's message
+(DESIGN_waiting_proposal.md §6.3), and nothing else sends a question before the next morning.
+
+**With the morning message switched off, no round ever starts.** The `push` setting turns the
+daily briefing off. Reminders still go out, and so do the notices about a changed week
+(DESIGN_change_heads_up.md §4). The queue's round does not, because the morning message is
+what opens it. The same holds on a morning when the message stays silent because the schedule
+has run out (§10).
+
+### 13.2 The model
+
+The author's words, 2026-10-10: "The messages should be scheduled. When there's no min/max,
+they are delivered asap in order. When the min time of a message expires, it should be
+enqueued right behind the messages to deliver asap." The minimum time is what "remind me in 1
+hour" sets. The maximum is expiration.
+
+Seven rules follow. Rules 3, 4 and 7 hold his three rulings of that day.
+
+**1. Every waiting item has a ready time.** It is the time from which the item may be sent.
+For a new item it is the start of the command that queued it. "In 1 hour" moves it to one hour
+after the tap, and "Ask me tomorrow" to the athlete's morning time on the next day.
+
+**2. The line.** The line is every waiting item whose ready time has passed, the earliest
+ready time first. Items with the same ready time keep the order of their ids. So an item put
+off for an hour does not take its old place back. When its hour is over, it stands behind
+everything that became ready before then. A proposal is in no line, as today (§3).
+
+**3. One at a time.** An item is **out** from the moment the bot sends it until the athlete
+taps it, and at the latest until the next morning time (rule 5). The bot sends the first item
+of the line only when nothing is out. The tap that answers an item, drops it or puts it off
+is what lets the next one go.
+
+"In 1 hour" therefore means at least one hour. It is 08:05 and the athlete puts the first
+question off for an hour. The second question arrives at once, and they leave it. At 09:05 the
+first question is ready again, behind the second. It is sent when the second is answered.
+Ruled 2026-10-10: "when the athlete asks to be reminded in one hour, this means at least one
+hour but can be more if there are other questions."
+
+**4. When the bot sends.** At three moments, and the step is the same each time: if nothing is
+out, send the first item of the line.
+
+- After the morning message, as its last act.
+- After a tap on a queued item, at any hour, because the athlete is in the chat.
+- On a wake of the bot's scheduler, which comes at least every five minutes, but only between
+  the athlete's morning time and 21:00. Those are the hours in which the notices about a
+  changed week go out (DESIGN_change_heads_up.md §4).
+
+So a question the nightly `data reflect` queues at 03:00 is ready at 03:00 and arrives after
+the 08:00 briefing. A message the operator leaves with `sm queue tell` at 14:00 arrives by
+14:05 when nothing is out. Ruled 2026-10-10.
+
+**5. An item left unanswered comes back each morning.** At the athlete's morning time nothing
+counts as out any more. The step that follows the morning message then sends the first item of
+the line again, as each morning's round does today (§10).
+
+**6. A reply comes first.** A reply is what a run sends on its own account: the proposal it
+makes, and the questions about what the athlete wrote (DESIGN_waiting_proposal.md §3, §6.3).
+Those are the kinds that stand alone or are drawn bare. The run sends them itself, as today,
+whatever is out. A reply is out like any other item, so the line waits for its answer. After a
+tap on a reply, the next question of the same run goes first. When there is none, the step of
+rule 4 runs.
+
+On a morning when the week planner proposes a change, the step after the morning message
+finds the proposal out and sends nothing. The line starts when the proposal is answered, as
+today (DESIGN_waiting_proposal.md §5).
+
+**7. Expiration is the kind's own check.** It is the check of §3, unchanged. Each kind says
+whether its item is still worth asking, and an item that is not is closed without a word. The
+check runs before an item is sent and when it is tapped. No time is stored for it. Five of the
+ten kinds expire on a fact and not on a date: a question about a set expires when the set gets
+a name. The other five work their date out when they are checked, as the retrospective
+question does with its seven days. Ruled 2026-10-10.
+
+### 13.3 A Wednesday with the line
+
+It is Wednesday 14 October 2026. The athlete's morning time is 08:00.
+
+At 03:00 the nightly `data reflect` doubts something the coach learned and queues a question
+about it. It is ready at 03:00. It is night, so nothing is sent.
+
+At 08:00 the morning message runs. It finds that Monday's test was done and queues "How did
+Monday's test go?", ready at 08:00. It sends the briefing. Then it sends the first item of the
+line, the learning question: "🙋 Quick question (2 left)".
+
+At 08:05 the athlete taps "Not now", then "In 1 hour". The learning question is now ready at
+09:05. Nothing is out, so the test question arrives at once. The athlete is busy and leaves
+it.
+
+At 09:05 the learning question is ready again. It stands behind the test question, which is
+out. Nothing is sent. Today the reminder would arrive at 09:05 on its own.
+
+At 12:15 the athlete writes "My knee hurts until Friday". The week planner proposes a change.
+The proposal arrives at 12:17 although the test question is out, because it is a reply. At
+12:20 the athlete taps "Change it". The reply comes, and then "Shall I remember this
+constraint?", the question of the same run. They tap "Yes". Nothing else arrives, because the
+test question is still out.
+
+At 14:00 the operator runs `sm queue tell "Charge your watch tonight."` in a terminal. The
+message is ready at 14:00 and stands last in the line. Had nothing been out, it would have
+arrived by 14:05.
+
+At 18:30 the athlete answers the test question. The learning question arrives at once, under
+"⏰ You asked me to come back to this:". They answer it. The operator's message arrives. They
+tap "👍 Got it", and the bot says "That's all for now — thanks!".
+
+Had the athlete left the test question alone all day, Thursday's briefing would be followed by
+the test question again, with the other two still behind it.
+
+### 13.4 The terminal and the typed commands
+
+`sm queue answer` goes through the line as it stands when the command starts, each item once.
+Its choices are the ones of §5.1, with "in 1 day" reworded: "later — tomorrow (Thu 08:00)" on
+a question and "remind me tomorrow (Thu 08:00)" on a message. "Skip" writes nothing. "After
+the others" sets the ready time to now, which puts the item last in the line. Showing an item
+in a terminal counts as sending it, so the bot does not send it again the same day.
+
+`sm queue list` calls an item hidden while its ready time is ahead, and shows that time.
+
+`sm queue tell` says when its message goes out: "Queued #19. It goes out when its turn comes:
+within minutes between 08:00 and 21:00, and at 08:00 otherwise."
+
+Typed in the chat, `/queue answer` sends the first item of the line whatever is out, and
+`/queue answer <id>` sends that item.
+
+### 13.5 Choices made without the author
+
+Each one changes something the athlete or the operator can see, or settles a detail the three
+rulings left open.
+
+1. **A reply does not wait in the line** (rule 6). At 08:00 a question arrives and the athlete
+   leaves it. At 12:15 they write "My knee hurts until Friday". In one strict line, "Shall I
+   remember this constraint?" would stand behind the morning's question and not be asked that
+   day. As designed it comes at once, as today. This carries over the author's ruling of
+   2026-10-09 (DESIGN_waiting_proposal.md §6.3, choice 1).
+2. **After a run's replies, the line goes on.** On 3 October the question about the finished
+   mesocycle would follow the tap on "Change it". Today nothing follows: "only the questions
+   of the run follow the answer to its proposal" (the same choice 1). What still does not
+   follow is a question that is out. That was the reason for that choice: a question about
+   Tuesday's sets, left since the morning, must not come up again in front of the athlete.
+3. **A tap on a proposal on a later day is a tap like any other.** Today it brings nothing
+   (DESIGN_waiting_proposal.md §5, §6.3). Now it brings that run's questions that are not out,
+   or else the step of rule 4. The day a proposal was sent no longer has to be known.
+4. **A run the athlete starts does not send from the line.** It sends its replies. What else
+   it queued goes out on the next wake, within five minutes, or at the morning time when it is
+   past 21:00. On 3 October there was a proposal, so the question would follow the tap at once.
+   The other way is a fourth moment, at the end of every run the chat starts. Then each such
+   command must end with the step, and `bot route`, the run that only works out what a message
+   means, must not.
+5. **"⏰ Ask me tomorrow" replaces "⏰ In 1 day".** The words are the author's, and he ruled
+   on the hour too, both on 2026-10-10: the item is ready at the athlete's morning time on the
+   next day, so it comes with that morning's questions. It is Wednesday 18:30 and the athlete
+   taps "Ask me tomorrow". The question is ready on Thursday at 08:00 and takes its turn after
+   the briefing. A tap at 00:30 on Thursday means Friday. Today "In 1 day" is one day after the
+   round began, less two minutes (§4). The other way is 24 hours after the tap: Thursday 18:30.
+   The button reads the same under a message, where nothing is asked: the bot draws the later
+   choices from the tap and does not know what the item is (§6.4).
+6. **"↩️ After the others" leaves the chat.** "Not now" swaps in two choices, "⏰ In 1 hour" and
+   "⏰ Ask me tomorrow". Both put the item behind the others. A third button would need a
+   sentence that tells it apart from those two, and alone in the line it would bring the item
+   straight back. The terminal keeps it (§13.4).
+7. **A put-off item that comes due at night waits for the morning.** "In 1 hour" tapped at
+   23:30 arrives at the morning time. Today it arrives at 00:30 (§10, "Quiet hours"). A tap at
+   night still brings the next item at once.
+8. **The `push` setting does not stop the line.** With the morning message off, the first wake
+   after the morning time sends the first item. Reminders and notices already ignore that
+   setting.
+9. **21:00 is the notices' constant**, not a setting of its own.
+10. **The closing line follows the tap that empties the line**, a put-off item's tap included.
+    Today nothing follows a reminder's tap. A bare question still gets no closing line.
+11. **`sm queue tell` goes out the same day.** Today it waits for the next morning message. It
+    has no waiting time like the 20 minutes of a changed week, because a message is typed once
+    and not reached by trial and error. One the operator regrets before it is sent is closed
+    with `sm queue answer <id>`.
+12. **Seen in a terminal counts as sent** (§13.4).
+13. **Two columns.** `ready_at` replaces `remind_at` and is never empty. `sent_at` is new.
+    `queued_at` keeps the time the item was queued and is never rewritten: "after the others"
+    used to overwrite it.
+
+### 13.6 Not handled
+
+- An item nobody taps holds the line. It is sent again each morning, and what stands behind it
+  waits, as today. Five of the ten kinds have no time limit: the operator's message, the two
+  questions about strength sets, the learning question and the test-result question. Neither
+  live queue has held two items of the line at once: 17 items from 19 September to 10 October
+  2026, 13 of them replies.
+- An item that is out and expires holds the line until a tap or the next morning. The wake's
+  check reads the database and runs no kind's check, so that no command starts unless
+  something can be sent (§6.5).
+- A message Telegram refuses after its retries is recorded as sent. It comes back the next
+  morning.
+- The replies are still sent by their own commands, `workout adapt` and `bot capture note`.
+  Moving those sends into the step is a later change.
+- A copy of an unanswered question arrives each morning, as today (§10).
+
+### 13.7 Touch points
+
+| Where | What |
+|---|---|
+| `stamind/db/schema.py`, `scripts/migrate_queue_ready.py` (new) | `athlete_queue` gains `ready_at` and `sent_at` and loses `remind_at`; schema 27. The script sets `ready_at` to `remind_at` where one was set and to `queued_at` elsewhere. It runs once per instance, before the bots restart |
+| `stamind/db/queue.py` | the line, whether something is out, setting a ready time, recording a send. The walk's query, "move to the back" and the due reminders go |
+| `stamind/athlete_queue.py` | the line with expired items closed on the way; the step's test; "tomorrow" as the next day's morning time, with its chat label "Ask me tomorrow"; the check the scheduler makes on a wake. `walk`, `shown` and the reminders go |
+| `stamind/cli/queue.py` | one function for the step, called after a tap and by the hidden `bot queue --next`; `send_item` and `send_alone` record the send; after a tap on a reply, the next question of the same run. The walk-start token, `send_walk_step`, `--remind`, `--since` and the test on the day a proposal was sent go |
+| `stamind/cli/bot/views.py` | `bot morning` ends with the step; `send_alone` no longer takes a walk's start |
+| `stamind/chat/scheduler.py` | a wake tells the changes, then runs the morning message when it is due, and otherwise `bot queue --next` when the check says so. The reminder run goes |
+| `stamind/chat/keyboards.py`, `callbacks.py`, `replies.py`, `stamind/sentinels.py` | a queue button is `q:<id>:<action>`. A button sent before this change has a fourth part and still works. "Not now" swaps in two choices |
+| `stamind/heads_up.py` | the 21:00 constant and the helper that places a time of day on a date move where the queue can read them |
+| `stamind/cli/render/` | `queue list` reads `ready_at`; the "⏰" lead stands on an item the athlete put off |
+| `docs/ARCHITECTURE.md` | the bot section, the scheduler's wake, the `athlete_queue` table |
+
+It is built in one step. The round and the line read the same rows, so they cannot run side by
+side.
+
+Sections amended when it lands: §3 (the columns, the order), §4 (the later choices, the round),
+§5.1 (`queue tell`, the later choices), §6.1, §6.2, §6.4 and §6.5, §7, §10 (quiet hours, the silent
+morning) and §12. In DESIGN_waiting_proposal.md: §3 and §5 (the round after a proposal) and
+§6.3 (what follows a run's questions, the tap on a later day). In DESIGN_change_heads_up.md
+§4: the wake's order. Designs still in progress are not edited. For them the contract is that
+`send_item` and `send_alone` stay the two functions that put an item in the chat, and that
+both record the send.
+
+Tests, one per rule: a ready time is the queue time until a later choice moves it, and the
+queue time is never rewritten; the line orders by ready time, and an item put off stands
+behind what became ready before its time; nothing is sent while an item is out, and a tap
+sends the next; the step runs after the morning message and after a tap at night; a wake sends
+inside the day's hours and not outside them, with the `push` setting off, and on a morning the
+message stays silent; an unanswered item is sent again after the next morning time and not
+before; a chat run's proposal and questions go out while an item of the line is out, and the
+line waits for them; after the last of them, an item not yet sent follows and one that is out
+does not; the Saturday of §13.1; an expired item is closed before it is sent and on a tap;
+"Not now" offers two choices in the chat and the terminal keeps three; "Ask me tomorrow" makes
+an item ready at the next day's morning time, whatever the hour of the tap; a button with a
+fourth part still works; an item shown in a terminal is not sent the same day; the migration.
