@@ -851,11 +851,12 @@ the test question again, with the other two still behind it.
 
 ### 13.4 The terminal and the typed commands
 
-`sm queue answer` goes through the line as it stands when the command starts, each item once.
-Its choices are the ones of §5.1, with "in 1 day" reworded: "later — tomorrow (Thu 08:00)" on
-a question and "remind me tomorrow (Thu 08:00)" on a message. "Skip" writes nothing. "After
-the others" sets the ready time to now, which puts the item last in the line. Showing an item
-in a terminal counts as sending it, so the bot does not send it again the same day.
+`sm queue answer` goes through the line, each item once. An item that becomes ready while the
+command runs is shown too. Its choices are the ones of §5.1, with "in 1 day" reworded: "later
+— tomorrow (Thu 08:00)" on a question and "remind me tomorrow (Thu 08:00)" on a message. "Skip"
+writes nothing. "After the others" sets the ready time to now, which puts the item last in the
+line. Showing an item in a terminal counts as sending it, so the bot does not send it again
+the same day.
 
 `sm queue list` calls an item hidden while its ready time is ahead, and shows that time.
 
@@ -944,6 +945,11 @@ rulings left open.
 - The replies are still sent by their own commands, `workout adapt` and `bot capture note`.
   Moving those sends into the step is a later change.
 - A copy of an unanswered question arrives each morning, as today (§10).
+- "⏰ You asked me to come back to this:" stands on every item whose ready time was moved. That
+  is right after "In 1 hour" and "Ask me tomorrow". It is not what happened in two cases: an
+  answer that could not be applied (choice 14), and an item the operator put after the others
+  in a terminal, which the athlete then reads in the chat. The queue does not record who moved
+  the time.
 - A typed answer that never comes. The athlete taps "Tell me" and types nothing. The command
   ends after five minutes, the item stays out, and the line waits until the next morning.
   Before the line, the round stopped there too.
@@ -952,19 +958,28 @@ rulings left open.
 
 | Where | What |
 |---|---|
-| `stamind/db/schema.py`, `scripts/migrate_queue_ready.py` (new) | `athlete_queue` gains `ready_at` and `sent_at` and loses `remind_at`; schema 27. The script sets `ready_at` to `remind_at` where one was set and to `queued_at` elsewhere. It runs once per instance, before the bots restart |
+| `stamind/db/schema.py`, `scripts/migrate_queue_ready.py` (new) | `athlete_queue` gains `ready_at` and `sent_at` and loses `remind_at`; schema 27. The script sets `ready_at` to `remind_at` where one was set and to `queued_at` elsewhere. It runs once per instance, between the landing and the bots' restart (see below) |
 | `stamind/db/queue.py` | the waiting items in the order they become ready, setting a ready time (which ends the item's turn), recording a send. The walk's query, "move to the back" and the due reminders go |
 | `stamind/athlete_queue.py` | the line with expired items closed on the way; whether an item is out; the questions a run still has to ask; "tomorrow" as the next day's morning time, with its chat label "Ask me tomorrow"; the check the scheduler makes on a wake. `walk`, `shown` and the reminders go |
 | `stamind/cli/queue.py` | one function for the step, called after a tap and by the hidden `bot queue --next`; `send_item` and `send_alone` record the send; after a tap on a reply, the next question of the same run. The walk-start token, `send_walk_step`, `--remind`, `--since` and the test on the day a proposal was sent go |
 | `stamind/cli/bot/views.py` | `bot morning` ends with the step; `send_alone` no longer takes a walk's start |
 | `stamind/chat/scheduler.py` | a wake tells the changes, then runs the morning message when it is due, and otherwise `bot queue --next` when the check says so. The reminder run goes |
-| `stamind/chat/keyboards.py`, `callbacks.py`, `replies.py`, `stamind/sentinels.py` | a queue button is `q:<id>:<action>`. A button sent before this change has a fourth part and still works. "Not now" swaps in two choices |
+| `stamind/chat/keyboards.py`, `callbacks.py`, `stamind/sentinels.py` | a queue button is `q:<id>:<action>`. A button drawn before the bot restarted has a fourth part, which is read past whatever it holds. "Not now" swaps in two choices |
 | `stamind/heads_up.py` | the helper that places a time of day on a date becomes public (`at_time`). The queue reads it and the 21:00 constant where they are, so neither moved |
-| `stamind/cli/render/` | `queue list` reads `ready_at`; the "⏰" lead stands on an item the athlete put off |
+| `stamind/cli/queue.py` (the texts) | `queue list` reads `ready_at`; the "⏰" lead stands on an item whose ready time was moved; `queue tell` says when its message goes out |
 | `docs/ARCHITECTURE.md` | the bot section, the scheduler's wake, the `athlete_queue` table |
 
 It is built in one step. The round and the line read the same rows, so they cannot run side by
 side.
+
+**The order on the day it lands.** A bot runs each command from the checkout. So between the
+landing and the restart, the old bot meets the new code. Three steps go back to back, at an
+hour when nobody is in the chat and away from the morning message: land the code, run the
+script on each instance, restart both bots. It is 14:00 and the code lands. Until the script
+has run, every command that reads the queue fails, "Feeling tired" included. Once it has run,
+the old bot's scheduler fails on each wake, so no morning message goes out until the restart.
+A question the old bot draws in between has buttons with an empty fourth part. They work once
+the bot has restarted.
 
 Sections amended on 2026-10-10, each with a dated note at its end: §3 (the columns, the order),
 §4 (the later choices, the round), §5.1 (`queue tell`, the later choices), §6.1, §6.2, §6.4 and

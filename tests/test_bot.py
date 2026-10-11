@@ -659,14 +659,15 @@ class QueueProtocolTest(unittest.TestCase):
         self.assertLessEqual(len(data.encode()), 64)
 
     def test_a_button_sent_before_the_line_still_works(self):
-        """It carries a fourth part, the start of its round, which is read past
-        (DESIGN_athlete_queue.md §13.7)."""
-        for data in ("q:12:a2:1789538400", "q:12:a2:r1789538400"):
+        """It carries a fourth part, the start of its round, which is read past. The part
+        is empty on a button the old bot drew for an item the new code sent, between the
+        day the code landed and the bot's restart (DESIGN_athlete_queue.md §13.7)."""
+        for data in ("q:12:a2:1789538400", "q:12:a2:r1789538400", "q:12:a2:"):
             self.assertEqual(keyboards.decode_queue_callback(data), ("12", "a2"), data)
 
     def test_decode_rejects_anything_but_a_queue_tap(self):
         for data in ("ui:ab12:0", "stop:ab12", "q:12", "q:x:a2", "q:12:a-2", "q:12:",
-                     "q:12:a2:1789 --next", "q:12:a2:x1", "q:12:a2:1:2"):
+                     "q:12:a2 --next:1", "q:12:a2:1:2"):
             self.assertIsNone(keyboards.decode_queue_callback(data), data)
 
     def test_a_queue_tap_leaves_the_live_button_row_alone(self):

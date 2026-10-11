@@ -200,9 +200,11 @@ class LineTest(_QueueCase):
         they are dated by the command's start (§3)."""
         clock.start_command()
         self.addCleanup(clock.end_command)
+        started = self.item(self.ask("queued as the push starts"))["queued_at"]
         self.at(8, 1)
-        item_id = self.ask("queued by the push")
-        self.assertEqual(ids(athlete_queue.line()), [item_id])
+        item = self.item(self.ask("queued by the push a minute in"))
+        self.assertEqual((item["queued_at"], item["ready_at"]), (started, started))
+        self.assertEqual(len(athlete_queue.line()), 2)
 
     def test_an_expired_item_is_closed_without_being_shown(self):
         gone, kept = self.ask("gone"), self.ask("kept")

@@ -16,11 +16,16 @@ stamped with, and does nothing when it is already there. It opens the file with 
 it was.
 
 It operates on the instance named by `STAMIND_CONFIG`, or on the default config when that
-variable is unset (ARCHITECTURE.md §9). Run it once per athlete, from the repository root,
-before the bots restart on the new code:
+variable is unset (ARCHITECTURE.md §9). Run it once per athlete, from the repository root:
 
     venv/bin/python scripts/migrate_queue_ready.py
     STAMIND_CONFIG=piupiu/config_piupiu.yaml venv/bin/python scripts/migrate_queue_ready.py
+
+Land the code, run this and restart both bots back to back, at an hour when nobody is in
+the chat and away from the morning message. A bot runs each command from the checkout, so
+between the three steps the old bot meets the new code. Before this script has run, every
+command that reads the queue fails. Once it has run, the old bot's scheduler fails on each
+wake until the restart (DESIGN_athlete_queue.md §13.7).
 """
 import os
 import sqlite3
@@ -57,8 +62,10 @@ def migrate(db_path: str) -> bool:
         columns = [row[1] for row in conn.execute("PRAGMA table_info(athlete_queue)")]
         if not columns or "ready_at" in columns:
             return False
-        # One transaction: a failure leaves the old table as it was.
+        # One transaction, opened by hand because a CREATE does not open one: a failure
+        # leaves the old table as it was and no half-built one beside it.
         with conn:
+            conn.execute("BEGIN")
             conn.execute(NEW_TABLE)
             conn.execute(
                 "INSERT INTO athlete_queue_new "

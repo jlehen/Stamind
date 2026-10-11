@@ -30,9 +30,8 @@ DROP = "d"
 SKIP = "s"
 
 # The "later" choices of a queued item: action code, the terminal chooser's words, and the
-# chat button "Not now" swaps in, which the bot builds from the tap itself. "After the
-# others" has no button: in the chat both others already put the item behind the rest
-# (§13.4, §13.5).
+# chat button "Not now" swaps in, which the bot builds from the tap itself. None means the
+# choice is the terminal's alone (§13.4, §13.5 choice 6).
 QUEUE_LATER_HOUR = "h"
 QUEUE_LATER_DAY = "t"
 QUEUE_LATER_BACK = "b"

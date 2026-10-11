@@ -11,12 +11,14 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from stamind import athlete_queue, clock, heads_up, runtime, settings
-from stamind.athlete_queue import ANSWERED, DROP, DROPPED, MESSAGE, SKIP, STALE
+from stamind.athlete_queue import (
+    ANSWERED, DROP, DROPPED, MESSAGE, QUEUE_LATER_BACK, QUEUE_LATER_CHOICES, QUEUE_NOT_NOW,
+    SKIP, STALE,
+)
 from stamind.cli.selectors import add_selector_args
 from stamind.cli.windows import has_selector, resolve_window
 from stamind.prompt import Choice
 from stamind.sentinels import emit_queue_item, is_json_frontend
-from stamind.athlete_queue import QUEUE_LATER_BACK, QUEUE_LATER_CHOICES, QUEUE_NOT_NOW
 from stamind.text import bold, capitalized, cmd, cyan, gray, red, wrap_text
 from stamind.output import notice
 from stamind.clock import fmt_span, fmt_timestamp

@@ -17,7 +17,6 @@ bytes, which is why a queued item's id travels inside the data rather than in an
 the bot remembers.
 """
 import datetime
-import re
 from typing import Any, List, Optional, Tuple
 
 from stamind.athlete_queue import QUEUE_LATER_CHOICES
@@ -219,15 +218,13 @@ def queue_callback_data(item_id: Any, action: str) -> str:
 def decode_queue_callback(data: str) -> Optional[Tuple[str, str]]:
     """Splits ``"q:{item id}:{action}"`` back into its parts, or None when it is not one.
     Each part becomes a word of `bot queue`'s argv, so each is held to its shape. A button
-    sent before 2026-10-10 carries a fourth part, the start of its round, which is read
-    past (§13.7)."""
+    drawn before the bot restarted on 2026-10-10 carries a fourth part, the start of its
+    round or nothing, which is read past whatever it holds (§13.7)."""
     parts = (data or "").split(":")
     if len(parts) not in (3, 4) or parts[0] != "q":
         return None
     item_id, action = parts[1], parts[2]
     if not (item_id.isdigit() and action.isalnum()):
-        return None
-    if len(parts) == 4 and not re.fullmatch(r"r?\d+", parts[3]):
         return None
     return item_id, action
 

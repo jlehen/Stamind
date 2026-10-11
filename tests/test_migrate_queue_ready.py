@@ -76,6 +76,24 @@ class QueueReadyTest(unittest.TestCase):
         self.assertIn("sent_at", columns)
         self.assertNotIn("remind_at", columns)
 
+    def test_a_failed_rebuild_leaves_the_old_table_and_can_be_run_again(self):
+        """A table without `remind_at` makes the copy fail. Nothing is left half-built, so
+        the second run fails the same way and not on a table that already exists."""
+        conn = sqlite3.connect(self.path)
+        conn.execute("ALTER TABLE athlete_queue DROP COLUMN remind_at")
+        conn.commit()
+        conn.close()
+        for _run in range(2):
+            with self.assertRaisesRegex(sqlite3.OperationalError, "remind_at"):
+                migrate.migrate(self.path)
+        conn = sqlite3.connect(self.path)
+        self.addCleanup(conn.close)
+        tables = [row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE name LIKE 'athlete_queue%' AND type = 'table'"
+        )]
+        self.assertEqual(tables, ["athlete_queue"])
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM athlete_queue").fetchone()[0], 3)
+
     def test_a_put_off_item_keeps_its_time_and_the_others_are_ready_since_queued(self):
         migrate.migrate(self.path)
         db = Database(db_path=self.path)
