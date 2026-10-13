@@ -198,7 +198,7 @@ def _print_effect(setting: settings.Setting) -> None:
         print(dim(f"It is now {moment.strftime('%Y-%m-%d %a %H:%M')} "
                   f"({clock.offset_label(moment)})."))
     if setting.name in (settings.PUSH, settings.MORNING_TIME, settings.MORNING_DEADLINE,
-                        settings.ADAPT_FIRST):
+                        settings.EVENING_TIME, settings.ADAPT_FIRST):
         aside("The running bot picks this up on its next check, within five minutes.")
 
 

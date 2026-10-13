@@ -144,6 +144,9 @@ coach:
 #    morning_time: "08:00"
 #    # A push missed while the bot was down is still sent until this time, then skipped.
 #    morning_deadline: "15:00"
+#    # From this time to morning_time the bot sends nothing on its own: no queued question
+#    # and no change to the week. `settings set evening-time` overrides it live.
+#    evening_time: "21:00"
 #    # Ask the coach first, so the push accounts for overnight signals. A session it would
 #    # change follows as a proposal the athlete answers with a tap. Costs one LLM call
 #    # every morning.

@@ -252,6 +252,10 @@ SETTING_DESCRIPTIONS = {
         "the local time after which a missed morning message is skipped rather than "
         "caught up, as HH:MM"
     ),
+    settings.EVENING_TIME: (
+        "the local time in the evening after which the app does not message the athlete "
+        "first, until the morning, as HH:MM"
+    ),
     settings.PUSH: 'whether the app opens the day at all — "on" or "off"',
     settings.LEARNING_QUESTIONS: (
         "whether the app asks before it leans less on something it has learned about "
@@ -270,7 +274,7 @@ SETTING_DESCRIPTIONS = {
 # deliberately puts it on this list. Anything operator- or cost-shaped — a model role,
 # adapt-first — is off it by construction.
 ROUTABLE_SETTINGS = (
-    settings.MORNING_TIME, settings.MORNING_DEADLINE, settings.PUSH,
+    settings.MORNING_TIME, settings.MORNING_DEADLINE, settings.EVENING_TIME, settings.PUSH,
     settings.LEARNING_QUESTIONS, settings.TERSE,
 )
 
@@ -312,6 +316,9 @@ def _setting_effect(key: str, value: str) -> str:
         return f"I'll open your day at {value}{when}."
     if key == settings.MORNING_DEADLINE:
         return f"If I miss the morning, I'll still catch you up until {value}."
+    if key == settings.EVENING_TIME:
+        return (f"From {value} I'll stay quiet until the morning, unless you write to me "
+                "first.")
     if key == settings.LEARNING_QUESTIONS:
         if value == "on":
             return "I'll ask you again before I lean less on something I've learned about you."

@@ -53,6 +53,12 @@ address is built into the code, so the switch is the only thing to set. Like `ch
 it stays off `ROUTABLE_SETTINGS`: the operator turns it off for an instance whose athlete
 does not lift.
 
+Amended 2026-10-13 (DESIGN_athlete_queue.md §13.5, choice 9): `evening-time`, in the Morning
+push group beside `morning-time`, is the local time from which the bot sends nothing on its
+own: no queued question and no notice about a changed week, until the morning time. It is
+21:00 by default, and `telegram.push.evening_time` seeds it. The athlete can change it from
+chat, like `morning-time`.
+
 Out, and staying in `config.yaml`: credentials (`llm.api_key`, `garmin.password`), file
 paths (`database`, `science_dir`, `service_account_file`), the web bind address, the
 Telegram plumbing (`bot_token`, `allowed_chat_ids`, timeouts, `wrap_width`), and every

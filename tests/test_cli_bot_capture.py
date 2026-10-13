@@ -577,6 +577,17 @@ class CaptureSettingTest(_CaptureCase):
         self.assertEqual(code, 0)
         self.assertIsNone(settings.stored(settings.PUSH))
 
+    def test_the_evening_hour_reads_back_as_its_effect(self):
+        """"Don't message me after 8pm" (DESIGN_athlete_queue.md §13.5, choice 17)."""
+        from stamind import settings
+        code, _, prompt = self._run({"key": "evening-time", "value": "20:00"},
+                                    text="don't message me after 8pm")
+        self.assertEqual(code, 0)
+        self.assertEqual(settings.evening_time(), "20:00")
+        self.assertIn("From 20:00 I'll stay quiet until the morning, unless you write to me "
+                      "first. OK?", prompt.text)
+        self.assertNotIn("evening-time", prompt.text)
+
     def test_the_learning_questions_switch_reads_back_as_its_effect(self):
         """"Stop asking me about that stuff" (DESIGN_learning_doubt_nudge.md §3.4)."""
         from stamind import settings
@@ -724,7 +735,7 @@ class TestResultQuestionTest(_CaptureCase):
         _, out = self._tap(answers=False)
         self.assertIsNone(test_db.get_latest_benchmark("ftp"))
         self.assertIsNone(test_db.get_queue_item(self.item["id"])["closed_at"])
-        self.assertIn("I'll ask again next time.", out)
+        self.assertIn("Nothing recorded.", out)
 
     def test_a_result_recorded_another_way_settles_the_question(self):
         test_db.add_benchmark_result(

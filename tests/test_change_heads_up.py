@@ -44,7 +44,7 @@ class SendRuleTest(unittest.TestCase):
     to today waits 20 minutes, the built-in default of the `change-delay` setting."""
 
     def due(self, waiting, now, notify_upto=None, delay=20):
-        return heads_up.due(waiting, now, "08:00", notify_upto, delay)
+        return heads_up.due(waiting, now, "08:00", "21:00", notify_upto, delay)
 
     def test_nothing_waiting_sends_nothing(self):
         self.assertFalse(self.due([], _at(24, 8)))
@@ -63,6 +63,12 @@ class SendRuleTest(unittest.TestCase):
     def test_nothing_is_sent_after_the_evening(self):
         change = [_waiting(7, _at(23, 19, 30))]
         self.assertFalse(self.due(change, _at(23, 21, 0)))
+
+    def test_the_evening_is_the_hour_it_is_given(self):
+        """The `evening-time` setting, 21:00 unless set (DESIGN_athlete_queue.md §13.5)."""
+        change = [_waiting(7, _at(23, 7, 30))]
+        self.assertTrue(heads_up.due(change, _at(23, 19, 45), "08:00", "20:00", None))
+        self.assertFalse(heads_up.due(change, _at(23, 20, 0), "08:00", "20:00", None))
 
     def test_a_change_made_during_the_day_waits_for_the_next_morning(self):
         """12:30 Wednesday, Friday's session changes: only `workout notify` sends it
@@ -122,22 +128,26 @@ class NoticeTimingTest(unittest.TestCase):
     """What the terminal says about when the line goes out (§8)."""
 
     def test_after_the_morning_time_it_goes_tomorrow_morning(self):
-        self.assertEqual(heads_up.sends_at(_at(23, 12, 30), "08:00"), _at(24, 8))
-        self.assertEqual(heads_up.sends_at(_at(23, 22, 0), "08:00"), _at(24, 8))
+        self.assertEqual(heads_up.sends_at(_at(23, 12, 30), "08:00", "21:00"), _at(24, 8))
+        self.assertEqual(heads_up.sends_at(_at(23, 22, 0), "08:00", "21:00"), _at(24, 8))
 
     def test_before_the_morning_time_it_goes_this_morning(self):
-        self.assertEqual(heads_up.sends_at(_at(23, 6, 0), "08:00"), _at(23, 8))
+        self.assertEqual(heads_up.sends_at(_at(23, 6, 0), "08:00", "21:00"), _at(23, 8))
 
     def test_a_change_to_today_goes_out_after_the_wait(self):
         self.assertEqual(
-            heads_up.sends_at(_at(23, 12, 30), "08:00", True, 20), _at(23, 12, 50)
+            heads_up.sends_at(_at(23, 12, 30), "08:00", "21:00", True, 20), _at(23, 12, 50)
         )
 
     def test_a_change_to_today_whose_wait_runs_past_the_evening_waits_for_the_morning(self):
-        self.assertEqual(heads_up.sends_at(_at(23, 20, 50), "08:00", True, 20), _at(24, 8))
+        self.assertEqual(
+            heads_up.sends_at(_at(23, 20, 50), "08:00", "21:00", True, 20), _at(24, 8)
+        )
 
     def test_a_change_to_today_before_the_morning_time_goes_at_it(self):
-        self.assertEqual(heads_up.sends_at(_at(23, 6, 0), "08:00", True, 20), _at(23, 8))
+        self.assertEqual(
+            heads_up.sends_at(_at(23, 6, 0), "08:00", "21:00", True, 20), _at(23, 8)
+        )
 
 
 class _DbCase(unittest.TestCase):

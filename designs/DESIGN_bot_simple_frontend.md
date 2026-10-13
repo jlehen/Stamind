@@ -1043,6 +1043,10 @@ I've learned about you, and go by what I see instead. OK?"
 Amended 2026-09-19 (DESIGN_output_verbosity.md §9): `terse` joins the allowlist. "Your
 messages are too long" reads back as "When I change your week, I'll keep it short. OK?"
 
+Amended 2026-10-13 (DESIGN_athlete_queue.md §13.5, choice 17): `evening-time` joins the
+allowlist. "Don't message me after 8pm" reads back as "From 20:00 I'll stay quiet until the
+morning, unless you write to me first. OK?"
+
 ### 12.8 The intent table after this pass
 
 | Intent | Shape | Runs |

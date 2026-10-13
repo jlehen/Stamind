@@ -563,6 +563,20 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
             await self.wake()
         self.assertEqual(self.ran, [(["bot", "queue", "--next"], True)])
 
+    async def test_past_the_evening_a_wake_says_whether_the_athlete_is_in_the_chat(self):
+        """The athlete wrote at 23:28. The wake at 23:30 counts them as in the chat, and
+        the one at 23:45 does not (DESIGN_athlete_queue.md §13.5 choice 7)."""
+        import datetime as dt
+        wrote = dt.datetime(2026, 9, 16, 23, 28).astimezone()
+        for minute, here in ((30, True), (45, False)):
+            self.now = dt.datetime(2026, 9, 16, 23, minute).astimezone()
+            await scheduler.scheduler_wake(
+                self.last_run, lambda: False, self.run_command, self.reflect, wrote
+            )
+            scheduler.athlete_queue.next_due.assert_called_with(here)
+        await self.wake()
+        scheduler.athlete_queue.next_due.assert_called_with(False)
+
     async def test_a_wake_with_nothing_to_send_runs_no_command(self):
         with mock.patch.object(scheduler.settings, "push_enabled", return_value=False), \
                 mock.patch.object(scheduler.athlete_queue, "next_due", return_value=False):

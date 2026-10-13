@@ -87,9 +87,10 @@ ROUTER_INTENTS = {
     ),
     "change_setting": (
         "the athlete asks to change how the app behaves in this chat — when it messages "
-        "in the morning, whether it does at all, whether it asks about what it has "
-        "learned about them, or how much it says ('can you message me at 7 instead?', "
-        "'stop the morning messages', 'stop asking me about that stuff', 'your messages "
+        "in the morning, whether it does at all, from what time in the evening it stops "
+        "messaging first, whether it asks about what it has learned about them, or how "
+        "much it says ('can you message me at 7 instead?', 'stop the morning messages', "
+        "'don't message me after 8pm', 'stop asking me about that stuff', 'your messages "
         "are too long, keep it short')"
     ),
     "help": "the athlete asks what they can say or how this works",

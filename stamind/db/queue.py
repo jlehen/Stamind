@@ -96,11 +96,13 @@ class QueueMixin:
             )
             conn.commit()
 
-    def mark_queue_sent(self, item_id: int, at: datetime) -> None:
-        """Records that a waiting item was put in front of the athlete at `at` (§13.2)."""
+    def mark_queue_sent(self, item_id: int, at: Optional[datetime]) -> None:
+        """Records that a waiting item was put in front of the athlete at `at`, or with
+        None that it no longer is (§13.2)."""
+        stamp = queue_stamp(at) if at is not None else None
         with self._get_connection() as conn:
             conn.execute(
                 "UPDATE athlete_queue SET sent_at = ? WHERE id = ? AND closed_at IS NULL",
-                (queue_stamp(at), item_id),
+                (stamp, item_id),
             )
             conn.commit()

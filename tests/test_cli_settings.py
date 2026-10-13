@@ -380,6 +380,7 @@ class TestRegistryShape(SettingsTestCase):
             settings.PUSH: "off",
             settings.MORNING_TIME: "06:45",
             settings.MORNING_DEADLINE: "11:15",
+            settings.EVENING_TIME: "20:30",
             settings.ADAPT_FIRST: "on",
             settings.COMMITMENT_DAYS: "10",
             settings.CHANGE_DELAY: "5",

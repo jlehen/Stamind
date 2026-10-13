@@ -25,6 +25,7 @@ TIMEZONE = "timezone"
 PUSH = "push"
 MORNING_TIME = "morning-time"
 MORNING_DEADLINE = "morning-deadline"
+EVENING_TIME = "evening-time"
 ADAPT_FIRST = "adapt-first"
 COMMITMENT_DAYS = "commitment-days"
 CHANGE_DELAY = "change-delay"
@@ -251,6 +252,18 @@ SETTINGS: List[Setting] = [
         fallback="15:00",
     ),
     Setting(
+        name=EVENING_TIME,
+        key="push_evening_time",
+        group="Morning push",
+        # From then to the morning time the bot waits for the athlete to write or tap
+        # (DESIGN_athlete_queue.md §13.2 rule 4, DESIGN_change_heads_up.md §4).
+        summary="Local time after which the bot sends nothing on its own",
+        value_hint="HH:MM",
+        parse=parse_hhmm,
+        config_path=("telegram", "push", "evening_time"),
+        fallback="21:00",
+    ),
+    Setting(
         name=ADAPT_FIRST,
         key="push_adapt_first",
         group="Morning push",
@@ -428,6 +441,12 @@ def morning_time() -> str:
 def morning_deadline() -> str:
     """Local HH:MM after which a missed push is skipped for the day (§4.3)."""
     return value(MORNING_DEADLINE)
+
+
+def evening_time() -> str:
+    """Local HH:MM from which the bot sends no queued item and no change to the week on its
+    own, until the morning time (DESIGN_athlete_queue.md §13.2 rule 4)."""
+    return value(EVENING_TIME)
 
 
 def adapt_first() -> bool:

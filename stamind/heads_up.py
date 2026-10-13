@@ -15,11 +15,6 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import clock, runtime, settings
 
-# Nothing is sent after this hour: a change the bot could not send at the morning time
-# waits for the next morning (§4). The athlete queue sends on its own inside the same
-# hours (DESIGN_athlete_queue.md §13.2).
-EVENING = "21:00"
-
 # The id of the newest change `workout notify` asked the bot to send at once (§4).
 NOTIFY_MARKER = "changes_notify_upto"
 
@@ -66,22 +61,24 @@ def _made_at(change: Dict[str, Any]) -> datetime:
 
 
 def due(
-    waiting: Sequence[Dict[str, Any]], now: datetime, morning: str,
+    waiting: Sequence[Dict[str, Any]], now: datetime, morning: str, evening: str,
     notify_upto: Optional[int], delay_minutes: int = 0,
 ) -> bool:
     """Whether the scheduler sends the waiting changes on this wake (§4).
 
     At once when `workout notify` asked for a change that is still waiting. Otherwise from
-    the morning time to the evening, once one of them was made before this morning's morning
-    time. A change that wrote a session dated today (`touches_today`) also goes out the same
-    day, once no waiting change is younger than `delay_minutes`: that wait is what keeps the
-    operator's trial and error off the athlete's phone, and a second run restarts it."""
+    the morning time to the evening time, once one of them was made before this morning's
+    morning time. A change the bot could not send by the evening waits for the next
+    morning. A change that wrote a session dated today (`touches_today`) also goes out the
+    same day, once no waiting change is younger than `delay_minutes`: that wait is what
+    keeps the operator's trial and error off the athlete's phone, and a second run restarts
+    it."""
     if not waiting:
         return False
     if notify_upto is not None and any(c["id"] <= notify_upto for c in waiting):
         return True
     morning_at = at_time(now, morning)
-    if not morning_at <= now < at_time(now, EVENING):
+    if not morning_at <= now < at_time(now, evening):
         return False
     if any(_made_at(c) < morning_at for c in waiting):
         return True
@@ -91,7 +88,7 @@ def due(
 
 
 def sends_after_delay(
-    now: datetime, morning: str, touches_today: bool, delay_minutes: int
+    now: datetime, morning: str, evening: str, touches_today: bool, delay_minutes: int
 ) -> bool:
     """Whether a change made now goes out `delay_minutes` from now rather than at a morning
     time (§4). `sends_at` and the terminal notice both key on this, so they cannot drift.
@@ -100,16 +97,17 @@ def sends_after_delay(
     evening: past it the day the change is about is over, so it waits like any other."""
     if now < at_time(now, morning):
         return False
-    return touches_today and now + timedelta(minutes=delay_minutes) < at_time(now, EVENING)
+    return touches_today and now + timedelta(minutes=delay_minutes) < at_time(now, evening)
 
 
 def sends_at(
-    now: datetime, morning: str, touches_today: bool = False, delay_minutes: int = 0,
+    now: datetime, morning: str, evening: str, touches_today: bool = False,
+    delay_minutes: int = 0,
 ) -> datetime:
     """When a change made now reaches the athlete, unless `workout notify` sends it sooner
     (§8): `delay_minutes` from now for a change to today, else this morning's morning time
     while it is still ahead, else tomorrow's."""
-    if sends_after_delay(now, morning, touches_today, delay_minutes):
+    if sends_after_delay(now, morning, evening, touches_today, delay_minutes):
         return now + timedelta(minutes=delay_minutes)
     morning_at = at_time(now, morning)
     if now < morning_at:
@@ -138,6 +136,6 @@ def _notify_upto() -> Optional[int]:
 def changes_due() -> bool:
     """The check the bot's scheduler makes on each wake (§4)."""
     return due(
-        waiting(), clock.now(), settings.morning_time(), _notify_upto(),
-        settings.change_delay_minutes(),
+        waiting(), clock.now(), settings.morning_time(), settings.evening_time(),
+        _notify_upto(), settings.change_delay_minutes(),
     )

@@ -17,7 +17,7 @@ import datetime
 import os
 import shlex
 import sys
-from typing import Awaitable, Callable, Dict, List, Tuple
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
 from stamind import athlete_queue, heads_up, journal, settings
 from stamind.chat import runner
@@ -52,6 +52,11 @@ def next_push_delay(
     return (start + datetime.timedelta(days=1) - now).total_seconds()
 
 
+# How long after the athlete's last message or tap a wake still counts them as in the chat.
+# A wake comes every five minutes at most, and one that finds the chat busy leaves the queue
+# to the next (DESIGN_athlete_queue.md §13.2 rule 4).
+ATHLETE_HERE = datetime.timedelta(minutes=10)
+
 # The nightly reflect reads the week that ended on Sunday from the night into Wednesday on,
 # once late syncs and weekend edits have landed (DESIGN_learning_doubt_nudge.md §3.1).
 REFLECT_FROM_WEEKDAY = 2  # Wednesday
@@ -67,6 +72,7 @@ def reflect_due(now: "datetime.datetime") -> bool:
 async def scheduler_wake(
     last_run: Dict[str, str], busy: Callable[[], bool],
     run: Callable[[List[str], bool], Awaitable[None]], reflect: Callable[[], None],
+    last_input: Optional["datetime.datetime"] = None,
 ) -> float:
     """One wake of the bot's scheduler. `last_run` holds the day the push and the nightly
     reflect last started, and the return is how long to sleep before the next wake: at most
@@ -80,7 +86,9 @@ async def scheduler_wake(
     §3.1). The push fires inside the [morning_time, deadline] window once per bot-day, and
     ends by sending from the athlete queue itself (DESIGN_bot_simple_frontend.md §4.3). On
     a wake with no push to run, the next item of the queue goes out when one is ready and
-    none is out, whether or not the push is on (DESIGN_athlete_queue.md §13.2 rule 4)."""
+    none is out, whether or not the push is on. Past the evening time that needs
+    `last_input`, the athlete's last message or tap, to be recent
+    (DESIGN_athlete_queue.md §13.2 rule 4)."""
     # The athlete's wall clock, not the machine's: morning-time/morning-deadline are the
     # hours they wake up in (DESIGN_user_timezone.md §2). Every knob here is re-read each
     # wake — `settings set` runs in a CLI subprocess, so this long-lived process would
@@ -96,7 +104,8 @@ async def scheduler_wake(
     delay = next_push_delay(now, settings.morning_time(), settings.morning_deadline())
     pushed = last_run.get("push") == today
     if delay > 0 or not settings.push_enabled() or pushed:
-        if not busy() and athlete_queue.next_due():
+        here = last_input is not None and now - last_input <= ATHLETE_HERE
+        if not busy() and athlete_queue.next_due(here):
             await run(["bot", "queue", "--next"], True)
         return min(max(delay, 60), 300)
     if busy():
@@ -123,8 +132,12 @@ class SchedulerMixin:
     async def _tell_changes_first(self, chat_id: int) -> None:
         """Sends the changes to the athlete's week not told yet, before acting on their own
         tap or message, whatever the hour and however young the change
-        (DESIGN_change_heads_up.md §4)."""
-        if chat_id != self.push_chat_id or self._runs(chat_id):
+        (DESIGN_change_heads_up.md §4). It also notes the moment: the wakes that follow
+        may send from the queue at night (DESIGN_athlete_queue.md §13.2 rule 4)."""
+        if chat_id != self.push_chat_id:
+            return
+        self.last_input_at = datetime.datetime.now(datetime.timezone.utc)
+        if self._runs(chat_id):
             return
         if not heads_up.waiting():
             return
@@ -170,7 +183,7 @@ class SchedulerMixin:
             try:
                 pause = await scheduler_wake(
                     last_run, lambda: bool(self._runs(self.push_chat_id)),
-                    self._run_scheduled, self._start_reflect,
+                    self._run_scheduled, self._start_reflect, self.last_input_at,
                 )
             except Exception as exc:
                 # One wake's failure never ends the loop: the push is the one thing that

@@ -134,9 +134,10 @@ def print_send_notice(dates: Iterable[str]) -> None:
         return
     now = clock.now()
     morning, delay = settings.morning_time(), settings.change_delay_minutes()
+    evening = settings.evening_time()
     touches_today = today_str() in set(dates)
-    at = heads_up.sends_at(now, morning, touches_today, delay)
-    if heads_up.sends_after_delay(now, morning, touches_today, delay):
+    at = heads_up.sends_at(now, morning, evening, touches_today, delay)
+    if heads_up.sends_after_delay(now, morning, evening, touches_today, delay):
         line = (
             f"This changes today's session, so the athlete gets this line on Telegram at "
             f"{at.strftime('%H:%M')} today, not tomorrow morning."

@@ -246,8 +246,8 @@ time, and the tap on it sends the next. **In 1 hour** makes the item ready one h
 tap. **In 1 day** is now **tomorrow**: the item is ready at the athlete's morning time on the
 next day. **After the others** makes it ready now, which puts it last in the line. In each
 case the item takes its turn in the line once its time has passed. It is not sent on its own
-ahead of the others. **Skip** still writes nothing. An answer the kind could not apply puts
-the item off until the next morning (§13.5, choice 14).
+ahead of the others. **Skip** still writes nothing. An answer the kind could not apply leaves
+the item in the line, so it is asked again at once (§13.5, choice 14).
 
 ## 5. The terminal
 
@@ -547,7 +547,7 @@ Amended 2026-10-10 (§13.2): this section no longer holds. Nothing is sent as a 
 wake with no morning message to run, the scheduler asks the database whether it is between
 the morning time and 21:00, an item is ready and none is out. If so it runs the hidden `bot
 queue --next`, which sends the first item of the line. An item the athlete put off comes back
-in its turn, under "⏰ You asked me to come back to this:".
+in its turn, under "⏰ Back to this one:", the words since 2026-10-13 (§13.5, choice 18).
 
 ## 7. The same week, with the queue
 
@@ -792,6 +792,13 @@ So a question the nightly `data reflect` queues at 03:00 is ready at 03:00 and a
 the 08:00 briefing. A message the operator leaves with `sm queue tell` at 14:00 arrives by
 14:05 when nothing is out. Ruled 2026-10-10.
 
+Amended 2026-10-13, on two rulings of that day (§13.5, choices 7 and 9). The evening hour is a
+setting, `evening-time`, 21:00 unless set. The notices about a changed week read the same
+setting. And past the evening time a wake still sends while the athlete is in the chat, which
+means they wrote or tapped in the last ten minutes. It is 23:30. The athlete taps "In 1 hour"
+and goes to bed. The question comes back after the 08:00 briefing. Had they still been writing
+to the coach at 00:40, it would have come back by 00:45.
+
 **5. An item left unanswered comes back each morning.** At the athlete's morning time nothing
 counts as out any more. The step that follows the morning message then sends the first item of
 the line again, as each morning's round does today (§10).
@@ -843,7 +850,7 @@ message is ready at 14:00 and stands last in the line. Had nothing been out, it 
 arrived by 14:05.
 
 At 18:30 the athlete answers the test question. The learning question arrives at once, under
-"⏰ You asked me to come back to this:". They answer it. The operator's message arrives. They
+"⏰ Back to this one:". They answer it. The operator's message arrives. They
 tap "👍 Got it", and the bot says "That's all for now — thanks!".
 
 Had the athlete left the test question alone all day, Thursday's briefing would be followed by
@@ -869,27 +876,34 @@ Typed in the chat, `/queue answer` sends the first item of the line whatever is 
 ### 13.5 Choices made without the author
 
 Each one changes something the athlete or the operator can see, or settles a detail the three
-rulings left open.
+rulings left open. The author ruled on every one: on choice 5 on 2026-10-10, and on the others
+on 2026-10-13.
 
 1. **A reply does not wait in the line** (rule 6). At 08:00 a question arrives and the athlete
    leaves it. At 12:15 they write "My knee hurts until Friday". In one strict line, "Shall I
    remember this constraint?" would stand behind the morning's question and not be asked that
    day. As designed it comes at once, as today. This carries over the author's ruling of
-   2026-10-09 (DESIGN_waiting_proposal.md §6.3, choice 1).
+   2026-10-09 (DESIGN_waiting_proposal.md §6.3, choice 1). **Kept**, on a condition, in his
+   words: "Ok as long as the sets question is asked again if the athlete overlooks it." It
+   is. The question left since the morning is sent again the next morning, after the briefing
+   (rule 5). It is not sent again the same day.
 2. **After a run's replies, the line goes on.** On 3 October the question about the finished
    mesocycle would follow the tap on "Change it". Today nothing follows: "only the questions
    of the run follow the answer to its proposal" (the same choice 1). What still does not
    follow is a question that is out. That was the reason for that choice: a question about
    Tuesday's sets, left since the morning, must not come up again in front of the athlete.
+   **Kept.**
 3. **A tap on a proposal on a later day is a tap like any other.** Today it brings nothing
    (DESIGN_waiting_proposal.md §5, §6.3). Now it brings that run's questions that are not out,
    or else the step of rule 4. The day a proposal was sent no longer has to be known.
+   **Kept.**
 4. **A run the athlete starts does not send from the line.** It sends its replies. What else
    it queued goes out on the next wake, within five minutes, or at the morning time when it is
    past 21:00. On 3 October there was a proposal, so the question would follow the tap at once.
    The other way is a fourth moment, at the end of every run the chat starts. Then each such
    command must end with the step, and `bot route`, the run that only works out what a message
-   means, must not.
+   means, must not. **Kept.** Since choice 7 was ruled, the next wake sends past the evening
+   time too: the athlete who started the run is in the chat.
 5. **"⏰ Ask me tomorrow" replaces "⏰ In 1 day".** The words are the author's, and he ruled
    on the hour too, both on 2026-10-10: the item is ready at the athlete's morning time on the
    next day, so it comes with that morning's questions. It is Wednesday 18:30 and the athlete
@@ -901,24 +915,29 @@ rulings left open.
 6. **"↩️ After the others" leaves the chat.** "Not now" swaps in two choices, "⏰ In 1 hour" and
    "⏰ Ask me tomorrow". Both put the item behind the others. A third button would need a
    sentence that tells it apart from those two, and alone in the line it would bring the item
-   straight back. The terminal keeps it (§13.4).
+   straight back. The terminal keeps it (§13.4). **Kept.**
 7. **A put-off item that comes due at night waits for the morning.** "In 1 hour" tapped at
    23:30 arrives at the morning time. Today it arrives at 00:30 (§10, "Quiet hours"). A tap at
-   night still brings the next item at once.
+   night still brings the next item at once. **Overruled in part**, in his words: "If the
+   athlete is interacting with the UI during the night, it's okay to ask queued questions."
+   With nobody in the chat the item still waits for the morning. While the athlete writes or
+   taps, a wake sends it (rule 4, as amended).
 8. **The `push` setting does not stop the line.** With the morning message off, the first wake
    after the morning time sends the first item. Reminders and notices already ignore that
-   setting.
-9. **21:00 is the notices' constant**, not a setting of its own.
+   setting. **Kept.**
+9. **21:00 is the notices' constant**, not a setting of its own. **Overruled: "Setting for
+   evening hour."** It is `evening-time`, 21:00 unless set.
 10. **The closing line follows the tap that empties the line**, a put-off item's tap included.
     Today nothing follows a reminder's tap. A bare question still gets no closing line.
+    **Kept.**
 11. **`sm queue tell` goes out the same day.** Today it waits for the next morning message. It
     has no waiting time like the 20 minutes of a changed week, because a message is typed once
     and not reached by trial and error. One the operator regrets before it is sent is closed
-    with `sm queue answer <id>`.
-12. **Seen in a terminal counts as sent** (§13.4).
+    with `sm queue answer <id>`. **Kept.**
+12. **Seen in a terminal counts as sent** (§13.4). **Kept.**
 13. **Two columns.** `ready_at` replaces `remind_at` and is never empty. `sent_at` is new.
     `queued_at` keeps the time the item was queued and is never rewritten: "after the others"
-    used to overwrite it.
+    used to overwrite it. **Kept.**
 14. **An answer that could not be applied puts the item off until the next morning.** Added
     when the design was built: the rulings did not cover it. It is Wednesday 08:10. The
     athlete names a block of sets "butterfly", and Stamind knows no such exercise: "No
@@ -928,7 +947,48 @@ rulings left open.
     08:00, and the next question arrives at once. The other way is to leave it out. It would
     then hold back every question behind it until Thursday morning, with no button left to
     tap. The cost: it comes back under "⏰ You asked me to come back to this:", which is not
-    what happened.
+    what happened. **Overruled, for a third way: the question is asked again at once.** Right
+    after "Nothing named.", the same question arrives again with all its buttons. The athlete
+    types "pec deck", or taps "Leave it unnamed", or "Not now". The next question follows as
+    usual. By Thursday they would not remember what the block was. The item keeps its place in
+    the line and is no longer out, so nothing about it is stored. The cost is the case where
+    Garmin cannot be reached: "Yes, final" brings the same question straight back, until the
+    athlete taps "Not now". Two lines changed with it, because they promised a later time
+    that no longer holds: "I'll ask again next time." is now "Nothing recorded.", and
+    "Couldn't read the sets from Garmin, so nothing changed." no longer ends with "The
+    question will come back."
+15. **"In the chat" at night means a message or a tap in the last ten minutes.** Made when
+    choice 7 was ruled. It is 23:28. The athlete asks the coach about tomorrow's swim, reads
+    the answer and puts the phone down. A question is waiting in the line. The bot's next wake
+    comes within five minutes, finds the athlete's message recent, and sends the question, at
+    23:33 at the latest. So the question can arrive a few minutes after the athlete has left.
+    The other way is to send it right under the coach's answer. That is the fourth moment of
+    choice 4, and it would hold by day too. Ten minutes is two wakes: a wake that finds the
+    chat busy leaves the queue to the next. **Kept, on a condition**, in his words: "I would
+    prefer that messages that were enqueued at the front (the athlete has litterally just done
+    the action) wouldn't wait 5 minutes to be posted but would be asked immediately." They do
+    not wait. Those are the replies of rule 6: the proposal, and the questions about what the
+    athlete just wrote. The run that queues them sends them itself, at any hour, and no wake is
+    involved. The wake, and its five minutes, are for a question that is not about what the
+    athlete just did.
+16. **One evening hour, for the queue and for the notices about a changed week.** Made when
+    choice 9 was ruled. The operator sets `evening-time` to 20:00. From 20:00 the bot sends
+    neither a queued question nor a notice on its own. The other way is one setting for each.
+    They were one constant, and the athlete sees one bot. **Kept.**
+17. **The athlete cannot change the evening hour from the chat.** Made when choice 9 was
+    ruled. The athlete writes "don't message me after 20:00". The bot does not change the
+    hour: it is the operator's to set. `morning-time` can be changed from the chat, so the
+    other way is to let the athlete change both. A setting can be changed from the chat only
+    when someone puts it on that list on purpose (DESIGN_bot_simple_frontend.md §12.7), and
+    nobody has for this one. **Overruled: "Let the athlete change it."** The athlete writes
+    "don't message me after 8pm". The bot reads it back: "From 20:00 I'll stay quiet until the
+    morning, unless you write to me first. OK?" A "Yes" sets it.
+18. **The line above a returning question does not say who moved it.** It read "⏰ You asked
+    me to come back to this:". The queue stores that an item's ready time was moved, and not
+    who moved it. So the line was false for the companion when the operator had put one of
+    their questions off in a terminal: they read "You asked me" about a question they had
+    never seen. The other ways were to leave it, or to store who moved the time, which costs a
+    column. **Ruled: "Neutral line."** It reads "⏰ Back to this one:". The words are mine.
 
 ### 13.6 Not handled
 
@@ -945,11 +1005,6 @@ rulings left open.
 - The replies are still sent by their own commands, `workout adapt` and `bot capture note`.
   Moving those sends into the step is a later change.
 - A copy of an unanswered question arrives each morning, as today (§10).
-- "⏰ You asked me to come back to this:" stands on every item whose ready time was moved. That
-  is right after "In 1 hour" and "Ask me tomorrow". It is not what happened in two cases: an
-  answer that could not be applied (choice 14), and an item the operator put after the others
-  in a terminal, which the athlete then reads in the chat. The queue does not record who moved
-  the time.
 - A typed answer that never comes. The athlete taps "Tell me" and types nothing. The command
   ends after five minutes, the item stays out, and the line waits until the next morning.
   Before the line, the round stopped there too.
@@ -971,6 +1026,17 @@ rulings left open.
 
 It is built in one step. The round and the line read the same rows, so they cannot run side by
 side.
+
+The rulings of 2026-10-13 touched five more places. `stamind/settings.py` has the
+`evening-time` setting. `stamind/heads_up.py` is handed the evening hour, as it is handed the
+morning time, and no longer holds a constant. `stamind/athlete_queue.py` reads the setting, and
+its check for a wake takes one more word: whether the athlete is in the chat.
+`stamind/chat/scheduler.py` and `stamind/chat/app.py` note the instant of the athlete's last
+message or tap and hand it to the wake. `stamind/cli/bot/capture.py` lets a chat message
+change `evening-time`, and `stamind/chat/routing.py` tells the fast model that such a message
+is a change of setting. For choices 14 and 18, `stamind/athlete_queue.py` marks an item whose
+answer failed as no longer out, `stamind/cli/queue.py` holds the neutral line, and the two
+kinds' lines are in `stamind/cli/bot/test_result.py` and `stamind/strength/questions.py`.
 
 **The order on the day it lands.** A bot runs each command from the checkout. So between the
 landing and the restart, the old bot meets the new code. Three steps go back to back, at an

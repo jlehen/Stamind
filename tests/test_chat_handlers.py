@@ -447,6 +447,28 @@ class SchedulerDriverTest(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(scheduler.heads_up, "waiting", return_value=True):
             await chat_bot._tell_changes_first(42)
         self.assertEqual(started, [])
+        self.assertIsNone(chat_bot.last_input_at)
+
+    async def test_the_athletes_own_input_is_noted_for_the_wakes_that_follow(self):
+        """A wake past the evening sends from the queue only while the athlete is in the
+        chat (DESIGN_athlete_queue.md §13.5 choice 7). A busy chat counts too."""
+        chat_bot = build_chat_bot(self)
+        record_commands(self, chat_bot)
+        self.assertIsNone(chat_bot.last_input_at)
+        chat_bot.sessions[42] = runner.Session(42, _FakeProc(), "n0nce")
+        await chat_bot._tell_changes_first(42)
+        noted = chat_bot.last_input_at
+        self.assertIsNotNone(noted.tzinfo)
+        seen = []
+
+        async def wake(_last_run, _busy, _run, _reflect, last_input):
+            seen.append(last_input)
+            raise asyncio.CancelledError
+
+        with mock.patch.object(scheduler, "scheduler_wake", wake):
+            with self.assertRaises(asyncio.CancelledError):
+                await chat_bot._push_loop()
+        self.assertEqual(seen, [noted])
 
     async def test_a_busy_chat_keeps_its_place_in_the_queue(self):
         chat_bot = build_chat_bot(self)

@@ -140,8 +140,7 @@ def _apply_sets_final(item: Dict[str, Any], index: int, text: Optional[str]) -> 
     try:
         found = sets.read_again(_activity(item), runtime.garmin.connect())
     except Exception as e:
-        raise NotApplied(f"Couldn't read the sets from Garmin ({e}), so nothing changed. "
-                         "The question will come back.")
+        raise NotApplied(f"Couldn't read the sets from Garmin ({e}), so nothing changed.")
     unnamed = [group for group in found if group.exercise is None]
     if not unnamed:
         return "Sets read again and frozen: every set has a name."

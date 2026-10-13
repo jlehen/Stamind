@@ -262,6 +262,10 @@ the changes go out when it comes back but not after 21:00; and a change to today
 would end after 21:00 waits for the next morning like any other, because by then today is
 over anyway.
 
+Amended 2026-10-13 (DESIGN_athlete_queue.md §13.5, choice 9): the 21:00 is now the
+`evening-time` setting, 21:00 unless the operator sets it. The athlete queue reads the same
+setting, so one hour ends everything the bot sends on its own.
+
 **The operator can send it now.** Stamind cannot know that the operator is done trying, or
 that a change matters before the next morning. The operator can. It is Wednesday 18:00 and the
 operator moves Thursday's run to the morning, because Thursday evening is taken. Nothing
@@ -665,7 +669,7 @@ Revision 9 adds to those:
 - Sending a `queue tell` message at once. The queue has the same gap: a note queued at 21:10
   about tonight goes out the next morning. That belongs to DESIGN_athlete_queue.md.
 - A setting for the evening hour. It is a constant, and it only stops a late catch-up after
-  the bot was down at her morning time.
+  the bot was down at her morning time. Amended 2026-10-13: done, as `evening-time` (§4).
 - Holding reminders overnight too. She chose their time herself (DESIGN_athlete_queue.md
   §10).
 - A coach-written description for the commands that make no LLM call. They already store the

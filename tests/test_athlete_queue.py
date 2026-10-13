@@ -77,6 +77,7 @@ class _QueueCase(unittest.TestCase):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
         test_db.set_setting("push_morning_time", "08:00")
+        test_db.set_setting("push_evening_time", "21:00")
         self.now = WEDNESDAY_8AM
         moving_clock = patch("stamind.clock.now", side_effect=lambda: self.now)
         moving_clock.start()
@@ -252,12 +253,18 @@ class LaterTest(_QueueCase):
         self.assertTrue(athlete_queue.next_due())
         self.assertEqual(athlete_queue.waiting_counts(), (1, 0))
 
-    def test_an_answer_that_could_not_be_applied_waits_for_the_next_morning(self):
+    def test_an_answer_that_could_not_be_applied_leaves_the_item_in_the_line(self):
+        """It keeps its place and is no longer out, so it is asked again at once
+        (§13.5 choice 14)."""
         item_id = self.ask("A")
+        athlete_queue.sent(self.item(item_id))
         self.refused.add("A")
         self.assertEqual(athlete_queue.act(self.item(item_id), "a1"), "Couldn't reach Garmin.")
-        self.assertIsNone(self.item(item_id)["closed_at"])
-        self.assertEqual(self.ready(item_id), "Thu 08:00")
+        item = self.item(item_id)
+        self.assertIsNone(item["closed_at"])
+        self.assertEqual(item["ready_at"], item["queued_at"])
+        self.assertFalse(athlete_queue.anything_out())
+        self.assertEqual(ids(athlete_queue.line()), [item_id])
 
 
 class OutTest(_QueueCase):
@@ -297,6 +304,27 @@ class OutTest(_QueueCase):
         ):
             self.at(hour, minute)
             self.assertEqual(athlete_queue.next_due(), due, (hour, minute))
+
+    def test_the_evening_hour_is_a_setting(self):
+        test_db.set_setting("push_evening_time", "20:00")
+        self.ask("A")
+        self.at(19, 59)
+        self.assertTrue(athlete_queue.next_due())
+        self.at(20, 0)
+        self.assertFalse(athlete_queue.next_due())
+
+    def test_at_night_a_wake_sends_while_the_athlete_is_in_the_chat(self):
+        """23:30 "In 1 hour". At 00:40 the athlete is still writing to the coach: the
+        question may come back. With nobody in the chat it waits for the morning
+        (§13.5 choice 7)."""
+        a = self.ask("A")
+        self.at(23, 30)
+        athlete_queue.act(self.item(a), QUEUE_LATER_HOUR)
+        self.at(0, 40, days=1)
+        self.assertFalse(athlete_queue.next_due())
+        self.assertTrue(athlete_queue.next_due(athlete_here=True))
+        athlete_queue.sent(self.item(a))
+        self.assertFalse(athlete_queue.next_due(athlete_here=True))
 
     def test_a_wake_sends_nothing_while_an_item_is_out(self):
         a = self.ask("A")
@@ -393,7 +421,7 @@ class ChatTest(_QueueCase):
         _, out, _ = self.tap(b, "a1")
         [back] = queue_lines(out)
         self.assertEqual(back["id"], a)
-        self.assertTrue(back["text"].startswith("⏰ You asked me to come back to this:"))
+        self.assertTrue(back["text"].startswith("⏰ Back to this one:\n"))
         _, out, _ = self.tap(a, "a1")
         self.assertEqual(queue_lines(out), [])
         self.assertIn(queue_cli.QUEUE_DONE_LINE, out)
@@ -417,12 +445,20 @@ class ChatTest(_QueueCase):
         self.assertEqual(again["id"], a)
         self.assertIn("(2 left)", again["text"])
 
-    def test_an_answer_that_could_not_be_applied_lets_the_next_one_go(self):
+    def test_an_answer_that_could_not_be_applied_brings_the_question_back_at_once(self):
+        """The tapped message has lost its buttons, so the same question arrives again
+        with them, as an ordinary question. The next one follows its answer
+        (§13.5 choice 14)."""
         a, b = self.ask("A"), self.ask("B")
         self.refused.add("A")
         self.step()
         _, out, _ = self.tap(a, "a1")
         self.assertIn("Couldn't reach Garmin.", out)
+        [again] = queue_lines(out)
+        self.assertEqual(again["id"], a)
+        self.assertTrue(again["text"].startswith("🙋 Quick question (2 left)"))
+        self.refused.clear()
+        _, out, _ = self.tap(a, "a1")
         self.assertEqual(ids(queue_lines(out)), [b])
 
     def test_a_chat_message_has_no_skip(self):
@@ -661,6 +697,9 @@ class TerminalTest(_QueueCase):
         self.assertIn("Queued #", out)
         self.assertIn("within minutes between 08:00 and 21:00, and at 08:00 otherwise.",
                       " ".join(out.split()))
+        test_db.set_setting("push_evening_time", "19:30")
+        _, out, _ = run_cli(["queue", "tell", "Bring", "your", "pool", "card."])
+        self.assertIn("between 08:00 and 19:30", " ".join(out.split()))
         [item] = test_db.waiting_queue_items()
         self.assertEqual(item["payload"], {"text": "Charge your watch."})
 

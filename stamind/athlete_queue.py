@@ -117,8 +117,8 @@ def is_hidden(item: Dict[str, Any], now: datetime) -> bool:
 
 
 def was_put_off(item: Dict[str, Any]) -> bool:
-    """Whether a later choice moved the item's ready time: it then comes back under "You
-    asked me to come back to this" (§13.3)."""
+    """Whether a later choice moved the item's ready time: it then comes back under "Back
+    to this one" (§13.3)."""
     return item["ready_at"] != item["queued_at"]
 
 
@@ -195,8 +195,8 @@ def later_time(action: str, now: datetime) -> Optional[datetime]:
 def act(item: Dict[str, Any], action: str, text: Optional[str] = None) -> Optional[str]:
     """Applies one action to a waiting item and returns the kind's line for an answer (§4).
     An action the item was not queued with writes nothing (§9). An answer its kind could
-    not apply puts the item off until the next morning, with the kind's line saying why
-    (§13.5, choice 14)."""
+    not apply leaves the item in the line and no longer out, so it is asked again at once,
+    with the kind's line saying why (§13.5, choice 14)."""
     now = clock.now()
     kind = kind_of(item)
     # A question kind without a drop label refuses one (§4).
@@ -215,7 +215,7 @@ def act(item: Dict[str, Any], action: str, text: Optional[str] = None) -> Option
     try:
         line_said = kind.apply(item, index, text)
     except NotApplied as not_applied:
-        runtime.db.set_queue_ready(item["id"], later_time(QUEUE_LATER_DAY, now))
+        runtime.db.mark_queue_sent(item["id"], None)
         return str(not_applied)
     runtime.db.close_queue_item(item["id"], ANSWERED, now)
     return line_said
@@ -236,12 +236,13 @@ def waiting_counts() -> Tuple[int, int]:
     return questions, messages
 
 
-def next_due() -> bool:
-    """Whether a wake of the bot's scheduler sends from the line: between the athlete's
-    morning time and the evening, with an item ready and none out. It reads the rows and
-    runs no kind's check, so no command starts unless something can be sent (§13.2 rule 4,
-    §13.6)."""
+def next_due(athlete_here: bool = False) -> bool:
+    """Whether a wake of the bot's scheduler sends from the line: with an item ready and
+    none out, between the athlete's morning time and the evening time, or at any hour when
+    the athlete has just written or tapped. It reads the rows and runs no kind's check, so
+    no command starts unless something can be sent (§13.2 rule 4, §13.6)."""
     now = clock.now()
-    if not morning_of(now) <= now < heads_up.at_time(now, heads_up.EVENING):
+    by_day = morning_of(now) <= now < heads_up.at_time(now, settings.evening_time())
+    if not (by_day or athlete_here):
         return False
     return bool(_ready(now)) and not anything_out()

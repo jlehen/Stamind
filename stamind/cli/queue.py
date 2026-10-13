@@ -10,7 +10,7 @@ import argparse
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from stamind import athlete_queue, clock, heads_up, runtime, settings
+from stamind import athlete_queue, clock, runtime, settings
 from stamind.athlete_queue import (
     ANSWERED, DROP, DROPPED, MESSAGE, QUEUE_LATER_BACK, QUEUE_LATER_CHOICES, QUEUE_NOT_NOW,
     SKIP, STALE,
@@ -25,6 +25,7 @@ from stamind.clock import fmt_span, fmt_timestamp
 
 QUEUE_DONE_LINE = "That's all for now — thanks!"
 QUEUE_SETTLED_LINE = "Already settled — thanks!"
+QUEUE_BACK_LINE = "⏰ Back to this one:"
 STAYS_OPEN_LABEL = "skip — it stays open"
 NOTHING_WAITING_LINE = "Nothing is waiting."
 NOT_NOW_LABEL = "🕐 Not now"
@@ -140,13 +141,14 @@ def queue_buttons(item: Dict[str, Any]) -> List[dict]:
 
 def queue_chat_message(item: Dict[str, Any], left: int) -> Tuple[str, List[dict]]:
     """One item as a chat message, in the companion's words and without skip (§6.4). `left`
-    counts the line from this item on. An item the athlete put off says so (§13.3)."""
+    counts the line from this item on. An item whose time was moved says it is back,
+    and not who moved it (§13.3, §13.5)."""
     text = athlete_queue.wording(item, companion=True)
     buttons = queue_buttons(item)
     if athlete_queue.kind_of(item).stands_alone:
         return text, buttons
     if athlete_queue.was_put_off(item):
-        return f"⏰ You asked me to come back to this:\n{text}", buttons
+        return f"{QUEUE_BACK_LINE}\n{text}", buttons
     if athlete_queue.kind_of(item).shape == MESSAGE:
         return f"📬 {text}", buttons
     if athlete_queue.kind_of(item).bare:
@@ -358,7 +360,7 @@ def run_queue_tell(args: argparse.Namespace) -> None:
     morning = settings.morning_time()
     print(wrap_text(
         f"Queued #{item_id}. It goes out when its turn comes: within minutes between "
-        f"{morning} and {heads_up.EVENING}, and at {morning} otherwise."
+        f"{morning} and {settings.evening_time()}, and at {morning} otherwise."
     ))
 
 

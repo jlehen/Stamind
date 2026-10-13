@@ -223,7 +223,7 @@ def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> None:
     read-back leaves the item waiting (§4)."""
     use_fast_model(argparse.Namespace())
     if capture_test_result(text or "", item["payload"]["workout_id"]) is None:
-        raise NotApplied("I'll ask again next time.")
+        raise NotApplied("Nothing recorded.")
     return None
 
 

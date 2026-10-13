@@ -45,6 +45,7 @@ class _Case(unittest.TestCase):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
         test_db.set_setting("push_morning_time", "08:00")
+        test_db.set_setting("push_evening_time", "21:00")
         self.now = THURSDAY_8AM
         moving_clock = patch("stamind.clock.now", side_effect=lambda: self.now)
         moving_clock.start()
@@ -579,6 +580,30 @@ class ChatRunTest(_Case):
         self.assertNotIn(BUTTONS_SENTINEL, out)
         self.assertEqual(queue_lines(out), [])
         self.assertNotIn(queue_cli.QUEUE_DONE_LINE, out)
+
+    def test_the_question_left_since_the_morning_is_asked_again_the_next_morning(self):
+        """The message of 08:00 is still out when the run's questions are answered, so it
+        is not brought up again on Thursday. On Friday at 08:00 it is
+        (DESIGN_athlete_queue.md §13.5 choice 1)."""
+        proposal = self.proposed_with_a_constraint()
+        [question] = queue_lines(self.tap(proposal, "a2"))
+        self.assertEqual(queue_lines(self.tap(question, "a1")), [])
+        self.at(20)
+        self.assertEqual(queue_lines(self.step()), [])
+        self.at(8, days=1)
+        [again] = queue_lines(self.step())
+        self.assertEqual(again["id"], self.message["id"])
+
+    def test_at_night_the_runs_proposal_and_its_question_do_not_wait_for_a_wake(self):
+        """23:30, past the evening time. The run sends its proposal itself, and the tap
+        brings the question about what the athlete wrote: no wake is involved
+        (DESIGN_athlete_queue.md §13.5, choice 15)."""
+        self.at(23, 30)
+        _coach, _prompt, out = self.coach_run(self.eased(new_constraints=self.CONSTRAINT))
+        [proposal] = queue_lines(out)
+        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
+        [question] = queue_lines(self.tap(proposal, "a2"))
+        self.assertIn("this constraint?", question["text"])
 
     def test_a_date_the_model_left_out_counts_from_the_day_of_the_message(self):
         proposal = self.proposed_with_a_constraint(

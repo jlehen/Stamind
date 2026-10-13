@@ -88,6 +88,9 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         self.ui_actions: Dict[int, Tuple[str, List[dict]]] = {}
         # Held until each ends: asyncio keeps only a weak reference to a running task.
         self.reflect_tasks: set = set()
+        # The instant of the athlete's last own message or tap in the push chat. None
+        # until the first one after a start (DESIGN_athlete_queue.md §13.2 rule 4).
+        self.last_input_at: Optional[datetime.datetime] = None
 
         # The one remaining stop on the long-poll is /restart's, which closes it before
         # the process exits (DESIGN_bot_restart.md §5.2); the lock guards against that
