@@ -22,7 +22,9 @@ page saves its state on the phone, so a closed Telegram reopens where it left of
 
 Each card has an "Insert" button. It puts the new exercise right after that card, so a
 face pull added after the rows does not have to climb up from the bottom one tap at a time.
-The button that puts another exercise in a card's place is "⇆ Swap". "❐ Dup" puts a copy
+The button that puts another exercise in a card's place is "⇆ Swap". Its search keeps the
+card's movement pattern as a filter, and says so beside the "Search every exercise" box
+that lifts it ("— only single leg"); Insert and Add search everything. "❐ Dup" puts a copy
 of the card right after it: the same exercise, its sets with the reps and kilograms they
 show now, none ticked. Like an inserted card, the copy stands for no line of the session.
 The card's eight buttons (↶, + Set, − Set, Swap, Insert, Dup, Del, Pic) sit in two rows of

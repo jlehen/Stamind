@@ -41,6 +41,7 @@ const ui = {
   searchInput: document.getElementById("search-input"),
   searchAll: document.getElementById("search-all"),
   searchAllRow: document.getElementById("search-all-row"),
+  searchFilter: document.getElementById("search-filter"),
   searchResults: document.getElementById("search-results"),
   searchClose: document.getElementById("search-close"),
   outputSheet: document.getElementById("output-sheet"),
@@ -468,6 +469,7 @@ function closeSearch() {
 
 function renderResults() {
   const pattern = ui.searchAll.checked ? null : swapPattern;
+  ui.searchFilter.textContent = pattern ? `— only ${pattern.replace(/_/g, " ")}` : "";
   const hits = logic.searchExercises(catalog, ui.searchInput.value, pattern);
   if (!hits.length) {
     ui.searchResults.replaceChildren(el("p", "empty", "Type a few letters of the exercise."));
