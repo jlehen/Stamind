@@ -231,6 +231,13 @@ pipeline like every `send` entry, and the structured-prompt protocol
 (`STAMIND_FRONTEND=json`) renders its preview/confirm as tappable buttons — she sees
 the proposed weeks and confirms with taps, as with any decision.
 
+Amended 2026-10-14 (DESIGN_long_runs_beside_chat.md §4): the button sends `workout generate
+--propose` (or `workout generate -m ..<id> --propose`). The run works beside the chat, asks
+nothing on the spot and ends: it saves the proposed weeks and sends them with "Shall I
+schedule these N sessions?", "✅ Schedule them" and "✖️ Leave it", which wait for her tap.
+When sessions already stand in the days, it first saves "Shall I plan these weeks?"; on an
+out-of-date plan it stops and says so.
+
 Two mechanics the earlier draft hand-waved:
 
 - **One gate per button row.** `emit_buttons` today fires only `if ahead:` — deliberately,

@@ -8,8 +8,8 @@ between silently defeated the staleness detector.
 
 So a proposal carries the facts it was computed from, and the consumer renders rather
 than recomputes. Records only: the logic that fills them in lives in `revisions.py`. The one
-exception is a revision's trip to JSON and back, for a proposal saved until the athlete
-answers it (DESIGN_waiting_proposal.md §3).
+exception is the trip to JSON and back, for a proposal saved until the athlete answers it
+(DESIGN_waiting_proposal.md §3, DESIGN_long_runs_beside_chat.md §4).
 """
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
@@ -176,6 +176,30 @@ class GenerateProposal:
     strength_stamp: str = ""
     strength_notice: Optional[str] = None
     strength_dropped: Tuple[str, ...] = ()
+
+
+# What `workout_generate_apply` reads off a proposal, and so what saved weeks keep
+# (DESIGN_long_runs_beside_chat.md §4). What only drew the preview is left out.
+SAVED_GENERATE_FIELDS = (
+    "reasoning", "workouts", "gen_start", "gen_end", "voids", "covered_constraint_ids",
+    "athlete_note", "commitment_end", "strength_checks", "strength_stamp",
+)
+
+
+def generate_to_json(proposal: GenerateProposal) -> Dict[str, Any]:
+    """What a tap on saved weeks writes, in a shape JSON can hold."""
+    return {field: getattr(proposal, field) for field in SAVED_GENERATE_FIELDS}
+
+
+def generate_from_json(saved: Dict[str, Any]) -> GenerateProposal:
+    """The weeks a tap writes, read back from `generate_to_json`'s shape: JSON keeps a
+    tuple as a list, so the pairs come back as tuples."""
+    fields = {field: saved[field] for field in SAVED_GENERATE_FIELDS}
+    fields["workouts"] = tuple(fields["workouts"])
+    fields["voids"] = tuple(tuple(void) for void in fields["voids"])
+    fields["covered_constraint_ids"] = tuple(fields["covered_constraint_ids"])
+    fields["strength_checks"] = tuple(tuple(check) for check in fields["strength_checks"])
+    return GenerateProposal(**fields)
 
 
 @dataclass(frozen=True)

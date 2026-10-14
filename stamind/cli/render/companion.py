@@ -31,6 +31,10 @@ from stamind.cli.render.session_lines import (
 )
 
 
+def _sessions(count: int) -> str:
+    return f"{count} session{'s' if count != 1 else ''}"
+
+
 def _whose_day(day: str, today: str) -> str:
     """Whose session a note is about: "today's", "yesterday's", else the day word's."""
     if day == today:
@@ -338,6 +342,28 @@ class CompanionRenderer(ExpertRenderer):
     def benchmark_replan(self) -> None:
         print(wrap_text(
             "That's a big enough change that your plan should be rebuilt around it — "
+            f"{config.telegram_operator_name} takes care of that from the computer."
+        ))
+
+    # -- `workout generate --propose`, saved for a tap (DESIGN_long_runs_beside_chat.md §4) --
+
+    def schedule_words(self, count: int, replaced: int, start: str, end: str) -> str:
+        words = f"Shall I schedule these {_sessions(count)}?"
+        if replaced:
+            span = simple_span_words(start, end, _today_str())
+            words += f" They replace the {_sessions(replaced)} planned from {span}."
+        return words
+
+    def replace_sessions_words(self, count: int, start: str, end: str) -> str:
+        span = simple_span_words(start, end, _today_str())
+        return (
+            f"You already have {_sessions(count)} planned from {span}. New weeks would "
+            "replace them if you accept them. Shall I plan these weeks?"
+        )
+
+    def weeks_need_a_new_plan(self) -> None:
+        print(wrap_text(
+            "I can't plan your next weeks yet: your training plan needs rebuilding first, and "
             f"{config.telegram_operator_name} takes care of that from the computer."
         ))
 

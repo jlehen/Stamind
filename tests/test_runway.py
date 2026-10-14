@@ -267,8 +267,10 @@ class SimpleRunwayWordingTest(unittest.TestCase):
             [_w(4)], [_meso(-30, 4, meso_id=6), _meso(5, 45, meso_id=7)], [], TODAY, WARN
         )
         plan = runway([_w(5)], [_meso(-30, 5)], [], TODAY, WARN)
-        self.assertEqual(runway_cli.runway_argv(span), "workout generate")
-        self.assertEqual(runway_cli.runway_argv(mesocycle), "workout generate -m ..7")
+        self.assertEqual(runway_cli.runway_argv(span), "workout generate --propose")
+        self.assertEqual(
+            runway_cli.runway_argv(mesocycle), "workout generate -m ..7 --propose"
+        )
         self.assertIsNone(runway_cli.runway_argv(plan))
         self.assertEqual(runway_cli.runway_buttons(plan), [])
         self.assertIsNone(runway_cli.runway_argv(None))

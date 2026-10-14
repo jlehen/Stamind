@@ -169,6 +169,15 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         help="Name each Calendar event as it is deleted and created, instead of the "
              "progress bar"
     )
+    p_w_gen.add_argument(
+        "--propose", action="store_true",
+        help=(
+            "Ask nothing and write nothing: save the proposed sessions for the athlete to "
+            "accept with a tap, as the chat's 'Plan my next weeks' button does. When "
+            "sessions already stand in the span, save that question first instead; on an "
+            "out-of-date plan, stop."
+        )
+    )
     # `--fresh` writes every session again and `--strength-only` the strength ones only.
     p_w_gen_scope = p_w_gen.add_mutually_exclusive_group()
     p_w_gen_scope.add_argument(

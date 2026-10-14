@@ -164,13 +164,14 @@ def runway_argv(state: Optional[Dict[str, Any]]) -> Optional[str]:
     """The command the §6 button sends, or None for the cliffs that offer no button.
 
     The narrow amendment to DESIGN_bot_simple_frontend.md §7's guardrail: `workout
-    generate` becomes tappable here and only here, with argv the detector chose."""
+    generate` becomes tappable here and only here, with argv the detector chose. It saves
+    its result for a tap rather than asking (DESIGN_long_runs_beside_chat.md §4)."""
     if not state:
         return None
     if state["kind"] == RUNWAY_MESOCYCLE:
-        return f"workout generate -m ..{state['next_mesocycle']['id']}"
+        return f"workout generate -m ..{state['next_mesocycle']['id']} --propose"
     if state["kind"] == RUNWAY_SPAN:
-        return "workout generate"
+        return "workout generate --propose"
     return None
 
 

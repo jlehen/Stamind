@@ -19,6 +19,7 @@ from stamind.athlete_queue import (
     ANSWERED, DROP, MESSAGE, QUEUE_LATER_CHOICES, SKIP,
 )
 from stamind.cli.bot import hand_off
+from stamind.cli.common import ensure_recent_data
 from stamind.cli.queue import (
     NOTHING_WAITING_LINE, QUEUE_DONE_LINE, send_alone, send_item, send_next, settled_line,
     short_when,
@@ -30,7 +31,9 @@ from stamind.sentinels import is_json_frontend
 from stamind.text import bold, cmd, red, wrap_text
 from stamind.output import notice
 from stamind.clock import fmt_timestamp
+from stamind.cli.workouts import proposal as saved
 import stamind.cli.workouts.adapt as _adapt
+import stamind.cli.workouts.generate as _generate
 
 STAYS_OPEN_LABEL = "skip — it stays open"
 
@@ -45,9 +48,21 @@ def _hand_off_to_coach(item: Dict[str, Any]) -> None:
     ))
 
 
+def _plan_them(item: Dict[str, Any]) -> None:
+    """"Plan them": the same `workout generate --propose` for the same days, with the question
+    answered (DESIGN_long_runs_beside_chat.md §4)."""
+    payload = item["payload"]
+    ensure_recent_data()
+    _generate.propose_weeks(
+        (payload["start"], payload["end"]), payload["prefer_macro_id"], payload["fresh"],
+        asked=True,
+    )
+
+
 # What the answer that starts a long run goes on to do, by the item's kind (§6 there).
 GOES_ON = {
     hand_off.KIND: _hand_off_to_coach,
+    saved.REPLACE_SESSIONS: _plan_them,
 }
 
 

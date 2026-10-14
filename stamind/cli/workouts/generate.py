@@ -2,9 +2,11 @@
 
 The span, the two confirmations that gate the model call and the write, and the preview the
 athlete reads before accepting it. `--strength-only` is its own flow, in `strength_only.py`.
+`--propose`, which the chat's "📅 Plan my next weeks" sends, asks nothing: it saves what it
+would write, and its questions, for a tap (DESIGN_long_runs_beside_chat.md §4).
 """
 import argparse
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 from stamind import runtime, settings
 from stamind.config import config
 from stamind.text import (
@@ -15,10 +17,13 @@ from stamind.clock import fmt_date, shift, today_str as _today_str
 from stamind.coach.proposals import GenerateProposal
 from stamind.cli import staleness
 from stamind.cli.common import ensure_recent_data, print_strength_notes
+from stamind.cli.queue import send_alone, send_own_questions
 from stamind.cli.runway import schedule_coverage
 from stamind.cli.windows import has_selector as _has_selector, resolve_window
+from stamind.cli.workouts import proposal as saved
+from stamind.cli.workouts.adapt import WEEK_CHANGED_LINE
 from stamind.cli.workouts.heads_up import (
-    generate_dates, print_send_notice, replacing_unsent,
+    generate_dates, newest_written, print_send_notice, replacing_unsent,
 )
 from stamind.cli.workouts.session_line import (
     line_markers, prescription_lines, print_marker_legend, workout_line,
@@ -100,22 +105,31 @@ def _preferred_macro_id(args: argparse.Namespace) -> Optional[int]:
     return rng.start if rng.start is not None and rng.start == rng.end else None
 
 
-def _confirm_out_of_date_plans(
-    start_date: str, end_date: str, prefer_macro_id: Optional[int], force: bool
-) -> bool:
-    """Warns when a plan governing this horizon was generated from inputs that have since
-    changed. Read off the dates, like the generation itself, so a horizon long enough to
-    cross from one goal's plan into the next checks both. Returns False to stop."""
+def _out_of_date_plans(
+    start_date: str, end_date: str, prefer_macro_id: Optional[int]
+) -> List[Tuple[dict, str]]:
+    """Each plan governing this horizon that was generated from inputs that have since
+    changed, with what changed. Read off the dates, like the generation itself, so a horizon
+    long enough to cross from one goal's plan into the next checks both."""
     mesocycles, _ = runtime.db.get_governing_mesocycles(
         start_date, end_date, prefer_macro_id=prefer_macro_id
     )
+    found = []
     for macro_id in dict.fromkeys(b['macrocycle_id'] for b in mesocycles):
         macro = runtime.db.get_macrocycle(macro_id)
         if not macro:
             continue
         change_reason = staleness.reason(macro)
-        if not change_reason:
-            continue
+        if change_reason:
+            found.append((macro, change_reason))
+    return found
+
+
+def _confirm_out_of_date_plans(
+    start_date: str, end_date: str, prefer_macro_id: Optional[int], force: bool
+) -> bool:
+    """Warns when a plan governing this horizon is out of date. Returns False to stop."""
+    for macro, change_reason in _out_of_date_plans(start_date, end_date, prefer_macro_id):
         warning = (
             "Generating workouts using the out-of-date plan might result in incorrect "
             "training targets. It is highly recommended to run "
@@ -336,6 +350,37 @@ def run_workout_generate(args: argparse.Namespace) -> None:
         _generate(args, force, unchanged, span)
 
 
+def propose_weeks(
+    span: Tuple[str, str], prefer_macro_id: Optional[int], fresh: bool, asked: bool = False
+) -> None:
+    """`--propose`: saves the weeks for a tap and sends them, and asks nothing
+    (DESIGN_long_runs_beside_chat.md §4). On an out-of-date plan it stops and says so. When
+    sessions already stand in the span it saves the question first and calls no planner,
+    unless `asked` says the athlete answered it. A session written on its days while the
+    week planner thought makes it save nothing."""
+    span_start, span_end = span
+    if _out_of_date_plans(span_start, span_end, prefer_macro_id):
+        runtime.render.weeks_need_a_new_plan()
+        return
+    standing = runtime.db.get_workouts(start_date=span_start, end_date=span_end)
+    if standing and not asked:
+        item = saved.ask_to_replace(span, standing, prefer_macro_id, fresh)
+        send_own_questions([item] if item else [])
+        return
+    written_upto = newest_written()
+    proposal = runtime.coach_service.workout_generate(
+        start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id,
+        fresh=fresh,
+    )
+    if not proposal.workouts:
+        runtime.render.workout_generate_preview(proposal)
+        return
+    if runtime.db.wrote_between(written_upto, proposal.gen_start, proposal.gen_end):
+        print(f"\n{WEEK_CHANGED_LINE}")
+        return
+    send_alone(saved.save_weeks(proposal, written_upto))
+
+
 def _generate(
     args: argparse.Namespace, force: bool, unchanged: str, span: Tuple[str, str]
 ) -> None:
@@ -347,11 +392,15 @@ def _generate(
     if _has_selector(args):
         _warn_span_change(span_start, span_end)
 
+    fresh = getattr(args, 'fresh', False)
+    if getattr(args, 'propose', False):
+        propose_weeks(span, prefer_macro_id, fresh)
+        return
+
     # The staleness check looks over the days about to be written.
     if not _confirm_out_of_date_plans(span_start, span_end, prefer_macro_id, force):
         return
 
-    fresh = getattr(args, 'fresh', False)
     if not force and not _confirm_regeneration(span_start, span_end, fresh):
         notice(f"Workout generation cancelled{unchanged}")
         return

@@ -496,8 +496,10 @@ fact a proposal carries.
   its button, and the adaptation after a goal or constraint edit still hold the chat while they
   run. The confirm of `workout generate`, like every other confirm in the chat, still times out
   after five minutes. Freeing them is a later design, which reuses the second place. Amended
-  2026-10-14: that design is DESIGN_long_runs_beside_chat.md, and the morning push now runs
-  beside the chat.
+  2026-10-14: that design is DESIGN_long_runs_beside_chat.md, and every one of them now runs
+  beside the chat: the morning push, `workout generate --propose` from its button, which
+  saves its weeks for a tap, and the hand-off, a saved question whose "Yes" starts the
+  coach's run.
 
 ## 9. Build order
 

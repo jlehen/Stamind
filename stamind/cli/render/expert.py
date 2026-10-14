@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from stamind.coach.proposals import RevisionProposal
 from stamind.text import bold, cmd, dim, gray, green, wrap_text
 from stamind.output import notice
+from stamind.clock import fmt_span
 from stamind.cli.benchmarks import (
     benchmark_confirm_words, print_benchmark_recorded, print_benchmark_replan,
 )
@@ -176,6 +177,28 @@ class ExpertRenderer:
     def workout_generate_preview(self, proposal) -> bool:
         """Draws the proposal; False when there is nothing to apply."""
         return print_generate_preview(proposal)
+
+    # -- `workout generate --propose`, saved for a tap (DESIGN_long_runs_beside_chat.md §4) --
+
+    def schedule_words(self, count: int, replaced: int, start: str, end: str) -> str:
+        """The question under the saved weeks. `replaced` sessions planned from `start` to
+        `end` give way to them."""
+        words = f"Schedule these {count} workout(s)?"
+        if replaced:
+            words += f" They replace the {replaced} session(s) planned from {fmt_span(start, end)}."
+        return words
+
+    def replace_sessions_words(self, count: int, start: str, end: str) -> str:
+        """The question saved before the week planner is called, when sessions stand."""
+        return (
+            f"You already have {count} workout(s) planned from {fmt_span(start, end)}. New weeks "
+            "would replace them if you accept them. Plan these weeks?"
+        )
+
+    def weeks_need_a_new_plan(self) -> None:
+        """Why a `--propose` run on an out-of-date plan planned nothing."""
+        notice("The plan is out of date, so nothing was planned. Run " + cmd("plan generate")
+               + " first.")
 
     def workout_compare(
         self, days: list, *, start_date: str, end_date: str, sport_filter: Optional[str],

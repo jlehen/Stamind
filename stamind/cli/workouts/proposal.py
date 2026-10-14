@@ -2,19 +2,25 @@
 the athlete answers it (DESIGN_waiting_proposal.md §3, §4).
 
 Its wording, the three rules that put it out of date, what each answer does, how a proposal
-is saved and how the open one is found. Nothing here sends: `cli/queue.py` does, and it
-imports the list of kinds this one is in.
+is saved and how the open one is found. The two kinds `workout generate --propose` saves
+are here too, since they share two of those rules: the weeks it would write, `schedule`, and
+the question it asks before it plans over sessions that stand, `replace_sessions`
+(DESIGN_long_runs_beside_chat.md §4). Nothing here sends: `cli/queue.py` does, and it
+imports the list of kinds these are in.
 """
 import contextlib
 import io
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from stamind import clock, runtime
 from stamind.analytics.compare import adherence_verdicts
-from stamind.cli.workouts.heads_up import newest_written, revision_dates
+from stamind.cli.workouts.heads_up import generate_dates, newest_written, revision_dates
 from stamind.clock import today_str
-from stamind.coach.proposals import RevisionProposal, revision_from_json, revision_to_json
+from stamind.coach.proposals import (
+    GenerateProposal, RevisionProposal, generate_from_json, generate_to_json, revision_from_json,
+    revision_to_json,
+)
 from stamind.db.queue import queue_stamp
 from stamind.output import step
 from stamind.queue_kind import QUESTION, STALE, Kind, queue
@@ -45,16 +51,20 @@ def trained_since(day: str, moment: datetime) -> bool:
     return any((a.get("start_time") or "") > since for a in activities)
 
 
+def _past_or_trained(item: Dict[str, Any]) -> bool:
+    """Rules 2 and 3 of §4: a day the item writes is over, or it writes today and an
+    activity of today started after it was made."""
+    dates = item["payload"]["dates"]
+    today = today_str()
+    if min(dates, default=today) < today:
+        return True
+    return today in dates and trained_since(today, made_at(item))
+
+
 def out_of_date(item: Dict[str, Any]) -> bool:
     """The three rules of §4: a later change wrote a session, a day the proposal changes is
     over, or it changes today and an activity of today started after it was made."""
-    payload = item["payload"]
-    today = today_str()
-    if newest_written() > payload["written_upto"]:
-        return True
-    if min(payload["dates"], default=today) < today:
-        return True
-    return today in payload["dates"] and trained_since(today, made_at(item))
+    return newest_written() > item["payload"]["written_upto"] or _past_or_trained(item)
 
 
 def _pull_today(today: str) -> None:
@@ -175,6 +185,138 @@ def save(proposal: RevisionProposal, written_upto: int, replaces: bool = False) 
         "sleep_seen": bool(proposal.sleep_seen),
     })
     return runtime.db.get_queue_item(item_id)
+
+
+# --- What `workout generate --propose` saves (DESIGN_long_runs_beside_chat.md §4) ---
+
+SCHEDULE = "schedule"
+SCHEDULE_ANSWERS = ({"label": "✅ Schedule them"}, {"label": "✖️ Leave it"})
+SCHEDULED_LINE = "Done — they're in your schedule. 💪"
+
+REPLACE_SESSIONS = "replace_sessions"
+REPLACE_ANSWERS = ({"label": "✅ Plan them"}, {"label": "✖️ Leave it"})
+
+
+def written_inside(item: Dict[str, Any]) -> bool:
+    """Rule 1 for saved weeks, narrower than a proposal's: a later change wrote a session on
+    one of the days they write (choice 2b)."""
+    payload = item["payload"]
+    return runtime.db.wrote_between(payload["written_upto"], payload["start"], payload["end"])
+
+
+def weeks_out_of_date(item: Dict[str, Any]) -> bool:
+    """The three rules of §4 there: rule 1 above, and a proposal's rules 2 and 3."""
+    return written_inside(item) or _past_or_trained(item)
+
+
+def _schedule(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
+    """"Schedule them" writes exactly the weeks that were shown, under one change, and
+    Google Calendar follows; "Leave it" writes nothing."""
+    if index != ACCEPT:
+        return KEPT_LINE
+    today = today_str()
+    if today in item["payload"]["dates"]:
+        _pull_today(today)
+        if weeks_out_of_date(item):
+            runtime.db.close_queue_item(item["id"], STALE, clock.now())
+            return OUT_OF_DATE_LINE
+    runtime.coach_service.workout_generate_apply(
+        generate_from_json(item["payload"]["proposal"])
+    )
+    return SCHEDULED_LINE
+
+
+# It has a proposal's manners: sent at once by the run, in no line, never sent again
+# (§4 there, "Where it is kept").
+SCHEDULE_KIND = Kind(
+    name=SCHEDULE, shape=QUESTION,
+    wording=lambda item: item["payload"]["text"],
+    companion_wording=lambda item: item["payload"]["question"],
+    is_stale=weeks_out_of_date, apply=_schedule,
+    stands_alone=True, closed_line=OUT_OF_DATE_LINE,
+)
+
+
+def _drawn_weeks(proposal: GenerateProposal) -> str:
+    """The proposed sessions, as this run's voice draws them."""
+    drawn = io.StringIO()
+    with contextlib.redirect_stdout(drawn):
+        runtime.render.workout_generate_preview(proposal)
+    return strip_ansi(drawn.getvalue()).strip()
+
+
+def save_weeks(proposal: GenerateProposal, written_upto: int) -> Dict[str, Any]:
+    """Saves the weeks a `--propose` run would write and returns their item. The weeks saved
+    before are closed, and a proposal that waits is left alone (choice 2a). `written_upto`
+    is the newest change that wrote a session when the run read the schedule."""
+    now = clock.now()
+    for other in runtime.db.waiting_queue_items():
+        if other["kind"] == SCHEDULE:
+            runtime.db.close_queue_item(other["id"], STALE, now)
+    dates = sorted(generate_dates(proposal))
+    # A kept session is in `displaced` and is not replaced (`generate._confirm_apply`).
+    kept = sum(1 for w in proposal.workouts if w.get("keep"))
+    question = runtime.render.schedule_words(
+        len(proposal.workouts), max(0, len(proposal.displaced) - kept),
+        proposal.gen_start, proposal.gen_end,
+    )
+    item_id = queue(SCHEDULE, queue_stamp(now), {
+        "text": _drawn_weeks(proposal),
+        "question": question,
+        "answers": list(SCHEDULE_ANSWERS),
+        "proposal": generate_to_json(proposal),
+        "dates": dates,
+        "start": dates[0] if dates else proposal.gen_start,
+        "end": dates[-1] if dates else proposal.gen_end,
+        "written_upto": written_upto,
+    })
+    return runtime.db.get_queue_item(item_id)
+
+
+def _replace_stale(item: Dict[str, Any]) -> bool:
+    """Out of date by rule 1 or 2 of §4 there: a later change wrote on its days, or its
+    first day is over."""
+    return written_inside(item) or item["payload"]["start"] < today_str()
+
+
+def _plan_them(item: Dict[str, Any], index: int, text: Optional[str]) -> Optional[str]:
+    """"Leave it" writes nothing. "Plan them" says nothing here: the planning that follows
+    in the same command speaks (`cli/queue_commands.py`)."""
+    if index == ACCEPT:
+        return None
+    return KEPT_LINE
+
+
+# A confirmation, drawn bare, whose "Plan them" starts the planning beside the chat (§4,
+# §6 there, choices 2c and 2f).
+REPLACE_SESSIONS_KIND = Kind(
+    name=REPLACE_SESSIONS, shape=QUESTION,
+    wording=lambda item: item["payload"]["text"],
+    companion_wording=lambda item: item["payload"]["text"],
+    is_stale=_replace_stale, apply=_plan_them, bare=True, confirmation=True,
+    long_run=(ACCEPT, ("workout", "generate", "--propose")),
+)
+
+
+def ask_to_replace(
+    span: Tuple[str, str], standing: List[Dict[str, Any]], prefer_macro_id: Optional[int],
+    fresh: bool,
+) -> Optional[Dict[str, Any]]:
+    """Saves the question asked before planning `span` over the sessions `standing` in it,
+    and returns its item. Its answer plans the same days, the same way."""
+    start, end = span
+    item_id = queue(REPLACE_SESSIONS, queue_stamp(clock.now()), {
+        "text": runtime.render.replace_sessions_words(
+            len(standing), standing[0]["date"], standing[-1]["date"],
+        ),
+        "answers": list(REPLACE_ANSWERS),
+        "start": start,
+        "end": end,
+        "prefer_macro_id": prefer_macro_id,
+        "fresh": fresh,
+        "written_upto": newest_written(),
+    })
+    return runtime.db.get_queue_item(item_id) if item_id else None
 
 
 def saw_the_night_on(day: str) -> List[datetime]:

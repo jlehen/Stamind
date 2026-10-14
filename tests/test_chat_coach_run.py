@@ -268,6 +268,21 @@ class MorningRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(spawned, ["I'm tired", "and my knee hurts"])
         self.assertEqual((chat_bot.long_runs, chat_bot.kept), ({}, {}))
 
+    async def test_plan_my_next_weeks_runs_beside_the_chat(self):
+        chat_bot = build_chat_bot(self)
+        buttons = [{"label": "📅 Plan my next weeks", "send": "workout generate --propose"}]
+        chat_bot.ui_actions[42] = ("tok", buttons)
+
+        async def spawn(*_args, **_kwargs):
+            return _FakeProc()
+
+        query = _FakeQuery(keyboards.ui_callback_data("tok", "0"))
+        with mock.patch("asyncio.create_subprocess_exec", spawn), \
+                mock.patch.object(chat_bot, "_drive", mock.AsyncMock()):
+            await chat_bot.on_callback(callback_update(query), None)
+        self.assertEqual(chat_bot.long_runs[42].long, PLANNING_RUN)
+        self.assertNotIn(42, chat_bot.sessions)
+
     async def test_a_second_long_run_is_kept_while_the_weeks_are_planned(self):
         chat_bot = build_chat_bot(self)
         started = record_commands(self, chat_bot)

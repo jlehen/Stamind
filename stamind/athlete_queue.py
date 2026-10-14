@@ -20,7 +20,9 @@ from stamind.queue_kind import (  # noqa: F401
 from stamind.cli.bot.hand_off import PASS_TO_COACH_KIND
 from stamind.cli.bot.test_result import TEST_RESULT_KIND
 from stamind.cli.candidates import CONSTRAINT_KIND, NOTE_KIND, SIGNAL_KIND
-from stamind.cli.workouts.proposal import PROPOSAL_KIND
+from stamind.cli.workouts.proposal import (
+    PROPOSAL_KIND, REPLACE_SESSIONS_KIND, SCHEDULE_KIND,
+)
 from stamind.learning_doubts import LEARNING_KIND
 from stamind.retrospective_question import RETROSPECTIVE_KIND
 from stamind.strength.questions import SET_NAMES_KIND, SETS_FINAL_KIND
@@ -66,14 +68,16 @@ MESSAGE_KIND = Kind(
 # The proposal kind holds what the week planner would change (DESIGN_waiting_proposal.md §3).
 # The constraint and signal kinds ask whether to store what a message stated (§6.3 there),
 # and the session-note kind which session the message is about (DESIGN_session_notes.md §3).
-# The hand-off kind asks whether to pass a message about a session to the coach
-# (DESIGN_long_runs_beside_chat.md §5).
+# The hand-off kind asks whether to pass a message about a session to the coach, the
+# schedule kind holds the weeks `workout generate --propose` would write, and the
+# replace-sessions kind asks before it plans over sessions (DESIGN_long_runs_beside_chat.md
+# §4, §5).
 KINDS: Dict[str, Kind] = {
     kind.name: kind
     for kind in (
         MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND, LEARNING_KIND, TEST_RESULT_KIND,
         RETROSPECTIVE_KIND, PROPOSAL_KIND, NOTE_KIND, CONSTRAINT_KIND, SIGNAL_KIND,
-        PASS_TO_COACH_KIND,
+        PASS_TO_COACH_KIND, SCHEDULE_KIND, REPLACE_SESSIONS_KIND,
     )
 }
 

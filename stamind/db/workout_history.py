@@ -190,6 +190,16 @@ class WorkoutHistoryMixin:
             return None
         return row["first"], row["last"]
 
+    def wrote_between(self, after_change_id: int, start: str, end: str) -> bool:
+        """Whether a change newer than `after_change_id` wrote a session dated `start` to
+        `end`: what puts saved weeks out of date (DESIGN_long_runs_beside_chat.md §4)."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM workouts WHERE change_id > ? AND date BETWEEN ? AND ? LIMIT 1",
+                (after_change_id, start, end),
+            ).fetchone()
+        return row is not None
+
     def change_writes_day(self, change_id: int, day: str) -> bool:
         """Whether a change wrote a session dated `day` — what makes it a change to today,
         which cannot wait for tomorrow's morning (DESIGN_change_heads_up.md §4)."""
