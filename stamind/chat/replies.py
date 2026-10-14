@@ -5,10 +5,6 @@ row of offer buttons, a queued item, or a question that parks the command until 
 answered. Each has a sender here, and `runner._drive` picks between them by the sentinel
 tag it just read (DESIGN_output_verbosity.md §7, DESIGN_bot_simple_frontend.md §4.4,
 DESIGN_athlete_queue.md §6.2).
-
-The ✋ Stop button lives here too, because it is raised and retired by the same flushes:
-one per chat at a time, hung off the "Working on it…" message that precedes a coach call
-(DESIGN_bot_stop_button.md §4, §7).
 """
 import asyncio
 import functools
@@ -19,9 +15,7 @@ from typing import List
 
 from stamind import journal
 from stamind.chat import telegram_api
-from stamind.chat.keyboards import (
-    STOP_LABEL, prompt_buttons, queue_button_rows, stop_callback_data, ui_button_rows,
-)
+from stamind.chat.keyboards import prompt_buttons, queue_button_rows, ui_button_rows
 from stamind.chat.runner import Session
 from stamind.sentinels import prompt_answer
 from stamind.text import strip_ansi
@@ -96,25 +90,9 @@ class RepliesMixin:
                            chat=chat_id)
         return await send(text=text, **kwargs)
 
-    async def _retire_stop(self, session: Session) -> None:
-        """Drops the live Stop button, if there is one: the wait it belonged to is
-        over (DESIGN_bot_stop_button.md §7)."""
-        message_id, session.stop_message_id = session.stop_message_id, None
-        if message_id is None:
-            return
-        try:
-            await self.bot.edit_message_reply_markup(
-                chat_id=session.chat_id, message_id=message_id, reply_markup=None
-            )
-        except Exception as exc:
-            journal.debug("bot.event", f"stop button not dropped: {exc}")
-
     async def _flush_output(self, session: Session, buf: List[str]) -> bool:
         """Sends the buffered output; True when something went out, so the caller knows
-        whether `session.last_message_id` is a fresh anchor to attach buttons to.
-
-        Anything arriving is the end of a wait, so it also retires a live Stop button —
-        the flush marker raises the next one (DESIGN_bot_stop_button.md §7)."""
+        whether `session.last_message_id` is a fresh anchor to attach buttons to."""
         text = "\n".join(buf).strip()
         if not text:
             return False
@@ -124,26 +102,7 @@ class RepliesMixin:
             sent = await self._send_keyed(session.chat_id, part, parse_mode=parse_mode)
             session.last_message_id = sent.message_id
         self._log(session.chat_id, "<<", repr(text))
-        await self._retire_stop(session)
         return True
-
-    async def _offer_stop(self, session: Session) -> None:
-        """Hangs a ✋ Stop button off the message the flush just sent — the wait notice
-        that precedes every coach call (DESIGN_bot_stop_button.md §4)."""
-        keyboard = telegram_api.inline_keyboard(
-            [[(STOP_LABEL, stop_callback_data(session.nonce))]]
-        )
-        try:
-            await self.bot.edit_message_reply_markup(
-                chat_id=session.chat_id, message_id=session.last_message_id,
-                reply_markup=keyboard,
-            )
-        except Exception as exc:
-            # The wait still happens; it just can't be tapped away (/cancel still can).
-            journal.debug("bot.event", f"stop button not attached: {exc}")
-            return
-        session.stop_message_id = session.last_message_id
-        self._log(session.chat_id, "<<", "stop button")
 
     async def _send_ui_buttons(self, session: Session, req: dict) -> None:
         """Attaches a SM-BUTTONS row to the output just flushed (§4.4). Non-blocking:

@@ -93,7 +93,6 @@ class ChangesCommandTest(unittest.TestCase):
         first, second = out.split(FLUSH_SENTINEL)
         self.assertIn("First.", first)
         self.assertIn("Second.", second)
-        self.assertIn('"wait": false', second)
 
     def test_a_change_the_athlete_watched_is_never_sent(self):
         started_from(self, "chat")

@@ -520,7 +520,9 @@ tapping "Feeling tired" under that morning message. So the call site cannot deci
 which silences every notice made inside it.
 
 With no notice the flush of §7.3 sends no message, so the morning run has no Stop button
-either (`DESIGN_bot_stop_button.md` §4). The command timeout is what bounds it.
+either (`DESIGN_bot_stop_button.md` §4). The command timeout is what bounds it. Amended
+2026-10-14: the Stop button is removed, and the morning run works beside the chat
+(DESIGN_long_runs_beside_chat.md §3, §8).
 
 ### 8.5 The terminal during the wait, and the keys pressed in it
 

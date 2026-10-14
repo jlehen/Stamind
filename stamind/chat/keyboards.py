@@ -2,17 +2,17 @@
 
 The reply keyboard the bot attaches to the chat and what each of its labels runs
 (DESIGN_bot_simple_frontend.md §5.1), and the inline rows raised over a command: a
-SM-BUTTONS offer, a prompt's choices, a queued item's answers, and the ✋ Stop button over
-an LLM wait (DESIGN_athlete_queue.md §6.2, DESIGN_bot_stop_button.md §3).
+SM-BUTTONS offer, a prompt's choices and a queued item's answers (DESIGN_athlete_queue.md
+§6.2).
 
 The cards `/start` and `/help` answer with, and Telegram's own command menu, are here too:
 the companion card teaches the reply keyboard label by label, so a relabelled button and
 the sentence describing it have to be edited together.
 
-Each kind of tap carries its own callback-data namespace — `ui:`, `stop:`, `q:`, and the
-bare prompt answer — and every decoder here rejects the other three. They share one
-Telegram channel, so a decoder that read another namespace as its own would turn a stale
-tap into an action (DESIGN_bot_stop_button.md §7). Telegram caps callback data at 64
+Each kind of tap carries its own callback-data namespace — `ui:`, `q:`, and the bare
+prompt answer — and every decoder here rejects the other two. They share one Telegram
+channel, so a decoder that read another namespace as its own would turn a stale tap into
+an action (DESIGN_bot_stop_button.md §7). Telegram caps callback data at 64
 bytes, which is why a queued item's id travels inside the data rather than in anything
 the bot remembers.
 """
@@ -157,15 +157,6 @@ UI_STALE_TAP = "That offer expired — just send it again."
 # What a tap gets while another command runs in the chat; its buttons stay alive for a retry.
 BUSY_TAP = "One moment — still finishing the last thing. Tap again shortly."
 
-# --- The Stop button raised over an LLM wait (DESIGN_bot_stop_button.md §3) ---
-# One button, one meaning: end the command the athlete is watching wait. "Stopped." is all
-# the reply claims, because a command that already wrote something before this call keeps
-# what it wrote (§6).
-STOP_LABEL = "✋ Stop"
-STOP_DONE = "Stopped."
-STOP_ALREADY_DONE = "That's already finished — nothing to stop."
-
-
 def keyboard_action(text: str) -> Optional[Tuple[str, Optional[List[str]]]]:
     """What a simple-keyboard tap maps to: ("run", argv), ("capture", None), or None
     when the text isn't a keyboard label."""
@@ -190,22 +181,6 @@ def decode_ui_callback(data: str) -> Optional[Tuple[str, str]]:
     if len(parts) != 3 or parts[0] != "ui" or not parts[1] or not parts[2]:
         return None
     return parts[1], parts[2]
-
-
-def stop_callback_data(nonce: str) -> str:
-    """callback_data for the §3 Stop button: ``"stop:{nonce}"``. The nonce is the
-    running command's own token, so a tap that arrives after it ended cannot stop
-    whatever started since (DESIGN_bot_stop_button.md §7)."""
-    return f"stop:{nonce}"
-
-
-def decode_stop_callback(data: str) -> Optional[str]:
-    """The nonce inside ``"stop:{nonce}"``, or None if it isn't a stop-namespace
-    callback or is malformed."""
-    parts = (data or "").split(":")
-    if len(parts) != 2 or parts[0] != "stop" or not parts[1]:
-        return None
-    return parts[1]
 
 
 def queue_callback_data(item_id: Any, action: str) -> str:

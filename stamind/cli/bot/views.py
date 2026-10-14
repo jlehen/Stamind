@@ -267,7 +267,7 @@ def run_bot_changes(args: argparse.Namespace) -> None:
     on a scheduler wake or ahead of the athlete's own input."""
     for position, change in enumerate(heads_up.waiting()):
         if position:
-            emit_flush(wait=False)
+            emit_flush()
         print(wrap_text(heads_up.message(change)))
         runtime.db.mark_changes_told([change["id"]])
 
@@ -344,7 +344,7 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     # as a message of its own. It is then out, so the line starts when the athlete answers
     # it (DESIGN_waiting_proposal.md §5).
     if proposal_item is not None:
-        emit_flush(wait=False)
+        emit_flush()
         send_alone(proposal_item, buttons)
     send_next()
 

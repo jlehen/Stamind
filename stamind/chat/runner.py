@@ -31,7 +31,7 @@ from stamind.chat.routing import (
 from stamind.config import config
 from stamind.sentinels import (
     BUTTONS_SENTINEL, FLUSH_SENTINEL, PHOTO_SENTINEL, PROMPT_SENTINEL, QUEUE_SENTINEL,
-    SENTINEL_PREFIX, flush_wants_a_wait, parse_frame, prompt_answer,
+    SENTINEL_PREFIX, parse_frame, prompt_answer,
 )
 from stamind.text import strip_ansi
 
@@ -115,10 +115,6 @@ class Session:
         self.sent = False                         # whether anything was sent to the chat
         self.quiet = quiet                        # scheduler-run: silence "(no output)"
         self.last_message_id: Optional[int] = None  # anchor for a SM-BUTTONS row
-        # The message carrying this command's live ✋ Stop button, if any: one at a
-        # time, retired when the next wait starts or the command ends
-        # (DESIGN_bot_stop_button.md §7).
-        self.stop_message_id: Optional[int] = None
 
 
 def cli_env(
@@ -200,7 +196,7 @@ class RunnerMixin:
         return [session for session in places if session is not None]
 
     def _run_by_nonce(self, chat_id: int, nonce: Optional[str]) -> Optional[Session]:
-        """The live command that raised a prompt or a Stop button, in either place."""
+        """The live command that raised a prompt, in either place."""
         return next((s for s in self._runs(chat_id) if s.nonce == nonce), None)
 
     def _alive_asks(self, chat_id: int, argv: List[str], run: Optional[str] = None) -> bool:
@@ -249,8 +245,8 @@ class RunnerMixin:
         """Reads the CLI's stdout, streaming prose to the chat and handling each
         prompt request inline, until the process exits.
 
-        Polling stays live throughout, so a ✋ Stop tap, /cancel or /restart reaches the
-        bot while the subprocess is computing (DESIGN_bot_stop_button.md §5)."""
+        Polling stays live throughout, so /cancel, /restart and the chat's own messages
+        reach the bot while the subprocess is computing (DESIGN_bot_stop_button.md §5)."""
         buf: List[str] = []
         try:
             while True:
@@ -287,11 +283,8 @@ class RunnerMixin:
                 tag, payload = frame
                 if tag == FLUSH_SENTINEL:
                     # Nothing to render: the marker's whole job is to end the message
-                    # here, before the CLI goes quiet for an LLM call (§7). That message
-                    # is the wait notice, and it carries the Stop button
-                    # (DESIGN_bot_stop_button.md §4) — no message, nothing to hang it on.
-                    if await self._flush_output(session, buf) and flush_wants_a_wait(payload):
-                        await self._offer_stop(session)
+                    # here, before the CLI goes quiet for an LLM call (§7).
+                    await self._flush_output(session, buf)
                     buf = []
                     continue
                 # Every other frame renders something of its own, so whatever prose is
@@ -325,9 +318,6 @@ class RunnerMixin:
                     session.proc.kill()
                 except ProcessLookupError:
                     pass
-            # A command that ends without a last message — killed, or answered with a
-            # photo — would otherwise leave a Stop button nothing can act on.
-            await self._retire_stop(session)
             # The kept run takes the place before this one leaves it, so no other long
             # run can start between the two (DESIGN_long_runs_beside_chat.md §7).
             if session.long:

@@ -308,8 +308,8 @@ class MorningPushTest(_Case):
         # own, then the proposal as another message.
         self.assertNotIn(BUTTONS_SENTINEL, out)
         briefing, proposal = out.split(FLUSH_SENTINEL, 1)
-        # The flush only ends the briefing's message: no wait follows, so no Stop button.
-        self.assertEqual(json.loads(proposal.split("\n", 1)[0]), {"wait": False})
+        # The flush only ends the briefing's message.
+        self.assertEqual(json.loads(proposal.split("\n", 1)[0]), {})
         self.assertIn("Intervals — 90 min", briefing)
         self.assertNotIn("Rough night.", briefing)
         self.assertIn("Rough night.", proposal)

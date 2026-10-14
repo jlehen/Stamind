@@ -294,21 +294,6 @@ class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(session.answer_future.done())
         self.assertEqual(query.markups, [None])
 
-    async def test_a_stop_tap_ends_the_command_it_was_raised_for(self):
-        chat_bot = build_chat_bot(self)
-        session = runner.Session(42, _FakeProc(), "n0nce")
-        chat_bot.sessions[42] = session
-        query = _FakeQuery(keyboards.stop_callback_data("n0nce"))
-        await chat_bot.on_callback(callback_update(query), None)
-        self.assertTrue(session.proc.killed)
-        self.assertIn(keyboards.STOP_DONE, chat_bot.bot.texts())
-
-    async def test_a_stop_tap_left_over_from_a_finished_command_says_so(self):
-        chat_bot = build_chat_bot(self)
-        query = _FakeQuery(keyboards.stop_callback_data("gone"))
-        await chat_bot.on_callback(callback_update(query), None)
-        self.assertEqual(chat_bot.bot.texts(), [keyboards.STOP_ALREADY_DONE])
-
     async def test_an_offer_tap_runs_its_utterance_through_the_normal_pipeline(self):
         chat_bot = build_chat_bot(self)
         started = record_commands(self, chat_bot)

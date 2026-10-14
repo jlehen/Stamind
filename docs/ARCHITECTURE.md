@@ -163,8 +163,8 @@ classes themselves.
     preparing your morning message — I'll pass this on right after." When the run alive
     waits on a question of its own, nothing is kept: "I asked you something above. Answer
     it, then send that again." (§7). `/cancel` drops what was kept. The morning push, a
-    reminder and a heads-up wait for both places. A per-command `nonce` (in the button `callback_data`)
-    finds the run that raised a prompt or a Stop button and rejects stale taps. `/cancel`
+    reminder and a heads-up wait for both places. A per-command `nonce` (in the button
+    `callback_data`) finds the run that raised a prompt and rejects stale taps. `/cancel`
     ends the command in both places, and an idle `telegram.prompt_timeout_seconds` ends
     the run that asked with "No answer, so I stopped there."; both send a cancellation
     the CLI turns into a clean abort. A between-output `telegram.command_timeout_seconds`
@@ -177,8 +177,8 @@ classes themselves.
     `ChatBot._on_error` for a handler, `runner._report_drive_failure` for the task that
     streams a command's output, which also keeps the push loop alive
     (DESIGN_telegram_send_retry.md §2).
-  - **Polling runs continuously**, a command in flight or not, so a `✋ Stop` tap,
-    `/cancel` or `/restart` reaches the bot while a command is computing. `_serve()`
+  - **Polling runs continuously**, a command in flight or not, so `/cancel`, `/restart`
+    and the chat's own messages reach the bot while a command is computing. `_serve()`
     still drives the Application/Updater lifecycle by hand instead of
     `Application.run_polling()`, but only so `_pause_polling` can close the long-poll
     from inside the `/restart` handler before its hard exit. This reverses the
@@ -189,15 +189,12 @@ classes themselves.
     failed poll (a Telegram 502, say) is retried by the library forever, backing off up
     to 30 seconds; `_on_polling_error` logs it as one line and a `warn` journal record
     instead of the library's full traceback.
-  - **Stopping a coach call.** Every model call emits `SM-FLUSH` right after its wait
-    notice ("Reviewing your coming sessions — this usually takes about 40 seconds.");
-    the bot attaches a `✋ Stop` inline button to the message that flush sends (none
-    in `bot morning`, which prints no notice), with
-    `callback_data` `stop:{nonce}` naming the running command. Tapping it kills that
-    command's subprocess, in whichever place of the chat it runs, and replies "Stopped.";
-    the button is
-    retired by the next output, by the command ending, or by the tap itself, and a tap on
-    a retired one is told the command already finished (DESIGN_bot_stop_button.md).
+  - **No Stop button.** Every model call emits `SM-FLUSH` right after its wait notice
+    ("Reviewing your coming sessions — this usually takes about 40 seconds."), so the
+    notice arrives before the wait. The ✋ Stop button that used to hang off that message
+    was removed on 2026-10-14: a wrong answer from the chat is a proposal nobody taps, a
+    long run no longer holds the chat, and the button was never shown
+    (DESIGN_long_runs_beside_chat.md §8). `/cancel` ends a command in both places.
   - **Self-restart.** `./sm-bot` is a **supervisor**, not just the venv bootstrap: it
     selects its mode from the `SM_BOT_SUPERVISED` env var it sets on itself — default
     invocation = a loop that relaunches a child of itself, `SM_BOT_SUPERVISED=1` = the
@@ -236,8 +233,7 @@ classes themselves.
       end, `_runs` and `_run_by_nonce` reading both places, `_keep_behind` and `_start_kept`
       for a second long run, `_route_intent`, and `restart_teardown`.
     - `replies` is what goes back into the chat for that command: prose, a chart, an
-      offer row, a queued item, a question — and the ✋ Stop button the flushes raise and
-      retire. `_send_keyed` is the one way the companion keyboard is attached to a send:
+      offer row, a queued item, a question. `_send_keyed` is the one way the companion keyboard is attached to a send:
       when building the keyboard or sending with it fails, it sends the same text again
       without one and journals the error (DESIGN_calendar_miniapp.md §6).
     - `messages` is what an arriving message does — the athlete's own text in
@@ -253,9 +249,8 @@ classes themselves.
     - `keyboards` is every button the bot draws and every tap it decodes — the reply
       keyboard with what each label runs, the gym button that opens the Mini App
       (`gym_button`, §16), the calendar cell's place in the layout (`CALENDAR_LABEL`,
-      `CALENDAR_SLOT`, §17), the inline rows, the four callback-data namespaces (`ui:`,
-      `stop:`, `q:`, and a bare prompt answer) with each decoder rejecting the other
-      three, and the `/start` and `/help` cards, which name the keyboard's labels one by
+      `CALENDAR_SLOT`, §17), the inline rows, the three callback-data namespaces (`ui:`,
+      `q:`, and a bare prompt answer) with each decoder rejecting the other two, and the `/start` and `/help` cards, which name the keyboard's labels one by
       one. A choice button of a prompt carries the position of its choice, never the
       value, because a value can be an exercise's key and 65 of those do not fit Telegram's
       64 bytes (`prompt_buttons`, `tapped_choice`, DESIGN_exercise_table.md §7).
@@ -476,8 +471,7 @@ classes themselves.
     switch does not stop it. A tap
     on an offer or a message from the athlete first runs `bot changes` whenever a change
     waits (`_tell_changes_first`). `bot changes` sends one message per change, split by a
-    `SM-FLUSH` carrying `{"wait": false}`, which the bot does not hang a Stop button on
-    (`flush_before_wait`).
+    `SM-FLUSH`.
   - **The nightly reflect:** from Wednesday to Sunday, the scheduler's
     first wake after 03:00 on the athlete's clock also starts `data reflect --auto`, once a
     day (`reflect_due`). It runs as a process of its own outside the chat, the way the
@@ -4563,7 +4557,8 @@ or not it is listed.
 Two things fell out of the adapter. Six places built an inline keyboard out of rows of
 (label, callback_data): five wrote the same `InlineKeyboardMarkup([[InlineKeyboardButton(…)
 …]])` comprehension, two of those five spelling the loop variable `cb` rather than `data`,
-and `_offer_stop` wrote the single-button form. They are one `inline_keyboard(rows)`.
+and the Stop button, since removed, wrote the single-button form. They are one
+`inline_keyboard(rows)`.
 And standing the library in is now patching eight functions, so
 `tests/chat_harness.py` can build a real `ChatBot` with nothing to connect to, and
 `tests/test_chat_handlers.py` drives `on_message` and `on_callback` for the first time.

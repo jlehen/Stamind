@@ -2,11 +2,11 @@
 
 Every inline button in the chat comes back through `on_callback`, which reads the
 namespace the tap's callback data opens with and hands it on: `q:` is a queued item's
-answer, `ui:` is a SM-BUTTONS offer, `stop:` ends the command being waited on, and a bare
-`nonce:id:answer` is the answer to the prompt a running command is parked on. The four
-namespaces share one Telegram channel, so each decoder rejects the other three — a stale
-tap must never turn into an action meant for something else (DESIGN_bot_stop_button.md §7,
-DESIGN_athlete_queue.md §6.2, DESIGN_bot_simple_frontend.md §4.4).
+answer, `ui:` is a SM-BUTTONS offer, and a bare `nonce:id:answer` is the answer to the
+prompt a running command is parked on. The three namespaces share one Telegram channel, so
+each decoder rejects the other two — a stale tap must never turn into an action meant for
+something else (DESIGN_bot_stop_button.md §7, DESIGN_athlete_queue.md §6.2,
+DESIGN_bot_simple_frontend.md §4.4).
 """
 import shlex
 from typing import Optional
@@ -15,9 +15,9 @@ from stamind import athlete_queue, journal, runtime
 from stamind.athlete_queue import QUEUE_NOT_NOW
 from stamind.chat import telegram_api
 from stamind.chat.keyboards import (
-    BUSY_TAP, STOP_ALREADY_DONE, STOP_DONE, UI_STALE_TAP, answers_kept, decode_callback,
-    decode_queue_callback, decode_stop_callback, decode_ui_callback, queue_later_rows,
-    resolve_ui_action, tapped_choice, tapped_label, ui_menu_rows,
+    BUSY_TAP, UI_STALE_TAP, answers_kept, decode_callback, decode_queue_callback,
+    decode_ui_callback, queue_later_rows, resolve_ui_action, tapped_choice, tapped_label,
+    ui_menu_rows,
 )
 from stamind.chat.replies import format_prompt_message
 from stamind.chat.routing import long_run, parse_message_to_argv
@@ -49,7 +49,7 @@ def tap_long_run(item_id: str, action: str) -> Optional[str]:
 
 
 class CallbacksMixin:
-    """`ChatBot`'s half that answers a tap on one of the four button namespaces."""
+    """`ChatBot`'s half that answers a tap on one of the three button namespaces."""
 
     async def _handle_ui_callback(self, query, chat_id: int, data: str) -> None:
         """A tap on a non-blocking SM-BUTTONS row (§4.4): a stale token drops the dead
@@ -162,25 +162,6 @@ class CallbacksMixin:
         self._log(chat_id, "  ", f"run: {shlex.join(argv)}")
         await self._start_command(chat_id, argv, quiet=True, run=run)
 
-    async def _handle_stop_callback(self, query, chat_id: int, data: str) -> None:
-        """A tap on the §3 Stop button: ends the command it was raised for, in whichever
-        place it runs, the way /cancel would. A tap left over from a command that already
-        finished says so rather than reaching whatever started since
-        (DESIGN_bot_stop_button.md §7)."""
-        nonce = decode_stop_callback(data)
-        session = self._run_by_nonce(chat_id, nonce)
-        if nonce is None or session is None:
-            try:  # the command is over: drop the dead button
-                await query.edit_message_reply_markup(reply_markup=None)
-            except Exception as exc:
-                journal.debug("bot.event", f"stale stop button not dropped: {exc}")
-            await self.bot.send_message(chat_id=chat_id, text=STOP_ALREADY_DONE)
-            return
-        self._log(chat_id, "  ", "stop tap")
-        await self._retire_stop(session)
-        self._end(session)
-        await self._send_keyed(chat_id, STOP_DONE)
-
     async def on_callback(self, update, context) -> None:
         query = update.callback_query
         chat = update.effective_chat
@@ -191,7 +172,7 @@ class CallbacksMixin:
             return
         data = query.data or ""
         # A tap on an offer is the athlete's own input: what changed in their week goes
-        # first. A prompt answer or a Stop tap belongs to a command already running.
+        # first. A prompt answer belongs to a command already running.
         if data.startswith(("q:", "ui:")):
             await self._tell_changes_first(chat.id)
         if data.startswith("q:"):
@@ -199,9 +180,6 @@ class CallbacksMixin:
             return
         if data.startswith("ui:"):
             await self._handle_ui_callback(query, chat.id, data)
-            return
-        if data.startswith("stop:"):
-            await self._handle_stop_callback(query, chat.id, data)
             return
         decoded = decode_callback(query.data or "")
         if decoded is None:

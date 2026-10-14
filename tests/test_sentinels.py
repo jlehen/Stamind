@@ -13,7 +13,7 @@ from unittest import mock
 from stamind.sentinels import (
     BUTTONS_SENTINEL, FLUSH_SENTINEL, PHOTO_SENTINEL, PROMPT_PROTOCOL_VERSION,
     PROMPT_SENTINEL, QUEUE_SENTINEL, SENTINEL_PREFIX, emit_buttons, emit_flush,
-    emit_photo, emit_queue_item, flush_wants_a_wait, parse_frame, prompt_answer,
+    emit_photo, emit_queue_item, parse_frame, prompt_answer,
 )
 
 
@@ -115,24 +115,6 @@ class TestWhatIsAndIsNotAFrame(unittest.TestCase):
         frame = parse_frame(FLUSH_SENTINEL + "{}\n")
         self.assertIsNotNone(frame)
         self.assertEqual(frame[1], {})
-
-
-class TestTheFlushWaitFlag(unittest.TestCase):
-    """Only `{"wait": false}` says no wait follows, so no Stop button is offered
-    (DESIGN_change_heads_up.md §4)."""
-
-    def test_an_ordinary_flush_announces_a_wait(self):
-        with mock.patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
-            _tag, payload = parse_frame(_emitted(emit_flush))
-        self.assertTrue(flush_wants_a_wait(payload))
-
-    def test_a_message_break_does_not(self):
-        with mock.patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
-            _tag, payload = parse_frame(_emitted(emit_flush, wait=False))
-        self.assertFalse(flush_wants_a_wait(payload))
-
-    def test_a_payload_that_is_not_a_dict_is_read_as_announcing_one(self):
-        self.assertTrue(flush_wants_a_wait("nonsense"))
 
 
 class TestTheAnswerSentBack(unittest.TestCase):

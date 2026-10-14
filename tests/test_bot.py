@@ -458,35 +458,6 @@ class UiCallbackTest(unittest.TestCase):
         self.assertEqual(rows[1][0][1], keyboards.ui_callback_data("t", "3"))
 
 
-class StopButtonTest(unittest.TestCase):
-    """The ✋ Stop button raised over a coach call (DESIGN_bot_stop_button.md)."""
-
-    def test_callback_roundtrips(self):
-        self.assertEqual(
-            keyboards.decode_stop_callback(keyboards.stop_callback_data("a1b2")), "a1b2"
-        )
-
-    def test_rejects_malformed_and_foreign_namespaces(self):
-        for data in ("", "stop", "stop:", "ui:tok:2", "nonce:p1:y", "stop:a:b"):
-            self.assertIsNone(keyboards.decode_stop_callback(data), data)
-
-    def test_a_stop_tap_is_never_read_as_a_prompt_answer(self):
-        """§7: the two namespaces share one callback channel, so neither may decode the
-        other's data into something actionable."""
-        data = keyboards.stop_callback_data("a1b2")
-        self.assertIsNone(keyboards.decode_callback(data))
-        self.assertIsNone(keyboards.decode_ui_callback(data))
-
-    def test_a_prompt_answer_is_never_read_as_a_stop_tap(self):
-        rows = keyboards.prompt_buttons({"id": "p1", "type": "confirm"}, "nonce")
-        for _label, data in rows[0]:
-            self.assertIsNone(keyboards.decode_stop_callback(data), data)
-
-    def test_fits_telegrams_64_byte_callback_cap(self):
-        data = keyboards.stop_callback_data("aabbccdd")  # secrets.token_hex(4) width
-        self.assertLessEqual(len(data.encode()), 64, data)
-
-
 class PushScheduleTest(unittest.TestCase):
     """`next_push_delay` — the §4.3 send/catch-up window arithmetic."""
 
@@ -680,16 +651,15 @@ class QueueProtocolTest(unittest.TestCase):
             self.assertEqual(keyboards.decode_queue_callback(data), ("12", "a2"), data)
 
     def test_decode_rejects_anything_but_a_queue_tap(self):
-        for data in ("ui:ab12:0", "stop:ab12", "q:12", "q:x:a2", "q:12:a-2", "q:12:",
+        for data in ("ui:ab12:0", "q:12", "q:x:a2", "q:12:a-2", "q:12:",
                      "q:12:a2 --next:1", "q:12:a2:1:2"):
             self.assertIsNone(keyboards.decode_queue_callback(data), data)
 
     def test_a_queue_tap_leaves_the_live_button_row_alone(self):
-        """The item's buttons are their own namespace: no SM-BUTTONS token or Stop nonce
-        reads them, so a tap neither retires nor answers the morning row (§6.2)."""
+        """The item's buttons are their own namespace: no SM-BUTTONS token reads them, so a
+        tap neither retires nor answers the morning row (§6.2)."""
         data = keyboards.queue_callback_data(12, "a1")
         self.assertIsNone(keyboards.decode_ui_callback(data))
-        self.assertIsNone(keyboards.decode_stop_callback(data))
 
     def test_not_now_swaps_in_the_two_later_choices_from_the_tap(self):
         """"After the others" is the terminal's alone (DESIGN_athlete_queue.md §13.5)."""

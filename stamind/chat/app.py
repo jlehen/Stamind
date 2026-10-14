@@ -7,12 +7,12 @@ its output back, answering a message, answering a tap, and firing the scheduler 
 each other and their shared state through `self`: the live sessions, the allowlist, and the
 client itself.
 
-Polling runs from start to shutdown, a command in flight or not, which is what lets a
-✋ Stop tap or /cancel reach a command that is waiting on the coach
-(DESIGN_bot_stop_button.md §5). `_serve` therefore drives the Application and the Updater
-by hand rather than through `run_polling()`: /restart has to close the long-poll from
-inside a handler, before its hard exit, and `run_polling()` does not expose that
-(DESIGN_bot_restart.md §5.2).
+Polling runs from start to shutdown, a command in flight or not, which is what lets
+/cancel reach a command that is waiting on the coach, and the chat answer while a long run
+thinks (DESIGN_bot_stop_button.md §5, DESIGN_long_runs_beside_chat.md §8). `_serve`
+therefore drives the Application and the Updater by hand rather than through
+`run_polling()`: /restart has to close the long-poll from inside a handler, before its hard
+exit, and `run_polling()` does not expose that (DESIGN_bot_restart.md §5.2).
 """
 import asyncio
 import datetime

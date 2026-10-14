@@ -1,6 +1,6 @@
 # Design: Every long run works beside the chat
 
-**Status:** Proposed · **Date:** 2026-10-08
+**Status:** Implemented 2026-10-14, in the four steps of §11 · **Date:** 2026-10-08
 
 **Ruled so far.** 2026-10-08: `workout generate` saves its result, so its last question cannot
 run out of time (§4). 2026-10-14: every other choice of §9. None is open.

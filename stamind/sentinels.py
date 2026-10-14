@@ -11,7 +11,7 @@ JSON object:
     \\x1eSM-PROMPT  {"v": 1, "id": …, "type": "confirm", "message": …}   answer expected
     \\x1eSM-PHOTO   {"path": …, "caption": …}                            one-way
     \\x1eSM-BUTTONS {"buttons": [{"label": …, "send"|"ack"|"menu": …}]}   one-way
-    \\x1eSM-FLUSH   {} or {"wait": false}                                one-way
+    \\x1eSM-FLUSH   {}                                                   one-way
     \\x1eSM-QUEUE   {"id": …, "text": …, "buttons": […]}                   one-way
                    and, on the morning's proposal only, "offer": a SM-BUTTONS list
 
@@ -92,18 +92,15 @@ def emit_buttons(buttons: Sequence[dict], out=None) -> None:
     _write(BUTTONS_SENTINEL, {"buttons": list(buttons)}, out)
 
 
-def emit_flush(out=None, wait: bool = True) -> None:
+def emit_flush(out=None) -> None:
     """Ends the message being buffered, so what follows arrives as a new one.
 
     Does nothing on a terminal, where output already reaches the screen line by line. The
     front-end test lives here rather than at each call site because a flush has no meaning
-    outside a buffering front-end (DESIGN_output_verbosity.md §7).
-
-    `wait=False` says no wait follows this marker — it merely ends a message — so the bot
-    hangs no Stop button on it (DESIGN_change_heads_up.md §4)."""
+    outside a buffering front-end (DESIGN_output_verbosity.md §7)."""
     if not is_json_frontend():
         return
-    _write(FLUSH_SENTINEL, {} if wait else {"wait": False}, out)
+    _write(FLUSH_SENTINEL, {}, out)
 
 
 def emit_queue_item(
@@ -138,12 +135,6 @@ def parse_frame(line: str) -> Optional[Tuple[str, Any]]:
         except json.JSONDecodeError:
             return None
     return None
-
-
-def flush_wants_a_wait(payload: Any) -> bool:
-    """Whether a flush marker announces a wait, and so earns a Stop button. Only
-    ``{"wait": false}`` says no (DESIGN_change_heads_up.md §4)."""
-    return not isinstance(payload, dict) or payload.get("wait", True) is not False
 
 
 def prompt_answer(

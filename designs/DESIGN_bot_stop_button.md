@@ -1,7 +1,14 @@
 # Design: a Stop button while the coach is thinking
 
-**Status:** Implemented · **Date:** 2026-09-09 · **Branch:**
+**Status:** Removed 2026-10-14, but for §5 · **Date:** 2026-09-09 · **Branch:**
 `worktree-telegram-stop-button`
+
+**Removed on 2026-10-14** (DESIGN_long_runs_beside_chat.md §8). The button, its tap, the
+"Stopped." and "That's already finished" lines, and the mark on a flush that said whether a
+wait follows are gone. A wrong answer from the chat is a proposal the athlete does not tap,
+no long run holds the chat any more, and the bot's journal shows the button was never
+attached. §5 stands: the bot keeps listening to Telegram while a command computes, which
+`/cancel` and the chat's second place both need. `/cancel` ends the command in both places.
 
 ## 1. The problem
 

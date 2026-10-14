@@ -396,18 +396,6 @@ class SendingTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(await self.chat_bot._flush_output(self.session, ["", "  "]))
         self.assertEqual(self.chat_bot.bot.sent, [])
 
-    async def test_the_stop_button_is_hung_off_the_wait_notice_and_retired_by_the_next(self):
-        """DESIGN_bot_stop_button.md §7: one live button per command, dropped as soon as
-        anything arrives — the flush marker raises the next one."""
-        await self.chat_bot._flush_output(self.session, ["Working on it…"])
-        await self.chat_bot._offer_stop(self.session)
-        self.assertEqual(self.session.stop_message_id, 101)
-        rows = self.chat_bot.bot.edits[-1][2]
-        self.assertEqual(rows[0][0][0], keyboards.STOP_LABEL)
-        await self.chat_bot._flush_output(self.session, ["done"])
-        self.assertIsNone(self.session.stop_message_id)
-        self.assertIsNone(self.chat_bot.bot.edits[-1][2])
-
     async def test_an_offer_is_remembered_per_chat_and_attached_to_the_last_message(self):
         await self.chat_bot._flush_output(self.session, ["your week"])
         await self.chat_bot._send_ui_buttons(

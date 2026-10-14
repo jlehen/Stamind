@@ -143,16 +143,6 @@ class CoachRunTest(unittest.IsolatedAsyncioTestCase):
         await chat_bot.on_callback(callback_update(_FakeQuery("c0ach:p1:y")), None)
         self.assertTrue(run.answer_future.result()["answer"])
 
-    async def test_stop_ends_the_coachs_run_and_nothing_else(self):
-        chat_bot = build_chat_bot(self)
-        run = self.thinking(chat_bot)
-        own = runner.Session(42, _FakeProc(), "n0nce")
-        chat_bot.sessions[42] = own
-        query = _FakeQuery(keyboards.stop_callback_data("c0ach"))
-        await chat_bot.on_callback(callback_update(query), None)
-        self.assertTrue(run.proc.killed)
-        self.assertFalse(own.proc.killed)
-
     async def test_cancel_ends_the_command_in_both_places_and_drops_what_was_kept(self):
         chat_bot = build_chat_bot(self)
         run = self.thinking(chat_bot)
