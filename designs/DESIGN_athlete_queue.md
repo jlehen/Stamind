@@ -636,6 +636,15 @@ Amended 2026-10-09 (DESIGN_session_notes.md §3): `session_note`, from the same 
 more entry, drawn bare and sent the same way. It asks which of a day's sessions the athlete's
 message is about, when the week planner could not tell.
 
+Amended 2026-10-14 (DESIGN_long_runs_beside_chat.md §5, §6): `pass_to_coach`, from
+`stamind/cli/bot/hand_off.py`, is one more entry, drawn bare. A kind says two more things
+now. It can be a confirmation: a question about what the athlete just wrote, which stands at
+the front of the line and closes after the `confirmation-days` mornings
+(DESIGN_chat_questions.md §2). And it can name the answer that starts a long run, with the
+command that run is: the bot runs that tap beside the chat, and the tap goes on to the run
+once the item is closed. `pass_to_coach` is both: its "Yes" passes the athlete's words to
+`workout adapt -m`.
+
 ## 9. Guardrails
 
 A queue button can only run one of the answers its item was queued with, on that item, after
@@ -820,6 +829,12 @@ check runs before an item is sent and when it is tapped. No time is stored for i
 ten kinds expire on a fact and not on a date: a question about a set expires when the set gets
 a name. The other five work their date out when they are checked, as the retrospective
 question does with its seven days. Ruled 2026-10-10.
+
+Amended 2026-10-14 (DESIGN_long_runs_beside_chat.md §6, DESIGN_chat_questions.md §2): a tap on
+an answer that starts a long run runs beside the chat, in the place the coach's run takes, so
+the chat stays free while it thinks. And a confirmation stands at the front of the line while
+it waits: on a later morning it is sent before the older questions, and it closes without a
+word on the morning after its last `confirmation-days` morning.
 
 ### 13.3 A Wednesday with the line
 

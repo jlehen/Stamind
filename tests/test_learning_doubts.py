@@ -15,7 +15,7 @@ from stamind.db import Database
 import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
 from stamind import athlete_queue, learning_doubts, runtime, settings
-from stamind.cli import queue as queue_cli
+from stamind.cli import queue as queue_cli, queue_commands
 from stamind.cli.queue import queue_chat_message
 from stamind.coach.service import coach_service
 from stamind.coach.service import CoachService
@@ -277,7 +277,7 @@ class WordingTest(_DoubtCase):
         self.doubt()
         self.run_end()
         [item] = self.questions()
-        codes = [choice.value for choice in queue_cli.terminal_choices(item)]
+        codes = [choice.value for choice in queue_commands.terminal_choices(item)]
         self.assertEqual(codes, [
             "a1", "a2", athlete_queue.SKIP, QUEUE_LATER_HOUR, QUEUE_LATER_DAY, QUEUE_LATER_BACK,
         ])

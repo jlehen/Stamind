@@ -10,7 +10,7 @@ from stamind.cli.bot.views import (
     run_bot_changes, run_bot_constraints, run_bot_goals, run_bot_mesocycle,
     run_bot_morning,
 )
-from stamind.cli.queue import run_bot_queue
+from stamind.cli.queue_commands import run_bot_queue
 
 
 def add_bot_parser(subparsers):

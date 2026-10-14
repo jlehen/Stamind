@@ -59,6 +59,12 @@ own: no queued question and no notice about a changed week, until the morning ti
 21:00 by default, and `telegram.push.evening_time` seeds it. The athlete can change it from
 chat, like `morning-time`.
 
+Amended 2026-10-14 (DESIGN_chat_questions.md §2, DESIGN_long_runs_beside_chat.md §5):
+`confirmation-days`, in the Morning push group, is on how many mornings after the day it was
+asked a question about what the athlete just wrote comes back after the morning message. On
+the next morning it is closed. It is 3 by default, and `telegram.confirmation_days` seeds it.
+Like `change-delay`, it stays off `ROUTABLE_SETTINGS`: the operator tunes it.
+
 Out, and staying in `config.yaml`: credentials (`llm.api_key`, `garmin.password`), file
 paths (`database`, `science_dir`, `service_account_file`), the web bind address, the
 Telegram plumbing (`bot_token`, `allowed_chat_ids`, timeouts, `wrap_width`), and every

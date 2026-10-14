@@ -17,6 +17,7 @@ from stamind.db.queue import queue_stamp
 from stamind.queue_kind import (  # noqa: F401
     ANSWERED, DROPPED, MESSAGE, QUESTION, STALE, Kind, NotApplied, queue,
 )
+from stamind.cli.bot.hand_off import PASS_TO_COACH_KIND
 from stamind.cli.bot.test_result import TEST_RESULT_KIND
 from stamind.cli.candidates import CONSTRAINT_KIND, NOTE_KIND, SIGNAL_KIND
 from stamind.cli.workouts.proposal import PROPOSAL_KIND
@@ -65,11 +66,14 @@ MESSAGE_KIND = Kind(
 # The proposal kind holds what the week planner would change (DESIGN_waiting_proposal.md §3).
 # The constraint and signal kinds ask whether to store what a message stated (§6.3 there),
 # and the session-note kind which session the message is about (DESIGN_session_notes.md §3).
+# The hand-off kind asks whether to pass a message about a session to the coach
+# (DESIGN_long_runs_beside_chat.md §5).
 KINDS: Dict[str, Kind] = {
     kind.name: kind
     for kind in (
         MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND, LEARNING_KIND, TEST_RESULT_KIND,
         RETROSPECTIVE_KIND, PROPOSAL_KIND, NOTE_KIND, CONSTRAINT_KIND, SIGNAL_KIND,
+        PASS_TO_COACH_KIND,
     )
 }
 
@@ -103,6 +107,15 @@ def answer_index(item: Dict[str, Any], action: str) -> Optional[int]:
         return None
     index = int(action[1:]) - 1
     return index if 0 <= index < len(answers(item)) else None
+
+
+def long_run_argv(item: Dict[str, Any], action: str) -> Optional[Tuple[str, ...]]:
+    """The command a tap on `action` starts beside the chat, or None when that answer
+    starts no long run (DESIGN_long_runs_beside_chat.md §6)."""
+    long_run = kind_of(item).long_run
+    if long_run is None or answer_index(item, action) != long_run[0]:
+        return None
+    return long_run[1]
 
 
 def tell(text: str) -> Optional[int]:
@@ -142,21 +155,33 @@ def anything_out() -> bool:
     return any(is_out(item, now) for item in runtime.db.waiting_queue_items())
 
 
+def lived_out(item: Dict[str, Any]) -> bool:
+    """Whether a confirmation was asked on its day and after the morning message on the
+    next `confirmation-days` mornings: at the morning after those, it closes
+    (DESIGN_chat_questions.md §2)."""
+    queued = clock.to_local(datetime.fromisoformat(item["queued_at"]))
+    return clock.now() >= morning_of(queued) + timedelta(days=settings.confirmation_days() + 1)
+
+
 def settle_if_stale(item: Dict[str, Any]) -> bool:
-    """Closes an item its kind no longer finds worth asking. True when it did (§3)."""
-    if not kind_of(item).is_stale(item):
+    """Closes an item its kind no longer finds worth asking, and a confirmation that has
+    lived out its mornings. True when it did (§3)."""
+    kind = kind_of(item)
+    if not (kind.is_stale(item) or (kind.confirmation and lived_out(item))):
         return False
     runtime.db.close_queue_item(item["id"], STALE, clock.now())
     return True
 
 
 def _ready(now: datetime) -> List[Dict[str, Any]]:
-    """The waiting items whose ready time has passed, the earliest first. A stand-alone
-    item is in no line (§13.2 rule 2, DESIGN_waiting_proposal.md §3)."""
-    return [
+    """The waiting items whose ready time has passed, the confirmations first, then the
+    earliest first. A stand-alone item is in no line (§13.2 rule 2,
+    DESIGN_waiting_proposal.md §3, DESIGN_chat_questions.md §2)."""
+    ready = [
         item for item in runtime.db.waiting_queue_items()
         if not is_hidden(item, now) and not kind_of(item).stands_alone
     ]
+    return sorted(ready, key=lambda item: not kind_of(item).confirmation)
 
 
 def line() -> List[Dict[str, Any]]:

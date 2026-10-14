@@ -6,7 +6,7 @@ answers queue items of their own, so the feature imports this module and the que
 imports the feature.
 """
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 from stamind import clock, runtime
 
@@ -52,6 +52,13 @@ class Kind:
     # question" lead, no "Not now", and no closing line after its answer
     # (DESIGN_waiting_proposal.md §6.3).
     bare: bool = False
+    # A confirmation asks about what the athlete just wrote. It stands at the front of the
+    # line while it waits, and closes without a word once it was asked on its day and the
+    # next `confirmation-days` mornings (DESIGN_chat_questions.md §2).
+    confirmation: bool = False
+    # The answer whose tap starts a long run, by its position, and the command that run is.
+    # The bot runs that tap beside the chat (DESIGN_long_runs_beside_chat.md §6).
+    long_run: Optional[Tuple[int, Tuple[str, ...]]] = None
 
 
 class NotApplied(Exception):

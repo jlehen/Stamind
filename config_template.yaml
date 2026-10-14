@@ -157,6 +157,10 @@ coach:
 #  # change restarts the wait; `settings set change-delay N` overrides it live, and 0 sends
 #  # on the bot's next wake.
 #  change_delay_minutes: 20
+#  # A question about what the athlete just wrote is sent at once, then again after the
+#  # morning message on this many mornings, then closed. `settings set confirmation-days N`
+#  # overrides it live.
+#  confirmation_days: 3
 
 # Second athlete, same checkout: give them their own config file and select it with
 # STAMIND_CONFIG=/path/to/other/config.yaml ./sm status. Their database, logs, science

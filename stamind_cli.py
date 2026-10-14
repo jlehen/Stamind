@@ -66,7 +66,7 @@ from stamind.cli.workouts.parser import add_workout_parser
 from stamind.cli.data.parser import add_data_parser
 from stamind.cli.settings import add_settings_parser
 from stamind.cli.journal.parser import add_journal_parser
-from stamind.cli.queue import add_queue_parser
+from stamind.cli.queue_commands import add_queue_parser
 from stamind.cli.strength import add_strength_parser
 from stamind.cli.bot.parser import add_bot_parser
 from stamind.cli.calendar import add_calendar_parser

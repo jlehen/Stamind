@@ -20,7 +20,7 @@ from tests.chat_harness import (
     _FakeProc, _FakeQuery, _ScriptedProc, build_chat_bot, callback_update, message_update,
     record_commands, routes_to,
 )
-from stamind.chat import keyboards, messages, replies, runner, scheduler
+from stamind.chat import callbacks, keyboards, messages, replies, runner, scheduler
 from stamind.chat.routing import COACH_RUN, MORNING_RUN, PLANNING_RUN
 from stamind.sentinels import PROMPT_SENTINEL
 
@@ -276,6 +276,67 @@ class MorningRunTest(unittest.IsolatedAsyncioTestCase):
             await self.say(chat_bot, "I'm tired")
         self.assertEqual(started, [])
         self.assertEqual(chat_bot.bot.texts(), [runner.KEPT_LINES[PLANNING_RUN]])
+
+
+class LongTapTest(unittest.IsolatedAsyncioTestCase):
+    """A tap on a queued answer that starts a long run: "✅ Yes" under "Shall I pass it to
+    your coach?" (DESIGN_long_runs_beside_chat.md §5, §6)."""
+
+    DATA = keyboards.queue_callback_data(7, "a1")
+
+    def tap(self, chat_bot):
+        markup = SimpleNamespace(inline_keyboard=[[
+            SimpleNamespace(text="✅ Yes", callback_data=self.DATA),
+            SimpleNamespace(text="✖️ No", callback_data=keyboards.queue_callback_data(7, "a2")),
+        ]])
+        query = _FakeQuery(self.DATA, text="Shall I pass it to your coach?", markup=markup)
+        return query, chat_bot.on_callback(callback_update(query), None)
+
+    def starts_a_long_run(self):
+        patcher = mock.patch.object(callbacks, "tap_long_run", return_value=COACH_RUN)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    async def test_it_runs_beside_the_chat_even_while_the_chat_is_busy(self):
+        chat_bot = build_chat_bot(self)
+        self.starts_a_long_run()
+        chat_bot.sessions[42] = runner.Session(42, _FakeProc(), "n0nce")
+
+        async def spawn(*_args, **_kwargs):
+            return _FakeProc()
+
+        query, tapped = self.tap(chat_bot)
+        with mock.patch("asyncio.create_subprocess_exec", spawn), \
+                mock.patch.object(chat_bot, "_drive", mock.AsyncMock()):
+            await tapped
+        run = chat_bot.long_runs[42]
+        self.assertEqual((run.long, run.quiet), (COACH_RUN, True))
+        self.assertIn("→ ✅ Yes", query.edited_text)
+
+    async def test_it_is_kept_while_the_morning_run_thinks(self):
+        chat_bot = build_chat_bot(self)
+        self.starts_a_long_run()
+        started = record_commands(self, chat_bot)
+        chat_bot.long_runs[42] = runner.Session(42, _FakeProc(), "m0rn", long=MORNING_RUN)
+        query, tapped = self.tap(chat_bot)
+        await tapped
+        self.assertEqual(started, [])
+        self.assertEqual(chat_bot.bot.texts(), [runner.KEPT_LINES[MORNING_RUN]])
+        self.assertEqual(chat_bot.kept[42], [(["bot", "queue", "7", "a1"], True, COACH_RUN)])
+        self.assertIn("→ ✅ Yes", query.edited_text)
+
+    async def test_it_is_refused_and_keeps_its_buttons_while_the_run_alive_asks(self):
+        chat_bot = build_chat_bot(self)
+        self.starts_a_long_run()
+        record_commands(self, chat_bot)
+        alive = runner.Session(42, _FakeProc(), "c0ach", long=COACH_RUN)
+        alive.awaiting = {"id": "p1", "type": "confirm"}
+        chat_bot.long_runs[42] = alive
+        query, tapped = self.tap(chat_bot)
+        await tapped
+        self.assertEqual(chat_bot.bot.texts(), [runner.COACH_ASKED])
+        self.assertIsNone(query.edited_text)
+        self.assertNotIn(42, chat_bot.kept)
 
 
 if __name__ == "__main__":

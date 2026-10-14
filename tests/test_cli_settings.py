@@ -384,6 +384,7 @@ class TestRegistryShape(SettingsTestCase):
             settings.ADAPT_FIRST: "on",
             settings.COMMITMENT_DAYS: "10",
             settings.CHANGE_DELAY: "5",
+            settings.CONFIRMATION_DAYS: "5",
             settings.STRENGTH_SETS_SINCE: "2026-09-03",
             settings.LEARNING_QUESTIONS: "off",
             settings.TERSE: "on",

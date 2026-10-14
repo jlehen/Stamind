@@ -29,6 +29,7 @@ EVENING_TIME = "evening-time"
 ADAPT_FIRST = "adapt-first"
 COMMITMENT_DAYS = "commitment-days"
 CHANGE_DELAY = "change-delay"
+CONFIRMATION_DAYS = "confirmation-days"
 STRENGTH_SETS_SINCE = "strength-sets-since"
 LEARNING_QUESTIONS = "learning-questions"
 TERSE = "terse"
@@ -275,6 +276,19 @@ SETTINGS: List[Setting] = [
         coerce=_is_on,
     ),
     Setting(
+        name=CONFIRMATION_DAYS,
+        key="confirmation_days",
+        group="Morning push",
+        # Sent at once, then after the morning message on this many mornings
+        # (DESIGN_chat_questions.md §2).
+        summary="Mornings a question about what the athlete just wrote is asked again",
+        value_hint="DAYS",
+        parse=parse_days,
+        config_path=("telegram", "confirmation_days"),
+        fallback="3",
+        coerce=_as_int,
+    ),
+    Setting(
         name=CHANGE_DELAY,
         key="changes_delay_minutes",
         group="Week changes",
@@ -426,6 +440,12 @@ def change_delay_minutes() -> int:
     so the operator's trial and error stays off their phone (DESIGN_change_heads_up.md §4).
     Operator-only: not in ROUTABLE_SETTINGS."""
     return value(CHANGE_DELAY)
+
+
+def confirmation_days() -> int:
+    """How many mornings a confirmation is asked again after the day it was asked
+    (DESIGN_chat_questions.md §2). Operator-only: not in ROUTABLE_SETTINGS."""
+    return value(CONFIRMATION_DAYS)
 
 
 def push_enabled() -> bool:

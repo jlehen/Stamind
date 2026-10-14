@@ -462,32 +462,39 @@ class CaptureEditTest(_CaptureCase):
         self.assertNotIn(BUTTONS_SENTINEL, out)
         self.assertEqual(test_db.get_objective(gid)["title"], "Spring 10k (fast)")
 
-    def test_a_session_shaped_ask_is_handed_to_the_coach_not_to_a_picker(self):
+    def test_a_session_shaped_ask_saves_the_hand_off_question_not_a_picker(self):
+        """The question is saved and sent, and the capture ends: nothing waits on the
+        athlete and nothing reaches the coach yet (DESIGN_long_runs_beside_chat.md §5)."""
         self._goal()
         save_workout(test_db, self.future(3), "running", "Long run", duration_minutes=90)
         session = test_db.get_workouts(
             start_date=self.future(3), end_date=self.future(3)
         )[0]
         prompt = self.prompt(True)
+        started_from(self, "chat")
         with patch(
             "stamind.openrouter.OpenRouterClient.complete",
             return_value={"kind": "session", "id": session["id"]},
-        ), patch("stamind.cli.bot.edit._hand_off_to_coach") as handoff:
+        ), patch("stamind.cli.workouts.adapt.run_workout_adapt") as adapt:
             code, out, _ = run_cli(
                 ["bot", "capture", "edit_goal", "move my long run to Sunday"]
             )
         self.assertEqual(code, 0)
+        self.assertEqual(prompt.asked, [])
+        adapt.assert_not_called()
+        [question] = [json.loads(line[len(QUEUE_SENTINEL):]) for line in out.split("\n")
+                      if line.startswith(QUEUE_SENTINEL)]
         # The wrong-domain picker — goals answering a question about a session — never
         # appears; the hand-off does (§12.4).
-        self.assertIn("Long run", prompt.text)
-        self.assertIn("pass it to your coach", prompt.text)
+        self.assertIn("Long run", question["text"])
+        self.assertIn("pass it to your coach", question["text"])
         # The dropped reading is named: the router's "sounds like a change to a goal"
         # echo is still on screen and this line is its correction — and the line says
         # what a "yes" sets in motion (§12.4).
-        self.assertIn("I don't see a goal for that", prompt.text)
-        self.assertIn("reread the coming days", prompt.text)
+        self.assertIn("I don't see a goal for that", question["text"])
+        self.assertIn("reread the coming days", question["text"])
+        self.assertEqual([b["label"] for b in question["buttons"]], ["✅ Yes", "✖️ No"])
         self.assertNotIn(BUTTONS_SENTINEL, out)
-        handoff.assert_called_once_with("move my long run to Sunday")
 
     def test_nothing_matching_falls_back_to_the_send_to_coach_offer(self):
         self._goal()

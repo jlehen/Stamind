@@ -222,6 +222,11 @@ telegram:
   # restarts the wait, which is what keeps trial and error off their phone. 0 sends on the
   # bot's next wake. Seeds `settings set change-delay N`, which overrides it live.
   change_delay_minutes: 20
+  # A question about what the athlete just wrote, such as "Shall I pass it to your coach?",
+  # is sent at once, then again after the morning message on this many mornings. On the
+  # next one it is closed without a word (DESIGN_chat_questions.md §2). Seeds `settings set
+  # confirmation-days N`, which overrides it live.
+  confirmation_days: 3
 
 google:
   # Service-account JSON file used to authenticate to the Google APIs.

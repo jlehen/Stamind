@@ -8,13 +8,15 @@ more plausible rows become a picker whose leaves re-enter this same flow with th
 pinned.
 
 A nomination that lands on a session instead is not an edit at all: the ask was coach
-territory, so it offers to hand the athlete's own words to `workout adapt -m` (§12.3).
+territory, so it saves the question whether to hand the athlete's own words to `workout
+adapt -m` (§12.3, DESIGN_long_runs_beside_chat.md §5).
 """
 import argparse
 import shlex
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from stamind import runtime
+from stamind.cli.bot import hand_off
 from stamind.cli.bot.extraction import (
     CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find, nominate_rows,
     upcoming_sessions, valid_date,
@@ -23,21 +25,12 @@ from stamind.cli.render.plan_lines import (
     picker_label, simple_constraint_edit_lines, simple_goal_edit_lines, simple_goal_line,
 )
 from stamind.cli.render.session_lines import simple_day_word, simple_session_line
+from stamind.cli.queue import send_own_questions
 from stamind.sentinels import emit_buttons
 from stamind.text import wrap_text
 from stamind.clock import today_str as _today_str
 import stamind.cli.constraints as _constraints
 import stamind.cli.goals as _goals
-import stamind.cli.workouts.adapt as _adapt
-
-
-def _hand_off_to_coach(text: str) -> None:
-    """Runs `workout adapt -m` with the athlete's original words, in this process. The
-    coach reads what she wrote, which is the whole point of this lane (§12.3, §12.4)."""
-    _adapt.run_workout_adapt(argparse.Namespace(
-        date=None, no_pull=False, force_pull=False, auto=False,
-        message=text, lookback=None,
-    ))
 
 
 # --- capture: the edits, which nominate their object (§12.4) ---
@@ -87,18 +80,6 @@ CONSTRAINT_EDIT_FIELDS = (
     '  "title": the constraint restated, "start_date"/"end_date": "YYYY-MM-DD",\n'
     '  "description": free text. Whether a constraint forces rest, or reshapes the plan, is\n'
     "  NOT yours to change here — leave those out entirely."
-)
-
-
-# The wrong-domain answer §12.4 replaces a picker with: the ask was coach territory all
-# along, so the preview offers the hand-off instead of listing goals at a question about a
-# session. It says which reading was dropped, so the router's echo a moment earlier
-# ("sounds like a change to a goal") has its correction on screen, and what a "yes"
-# sets in motion, because the help card is not on screen at that moment.
-SESSION_HANDOFF_ASK = (
-    "I don't see a {noun} for that — it sounds like {named}. Shall I pass it to your "
-    "coach? They'll reread the coming days with it in mind and propose changes for you "
-    "to confirm."
 )
 
 
@@ -222,7 +203,8 @@ def _offer_session_handoff(
     domain: str, data: dict, sessions: Sequence[Dict[str, Any]], text: str, today: str
 ) -> None:
     """A nomination that landed on a session: the ask was coach territory all along, so
-    the preview offers the hand-off and the confirm runs `adapt -m` with her own words."""
+    the hand-off question is saved and sent, and this command ends. Its "Yes" runs `adapt
+    -m` with her own words (DESIGN_long_runs_beside_chat.md §5)."""
     session = next(
         (w for w in sessions
          if _row_id(data.get("id"), {int(w["id"]): w}) is not None), None
@@ -232,10 +214,8 @@ def _offer_session_handoff(
         return
     named = simple_session_line(session, lead=simple_day_word(session["date"], today))
     noun = "goal" if domain == "goal" else "constraint"
-    if not runtime.prompt.confirm(SESSION_HANDOFF_ASK.format(noun=noun, named=named)):
-        print("Okay — I'll leave it.")
-        return
-    _hand_off_to_coach(text)
+    item = hand_off.queue_question(noun, named, session, text)
+    send_own_questions([item] if item else [])
 
 
 def _offer_row_picker(

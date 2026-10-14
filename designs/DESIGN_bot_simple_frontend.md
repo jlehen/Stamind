@@ -959,7 +959,11 @@ The call returns the most plausible reading, and each kind lands differently:
   earlier ("→ sounds like a change to a goal — checking") is still on screen, and
   says what a "yes" sets in motion, because the help card is not. The wrong-domain
   picker this replaces — a list of goals answering a question about a session —
-  never appears.
+  never appears. Amended 2026-10-14 (DESIGN_long_runs_beside_chat.md §5): the
+  question is no longer asked on the spot. It is saved as a queued question, kind
+  `pass_to_coach`, with the same words and Yes and No, and the capture ends. Its "Yes"
+  runs `adapt -m` with her original words beside the chat; it closes after the
+  `confirmation-days` mornings, or when the day of the session it names is over.
 - **Several close candidates, or "no" on the preview** — a picker of the candidate
   rows. A leaf does *not* execute the edit: it re-runs `bot capture <intent> --id <n>
   "<text>"` with the nomination pinned, which re-enters the ordinary preview/confirm.

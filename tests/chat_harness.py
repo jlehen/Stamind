@@ -12,7 +12,7 @@ import os
 from types import SimpleNamespace
 from unittest import mock
 
-from stamind.chat import scheduler, telegram_api
+from stamind.chat import callbacks, scheduler, telegram_api
 from stamind.chat.app import ChatBot
 from stamind.config import config
 
@@ -161,6 +161,9 @@ def build_chat_bot(testcase, allowed=(42,)) -> ChatBot:
         # `_tell_changes_first` reads the database before acting on the athlete's own
         # message; these cases are about the handler, not about what is waiting.
         mock.patch.object(scheduler.heads_up, "waiting", return_value=False),
+        # A tap on a queued answer reads its item's kind from the database; the cases that
+        # start a long run say so themselves (DESIGN_long_runs_beside_chat.md §6).
+        mock.patch.object(callbacks, "tap_long_run", return_value=None),
     ]
     for patcher in patchers:
         patcher.start()

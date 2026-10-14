@@ -9,8 +9,9 @@ tap must never turn into an action meant for something else (DESIGN_bot_stop_but
 DESIGN_athlete_queue.md §6.2, DESIGN_bot_simple_frontend.md §4.4).
 """
 import shlex
+from typing import Optional
 
-from stamind import journal
+from stamind import athlete_queue, journal, runtime
 from stamind.athlete_queue import QUEUE_NOT_NOW
 from stamind.chat import telegram_api
 from stamind.chat.keyboards import (
@@ -19,7 +20,7 @@ from stamind.chat.keyboards import (
     resolve_ui_action, tapped_choice, tapped_label, ui_menu_rows,
 )
 from stamind.chat.replies import format_prompt_message
-from stamind.chat.routing import parse_message_to_argv
+from stamind.chat.routing import long_run, parse_message_to_argv
 from stamind.sentinels import prompt_answer
 
 
@@ -35,6 +36,16 @@ def _keyboard_or_none(rows: list):
     if not rows:
         return None
     return telegram_api.inline_keyboard(rows)
+
+
+def tap_long_run(item_id: str, action: str) -> Optional[str]:
+    """Which long run a tap on a queued item's answer starts, or None: the item's kind
+    names the answer that starts one (DESIGN_long_runs_beside_chat.md §6)."""
+    item = runtime.db.get_queue_item(int(item_id))
+    if item is None or item["closed_at"]:
+        return None
+    argv = athlete_queue.long_run_argv(item, action)
+    return long_run(argv) if argv else None
 
 
 class CallbacksMixin:
@@ -112,7 +123,10 @@ class CallbacksMixin:
         in the two later choices; any other tap leaves the choice under the item's text
         and runs `bot queue`, which checks the item and sends the next one. The chat's live
         SM-BUTTONS row is not touched, unless it was sent under this item: then it goes
-        with the item's buttons (DESIGN_waiting_proposal.md §5)."""
+        with the item's buttons (DESIGN_waiting_proposal.md §5).
+
+        A tap on an answer that starts a long run runs beside the chat, and is kept while
+        another long run is alive (DESIGN_long_runs_beside_chat.md §6, §7)."""
         decoded = decode_queue_callback(data)
         if decoded is None:
             return
@@ -124,8 +138,15 @@ class CallbacksMixin:
             except Exception as exc:
                 journal.debug("bot.event", f"later choices not swapped in: {exc}")
             return
-        if self.sessions.get(chat_id) is not None:
+        run = tap_long_run(item_id, action)
+        argv = ["bot", "queue", item_id, action]
+        if run is None and self.sessions.get(chat_id) is not None:
             await self.bot.send_message(chat_id=chat_id, text=BUSY_TAP)
+            return
+        # Refused while the long run alive asks, before the buttons go, so it can be tapped
+        # again (§7).
+        if run and self._alive_asks(chat_id, argv, run):
+            await self._keep_behind(chat_id, argv, quiet=True, run=run)
             return
         message = query.message
         label = tapped_label(_keyboard_rows(message), data)
@@ -136,9 +157,10 @@ class CallbacksMixin:
                 await query.edit_message_reply_markup(reply_markup=None)
         except Exception as exc:
             journal.debug("bot.event", f"queue choice not echoed: {exc}")
-        argv = ["bot", "queue", item_id, action]
+        if run and await self._keep_behind(chat_id, argv, quiet=True, run=run):
+            return
         self._log(chat_id, "  ", f"run: {shlex.join(argv)}")
-        await self._start_command(chat_id, argv, quiet=True)
+        await self._start_command(chat_id, argv, quiet=True, run=run)
 
     async def _handle_stop_callback(self, query, chat_id: int, data: str) -> None:
         """A tap on the §3 Stop button: ends the command it was raised for, in whichever
