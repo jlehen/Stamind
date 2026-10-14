@@ -8,8 +8,8 @@ wants to ask or tell the athlete. Revision 4 gives it one line and one
 rule for when an item is sent. So this design does not say when a question arrives. It says,
 for each question, what it asks, what its answers do, and when it closes itself.
 
-Two neighbouring questions are settled in DESIGN_long_runs_beside_chat.md and are not designed
-again here (§7).
+Three neighbouring questions are settled in DESIGN_long_runs_beside_chat.md and are not
+designed again here (§7).
 
 ## 1. The problem
 
@@ -270,16 +270,21 @@ first question waits.
 
 ## 7. Settled elsewhere
 
-DESIGN_long_runs_beside_chat.md, proposed on 2026-10-08, holds two more:
+DESIGN_long_runs_beside_chat.md, proposed on 2026-10-08 and ruled on 2026-10-14, holds three
+more:
 
 - The question after `workout generate` thinks, "Schedule these 12 workouts…?", becomes a saved
   item with two buttons (§4 there).
+- "…Regenerate?", asked before `workout generate` thinks when sessions already stand in the
+  days it would write, becomes a saved question. Its "Plan them" starts the planning (§4 and
+  §6 there).
 - "Shall I pass it to your coach?", asked when a message about a session lands on the goal or
-  constraint lane, becomes the button "📨 Send it to your coach as written" (§5 there).
+  constraint lane, becomes a saved question. Its "Yes" passes the athlete's words to the coach
+  (§5 and §6 there).
 
-That design keeps one question on the spot: "…Proceed anyway?", asked seconds after the tap on
-"📅 Plan my next weeks" when the plan, the periodization, is out of date. It was written the
-day before the rule of §1.
+The last two are confirmations under the three rules of §2. "…Proceed anyway?", asked when the
+plan, the periodization, is out of date, is no longer asked in the chat: the run stops and says
+why (§4 there).
 
 ## 8. Choices made without the author
 
@@ -375,7 +380,6 @@ The numbers are the ones the author was given them under. All are ruled.
   before tapping. Each tap lands on its own question.
 - A proposal made at 12:17 on the app's own pairing is not made again when the cut-short
   question is answered "No".
-- "…Proceed anyway?" still waits on the spot (§7).
 
 ## 10. Touch points
 
