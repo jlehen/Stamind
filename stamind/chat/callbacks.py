@@ -84,9 +84,11 @@ class CallbacksMixin:
                 argv = parse_message_to_argv(str(utterance))
             except ValueError:
                 argv = None
-        # A fixed sentence for the coach is refused like a typed one, and before its row
-        # goes, so it can be tapped again (DESIGN_waiting_proposal.md §6.2).
-        if argv and await self._coach_busy(chat_id, argv):
+        # A fixed sentence for the coach is refused like a typed one while the long run alive
+        # waits on a question of its own, and before its row goes, so it can be tapped again
+        # (DESIGN_long_runs_beside_chat.md §7).
+        if argv and self._alive_asks(chat_id, argv):
+            await self._keep_behind(chat_id, argv)
             return
         self._log(chat_id, "  ", f"ui tap: {action.get('label')}")
         try:  # a decided row is spent: drop the buttons
@@ -99,7 +101,7 @@ class CallbacksMixin:
             if ack:
                 await self.bot.send_message(chat_id=chat_id, text=str(ack))
             return
-        if not argv:
+        if not argv or await self._keep_behind(chat_id, argv):
             return
         self._log(chat_id, "  ", f"run: {shlex.join(argv)}")
         await self.bot.send_chat_action(chat_id=chat_id, action="typing")
@@ -183,7 +185,7 @@ class CallbacksMixin:
         if decoded is None:
             return
         nonce, pid, value = decoded
-        # Found by the run that raised it: the coach's run asks from the second place.
+        # Found by the run that raised it: a long run asks from the second place.
         session = self._run_by_nonce(chat.id, nonce)
         awaiting = session.awaiting if session else None
         fut = session.answer_future if session else None

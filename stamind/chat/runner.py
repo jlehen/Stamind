@@ -6,8 +6,9 @@ that child plus the state needed to route a pending prompt's answer back into it
 `replies.py` and sends the rest as prose.
 
 A chat has two places. Its own holds one command at a time, and the chat is busy while it
-runs. The second holds the coach's run, a `workout adapt` or a `workout tweak`, so the chat
-stays free while the coach thinks (DESIGN_waiting_proposal.md §6.1).
+runs. The second holds one long run, a run that asks the week planner, so the chat stays
+free while it thinks. A second long run is kept and started when the first ends
+(DESIGN_long_runs_beside_chat.md §2, §7).
 
 The child is launched with `STAMIND_FRONTEND=json`, so a `confirm`/`choose`/`text`
 prompt arrives as a framed request line instead of blocking on `input()`
@@ -18,12 +19,15 @@ import asyncio
 import json
 import os
 import secrets
+import shlex
 import sys
 from typing import Dict, List, Optional
 
 from stamind import journal
 from stamind.chat import telegram_api
-from stamind.chat.routing import ROUTER_TIMEOUT_SECONDS, is_coach_argv
+from stamind.chat.routing import (
+    COACH_RUN, MORNING_RUN, PLANNING_RUN, ROUTER_TIMEOUT_SECONDS, long_run,
+)
 from stamind.config import config
 from stamind.sentinels import (
     BUTTONS_SENTINEL, FLUSH_SENTINEL, PHOTO_SENTINEL, PROMPT_SENTINEL, QUEUE_SENTINEL,
@@ -56,10 +60,15 @@ RESTART_NOTE = "restart_chat"
 # (DESIGN_bot_simple_frontend.md §6).
 WRAP_WIDTH = 900
 
-# What a message to the coach is told while a run of the coach is alive: it is not taken,
-# whether the coach is thinking or waits on a question of its own
-# (DESIGN_waiting_proposal.md §6.2).
-COACH_THINKING = "I'm still working on your last message — send that again in a minute."
+# What a second long run is told while the one alive thinks: it is kept, and started when
+# that one ends. The line names the run that is alive (DESIGN_long_runs_beside_chat.md §7).
+KEPT_LINES = {
+    COACH_RUN: "I'm still working on your last message — I'll pass this one on right after.",
+    MORNING_RUN: "I'm preparing your morning message — I'll pass this on right after.",
+    PLANNING_RUN: "I'm still planning your next weeks — I'll pass this on right after.",
+}
+# While the one alive waits on a question of its own, nothing is kept: the answer decides
+# what that run does (§7).
 COACH_ASKED = "I asked you something above. Answer it, then send that again."
 
 
@@ -93,12 +102,12 @@ class Session:
     needed to route a pending prompt's answer back to it."""
 
     def __init__(
-        self, chat_id: int, proc, nonce: str, quiet: bool = False, coach: bool = False
+        self, chat_id: int, proc, nonce: str, quiet: bool = False, long: Optional[str] = None
     ) -> None:
         self.chat_id = chat_id
         self.proc = proc
         self.nonce = nonce
-        self.coach = coach                        # the coach's run, in the second place
+        self.long = long                          # the long run it is, in the second place
         self.timed_out = False                    # a prompt of it went unanswered
         self.awaiting: Optional[dict] = None      # the prompt request awaiting an answer
         self.answer_future: Optional["asyncio.Future"] = None
@@ -166,7 +175,7 @@ async def _end_for_restart(session: Optional[Session]) -> None:
 
 
 async def restart_teardown(
-    session: Optional[Session], stop_polling, coach_run: Optional[Session] = None
+    session: Optional[Session], stop_polling, second: Optional[Session] = None
 ) -> None:
     """Ends the live command in each place of the chat and closes the Telegram long-poll,
     so /restart's hard exit strands neither an orphaned subprocess nor an unconfirmed
@@ -174,7 +183,7 @@ async def restart_teardown(
 
     Both halves are bounded and failure-tolerant: reaching os._exit(RESTART_EXIT_CODE)
     matters more than a tidy teardown. See DESIGN_bot_restart.md §5.2."""
-    for live in (session, coach_run):
+    for live in (session, second):
         await _end_for_restart(live)
     try:
         await asyncio.wait_for(stop_polling(), timeout=RESTART_GRACE_SECONDS)
@@ -186,25 +195,55 @@ class RunnerMixin:
     """`ChatBot`'s half that starts a CLI subprocess and reads it to the end."""
 
     def _runs(self, chat_id: int) -> List[Session]:
-        """The live commands of a chat: the one in its own place, then the coach's run."""
-        places = (self.sessions.get(chat_id), self.coach_runs.get(chat_id))
+        """The live commands of a chat: the one in its own place, then the long run."""
+        places = (self.sessions.get(chat_id), self.long_runs.get(chat_id))
         return [session for session in places if session is not None]
 
     def _run_by_nonce(self, chat_id: int, nonce: Optional[str]) -> Optional[Session]:
         """The live command that raised a prompt or a Stop button, in either place."""
         return next((s for s in self._runs(chat_id) if s.nonce == nonce), None)
 
-    async def _coach_busy(self, chat_id: int, argv: List[str]) -> bool:
-        """Whether `argv` is a message to the coach that is not taken, because a run of the
-        coach is alive: the bot never ends one to start another. It says which of the two
-        lines applies (DESIGN_waiting_proposal.md §6.2)."""
-        run = self.coach_runs.get(chat_id)
-        if run is None or not is_coach_argv(argv):
+    def _alive_asks(self, chat_id: int, argv: List[str], run: Optional[str] = None) -> bool:
+        """Whether `argv` is a long run that is refused, because the long run alive waits on
+        a question of its own (DESIGN_long_runs_beside_chat.md §7)."""
+        alive = self.long_runs.get(chat_id)
+        return bool(alive and alive.awaiting and (run or long_run(argv)))
+
+    async def _keep_behind(
+        self, chat_id: int, argv: List[str], quiet: bool = False, run: Optional[str] = None
+    ) -> bool:
+        """Whether `argv` is a long run that cannot start, because another one is alive: the
+        bot never starts a second one beside it. It is kept, and started when the alive one
+        ends, unless that one waits on a question of its own. Either way the athlete is told
+        which (DESIGN_long_runs_beside_chat.md §7). `run` names the long run when the argv
+        alone does not say, as for a tap (§6)."""
+        run = run or long_run(argv)
+        alive = self.long_runs.get(chat_id)
+        if alive is None or run is None:
             return False
-        line = COACH_ASKED if run.awaiting else COACH_THINKING
+        if alive.awaiting:
+            line = COACH_ASKED
+        else:
+            self.kept.setdefault(chat_id, []).append((list(argv), quiet, run))
+            line = KEPT_LINES[alive.long]
         await self.bot.send_message(chat_id=chat_id, text=line)
         self._log(chat_id, "<<", repr(line))
         return True
+
+    async def _start_kept(self, chat_id: int) -> None:
+        """Starts the first long run kept behind the one that just ended (§7). A failure is
+        journalled: it must not escape the run that ended."""
+        kept = self.kept.get(chat_id)
+        if not kept:
+            return
+        argv, quiet, run = kept.pop(0)
+        if not kept:
+            self.kept.pop(chat_id)
+        self._log(chat_id, "  ", f"run kept: {shlex.join(argv)}")
+        try:
+            await self._start_command(chat_id, argv, quiet=quiet, run=run)
+        except Exception as exc:
+            self._log(chat_id, "!!", f"kept run not started: {exc!r}", lvl="error")
 
     async def _drive(self, session: Session) -> None:
         """Reads the CLI's stdout, streaming prose to the chat and handling each
@@ -281,8 +320,6 @@ class RunnerMixin:
         except Exception as e:  # pragma: no cover - defensive
             await self._report_drive_failure(session, e)
         finally:
-            place = self.coach_runs if session.coach else self.sessions
-            place.pop(session.chat_id, None)
             if session.proc.returncode is None:
                 try:
                     session.proc.kill()
@@ -291,6 +328,13 @@ class RunnerMixin:
             # A command that ends without a last message — killed, or answered with a
             # photo — would otherwise leave a Stop button nothing can act on.
             await self._retire_stop(session)
+            # The kept run takes the place before this one leaves it, so no other long
+            # run can start between the two (DESIGN_long_runs_beside_chat.md §7).
+            if session.long:
+                await self._start_kept(session.chat_id)
+            place = self.long_runs if session.long else self.sessions
+            if place.get(session.chat_id) is session:
+                place.pop(session.chat_id)
 
     async def _report_drive_failure(self, session: Session, exc: Exception) -> None:
         """Tells the athlete their command died, unless Telegram itself is what died: then
@@ -314,7 +358,8 @@ class RunnerMixin:
             )
 
     async def _start_command(
-        self, chat_id: int, argv: List[str], quiet: bool = False, source: str = "bot"
+        self, chat_id: int, argv: List[str], quiet: bool = False, source: str = "bot",
+        run: Optional[str] = None,
     ) -> Session:
         proc = await asyncio.create_subprocess_exec(
             sys.executable, "-u", CLI_PATH, *argv,
@@ -324,11 +369,11 @@ class RunnerMixin:
             env=cli_env(WRAP_WIDTH, simple=True, source=source),
             cwd=os.path.dirname(CLI_PATH),
         )
-        # The coach's run takes the second place, and the chat stays free
-        # (DESIGN_waiting_proposal.md §6.1).
-        coach = is_coach_argv(argv)
-        session = Session(chat_id, proc, secrets.token_hex(4), quiet=quiet, coach=coach)
-        place = self.coach_runs if coach else self.sessions
+        # A long run takes the second place, and the chat stays free. `run` names it when
+        # the argv alone does not say, as for a tap (DESIGN_long_runs_beside_chat.md §2, §6).
+        run = run or long_run(argv)
+        session = Session(chat_id, proc, secrets.token_hex(4), quiet=quiet, long=run)
+        place = self.long_runs if run else self.sessions
         place[chat_id] = session
         session.task = asyncio.create_task(self._drive(session))
         return session

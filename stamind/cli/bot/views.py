@@ -72,6 +72,12 @@ SESSION_BUTTONS = [
 # prescription back with a "can't today" row attached is a ping about nothing (§4.1).
 PUSH_ALL_DONE_LINE = "✅ Already done for today — nice work 💪"
 
+# Where the coach's reason would stand, when a session was written while the week planner
+# thought: nothing is saved or written (DESIGN_long_runs_beside_chat.md §3).
+WEEK_CHANGED_MORNING_LINE = (
+    "I had a change in mind, but your week changed while I was thinking."
+)
+
 # --- Pickers (§12.1: the model picks that something should change, the tap picks which) ---
 
 def _picker_leaves(rows: Sequence[Dict[str, Any]], command: str) -> List[dict]:
@@ -170,9 +176,10 @@ def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str
 
     A session that would change is saved as a proposal and nothing is written. Kilograms
     that moved alone are written at once, with their sentence as the line
-    (DESIGN_waiting_proposal.md §5, §7). A failure must not sink the push: the schedule
-    then renders as stored, and the error surfaces only as a terminal aside — never in the
-    athlete's chat.
+    (DESIGN_waiting_proposal.md §5, §7). Neither happens when a session was written while
+    the week planner thought (DESIGN_long_runs_beside_chat.md §3). A failure must not sink
+    the push: the schedule then renders as stored, and the error surfaces only as a
+    terminal aside — never in the athlete's chat.
 
     The strength planner's notice is the line when nothing changed, which is what covers
     the morning of the gym day itself (DESIGN_strength_tracking.md §9)."""
@@ -195,6 +202,10 @@ def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str
         if not proposal.workouts:
             runtime.coach_service.workout_revision_record_no_change(proposal)
             return proposal.strength_notice, None
+        # The chat is free while this run thinks, so a tap may have written a session since
+        # it read the week (DESIGN_long_runs_beside_chat.md §3).
+        if newest_written() != written_upto:
+            return WEEK_CHANGED_MORNING_LINE, None
         if proposal.week_planner_changed:
             item = saved_proposal.save(
                 proposal, written_upto, replaces=still_open is not None

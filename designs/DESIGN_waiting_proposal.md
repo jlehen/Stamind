@@ -231,8 +231,10 @@ The run itself changes little:
 - When the week planner changes nothing, the athlete is told so, as today.
 
 The morning push, a reminder and a heads-up wait while the coach's run is alive, the way they
-already wait for a busy chat. The reverse holds too: while the morning push runs, a message to
-the coach gets the busy line.
+already wait for a busy chat. The reverse held too until 2026-10-14: while the morning push ran,
+a message to the coach got the busy line. Amended 2026-10-14: the morning push runs in the
+second place as well, and a message to the coach sent while it runs is kept and started when it
+ends (DESIGN_long_runs_beside_chat.md §3, §7).
 
 ### 6.2 The next message to the coach
 
@@ -256,6 +258,11 @@ lost: its question still waits.
 
 A button that sends a fixed sentence follows the same two rules. It is refused before its row
 of buttons is removed, so the athlete can tap it again.
+
+Amended 2026-10-14: while the coach is thinking, the message is no longer refused. It is kept,
+and started when the run ends, and the line is "I'm still working on your last message — I'll
+pass this one on right after." A button's row is then spent like any tap. Only the run that
+waits on a question still refuses, as above (DESIGN_long_runs_beside_chat.md §7).
 
 **A proposal waits.** At 07:07 the coach proposes to skip today's ride. The athlete does not
 tap. At 07:30 they write "no, shorten it instead". The new run looks for the open proposal
@@ -488,7 +495,9 @@ fact a proposal carries.
 - Only a message to the coach runs beside the chat. The morning push, `workout generate` from
   its button, and the adaptation after a goal or constraint edit still hold the chat while they
   run. The confirm of `workout generate`, like every other confirm in the chat, still times out
-  after five minutes. Freeing them is a later design, which reuses the second place.
+  after five minutes. Freeing them is a later design, which reuses the second place. Amended
+  2026-10-14: that design is DESIGN_long_runs_beside_chat.md, and the morning push now runs
+  beside the chat.
 
 ## 9. Build order
 

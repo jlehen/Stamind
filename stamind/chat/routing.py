@@ -135,6 +135,27 @@ def is_coach_argv(argv: Sequence[str]) -> bool:
     return list(argv[:2]) in [message[:2] for message in ROUTER_MESSAGE_ARGV.values()]
 
 
+# The long runs, named for what the athlete is told while one is alive
+# (DESIGN_long_runs_beside_chat.md §2, §7).
+COACH_RUN = "coach"
+MORNING_RUN = "morning"
+PLANNING_RUN = "planning"
+
+
+def long_run(argv: Sequence[str]) -> Optional[str]:
+    """Which long run a command line starts, or None: a message to the coach, the morning
+    run, or `workout generate --propose`. A long run takes the chat's second place
+    (DESIGN_long_runs_beside_chat.md §2)."""
+    if is_coach_argv(argv):
+        return COACH_RUN
+    head = list(argv[:2])
+    if head == ["bot", "morning"]:
+        return MORNING_RUN
+    if head == ["workout", "generate"] and "--propose" in argv:
+        return PLANNING_RUN
+    return None
+
+
 # The intents that need values out of the message: each runs `bot capture <intent>` with
 # the athlete's text, and that second, domain-focused call extracts, previews and asks
 # (§12.2). The two note intents share one inbox — they differ only in the echo, so a

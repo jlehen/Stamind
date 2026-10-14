@@ -217,7 +217,7 @@ def record_commands(testcase, chat_bot: ChatBot) -> list:
     """Replaces `_start_command` with a recorder; returns the list it fills."""
     started = []
 
-    async def start(chat_id, argv, quiet=False, source="bot"):
+    async def start(chat_id, argv, quiet=False, source="bot", run=None):
         started.append((chat_id, list(argv), quiet, source))
         done = asyncio.get_running_loop().create_future()
         done.set_result(None)

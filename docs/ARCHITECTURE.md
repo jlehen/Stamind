@@ -151,15 +151,18 @@ classes themselves.
   - **State / safety:** a chat has two places, each holding at most one in-flight
     `chat.runner.Session` (the process + pending-prompt state). Its own place
     (`ChatBot.sessions`) takes every command, and the chat is busy while one runs there.
-    The second (`ChatBot.coach_runs`) takes the coach's run only: any `workout adapt` or
-    `workout tweak` the chat starts (`routing.is_coach_argv`). So while the coach thinks,
-    "show my week" answers at once and a tap on a proposal's "Change it" is applied
-    (DESIGN_waiting_proposal.md §6.1). The bot never ends one run of the coach to start
-    another: while one is alive, a message to the coach is not taken and gets one line
-    (`runner._coach_busy`), "I'm still working on your last message — send that again in a
-    minute." or, when the run waits on a question of its own, "I asked you something
-    above. Answer it, then send that again." (§6.2). The morning push, a reminder and a
-    heads-up wait for both places. A per-command `nonce` (in the button `callback_data`)
+    The second (`ChatBot.long_runs`) takes a long run, one that asks the week planner:
+    any `workout adapt` or `workout tweak` the chat starts, and the morning run
+    (`routing.long_run`). So while the coach thinks, "show my week" answers at once and a
+    tap on a proposal's "Change it" is applied (DESIGN_waiting_proposal.md §6.1,
+    DESIGN_long_runs_beside_chat.md §2). The bot never starts a second long run beside
+    the first: while one is alive, a message to the coach is kept (`ChatBot.kept`), started
+    when the first ends (`runner._start_kept`), and the athlete is told so with a line that
+    names the run alive (`runner._keep_behind`, `runner.KEPT_LINES`), such as "I'm
+    preparing your morning message — I'll pass this on right after." When the run alive
+    waits on a question of its own, nothing is kept: "I asked you something above. Answer
+    it, then send that again." (§7). `/cancel` drops what was kept. The morning push, a
+    reminder and a heads-up wait for both places. A per-command `nonce` (in the button `callback_data`)
     finds the run that raised a prompt or a Stop button and rejects stale taps. `/cancel`
     ends the command in both places, and an idle `telegram.prompt_timeout_seconds` ends
     the run that asked with "No answer, so I stopped there."; both send a cancellation
@@ -229,8 +232,8 @@ classes themselves.
       `_serve`, the Application/Updater lifetime.
     - `runner` is one CLI subprocess per place of a chat: `Session`, the environment the
       child gets, `_start_command` choosing the place, `_drive` reading its stdout to the
-      end, `_runs` and `_run_by_nonce` reading both places, `_coach_busy`, `_route_intent`,
-      and `restart_teardown`.
+      end, `_runs` and `_run_by_nonce` reading both places, `_keep_behind` and `_start_kept`
+      for a second long run, `_route_intent`, and `restart_teardown`.
     - `replies` is what goes back into the chat for that command: prose, a chart, an
       offer row, a queued item, a question — and the ✋ Stop button the flushes raise and
       retire. `_send_keyed` is the one way the companion keyboard is attached to a send:
@@ -243,8 +246,9 @@ classes themselves.
     - `routing` is what one chat message means — both halves of the router's intent table
       (`ROUTER_INTENTS`, which `sm bot route` builds its prompt from, and the intent→argv,
       intent→capture and echo tables the bot maps a returned name onto), plus
-      `parse_message_to_argv` and `is_coach_argv`, which says whether a command line is a
-      message to the coach.
+      `parse_message_to_argv` and `long_run`, which says whether a command line is a long
+      run, and which: a message to the coach, the morning run or `workout generate
+      --propose`.
     - `keyboards` is every button the bot draws and every tap it decodes — the reply
       keyboard with what each label runs, the gym button that opens the Mini App
       (`gym_button`, §16), the calendar cell's place in the layout (`CALENDAR_LABEL`,
@@ -809,7 +813,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A preference the athlete can change at runtime | `stamind/settings.py` (the registry: one `Setting`, its validator, its config key, its cache hook), `cli/settings.py` (the listing and the two rich detail views), and the reader that consumes it — `llm_models.active_model`, `clock.active_zone`, or a named reader in `settings.py` for the morning-push knobs. Adding one is a registry entry, not a command, DESIGN_settings.md |
 | Cycle retrospectives (the stored record of a finished mesocycle or plan) | `stamind/cycle_records.py` (which records exist, when one is due, how one reads), `db/retrospectives.py` (the rows), `coach/service/retrospective.py` (the write step and the numbers), `coach/engine/retrospective.py` (the writer's prompt), `stamind/retrospective_question.py` (the question and its answer), `coach/service/history_context.py` (what `plan generate` reads), `cli/plans/show.py` (`plan show -vv`, each record under the text it looks back on) and `cli/plans/retro.py` (`plan retrospective`, the view laid out like the plan, and `plan retro redo`), `cli/common.py` (`print_mesocycle_head`, the timeline entry, and `print_retrospective`, what a record holds, which both views draw), DESIGN_cycle_retrospective.md |
 | A question or message for the athlete that no command waits on | A `Kind` (`stamind/queue_kind.py`) added to `KINDS` in `stamind/athlete_queue.py` — its wording (expert and companion), its stale check, what each answer does (raising `NotApplied` to leave the item waiting), its drop label, and whether its items stand alone — and `queue_kind.queue(kind, subject, payload)` from the feature, answers included. Nothing to schedule, nothing to remember, nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
-| A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` queue kind: its wording, the three rules that put it out of date, what "Change it" and "Keep it as planned" do, `save`, `open_proposal`, `shown_to_week_planner`), `coach/proposals.py` (`week_planner_changed`; `revision_to_json`/`revision_from_json`, what a tap writes, without the sleep mark), `coach/engine/notes.py:open_proposal_task` (how the week planner reads the open one), `cli/queue.py:send_alone` (the sending), `cli/workouts/adapt.py:_settle` (a chat run saves one in place of the confirm), `chat/runner.py` (the second place per chat for the coach's run), `cli/bot/views.py:_morning_adaptation` (the push saves one). DESIGN_waiting_proposal.md |
+| A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` queue kind: its wording, the three rules that put it out of date, what "Change it" and "Keep it as planned" do, `save`, `open_proposal`, `shown_to_week_planner`), `coach/proposals.py` (`week_planner_changed`; `revision_to_json`/`revision_from_json`, what a tap writes, without the sleep mark), `coach/engine/notes.py:open_proposal_task` (how the week planner reads the open one), `cli/queue.py:send_alone` (the sending), `cli/workouts/adapt.py:_settle` (a chat run saves one in place of the confirm), `chat/runner.py` (the second place per chat for a long run), `cli/bot/views.py:_morning_adaptation` (the push saves one). DESIGN_waiting_proposal.md |
 | A strength activity's sets | `strength/sets.py` (parse, read once, freeze, groups, `exercise_lines`, `activity_lines`, `logbook`), `strength/vocabulary.py` + `exercises.tsv` (a name Garmin adds later is appended to its line there, or gets a line of its own; the first name of a line is stored and never moves; then rebuild `miniapp/exercises.json` with `miniapp/build_exercises.py`), `strength/questions.py` (the two queue kinds), `db/strength.py`, `cli/strength.py` (`strength name`/`reset`/`discard`), `cli/strength_log.py` (`strength log`/`exercises`, which read the record and the table back), the `strength-sets-since` setting. DESIGN_strength_tracking.md, DESIGN_exercise_table.md |
 | A gym session logged on the phone | `miniapp/` (the page), `strength/logger.py` (the two payloads), `cli/strength_ingest.py` (`strength ingest`), `strength/sets.py::take_over_logs` (the pull handing the log to Garmin's activity), `gym_logs` + `upsert_logged_activity`/`save_gym_log`/`gym_log_for_day`/`garmin_activity_with_log`/`move_gym_log` in `db/strength.py`. The bot's button and the handler for the page's message are DESIGN_gym_logger.md §6 and not wired yet. DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
 | A past strength session against its planned lines | `strength/comparison.py` (the counting, the marks, the totals, the §6 reason), `db/strength.py::attach_lifted` (what `get_completed_activities` puts on a strength activity: `lifted`, and `gym_log`), `analytics/adherence.py` (`_discrepancy_reasons` grades a logged session by its sets, `_pairing_order` and `is_ambiguous_match` put the logged activity first), `cli/common.py` (`strength_table` for `workout list -vv` and `workout compare`, `simple_comparison_lines` for "Done lately" and `strength ingest`), `strength/sets.py::done_text` (the Done cell). DESIGN_strength_planned_vs_done.md |
@@ -3681,7 +3685,7 @@ top-level import would put all five `garmin/` modules on every command's startup
 |                                | lines under the activity, `strength log`/`exercises` reading the |
 |                                | record back, the morning push reading sets before it sends from the queue |
 | `tests/test_strength_comparison.py` | a past strength session planned against done (DESIGN_strength_planned_vs_done.md), on the design's Thursday: which sets count, the marks and totals, the verdict by sets and the one kept by time and load, the logged activity pairing first and never asked about, the sets on the activity, the same-day takeover, the table, the companion lines, `workout show` and `workout compare` |
-| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (in no line, no "Not now", saving one closes the others, out like any item), the morning push that proposes a session change and writes kilograms at once, and the chat run that saves its proposal, is shown the open one and replaces it, queues its constraint question, which goes out when the proposal is answered or at once when nothing changes, and saves nothing when the week changed while it thought. Also the queue's rule for replies (DESIGN_athlete_queue.md §13.2 rule 6): a run's proposal going out while an item is out, the line waiting for it, what follows the run's last question, and a tap on a later day. The tweak that keeps the open proposal's days is in `test_workout_tweak.py`, the prompt gate in `test_prompt_gates.py`, and the second place per chat with its two refusals and the time-out line in `test_chat_coach_run.py` |
+| `tests/test_waiting_proposal.py` | a proposal that waits for the athlete's answer (DESIGN_waiting_proposal.md), on the design's Thursday: what each answer writes, the three out-of-date rules and the Garmin pull before "Change it", the stand-alone item (in no line, no "Not now", saving one closes the others, out like any item), the morning push that proposes a session change and writes kilograms at once, and the chat run that saves its proposal, is shown the open one and replaces it, queues its constraint question, which goes out when the proposal is answered or at once when nothing changes, and saves nothing when the week changed while it thought. Also the queue's rule for replies (DESIGN_athlete_queue.md §13.2 rule 6): a run's proposal going out while an item is out, the line waiting for it, what follows the run's last question, and a tap on a later day. The tweak that keeps the open proposal's days is in `test_workout_tweak.py`, the prompt gate in `test_prompt_gates.py`, and the second place per chat, the long runs kept behind the one alive, the refusal while it asks and the time-out line in `test_chat_coach_run.py` |
 | `tests/test_change_heads_up.py` | telling the athlete about a change they did not watch (DESIGN_change_heads_up.md): the send rule and the notice's timing on fixed clocks, the line for a change to today, who is watching, the replace question and its ways out, `workout notify` with `--all` and `--sent` and their tags, `workout batches`. `bot changes` and the rollback's line are in `test_cli_bot.py`, the scheduler step in `test_bot.py`, the prompt paragraph in `test_prompt_gates.py`. `tests.helpers.started_from` pins where the run started, the terminal or the athlete's chat |
 | `tests/test_constraints*.py`   | the constraint object: DB windowing, the §8 message capture and |
 |                                | the hard-rest pre-pass (`test_constraints.py`); the §7          |

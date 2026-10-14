@@ -63,8 +63,9 @@ class MessagesMixin:
         # adaptation. A misroute across that line degrades gracefully both ways (§12.3).
         if intent in ROUTER_MESSAGE_ARGV:
             argv = [*ROUTER_MESSAGE_ARGV[intent], text]
-            # Not taken while a run of the coach is alive, and it gets no echo.
-            if await self._coach_busy(chat_id, argv):
+            # Kept while another long run is alive, and it gets no echo
+            # (DESIGN_long_runs_beside_chat.md §7).
+            if await self._keep_behind(chat_id, argv):
                 return None
         elif intent in ROUTER_CAPTURE_INTENTS:
             argv = ["bot", "capture", ROUTER_CAPTURE_INTENTS[intent], text]
@@ -113,8 +114,11 @@ class MessagesMixin:
             pass
 
     async def _cancel(self, chat_id: int) -> str:
-        """/cancel: ends the command in both places of the chat."""
+        """/cancel: ends the command in both places of the chat, and drops the long runs
+        kept behind them before the one alive can start them
+        (DESIGN_long_runs_beside_chat.md §10)."""
         self.armed.pop(chat_id, None)  # /cancel also drops a "💬 Talk to me" tap (§5.2)
+        self.kept.pop(chat_id, None)
         runs = self._runs(chat_id)
         if not runs:
             return "Nothing to cancel."
@@ -126,7 +130,7 @@ class MessagesMixin:
         """Tears down, replies, then hard-exits with RESTART_EXIT_CODE for the sm-bot
         supervisor to relaunch us. See DESIGN_bot_restart.md §5.2."""
         await runner.restart_teardown(
-            self.sessions.get(chat_id), self._pause_polling, self.coach_runs.get(chat_id)
+            self.sessions.get(chat_id), self._pause_polling, self.long_runs.get(chat_id)
         )
         runner.leave_restart_note(chat_id)
         await self.bot.send_message(chat_id=chat_id, text="Restarting…")
@@ -170,8 +174,8 @@ class MessagesMixin:
                 fut.set_result(prompt_answer(awaiting.get("id"), answer=text))
                 self._log(chat.id, "  ", "text answer")
                 return
-        # Only the chat's own place makes it busy: the coach's run works beside it
-        # (DESIGN_waiting_proposal.md §6.1).
+        # Only the chat's own place makes it busy: a long run works beside it
+        # (DESIGN_long_runs_beside_chat.md §2).
         if self.sessions.get(chat.id) is not None:
             await message.reply_text(BUSY_NOTICE)
             return
@@ -214,7 +218,7 @@ class MessagesMixin:
         except ValueError:
             await message.reply_text("Couldn't parse that — check your quotes.")
             return
-        if not argv or await self._coach_busy(chat.id, argv):
+        if not argv or await self._keep_behind(chat.id, argv):
             return
 
         self._log(chat.id, "  ", f"run: {shlex.join(argv)}")

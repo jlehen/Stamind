@@ -19,7 +19,10 @@ from stamind.db import Database
 import stamind_cli
 
 from stamind import clock, runtime
-from stamind.cli.bot.views import MORNING_MARKER, PUSH_ALL_DONE_LINE
+from stamind.cli.bot.views import (
+    MORNING_MARKER, PUSH_ALL_DONE_LINE, WEEK_CHANGED_MORNING_LINE,
+)
+from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
 from stamind.config import config
 from stamind.heads_up import CHANGE_LEAD, UNDONE_ONE, UNDONE_PLAIN, UNDONE_SEVERAL
@@ -331,6 +334,38 @@ class MorningPushTest(unittest.TestCase):
             run_cli(["bot", "morning"])
         self.assertEqual(announced, [False])
         self.assertTrue(openrouter_client.announces_wait)
+
+    def _changed_while_thinking(self, week_planner_changed):
+        """Friday 08:00: the morning run asks the week planner. At 08:00:40, while it
+        thinks, a tap on Thursday evening's proposal rewrites tomorrow's session
+        (DESIGN_long_runs_beside_chat.md §3)."""
+        save_workout(test_db, today_str(), "running", "Easy run", duration_minutes=40)
+        tomorrow = (clock.today_date() + timedelta(days=1)).isoformat()
+
+        def think(*_args, **_kwargs):
+            save_workout(test_db, tomorrow, "running", "Long run", duration_minutes=100)
+            return MagicMock(
+                workouts=[{"date": today_str()}], reason="Ease today's run.",
+                strength_notice=None, week_planner_changed=week_planner_changed,
+            )
+
+        coach = MagicMock()
+        coach.workout_adapt.side_effect = think
+        cfg, svc, pull = self._adapt_first_env(coach)
+        with cfg, svc, pull:
+            code, out, _ = run_cli(["bot", "morning"])
+        self.assertEqual(code, 0)
+        self.assertIn(WEEK_CHANGED_MORNING_LINE, out)
+        self.assertNotIn("Ease today's run.", out)
+        self.assertIn("Easy run", out)
+        coach.workout_revision_apply.assert_not_called()
+        self.assertEqual(saved_proposal.waiting(), [])
+
+    def test_a_week_that_changed_while_it_thought_saves_no_proposal(self):
+        self._changed_while_thinking(week_planner_changed=True)
+
+    def test_a_week_that_changed_while_it_thought_writes_no_kilograms(self):
+        self._changed_while_thinking(week_planner_changed=False)
 
     def test_adapt_failure_does_not_sink_the_push(self):
         save_workout(test_db, today_str(), "running", "Easy run")
