@@ -1,3 +1,5 @@
+"""The `learnings` command family, with the service mocked, and the check that every
+learning tuning knob is documented."""
 import os
 import unittest
 

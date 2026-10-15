@@ -1,3 +1,6 @@
+"""`analytics/timeline.py`: majority-overlap labeling (DESIGN_progress_timeline.md §6.1),
+band trimming, the zero-load workout count, `assemble_timeline`'s payload and coded
+warnings, `select_weeks`/`clip_payload`, and the empty states."""
 import os
 import unittest
 from datetime import date, timedelta

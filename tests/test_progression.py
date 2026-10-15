@@ -1,3 +1,8 @@
+"""`analytics/progression.py` pure functions: the merged-load seam rule (the zero-load
+activity included), the stored-read past plus the anchored fold (closed-form decay, a
+morning-pull today row ignored, a trailing-NULL anchor skipped, no-anchor suppression,
+non-default τ continuity), the generated-only plan-end clamp, Monday bucketing, the
+in-progress elapsed split (today only once synced), and part-week plan coverage."""
 import os
 import unittest
 from datetime import date, timedelta

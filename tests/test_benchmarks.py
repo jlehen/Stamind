@@ -1,3 +1,6 @@
+"""The benchmark logbook: the anchor vocabulary (`anchors_for_sport`, the units, the
+direction-aware delta), the rows, the effective thresholds, the CLI, and the placement
+guards."""
 import os
 import unittest
 

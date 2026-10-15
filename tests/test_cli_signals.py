@@ -1,3 +1,4 @@
+"""The `signal` command family: output and argument handling, with the service mocked."""
 import os
 import unittest
 from unittest.mock import patch

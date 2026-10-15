@@ -1,3 +1,4 @@
+"""The `status` command: output and argument handling, with the service mocked."""
 import os
 import unittest
 from datetime import datetime, timedelta, timezone

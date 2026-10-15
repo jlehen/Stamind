@@ -1,3 +1,5 @@
+"""Garmin transforms (the load model), zone parsing, the watermark and auto-ensure
+policy, the recompute, and `backfill_tss`."""
 import io
 import os
 import unittest

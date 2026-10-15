@@ -1,3 +1,4 @@
+"""`analyze_adherence()`: misses, tolerances, rest violations."""
 import os
 import unittest
 from datetime import date

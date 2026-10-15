@@ -1,3 +1,5 @@
+"""`stamind/openrouter.py`: the JSON read out of a reply (bare or fenced), the client, the
+flush before a call, the wait notice and its human wording."""
 import io
 import os
 import unittest

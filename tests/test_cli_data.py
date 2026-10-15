@@ -1,3 +1,4 @@
+"""The `data` command family: output and argument handling, with the service mocked."""
 import io
 import os
 import unittest

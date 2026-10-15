@@ -1,3 +1,7 @@
+"""The `plan` command family, with the service mocked, and the retrospective views
+(DESIGN_cycle_retrospective.md §8, §9): `plan show` with and without `-v`, `plan retro redo`
+with `--words` and `--clear-words`, a failed redo, and `plan rm` and `plan wipe` deleting
+the records."""
 import json
 import os
 import unittest

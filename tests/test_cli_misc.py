@@ -1,3 +1,5 @@
+"""The CLI's help and usage: the recursing `help`, the wrap to the client's width, and the
+missing-argument lines on a terminal and on the JSON front-end."""
 import os
 import unittest
 from unittest.mock import patch

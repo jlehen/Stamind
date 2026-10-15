@@ -1,3 +1,5 @@
+"""The dashless command syntax: the option translator, command-prefix resolution, the
+command-tree invariants, and a few command lines end to end."""
 import io
 import os
 import unittest

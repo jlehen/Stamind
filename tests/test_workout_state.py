@@ -1,3 +1,5 @@
+"""The two derived axes of a session: the calendar signature over exactly the rendered
+fields, and what `unpushed`/`synced`/`stale` mean."""
 from tests.helpers import rebind_test_db, restore_db_handles, save_workout
 import os
 import unittest

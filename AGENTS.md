@@ -55,6 +55,13 @@
 # Code
 - Read docs/ARCHITECTURE.md to ramp up on the code structure.
 - When changing code, always update docs/ARCHITECTURE.md if appropriate.
+- docs/ARCHITECTURE.md is read in full before every task, so every line costs every task.
+  It holds what an agent needs before its first grep: one line per module, the change
+  recipes (files and functions), each data flow as a short numbered list, one line per
+  table column and per command flag, and the rules that span files. A fact that matters
+  only inside file X lives in X's docstring or its design doc, and the document points at
+  it; rationale lives in the design doc, and a decision with no design doc gets a short
+  §15 entry. "The bump to 27 adds…" is a commit message, not architecture.
 - When adding a new feature, always reflect if this needs to be integrated
   in each command and data flow.
 - When storing values in the database, always lean toward storing exact or
@@ -130,7 +137,10 @@
   trim the docstring before reaching for a split. Three things stay over 500 lines on
   purpose: `stamind_web.py`, a flat list of independent GET handlers that splitting
   would not separate; `db/schema.py`, one ordered run of CREATE statements that
-  `SCHEMA_VERSION` versions as a unit; and `static/style.css`, which is not Python. One
+  `SCHEMA_VERSION` versions as a unit; and `static/style.css`, which is not Python. Two
+  more are over 500 because one method holds them there, and the cut is a refactor of that
+  method rather than a file move: `coach/engine/adapt.py` (`_workout_adapt_logic`) and
+  `coach/service/analysis.py` (`_run_workout_analysis`). One
   file stays under the 100-line floor for a reason the rule does not list:
   `stamind_bot.py` is 38 lines that build `stamind.chat.app.ChatBot` and run it, and
   it cannot be merged into a sibling because the `sm-bot` supervisor execs it by path.

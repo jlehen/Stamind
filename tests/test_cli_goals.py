@@ -1,3 +1,5 @@
+"""The `goal` command family, with the service mocked, and calling a goal off
+(`goal edit --status archived`, `goal rm`) and back."""
 import os
 import unittest
 from datetime import datetime, timedelta, timezone

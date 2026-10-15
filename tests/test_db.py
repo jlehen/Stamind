@@ -1,3 +1,5 @@
+"""`Database` CRUD, evidence-based confidence (derivation, dedup, week validation,
+contradiction/demote/keep, staleness), decay, and `analysis_cache`."""
 import os
 import unittest
 from datetime import datetime, timedelta, timezone
