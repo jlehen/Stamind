@@ -9,8 +9,12 @@ athlete queue is the stored list of things Stamind wants to ask or tell the athl
 question arrives. It says, for each question, what it asks, what its answers do, and when it
 closes itself.
 
-Three neighbouring questions are settled in DESIGN_long_runs_beside_chat.md and are not
-designed again here (§7).
+It also stands on DESIGN_long_runs_beside_chat.md, built on 2026-10-14. That build gave the
+queue two things this design needs. A kind of question can be marked a confirmation: its
+questions stand first in the line and close after the `confirmation-days` mornings (§2). And a
+tap on an answer can start one of the coach's runs, which take minutes, beside the chat: the
+chat stays free while the coach thinks. Three neighbouring questions are settled in that design
+and are not designed again here (§7).
 
 ## 1. The problem
 
@@ -67,7 +71,9 @@ DESIGN_session_notes.md §3). They come at once today. They take the other two r
 so that every confirmation behaves the same. On 7 October the athlete writes "No training on
 November 12th" and never taps. The question is sent that day and on the next three mornings.
 On 11 October it is closed, and the constraint is not stored. Today it would be sent each
-morning until 12 November.
+morning until 12 November. Two more confirmations were built with DESIGN_long_runs_beside_chat.md
+and follow all three rules already: "Shall I pass it to your coach?" and "Shall I plan these
+weeks?" (§7).
 
 All of them are drawn bare: no "🙋 Quick question" above, no "Not now" under
 (DESIGN_waiting_proposal.md §6.3). What the command prints before its question
@@ -75,9 +81,19 @@ today becomes part of the question, in one message, because a question left unan
 again whole the next morning.
 
 The cut-short question is not a confirmation. The athlete wrote about something else. It is an
-ordinary question, with "Not now" under it, and it stands at the front of the line (§3).
+ordinary question, with "Not now" under it. But it takes a confirmation's place and life: it
+stands at the front of the line, and it closes after the `confirmation-days` mornings (§3,
+choice 18).
 
 A terminal keeps asking on the spot, because someone sits there.
+
+**A row of buttons under a view is not a question, and stays a row.** A view is what the
+athlete reads on screen. "👍 All good" and "🗑 Remove one" stand under the constraints, "🗑 Call
+one off" under the goals, a row under the morning message, "📅 Plan my next weeks" under the
+week, and a mesocycle's button under the plan. Each acts on what is on screen and asks nothing,
+and showing the view again brings it back. An offer the bot makes after an answer or a message
+is a question, and goes through the queue (§4). Ruled 2026-10-15, and made a design rule of the
+app (AGENTS.md, Design).
 
 ## 3. "Was that the session, cut short?"
 
@@ -107,7 +123,8 @@ The words and the two answers are today's.
 - **Yes** stores the answer. "Counted as that session, partially performed."
 - **No** stores the answer. "Discarded — the session reads as not done." The 20-minute ride is
   then read as something else the athlete did.
-- **No answer.** It comes back with the next morning's questions.
+- **No answer.** It comes back first on each of the next three mornings, as a confirmation
+  does. On the fourth it is closed (choice 18).
 
 At 12:15 the athlete writes "I'm tired, can we go easier this weekend?". Nothing is asked. The
 week planner is called at once.
@@ -140,6 +157,12 @@ run leaves the question to the line, where it stands first and follows the brief
 The question closes without a word when it is no longer open: the athlete answered it in a
 terminal, the session was removed, or its day is further back than the days `workout adapt`
 looks back over. The check is the one that finds the question in the first place.
+
+It also closes on the fourth morning, like a confirmation (choice 18). It is Friday 16
+October. The athlete leaves the question unanswered on Friday, Saturday, Sunday and Monday. On
+Tuesday morning it is closed without a word. No answer is stored, so Thursday's ride stays
+counted as the session, cut short, with its 20 minutes. It is not asked again: the queue keeps
+one item per question, even a closed one.
 
 **What the answer changes for the week planner.** For a session of a past day, the facts it
 reads are the same either way: 20 minutes were ridden and the 90 were not. Only the label
@@ -253,7 +276,9 @@ asks when a message about a session lands on the goal or constraint lane:
 
 "Yes" passes the athlete's words to the coach, beside the chat. "No" answers "Okay — I'll
 leave it.". It is the kind `pass_to_coach` of that design, with this first line. After a
-preference, the question follows the sentence that says where a preference belongs.
+preference, the question follows the sentence that says where a preference belongs. That kind
+also closes once the day of the session it names is over. A miss names no session, so only the
+`confirmation-days` mornings close it.
 
 Both offers are confirmations under the three rules of §2.
 
@@ -328,26 +353,26 @@ question arrives again at once with its buttons.
 
 ## 7. Settled elsewhere
 
-DESIGN_long_runs_beside_chat.md, proposed on 2026-10-08 and ruled on 2026-10-14, holds three
-more:
+DESIGN_long_runs_beside_chat.md, ruled and built on 2026-10-14, holds three more. In the chat
+each is now a saved question:
 
-- The question after `workout generate` thinks, "Schedule these 12 workouts…?", becomes a saved
-  item with two buttons (§4 there).
+- The question after `workout generate` thinks, "Schedule these 12 workouts…?", is "Shall I
+  schedule these 12 sessions?", with "✅ Schedule them" and "✖️ Leave it" (§4 there).
 - "…Regenerate?", asked before `workout generate` thinks when sessions already stand in the
-  days it would write, becomes a saved question. Its "Plan them" starts the planning (§4 and
-  §6 there).
-- "Shall I pass it to your coach?", asked when a message about a session lands on the goal or
-  constraint lane, becomes a saved question. Its "Yes" passes the athlete's words to the coach
-  (§5 and §6 there).
+  days it would write, is "Shall I plan these weeks?". Its "Plan them" starts the planning
+  beside the chat (§4 and §6 there).
+- "Shall I pass it to your coach?" is asked when a message about a session lands on the goal or
+  constraint lane. Its "Yes" passes the athlete's words to the coach beside the chat (§5 and §6
+  there).
 
-The last two are confirmations under the three rules of §2. "…Proceed anyway?", asked when the
-plan, the periodization, is out of date, is no longer asked in the chat: the run stops and says
-why (§4 there).
+The last two are confirmations under the three rules of §2, and are built so. "…Proceed
+anyway?", asked when the plan, the periodization, is out of date, is no longer asked in the
+chat: the run stops and says why (§4 there).
 
 ## 8. Choices made without the author
 
-The numbers are the ones the author was given them under. All are ruled but the details of
-choice 16.
+The numbers are the ones the author was given them under. All are ruled. Choice 18 came with
+the rebase onto the build of the long runs.
 
 1. **The cut-short question no longer comes before the week planner's call** (§3). Today the
    athlete answers "No, it was a warm-up" at 12:15 and the proposal of 12:17 knows Thursday's
@@ -439,15 +464,28 @@ choice 16.
     author's condition on the queue (DESIGN_athlete_queue.md §13.5, choice 15), which was
     given for the questions about what the athlete wrote. **Ruled 2026-10-14: as designed.**
 16. **The offer to adjust the week becomes a question** (§4). **Ruled 2026-10-14**, in the
-    author's words: "Everything goes through the queue." The details are mine and not ruled:
-    the words "Shall I adjust your week around this constraint?", the reply "Okay — I'll leave
-    your week as it is.", and that it closes once the coach has looked at the week again. The
-    other way for the last one is the three days alone: a question about Saturday's
-    constraint could then come back on Sunday morning, after the morning run has already
-    worked around it.
+    author's words: "Everything goes through the queue." The details were mine: the words
+    "Shall I adjust your week around this constraint?", the reply "Okay — I'll leave your week
+    as it is.", and that it closes once the coach has looked at the week again. The other way
+    for the last one is the three days alone: a question about Saturday's constraint could
+    then come back on Sunday morning, after the morning run has already worked around it.
+    **Ruled 2026-10-15: as designed.**
 17. **The offer to pass a message to the coach becomes the question of the hand-off** (§4).
     **Ruled 2026-10-14**, in the same words. That one kind, `pass_to_coach`, serves both
     places, with the first line of each.
+18. **The cut-short question closes after the `confirmation-days` mornings** (§2, §3). The
+    build of the long runs made the front of the line part of being a confirmation: one mark
+    on a kind puts its questions first and closes them after three mornings. As now written,
+    the cut-short question takes that mark. It is Friday 16 October. The morning run queues
+    the question about Thursday's short ride, and the athlete never taps it. It comes first on
+    Friday, Saturday, Sunday and Monday. On Tuesday morning it is closed without a word, and
+    Thursday's ride stays counted as the session, cut short. The other way gives the cut-short
+    question a mark of its own, which puts it first without closing it. It then comes first
+    every morning until its day is more than 15 days back (`coach.metrics_lookback_days`),
+    here until Thursday 29 October. While it is out and not tapped, no other question is sent
+    that day. So an athlete who leaves it sees no other question for two weeks. As written,
+    that lasts three mornings, as for any confirmation, and the queue needs no new mark.
+    **Ruled 2026-10-15: as written.**
 
 ## 9. Not handled
 
@@ -458,21 +496,16 @@ choice 16.
   before tapping. Each tap lands on its own question.
 - A proposal made at 12:17 on the app's own pairing is not made again when the cut-short
   question is answered "No".
-- The rows of buttons under what the athlete asked to see stay rows: "👍 All good" and "🗑
-  Remove one" under the constraints, "🗑 Call one off" under the goals, the row under the
-  morning message, "📅 Plan my next weeks" under the week, a mesocycle's button under the
-  plan. They are not questions the bot asks. They act on what the athlete is reading, and
-  asking for the same view again brings them back.
 
 ## 10. Touch points
 
-It is built on revision 4, one question at a time. Each of the eight, the six questions and
-the two offers, is independent of the others. Revision 4 already gives most of what they need:
-a run sends its own replies, and a kind's own check runs before a send and on a tap. Two things
-are new in the queue: a kind whose items stand first in the line, and an answer that puts its
-own question off until the next morning. The two offers also need the tap that starts a long
-run beside the chat, and the kind `pass_to_coach`, both from DESIGN_long_runs_beside_chat.md
-(§5, §6 there). They are built with that design or after it.
+It is built one question at a time. Each of the eight, the six questions and the two offers,
+is independent of the others. The queue already gives most of what they need. From revision 4:
+a run sends its own replies, and a kind's own check runs before a send and on a tap. From the
+build of the long runs: a kind marked a confirmation stands first and closes after the
+`confirmation-days` mornings, an answer can start a run of the coach beside the chat, and the
+kind `pass_to_coach` exists. One thing is new in the queue: an answer that puts its own
+question off until the next morning.
 
 | Where | What |
 |---|---|
@@ -480,38 +513,36 @@ run beside the chat, and the kind `pass_to_coach`, both from DESIGN_long_runs_be
 | `stamind/coach/service/matching.py` | unchanged: `pending_match_questions` finds the question and is its check, `record_match_decision` stores the answer |
 | `stamind/cli/bot/capture.py`, `edit.py`, `test_result.py` | a chat run queues its question and sends it, in place of the confirm; "No" on an edit and several candidates queue the picker; the buttons with the athlete's words in them go |
 | `stamind/cli/benchmarks.py` | `benchmark record` takes the answer already given, as `--yes` does |
-| `stamind/athlete_queue.py` | seven kinds join the list: the cut-short question, the new goal, the edit, the picker, the setting, the confirmation of a test, and `adjust_week`; the line puts the items of a kind marked first before the others; a confirmation's check closes it on the fourth morning |
-| `stamind/queue_kind.py` | a kind can be marked first: the cut-short question and every confirmation are; an answer can say its question waits until the next morning |
-| `stamind/cli/candidates.py` | the constraint, signal and session-note questions are marked first, and their checks also close them on the fourth morning; a "Yes" queues and sends the `adjust_week` question where it emitted the button; that question's check reads the newest pass of the week planner (`newest_adapt`) and the waiting proposal |
-| `stamind/cli/bot/capture.py`, `extraction.py` | a miss, and a preference with no end date, queue and send the `pass_to_coach` question where they emitted the button |
-| `stamind/settings.py`, `config_template_full.yaml` | the setting `confirmation-days`, a number of days, seeded by `telegram.confirmation_days`, default 3; not among the settings a chat message may change |
+| `stamind/athlete_queue.py` | seven kinds join the list: the cut-short question, the new goal, the edit, the picker, the setting, the confirmation of a test, and `adjust_week`; each is marked a confirmation, the cut-short question by choice 18 |
+| `stamind/queue_kind.py` | an answer can say its question waits until the next morning; the note on the confirmation mark names the cut-short question too (choice 18) |
+| `stamind/cli/candidates.py` | the constraint, signal and session-note kinds are marked confirmations; a "Yes" queues and sends the `adjust_week` question where it emitted the button; that question's check reads the newest pass of the week planner (`newest_adapt`) and the waiting proposal |
+| `stamind/cli/queue_commands.py` | `adjust_week` joins `GOES_ON`: its "Yes" runs `workout adapt` with no message, as the button does today |
+| `stamind/cli/bot/capture.py`, `extraction.py`, `hand_off.py` | in the chat, a miss and a preference with no end date queue and send the `pass_to_coach` question where they emitted the button, with the miss's first line; such a question names no session, so only its mornings close it |
 | `stamind/cli/render/` | the new words of the confirmations (§8, choice 13) |
 | `docs/ARCHITECTURE.md` | the bot's capture lanes, the matching section, the list of kinds |
 
 Sections amended when it lands: DESIGN_athlete_queue.md §2 (the list of questions that do not
-follow the rule), §8 and §13.2, rule 2 (the order of the line); DESIGN_bot_simple_frontend.md
-§12.2, §12.3, §12.4, §12.5 and §12.7; DESIGN_benchmark_from_chat.md §3 and §4;
-DESIGN_waiting_proposal.md §6.3 (where a confirmation stands, how long it lives, and the offer
-to adjust the week) and DESIGN_session_notes.md §3; ARCHITECTURE.md §15. Designs still in
-progress are not edited.
+follow the rule) and §8 (the list of kinds); DESIGN_bot_simple_frontend.md §12.2, §12.3, §12.4,
+§12.5 and §12.7; DESIGN_benchmark_from_chat.md §3 and §4; DESIGN_waiting_proposal.md §6.3
+(where a confirmation stands, how long it lives, and the offer to adjust the week);
+DESIGN_session_notes.md §3; DESIGN_long_runs_beside_chat.md §5 (the hand-off after a miss,
+which names no session); ARCHITECTURE.md §15. Designs still in progress are not edited.
 
 Tests, one per behaviour: a chat run of `workout adapt` with a short activity calls the week
-planner and leaves the question waiting; the morning run queues it; it is sent before an
-older question that waits, and not before one that is out; a chat run sends it after its
-proposal's tap, and at once when it has no proposal; each answer stores the decision, and an
-answer given in a terminal closes the item; a terminal still asks on the
-spot; each confirmation writes on "Yes" and nothing on "No", and its text holds the preview; an
-edit question shows the constraint as it is when sent, and closes when the constraint is gone;
-a second question about the same part of the same constraint closes the first, and one about
+planner and leaves the question waiting; the morning run queues it; it is sent before an older
+question that waits, and is closed on the fourth morning and not queued again; a chat run sends
+it after its proposal's tap, and at once when it has no proposal; each answer stores the
+decision, and an answer given in a terminal closes the item; a terminal still asks on the spot;
+each confirmation writes on "Yes" and nothing on "No", and its text holds the preview; an edit
+question shows the constraint as it is when sent, and closes when the constraint is gone; a
+second question about the same part of the same constraint closes the first, and one about
 another constraint, or about only some of the parts the first would change, does not; the
-picker's tap sends the edit
-question, and "None of these" writes nothing; a typed test number sends the confirmation and puts
-the first question off, "Yes" closes the first question the next morning, "No" leaves it; a
-confirmation left unanswered is sent before an older question on each of the next three mornings
-and is closed on the fourth, the constraint question included, and the number of mornings
-follows the `confirmation-days` setting; each confirmation's question names a goal, a
-constraint, a setting or a test result; a "Yes" on a constraint the coach can reach, and on a
-signal, sends "Shall I adjust your week around …?", and none follows a constraint after the
-end of the mesocycle under way; its "Yes" starts the coach beside the chat; it closes once the
-coach has looked at the week since; a miss sends "Shall I pass it to your coach?" and no row of
-buttons.
+picker's tap sends the edit question, and "None of these" writes nothing; a typed test number
+sends the confirmation and puts the first question off, "Yes" closes the first question the next
+morning, "No" leaves it; a confirmation of this design left unanswered is sent before an older
+question and is closed on the fourth morning, the constraint question included; each
+confirmation's question names a goal, a constraint, a setting or a test result; a "Yes" on a
+constraint the coach can reach, and on a signal, sends "Shall I adjust your week around …?", and
+none follows a constraint after the end of the mesocycle under way; its "Yes" starts the coach
+beside the chat; it closes once the coach has looked at the week since; a miss sends "Shall I
+pass it to your coach?" and no row of buttons, and that question closes only after its mornings.
