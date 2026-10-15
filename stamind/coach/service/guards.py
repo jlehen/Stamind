@@ -5,8 +5,9 @@ to rest here (DESIGN_constraints.md §5, §6). Every date of a generated span mu
 row, so an empty one is backfilled (DESIGN_runway_nudge.md §2.1). A benchmark the athlete
 scheduled is not displaced by an ordinary session on its date, and a mesocycle boundary
 that ended up with no benchmark is warned about rather than filled in
-(DESIGN_benchmark_workouts.md §4.1). `workout generate` and `workout adapt` both pass their
-sessions through these.
+(DESIGN_benchmark_workouts.md §4.1). An entry dated outside the days a run writes is dropped
+with a notice (DESIGN_mesocycle_boundary.md §7). `workout generate` and `workout adapt` both
+pass their sessions through these.
 
 It is one mixin of :class:`CoachService` — see coach/service/__init__.py.
 """
@@ -15,11 +16,29 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from stamind.types import Constraint, Workout
 from stamind.benchmarks import MIN_RETEST_DAYS
+from stamind.clock import fmt_date
 from stamind.sports import canonical_sport
 from stamind.output import notice
 
 
 class GuardsMixin:
+    @staticmethod
+    def _keep_inside(
+        workouts: List[Dict[str, Any]], first: str, last: str
+    ) -> List[Dict[str, Any]]:
+        """The entries dated inside the days this run writes, with a notice for the rest:
+        the days outside were shown to the week planner as not its own
+        (DESIGN_mesocycle_boundary.md §7)."""
+        outside = sorted({
+            w.get('date', '') for w in workouts if not first <= w.get('date', '') <= last
+        })
+        if outside:
+            notice(
+                f"The coach wrote sessions outside the days this run writes "
+                f"({', '.join(fmt_date(d) for d in outside)}) — leaving those days as they are.",
+            )
+        return [w for w in workouts if first <= w.get('date', '') <= last]
+
     @staticmethod
     def _rest_workout(
         date: str, cause: str, title: str = 'Rest (forced constraint)'

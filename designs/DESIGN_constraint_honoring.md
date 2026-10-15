@@ -14,11 +14,11 @@ meso_end_date_str = active_meso['end_date']
 constraints = self._db.get_constraints(target_date_str, meso_end_date_str)
 ```
 
-Two bounds follow, enforced separately (DESIGN_mesocycle_boundary.md §1): the read bound keeps
-post-boundary sessions out of the prompt, and a write-side filter drops any proposal dated past
-`meso_end`. So even when the sessions already exist — `workout generate -g` lays down a whole
-macrocycle, and since DESIGN_cli_selectors.md §8 that is the natural thing to ask for — a
-constraint landing three weeks out changes nothing today.
+Two bounds follow (DESIGN_mesocycle_boundary.md §1): the sessions adapt may rewrite stop at the
+mesocycle end, with the week after it shown read-only (§7 of the same doc), and a write-side filter
+drops any proposal dated past `meso_end`. So even when the sessions already exist — `workout
+generate -g` lays down a whole macrocycle, and since DESIGN_cli_selectors.md §8 that is the natural
+thing to ask for — a constraint landing three weeks out changes nothing today.
 
 The existing tiers cover it eventually:
 

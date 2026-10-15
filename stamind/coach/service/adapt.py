@@ -190,6 +190,12 @@ class AdaptMixin:
         if outside:
             raise ValueError(_outside_tweak_reach(outside, range_end))
 
+        # The week after the range as already planned, so a session moved onto the range's
+        # last days counts what follows them (DESIGN_mesocycle_boundary.md §7).
+        neighbour_workouts = self._db.get_workouts(
+            start_date=shift(range_end, 1), end_date=shift(range_end, 7)
+        )
+
         # The BACKWARD window — from the adherence lookback start, removed rows included —
         # not the forward one the proposal carries. Two different ranges, so two names.
         lookback_workouts = self._db.get_workouts(
@@ -318,6 +324,7 @@ class AdaptMixin:
             tweak_dates=tweak_dates,
             terse=settings.terse(),
             open_proposal=open_proposal,
+            neighbour_workouts=neighbour_workouts,
         )
 
         # NOTE: daily adaptation is read-only w.r.t. coach learnings
@@ -344,10 +351,7 @@ class AdaptMixin:
         # Integers, before the no-op backstop and the preview both read these numbers.
         normalize_load_fields(adapted)
 
-        # Drop any proposal dated past the adaptation range: the days after it were never
-        # shown to the model, so such a date is a hallucination
-        # (DESIGN_mesocycle_boundary.md §1).
-        adapted = [w for w in adapted if str(w.get("date", "")) <= range_end]
+        adapted = self._keep_inside(adapted, target_date_str, range_end)
 
         # Drop any proposal that targets an already-completed session — those are locked
         # history (see completed_keys above). This is the load-bearing guard: it holds even

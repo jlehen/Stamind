@@ -13,12 +13,11 @@ Two consequences follow:
 - The week planner in `workout adapt` keeps full evidence of fatigue but loses the runway to
   act on it. On the penultimate day the only adaptable sessions are today's and tomorrow's,
   and today's is locked if a matching activity was already recorded.
-- The next mesocycle is invisible. `get_workouts` is bounded at the mesocycle end, so an
-  already-generated next mesocycle is neither read nor writable. Both halves are enforced
-  separately: the read bound keeps post-boundary sessions out of the prompt, and a
-  write-side filter drops any proposal dated past the range end, so a hallucinated date
-  cannot slip through (the apply range is derived from the surviving proposals, so it
-  cannot stretch past the mesocycle either).
+- The next mesocycle is out of reach. The sessions adapt may rewrite stop at the mesocycle
+  end, and a write-side filter drops any proposal dated past the range end, so a date the
+  week planner writes there cannot slip through (the apply range is derived from the
+  surviving proposals, so it cannot stretch past the mesocycle either). The week after the
+  range is shown to the week planner read-only (§7).
 
 When no mesocycle covers the evaluation date at all, `workout_adapt` **refuses**, raising
 the same "run `plan generate` first" error `workout_generate` already raises (§6). There is
@@ -102,13 +101,20 @@ it only once it was too late to act on.
   (DESIGN_constraint_honoring.md §1). This entry stands: nothing extends *adapt's* range.
   `workout tweak` does reach past the boundary, because it changes only the days the athlete
   names and makes no load judgement (DESIGN_workout_tweak.md §3.2).
-- **Feeding the next mesocycle's concrete sessions to the model as read-only context.** The system
-  prompt already lists every mesocycle's name, date range and focus
-  (`coach/service/athlete_context.py::_get_active_strategy_and_meso_text`), which is enough to
-  support the "is easing cheap here?" judgement. Adding the sessions would introduce a new data path
-  and a new class of prompt-visible-but-immutable workout for modest gain. This entry is
-  about `workout adapt` only: `workout generate` does show the week either side of its span
-  (§7), because there the missing sessions broke a weekly rule outright.
+- **Feeding the next mesocycle's concrete sessions to the model as read-only context.**
+  Rejected at first: the system prompt lists every mesocycle's name, date range and focus
+  (`coach/service/athlete_context.py::_get_active_strategy_and_meso_text`), which was judged
+  enough for the "is easing cheap here?" judgement, and the sessions would add a class of
+  prompt-visible-but-immutable workout for modest gain. **Done on 2026-10-15**, after a real
+  week showed the gain was not modest. It is Monday 12 October. The mesocycle ends on
+  Sunday 18, and the next one opens on Monday 19 with a heavy full-body lift. The athlete
+  tells the chat about a gravel ride with colleagues on Friday. `workout adapt` puts the
+  ride on Friday and moves the kettlebell session Friday held to Sunday, the day before a
+  heavy lift it could not see: its list of planned sessions stopped on Sunday 18, and the
+  one line about 19 October was the mesocycle's name and focus. The athlete asked for the
+  swap by hand. `workout adapt` now gets the week after its range the way `workout generate`
+  gets the week either side of its span (§7). The write side is unchanged: a date past the
+  range is still dropped.
 
 ## 6. Known asymmetry
 
@@ -138,7 +144,7 @@ one goal ending and the next being set. It no longer does. One consequence follo
 engine's "no active mesocycle" branch — which dropped the intensity table and the drift
 instructions that reference it — is no longer reachable through this path.
 
-## 7. `workout generate` sees the week either side of its span
+## 7. The week planner sees the week just outside the days it writes
 
 ### The problem, in a real week
 
@@ -172,6 +178,13 @@ description. The week planner only counts these sessions; it does not revise the
 The span is enforced on the way out, not only asked for. Any entry the week planner dates
 outside the span is dropped with a notice, and the session already on that day stays. Before
 this section, only a date before the span's start was dropped.
+
+`workout adapt` sends the same two sections for the seven days after its range, which ends with the
+mesocycle (§2). Nothing is listed before the range: the days before today are already in PLANNED
+WORKOUTS as the adherence window, and WHAT YOU MAY NOT TOUCH says to adapt only sessions still
+ahead. A tweak's range reaches at least a week past today (DESIGN_workout_tweak.md §3.2), so it is
+shown the week after that. The write side is `guards.py:_keep_inside`, the drop `workout generate`
+runs on its span: an entry dated before today or past the range is dropped with the same notice.
 
 ### Not handled
 

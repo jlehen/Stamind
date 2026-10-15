@@ -313,6 +313,35 @@ class TestAdaptPrompt(unittest.TestCase):
             self.assertNotIn("THIS MESOCYCLE IS ENDING", mock_client.complete.call_args[0][0])
 
     @patch("stamind.coach.engine.openrouter_client")
+    def test_the_week_after_the_range_is_shown_and_no_more(self, mock_client):
+        """The sessions planned in the seven days after the mesocycle's end reach the prompt
+        as SESSIONS JUST OUTSIDE THE SPAN; the eighth day and the range itself do not
+        (DESIGN_mesocycle_boundary.md §7)."""
+        self._save_two_mesocycle_plan()
+        for date, title in (("2026-06-29", "Last easy ride"), ("2026-07-01", "Monday lift"),
+                            ("2026-07-07", "Sunday long ride"), ("2026-07-08", "Too late")):
+            save_workout(
+                test_db, date=date, sport_type="cycling", title=title,
+                description=f"[{title}]\n60 min.", duration_minutes=60, rpe=4, tss=40,
+            )
+        mock_client.complete.return_value = {
+            "change_needed": False, "reason": "On track.", "adapted_workouts": [],
+        }
+        with patch.dict(stamind.config.config.data, {
+            "user_profile": {"lthr": 165, "max_hr": 185},
+            "coach": {"metrics_lookback_days": 3, "minor_activity_load_threshold": 10.0},
+        }):
+            coach_service.workout_adapt("2026-06-28")
+            system_prompt, user_content = mock_client.complete.call_args[0][:2]
+            self.assertIn("### THE DAYS JUST OUTSIDE THE SPAN", system_prompt)
+            section = user_content.split("## SESSIONS JUST OUTSIDE THE SPAN\n", 1)[1]
+            section = section.split("\n## ", 1)[0]
+            self.assertIn("Monday lift", section)
+            self.assertIn("Sunday long ride", section)
+            self.assertNotIn("Last easy ride", section)
+            self.assertNotIn("Too late", user_content)
+
+    @patch("stamind.coach.engine.openrouter_client")
     def test_the_shared_revision_sections_render_adapts_scope(self, mock_client):
         """The benchmark and vacate sections are built by helpers rather than written
         inline, so what has to hold here is that adapt gets their wording in full

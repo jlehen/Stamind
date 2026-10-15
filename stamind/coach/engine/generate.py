@@ -8,12 +8,13 @@ calls share come from `sessions.py`.
 from typing import Any, Dict, List, Optional
 
 from stamind.coach.engine.sessions import (
-    SPORT_TYPE_ENUM, athlete_words_task, planned_zone_fields, planned_zone_task,
-    replaces_field, strength_brief_task,
+    SPORT_TYPE_ENUM, athlete_words_task, neighbour_sessions_section,
+    neighbour_sessions_task, planned_zone_fields, planned_zone_task, replaces_field,
+    strength_brief_task,
 )
 from stamind.coach.formatting import (
     format_baseline, format_completed_activities, format_metrics_history,
-    format_neighbour_workouts, format_standing_workouts,
+    format_standing_workouts,
 )
 from stamind.output import step
 from stamind.text import cyan
@@ -95,22 +96,6 @@ whose dates have passed but which fall inside the mesocycle the athlete is in. T
 yours to work around any more — they explain the mesocycle's record. A week that shows far less
 training than it was planned was often a week under one of these, and reading it as the
 athlete failing to train, or as evidence the mesocycle is too hard, would be wrong.
-"""
-
-
-def _neighbour_sessions_task(neighbour_workouts: Optional[List[Workout]]) -> str:
-    """The section on the sessions planned just outside the span
-    (DESIGN_mesocycle_boundary.md §7)."""
-    if not neighbour_workouts:
-        return ""
-    return """
-### THE DAYS JUST OUTSIDE THE SPAN
-The user content includes a section titled "SESSIONS JUST OUTSIDE THE SPAN": the sessions
-already planned in the seven days before the span's first day and the seven days after its
-last day. They are not yours to change: never return an entry dated on one of those days.
-Count them when you write the days next to them. A weekly rule — how many strength
-sessions, how many hard days, a rest day, no gym day before a hard ride — holds over the
-week the athlete lives, and that week does not stop at the edge of the span.
 """
 
 
@@ -331,7 +316,7 @@ class WorkoutGenerateMixin:
             + strength_brief_task()
             + _standing_sessions_task(standing_workouts)
             + _past_constraints_task(past_constraints)
-            + _neighbour_sessions_task(neighbour_workouts)
+            + neighbour_sessions_task(neighbour_workouts)
             + athlete_words_task(
                 [*(spoken_workouts or []), *(standing_workouts or []),
                  *(neighbour_workouts or [])]
@@ -451,10 +436,7 @@ class WorkoutGenerateMixin:
 
         if neighbour_workouts:
             history_text_parts.append(
-                "## SESSIONS JUST OUTSIDE THE SPAN\n"
-                "Already planned and not yours to change — see THE DAYS JUST OUTSIDE THE "
-                "SPAN.\n"
-                + format_neighbour_workouts(neighbour_workouts, eval_date=today_str)
+                neighbour_sessions_section(neighbour_workouts, eval_date=today_str)
             )
 
         # Last, closest to where the model starts writing: unlike the sections above it

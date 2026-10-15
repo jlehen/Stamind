@@ -866,9 +866,10 @@ The submodules:
   `stamind.coach.engine.openrouter_client`. Two of its files hold no mixin.
   `sessions.py` is the prompt sections about one session entry rather than about the
   span: the sport enum, the intensity target and its two schema members, the `replaces`
-  field and the strength brief, which `workout generate` and `workout adapt` both send,
-  then the locked history, how a move is written and what a benchmark entry must keep,
-  which only adapt sends today. `notes.py` is what is done with the athlete's words: the
+  field, the strength brief and the sessions just outside the days being written, which
+  `workout generate` and `workout adapt` both send, then the locked history, how a move is
+  written and what a benchmark entry must keep, which only adapt sends today. `notes.py`
+  is what is done with the athlete's words: the
   `workout tweak` TASK head, the note section, the constraint and signal extraction
   that `bot capture note` asks for too, and the section that asks which session of the day
   the note is about.
@@ -1001,7 +1002,9 @@ default the user layer overrides.
   rule has one wording and cannot drift copy by copy (DESIGN_adapt_task_prompt.md §2).
   Within `config.adapt_terminal_window_days` of the mesocycle's end it appends a
   `THIS MESOCYCLE IS ENDING` section biasing the model toward holding load, since a cut
-  there cannot rebound (DESIGN_mesocycle_boundary.md §3). There is **no separate
+  there cannot rebound (DESIGN_mesocycle_boundary.md §3). `neighbour_workouts`, the week
+  after the range, is shown read-only the way generate's week either side is (§7 of the
+  same doc). There is **no separate
   classification pass** for `--message`: the same call also extracts any
   constraint candidates from the note and returns them as `new_constraints`
   (DESIGN_constraints.md §8). Label `workout_adapt`.
@@ -1169,7 +1172,8 @@ called by the UIs.
   `workout_generate` + `workout_generate_apply`, with no preview — the unattended path
   ([§11](#11-terminology-plans-vs-workouts)).
 - **`workout_adapt(target_date_str, message=None)`** — fetches metrics + workouts in
-  the rolling window, calls `CoachEngine._workout_adapt_logic()`, returns a
+  the rolling window and the week after the range, calls
+  `CoachEngine._workout_adapt_logic()`, returns a
   `RevisionProposal` (`coach/proposals.py`) carrying `reason`, `workouts`, `pairs`/
   `removals` and the two candidate lists below; caller decides whether to apply.
   `open_proposal` is the proposal the athlete has not answered yet, which the answer
@@ -1193,9 +1197,11 @@ called by the UIs.
   - **Rest-window pre-pass** (`_enforce_rest_windows_revision`): eases any future,
     not-yet-completed planned session under a `rest = 1` constraint to rest, regardless
     of the model's proposals.
-  - **Mesocycle firewall (write side):** any proposal dated past the mesocycle end is dropped —
-    the next mesocycle was never shown to the model, so a post-boundary date is a
-    hallucination ([§15](#15-design-rationale--history), DESIGN_mesocycle_boundary.md §1).
+  - **Mesocycle firewall (write side):** any proposal dated past the mesocycle end is dropped
+    with a notice (`guards.py:_keep_inside`, the same drop `workout generate` runs on its
+    span) — the week after it is shown read-only, so a post-boundary date is the week planner
+    writing where it was told not to ([§15](#15-design-rationale--history),
+    DESIGN_mesocycle_boundary.md §1, §7).
   - **Requires a mesocycle:** `workout_adapt` raises "No active periodization strategy found"
     when `get_active_mesocycle` returns nothing, as `workout_generate` does. Adapt's
     judgements are all relative to the mesocycle, so there is nothing to adapt towards
@@ -3084,7 +3090,8 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
    reports. Consumers read the `pending` flag on each matching row rather than
    re-deriving the date rule.
 3. Finds active mesocycle for the target date → sets `meso_end_date` for
-   adaptation range.
+   adaptation range, and reads the seven days after it, shown read-only
+   (DESIGN_mesocycle_boundary.md §7).
 3b. `_intensity_mesocycle_context()` builds the mesocycle's **measured intensity distribution**
    (`analytics/mesocycle_report.py`): the mesocycle to date as a per-week rate over its *completed*
    weeks, per canonical sport and per zone, beside its stated focus, plus the current
@@ -3098,7 +3105,7 @@ event-day TSB over the plan's own workouts — is a deferred Phase 2 follow-up.
 4. Calls `CoachEngine._workout_adapt_logic()` → LLM → `{change_needed, reason,
    adapted_workouts[]}`. **Read-only w.r.t. coach learnings** (see
    [§3](#3-coach-package-architecture)).
-5. Drops any proposal dated past the adaptation range end (the mesocycle firewall's write
+5. Drops any proposal dated outside the adaptation range (the mesocycle firewall's write
    side) and any targeting an already-completed session, then returns
    a `RevisionProposal` ([§3](#coachservice)) — caller decides whether to apply, and
    asks about each extracted constraint and signal candidate before persisting it: on the
@@ -3917,11 +3924,12 @@ every daily surface rather than on `workout adapt` alone. Only the *prompt* side
 runs on `adapt_terminal_window_days` — that gate is about what the thinking model is told
 and must stay tight.
 
-The firewall is enforced on **both** sides: the read bound (`get_workouts` capped at the
-mesocycle end) and, on the write side, `workout_adapt` dropping any proposal dated past the
-adaptation range end. A hallucinated post-boundary date therefore cannot be written, and
-the apply range — derived from the surviving proposals — cannot stretch into the next
-mesocycle. See DESIGN_mesocycle_boundary.md.
+The firewall is enforced on **both** sides: the sessions the week planner may rewrite stop
+at the mesocycle end (the week after it is shown read-only, §7 of the design doc), and on
+the write side `workout_adapt` drops any proposal dated past the adaptation range end, with
+a notice. A post-boundary date therefore cannot be written, and the apply range — derived
+from the surviving proposals — cannot stretch into the next mesocycle. See
+DESIGN_mesocycle_boundary.md.
 
 ### Saying so rather than widening it
 The firewall above is not about the *range*; it is about what would ride along with it.
@@ -4283,8 +4291,8 @@ is to keep the names parallel rather than to merge the files:
 names first; the service and the CLI carry them now too.
 
 ### `coach/engine/adapt.py` is over the 500-line rule, and the cut that fixes it is elsewhere
-The file is 550 lines and 410 of them are a single method, `_workout_adapt_logic`, which
-takes 31 parameters and assembles the whole adapt TASK, the response schema and the user
+The file is 568 lines and about 420 of them are a single method, `_workout_adapt_logic`, which
+takes 32 parameters and assembles the whole adapt TASK, the response schema and the user
 content in one run. Every prompt section it appends already lives outside it — the shared
 ones in `sessions.py`, the ones about the athlete's words in `notes.py`, and adapt's own
 as constants beside it — so there is nothing left to move out. A fifth file holding those

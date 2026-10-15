@@ -100,8 +100,8 @@ class TestAdaptLeavesHistoryAlone(unittest.TestCase):
     @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_drops_proposal_past_mesocycle_end(self, mock_client):
         """The next mesocycle is out of adapt's reach on the write side too: a proposal dated
-        past the mesocycle's end is dropped, so the applied range can never stretch into the next
-        mesocycle (DESIGN_mesocycle_boundary.md §1)."""
+        past the mesocycle's end, or before the evaluation date, is dropped, so the applied range
+        can never stretch into the next mesocycle (DESIGN_mesocycle_boundary.md §1, §7)."""
         self._save_two_mesocycle_plan()
         with patch.dict(stamind.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
@@ -126,6 +126,12 @@ class TestAdaptLeavesHistoryAlone(unittest.TestCase):
                         "title": "Next-mesocycle Session (should be dropped)",
                         "description": "Past the boundary.",
                         "duration_minutes": 60, "rpe": 7, "tss": 55.0,
+                    },
+                    {
+                        "date": "2026-06-27", "sport_type": "running",
+                        "title": "Yesterday rewritten (should be dropped)",
+                        "description": "Before the evaluation date.",
+                        "duration_minutes": 30, "rpe": 3, "tss": 15.0,
                     },
                 ],
             }

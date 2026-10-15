@@ -2,14 +2,16 @@
 
 The prompt sections about a single session rather than about the span: the sport enum
 both schemas list, the intensity target, its two schema members, the `replaces` field,
-the strength brief, what the athlete said about a session, what may not be rewritten, how a
-move is written, and what a benchmark entry must keep. The first six of those are sent by
-`workout generate` and `workout adapt` both, and a second copy of one would slowly stop
-meaning the same thing in the two prompts (DESIGN_adapt_task_prompt.md §1). The last three
-only adapt sends today; they live here because they are about the entry, not about adapting.
+the strength brief, what the athlete said about a session, the sessions just outside the days
+being written, what may not be rewritten, how a move is written, and what a benchmark entry
+must keep. The first seven of those are sent by `workout generate` and `workout adapt` both,
+and a second copy of one would slowly stop meaning the same thing in the two prompts
+(DESIGN_adapt_task_prompt.md §1). The last three only adapt sends today; they live here
+because they are about the entry, not about adapting.
 """
 from typing import Dict, List, Optional, Sequence
 
+from stamind.coach.formatting import format_neighbour_workouts
 from stamind.sports import CANONICAL_SPORTS
 from stamind.types import Workout
 
@@ -197,6 +199,34 @@ comparable session from all three. The words are how the session felt and the nu
 what it measured; when they disagree, weigh both. A request in those words was about that
 day and has already been answered: it asks nothing of today.
 """
+
+
+def neighbour_sessions_task(neighbour_workouts: Optional[Sequence[Workout]]) -> str:
+    """The THE DAYS JUST OUTSIDE THE SPAN section, sent by `workout generate` for the week
+    either side of its span and by `workout adapt` for the week after its range
+    (DESIGN_mesocycle_boundary.md §7)."""
+    if not neighbour_workouts:
+        return ""
+    return """
+### THE DAYS JUST OUTSIDE THE SPAN
+The user content includes a section titled "SESSIONS JUST OUTSIDE THE SPAN": the sessions
+already planned in the week just outside the days you may write. They are not yours to
+change: never return an entry dated on one of those days, and never name one of them in
+"replaces". Count them when you write the days next to them. A weekly rule — how many
+strength sessions, how many hard days, a rest day, no gym day before a hard ride or a heavy
+lift — holds over the week the athlete lives, and that week does not stop at the edge of the
+days you write.
+"""
+
+
+def neighbour_sessions_section(neighbour_workouts: Sequence[Workout], eval_date: str) -> str:
+    """The SESSIONS JUST OUTSIDE THE SPAN section of the user content, one summary line per
+    session (DESIGN_mesocycle_boundary.md §7)."""
+    return (
+        "## SESSIONS JUST OUTSIDE THE SPAN\n"
+        "Already planned and not yours to change — see THE DAYS JUST OUTSIDE THE SPAN.\n"
+        + format_neighbour_workouts(neighbour_workouts, eval_date=eval_date)
+    )
 
 
 def move_task() -> str:

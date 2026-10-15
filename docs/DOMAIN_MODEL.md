@@ -601,11 +601,11 @@ nothing as a mesocycle ends.
 
 That is on purpose, and it is enforced on both sides:
 
-- **Read side:** workouts are fetched with the mesocycle end as the upper bound, so
-  post-boundary sessions never enter the prompt.
-- **Write side:** any proposal dated past the range end is dropped, so a hallucinated date
-  cannot be written. The apply range is derived from the *surviving* proposals, so it
-  cannot stretch past the mesocycle either.
+- **Read side:** the sessions adapt may rewrite are fetched with the mesocycle end as the
+  upper bound; the seven days after it are shown read-only (DESIGN_mesocycle_boundary.md §7).
+- **Write side:** any proposal dated past the range end is dropped, so a date the week
+  planner writes there cannot slip through. The apply range is derived from the *surviving*
+  proposals, so it cannot stretch past the mesocycle either.
 
 The reason is not the range, it is what would ride along with it. Adapt's whole input is a
 backward window of recovery metrics. A longer reach would give this morning's HRV authority

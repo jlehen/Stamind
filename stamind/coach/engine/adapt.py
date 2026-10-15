@@ -15,6 +15,7 @@ from stamind.coach.engine.notes import (
 )
 from stamind.coach.engine.sessions import (
     LOCKED_HISTORY_TASK, SPORT_TYPE_ENUM, athlete_words_task, benchmark_task, move_task,
+    neighbour_sessions_section, neighbour_sessions_task,
     planned_zone_fields, planned_zone_task, replaces_field, strength_brief_task,
 )
 from stamind.coach.formatting import (
@@ -160,6 +161,7 @@ class WorkoutAdaptMixin:
         tweak_dates: Sequence[str] = (),
         terse: bool = False,
         open_proposal: Optional[str] = None,
+        neighbour_workouts: Optional[List[Workout]] = None,
     ) -> Dict[str, Any]:
         """Queries LLM to evaluate metrics/activities and adapt workouts if needed.
 
@@ -174,7 +176,8 @@ class WorkoutAdaptMixin:
         is then every cancelled session in the range, not only the athlete's (§3.1).
         `terse` halves the summary (DESIGN_output_verbosity.md §9). `open_proposal` is the
         proposal the athlete has not answered, which this answer replaces
-        (DESIGN_waiting_proposal.md §6.2).
+        (DESIGN_waiting_proposal.md §6.2). `neighbour_workouts` are the sessions planned in
+        the week after the range, shown and never written (DESIGN_mesocycle_boundary.md §7).
         """
         # has_message gates EIGHT regions that sit hundreds of lines apart: the clause
         # spliced into the change_reason wording, the note-handling instructions, the
@@ -263,7 +266,8 @@ the active mesocycle (from {target_date_str} to {range_end_str}).
             custom_task += LOCKED_HISTORY_TASK
         else:
             custom_task = adapt_task + LOCKED_HISTORY_TASK + _FATIGUE_READING_TASK
-        custom_task += athlete_words_task(planned_workouts)
+        custom_task += athlete_words_task([*planned_workouts, *(neighbour_workouts or [])])
+        custom_task += neighbour_sessions_task(neighbour_workouts)
 
         # A strength day's description is a brief, here as in generate: the same rule has
         # to reach every call that writes one (DESIGN_strength_tracking.md §9).
@@ -453,6 +457,12 @@ evidence-backed observations are authored only by the weekly history analysis
                 + format_removed_workouts(removed_workouts) + "\n"
             )
 
+        neighbour_section = ""
+        if neighbour_workouts:
+            neighbour_section = "\n" + neighbour_sessions_section(
+                neighbour_workouts, eval_date=target_date_str
+            ) + "\n"
+
         informational_section = ""
         if informational:
             informational_section = (
@@ -536,7 +546,7 @@ Each session below includes its full description so you can reuse its specifics 
 interval structure, heart-rate zones, rest/recovery durations — when you carry a changed
 session over largely as-is. {descriptions_note}
 {planned_text}
-{removed_section}
+{removed_section}{neighbour_section}
 ## ACTUAL COMPLETED GARMIN ACTIVITIES IN WINDOW
 {completed_text}
 

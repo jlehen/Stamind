@@ -580,25 +580,30 @@ class TestPastConstraintsGate(unittest.TestCase):
 
 
 class TestNeighbourSessionsGate(unittest.TestCase):
-    """The week either side of the span, shown so a weekly rule counts it
-    (DESIGN_mesocycle_boundary.md §7)."""
+    """The week either side of generate's span and the week after adapt's range, shown so a
+    weekly rule counts them (DESIGN_mesocycle_boundary.md §7)."""
 
     NEIGHBOURS = [{
         "date": "2026-06-08", "sport_type": "strength_training", "title": "Monday lift",
         "description": "[Monday lift]", "duration_minutes": 60, "rpe": 6, "tss": 30,
     }]
+    BUILDERS = (("adapt", build_prompt), ("generate", build_generate_prompt))
 
     def test_a_neighbour_reaches_both_regions(self):
-        system, user = build_generate_prompt(neighbour_workouts=self.NEIGHBOURS)
-        self.assertIn(NEIGHBOUR_INSTRUCTIONS, system)
-        self.assertIn(NEIGHBOUR_DATA, user)
-        self.assertIn("Monday lift", user)
+        for name, build in self.BUILDERS:
+            with self.subTest(call=name):
+                system, user = build(neighbour_workouts=self.NEIGHBOURS)
+                self.assertIn(NEIGHBOUR_INSTRUCTIONS, system)
+                self.assertIn(NEIGHBOUR_DATA, user)
+                self.assertIn("Monday lift", user)
 
     def test_without_one_neither_appears(self):
-        system, user = build_generate_prompt()
-        whole = system + user
-        self.assertNotIn(NEIGHBOUR_INSTRUCTIONS, whole)
-        self.assertNotIn(NEIGHBOUR_DATA, whole)
+        for name, build in self.BUILDERS:
+            with self.subTest(call=name):
+                system, user = build()
+                whole = system + user
+                self.assertNotIn(NEIGHBOUR_INSTRUCTIONS, whole)
+                self.assertNotIn(NEIGHBOUR_DATA, whole)
 
 
 class TestSpokenSessionsGate(unittest.TestCase):

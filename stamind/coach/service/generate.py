@@ -226,19 +226,7 @@ class WorkoutGenMixin:
         # Integers, before the preview and the save both read these numbers.
         normalize_load_fields(workouts)
 
-        # Only the span is written. A date before it would overwrite today's completed
-        # session when that day is being kept; a date after it would stand beside a session
-        # the week planner was shown as not its own (DESIGN_mesocycle_boundary.md §7).
-        outside = sorted({
-            w.get('date', '') for w in workouts
-            if not gen_start_str <= w.get('date', '') <= gen_end_str
-        })
-        if outside:
-            notice(
-                f"The coach wrote sessions outside the days this run writes "
-                f"({', '.join(fmt_date(d) for d in outside)}) — leaving those days as they are.",
-            )
-            workouts = [w for w in workouts if gen_start_str <= w.get('date', '') <= gen_end_str]
+        workouts = self._keep_inside(workouts, gen_start_str, gen_end_str)
 
         # Same-day collision guard (§4.1): drop any non-benchmark session that shares a
         # date+sport with a scheduled benchmark, before the (date, sport)-keyed save can
