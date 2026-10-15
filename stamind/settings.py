@@ -35,6 +35,11 @@ LEARNING_QUESTIONS = "learning-questions"
 TERSE = "terse"
 STRENGTH_LOGGER = "strength-logger"
 
+# Not a setting: the day `bot morning` last sent, kept in the settings table so the bot
+# process stays stateless across restarts. The morning push reads it, and so does the
+# question that changes `morning-time` (DESIGN_bot_simple_frontend.md §4.2, §12.7).
+MORNING_MARKER = "push_morning_last"
+
 
 def parse_hhmm(token: Any) -> str:
     """A local time as 'HH:MM', zero-padded. Raises ValueError with a printable message."""

@@ -42,7 +42,12 @@
 - In the companion, every question goes through the athlete queue: the command saves it and
   ends, and a tap answers it whenever the athlete likes. No command waits on the athlete.
   When a question needs another look or another moment, adapt its queue kind; do not ask on
-  the spot (DESIGN_athlete_queue.md §2). The CLI is exempt.
+  the spot (DESIGN_athlete_queue.md §2). An offer the bot makes after an answer or a message
+  is a question too, even when the queue needs a new feature to hold it. The CLI is exempt.
+- In the companion, a row of buttons under a view stays a row, not a queued question. A view
+  is what the athlete reads on screen: their constraints, their goals, their week, the plan,
+  the morning message. Its buttons act on what is on screen and ask nothing, and showing the
+  view again brings them back (DESIGN_chat_questions.md §2).
 - A destructive command defaults to the reversible action (archive) and keeps the hard
   cascade behind `--purge`. If the docs warn the reader off a default every time it is
   mentioned, the default is wrong; fix it rather than repeat the caveat.

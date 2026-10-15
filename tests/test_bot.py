@@ -298,19 +298,6 @@ class GuardrailTest(unittest.TestCase):
             argv = ["bot", "capture", captured_as, "some message"]
             self.assertIn(tuple(argv[:2]), self.ALLOWED_PREFIXES, intent)
 
-    def test_the_captures_own_offers_stay_inside_the_guardrail(self):
-        """The two buttons a capture emits, and the picker leaf that re-enters it: none
-        may reach a command the router itself could not (§12.9)."""
-        from stamind.cli.bot.extraction import (
-            adjust_week_button, send_to_coach_button,
-        )
-        adjust = routing.parse_message_to_argv(adjust_week_button()["send"])
-        self.assertEqual(adjust, ["workout", "adapt"])
-        # The coach lane carries her words verbatim through one -m, quoting and all.
-        message = "knee's sore; \"no running\" for 2 weeks"
-        to_coach = routing.parse_message_to_argv(send_to_coach_button(message)["send"])
-        self.assertEqual(to_coach, ["workout", "adapt", "-m", message])
-
     def test_keyboard_argv_stays_read_only(self):
         for label, argv in keyboards.SIMPLE_KEYBOARD:
             if argv is None:

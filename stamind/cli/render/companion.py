@@ -23,7 +23,7 @@ from stamind.cli.render.plan_lines import (
     SIMPLE_NO_PLAN_LINE, simple_end_buttons, simple_end_note, simple_goal_line,
     simple_goal_lines, simple_mesocycle_buttons, simple_plan_lines,
     simple_plan_setup_line, simple_plan_shaping_line, simple_plan_wrapped_line,
-    simple_progress_lines, simple_runway_lines,
+    simple_preference_words, simple_progress_lines, simple_runway_lines,
 )
 from stamind.cli.render.session_lines import (
     SIMPLE_SESSION_RULE, simple_benchmark_question, simple_compare_lines, simple_day_lines,
@@ -115,18 +115,12 @@ class CompanionRenderer(ExpertRenderer):
     def constraints_open_ended(self, titles: List[str], text: str) -> None:
         """One forwardable message: her words are quoted so a Telegram forward carries
         the preference to the operator without retyping (§12.3, 2026-09-16)."""
-        print(wrap_text(
-            "That sounds like a preference for good, not something for the next few days. Ask "
-            f"{config.telegram_operator_name} to record this in your preferences. You can just "
-            "forward this message:"
-        ))
-        print()
-        print(f"“{text.strip()}”")
+        print(wrap_text(simple_preference_words(text)))
 
     def constraint_plan_shaping(self, constraint_id: int, impact: Dict[str, Any]) -> None:
-        """The same fact, without the commands: reshaping the plan around it is one tap
-        away on the offer that follows this capture, and `plan generate` is operator work
-        the athlete cannot run (DESIGN_bot_simple_frontend.md §12.10)."""
+        """The same fact, without the commands: the question whether to adjust the week
+        follows this capture, and `plan generate` is operator work the athlete cannot run
+        (DESIGN_bot_simple_frontend.md §12.10)."""
         print(wrap_text(simple_plan_shaping_line(impact)))
 
     def signal_candidate_question(

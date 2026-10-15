@@ -15,11 +15,15 @@ from stamind.db.queue import queue_stamp
 # Re-exported: what a feature needs lives in queue_kind, so a feature can queue items
 # without importing the list of kinds that imports it.
 from stamind.queue_kind import (  # noqa: F401
-    ANSWERED, DROPPED, MESSAGE, QUESTION, STALE, Kind, NotApplied, queue,
+    ANSWERED, DROPPED, MESSAGE, QUESTION, STALE, Kind, NotApplied, PutOff, queue,
 )
-from stamind.cli.bot.hand_off import PASS_TO_COACH_KIND
-from stamind.cli.bot.test_result import TEST_RESULT_KIND
+from stamind.cli.bot.edit import EDIT_KIND, PICK_KIND
+from stamind.cli.bot.goal import NEW_GOAL_KIND
+from stamind.cli.bot.hand_off import ADJUST_WEEK_KIND, PASS_TO_COACH_KIND
+from stamind.cli.bot.setting import CHANGE_SETTING_KIND
+from stamind.cli.bot.test_result import TEST_RECORD_KIND, TEST_RESULT_KIND
 from stamind.cli.candidates import CONSTRAINT_KIND, NOTE_KIND, SIGNAL_KIND
+from stamind.cli.workouts.cut_short import CUT_SHORT_KIND
 from stamind.cli.workouts.proposal import (
     PROPOSAL_KIND, REPLACE_SESSIONS_KIND, SCHEDULE_KIND,
 )
@@ -68,16 +72,19 @@ MESSAGE_KIND = Kind(
 # The proposal kind holds what the week planner would change (DESIGN_waiting_proposal.md §3).
 # The constraint and signal kinds ask whether to store what a message stated (§6.3 there),
 # and the session-note kind which session the message is about (DESIGN_session_notes.md §3).
-# The hand-off kind asks whether to pass a message about a session to the coach, the
-# schedule kind holds the weeks `workout generate --propose` would write, and the
-# replace-sessions kind asks before it plans over sessions (DESIGN_long_runs_beside_chat.md
-# §4, §5).
+# The hand-off kind asks whether to pass a message to the coach, the schedule kind holds
+# the weeks `workout generate --propose` would write, and the replace-sessions kind asks
+# before it plans over sessions (DESIGN_long_runs_beside_chat.md §4, §5). The cut-short
+# question, the confirmations of a new goal, an edit, a setting and a test result, the
+# picker, and the question whether to adjust the week are DESIGN_chat_questions.md §3 to §6.
 KINDS: Dict[str, Kind] = {
     kind.name: kind
     for kind in (
         MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND, LEARNING_KIND, TEST_RESULT_KIND,
         RETROSPECTIVE_KIND, PROPOSAL_KIND, NOTE_KIND, CONSTRAINT_KIND, SIGNAL_KIND,
-        PASS_TO_COACH_KIND, SCHEDULE_KIND, REPLACE_SESSIONS_KIND,
+        PASS_TO_COACH_KIND, SCHEDULE_KIND, REPLACE_SESSIONS_KIND, CUT_SHORT_KIND,
+        NEW_GOAL_KIND, EDIT_KIND, PICK_KIND, CHANGE_SETTING_KIND, TEST_RECORD_KIND,
+        ADJUST_WEEK_KIND,
     )
 }
 
@@ -194,15 +201,15 @@ def line() -> List[Dict[str, Any]]:
     return [item for item in _ready(clock.now()) if not settle_if_stale(item)]
 
 
-def run_questions(item: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """The questions about what the athlete wrote that the run which queued `item` has
-    not asked yet: its bare items that wait and are not out. They follow a tap on a reply
-    of that run (§13.2 rule 6)."""
+def run_questions(queued_at: str) -> List[Dict[str, Any]]:
+    """The confirmations the run which started at `queued_at` queued and has not asked
+    yet: they wait and are not out. They follow a tap on a reply of that run (§13.2 rule 6,
+    DESIGN_chat_questions.md §3)."""
     now = clock.now()
     return [
-        other for other in _ready(now)
-        if other["queued_at"] == item["queued_at"] and other["id"] != item["id"]
-        and kind_of(other).bare and not is_out(other, now) and not settle_if_stale(other)
+        item for item in _ready(now)
+        if item["queued_at"] == queued_at and kind_of(item).confirmation
+        and not is_out(item, now) and not settle_if_stale(item)
     ]
 
 
@@ -225,7 +232,8 @@ def act(item: Dict[str, Any], action: str, text: Optional[str] = None) -> Option
     """Applies one action to a waiting item and returns the kind's line for an answer (§4).
     An action the item was not queued with writes nothing (§9). An answer its kind could
     not apply leaves the item in the line and no longer out, so it is asked again at once,
-    with the kind's line saying why (§13.5, choice 14)."""
+    with the kind's line saying why (§13.5, choice 14). An answer that puts its question
+    off leaves it until the next morning (DESIGN_chat_questions.md §6)."""
     now = clock.now()
     kind = kind_of(item)
     # A question kind without a drop label refuses one (§4).
@@ -246,6 +254,9 @@ def act(item: Dict[str, Any], action: str, text: Optional[str] = None) -> Option
     except NotApplied as not_applied:
         runtime.db.mark_queue_sent(item["id"], None)
         return str(not_applied)
+    except PutOff:
+        runtime.db.set_queue_ready(item["id"], later_time(QUEUE_LATER_DAY, now))
+        return None
     runtime.db.close_queue_item(item["id"], ANSWERED, now)
     return line_said
 

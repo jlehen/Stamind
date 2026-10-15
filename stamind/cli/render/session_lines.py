@@ -334,7 +334,7 @@ def simple_benchmark_question(
     words += "."
     if note:
         words += f" Note: “{note}”."
-    return words + " Shall I write it down?"
+    return words + " Shall I write down this test result?"
 
 
 def _is_rest(w: Optional[dict]) -> bool:

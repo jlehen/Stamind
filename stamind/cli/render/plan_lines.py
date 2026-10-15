@@ -189,6 +189,16 @@ def simple_constraint_edit_lines(
     return lines
 
 
+def simple_preference_words(text: str) -> str:
+    """Where a preference with no end date belongs, with the athlete's words quoted so the
+    message can be forwarded to the operator (DESIGN_bot_simple_frontend.md §12.3)."""
+    return (
+        "That sounds like a preference for good, not something for the next few days. Ask "
+        f"{config.telegram_operator_name} to record this in your preferences. You can just "
+        f"forward this message:\n\n“{text.strip()}”"
+    )
+
+
 def simple_plan_shaping_line(impact: Dict[str, Any]) -> str:
     """How big a constraint just captured turns out to be, without the commands that would
     escalate it: building it into the plan is `plan generate`, which is operator work, and

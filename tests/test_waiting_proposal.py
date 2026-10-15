@@ -615,30 +615,25 @@ class ChatRunTest(_Case):
         [constraint] = test_db.get_constraints(THURSDAY, SATURDAY)
         self.assertEqual(constraint["start_date"], THURSDAY)
 
-    def test_a_tap_on_the_proposal_the_next_day_brings_the_question_not_asked_yet(self):
-        """Friday 08:00: the message left since Thursday goes out again and stays
-        unanswered. 09:00: the tap on Thursday's proposal brings the question of its run,
-        which was never sent (DESIGN_athlete_queue.md §13.5)."""
-        proposal = self.proposed_with_a_constraint()
+    def test_the_next_morning_the_constraint_question_goes_out_before_the_message(self):
+        """Friday 08:00: the constraint question is a confirmation, so it stands at the front
+        of the line, before the message left since Thursday (DESIGN_chat_questions.md §2)."""
+        self.proposed_with_a_constraint()
         self.at(8, days=1)
-        self.assertEqual([m["id"] for m in queue_lines(self.step())], [self.message["id"]])
-        self.at(9, days=1)
-        out = self.tap(proposal, "a2")
-        self.assertIn(saved_proposal.OUT_OF_DATE_LINE, out)
-        [question] = queue_lines(out)
+        [question] = queue_lines(self.step())
         self.assertIn("this constraint?", question["text"])
 
     def test_a_tap_on_the_proposal_the_next_day_does_not_repeat_a_question_that_is_out(self):
-        """Friday 08:00: the message goes out again, and "Got it" brings the constraint
-        question, which stands next in the line. It is left. 09:00: the tap on Thursday's
-        proposal brings nothing."""
+        """Friday 08:00: the constraint question goes out first, and it is left. 09:00: the
+        tap on Thursday's proposal brings nothing."""
         proposal = self.proposed_with_a_constraint()
         self.at(8, days=1)
-        [message] = queue_lines(self.step())
-        [question] = queue_lines(self.tap(message, "a1"))
+        [question] = queue_lines(self.step())
         self.assertIn("this constraint?", question["text"])
         self.at(9, days=1)
-        self.assertEqual(queue_lines(self.tap(proposal, "a2")), [])
+        out = self.tap(proposal, "a2")
+        self.assertIn(saved_proposal.OUT_OF_DATE_LINE, out)
+        self.assertEqual(queue_lines(out), [])
 
     def test_after_the_runs_questions_an_item_not_sent_yet_follows(self):
         """A message queued at 08:25 has not gone out when the athlete writes at 08:30. It

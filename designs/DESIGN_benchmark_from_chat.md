@@ -74,6 +74,16 @@ through the renderer (§12.11). The companion words are §1's. The expert words 
 and `--session` is useful on the terminal for the same reason: the logbook's `workout_id`
 column has been empty since Phase 1 because nothing ever set it.
 
+Amended 2026-10-15 (DESIGN_chat_questions.md §6): in the chat the capture no longer waits on
+the confirm. It saves the question as a queued question, kind `test_record`, and `bot capture`
+sends it as it ends. The question is `benchmark record`'s own, worded again each time it is
+sent, so the comparison with the latest result is current. It now ends "Shall I write down this
+test result?" where §1 says "Shall I write it down?". Its "Yes" runs `benchmark record` with the
+answer already given, as `--yes` does. It is a confirmation: while it waits, it comes before
+any older question in the queue, and it closes without a word after the `confirmation-days`
+mornings, three by default. It also closes when the logbook already holds a result for the
+planned test it is filed under. A terminal still asks on the spot.
+
 No offer button follows a recorded result: nothing about the week changes today because of a
 number. Sessions already written keep their watts and paces; the next time the week planner
 writes or changes a session, it prescribes from the new value. A change past the replan band
@@ -91,6 +101,15 @@ goes to the capture with the session pinned, the drop "Nothing to record", and t
 "Not now". A "No" on the read-back raises `NotApplied`, so the item waits and the next walk
 asks again. On the terminal the same item shows up in `sm queue answer`, and the typed answer
 runs the same capture in the expert voice.
+
+Amended 2026-10-15 (DESIGN_chat_questions.md §6): in the chat the typed answer no longer waits
+for the read-back's tap. A typed number queues the `test_record` question of §3 and sends it.
+It also puts the morning-after question off until the next morning, as "⏰ Ask me tomorrow"
+would: the answer raises `PutOff` (DESIGN_athlete_queue.md §8). After a "Yes", the
+morning-after question finds the result the next morning and closes without a word. After a
+"No", or when the read-back closes unanswered, the morning-after question is asked again. A
+typed answer the capture cannot use still raises `NotApplied`, and the morning-after question
+is asked again at once. On the terminal nothing changes.
 
 ## 5. Guardrails
 

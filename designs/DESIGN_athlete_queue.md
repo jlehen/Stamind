@@ -99,6 +99,12 @@ These questions do not follow it yet. Each still holds the chat for up to five m
 A typed answer is not one of them (§6.3): the bot waits for it only after a tap, and an answer
 that never comes leaves the item waiting.
 
+Amended 2026-10-15: none of these is left. The question of `workout generate` and the offer to
+pass a message on became saved questions with DESIGN_long_runs_beside_chat.md §4 and §5. The
+others became queued questions with DESIGN_chat_questions.md §3 to §6. So did "Which one did you
+mean?", which was a row of buttons and not a waiting question (§5 there). In the chat, every
+question now goes through the queue. A terminal still asks on the spot.
+
 "What was that block of sets?" changes what the app knows, but nothing is stuck while the
 answer is missing: an unnamed set still counts as volume. That goes to the queue, even when
 she is watching.
@@ -110,6 +116,9 @@ scheduled run and can only reach her through the queue. When such a run meets a 
 would have needed, it goes on without the answer, the way an unattended `workout adapt`
 already skips the "is this activity that session?" question and trusts the matcher. Whether
 it also queues the question, so the answer is there next time, is the feature's choice.
+Amended 2026-10-15 (DESIGN_chat_questions.md §3): `workout adapt` now queues "Was that the
+session, cut short?" in every run where it does not ask it on the spot, the morning run
+included. It asks on the spot only in a terminal run without `-y`.
 
 The queue holds two shapes. A **question** has answers. A **message** has nothing to
 answer; it only needs to be read.
@@ -644,6 +653,29 @@ the front of the line and closes after the `confirmation-days` mornings
 command that run is: the bot runs that tap beside the chat, and the tap goes on to the run
 once the item is closed. `pass_to_coach` is both: its "Yes" passes the athlete's words to
 `workout adapt -m`.
+
+Amended 2026-10-15 (DESIGN_chat_questions.md §3 to §6): seven more entries. Each was asked on
+the spot in the chat, or was a row of buttons, before.
+
+- `cut_short`, from `stamind/cli/workouts/cut_short.py`: "Was that the session, cut short?".
+- `new_goal`, from `stamind/cli/bot/goal.py`: "Shall I set up this goal?".
+- `edit`, from `stamind/cli/bot/edit.py`: "Shall I change this constraint?", or "this goal".
+- `pick`, from the same file: "Which constraint did you mean?" when the chat cannot tell which
+  one, and "Which constraint should I change?" after a "No" on `edit`. The same for a goal.
+- `change_setting`, from `stamind/cli/bot/setting.py`: "… Shall I change this setting?".
+- `test_record`, from `stamind/cli/bot/test_result.py`: "… Shall I write down this test
+  result?".
+- `adjust_week`, from `stamind/cli/bot/hand_off.py`: "Shall I adjust your week around this
+  constraint?". Its "Yes" starts `workout adapt` as a long run.
+
+All seven are confirmations, and so are `constraint`, `signal` and `session_note` now. All but
+`cut_short` are drawn bare: `cut_short` keeps its "Not now". A feature that queues an `edit`, a
+`change_setting` or a `test_record` question closes an older waiting one about the same thing,
+when the newer one changes every part the older one would (DESIGN_chat_questions.md §4).
+
+An answer can now say one more thing: that its question waits until the next morning, as
+"⏰ Ask me tomorrow" would. It raises `PutOff`, from `stamind/queue_kind.py`. The typed answer to
+`test_result` does so when it queues its `test_record` question (DESIGN_chat_questions.md §6).
 
 ## 9. Guardrails
 

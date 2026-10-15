@@ -209,6 +209,12 @@ After, the command saves the question and ends. The words and the two answers st
 It is a confirmation like the question of §4, under the same three rules. Its kind is
 `pass_to_coach`. The answer calls `_hand_off_to_coach`, which no longer runs inside the capture.
 
+Amended 2026-10-15 (DESIGN_chat_questions.md §4): the same kind now replaces the button "📨 Send
+it to your coach as written". A capture that finds nothing asks "I'm not sure what to do with
+that one 🤔 — but I don't want to lose it. Shall I pass it to your coach?". A preference with no
+end date gets the question after the sentence that says where a preference belongs. Neither
+names a session, so only the `confirmation-days` mornings close it.
+
 ## 6. A tap that starts a long run
 
 Today a tap on a queued question runs `bot queue` in the chat's own place. That command checks
@@ -217,8 +223,9 @@ would hold the chat while it thinks.
 
 A kind of queued question can now name the answer that starts a long run. When a tap on that
 answer arrives, the bot reads the item's kind and runs the tap in the second place. The item is
-checked and closed as for any answer, and the long run goes on in the same command. Two kinds
-name one: "Plan them" of `replace_sessions` (§4) and "Yes" of `pass_to_coach` (§5).
+checked and closed as for any answer, and the long run goes on in the same command. Three kinds
+name one: "Plan them" of `replace_sessions` (§4), "Yes" of `pass_to_coach` (§5), and "Yes" of
+`adjust_week` (amended 2026-10-15, DESIGN_chat_questions.md §4).
 
 While another long run is alive, the tap is kept and run when that run ends (§7).
 
