@@ -19,6 +19,8 @@ from stamind.db import Database
 import stamind_cli  # noqa: F401  (registers the parsers)
 
 from stamind import athlete_queue, runtime
+from stamind.chat.callbacks import tap_long_run
+from stamind.chat.routing import COACH_RUN, PLANNING_RUN
 from stamind.cli.bot import hand_off
 from stamind.cli.runway import runway_argv
 from stamind.cli.workouts import proposal as saved
@@ -71,6 +73,7 @@ class _Case(unittest.TestCase):
         rebind_test_db(test_db)
         clear_all_tables(test_db)
         test_db.set_setting("push_morning_time", "08:00")
+        test_db.set_setting("confirmation_days", "3")
         self.now = THURSDAY_8AM.replace(minute=30)
         clock = patch("stamind.clock.now", side_effect=lambda: self.now)
         clock.start()
@@ -129,17 +132,21 @@ class HandOffTest(_Case):
         self.assertEqual(code, 0)
         self.assertEqual(adapt.call_args.args[0].message, WORDS)
 
-    def test_a_tap_on_yes_starts_a_long_run_and_on_no_does_not(self):
+    def test_the_bot_runs_a_yes_as_the_coachs_run_and_a_no_in_the_chats_place(self):
         item = self.ask()
-        self.assertEqual(athlete_queue.long_run_argv(item, "a1"), ("workout", "adapt", "-m"))
-        self.assertIsNone(athlete_queue.long_run_argv(item, "a2"))
+        self.assertEqual(tap_long_run(str(item["id"]), "a1"), COACH_RUN)
+        self.assertIsNone(tap_long_run(str(item["id"]), "a2"))
 
-    def test_it_closes_once_the_day_of_the_session_is_over(self):
+    def test_once_the_day_of_the_session_is_over_it_closes_and_a_yes_says_so(self):
+        """The run named is Friday's. On Friday it is still asked; on Saturday it is out of
+        date, and a tap on "Yes" passes nothing on."""
         item = self.ask(day="2026-10-09")
         self.at(days=1)
         self.assertEqual(self.line_ids(), [item["id"]])
         self.at(days=2)
-        self.assertEqual(self.line_ids(), [])
+        adapt, out = self.tap(item, "a1")
+        adapt.assert_not_called()
+        self.assertIn(hand_off.CLOSED_LINE, out)
         self.assertEqual(test_db.get_queue_item(item["id"])["outcome"], athlete_queue.STALE)
 
 
@@ -180,10 +187,6 @@ class ConfirmationTest(_Case):
         item = self.ask()
         self.at(days=1)
         self.assertEqual(self.line_ids(), [item["id"], older])
-
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 class ProposeTest(_Case):
@@ -349,8 +352,7 @@ class ProposeTest(_Case):
         save_workout(test_db, THURSDAY, "running", "Easy run", duration_minutes=40)
         self.propose("-d", f"{THURSDAY}..{NEXT_THURSDAY}")
         [item] = self.waiting(saved.REPLACE_SESSIONS)
-        self.assertEqual(athlete_queue.long_run_argv(item, "a1"),
-                         ("workout", "generate", "--propose"))
+        self.assertEqual(tap_long_run(str(item["id"]), "a1"), PLANNING_RUN)
         out = self.tap(item)
         self.coach.workout_generate.assert_called_once()
         self.assertEqual(self.coach.workout_generate.call_args.kwargs["start_date"], THURSDAY)
@@ -364,6 +366,17 @@ class ProposeTest(_Case):
         [item] = self.waiting(saved.REPLACE_SESSIONS)
         out = self.tap(item, "a2")
         self.assertIn(saved.KEPT_LINE, out)
+        self.coach.workout_generate.assert_not_called()
+
+    def test_plan_them_on_a_question_gone_out_of_date_says_so_and_plans_nothing(self):
+        """08:02 the question is saved; 08:03 "Change it" on a proposal writes today, inside
+        its days; 08:05 "Plan them"."""
+        save_workout(test_db, THURSDAY, "running", "Easy run", duration_minutes=40)
+        self.propose("-d", f"{THURSDAY}..{NEXT_THURSDAY}")
+        [item] = self.waiting(saved.REPLACE_SESSIONS)
+        save_workout(test_db, THURSDAY, "running", "Shorter run", duration_minutes=30)
+        out = self.tap(item)
+        self.assertIn(saved.REPLACE_CLOSED_LINE, out)
         self.coach.workout_generate.assert_not_called()
 
     def test_the_question_closes_after_its_mornings(self):
@@ -395,3 +408,7 @@ class ProposeTest(_Case):
             runway_argv({"kind": "mesocycle", "next_mesocycle": {"id": 7}}),
             "workout generate -m ..7 --propose",
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

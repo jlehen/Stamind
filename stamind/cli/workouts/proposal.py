@@ -11,15 +11,16 @@ imports the list of kinds these are in.
 import contextlib
 import io
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from stamind import clock, runtime
 from stamind.analytics.compare import adherence_verdicts
+from stamind.chat.routing import PLANNING_RUN
 from stamind.cli.workouts.heads_up import generate_dates, newest_written, revision_dates
 from stamind.clock import today_str
 from stamind.coach.proposals import (
     GenerateProposal, RevisionProposal, generate_from_json, generate_to_json, revision_from_json,
-    revision_to_json,
+    revision_to_json, sessions_replaced,
 )
 from stamind.db.queue import queue_stamp
 from stamind.output import step
@@ -76,23 +77,34 @@ def _pull_today(today: str) -> None:
         step(f"Could not reach Garmin, checking against what is stored: {e}")
 
 
+def _spoiled_today(
+    item: Dict[str, Any], is_out_of_date: Callable[[Dict[str, Any]], bool]
+) -> bool:
+    """Whether an item that writes today went out of date since it was saved, checked
+    after today's activities are pulled. It is then closed as stale (§4)."""
+    today = today_str()
+    if today not in item["payload"]["dates"]:
+        return False
+    _pull_today(today)
+    if not is_out_of_date(item):
+        return False
+    runtime.db.close_queue_item(item["id"], STALE, clock.now())
+    return True
+
+
 def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
     """"Change it" writes the saved proposal under one change; "Keep it as planned" writes
     nothing. A change to today is followed by today's sessions as they now stand, which
     nothing in the chat shows yet (§4)."""
     if index != ACCEPT:
         return KEPT_LINE
-    today = today_str()
-    changes_today = today in item["payload"]["dates"]
-    if changes_today:
-        _pull_today(today)
-        if out_of_date(item):
-            runtime.db.close_queue_item(item["id"], STALE, clock.now())
-            return OUT_OF_DATE_LINE
+    if _spoiled_today(item, out_of_date):
+        return OUT_OF_DATE_LINE
     runtime.coach_service.workout_revision_apply(
         revision_from_json(item["payload"]["proposal"])
     )
-    if not changes_today:
+    today = today_str()
+    if today not in item["payload"]["dates"]:
         return APPLIED_LINE
     return f"{APPLIED_LINE}\n\n{_today_text(today)}".rstrip()
 
@@ -195,6 +207,10 @@ SCHEDULED_LINE = "Done — they're in your schedule. 💪"
 
 REPLACE_SESSIONS = "replace_sessions"
 REPLACE_ANSWERS = ({"label": "✅ Plan them"}, {"label": "✖️ Leave it"})
+REPLACE_CLOSED_LINE = (
+    "That question is out of date, so I planned nothing. The morning message offers "
+    "📅 Plan my next weeks while your schedule runs short."
+)
 
 
 def written_inside(item: Dict[str, Any]) -> bool:
@@ -214,12 +230,8 @@ def _schedule(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
     Google Calendar follows; "Leave it" writes nothing."""
     if index != ACCEPT:
         return KEPT_LINE
-    today = today_str()
-    if today in item["payload"]["dates"]:
-        _pull_today(today)
-        if weeks_out_of_date(item):
-            runtime.db.close_queue_item(item["id"], STALE, clock.now())
-            return OUT_OF_DATE_LINE
+    if _spoiled_today(item, weeks_out_of_date):
+        return OUT_OF_DATE_LINE
     runtime.coach_service.workout_generate_apply(
         generate_from_json(item["payload"]["proposal"])
     )
@@ -254,11 +266,9 @@ def save_weeks(proposal: GenerateProposal, written_upto: int) -> Dict[str, Any]:
         if other["kind"] == SCHEDULE:
             runtime.db.close_queue_item(other["id"], STALE, now)
     dates = sorted(generate_dates(proposal))
-    # A kept session is in `displaced` and is not replaced (`generate._confirm_apply`).
-    kept = sum(1 for w in proposal.workouts if w.get("keep"))
     question = runtime.render.schedule_words(
-        len(proposal.workouts), max(0, len(proposal.displaced) - kept),
-        proposal.gen_start, proposal.gen_end,
+        len(proposal.workouts), sessions_replaced(proposal), proposal.gen_start,
+        proposal.gen_end,
     )
     item_id = queue(SCHEDULE, queue_stamp(now), {
         "text": _drawn_weeks(proposal),
@@ -294,7 +304,7 @@ REPLACE_SESSIONS_KIND = Kind(
     wording=lambda item: item["payload"]["text"],
     companion_wording=lambda item: item["payload"]["text"],
     is_stale=_replace_stale, apply=_plan_them, bare=True, confirmation=True,
-    long_run=(ACCEPT, ("workout", "generate", "--propose")),
+    long_run=(ACCEPT, PLANNING_RUN), closed_line=REPLACE_CLOSED_LINE,
 )
 
 

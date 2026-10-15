@@ -129,6 +129,9 @@ class MessagesMixin:
     async def _restart(self, chat_id: int) -> None:
         """Tears down, replies, then hard-exits with RESTART_EXIT_CODE for the sm-bot
         supervisor to relaunch us. See DESIGN_bot_restart.md §5.2."""
+        # Dropped first, or the run that ends in the teardown would start it
+        # (DESIGN_long_runs_beside_chat.md §10).
+        self.kept.pop(chat_id, None)
         await runner.restart_teardown(
             self.sessions.get(chat_id), self._pause_polling, self.long_runs.get(chat_id)
         )

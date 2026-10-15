@@ -56,9 +56,10 @@ class Kind:
     # line while it waits, and closes without a word once it was asked on its day and the
     # next `confirmation-days` mornings (DESIGN_chat_questions.md §2).
     confirmation: bool = False
-    # The answer whose tap starts a long run, by its position, and the command that run is.
-    # The bot runs that tap beside the chat (DESIGN_long_runs_beside_chat.md §6).
-    long_run: Optional[Tuple[int, Tuple[str, ...]]] = None
+    # The answer whose tap starts a long run, by its position, and which long run, as
+    # `chat/routing.py` names them. The bot runs that tap beside the chat
+    # (DESIGN_long_runs_beside_chat.md §6).
+    long_run: Optional[Tuple[int, str]] = None
 
 
 class NotApplied(Exception):

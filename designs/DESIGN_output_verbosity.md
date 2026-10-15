@@ -389,8 +389,7 @@ buffers stdout and flushes at a photo, a button row, a prompt, or exit — so wi
 a wait of tens of seconds, which is exactly the shape §1 set out to kill.
 
 A fourth one-way sentinel, `\x1eSM-FLUSH` (`FLUSH_SENTINEL` / `emit_flush()` in
-`stamind/prompt.py`; both ends are `stamind/sentinels.py` now, where the reader is
-`flush_wants_a_wait()`), ends the message where
+`stamind/prompt.py`; both ends are `stamind/sentinels.py` now), ends the message where
 it stands. Three details:
 
 - **It gates itself.** `emit_flush()` is a no-op unless `is_json_frontend()`. A flush has

@@ -20,7 +20,8 @@ from stamind.chat.keyboards import (
     ui_menu_rows,
 )
 from stamind.chat.replies import format_prompt_message
-from stamind.chat.routing import long_run, parse_message_to_argv
+from stamind.chat.routing import parse_message_to_argv
+from stamind.chat.runner import COACH_ASKED
 from stamind.sentinels import prompt_answer
 
 
@@ -44,8 +45,7 @@ def tap_long_run(item_id: str, action: str) -> Optional[str]:
     item = runtime.db.get_queue_item(int(item_id))
     if item is None or item["closed_at"]:
         return None
-    argv = athlete_queue.long_run_argv(item, action)
-    return long_run(argv) if argv else None
+    return athlete_queue.long_run_name(item, action)
 
 
 class CallbacksMixin:
@@ -95,11 +95,11 @@ class CallbacksMixin:
                 argv = parse_message_to_argv(str(utterance))
             except ValueError:
                 argv = None
-        # A fixed sentence for the coach is refused like a typed one while the long run alive
-        # waits on a question of its own, and before its row goes, so it can be tapped again
-        # (DESIGN_long_runs_beside_chat.md §7).
-        if argv and self._alive_asks(chat_id, argv):
-            await self._keep_behind(chat_id, argv)
+        # A fixed sentence for the coach is kept like a typed one. While the long run alive
+        # waits on a question of its own it is refused, before its row goes, so it can be
+        # tapped again (DESIGN_long_runs_beside_chat.md §7).
+        held = await self._keep_behind(chat_id, argv) if argv else None
+        if held == COACH_ASKED:
             return
         self._log(chat_id, "  ", f"ui tap: {action.get('label')}")
         try:  # a decided row is spent: drop the buttons
@@ -112,7 +112,7 @@ class CallbacksMixin:
             if ack:
                 await self.bot.send_message(chat_id=chat_id, text=str(ack))
             return
-        if not argv or await self._keep_behind(chat_id, argv):
+        if not argv or held:
             return
         self._log(chat_id, "  ", f"run: {shlex.join(argv)}")
         await self.bot.send_chat_action(chat_id=chat_id, action="typing")
@@ -138,15 +138,15 @@ class CallbacksMixin:
             except Exception as exc:
                 journal.debug("bot.event", f"later choices not swapped in: {exc}")
             return
-        run = tap_long_run(item_id, action)
-        argv = ["bot", "queue", item_id, action]
-        if run is None and self.sessions.get(chat_id) is not None:
+        if self.sessions.get(chat_id) is not None:
             await self.bot.send_message(chat_id=chat_id, text=BUSY_TAP)
             return
+        run = tap_long_run(item_id, action)
+        argv = ["bot", "queue", item_id, action]
+        held = await self._keep_behind(chat_id, argv, quiet=True, run=run) if run else None
         # Refused while the long run alive asks, before the buttons go, so it can be tapped
         # again (§7).
-        if run and self._alive_asks(chat_id, argv, run):
-            await self._keep_behind(chat_id, argv, quiet=True, run=run)
+        if held == COACH_ASKED:
             return
         message = query.message
         label = tapped_label(_keyboard_rows(message), data)
@@ -157,7 +157,7 @@ class CallbacksMixin:
                 await query.edit_message_reply_markup(reply_markup=None)
         except Exception as exc:
             journal.debug("bot.event", f"queue choice not echoed: {exc}")
-        if run and await self._keep_behind(chat_id, argv, quiet=True, run=run):
+        if held:
             return
         self._log(chat_id, "  ", f"run: {shlex.join(argv)}")
         await self._start_command(chat_id, argv, quiet=True, run=run)

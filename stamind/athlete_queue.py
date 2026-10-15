@@ -113,9 +113,9 @@ def answer_index(item: Dict[str, Any], action: str) -> Optional[int]:
     return index if 0 <= index < len(answers(item)) else None
 
 
-def long_run_argv(item: Dict[str, Any], action: str) -> Optional[Tuple[str, ...]]:
-    """The command a tap on `action` starts beside the chat, or None when that answer
-    starts no long run (DESIGN_long_runs_beside_chat.md §6)."""
+def long_run_name(item: Dict[str, Any], action: str) -> Optional[str]:
+    """Which long run a tap on `action` starts beside the chat, or None when that answer
+    starts none (DESIGN_long_runs_beside_chat.md §6)."""
     long_run = kind_of(item).long_run
     if long_run is None or answer_index(item, action) != long_run[0]:
         return None

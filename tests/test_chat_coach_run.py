@@ -20,11 +20,31 @@ from tests.chat_harness import (
     _FakeProc, _FakeQuery, _ScriptedProc, build_chat_bot, callback_update, message_update,
     record_commands, routes_to,
 )
-from stamind.chat import callbacks, keyboards, messages, replies, runner, scheduler
+from stamind.chat import callbacks, keyboards, messages, replies, routing, runner, scheduler
 from stamind.chat.routing import COACH_RUN, MORNING_RUN, PLANNING_RUN
 from stamind.sentinels import PROMPT_SENTINEL
 
 TIRED = ["workout", "adapt", "-m", "I'm tired"]
+
+
+class LongRunTableTest(unittest.TestCase):
+    """Which command lines are long runs, and so take the second place
+    (DESIGN_long_runs_beside_chat.md §2)."""
+
+    def test_the_long_runs_and_the_rest(self):
+        cases = {
+            ("bot", "morning"): MORNING_RUN,
+            ("workout", "adapt", "-m", "I'm tired"): COACH_RUN,
+            ("workout", "tweak", "move Saturday's ride"): COACH_RUN,
+            ("workout", "generate", "--propose"): PLANNING_RUN,
+            ("workout", "generate", "-m", "..7", "--propose"): PLANNING_RUN,
+            ("workout", "generate"): None,
+            ("workout", "list", "-d", "today"): None,
+            ("bot", "queue", "7", "a1"): None,
+        }
+        for argv, run in cases.items():
+            with self.subTest(argv=argv):
+                self.assertEqual(routing.long_run(list(argv)), run)
 
 
 class CoachRunTest(unittest.IsolatedAsyncioTestCase):
@@ -194,18 +214,6 @@ class MorningRunTest(unittest.IsolatedAsyncioTestCase):
         await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
         return replied
 
-    async def test_the_morning_run_takes_the_second_place(self):
-        chat_bot = build_chat_bot(self)
-
-        async def spawn(*_args, **_kwargs):
-            return _FakeProc()
-
-        with mock.patch("asyncio.create_subprocess_exec", spawn), \
-                mock.patch.object(chat_bot, "_drive", mock.AsyncMock()):
-            run = await chat_bot._start_command(42, ["bot", "morning"], quiet=True)
-        self.assertIs(chat_bot.long_runs[42], run)
-        self.assertNotIn(42, chat_bot.sessions)
-
     async def test_a_keyboard_button_is_answered_at_once(self):
         """08:01 "✅ Done lately": the last days, at once."""
         chat_bot = build_chat_bot(self)
@@ -216,44 +224,25 @@ class MorningRunTest(unittest.IsolatedAsyncioTestCase):
             started, [(42, ["workout", "compare", "-d", "7d", "--no-mark"], False, "bot")]
         )
 
-    async def test_a_message_to_the_coach_gets_its_line_and_starts_when_the_run_ends(self):
-        """08:01 "I'm tired". At 08:02 the morning message is out, and the message starts."""
-        chat_bot = build_chat_bot(self)
-        run = self.morning(chat_bot)
-        with routes_to(chat_bot, "coach_message"):
-            await self.say(chat_bot, "I'm tired")
-        self.assertEqual(chat_bot.bot.texts(), [runner.KEPT_LINES[MORNING_RUN]])
-        self.assertNotIn(42, chat_bot.sessions)
-
-        spawned = []
-
-        async def spawn(*args, **_kwargs):
-            spawned.append(list(args[3:]))
-            return _ScriptedProc(["Your coach says hello.\n"])
-
-        run.proc = _ScriptedProc(["🏃 Today: Easy run — 40 min\n"])
-        with mock.patch("asyncio.create_subprocess_exec", spawn):
-            await chat_bot._drive(run)
-            self.assertEqual(spawned, [TIRED])
-            self.assertEqual(chat_bot.long_runs[42].long, COACH_RUN)
-            self.assertNotIn(42, chat_bot.kept)
-            await chat_bot.long_runs[42].task
-
-    async def test_two_kept_messages_start_one_after_the_other_in_order(self):
+    async def test_kept_messages_get_its_line_and_start_in_order_when_it_ends(self):
+        """08:01 "I'm tired", 08:01:30 "and my knee hurts". At 08:02 the morning message is
+        out, and the two messages start one after the other."""
         chat_bot = build_chat_bot(self)
         run = self.morning(chat_bot)
         with routes_to(chat_bot, "coach_message"):
             await self.say(chat_bot, "I'm tired")
             await self.say(chat_bot, "and my knee hurts")
+        self.assertEqual(chat_bot.bot.texts(), [runner.KEPT_LINES[MORNING_RUN]] * 2)
         spawned = []
 
         async def spawn(*args, **_kwargs):
             spawned.append(args[-1])
             return _ScriptedProc(["Your coach says hello.\n"])
 
-        run.proc = _ScriptedProc([])
+        run.proc = _ScriptedProc(["🏃 Today: Easy run — 40 min\n"])
         with mock.patch("asyncio.create_subprocess_exec", spawn):
             await chat_bot._drive(run)
+            self.assertEqual(chat_bot.long_runs[42].long, COACH_RUN)
             await chat_bot.long_runs[42].task
         self.assertEqual(spawned, ["I'm tired", "and my knee hurts"])
         self.assertEqual((chat_bot.long_runs, chat_bot.kept), ({}, {}))
@@ -302,10 +291,9 @@ class LongTapTest(unittest.IsolatedAsyncioTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    async def test_it_runs_beside_the_chat_even_while_the_chat_is_busy(self):
+    async def test_it_runs_beside_the_chat(self):
         chat_bot = build_chat_bot(self)
         self.starts_a_long_run()
-        chat_bot.sessions[42] = runner.Session(42, _FakeProc(), "n0nce")
 
         async def spawn(*_args, **_kwargs):
             return _FakeProc()
@@ -316,7 +304,19 @@ class LongTapTest(unittest.IsolatedAsyncioTestCase):
             await tapped
         run = chat_bot.long_runs[42]
         self.assertEqual((run.long, run.quiet), (COACH_RUN, True))
+        self.assertNotIn(42, chat_bot.sessions)
         self.assertIn("→ ✅ Yes", query.edited_text)
+
+    async def test_it_waits_like_any_tap_while_the_chat_is_busy(self):
+        chat_bot = build_chat_bot(self)
+        self.starts_a_long_run()
+        started = record_commands(self, chat_bot)
+        chat_bot.sessions[42] = runner.Session(42, _FakeProc(), "n0nce")
+        query, tapped = self.tap(chat_bot)
+        await tapped
+        self.assertEqual(started, [])
+        self.assertEqual(chat_bot.bot.texts(), [keyboards.BUSY_TAP])
+        self.assertIsNone(query.edited_text)
 
     async def test_it_is_kept_while_the_morning_run_thinks(self):
         chat_bot = build_chat_bot(self)

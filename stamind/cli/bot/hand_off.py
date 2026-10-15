@@ -10,6 +10,7 @@ kinds imports it, and `bot capture`, which asks it, imports the queue's sender.
 from typing import Any, Dict, Optional
 
 from stamind import clock, runtime
+from stamind.chat.routing import COACH_RUN
 from stamind.clock import today_str
 from stamind.db.queue import queue_stamp
 from stamind.queue_kind import QUESTION, Kind, queue
@@ -27,6 +28,10 @@ SESSION_HANDOFF_ASK = (
 ANSWERS = ({"label": "✅ Yes"}, {"label": "✖️ No"})
 YES = 0
 LEFT_LINE = "Okay — I'll leave it."
+CLOSED_LINE = (
+    "That question is out of date, so I passed nothing on. Write to me again if you still "
+    "want a change."
+)
 
 
 def _text(item: Dict[str, Any]) -> str:
@@ -47,7 +52,7 @@ PASS_TO_COACH_KIND = Kind(
     wording=_text, companion_wording=_text,
     is_stale=lambda item: item["payload"]["date"] < today_str(),
     apply=_apply, bare=True, confirmation=True,
-    long_run=(YES, ("workout", "adapt", "-m")),
+    long_run=(YES, COACH_RUN), closed_line=CLOSED_LINE,
 )
 
 

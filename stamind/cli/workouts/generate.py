@@ -14,7 +14,7 @@ from stamind.text import (
 )
 from stamind.output import notice
 from stamind.clock import fmt_date, shift, today_str as _today_str
-from stamind.coach.proposals import GenerateProposal
+from stamind.coach.proposals import GenerateProposal, sessions_replaced
 from stamind.cli import staleness
 from stamind.cli.common import ensure_recent_data, print_strength_notes
 from stamind.cli.queue import send_alone, send_own_questions
@@ -68,16 +68,14 @@ def _confirm_regeneration(span_start: str, span_end: str, fresh: bool) -> bool:
 
 def _confirm_apply(proposal: GenerateProposal) -> bool:
     """Gates the write, once the athlete has read the proposed sessions."""
-    # A kept session is already live and is not rewritten, so it is not among what this
-    # archives. Every kept slot is in `displaced` by construction, so subtracting is
-    # exact — and the danger prompt must not overstate the loss.
+    # The danger prompt must not overstate the loss: a kept session is not archived.
     kept = sum(1 for w in proposal.workouts if w.get('keep'))
     held = (
         f" {kept} session(s) you were already told about are kept exactly as they are."
         if kept else ""
     )
-    displaced = len(proposal.displaced) - kept
-    if displaced <= 0:
+    displaced = sessions_replaced(proposal)
+    if not displaced:
         return runtime.prompt.confirm(
             wrap_text(
                 f"Schedule these {len(proposal.workouts)} workout(s) and push them to "

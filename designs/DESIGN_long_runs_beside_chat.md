@@ -332,6 +332,7 @@ given them under.
   `workout generate` thinks, which can be several minutes.
 - `plan generate`, `data pull` and `/workout generate` without `--propose`, typed with a slash,
   still hold the chat. Only the operator types them.
+- Two long runs started in the same few milliseconds both run.
 
 ## 11. Build order
 

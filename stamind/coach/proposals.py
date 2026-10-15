@@ -7,9 +7,12 @@ fingerprinted at prompt time and ``plan_apply`` re-read at accept time, an edit 
 between silently defeated the staleness detector.
 
 So a proposal carries the facts it was computed from, and the consumer renders rather
-than recomputes. Records only: the logic that fills them in lives in `revisions.py`. The one
-exception is the trip to JSON and back, for a proposal saved until the athlete answers it
-(DESIGN_waiting_proposal.md §3, DESIGN_long_runs_beside_chat.md §4).
+than recomputes. Records only: the logic that fills them in lives in `revisions.py`. Two
+things are read off them here, because both sides of the boundary need the same answer: the
+trip to JSON and back, for a proposal saved until the athlete answers it
+(DESIGN_waiting_proposal.md §3, DESIGN_long_runs_beside_chat.md §4), and
+`sessions_replaced`, the count the terminal's question and the saved weeks' question both
+name.
 """
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
@@ -176,6 +179,14 @@ class GenerateProposal:
     strength_stamp: str = ""
     strength_notice: Optional[str] = None
     strength_dropped: Tuple[str, ...] = ()
+
+
+def sessions_replaced(proposal: GenerateProposal) -> int:
+    """How many live sessions accepting the proposal archives. A kept session is already
+    live and is not rewritten, and every kept slot is in `displaced` by construction, so
+    subtracting is exact."""
+    kept = sum(1 for w in proposal.workouts if w.get('keep'))
+    return max(0, len(proposal.displaced) - kept)
 
 
 # What `workout_generate_apply` reads off a proposal, and so what saved weeks keep

@@ -199,24 +199,19 @@ class RunnerMixin:
         """The live command that raised a prompt, in either place."""
         return next((s for s in self._runs(chat_id) if s.nonce == nonce), None)
 
-    def _alive_asks(self, chat_id: int, argv: List[str], run: Optional[str] = None) -> bool:
-        """Whether `argv` is a long run that is refused, because the long run alive waits on
-        a question of its own (DESIGN_long_runs_beside_chat.md §7)."""
-        alive = self.long_runs.get(chat_id)
-        return bool(alive and alive.awaiting and (run or long_run(argv)))
-
     async def _keep_behind(
         self, chat_id: int, argv: List[str], quiet: bool = False, run: Optional[str] = None
-    ) -> bool:
-        """Whether `argv` is a long run that cannot start, because another one is alive: the
-        bot never starts a second one beside it. It is kept, and started when the alive one
-        ends, unless that one waits on a question of its own. Either way the athlete is told
-        which (DESIGN_long_runs_beside_chat.md §7). `run` names the long run when the argv
-        alone does not say, as for a tap (§6)."""
+    ) -> Optional[str]:
+        """The line the athlete is told when `argv` is a long run that cannot start, because
+        another one is alive, and None when it can start: the bot never starts a second one
+        beside it. It is kept, and started when the alive one ends, unless that one waits on
+        a question of its own: then the line is `COACH_ASKED` and nothing is kept
+        (DESIGN_long_runs_beside_chat.md §7). `run` names the long run when the argv alone
+        does not say, as for a tap (§6)."""
         run = run or long_run(argv)
         alive = self.long_runs.get(chat_id)
         if alive is None or run is None:
-            return False
+            return None
         if alive.awaiting:
             line = COACH_ASKED
         else:
@@ -224,7 +219,7 @@ class RunnerMixin:
             line = KEPT_LINES[alive.long]
         await self.bot.send_message(chat_id=chat_id, text=line)
         self._log(chat_id, "<<", repr(line))
-        return True
+        return line
 
     async def _start_kept(self, chat_id: int) -> None:
         """Starts the first long run kept behind the one that just ended (§7). A failure is
