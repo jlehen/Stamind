@@ -377,6 +377,13 @@ run's own questions.
 constraint is behind. A signal question is closed once its last day is further back than the
 days of metrics the coach reads, 15 by default.
 
+Amended 2026-10-15 (DESIGN_chat_questions.md §2, choice 14): both questions are confirmations,
+questions about what the athlete just wrote. While one waits, it stands at the front of the
+line, before older questions. It is sent on its day and after the briefing on each of the next
+`confirmation-days` mornings, three by default. On the morning after those, it is closed
+without a word, whatever its dates. The question about November 12th, asked on 7 October and
+never answered, is closed on 11 October.
+
 **The same Wednesday.** At 18:33 the athlete writes the message. At 18:35 the proposal arrives
 with "Shall I make these changes?", and nothing under it. The run has ended, so a new message
 to the coach is taken. At 19:10 the athlete taps "Keep it as planned". The bot answers "Okay —
@@ -407,6 +414,14 @@ cases bring no button:
 
 A logged signal always brings the button: it is about days the coach reads.
 
+Amended 2026-10-15 (DESIGN_chat_questions.md §4): the button is gone. Where it came, the reply
+to the "Yes" is now followed by a queued question, "Shall I adjust your week around this
+constraint?" or "… this signal?", with Yes and No. The two cases above still bring nothing. It
+is a confirmation like the two questions above.
+Its "Yes" runs `workout adapt` beside the chat, and a proposal comes back. Its "No" answers
+"Okay — I'll leave your week as it is." It also closes without a word once the week planner has
+looked at the week since it was asked: in the morning run, or for any message to the coach.
+
 **Choices**, each made without the author, all ruled on 2026-10-09.
 
 1. Only the questions of the run follow the answer to its proposal. The other way was the
@@ -417,7 +432,8 @@ A logged signal always brings the button: it is about days the coach reads.
    closed by its dates. It has no button to drop it, because "No" already settles it.
    **Kept, with new words.** A question that comes back on a later morning has no message
    above it for "that" to point at, so the two questions name what they ask about: "Shall I
-   remember this constraint?" and "Shall I log this signal?".
+   remember this constraint?" and "Shall I log this signal?". Amended 2026-10-15: it now also
+   closes after the `confirmation-days` mornings (DESIGN_chat_questions.md §8, choice 14).
 4. The signal question moves with the constraint question. A message that holds both would
    otherwise leave one question that waits and one that ends its run after five minutes.
    **Kept.**
@@ -434,7 +450,8 @@ A logged signal always brings the button: it is about days the coach reads.
   "Yes" store it twice.
 - A proposal replaced by a newer one before it is answered (§6.2): the questions of its run
   come with the next morning's round, not with the answer to the newer proposal.
-- The questions the chat still asks on the spot. DESIGN_athlete_queue.md §2 lists them.
+- The questions the chat still asked on the spot. DESIGN_athlete_queue.md §2 lists them. None
+  is left since 2026-10-15 (DESIGN_chat_questions.md).
 
 **Touch points.** No table, no column, and nothing in the bot (`stamind/chat/`).
 

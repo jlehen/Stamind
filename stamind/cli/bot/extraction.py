@@ -1,21 +1,20 @@
 """What every `bot capture` extraction shares (DESIGN_bot_simple_frontend.md §12.2).
 
 One capture is one domain-focused model call. This module holds the role that call opens
-with, the rows the athlete could be talking about, the call itself, and the two lanes out
-of it: hand the words to the coach as written, or offer to adjust the week around what
-was just stored (§12.3).
+with, the rows the athlete could be talking about, the call itself, and what a capture says
+when it read nothing it could store (§12.3).
 
 It is a module of its own rather than the top of `capture.py` because `capture.py`
 dispatches the five intents and so imports `edit.py`, which needs these same names; a
 shared module is what keeps that from being an import cycle (AGENTS.md, Code style).
 """
-import shlex
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from stamind import runtime
+from stamind.cli.bot import hand_off
 from stamind.db.objectives import GOAL_UPCOMING, goal_state
-from stamind.sentinels import emit_buttons
+from stamind.prompt import athlete_watching
 from stamind.text import wrap_text
 from stamind.output import step
 
@@ -24,30 +23,13 @@ from stamind.output import step
 # include the sessions on the way, but only as far as anyone talks about them.
 NOMINATE_SESSION_DAYS = 21
 
-# What a capture says when it read nothing it could store, and the one button that keeps a
-# miss down to a single tap (§12.3). The message behind it was already consumed by the
-# capture, so a silent miss would lose it twice.
+# What a capture says when it read nothing it could store (§12.3). The message behind it
+# was already consumed by the capture, so a silent miss would lose it twice.
 # Worded for every capture, not just the note inbox: an edit that names no row it may
 # change lands here too, and one honest sentence beats a per-intent apology.
 CAPTURE_NO_FIND_LINE = (
     "I'm not sure what to do with that one 🤔 — but I don't want to lose it."
 )
-SEND_TO_COACH_LABEL = "📨 Send it to your coach as written"
-ADJUST_WEEK_LABEL = "🔄 Adjust my week around it"
-
-
-def send_to_coach_button(text: str) -> dict:
-    """The lane that carries her exact words (§12.3): `adapt -m` with the original
-    message, offered as a button so declining it is a non-action."""
-    return {"label": SEND_TO_COACH_LABEL,
-            "send": "workout adapt -m " + shlex.quote(text)}
-
-
-def adjust_week_button() -> dict:
-    """The offer every persisted capture ends on (§12.3). Bare `workout adapt`: the week planner
-    reads the stored row, not the original words — transcription is the price of the
-    instant lane, and the help card teaches which lane is which."""
-    return {"label": ADJUST_WEEK_LABEL, "send": "workout adapt"}
 
 
 def dated_context(today: str) -> str:
@@ -94,10 +76,12 @@ def capture_call(system_prompt: str, text: str, label: str) -> Optional[dict]:
 
 
 def no_find(text: str) -> None:
-    """The §12.3 miss: say so gently, and offer the one tap that walks the message to the
-    coach as written."""
+    """The §12.3 miss: say so gently. In the chat the line opens the question whether to
+    pass the message to the coach as written (DESIGN_chat_questions.md §4)."""
+    if athlete_watching():
+        hand_off.queue_hand_off(f"{CAPTURE_NO_FIND_LINE} {hand_off.PASS_IT_ASK}", text)
+        return
     print(wrap_text(CAPTURE_NO_FIND_LINE))
-    emit_buttons([send_to_coach_button(text)])
 
 
 def valid_date(raw: Any) -> Optional[str]:

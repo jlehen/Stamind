@@ -1,11 +1,13 @@
-"""`bot capture test_result`, and the question the morning after a test
-(DESIGN_benchmark_from_chat.md).
+"""`bot capture test_result`, the question the morning after a test, and the question that
+confirms a result before it is written down (DESIGN_benchmark_from_chat.md,
+DESIGN_chat_questions.md §6).
 
-Both doors end in `benchmark record`'s own confirm: the typed one when the router names
-`record_test`, and the `test_result` queue kind, whose "Tell me the number" answer hands
-the typed text to the same capture with the session pinned (§2). The model reads the
-message; the app parses the value, picks the sport, date and source, and assembles the
-argv (§3, §5).
+Two doors lead to the same capture: the typed one when the router names `record_test`, and
+the `test_result` queue kind, whose "Tell me the number" answer hands the typed text to the
+capture with the session pinned (§2). The model reads the message; the app parses the
+value, picks the sport, date and source, and assembles the argv (§3, §5). A terminal then
+asks `benchmark record`'s own question on the spot. In the chat the `test_record` kind asks
+it, and its "Yes" runs `benchmark record` with the answer given.
 """
 import argparse
 from datetime import date as _date, datetime, timedelta
@@ -18,12 +20,16 @@ from stamind.cli.bot.extraction import (
 )
 from stamind.cli.bot.route import use_fast_model
 from stamind.clock import to_local, today_str as _today_str
-from stamind.queue_kind import QUESTION, Kind, NotApplied, queue
+from stamind.prompt import athlete_watching
+from stamind.queue_kind import (
+    QUESTION, YES, YES_NO, Kind, NotApplied, PutOff, queue, queue_replacing,
+)
 from stamind.sports import CANONICAL_SPORTS, canonical_sport
 from stamind.text import wrap_text
 import stamind.cli.benchmarks as _benchmarks
 
 KIND = "test_result"
+CONFIRM = "test_record"
 
 # How far back the capture is shown the planned tests it may file a result under (§3).
 RECENT_TEST_DAYS = 14
@@ -112,11 +118,11 @@ def _session_id(raw: Any) -> Optional[int]:
         return None
 
 
-def capture_test_result(text: str, pinned: Optional[int] = None) -> Optional[int]:
-    """Reads one message into a `benchmark record` run and returns the recorded row's id,
-    or None when nothing was recorded: a field was missing, or she said no (§3). `pinned`
-    is the session the morning-after question is about; the capture is then shown that
-    test alone."""
+def capture_test_result(text: str, pinned: Optional[int] = None) -> bool:
+    """Reads one message into a `benchmark record` run. A terminal asks on the spot; the
+    chat saves the question that confirms it. False when a field was missing, or she said
+    no on the spot (§3). `pinned` is the session the morning-after question is about; the
+    capture is then shown that test alone."""
     today = _today_str()
     sessions = recent_tests(today)
     if pinned is not None:
@@ -134,20 +140,24 @@ def capture_test_result(text: str, pinned: Optional[int] = None) -> Optional[int
         ),
         text, "bot_capture_test_result",
     )
+    # Answering the morning-after question, a failed call leaves that question to be asked
+    # again (DESIGN_chat_questions.md §6); typed unasked, it lands where a miss does.
+    if data is None and pinned is not None:
+        return False
     if data is None:
         no_find(text)
-        return None
+        return False
 
     kind = str(data.get("kind") or "").strip().lower()
     if kind not in CHAT_KINDS:
         print(wrap_text(KIND_ASK))
-        return None
+        return False
     raw = str(data.get("value") or "").strip()
     try:
         _benchmarks.parse_value(kind, raw)
     except (ValueError, IndexError):
         print(wrap_text(_value_ask(kind)))
-        return None
+        return False
 
     by_id = {w["id"]: w for w in sessions}
     session = by_id.get(pinned if pinned is not None else _session_id(data.get("session_id")))
@@ -159,19 +169,33 @@ def capture_test_result(text: str, pinned: Optional[int] = None) -> Optional[int
     plausible = anchors_for_sport(sport)
     if plausible and kind not in plausible:
         print(wrap_text(_mismatch_ask(kind, sport)))
-        return None
+        return False
 
-    date = session["date"] if session else (valid_date(data.get("date")) or today)
     source = "manual"
     if session or data.get("performed") is True:
         source = "test"
+    result = {
+        "kind": kind, "value": raw, "sport": sport, "source": source,
+        "date": session["date"] if session else (valid_date(data.get("date")) or today),
+        "note": str(data.get("note") or "").strip() or None,
+        "session": session["id"] if session else None,
+    }
+    if athlete_watching():
+        about = f"session:{result['session']}" if session else f"{sport}:{kind}:{result['date']}"
+        queue_replacing(CONFIRM, {"result": result, "answers": list(YES_NO)}, about=about)
+        return True
+    return _benchmarks.run_benchmark_record(_record_args(result)) is not None
+
+
+def _record_args(result: Dict[str, Any], yes: bool = False) -> argparse.Namespace:
+    """The `benchmark record` argv for a result the capture read."""
     args = argparse.Namespace(
-        sport=sport, date=date, note=str(data.get("note") or "").strip() or None,
-        session=session["id"] if session else None, source=source, yes=False,
+        sport=result["sport"], date=result["date"], note=result["note"],
+        session=result["session"], source=result["source"], yes=yes,
         **{k: None for k in LOGBOOK_KINDS},
     )
-    setattr(args, kind, raw)
-    return _benchmarks.run_benchmark_record(args)
+    setattr(args, result["kind"], result["value"])
+    return args
 
 
 # --- the morning-after question (§4) ---
@@ -219,11 +243,14 @@ def _is_stale(item: Dict[str, Any]) -> bool:
 
 
 def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> None:
-    """The typed answer goes to the capture with the session pinned. A "No" on the
-    read-back leaves the item waiting (§4)."""
+    """The typed answer goes to the capture with the session pinned. In the chat its
+    confirmation is asked in its place, and this question waits for the next morning: a
+    "No" on the confirmation leaves it to be asked again (DESIGN_chat_questions.md §6)."""
     use_fast_model(argparse.Namespace())
-    if capture_test_result(text or "", item["payload"]["workout_id"]) is None:
+    if not capture_test_result(text or "", item["payload"]["workout_id"]):
         raise NotApplied("Nothing recorded.")
+    if athlete_watching():
+        raise PutOff()
     return None
 
 
@@ -246,3 +273,35 @@ def ask_about(session: Dict[str, Any]) -> None:
         "sport": sport,
         "answers": [dict(TELL_ME)],
     })
+
+
+# --- the question that confirms a result (DESIGN_chat_questions.md §6) ---
+
+def _confirm_wording(item: Dict[str, Any]) -> str:
+    """`benchmark record`'s own question, read against the latest result when it is sent."""
+    return _benchmarks.record_question(_record_args(item["payload"]["result"]))
+
+
+def _confirm_stale(item: Dict[str, Any]) -> bool:
+    """The logbook already holds a result for the planned test it is filed under."""
+    result = item["payload"]["result"]
+    return result["session"] is not None and has_result(
+        result["session"], result["sport"], result["date"]
+    )
+
+
+def _apply_confirm(item: Dict[str, Any], index: int, text: Optional[str]) -> None:
+    """"Yes" runs `benchmark record` with the answer already given; "No" writes nothing."""
+    if index != YES:
+        runtime.render.benchmark_not_recorded()
+        return None
+    _benchmarks.run_benchmark_record(_record_args(item["payload"]["result"], yes=True))
+    return None
+
+
+# A confirmation drawn bare (DESIGN_chat_questions.md §2).
+TEST_RECORD_KIND = Kind(
+    name=CONFIRM, shape=QUESTION,
+    wording=_confirm_wording, companion_wording=_confirm_wording,
+    is_stale=_confirm_stale, apply=_apply_confirm, bare=True, confirmation=True,
+)

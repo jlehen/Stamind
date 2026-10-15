@@ -21,8 +21,8 @@ from stamind.athlete_queue import (
 from stamind.cli.bot import hand_off
 from stamind.cli.common import ensure_recent_data
 from stamind.cli.queue import (
-    NOTHING_WAITING_LINE, QUEUE_DONE_LINE, send_alone, send_item, send_next, settled_line,
-    short_when,
+    NOTHING_WAITING_LINE, QUEUE_DONE_LINE, send_alone, send_item, send_next,
+    send_own_questions, settled_line, short_when,
 )
 from stamind.cli.selectors import add_selector_args
 from stamind.cli.windows import has_selector, resolve_window
@@ -41,10 +41,12 @@ STAYS_OPEN_LABEL = "skip — it stays open"
 def _hand_off_to_coach(item: Dict[str, Any]) -> None:
     """"Yes" to the hand-off: runs `workout adapt -m` with the athlete's original words, in
     this process. The coach reads what they wrote, which is the whole point of this lane
-    (DESIGN_bot_simple_frontend.md §12.3, DESIGN_long_runs_beside_chat.md §5)."""
+    (DESIGN_bot_simple_frontend.md §12.3, DESIGN_long_runs_beside_chat.md §5). "Yes" to
+    adjusting the week runs it with no message: the coach reads the stored row
+    (DESIGN_chat_questions.md §4)."""
     _adapt.run_workout_adapt(argparse.Namespace(
         date=None, no_pull=False, force_pull=False, auto=False,
-        message=item["payload"]["message"], lookback=None,
+        message=item["payload"].get("message"), lookback=None,
     ))
 
 
@@ -62,6 +64,7 @@ def _plan_them(item: Dict[str, Any]) -> None:
 # What the answer that starts a long run goes on to do, by the item's kind (§6 there).
 GOES_ON = {
     hand_off.KIND: _hand_off_to_coach,
+    hand_off.ADJUST_WEEK: _hand_off_to_coach,
     saved.REPLACE_SESSIONS: _plan_them,
 }
 
@@ -225,12 +228,14 @@ def run_bot_queue(args: argparse.Namespace) -> None:
         _apply(item, args.action)
     if item is None:
         return
-    # A reply is followed by the next question of its own run, whatever is out. Any other
-    # tap, and the last reply of a run, is followed by the step (§13.2 rule 6).
+    # An answer that queued a question, or started a run that did, is followed by that
+    # question (DESIGN_chat_questions.md §4). A reply is followed by the next question of
+    # its own run, whatever is out. Any other tap, and the last reply of a run, is
+    # followed by the step (§13.2 rule 6).
+    if send_own_questions():
+        return
     kind = athlete_queue.kind_of(item)
-    behind = athlete_queue.run_questions(item) if kind.stands_alone or kind.bare else []
-    if behind:
-        send_item(behind[0], len(behind))
+    if (kind.stands_alone or kind.confirmation) and send_own_questions(item["queued_at"]):
         return
     send_next(after=item)
 

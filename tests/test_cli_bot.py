@@ -19,9 +19,8 @@ from stamind.db import Database
 import stamind_cli
 
 from stamind import clock, runtime
-from stamind.cli.bot.views import (
-    MORNING_MARKER, PUSH_ALL_DONE_LINE, WEEK_CHANGED_MORNING_LINE,
-)
+from stamind.cli.bot.views import PUSH_ALL_DONE_LINE, WEEK_CHANGED_MORNING_LINE
+from stamind.settings import MORNING_MARKER
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
 from stamind.config import config

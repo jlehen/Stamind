@@ -15,12 +15,11 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from stamind import clock, runtime, signals
-from stamind.cli.bot.extraction import adjust_week_button
+from stamind.cli.bot import hand_off
 from stamind.clock import today_str
 from stamind.config import config
 from stamind.db.queue import queue_stamp
 from stamind.queue_kind import QUESTION, Kind, queue
-from stamind.sentinels import emit_buttons
 
 # The answers of a queued question, as its item stores them (DESIGN_athlete_queue.md §3).
 YES = "yes"
@@ -59,7 +58,7 @@ def _dated(candidates: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     ]
 
 
-def _tell_open_ended(candidates: Sequence[Dict[str, Any]], text: str) -> None:
+def tell_open_ended(candidates: Sequence[Dict[str, Any]], text: str) -> None:
     """Says where a preference for good belongs, quoting `text`, the note as written, so it
     can be passed on. It is never stored."""
     preferences = [
@@ -85,9 +84,9 @@ def _store_constraint(candidate: Dict[str, Any], date_str: str) -> Optional[int]
     start, end = _span(candidate, 'start_date', date_str)
     runtime.render.constraint_captured(cid, candidate['title'].strip(), start, end, date_str)
     if shaping:
-        # The escalation this names is the operator's typed work: in companion
-        # chat the same fact is said without commands, and the plan-adjusting tap
-        # is the offer the capture ends on (DESIGN_bot_simple_frontend.md §12.10).
+        # The escalation this names is the operator's typed work: in companion chat the
+        # same fact is said without commands, and the question whether to adjust the week
+        # follows (DESIGN_chat_questions.md §4).
         runtime.render.constraint_plan_shaping(cid, shaping)
     return cid
 
@@ -139,7 +138,7 @@ def confirm_new_constraints(
         cid = _store_constraint(candidate, date_str)
         if cid is not None:
             captured.append(cid)
-    _tell_open_ended(candidates, text)
+    tell_open_ended(candidates, text)
     return captured
 
 
@@ -195,8 +194,9 @@ def _constraint_stale(item: Dict[str, Any]) -> bool:
 
 
 def _apply_constraint(item: Dict[str, Any], index: int, text: Optional[str]) -> None:
-    """"Yes" stores the constraint. The offer to adjust the week follows it only where the
-    item asks for one and the coach can reach the constraint's first day."""
+    """"Yes" stores the constraint. The question whether to adjust the week follows it only
+    where the item asks for one and the coach can reach the constraint's first day
+    (DESIGN_chat_questions.md §4)."""
     payload = item['payload']
     if payload['answers'][index]['label'] != YES:
         runtime.render.constraint_candidate_discarded()
@@ -205,7 +205,7 @@ def _apply_constraint(item: Dict[str, Any], index: int, text: Optional[str]) -> 
         return
     start, _end = _span(payload['candidate'], 'start_date', payload['date'])
     if payload['offer'] and coach_reaches(start, today_str()):
-        emit_buttons([adjust_week_button()])
+        hand_off.ask_to_adjust_week("constraint", item['queued_at'])
 
 
 def _signal_wording(item: Dict[str, Any]) -> str:
@@ -241,19 +241,20 @@ def _apply_signal(item: Dict[str, Any], index: int, text: Optional[str]) -> None
         runtime.render.signal_candidate_discarded()
         return
     if _store_signal(payload['candidate'], payload['date'], metric) and payload['offer']:
-        emit_buttons([adjust_week_button()])
+        hand_off.ask_to_adjust_week("signal", item['queued_at'])
 
 
-# Both are drawn bare and have no drop: "No" already settles them.
+# Both are confirmations, drawn bare, and have no drop: "No" already settles them
+# (DESIGN_chat_questions.md §2).
 CONSTRAINT_KIND = Kind(
     name="constraint", shape=QUESTION,
     wording=_constraint_wording, companion_wording=_constraint_wording,
-    is_stale=_constraint_stale, apply=_apply_constraint, bare=True,
+    is_stale=_constraint_stale, apply=_apply_constraint, bare=True, confirmation=True,
 )
 SIGNAL_KIND = Kind(
     name="signal", shape=QUESTION,
     wording=_signal_wording, companion_wording=_signal_wording,
-    is_stale=_signal_stale, apply=_apply_signal, bare=True,
+    is_stale=_signal_stale, apply=_apply_signal, bare=True, confirmation=True,
 )
 
 
@@ -285,25 +286,23 @@ def _apply_note(item: Dict[str, Any], index: int, text: Optional[str]) -> None:
     keep_note(session, payload['date'], payload['text'])
 
 
-# Asks which of a day's sessions a note is about, when the week planner could not tell.
+# Asks which of a day's sessions a note is about, when the week planner could not tell. A
+# confirmation, like the two above.
 NOTE_KIND = Kind(
     name="session_note", shape=QUESTION,
     wording=_note_wording, companion_wording=_note_wording,
-    is_stale=_note_stale, apply=_apply_note, bare=True,
+    is_stale=_note_stale, apply=_apply_note, bare=True, confirmation=True,
 )
 
 
-def queue_note_question(
-    sessions: Sequence[Dict[str, Any]], day: str, text: str
-) -> List[Dict[str, Any]]:
+def queue_note_question(sessions: Sequence[Dict[str, Any]], day: str, text: str) -> None:
     """Queues "which session is this about?" with one answer per session of `day` and one
-    for none of them, and returns the item in a list, as `queue_candidates` does."""
-    item_id = queue(NOTE_KIND.name, f"{queue_stamp(clock.command_start())}:note", {
+    for none of them."""
+    queue(NOTE_KIND.name, f"{queue_stamp(clock.command_start())}:note", {
         'text': text, 'date': day,
         'answers': [{'label': w['title'], 'session': w['id']} for w in sessions]
         + [{'label': NOT_ABOUT_A_SESSION}],
     })
-    return [runtime.db.get_queue_item(item_id)] if item_id is not None else []
 
 
 def _signal_answers(metric: str, near: Optional[str]) -> List[Dict[str, Any]]:
@@ -323,8 +322,9 @@ def queue_candidates(
     date_str: str, text: str, offer: bool,
 ) -> List[Dict[str, Any]]:
     """Queues one question per constraint, then one per signal, in the order a terminal
-    asks them, and returns the items. `offer` says a "Yes" is followed by the offer to
-    adjust the week, which a run of the coach has no use for.
+    asks them, and returns the items. `offer` says a "Yes" is followed by the question
+    whether to adjust the week, which a run of the coach has no use for
+    (DESIGN_chat_questions.md §4). A preference for good is the caller's to tell.
 
     An item's subject is the start of this run and the candidate's place in the model's
     list, so the same words sent again ask again."""
@@ -335,7 +335,6 @@ def queue_candidates(
             'candidate': candidate, 'date': date_str, 'offer': offer,
             'answers': [{'label': YES}, {'label': NO}],
         }))
-    _tell_open_ended(constraints, text)
     for place, candidate in enumerate(signal_rows):
         metric, near, new = _categories(candidate)
         if not metric:

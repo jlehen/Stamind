@@ -830,6 +830,13 @@ Capture runs as an ordinary routed command: its questions are `SM-PROMPT` confir
 offers are `SM-BUTTONS` rows, its output is simple-rendered. Nothing new crosses the
 CLI↔bot channel.
 
+Amended 2026-10-15 (DESIGN_chat_questions.md §2): in the chat, capture asks nothing on the spot
+and leaves no row of buttons. It saves each of its questions in the athlete queue, and `bot
+capture` sends the first one it saved as it ends. A tap answers it whenever the athlete likes.
+Each of these questions is a confirmation: while it waits, it comes before any older question
+in the queue, and it closes without a word after the `confirmation-days` mornings, three by
+default. A terminal still asks on the spot.
+
 ### 12.3 Notes move off the coach: `bot capture note`
 
 `add_constraint` and `add_signal` stop mapping to `adapt -m` and map to one shared
@@ -859,6 +866,18 @@ Amended 2026-10-08 (DESIGN_waiting_proposal.md §6.3): the capture no longer wai
 questions. It saves each as a queued question, sends the first, and ends. The offer
 "🔄 Adjust my week around it" comes with the reply to a "Yes", and not at all for a
 constraint that starts after the mesocycle under way ends, which `workout adapt` cannot reach.
+
+Amended 2026-10-15 (DESIGN_chat_questions.md §4): both buttons of this section are gone. In the
+chat each is now a queued question with Yes and No. After a "Yes" that stored a constraint the
+coach can reach, or a signal, the chat asks "Shall I adjust your week around this constraint?",
+or "this signal?". Its "Yes" runs `workout adapt` beside the chat. It closes without a word
+once the week planner has looked at the week since it was asked. A miss now reads, in one
+message, "I'm not sure what to do with that one 🤔 — but I don't want to lose it. Shall I pass
+it to your coach?". Its "Yes" runs `adapt -m` with her words. A preference with no end date
+gets the same question after the sentence that says where a preference belongs, when the
+message held nothing else to ask about. A terminal offers neither. The paragraphs below still
+call these two "buttons". The capture leaves no row of buttons any more, so "one live button
+row per chat", below, no longer touches it.
 
 **The two lanes are taught, not discovered** (2026-09-02; reworked the same day when
 §5.2 retired the armed channel this paragraph first hung its copy on). The offer runs
@@ -977,6 +996,16 @@ A wrong nomination shows the wrong goal in the preview — "Your goal **Marathon
 remains the only thing that fires a write, and the argv it fires is assembled by the
 CLI from the confirmed proposal, never authored by the model.
 
+Amended 2026-10-15 (DESIGN_chat_questions.md §4, §5): in the chat the preview and the picker
+are queued questions, confirmations as in §12.2. The preview now ends "Shall I change this
+goal?" or "Shall I change this constraint?". Its first line is drawn from the stored row each
+time it is sent. The picker asks "Which constraint did you mean?", or "Which constraint should I
+change?" after a "No", with one answer per row and "✖️ None of these". A tap on a row runs the
+capture on her words again with that row pinned, and asks the preview's question, so the
+invariant above still holds. A newer preview closes an older waiting one about the same goal
+or constraint when it changes every part (dates, name, note) the older one would. A miss gets
+the question of §12.3, not a button. A terminal still asks on the spot.
+
 Chat-editable fields are the transcribable ones: a goal's title, target date and
 description; a constraint's title, dates and description. Everything that changes an
 object's *semantics tier* stays expert vocabulary — a goal's status, sports and
@@ -1001,6 +1030,10 @@ vocabulary — the plan for it gets set up from the computer, by ⟨operator⟩
 formally means the app) — and `plan generate` remains the
 operator's typed act. A goal row is cheap and editable; the periodization built on it
 is neither, and stays behind the §7 line.
+
+Amended 2026-10-15 (DESIGN_chat_questions.md §4): in the chat the preview is a queued question,
+kind `new_goal`, a confirmation as in §12.2. It ends "Shall I set up this goal?". Its "Yes" runs
+`goal add`, and its "No" answers "Okay — nothing set up." A terminal still asks on the spot.
 
 ### 12.6 Calling a goal off: the goals picker
 
@@ -1050,6 +1083,13 @@ messages are too long" reads back as "When I change your week, I'll keep it shor
 Amended 2026-10-13 (DESIGN_athlete_queue.md §13.5, choice 17): `evening-time` joins the
 allowlist. "Don't message me after 8pm" reads back as "From 20:00 I'll stay quiet until the
 morning, unless you write to me first. OK?"
+
+Amended 2026-10-15 (DESIGN_chat_questions.md §4): every read-back above now ends "Shall I change
+this setting?" where it ended "OK?". In the chat it is a queued question, kind `change_setting`,
+a confirmation as in §12.2. Its first sentence is written each time it is sent, so "from
+tomorrow" is still true on a later morning. It closes without a word when the setting already
+has that value, and a newer question about the same setting closes an older one. "No" answers
+"Okay — I've left it as it was." A terminal asks the same words on the spot.
 
 ### 12.8 The intent table after this pass
 

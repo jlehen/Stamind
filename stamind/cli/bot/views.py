@@ -28,7 +28,7 @@ from stamind.cli.render.plan_lines import (
 from stamind.cli.render.session_lines import SIMPLE_DONE_STATUSES, simple_day_lines
 from stamind.cli.queue import send_alone, send_next
 from stamind.cli.runway import current_runway, runway_buttons, schedule_exhausted
-from stamind.cli.workouts import proposal as saved_proposal
+from stamind.cli.workouts import cut_short, proposal as saved_proposal
 from stamind.cli.workouts.heads_up import newest_written
 from stamind.db.objectives import GOAL_ARCHIVED, GOAL_UPCOMING, goal_state
 from stamind.openrouter import openrouter_client
@@ -38,10 +38,6 @@ from stamind.strength.sets import read_new_activities
 from stamind.text import wrap_text
 from stamind.output import step
 from stamind.clock import today_str as _today_str
-
-# lives in the instance's database so the bot process stays stateless across restarts
-# (DESIGN_bot_simple_frontend.md §4.2).
-MORNING_MARKER = "push_morning_last"
 
 # What the morning push offers (§4.1/§4.4): the CLI owns WHAT to offer, the bot only
 # renders. Each `send` is a canned utterance the bot feeds back through its normal
@@ -285,7 +281,7 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     Once the schedule has run out the push says so and offers to extend it, and once even
     that has nothing left to say it sends nothing at all (DESIGN_runway_nudge.md §6)."""
     today = _today_str()
-    if not args.force and runtime.db.get_setting(MORNING_MARKER) == today:
+    if not args.force and runtime.db.get_setting(settings.MORNING_MARKER) == today:
         return
     # Before the silence below, so a plan that has run out still gets its records
     # (DESIGN_cycle_retrospective.md §3, §5).
@@ -298,10 +294,12 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     # Decided before the adaptation, so a dead plan does not spend an LLM call each morning.
     if (runway is None and schedule_exhausted(today)
             and not runtime.db.get_workouts(start_date=today, end_date=today)):
-        runtime.db.set_setting(MORNING_MARKER, today)
+        runtime.db.set_setting(settings.MORNING_MARKER, today)
         return
     _refresh_garmin(today)
     _ask_about_tests(today)
+    # It then stands first in the line, after the briefing (DESIGN_chat_questions.md §3).
+    cut_short.queue_questions(today)
 
     adapt_note, proposal_item = None, None
     if settings.adapt_first():
@@ -338,7 +336,7 @@ def run_bot_morning(args: argparse.Namespace) -> None:
         buttons = [GOT_IT_BUTTON] + buttons
     if proposal_item is None and buttons:
         emit_buttons(buttons)
-    runtime.db.set_setting(MORNING_MARKER, today)
+    runtime.db.set_setting(settings.MORNING_MARKER, today)
     # The last act is the queue's step: the first item of the line, unless an item is
     # out (DESIGN_athlete_queue.md §13.2). What the week planner would change goes first,
     # as a message of its own. It is then out, so the line starts when the athlete answers

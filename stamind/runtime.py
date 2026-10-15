@@ -80,9 +80,9 @@ def _build_prompt():
 @_builder("render")
 def _build_render():
     """The active voice: ExpertRenderer on a terminal, CompanionRenderer under the bot,
-    chosen from STAMIND_RENDER (stamind.cli.render.make_renderer,
+    chosen from STAMIND_RENDER (stamind.cli.render.persona.make_renderer,
     DESIGN_render_persona.md §2)."""
-    from stamind.cli.render import make_renderer
+    from stamind.cli.render.persona import make_renderer
     return make_renderer()
 
 

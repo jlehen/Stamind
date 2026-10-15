@@ -73,6 +73,11 @@ A tap on a session keeps the note with it: "Kept with today's “Kettlebell HIIT
 answer keeps nothing. The question is closed without being asked once its day is out of every
 prompt's look back (§4), because nobody would read the note.
 
+Amended 2026-10-15 (DESIGN_chat_questions.md §2): the question is a confirmation, a question
+about what the athlete just wrote. While it waits, it comes before any older question in the
+queue. It is also closed without a word after the `confirmation-days` mornings, three by
+default.
+
 An answer the app cannot use keeps nothing: a sport with no session that day, one that two
 sessions of the day share, or a day other than those two.
 

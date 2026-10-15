@@ -362,8 +362,8 @@ def propose_weeks(
         return
     standing = runtime.db.get_workouts(start_date=span_start, end_date=span_end)
     if standing and not asked:
-        item = saved.ask_to_replace(span, standing, prefer_macro_id, fresh)
-        send_own_questions([item] if item else [])
+        saved.ask_to_replace(span, standing, prefer_macro_id, fresh)
+        send_own_questions()
         return
     written_upto = newest_written()
     proposal = runtime.coach_service.workout_generate(

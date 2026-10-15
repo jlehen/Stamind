@@ -3,12 +3,14 @@
 
 Kept apart from `stamind/athlete_queue.py`, which holds the list of kinds: a feature's
 answers queue items of their own, so the feature imports this module and the queue
-imports the feature.
+imports the feature. For the same reason a module that holds a kind never imports the
+queue's sender, `cli/queue.py`: the command that runs the kind's code sends what it queued.
 """
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 from stamind import clock, runtime
+from stamind.db.queue import queue_stamp
 
 QUESTION = "question"
 MESSAGE = "message"
@@ -17,6 +19,10 @@ MESSAGE = "message"
 ANSWERED = "answered"
 DROPPED = "dropped"
 STALE = "stale"
+
+# The two answers of a confirmation, "Yes" first (DESIGN_chat_questions.md §4).
+YES_NO = ({"label": "✅ Yes"}, {"label": "✖️ No"})
+YES = 0
 
 
 @dataclass(frozen=True)
@@ -54,7 +60,8 @@ class Kind:
     bare: bool = False
     # A confirmation asks about what the athlete just wrote. It stands at the front of the
     # line while it waits, and closes without a word once it was asked on its day and the
-    # next `confirmation-days` mornings (DESIGN_chat_questions.md §2).
+    # next `confirmation-days` mornings. The cut-short question takes the mark too
+    # (DESIGN_chat_questions.md §2, §8 choice 18).
     confirmation: bool = False
     # The answer whose tap starts a long run, by its position, and which long run, as
     # `chat/routing.py` names them. The bot runs that tap beside the chat
@@ -67,9 +74,31 @@ class NotApplied(Exception):
     names chosen. The message is the line shown in place of a confirmation (§4)."""
 
 
+class PutOff(Exception):
+    """An answer that leaves its question waiting until the next morning, as "Ask me
+    tomorrow" would: a typed test number, whose confirmation is asked in its place
+    (DESIGN_chat_questions.md §6)."""
+
+
 def queue(kind: str, subject: str, payload: Dict[str, Any]) -> Optional[int]:
     """Queues an item once per kind and subject, and returns its id (§3).
 
     Dated by the command that queues it, and ready from then on: the items one run
     queues share that instant, which is how a tap on one finds the others (§13.2)."""
     return runtime.db.queue_item(kind, subject, payload, clock.command_start())
+
+
+def queue_replacing(
+    kind: str, payload: Dict[str, Any], about: str, parts: Sequence[str] = (),
+) -> None:
+    """Queues a confirmation of this run. A waiting one of the same kind about the same
+    thing is closed first when the new one changes every part it would change: the newer
+    question replaces it (DESIGN_chat_questions.md §4)."""
+    for item in runtime.db.waiting_queue_items():
+        older = item["payload"]
+        if (item["kind"] == kind and older.get("about") == about
+                and set(older.get("parts", ())) <= set(parts)):
+            runtime.db.close_queue_item(item["id"], STALE, clock.now())
+    queue(kind, queue_stamp(clock.command_start()), {
+        **payload, "about": about, "parts": sorted(parts),
+    })

@@ -12,6 +12,7 @@ from stamind import athlete_queue, clock, runtime
 from stamind.athlete_queue import (
     ANSWERED, DROP, DROPPED, MESSAGE, QUEUE_LATER_BACK, QUEUE_NOT_NOW, STALE,
 )
+from stamind.db.queue import queue_stamp
 from stamind.sentinels import emit_queue_item, is_json_frontend
 from stamind.text import bold, capitalized, cmd, cyan, gray, wrap_text
 from stamind.output import notice
@@ -211,9 +212,19 @@ def send_next(after: Optional[Dict[str, Any]] = None) -> bool:
     return False
 
 
-def send_own_questions(items: Sequence[Dict[str, Any]]) -> None:
-    """Sends the first of the questions this command just queued, whatever is out: a reply
-    does not wait in the line. The next goes out when it is answered (§13.2 rule 6,
-    DESIGN_waiting_proposal.md §6.3)."""
-    if items:
-        send_item(items[0], len(items))
+def send_own_questions(queued_at: Optional[str] = None) -> bool:
+    """Sends the first question a run queued and has not asked, whatever else is out: a
+    reply does not wait in the line. The run is this command's unless `queued_at` names
+    another. Nothing goes out while that run has an item out, and the next goes out when it
+    is answered (§13.2 rules 3 and 6, DESIGN_waiting_proposal.md §6.3). True when that run
+    has a question out."""
+    stamp = queued_at or queue_stamp(clock.command_start())
+    now = clock.now()
+    if any(item["queued_at"] == stamp and athlete_queue.is_out(item, now)
+           for item in runtime.db.waiting_queue_items()):
+        return True
+    items = athlete_queue.run_questions(stamp)
+    if not items:
+        return False
+    send_item(items[0], len(items))
+    return True

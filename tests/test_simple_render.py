@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.helpers import pin_clock
 
-from stamind.cli import render
+from stamind.cli.render import persona as render
 from stamind.cli.render import session_lines
 from stamind.cli.render.companion import CompanionRenderer
 from stamind.cli.render.expert import ExpertRenderer
@@ -69,7 +69,7 @@ class RenderImportDirectionTest(unittest.TestCase):
     # either, so a new file under `cli/bot/` has to be added here deliberately. The
     # render package's own files are exempt by directory, so cutting it into more files
     # never quietly widens the exemption.
-    ALLOWED = {"bot/views.py", "bot/capture.py", "bot/edit.py"}
+    ALLOWED = {"bot/views.py", "bot/capture.py", "bot/edit.py", "bot/goal.py"}
 
     def test_no_command_module_imports_the_renderer(self):
         from pathlib import Path

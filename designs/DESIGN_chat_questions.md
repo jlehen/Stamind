@@ -1,6 +1,6 @@
 # Design: The last questions the chat asks on the spot
 
-**Status:** Proposed · **Date:** 2026-10-10 · not built
+**Status:** Built 2026-10-15 · **Date:** 2026-10-10
 
 This design stands on revision 4 of the athlete queue (DESIGN_athlete_queue.md §13), which is
 built and on main, with the author's rulings of 2026-10-13 on its choices (§13.5 there). The

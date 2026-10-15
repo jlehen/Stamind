@@ -109,16 +109,11 @@ def run_benchmark_record(args: argparse.Namespace) -> Optional[int]:
             notice(f"No session with ID {args.session}.", red)
             sys.exit(1)
 
-    # Show the change against the current latest of this kind before touching anything.
     prev = runtime.db.get_latest_benchmark(kind)
     crosses = _crosses_replan_band(kind, value, prev)
-    if not args.yes:
-        question = runtime.render.benchmark_confirm_question(
-            kind, value, prev, crosses, date, session, args.note,
-        )
-        if not runtime.prompt.confirm(question):
-            runtime.render.benchmark_not_recorded()
-            return None
+    if not args.yes and not runtime.prompt.confirm(record_question(args)):
+        runtime.render.benchmark_not_recorded()
+        return None
 
     rid = runtime.db.add_benchmark_result(
         date=date, sport_type=sport, anchor_kind=kind, value=value,
@@ -129,6 +124,20 @@ def run_benchmark_record(args: argparse.Namespace) -> Optional[int]:
     if crosses:
         runtime.render.benchmark_replan()
     return rid
+
+
+def record_question(args: argparse.Namespace) -> str:
+    """What `record` asks before it writes: the change against the latest result of this
+    kind as it stands now. A question queued in the chat is worded by it each time it is
+    sent (DESIGN_chat_questions.md §6)."""
+    kind, raw = _selected_kind(args)
+    value = parse_value(kind, str(raw))
+    prev = runtime.db.get_latest_benchmark(kind)
+    session = runtime.db.get_workout_by_id(args.session) if args.session is not None else None
+    return runtime.render.benchmark_confirm_question(
+        kind, value, prev, _crosses_replan_band(kind, value, prev),
+        args.date or _today_str(), session, args.note,
+    )
 
 
 def benchmark_confirm_words(

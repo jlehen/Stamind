@@ -1,36 +1,55 @@
-"""`bot capture edit_goal` and `bot capture edit_constraint` (§12.4).
+"""`bot capture edit_goal` and `bot capture edit_constraint` (§12.4), and the two queue
+kinds they ask through: `edit`, "Shall I change this constraint?", and `pick`, "Which
+constraint did you mean?" (DESIGN_chat_questions.md §4, §5).
 
 The two intents that change a row the athlete already has. They are the only captures
 where the model nominates WHICH row is meant, so everything here exists to keep that
-nomination honest: it may only name a row this command showed it, the preview is drawn
+nomination honest: it may only name a row this command showed it, the question is drawn
 from the stored row rather than from what the model believes the row says, and two or
-more plausible rows become a picker whose leaves re-enter this same flow with the row
+more plausible rows become a picker whose answers re-enter this same flow with the row
 pinned.
 
 A nomination that lands on a session instead is not an edit at all: the ask was coach
 territory, so it saves the question whether to hand the athlete's own words to `workout
 adapt -m` (§12.3, DESIGN_long_runs_beside_chat.md §5).
+
+A terminal asks on the spot. In the chat each question is saved, and the command sends it.
 """
 import argparse
-import shlex
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence
 
-from stamind import runtime
+from stamind import clock, runtime
 from stamind.cli.bot import hand_off
 from stamind.cli.bot.extraction import (
     CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find, nominate_rows,
     upcoming_sessions, valid_date,
 )
+from stamind.cli.bot.route import use_fast_model
 from stamind.cli.render.plan_lines import (
     picker_label, simple_constraint_edit_lines, simple_goal_edit_lines, simple_goal_line,
 )
 from stamind.cli.render.session_lines import simple_day_word, simple_session_line
-from stamind.cli.queue import send_own_questions
-from stamind.sentinels import emit_buttons
-from stamind.text import wrap_text
 from stamind.clock import today_str as _today_str
+from stamind.db.queue import queue_stamp
+from stamind.prompt import Choice, athlete_watching
+from stamind.queue_kind import QUESTION, YES, YES_NO, Kind, queue, queue_replacing
+from stamind.text import wrap_text
 import stamind.cli.constraints as _constraints
 import stamind.cli.goals as _goals
+
+EDIT = "edit"
+PICK = "pick"
+NOTHING_CHANGED_LINE = "Okay — nothing changed."
+NONE_OF_THESE = "✖️ None of these"
+NONE_LINE = "No problem — tell me again in your own words 💬"
+
+# The part of a goal or a constraint each field changes: a newer question closes an older
+# one about the same row when it changes every part the older one would
+# (DESIGN_chat_questions.md §4).
+PARTS = {
+    "title": "name", "description": "note",
+    "target_date": "dates", "start_date": "dates", "end_date": "dates",
+}
 
 
 # --- capture: the edits, which nominate their object (§12.4) ---
@@ -122,11 +141,11 @@ def _row_id(raw: Any, by_id: Dict[int, Dict[str, Any]]) -> Optional[int]:
     return row_id if row_id in by_id else None
 
 
-def edit_capture(domain: str, text: str, pinned_id: Optional[int]) -> None:
+def edit_capture(domain: str, text: str, pinned_id: Optional[int] = None) -> None:
     """The shared body of `edit_goal` and `edit_constraint` (§12.4).
 
-    Every path ends at a CLI-rendered preview and a tap — the picker fallback included,
-    whose leaves re-enter this function with the nomination pinned rather than executing
+    Every path ends at a question drawn from the stored row — the picker fallback included,
+    whose answers re-enter this function with the nomination pinned rather than executing
     anything themselves. That is what makes the relaxed clause survive its own fallback."""
     today = _today_str()
     rows = nominate_rows(domain, today)
@@ -176,35 +195,34 @@ def edit_capture(domain: str, text: str, pinned_id: Optional[int]) -> None:
         if i is not None
     ))
     if pinned_id is None and len(candidates) > 1:
-        _offer_row_picker(domain, [by_id[i] for i in candidates], text, today)
+        _pick(domain, [by_id[i] for i in candidates], text, today)
         return
 
     row = by_id[row_id]
-    lines, kwargs = _edit_preview(domain, row, changes, today)
-    if not kwargs:
+    changes = _edit_changes(domain, row, changes)
+    if not changes:
         # The nomination landed but the message changed nothing this surface may write —
         # a tier or a sport, which stay expert vocabulary (§12.4).
         no_find(text)
         return
-    for line in lines:
-        print(wrap_text(line))
-    if not runtime.prompt.confirm("Shall I make that change?"):
-        # A wrong nomination dies visibly here, and the picker is the way back to the
-        # right row rather than a dead end (§12.4).
-        others = [r for r in rows if int(r["id"]) != row_id]
-        print("Okay — nothing changed.")
-        if others:
-            _offer_row_picker(domain, others, text, today, declined=True)
+    if athlete_watching():
+        queue_replacing(EDIT, {
+            "domain": domain, "row": row_id, "was": row, "changes": changes, "text": text,
+            "answers": list(YES_NO),
+        }, about=f"{domain}:{row_id}", parts={PARTS[field] for field in changes})
         return
-    _apply_edit(domain, row_id, kwargs)
+    if not runtime.prompt.confirm(wrap_text(_edit_question(domain, row, changes, today))):
+        _declined(domain, row_id, text)
+        return
+    _apply_edit(domain, row_id, changes)
 
 
 def _offer_session_handoff(
     domain: str, data: dict, sessions: Sequence[Dict[str, Any]], text: str, today: str
 ) -> None:
     """A nomination that landed on a session: the ask was coach territory all along, so
-    the hand-off question is saved and sent, and this command ends. Its "Yes" runs `adapt
-    -m` with her own words (DESIGN_long_runs_beside_chat.md §5)."""
+    the hand-off question is saved, and this command ends. Its "Yes" runs `adapt -m` with
+    her own words (DESIGN_long_runs_beside_chat.md §5)."""
     session = next(
         (w for w in sessions
          if _row_id(data.get("id"), {int(w["id"]): w}) is not None), None
@@ -214,72 +232,74 @@ def _offer_session_handoff(
         return
     named = simple_session_line(session, lead=simple_day_word(session["date"], today))
     noun = "goal" if domain == "goal" else "constraint"
-    item = hand_off.queue_question(noun, named, session, text)
-    send_own_questions([item] if item else [])
+    hand_off.queue_question(noun, named, session, text)
 
 
-def _offer_row_picker(
-    domain: str, rows: Sequence[Dict[str, Any]], text: str, today: str,
-    declined: bool = False,
-) -> None:
-    """Several close candidates, or a "no" on the preview: the athlete picks the row.
-
-    A leaf does NOT execute the edit — it re-runs this capture with the nomination
-    pinned, which re-enters the ordinary preview and confirm (§12.4)."""
-    intent = "edit_goal" if domain == "goal" else "edit_constraint"
-    print("Which one did you mean?" if not declined else "Which one should I change?")
-    for row in rows:
-        print(_picker_row_line(domain, row, today))
-    leaves = [
-        {"label": _picker_label(row["title"]),
-         "send": f"bot capture {intent} --id {row['id']} {shlex.quote(text)}"}
-        for row in rows
-    ]
-    emit_buttons(leaves + [{"label": "✖️ None of these",
-                            "ack": "No problem — tell me again in your own words 💬"}])
+def _declined(domain: str, row_id: int, text: str) -> None:
+    """"No" on the question: a wrong nomination dies visibly here, and the picker is the
+    way back to the right row rather than a dead end (§12.4)."""
+    print(NOTHING_CHANGED_LINE)
+    today = _today_str()
+    others = [row for row in nominate_rows(domain, today) if int(row["id"]) != row_id]
+    if others:
+        _pick(domain, others, text, today, declined=True)
 
 
-def _picker_label(title: str) -> str:
-    return f"✏️ {picker_label(title)}"
+def _pick_ask(domain: str, declined: bool) -> str:
+    if declined:
+        return f"Which {domain} should I change?"
+    return f"Which {domain} did you mean?"
 
 
 def _picker_row_line(domain: str, row: Dict[str, Any], today: str) -> str:
     if domain == "goal":
-        return "• " + simple_goal_line(row, today)
-    return "• " + f"{row['title']} — " + simple_day_word(row["start_date"], today)
+        return simple_goal_line(row, today)
+    return f"{row['title']} — " + simple_day_word(row["start_date"], today)
 
 
-def _edit_preview(
-    domain: str, row: Dict[str, Any], changes: Dict[str, Any], today: str
-) -> Tuple[List[str], Dict[str, Any]]:
-    """The preview lines, and the fields the edit would actually write.
+def _pick(
+    domain: str, rows: Sequence[Dict[str, Any]], text: str, today: str,
+    declined: bool = False,
+) -> None:
+    """Several close candidates, or a "No" on the question: the athlete picks the row.
 
-    Rendered from the real row, never from what the model believes the row says — which
-    is what makes a wrong nomination visible ("Your goal Marathon (Sat Oct 26) → move to
-    Sun Oct 12") rather than plausible (§12.4)."""
-    if domain == "goal":
-        kwargs: Dict[str, Any] = {}
-        title = str(changes.get("title") or "").strip()
-        if title and title != row["title"]:
-            kwargs["title"] = title
-        target = valid_date(changes.get("target_date"))
-        if target and target != str(row["target_date"]):
-            kwargs["target_date"] = target
-        description = changes.get("description")
-        if description is not None and str(description).strip() != (
-            row.get("description") or ""
-        ):
-            kwargs["description"] = str(description).strip()
-        return simple_goal_edit_lines(row, kwargs, today), kwargs
+    A pick does NOT execute the edit — it reads the message again with the row pinned,
+    which re-enters the ordinary question (§12.4)."""
+    if athlete_watching():
+        queue(PICK, queue_stamp(clock.command_start()), {
+            "domain": domain, "text": text, "declined": declined,
+            "answers": [
+                {"label": f"✏️ {picker_label(row['title'])}", "row": int(row["id"])}
+                for row in rows
+            ] + [{"label": NONE_OF_THESE}],
+        })
+        return
+    picked = runtime.prompt.choose(
+        _pick_ask(domain, declined),
+        [Choice(str(row["id"]), _picker_row_line(domain, row, today)) for row in rows]
+        + [Choice("none", NONE_OF_THESE)],
+        default="none",
+    )
+    if picked == "none":
+        print(NONE_LINE)
+        return
+    edit_capture(domain, text, int(picked))
 
-    kwargs = {}
+
+def _edit_changes(
+    domain: str, row: Dict[str, Any], changes: Dict[str, Any]
+) -> Dict[str, Any]:
+    """The fields the edit would actually write: those the message changes, read against
+    the real row, never against what the model believes the row says (§12.4)."""
+    kwargs: Dict[str, Any] = {}
     title = str(changes.get("title") or "").strip()
     if title and title != row["title"]:
         kwargs["title"] = title
-    for field, key in (("start_date", "start_date"), ("end_date", "end_date")):
+    dates = ("target_date",) if domain == "goal" else ("start_date", "end_date")
+    for field in dates:
         value = valid_date(changes.get(field))
-        if value and value != str(row[key]):
-            kwargs[key] = value
+        if value and value != str(row[field]):
+            kwargs[field] = value
     description = changes.get("description")
     if description is not None and str(description).strip() != (
         row.get("description") or ""
@@ -287,11 +307,24 @@ def _edit_preview(
         kwargs["description"] = str(description).strip()
     # The dates only make sense as a pair: a new start past the stored end would be
     # refused by the command, so the window closes on the day it opens instead.
-    if kwargs.get("start_date") and kwargs["start_date"] > kwargs.get(
+    if domain != "goal" and kwargs.get("start_date") and kwargs["start_date"] > kwargs.get(
         "end_date", str(row["end_date"])
     ):
         kwargs["end_date"] = kwargs["start_date"]
-    return simple_constraint_edit_lines(row, kwargs, today), kwargs
+    return kwargs
+
+
+def _edit_question(
+    domain: str, row: Dict[str, Any], changes: Dict[str, Any], today: str
+) -> str:
+    """The row as it is beside what it would become, then the question. Drawn from the
+    stored row, which is what makes a wrong nomination visible ("Your goal Marathon (Sat
+    Oct 26) → move to Sun Oct 12") rather than plausible (§12.4)."""
+    if domain == "goal":
+        lines = simple_goal_edit_lines(row, changes, today)
+    else:
+        lines = simple_constraint_edit_lines(row, changes, today)
+    return "\n".join(lines + [f"Shall I change this {domain}?"])
 
 
 def _apply_edit(domain: str, row_id: int, kwargs: Dict[str, Any]) -> None:
@@ -309,3 +342,81 @@ def _apply_edit(domain: str, row_id: int, kwargs: Dict[str, Any]) -> None:
         end=kwargs.get("end_date"), rest=None, desc=kwargs.get("description"),
         replan=None,
     ))
+
+
+# --- the two queue kinds (DESIGN_chat_questions.md §4, §5) ---
+
+def _current_row(domain: str, row_id: int) -> Optional[Dict[str, Any]]:
+    """The goal or constraint as stored now, or None when it is no longer one an edit
+    may change."""
+    rows = nominate_rows(domain, _today_str())
+    return next((row for row in rows if int(row["id"]) == row_id), None)
+
+
+def _edit_wording(item: Dict[str, Any]) -> str:
+    """Drawn from the row as it is each time it is sent, or as it was if it is gone."""
+    payload = item["payload"]
+    row = _current_row(payload["domain"], payload["row"]) or payload["was"]
+    return _edit_question(payload["domain"], row, payload["changes"], _today_str())
+
+
+def _edit_stale(item: Dict[str, Any]) -> bool:
+    """The row is gone, or already reads as asked."""
+    payload = item["payload"]
+    row = _current_row(payload["domain"], payload["row"])
+    return row is None or all(
+        str(row.get(field) or "") == value for field, value in payload["changes"].items()
+    )
+
+
+def _apply_edit_answer(item: Dict[str, Any], index: int, text: Optional[str]) -> None:
+    """"Yes" makes the change. "No" changes nothing, and asks which row was meant when
+    there are others."""
+    payload = item["payload"]
+    if index == YES:
+        _apply_edit(payload["domain"], payload["row"], payload["changes"])
+        return
+    _declined(payload["domain"], payload["row"], payload["text"])
+
+
+def _listed_rows(item: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The rows the picker offers that are still ones an edit may change."""
+    payload = item["payload"]
+    listed = {answer.get("row") for answer in payload["answers"]}
+    return [
+        row for row in nominate_rows(payload["domain"], _today_str())
+        if int(row["id"]) in listed
+    ]
+
+
+def _pick_wording(item: Dict[str, Any]) -> str:
+    payload = item["payload"]
+    today = _today_str()
+    return "\n".join(
+        [_pick_ask(payload["domain"], payload["declined"])]
+        + ["• " + _picker_row_line(payload["domain"], row, today) for row in _listed_rows(item)]
+    )
+
+
+def _apply_pick(item: Dict[str, Any], index: int, text: Optional[str]) -> Optional[str]:
+    """A row reads the athlete's words again with that row named, and asks the edit
+    question. "None of these" writes nothing."""
+    payload = item["payload"]
+    answer = payload["answers"][index]
+    if "row" not in answer:
+        return NONE_LINE
+    use_fast_model(argparse.Namespace())
+    edit_capture(payload["domain"], payload["text"], answer["row"])
+    return None
+
+
+# Both are confirmations drawn bare (DESIGN_chat_questions.md §2).
+EDIT_KIND = Kind(
+    name=EDIT, shape=QUESTION, wording=_edit_wording, companion_wording=_edit_wording,
+    is_stale=_edit_stale, apply=_apply_edit_answer, bare=True, confirmation=True,
+)
+PICK_KIND = Kind(
+    name=PICK, shape=QUESTION, wording=_pick_wording, companion_wording=_pick_wording,
+    is_stale=lambda item: not _listed_rows(item), apply=_apply_pick, bare=True,
+    confirmation=True,
+)

@@ -311,11 +311,11 @@ REPLACE_SESSIONS_KIND = Kind(
 def ask_to_replace(
     span: Tuple[str, str], standing: List[Dict[str, Any]], prefer_macro_id: Optional[int],
     fresh: bool,
-) -> Optional[Dict[str, Any]]:
-    """Saves the question asked before planning `span` over the sessions `standing` in it,
-    and returns its item. Its answer plans the same days, the same way."""
+) -> None:
+    """Saves the question asked before planning `span` over the sessions `standing` in it.
+    Its answer plans the same days, the same way."""
     start, end = span
-    item_id = queue(REPLACE_SESSIONS, queue_stamp(clock.now()), {
+    queue(REPLACE_SESSIONS, queue_stamp(clock.now()), {
         "text": runtime.render.replace_sessions_words(
             len(standing), standing[0]["date"], standing[-1]["date"],
         ),
@@ -325,7 +325,6 @@ def ask_to_replace(
         "prefer_macro_id": prefer_macro_id,
         "fresh": fresh,
     })
-    return runtime.db.get_queue_item(item_id) if item_id else None
 
 
 def saw_the_night_on(day: str) -> List[datetime]:

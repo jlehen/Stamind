@@ -555,7 +555,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
         Asides are suppressed on the chat front-end, so a `step()` premise left Telegram
         asking "Was that the session, cut short?" about nothing the athlete could see
         (DESIGN_output_verbosity.md §3, ARCHITECTURE.md §15)."""
-        from stamind.cli.workouts.adapt import _resolve_ambiguous_matches
+        from stamind.cli.workouts.cut_short import ask_on_the_spot
 
         mock_coach.pending_match_questions.return_value = [{
             "activity_id": "act_warmup",
@@ -574,7 +574,7 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
 
         # Asides off is the chat front-end's own setting; the question must survive it.
         with patch.dict(os.environ, {"STAMIND_VERBOSE": "0"}):
-            _resolve_ambiguous_matches("2026-06-03", auto=False)
+            ask_on_the_spot("2026-06-03")
 
         asked = " ".join(mock_prompt.confirm.call_args[0][0].split())
         self.assertIn("Full-Body Strength", asked)

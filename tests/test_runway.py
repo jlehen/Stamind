@@ -29,7 +29,7 @@ from stamind import runtime  # noqa: E402
 from stamind.cli import runway as runway_cli  # noqa: E402
 from stamind.cli.render import plan_lines as render_plan  # noqa: E402
 from stamind.cli.workouts import generate as generate_cli  # noqa: E402
-from stamind.cli.bot.views import MORNING_MARKER  # noqa: E402
+from stamind.settings import MORNING_MARKER  # noqa: E402
 from stamind.config import config  # noqa: E402
 from stamind.cli.render.plan_lines import SIMPLE_PASSED_LINE  # noqa: E402
 from stamind.cli.render.session_lines import SPORT_EMOJI  # noqa: E402
