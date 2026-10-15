@@ -284,9 +284,9 @@ def save_weeks(proposal: GenerateProposal, written_upto: int) -> Dict[str, Any]:
 
 
 def _replace_stale(item: Dict[str, Any]) -> bool:
-    """Out of date by rule 1 or 2 of §4 there: a later change wrote on its days, or its
-    first day is over."""
-    return written_inside(item) or item["payload"]["start"] < today_str()
+    """Out of date once its first day is over. A change written on its days does not count:
+    "Plan them" reads the schedule as it then stands (§4 there, ruled 2026-10-15)."""
+    return item["payload"]["start"] < today_str()
 
 
 def _plan_them(item: Dict[str, Any], index: int, text: Optional[str]) -> Optional[str]:
@@ -324,7 +324,6 @@ def ask_to_replace(
         "end": end,
         "prefer_macro_id": prefer_macro_id,
         "fresh": fresh,
-        "written_upto": newest_written(),
     })
     return runtime.db.get_queue_item(item_id) if item_id else None
 

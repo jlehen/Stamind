@@ -166,8 +166,10 @@ take. A run with `--propose` saves that question and ends, before any planner is
 - **Plan them** starts the same `workout generate --propose` for the same days, with this
   question answered. It runs beside the chat (§6), and its result is saved and sent as above.
 - **Leave it** writes nothing: "Okay — nothing changed."
-- **No answer.** It closes without a word after three more mornings, or sooner when it is out
-  of date by rule 1 or 2 above.
+- **No answer.** It closes without a word after three more mornings, or sooner when its first
+  day is over (rule 2 above). A session written on its days does not close it: "Plan them"
+  reads the schedule as it then stands, and the weeks it saves have rule 1 of their own.
+  Ruled 2026-10-15; until then rule 1 closed it too.
 
 It is a confirmation: a question about what the athlete just did, under the three rules of
 DESIGN_chat_questions.md §2. It is sent at once, it stands at the front of the line while it
@@ -304,7 +306,9 @@ given them under.
    - **2e. On an out-of-date plan, a chat run stops and says so.** **Ruled 2026-10-14: as
      designed.**
    - **2f. How the saved "…Regenerate?" reads and how long it lives** (§4). **Ruled 2026-10-14:**
-     like the other confirmations, three more mornings by `confirmation-days`.
+     like the other confirmations, three more mornings by `confirmation-days`. **Ruled
+     2026-10-15, after the code review:** a session written on its days no longer closes it;
+     only its first day being over does. The author's words: "drop it".
 3. **The hand-off** (§5). **Ruled 2026-10-14: a saved Yes/No question.** The author's words:
    "I really think all the bot's questions should go through the queue, even if this means
    adding more features to the queue. That is a general principle."

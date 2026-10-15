@@ -368,13 +368,21 @@ class ProposeTest(_Case):
         self.assertIn(saved.KEPT_LINE, out)
         self.coach.workout_generate.assert_not_called()
 
-    def test_plan_them_on_a_question_gone_out_of_date_says_so_and_plans_nothing(self):
-        """08:02 the question is saved; 08:03 "Change it" on a proposal writes today, inside
-        its days; 08:05 "Plan them"."""
+    def test_a_session_written_on_its_days_leaves_the_question_open(self):
+        """Sunday 09:00 the question is saved; 10:00 "Change it" on the knee proposal writes
+        one of its days; 11:00 "Plan them" plans from the week as it now stands."""
         save_workout(test_db, THURSDAY, "running", "Easy run", duration_minutes=40)
         self.propose("-d", f"{THURSDAY}..{NEXT_THURSDAY}")
         [item] = self.waiting(saved.REPLACE_SESSIONS)
         save_workout(test_db, THURSDAY, "running", "Shorter run", duration_minutes=30)
+        self.tap(item)
+        self.coach.workout_generate.assert_called_once()
+
+    def test_plan_them_once_its_first_day_is_over_says_so_and_plans_nothing(self):
+        save_workout(test_db, THURSDAY, "running", "Easy run", duration_minutes=40)
+        self.propose("-d", f"{THURSDAY}..{NEXT_THURSDAY}")
+        [item] = self.waiting(saved.REPLACE_SESSIONS)
+        self.at(days=1)
         out = self.tap(item)
         self.assertIn(saved.REPLACE_CLOSED_LINE, out)
         self.coach.workout_generate.assert_not_called()
