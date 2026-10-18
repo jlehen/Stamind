@@ -52,6 +52,8 @@
 +SQUAT/SINGLE_LEG_LEG_PRESS	single_leg	QUADS,GLUTES	Machine		per side
 # nearest Garmin exercise: SQUAT/STEP_UP
 +SQUAT/STEP_DOWN	single_leg	QUADS,GLUTES	Box		per side
+# nearest Garmin exercise: LUNGE/DUMBBELL_REVERSE_LUNGE
++LUNGE/REVERSE_LUNGE +LUNGE/BACK_LUNGE	single_leg	QUADS,GLUTES|HAMSTRINGS	Nothing		per side
 # nearest Garmin exercise: HIP_RAISE/BARBELL_HIP_THRUST_WITH_BENCH
 +HIP_RAISE/HIP_THRUST_MACHINE	hinge	GLUTES|HAMSTRINGS	Machine
 # nearest Garmin exercise: HIP_RAISE/SINGLE_LEG_HIP_RAISE

@@ -232,6 +232,12 @@ one-arm triceps pressdown, and a calf raise machine.
 bench, which loads the inner thigh. Garmin has no name for it. Its nearest Garmin exercise is
 `PLANK/SIDE_PLANK_WITH_FEET_ON_BENCH`, which rests both feet on the bench.
 
+`LUNGE/REVERSE_LUNGE` was added on 2026-10-18: the plain back lunge, one foot stepping back,
+with no load. Garmin's bodyweight reverse lunges all add a reach or a twist, and its plain ones
+hold a dumbbell, a barbell or a ruck. Its nearest Garmin exercise is
+`LUNGE/DUMBBELL_REVERSE_LUNGE`. "Back lunge" is a later name on its line (§3.2), so the
+search finds it under either word. A kettlebell form is not added, by the rule of §7.
+
 ### 3.4 Pattern
 
 The pattern says what job an exercise does in a session: `squat`, `hinge`, `single_leg`,
