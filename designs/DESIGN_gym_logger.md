@@ -102,8 +102,9 @@ supplies heart rate, duration and RPE; the log supplies the sets. Nothing is ask
 
 ## 2. Where things live
 
-- `miniapp/` — the page: `index.html`, `app.js`, `style.css`, `exercises.json`. Static,
-  no build step, no server. Served by GitHub Pages at
+- `miniapp/` — the page: `index.html`, `app.js` (the DOM), `logic.js` (the pure logic,
+  under node tests in `miniapp/tests/`), `markdown.js` (the export button), `style.css`,
+  `exercises.json`. Static, no build step, no server. Served by GitHub Pages at
   `https://jlehen.github.io/Stamind/miniapp/` through `.github/workflows/pages.yml`, which
   deploys the folder on every push to the branch; the site root stays free. The page names
   its files with `?v=dev`, and the deploy replaces `dev` with the commit. Telegram keeps a
@@ -124,7 +125,7 @@ supplies heart rate, duration and RPE; the log supplies the sets. Nothing is ask
   one is linked by hand when it is wanted.
 - `stamind/strength/logger.py` — the two payloads (§3, §4): the session encoded into the
   button's URL, and the log decoded and validated. Pure functions, no database.
-- `stamind/cli/strength.py` gains `strength ingest FILE`.
+- `stamind/cli/strength_ingest.py` — `strength ingest FILE`, a file of its own.
 - `stamind/chat/` — the keyboard button and the handler for the page's data message.
 - The page's address is built in, as `logger.PAGE_URL`. The `strength-logger` setting, on by
   default, turns the button off for one instance: `sm settings set strength-logger off`.

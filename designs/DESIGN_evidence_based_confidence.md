@@ -150,8 +150,9 @@ overlapping window.
 **Upgrades auto-apply; downgrades are proposed.** Crossing a threshold *upward* is
 earned and safe, so the app applies it immediately. Crossing *downward* (from
 contradiction) erases hard-won trust on what might be one odd week, so the app does
-**not** apply it — it records a `proposed_confidence` and surfaces it in `status`
-for the human to accept or dismiss (§7).
+**not** apply it — it records a `proposed_confidence` and asks the athlete through the
+`learning` kind of the athlete queue (DESIGN_learning_doubt_nudge.md), while `status`
+counts the pending ones (§7).
 
 ---
 

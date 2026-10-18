@@ -1171,7 +1171,7 @@ To be made when this is implemented, not before:
 | Document | Change |
 |---|---|
 | `ARCHITECTURE.md` §5 | Schema: the two new tables, the view, the sixteen dropped columns. |
-| `ARCHITECTURE.md` §15 "Workout state" | The four orthogonal axes become three; *archived* is no longer an axis but a position in a chain. |
+| `ARCHITECTURE.md` §5 "Workout state" | The four orthogonal axes become three; *archived* is no longer an axis but a position in a chain. |
 | `docs/DOMAIN_MODEL.md` §6 | Workout fields, the state axes, and invariants 10 and 11. **Done** — a row is a revision, "archived" stops being an axis. |
 | `docs/DOMAIN_MODEL.md` §7 | "Two write models" collapses to one: everything appends. **Done.** |
 | `docs/DOMAIN_MODEL.md` §10 | Invariant 11 is replaced by the immutability trigger; a new invariant covers the lineage. **Done.** |
