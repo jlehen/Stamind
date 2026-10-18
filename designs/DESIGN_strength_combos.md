@@ -227,8 +227,8 @@ second pick, the fourth pick finishes the chain by itself, and the sheet's ✕ c
 one card with the joined key, bodyweight when every part is, with the sets an added exercise gets
 today. There is no taking one pick back: ✕ and start again. The page checks nothing about the gear
 (D7): she is holding it, and a chain she has done passes the planner's check from then on (D10).
-The Done button is the only new markup; the search, the results and the pattern toggle are the
-ones Swap and Add use.
+The "+ Add a chain" button and the Done button are the only new markup; the search, the results
+and the pattern toggle are the ones Swap and Add use.
 
 **The log.** `n` carries the joined key, and each set is rounds, kilograms and seconds as today.
 `parse_log` in `strength/logger.py` checks each part of a key with `vocabulary.get`, so a chain of
@@ -338,7 +338,7 @@ rule on each there. The choices below have no row of their own. Each is one line
 | D7 | Gear on the phone | No check on the page | She is holding the gear; the check guards the planner, which cannot see the gym. Declined: narrow the second pick; refuse and say why | Interview | 2026-10-18 |
 | D8 | Process | Commit, red team on Opus, commit, two reviewers on Opus and Fable, commit | The author's process preference | Interview | 2026-10-18 |
 | D9 | The joiner | `>`, not `+` | The history already prints alternated exercises as "A + B" and says so; a chain with the same sign reads as a pair taken in turns, and a pair as a chain (finding 1). Declined: alternation changes sign; both keep `+` told apart by spaces | Red Team | 2026-10-18 |
-| D10 | Habit vs check | A chain on the athlete's record passes the planner's check whatever its gear or a repeated movement; `_clean_exercise` reads the record only on a gear failure, and the preview keeps one line, reworded to be true for a chain | What she did is the proof; the check guards invented chains (finding 3). The pragmatic review cut the "which ground failed" plumbing and the no-repeat rule, and the author agreed. Declined: the page refuses what the check refuses; leave it with a true message | Red Team | 2026-10-18 |
+| D10 | Habit vs check | A chain on the athlete's record passes the planner's check whatever its gear or a repeated movement | What she did is the proof; the check guards invented chains (finding 3). Built as: `_clean_exercise` reads the record only on a gear failure, and the preview keeps one line, reworded to be true for a chain; the pragmatic review cut the "which ground failed" plumbing and the no-repeat rule, and the author agreed. Declined: the page refuses what the check refuses; leave it with a true message | Red Team | 2026-10-18 |
 | D11 | The watch | A chain is recorded from the page only; a watch-only athlete loses a prescribed chain after two weeks, listed in §7 | Both athletes log from the page; a chain offered by the naming question would store the watch's reps as rounds (finding 5). Declined: the naming question offers the day's chain; the naming question never offers a chain | Red Team | 2026-10-18 |
 | D12 | Merges | The merge script renames the parts of a chain key | Else a merge splits a chain's history and an old page's log is refused (finding 4); author's resolution | Red Team | 2026-10-18 |
 | D13 | Progression | A range of rounds kept like a rep range; the load holds at the top when no heavier implement exists; the range is the planner's to choose, no number in the science | The §2 story had raised the rounds, which `progression.md` forbids (finding 2); author's resolution; the pragmatic review cut the "three to eight" the author had written | Red Team | 2026-10-18 |
@@ -363,8 +363,11 @@ vocabulary.parts + parse_log (1) ──> page (2) ──> planner (3) ──> me
    tests for `wordsOf` and `perSideOf`. From here the athlete can build and log a chain, and the
    history shows it back.
 3. **The planner** (`planner_prompt.py`, `progression.md`): the paragraph, the amended sentences,
-   the section, the check. From here the planner writes chains. Steps 1 to 3 land as one branch,
-   merged and pushed in the same sitting (D19).
+   the section, the check, with tests on the §2 chain (passes: Kettlebells and Dumbbells read as
+   one), a barbell clean into a kettlebell swing (dropped), a bodyweight chain (passes), a dropped
+   chain that is on record (passes), and the reworded preview line in
+   `tests/test_strength_planner.py`. From here the planner writes chains. Steps 1 to 3 land as one
+   branch, merged and pushed in the same sitting (D19).
 4. **The merge script** (`scripts/migrate_exercise_names.py`): renames inside a chain key. Needed
    before the next table merge, not before the feature.
 5. **Docs.**
@@ -375,7 +378,7 @@ vocabulary.parts + parse_log (1) ──> page (2) ──> planner (3) ──> me
 - [ ] `logger.py`: `parse_log` on a chain
 - [ ] `miniapp/logic.js`, `app.js`, `index.html`: readers, chain mode, Done; node tests
 - [ ] `planner_prompt.py`: the paragraph, the two amended sentences, `_clean_exercise` on a
-      chain, the preview line
+      chain and its tests, the preview line and its two tests
 - [ ] `progression.md`: "A chain", the amended no-pattern sentence
 - [ ] `scripts/migrate_exercise_names.py`: parts of a chain key
 - [ ] `docs/ARCHITECTURE.md`, the three amended designs
