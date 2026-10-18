@@ -178,10 +178,11 @@ table that is not a key is taken as its class's key as today, and joins the keys
 passes when it has two to four parts, every part is known, and the parts share an implement: among
 the parts whose gear holds a load word (`vocabulary.LOADS`), those words have one in common, with
 Dumbbells and Kettlebells read as one; a chain whose parts hold no load word at all, bodyweight
-through and through, passes. A chain that fails the gear test still passes when it is on the
-athlete's record, among the exercises a person has named in her stored sets
-(`sets.own_exercises`), which `_clean_exercise` reads only then: what she did is the proof, and
-the gear test guards the chains the planner invents (D10). A chain that fails is dropped from the
+through and through, passes. A chain that fails the gear test still passes when its resolved
+joined key is on the athlete's record, among the exercises a person has named in her stored sets
+(`sets.own_exercises`), which `_clean_exercise` reads only then; the page composes a chain from
+the same keys, so the two spellings meet. What she did is the proof, and the gear test guards the
+chains the planner invents (D10). A chain that fails is dropped from the
 session as an unknown name is today, and the one preview line is reworded so it is true for both:
 "'{name}' is not an exercise Stamind knows or a chain it accepts, left out".
 
@@ -240,9 +241,10 @@ Markdown prints the chain's shown words on its line.
 
 **Order of going live.** Steps 1 to 3 of the order below land as one branch, merged and pushed in
 the same sitting: the prompt is live at the merge, since every run is a fresh subprocess, and the
-page at the push, through GitHub Pages. Until the push a page shows a chain as its raw key with no
-"/side", and its log is accepted; an athlete who logs 5 rounds in total on such a card has 5 per
-side stored, which is why the two go together. No bot restart (D19).
+page at the push, through GitHub Pages. Until the new page reaches the phone, a minute or two of
+deploy and up to ten minutes of Telegram's cache after the push, a page shows a chain as its raw
+key with no "/side", and its log is accepted; an athlete who logs 5 rounds in total on such a card
+has 5 per side stored, which is why the two go together. No bot restart (D19).
 
 ## 7. Not handled
 
@@ -300,6 +302,11 @@ rule on each there. The choices below have no row of their own. Each is one line
 9. No interview state file is written under `designs/`: the one written for the cycle
    retrospective was a stray. The pragmatic review says this is about a file the design does not
    write.
+10. The gear test for a chain the planner invents: the load words of each movement's gear must
+    have one in common, Dumbbells and Kettlebells read as one, a movement with no load word
+    skipped, a chain with none passes; machines and bands pass as any load word; no rule against
+    a repeated movement (§4). The pragmatic review cut the no-repeat rule.
+11. The science paragraph lives in `progression.md`, not in a file of its own (§4).
 
 ## 9. Where the code goes
 
@@ -308,7 +315,8 @@ rule on each there. The choices below have no row of their own. Each is one line
 - `strength/logger.py`: `parse_log` checks the parts.
 - `strength/planner_prompt.py`: the paragraph in CHOOSING THE EXERCISES and the two amended
   sentences; `_clean_exercise` resolves and checks a chain, reading `sets.own_exercises` on a
-  gear failure; the one preview line reworded.
+  gear failure; the one preview line reworded, with the copy DESIGN_strength_tracking.md §9
+  quotes and the test that pins it.
 - `strength/progression.md`: the section "A chain" and the amended no-pattern sentence.
 - `miniapp/logic.js`: `wordsOf`, `perSideOf`, `photosOf` read the parts. `miniapp/app.js` and
   `miniapp/index.html`: the chain mode and Done. Tests in `miniapp/tests/logic.test.mjs`.
