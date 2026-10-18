@@ -16,7 +16,10 @@ from typing import List
 # spellings that count as the same sport. The canonical name appears first in its own
 # alias list, so it round-trips to itself.
 SPORT_MAPPING = {
-    "running": ["running", "indoor_running", "trail_running", "treadmill_running"],
+    "running": [
+        "running", "indoor_running", "trail_running", "treadmill_running", "track_running",
+        "street_running", "virtual_run", "ultra_run",
+    ],
     # Road, gravel, cyclocross, MTB and BMX share one set of Garmin cycling zone
     # boundaries, which is what qualifies them for a single row
     # (DESIGN_intensity_distribution.md §6.1).
