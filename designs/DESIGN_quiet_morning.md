@@ -52,25 +52,24 @@ only remembered the night.
 
 The next morning, the push takes a fresh picture with the same function and compares the two.
 Every difference is listed, because the journal names them (§5). The comparison never reads
-timestamps: constraints and goals have no edit time, a removed row leaves no time behind, and
-an activity synced a day late carries a start time older than the run that never saw it.
+the sources' timestamps: constraints and goals have no edit time, a removed row leaves no time
+behind, and an activity synced a day late carries a start time older than the run that never
+saw it.
 
 The picture holds, and a morning runs when:
 
 | Key | What the picture keeps | New when |
 |---|---|---|
 | `date` | The day the run was evaluated on | — (used by `missed`) |
-| `night` | The newest day up to the evaluation date with a sleep score or an HRV reading | See §4 |
+| `night` | The newest day up to `date` with a sleep score: the mark `sleep_seen` keeps today | See §4 |
 | `activities` | The ids of the activities in the lookback window | An id is present now that was not in the picture, and the activity is not clean (below) |
 | `missed` | — | A non-rest session dated from `date` to yesterday has the verdict missed |
-| `written` | The id of the newest change that wrote a session, as the run read it; after an apply, the id of the change the run itself wrote | A newer change wrote a session |
-| `constraints` | A hash of every constraint whose end date is today or later, as the prompt renders it | The hash differs: one was added, edited, ended early or removed |
+| `written` | The id of the newest change that wrote a session and is not of kind `adapt`, as the run read it | A newer such change exists: `workout generate`, `workout tweak`, a rollback, a goal stood down or reinstated. A run's own write and a tap on a `workout adapt` proposal are both `adapt`, so neither is news: the week planner wrote them. A tap on a tweak's proposal is `tweak` and is news, as the tweak itself was |
+| `constraints` | `sha256` over `plan_inputs.clean_constraints_all` of the constraints the run reads: those overlapping today to the mesocycle's end | The hash differs: one was added, edited, ended early or removed |
 | `signals` | The `(id, updated)` pairs of the daily signals in the run's signal window | A pair is present now that was not in the picture |
-| `notes` | The id of the newest session note | A newer note exists |
-| `matches` | The newest `decided_at` among the activity pairing decisions | A newer decision exists: the athlete answered "Was that the session, cut short?" |
 | `plan` | The active macrocycle's id, the active mesocycle's id and end date | Any of the three differs: a new plan version, or a new mesocycle began |
 | `goals` | `plan_inputs.goals_hash` over the upcoming goals | The hash differs |
-| `benchmarks` | The ids of the logbook rows (`benchmark_results`) | An id is present now that was not in the picture |
+| `benchmarks` | The largest id in the logbook (`benchmark_results`) | A larger id exists |
 | `profile` | A hash of the whole `user_profile` section of config.yaml | The hash differs |
 | `science` | A hash of the athlete's science documents (`plan_inputs.athlete_science_documents`) | The hash differs |
 
@@ -85,21 +84,31 @@ work, the morning runs. This also covers a strength day with a brief and no exer
 `workout generate` normally never leaves behind.
 
 **A clean activity is not new.** An activity is clean when the coach has nothing to look at in
-it: its load is below `coach.minor_activity_load_threshold`, the same cut that greys an
-activity out in `status`; or it matched a planned session with the verdict done and no reason
-attached, so no load mismatch, not cut short, not "felt harder than measured". The verdicts
-come from `analytics.compare.adherence_verdicts`, which the push already computes for the
-briefing. It is Thursday 15 October. Wednesday's 85-minute ride matched its session and was
-done. The morning is quiet. It is Friday 9 October. Thursday's three-hour hike broke a planned
-rest day. The morning runs.
+it: it matched no session and its load is below `coach.minor_activity_load_threshold`, the
+cut `unplanned_kind` uses to grey an activity out in `status`; or it matched a planned session
+with the verdict done and no reason attached, so no load mismatch, not cut short, not "felt
+harder than measured". A matched activity is never minor: a 60-minute run stopped after 12
+minutes with a tight calf has a small load and the verdict partial, and it is new. It is
+Thursday 15 October. Wednesday's 85-minute ride matched its session and was done. The morning
+is quiet. It is Friday 9 October. Thursday's three-hour hike broke a planned rest day. The
+morning runs.
 
-**A missed session is new.** The verdict comes from the same function, over the days from the
-last run's evaluation date to yesterday. The evaluation date is included because that day's
-session was still pending when the run looked at it. A session done that day is not counted
-again: it is clean, or its activity is new.
+**A missed session is new.** Both rules read one call,
+`analytics.compare.adherence_verdicts(db, date, today, today)`, the function the push already
+uses to grade today's sessions for the briefing. Over that window a session dated before today
+with no activity is missed, and today's untrained sessions are pending, not missed. The
+evaluation date is included because that day's session was still pending when the run looked
+at it. A session done that day is not counted again: it is clean. A new activity is clean
+when it is the one a verdict in that window graded done. An activity dated before `date` is
+outside the window, so the gate sees it as unmatched: new unless it is minor. A late-synced
+ride runs the morning it appears; a late-synced 15-minute walk does not. A swim at 06:00 that
+matched today's session is done, so clean.
 
 **What is not new.** Learnings rewritten by `data reflect`, a changed setting, a proposal the
-athlete has not answered (§5), a Garmin re-pull of an activity already in the picture.
+athlete has not answered (§5), a Garmin re-pull of an activity already in the picture, an
+answer to "Was that the session, cut short?" (§8), and a session note: its only writer is a
+run with a message, which read the words as the message (`cli/candidates.py:keep_note`), so a
+note is never news to the next run.
 
 ## 4. The night
 
@@ -108,10 +117,14 @@ and `data show-metrics`: HRV is suppressed below the 28-day mean minus one stand
 resting HR is elevated above the mean plus one standard deviation with a floor of 3 bpm, and
 sleep is poor below a score of 60. No new threshold and no new setting.
 
-The push grades every night after the one the last run had in hand, up to this morning. A
-night is not normal when any of its three verdicts is suppressed, elevated or poor. One such
-night makes the morning run. A night with no reading, or with a reading the baseline cannot
-grade yet, is unknown, and unknown is quiet.
+The push grades the days after `night`, up to today, that have a sleep score, on all three
+verdicts. With no `night` yet, because no day up to `date` had a sleep score, it grades every
+day up to today that has one, which is none until the first arrives. A quiet streak grades the
+same normal nights again each morning; that is a few rows of the metrics cache. A night is
+not normal when any verdict is suppressed, elevated or poor. One such night makes the morning
+run. A day without a sleep score is unknown, even when resting HR is already in, because
+Garmin's daily summary fills before the sleep is scored; a reading the baseline cannot grade
+yet is unknown too. Unknown is quiet.
 
 Grading every night since the last one in hand keeps today's skip and closes a hole. It is
 Thursday, HRV is suppressed. At 07:05 the athlete writes "rough night"; the run reads the night
@@ -138,11 +151,21 @@ normal and nothing is new since Thursday 08:00", or "Quiet morning: nothing is n
 week planner: Thursday's ride is missed; a constraint changed". DESIGN_logging.md §4.2 is not
 amended, because `note` is the general sentence it already allows.
 
+A quiet morning writes no change row, so `workout batches` shows nothing for it; the journal
+is its only trace. Today a run that changes nothing writes a row that `workout batches` lists
+as `(held)`.
+
 A proposal the athlete has not answered stands. It is Thursday 21:00. She writes to the coach
 about Saturday, the week planner proposes a change, and she does not answer. Friday 08:00: the
 night is normal and nothing else is new. Thursday's proposal keeps its two buttons, Friday's
 briefing has its usual row, and a tap on either works as today. Nothing new happened, so the
 coach has nothing new to say.
+
+A tap on "Change it" writes no picture, and its change is of kind `adapt`, the week planner's
+own, so the next morning does not count it (§3). It is Thursday 07:05, HRV is suppressed. She
+writes "rough night"; the run saves a proposal and writes its picture. At 07:10 she taps
+"Change it". At 08:00 the stored picture is the 07:05 one, the tap's change does not count,
+nothing else is new, and Thursday's night is in hand: quiet, as today's skip would be.
 
 ## 6. The gate fails open
 
@@ -155,15 +178,23 @@ when the planner fails, as today.
 Only a run evaluated on today writes the picture. `workout adapt --date` on another day writes
 nothing, so a preview of next Saturday cannot make next week's mornings quiet.
 
+The picture is JSON in one settings row; its lists are compared as sets.
+
 ## 7. What goes away
 
 - `_adapted_this_morning` in `cli/bot/views.py`, with `saw_the_night_on` in
-  `cli/workouts/proposal.py` and `newest_adapt` in `db/workout_history.py`. The gate subsumes
-  them. `trained_since` stays: a proposal's out-of-date rule 3 still uses it.
-- The `sleep_seen` column of `workout_changes`, the `sleep_seen` field of the saved proposal's
-  payload, and `RevisionProposal.sleep_seen`. The picture is one row of the `settings` table,
-  key `adapt_last_seen`, like the morning marker `push_morning_last`: no column, no migration,
-  one home. The column is dropped by the guarded DDL that dropped the ACWR columns.
+  `cli/workouts/proposal.py`. The gate subsumes them. `trained_since` stays: a proposal's
+  out-of-date rule 3 still uses it. `newest_adapt` in `db/workout_history.py` stays too:
+  `cli/bot/hand_off.py:_coach_looked` reads it to tell whether the coach looked after a goal
+  or constraint edit from the chat. A quiet morning writes no `adapt` row, so after one the
+  hand-off still says the coach has not looked, which is true; and such an edit changes the
+  goals or constraints hash, so that morning is never quiet.
+- The `sleep_seen` field of the saved proposal's payload and `RevisionProposal.sleep_seen`. The
+  picture is one row of the `settings` table, key `adapt_last_seen`, like the morning marker
+  `push_morning_last`: no column, no migration, one home. The `sleep_seen` column of
+  `workout_changes` leaves the CREATE text, so a fresh database has none; the two live
+  databases keep it as a dead column nothing reads or writes, because the schema is
+  CREATE-only and cannot drop one. The INSERT in `db/workout_change.py` stops naming it.
 
 ## 8. Not handled
 
@@ -174,11 +205,21 @@ nothing, so a preview of next Saturday cannot make next week's mornings quiet.
   not that day. Today's push runs blind in that case and then never looks again either.
 - A constraint that ends makes one morning run, because it leaves the hash. A removed daily
   signal or a removed logbook row does not count as new.
-- A tap that writes a session while the week planner thinks, on a run that then applies its
-  proposal, is not seen as new the next morning. The two other outcomes keep the value the run
-  read, so there it is.
+- An answer to "Was that the session, cut short?" waits for the next morning that runs. It is
+  Monday, the ride stopped at 12 minutes. Tuesday runs anyway, on the new activity. The
+  question goes out after the briefing and she answers "No" at 08:30. Wednesday is quiet if
+  nothing else is new, and the week planner reads Monday as missed rather than partial the
+  next morning that runs.
+- Two runs that overlap, a message at 07:58 and the push at 08:00, write the picture in the
+  order they finish. When the older one wins, the next morning may run once more.
 - An athlete whose watch rarely syncs before the morning time gets quiet mornings and a
   graded night the morning after, every day. There is no setting to run blind instead.
+- A night whose HRV was scored but whose sleep was not is unknown: `night` and the grading
+  follow the sleep score alone.
+- An unanswered proposal in a week with a gym session and new lifted sets makes the mornings
+  run until it is answered or a run changes nothing. A saved proposal records no strength
+  checks, so the strength planner's test keeps finding work. Not a regression: today every
+  morning runs.
 - The companion instance has `adapt-first` off. Nothing changes there.
 
 ## 9. Choices made without asking
@@ -188,13 +229,15 @@ Each is listed so it can be overruled.
 1. The picture lives in the `settings` table under `adapt_last_seen`, not in a column of
    `workout_changes` and a field of the saved proposal. One home, no migration, nothing can
    disagree with itself.
-2. `workout tweak` writes the picture too, as it sets `sleep_seen` today. A tweak at 07:00
-   makes the 08:00 push quiet when nothing else is new.
-3. After an apply, `written` is the id of the run's own change, so the run does not count its
-   own write as new. After a save or a no-change record, it is the value the run read.
-4. The constraints hash covers every constraint ending today or later, not only the
-   plan-shaping ones `plan_inputs.constraints_hash` covers, because the week planner reads all
-   of them.
+2. `workout tweak` writes no picture: `workout_adapt` fills it only when `not tweak`. A tweak's
+   prompt leaves out the fatigue-reading sections (DESIGN_workout_tweak.md §3.2), so it did not
+   weigh the night, and today's skip already ignores a tweak (`newest_adapt` reads `adapt` rows
+   only). A tweak at 07:00 does not make the 08:00 push quiet.
+3. `written` leaves out every change of kind `adapt`, so a run never counts its own write, and
+   a tap on a proposal writes no picture. The last writer wins when two runs overlap (§8).
+4. The constraints hash covers every constraint the run reads, those overlapping today to the
+   mesocycle's end, not only the plan-shaping ones `plan_inputs.constraints_hash` covers,
+   because the week planner reads all of them.
 5. "Clean" uses the verdict's reasons as they stand, so a session the adherence analysis flags
    for a 15 % load mismatch is not clean. The tolerance is `_adherence_tolerance`'s, unchanged.
 6. The journal line is a `note`, not a new event name.
@@ -213,26 +256,36 @@ One step. It works on its own and removes what it replaces.
 | Where | What |
 |---|---|
 | `stamind/coach/picture.py` (new) | Takes the picture from the database; compares two and names each difference; grades the nights since the last one in hand with `analytics/baselines.py`. Reads only the database and config. Under 150 lines; it is a concept of its own |
-| `stamind/coach/service/adapt.py` | `workout_adapt` takes the picture where it reads its inputs and puts it on the proposal in place of `sleep_seen` |
-| `stamind/coach/proposals.py` | `RevisionProposal.seen` replaces `sleep_seen`, to and from JSON |
-| `stamind/coach/service/revision_apply.py` | `workout_revision_apply` and `workout_revision_record_no_change` write the picture to `adapt_last_seen`, when the run was evaluated on today; after an apply, `written` is the run's own change id |
-| `stamind/cli/workouts/proposal.py` | `save` writes the picture; `saw_the_night_on` and the payload's `sleep_seen` go |
+| `stamind/coach/service/adapt.py` | `workout_adapt` takes the picture where it reads its inputs and puts it on the proposal in place of `sleep_seen`, when `not tweak` |
+| `stamind/coach/proposals.py` | `RevisionProposal.seen` replaces `sleep_seen`. The saved proposal's payload does not carry it, and a tap writes no picture |
+| `stamind/coach/service/revision_apply.py` | `workout_revision_apply` and `workout_revision_record_no_change` write the picture to `adapt_last_seen` when the run was evaluated on today and the proposal carries one |
+| `stamind/cli/workouts/proposal.py` | `save` writes the picture from the live proposal; `saw_the_night_on` and the payload's `sleep_seen` go |
 | `stamind/strength/planner.py` | The "anything to write or recheck" decision of `run` becomes a function the push can call without a proposal; `run` calls it |
 | `stamind/cli/bot/views.py` | `_morning_adaptation`: forced pull, then the gate in its own `try`, then the run; the journal note; `_adapted_this_morning` goes |
-| `stamind/db/workout_history.py`, `db/workout_change.py`, `db/schema.py` | `newest_adapt` and the `sleep_seen` column go; the guarded drop |
+| `stamind/db/workout_change.py`, `db/schema.py` | The INSERT stops naming `sleep_seen`; the column leaves the CREATE text |
+| `stamind/db/workout_history.py` | A sibling of `newest_change_with_sessions` that leaves out kind `adapt`; `newest_adapt` stays |
 | `stamind/settings.py` | The `adapt_last_seen` key beside `MORNING_MARKER` |
-| `docs/ARCHITECTURE.md` | The adaptation flow, the `workout_changes` table, the `adapt_first` row of the config table, the settings-table markers |
+| `docs/ARCHITECTURE.md` | The adaptation flow, the `workout_changes` table, the `adapt_first` row of the config table, the settings-table markers, and the stale "guarded DDL" sentence under `athlete_metrics_cache` |
 | `docs/DOMAIN_MODEL.md` | The `sleep_seen` row |
 
-Implemented designs amended when it lands: DESIGN_waiting_proposal.md §5 ("Once a morning" is
+Implemented designs amended when it lands: DESIGN_waiting_proposal.md §3 (the saved proposal
+no longer carries "whether the run had last night's sleep score") and §5 ("Once a morning" is
 now this document); DESIGN_bot_simple_frontend.md §4.2 (the skip and the forced pull);
 DESIGN_strength_tracking.md §9 (the work test is also asked by the push).
 
+Existing tests that change: the `sleep_seen` skip tests in `tests/test_cli_bot.py` (lines 380
+to 450) are replaced by the gate's; `tests/test_waiting_proposal.py` asserts on
+`newest_adapt()["sleep_seen"]` at line 162 and on `newest_adapt()` at line 306, and the first
+goes.
+
 Tests, one per rule: a normal night with nothing new is quiet; a missed session runs; an
-activity done as planned is quiet and a partial one runs; a minor activity is quiet; an
-activity synced late runs the morning it appears; each hashed source runs when it changes
+activity done as planned is quiet and a partial one runs, a cut-short one under the minor
+threshold included; an unmatched minor activity is quiet; an activity this morning that
+matched today's session is clean; an activity synced late runs the morning it appears, a
+minor one does not; a tweak writes no picture and its change is news; a tap writes no picture
+and the morning after a same-day tap is quiet; each hashed source runs when it changes
 (constraint ended early, goal edited, profile edited, science edited, benchmark logged) and
-not when it is merely re-read; a new cut-short decision runs; a new mesocycle runs; a
+not when it is merely re-read; a new mesocycle runs; a
 suppressed night after the last one in hand runs, a night the last run had in hand does not,
 and an unknown night is quiet; the strength planner's work test alone runs the morning; a
 `--date` run writes no picture; no picture, a broken picture and an exception in the gate all
@@ -258,24 +311,23 @@ with the last run's; after an apply the run's own change is not new.
 | D12 | No timestamps | Hashes and identifier lists, never times | Constraints and goals have no edit time; late syncs carry an old start time | Red Team | 2026-10-17 |
 | D13 | Nights since | Every night after the last one in hand is graded | Keeps today's once-a-morning skip; grades a night synced after a lie-in | Red Team | 2026-10-17 |
 | D14 | Storage | One `settings` row, `adapt_last_seen`; `sleep_seen` dropped | No migration on two instances, one home | Red Team | 2026-10-17 |
-| D15 | Picture at read time | Taken when the run reads its inputs; `--date` runs write none | A tap during the think is not lost; a preview of next week cannot quiet it | Red Team | 2026-10-17 |
+| D15 | Picture at read time | Taken when the run reads its inputs; `--date` runs write none | The inputs are the ones the week planner read; a preview of next week cannot quiet it | Red Team | 2026-10-17 |
 | D16 | Two more sources | Cut-short answers and the plan version count as new | One identifier each; both change what the week planner reads | Red Team | 2026-10-17 |
+| D17 | Tweak | `workout tweak` writes no picture | Its prompt leaves out the fatigue sections; today's skip already ignores a tweak | Review | 2026-10-18 |
+| D18 | Session notes | Not a source | Their only writer is a run with a message that read the words | Review | 2026-10-18 |
+| D19 | Minor means unmatched | A matched activity is never minor; one `adherence_verdicts` call over `[date, today]` | A cut-short session has a small load and must run the morning | Review | 2026-10-18 |
+| D20 | Which picture wins | Superseded by D22 | — | Review | 2026-10-18 |
+| D21 | Dead column | `sleep_seen` stays in the live databases; `newest_adapt` stays | The schema is CREATE-only; the hand-off question reads `newest_adapt` | Review | 2026-10-18 |
+| D22 | `written` | Leaves out kind `adapt`; a tap writes no picture; the last writer wins | A run's own write and a tap are the week planner's own; one query replaces `taken`, a tap rule and an apply rule | Review | 2026-10-18 |
+| D23 | Cut-short answers | Not a source; replaces the first half of D16 | The morning after the short ride runs anyway; the answer is a one-word correction to a day already reacted to | Review | 2026-10-18 |
 
 ## Dependency Graph & Implementation Order
 
-```
-picture.py (take, compare, nights) ──► service/adapt.py (take on read) ──► proposals.py (seen)
-        │                                                                       │
-        │                                   revision_apply.py, proposal.py:save (write it)
-        │                                                                       │
-        └──► strength/planner.py (work test) ──► cli/bot/views.py (the gate) ◄──┘
-                                                          │
-                                   removals: _adapted_this_morning, saw_the_night_on,
-                                   newest_adapt, sleep_seen (column, payload, proposal)
-```
+Each step depends on the ones before it.
 
 1. `coach/picture.py`: take, compare, grade the nights. Pure reads; tests on a test database.
-2. `workout_adapt` takes the picture; `RevisionProposal.seen`; the three writers.
+2. `workout_adapt` takes the picture when `not tweak`; `RevisionProposal.seen`; the three
+   writers: `proposal.save`, `workout_revision_apply`, `workout_revision_record_no_change`.
 3. The strength planner's work test, split out of `run`.
 4. The gate in `_morning_adaptation`, with the forced pull first and its own `try`.
-5. The removals of §7, the schema drop, the docs and the amended designs.
+5. The removals of §7, the CREATE text, the docs and the amended designs.
