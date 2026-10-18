@@ -238,6 +238,12 @@ hold a dumbbell, a barbell or a ruck. Its nearest Garmin exercise is
 `LUNGE/DUMBBELL_REVERSE_LUNGE`. "Back lunge" is a later name on its line (§3.2), so the
 search finds it under either word. A kettlebell form is not added, by the rule of §7.
 
+`CORE/AROUND_THE_WORLD` was added the same day: the kettlebell passed from hand to hand around
+the waist, in the core_carry pattern. Garmin's only around the world is the sandbag one, swung
+around the head, and Free Exercise DB's is the lying dumbbell sweep, so the line has no photos.
+Its gear is Kettlebells, as the Turkish get-up's is, and a dumbbell counts by §7. A set goes
+both ways round, so it is not `per side`. The halo is not added.
+
 ### 3.4 Pattern
 
 The pattern says what job an exercise does in a session: `squat`, `hinge`, `single_leg`,
