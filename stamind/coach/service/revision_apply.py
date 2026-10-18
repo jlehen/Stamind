@@ -25,7 +25,7 @@ from stamind.analytics import intensity
 from stamind.sports import canonical_sport
 from stamind.output import notice
 from stamind.gcal.reconcile import verbose_events
-from stamind.coach import honoring
+from stamind.coach import honoring, picture
 from stamind.coach.proposals import RevisionProposal
 from stamind.clock import today_str as _today_str
 from stamind.coach.revisions import held_slots, replaces_source, rest_in_place_of
@@ -222,7 +222,6 @@ class RevisionApplyMixin:
         # revision commands use (DESIGN_change_heads_up.md §6).
         with self._db.workout_change(
             kind=proposal.kind, summary=proposal.reason, note=proposal.reason,
-            sleep_seen=proposal.sleep_seen,
         ) as change:
             for (day, sport), mover in moved_out.items():
                 source = by_slot.get((day, sport))
@@ -300,6 +299,8 @@ class RevisionApplyMixin:
         # Stamped on the athlete's `y`, never on a proposal they declined (§8).
         honoring.stamp(self._db, proposal.covered_constraint_ids)
         strength_planner.record_checks(self._db, proposal)
+        # What the run read, for the next morning to compare with (DESIGN_quiet_morning.md §3).
+        picture.remember(self._db, proposal)
 
     def workout_revision_record_no_change(self, proposal: RevisionProposal) -> None:
         """Records a pass that proposed nothing. Every revision command's no-change branch
@@ -315,14 +316,13 @@ class RevisionApplyMixin:
         flagged forever (§8). Separate from `workout_revision_apply` because there is
         nothing to apply, and outside the propose call because a propose writes nothing.
         """
-        with self._db.workout_change(
-            kind=proposal.kind, summary=proposal.reason, sleep_seen=proposal.sleep_seen,
-        ):
+        with self._db.workout_change(kind=proposal.kind, summary=proposal.reason):
             pass
         honoring.stamp(self._db, proposal.covered_constraint_ids)
         # A pass that weighed a session's kilograms and kept them has still weighed them,
         # which is what stops tomorrow asking again (DESIGN_strength_tracking.md §9).
         strength_planner.record_checks(self._db, proposal)
+        picture.remember(self._db, proposal)
 
     def workout_rollback(
         self, change_id: Optional[int] = None, verbose: bool = False

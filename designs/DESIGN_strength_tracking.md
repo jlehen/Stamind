@@ -1324,7 +1324,9 @@ revised at least one strength session, when a strength session in the span has n
 sets, or when the stamp is later than the row of a strength session in the span. Otherwise
 there is nothing new to write from, and a morning adapt in a week with no lifting costs no
 call. An adapt whose week planner changed nothing still becomes a proposal when the strength
-planner updates a kept session.
+planner updates a kept session. The same test, asked of the database alone
+(`strength/planner.py:has_work`), is one of the questions the morning push asks before it
+asks the week planner: a yes alone makes the morning run (DESIGN_quiet_morning.md §3).
 
 **Checking the output.** Every exercise name is looked up in the vocabulary. Sets and reps
 must be whole numbers above zero, with the lowest reps not above the highest, and a load

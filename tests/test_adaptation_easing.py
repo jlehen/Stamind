@@ -22,6 +22,7 @@ rebind_test_db(test_db)
 
 from stamind.coach.service import CoachService, coach_service
 from stamind.coach.proposals import RevisionProposal
+from stamind.settings import ADAPT_LAST_SEEN
 
 
 class TestAdaptEasing(unittest.TestCase):
@@ -120,10 +121,10 @@ class TestAdaptEasing(unittest.TestCase):
             self.assertIsNone(ride["adapted_at"])
 
     @patch("stamind.coach.engine.openrouter_client")
-    def test_adapt_records_whether_it_read_the_night(self, mock_client):
-        """The change row says whether the run read a sleep score for its day, which is what
-        lets the morning push skip an adaptation that already ran with the night in hand
-        (DESIGN_bot_simple_frontend.md §4.2)."""
+    def test_adapt_takes_its_picture_and_a_tweak_takes_none(self, mock_client):
+        """The proposal carries what the run read, the newest day with a sleep score among
+        it, for the morning push to compare with. A tweak takes no picture, and a run
+        evaluated on another day than today writes none (DESIGN_quiet_morning.md §3, §6)."""
         mock_client.complete.return_value = {
             "change_needed": False, "reason": "All green.", "adapted_workouts": [],
         }
@@ -142,14 +143,12 @@ class TestAdaptEasing(unittest.TestCase):
             test_db.save_metric_cache("2026-06-03", 50, 60, 80, 20, None, None, None)
             seen = service.workout_adapt("2026-06-03")
             service.workout_revision_record_no_change(seen)
-        self.assertFalse(blind.sleep_seen)
-        self.assertTrue(seen.sleep_seen)
-        with test_db._get_connection() as conn:
-            rows = conn.execute(
-                "SELECT sleep_seen FROM workout_changes WHERE kind = 'adapt' ORDER BY id"
-            ).fetchall()
-        self.assertEqual([r[0] for r in rows], [0, 1])
-        self.assertEqual(test_db.newest_adapt()["sleep_seen"], 1)
+            tweak = service.workout_tweak("Make Friday easy.", today_str="2026-06-03")
+        self.assertIsNone(blind.seen["night"])
+        self.assertEqual(seen.seen["night"], "2026-06-03")
+        self.assertEqual(seen.seen["date"], "2026-06-03")
+        self.assertIsNone(tweak.seen)
+        self.assertIsNone(test_db.get_setting(ADAPT_LAST_SEEN))
 
     def test_adapt_apply_stamps_recency_and_bumps_count(self):
         """Applying an adaptation that MOVES THE LOAD stamps `adapted_at` and bumps

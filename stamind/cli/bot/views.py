@@ -8,14 +8,15 @@ changes to the athlete's week they have not been told about yet
 The three views run fixed argv and write nothing: the only mutation they reach is what a
 tapped picker leaf later runs as a command of its own (§12.1). The two unasked messages do
 write — `bot morning` stamps its per-day marker and, with `adapt-first` on, asks the week
-planner before it renders and saves what it would change as a proposal
+planner before it renders when something is new since the last run or a night is not
+normal (DESIGN_quiet_morning.md §2), and saves what it would change as a proposal
 (DESIGN_waiting_proposal.md §5); `bot changes` marks each line told as it prints it.
 """
 import argparse
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from stamind import clock, heads_up, runtime, settings
+from stamind import heads_up, journal, runtime, settings
 from stamind.analytics.compare import adherence_verdicts
 from stamind.cli.bot import test_result
 from stamind.cli.common import ensure_recent_data
@@ -30,13 +31,14 @@ from stamind.cli.queue import send_alone, send_next
 from stamind.cli.runway import current_runway, runway_buttons, schedule_exhausted
 from stamind.cli.workouts import cut_short, proposal as saved_proposal
 from stamind.cli.workouts.heads_up import newest_written
+from stamind.coach import picture
 from stamind.db.objectives import GOAL_ARCHIVED, GOAL_UPCOMING, goal_state
 from stamind.openrouter import openrouter_client
 from stamind.sentinels import emit_buttons, emit_flush
 from stamind.sports import canonical_sport
 from stamind.strength.sets import read_new_activities
-from stamind.text import wrap_text
-from stamind.output import step
+from stamind.text import wrap_text, yellow
+from stamind.output import aside, step
 from stamind.clock import today_str as _today_str
 
 # What the morning push offers (§4.1/§4.4): the CLI owns WHAT to offer, the bot only
@@ -150,25 +152,48 @@ def run_bot_mesocycle(args: argparse.Namespace) -> None:
         print(wrap_text(focus))
 
 
-def _adapted_this_morning(date_str: str) -> bool:
-    """Whether the daily adaptation already ran today with last night's sleep score in hand
-    and nothing has been trained since — then the push does not run it again (§4.2). A run
-    that saved a proposal counts like one that recorded a change, whatever the proposal's
-    answer (DESIGN_waiting_proposal.md §5)."""
-    ran = saved_proposal.saw_the_night_on(date_str)
-    change = runtime.db.newest_adapt()
-    if change and change.get("sleep_seen"):
-        ran.append(datetime.fromisoformat(change["created_at"]))
-    return any(
-        clock.to_local(ran_at).strftime("%Y-%m-%d") == date_str
-        and not saved_proposal.trained_since(date_str, ran_at)
-        for ran_at in ran
-    )
+def _warn_quietly(text: str) -> None:
+    """A warning the terminal sees and the journal keeps at warn level, kept out of the
+    athlete's chat, where `warn` would print it (DESIGN_quiet_morning.md §6)."""
+    aside(text, yellow)
+    journal.note(text, lvl="warn")
+
+
+def _asks(date_str: str) -> bool:
+    """Whether this morning asks the week planner: something is new since the last run, a
+    night since the last one in hand is not normal, or the strength planner has work
+    (DESIGN_quiet_morning.md §2, §3, §4). The journal gets one line either way (§5). Its
+    own `try`, apart from the run's: a gate that breaks asks, and says so at warn level
+    (§6)."""
+    try:
+        before = picture.last(runtime.db)
+        if before is None:
+            _warn_quietly("Asking the week planner: no picture of the last run")
+            return True
+        reasons = picture.news(runtime.db, before, picture.take(runtime.db, date_str))
+        graded = picture.nights(runtime.db, before["night"], date_str)
+        reasons += [
+            f"{date.fromisoformat(day):%A}'s night is not normal: {', '.join(off)}"
+            for day, off in graded.items() if off
+        ]
+    except Exception as e:
+        _warn_quietly(f"Asking the week planner: the gate failed: {e}")
+        return True
+    if reasons:
+        step("Asking the week planner: " + "; ".join(reasons))
+        return True
+    since = picture.taken(before)
+    if graded:
+        step(f"Quiet morning: the night is normal and nothing is new since {since}")
+    else:
+        step(f"Quiet morning: nothing is new since {since} and no night since has a reading")
+    return False
 
 
 def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
-    """Asks the week planner about today, unless it already ran this morning with the night
-    in hand (§4.2), and returns (the line for the briefing, the saved proposal's item).
+    """Asks the week planner about today when something is new or a night is not normal
+    (DESIGN_quiet_morning.md §2), and returns (the line for the briefing, the saved
+    proposal's item). A quiet morning returns neither, like a run that changed nothing.
 
     A session that would change is saved as a proposal and nothing is written. Kilograms
     that moved alone are written at once, with their sentence as the line
@@ -180,11 +205,12 @@ def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str
     The strength planner's notice is the line when nothing changed, which is what covers
     the morning of the gym day itself (DESIGN_strength_tracking.md §9)."""
     try:
-        if _adapted_this_morning(date_str):
-            return None, None
         # A pull that found no sleep score yet leaves a row for today that the refresh
-        # throttle would keep; the night is what this run is for, so fetch again (§4.2).
+        # throttle would keep; the night is what this morning is about, so fetch again,
+        # and grade it only after (§4.2, DESIGN_quiet_morning.md §4).
         ensure_recent_data(date_str, force_pull=runtime.db.get_sleep_score(date_str) is None)
+        if not _asks(date_str):
+            return None, None
         written_upto = newest_written()
         # The proposal that still waits is shown to the week planner, and a new one
         # replaces it (DESIGN_waiting_proposal.md §6.2).

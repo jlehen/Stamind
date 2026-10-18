@@ -5,7 +5,7 @@ router (DESIGN_bot_simple_frontend.md §4.2, §5.3, §5.5, §11.2, §12.6). The 
 import json
 import os
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from tests.helpers import (
@@ -20,13 +20,15 @@ import stamind_cli
 
 from stamind import clock, runtime
 from stamind.cli.bot.views import PUSH_ALL_DONE_LINE, WEEK_CHANGED_MORNING_LINE
-from stamind.settings import MORNING_MARKER
+from stamind.settings import ADAPT_LAST_SEEN, MORNING_MARKER
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
+from stamind.coach import picture
+from stamind.coach.proposals import RevisionProposal
 from stamind.config import config
 from stamind.heads_up import CHANGE_LEAD, UNDONE_ONE, UNDONE_PLAIN, UNDONE_SEVERAL
 from stamind.sentinels import BUTTONS_SENTINEL, FLUSH_SENTINEL
-from stamind.clock import today_str
+from stamind.clock import shift, today_str
 
 # One database for the whole module: the three test classes below share it and
 # clear its tables per test, so its lifecycle is module-level, not per-class.
@@ -379,17 +381,6 @@ class MorningPushTest(unittest.TestCase):
         self.assertNotIn("LLM down", out)
         self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
 
-    # --- §4.2: the push does not run an adaptation that already ran this morning ---
-
-    def _adapted(self, sleep_seen, created_at=None):
-        """An adapt row as the dawn run leaves it; `created_at` (UTC ISO) backdates it."""
-        with test_db.workout_change(kind="adapt", summary="held", sleep_seen=sleep_seen):
-            pass
-        if created_at is None:
-            return
-        with test_db.transaction() as conn:
-            conn.execute("UPDATE workout_changes SET created_at = ?", (created_at,))
-
     def _adapt_first_run(self, coach):
         coach.workout_adapt.return_value = MagicMock(
             workouts=[], reason="All green.", strength_notice=None,
@@ -399,41 +390,6 @@ class MorningPushTest(unittest.TestCase):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         return out, pulled
-
-    def test_adapt_first_skips_a_run_that_already_saw_the_night(self):
-        """The dawn run read last night's sleep score, so the push spends neither a second
-        LLM call nor a Garmin pull on the same morning."""
-        self._adapted(sleep_seen=True)
-        coach = MagicMock()
-        out, pull = self._adapt_first_run(coach)
-        coach.workout_adapt.assert_not_called()
-        pull.assert_not_called()
-        self.assertIn("Rest day", out)
-
-    def test_adapt_first_runs_again_after_a_run_that_missed_the_night(self):
-        self._adapted(sleep_seen=False)
-        coach = MagicMock()
-        self._adapt_first_run(coach)
-        coach.workout_adapt.assert_called_once()
-
-    def test_adapt_first_runs_again_after_a_session_trained_since(self):
-        self._adapted(sleep_seen=True)
-        later = (clock.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
-        test_db.save_completed_activity(
-            activity_id="a-ride", date=today_str(), start_time=later, activity_name="Ride",
-            activity_type="cycling", duration_sec=3600, distance_km=30.0,
-            elevation_gain_m=0.0, avg_hr=140, max_hr=160, rpe=None, tss=60.0,
-        )
-        coach = MagicMock()
-        self._adapt_first_run(coach)
-        coach.workout_adapt.assert_called_once()
-
-    def test_adapt_first_ignores_yesterdays_run(self):
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
-        self._adapted(sleep_seen=True, created_at=yesterday)
-        coach = MagicMock()
-        self._adapt_first_run(coach)
-        coach.workout_adapt.assert_called_once()
 
     def test_adapt_first_pulls_past_the_throttle_while_the_night_is_missing(self):
         """A pull that found no sleep score yet leaves a row the refresh throttle would
@@ -447,6 +403,326 @@ class MorningPushTest(unittest.TestCase):
         coach = MagicMock()
         _, pull = self._adapt_first_run(coach)
         pull.assert_called_once_with(today_str(), force_pull=False)
+
+
+class QuietMorningTest(unittest.TestCase):
+    """With `adapt-first` on, the push asks the week planner only when something is new
+    since the last run or a night since the last one in hand is not normal
+    (DESIGN_quiet_morning.md §2–§6). Each case stores the last run's picture, changes one
+    thing, and runs the push."""
+
+    def setUp(self):
+        rebind_test_db(test_db)
+        clear_all_tables(test_db)
+        garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
+        garmin.start()
+        self.addCleanup(garmin.stop)
+        self.today = today_str()
+        self.yesterday = shift(self.today, -1)
+
+    def _remember(self, **overrides):
+        """The last run's picture, taken now, with `overrides` on top."""
+        taken = picture.take(test_db, self.today)
+        taken.update(overrides)
+        test_db.set_setting(ADAPT_LAST_SEEN, json.dumps(taken))
+        return json.dumps(taken)
+
+    def _push(self, pull=None):
+        """One push with the week planner mocked to change nothing. Returns whether it
+        asked the week planner, and the journal's lines."""
+        coach = MagicMock()
+        coach.workout_adapt.return_value = MagicMock(
+            workouts=[], reason="All green.", strength_notice=None,
+        )
+        pinned = {
+            "telegram": {"push": {"adapt_first": True}},
+            "coach": {"minor_activity_load_threshold": 25.0, "metrics_lookback_days": 15},
+        }
+        with patch.dict(config.data, pinned), \
+                patch.object(runtime, "coach_service", coach, create=True), \
+                patch("stamind.cli.bot.views.ensure_recent_data", side_effect=pull), \
+                patch("stamind.journal.record") as journal, \
+                patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
+            code, out, _ = run_cli(["bot", "morning", "--force"])
+        self.assertEqual(code, 0)
+        self.out = out
+        lines = [(c.args[1], c.kwargs.get("lvl", "info")) for c in journal.call_args_list]
+        return coach.workout_adapt.called, lines
+
+    def _activity(self, day, tss, minutes=60, sport="cycling", name="Ride"):
+        test_db.save_completed_activity(
+            activity_id=f"a-{day}-{sport}", date=day, start_time=f"{day} 07:00:00",
+            activity_name=name, activity_type=sport, duration_sec=minutes * 60,
+            distance_km=10.0, elevation_gain_m=0.0, avg_hr=140, max_hr=160, rpe=None,
+            tss=tss,
+        )
+
+    def _plan(self, goal=None):
+        if goal is None:
+            goal = test_db.add_objective("Race", shift(self.today, 60), "cycling")
+        return test_db.save_macrocycle(goal, "Build.", "g", "c", [{
+            "name": "Base", "start_date": shift(self.today, -10),
+            "end_date": shift(self.today, 20), "focus": "Endurance",
+        }])
+
+    def _baseline(self):
+        test_db.save_baseline(self.yesterday, 50.0, 2.0, 60.0, 5.0, 80.0, 5.0)
+
+    # --- nothing new ---
+
+    def test_a_normal_night_with_nothing_new_is_quiet(self):
+        """It is Friday. Thursday's ride was done as planned and the night was normal."""
+        test_db.add_constraint("Travel", self.today, shift(self.today, 3))
+        test_db.add_objective("Race", shift(self.today, 60), "cycling")
+        save_workout(test_db, self.yesterday, "cycling", "Ride", duration_minutes=60, tss=60)
+        save_workout(test_db, shift(self.today, 1), "cycling", "Long ride")
+        self._activity(self.yesterday, tss=60.0)
+        self._baseline()
+        stored = self._remember(date=self.yesterday, activities=[])
+        test_db.save_metric_cache(self.today, 50, 60, 80, 20)
+        asked, lines = self._push()
+        self.assertFalse(asked)
+        self.assertIn(("Quiet morning: the night is normal and nothing is new since "
+                       f"{picture.taken(json.loads(stored))}", "info"), lines)
+        # A quiet morning writes no picture and shows the schedule as a no-change run does.
+        self.assertEqual(test_db.get_setting(ADAPT_LAST_SEEN), stored)
+        self.assertIn("Rest day", self.out)
+
+    def test_with_no_night_to_grade_the_quiet_line_says_so(self):
+        self._remember()
+        asked, lines = self._push()
+        self.assertFalse(asked)
+        self.assertTrue(any(line.startswith("Quiet morning: nothing is new since")
+                            and line.endswith("no night since has a reading")
+                            for line, _lvl in lines))
+
+    # --- activities and sessions ---
+
+    def test_a_missed_session_runs(self):
+        save_workout(test_db, self.yesterday, "running", "Tempo run", duration_minutes=40)
+        save_workout(test_db, shift(self.today, 1), "running", "Long run")
+        self._remember(date=self.yesterday)
+        asked, lines = self._push()
+        self.assertTrue(asked)
+        day = f"{datetime.strptime(self.yesterday, '%Y-%m-%d'):%A}"
+        self.assertIn((f"Asking the week planner: {day}'s Tempo run is missed", "info"),
+                      lines)
+
+    def test_a_session_cut_short_runs_even_under_the_minor_threshold(self):
+        save_workout(test_db, self.yesterday, "cycling", "Ride", duration_minutes=60, tss=60)
+        save_workout(test_db, shift(self.today, 1), "cycling", "Long ride")
+        self._remember(date=self.yesterday)
+        self._activity(self.yesterday, tss=10.0, minutes=12)
+        asked, _lines = self._push()
+        self.assertTrue(asked)
+
+    def test_an_unmatched_minor_activity_is_quiet(self):
+        self._remember(date=self.yesterday)
+        self._activity(self.yesterday, tss=10.0, minutes=20, sport="walking", name="Walk")
+        asked, _lines = self._push()
+        self.assertFalse(asked)
+
+    def test_an_unplanned_activity_runs(self):
+        self._remember(date=self.yesterday)
+        self._activity(self.yesterday, tss=80.0, minutes=180, sport="hiking", name="Hike")
+        asked, lines = self._push()
+        self.assertTrue(asked)
+        self.assertTrue(any("a new activity" in line and "Hike" in line
+                            for line, _lvl in lines))
+
+    def test_this_mornings_activity_that_matched_todays_session_is_clean(self):
+        save_workout(test_db, self.today, "swimming", "Swim", duration_minutes=45, tss=40)
+        self._remember(date=self.yesterday)
+        self._activity(self.today, tss=40.0, minutes=45, sport="swimming", name="Swim")
+        asked, _lines = self._push()
+        self.assertFalse(asked)
+
+    def test_an_activity_synced_late_runs_unless_it_is_minor(self):
+        """A ride from four days ago appears this morning: outside the window the verdicts
+        grade, so it counts as unmatched."""
+        late = shift(self.today, -4)
+        self._remember(date=self.yesterday)
+        self._activity(late, tss=10.0, minutes=15, sport="walking", name="Walk")
+        asked, _lines = self._push()
+        self.assertFalse(asked)
+        self._activity(late, tss=80.0, minutes=120)
+        asked, _lines = self._push()
+        self.assertTrue(asked)
+
+    # --- what was written ---
+
+    def test_a_session_written_since_runs_unless_the_week_planner_wrote_it(self):
+        tomorrow = shift(self.today, 1)
+        self._remember()
+        save_workout(test_db, tomorrow, "running", "Easy run", kind="adapt")
+        asked, _lines = self._push()
+        self.assertFalse(asked)
+        save_workout(test_db, tomorrow, "running", "Long run", kind="generate")
+        asked, lines = self._push()
+        self.assertTrue(asked)
+        self.assertIn(("Asking the week planner: a session was written", "info"), lines)
+
+    def test_a_tweak_writes_no_picture_and_its_change_is_news(self):
+        self._remember()
+        tweak = RevisionProposal(reason="", workouts=[], range_start=self.today,
+                                 range_end=self.today, kind="tweak")
+        stored = test_db.get_setting(ADAPT_LAST_SEEN)
+        picture.remember(test_db, tweak)
+        self.assertEqual(test_db.get_setting(ADAPT_LAST_SEEN), stored)
+        save_workout(test_db, shift(self.today, 1), "running", "Easy run", kind="tweak")
+        asked, _lines = self._push()
+        self.assertTrue(asked)
+
+    # --- the hashed sources ---
+
+    def test_a_constraint_change_runs(self):
+        ended = test_db.add_constraint("Travel", self.today, shift(self.today, 5))
+        self._remember()
+        test_db.update_constraint(ended, end_date=shift(self.today, 1))
+        asked, lines = self._push()
+        self.assertTrue(asked)
+        self.assertIn(("Asking the week planner: a constraint changed", "info"), lines)
+
+    def test_a_goal_edit_runs(self):
+        goal = test_db.add_objective("Race", shift(self.today, 60), "cycling")
+        self._remember()
+        test_db.update_objective(goal, title="Gran Fondo")
+        asked, _lines = self._push()
+        self.assertTrue(asked)
+
+    def test_a_logged_benchmark_runs(self):
+        self._remember()
+        test_db.add_benchmark_result(self.today, "cycling", "ftp", 250.0, "W")
+        asked, _lines = self._push()
+        self.assertTrue(asked)
+
+    def test_a_profile_edit_runs(self):
+        self._remember()
+        with patch.dict(config.data, {"user_profile": {"name": "Someone else"}}):
+            asked, _lines = self._push()
+        self.assertTrue(asked)
+
+    def test_a_science_edit_runs(self):
+        self._remember()
+        with patch("stamind.coach.picture.athlete_science_documents",
+                   return_value={"strength.md": "Lift heavy."}):
+            asked, _lines = self._push()
+        self.assertTrue(asked)
+
+    def test_a_new_plan_version_runs(self):
+        goal = test_db.add_objective("Race", shift(self.today, 60), "cycling")
+        self._plan(goal)
+        self._remember()
+        self._plan(goal)
+        asked, lines = self._push()
+        self.assertTrue(asked)
+        self.assertIn(("Asking the week planner: the plan changed", "info"), lines)
+
+    # --- the strength planner's work test ---
+
+    def test_the_strength_planners_work_alone_runs_the_morning(self):
+        self._plan()
+        gym = save_workout(test_db, shift(self.today, 2), "strength_training", "Gym",
+                           prescribed_sets=[{"exercise": "SQUAT/BELT_SQUAT", "sets": 3,
+                                             "reps_low": 4, "reps_high": 6,
+                                             "load_kg": 140.0, "light": False}])
+        test_db.record_strength_check(gym, test_db.strength_history_stamp())
+        self._remember()
+        asked, _lines = self._push()
+        self.assertFalse(asked)
+        test_db.bump_strength_history()
+        asked, lines = self._push()
+        self.assertTrue(asked)
+        self.assertIn(("Asking the week planner: the strength planner has work", "info"),
+                      lines)
+
+    # --- the night ---
+
+    def test_a_night_not_normal_after_the_last_one_in_hand_runs(self):
+        self._baseline()
+        self._remember()
+        test_db.save_metric_cache(self.today, 50, 40, 80, 20)
+        asked, lines = self._push()
+        self.assertTrue(asked)
+        day = f"{datetime.strptime(self.today, '%Y-%m-%d'):%A}"
+        self.assertIn((f"Asking the week planner: {day}'s night is not normal: "
+                       "HRV suppressed", "info"), lines)
+
+    def test_a_poor_sleep_score_runs_without_a_baseline(self):
+        self._remember()
+        test_db.save_metric_cache(self.today, 50, 60, 41, 20)
+        asked, _lines = self._push()
+        self.assertTrue(asked)
+
+    def test_a_night_the_last_run_had_in_hand_does_not_run(self):
+        self._baseline()
+        test_db.save_metric_cache(self.today, 50, 40, 80, 20)
+        self._remember()
+        asked, _lines = self._push()
+        self.assertFalse(asked)
+
+    def test_an_unknown_night_is_quiet(self):
+        """No baseline to grade HRV against, and then a day whose sleep is not scored yet
+        though its resting HR is in."""
+        self._remember()
+        test_db.save_metric_cache(self.today, 50, 40, 80, 20)
+        asked, _lines = self._push()
+        self.assertFalse(asked)
+        self._baseline()
+        test_db.save_metric_cache(self.today, 70, None, None, None)
+        asked, _lines = self._push()
+        self.assertFalse(asked)
+
+    def test_the_night_is_graded_after_the_forced_pull(self):
+        """At 08:00 the sleep score is not in; the forced pull brings a poor night."""
+        self._remember()
+
+        def pull(day, force_pull):
+            self.assertTrue(force_pull)
+            test_db.save_metric_cache(day, 50, 60, 41, 20)
+
+        asked, _lines = self._push(pull=pull)
+        self.assertTrue(asked)
+
+    # --- the gate fails open ---
+
+    def _warned(self, lines):
+        return [line for line, lvl in lines if lvl == "warn"]
+
+    def test_no_picture_runs_and_warns(self):
+        asked, lines = self._push()
+        self.assertTrue(asked)
+        self.assertEqual(self._warned(lines),
+                         ["Asking the week planner: no picture of the last run"])
+        self.assertNotIn("picture", self.out)
+
+    def test_a_broken_picture_runs_and_warns(self):
+        test_db.set_setting(ADAPT_LAST_SEEN, "{not json")
+        asked, lines = self._push()
+        self.assertTrue(asked)
+        self.assertTrue(self._warned(lines)[0].startswith(
+            "Asking the week planner: the gate failed:"))
+
+    def test_an_exception_in_the_gate_runs_and_warns(self):
+        self._remember()
+        with patch("stamind.coach.picture.take", side_effect=RuntimeError("boom")):
+            asked, lines = self._push()
+        self.assertTrue(asked)
+        self.assertEqual(self._warned(lines),
+                         ["Asking the week planner: the gate failed: boom"])
+
+    def test_a_run_writes_the_picture_only_when_evaluated_on_today(self):
+        service = runtime.coach_service
+        seen = picture.take(test_db, self.today)
+        service.workout_revision_record_no_change(RevisionProposal(
+            reason="", workouts=[], range_start=self.yesterday, range_end=self.yesterday,
+            seen={**seen, "date": self.yesterday},
+        ))
+        self.assertIsNone(test_db.get_setting(ADAPT_LAST_SEEN))
+        service.workout_revision_record_no_change(RevisionProposal(
+            reason="", workouts=[], range_start=self.today, range_end=self.today, seen=seen,
+        ))
+        self.assertEqual(json.loads(test_db.get_setting(ADAPT_LAST_SEEN)), seen)
 
 
 class RouteCommandTest(unittest.TestCase):

@@ -140,27 +140,21 @@ look again tomorrow." — DESIGN_strength_tracking.md §9). It has to reach the 
 morning where nothing else moved, because the morning of the gym day itself is exactly such
 a morning.
 
-Amended 2026-09-26: the push does not run the adaptation again when one already ran this
-morning. Every `workout adapt` writes a `workout_changes` row, held or applied, and the row
-now records whether the run read a sleep score for its day (`sleep_seen`). Garmin delivers
-last night's sleep score only once the watch has synced after the athlete got up, so a run
-before that sync saw no night, and the push runs the adaptation again. Two more conditions:
-the newest adapt row is dated today on the athlete's clock, and no activity recorded today
-started after it — a session trained since the dawn run is new information that run could
-not weigh. A tweak does not count: it leaves out the fatigue-reading sections of the prompt
-(DESIGN_workout_tweak.md §3.2). On a skipped morning the push shows no reason line and no
-strength notice. The run that wrote them either showed them in the athlete's chat, or left
-its line for `bot changes` to tell before the push.
+Amended 2026-09-26, superseded 2026-10-18: the once-a-morning skip, which read a
+`sleep_seen` mark off the newest adapt row, is replaced by the gate of
+DESIGN_quiet_morning.md. The push asks the week planner only when something is new since the
+last `workout adapt` run or a night since the last one in hand is not normal; otherwise the
+morning is quiet. On a quiet morning the push shows no reason line and no strength notice,
+as on a skipped one before. What is not handled is listed in §8 there.
 
-Before it runs the adaptation, the push forces a Garmin pull when today's sleep score is
-still missing. A pull that finds no sleep score yet leaves a row for today, and the refresh
-throttle (`refresh_minutes`, two hours by default) would keep that empty row for the whole
-window, so an early manual run and the push would both run the week planner blind.
+Before it asks, the push forces a Garmin pull when today's sleep score is still missing, and
+grades the night only after it. A pull that finds no sleep score yet leaves a row for today,
+and the refresh throttle (`refresh_minutes`, two hours by default) would keep that empty row
+for the whole window, so an early manual run and the push would both run the week planner
+blind.
 
-Not handled: an athlete who does not wear the watch at night never has a sleep score, so
-their push always runs the adaptation again; a proposal the athlete declined writes no row,
-so the push runs again after it; and a held run started from the terminal leaves no line,
-so its strength notice reaches the operator only.
+Not handled: a held run started from the terminal leaves no line, so its strength notice
+reaches the operator only.
 
 Amended 2026-10-01 (DESIGN_cycle_retrospective.md §3, §5): right after its once-a-day test,
 `sm bot morning` runs the date check and then the write step, the two steps that keep the
@@ -172,9 +166,8 @@ Amended 2026-10-03 (DESIGN_waiting_proposal.md §5, §7): the push no longer wri
 change. It asks the week planner as before, without `-y`. A session that would change is
 saved as a proposal, an item of the athlete queue, and nothing is written until the athlete
 taps "Change it". Kilograms that moved alone are still written at once, with their sentence
-in the briefing. The once-a-morning read also counts a `workout adapt` proposal saved this
-morning with the sleep score, whatever its answer, so a declined proposal no longer makes
-the push ask again.
+in the briefing. Saving a proposal writes the run's picture, so the push after it is quiet
+unless something new happened, whatever its answer (DESIGN_quiet_morning.md §5).
 
 ### 4.3 Scheduling
 

@@ -22,10 +22,12 @@ from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.workouts.adapt import WEEK_CHANGED_LINE
 from stamind.cli.workouts.heads_up import newest_written
+from stamind.coach import picture
 from stamind.coach.proposals import RevisionProposal
 from stamind.coach.revisions import pair_revisions
 from stamind.config import config
 from stamind.sentinels import BUTTONS_SENTINEL, FLUSH_SENTINEL, QUEUE_SENTINEL
+from stamind.settings import ADAPT_LAST_SEEN
 from stamind.clock import today_str
 
 THURSDAY_8AM = datetime(2026, 10, 8, 8, 0).astimezone()
@@ -81,7 +83,7 @@ class _Case(unittest.TestCase):
         fields.setdefault("week_planner_changed", True)
         return RevisionProposal(
             reason="Rough night.", workouts=workouts, range_start=THURSDAY, range_end=day,
-            pairs=pairs, removals=removals, sleep_seen=True, **fields,
+            pairs=pairs, removals=removals, **fields,
         )
 
     def save(self, **kwargs):
@@ -155,11 +157,15 @@ class AnswerTest(_Case):
         reply = out[out.index(saved_proposal.APPLIED_LINE):]
         self.assertNotIn("Today:", reply)
 
-    def test_a_taps_change_never_carries_the_sleep_mark(self):
-        """Thursday evening's proposal read Thursday's night. Accepted on Friday at 07:00,
-        its change must not tell the 08:00 push that Friday's night was read (§5)."""
-        self.tap(self.save())
-        self.assertIsNone(test_db.newest_adapt()["sleep_seen"])
+    def test_a_tap_writes_no_picture(self):
+        """Thursday evening's run wrote its picture when it saved the proposal. Accepted on
+        Friday at 07:00, the tap writes none, so the 08:00 push compares with Thursday's
+        (DESIGN_quiet_morning.md §5)."""
+        item = self.save(seen=picture.take(test_db, THURSDAY))
+        self.assertIsNotNone(test_db.get_setting(ADAPT_LAST_SEEN))
+        test_db.clear_setting(ADAPT_LAST_SEEN)
+        self.tap(item)
+        self.assertIsNone(test_db.get_setting(ADAPT_LAST_SEEN))
 
     def test_keep_it_as_planned_writes_nothing_and_pulls_nothing(self):
         item = self.save()
@@ -348,7 +354,7 @@ class MorningPushTest(_Case):
 
     def test_a_morning_with_nothing_to_change_keeps_got_it_under_the_briefing(self):
         _coach, out = self.push(RevisionProposal(
-            reason="", workouts=[], range_start=THURSDAY, range_end=THURSDAY, sleep_seen=True,
+            reason="", workouts=[], range_start=THURSDAY, range_end=THURSDAY,
         ))
         self.assertEqual(queue_lines(out), [])
         [row] = [json.loads(line[len(BUTTONS_SENTINEL):]) for line in out.split("\n")
@@ -422,21 +428,28 @@ class MorningPushTest(_Case):
         self.assertEqual(saved_proposal.waiting(), [])
 
     def test_a_saved_proposal_counts_as_this_mornings_run_whatever_its_answer(self):
-        self.push(self.eased())
+        """The 08:00 push saved its proposal, and with it the run's picture. Declined at
+        08:10, nothing is new at 08:30 (DESIGN_quiet_morning.md §5)."""
+        self.push(self.eased(seen=picture.take(test_db, THURSDAY)))
         [item] = saved_proposal.waiting()
+        self.at(8, 10)
         self.tap(item, "a2")
         self.at(8, 30)
         coach, _out = self.push(self.eased())
         coach.workout_adapt.assert_not_called()
 
-    def test_a_proposal_made_without_the_sleep_score_does_not_count(self):
-        saved_proposal.save(
-            RevisionProposal(**{**self.eased().__dict__, "sleep_seen": False}),
-            newest_written(),
-        )
-        self.at(8, 30)
+    def test_a_proposal_that_stands_leaves_the_morning_quiet(self):
+        """Thursday 21:00: a proposal about Saturday, not answered. Friday 08:00: Thursday's
+        ride was done as planned and nothing else is new, so the push asks nothing and the
+        proposal keeps waiting with its buttons (DESIGN_quiet_morning.md §5)."""
+        save_workout(test_db, SATURDAY, "cycling", "Long ride", duration_minutes=180)
+        self.trained_at_noon()
+        self.at(21)
+        evening = self.save(day=SATURDAY, seen=picture.take(test_db, THURSDAY))
+        self.at(8, days=1)
         coach, _out = self.push(self.eased())
-        coach.workout_adapt.assert_called_once()
+        coach.workout_adapt.assert_not_called()
+        self.assertEqual([item["id"] for item in saved_proposal.waiting()], [evening["id"]])
 
     def test_the_push_is_shown_the_open_proposal_and_replaces_it(self):
         """Thursday evening's proposal about Saturday is still open on Friday at 08:00."""
@@ -482,6 +495,13 @@ class ChatRunTest(_Case):
         return RevisionProposal(
             reason="All fine.", workouts=[], range_start=THURSDAY, range_end=THURSDAY,
         )
+
+    def test_a_run_with_a_message_is_never_gated(self):
+        """The message is new by definition, so the picture of a run a minute ago does not
+        keep it from asking (DESIGN_quiet_morning.md §2)."""
+        test_db.set_setting(ADAPT_LAST_SEEN, json.dumps(picture.take(test_db, THURSDAY)))
+        coach, _prompt, _out = self.coach_run(self.nothing_to_change())
+        coach.workout_adapt.assert_called_once()
 
     def test_a_chat_run_saves_its_proposal_and_asks_nothing(self):
         coach, prompt, out = self.coach_run(self.eased())

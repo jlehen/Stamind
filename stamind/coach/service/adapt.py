@@ -22,7 +22,7 @@ from stamind import settings, signals
 from stamind.text import cmd
 from stamind.clock import fmt_date, shift, today_str as _today_str
 from stamind.coach.formatting import format_baseline
-from stamind.coach import honoring
+from stamind.coach import honoring, picture
 from stamind.coach.proposals import RevisionProposal
 from stamind.coach.revisions import (
     normalize_load_fields, pair_revisions, prescription_matches, replaces_source,
@@ -288,6 +288,9 @@ class AdaptMixin:
         if tweak:
             # Drift is the morning adaptation's question, not a request's (§3.2).
             intensity_context = None
+        # What this run read, for the next morning to compare with; a tweak takes no
+        # picture (DESIGN_quiet_morning.md §3).
+        seen = None if tweak else picture.take(self._db, target_date_str)
         decision = self.engine._workout_adapt_logic(
             target_date_str=target_date_str,
             history_days=history_days,
@@ -489,7 +492,7 @@ class AdaptMixin:
             removals=removals,
             held=tuple(held),
             covered_constraint_ids=covered,
-            sleep_seen=self._db.get_sleep_score(target_date_str) is not None,
+            seen=seen,
             week_planner_changed=week_planner_changed,
             **strength_planner.proposal_fields(strength),
         )

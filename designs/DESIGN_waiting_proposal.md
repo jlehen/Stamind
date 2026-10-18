@@ -59,7 +59,8 @@ The new kind is `proposal`. Its item holds:
   the run saves as queued questions of their own (§6.3);
 - the days it changes;
 - the newest change that wrote a session, at the moment the run read the week (§4, rule 1);
-- when it was made, and whether the run had last night's sleep score.
+- when it was made. (Until 2026-10-18 it also kept whether the run had last night's sleep
+  score; the run's picture, DESIGN_quiet_morning.md §3, replaced that mark.)
 
 **How it is sent.** The reason and the preview go out as ordinary text, which the bot already
 cuts into several messages when it is long. A proposal that rewrites four sessions can pass
@@ -185,17 +186,11 @@ the bot was down, the tap brings that question. Of the two cases not handled, th
 gone: the answer to any proposal lets the line go on. The first stays: a proposal nobody
 answers holds the line until the next morning time.
 
-**Once a morning.** The push skips the week planner when it already ran this morning with the
-night's sleep score. Today it reads that from the newest change that `workout adapt`
-recorded, whether it wrote a session or not. A saved proposal records no change, so the push
-also counts an `adapt` proposal saved this morning with the sleep score, whatever its answer. A
-declined proposal then no longer makes the push ask again, which
-DESIGN_bot_simple_frontend.md §4.2 lists as not handled.
-
-What a tap writes is saved without the mark that the sleep score was seen, so a tap's change
-never carries it. It is Thursday 21:00 and a proposal about Saturday is made, with Thursday's
-sleep score. The athlete taps "Change it" on Friday at 07:00. If the tap's change carried the
-mark, the 08:00 push would believe Friday's night was already read, and skip it.
+**Once a morning.** Since 2026-10-18 this is DESIGN_quiet_morning.md: the push asks the week
+planner only when something is new since the last run or a night since the last one in hand
+is not normal. Saving a proposal writes the run's picture, so the push after it is quiet
+unless something new happened, whatever the proposal's answer, and a tap writes no picture
+(§5 there).
 
 ## 6. A message to the coach from the chat
 
@@ -545,7 +540,7 @@ No table and no column are added: a proposal is a row of `athlete_queue`.
 | `stamind/queue_kind.py` | `Kind` gains the stand-alone property and its own line for a tap that comes too late |
 | `stamind/athlete_queue.py`, `stamind/cli/queue.py` | a stand-alone item is sent when queued, by a function the push and `workout adapt` call; it is in no round and not counted in the terminal's hint; it is drawn without the "🙋 Quick question" lead and without "Not now"; a tap on a closed one prints the kind's own line |
 | `stamind/cli/workouts/proposal.py` (new) | the `proposal` kind and nothing that sends: wording, the three out-of-date rules, what each answer does with the Garmin pull in "Change it", finding the open one. It must not import `cli/queue.py`, which imports the list of kinds. The item's subject, the key the queue uses to refuse a duplicate, is the instant it was saved, as for the `message` kind |
-| `stamind/coach/proposals.py` | whether the week planner changed a session; what a tap writes, to and from JSON, without the sleep mark |
+| `stamind/coach/proposals.py` | whether the week planner changed a session; what a tap writes, to and from JSON, without the run's picture |
 | `stamind/coach/service/adapt.py`, `stamind/coach/engine/adapt.py` | the open proposal as a data section and a sub-section of `## TASK` (DESIGN_prompt_structure.md); a tweak may also write the days the open proposal changes |
 | `stamind/cli/workouts/adapt.py` | a chat run saves and sends in place of the confirm; in the chat the constraint and signal questions move after it; the check before saving a proposal or writing kilograms |
 | `stamind/cli/bot/views.py` | the push saves a proposal when a session would change; the once-a-morning read also counts a saved proposal, and shares its test on today's activities with rule 3 |

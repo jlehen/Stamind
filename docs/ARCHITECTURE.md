@@ -198,7 +198,7 @@ One line per module; the rule each keeps is the part worth knowing before openin
 | `signals.py` | — | The daily-signal vocabulary and `write_signal_days` ([§13](#13-daily-signals-calendar-ingest)) |
 | `science/` | — | The shipped science guidelines the prompts quote ([§3](#3-coach-package-architecture)) |
 | `db/` | `db` | SQLite, `Database` composed from per-domain mixins. The only write path onto `workouts` is `workout_change.py`; a session as it stands is `workouts.py`, its lineage and change log `workout_history.py`; `schema.py` the DDL, `base.py` the connection |
-| `coach/` | `coach_service` | `service/` (`CoachService`: reads the database, orchestrates, prints), `engine/` (`CoachEngine`: the prompts and the model call), `formatting.py`, `honoring.py` (`honored_at`: who may stamp it, `needs_a_pass`, DESIGN_constraint_honoring.md), `proposals.py` and `revisions.py` (the frozen proposals and the pure helpers behind one) ([§3](#3-coach-package-architecture)) |
+| `coach/` | `coach_service` | `service/` (`CoachService`: reads the database, orchestrates, prints), `engine/` (`CoachEngine`: the prompts and the model call), `formatting.py`, `honoring.py` (`honored_at`: who may stamp it, `needs_a_pass`, DESIGN_constraint_honoring.md), `proposals.py` and `revisions.py` (the frozen proposals and the pure helpers behind one), `picture.py` (what a `workout adapt` run saw, kept in the `settings` row `adapt_last_seen` so the morning push can tell what is new: `take`, `news`, `nights`, `remember`, DESIGN_quiet_morning.md §3, §4) ([§3](#3-coach-package-architecture)) |
 | `analytics/` | module functions | Training maths over rows the caller fetched: opens no database, calls no model (`tests/test_layering.py`). `load.py` (the load model), `pmc.py` (CTL/ATL/TSB), `adherence.py` and `compare.py` (the verdict on a planned session), `intensity.py`, `zone_tables.py` and `mesocycle_report.py` (time in zone, DESIGN_intensity_distribution.md), `progression.py`, `timeline.py` and `chart.py` (the progress timeline, DESIGN_progress_timeline.md), `runway.py` (DESIGN_runway_nudge.md §2), `weekly_evidence.py`, `baselines.py`. `__init__.py` re-exports nothing |
 | `garmin/` | module functions | `client.py` (login, fetch), `sync.py` (`pull`, `ensure_data`, the `sync_state` watermark, the Calendar ride-along, §13), `derived.py` (where a handle meets the maths: `recompute_derived`, `backfill_tss`, `warmup_cutoff`). `__init__.py` still re-exports everything: debt, not precedent (AGENTS.md) |
 | `gcal/` | `CalendarSyncer` | Google Calendar, both ways: `event.py` (what an event says, no Google import), `history.py`, `client.py` (the only file that calls the API), `reconcile.py` (the pass after every change, DESIGN_workout_revisions.md §8); `__init__.py` maps them and re-exports nothing ([§15](#15-design-rationale--history)) |
@@ -239,6 +239,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A question or message no command waits on | a `Kind` (`stamind/queue_kind.py`) in `KINDS` of `stamind/athlete_queue.py`, and `queue_kind.queue(kind, subject, payload)` from the feature; nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
 | A long run beside the chat | `chat/routing.py:long_run`, `chat/runner.py` (`_keep_behind`, `_start_kept`, `KEPT_LINES`), `chat/callbacks.py:tap_long_run`, `queue_kind.Kind.long_run`/`confirmation`, `athlete_queue.long_run_name`/`lived_out`, `cli/queue_commands.py:GOES_ON`, `cli/bot/hand_off.py` (`pass_to_coach`, `adjust_week`), `cli/workouts/proposal.py` (`schedule`, `replace_sessions`), `cli/workouts/generate.py:propose_weeks`, `coach/proposals.py` (`generate_to_json`/`generate_from_json`), `cli/bot/views.py:_morning_adaptation`. DESIGN_long_runs_beside_chat.md |
 | A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` kind, `save`, `open_proposal`, `shown_to_week_planner`, `out_of_date`), `coach/proposals.py` (`week_planner_changed`, `revision_to_json`/`revision_from_json`), `coach/engine/notes.py:open_proposal_task`, `cli/queue.py:send_alone`, `cli/workouts/adapt.py:_settle`, `cli/bot/views.py:_morning_adaptation`. DESIGN_waiting_proposal.md |
+| Whether the morning push asks the week planner | `coach/picture.py` (`take`, `news`, `nights`, `remember`), `cli/bot/views.py:_asks`, `strength/planner.py:has_work`, `db/workout_history.py:newest_change_with_sessions(exclude_kind)`, `RevisionProposal.seen`, the `adapt_last_seen` row of `settings`. DESIGN_quiet_morning.md |
 | A strength activity's sets | `strength/sets.py`, `strength/vocabulary.py` + `exercises.tsv` (then rebuild `miniapp/exercises.json` with `miniapp/build_exercises.py`), `strength/questions.py`, `db/strength.py`, `cli/strength.py`, `cli/strength_log.py`, the `strength-sets-since` setting. DESIGN_strength_tracking.md, DESIGN_exercise_table.md |
 | A gym session logged on the phone | `miniapp/`, `strength/logger.py`, `cli/strength_ingest.py`, `strength/sets.py::take_over_logs`, `db/strength.py` (`gym_logs`, `upsert_logged_activity`, `save_gym_log`, `gym_log_for_day`, `garmin_activity_with_log`, `move_gym_log`). DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
 | A past strength session against its planned lines | `strength/comparison.py`, `db/strength.py::attach_lifted`, `analytics/adherence.py` (`_discrepancy_reasons`, `_pairing_order`, `is_ambiguous_match`), `cli/common.py` (`strength_table`, `simple_comparison_lines`), `strength/sets.py::done_text`. DESIGN_strength_planned_vs_done.md |
@@ -274,9 +275,10 @@ itself. The submodules:
   invisible outside the package. It holds no handles of its own: `_db` and `_prompt` are
   properties over `runtime.db` and `runtime.prompt`, and it has no Calendar handle at all
   (the comment beside `_prompt` in `service/__init__.py` says why).
-- `honoring.py`, `proposals.py` and `revisions.py` sit beside them: whether the schedule
-  reflects a constraint yet, the frozen records the coach hands the CLI before the athlete
-  has accepted anything, and the pure helpers that fill one in.
+- `honoring.py`, `proposals.py`, `revisions.py` and `picture.py` sit beside them: whether
+  the schedule reflects a constraint yet, the frozen records the coach hands the CLI before
+  the athlete has accepted anything, the pure helpers that fill one in, and the picture a
+  `workout adapt` run took of its inputs (DESIGN_quiet_morning.md §3).
 
 ### `_load_science_guidelines(app_science_dir, science_dir) → str`
 Module-level in `formatting.py`: one `====` banner per corpus (DESIGN_prompt_structure.md
@@ -387,7 +389,9 @@ one line each here; the flows are [§10](#10-key-data-flows).
   whether a revision counts as an easing is derived at read time
   ([§5](#workout-state--three-orthogonal-axes-not-one-enum)).
 - **`workout_revision_record_no_change(proposal)`** — an adapt that held still writes its
-  `workout_changes` row anyway and stamps `honored_at`.
+  `workout_changes` row anyway and stamps `honored_at`. Like `workout_revision_apply` and
+  `proposal.save`, it writes the run's picture when the run was evaluated on today
+  (`picture.remember`, DESIGN_quiet_morning.md §3, §6).
 - **`data_bootstrap(...)` / `data_reflect(...)`** — the shared `_run_workout_analysis`
   under horizon `long` or `short` (DESIGN_backward_evaluation.md §5, §8, §9, §13). A
   reply that parses but carries nothing raises before anything is written.
@@ -622,8 +626,11 @@ nothing, because an adapt that looked at the metrics and held is a real event.
 | `macrocycle_id` | INTEGER    | The plan version in force when this ran: context for `workout batches`, distinct from the per-row tag. |
 | `note`          | TEXT       | The coach's one line to the athlete about this change. A `generate` writes it only when something they would notice changed (DESIGN_plan_change_continuity.md §6.3); an `adapt` that changed something stores its reason here too; a `rollback` writes its own line about what it undid. NULL on everything else (DESIGN_change_heads_up.md §6). |
 | `told_at`       | TEXT       | UTC ISO, when the athlete was told about this change: stamped as it is written when they watched the run, else by `bot changes`. A change is **waiting** when it has a `note`, no `told_at`, and still stands (DESIGN_change_heads_up.md §6). |
-| `sleep_seen`    | INTEGER    | 1 when an `adapt` (or `tweak`) read a sleep score for its day, 0 when it ran before the watch had synced, NULL on every other kind. What lets the morning push skip an adaptation that already ran with the night in hand (DESIGN_bot_simple_frontend.md §4.2). |
 | `commitment_end`| TEXT       | Last day of the commitment window in force when this ran, so a removal is judged by the window it was written under rather than by the one standing when the Calendar sync happens to run (§5.2). |
+
+The two live databases also carry a dead `sleep_seen` column, left by the once-a-morning
+skip the picture replaced; the schema is CREATE-only and cannot drop it
+(DESIGN_quiet_morning.md §7).
 
 ### workout_calendar_state
 
@@ -859,12 +866,14 @@ App preferences that outlive one invocation but are not training data: a key/val
 store, untouched by every `wipe`. Every athlete-facing key is one entry in the
 `stamind/settings.py` registry, written only by `settings set` (DESIGN_settings.md §2; the
 registry is the list, [§9](#9-configuration-configyaml) the config keys where a
-setting has one). Three internal markers are not preferences: `push_morning_last`, the
-morning push's per-day stamp;
-`changes_notify_upto`, the id of the newest change `workout notify` asked the bot to send
-(DESIGN_change_heads_up.md §4); and `strength_history_changed_at`, bumped by every write
-that changes what the strength history shows, the evidence a kept strength session's
-kilograms may move on (DESIGN_strength_tracking.md §5, §9).
+setting has one). Four internal markers are not preferences: `push_morning_last`, the
+morning push's per-day stamp; `adapt_last_seen`, the picture the last `workout adapt` run
+took of its inputs, as JSON, which the push compares with a fresh one
+(DESIGN_quiet_morning.md §3); `changes_notify_upto`, the id of the newest change
+`workout notify` asked the bot to send (DESIGN_change_heads_up.md §4); and
+`strength_history_changed_at`, bumped by every write that changes what the strength
+history shows, the evidence a kept strength session's kilograms may move on
+(DESIGN_strength_tracking.md §5, §9).
 
 | Column       | Type    | Notes                                              |
 |--------------|---------|----------------------------------------------------|
@@ -1335,7 +1344,7 @@ but the credentials is optional and falls back to the default shown:
 | `logging.retain_days` / `logging.retain_exchange_days` | int | Days each directory keeps (default 90 each). The sweep runs at most once a UTC day, off the first command to finish; `sm journal prune` forces one |
 | `llm.fast_model`       | str  | Cheaper model the bot's free-text router (`sm bot route`) and its capture extractions (`sm bot capture`) use; a role, not a `settings list thinking-model` entry. Absent → the active thinking model (DESIGN_bot_simple_frontend.md §5.4, §12.2) |
 | `telegram.operator_name` | str | What the companion calls the human who runs the CLI. "Coach" is already the app in the athlete's vocabulary, so the operator gets a word of their own; absent → "the person who set this up for you" (DESIGN_render_persona.md §5) |
-| `telegram.push.*`      | —    | Morning push: `enabled` (default true), `morning_time` (`08:00`), `morning_deadline` (`15:00`), `evening_time` (`21:00`, from when the bot sends no queued item and no notice on its own), `adapt_first` (default false → ask the week planner before rendering, unless it already ran today with last night's sleep score in hand and nothing has been trained since; a session it would change is saved as a proposal the athlete answers with a tap, DESIGN_waiting_proposal.md §5) |
+| `telegram.push.*`      | —    | Morning push: `enabled` (default true), `morning_time` (`08:00`), `morning_deadline` (`15:00`), `evening_time` (`21:00`, from when the bot sends no queued item and no notice on its own), `adapt_first` (default false → ask the week planner before rendering, when something is new since the last run or a night since the last one in hand is not normal, else the morning is quiet, DESIGN_quiet_morning.md §2; a session it would change is saved as a proposal the athlete answers with a tap, DESIGN_waiting_proposal.md §5) |
 | `telegram.bot_token` / `telegram.allowed_chat_ids` | — | The bot's token (or the `TELEGRAM_BOT_TOKEN` env var) and the numeric chat-id allowlist that gates every chat |
 | `telegram.command_timeout_seconds` / `telegram.prompt_timeout_seconds` | — | The silent-run watchdog (180) and the idle-prompt cancel (300) |
 | `telegram.send_retry_seconds` | float | How long a call Telegram failed to answer is tried again before the bot gives up and journals one warning (default 180; 0 = off). The poll is not affected. DESIGN_telegram_send_retry.md §3 |
@@ -1446,7 +1455,9 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    recovery lags the signal; DESIGN_quantitative_signal_impact.md §6.1). A `-m/--message`
    note rides as a bounded prompt section, and the same call says which session it is
    about (`note_session`; "unclear" with several sessions asks on a terminal and queues in
-   the chat, DESIGN_session_notes.md §3).
+   the chat, DESIGN_session_notes.md §3). Where it reads its inputs it takes the picture
+   of them (`coach/picture.py:take`), identifiers and hashes the next morning compares
+   with; a tweak takes none (DESIGN_quiet_morning.md §3).
 2. `analyze_adherence()` grades the active sessions only. The window ends on the
    evaluation date, so `pending_from=target_date` marks that day's untrained sessions
    pending, not missed; only the absence of an activity is deferred this way.
@@ -1481,6 +1492,16 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    (`proposal.open_proposal`) and shows it to the week planner
    (`proposal.shown_to_week_planner`), and saving one closes the others
    (DESIGN_waiting_proposal.md §2, §3, §6, §7).
+8. Apply, no-change and save each write the run's picture to the `settings` row
+   `adapt_last_seen` when the run was evaluated on today (`picture.remember`). With
+   `adapt-first` on, the morning push (`cli/bot/views.py:_asks`) runs `workout adapt`
+   only when a fresh picture differs from it (`picture.news`: a non-clean activity, a
+   missed session, a session written by something other than the week planner, a changed
+   constraint, signal, plan, goal, benchmark, profile or science document, or the strength
+   planner's `has_work`), or a night since the last one in hand is not normal
+   (`picture.nights`, graded after the forced pull). Otherwise the morning is quiet: no
+   model call, no change row, one journal `note`. No picture, a broken one or an error in
+   the gate asks and journals a warning (DESIGN_quiet_morning.md §2–§6).
 
 ### A change on request (`workout tweak`)
 

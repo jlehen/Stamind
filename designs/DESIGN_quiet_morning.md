@@ -1,6 +1,6 @@
 # Design: A quiet morning
 
-**Status:** Designed · **Date:** 2026-10-17
+**Status:** Implemented 2026-10-18 · **Date:** 2026-10-17
 
 The week planner is the model call inside `workout adapt` that rewrites the sessions ahead. The
 morning push is the message the bot sends at the athlete's morning time. With the `adapt-first`
@@ -195,6 +195,8 @@ The picture is JSON in one settings row; its lists are compared as sets.
   `workout_changes` leaves the CREATE text, so a fresh database has none; the two live
   databases keep it as a dead column nothing reads or writes, because the schema is
   CREATE-only and cannot drop one. The INSERT in `db/workout_change.py` stops naming it.
+  The schema stamp moves to 28 because the CREATE text changed; a live database re-runs
+  the `CREATE IF NOT EXISTS` statements once, which changes nothing in it.
 
 ## 8. Not handled
 
@@ -265,7 +267,7 @@ One step. It works on its own and removes what it replaces.
 | `stamind/db/workout_change.py`, `db/schema.py` | The INSERT stops naming `sleep_seen`; the column leaves the CREATE text |
 | `stamind/db/workout_history.py` | A sibling of `newest_change_with_sessions` that leaves out kind `adapt`; `newest_adapt` stays |
 | `stamind/settings.py` | The `adapt_last_seen` key beside `MORNING_MARKER` |
-| `docs/ARCHITECTURE.md` | The adaptation flow, the `workout_changes` table, the `adapt_first` row of the config table, the settings-table markers, and the stale "guarded DDL" sentence under `athlete_metrics_cache` |
+| `docs/ARCHITECTURE.md` | The adaptation flow, the `workout_changes` table, the `adapt_first` row of the config table, the settings-table markers (the "guarded DDL" sentence under `athlete_metrics_cache` this row once named was already gone) |
 | `docs/DOMAIN_MODEL.md` | The `sleep_seen` row |
 
 Implemented designs amended when it lands: DESIGN_waiting_proposal.md §3 (the saved proposal

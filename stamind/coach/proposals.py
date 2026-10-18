@@ -86,10 +86,10 @@ class RevisionProposal:
     # entries the output checks dropped — both shown in the preview (§9).
     strength_notice: Optional[str] = None
     strength_dropped: Tuple[str, ...] = ()
-    # Whether the run read a sleep score for its day, stamped on the change row so the
-    # morning push can tell a run that saw the night from one that ran before the watch
-    # synced (DESIGN_bot_simple_frontend.md §4.2).
-    sleep_seen: Optional[bool] = None
+    # The picture the run took of its inputs, which the morning push compares with a fresh
+    # one to tell what is new. None on a tweak and on a tap's proposal
+    # (DESIGN_quiet_morning.md §3).
+    seen: Optional[Dict[str, Any]] = None
     # Whether the week planner itself changed a session, as against the strength planner
     # moving the kilograms alone: only the first waits for the athlete's answer
     # (DESIGN_waiting_proposal.md §7).
@@ -97,8 +97,8 @@ class RevisionProposal:
 
 
 # What `workout_revision_apply` reads off a proposal, and so what a saved one keeps. What
-# only drew the preview is left out, and so is `sleep_seen`: a tap's change must not claim
-# a night it never read (DESIGN_waiting_proposal.md §3, §5).
+# only drew the preview is left out, and so is `seen`: a tap writes no picture
+# (DESIGN_waiting_proposal.md §3, DESIGN_quiet_morning.md §5).
 SAVED_REVISION_FIELDS = (
     "reason", "workouts", "range_start", "range_end", "kind", "held",
     "covered_constraint_ids", "strength_checks", "strength_stamp",

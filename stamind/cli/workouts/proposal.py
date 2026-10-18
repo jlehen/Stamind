@@ -10,7 +10,7 @@ imports the list of kinds these are in.
 """
 import contextlib
 import io
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from stamind import clock, runtime
@@ -18,6 +18,7 @@ from stamind.analytics.compare import adherence_verdicts
 from stamind.chat.routing import PLANNING_RUN
 from stamind.cli.workouts.heads_up import generate_dates, newest_written, revision_dates
 from stamind.clock import today_str
+from stamind.coach import picture
 from stamind.coach.proposals import (
     GenerateProposal, RevisionProposal, generate_from_json, generate_to_json, revision_from_json,
     revision_to_json, sessions_replaced,
@@ -181,7 +182,8 @@ def save(proposal: RevisionProposal, written_upto: int, replaces: bool = False) 
     """Saves a proposal and returns its item. Every other proposal that still waits is
     closed, so one is open at a time (§3). `written_upto` is the newest change that wrote a
     session when the run read the week (§4, rule 1). `replaces` says the run was shown an
-    open proposal, so the text opens by saying so (§6.2)."""
+    open proposal, so the text opens by saying so (§6.2). The run's picture is written
+    here, since saving is how this run ends (DESIGN_quiet_morning.md §3)."""
     now = clock.now()
     for other in waiting():
         runtime.db.close_queue_item(other["id"], STALE, now)
@@ -194,8 +196,8 @@ def save(proposal: RevisionProposal, written_upto: int, replaces: bool = False) 
         "proposal": revision_to_json(proposal),
         "dates": sorted(revision_dates(proposal)),
         "written_upto": written_upto,
-        "sleep_seen": bool(proposal.sleep_seen),
     })
+    picture.remember(runtime.db, proposal)
     return runtime.db.get_queue_item(item_id)
 
 
@@ -325,14 +327,3 @@ def ask_to_replace(
         "prefer_macro_id": prefer_macro_id,
         "fresh": fresh,
     })
-
-
-def saw_the_night_on(day: str) -> List[datetime]:
-    """When each `workout adapt` proposal saved on `day` with the night's sleep score was
-    made, whatever its answer: the push counts them as runs of this morning (§5)."""
-    recent = runtime.db.queue_items_since(KIND, clock.now() - timedelta(days=1))
-    return [
-        made_at(item) for item in recent
-        if item["payload"]["sleep_seen"] and item["payload"]["proposal"]["kind"] == "adapt"
-        and clock.to_local(made_at(item)).strftime("%Y-%m-%d") == day
-    ]

@@ -156,21 +156,27 @@ class WorkoutHistoryMixin:
             ).fetchone()
             return int(row["c"]) if row and row["c"] is not None else None
 
-    def newest_change_with_sessions(self) -> Optional[Dict[str, Any]]:
+    def newest_change_with_sessions(
+        self, exclude_kind: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """The newest change that wrote at least one revision, or None: the one a terminal
-        run offers to replace (DESIGN_change_heads_up.md §5)."""
+        run offers to replace (DESIGN_change_heads_up.md §5). `exclude_kind` leaves one kind
+        out: the morning push's picture skips `adapt`, the week planner's own writes
+        (DESIGN_quiet_morning.md §3)."""
         with self._get_connection() as conn:
             row = conn.execute(
                 "SELECT c.* FROM workout_changes c "
                 "WHERE EXISTS (SELECT 1 FROM workouts w WHERE w.change_id = c.id) "
-                "ORDER BY c.id DESC LIMIT 1"
+                "AND (? IS NULL OR c.kind != ?) "
+                "ORDER BY c.id DESC LIMIT 1",
+                (exclude_kind, exclude_kind),
             ).fetchone()
             return dict(row) if row else None
 
     def newest_adapt(self) -> Optional[Dict[str, Any]]:
-        """The newest `adapt` change, held or applied, or None: what the morning push reads
-        to tell whether the daily adaptation already ran today
-        (DESIGN_bot_simple_frontend.md §4.2)."""
+        """The newest `adapt` change, held or applied, or None: what the hand-off question
+        reads to tell whether the coach looked after a goal or constraint edit from the
+        chat (DESIGN_chat_questions.md §4)."""
         with self._get_connection() as conn:
             row = conn.execute(
                 "SELECT * FROM workout_changes WHERE kind = 'adapt' ORDER BY id DESC LIMIT 1"

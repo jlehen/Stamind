@@ -321,7 +321,7 @@ class ProposeTest(_Case):
     def test_saving_weeks_leaves_a_waiting_proposal_open_and_the_other_way_round(self):
         earlier = queue("proposal", "2026-10-08T05:00:00", {
             "text": "Ease today.", "answers": [], "proposal": {}, "dates": [THURSDAY],
-            "written_upto": 0, "sleep_seen": False,
+            "written_upto": 0,
         })
         self.propose()
         [weeks_item] = self.waiting(saved.SCHEDULE)

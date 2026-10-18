@@ -210,6 +210,30 @@ def _weighed_before(session: Session, stamp: str, checks: Dict[int, str]) -> boo
     return lineage_id is not None and checks.get(lineage_id, "") >= stamp
 
 
+def _evidence(to_check: Sequence[Session]) -> Tuple[str, Dict[int, str]]:
+    """The strength history's stamp, and what each session to check was last weighed
+    against (§9)."""
+    stamp = runtime.db.strength_history_stamp()
+    checks = runtime.db.strength_checks_for(
+        [s.lineage_id for s in to_check if s.lineage_id is not None]
+    )
+    return stamp, checks
+
+
+def has_work(
+    live_sessions: Sequence[Dict[str, Any]], span_start: str, span_end: str
+) -> bool:
+    """Whether a run in which the week planner changes nothing would still call the
+    strength planner: a strength session in the span with no sets, or one whose kilograms
+    were weighed before the strength history last changed (§9). The morning push asks this
+    before it asks the week planner (DESIGN_quiet_morning.md §3)."""
+    to_write, to_check = _collect([], live_sessions, span_start, span_end)
+    if to_write:
+        return True
+    stamp, checks = _evidence(to_check)
+    return any(not _weighed_before(s, stamp, checks) for s in to_check)
+
+
 def _day_name(day: str) -> str:
     return f"{date.fromisoformat(day):%A}'s"
 
@@ -249,10 +273,7 @@ def run(
         return None
     for session in to_check:
         session.asked_again = write_again
-    stamp = runtime.db.strength_history_stamp()
-    checks = runtime.db.strength_checks_for(
-        [s.lineage_id for s in to_check if s.lineage_id is not None]
-    )
+    stamp, checks = _evidence(to_check)
     fresh_evidence = [s for s in to_check if not _weighed_before(s, stamp, checks)]
     written_by_the_week_planner = any(
         s.entry is not None and not s.entry.get("keep") for s in to_write + to_check

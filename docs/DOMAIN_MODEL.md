@@ -771,7 +771,6 @@ that differs from the live one only in its short name is not written
 | `note` | The coach's one line to the athlete about this change. NULL when there is nothing the athlete would notice. |
 | `told_at` | When the athlete was told. Stamped as the change is written when they watched the run, else when the bot sends the line (`DESIGN_change_heads_up.md §6`). |
 | `commitment_end` | The last day of the commitment window (§7) a `workout generate` ran under. It decides whether a void that run wrote keeps its Calendar event (below). |
-| `sleep_seen` | Whether a `workout adapt` read a sleep score for its day. It lets the morning message skip an adaptation that already ran with the night in hand. |
 
 **Nothing else is stored on the revision, because nothing else needs to be.**
 `original_*`, `adapted_at`, `adaptation_count` and the modification kind are all

@@ -39,6 +39,9 @@ STRENGTH_LOGGER = "strength-logger"
 # process stays stateless across restarts. The morning push reads it, and so does the
 # question that changes `morning-time` (DESIGN_bot_simple_frontend.md §4.2, §12.7).
 MORNING_MARKER = "push_morning_last"
+# Not a setting either: the picture the last `workout adapt` run took of its inputs, as
+# JSON, which the morning push compares with a fresh one (DESIGN_quiet_morning.md §3).
+ADAPT_LAST_SEEN = "adapt_last_seen"
 
 
 def parse_hhmm(token: Any) -> str:
