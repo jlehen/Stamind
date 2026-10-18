@@ -13,6 +13,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional, Sequence
 
 from stamind import runtime
+from stamind.clock import fmt_date
 from stamind.coach.formatting import BANNER_RULE, preferences_text, science_section
 from stamind.config import config
 from stamind.strength import prescription, vocabulary
@@ -291,7 +292,8 @@ def _session_block(
     constraints: Sequence[Dict[str, Any]], mesocycles: Dict[str, Any],
 ) -> str:
     duration = f"{session.duration} min" if session.duration else "duration not stated"
-    lines = [f"- {session.date} ({duration}) \"{session.title}\""]
+    # The weekday beside the date: a preference may tie a session to the weekend (§9).
+    lines = [f"- {fmt_date(session.date)} ({duration}) \"{session.title}\""]
     if session.rows and session.moved_on:
         lines.append(f"  {MOVED_ON}")
     elif session.asked_again:

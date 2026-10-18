@@ -242,7 +242,18 @@ search finds it under either word. A kettlebell form is not added, by the rule o
 the waist, in the core_carry pattern. Garmin's only around the world is the sandbag one, swung
 around the head, and Free Exercise DB's is the lying dumbbell sweep, so the line has no photos.
 Its gear is Kettlebells, as the Turkish get-up's is, and a dumbbell counts by §7. A set goes
-both ways round, so it is not `per side`. The halo is not added.
+both ways round, so it is not `per side`. The halo, swung around the head, is the line below.
+
+**Two one-bell exercises, added on 2026-10-18**, for a circuit done at home with one kettlebell.
+Garmin has no name for either. The halo circles the bell around the head, so it is filed with
+the shoulder stability work. The pullover is done lying on the floor, which is why the bench
+pullover already in the table could not stand for it. It is a pull and not an accessory,
+because it is that circuit's only pull and has to progress (DESIGN_strength_tracking.md §10).
+
+| Key | Nearest Garmin exercise | Pattern | Gear |
+|---|---|---|---|
+| `SHOULDER_STABILITY/KETTLEBELL_HALO` | `SANDBAG/AROUND_THE_WORLD` | accessory | Kettlebells |
+| `PULL_UP/KETTLEBELL_FLOOR_PULLOVER` | `PULL_UP/EZ_BAR_PULLOVER` | pull_vertical | Kettlebells |
 
 ### 3.4 Pattern
 

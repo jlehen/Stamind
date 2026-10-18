@@ -29,6 +29,8 @@
 +SHOULDER_PRESS/MACHINE_SHOULDER_PRESS	push_vertical	SHOULDERS|TRICEPS	Machine	Machine_Shoulder_Military_Press
 # nearest Garmin exercise: SHOULDER_PRESS/STANDING_LANDMINE_PRESS
 +SHOULDER_PRESS/SINGLE_ARM_STANDING_LANDMINE_PRESS	push_vertical	SHOULDERS,TRICEPS|ABS,CHEST,GLUTES,OBLIQUES,QUADS	Barbell, Landmine	Single-Arm_Linear_Jammer	per side
+# nearest Garmin exercise: SANDBAG/AROUND_THE_WORLD
++SHOULDER_STABILITY/KETTLEBELL_HALO	accessory	SHOULDERS|TRAPS,ABS,OBLIQUES	Kettlebells		per side
 # nearest Garmin exercise: ROW/ROW
 +ROW/MACHINE_ROW	pull_horizontal	LATS,TRAPS|BICEPS	Machine
 # nearest Garmin exercise: ROW/SINGLE_ARM_CABLE_ROW
@@ -38,6 +40,8 @@
 +FLYE/REVERSE_PEC_DECK	accessory	SHOULDERS|TRAPS	Machine
 # nearest Garmin exercise: PULL_UP/EZ_BAR_PULLOVER
 +PULL_UP/DUMBBELL_PULLOVER	accessory	LATS,CHEST|TRICEPS	Bench, Dumbbells
+# nearest Garmin exercise: PULL_UP/EZ_BAR_PULLOVER
++PULL_UP/KETTLEBELL_FLOOR_PULLOVER	pull_vertical	LATS,CHEST|TRICEPS	Kettlebells
 # nearest Garmin exercise: PULL_UP/LAT_PULLDOWN
 +PULL_UP/SINGLE_ARM_LAT_PULLDOWN	pull_vertical	LATS|BICEPS,TRAPS,SHOULDERS	Cable Machine, Cable Attachment	One_Arm_Lat_Pulldown	per side
 # nearest Garmin exercise: BANDED_EXERCISES/LEG_EXTENSION

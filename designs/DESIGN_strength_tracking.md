@@ -1017,9 +1017,10 @@ prints, is the strength planner's reasons, one sentence per session it changed, 
   that needs it: the athlete's own guidelines are where a rule keyed on the boundary lives,
   such as changing which exercise fills a movement pattern when a new mesocycle opens (§10).
 - The sessions to write: every strength session in the span that has no prescribed sets,
-  with its title, duration, RPE and brief. That is every new session the week planner
-  wrote in this proposal, and a kept session written before phase 2, whose old prose
-  stands in for the brief.
+  with its date and weekday, title, duration, RPE and brief. The weekday is printed because
+  a preference may tie a session's content to the weekend, and a model does not always get a
+  date's weekday right. That is every new session the week planner wrote in this proposal,
+  and a kept session written before phase 2, whose old prose stands in for the brief.
 - The sessions to check: every other strength session in the span that has prescribed sets,
   whether the week planner kept or revised it or it arrived from another date with its
   lineage (below), with the brief it has now and those sets. One whose brief or duration is

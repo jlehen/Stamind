@@ -134,7 +134,7 @@ class ClassTest(unittest.TestCase):
         self.assertTrue(step_down.added)
         self.assertEqual(vocabulary.key_of("SQUAT/STEP_DOWN"), "SQUAT/STEP_DOWN")
         self.assertIsNone(vocabulary.get("+SQUAT/STEP_DOWN"))
-        self.assertEqual(sum(1 for one in vocabulary.all_exercises() if one.added), 38)
+        self.assertEqual(sum(1 for one in vocabulary.all_exercises() if one.added), 40)
 
     def test_a_name_people_use_finds_its_class_and_is_never_a_key(self):
         """§3.2: Garmin's cable core press is what people call the Pallof press."""
