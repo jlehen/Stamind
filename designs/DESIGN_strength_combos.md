@@ -53,10 +53,12 @@ opening with the chain mark ⛓ and then "One arm swing → Single arm dumbbell 
 each name a small rounded chip, with "3×5–8/side @ 8 kg" under it and three set boxes. She does
 five rounds, ticks the set, then six and six. She also has an idea: a swing straight into a halo.
 She taps "+ Add an exercise" and picks the kettlebell swing, as today. The new card's title is one
-chip. She taps it, and three buttons appear right under it: Replace, Remove, Insert after. She taps
-Insert after; the search opens as "Chain after Kettlebell swing", she picks the kettlebell halo,
-and the card now reads "⛓ Kettlebell swing → Kettlebell halo", marked added, with the three sets
-it had. She taps Finish.
+chip, "[Hip raise] Kettlebell swing". She taps it, and three buttons appear right under it:
+Replace, Remove, Chain after. She taps Chain after; the search opens as "Chain after [Hip raise]
+Kettlebell swing", she picks the kettlebell halo, and the card now reads "⛓ Kettlebell swing →
+Kettlebell halo", marked added, with the three sets it had, eight at 20 kg, its reps box now
+saying "/side". She sets 8 kg, does three sets of eight rounds a side, ticking each, and taps
+Finish.
 
 The log reaches the bot. Each card is an entry whose `n` is its key, the chain's joined key
 included, and each set is rounds, kilograms and seconds, as any set. The ingest stores the sets
@@ -74,15 +76,15 @@ HIP_RAISE/KETTLEBELL_SWING>SHOULDER_STABILITY/KETTLEBELL_HALO
   Wed Oct 22: 3×8/side @ 8 | RPE 4
 ```
 
-The planner progresses the chain the way it progresses one exercise under HOW TO PROGRESS: the
-range stays 5 to 8, she adds rounds inside it, and the load moves up a step the day every set
-reaches 8 and a heavier bell is on her equipment list. With one bell the load holds, as a one-bell
-goblet squat holds today. The swing-and-halo chain she invented carries the "(not prescribed)"
-mark on Wednesday's line under SESSIONS AS DONE, the part of the history that shows each session
-whole. If she keeps doing it, it becomes a habit and the planner writes it in, under the habit
-rule of DESIGN_strength_tracking.md §9, which does not change. The one-arm swing's own entry in the
-history does not mention Wednesday: a set of the chain teaches the planner about the chain, not
-about the swing (§5).
+The strength planner progresses the chain the way it progresses one exercise under HOW TO
+PROGRESS: the range stays 5 to 8, she adds rounds inside it, and the load moves up a step the day
+every set reaches 8 and a heavier bell is on her equipment list. With one bell the load holds, as
+a one-bell goblet squat holds today. The swing-and-halo chain she invented carries the "(not
+prescribed)" mark on Wednesday's line under SESSIONS AS DONE, the part of the history that shows
+each session whole. If she keeps doing it, it becomes a habit and the strength planner writes it
+in, under the habit rule of DESIGN_strength_tracking.md §9, which does not change. The one-arm
+swing's own entry in the history does not mention Wednesday: a set of the chain teaches the
+strength planner about the chain, not about the swing (§5).
 
 ## 3. A chain in the data
 
@@ -135,25 +137,25 @@ once and kept, more rounds inside it, then more load. The science says so (§4).
 unknown key as "the key alone": `vocabulary.model_line` prints the bare key, `side_mark` prints
 nothing, `implausible` is false, `get` is None. The change is one helper, `vocabulary.parts(key)`,
 the list of part keys, one for a plain key, and the readers that need the parts: `words`,
-`side_mark`, the planner's check (§4), the log's check (§6) and the merge script. Everything else
-keys on the string and does not care that it holds a `>`. `strength log` already matches a typed
-name against a key's words, so once `words` gives a chain its movements' names, "goblet squat"
-lists the goblet squat and every chain holding it with no change to the command.
+`side_mark`, the strength planner's check (§4), the log's check (§6) and the merge script.
+Everything else keys on the string and does not care that it holds a `>`. `strength log` already
+matches a typed name against a key's words, so once `words` gives a chain its movements' names,
+"goblet squat" lists the goblet squat and every chain holding it with no change to the command.
 
 ## 4. The strength planner
 
 **What it may write.** A chain is allowed wherever a plain exercise is, under the rules that
 already hold: the comparable session as done, the brief, the day's equipment and HOW TO PROGRESS.
-The prompt does not push the planner toward chains. A session copied from a comparable one keeps
-the plain exercises that one had, and a chain enters a session the way any exercise does: the brief
-asks for a flow, the preferences name one, the athlete made a habit of one, or a new session with no
+The prompt does not push the strength planner toward chains. A session copied from a comparable
+one keeps the plain exercises that one had, and a chain enters a session the way any exercise
+does: the brief asks for a flow, the preferences name one, the athlete made a habit of one, or a
+new session with no
 history is written from the brief, the equipment and the guidelines alone. One paragraph joins
 CHOOSING THE EXERCISES in `planner_prompt.py`:
 
-> A chain is two or more exercises, usually three or four, done back to back with one implement
-> and no rest between them. Write a chain as one exercise whose key is its movements' keys joined
-> with >, in the order they are done. Its reps are rounds, one of each movement a round, in a
-> range kept from one session to
+> A chain is two or more exercises done back to back with one implement and no rest between them.
+> Write a chain as one exercise whose key is its movements' keys joined with >, in the order they
+> are done. Its reps are rounds, one of each movement a round, in a range kept from one session to
 > the next like any rep range. A chain holding a movement marked per side is per side as a whole:
 > its rounds are per side and a set is both sides, as under ONE SIDE AT A TIME. Every movement must
 > be in EXERCISES STAMIND KNOWS, and all of them must share one implement; dumbbells and kettlebells
@@ -171,11 +173,11 @@ a string in `exercise`.
 **The science.** `strength/progression.md` gets a section, "A chain": one implement held the whole
 time; usually three or four movements; each movement ends where the next starts, so a swing ends
 at the hip where a clean starts, and a clean ends in the rack where a squat and a press start; the
-load is the weakest movement's, so a
-chain on record is an exercise of its own and its load says nothing about any movement's own load;
-a chain progresses as one exercise, rounds then load, and is not a way to progress its movements.
-The range of rounds is the planner's to choose from the brief and the duration, as any rep range
-is. This is the model's taste guided, not a list of allowed chains (D3).
+load is the weakest movement's, so a chain on record is an exercise of its own and its load says
+nothing about any movement's own load; a chain progresses as one exercise, rounds then load, and
+is not a way to progress its movements. The range of rounds is the strength planner's to choose
+from the brief and the duration, as any rep range is. This is the model's taste guided, not a list
+of allowed chains (D3).
 
 **The check.** `_clean_exercise` in `planner_prompt.py` splits the returned name on `>`, strips
 the spaces around each part, resolves each part with `vocabulary.key_of`, so a Garmin name of the
@@ -187,7 +189,7 @@ through and through, passes. A chain that fails the gear test still passes when 
 joined key is on the athlete's record, among the exercises a person has named in her stored sets
 (`sets.own_exercises`), which `_clean_exercise` reads only then; the page composes a chain from
 the same keys, so the two spellings meet. What she did is the proof, and the gear test guards the
-chains the planner invents (D10). A chain that fails is dropped from the
+chains the strength planner invents (D10). A chain that fails is dropped from the
 session as an unknown name is today, and the one preview line is reworded so it is true for both:
 "'{name}' is not an exercise Stamind knows or a chain it accepts, left out".
 
@@ -205,7 +207,7 @@ chain as one exercise, and its " + " keeps its meaning (§3). `history.py` chang
 
 Nothing lands in the movements' own entries (D4). The load of a chain is the weakest movement's,
 so an 8 kg clean done inside a chain says nothing about what the athlete cleans alone, and a
-history that showed it would mislead the planner on the clean.
+history that showed it would mislead the strength planner on the clean.
 
 The planned-against-done table (`cli/common.py::strength_table`) and the comparison it is built
 on (`strength/comparison.py`) match planned lines to done sets by key and print the words. A
@@ -218,27 +220,33 @@ it from her sessions after two such weeks (§7).
 
 ## 6. The page
 
-**Drawing a chain.** A chain is one card like any card. Every card's title is chips, one per
-movement, each the shown name after the category, with " → " between them; a chain's title opens
-with the chain mark ⛓, and a plain exercise's title is one chip with no mark. `wordsOf` splits the
-key on `>` for the chips and for every other place the words are printed. `perSideOf` is true
-when any part is. `photosOf` shows the first movement's photos. `patternOf` is already null for
-any key the catalog lacks, a chain's included, so Swap on a chain card searches every exercise
-with no pattern filter and needs no change. Swap and Del act on the whole card, as today.
+**Drawing a chain.** A chain is one card like any card. Every card's title is chips. A plain
+exercise's title is one chip that reads as its card reads today, "[Squat] Goblet squat", category
+and all. A chain's title opens with the chain mark ⛓ and holds one chip per movement, each the
+words after the category as a chain's words are everywhere (§3), with " → " between them.
+`wordsOf` splits the key on `>` for the chips and for every other place the words are printed.
+`perSideOf` is true when any part is, so the reps boxes say "/side" as for any one-sided
+exercise. `photosOf` shows the first movement's photos. `patternOf` is already null for any key
+the catalog lacks, a chain's included, so Swap on a chain card searches every exercise with no
+pattern filter and needs no change. Swap, Del and Dup act on the whole card, as today.
 
 **Building and changing a chain.** Nothing is added to the card's eight buttons and nothing to the
-footer (D21). A tap on a chip brings up three buttons right under it, Replace, Remove and Insert
-after, and a second tap on the chip hides them. Replace opens the search sheet titled "Replace
-Goblet squat" and puts the pick in that movement's place. Remove drops the movement; on a
-one-chip title it does what Del does. Insert after opens the search titled "Chain after Goblet
-squat" and puts the pick after that movement, which on a plain exercise is how a chain starts.
-The two are the search Swap and Insert open today, with another title and another landing. The
-card's sets stay as they are through every edit, and the card's ↶ takes the last edit back, as it
-takes back any change to the card. The page checks nothing about the gear (D7): she is holding
-it, and a chain she has done passes the planner's check from then on (D10). Every edit gives the
-card a new key, so an edited chain is a new chain for the record and the planner, as a swapped
-exercise is today. The chips, the three buttons and the ⛓ mark are the only new markup; the
-search, the results and the pattern toggle are the ones Swap and Add use.
+footer (D21). A tap on a chip brings up three buttons right under it, Replace, Remove and Chain
+after, and a second tap on the chip hides them. Each opens the search sheet titled after the chip
+as it reads, "Replace [Squat] Goblet squat" or "Chain after Goblet squat". Replace puts the pick
+in that movement's place; its search keeps the replaced movement's pattern as its filter, with
+the box that lifts it, as Swap's does. Remove drops the movement. Chain after puts the pick after
+that movement; its search covers every exercise, as Insert's does. On a plain exercise, Chain
+after is how a chain starts. Each edit works out the card's new key and hands it to
+`swapExercise`, recorded on the card as Swap is: the sets stay, ticked or not, with their reps
+and kilograms; the written load leaves the card's line, as after a swap; and the card's ↶ takes
+the edit back. On a one-chip title, Replace does what Swap does and Remove does what Del does,
+and only the header's Undo brings a removed card back. The page checks nothing about the gear
+(D7): she is holding it, and a chain she has done passes the strength planner's check from then
+on (D10). Every edit gives the card a new key, so an edited chain is a new chain for the record
+and the strength planner, as a swapped exercise is today. The chips, the three buttons and the ⛓
+mark are the only new markup, the three buttons being pills of the page's tap size; the search,
+the results and the pattern toggle are the ones Swap and Add use.
 
 **The log.** `n` carries the joined key, and each set is rounds, kilograms and seconds as today.
 `parse_log` in `strength/logger.py` checks each part of a key with `vocabulary.get`, so a chain of
@@ -274,10 +282,13 @@ Each is a case a plausible athlete rarely meets, left out on purpose with the be
   the page's address, where a plain key runs about 25, so a session of many long chains meets the
   keyboard size limit of DESIGN_exercise_table.md §8 sooner, and a long title wraps over several
   lines of its card. The behaviour there is unchanged.
-- The page offers no check that two picks flow into each other, and the planner's check reads gear
-  only. Two different machines share the gear word "Machine" and pass it, and a planner-written
-  "clean → press → clean" passes too. A chain the model composes badly is a chain the athlete reads
+- The page offers no check that two picks flow into each other, and the strength planner's check
+  reads gear only. Two different machines share the gear word "Machine" and pass it, and a chain
+  the strength planner writes as "clean → press → clean" passes too. A chain the model composes
+  badly is a chain the athlete reads
   before lifting and swaps.
+- Chaining a card with ticked sets makes those sets rounds of the chain, as a swap renames them.
+  To keep them as they were, Dup the card and chain the copy.
 - A chain holding one two-handed movement and one per-side movement is per side as a whole (§3):
   "kettlebell swing → kettlebell halo" at 8 rounds a side is 16 swings a set. The notes say how
   the sides are done, and the athlete who means 8 swings logs 4 a side.
@@ -291,27 +302,32 @@ D12 to D19 of the Decisions Log are the author's resolutions of red-team finding
 rule on each there. The choices below have no row of their own. Each is one line to object to.
 
 1. Order matters: `A>B` and `B>A` are two chains with two histories (§3).
-2. The prompt does not push the planner toward chains: a chain is allowed wherever a plain
+2. The prompt does not push the strength planner toward chains: a chain is allowed wherever a plain
    exercise is, under today's rules, and enters a session the way any exercise does. The week
    planner is not told about chains; a brief that says "a one-bell flow" is prose the strength
    planner reads, as any brief is (§4).
 3. The notes name a chain in words and say how the sides are done (§4).
 4. Inside the page shape you chose (D21): a plain exercise's title is a chip too, so every title
-   is tapped the same way; the ⛓ mark sits only on a chain; the three buttons are named Replace,
-   Remove and Insert after; the search they open is titled "Replace Goblet squat" and "Chain after
-   Goblet squat", the way Insert's is titled "Insert after"; Remove on a one-chip title does what
-   Del does; the card's ↶ is the way to take an edit back; photos are the first movement's (§6).
-5. The planner's list does not list chains; the history does (§4). The pragmatic review says this
-   follows from D3 and is not a choice.
+   is tapped the same way, and it keeps its category in brackets while a chain's chips do not;
+   the ⛓ mark sits only on a chain; the three buttons are named Replace, Remove and Chain after,
+   the last named after the sheet it opens so it is not confused with the card's own Insert, which
+   adds a card; the search they open is titled after the chip as it reads; every edit goes
+   through `swapExercise`, so the written load leaves the line as after a swap; Replace keeps
+   Swap's pattern filter and Chain after searches everything; Remove on a one-chip title does
+   what Del does; the card's ↶ takes an edit back and only the header's Undo brings a removed
+   card back; photos are the first movement's (§6).
+5. The strength planner's list does not list chains; the history does (§4). The pragmatic review
+   says this follows from D3 and is not a choice.
 6. A chain built on the page keeps the sets its card had: an added exercise's default sets, or
    the coach's sets when she chains a written card (§6).
 7. The payload version stays 2 (§6). The pragmatic review calls this a fact, not a choice.
 8. No interview state file is written under `designs/`: the one written for the cycle
    retrospective was a stray. The pragmatic review says this is about a file the design does not
    write.
-9. The gear test for a chain the planner invents: the load words of each movement's gear must
-    have one in common, Dumbbells and Kettlebells read as one, a movement with no load word
-    skipped, a chain with none passes; machines and bands pass as any load word; no rule against
+9. The gear test for a chain the strength planner invents: the load words of each movement's
+   gear must have one in common, Dumbbells and Kettlebells read as one, a movement with no load
+   word skipped, a chain with none passes; machines and bands pass as any load word; no rule
+   against
     a repeated movement (§4). The pragmatic review cut the no-repeat rule.
 10. The science paragraph lives in `progression.md`, not in a file of its own (§4).
 
@@ -326,9 +342,10 @@ rule on each there. The choices below have no row of their own. Each is one line
   quotes and the test that pins it.
 - `strength/progression.md`: the section "A chain" and the amended no-pattern sentence.
 - `miniapp/logic.js`: `wordsOf`, `perSideOf`, `photosOf` read the parts; `replacePart`,
-  `removePart` and `insertPart` on a card. `miniapp/app.js` and `miniapp/index.html`: the chips
-  and the ⛓ mark in the card head, the three buttons under a tapped chip, the two search modes.
-  Tests in `miniapp/tests/logic.test.mjs`.
+  `removePart` and `chainAfter`, pure functions from a key and a pick to the new key, handed to
+  `swapExercise`. `miniapp/app.js`: the chips and the ⛓ mark in the card head, the three buttons
+  under a tapped chip, the two search modes. `miniapp/style.css`: the chip, the mark and the row
+  of three pills. `index.html` does not change. Tests in `miniapp/tests/logic.test.mjs`.
 - `scripts/migrate_exercise_names.py`: renames inside a chain key.
 - Docs: the recipe lines of `docs/ARCHITECTURE.md`; DESIGN_strength_tracking.md §4, §8, §9;
   DESIGN_exercise_table.md §4, §8, §9; DESIGN_gym_logger.md §1, §3, §4, each pointing here.
@@ -343,22 +360,22 @@ rule on each there. The choices below have no row of their own. Each is one line
 | D3 | Who composes | The strength planner composes; the science says what a good chain is; code checks known keys and shared gear | Most variety, the model's taste decides. Declined: a shipped list of chains; only chains written in preferences | Interview | 2026-10-18 |
 | D4 | History | A chain is its own exercise in the history; nothing lands under its movements | The load is the weakest movement's, so it says nothing about the others. Declined: under both with a marker; under the movements only | Interview | 2026-10-18 |
 | D5 | Variety | Handed to DESIGN_strength_rotation.md; the strength planner acts on what the brief asks, as for a requested exercise | A strength variability design is under way in the `strength-rotation` worktree. Declined here: new mesocycle (the author's recommendation); every session | Interview | 2026-10-18 |
-| D6 | Page | The athlete builds a chain from the search | She can invent a chain at the gym, and a repeated one becomes a habit the planner writes. Declined: read and log only (the author's recommendation); swap one movement, which D21 later brought back as part of the chips | Interview | 2026-10-18 |
-| D7 | Gear on the phone | No check on the page | She is holding the gear; the check guards the planner, which cannot see the gym. Declined: narrow the second pick; refuse and say why | Interview | 2026-10-18 |
+| D6 | Page | The athlete builds a chain from the search | She can invent a chain at the gym, and a repeated one becomes a habit the strength planner writes. Declined: read and log only (the author's recommendation); swap one movement, which D21 later brought back as part of the chips | Interview | 2026-10-18 |
+| D7 | Gear on the phone | No check on the page | She is holding the gear; the check guards the strength planner, which cannot see the gym. Declined: narrow the second pick; refuse and say why | Interview | 2026-10-18 |
 | D8 | Process | Commit, red team on Opus, commit, two reviewers on Opus and Fable, commit | The author's process preference | Interview | 2026-10-18 |
 | D9 | The joiner | `>`, not `+` | The history already prints alternated exercises as "A + B" and says so; a chain with the same sign reads as a pair taken in turns, and a pair as a chain (finding 1). Declined: alternation changes sign; both keep `+` told apart by spaces | Red Team | 2026-10-18 |
-| D10 | Habit vs check | A chain on the athlete's record passes the planner's check whatever its gear or a repeated movement | What she did is the proof; the check guards invented chains (finding 3). Built as: `_clean_exercise` reads the record only on a gear failure, and the preview keeps one line, reworded to be true for a chain; the pragmatic review cut the "which ground failed" plumbing and the no-repeat rule, and the author agreed. Declined: the page refuses what the check refuses; leave it with a true message | Red Team | 2026-10-18 |
+| D10 | Habit vs check | A chain on the athlete's record passes the strength planner's check whatever its gear or a repeated movement | What she did is the proof; the check guards invented chains (finding 3). Built as: `_clean_exercise` reads the record only on a gear failure, and the preview keeps one line, reworded to be true for a chain; the pragmatic review cut the "which ground failed" plumbing and the no-repeat rule, and the author agreed. Declined: the page refuses what the check refuses; leave it with a true message | Red Team | 2026-10-18 |
 | D11 | The watch | A chain is recorded from the page only; a watch-only athlete loses a prescribed chain after two weeks, listed in §7 | Both athletes log from the page; a chain offered by the naming question would store the watch's reps as rounds (finding 5). Declined: the naming question offers the day's chain; the naming question never offers a chain | Red Team | 2026-10-18 |
 | D12 | Merges | The merge script renames the parts of a chain key | Else a merge splits a chain's history and an old page's log is refused (finding 4); author's resolution | Red Team | 2026-10-18 |
-| D13 | Progression | A range of rounds kept like a rep range; the load holds at the top when no heavier implement exists; the range is the planner's to choose, no number in the science | The §2 story had raised the rounds, which `progression.md` forbids (finding 2); author's resolution; the pragmatic review cut the "three to eight" the author had written | Red Team | 2026-10-18 |
+| D13 | Progression | A range of rounds kept like a rep range; the load holds at the top when no heavier implement exists; the range is the strength planner's to choose, no number in the science | The §2 story had raised the rounds, which `progression.md` forbids (finding 2); author's resolution; the pragmatic review cut the "three to eight" the author had written | Red Team | 2026-10-18 |
 | D14 | Older sentences | Three sentences that said the opposite are amended in the same change | A prompt must not contradict itself (finding 6); author's resolution; the thorough review added the per-side hint and the pragmatic review cut it and the "a key is a category…" amendment as second homes of rules the paragraph already states | Red Team | 2026-10-18 |
-| D15 | Tags | A chain has none; `model_line` prints its key alone | The author had written the union of the movements' gear; the pragmatic review showed that "every item of the gear is needed" would then tell the planner a one-bell home lacks the gear for its own chain (finding 7, review); author's resolution | Red Team | 2026-10-18 |
+| D15 | Tags | A chain has none; `model_line` prints its key alone | The author had written the union of the movements' gear; the pragmatic review showed that "every item of the gear is needed" would then tell the strength planner a one-bell home lacks the gear for its own chain (finding 7, review); author's resolution | Red Team | 2026-10-18 |
 | D16 | Per side | Choice 4 of the first version stands: per side when any movement is; the §2 example is corrected and the two-handed oddity listed in §7; the prompt says so in one sentence | A rule that fits single-arm complexes (finding 8); the model's rounds must mean what the page prints (thorough review finding 1); author's resolution | Red Team | 2026-10-18 |
 | D17 | Alike words | Accepted; the stored key tells chains apart | Brackets for 37 ambiguous names would cost more than they give (finding 9); author's resolution | Red Team | 2026-10-18 |
 | D18 | `strength log` and `strength name` | No change to either; `similar` is left as it is | The substring match on words already finds a chain (finding 10); on a chain line `strength name` offers the first movement's category, which nobody meets in a normal week, so the guard the author had written was cut by the pragmatic review; author's resolution | Red Team | 2026-10-18 |
 | D19 | Going live | Steps 1 to 3 land as one branch, merged and pushed in the same sitting; no bot restart | The prompt is live at the merge, the page at the push, and a page in between stores rounds as per side (finding 11); author's resolution, collapsed to one line by the pragmatic review | Red Team | 2026-10-18 |
 | D20 | No cap | A chain holds two or more movements; no cap in the check or on the page; the science says usually three or four | Nothing technical needs a number: the key is text, the page composes what she taps, and a session full of long chains is already listed under not handled. The author had written two to four. Declined: a generous cap of six | Interview | 2026-10-19 |
-| D21 | The page | Every title is chips, one per movement, a chain marked ⛓; a tap on a chip offers Replace, Remove and Insert after right under it; no new card button, no footer button, no Done | Chosen from a mock-up of three shapes: the sheet with a second footer button (the design as reviewed), a ninth "Chain" button on each card (the pragmatic review's proposal), and the chips. The chain is edited where the chain is, and a chain starts from a plain exercise. Declined: the sheet; the pill | Interview | 2026-10-19 |
+| D21 | The page | Every title is chips, one per movement, a chain marked ⛓; a tap on a chip offers Replace, Remove and Chain after right under it; no new card button, no footer button, no Done | Chosen from a mock-up of three shapes: the sheet with a second footer button (the design as reviewed), a ninth "Chain" button on each card (the pragmatic review's proposal), and the chips. The chain is edited where the chain is, and a chain starts from a plain exercise. Declined: the sheet; the pill | Interview | 2026-10-19 |
 
 ## Dependency Graph & Implementation Order
 
@@ -370,16 +387,16 @@ vocabulary.parts + parse_log (1) ──> page (2) ──> planner (3) ──> me
    `words` and `side_mark` reading the parts; `parse_log` accepts a chain of known parts. Tests by
    shape in the vocabulary tests, a plain key being one part that reads as today, and one test on
    the log. Nothing writes a chain yet, and every reader is ready for one.
-2. **The page** (`logic.js`, `app.js`, `index.html`): the readers, the chips and the ⛓ mark, the
+2. **The page** (`logic.js`, `app.js`, `style.css`): the readers, the chips and the ⛓ mark, the
    three buttons under a tapped chip, the two search modes. Node tests for `wordsOf`, `perSideOf`
    and the three edits of a card's key. From here the athlete can build and log a chain, and the
    history shows it back.
-3. **The planner** (`planner_prompt.py`, `progression.md`): the paragraph, the amended sentences,
-   the section, the check, with tests on the §2 chain (passes: Kettlebells and Dumbbells read as
-   one), a barbell clean into a kettlebell swing (dropped), a bodyweight chain (passes), a dropped
-   chain that is on record (passes), and the reworded preview line in
-   `tests/test_strength_planner.py`. From here the planner writes chains. Steps 1 to 3 land as one
-   branch, merged and pushed in the same sitting (D19).
+3. **The strength planner** (`planner_prompt.py`, `progression.md`): the paragraph, the amended
+   sentences, the section, the check, with tests on the §2 chain (passes: Kettlebells and
+   Dumbbells read as one), a barbell clean into a kettlebell swing (dropped), a bodyweight chain
+   (passes), a dropped chain that is on record (passes), and the reworded preview line in
+   `tests/test_strength_planner.py`. From here the strength planner writes chains. Steps 1 to 3
+   land as one branch, merged and pushed in the same sitting (D19).
 4. **The merge script** (`scripts/migrate_exercise_names.py`): renames inside a chain key. Needed
    before the next table merge, not before the feature.
 5. **Docs.**
@@ -388,7 +405,7 @@ vocabulary.parts + parse_log (1) ──> page (2) ──> planner (3) ──> me
 
 - [ ] `vocabulary.py`: `CHAIN_MARK`, `parts`, `shared_load`; `words`, `side_mark`
 - [ ] `logger.py`: `parse_log` on a chain
-- [ ] `miniapp/logic.js`, `app.js`, `index.html`: readers, chips and the ⛓ mark, the three
+- [ ] `miniapp/logic.js`, `app.js`, `style.css`: readers, chips and the ⛓ mark, the three
       buttons under a tapped chip, the two search modes; node tests
 - [ ] `planner_prompt.py`: the paragraph, the two amended sentences, `_clean_exercise` on a
       chain and its tests, the preview line and its two tests
