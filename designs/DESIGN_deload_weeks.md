@@ -326,7 +326,8 @@ The page is published through the Pages deploy, which needs a push the author ap
    hold a deload in the middle of a mesocycle. Choices 1 and 11 already ask for the deload at
    the end, and one column makes that the only shape the data can hold. It removes a column,
    three of the four cases the check in §3.4 had to catch, the clip-or-drop question of
-   choice 4, and a sentence about where the ramp resumes. What the athlete loses: a six-week
+   choice 4 for a deload that overran its mesocycle's end, and a sentence about where the
+   ramp resumes. What the athlete loses: a six-week
    mesocycle with its deload in week 3 becomes two three-week mesocycles, with the same
    sessions and two strip colours, and one more "how did it go?" question, since each
    finished mesocycle but the plan's last gets one (`cycle_records.py`), and one more
