@@ -117,8 +117,11 @@ movements has none.
 with " → ": the key above reads "one arm swing → single arm dumbbell clean → goblet squat". Each
 movement gives the words after its category, or all of them when it has none, which is what the
 page's `nameAfterCategory` already does. The category is the first half of a key's words, "squat:
-goblet squat", and three categories in one line would say nothing a reader wants. Dropping the
-category makes a few chains read alike (§7).
+goblet squat", and three categories in one line would say nothing a reader wants. A movement
+keeps its category when its bare name belongs to more than one class of the table (D23): a chain
+holding the cable face pull reads "row: face pull → …", because the band one is a face pull too.
+The table holds 37 such names. The set of shared names is read from the table once, in Python
+and on the page alike.
 
 **Per side.** A chain is done one side at a time when any of its movements is. Its reps are then
 per side and a set is both sides, printed "3×5/side", exactly as DESIGN_strength_tracking.md §4
@@ -223,7 +226,8 @@ it from her sessions after two such weeks (§7).
 **Drawing a chain.** A chain is one card like any card. Every card's title is chips. A plain
 exercise's title is one chip that reads as its card reads today, "[Squat] Goblet squat", category
 and all. A chain's title opens with the chain mark ⛓ and holds one chip per movement, each the
-words after the category as a chain's words are everywhere (§3), with " → " between them.
+words after the category as a chain's words are everywhere (§3), with " → " between them; a
+movement whose bare name is shared keeps its brackets, "[Row] Face pull" (D23).
 `wordsOf` splits the key on `>` for the chips and for every other place the words are printed.
 `perSideOf` is true when any part is, so the reps boxes say "/side" as for any one-sided
 exercise. `photosOf` shows the first movement's photos. `patternOf` is already null for any key
@@ -288,9 +292,6 @@ Each is a case a plausible athlete rarely meets, left out on purpose with the be
 - A chain holding one two-handed movement and one per-side movement is per side as a whole (§3):
   "kettlebell swing → kettlebell halo" at 8 rounds a side is 16 swings a set. The notes say how
   the sides are done, and the athlete who means 8 swings logs 4 a side.
-- Two chains of different implements can read alike once the categories are dropped: a band curl
-  into a band front raise and the dumbbell pair both read "Curl → Front raise". The stored key
-  tells them apart, and the athlete knows what she picked.
 
 ## 8. Choices made without you
 
@@ -304,7 +305,8 @@ rule on each there. The choices below have no row of their own. Each is one line
    planner reads, as any brief is (§4).
 3. The notes name a chain in words and say how the sides are done (§4).
 4. Inside the page shape you chose (D21): a plain exercise's one chip keeps its category in
-   brackets while a chain's chips drop theirs; the third button is named Chain after, after the
+   brackets while a chain's chips drop theirs unless the bare name is shared (D23); the third
+   button is named Chain after, after the
    sheet it opens, so it is not confused with the card's own Insert, which adds a card; Replace
    and Remove on a one-chip title are Swap and Del; photos are the first movement's (§6). The
    rest of §6 follows from reusing Swap and Insert and is not a choice.
@@ -319,14 +321,12 @@ rule on each there. The choices below have no row of their own. Each is one line
    word skipped, a chain with none passes; machines and bands pass as any load word; no rule
    against a repeated movement (§4). The pragmatic review cut the no-repeat rule.
 9. The science paragraph lives in `progression.md`, not in a file of its own (§4).
-10. A card edited by its chips is treated as a swapped card: it keeps its sets, ticked or not,
-    with their reps and kilograms, and the written load leaves its line, as after Swap and as on
-    a log reopened from the calendar. §7 says what that does to sets already ticked (§6).
 
 ## 9. Where the code goes
 
 - `strength/vocabulary.py`: `CHAIN_JOINER`, the `>`; `parts(key)`, `shared_load(parts)` for the
-  check; `words` and `side_mark` read the parts.
+  check; `shared_names()`, the bare names that belong to more than one class, read from the
+  table once; `words` and `side_mark` read the parts.
 - `strength/logger.py`: `parse_log` checks the parts.
 - `strength/planner_prompt.py`: the paragraph in CHOOSING THE EXERCISES and the two amended
   sentences; `_clean_exercise` resolves and checks a chain, reading `sets.own_exercises` on a
@@ -334,7 +334,8 @@ rule on each there. The choices below have no row of their own. Each is one line
   quotes and the test that pins it.
 - `strength/progression.md`: the section "A chain" and the amended no-pattern sentence.
 - `miniapp/logic.js`: `wordsOf`, `perSideOf`, `photosOf` read the parts, and `chipsOf` gives
-  the chips their names, one per part, which `wordsOf` joins; `replacePart`, `removePart` and
+  the chips their names, one per part, which `wordsOf` joins, keeping the brackets on a shared
+  name from a set built from the catalog once; `replacePart`, `removePart` and
   `chainAfter`, pure functions from a key and a pick to the new key, handed to `swapExercise`.
   `miniapp/app.js`: the chips and the ⛓ mark in the card head, the three buttons
   under a tapped chip, the two search modes. `miniapp/style.css`: the chip, the mark and the row
@@ -364,11 +365,13 @@ rule on each there. The choices below have no row of their own. Each is one line
 | D14 | Older sentences | Three sentences that said the opposite are amended in the same change | A prompt must not contradict itself (finding 6); author's resolution; the thorough review added the per-side hint and the pragmatic review cut it and the "a key is a category…" amendment as second homes of rules the paragraph already states | Red Team | 2026-10-18 |
 | D15 | Tags | A chain has none; `model_line` prints its key alone | The author had written the union of the movements' gear; the pragmatic review showed that "every item of the gear is needed" would then tell the strength planner a one-bell home lacks the gear for its own chain (finding 7, review); author's resolution | Red Team | 2026-10-18 |
 | D16 | Per side | Choice 4 of the first version stands: per side when any movement is; the §2 example is corrected and the two-handed oddity listed in §7; the prompt says so in one sentence | A rule that fits single-arm complexes (finding 8); the model's rounds must mean what the page prints (thorough review finding 1); author's resolution | Red Team | 2026-10-18 |
-| D17 | Alike words | Accepted; the stored key tells chains apart | Brackets for 37 ambiguous names would cost more than they give (finding 9); author's resolution | Red Team | 2026-10-18 |
+| D17 | Alike words | Accepted at first; the stored key tells chains apart. Reversed by D23 | Brackets for 37 ambiguous names would cost more than they give (finding 9); author's resolution, overruled on 2026-10-19 | Red Team | 2026-10-18 |
 | D18 | `strength log` and `strength name` | No change to either; `similar` is left as it is | The substring match on words already finds a chain (finding 10); on a chain line `strength name` offers the first movement's category, which nobody meets in a normal week, so the guard the author had written was cut by the pragmatic review; author's resolution | Red Team | 2026-10-18 |
 | D19 | Going live | Steps 1, 2a and 3 land as one branch, merged and pushed in the same sitting; no bot restart; the chips follow as a branch of their own | The prompt is live at the merge, the page at the push, and a page in between stores rounds as per side (finding 11); author's resolution, collapsed to one line by the pragmatic review | Red Team | 2026-10-18 |
 | D20 | No cap | A chain holds two or more movements; no cap in the check or on the page; the science says usually three or four | Nothing technical needs a number: the key is text, the page composes what she taps, and a session full of long chains is already listed under not handled. The author had written two to four. Declined: a generous cap of six | Interview | 2026-10-19 |
 | D21 | The page | Every title is chips, one per movement, a chain marked ⛓; a tap on a chip offers Replace, Remove and Insert after right under it, the last named Chain after by §8 choice 4; no new card button, no footer button, no Done | Chosen from a mock-up of three shapes: the sheet with a second footer button (the design as reviewed), a ninth "Chain" button on each card (the pragmatic review's proposal), and the chips. The chain is edited where the chain is, and a chain starts from a plain exercise. Declined: the sheet; the pill | Interview | 2026-10-19 |
+| D22 | Ticked sets | A card edited by its chips keeps its sets, ticked or not, as a swapped card does; the written load leaves its line | The user wants to be able to tweak what was done, even after the fact. Declined: a card with ticked sets is left alone and a copy is chained | Interview | 2026-10-19 |
+| D23 | Shared names | In a chain's words, a movement whose bare name belongs to more than one class keeps its category; the rest drop it | On the screen a bare "Face pull" cannot be told from the band one, though the stored key can. Declined: the category on every chip; the full name only when the chip is tapped; accepting it (D17) | Interview | 2026-10-19 |
 
 ## Dependency Graph & Implementation Order
 
@@ -402,7 +405,8 @@ vocabulary.parts + parse_log (1) ──> page readers (2a) ──> strength plan
 
 ## Checklist
 
-- [ ] `vocabulary.py`: `CHAIN_JOINER`, `parts`, `shared_load`; `words`, `side_mark`
+- [ ] `vocabulary.py`: `CHAIN_JOINER`, `parts`, `shared_load`, `shared_names`; `words`,
+      `side_mark`
 - [ ] `logger.py`: `parse_log` on a chain
 - [ ] `miniapp/logic.js`: the readers, `chipsOf`; node tests (branch one)
 - [ ] `miniapp/logic.js`, `app.js`, `style.css`: chips and the ⛓ mark, the three buttons under a
