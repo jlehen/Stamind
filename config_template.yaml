@@ -147,9 +147,10 @@ coach:
 #    # From this time to morning_time the bot sends nothing on its own: no queued question
 #    # and no change to the week. `settings set evening-time` overrides it live.
 #    evening_time: "21:00"
-#    # Ask the coach first, so the push accounts for overnight signals. A session it would
-#    # change follows as a proposal the athlete answers with a tap. Costs one LLM call
-#    # every morning.
+#    # Ask the week planner first, so the push accounts for overnight signals, on the
+#    # mornings when something is new or the night is not normal. A session it would
+#    # change follows as a proposal the athlete answers with a tap. Costs at most one LLM
+#    # call a morning.
 #    adapt_first: false
 #  # When you change the athlete's week from the terminal, they are told at their next
 #  # morning time. A change to one of today's sessions cannot wait that long, so it goes

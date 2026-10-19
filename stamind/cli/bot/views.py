@@ -13,7 +13,7 @@ normal (DESIGN_quiet_morning.md §2), and saves what it would change as a propos
 (DESIGN_waiting_proposal.md §5); `bot changes` marks each line told as it prints it.
 """
 import argparse
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from stamind import heads_up, journal, runtime, settings
@@ -172,17 +172,14 @@ def _asks(date_str: str) -> bool:
             return True
         reasons = picture.news(runtime.db, before, picture.take(runtime.db, date_str))
         graded = picture.nights(runtime.db, before["night"], date_str)
-        reasons += [
-            f"{date.fromisoformat(day):%A}'s night is not normal: {', '.join(off)}"
-            for day, off in graded.items() if off
-        ]
+        reasons += [why for why in graded.values() if why]
+        since = picture.taken(before)
     except Exception as e:
         _warn_quietly(f"Asking the week planner: the gate failed: {e}")
         return True
     if reasons:
         step("Asking the week planner: " + "; ".join(reasons))
         return True
-    since = picture.taken(before)
     if graded:
         step(f"Quiet morning: the night is normal and nothing is new since {since}")
     else:

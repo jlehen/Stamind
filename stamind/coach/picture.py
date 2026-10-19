@@ -31,10 +31,15 @@ def _day(day: str) -> str:
     return f"{date.fromisoformat(day):%A}"
 
 
+def _window_start(day: str) -> str:
+    """The first day of the metrics window a run evaluated on `day` reads."""
+    return shift(day, 1 - config.metrics_lookback_days)
+
+
 def take(db: Any, day: str) -> Dict[str, Any]:
     """The picture of a run evaluated on `day`: the keys of the table in §3, read the way
     `workout_adapt` reads them. `at` is when it was taken, for the journal line."""
-    start = shift(day, 1 - config.metrics_lookback_days)
+    start = _window_start(day)
     meso = db.get_active_mesocycle(day)
     range_end = meso["end_date"] if meso else day
     nights = [
@@ -102,17 +107,14 @@ def _new_activities(
             return activity_load(act) >= threshold
         return verdict["status"] != "done" or bool(verdict["reasons"])
 
-    start = shift(now["date"], 1 - config.metrics_lookback_days)
     return [
         f"a new activity on {_day(a['date'])}: {a.get('activity_name') or a['activity_type']}"
-        for a in db.get_completed_activities(start, now["date"])
+        for a in db.get_completed_activities(_window_start(now["date"]), now["date"])
         if a["activity_id"] in fresh and is_new(a)
     ]
 
 
-def _missed(
-    db: Any, since: str, today: str, verdicts: Dict[int, Dict[str, Any]]
-) -> List[str]:
+def _missed(db: Any, since: str, today: str, verdicts: Dict[int, Dict[str, Any]]) -> List[str]:
     """The sessions dated from the last run's day to yesterday with the verdict missed (§3)."""
     return [
         f"{_day(w['date'])}'s {w['title']} is missed"
@@ -131,9 +133,7 @@ def _strength_work(db: Any, now: Dict[str, Any]) -> bool:
     return strength_planner.has_work(live, now["date"], range_end)
 
 
-def news(
-    db: Any, before: Dict[str, Any], now: Dict[str, Any]
-) -> List[str]:
+def news(db: Any, before: Dict[str, Any], now: Dict[str, Any]) -> List[str]:
     """Each difference between the last run's picture and the fresh one, named, and the
     strength planner's work test (§3). Empty when nothing is new."""
     verdicts = adherence_verdicts(db, before["date"], now["date"], now["date"])
@@ -157,23 +157,26 @@ def news(
     return reasons
 
 
-def nights(db: Any, since: Optional[str], today: str) -> Dict[str, List[str]]:
-    """Each day after `since`, up to today, that has a sleep score, with what is not normal
-    about it: HRV suppressed, resting HR elevated or sleep poor, by the verdicts `status`
-    colours with (§4). A day without a sleep score is unknown and is not graded."""
-    start = shift(since, 1) if since else shift(today, 1 - config.metrics_lookback_days)
-    graded: Dict[str, List[str]] = {}
+def nights(db: Any, since: Optional[str], today: str) -> Dict[str, str]:
+    """Each day after `since`, up to today, that has a sleep score, with the sentence that
+    says what is not normal about it, or "" for a normal night: HRV suppressed, resting HR
+    elevated or sleep poor, by the verdicts `status` colours with (§4). A day without a
+    sleep score is unknown and is not graded."""
+    start = shift(since, 1) if since else _window_start(today)
+    graded: Dict[str, str] = {}
     for row in db.get_metrics_cache(start_date=start, end_date=today):
         if row.get("sleep_score") is None:
             continue
         baseline = db.get_baseline(row["date"])
         off = []
-        for kind, label, value in (
-            ("hrv", "HRV", row.get("hrv")), ("rhr", "resting HR", row.get("rhr")),
-            ("sleep", "sleep", row.get("sleep_score")),
+        for kind, label, value, bad in (
+            ("hrv", "HRV", row.get("hrv"), "suppressed"),
+            ("rhr", "resting HR", row.get("rhr"), "elevated"),
+            ("sleep", "sleep", row.get("sleep_score"), "poor"),
         ):
-            verdict = classify_metric(kind, value, baseline)
-            if is_anomalous(verdict):
-                off.append(f"{label} {verdict}")
-        graded[row["date"]] = off
+            if is_anomalous(classify_metric(kind, value, baseline)):
+                off.append(f"{label} {bad}")
+        graded[row["date"]] = ""
+        if off:
+            graded[row["date"]] = f"{_day(row['date'])}'s night is not normal: {', '.join(off)}"
     return graded

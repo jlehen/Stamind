@@ -1494,14 +1494,11 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    (DESIGN_waiting_proposal.md §2, §3, §6, §7).
 8. Apply, no-change and save each write the run's picture to the `settings` row
    `adapt_last_seen` when the run was evaluated on today (`picture.remember`). With
-   `adapt-first` on, the morning push (`cli/bot/views.py:_asks`) runs `workout adapt`
-   only when a fresh picture differs from it (`picture.news`: a non-clean activity, a
-   missed session, a session written by something other than the week planner, a changed
-   constraint, signal, plan, goal, benchmark, profile or science document, or the strength
-   planner's `has_work`), or a night since the last one in hand is not normal
-   (`picture.nights`, graded after the forced pull). Otherwise the morning is quiet: no
-   model call, no change row, one journal `note`. No picture, a broken one or an error in
-   the gate asks and journals a warning (DESIGN_quiet_morning.md §2–§6).
+   `adapt-first` on, the morning push (`cli/bot/views.py:_asks`) runs `workout adapt` only
+   when a fresh picture differs from it (`picture.news`, the table in
+   DESIGN_quiet_morning.md §3), or a night since the last one in hand is not normal
+   (`picture.nights`, after the forced pull, §4). Otherwise the morning is quiet, with one
+   journal `note`; a missing or broken picture or an error in the gate asks (§5, §6).
 
 ### A change on request (`workout tweak`)
 

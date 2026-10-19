@@ -86,8 +86,9 @@ work, the morning runs. This also covers a strength day with a brief and no exer
 **A clean activity is not new.** An activity is clean when the coach has nothing to look at in
 it: it matched no session and its load is below `coach.minor_activity_load_threshold`, the
 cut `unplanned_kind` uses to grey an activity out in `status`; or it matched a planned session
-with the verdict done and no reason attached, so no load mismatch, not cut short, not "felt
-harder than measured". A matched activity is never minor: a 60-minute run stopped after 12
+with the verdict done and no reason attached, so no duration or load mismatch and, for a gym
+session with planned lines, no sets short of the grade. A matched activity is never minor: a
+60-minute run stopped after 12
 minutes with a tight calf has a small load and the verdict partial, and it is new. It is
 Thursday 15 October. Wednesday's 85-minute ride matched its session and was done. The morning
 is quiet. It is Friday 9 October. Thursday's three-hour hike broke a planned rest day. The

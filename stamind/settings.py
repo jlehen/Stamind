@@ -276,7 +276,10 @@ SETTINGS: List[Setting] = [
         name=ADAPT_FIRST,
         key="push_adapt_first",
         group="Morning push",
-        summary="Ask the coach before the push and propose its changes (one LLM call a morning)",
+        summary=(
+            "Ask the week planner before the push when something is new, and propose its "
+            "changes (at most one LLM call a morning)"
+        ),
         value_hint="on|off",
         parse=parse_switch,
         config_path=("telegram", "push", "adapt_first"),

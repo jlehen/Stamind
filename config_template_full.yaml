@@ -211,9 +211,10 @@ telegram:
     # question while the athlete is writing or tapping (DESIGN_athlete_queue.md §13.2).
     # Seeds `settings set evening-time`.
     evening_time: "21:00"
-    # Ask the coach before writing the push, so it accounts for overnight signals. A session
-    # it would change follows the push as a proposal the athlete accepts or declines with a
-    # tap. Costs one LLM call every morning.
+    # Ask the week planner before writing the push, so it accounts for overnight signals, on
+    # the mornings when something is new or the night is not normal. A session it would
+    # change follows the push as a proposal the athlete accepts or declines with a tap.
+    # Costs at most one LLM call a morning.
     adapt_first: false
   # A change you make to the athlete's week from the terminal reaches them at their next
   # morning time (DESIGN_change_heads_up.md §4). A change to one of today's sessions cannot

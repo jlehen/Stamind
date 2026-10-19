@@ -31,11 +31,11 @@ def add_bot_parser(subparsers):
             "rest-day line — and emit the follow-up button row. Records "
             "push_morning_last in the settings table and exits silently when already "
             "sent today, so the bot's scheduler can fire it repeatedly without "
-            "double-sending. With telegram.push.adapt_first, asks the coach first, "
-            "unless it already ran today with last night's sleep score in hand and "
-            "nothing has been trained since. A session the coach would change is sent "
-            "after the briefing as a proposal the athlete answers with a tap; nothing is "
-            "written before that."
+            "double-sending. With telegram.push.adapt_first, asks the week planner first "
+            "when something is new since the last workout adapt run or a night since "
+            "then is not normal (DESIGN_quiet_morning.md). A session it would change is "
+            "sent after the briefing as a proposal the athlete answers with a tap; "
+            "nothing is written before that."
         ),
     )
     b_morning.set_defaults(func=run_bot_morning)
