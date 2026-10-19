@@ -90,8 +90,8 @@ deload_start, and it runs to the mesocycle's end date. Place each deload by coun
 loading weeks since the athlete's last lighter week, read from the weekly load lines in
 PRIOR TRAINING REVIEW and the deloads in PREVIOUS PERIODIZATION STRATEGY, and carry that
 count across every mesocycle boundary. When the count brings a deload forward, shorten the
-mesocycle so that it ends with the deload. This does not apply to the mesocycle under way,
-whose dates are kept.
+mesocycle so that it ends with the deload. For the mesocycle under way, keep its start date
+and end it earlier instead.
 ```
 
 `plan generate` already has the numbers. Its prompt section PRIOR TRAINING REVIEW shows each
@@ -122,8 +122,19 @@ unchanged or to discard it. That section gains a line `Deload: from 2026-11-02`,
 ```
 Its deload follows one rule. A deload whose first day is on or before today stays as it is:
 the athlete is in it. If its deload has not started, or it has none, give this mesocycle its
-deload by the counting rule, starting today or later.
+deload by the counting rule, starting today or later. To bring its deload forward, end this
+mesocycle on the deload's last day, earlier than its original end date. Its start date, name
+and focus stay unchanged, and your next mesocycle starts the day after.
 ```
+
+The bullet of that section that asks for "its original end date" gains "unless you end it
+earlier to bring its deload forward". The start date is the part that must not move:
+mesocycles own their sessions by the dates they contain, keyed on the start
+(DESIGN_mesocycle_progress.md §7). It is Thursday 22 October, and HIIT Block 1, 19 October
+to 8 November, has no deload date. The count says a deload is overdue. The model ends HIIT
+Block 1 on Sunday 1 November with its deload from Monday 26 October, and the next mesocycle
+starts on 2 November. Without the earlier end, the only deload the model could give it would
+run from today to 8 November, eighteen days, or start a week late.
 
 It is Wednesday 4 November, 09:00, and the deload runs from Monday 2 to Sunday 8 November.
 The athlete edits a goal and runs `plan generate`, which keeps the mesocycle. The deload has
@@ -134,9 +145,11 @@ with its mesocycle, which is then no longer under way.
 `plan_generate` (`coach/service/planning.py`) holds the first half in code, because this is
 the one place where a wrong answer rewrites the past. When the model returns a mesocycle
 with the start date of the mesocycle under way, and that mesocycle's stored deload has
-started, the stored `deload_start` is copied onto it, whatever the model returned. "Today"
-is `clock.today_str()`, the athlete's day in the instance's time zone. The copy happens
-before the preview, so the preview shows what will be saved.
+started, the stored `deload_start` and `end_date` are copied onto it, whatever the model
+returned: a started deload stays as it is only if its mesocycle's last day stays too. If the
+model's next mesocycle then overlaps, the repair pass of §3.4 moves its start, with its usual
+note. "Today" is `clock.today_str()`, the athlete's day in the instance's time zone. The copy
+happens before the preview, so the preview shows what will be saved.
 
 The section exists only for a mesocycle that started before today. On Monday 19 October the
 new mesocycle starts that day, so nothing is under way and §3.2 alone applies. The same
@@ -248,7 +261,7 @@ it still shows how each session went against its plan.
   mesocycle with a deload one more key, `"d": "2026-11-02"`. `header`, in
   `cli/render/calendar_page.py`, builds both the button's snapshot and the index file in the
   bucket, so both carry `d`. The snapshot version stays 1: a page that does not know the key
-  ignores it. The key costs about 32 bytes per mesocycle with a deload, and `fit` keeps the
+  ignores it. The key costs about 18 bytes per mesocycle with a deload, and `fit` keeps the
   snapshot inside the 5 KB budget, as it does today.
 - **The page** (`miniapp/calendar_logic.js`) counts a day as a deload day when it falls from
   `d` to `e`, the mesocycle's last day, the way it already finds the day's mesocycle. `calendar.js`
@@ -263,10 +276,20 @@ The page is published through the Pages deploy, which needs a push the author ap
 - **`sm calendar`** prints `── Deload Mon 2 Nov to Sun 8 Nov` under the week the deload
   starts in, the way it already prints `── <name> starts Thu 1 Oct`
   (`cli/render/calendar_grid.py`).
-- **`plan generate`'s preview and `plan show`** print a `Deload` line with the dates under the
-  mesocycle's head (`cli/plans/generate.py`, `cli/plans/show.py`). The athlete accepts a plan
-  after seeing where its deloads fall. The preview prints `Deload: none` under a mesocycle
-  without one, so a model that ignores the key is noticed before the plan is accepted.
+- **`plan generate`'s preview and `plan show`** print a `Deload` line with the dates and the
+  length in days under the mesocycle's head, `Deload Mon 2 Nov to Sun 8 Nov (7 days)`
+  (`cli/plans/generate.py`, `cli/plans/show.py`). The athlete accepts a plan after seeing
+  where its deloads fall, and a `deload_start` written two weeks early shows as a 21-day
+  deload. The preview prints `Deload: none` under a mesocycle without one, so a model that
+  ignores the key is noticed before the plan is accepted.
+- **After a plan is applied**, `plan generate` names the command that rewrites the sessions
+  already written. It is Monday 26 October, the schedule is written to Sunday 15 November,
+  and a replan dates a deload from 26 October to 1 November. The calendar draws that week
+  pale at once, over the intervals the old plan wrote. A bare `workout generate` starts the
+  day after the written schedule ends (`cli/workouts/generate.py::_resolve_span`), so it
+  would never reach that week. When sessions are written past today
+  (`cli/runway.py::schedule_coverage`), the closing line becomes: "Sessions are written up to
+  Sun 15 Nov under the old plan. Run `workout generate -g` to rewrite them under this one."
 - **`plan diff`** reports a deload added, removed or moved as a field change of that
   mesocycle: the column joins the field list `plan_versions.py::_diff_mesocycle_pair`
   compares.
@@ -281,11 +304,11 @@ The page is published through the Pages deploy, which needs a push the author ap
 - **A run of loading weeks older than the mesocycle that finished last.** `plan generate`
   sees it only as a short record, so the count can come out short and the deload lands a
   week late.
-- **A later goal's plan.** It is counted from the plan before it, since those weeks are not
-  trained yet.
-- **A past deload from a plan version since replaced.** The calendar draws only the active
-  plan's mesocycles, so after a replan the days before the new plan lose their strip, a
-  deload's paler strip included, as every strip does today.
+- **A later goal's plan.** Its weeks are not trained yet. Only a goal with no plan of its own
+  yet is shown the plan before it, in PREVIOUS PERIODIZATION STRATEGY; a replan of it sees
+  its own previous version, so its count starts on its own first day. After a race with a
+  taper that costs nothing, but after a training horizon, which has no taper, the count
+  restarts.
 
 ## 7. Choices made without asking
 
@@ -300,20 +323,34 @@ The page is published through the Pages deploy, which needs a push the author ap
    three of the four cases the check in §3.4 had to catch, the clip-or-drop question of
    choice 4, and a sentence about where the ramp resumes. What the athlete loses: a six-week
    mesocycle with its deload in week 3 becomes two three-week mesocycles, with the same
-   sessions and two strip colours. Both versions keep the deload out of a per-week flag,
-   which would need the code to decide what a week is: the mesocycle before today started on
-   a Thursday.
+   sessions and two strip colours, and one more "how did it go?" question, since each
+   finished mesocycle but the plan's last gets one (`cycle_records.py`), and one more
+   boundary week for BENCHMARK PLACEMENT to weigh. Both versions keep the deload out of a
+   per-week flag, which would need the code to decide what a week is: the mesocycle before
+   today started on a Thursday.
 3. **Only `plan generate` writes the date.** No code guesses a deload from the load or from a
    mesocycle's name, and old plans are not backfilled.
 4. **A deload whose first day falls outside its mesocycle is dropped with a note**, not moved
    (§3.4). *An objection from the review* proposed clipping a deload that overran its
    mesocycle, since the note prints only after the athlete has answered yes to "Apply?". With
    one column a deload cannot overrun its mesocycle's end, so there is nothing left to clip.
+   *Objection from the second review:* the repair pass can still move a mesocycle's start
+   past its deload's first day. A Recovery mesocycle written from Sunday 25 October, the race
+   mesocycle's last day, has its start moved to Monday 26 October, and its deload from 25
+   October is dropped: the week after the race is told it has no deload. Moving the deload's
+   first day to the mesocycle's first day keeps the week a deload, at the cost of one `max`.
+   If taken, §3.4 reads: "The same pass, once the mesocycle's dates are repaired, moves a
+   deload whose first day falls before its mesocycle's first day to that first day, and drops
+   one whose first day is not a `YYYY-MM-DD` date or falls after the mesocycle's last day.
+   Each prints a note in the same form." §10's first bullet and the DOMAIN_MODEL.md invariant
+   in §8 follow the same wording.
 5. **The deload of the mesocycle under way can be re-dated by a replan only before it
-   starts** (§3.3), even though its name, dates and focus are kept. *Narrowed by the
+   starts** (§3.3), even though its name, start date and focus are kept. *Narrowed by the
    review:* the first version let a replan move a deload that had already started, which
    could erase half a deload the athlete was in. A started deload stays, in the prompt and in
-   code.
+   code. *Changed by the second review:* a kept mesocycle may end earlier than its original
+   end date to bring its deload forward. With one date column this is the only way a replan
+   can bring the deload of the mesocycle under way forward.
 6. **A paler strip, at 40% opacity, not a new tint.** The tint already means "how did this
    session go". A dashed strip would be easier for colour-blind readers, but the author asked
    for a colour.
@@ -333,6 +370,18 @@ The page is published through the Pages deploy, which needs a push the author ap
     fitness test to the deload's last day. That changes BENCHMARK PLACEMENT, the warning for
     a boundary week without a test, DESIGN_benchmark_workouts.md and
     DESIGN_mesocycle_progress.md §4.1.
+12. **A past deload keeps its paler strip only while the plan version that dated it is
+    active.** Added by the second review. The calendar draws only active plan versions
+    (`db/mesocycles.py::_get_covering_mesocycles`), so every `plan generate`, step 7 on the
+    build day included, takes the strip off the days before the new plan, as it does for
+    every strip today. When the replan keeps the mesocycle under way, the strip goes up to the
+    day before that mesocycle, which is where the previous mesocycle's deload was. It is
+    Friday 13 November, the athlete replanned on Thursday, and the deload of 26 October to 1
+    November no longer shows. The other way: each mesocycle's retrospective record also keeps
+    its `deload_start`, and the calendar draws the days before the active plan from the
+    records. That costs a column on `retrospectives`, the field in both record writers, a
+    past list in `calendar_days.gather`, and keeping the strip colours of the calendar and the
+    "Goals & plan" page in step. It brings back every past strip, deload or not.
 
 ## 8. Amendments to other documents
 
@@ -344,6 +393,10 @@ Applied in the build commit, so no document describes behaviour the code does no
   prompt. The fixed-rhythm clause now sits in `periodization.md`'s counting rule, where `plan
   generate` reads it." §4 asks for two things instead of three: the sentence "treat a clear
   dip in an elapsed week as the deload already taken" goes, with a pointer to this design.
+- **DESIGN_mesocycle_progress.md** §7 gets an amendment too: "Amendment, 2026-10-19. A kept
+  mesocycle may now end earlier than its original end date, when `plan generate` brings its
+  deload forward (DESIGN_deload_weeks.md §3.3). Its start date, which everything in this
+  section keys off, stays."
 - **DESIGN_calendar_miniapp.md.** §1's strip paragraph and §3.1's third item say a deload day's
   strip is paler and the legend gives the deload its own row. §5's snapshot shape shows `d`,
   with one bullet: "`d` is the first day of the mesocycle's deload, which runs to `e`, when
@@ -366,10 +419,12 @@ DESIGN_plan_change_continuity.md.
 ## 9. Build order
 
 1. The column: `db/schema.py`, `types.py::Mesocycle`, `save_macrocycle`, the entry in
-   `scripts/migrate_calendar_columns.py`.
+   `scripts/migrate_calendar_columns.py`, and that script's docstring and closing message,
+   which say "two" and "both".
 2. `plan generate`: the guideline rule (§3.1), the TASK sentences and the response key
    (§3.2), the mesocycle under way and the copy-back in `plan_generate` (§3.3), the check
-   (§3.4), and the preview's `Deload` line (§5.2), where the author checks this step's output.
+   (§3.4), the preview's `Deload` line, where the author checks this step's output, and the
+   line printed after the plan is applied (§5.2).
 3. The model calls: `mesocycle_text` and its four callers, `workout generate`'s TASK wording,
    the deleted paragraph (§4.2).
 4. The terminal: `plan show`, `plan diff`, `sm calendar` (§5.2).
@@ -385,8 +440,10 @@ DESIGN_plan_change_continuity.md.
 - The repair pass drops a deload whose first day is outside its mesocycle or is not a
   `YYYY-MM-DD` date, and names it in its note.
 - `save_macrocycle` stores the date, and the mesocycle reads back with it.
-- `plan_generate` copies a started deload of the mesocycle under way back onto the kept
-  mesocycle, and leaves a deload still ahead as the model returned it.
+- `plan_generate` copies a started deload's first day and its mesocycle's end date back onto
+  the kept mesocycle, and leaves a deload still ahead as the model returned it.
+- `plan generate` names `workout generate -g` after applying a plan when sessions are written
+  past today.
 - `mesocycle_text` ends its line with the deload when there is one, and not otherwise.
 - The guessing paragraph is gone from the CONTINUING A MESOCYCLE section. The
   `assertIn("deload", task)` in `tests/test_mesocycle_progress.py` goes with it.
