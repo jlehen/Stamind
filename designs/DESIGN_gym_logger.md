@@ -96,6 +96,10 @@ the session as the page holds it, so the athlete can paste the day's workout ahe
 once a set is ticked it copies only the ticked sets, the way the log does. A phone that
 refuses the clipboard gets the same sheet the log uses, with the text to select by hand.
 
+A card's title is chips, one per movement. A tap on a chip boxes it with Replace, Remove and
+Insert after, and Insert after on a plain exercise starts a chain: several movements done back
+to back as one set, drawn and logged as one card (DESIGN_strength_combos.md §6).
+
 The next morning the pull finds Garmin's activity for that day. Instead of reading
 Garmin's sets, half of them unnamed, it hands the logged sets to that activity. Garmin
 supplies heart rate, duration and RPE; the log supplies the sets. Nothing is asked.

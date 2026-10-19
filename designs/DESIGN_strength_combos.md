@@ -411,7 +411,7 @@ vocabulary.parts + parse_log (1) ──> page readers (2a) ──> strength plan
       `side_mark`
 - [x] `logger.py`: `parse_log` on a chain
 - [x] `miniapp/logic.js`: the readers, `chipsOf`; node tests (branch one)
-- [ ] `miniapp/logic.js`, `app.js`, `style.css`: chips and the ⛓ mark, the three buttons under a
+- [x] `miniapp/logic.js`, `app.js`, `style.css`: chips and the ⛓ mark, the three buttons under a
       tapped chip, the two search modes, the three key edits; node tests (branch two)
 - [x] `planner_prompt.py`: the paragraph, the two amended sentences, `_clean_exercise` on a
       chain and its tests, the preview line and its two tests

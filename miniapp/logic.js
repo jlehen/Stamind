@@ -652,6 +652,26 @@ export function partsOf(key) {
   return key.split(CHAIN_JOINER);
 }
 
+// The three edits a tapped chip offers (DESIGN_strength_combos.md §6): each takes the card's key
+// and the index of the tapped movement, and gives the key the page hands to `swapExercise`.
+export function replacePart(key, part, pick) {
+  const parts = partsOf(key);
+  parts[part] = pick;
+  return parts.join(CHAIN_JOINER);
+}
+
+export function removePart(key, part) {
+  const parts = partsOf(key);
+  parts.splice(part, 1);
+  return parts.join(CHAIN_JOINER);
+}
+
+export function chainAfter(key, part, pick) {
+  const parts = partsOf(key);
+  parts.splice(part + 1, 0, pick);
+  return parts.join(CHAIN_JOINER);
+}
+
 // The words after the category that more than one row reads as, worked out once per catalog.
 const sharedNames = new WeakMap();
 

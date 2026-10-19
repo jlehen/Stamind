@@ -553,6 +553,9 @@ it from the session as written. The refused log is still in `logs/gym_logs/`.
 "what was this?" question holds its answers. Both hold keys when the new code wrote them. An
 answer carries the key to store and is shown as its words. Today the label is both.
 
+**A chain.** The page draws a chain as one card whose title holds a chip per movement, and builds
+or changes one from those chips (DESIGN_strength_combos.md §6). The catalog lists no chain.
+
 ## 9. The one-off conversion
 
 `scripts/migrate_exercise_names.py`, run once per athlete on the instance named by

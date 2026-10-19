@@ -642,3 +642,29 @@ test("a chain is per side when any movement is, and shows its first movement's p
     assert.deepEqual(logic.photosOf(catalog, "SQUAT/GOBLET_SQUAT>HIP_RAISE/KETTLEBELL_SWING"),
                      logic.photosOf(catalog, "SQUAT/GOBLET_SQUAT"));
   });
+
+test("a chip's three edits give the card its new key", () => {
+  // Insert after on a plain exercise starts a chain.
+  const swing = "HIP_RAISE/KETTLEBELL_SWING";
+  const halo = "SHOULDER_STABILITY/KETTLEBELL_HALO";
+  assert.equal(logic.chainAfter(swing, 0, halo), `${swing}>${halo}`);
+  assert.equal(logic.chainAfter(CHAIN, 0, halo),
+               `HIP_SWING/ONE_ARM_SWING>${halo}>OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN`
+               + ">SQUAT/GOBLET_SQUAT");
+  assert.equal(logic.replacePart(CHAIN, 2, halo),
+               `HIP_SWING/ONE_ARM_SWING>OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN>${halo}`);
+  // Removing a movement of two leaves a plain exercise.
+  assert.equal(logic.removePart(`${swing}>${halo}`, 1), swing);
+});
+
+test("an edited chain keeps its sets, ticked or not, and loses its written load", () => {
+  // DESIGN_strength_combos.md D22: the edit goes through `swapExercise`, as a swap does.
+  const state = tickSet(exampleState(), 0, 0, 40);
+  const key = logic.chainAfter(state.x[0].n, 0, "SQUAT/LEG_PRESS");
+  const after = logic.swapExercise(state, 0, key);
+  assert.equal(after.x[0].n, "SQUAT/BELT_SQUAT>SQUAT/LEG_PRESS");
+  assert.deepEqual(after.x[0].sets, state.x[0].sets);
+  assert.equal(after.x[0].p, 1);
+  assert.equal(after.x[0].kg, null);
+  assert.equal(logic.buildLog(after, END).x[0].n, key);
+});
