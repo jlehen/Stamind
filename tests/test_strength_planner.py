@@ -315,7 +315,8 @@ class OutputChecksTest(_PlannerCase):
         }]}]
         result = self.strength_pass([])
         self.assertEqual(result.dropped, [
-            "2026-09-17: 'Nordic curl' is not an exercise Stamind knows, left out"
+            "2026-09-17: 'Nordic curl' is not an exercise Stamind knows or a chain it accepts, "
+            "left out"
         ])
         self.assertIn("Squat: belt squat 3×4–6 @ 140 kg", result.added[0]["description"])
 
@@ -338,7 +339,8 @@ class OutputChecksTest(_PlannerCase):
         self.assertIn("Pull up 3×5 @ 10 kg", result.added[0]["description"])
         # A made-up name of the old table is a name the table lacks, like any other.
         self.assertEqual(result.dropped, [
-            "2026-09-17: 'belt squat' is not an exercise Stamind knows, left out"
+            "2026-09-17: 'belt squat' is not an exercise Stamind knows or a chain it accepts, "
+            "left out"
         ])
 
     def test_nonsense_numbers_drop_the_entry(self):
@@ -349,6 +351,48 @@ class OutputChecksTest(_PlannerCase):
              "load_kg": -5},
         ):
             self.assertIsNone(planner_prompt._clean_exercise(bad), bad)
+
+    def test_a_chain_of_known_movements_sharing_an_implement_is_one_row(self):
+        """DESIGN_strength_combos.md §2: a one-arm kettlebell swing, a one-arm dumbbell clean
+        and a goblet squat, with one 8 kg bell. Kettlebells and dumbbells read as one, and a
+        Garmin name that is not a key is taken as its class's key, inside a chain too."""
+        self.gym("2026-09-17")
+        said = "HIP_SWING/ONE_ARM_SWING > OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN>SQUAT/GOBLET_SQUAT"
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row(said, 3, 5, 8, 8.0),
+                   row("PUSH_UP/PUSH_UP>PLANK/PLANK", 2, 6, 6)),
+        ]}]
+        result = self.strength_pass([])
+        self.assertEqual(result.dropped, [])
+        self.assertEqual(
+            [r["exercise"] for r in result.added[0]["prescribed_sets"]],
+            ["HIP_SWING/ONE_ARM_SWING>OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN>SQUAT/GOBLET_SQUAT",
+             "PUSH_UP/PUSH_UP>PLANK/PLANK"])
+        self.assertIn("One arm swing → single arm dumbbell clean → goblet squat 3×5–8/side @ 8 kg",
+                      result.added[0]["description"])
+        self.assertEqual(
+            planner_prompt._clean_exercise(
+                row("PULL_UP/PULL_UP>PULL_UP/WEIGHTED_PULL_UP", 3, 5, 5))["exercise"],
+            "PULL_UP/PULL_UP>PULL_UP/PULL_UP")
+
+    def test_a_chain_of_two_implements_is_dropped_unless_the_athlete_did_it(self):
+        """A barbell clean into a kettlebell swing needs two implements. What the athlete did
+        is the proof, so the same chain on her record passes (D10)."""
+        chain = "OLYMPIC_LIFT/BARBELL_POWER_CLEAN>HIP_RAISE/KETTLEBELL_SWING"
+        self.assertIsNone(planner_prompt._clean_exercise(row(chain, 3, 5, 5, 40.0)))
+        self.assertIsNone(planner_prompt._clean_exercise(
+            row("HIP_RAISE/KETTLEBELL_SWING>SQUAT/MOON_SQUAT", 3, 5, 5, 8.0)))
+        with patch.object(sets, "own_exercises", return_value={chain}):
+            self.assertEqual(planner_prompt._clean_exercise(row(chain, 3, 5, 5, 40.0))["exercise"],
+                             chain)
+        self.gym("2026-09-17")
+        self.replies = [{"sessions": [answer("2026-09-17", row(chain, 3, 5, 5, 40.0),
+                                             row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))]}]
+        result = self.strength_pass([])
+        self.assertEqual(result.dropped, [
+            f"2026-09-17: '{chain}' is not an exercise Stamind knows or a chain it accepts, "
+            "left out"
+        ])
 
     def test_a_light_session_marks_every_row(self):
         self.gym("2026-09-17")

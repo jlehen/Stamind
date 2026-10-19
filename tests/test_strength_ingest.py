@@ -160,6 +160,20 @@ class ParseLogTest(unittest.TestCase):
         ))
         self.assertIsNone(log.exercises[0].sets[0].load_kg)
 
+    def test_a_chain_passes_when_every_movement_is_known(self):
+        """DESIGN_strength_combos.md §6: the joined key is the entry's name, a set is rounds."""
+        chain = "HIP_RAISE/KETTLEBELL_SWING>SHOULDER_STABILITY/KETTLEBELL_HALO"
+        log = logger.parse_log(json.dumps(
+            {**EXAMPLE_LOG, "x": [{"n": chain, "sets": [[8, 8, 60]]}]}
+        ))
+        self.assertEqual(log.exercises[0].name, chain)
+        with self.assertRaises(logger.LogError) as refused:
+            logger.parse_log(json.dumps(
+                {**EXAMPLE_LOG, "x": [{"n": "HIP_RAISE/KETTLEBELL_SWING>SQUAT/MOON_SQUAT",
+                                       "sets": [[8, 8, 60]]}]}
+            ))
+        self.assertIn("kettlebell swing → moon squat", str(refused.exception))
+
     def test_an_exercise_the_table_does_not_know_is_refused_by_name(self):
         payload = {**EXAMPLE_LOG, "x": [
             {"n": "SQUAT/BELT_SQUAT", "sets": [[5, 120, 40]]},

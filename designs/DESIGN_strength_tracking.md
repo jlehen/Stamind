@@ -346,6 +346,10 @@ Its line is unmarked, and the athlete picks the one-leg name to have it marked. 
 either: the count Garmin's watch gives. It counts what the arm wearing it does, and the
 athlete corrects it.
 
+A chain, several movements done back to back as one set, is one key: its movements' keys
+joined with `>`. Its reps are rounds, and it is per side when any movement is
+(DESIGN_strength_combos.md §3).
+
 ## 5. Data model
 
 One new table:
@@ -711,7 +715,8 @@ being a file nobody can see.
 The strength planner cannot write kilograms without last time's kilograms. The **strength
 history** gives it those: a text built on read from `exercise_sets`, one entry per
 exercise, shown to the strength planner (§9) and to nothing else. Nothing is stored for it,
-and it holds no computed number.
+and it holds no computed number. A chain is an entry of its own under its joined key, and
+nothing of it lands under its movements (DESIGN_strength_combos.md §5).
 
 **Which exercises.** Every exercise that a person named (§5) in the athlete's last eight
 strength days, discarded activities skipped, accessories included. Strength activities are
@@ -1331,9 +1336,11 @@ asks the week planner: a yes alone makes the morning run (DESIGN_quiet_morning.m
 
 **Checking the output.** Every exercise name is looked up in the vocabulary. Sets and reps
 must be whole numbers above zero, with the lowest reps not above the highest, and a load
-must not be negative. An entry that fails is dropped with a line in the preview — "Mon Sep
-21: 'Nordic curl' is not an exercise Stamind knows, left out" — and the rest of the
-session is written. A session to write whose every entry fails counts as a failed call, and
+must not be negative. A chain passes when every movement is known and they share an
+implement, or when the athlete has done that chain (DESIGN_strength_combos.md §4). An entry
+that fails is dropped with a line in the preview — "Mon Sep 21: 'Nordic curl' is not an
+exercise Stamind knows or a chain it accepts, left out" — and the rest of the session is
+written. A session to write whose every entry fails counts as a failed call, and
 a session to check whose every entry fails is a "keep". When the strength planner's call
 fails it is tried once more. What a second failure costs depends on what was asked.
 

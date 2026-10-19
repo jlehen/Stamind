@@ -104,7 +104,27 @@ Curls, lateral raises, triceps work, leg curls and the rest carry volume and fat
 nothing progresses them by rule. Write them at the reps and the load the athlete last did
 them at. The athlete moves them in the gym when they are ready, Connect records it, and the
 history follows. An exercise with no movement pattern, such as a cardio drill, a warm-up or
-a yoga pose, is written the same way: at what the athlete last did.
+a yoga pose, is written the same way: at what the athlete last did, except a chain, which
+progresses (A chain).
+
+## A chain
+
+A chain is several movements done back to back with one implement held the whole time and no
+rest between them. One rep of each movement is a round, and a set is several rounds without
+putting the implement down.
+
+- **Each movement ends where the next one starts.** A swing ends at the hip, where a clean
+  starts. A clean ends in the rack, where a squat and a press start. A chain usually holds
+  three or four movements.
+- **The load is the weakest movement's**, the one the hardest movement of the round can carry,
+  usually the press. So a chain on record is an exercise of its own: its load says nothing
+  about what any of its movements is done at alone.
+- **A chain progresses as one exercise**, under Double progression. The range of rounds is
+  yours, chosen from the brief and the duration like any rep range, and kept from one session
+  to the next. The rounds go up inside it, then the load goes up a step. When no heavier
+  implement is on the equipment list, the load holds at the top of the range.
+- **A chain is not a way to progress its movements.** Each movement keeps its own history,
+  and a chain adds nothing to it.
 
 ## An exercise with no history
 

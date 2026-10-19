@@ -16,7 +16,7 @@ from stamind import runtime
 from stamind.clock import fmt_date
 from stamind.coach.formatting import BANNER_RULE, preferences_text, science_section
 from stamind.config import config
-from stamind.strength import prescription, vocabulary
+from stamind.strength import prescription, sets, vocabulary
 
 SCIENCE_PATH = os.path.join(os.path.dirname(__file__), "progression.md")
 
@@ -103,22 +103,31 @@ squats, as requested". Do what it says in that session, and keep everything else
 brief changes one exercise, not the session. For that session it outranks the athlete's
 habits. Only the day's equipment can rule it out, and then the notes say so.
 
-Use only exercises from EXERCISES STAMIND KNOWS, and name each by its key, spelled exactly as
-it appears there: SQUAT/BELT_SQUAT. A key is a category, a slash and a name, and the category
-is part of what the exercise is: BANDED_EXERCISES/GLUTE_BRIDGE is the glute bridge done with a
-band. The strength history and the sessions already written name exercises by the same keys.
-In the list, each key is followed, in brackets, by its movement pattern, its main muscles and
-the gear it needs. Every item of the gear is needed. Where an exercise has no movement
-pattern, or no muscles on record, the brackets leave that part out. The brackets end with
-"per side" on an exercise done one side at a time: its reps are per side and one set is both
-sides (HOW TO PROGRESS). Pick exercises the day's equipment allows: a travel week with
-dumbbells only gets goblet squats and dumbbell Romanian deadlifts where the home gym had the
-belt squat and the barbell. A substitution is a different exercise doing the same pattern's
-job, and it keeps its own history.
+Use only exercises from EXERCISES STAMIND KNOWS, or a chain of them, and name each by its key,
+spelled exactly as it appears there: SQUAT/BELT_SQUAT. A key is a category, a slash and a
+name, and the category is part of what the exercise is: BANDED_EXERCISES/GLUTE_BRIDGE is the
+glute bridge done with a band. The strength history and the sessions already written name
+exercises by the same keys. In the list, each key is followed, in brackets, by its movement
+pattern, its main muscles and the gear it needs. Every item of the gear is needed. Where an
+exercise has no movement pattern, or no muscles on record, the brackets leave that part out.
+The brackets end with "per side" on an exercise done one side at a time: its reps are per side
+and one set is both sides (HOW TO PROGRESS). Pick exercises the day's equipment allows: a
+travel week with dumbbells only gets goblet squats and dumbbell Romanian deadlifts where the
+home gym had the belt squat and the barbell. A substitution is a different exercise doing the
+same pattern's job, and it keeps its own history.
 
 An exercise whose gear holds Dumbbells can be done with kettlebells of the same weight, and
 an exercise whose gear holds Kettlebells can be done with dumbbells of the same weight. It is
 the same exercise either way: write it under its own key, and it keeps its history.
+
+A chain is two or more exercises done back to back with one implement and no rest between them.
+Write a chain as one exercise whose key is its movements' keys joined with >, in the order they
+are done. Its reps are rounds, one of each movement a round, in a range kept from one session to
+the next like any rep range. A chain holding a movement marked per side is per side as a whole:
+its rounds are per side and a set is both sides, as One side at a time in HOW TO PROGRESS says.
+Every movement must be in EXERCISES STAMIND KNOWS, and all of them must share one implement;
+dumbbells and kettlebells count as one, and a bodyweight movement fits any. In the notes, name a
+chain in words and say how its sides are done.
 
 Write an exercise more than once when it needs a warm-up ramp: the same key at a lighter
 load first, then the working sets.
@@ -158,7 +167,7 @@ You MUST respond with a JSON object containing:
       "exercises": [
         {{
           "exercise": "SQUAT/BELT_SQUAT", (the key, exactly as EXERCISES STAMIND KNOWS
-            spells it)
+            spells it, or a chain of keys joined with >)
           "sets": 3,
           "reps_low": 4, (per side on an exercise marked "per side")
           "reps_high": 6, (equal to "reps_low" for a fixed rep count)
@@ -343,13 +352,25 @@ def user_content(
 
 # --- checking what comes back ---
 
-def _clean_exercise(raw: Any) -> Optional[Dict[str, Any]]:
-    """One returned exercise as a row, or None when it fails a check (§9). A Garmin name of
+def _known_key(said: str) -> Optional[str]:
+    """The key a returned name stands for, or None when it fails the check. A Garmin name of
     the table that is not a key is taken as the key of its class (DESIGN_exercise_table.md
-    §7)."""
+    §7). A chain's movements are each resolved so, and must share an implement unless the
+    athlete has done that chain (DESIGN_strength_combos.md §4)."""
+    resolved = [vocabulary.key_of(part.strip()) for part in vocabulary.parts(said)]
+    if None in resolved:
+        return None
+    key = vocabulary.CHAIN_JOINER.join(resolved)
+    if vocabulary.shared_load(resolved) or key in sets.own_exercises():
+        return key
+    return None
+
+
+def _clean_exercise(raw: Any) -> Optional[Dict[str, Any]]:
+    """One returned exercise as a row, or None when it fails a check (§9)."""
     if not isinstance(raw, dict):
         return None
-    name = vocabulary.key_of(str(raw.get("exercise") or "").strip().upper())
+    name = _known_key(str(raw.get("exercise") or "").strip().upper())
     if name is None:
         return None
     try:
@@ -390,7 +411,8 @@ def clean_session(raw: Dict[str, Any], dropped: List[str]) -> Answer:
         if cleaned is None:
             name = (entry or {}).get("exercise") if isinstance(entry, dict) else entry
             dropped.append(
-                f"{raw.get('date')}: '{name}' is not an exercise Stamind knows, left out"
+                f"{raw.get('date')}: '{name}' is not an exercise Stamind knows or a chain it "
+                "accepts, left out"
             )
             continue
         rows.append(cleaned)

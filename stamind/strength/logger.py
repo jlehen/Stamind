@@ -112,7 +112,9 @@ def parse_log(text: str) -> Log:
     exercises = [_entry(entry, place) for place, entry in enumerate(listed, 1)]
     unknown: List[str] = []
     for entry in exercises:
-        if vocabulary.get(entry.name) is None and entry.name not in unknown:
+        # A chain passes when every movement is known (DESIGN_strength_combos.md §6).
+        known = all(vocabulary.get(part) for part in vocabulary.parts(entry.name))
+        if not known and entry.name not in unknown:
             unknown.append(entry.name)
     if unknown:
         raise LogError("The log names exercises Stamind does not know: "

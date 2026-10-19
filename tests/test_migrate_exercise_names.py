@@ -114,6 +114,18 @@ class RulesTest(_ConversionCase):
                       "1 log entry; 40 kg)", out)
         self.assertEqual(self.convert()[1], "No old name is stored. Nothing to convert.\n")
 
+    def test_a_merged_name_inside_a_chain_is_renamed_and_the_chain_kept(self):
+        """DESIGN_strength_combos.md D12: a carry then a swing keeps one history."""
+        chain, merged = ("CARRY/FARMERS_WALK>HIP_RAISE/KETTLEBELL_SWING",
+                         "CARRY/FARMERS_CARRY>HIP_RAISE/KETTLEBELL_SWING")
+        self.store(lifted(1, chain, None, 16.0), lifted(2, merged, None, 16.0))
+        self.plan(planned(chain, 16.0))
+        self.log({**OLD_LOG, "x": [{"n": chain, "sets": [[8, 16, 60]]}]})
+        code, out = self.convert()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stored(), ([merged] * 2, [merged], [merged]))
+        self.assertEqual(self.convert()[1], "No old name is stored. Nothing to convert.\n")
+
     def test_a_name_with_one_key_in_the_list_takes_it_in_all_three_places(self):
         self.store(lifted(1, "belt squat", "SQUAT/BELT_SQUAT", 140.0))
         self.plan(planned("belt squat", 140.0))

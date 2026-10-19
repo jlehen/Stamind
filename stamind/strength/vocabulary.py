@@ -8,9 +8,10 @@ are worked out from the key by `words`. The table ships with the code and nobody
 a name Garmin adds later is added to the file by hand.
 """
 import os
+from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Collection, Dict, List, Optional, Set, Tuple
+from typing import Collection, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 
 PATTERNS = (
     "squat", "hinge", "single_leg", "push_horizontal", "push_vertical", "pull_horizontal",
@@ -49,6 +50,14 @@ LINK_WORDS = {"", "A", "AND", "AT", "FROM", "IN", "ON", "THE", "TO", "WITH"}
 # they are printed: "3×8/side" (DESIGN_strength_tracking.md §4).
 PER_SIDE = "per side"
 SIDE_MARK = "/side"
+
+# The sign between the keys of a chain, several movements done as one set, and what a person
+# reads between their words (DESIGN_strength_combos.md §3). No key of the table holds it.
+CHAIN_JOINER = ">"
+CHAIN_ARROW = " → "
+# A chain's movements share one implement, and a kettlebell does what a dumbbell does
+# (DESIGN_strength_combos.md §4).
+SAME_LOAD = {"Kettlebells": "Dumbbells"}
 
 TABLE_PATH = os.path.join(os.path.dirname(__file__), "exercises.tsv")
 
@@ -148,13 +157,48 @@ def key_of(name: Optional[str]) -> Optional[str]:
     return _table()[1].get(name) if name else None
 
 
+def parts(key: str) -> List[str]:
+    """The keys of a chain's movements in the order they are done, or the key alone for one
+    exercise (DESIGN_strength_combos.md §3)."""
+    return key.split(CHAIN_JOINER)
+
+
 def words(key: str) -> str:
     """A key as a person reads it (§4): 'SQUAT/BELT_SQUAT' is 'squat: belt squat'. A name equal
-    to its category, and a bare category, show once."""
-    parts = [part.lower().strip("_").replace("_", " ") for part in key.split("/", 1)]
-    if len(parts) == 1 or parts[0] == parts[1]:
-        return parts[0]
-    return f"{parts[0]}: {parts[1]}"
+    to its category, and a bare category, show once. A chain is its movements' words joined by
+    an arrow, each without its category unless that bare name is shared
+    (DESIGN_strength_combos.md §3)."""
+    if CHAIN_JOINER in key:
+        return CHAIN_ARROW.join(_movement_words(part) for part in parts(key))
+    halves = [half.lower().strip("_").replace("_", " ") for half in key.split("/", 1)]
+    if len(halves) == 1 or halves[0] == halves[1]:
+        return halves[0]
+    return f"{halves[0]}: {halves[1]}"
+
+
+def _movement_words(key: str) -> str:
+    said = words(key)
+    bare = said.rpartition(": ")[2]
+    return said if bare in shared_names() else bare
+
+
+@lru_cache(maxsize=None)
+def shared_names() -> FrozenSet[str]:
+    """The words after the category that more than one class reads as: 'face pull' is a row
+    and a band exercise (DESIGN_strength_combos.md §3)."""
+    counts = Counter(words(key).rpartition(": ")[2] for key in keys())
+    return frozenset(name for name, count in counts.items() if count > 1)
+
+
+def shared_load(chain: Sequence[str]) -> bool:
+    """Whether known movements can be done with one implement: the load words of their gear
+    have one in common, a movement with none fitting any (DESIGN_strength_combos.md §4)."""
+    loads = []
+    for key in chain:
+        held = {SAME_LOAD.get(word, word) for word in get(key).gear if word in LOADS}
+        if held:
+            loads.append(held)
+    return not loads or bool(set.intersection(*loads))
 
 
 def searched(key: str) -> str:
@@ -191,9 +235,10 @@ def similar(key: str, own: Collection[str], most: int) -> List[str]:
 
 def side_mark(key: Optional[str]) -> str:
     """What follows the reps of this exercise where they are printed: '/side' when it is done
-    one side at a time, nothing otherwise (DESIGN_strength_tracking.md §4)."""
-    known = get(key)
-    if known is None or not known.per_side:
+    one side at a time, nothing otherwise (DESIGN_strength_tracking.md §4). A chain is when
+    any of its movements is (DESIGN_strength_combos.md §3)."""
+    known = [get(part) for part in parts(key)] if key else []
+    if not any(one and one.per_side for one in known):
         return ""
     return SIDE_MARK
 

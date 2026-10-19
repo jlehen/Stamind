@@ -403,6 +403,10 @@ search results and in the page's Markdown export, which reads
 On a card the category is the same for many exercises, so the brackets set it apart from the
 name the athlete looks for.
 
+A chain, several movements done as one set, stores its movements' keys joined with `>` and reads
+as their words joined by an arrow, each without its category unless that bare name belongs to
+more than one class (DESIGN_strength_combos.md §3).
+
 ## 5. Where a name lives
 
 | Place | Holds after this design |
@@ -643,6 +647,9 @@ sessions to come are then two exercises, with two histories.
 
 Not handled: new code started on a database that was not converted reads every old name as an
 exercise it does not know. Nothing is lost, and the script can still be run then.
+
+Run after two lines are merged, the script also renames a merged name inside a chain's key, so
+the chain keeps one history (DESIGN_strength_combos.md D12).
 
 ## 10. Building the table
 

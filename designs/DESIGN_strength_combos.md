@@ -1,7 +1,7 @@
 # Strength combos: several movements chained into one set
 
 Status: designed 2026-10-18, red-teamed and reviewed the same day, amended 2026-10-19 after a
-mock-up of the page (D20, D21), not built. Amends DESIGN_strength_tracking.md §4, §8 and §9,
+mock-up of the page (D20, D21), built 2026-10-19. Amends DESIGN_strength_tracking.md §4, §8 and §9,
 DESIGN_exercise_table.md §4, §8 and §9, and DESIGN_gym_logger.md §1, §3 and §4. The interview
 that produced it, the red-team pass on its decisions, the two review passes and every choice made
 on the author's behalf are in §8 and the Decisions Log. When the strength planner swaps one chain
@@ -160,10 +160,10 @@ One paragraph joins CHOOSING THE EXERCISES in `planner_prompt.py`:
 > Write a chain as one exercise whose key is its movements' keys joined with >, in the order they
 > are done. Its reps are rounds, one of each movement a round, in a range kept from one session to
 > the next like any rep range. A chain holding a movement marked per side is per side as a whole:
-> its rounds are per side and a set is both sides, as under ONE SIDE AT A TIME. Every movement must
-> be in EXERCISES STAMIND KNOWS, and all of them must share one implement; dumbbells and kettlebells
-> count as one, and a bodyweight movement fits any. In the notes, name a chain in words and say how
-> its sides are done.
+> its rounds are per side and a set is both sides, as One side at a time in HOW TO PROGRESS says.
+> Every movement must be in EXERCISES STAMIND KNOWS, and all of them must share one implement;
+> dumbbells and kettlebells count as one, and a bodyweight movement fits any. In the notes, name a
+> chain in words and say how its sides are done.
 
 Three older sentences of the prompt and the science would otherwise say the opposite, and each is
 amended in the same change (D14): "Use only exercises from EXERCISES STAMIND KNOWS" gains "or a
@@ -407,14 +407,14 @@ vocabulary.parts + parse_log (1) ──> page readers (2a) ──> strength plan
 
 ## Checklist
 
-- [ ] `vocabulary.py`: `CHAIN_JOINER`, `parts`, `shared_load`, `shared_names`; `words`,
+- [x] `vocabulary.py`: `CHAIN_JOINER`, `parts`, `shared_load`, `shared_names`; `words`,
       `side_mark`
-- [ ] `logger.py`: `parse_log` on a chain
-- [ ] `miniapp/logic.js`: the readers, `chipsOf`; node tests (branch one)
+- [x] `logger.py`: `parse_log` on a chain
+- [x] `miniapp/logic.js`: the readers, `chipsOf`; node tests (branch one)
 - [ ] `miniapp/logic.js`, `app.js`, `style.css`: chips and the ⛓ mark, the three buttons under a
       tapped chip, the two search modes, the three key edits; node tests (branch two)
-- [ ] `planner_prompt.py`: the paragraph, the two amended sentences, `_clean_exercise` on a
+- [x] `planner_prompt.py`: the paragraph, the two amended sentences, `_clean_exercise` on a
       chain and its tests, the preview line and its two tests
-- [ ] `progression.md`: "A chain", the amended no-pattern sentence
-- [ ] `scripts/migrate_exercise_names.py`: parts of a chain key
-- [ ] `docs/ARCHITECTURE.md`, the three amended designs
+- [x] `progression.md`: "A chain", the amended no-pattern sentence
+- [x] `scripts/migrate_exercise_names.py`: parts of a chain key
+- [x] `docs/ARCHITECTURE.md`, the three amended designs

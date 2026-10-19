@@ -149,7 +149,9 @@ lines of the description, cut to 300 characters. The brief is left out: the page
 the gym, not for reading.
 
 Version 2, the key in `n`, the words the page shows for it, how the notes are found, and
-what the page shows for a session of another version are in DESIGN_exercise_table.md §8.
+what the page shows for a session of another version are in DESIGN_exercise_table.md §8. An
+`n` may be a chain's key, its movements' keys joined with `>`, and `lo`/`hi` then count rounds
+(DESIGN_strength_combos.md §3).
 
 ## 4. The log payload (page → bot)
 
@@ -167,7 +169,8 @@ and position, never by copying the prescription back.
 ```
 
 `n` is the exercise's key, and a log of another version is refused
-(DESIGN_exercise_table.md §8).
+(DESIGN_exercise_table.md §8). A chain's `n` passes when every movement in it is known, and its
+reps are rounds; the version stays 2 (DESIGN_strength_combos.md §6).
 
 Each set is `[reps, kg, seconds since the session started]`; `kg` is null for a
 bodyweight exercise. `p` is the position of the prescribed row this exercise stands for;

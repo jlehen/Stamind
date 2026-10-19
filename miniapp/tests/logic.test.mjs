@@ -611,3 +611,34 @@ test("the calendar's address carries the session and the log, and a gym address 
   assert.deepEqual(logic.logFromHash(hash), SENT_LOG);
   assert.equal(logic.logFromHash(EXAMPLE_HASH), null);
 });
+
+// The chain of DESIGN_strength_combos.md §2, three keys joined by ">".
+const CHAIN = "HIP_SWING/ONE_ARM_SWING>OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN>SQUAT/GOBLET_SQUAT";
+
+async function realCatalog() {
+  const { readFile } = await import("node:fs/promises");
+  return JSON.parse(await readFile(new URL("../exercises.json", import.meta.url), "utf8"));
+}
+
+test("a chain reads as its movements, each without its category unless the name is shared",
+  async () => {
+    const catalog = await realCatalog();
+    assert.deepEqual(logic.chipsOf(catalog, CHAIN),
+                     ["One arm swing", "Single arm dumbbell clean", "Goblet squat"]);
+    assert.equal(logic.wordsOf(catalog, CHAIN),
+                 "One arm swing → Single arm dumbbell clean → Goblet squat");
+    // A plain exercise keeps its category, and so does a movement whose name a band
+    // exercise shares (DESIGN_strength_combos.md D23).
+    assert.deepEqual(logic.chipsOf(catalog, "SQUAT/GOBLET_SQUAT"), ["[Squat] Goblet squat"]);
+    assert.equal(logic.wordsOf(catalog, "ROW/FACE_PULL>SQUAT/GOBLET_SQUAT"),
+                 "[Row] Face pull → Goblet squat");
+  });
+
+test("a chain is per side when any movement is, and shows its first movement's photos",
+  async () => {
+    const catalog = await realCatalog();
+    assert.equal(logic.perSideOf(catalog, CHAIN), true);
+    assert.equal(logic.perSideOf(catalog, "HIP_RAISE/KETTLEBELL_SWING>SQUAT/GOBLET_SQUAT"), false);
+    assert.deepEqual(logic.photosOf(catalog, "SQUAT/GOBLET_SQUAT>HIP_RAISE/KETTLEBELL_SWING"),
+                     logic.photosOf(catalog, "SQUAT/GOBLET_SQUAT"));
+  });

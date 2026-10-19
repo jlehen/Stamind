@@ -244,6 +244,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A gym session logged on the phone | `miniapp/`, `strength/logger.py`, `cli/strength_ingest.py`, `strength/sets.py::take_over_logs`, `db/strength.py` (`gym_logs`, `upsert_logged_activity`, `save_gym_log`, `gym_log_for_day`, `garmin_activity_with_log`, `move_gym_log`). DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
 | A past strength session against its planned lines | `strength/comparison.py`, `db/strength.py::attach_lifted`, `analytics/adherence.py` (`_discrepancy_reasons`, `_pairing_order`, `is_ambiguous_match`), `cli/common.py` (`strength_table`, `simple_comparison_lines`), `strength/sets.py::done_text`. DESIGN_strength_planned_vs_done.md |
 | What a strength session prescribes | `strength/planner.py`, `strength/planner_prompt.py`, `strength/progression.md`, `strength/history.py`, `strength/prescription.py`, `prescribed_sets` + `strength_checks` in `db/schema.py`, `db/workout_change.py::WorkoutChange`, the pass's place in `coach/service/generate.py` and `coach/service/adapt.py`. DESIGN_strength_tracking.md §9 |
+| A chain: several movements done as one set, one key joined with `>` | `strength/vocabulary.py` (`parts`, `words`, `side_mark`, `shared_load`, `shared_names`), `strength/logger.py::parse_log`, `strength/planner_prompt.py::_known_key` + the prompt's chain paragraph, `strength/progression.md` ("A chain"), `miniapp/logic.js` (`partsOf`, `chipsOf`), `scripts/migrate_exercise_names.py`. Everything else keys on the string. DESIGN_strength_combos.md |
 | A CLI command | `stamind/cli/<family>.py` (`run_*`), the dispatcher in `stamind_cli.py` ([§7](#7-cli-commands-reference)) |
 | A message telling the athlete to run something | `text.cmd()` inside the line's colour call, emitted with `output.aside` |
 | Whether a line reaches the chat | `output.aside` (terminal only) vs `print`; a list of lines gates on `text.asides_enabled()`. DESIGN_output_verbosity.md §3 |
@@ -717,7 +718,7 @@ session again. Rows cascade with their `completed_activities` row.
 | `activity_id`  | TEXT    | The Garmin activity; `UNIQUE (activity_id, seq)`, `ON DELETE CASCADE`  |
 | `seq`          | INTEGER | Position in Garmin's list, rest entries included, from 1              |
 | `set_type`     | TEXT    | `active` or `rest`                                                    |
-| `exercise`     | TEXT    | The key of the exercise's class in the exercise table (DESIGN_exercise_table.md §4), so weighted pull-ups and plain ones are one history. A Garmin name the table lacks is its own key. NULL while unnamed |
+| `exercise`     | TEXT    | The key of the exercise's class in the exercise table (DESIGN_exercise_table.md §4), so weighted pull-ups and plain ones are one history. A Garmin name the table lacks is its own key; a chain is its movements' keys joined with `>` (DESIGN_strength_combos.md §3). NULL while unnamed |
 | `garmin_name`  | TEXT    | What Garmin said: `CATEGORY/NAME`, a bare `CATEGORY`, or `UNKNOWN`    |
 | `reps`         | INTEGER |                                                                       |
 | `load_kg`      | REAL    | Garmin's grams / 1000; NULL when no weight was entered. On a bodyweight exercise, the added load |
@@ -737,7 +738,7 @@ cascaded away with their `workouts` row.
 |--------------|---------|--------------------------------------------------------------|
 | `workout_id` | INTEGER | The revision; `UNIQUE (workout_id, position)`, `ON DELETE CASCADE` |
 | `position`   | INTEGER | Order in the session, from 1                                 |
-| `exercise`   | TEXT    | A key of the exercise table                                  |
+| `exercise`   | TEXT    | A key of the exercise table, or a chain of keys joined with `>`; reps are then rounds (DESIGN_strength_combos.md §3) |
 | `sets`       | INTEGER |                                                              |
 | `reps_low` / `reps_high` | INTEGER | The rep range, equal for a fixed count. The reps are the athlete's dial, the load the strength planner's (§10) |
 | `load_kg`    | REAL    | NULL for a bodyweight exercise with nothing added            |
