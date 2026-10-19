@@ -18,11 +18,12 @@ Today a strength session is a flat list of rows, one exercise per row, each with
 range and its kilograms (`prescribed_sets`, DESIGN_strength_tracking.md §9). The strength planner,
 the model call that writes those rows, cannot write a chain. It can write three rows and say "do
 these three as a chain" in the notes, and then everything downstream reads three exercises. The gym
-logger page draws three cards and asks for three ticks per round. The strength history, the text the
-planner reads before writing the next session, records a clean, a squat and a press, each at the
-press's load. The planned-against-done table counts three lines. The companion athlete's circuits
-hold a "single-arm clean and press" only because Garmin happens to have a name for that pair. A
-clean, a squat and a press has no name, and neither do the hundreds of other chains one bell allows.
+logger page draws three cards and asks for three ticks per round. The strength history, the text
+the strength planner reads before writing the next session, records a clean, a squat and a press,
+each at the press's load. The planned-against-done table counts three lines. The companion
+athlete's circuits hold a "single-arm clean and press" only because Garmin happens to have a name
+for that pair. A clean, a squat and a press has no name, and neither do the hundreds of other
+chains one bell allows.
 
 The reason to want chains is variety. The exercise table holds about 1,500 classes of exercise, and
 a chain is any two or more of them that flow into each other with one implement. Each chain is a new
@@ -149,9 +150,8 @@ already hold: the comparable session as done, the brief, the day's equipment and
 The prompt does not push the strength planner toward chains. A session copied from a comparable
 one keeps the plain exercises that one had, and a chain enters a session the way any exercise
 does: the brief asks for a flow, the preferences name one, the athlete made a habit of one, or a
-new session with no
-history is written from the brief, the equipment and the guidelines alone. One paragraph joins
-CHOOSING THE EXERCISES in `planner_prompt.py`:
+new session with no history is written from the brief, the equipment and the guidelines alone.
+One paragraph joins CHOOSING THE EXERCISES in `planner_prompt.py`:
 
 > A chain is two or more exercises done back to back with one implement and no rest between them.
 > Write a chain as one exercise whose key is its movements' keys joined with >, in the order they
@@ -232,22 +232,21 @@ pattern filter and needs no change. Swap, Del and Dup act on the whole card, as 
 
 **Building and changing a chain.** Nothing is added to the card's eight buttons and nothing to the
 footer (D21). A tap on a chip brings up three buttons right under it, Replace, Remove and Chain
-after, and a second tap on the chip hides them. Each opens the search sheet titled after the chip
-as it reads, "Replace [Squat] Goblet squat" or "Chain after Goblet squat". Replace puts the pick
-in that movement's place; its search keeps the replaced movement's pattern as its filter, with
-the box that lifts it, as Swap's does. Remove drops the movement. Chain after puts the pick after
-that movement; its search covers every exercise, as Insert's does. On a plain exercise, Chain
-after is how a chain starts. Each edit works out the card's new key and hands it to
-`swapExercise`, recorded on the card as Swap is: the sets stay, ticked or not, with their reps
+after, and a second tap on the chip hides them. Replace and Chain after open the search sheet
+titled after the chip as it reads, "Replace [Squat] Goblet squat" or "Chain after Goblet squat".
+Replace puts the pick in that movement's place; its search keeps the replaced movement's pattern
+as its filter, with the box that lifts it, as Swap's does. Remove drops the movement. Chain after
+puts the pick after that movement; its search covers every exercise, as Insert's does. On a plain
+exercise, Chain after is how a chain starts. Each edit works out the card's new key and hands it
+to `swapExercise`, recorded on the card as Swap is: the sets stay, ticked or not, with their reps
 and kilograms; the written load leaves the card's line, as after a swap; and the card's ↶ takes
 the edit back. On a one-chip title, Replace does what Swap does and Remove does what Del does,
 in Del's colour, and only the header's Undo brings a removed card back. The page checks nothing
-about the gear
-(D7): she is holding it, and a chain she has done passes the strength planner's check from then
-on (D10). Every edit gives the card a new key, so an edited chain is a new chain for the record
-and the strength planner, as a swapped exercise is today. The chips, the three buttons and the ⛓
-mark are the only new markup, the three buttons being pills of the page's tap size; the search,
-the results and the pattern toggle are the ones Swap and Add use.
+about the gear (D7): she is holding it, and a chain she has done passes the strength planner's
+check from then on (D10). Every edit gives the card a new key, so an edited chain is a new chain
+for the record and the strength planner, as a swapped exercise is today. The chips, the three
+buttons and the ⛓ mark are the only new markup, the three buttons being pills of the page's tap
+size; the search, the results and the pattern toggle are the ones Swap and Add use.
 
 **The log.** `n` carries the joined key, and each set is rounds, kilograms and seconds as today.
 `parse_log` in `strength/logger.py` checks each part of a key with `vocabulary.get`, so a chain of
@@ -260,7 +259,8 @@ Markdown prints the chain's shown words on its line.
 
 **Order of going live.** Steps 1, 2a and 3 of the order below land as one branch, merged and
 pushed in the same sitting, no bot restart (D19): a page older than the prompt shows a chain as
-its raw key with no "/side", and 5 rounds logged on it are stored as 5 per side.
+its raw key with no "/side", and an athlete who logs 5 rounds in total on it has 5 per side
+stored.
 
 ## 7. Not handled
 
@@ -282,8 +282,7 @@ Each is a case a plausible athlete rarely meets, left out on purpose with the be
 - The page offers no check that two picks flow into each other, and the strength planner's check
   reads gear only. Two different machines share the gear word "Machine" and pass it, and a chain
   the strength planner writes as "clean → press → clean" passes too. A chain the model composes
-  badly is a chain the athlete reads
-  before lifting and swaps.
+  badly is a chain the athlete reads before lifting and swaps.
 - Chaining a card with ticked sets makes those sets rounds of the chain, as a swap renames them.
   To keep them as they were, Dup the card and chain the copy.
 - A chain holding one two-handed movement and one per-side movement is per side as a whole (§3):
@@ -318,14 +317,16 @@ rule on each there. The choices below have no row of their own. Each is one line
 8. The gear test for a chain the strength planner invents: the load words of each movement's
    gear must have one in common, Dumbbells and Kettlebells read as one, a movement with no load
    word skipped, a chain with none passes; machines and bands pass as any load word; no rule
-   against
-    a repeated movement (§4). The pragmatic review cut the no-repeat rule.
+   against a repeated movement (§4). The pragmatic review cut the no-repeat rule.
 9. The science paragraph lives in `progression.md`, not in a file of its own (§4).
+10. A card edited by its chips is treated as a swapped card: it keeps its sets, ticked or not,
+    with their reps and kilograms, and the written load leaves its line, as after Swap and as on
+    a log reopened from the calendar. §7 says what that does to sets already ticked (§6).
 
 ## 9. Where the code goes
 
-- `strength/vocabulary.py`: `CHAIN_MARK`, `parts(key)`, `shared_load(parts)` for the check;
-  `words` and `side_mark` read the parts.
+- `strength/vocabulary.py`: `CHAIN_JOINER`, the `>`; `parts(key)`, `shared_load(parts)` for the
+  check; `words` and `side_mark` read the parts.
 - `strength/logger.py`: `parse_log` checks the parts.
 - `strength/planner_prompt.py`: the paragraph in CHOOSING THE EXERCISES and the two amended
   sentences; `_clean_exercise` resolves and checks a chain, reading `sets.own_exercises` on a
@@ -367,7 +368,7 @@ rule on each there. The choices below have no row of their own. Each is one line
 | D18 | `strength log` and `strength name` | No change to either; `similar` is left as it is | The substring match on words already finds a chain (finding 10); on a chain line `strength name` offers the first movement's category, which nobody meets in a normal week, so the guard the author had written was cut by the pragmatic review; author's resolution | Red Team | 2026-10-18 |
 | D19 | Going live | Steps 1, 2a and 3 land as one branch, merged and pushed in the same sitting; no bot restart; the chips follow as a branch of their own | The prompt is live at the merge, the page at the push, and a page in between stores rounds as per side (finding 11); author's resolution, collapsed to one line by the pragmatic review | Red Team | 2026-10-18 |
 | D20 | No cap | A chain holds two or more movements; no cap in the check or on the page; the science says usually three or four | Nothing technical needs a number: the key is text, the page composes what she taps, and a session full of long chains is already listed under not handled. The author had written two to four. Declined: a generous cap of six | Interview | 2026-10-19 |
-| D21 | The page | Every title is chips, one per movement, a chain marked ⛓; a tap on a chip offers Replace, Remove and Chain after right under it; no new card button, no footer button, no Done | Chosen from a mock-up of three shapes: the sheet with a second footer button (the design as reviewed), a ninth "Chain" button on each card (the pragmatic review's proposal), and the chips. The chain is edited where the chain is, and a chain starts from a plain exercise. Declined: the sheet; the pill | Interview | 2026-10-19 |
+| D21 | The page | Every title is chips, one per movement, a chain marked ⛓; a tap on a chip offers Replace, Remove and Insert after right under it, the last named Chain after by §8 choice 4; no new card button, no footer button, no Done | Chosen from a mock-up of three shapes: the sheet with a second footer button (the design as reviewed), a ninth "Chain" button on each card (the pragmatic review's proposal), and the chips. The chain is edited where the chain is, and a chain starts from a plain exercise. Declined: the sheet; the pill | Interview | 2026-10-19 |
 
 ## Dependency Graph & Implementation Order
 
@@ -401,7 +402,7 @@ vocabulary.parts + parse_log (1) ──> page readers (2a) ──> strength plan
 
 ## Checklist
 
-- [ ] `vocabulary.py`: `CHAIN_MARK`, `parts`, `shared_load`; `words`, `side_mark`
+- [ ] `vocabulary.py`: `CHAIN_JOINER`, `parts`, `shared_load`; `words`, `side_mark`
 - [ ] `logger.py`: `parse_log` on a chain
 - [ ] `miniapp/logic.js`: the readers, `chipsOf`; node tests (branch one)
 - [ ] `miniapp/logic.js`, `app.js`, `style.css`: chips and the ⛓ mark, the three buttons under a
