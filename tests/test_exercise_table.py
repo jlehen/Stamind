@@ -119,10 +119,16 @@ class ChainTest(unittest.TestCase):
         self.assertEqual(vocabulary.words("ROW/FACE_PULL>SQUAT/GOBLET_SQUAT"),
                          "row: face pull → goblet squat")
 
-    def test_a_chain_is_per_side_when_any_movement_is(self):
+    def test_a_chain_is_per_side_when_a_one_sided_movement_appears_once(self):
         self.assertEqual(vocabulary.side_mark(CHAIN), "/side")
         self.assertEqual(vocabulary.side_mark("HIP_RAISE/KETTLEBELL_SWING>SQUAT/GOBLET_SQUAT"), "")
         self.assertEqual(vocabulary.model_line(CHAIN), CHAIN)
+
+    def test_a_one_sided_movement_twice_is_one_round_of_both_sides(self):
+        """D16: a left clean, a goblet squat, a right clean is one round, not per side."""
+        clean = "OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN"
+        self.assertEqual(vocabulary.side_mark(f"{clean}>SQUAT/GOBLET_SQUAT>{clean}"), "")
+        self.assertEqual(vocabulary.side_mark(f"{clean}>{clean}>{clean}"), "/side")
 
     def test_the_movements_share_one_implement(self):
         # Kettlebells and dumbbells read as one.

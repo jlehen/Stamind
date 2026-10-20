@@ -347,8 +347,8 @@ either: the count Garmin's watch gives. It counts what the arm wearing it does, 
 athlete corrects it.
 
 A chain, several movements done back to back as one set, is one key: its movements' keys
-joined with `>`. Its reps are rounds, and it is per side when any movement is
-(DESIGN_strength_combos.md §3).
+joined with `>`. Its reps are rounds, and it is per side unless each of its one-sided movements
+appears twice, once on each side (DESIGN_strength_combos.md §3).
 
 ## 5. Data model
 

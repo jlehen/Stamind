@@ -59,12 +59,12 @@ class Stored:
 def is_old(name: Optional[str]) -> bool:
     """Whether a stored value is still an old name: those are lower case, keys upper case. So
     is a name whose line was merged into another, which the table now holds as a later name
-    of that line (§3.2), and a chain holding one (DESIGN_strength_combos.md §3)."""
+    of that line (§3.2)."""
     if not name:
         return False
     if any(letter.islower() for letter in name):
         return True
-    return any(vocabulary.key_of(part) not in (None, part) for part in vocabulary.parts(name))
+    return vocabulary.key_of(name) not in (None, name)
 
 
 def read_migration(path: str = MIGRATION_PATH) -> Dict[str, List[str]]:
@@ -95,13 +95,9 @@ def new_key(
 ) -> Optional[str]:
     """The five rules, in order: a rename, the key of the line a merged name now sits on, the
     one key of the list, the class holding the set's own Garmin name `said` when it is one of
-    several keys, else not settled. A chain's movements are keys, so only the second rule
-    renames one, and the chain keeps one history (DESIGN_strength_combos.md D12)."""
+    several keys, else not settled."""
     if old in renames:
         return renames[old]
-    if vocabulary.CHAIN_JOINER in old:
-        return vocabulary.CHAIN_JOINER.join(
-            vocabulary.key_of(part) or part for part in vocabulary.parts(old))
     if vocabulary.key_of(old):
         return vocabulary.key_of(old)
     keys = listed.get(old, [])

@@ -239,12 +239,18 @@ def similar(key: str, own: Collection[str], most: int) -> List[str]:
 
 def side_mark(key: Optional[str]) -> str:
     """What follows the reps of this exercise where they are printed: '/side' when it is done
-    one side at a time, nothing otherwise (DESIGN_strength_tracking.md §4). A chain is when
-    any of its movements is (DESIGN_strength_combos.md §3)."""
-    known = [get(part) for part in parts(key)] if key else []
-    if not any(one and one.per_side for one in known):
+    one side at a time, nothing otherwise (DESIGN_strength_tracking.md §4). A one-sided movement
+    makes it so when it appears an odd number of times: twice is once on each side inside a
+    chain's round (DESIGN_strength_combos.md §3)."""
+    counts = Counter(parts(key)) if key else Counter()
+    if not any(count % 2 and _one_sided(part) for part, count in counts.items()):
         return ""
     return SIDE_MARK
+
+
+def _one_sided(key: str) -> bool:
+    known = get(key)
+    return bool(known and known.per_side)
 
 
 def model_line(key: str) -> str:

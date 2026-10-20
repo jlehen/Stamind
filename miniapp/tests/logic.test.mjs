@@ -639,6 +639,9 @@ test("a chain is per side when any movement is, and shows its first movement's p
     const catalog = await realCatalog();
     assert.equal(logic.perSideOf(catalog, CHAIN), true);
     assert.equal(logic.perSideOf(catalog, "HIP_RAISE/KETTLEBELL_SWING>SQUAT/GOBLET_SQUAT"), false);
+    // A one-sided movement twice is once on each side inside the round (D16).
+    const clean = "OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN";
+    assert.equal(logic.perSideOf(catalog, `${clean}>SQUAT/GOBLET_SQUAT>${clean}`), false);
     assert.deepEqual(logic.photosOf(catalog, "SQUAT/GOBLET_SQUAT>HIP_RAISE/KETTLEBELL_SWING"),
                      logic.photosOf(catalog, "SQUAT/GOBLET_SQUAT"));
   });

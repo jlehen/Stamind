@@ -125,9 +125,10 @@ Write a chain as one exercise whose key is its movements' keys joined with >, in
 are done. Its reps are rounds, one of each movement a round, in a range kept from one session to
 the next like any rep range. A chain holding a movement marked per side is per side as a whole:
 its rounds are per side and a set is both sides, as One side at a time in HOW TO PROGRESS says.
-Every movement must be in EXERCISES STAMIND KNOWS, and all of them must share one implement;
-dumbbells and kettlebells count as one, and a bodyweight movement fits any. In the notes, name a
-chain in words and say how its sides are done.
+A movement marked per side that appears twice is done once on each side inside the round, and
+does not make the chain per side. Every movement must be in EXERCISES STAMIND KNOWS, and all of
+them must share one implement; dumbbells and kettlebells count as one, and a bodyweight movement
+fits any. In the notes, name a chain in words and say how its sides are done.
 
 Write an exercise more than once when it needs a warm-up ramp: the same key at a lighter
 load first, then the working sets.

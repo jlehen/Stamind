@@ -651,9 +651,6 @@ sessions to come are then two exercises, with two histories.
 Not handled: new code started on a database that was not converted reads every old name as an
 exercise it does not know. Nothing is lost, and the script can still be run then.
 
-Run after two lines are merged, the script also renames a merged name inside a chain's key, so
-the chain keeps one history (DESIGN_strength_combos.md D12).
-
 ## 10. Building the table
 
 The new `exercises.tsv` and `scripts/exercise_name_migration.tsv` are built once, by a script

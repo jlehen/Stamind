@@ -732,9 +732,13 @@ export function patternOf(catalog, key) {
 }
 
 // Whether a key is done one side at a time: its reps are per side and a set is both sides
-// (DESIGN_strength_tracking.md §4). A chain is when any of its movements is.
+// (DESIGN_strength_tracking.md §4). A one-sided movement makes it so when it appears an odd
+// number of times: twice is once on each side inside a chain's round (DESIGN_strength_combos.md
+// §3).
 export function perSideOf(catalog, key) {
-  return partsOf(key).some((part) => Boolean(rowOf(catalog, part)?.o));
+  const parts = partsOf(key);
+  return parts.some((part) => Boolean(rowOf(catalog, part)?.o)
+    && parts.filter((other) => other === part).length % 2 === 1);
 }
 
 // ---------------------------------------------------------------------------------------
