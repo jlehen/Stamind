@@ -308,15 +308,20 @@ class ProposeTest(_Case):
         self.assertIn(saved.OUT_OF_DATE_LINE, out)
         self.coach.workout_generate_apply.assert_not_called()
 
-    def test_a_session_written_while_it_thought_saves_nothing(self):
+    def test_the_week_is_held_while_it_thinks(self):
+        """A tap that would write a session waits until the weeks are saved
+        (DESIGN_long_runs_beside_chat.md §3)."""
+        held = []
+
         def think(**_kwargs):
-            save_workout(test_db, SATURDAY, "running", "Shorter run", duration_minutes=30)
+            held.append(test_db.week_busy())
             return weeks(FRIDAY, SATURDAY)
 
         self.coach.workout_generate.side_effect = think
-        out = self.propose()
-        self.assertIn("Your week changed while I was thinking.", out)
-        self.assertEqual(self.waiting(saved.SCHEDULE), [])
+        self.propose()
+        self.assertEqual(held, [True])
+        self.assertEqual(len(self.waiting(saved.SCHEDULE)), 1)
+        self.assertFalse(test_db.week_busy())
 
     def test_saving_weeks_leaves_a_waiting_proposal_open_and_the_other_way_round(self):
         earlier = queue("proposal", "2026-10-08T05:00:00", {

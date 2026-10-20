@@ -54,7 +54,10 @@ def generate_strength_only(
         return
 
     step("Asking the strength planner to write the strength sessions again...")
-    proposal = runtime.coach_service.workout_generate_strength(start, end)
+    # One run at a time; a terminal asks next, so it lets go, and the write takes the lock
+    # again (DESIGN_long_runs_beside_chat.md §3).
+    with runtime.db.week_lock():
+        proposal = runtime.coach_service.workout_generate_strength(start, end)
     runtime.render.adapt_reason(proposal.reason)
     if not proposal.workouts:
         # It still weighed them, so the next `workout adapt` does not ask again (§9).

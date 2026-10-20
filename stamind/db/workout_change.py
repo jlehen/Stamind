@@ -318,23 +318,27 @@ class WorkoutChangeMixin:
         the last day of the window in force while it ran
         (DESIGN_plan_change_continuity.md §6.3, §5.2). A change the athlete watched is
         told as it is written (DESIGN_change_heads_up.md §6).
+
+        It holds the week lock, so it waits while a run of the week planner looks at the
+        week (DESIGN_long_runs_beside_chat.md §3).
         """
         if kind not in CHANGE_KINDS:
             raise ValueError(f"unknown workout change kind: {kind!r}")
-        created_at = datetime.now(timezone.utc).isoformat()
-        told_at = created_at if athlete_watching() else None
-        change: Optional[WorkoutChange] = None
-        with self.transaction() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO workout_changes "
-                "(created_at, kind, summary, macrocycle_id, note, commitment_end, told_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (created_at, kind, summary, macrocycle_id, note, commitment_end, told_at),
-            )
-            change = WorkoutChange(self, conn, int(cursor.lastrowid), kind, created_at)
-            yield change
-        self._reconcile_calendar(change.touched_lineages)
+        with self.week_lock():
+            created_at = datetime.now(timezone.utc).isoformat()
+            told_at = created_at if athlete_watching() else None
+            change: Optional[WorkoutChange] = None
+            with self.transaction() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO workout_changes "
+                    "(created_at, kind, summary, macrocycle_id, note, commitment_end, "
+                    "told_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (created_at, kind, summary, macrocycle_id, note, commitment_end, told_at),
+                )
+                change = WorkoutChange(self, conn, int(cursor.lastrowid), kind, created_at)
+                yield change
+            self._reconcile_calendar(change.touched_lineages)
 
     def _reconcile_calendar(self, lineage_ids: Set[int]) -> None:
         """Runs the §8 pass, if a Calendar is attached (see BaseDB.calendar_hook)."""

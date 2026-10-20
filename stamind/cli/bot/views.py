@@ -70,12 +70,6 @@ SESSION_BUTTONS = [
 # prescription back with a "can't today" row attached is a ping about nothing (§4.1).
 PUSH_ALL_DONE_LINE = "✅ Already done for today — nice work 💪"
 
-# Where the coach's reason would stand, when a session was written while the week planner
-# thought: nothing is saved or written (DESIGN_long_runs_beside_chat.md §3).
-WEEK_CHANGED_MORNING_LINE = (
-    "I had a change in mind, but your week changed while I was thinking."
-)
-
 # --- Pickers (§12.1: the model picks that something should change, the tap picks which) ---
 
 def _picker_leaves(rows: Sequence[Dict[str, Any]], command: str) -> List[dict]:
@@ -194,10 +188,9 @@ def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str
 
     A session that would change is saved as a proposal and nothing is written. Kilograms
     that moved alone are written at once, with their sentence as the line
-    (DESIGN_waiting_proposal.md §5, §7). Neither happens when a session was written while
-    the week planner thought (DESIGN_long_runs_beside_chat.md §3). A failure must not sink
-    the push: the schedule then renders as stored, and the error surfaces only as a
-    terminal aside — never in the athlete's chat.
+    (DESIGN_waiting_proposal.md §5, §7). A failure must not sink the push: the schedule
+    then renders as stored, and the error surfaces only as a terminal aside — never in the
+    athlete's chat.
 
     The strength planner's notice is the line when nothing changed, which is what covers
     the morning of the gym day itself (DESIGN_strength_tracking.md §9)."""
@@ -206,36 +199,39 @@ def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str
         # throttle would keep; the night is what this morning is about, so fetch again,
         # and grade it only after (§4.2, DESIGN_quiet_morning.md §4).
         ensure_recent_data(date_str, force_pull=runtime.db.get_sleep_score(date_str) is None)
-        if not _asks(date_str):
-            return None, None
-        written_upto = newest_written()
-        # The proposal that still waits is shown to the week planner, and a new one
-        # replaces it (DESIGN_waiting_proposal.md §6.2).
-        still_open = saved_proposal.open_proposal()
-        # Nobody asked for this run, so the chat is not told it is waiting
-        # (DESIGN_output_verbosity.md §8.4).
-        with openrouter_client.unannounced():
-            proposal = runtime.coach_service.workout_adapt(
-                date_str, **saved_proposal.shown_to_week_planner(still_open)
-            )
-        if not proposal.workouts:
-            runtime.coach_service.workout_revision_record_no_change(proposal)
-            return proposal.strength_notice, None
-        # The chat is free while this run thinks, so a tap may have written a session since
-        # it read the week (DESIGN_long_runs_beside_chat.md §3).
-        if newest_written() != written_upto:
-            return WEEK_CHANGED_MORNING_LINE, None
-        if proposal.week_planner_changed:
-            item = saved_proposal.save(
-                proposal, written_upto, replaces=still_open is not None
-            )
-            return None, item
-        runtime.coach_service.workout_revision_apply(proposal)
-        note = " ".join(part for part in (proposal.reason, proposal.strength_notice) if part)
-        return note, None
+        # From the gate to the save nothing writes the week, and a tap waits its turn
+        # (DESIGN_long_runs_beside_chat.md §3). Nobody asked for this run, so the chat is
+        # not told when it waits.
+        with runtime.db.week_lock(waiting=None):
+            return _ask_week_planner(date_str)
     except Exception as e:
         step(f"Morning adaptation failed, rendering the stored schedule: {e}")
         return None, None
+
+
+def _ask_week_planner(date_str: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """`_morning_adaptation`'s look at the week, under the week lock."""
+    if not _asks(date_str):
+        return None, None
+    written_upto = newest_written()
+    # The proposal that still waits is shown to the week planner, and a new one replaces it
+    # (DESIGN_waiting_proposal.md §6.2).
+    still_open = saved_proposal.open_proposal()
+    # Nobody asked for this run, so the chat is not told it is waiting
+    # (DESIGN_output_verbosity.md §8.4).
+    with openrouter_client.unannounced():
+        proposal = runtime.coach_service.workout_adapt(
+            date_str, **saved_proposal.shown_to_week_planner(still_open)
+        )
+    if not proposal.workouts:
+        runtime.coach_service.workout_revision_record_no_change(proposal)
+        return proposal.strength_notice, None
+    if proposal.week_planner_changed:
+        item = saved_proposal.save(proposal, written_upto, replaces=still_open is not None)
+        return None, item
+    runtime.coach_service.workout_revision_apply(proposal)
+    note = " ".join(part for part in (proposal.reason, proposal.strength_notice) if part)
+    return note, None
 
 
 def _refresh_garmin(date_str: str) -> None:

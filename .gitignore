@@ -20,6 +20,8 @@ stamind.db.freshstart
 stamind.db-journal
 stamind.db-wal
 stamind.db-shm
+# The week lock beside each database (DESIGN_long_runs_beside_chat.md §3)
+*.week-lock
 
 # Logs, gym logs included (DESIGN_gym_logger.md §6)
 logs

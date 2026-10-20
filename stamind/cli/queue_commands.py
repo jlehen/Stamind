@@ -212,6 +212,16 @@ def run_queue_tell(args: argparse.Namespace) -> None:
     ))
 
 
+def _answer(item_id: int, action: str) -> Optional[Dict[str, Any]]:
+    """Acts on the item, or says it is settled. Returns the item as it was read."""
+    item = runtime.db.get_queue_item(item_id)
+    if item is None or item["closed_at"] or athlete_queue.settle_if_stale(item):
+        print(settled_line(item))
+    else:
+        _apply(item, action)
+    return item
+
+
 def run_bot_queue(args: argparse.Namespace) -> None:
     """A tap on a queued item's button, or `--next` from the bot's scheduler (§6.2,
     §13.2). Spawned by the bot, never typed."""
@@ -222,10 +232,14 @@ def run_bot_queue(args: argparse.Namespace) -> None:
         notice("Give an item id and an action, or --next.", red)
         return
     item = runtime.db.get_queue_item(args.item_id)
-    if item is None or item["closed_at"] or athlete_queue.settle_if_stale(item):
-        print(settled_line(item))
+    if item is not None and athlete_queue.kind_of(item).stands_alone:
+        # What a planner saved is answered once no run looks at the week, and read again
+        # after the wait: the run it waited for may have replaced it
+        # (DESIGN_long_runs_beside_chat.md §3).
+        with runtime.db.week_lock():
+            item = _answer(args.item_id, args.action)
     else:
-        _apply(item, args.action)
+        item = _answer(args.item_id, args.action)
     if item is None:
         return
     # An answer that queued a question, or started a run that did, is followed by that

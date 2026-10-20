@@ -79,15 +79,42 @@ The morning run asks nothing on the spot, so nothing new can wait in the second 
 it" while the morning run thinks, and Saturday is rewritten. The morning run read the week
 before that tap, so its answer is about a week that no longer exists.
 
-A chat run already checks for this before it saves a proposal or writes kilograms
-(DESIGN_waiting_proposal.md §6.2). The morning run makes the same check. When a session was
-written since it read the week, it saves no proposal and writes no kilograms. The morning
-message shows the week as it now stands, and says so in one line, where the coach's reason
-would stand:
+**One look at the week at a time** (amended 2026-10-20). The morning run used to check for
+this before it saved, and to throw its answer away when a session had been written since it
+read the week: "I had a change in mind, but your week changed while I was thinking." On
+Monday 19 October that threw away the better answer. At 07:59 the athlete wrote "I'm tired,
+skip the strength", and `workout tweak` proposed a rest day. At 08:00:00 the morning run
+started; its week planner was shown that proposal and answered with a rest day plus the heavy
+lift moved to Thursday and the light one to Friday. At 08:00:02 the athlete tapped "Change it"
+on the tweak. The morning answer was thrown away, and the next morning moved a gym session
+onto that day.
 
-> I had a change in mind, but your week changed while I was thinking.
+Now nothing writes the week while a run of the week planner looks at it. A lock file beside
+the database (`db.week_lock()`) is held:
 
-The next morning's run looks again.
+- by every write of the sessions, since `workout_change` takes it;
+- by every run of the week planner, from reading the week, the open proposal included, to
+  saving or writing its answer: `workout adapt`, `workout tweak`, `workout generate`, its
+  `--strength-only`, and the morning run from its gate on;
+- by a tap that answers a proposal or planned weeks, which reads the item again once it has
+  the lock.
+
+On that Monday, the tap at 08:00:02 waits and says "The coach is busy with your week right
+now. This goes on once it is done." The morning run saves its proposal at 08:03, which closes
+the tweak's as replaced. The tap then reads the tweak's closed and answers "That proposal is
+out of date, so I left your week as it is."; the morning's proposal, "This replaces my earlier
+proposal.", is the one to answer.
+
+The morning run waits without a word, and the bot does not start it while the lock is held:
+a run from a terminal counts as busy, like a run in the chat. A terminal run lets go once the
+week planner has answered, because it asks a person next, so a question left open in a
+terminal never holds the bot. It takes the lock again to write, and writes nothing if a
+session was written meanwhile: "Your week changed while I was thinking. Tell me again if you
+still want a change." The kernel lets go of the lock of a process that ends, so a run that
+dies holds nothing.
+
+Not handled: a terminal `workout generate` writes what it previewed even when a session was
+written while it asked, as before.
 
 ## 4. `workout generate` from its button
 
@@ -322,7 +349,8 @@ given them under.
    - **3a. How long the hand-off question lives** (§5). **Ruled 2026-10-14:** like the other
      confirmations, and sooner when the day of the session it names is over.
 4. **The morning run says so when the week changed under it** (§3). **Ruled 2026-10-14: B,** one
-   line: "I had a change in mind, but your week changed while I was thinking."
+   line: "I had a change in mind, but your week changed while I was thinking." **Replaced
+   2026-10-20** on the author's ask by the week lock (§3): the week no longer changes under it.
 5. **`/workout generate` typed in the chat** (§2, §4). **Ruled 2026-10-14: B,** it keeps today's
    behaviour. So the button sends a flag the typed command does not have, `--propose`.
 6. **The Stop button** (§8). **Ruled 2026-10-14: removed.**

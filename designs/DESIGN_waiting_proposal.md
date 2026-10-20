@@ -291,14 +291,14 @@ proposal from Thursday evening about Saturday is still open on Friday at 08:00. 
 is shown it, and its proposal replaces it. A terminal run asks and writes as before, and what
 it writes puts the open proposal out of date by rule 1 of §4.
 
-**The week changed while the coach was thinking.** The run compares the newest change that
-wrote a session when it started and when it is about to save a proposal or to write kilograms
-(§7). If they differ, it saves and writes nothing, and says "Your week changed while I was
-thinking. Tell me again if you still want a change."
-This is rule 1 of §4, checked one step earlier. The second place makes it needed: at 07:30 the
+**The week cannot change while the coach is thinking** (amended 2026-10-20). At 07:30 the
 athlete writes "also move Saturday's ride", and at 07:30:30, while that run thinks, they tap
-"Change it" on the 07:07 proposal. Without the check, the 07:31 proposal would arrive already
-out of date.
+"Change it" on the 07:07 proposal. The run used to throw its answer away when it found a
+session written since it read the week. Now the tap waits until the run has saved its
+proposal, which replaces the 07:07 one, and is then told that proposal is out of date. The
+lock that does this is DESIGN_long_runs_beside_chat.md §3; a terminal run, which lets go of
+it while it asks, still says "Your week changed while I was thinking. Tell me again if you
+still want a change." when a session was written meanwhile.
 
 ### 6.3 The questions about what the athlete wrote
 

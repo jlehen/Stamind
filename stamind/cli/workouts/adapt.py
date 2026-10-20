@@ -13,6 +13,7 @@ from typing import List, Optional
 from stamind import athlete_queue, runtime
 from stamind.coach.proposals import NOTE_SESSION_UNCLEAR
 from stamind.config import config
+from stamind.db.base import WeekHold
 from stamind.prompt import Choice, athlete_watching
 from stamind.sports import canonical_sport
 from stamind.types import Workout
@@ -92,8 +93,8 @@ def run_workout_tweak(args: argparse.Namespace) -> None:
         _adapt(args, tweak=True)
 
 
-# What a chat run says when a session was written while the week planner was thinking: it
-# saves and writes nothing (DESIGN_waiting_proposal.md §6.2).
+# What a terminal run says when a session was written while it asked: it writes nothing
+# (DESIGN_long_runs_beside_chat.md §3).
 WEEK_CHANGED_LINE = (
     "Your week changed while I was thinking. Tell me again if you still want a change."
 )
@@ -121,9 +122,6 @@ def _settle(
     `replaces` says a proposal was open when the run started, and `written_upto` is the
     newest change that wrote a session at that moment (§6.2)."""
     saves = in_chat and not args.auto
-    if saves and proposal.workouts and newest_written() != written_upto:
-        print(f"\n{WEEK_CHANGED_LINE}")
-        return
     if saves and proposal.week_planner_changed:
         # In place of the confirm: the reason and the preview, then the two answers (§3).
         send_alone(saved_proposal.save(proposal, written_upto, replaces=replaces))
@@ -158,8 +156,14 @@ def _settle(
             runtime.render.adapt_discarded()
             return
 
-    step("\nApplying adaptations...")
-    runtime.coach_service.workout_revision_apply(proposal)
+    # A terminal let go of the week while it asked (`_adapt`), so a session may have been
+    # written meanwhile (DESIGN_long_runs_beside_chat.md §3).
+    with runtime.db.week_lock():
+        if newest_written() != written_upto:
+            print(f"\n{WEEK_CHANGED_LINE}")
+            return
+        step("\nApplying adaptations...")
+        runtime.coach_service.workout_revision_apply(proposal)
     runtime.render.adapt_applied()
 
 
@@ -203,6 +207,17 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
     in_chat = athlete_watching()
     if not (in_chat or args.auto):
         cut_short.ask_on_the_spot(date_str)
+    with runtime.db.week_lock() as week:
+        _consult(args, tweak, date_str, in_chat, week)
+
+
+def _consult(
+    args: argparse.Namespace, tweak: bool, date_str: str, in_chat: bool, week: WeekHold
+) -> None:
+    """The week planner's look at the week, and what becomes of its answer. Nothing writes
+    the week from the reading below to the save, and a terminal lets go once the week
+    planner has answered, since it asks a person next (DESIGN_long_runs_beside_chat.md
+    §3)."""
     # Every run shows the week planner the proposal that still waits
     # (DESIGN_waiting_proposal.md §6.2).
     still_open = saved_proposal.open_proposal()
@@ -221,6 +236,8 @@ def _adapt(args: argparse.Namespace, tweak: bool = False) -> None:
                 date_str, message=getattr(args, 'message', None),
                 **saved_proposal.shown_to_week_planner(still_open),
             )
+        if not in_chat:
+            week.release()
         # The note is kept with the session the week planner says it is about, once its
         # call has returned (DESIGN_session_notes.md §3). When it cannot tell which of
         # several, a terminal asks on the spot and the chat queues the question. A tweak's

@@ -19,7 +19,7 @@ import shlex
 import sys
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
-from stamind import athlete_queue, heads_up, journal, settings
+from stamind import athlete_queue, heads_up, journal, runtime, settings
 from stamind.chat import runner
 from stamind.clock import now as athlete_now, reset_cache as forget_timezone
 from stamind.text import strip_ansi
@@ -181,8 +181,11 @@ class SchedulerMixin:
         last_run: Dict[str, str] = {}
         while True:
             try:
+                # Busy too while a run outside the chat, such as a terminal's, looks at the
+                # week (DESIGN_long_runs_beside_chat.md §3).
                 pause = await scheduler_wake(
-                    last_run, lambda: bool(self._runs(self.push_chat_id)),
+                    last_run,
+                    lambda: bool(self._runs(self.push_chat_id)) or runtime.db.week_busy(),
                     self._run_scheduled, self._start_reflect, self.last_input_at,
                 )
             except Exception as exc:

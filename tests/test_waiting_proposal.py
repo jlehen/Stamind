@@ -204,6 +204,22 @@ class OutOfDateTest(_Case):
         save_workout(test_db, SATURDAY, "running", "Long run", duration_minutes=100)
         self.refused(item)
 
+    def test_a_tap_that_waited_reads_its_proposal_again(self):
+        """Monday 08:00:02: "Change it" on the 07:59 proposal waits for the morning run,
+        which saves its own proposal in its place. The tap then writes nothing
+        (DESIGN_long_runs_beside_chat.md §3)."""
+        item = self.save()
+        real_lock = test_db.week_lock
+        replaced = []
+
+        def morning_saves_meanwhile(*args, **kwargs):
+            if not replaced:
+                replaced.append(self.save(minutes=45))
+            return real_lock(*args, **kwargs)
+
+        with patch.object(test_db, "week_lock", side_effect=morning_saves_meanwhile):
+            self.refused(item)
+
     def test_a_run_that_changed_nothing_does_not_put_it_out_of_date(self):
         item = self.save()
         with test_db.workout_change(kind="adapt", summary="held"):
@@ -343,6 +359,23 @@ class MorningPushTest(_Case):
         self.assertIn("Today: Intervals — 90 min", briefing)
         self.assertNotIn("Rough night.", briefing)
         self.assertIn("Rough night.", proposal)
+
+    def test_the_week_is_held_from_the_gate_to_the_save(self):
+        """Monday 08:00: the morning run asks the week planner. A tap at 08:00:02 on the
+        07:59 proposal waits until this run has saved its own
+        (DESIGN_long_runs_beside_chat.md §3)."""
+        held = []
+        real_save = saved_proposal.save
+
+        def save(*args, **kwargs):
+            held.append(test_db.week_busy())
+            return real_save(*args, **kwargs)
+
+        with patch.object(saved_proposal, "save", side_effect=save):
+            coach, _out = self.push(self.eased())
+        self.assertEqual(held, [True])
+        self.assertEqual(len(saved_proposal.waiting()), 1)
+        self.assertFalse(test_db.week_busy())
 
     def test_the_question_carries_the_two_answers_then_the_briefings_buttons(self):
         """One keyboard on such a morning. The two answers stand where "Got it" would."""
@@ -816,24 +849,40 @@ class ChatRunTest(_Case):
         self.assertIn("no run on Fridays", constraint_question.args[0])
         self.assertNotIn("no run on Fridays", apply_question.args[0])
 
-    def test_a_week_that_changed_while_the_coach_was_thinking_saves_nothing(self):
-        """07:30 "also move Saturday's ride". At 07:30:30, while that run thinks, a tap on
-        the 07:07 proposal writes a session (§6.2)."""
+    def test_the_week_is_held_from_the_reading_to_the_save(self):
+        """07:30 "also move Saturday's ride". A tap at 07:30:30 on the 07:07 proposal waits
+        until this run has saved its answer (DESIGN_long_runs_beside_chat.md §3)."""
+        held = []
+
         def think(*_args, **_kwargs):
-            save_workout(test_db, SATURDAY, "running", "Long run", duration_minutes=100)
+            held.append(test_db.week_busy())
             return self.eased()
 
-        coach, _prompt, out = self.coach_run(None, think=think)
-        self.assertIn(WEEK_CHANGED_LINE, out)
-        self.assertEqual(saved_proposal.waiting(), [])
-        coach.workout_revision_apply.assert_not_called()
+        real_save = saved_proposal.save
 
-    def test_kilograms_are_not_written_either_when_the_week_changed(self):
-        def think(*_args, **_kwargs):
+        def save(*args, **kwargs):
+            held.append(test_db.week_busy())
+            return real_save(*args, **kwargs)
+
+        with patch.object(saved_proposal, "save", side_effect=save):
+            self.coach_run(None, think=think)
+        self.assertEqual(held, [True, True])
+        self.assertEqual(len(saved_proposal.waiting()), 1)
+        self.assertFalse(test_db.week_busy())
+
+    def test_a_terminal_lets_go_of_the_week_while_it_asks(self):
+        """A terminal run asks "Apply?". The bot may write while it waits for the answer, and
+        a session written meanwhile makes the answer write nothing."""
+        held = []
+
+        def answer(*_args, **_kwargs):
+            held.append(test_db.week_busy())
             save_workout(test_db, SATURDAY, "running", "Long run", duration_minutes=100)
-            return self.eased(title="Intervals", minutes=90, week_planner_changed=False)
+            return True
 
-        coach, _prompt, out = self.coach_run(None, think=think)
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "", "STAMIND_RENDER": ""}):
+            coach, _prompt, out = self.coach_run(self.eased(), on_confirm=answer)
+        self.assertEqual(held, [False])
         self.assertIn(WEEK_CHANGED_LINE, out)
         coach.workout_revision_apply.assert_not_called()
 

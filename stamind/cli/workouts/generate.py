@@ -21,7 +21,6 @@ from stamind.cli.queue import send_alone, send_own_questions
 from stamind.cli.runway import schedule_coverage
 from stamind.cli.windows import has_selector as _has_selector, resolve_window
 from stamind.cli.workouts import proposal as saved
-from stamind.cli.workouts.adapt import WEEK_CHANGED_LINE
 from stamind.cli.workouts.heads_up import (
     generate_dates, newest_written, print_send_notice, replacing_unsent,
 )
@@ -354,29 +353,28 @@ def propose_weeks(
     """`--propose`: saves the weeks for a tap and sends them, and asks nothing
     (DESIGN_long_runs_beside_chat.md §4). On an out-of-date plan it stops and says so. When
     sessions already stand in the span it saves the question first and calls no planner,
-    unless `asked` says the athlete answered it. A session written on its days while the
-    week planner thought makes it save nothing."""
+    unless `asked` says the athlete answered it."""
     span_start, span_end = span
     if _out_of_date_plans(span_start, span_end, prefer_macro_id):
         runtime.render.weeks_need_a_new_plan()
         return
-    standing = runtime.db.get_workouts(start_date=span_start, end_date=span_end)
-    if standing and not asked:
-        saved.ask_to_replace(span, standing, prefer_macro_id, fresh)
-        send_own_questions()
-        return
-    written_upto = newest_written()
-    proposal = runtime.coach_service.workout_generate(
-        start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id,
-        fresh=fresh,
-    )
-    if not proposal.workouts:
-        runtime.render.workout_generate_preview(proposal)
-        return
-    if runtime.db.wrote_between(written_upto, proposal.gen_start, proposal.gen_end):
-        print(f"\n{WEEK_CHANGED_LINE}")
-        return
-    send_alone(saved.save_weeks(proposal, written_upto))
+    # Nothing writes the week from the reading below to the save
+    # (DESIGN_long_runs_beside_chat.md §3).
+    with runtime.db.week_lock():
+        standing = runtime.db.get_workouts(start_date=span_start, end_date=span_end)
+        if standing and not asked:
+            saved.ask_to_replace(span, standing, prefer_macro_id, fresh)
+            send_own_questions()
+            return
+        written_upto = newest_written()
+        proposal = runtime.coach_service.workout_generate(
+            start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id,
+            fresh=fresh,
+        )
+        if not proposal.workouts:
+            runtime.render.workout_generate_preview(proposal)
+            return
+        send_alone(saved.save_weeks(proposal, written_upto))
 
 
 def _generate(
@@ -403,10 +401,13 @@ def _generate(
         notice(f"Workout generation cancelled{unchanged}")
         return
 
-    proposal = runtime.coach_service.workout_generate(
-        start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id,
-        fresh=fresh,
-    )
+    # One run of the week planner at a time; a terminal asks next, so it lets go, and the
+    # write takes the lock again (DESIGN_long_runs_beside_chat.md §3).
+    with runtime.db.week_lock():
+        proposal = runtime.coach_service.workout_generate(
+            start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id,
+            fresh=fresh,
+        )
     if not runtime.render.workout_generate_preview(proposal):
         return
 
