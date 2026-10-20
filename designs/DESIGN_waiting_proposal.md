@@ -105,7 +105,8 @@ as "the goblet squat and hip thrust are gone, every load a tenth lighter". After
 the only list of exercises in the chat was the briefing's, with both exercises still in it.
 
 **Keep it as planned.** The item is closed. Nothing is written. The reply is "Okay — nothing
-changed."
+changed.", followed in the chat by today's sessions when the proposal changes today, since the
+morning push no longer draws them above it (§5, amended 2026-10-20).
 
 **No answer.** The week stays as planned. Nothing reminds the athlete.
 
@@ -136,12 +137,19 @@ With `adapt-first` on, the push asks the week planner as it does today. Then:
 
 - **Nothing to change.** As today.
 - **Only kilograms moved.** Written at once, with its sentence in the briefing, as today (§7).
-- **A session would change.** Nothing is written. The briefing shows today as planned, with no
-  reason line. The proposal follows as its own message. The round of queued questions starts
-  when the athlete answers it.
+- **A session would change.** Nothing is written. The proposal is sent as its own message.
+  When it leaves today alone, the briefing above it shows today as planned, with no reason
+  line. When it changes today, there is no briefing: the proposal's lines for today say what
+  today is and what it would become, and either answer is followed by today's sessions as
+  they then stand (§4). The round of queued questions starts when the athlete answers it.
 
-On the Thursday of §1 the athlete reads the 90-minute ride, then: "Rough night. Here's what I'd
-change: 60 easy minutes." They tap **Keep it as planned** and ride the 90 minutes.
+On the Thursday of §1 the athlete reads: "Rough night. Here's what I'd change: 🚴 Today: Easy
+ride — 60 min (was Intervals, 90 min)." They tap **Keep it as planned**, read the 90-minute
+ride under "Okay — nothing changed.", and ride it.
+
+Why not the briefing first (amended 2026-10-20): on Tuesday 20 October the briefing said
+"🧘 Today: Rest Day — Mobility Yoga", and the proposal under it moved a gym session onto that
+day. The athlete tapped "Change it" with the yoga in mind and went for a ride.
 
 **One keyboard on such a morning** (amended 2026-10-05). The briefing first kept its row. On
 Monday 5 October the athlete read a 60-minute gym session with "👍 Got it" under it, and half

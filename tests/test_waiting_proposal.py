@@ -170,9 +170,9 @@ class AnswerTest(_Case):
     def test_keep_it_as_planned_writes_nothing_and_pulls_nothing(self):
         item = self.save()
         out = self.tap(item, "a2")
-        self.assertIn(saved_proposal.KEPT_LINE, out)
-        # The briefing already shows today as planned, so the reply does not repeat it.
-        self.assertNotIn("Today:", out)
+        # No briefing stood above a proposal about today, so the reply shows today (§4).
+        reply = out[out.index(saved_proposal.KEPT_LINE):]
+        self.assertIn("Today: Intervals — 90 min", reply)
         self.assertEqual(self.ride()["duration_minutes"], 90)
         self.assertEqual(self.outcome(item), athlete_queue.ANSWERED)
         self.garmin.ensure_data.assert_not_called()
@@ -310,19 +310,27 @@ class MorningPushTest(_Case):
         coach.workout_revision_apply.assert_not_called()
         self.assertEqual(self.ride()["duration_minutes"], 90)
         self.assertIsNone(test_db.newest_adapt())
-        # The briefing shows today as planned, with no reason line and no buttons of its
-        # own, then the proposal as another message.
+        # The proposal changes today, so today as planned is not drawn above it: the
+        # proposal's own line for today says both (§5).
         self.assertNotIn(BUTTONS_SENTINEL, out)
         briefing, proposal = out.split(FLUSH_SENTINEL, 1)
-        # The flush only ends the briefing's message.
-        self.assertEqual(json.loads(proposal.split("\n", 1)[0]), {})
-        self.assertIn("Intervals — 90 min", briefing)
-        self.assertNotIn("Rough night.", briefing)
+        self.assertNotIn("Today:", briefing)
         self.assertIn("Rough night.", proposal)
+        self.assertIn("Today: Easy ride — 60 min (was Intervals, 90 min)", proposal)
         [sent] = queue_lines(out)
         self.assertEqual(sent["text"], saved_proposal.QUESTION_LINE)
         [item] = saved_proposal.waiting()
         self.assertEqual(item["payload"]["dates"], [THURSDAY])
+
+    def test_a_proposal_about_another_day_comes_under_the_briefing(self):
+        save_workout(test_db, SATURDAY, "cycling", "Long ride", duration_minutes=180)
+        _coach, out = self.push(self.eased(day=SATURDAY))
+        briefing, proposal = out.split(FLUSH_SENTINEL, 1)
+        # The flush only ends the briefing's message.
+        self.assertEqual(json.loads(proposal.split("\n", 1)[0]), {})
+        self.assertIn("Today: Intervals — 90 min", briefing)
+        self.assertNotIn("Rough night.", briefing)
+        self.assertIn("Rough night.", proposal)
 
     def test_the_question_carries_the_two_answers_then_the_briefings_buttons(self):
         """One keyboard on such a morning. The two answers stand where "Got it" would."""

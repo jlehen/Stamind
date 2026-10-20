@@ -95,19 +95,24 @@ def _spoiled_today(
 
 def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
     """"Change it" writes the saved proposal under one change; "Keep it as planned" writes
-    nothing. A change to today is followed by today's sessions as they now stand, which
-    nothing in the chat shows yet (§4)."""
+    nothing. Either answer about today is followed by today's sessions as they then stand,
+    which the morning push no longer draws above such a proposal (§4, §5)."""
     if index != ACCEPT:
-        return KEPT_LINE
+        return _with_today(KEPT_LINE, item)
     if _spoiled_today(item, out_of_date):
         return OUT_OF_DATE_LINE
     runtime.coach_service.workout_revision_apply(
         revision_from_json(item["payload"]["proposal"])
     )
+    return _with_today(APPLIED_LINE, item)
+
+
+def _with_today(line: str, item: Dict[str, Any]) -> str:
+    """`line`, then today's sessions when the proposal changes today."""
     today = today_str()
     if today not in item["payload"]["dates"]:
-        return APPLIED_LINE
-    return f"{APPLIED_LINE}\n\n{_today_text(today)}".rstrip()
+        return line
+    return f"{line}\n\n{_today_text(today)}".rstrip()
 
 
 def _today_text(today: str) -> str:

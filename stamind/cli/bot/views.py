@@ -335,11 +335,15 @@ def run_bot_morning(args: argparse.Namespace) -> None:
         if (verdicts.get(w.get("id")) or {}).get("status") not in SIMPLE_DONE_STATUSES
     ]
 
+    # A proposal that changes today says what today would become, and either answer draws
+    # today as it then stands, so today as stored is not drawn above it
+    # (DESIGN_waiting_proposal.md §5).
+    changes_today = proposal_item is not None and today in proposal_item["payload"]["dates"]
     if workouts and not ahead:
         print(PUSH_ALL_DONE_LINE)
     elif not workouts and runway is not None and runway["days_left"] < 0:
         print(SIMPLE_PASSED_LINE)
-    else:
+    elif not changes_today:
         for line in simple_day_lines(workouts, today, verdicts):
             print(line)
     if adapt_note:
