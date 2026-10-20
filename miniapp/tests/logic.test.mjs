@@ -611,3 +611,63 @@ test("the calendar's address carries the session and the log, and a gym address 
   assert.deepEqual(logic.logFromHash(hash), SENT_LOG);
   assert.equal(logic.logFromHash(EXAMPLE_HASH), null);
 });
+
+// The chain of DESIGN_strength_combos.md §2, three keys joined by ">".
+const CHAIN = "HIP_SWING/ONE_ARM_SWING>OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN>SQUAT/GOBLET_SQUAT";
+
+async function realCatalog() {
+  const { readFile } = await import("node:fs/promises");
+  return JSON.parse(await readFile(new URL("../exercises.json", import.meta.url), "utf8"));
+}
+
+test("a chain reads as its movements, each without its category unless the name is shared",
+  async () => {
+    const catalog = await realCatalog();
+    assert.deepEqual(logic.chipsOf(catalog, CHAIN),
+                     ["One arm swing", "Single arm dumbbell clean", "Goblet squat"]);
+    assert.equal(logic.wordsOf(catalog, CHAIN),
+                 "One arm swing → Single arm dumbbell clean → Goblet squat");
+    // A plain exercise keeps its category, and so does a movement whose name a band
+    // exercise shares (DESIGN_strength_combos.md D23).
+    assert.deepEqual(logic.chipsOf(catalog, "SQUAT/GOBLET_SQUAT"), ["[Squat] Goblet squat"]);
+    assert.equal(logic.wordsOf(catalog, "ROW/FACE_PULL>SQUAT/GOBLET_SQUAT"),
+                 "[Row] Face pull → Goblet squat");
+  });
+
+test("a chain is per side when any movement is, and shows its first movement's photos",
+  async () => {
+    const catalog = await realCatalog();
+    assert.equal(logic.perSideOf(catalog, CHAIN), true);
+    assert.equal(logic.perSideOf(catalog, "HIP_RAISE/KETTLEBELL_SWING>SQUAT/GOBLET_SQUAT"), false);
+    // A one-sided movement twice is once on each side inside the round (D16).
+    const clean = "OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN";
+    assert.equal(logic.perSideOf(catalog, `${clean}>SQUAT/GOBLET_SQUAT>${clean}`), false);
+    assert.deepEqual(logic.photosOf(catalog, "SQUAT/GOBLET_SQUAT>HIP_RAISE/KETTLEBELL_SWING"),
+                     logic.photosOf(catalog, "SQUAT/GOBLET_SQUAT"));
+  });
+
+test("a chip's three edits give the card its new key", () => {
+  // Insert after on a plain exercise starts a chain.
+  const swing = "HIP_RAISE/KETTLEBELL_SWING";
+  const halo = "SHOULDER_STABILITY/KETTLEBELL_HALO";
+  assert.equal(logic.chainAfter(swing, 0, halo), `${swing}>${halo}`);
+  assert.equal(logic.chainAfter(CHAIN, 0, halo),
+               `HIP_SWING/ONE_ARM_SWING>${halo}>OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN`
+               + ">SQUAT/GOBLET_SQUAT");
+  assert.equal(logic.replacePart(CHAIN, 2, halo),
+               `HIP_SWING/ONE_ARM_SWING>OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN>${halo}`);
+  // Removing a movement of two leaves a plain exercise.
+  assert.equal(logic.removePart(`${swing}>${halo}`, 1), swing);
+});
+
+test("an edited chain keeps its sets, ticked or not, and loses its written load", () => {
+  // DESIGN_strength_combos.md D22: the edit goes through `swapExercise`, as a swap does.
+  const state = tickSet(exampleState(), 0, 0, 40);
+  const key = logic.chainAfter(state.x[0].n, 0, "SQUAT/LEG_PRESS");
+  const after = logic.swapExercise(state, 0, key);
+  assert.equal(after.x[0].n, "SQUAT/BELT_SQUAT>SQUAT/LEG_PRESS");
+  assert.deepEqual(after.x[0].sets, state.x[0].sets);
+  assert.equal(after.x[0].p, 1);
+  assert.equal(after.x[0].kg, null);
+  assert.equal(logic.buildLog(after, END).x[0].n, key);
+});

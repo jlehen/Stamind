@@ -642,14 +642,84 @@ export function shown(words) {
   return `[${capitalise(words.slice(0, colon))}] ${capitalise(nameAfterCategory(words))}`;
 }
 
-// What the page prints for a key. A key the catalog lacks shows as it is.
-export function wordsOf(catalog, key) {
-  const row = catalog.find((entry) => entry.k === key);
-  return row ? shown(row.w) : key;
+// The sign between the keys of a chain, several movements done as one set
+// (DESIGN_strength_combos.md §3). No key of the catalog holds it.
+export const CHAIN_JOINER = ">";
+const CHAIN_ARROW = " → ";
+
+// The keys of a chain's movements in order, or the key alone for one exercise.
+export function partsOf(key) {
+  return key.split(CHAIN_JOINER);
 }
 
+// The three edits a tapped chip offers (DESIGN_strength_combos.md §6): each takes the card's key
+// and the index of the tapped movement, and gives the key the page hands to `swapExercise`.
+export function replacePart(key, part, pick) {
+  const parts = partsOf(key);
+  parts[part] = pick;
+  return parts.join(CHAIN_JOINER);
+}
+
+export function removePart(key, part) {
+  const parts = partsOf(key);
+  parts.splice(part, 1);
+  return parts.join(CHAIN_JOINER);
+}
+
+export function chainAfter(key, part, pick) {
+  const parts = partsOf(key);
+  parts.splice(part + 1, 0, pick);
+  return parts.join(CHAIN_JOINER);
+}
+
+// The words after the category that more than one row reads as, worked out once per catalog.
+const sharedNames = new WeakMap();
+
+function sharedOf(catalog) {
+  if (sharedNames.has(catalog)) {
+    return sharedNames.get(catalog);
+  }
+  const counts = new Map();
+  for (const row of catalog) {
+    const name = nameAfterCategory(row.w);
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  const shared = new Set([...counts].filter(([, n]) => n > 1).map(([name]) => name));
+  sharedNames.set(catalog, shared);
+  return shared;
+}
+
+// The catalog's row for one key, or undefined when it lacks the key.
+function rowOf(catalog, key) {
+  return catalog.find((entry) => entry.k === key);
+}
+
+// One name per movement, as the card's chips print them (DESIGN_strength_combos.md §6): a plain
+// exercise reads "[Squat] Goblet squat"; a chain's movements drop the category unless their
+// name is shared, "[Row] Face pull". A key the catalog lacks shows as it is.
+export function chipsOf(catalog, key) {
+  const parts = partsOf(key);
+  return parts.map((part) => {
+    const row = rowOf(catalog, part);
+    if (!row) {
+      return part;
+    }
+    const name = nameAfterCategory(row.w);
+    if (parts.length === 1 || sharedOf(catalog).has(name)) {
+      return shown(row.w);
+    }
+    return capitalise(name);
+  });
+}
+
+// What the page prints for a key.
+export function wordsOf(catalog, key) {
+  return chipsOf(catalog, key).join(CHAIN_ARROW);
+}
+
+// A chain shows its first movement's photos.
 export function photosOf(catalog, key) {
-  const row = catalog.find((entry) => entry.k === key);
+  const row = rowOf(catalog, partsOf(key)[0]);
   if (!row || !row.f) {
     return [];
   }
@@ -657,15 +727,18 @@ export function photosOf(catalog, key) {
 }
 
 export function patternOf(catalog, key) {
-  const row = catalog.find((entry) => entry.k === key);
+  const row = rowOf(catalog, key);
   return row ? row.p : null;
 }
 
 // Whether a key is done one side at a time: its reps are per side and a set is both sides
-// (DESIGN_strength_tracking.md §4).
+// (DESIGN_strength_tracking.md §4). A one-sided movement makes it so when it appears an odd
+// number of times: twice is once on each side inside a chain's round (DESIGN_strength_combos.md
+// §3).
 export function perSideOf(catalog, key) {
-  const row = catalog.find((entry) => entry.k === key);
-  return Boolean(row && row.o);
+  const parts = partsOf(key);
+  return parts.some((part) => Boolean(rowOf(catalog, part)?.o)
+    && parts.filter((other) => other === part).length % 2 === 1);
 }
 
 // ---------------------------------------------------------------------------------------

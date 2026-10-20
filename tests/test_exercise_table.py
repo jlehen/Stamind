@@ -94,6 +94,52 @@ class WordsTest(unittest.TestCase):
         self.assertEqual(vocabulary.words("SQUAT/MOON_SQUAT"), "squat: moon squat")
 
 
+# The chain of DESIGN_strength_combos.md §2: a kettlebell swing done one arm at a time, a
+# dumbbell clean done one arm at a time, a goblet squat.
+CHAIN = "HIP_SWING/ONE_ARM_SWING>OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN>SQUAT/GOBLET_SQUAT"
+
+
+class ChainTest(unittest.TestCase):
+    """Several movements as one exercise, their keys joined (DESIGN_strength_combos.md §3)."""
+
+    def test_a_plain_key_is_one_part_and_reads_as_before(self):
+        for key in vocabulary.keys():
+            self.assertEqual(vocabulary.parts(key), [key])
+        self.assertEqual(vocabulary.words("SQUAT/GOBLET_SQUAT"), "squat: goblet squat")
+
+    def test_a_chain_reads_as_its_movements_without_their_categories(self):
+        self.assertEqual(vocabulary.parts(CHAIN)[1], "OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN")
+        self.assertEqual(vocabulary.words(CHAIN),
+                         "one arm swing → single arm dumbbell clean → goblet squat")
+
+    def test_a_bare_name_two_classes_share_keeps_its_category(self):
+        """The cable face pull and the band one are both 'face pull' (D23)."""
+        self.assertIn("face pull", vocabulary.shared_names())
+        self.assertNotIn("goblet squat", vocabulary.shared_names())
+        self.assertEqual(vocabulary.words("ROW/FACE_PULL>SQUAT/GOBLET_SQUAT"),
+                         "row: face pull → goblet squat")
+
+    def test_a_chain_is_per_side_when_a_one_sided_movement_appears_once(self):
+        self.assertEqual(vocabulary.side_mark(CHAIN), "/side")
+        self.assertEqual(vocabulary.side_mark("HIP_RAISE/KETTLEBELL_SWING>SQUAT/GOBLET_SQUAT"), "")
+        self.assertEqual(vocabulary.model_line(CHAIN), CHAIN)
+
+    def test_a_one_sided_movement_twice_is_one_round_of_both_sides(self):
+        """D16: a left clean, a goblet squat, a right clean is one round, not per side."""
+        clean = "OLYMPIC_LIFT/SINGLE_ARM_DUMBBELL_CLEAN"
+        self.assertEqual(vocabulary.side_mark(f"{clean}>SQUAT/GOBLET_SQUAT>{clean}"), "")
+        self.assertEqual(vocabulary.side_mark(f"{clean}>{clean}>{clean}"), "/side")
+
+    def test_the_movements_share_one_implement(self):
+        # Kettlebells and dumbbells read as one.
+        self.assertTrue(vocabulary.shared_load(vocabulary.parts(CHAIN)))
+        self.assertFalse(vocabulary.shared_load(
+            ["OLYMPIC_LIFT/BARBELL_POWER_CLEAN", "HIP_RAISE/KETTLEBELL_SWING"]))
+        # A bodyweight movement fits any implement, and a chain of them passes.
+        self.assertTrue(vocabulary.shared_load(["PUSH_UP/PUSH_UP", "PLANK/PLANK"]))
+        self.assertTrue(vocabulary.shared_load(["HIP_RAISE/KETTLEBELL_SWING", "PUSH_UP/PUSH_UP"]))
+
+
 class ClassTest(unittest.TestCase):
     """What the module gives for a key, and for any Garmin name (§11)."""
 

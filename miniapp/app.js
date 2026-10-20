@@ -79,10 +79,14 @@ let locked = false;
 const OPENED_LOCKED = "This is the log the bot holds for this session. Tap Edit to change it.";
 const OPENED_EDITING = "Send again replaces the log the bot holds. A change you do not send is "
   + "lost when the page closes.";
-// What the search sheet is for: "swap" or "insert" the card at `searchIndex`, or "add" one.
+// What the search sheet is for: "swap" or "insert" the card at `searchIndex`, or "add" one;
+// "replace" the movement `searchPart` of that card, or "chain" a pick after it.
 let searchMode = "add";
 let searchIndex = null;
+let searchPart = null;
 let swapPattern = null;
+// The chip whose three buttons show, `{ card, part }`, or null. Not saved.
+let openChip = null;
 
 // ---------------------------------------------------------------------------------------
 // Saving. Telegram's own device storage when the app has it, the browser's otherwise (§1).
@@ -158,7 +162,8 @@ function persist() {
 // ---------------------------------------------------------------------------------------
 // Applying a change. `apply` redraws, `applyQuiet` does not, because a redraw triggered by a
 // field losing focus would replace the button the tap was heading for. Both record the change
-// for Undo, under the card it was made on (`card`, its id) or under the page (null).
+// for Undo, under the card it was made on (`card`, its id) or under the page (null). Both, and
+// an undo, close the open chip box: its place in the card may now hold another movement.
 // ---------------------------------------------------------------------------------------
 
 function remember(after, card) {
@@ -166,6 +171,7 @@ function remember(after, card) {
     history = logic.record(history, state, card);
   }
   state = after;
+  openChip = null;
   persist();
 }
 
@@ -192,6 +198,7 @@ function undo(result) {
   }
   state = result.state;
   history = result.history;
+  openChip = null;
   persist();
   render();
 }
@@ -279,7 +286,7 @@ function exerciseCard(exercise, xi) {
   const head = el("div", "card-head");
   const name = el("div", "card-name");
   const words = logic.wordsOf(catalog, exercise.n);
-  name.append(el("div", "card-title", words));
+  name.append(cardTitle(exercise, xi));
   const line = el("div", "card-line");
   const kind = button(exercise.warmup ? "Warm-up" : "Main",
     exercise.warmup ? "kind warmup" : "kind", () => apply(logic.toggleWarmup(state, xi), id));
@@ -337,6 +344,55 @@ function exerciseCard(exercise, xi) {
     () => applyQuiet(logic.setExerciseNote(state, xi, note.value), id));
   card.append(note);
   return card;
+}
+
+// Every title is chips, one per movement, a chain's opened by ⛓. A tap on a chip boxes it with
+// the three buttons that act on that movement (DESIGN_strength_combos.md §6).
+function cardTitle(exercise, xi) {
+  const chips = logic.chipsOf(catalog, exercise.n);
+  const title = el("div", "card-title");
+  if (chips.length > 1) {
+    title.append(el("span", "chain-mark", "⛓"));
+  }
+  chips.forEach((chip, part) => {
+    if (part) {
+      title.append(el("span", "chain-arrow", "→"));
+    }
+    title.append(movement(exercise, xi, chip, part, chips.length));
+  });
+  return title;
+}
+
+function movement(exercise, xi, chip, part, count) {
+  const open = Boolean(openChip) && openChip.card === exercise.id && openChip.part === part;
+  const box = el("div", open ? "part open" : "part");
+  const name = button(chip, "chip", () => {
+    openChip = open ? null : { card: exercise.id, part };
+    render();
+  });
+  name.setAttribute("aria-expanded", String(open));
+  box.append(name);
+  if (!open) {
+    return box;
+  }
+  const menu = el("div", "part-menu");
+  menu.append(button("⇆ Replace", "pill", () => openSearch("replace", xi, part)));
+  menu.append(button("✕ Remove", "pill danger", () => {
+    // The last movement of a card goes the way Del takes the card.
+    if (count === 1) {
+      apply(logic.removeExercise(state, xi));
+      return;
+    }
+    editChain(xi, logic.removePart(exercise.n, part));
+  }));
+  menu.append(button("⤵ Insert after", "pill", () => openSearch("chain", xi, part)));
+  box.append(menu);
+  return box;
+}
+
+// A chip's edit is a swap to the card's new key: the sets stay, the card's ↶ takes it back.
+function editChain(xi, key) {
+  apply(logic.swapExercise(state, xi, key), state.x[xi].id);
 }
 
 function togglePhotos(name) {
@@ -437,14 +493,16 @@ function tick() {
 
 // ---------------------------------------------------------------------------------------
 // The exercise search: a swap keeps the card's movement pattern as its filter, an added or
-// inserted exercise searches everything (§1).
+// inserted exercise searches everything (§1). A chip's Replace keeps its movement's pattern,
+// its Insert after searches everything (DESIGN_strength_combos.md §6).
 // ---------------------------------------------------------------------------------------
 
-function openSearch(mode, xi = null) {
+function openSearch(mode, xi = null, part = null) {
   searchMode = mode;
   searchIndex = xi;
-  swapPattern = mode === "swap" ? logic.patternOf(catalog, state.x[xi].n) : null;
-  ui.searchTitle.textContent = searchTitle(mode, xi);
+  searchPart = part;
+  swapPattern = searchPattern(mode, xi, part);
+  ui.searchTitle.textContent = searchTitle(mode, xi, part);
   ui.searchAllRow.hidden = !swapPattern;
   ui.searchAll.checked = !swapPattern;
   ui.searchInput.value = "";
@@ -453,12 +511,29 @@ function openSearch(mode, xi = null) {
   ui.searchInput.focus();
 }
 
-function searchTitle(mode, xi) {
+function searchPattern(mode, xi, part) {
+  if (mode === "swap") {
+    return logic.patternOf(catalog, state.x[xi].n);
+  }
+  if (mode === "replace") {
+    return logic.patternOf(catalog, logic.partsOf(state.x[xi].n)[part]);
+  }
+  return null;
+}
+
+// A chip's Insert after is titled "Insert in chain after …" (DESIGN_strength_combos.md §6).
+function searchTitle(mode, xi, part) {
   if (mode === "swap") {
     return "Swap exercise";
   }
   if (mode === "insert") {
     return `Insert after ${logic.wordsOf(catalog, state.x[xi].n)}`;
+  }
+  if (mode === "replace") {
+    return `Replace ${logic.chipsOf(catalog, state.x[xi].n)[part]}`;
+  }
+  if (mode === "chain") {
+    return `Insert in chain after ${logic.chipsOf(catalog, state.x[xi].n)[part]}`;
   }
   return "Add an exercise";
 }
@@ -493,6 +568,14 @@ function choose(row) {
   }
   if (searchMode === "insert") {
     apply(logic.addExercise(state, row.k, row.b, searchIndex + 1));
+    return;
+  }
+  if (searchMode === "replace") {
+    editChain(searchIndex, logic.replacePart(state.x[searchIndex].n, searchPart, row.k));
+    return;
+  }
+  if (searchMode === "chain") {
+    editChain(searchIndex, logic.chainAfter(state.x[searchIndex].n, searchPart, row.k));
     return;
   }
   apply(logic.addExercise(state, row.k, row.b));

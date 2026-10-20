@@ -403,6 +403,10 @@ search results and in the page's Markdown export, which reads
 On a card the category is the same for many exercises, so the brackets set it apart from the
 name the athlete looks for.
 
+A chain, several movements done as one set, stores its movements' keys joined with `>` and reads
+as their words joined by an arrow, each without its category unless that bare name belongs to
+more than one class (DESIGN_strength_combos.md §3).
+
 ## 5. Where a name lives
 
 | Place | Holds after this design |
@@ -548,6 +552,9 @@ it from the session as written. The refused log is still in `logs/gym_logs/`.
 **The queue.** A waiting "are the sets final?" question holds the watch's guesses, and a waiting
 "what was this?" question holds its answers. Both hold keys when the new code wrote them. An
 answer carries the key to store and is shown as its words. Today the label is both.
+
+**A chain.** The page draws a chain as one card whose title holds a chip per movement, and builds
+or changes one from those chips (DESIGN_strength_combos.md §6). The catalog lists no chain.
 
 ## 9. The one-off conversion
 
