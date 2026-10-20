@@ -216,7 +216,7 @@ h1 {
   min-width: 0;
 }
 
-/* The tapped movement and its three buttons, boxed together so it is plain what they act on. */
+/* The tapped movement boxed with its three buttons (DESIGN_strength_combos.md §6). */
 .part.open {
   padding: 6px;
   border: 1px solid var(--accent);

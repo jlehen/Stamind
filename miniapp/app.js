@@ -162,7 +162,8 @@ function persist() {
 // ---------------------------------------------------------------------------------------
 // Applying a change. `apply` redraws, `applyQuiet` does not, because a redraw triggered by a
 // field losing focus would replace the button the tap was heading for. Both record the change
-// for Undo, under the card it was made on (`card`, its id) or under the page (null).
+// for Undo, under the card it was made on (`card`, its id) or under the page (null). Both, and
+// an undo, close the open chip box: its place in the card may now hold another movement.
 // ---------------------------------------------------------------------------------------
 
 function remember(after, card) {
@@ -170,6 +171,7 @@ function remember(after, card) {
     history = logic.record(history, state, card);
   }
   state = after;
+  openChip = null;
   persist();
 }
 
@@ -196,6 +198,7 @@ function undo(result) {
   }
   state = result.state;
   history = result.history;
+  openChip = null;
   persist();
   render();
 }
@@ -377,7 +380,6 @@ function movement(exercise, xi, chip, part, count) {
   menu.append(button("✕ Remove", "pill danger", () => {
     // The last movement of a card goes the way Del takes the card.
     if (count === 1) {
-      openChip = null;
       apply(logic.removeExercise(state, xi));
       return;
     }
@@ -390,7 +392,6 @@ function movement(exercise, xi, chip, part, count) {
 
 // A chip's edit is a swap to the card's new key: the sets stay, the card's ↶ takes it back.
 function editChain(xi, key) {
-  openChip = null;
   apply(logic.swapExercise(state, xi, key), state.x[xi].id);
 }
 
@@ -520,7 +521,7 @@ function searchPattern(mode, xi, part) {
   return null;
 }
 
-// "In chain" tells a chip's sheet from the one the card's own Insert opens, which adds a card.
+// A chip's Insert after is titled "Insert in chain after …" (DESIGN_strength_combos.md §6).
 function searchTitle(mode, xi, part) {
   if (mode === "swap") {
     return "Swap exercise";

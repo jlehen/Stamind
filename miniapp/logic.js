@@ -676,15 +676,22 @@ export function chainAfter(key, part, pick) {
 const sharedNames = new WeakMap();
 
 function sharedOf(catalog) {
-  if (!sharedNames.has(catalog)) {
-    const counts = new Map();
-    for (const row of catalog) {
-      const name = nameAfterCategory(row.w);
-      counts.set(name, (counts.get(name) || 0) + 1);
-    }
-    sharedNames.set(catalog, new Set([...counts].filter(([, n]) => n > 1).map(([name]) => name)));
+  if (sharedNames.has(catalog)) {
+    return sharedNames.get(catalog);
   }
-  return sharedNames.get(catalog);
+  const counts = new Map();
+  for (const row of catalog) {
+    const name = nameAfterCategory(row.w);
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  const shared = new Set([...counts].filter(([, n]) => n > 1).map(([name]) => name));
+  sharedNames.set(catalog, shared);
+  return shared;
+}
+
+// The catalog's row for one key, or undefined when it lacks the key.
+function rowOf(catalog, key) {
+  return catalog.find((entry) => entry.k === key);
 }
 
 // One name per movement, as the card's chips print them (DESIGN_strength_combos.md §6): a plain
@@ -693,7 +700,7 @@ function sharedOf(catalog) {
 export function chipsOf(catalog, key) {
   const parts = partsOf(key);
   return parts.map((part) => {
-    const row = catalog.find((entry) => entry.k === part);
+    const row = rowOf(catalog, part);
     if (!row) {
       return part;
     }
@@ -712,7 +719,7 @@ export function wordsOf(catalog, key) {
 
 // A chain shows its first movement's photos.
 export function photosOf(catalog, key) {
-  const row = catalog.find((entry) => entry.k === partsOf(key)[0]);
+  const row = rowOf(catalog, partsOf(key)[0]);
   if (!row || !row.f) {
     return [];
   }
@@ -720,17 +727,14 @@ export function photosOf(catalog, key) {
 }
 
 export function patternOf(catalog, key) {
-  const row = catalog.find((entry) => entry.k === key);
+  const row = rowOf(catalog, key);
   return row ? row.p : null;
 }
 
 // Whether a key is done one side at a time: its reps are per side and a set is both sides
 // (DESIGN_strength_tracking.md §4). A chain is when any of its movements is.
 export function perSideOf(catalog, key) {
-  return partsOf(key).some((part) => {
-    const row = catalog.find((entry) => entry.k === part);
-    return Boolean(row && row.o);
-  });
+  return partsOf(key).some((part) => Boolean(rowOf(catalog, part)?.o));
 }
 
 // ---------------------------------------------------------------------------------------

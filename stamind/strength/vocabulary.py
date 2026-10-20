@@ -95,7 +95,7 @@ class Exercise:
     @property
     def also_words(self) -> Tuple[str, ...]:
         """The names people use as they are read, the category left out: 'pallof press'."""
-        return tuple(words(name).rpartition(": ")[2] for name in self.also)
+        return tuple(_bare(name) for name in self.also)
 
 
 def _listed(text: str, separator: str) -> Tuple[str, ...]:
@@ -176,17 +176,21 @@ def words(key: str) -> str:
     return f"{halves[0]}: {halves[1]}"
 
 
+def _bare(key: str) -> str:
+    """A key's words after the category, or all of them when it has none: 'goblet squat'."""
+    return words(key).rpartition(": ")[2]
+
+
 def _movement_words(key: str) -> str:
-    said = words(key)
-    bare = said.rpartition(": ")[2]
-    return said if bare in shared_names() else bare
+    bare = _bare(key)
+    return words(key) if bare in shared_names() else bare
 
 
 @lru_cache(maxsize=None)
 def shared_names() -> FrozenSet[str]:
     """The words after the category that more than one class reads as: 'face pull' is a row
     and a band exercise (DESIGN_strength_combos.md §3)."""
-    counts = Counter(words(key).rpartition(": ")[2] for key in keys())
+    counts = Counter(_bare(key) for key in keys())
     return frozenset(name for name, count in counts.items() if count > 1)
 
 
