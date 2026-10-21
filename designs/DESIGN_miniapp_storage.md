@@ -91,7 +91,7 @@ uploaded, and the buttons' addresses are the ones of today.
 
 | File | Label | What it holds | Built |
 |---|---|---|---|
-| A month file | `calendar/2026-09` | The days of that month: each day's cell, its sheet, workout text included, and its gym log when it has one. Nothing else. | After every command, for the months the window touches. Older months by `sm data publish` only (§9). |
+| A month file | `calendar/2026-09` | The days of that month: each day's cell, its sheet, workout text included, and its gym log when it has one. Nothing else. On a day that is over, a session's text is its short line, or nothing when it has none (amended 2026-10-21, DESIGN_short_messages.md §4, D6). | After every command, for the months the window touches. Older months by `sm data publish` only (§9). |
 | The index file | `calendar/index` | Today's date, the stamp, the goals, the mesocycles, the last day of the schedule, and the first and last month that have a file. | After every command. |
 | The plan file | `plan` | What the "Goals & plan" button carries, plus each mesocycle's whole long text. | After every command. |
 

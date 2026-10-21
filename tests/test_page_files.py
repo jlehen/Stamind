@@ -207,11 +207,36 @@ class BuildTest(FilesTestCase):
         self.assertIn("2026-05-10", files["calendar/2026-05"]["days"])
 
     def test_a_month_file_holds_the_workout_text_as_stored(self):
-        september = sync.build(test_db, TODAY)["calendar/2026-09"]
-        planned = dict(september["days"]["2026-09-29"]["sheet"])["Planned"]
+        save_workout(test_db, date="2026-10-01", sport_type="running", title="Easy run",
+                     description=EASY_TEXT, duration_minutes=40, tss=30)
+        october = sync.build(test_db, TODAY)["calendar/2026-10"]
+        planned = dict(october["days"]["2026-10-01"]["sheet"])["Planned"]
         self.assertIn(EASY_TEXT, planned)
         # A day with nothing on it but inside the schedule says it is a rest day.
+        september = sync.build(test_db, TODAY)["calendar/2026-09"]
         self.assertIn("sheet", september["days"]["2026-09-30"])
+
+    def test_a_day_that_is_over_shows_the_short_line(self):
+        """DESIGN_short_messages.md §4 (D6). It is Wednesday 30 September. Monday's tempo
+        run shows its short line and what the athlete said about it; Tuesday's easy run,
+        written before short lines existed, shows its title and length only (A22)."""
+        with test_db.workout_change(kind="generate") as change:
+            change.append(date="2026-09-28", sport_type="running", title="Tempo run",
+                          description="[Tempo run]\nWarm up, then 3x10 min at threshold.",
+                          duration_minutes=60, summary="Three 10-minute blocks at threshold.")
+        tempo = test_db.get_workout("2026-09-28", "running")
+        test_db.add_session_note(tempo["id"], "Legs felt heavy on the last block.")
+        september = sync.build(test_db, TODAY)["calendar/2026-09"]
+
+        monday = dict(september["days"]["2026-09-28"]["sheet"])["Planned"]
+        self.assertIn("Three 10-minute blocks at threshold.", monday)
+        self.assertIn("You said: “Legs felt heavy on the last block.”", monday)
+        self.assertNotIn("3x10 min at threshold", "\n".join(monday))
+
+        tuesday = dict(september["days"]["2026-09-29"]["sheet"])["Planned"]
+        self.assertEqual(len(tuesday), 1)
+        self.assertIn("Easy run", tuesday[0])
+        self.assertNotIn(EASY_TEXT, tuesday)
 
     def test_a_month_file_holds_a_days_gym_log_beside_its_session(self):
         """Thursday's gym was logged from the page, so its day carries the two things the

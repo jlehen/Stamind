@@ -169,12 +169,13 @@ def _in_schedule(cal: Calendar, day: str) -> bool:
 def sheet(cal: Calendar, day: Day, texts: bool = False) -> List[Any]:
     """The day's sheet as [heading, lines] pairs; empty when there is nothing to say.
     `texts` adds each workout's text as stored, for the month files
-    (DESIGN_miniapp_storage.md §4)."""
+    (DESIGN_miniapp_storage.md §4): its short line on a day that is over
+    (DESIGN_short_messages.md §4, D6)."""
     parts: List[Any] = []
     planned = [r["planned"] for r in day.results]
     if planned or _in_schedule(cal, day.date):
         parts.append([PLANNED, simple_day_lines(planned, day.date, descriptions=texts,
-                                                wrap=False)])
+                                                wrap=False, short=day.date < cal.today)])
     done = _done_lines(day, cal.today)
     if done:
         parts.append([DONE, done])

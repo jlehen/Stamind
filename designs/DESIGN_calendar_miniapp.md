@@ -50,7 +50,10 @@ writes in the chat:
 - **Planned:** the session's line, as "📅 Today" writes it: "🏃 2026-09-22 Tue: Easy run
   — 50 min". Not the full workout text, which does not fit in a button (§8). Under it, a
   "💬 Full day in chat" button closes the calendar, and the bot posts that day the way
-  "📅 Today" writes it, workout text included (§6).
+  "📅 Today" writes it, workout text included (§6). Once the month's file has arrived, the
+  workout text is under the line; on a day that is over it is the session's short line, or
+  nothing for a session written before short lines existed (amended 2026-10-21,
+  DESIGN_short_messages.md §4, D6 and A22).
 - **Done:** that day's lines from "✅ Done lately": "✅ 🏃 Easy run — 50 min (you did 32
   min)", with the lifted sets under a gym session.
 - **Signals and constraints:** each one on its own line.
