@@ -26,7 +26,7 @@ from stamind.clock import fmt_date, today_str as _today_str
 from stamind.config import config
 from stamind.db.workout_change import ATHLETE_VOID_KINDS
 from stamind.text import green
-from stamind.output import Progress, fail, warn
+from stamind.output import Progress, fail, step, warn
 
 # Whether a pass renders as one summary line and a bar, or as the per-event lines. The
 # commands that take `-v` flip this around their write.
@@ -84,7 +84,7 @@ def reconcile(db, lineage_ids: Sequence[int]) -> None:
         for lineage_id, event_id in teardowns:
             _tear_down(db, syncer, lineage_id, event_id)
             bar.step()
-    print(green("Google Calendar updated: " + _summary(len(pushes), len(teardowns)) + "."))
+    step("Google Calendar updated: " + _summary(len(pushes), len(teardowns)) + ".", green)
 
 
 @contextmanager

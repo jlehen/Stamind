@@ -49,8 +49,8 @@ GOT_IT_BUTTON = {"label": "👍 Got it", "ack": "Nice — have a good one! 💪"
 # The buttons about today's session. Under a proposal they follow its two answers, which
 # stand where "Got it" would (DESIGN_waiting_proposal.md §5).
 SESSION_BUTTONS = [
-    {"label": "😴 Feeling tired",
-     "send": 'workout adapt -m "feeling tired this morning"'},
+    {"label": "😴 Should I rest?",
+     "send": 'workout adapt -m "feeling tired today"'},
     {"label": "🕐 Can't today", "menu": [
         {"label": "📆 Move it",
          "send": 'workout adapt -m "no time to train today - please move today\'s '

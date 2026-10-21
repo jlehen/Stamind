@@ -269,10 +269,10 @@ message arrives by itself:
 ```
 🚴 Today: Hill Repeats 5x4 min — 75 min
 
-[ 👍 Got it ]  [ 😴 Feeling tired ]  [ 🕐 Can't today ]
+[ 👍 Got it ]  [ 😴 Should I rest? ]  [ 🕐 Can't today ]
 ```
 
-Tapping "Feeling tired" runs the same adaptation as the Wednesday command
+Tapping "Should I rest?" runs the same adaptation as the Wednesday command
 above. Typing "no bike Sunday to Tuesday, I'm travelling" saves the same
 constraint as the Thursday command, after asking you to confirm. Typing "my week"
 shows:

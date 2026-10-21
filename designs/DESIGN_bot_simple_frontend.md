@@ -84,7 +84,7 @@ describes the bot before this date.
 > 🏃 **Today: easy run, 40 min** — conversational pace, HR under 145.
 > Fresh legs — recovery looks good.
 >
-> `[ 👍 Got it ]  [ 😴 Feeling tired ]  [ 🕐 Can't today ]`
+> `[ 👍 Got it ]  [ 😴 Should I rest? ]  [ 🕐 Can't today ]`
 
 Rest days get one line ("Rest day — enjoy it 🎉", no buttons). So does a day whose
 sessions are all already trained — "✅ Already done for today — nice work 💪", the
@@ -97,8 +97,10 @@ none of them, and a day where one of two sessions is done briefs the one left an
 them. Tapping:
 
 - **Got it** — acknowledges, nothing runs.
-- **Feeling tired** — runs `workout adapt -m "feeling tired this morning"`; the existing
-  adaptation flow (including its confirm prompts) takes over.
+- **Should I rest?** — runs `workout adapt -m "feeling tired today"`; the existing
+  adaptation flow (including its confirm prompts) takes over. The label asks, because the
+  week planner may answer that today stands. "Today", not "this morning": the button stays
+  under the briefing all day. Amended 2026-10-21; it was "Feeling tired".
 - **Can't today** — a bot-level choose row (move it / shorten it / skip it), each option
   mapping to an `adapt -m` message. The week planner decides; the buttons only phrase the ask.
 

@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from stamind.types import Workout
 from stamind.analytics import intensity
 from stamind.sports import canonical_sport
-from stamind.output import notice
+from stamind.output import notice, step
 from stamind.gcal.reconcile import verbose_events
 from stamind.coach import honoring, picture
 from stamind.coach.proposals import RevisionProposal
@@ -227,7 +227,7 @@ class RevisionApplyMixin:
                 source = by_slot.get((day, sport))
                 if source is None:
                     continue
-                notice(
+                step(
                     f"Moving {source['title']} ({source['sport_type']}) from {day} to "
                     f"{mover['date']}",
                 )
@@ -237,7 +237,7 @@ class RevisionApplyMixin:
                 )
 
             for ew in [*displaced_by_date.values(), *taken_over]:
-                notice(
+                step(
                     f"Removing overridden workout: {ew['title']} ({ew['sport_type']}) "
                     f"on {ew['date']}",
                 )

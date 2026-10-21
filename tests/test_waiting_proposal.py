@@ -331,7 +331,7 @@ class MorningPushTest(_Case):
         self.assertEqual([b["label"] for b in sent["buttons"]],
                          ["✅ Change it", "💪 Keep it as planned"])
         self.assertEqual([b["label"] for b in sent["offer"]],
-                         ["😴 Feeling tired", "🕐 Can't today"])
+                         ["😴 Should I rest?", "🕐 Can't today"])
 
     def test_the_button_that_extends_the_schedule_joins_them(self):
         extend = {"label": "📅 Plan more weeks", "send": "workout generate"}
@@ -340,7 +340,7 @@ class MorningPushTest(_Case):
         self.assertNotIn(BUTTONS_SENTINEL, out)
         [sent] = queue_lines(out)
         self.assertEqual([b["label"] for b in sent["offer"]],
-                         ["😴 Feeling tired", "🕐 Can't today", "📅 Plan more weeks"])
+                         ["😴 Should I rest?", "🕐 Can't today", "📅 Plan more weeks"])
 
     def test_a_proposal_on_a_day_already_trained_brings_no_button_about_today(self):
         """Thursday's ride is done at noon and the push proposes to ease Saturday's."""
@@ -360,7 +360,7 @@ class MorningPushTest(_Case):
         [row] = [json.loads(line[len(BUTTONS_SENTINEL):]) for line in out.split("\n")
                  if line.startswith(BUTTONS_SENTINEL)]
         self.assertEqual([b["label"] for b in row["buttons"]],
-                         ["👍 Got it", "😴 Feeling tired", "🕐 Can't today"])
+                         ["👍 Got it", "😴 Should I rest?", "🕐 Can't today"])
 
     def proposed(self, **kwargs):
         """The push with a message queued behind its proposal: the question it sent."""
