@@ -289,6 +289,35 @@ class TestAdaptMoves(unittest.TestCase):
         )
 
     @patch("stamind.coach.engine.openrouter_client")
+    def test_a_day_already_trained_gets_no_rest_day(self, mock_client):
+        """It is Thursday 11 June, 19:00. The athlete rode at 08:00 instead of the gym, and
+        the coach moves the gym session to Saturday. A rest day written onto Thursday now
+        would be graded "rest broken" by a ride done before it existed, so Thursday keeps
+        no session and the ride reads as unplanned (DESIGN_workout_revisions.md §11)."""
+        self._eased_thursday_gym()
+        test_db.save_completed_activity(
+            activity_id="a-ride", date="2026-06-11", start_time="2026-06-11 08:00:00",
+            activity_name="Gravel ride", activity_type="gravel_cycling",
+            duration_sec=4260, distance_km=30.0, elevation_gain_m=200.0, avg_hr=140,
+            max_hr=165, rpe=None, tss=51.5,
+        )
+        proposal = self._adapt_returning(
+            mock_client, "The gym day moves to Saturday.",
+            [{
+                "date": "2026-06-13", "sport_type": "strength_training",
+                "title": "Gym: Lower", "description": "[Gym: Lower]\n45 min, lighter.",
+                "change_reason": "Moved from Thursday, when you rode instead.",
+                "duration_minutes": 45, "rpe": 6, "tss": 35,
+                "replaces": {"date": "2026-06-11", "sport_type": "strength_training"},
+            }],
+            on="2026-06-11",
+        )
+        self.assertEqual(
+            [(w["date"], w["sport_type"]) for w in proposal.workouts],
+            [("2026-06-13", "strength_training")],
+        )
+
+    @patch("stamind.coach.engine.openrouter_client")
     def test_a_move_onto_a_day_that_already_carries_work_takes_that_day(
         self, mock_client
     ):

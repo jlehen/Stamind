@@ -436,7 +436,10 @@ class AdaptMixin:
         # A session the week planner carried to another day says where it came from, and
         # the lineage travels with it rather than ending where it left (§11). Last of the
         # passes, so a move whose destination a rest constraint cleared is already gone.
-        adapted = self._resolve_moves(adapted, window_workouts, completed_keys)
+        adapted = self._resolve_moves(
+            adapted, window_workouts, completed_keys,
+            {a['date'] for a in completed_activities},
+        )
 
         # The row shape both revision commands write, built in one place (§7).
         structured = structure_revision(adapted, reason)

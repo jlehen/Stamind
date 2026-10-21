@@ -18,7 +18,7 @@ a change ran.
 It is one mixin of :class:`CoachService` — see coach/service/__init__.py.
 """
 from contextlib import nullcontext
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from stamind.types import Workout
 from stamind.analytics import intensity
@@ -90,14 +90,15 @@ class RevisionApplyMixin:
 
     def _resolve_moves(
         self, adapted: List[Dict[str, Any]], window_workouts: List[Workout],
-        completed_keys: set,
+        completed_keys: set, trained_days: Set[str],
     ) -> List[Dict[str, Any]]:
         """Turns each accepted `replaces` into the slot the session leaves and the
         lineage it carries there, and fills the day it left
         (DESIGN_workout_revisions.md §11).
 
-        A date a move empties gets a rest day, unless another entry already covers it or
-        another session still stands there.
+        A date a move empties gets a rest day, unless another entry already covers it,
+        another session still stands there, or an activity is already recorded on it
+        (`trained_days`).
         """
         by_slot = {
             (w['date'], canonical_sport(w['sport_type'])): w for w in window_workouts
@@ -121,6 +122,10 @@ class RevisionApplyMixin:
         for source, mover in movers.items():
             day = source[0]
             if day in covered:
+                continue
+            # A rest day written after the athlete trained would be graded broken by what
+            # they did before it existed (DESIGN_workout_revisions.md §11).
+            if day in trained_days:
                 continue
             # Another session still stands on the day it left, so the day is not empty
             # and a rest row there would contradict it.
