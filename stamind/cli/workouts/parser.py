@@ -41,8 +41,19 @@ def _add_listing_args(parser, default):
         direction="forward", default=default,
     )
     parser.add_argument(
-        "--link", "-l", action="store_true",
+        "--link", "-L", action="store_true",
         help="Show each synced workout's Google Calendar event link"
+    )
+    # Which text the detail lines carry (DESIGN_short_messages.md §4, D7).
+    text = parser.add_mutually_exclusive_group()
+    text.add_argument(
+        "--long", "-l", action="store_true",
+        help="In the detail, each session's full description, whatever the days shown"
+    )
+    text.add_argument(
+        "--short", "-s", action="store_true",
+        help="In the detail, each session's short line in place of its description, "
+             "when it has one"
     )
 
 
@@ -93,7 +104,10 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             f"and any adapt notes. Same output as '{green('workout list')} -vv', under a "
             "name that says what it does. Name workout IDs or dates as arguments "
             f"('{green('workout show')} 12'), and every filter '{green('workout list')}' "
-            "takes works here too. With no argument at all, it details today's sessions."
+            "takes works here too. With no argument at all, it details today's sessions. "
+            "Sessions of one day print their full description; over several days, or with "
+            "--history, a session's short line stands in its place when it has one. "
+            "--long and --short choose."
         )
     )
     w_show.set_defaults(func=run_workout_show)

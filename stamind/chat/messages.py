@@ -246,8 +246,8 @@ class MessagesMixin:
         "Goals & plan" page asking why, or the gym logger's log when the athlete taps
         "Finish".
 
-        The calendar's day runs `workout list -d <day>`, the command behind "📅 Today"
-        (DESIGN_calendar_miniapp.md §6); the why runs `plan show` (§3.7). The log is written
+        The calendar's day runs `workout show -d <day>`, which prints one day in full
+        (DESIGN_calendar_miniapp.md §6, DESIGN_short_messages.md §4); the why runs `plan show` (§3.7). The log is written
         to a file and handed to `strength ingest`, whose summary streams back the way every
         command's output does. The bot never reads the log itself: every write goes through
         the CLI (DESIGN_gym_logger.md §6)."""
@@ -271,7 +271,7 @@ class MessagesMixin:
         day = calendar_page.requested_day(data)
         if day is not None:
             self._log(chat.id, "  ", f"calendar day: {day}")
-            await self._start_command(chat.id, ["workout", "list", "-d", day])
+            await self._start_command(chat.id, ["workout", "show", "-d", day])
             return
         plan = plan_page.why_plan(data)
         if plan is not None:

@@ -221,7 +221,7 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
         started = record_commands(self, chat_bot)
         update, _replied = web_app_update(data='{"calendar_day": "2026-09-26"}')
         await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
-        self.assertEqual([s[1] for s in started], [["workout", "list", "-d", "2026-09-26"]])
+        self.assertEqual([s[1] for s in started], [["workout", "show", "-d", "2026-09-26"]])
         self.assertFalse(os.path.exists(self.gym_logs()))
 
     async def test_the_plan_page_asks_why_and_writes_no_log(self):

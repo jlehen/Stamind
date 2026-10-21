@@ -417,8 +417,9 @@ included. A page opened from a keyboard button can hand the bot one message with
 `sendData`, and Telegram closes the page when it does; the page has no way to receive an
 answer. The gym logger already uses this way back. The message is
 `{"calendar_day": "2026-09-26"}`. `on_web_app_data` recognises it and runs
-`workout list -d 2026-09-26`, the command behind "📅 Today", so the day reads exactly as
-"📅 Today" writes it. Any other message is still a gym log. The button shows only under a
+`workout show -d 2026-09-26`, which prints one day with its full text (amended 2026-10-21:
+it was `workout list -d`, the command behind "📅 Today", which the short messages make
+short; DESIGN_short_messages.md §4). Any other message is still a gym log. The button shows only under a
 day that has a session, and only when the page was opened from Telegram.
 
 **The gym log.** Under a day that has a gym log, the sheet offers "🏋️ Open the gym log"

@@ -323,6 +323,62 @@ class TestCliWorkoutsListing(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(same, full, depth)
 
+    def _two_days_with_short_lines(self):
+        """Today's tempo run and tomorrow's ride, each with its short line."""
+        today = datetime.now(timezone.utc).date()
+        days = [today.strftime("%Y-%m-%d"), (today + timedelta(days=1)).strftime("%Y-%m-%d")]
+        with test_db.workout_change(kind="generate") as change:
+            change.append(date=days[0], sport_type="running", title="Tempo",
+                          description="[Tempo]\nWarm up 15 min, then 3x10 min at threshold.",
+                          duration_minutes=60, summary="Three 10-minute blocks at threshold.")
+            change.append(date=days[1], sport_type="cycling", title="Easy ride",
+                          description="[Easy ride]\n90 min in Z2, flat route.",
+                          duration_minutes=90, summary="90 easy minutes on a flat route.")
+        return days
+
+    def test_workout_show_of_one_day_prints_the_description(self):
+        """DESIGN_short_messages.md §4 (D7): one day is read in full."""
+        today, _tomorrow = self._two_days_with_short_lines()
+        _code, out, _ = self.run_cli(["workout", "show", "-d", today, "--no-pull"])
+        self.assertIn("3x10 min at threshold", out)
+        self.assertNotIn("In short:", out)
+
+    def test_workout_show_of_several_days_prints_the_short_lines(self):
+        today, tomorrow = self._two_days_with_short_lines()
+        _code, out, _ = self.run_cli(
+            ["workout", "show", "-d", f"{today}..{tomorrow}", "--no-pull"])
+        self.assertEqual(out.count("In short:"), 2)
+        self.assertIn("Three 10-minute blocks at threshold.", out)
+        self.assertIn("90 easy minutes on a flat route.", out)
+        self.assertNotIn("3x10 min at threshold", out)
+        # --long brings the descriptions back, whatever the days shown.
+        _code, out, _ = self.run_cli(
+            ["workout", "show", "-d", f"{today}..{tomorrow}", "-l", "--no-pull"])
+        self.assertIn("3x10 min at threshold", out)
+        self.assertNotIn("In short:", out)
+
+    def test_history_and_short_make_one_day_short(self):
+        today, _tomorrow = self._two_days_with_short_lines()
+        for flag in ("-H", "-s"):
+            _code, out, _ = self.run_cli(["workout", "show", "-d", today, flag, "--no-pull"])
+            self.assertIn("In short:", out, flag)
+            self.assertIn("Three 10-minute blocks at threshold.", out, flag)
+            self.assertNotIn("3x10 min at threshold", out, flag)
+
+    def test_a_session_with_no_short_line_prints_its_description(self):
+        today = datetime.now(timezone.utc).date()
+        save_workout(test_db, date=today.strftime("%Y-%m-%d"), sport_type="running",
+                     title="Old run", description="30 mins easy, written before the line.")
+        _code, out, _ = self.run_cli(["workout", "show", "-s", "--no-pull"])
+        self.assertIn("30 mins easy, written before the line.", out)
+
+    def test_the_calendar_link_is_capital_l(self):
+        today = datetime.now(timezone.utc).date()
+        save_workout(test_db, date=today.strftime("%Y-%m-%d"), sport_type="running",
+                     title="Easy", description="30 mins")
+        _code, out, _ = self.run_cli(["workout", "list", "-L", "--no-pull"])
+        self.assertIn("Calendar: (not synced)", out)
+
     def test_workout_show_history_on_a_first_form_says_so(self):
         today_str = datetime.now(timezone.utc).date().strftime("%Y-%m-%d")
         workout_id = save_workout(test_db,

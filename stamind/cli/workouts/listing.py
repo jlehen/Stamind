@@ -124,6 +124,19 @@ def _print_history(workout: dict, depth: Optional[int]) -> None:
     print(wrap_text(indented))
 
 
+def _full_text(workouts: list, args: argparse.Namespace) -> bool:
+    """Whether the detail prints each description, or the short line in its place: the
+    description for one day, the short line over several days or with `--history`, and
+    `--long`/`--short` choose (DESIGN_short_messages.md §4, D7)."""
+    if getattr(args, "long", False):
+        return True
+    if getattr(args, "short", False):
+        return False
+    if getattr(args, "history", None) is not None:
+        return False
+    return len({w['date'] for w in workouts}) <= 1
+
+
 def print_workout_table(
     workouts: list, verdicts: dict, args: argparse.Namespace, *,
     start_date: Optional[str], end_date: Optional[str], ids: list, names_a_range: bool,
@@ -150,12 +163,13 @@ def print_workout_table(
     # distinct summary only once across the listing so it doesn't dominate the output.
     seen_summaries: set = set()
     markers: set = set()
+    full_text = _full_text(workouts, args)
     for w in workouts:
         verdict = verdicts.get(w.get('id'))
         head = workout_line(w, verdict)
         markers |= line_markers(head)
         print(head)
-        # -l surfaces the Calendar event link (rebuilt from the stored event id) so it can
+        # -L surfaces the Calendar event link (rebuilt from the stored event id) so it can
         # be opened without the sync commands having to print the URL every push.
         if getattr(args, "link", False):
             url = event_url(w.get('google_event_id'), config.google_calendar_id)
@@ -187,7 +201,10 @@ def print_workout_table(
                 print(f"  {line}")
         for reason in (verdict or {}).get('reasons') or []:
             notice(f"  Discrepancy: {reason}")
-        print(format_labeled_paragraph("  Description:", w['description']))
+        if full_text or not w.get('summary'):
+            print(format_labeled_paragraph("  Description:", w['description']))
+        else:
+            print(format_labeled_paragraph("  In short:", w['summary']))
         # The zone target, which the description never carries (§9.8 of
         # DESIGN_intensity_distribution.md).
         target = intensity.format_planned_zones(w)
