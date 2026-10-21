@@ -315,32 +315,35 @@ Each is a case a plausible athlete rarely meets, left out on purpose with the be
 
 ## 8. Choices made without you
 
-D12 to D19 of the Decisions Log are the author's resolutions of red-team findings, not rulings;
-rule on each there. The choices below have no row of their own. Each is one line to object to.
+D12 to D19 of the Decisions Log are the author's resolutions of red-team findings, each since
+ruled on by the user there. The choices below have no row of their own; each is ruled too.
 
 1. Order matters: `A>B` and `B>A` are two chains with two histories (§3). Ruled: kept (D25).
 2. The prompt does not push the strength planner toward chains: a chain is allowed wherever a plain
    exercise is, under today's rules, and enters a session the way any exercise does. The week
    planner is not told about chains; a brief that says "a one-bell flow" is prose the strength
-   planner reads, as any brief is (§4).
-3. The notes name a chain in words and say how the sides are done (§4).
+   planner reads, as any brief is (§4). Ruled: kept, with a note for the rotation design (D24).
+3. The notes name a chain in words and say how the sides are done (§4). Ruled: kept (2026-10-21).
 4. Inside the page shape you chose (D21): a plain exercise's one chip keeps its category in
    brackets while a chain's chips drop theirs unless the bare name is shared (D23); the chain's
    search sheet is titled "Insert in chain after …", so it is not confused with the sheet the
    card's own Insert opens, which adds a card; Replace and Remove on a one-chip title are Swap
    and Del; photos are the first movement's (§6). The rest of §6 follows from reusing Swap and
-   Insert and is not a choice.
+   Insert and is not a choice. Ruled: kept (2026-10-21).
 5. The strength planner's list does not list chains; the history does (§4). Both pragmatic
-   reviews say this follows from D3 and is not a choice.
+   reviews say this follows from D3 and is not a choice. Ruled: kept (2026-10-21).
 6. The payload version stays 2 (§6). Both pragmatic reviews call this a fact, not a choice.
+   Ruled: kept (2026-10-21).
 7. No interview state file is written under `designs/`: the one written for the cycle
    retrospective was a stray. Both pragmatic reviews say this is about a file the design does not
-   write.
+   write. Ruled: kept (2026-10-21).
 8. The gear test for a chain the strength planner invents: the load words of each movement's
    gear must have one in common, Dumbbells and Kettlebells read as one, a movement with no load
    word skipped, a chain with none passes; machines and bands pass as any load word; no rule
-   against a repeated movement (§4). The pragmatic review cut the no-repeat rule.
-9. The science paragraph lives in `progression.md`, not in a file of its own (§4).
+   against a repeated movement (§4). The pragmatic review cut the no-repeat rule. Ruled: kept
+   (2026-10-20).
+9. The science paragraph lives in `progression.md`, not in a file of its own (§4). Ruled: kept
+   (2026-10-21).
 
 ## 9. Where the code goes
 
@@ -380,12 +383,12 @@ rule on each there. The choices below have no row of their own. Each is one line
 | D10 | Habit vs check | A chain on the athlete's record passes the strength planner's check whatever its gear or a repeated movement | What she did is the proof; the check guards invented chains (finding 3). Built as: `_clean_exercise` reads the record only on a gear failure, and the preview keeps one line, reworded to be true for a chain; the pragmatic review cut the "which ground failed" plumbing and the no-repeat rule, and the author agreed. Declined: the page refuses what the check refuses; leave it with a true message | Red Team | 2026-10-18 |
 | D11 | The watch | A chain is recorded from the page only; a watch-only athlete loses a prescribed chain after two weeks, listed in §7 | Both athletes log from the page; a chain offered by the naming question would store the watch's reps as rounds (finding 5). Declined: the naming question offers the day's chain; the naming question never offers a chain | Red Team | 2026-10-18 |
 | D12 | Merges | Dropped on 2026-10-20: no script learns about chains, and a merge under a chain's movement is listed in §7. Was: the merge script renames the parts of a chain key | The merge script belongs to a one-off migration, not to this feature (the user's ruling). Else a merge splits a chain's history and an old page's log is refused (finding 4) | Red Team, then ruling | 2026-10-18, 2026-10-20 |
-| D13 | Progression | A range of rounds kept like a rep range; the load holds at the top when no heavier implement exists; the range is the strength planner's to choose, no number in the science | The §2 story had raised the rounds, which `progression.md` forbids (finding 2); author's resolution; the pragmatic review cut the "three to eight" the author had written | Red Team | 2026-10-18 |
+| D13 | Progression | A range of rounds kept like a rep range; the load holds at the top when no heavier implement exists; the range is the strength planner's to choose, no number in the science. Ruled on 2026-10-21: the one-bell athlete at the top of her range holds, the same line every week until a heavier implement exists | The §2 story had raised the rounds, which `progression.md` forbids (finding 2); author's resolution; the pragmatic review cut the "three to eight" the author had written. Declined: progress another way, a set more or a harder chain, which is variety and belongs to DESIGN_strength_rotation.md | Red Team, then ruling | 2026-10-18, 2026-10-21 |
 | D14 | Older sentences | Three sentences that said the opposite are amended in the same change | A prompt must not contradict itself (finding 6); author's resolution; the thorough review added the per-side hint and the pragmatic review cut it and the "a key is a category…" amendment as second homes of rules the paragraph already states | Red Team | 2026-10-18 |
 | D15 | Tags | A chain has none; `model_line` prints its key alone | The author had written the union of the movements' gear; the pragmatic review showed that "every item of the gear is needed" would then tell the strength planner a one-bell home lacks the gear for its own chain (finding 7, review); author's resolution | Red Team | 2026-10-18 |
 | D16 | Per side | Per side when a one-sided movement appears once, or any odd number of times; one that appears twice is done once on each side inside the round (§3). The two-handed oddity and the same-arm-twice chain are in §7; the prompt says so in two sentences | A rule that fits single-arm complexes (finding 8); the model's rounds must mean what the page prints (thorough review finding 1). Amended on 2026-10-20 by the user: left clean → goblet squat → right clean is one round, not per side. Declined: the arm stored on each movement, which would tell same-arm-twice apart at the cost of an arm control on the page and in the check | Red Team, then ruling | 2026-10-18, 2026-10-20 |
 | D17 | Alike words | Accepted at first; the stored key tells chains apart. Reversed by D23 | Brackets for 37 ambiguous names would cost more than they give (finding 9); author's resolution, overruled on 2026-10-19 | Red Team | 2026-10-18 |
-| D18 | `strength log` and `strength name` | No change to either; `similar` is left as it is | The substring match on words already finds a chain (finding 10); on a chain line `strength name` offers the first movement's category, which nobody meets in a normal week, so the guard the author had written was cut by the pragmatic review; author's resolution | Red Team | 2026-10-18 |
+| D18 | `strength log` and `strength name` | No change to either; `similar` is left as it is | The substring match on words already finds a chain (finding 10); on a chain line `strength name` offers the first movement's category, which nobody meets in a normal week, so the guard the author had written was cut by the pragmatic review; author's resolution. Kept by the user on 2026-10-21. Declined: no list on a chain's line, only the three fixed answers | Red Team, then ruling | 2026-10-18, 2026-10-21 |
 | D19 | Going live | Steps 1, 2a and 3 land as one branch, merged and pushed in the same sitting; no bot restart; the chips follow as a branch of their own | The prompt is live at the merge, the page at the push, and a page in between stores rounds as per side (finding 11); author's resolution, collapsed to one line by the pragmatic review | Red Team | 2026-10-18 |
 | D20 | No cap | A chain holds two or more movements; no cap in the check or on the page; the science says usually three or four | Nothing technical needs a number: the key is text, the page composes what she taps, and a session full of long chains is already listed under not handled. The author had written two to four. Declined: a generous cap of six | Interview | 2026-10-19 |
 | D21 | The page | Every title is chips, one per movement, a chain marked ⛓; a tap on a chip opens a box around that movement holding Replace, Remove and Insert after; no new card button, no footer button, no Done | Chosen from a mock-up of three shapes: the sheet with a second footer button (the design as reviewed), a ninth "Chain" button on each card (the pragmatic review's proposal), and the chips. The chain is edited where the chain is, and a chain starts from a plain exercise. The box and the name "Insert after" are the user's, after seeing both drawn; the thorough review's "Chain after" was declined, the sheet title "Insert in chain after …" keeping the two Inserts apart. Declined: the sheet; the pill | Interview | 2026-10-19 |
