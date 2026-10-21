@@ -285,6 +285,89 @@ class ShortProposalTest(_Case):
         upload.assert_not_called()
 
 
+PARAMS = "&k=KEY&b=pages&f=123"
+
+
+def buttons_lines(out):
+    """The SM-BUTTONS payloads a run wrote, in order."""
+    return [json.loads(line[len(BUTTONS_SENTINEL):]) for line in out.split("\n")
+            if line.startswith(BUTTONS_SENTINEL)]
+
+
+class ShortDayTest(_Case):
+    """One day in a published chat: each session's short line, and "Tell me more" under the
+    day (DESIGN_short_messages.md §4, §5). It is Thursday; the ride has its short line."""
+
+    def setUp(self):
+        super().setUp()
+        with test_db.workout_change(kind="adapt") as change:
+            change.append(date=THURSDAY, sport_type="cycling", title="Intervals",
+                          description="[Intervals]\n90 minutes with four intervals.",
+                          duration_minutes=90, summary="Four hard blocks of six minutes.")
+        self.upload = MagicMock()
+        for patcher in (patch("stamind.page_files.sync.button_params", return_value=PARAMS),
+                        patch("stamind.page_files.sync.after_command", self.upload)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def page_of(self, day):
+        return {"label": "🔎 Tell me more",
+                "url": f"{proposal_lines.PAGE_URL}#d={day}{PARAMS}"}
+
+    def push(self, proposal):
+        coach = MagicMock()
+        coach.workout_adapt.return_value = proposal
+        with patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}), \
+                patch.object(runtime, "coach_service", coach, create=True), \
+                patch("stamind.cli.bot.views.ensure_recent_data"):
+            code, out, _err = run_cli(["bot", "morning", "--force"])
+        self.assertEqual(code, 0)
+        return out
+
+    def test_the_briefing_shows_the_short_line_and_tell_me_more(self):
+        out = self.push(RevisionProposal(
+            reason="", workouts=[], range_start=THURSDAY, range_end=THURSDAY,
+        ))
+        self.assertIn("Four hard blocks of six minutes.", out)
+        self.assertNotIn("four intervals", out)
+        [row] = buttons_lines(out)
+        self.assertEqual(row["buttons"][0]["label"], "👍 Got it")
+        self.assertEqual(row["page"], self.page_of(THURSDAY))
+        self.upload.assert_called()
+
+    def test_on_a_morning_with_a_proposal_the_briefing_keeps_tell_me_more(self):
+        """D8: the proposal is about Saturday, so the briefing stands above it, its own row
+        holding the page button alone."""
+        save_workout(test_db, SATURDAY, "cycling", "Long ride", duration_minutes=180)
+        out = self.push(self.eased(day=SATURDAY))
+        [row] = buttons_lines(out)
+        self.assertEqual((row["buttons"], row["page"]), ([], self.page_of(THURSDAY)))
+
+    def test_today_is_short_and_workout_show_is_the_day_in_full(self):
+        _code, out, _err = run_cli(["workout", "list", "-d", "today", "--no-pull"])
+        self.assertIn("Four hard blocks of six minutes.", out)
+        [row] = buttons_lines(out)
+        self.assertEqual(row["page"], self.page_of(THURSDAY))
+        _code, out, _err = run_cli(["workout", "show", "-d", "today", "--no-pull"])
+        self.assertIn("90 minutes with four intervals.", out)
+        self.assertEqual(buttons_lines(out), [])
+
+    def test_a_session_with_no_short_line_shows_its_text_and_brings_no_button(self):
+        save_workout(test_db, FRIDAY, "running", "Easy run", description="[Easy run]\n40 min.",
+                     duration_minutes=40)
+        _code, out, _err = run_cli(["workout", "list", "-d", FRIDAY, "--no-pull"])
+        self.assertIn("40 min.", out)
+        self.assertEqual(buttons_lines(out), [])
+
+    def test_after_an_answer_today_is_short_with_its_button(self):
+        """Keep it as planned: today's ride as planned, in short, under the reply."""
+        out = self.tap(self.save(), "a2")
+        reply = out[out.index(saved_proposal.KEPT_LINE):]
+        self.assertIn("Four hard blocks of six minutes.", reply)
+        self.assertNotIn("four intervals", reply)
+        self.assertIn(self.page_of(THURSDAY), [row["page"] for row in buttons_lines(out)])
+
+
 class OutOfDateTest(_Case):
     """A tap that comes too late writes nothing (§4)."""
 

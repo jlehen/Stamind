@@ -115,7 +115,12 @@ def _apply(item: Dict[str, Any], action: str) -> None:
     line = athlete_queue.act(item, action, text)
     after = runtime.db.get_queue_item(item["id"])
     runtime.render.queue_acted(after, action, line)
-    if after["outcome"] == ANSWERED and athlete_queue.long_run_name(item, action):
+    if after["outcome"] != ANSWERED:
+        return
+    show = athlete_queue.kind_of(item).after_answer
+    if show:
+        show(item)
+    if athlete_queue.long_run_name(item, action):
         GOES_ON[item["kind"]](item)
 
 

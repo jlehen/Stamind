@@ -284,8 +284,9 @@ The stamp follows the calendar's rule.
 
 ### 7.3 Details (added 2026-10-21)
 
-The page a proposal's "🔎 Tell me more" opens, read-only, downloads the proposal file and
-shows it; DESIGN_short_messages.md §6 is its contract.
+The page a "🔎 Tell me more" opens, read-only: under a proposal it downloads the proposal
+file, under a day that day's month file, whose sheet it draws as the Calendar does.
+DESIGN_short_messages.md §6 is its contract.
 
 ## 8. The button's address
 

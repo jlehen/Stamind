@@ -97,39 +97,31 @@ def _spoiled_today(
 
 def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
     """"Change it" writes the saved proposal under one change; "Keep it as planned" writes
-    nothing. Either answer about today is followed by today's sessions as they then stand,
-    which the morning push no longer draws above such a proposal (§4, §5)."""
+    nothing (§4)."""
     if index != ACCEPT:
-        return _with_today(KEPT_LINE, item)
+        return KEPT_LINE
     if _spoiled_today(item, out_of_date):
         return OUT_OF_DATE_LINE
     runtime.coach_service.workout_revision_apply(
         revision_from_json(item["payload"]["proposal"])
     )
-    return _with_today(APPLIED_LINE, item)
+    return APPLIED_LINE
 
 
-def _with_today(line: str, item: Dict[str, Any]) -> str:
-    """`line`, then today's sessions when the proposal changes today."""
+def _show_today(item: Dict[str, Any]) -> None:
+    """After either answer about today, today's sessions as they then stand, which the
+    morning push no longer draws above such a proposal (§4, §5). The answer is written by
+    now, so a failure here only leaves them out."""
     today = today_str()
     if today not in item["payload"]["dates"]:
-        return line
-    return f"{line}\n\n{_today_text(today)}".rstrip()
-
-
-def _today_text(today: str) -> str:
-    """Today's sessions as this run's voice draws them after a change. The change is
-    written by now, so a failure here must not keep the item open: it draws nothing."""
+        return
     try:
         workouts = runtime.db.get_workouts(start_date=today, end_date=today)
         verdicts = adherence_verdicts(runtime.db, today, today, today)
-        drawn = io.StringIO()
-        with contextlib.redirect_stdout(drawn):
-            runtime.render.today_after_change(workouts, verdicts, today)
-        return strip_ansi(drawn.getvalue()).strip()
     except Exception as e:
-        step(f"Could not draw today's sessions after the change: {e}")
-        return ""
+        step(f"Could not draw today's sessions after the answer: {e}")
+        return
+    runtime.render.today_after_change(workouts, verdicts, today)
 
 
 def _asks(item: Dict[str, Any]) -> str:
@@ -144,7 +136,7 @@ PROPOSAL_KIND = Kind(
     name=KIND, shape=QUESTION,
     wording=lambda item: item["payload"]["text"],
     companion_wording=_asks,
-    is_stale=out_of_date, apply=_apply,
+    is_stale=out_of_date, apply=_apply, after_answer=_show_today,
     stands_alone=True, closed_line=OUT_OF_DATE_LINE,
 )
 

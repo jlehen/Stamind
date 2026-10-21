@@ -250,10 +250,14 @@ def queue_button_rows(req: dict) -> List[List[Tuple[str, str]]]:
         for b in req.get("buttons") or [] if isinstance(b, dict)
     ]
     rows = [cells[i:i + UI_BUTTONS_PER_ROW] for i in range(0, len(cells), UI_BUTTONS_PER_ROW)]
-    page = req.get("page")
-    if isinstance(page, dict) and page.get("url"):
-        rows.append([(page.get("label", ""), PAGE_CELL + page["url"])])
-    return rows
+    return rows + page_rows(req.get("page"))
+
+
+def page_rows(page: Any) -> List[List[Tuple[str, str]]]:
+    """A page button on a row of its own, or no row (DESIGN_short_messages.md §5)."""
+    if not isinstance(page, dict) or not page.get("url"):
+        return []
+    return [[(page.get("label", ""), PAGE_CELL + page["url"])]]
 
 
 def queue_later_rows(item_id: str) -> List[List[Tuple[str, str]]]:

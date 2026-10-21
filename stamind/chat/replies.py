@@ -15,7 +15,9 @@ from typing import List
 
 from stamind import journal
 from stamind.chat import telegram_api
-from stamind.chat.keyboards import prompt_buttons, queue_button_rows, ui_button_rows
+from stamind.chat.keyboards import (
+    page_rows, prompt_buttons, queue_button_rows, ui_button_rows,
+)
 from stamind.chat.runner import Session
 from stamind.sentinels import prompt_answer
 from stamind.text import strip_ansi
@@ -110,12 +112,18 @@ class RepliesMixin:
         canned utterance back through the normal pipeline. Falls back to its own
         message when there is nothing to anchor to."""
         buttons = [b for b in (req.get("buttons") or []) if isinstance(b, dict)]
-        if not buttons:
+        pages = page_rows(req.get("page"))
+        if not buttons and not pages:
             return
-        token = secrets.token_hex(3)
-        self.ui_actions[session.chat_id] = (token, buttons)
-        keyboard = telegram_api.inline_keyboard(ui_button_rows(buttons, token))
-        labels = f"buttons {[b.get('label') for b in buttons]}"
+        rows = []
+        # A page button alone is no live row: the row it would replace keeps its buttons
+        # (DESIGN_short_messages.md §5).
+        if buttons:
+            token = secrets.token_hex(3)
+            self.ui_actions[session.chat_id] = (token, buttons)
+            rows = ui_button_rows(buttons, token)
+        keyboard = telegram_api.inline_keyboard(rows + pages)
+        labels = f"buttons {[b.get('label') for b in buttons] + [r[0][0] for r in pages]}"
         session.sent = True
         if session.last_message_id is not None:
             try:

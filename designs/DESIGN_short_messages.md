@@ -1,6 +1,6 @@
 # Design: Short messages in the chat, details on a page
 
-**Status:** Being built: steps 0 to 5 done 2026-10-21; the details page not yet
+**Status:** Implemented 2026-10-21, every step of the build order; the details page not yet
 seen on a phone · **Date:** 2026-10-06
 
 This design comes out of an interview with the author on 2026-10-06 (five decisions, §13),

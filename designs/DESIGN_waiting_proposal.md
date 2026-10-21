@@ -154,6 +154,9 @@ Why not the briefing first (amended 2026-10-20): on Tuesday 20 October the brief
 "🧘 Today: Rest Day — Mobility Yoga", and the proposal under it moved a gym session onto that
 day. The athlete tapped "Change it" with the yoga in mind and went for a ride.
 
+A briefing above a proposal keeps its "🔎 Tell me more", alone on its row: a page button asks
+nothing and is no live row (amended 2026-10-21, DESIGN_short_messages.md §5, D8).
+
 **One keyboard on such a morning** (amended 2026-10-05). The briefing first kept its row. On
 Monday 5 October the athlete read a 60-minute gym session with "👍 Got it" under it, and half
 a second later a second question that cut it to 45 minutes.

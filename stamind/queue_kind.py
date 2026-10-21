@@ -67,6 +67,9 @@ class Kind:
     # `chat/routing.py` names them. The bot runs that tap beside the chat
     # (DESIGN_long_runs_beside_chat.md §6).
     long_run: Optional[Tuple[int, str]] = None
+    # What the kind shows after its answer's line, as output of its own: a proposal about
+    # today shows today's sessions (DESIGN_short_messages.md §4).
+    after_answer: Optional[Callable[[Dict[str, Any]], None]] = None
 
 
 class NotApplied(Exception):

@@ -36,6 +36,32 @@ test("an older button meets a newer proposal: it says so and shows nothing else"
   assert.deepEqual(logic.proposalView(FILE, 24), { problem: logic.REPLACED });
 });
 
+// October's file, with Tuesday's sheet as the bot wrote it.
+const OCTOBER = {
+  v: 1, at: "2026-10-20T08:03",
+  days: {
+    "2026-10-20": { x: ["🏋️"], sheet: [["Planned", ["🏋️ Today: Gym — 45 min", "[Gym]\nBench"]]] },
+  },
+};
+
+test("the button's day is read from the address, and names its month's file", () => {
+  assert.equal(logic.wantedDay("#d=2026-10-20&k=abc&b=pages&f=123"), "2026-10-20");
+  assert.equal(logic.wantedDay("#d=yesterday"), null);
+  assert.equal(logic.wantedDay("#p=25"), null);
+  assert.equal(logic.monthFileLabel("2026-10-20"), "calendar/2026-10");
+});
+
+test("a day draws the sheet the Calendar draws", () => {
+  const view = logic.dayView(OCTOBER, "2026-10-20");
+  assert.deepEqual(view.parts, OCTOBER.days["2026-10-20"].sheet);
+  assert.ok(view.title);
+});
+
+test("a day with nothing, and a month file that did not arrive", () => {
+  assert.deepEqual(logic.dayView(OCTOBER, "2026-10-21"), { problem: logic.NOTHING_PLANNED });
+  assert.deepEqual(logic.dayView(null, "2026-10-20"), { problem: logic.COULD_NOT_LOAD });
+});
+
 test("a file that did not arrive, or that the upload has not caught up with, asks for a retry",
   () => {
     assert.deepEqual(logic.proposalView(null, 25), { problem: logic.COULD_NOT_LOAD });

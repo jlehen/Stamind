@@ -149,11 +149,13 @@ classes themselves.
     inside the `morning-time` → `morning-deadline` window and idempotent on the
     `settings` row `push_morning_last` (DESIGN_bot_simple_frontend.md §4.2, §4.3); the
     proposal it saves is DESIGN_waiting_proposal.md §5.
-  - **A proposal**, where the pages are published, is one message: its short text above
-    "Shall I make these changes?", and "🔎 Tell me more" under the answers, a page button
-    (`telegram_api.PAGE_CELL`) that stays under its message and is never journalled
-    (`cli/render/proposal_lines.py`, `page_files/sync.py:page_button`,
-    DESIGN_short_messages.md §3, §5).
+  - **Short messages**, where the pages are published: a proposal is one message, its short
+    text above "Shall I make these changes?"; a day the chat draws (the morning message,
+    "📅 Today", today after a proposal's answer) shows each session's short line. Under
+    either, "🔎 Tell me more" opens `miniapp/details.html`: a page button
+    (`telegram_api.PAGE_CELL`), never the live row, kept under its message, never journalled
+    (`cli/render/proposal_lines.py`, `page_files/sync.py` `page_button`/`day_button`,
+    DESIGN_short_messages.md §3–§6).
   - **The athlete queue** travels as `SM-QUEUE` (`cli/queue.py`); a tap runs `sm bot
     queue <id> <action>` (`cli/queue_commands.py`), which applies the action and sends
     the next item, and the buttons carry `q:<id>:<action>` so the bot stores nothing

@@ -102,10 +102,16 @@ def proposal_file(dbh, at) -> Optional[Dict[str, Any]]:
             **item["payload"]["page"]}
 
 
+def pages_published(dbh) -> bool:
+    """Whether the chat may say things short, the long text one tap away on a page: the pages
+    are published here (DESIGN_short_messages.md §5, D9)."""
+    return bool(button_params(dbh))
+
+
 def has_page(dbh, item: Dict[str, Any]) -> bool:
-    """Whether a saved item is read short in the chat, its page one tap away: it was saved
-    with its page, and the pages are published (DESIGN_short_messages.md §5, D9)."""
-    return "page" in item["payload"] and bool(button_params(dbh))
+    """Whether a saved item is read short in the chat: it was saved with its page, and the
+    pages are published (DESIGN_short_messages.md §5)."""
+    return "page" in item["payload"] and pages_published(dbh)
 
 
 def page_button(dbh, item: Dict[str, Any]) -> Optional[Dict[str, str]]:
@@ -117,6 +123,18 @@ def page_button(dbh, item: Dict[str, Any]) -> Optional[Dict[str, str]]:
     after_command()
     return {"label": proposal_lines.PAGE_LABEL,
             "url": f"{proposal_lines.PAGE_URL}#p={item['id']}{button_params(dbh)}"}
+
+
+def day_button(dbh, workouts: List[Dict[str, Any]], day: str) -> Optional[Dict[str, str]]:
+    """The "Tell me more" button under a day drawn short, or None where the pages are not
+    published or no session of the day has a short line, so nothing was left out. The step
+    after a command runs first, so the day's month file is up before the button
+    (DESIGN_short_messages.md §5, §6.1)."""
+    if not pages_published(dbh) or not any((w.get("summary") or "").strip() for w in workouts):
+        return None
+    after_command()
+    return {"label": proposal_lines.PAGE_LABEL,
+            "url": f"{proposal_lines.PAGE_URL}#d={day}{button_params(dbh)}"}
 
 
 def rebuilt(label: str, today: str) -> bool:

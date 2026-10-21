@@ -78,7 +78,7 @@ def simple_session_line(w: Dict[str, Any], lead: Optional[str] = None) -> str:
 def simple_day_lines(
     workouts: List[Dict[str, Any]], date_str: str,
     verdicts: Optional[Dict[int, Dict[str, Any]]] = None, descriptions: bool = True,
-    wrap: bool = True, short: bool = False,
+    wrap: bool = True, short: bool = False, fall_back: bool = True,
 ) -> List[str]:
     """Simple rendering of one day's schedule: session line(s) plus the wrapped
     description (the week planner's actual prescription), or the one-line rest message.
@@ -91,7 +91,8 @@ def simple_day_lines(
     (DESIGN_calendar_miniapp.md §5). `wrap=False` keeps the description and the athlete's
     notes as stored, for the pages' files, which the browser wraps
     (DESIGN_miniapp_storage.md §4). `short` puts the session's short line in place of its
-    description, and nothing when it has none: a day that is over on the Calendar
+    description, the chat's day where the pages are published; without `fall_back` a
+    session with no short line shows nothing, a day that is over on the Calendar
     (DESIGN_short_messages.md §4)."""
     if not workouts:
         return [REST_DAY_LINE]
@@ -106,7 +107,7 @@ def simple_day_lines(
             lines.append(SIMPLE_DONE_LINE)
         if not descriptions:
             continue
-        text = (w.get("summary" if short else "description") or "").strip()
+        text = _session_text(w, short, fall_back)
         texts = [text] if text else []
         # What the athlete told the coach about it (DESIGN_session_notes.md §2).
         texts += [f"You said: “{note['text']}”" for note in w.get("athlete_notes") or []]
@@ -114,6 +115,18 @@ def simple_day_lines(
             texts = [wrap_text(text) for text in texts]
         lines.extend(texts)
     return lines
+
+
+def _session_text(w: Dict[str, Any], short: bool, fall_back: bool) -> str:
+    """The description, or in the short form the short line, falling back to the description
+    for a session that has none unless `fall_back` is off."""
+    description = (w.get("description") or "").strip()
+    if not short:
+        return description
+    summary = (w.get("summary") or "").strip()
+    if summary or not fall_back:
+        return summary
+    return description
 
 
 def simple_week_lines(

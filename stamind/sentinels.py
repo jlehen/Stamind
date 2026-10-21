@@ -84,12 +84,18 @@ def emit_photo(path: str, caption: Optional[str] = None, out=None) -> None:
     _write(PHOTO_SENTINEL, {"path": path, "caption": caption}, out)
 
 
-def emit_buttons(buttons: Sequence[dict], out=None) -> None:
+def emit_buttons(buttons: Sequence[dict], out=None, page: Optional[dict] = None) -> None:
     """Offers a row of buttons. Each is ``{"label": …}`` plus exactly one of: ``send``
     (a canned utterance the front-end feeds back through its normal command pipeline when
     tapped), ``ack`` (a short reply text; nothing runs), or ``menu`` (a nested list of
-    send/ack buttons) — DESIGN_bot_simple_frontend.md §4.4."""
-    _write(BUTTONS_SENTINEL, {"buttons": list(buttons)}, out)
+    send/ack buttons) — DESIGN_bot_simple_frontend.md §4.4. `page` is ``{"label", "url"}``,
+    a button that opens a page on a row of its own: never the live row, it stays under its
+    message, and the bot never journals its address (DESIGN_short_messages.md §5). A row may
+    hold the page button alone."""
+    payload = {"buttons": list(buttons)}
+    if page:
+        payload["page"] = dict(page)
+    _write(BUTTONS_SENTINEL, payload, out)
 
 
 def emit_flush(out=None) -> None:

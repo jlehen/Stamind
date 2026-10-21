@@ -86,6 +86,11 @@ describes the bot before this date.
 >
 > `[ 👍 Got it ]  [ 😴 Should I rest? ]  [ 🕐 Can't today ]`
 
+Amended 2026-10-21 (DESIGN_short_messages.md §4, §5): where the pages are published, a day
+the chat draws (this message, "📅 Today", today after a proposal's answer) shows each
+session's short line in place of its description, and "🔎 Tell me more" opens the day in
+full on the details page.
+
 Rest days get one line ("Rest day — enjoy it 🎉", no buttons). So does a day whose
 sessions are all already trained — "✅ Already done for today — nice work 💪", the
 acknowledgement §6 gives the day view, promoted to the whole message. The catch-up

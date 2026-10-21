@@ -34,6 +34,7 @@ from stamind.cli.workouts.heads_up import newest_written
 from stamind.coach import picture
 from stamind.db.objectives import GOAL_ARCHIVED, GOAL_UPCOMING, goal_state
 from stamind.openrouter import openrouter_client
+from stamind.page_files import sync as page_files
 from stamind.sentinels import emit_buttons, emit_flush
 from stamind.sports import canonical_sport
 from stamind.strength.sets import read_new_activities
@@ -335,13 +336,18 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     # today as it then stands, so today as stored is not drawn above it
     # (DESIGN_waiting_proposal.md §5).
     changes_today = proposal_item is not None and today in proposal_item["payload"]["dates"]
+    page = None
     if workouts and not ahead:
         print(PUSH_ALL_DONE_LINE)
     elif not workouts and runway is not None and runway["days_left"] < 0:
         print(SIMPLE_PASSED_LINE)
     elif not changes_today:
-        for line in simple_day_lines(workouts, today, verdicts):
+        # Each session's short line where the pages are published, its whole text one tap
+        # away (DESIGN_short_messages.md §4).
+        short = page_files.pages_published(runtime.db)
+        for line in simple_day_lines(workouts, today, verdicts, short=short):
             print(line)
+        page = page_files.day_button(runtime.db, workouts, today)
     if adapt_note:
         print(wrap_text(adapt_note))
     if runway:
@@ -358,7 +364,11 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     if proposal_item is None and to_change:
         buttons = [GOT_IT_BUTTON] + buttons
     if proposal_item is None and buttons:
-        emit_buttons(buttons)
+        emit_buttons(buttons, page=page)
+    elif page:
+        # A page button asks nothing and is no live row, so the briefing keeps it on a
+        # morning with a proposal (DESIGN_short_messages.md §5, D8).
+        emit_buttons([], page=page)
     runtime.db.set_setting(settings.MORNING_MARKER, today)
     # The last act is the queue's step: the first item of the line, unless an item is
     # out (DESIGN_athlete_queue.md §13.2). What the week planner would change goes first,

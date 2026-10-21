@@ -175,7 +175,8 @@ def sheet(cal: Calendar, day: Day, texts: bool = False) -> List[Any]:
     planned = [r["planned"] for r in day.results]
     if planned or _in_schedule(cal, day.date):
         parts.append([PLANNED, simple_day_lines(planned, day.date, descriptions=texts,
-                                                wrap=False, short=day.date < cal.today)])
+                                                wrap=False, short=day.date < cal.today,
+                                                fall_back=False)])
     done = _done_lines(day, cal.today)
     if done:
         parts.append([DONE, done])

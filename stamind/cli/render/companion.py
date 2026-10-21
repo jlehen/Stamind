@@ -11,6 +11,7 @@ from stamind.analytics import timeline
 from stamind.analytics.adherence import MINOR, unplanned_kind
 from stamind.coach.proposals import RevisionProposal
 from stamind.config import config
+from stamind.page_files import sync as page_files
 from stamind.sentinels import emit_buttons
 from stamind.strength.prescription import exercise_lines
 from stamind.text import green, wrap_text
@@ -30,6 +31,18 @@ from stamind.cli.render.session_lines import (
     SIMPLE_SESSION_RULE, simple_benchmark_question, simple_compare_lines, simple_day_lines,
     simple_day_word, simple_span_words, simple_week_lines,
 )
+
+
+def _short_day(workouts: list, day: str, verdicts: dict) -> None:
+    """One day in the chat: each session's short line where the pages are published, and
+    "Tell me more" under the day when a line stands for a longer text
+    (DESIGN_short_messages.md §4, §5)."""
+    short = page_files.pages_published(runtime.db)
+    for line in simple_day_lines(workouts, day, verdicts, short=short):
+        print(line)
+    page = page_files.day_button(runtime.db, workouts, day)
+    if page:
+        emit_buttons([], page=page)
 
 
 def _sessions(count: int) -> str:
@@ -75,10 +88,10 @@ class CompanionRenderer(ExpertRenderer):
         print(green("Done — your week is updated. 💪"))
 
     def today_after_change(self, workouts: list, verdicts: dict, today: str) -> None:
-        """Today's sessions as the briefing draws them, once "Change it" rewrote one
-        (DESIGN_waiting_proposal.md §4)."""
-        for line in simple_day_lines(workouts, today, verdicts):
-            print(line)
+        """Today's sessions as the briefing draws them, once a proposal about today was
+        answered (DESIGN_waiting_proposal.md §4)."""
+        print()
+        _short_day(workouts, today, verdicts)
 
     def session_note_kept(self, session: Dict[str, Any], day: str) -> None:
         print(f"Kept with {_whose_day(day, _today_str())} “{session['title']}”.")
@@ -169,8 +182,13 @@ class CompanionRenderer(ExpertRenderer):
         # A single-day window reads as the day, any other window as the week ahead
         # (DESIGN_bot_simple_frontend.md §6).
         if start_date and start_date == end_date:
-            for line in simple_day_lines(workouts, start_date, verdicts):
-                print(line)
+            # `workout show` of a day is the day in full, as "Full day in chat" asks
+            # (DESIGN_short_messages.md §4).
+            if (getattr(args, "verbose", 0) or 0) >= 2:
+                for line in simple_day_lines(workouts, start_date, verdicts):
+                    print(line)
+                return
+            _short_day(workouts, start_date, verdicts)
             return
         for line in simple_week_lines(
             workouts, verdicts,

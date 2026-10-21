@@ -407,6 +407,28 @@ class SendingTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.chat_bot.bot.edits[-1][2][0][0][1],
                          keyboards.ui_callback_data(token, "0"))
 
+    PAGE = {"label": "🔎 Tell me more",
+            "url": "https://x/details.html#d=2026-10-20&k=secret&b=pages&f=1"}
+
+    async def test_a_page_button_rides_under_the_row_and_alone_is_no_live_row(self):
+        """DESIGN_short_messages.md §5: under "Got it" it is a row of its own; alone, under
+        "📅 Today", it leaves the morning's live row as it was; its address is never
+        journalled."""
+        page_row = [("🔎 Tell me more", telegram_api.PAGE_CELL + self.PAGE["url"])]
+        await self.chat_bot._flush_output(self.session, ["your day"])
+        with mock.patch.object(self.chat_bot, "_log") as log:
+            await self.chat_bot._send_ui_buttons(self.session, {
+                "buttons": [{"label": "👍 Got it", "ack": "Nice"}], "page": self.PAGE,
+            })
+            token, live = self.chat_bot.ui_actions[42]
+            self.assertEqual([b["label"] for b in live], ["👍 Got it"])
+            self.assertEqual(self.chat_bot.bot.edits[-1][2][-1], page_row)
+
+            await self.chat_bot._send_ui_buttons(self.session, {"buttons": [], "page": self.PAGE})
+            self.assertEqual(self.chat_bot.ui_actions[42][0], token)
+            self.assertEqual(self.chat_bot.bot.edits[-1][2], [page_row])
+        self.assertNotIn("secret", repr(log.call_args_list))
+
     async def test_the_chart_is_sent_and_its_temp_file_unlinked(self):
         """§7.2: the CLI writes it with delete=False precisely so the bot owns cleanup."""
         handle = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
