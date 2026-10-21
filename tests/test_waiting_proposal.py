@@ -151,6 +151,18 @@ class AnswerTest(_Case):
         self.assertIn("Today: Easy run — 30 min\n" + SIMPLE_DONE_LINE, reply)
         self.assertIn("Today: Easy ride — 60 min", reply)
 
+    def test_a_move_is_not_told_in_the_terminals_words(self):
+        """Thursday's ride moves to Saturday. "Moving Intervals (cycling) from 2026-10-08
+        to 2026-10-10" is a line for the terminal and the journal: the chat has read the
+        proposal, and the reply opens on "Done"."""
+        proposal = self.eased(day=SATURDAY)
+        proposal.workouts[0]["replaces_slot"] = (THURSDAY, "cycling")
+        out = self.tap(saved_proposal.save(proposal, newest_written()))
+        self.assertTrue(self.ride()["removed"])
+        self.assertEqual(self.ride(SATURDAY)["title"], "Easy ride")
+        self.assertNotIn("Moving", out)
+        self.assertIn(saved_proposal.APPLIED_LINE, out)
+
     def test_change_it_on_another_day_shows_no_session(self):
         save_workout(test_db, SATURDAY, "cycling", "Long ride", duration_minutes=180)
         out = self.tap(self.save(day=SATURDAY))

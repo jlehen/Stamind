@@ -23,8 +23,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from stamind.types import Workout
 from stamind.analytics import intensity
 from stamind.sports import canonical_sport
-from stamind.output import notice, step
+from stamind.output import step
 from stamind.gcal.reconcile import verbose_events
+from stamind.text import yellow
 from stamind.coach import honoring, picture
 from stamind.coach.proposals import RevisionProposal
 from stamind.clock import today_str as _today_str
@@ -52,10 +53,11 @@ class RevisionApplyMixin:
     ) -> Optional[Workout]:
         """The session an entry's `replaces` takes out of another slot, or None.
 
-        Three answers are refused, each with a notice, because honouring half of one
-        loses a session: a source no session stands in, a source the athlete has already
-        trained, and a second entry claiming a source the first one took. A refused entry
-        is still written where it stands — only its claim on the other day is dropped.
+        Three answers are refused, because honouring half of one loses a session: a source
+        no session stands in, a source the athlete has already trained, and a second entry
+        claiming a source the first one took. A refused entry is still written where it
+        stands — only its claim on the other day is dropped. Each refusal is a line for the
+        terminal and the journal, never for the chat (DESIGN_output_verbosity.md §3).
 
         A destination that already holds a same-sport session is not refused: the moved
         session takes the slot, and apply ends the one standing there
@@ -65,22 +67,24 @@ class RevisionApplyMixin:
         if source is None:
             return None
         if source not in by_slot:
-            notice(
+            step(
                 f"The coach says this {entry.get('date')} session came from "
                 f"{source[0]}, where no session of yours stands — writing it where it "
                 f"is and leaving {source[0]} alone.",
+                yellow,
             )
             return None
         if source in completed_keys:
-            notice(
+            step(
                 f"The coach moved the {source[0]} session to {entry.get('date')}, but "
                 f"you have already trained it — writing the new session and leaving "
                 f"{source[0]} alone.",
+                yellow,
             )
             return None
         if source in claimed:
-            notice(f"Two sessions came back for the {source[0]} session — keeping the "
-                   f"first.")
+            step(f"Two sessions came back for the {source[0]} session — keeping the "
+                 f"first.", yellow)
             return None
         return by_slot[source]
 
