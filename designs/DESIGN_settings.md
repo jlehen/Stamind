@@ -39,7 +39,7 @@ learned. It is on by default, and the athlete can change it from chat.
 
 Amended 2026-09-19 (DESIGN_output_verbosity.md §9): `terse`, in the Coach group, keeps what
 the coach says about a change short. It is off by default, and the athlete can change it
-from chat.
+from chat. Removed 2026-10-21 (DESIGN_short_messages.md §8): short is the rule for everyone.
 
 Amended 2026-09-20 (DESIGN_change_heads_up.md §4): `change-delay`, in a group of its own
 called Week changes, is how many minutes a change to one of today's sessions waits before

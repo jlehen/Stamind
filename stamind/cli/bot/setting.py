@@ -57,10 +57,6 @@ SETTING_DESCRIPTIONS = {
         "whether the app asks before it leans less on something it has learned about "
         'the athlete — "on" or "off"'
     ),
-    settings.TERSE: (
-        "whether the coach keeps what it says about a change to the week short — "
-        '"on" for short, "off" for the full explanation'
-    ),
 }
 
 
@@ -71,7 +67,7 @@ SETTING_DESCRIPTIONS = {
 # adapt-first — is off it by construction.
 ROUTABLE_SETTINGS = (
     settings.MORNING_TIME, settings.MORNING_DEADLINE, settings.EVENING_TIME, settings.PUSH,
-    settings.LEARNING_QUESTIONS, settings.TERSE,
+    settings.LEARNING_QUESTIONS,
 )
 
 
@@ -120,10 +116,6 @@ def _setting_effect(key: str, value: str) -> str:
             return "I'll ask you again before I lean less on something I've learned about you."
         return ("I'll stop asking about what I've learned about you, and go by what I see "
                 "instead.")
-    if key == settings.TERSE:
-        if value == "on":
-            return "When I change your week, I'll keep it short."
-        return "When I change your week, I'll explain it in full again."
     if value == "on":
         return "I'll start opening your day again in the morning."
     return "I'll stop opening the day — you can always ask me here whenever you like."

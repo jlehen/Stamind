@@ -12,7 +12,7 @@ from stamind.cli.render.session_lines import (
     simple_date_word, simple_day_word, simple_session_line, sport_emoji, title_and_length,
 )
 from stamind.cli.workouts.revisions import (
-    quotes_wording, rewritten_text_only, wording_group_lines, wording_groups,
+    rewritten_text_only, wording_group_lines, wording_groups,
 )
 from stamind.coach.proposals import RevisionProposal
 from stamind.text import wrap_text
@@ -72,7 +72,7 @@ def simple_revision_lines(proposal: RevisionProposal) -> List[str]:
         if why:
             entry_lines.append(why)
         quoted = []
-        if quotes_wording(pw, existing):
+        if rewritten_text_only(pw, existing):
             quoted = _quotes(pw, existing)
         change = "\n\n".join(entry_lines[1:] + quoted)
         if quoted and change in first_quoted:

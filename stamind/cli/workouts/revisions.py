@@ -7,7 +7,6 @@ The expert table lives here; the companion prose form of the same proposal is
 import difflib
 from typing import Dict, List, Set, Tuple
 
-from stamind import settings
 from stamind.text import (
     bold, cyan, format_labeled_text, gray, green, magenta, red, render_table, yellow,
 )
@@ -46,12 +45,6 @@ def rewritten_text_only(proposal: dict, original: dict) -> bool:
         return False
     norm = lambda v: " ".join(str(v or "").split())  # noqa: E731
     return norm(proposal.get('description')) != norm(original.get('description'))
-
-
-def quotes_wording(proposal: dict, original: dict) -> bool:
-    """True when the preview quotes a session's old and new wording: only its text moved,
-    and the athlete has not asked for short answers (DESIGN_output_verbosity.md §9)."""
-    return rewritten_text_only(proposal, original) and not settings.terse()
 
 
 def _lines(text) -> Tuple[List[str], Set[int]]:
@@ -190,7 +183,7 @@ def _print_wording_changes(proposal: RevisionProposal) -> None:
     but not how is what makes an honest text revision look like a bug (§9.1)."""
     reworded = [
         (pair.proposal, pair.original) for pair in proposal.pairs
-        if quotes_wording(pair.proposal, pair.original)
+        if rewritten_text_only(pair.proposal, pair.original)
     ]
     if not reworded:
         return

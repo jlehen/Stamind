@@ -255,7 +255,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Whether a line reaches the chat | `output.aside` (terminal only) vs `print`; a list of lines gates on `text.asides_enabled()`. DESIGN_output_verbosity.md §3 |
 | Recording that something happened | `output.step`/`warn`/`fail` print and journal in one go; `stamind/journal.py` directly only for structured fields (`journal.record`) or what must never reach the athlete (`journal.debug`); event names from `journal.EVENTS`; `runtime.prompt` journals every answer itself. DESIGN_logging.md §2, §4.2, §5 |
 | Reading back what a command did | `sm journal` (`cli/journal/`), `logs/runs/*.jsonl`; a run's prompts are `logs/llm_exchanges/*<run id>*`. DESIGN_logging.md §6, §7 |
-| How long the coach's prose is | `coach/engine/prompt.py` (`## WRITING FOR THE ATHLETE`) + the per-field caps in each `## RESPONSE FORMAT`; a field re-injected into later prompts is not capped (DESIGN_output_verbosity.md §5.1); the `terse` setting (§9, `quotes_wording` in `cli/workouts/revisions.py`) |
+| How long the coach's prose is | `coach/engine/prompt.py` (`## WRITING FOR THE ATHLETE`) + the per-field caps in each `## RESPONSE FORMAT`; a field re-injected into later prompts is not capped (DESIGN_output_verbosity.md §5.1); the short proposal in the chat (`cli/render/proposal_lines.py`, DESIGN_short_messages.md §3) |
 | A web view of existing data | a GET in `stamind_web.py` + a panel under `static/` ([§8](#8-web-api-endpoints)) |
 | A web endpoint that would write | does not go in the web app: add the CLI command ([§8](#8-web-api-endpoints)) |
 | DB schema / a new column | the `db/*.py` mixin + the table in [§5](#5-database-schema) |

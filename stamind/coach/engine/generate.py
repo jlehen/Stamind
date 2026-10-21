@@ -241,7 +241,6 @@ class WorkoutGenerateMixin:
         past_constraints: Optional[List[Constraint]] = None,
         neighbour_workouts: Optional[List[Workout]] = None,
         spoken_workouts: Optional[List[Workout]] = None,
-        terse: bool = False,
     ) -> Dict[str, Any]:
         """Queries LLM to generate workouts for a given number of days based on active strategy.
 
@@ -255,8 +254,7 @@ class WorkoutGenerateMixin:
         `neighbour_workouts` are the sessions planned in the week either side of the span,
         shown and never written (DESIGN_mesocycle_boundary.md §7). `spoken_workouts` are
         the past sessions of the look back the athlete said something about
-        (DESIGN_session_notes.md §4). `terse` halves the summary
-        (DESIGN_output_verbosity.md §9).
+        (DESIGN_session_notes.md §4).
         """
         start_str = start_str or today_str
         starting_phrase = "today" if start_str == today_str else start_str
@@ -283,9 +281,6 @@ class WorkoutGenerateMixin:
                 "test there\n"
                 "competes with the effort it is meant to serve."
             )
-        # Half the summary for an athlete who asked for short answers
-        # (DESIGN_output_verbosity.md §9).
-        sentences = 2 if terse else 4
         custom_task = (
             "## TASK\n"
             f"Generate a training schedule for the next {duration_desc} starting from "
@@ -327,7 +322,7 @@ class WorkoutGenerateMixin:
             "You MUST respond with a JSON object containing:\n"
             "{\n"
             '  "reasoning": "How this microcycle design serves the active mesocycle focus, in AT\n'
-            f'    MOST {sentences} SENTENCES. The sessions themselves are listed below your\n'
+            '    MOST 2 SENTENCES. The sessions themselves are listed below your\n'
             '    prose — describe the shape of the microcycle and why, not each workout in\n'
             '    turn.",\n'
             + _athlete_note_field(standing_workouts)

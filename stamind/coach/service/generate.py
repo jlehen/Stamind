@@ -205,7 +205,6 @@ class WorkoutGenMixin:
             past_constraints=past_constraints,
             neighbour_workouts=neighbour_sessions,
             spoken_workouts=spoken_sessions,
-            terse=settings.terse(),
         )
 
         # NOTE: workout generation is read-only w.r.t. coach learnings (see

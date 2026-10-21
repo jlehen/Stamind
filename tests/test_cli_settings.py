@@ -387,7 +387,6 @@ class TestRegistryShape(SettingsTestCase):
             settings.CONFIRMATION_DAYS: "5",
             settings.STRENGTH_SETS_SINCE: "2026-09-03",
             settings.LEARNING_QUESTIONS: "off",
-            settings.TERSE: "on",
             settings.STRENGTH_LOGGER: "off",
         }
         self.assertEqual(sorted(samples), sorted(settings.names()),

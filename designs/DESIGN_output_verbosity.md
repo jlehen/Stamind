@@ -308,7 +308,7 @@ actually reads:
 | `reason` | `workout adapt` | at most 2 short sentences (~30 words), for everyone (amended 2026-10-21, DESIGN_short_messages.md §7) |
 | `change` | `workout adapt`, the strength planner | at most 8 words (added 2026-10-21, DESIGN_short_messages.md §7) |
 | `change_reason` | `workout adapt` | one sentence, at most 20 words |
-| `reasoning` | `workout generate` | at most 4 sentences |
+| `reasoning` | `workout generate` | at most 2 sentences, for everyone (amended 2026-10-21, DESIGN_short_messages.md §8) |
 | `summary` | `workout generate`, `workout adapt`, the strength planner | at most 2 short sentences, about 20 words (added 2026-10-21, DESIGN_short_messages.md §7) |
 
 ### 5.1 What is deliberately left long
@@ -587,6 +587,11 @@ athlete learns of the strength planner's wait only when it starts.
 ## 9. A shorter coach, on request
 
 Rev 4, 2026-09-19.
+
+Removed 2026-10-21 (DESIGN_short_messages.md §8): its two-sentence summaries became the rule
+for everyone, the chat's proposal quotes no wording, and a terminal always does, so the
+setting switched nothing left. The stored rows stay in each database, read by nothing. What
+follows is the record.
 
 ### 9.1 The problem
 

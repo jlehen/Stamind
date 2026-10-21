@@ -354,18 +354,19 @@ class TestTheTweakGate(unittest.TestCase):
         self.assertNotIn("Read them off the request", system)
 
 
-class TestTheTerseSwitch(unittest.TestCase):
-    """`terse` halves `workout generate`'s summary. Adapt and tweak ask everyone for two
-    short sentences, with a change line per session, and leave "change_reason" alone,
-    because later runs read it again (DESIGN_short_messages.md §7)."""
+class TestTheSummaryLength(unittest.TestCase):
+    """Every athlete gets two-sentence summaries: `workout generate`'s, and adapt's and
+    tweak's with a change line per session, which leave "change_reason" alone because later
+    runs read it again (DESIGN_short_messages.md §7, §8)."""
 
     ADAPT_REASON = "2 SHORT SENTENCES (~30 words in all)"
     CHANGE_LINE = '"change": "power band now 250-270 W"'
     CHANGE_REASON_CAP = "a single sentence of at most 20 words"
 
-    def test_off_asks_for_the_full_summary_of_generate(self):
+    def test_generate_asks_two_sentences(self):
         system, _user = build_generate_prompt()
-        self.assertIn("MOST 4 SENTENCES", system)
+        self.assertIn("MOST 2 SENTENCES", system)
+        self.assertNotIn("MOST 4 SENTENCES", system)
 
     def test_adapt_and_tweak_ask_two_sentences_and_a_change_line(self):
         for extra in ({}, {"tweak": True, "athlete_message": "swap Thursday and Friday"}):
@@ -375,11 +376,6 @@ class TestTheTerseSwitch(unittest.TestCase):
                 self.assertNotIn("AT MOST 3 SENTENCES", system)
                 self.assertIn(self.CHANGE_LINE, system)
                 self.assertIn(self.CHANGE_REASON_CAP, system)
-
-    def test_on_halves_the_summary_of_generate(self):
-        system, _user = build_generate_prompt(terse=True)
-        self.assertIn("MOST 2 SENTENCES", system)
-        self.assertNotIn("MOST 4 SENTENCES", system)
 
 
 class TestTheGatesAreIndependent(unittest.TestCase):
@@ -648,8 +644,7 @@ class TestSpokenSessionsGate(unittest.TestCase):
 # The optional inputs whose regions are asserted above.
 GATES_WITH_A_TEST = {
     "athlete_message", "intensity_context", "standing_workouts", "past_constraints",
-    "neighbour_workouts", "spoken_workouts", "tweak", "tweak_dates", "terse",
-    "open_proposal",
+    "neighbour_workouts", "spoken_workouts", "tweak", "tweak_dates", "open_proposal",
 }
 
 # The rest of the two builders' optional inputs. Being here is not a claim that an input
