@@ -463,5 +463,39 @@ class TestShortName(unittest.TestCase):
         self.assertEqual(self._live()["short_name"], "Long")
 
 
+class TestShortLine(unittest.TestCase):
+    """The short line follows the short name's rules (DESIGN_short_messages.md §7)."""
+
+    def setUp(self):
+        self.db = _fresh_db(self)
+
+    def _live(self):
+        return self.db.get_workout("2026-09-01", "running")
+
+    def _write_line(self, kind, title, minutes, summary=None):
+        with self.db.workout_change(kind=kind) as change:
+            change.append(date="2026-09-01", sport_type="running", title=title,
+                          description=f"{minutes} min", duration_minutes=minutes,
+                          tss=minutes, summary=summary)
+        return self.db.get_workout_changes()[0]["id"]
+
+    def test_a_short_line_alone_is_not_a_change(self):
+        self._write_line("generate", "Easy run", 45, summary="Easy 45 min, chatty pace.")
+        before = len(self.db.get_plan_revisions())
+
+        self._write_line("adapt", "Easy run", 45, summary="45 easy minutes.")
+
+        self.assertEqual(len(self.db.get_plan_revisions()), before)
+        self.assertEqual(self._live()["summary"], "Easy 45 min, chatty pace.")
+
+    def test_rollback_brings_the_short_line_back(self):
+        self._write_line("generate", "Hill repeats", 60, summary="Six hills, 90 s each.")
+        adapt = self._write_line("adapt", "Tempo run", 50, summary="20 min at tempo.")
+
+        self.db.rollback_to_change(adapt, "2026-09-01")
+
+        self.assertEqual(self._live()["summary"], "Six hills, 90 s each.")
+
+
 if __name__ == "__main__":
     unittest.main()

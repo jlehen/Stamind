@@ -599,6 +599,7 @@ DESIGN_workout_revisions.md.
 | `sport_type`            | TEXT       | The spelling as written.                         |
 | `title`                 | TEXT       |                                                  |
 | `short_name`            | TEXT       | At most five characters naming the kind of session ("Easy", "Hills", "Z2"), shown under the calendar cell's icon. Written with the title by the week planner and taken as given like `title`; not a prescription field (a revision differing only in it is dropped, and Google Calendar never shows it); NULL on a rest day (DESIGN_calendar_miniapp.md §3.6). |
+| `summary`               | TEXT       | The short line the chat shows in place of the description, about 20 words: written by the week planner on every session but a gym day and a rest day, and by the strength planner on a gym day, which copies it with the sets it keeps. Taken as given and not a prescription field, like `short_name`. NULL on a session written before it existed (DESIGN_short_messages.md §4, §7). |
 | `description`           | TEXT       |                                                  |
 | `duration_minutes`      | INTEGER    |                                                  |
 | `rpe`                   | INTEGER    | Expected RPE 1–10 (excluded from `pushed_signature`) |

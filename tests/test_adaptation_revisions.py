@@ -209,6 +209,7 @@ class TestAdaptRevisions(unittest.TestCase):
                 "adapted_workouts": [{
                     "date": "2026-06-04", "sport_type": "running",
                     "title": "Short hill repeats", "short_name": "Hills",
+                    "summary": "Four hill repeats of 90 s, hard but even.",
                     "description": "4x90s uphill", "duration_minutes": 40,
                     "rpe": 7, "tss": 45,
                 }],
@@ -227,6 +228,9 @@ class TestAdaptRevisions(unittest.TestCase):
             live = test_db.get_workout("2026-06-04", "running")
             self.assertEqual(live["title"], "Short hill repeats")
             self.assertEqual(live["short_name"], "Hills")
+            # The short line travels the same way (DESIGN_short_messages.md §7).
+            self.assertIn('"summary"', mock_client.complete.call_args.args[0])
+            self.assertEqual(live["summary"], "Four hill repeats of 90 s, hard but even.")
 
     @patch("stamind.coach.engine.openrouter_client")
     def test_adapt_holds_a_relisted_session_instead_of_deleting_it(self, mock_client):

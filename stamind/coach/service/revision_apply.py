@@ -287,6 +287,7 @@ class RevisionApplyMixin:
                     sport_type=w['sport_type'],
                     title=w['title'],
                     short_name=w.get('short_name'),
+                    summary=w.get('summary'),
                     description=w['description'],
                     duration_minutes=w.get('duration_minutes'),
                     rpe=w.get('rpe'),

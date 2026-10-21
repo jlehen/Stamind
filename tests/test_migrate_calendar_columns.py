@@ -1,9 +1,8 @@
-"""The one-off migration that adds `workouts.short_name` and `mesocycles.summary`
-(DESIGN_calendar_miniapp.md §3.6, §3.7).
+"""The one-off migration that adds `workouts.short_name`, `mesocycles.summary`
+(DESIGN_calendar_miniapp.md §3.6, §3.7) and `workouts.summary` (DESIGN_short_messages.md §4).
 
-The fixture is a database made by the current code with both columns dropped again and the
-stamp put back to 20: the shape the author's and the companion's databases have on the day
-this ships.
+The fixture is a database made by the current code with the three columns dropped again and
+the stamp put back to 20: the oldest shape a live database can have.
 """
 import importlib.util
 import os
@@ -52,6 +51,7 @@ class AddColumnsTest(unittest.TestCase):
         conn = sqlite3.connect(self.path)
         conn.execute("ALTER TABLE workouts DROP COLUMN short_name")
         conn.execute("ALTER TABLE mesocycles DROP COLUMN summary")
+        conn.execute("ALTER TABLE workouts DROP COLUMN summary")
         conn.execute("DELETE FROM schema_version")
         conn.execute(
             "INSERT INTO schema_version (version, applied_at) VALUES (20, '2026-09-26')"
@@ -62,30 +62,36 @@ class AddColumnsTest(unittest.TestCase):
     def test_each_column_is_added_once(self):
         self.assertNotIn("short_name", _columns(self.path, "workouts"))
         self.assertNotIn("summary", _columns(self.path, "mesocycles"))
+        self.assertNotIn("summary", _columns(self.path, "workouts"))
 
         self.assertEqual(migrate.add_columns(self.path),
-                         ["workouts.short_name", "mesocycles.summary"])
+                         ["workouts.short_name", "mesocycles.summary", "workouts.summary"])
         self.assertEqual(migrate.add_columns(self.path), [])
 
         self.assertEqual(_columns(self.path, "workouts").count("short_name"), 1)
         self.assertEqual(_columns(self.path, "mesocycles").count("summary"), 1)
+        self.assertEqual(_columns(self.path, "workouts").count("summary"), 1)
 
-    def test_the_migrated_database_takes_both(self):
+    def test_the_migrated_database_takes_them(self):
         """The new code opens the migrated file, keeps the old rows, and writes and reads
-        a short name and a summary."""
+        a short name, a short line and a mesocycle's summary."""
         migrate.add_columns(self.path)
         db = Database(db_path=self.path)
 
         old = db.get_workouts()[0]
         self.assertEqual(old["title"], "Hill repeats")
         self.assertIsNone(old["short_name"])
+        self.assertIsNone(old["summary"])
 
         with db.workout_change(kind="adapt", summary="after") as change:
             change.append(
                 date="2026-07-02", sport_type="running", title="Short hill repeats",
                 description="4x90s", short_name="Hills",
+                summary="Four hill repeats of 90 s, hard but even.",
             )
-        self.assertEqual(db.get_workouts()[0]["short_name"], "Hills")
+        new = db.get_workouts()[0]
+        self.assertEqual(new["short_name"], "Hills")
+        self.assertEqual(new["summary"], "Four hill repeats of 90 s, hard but even.")
 
         goal = db.add_objective(title="Winter 10k", target_date="2026-12-13",
                                 sport_type="running")

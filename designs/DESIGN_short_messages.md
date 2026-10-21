@@ -1,6 +1,7 @@
 # Design: Short messages in the chat, details on a page
 
-**Status:** Designed, not implemented · **Date:** 2026-10-06
+**Status:** Being built: step 1 done 2026-10-21; step 0 waits for the phone check
+(`scripts/check_page_button.py`) · **Date:** 2026-10-06
 
 This design comes out of an interview with the author on 2026-10-06 (five decisions, §13),
 a review by two reviewers, and the author's rulings of 2026-10-07 and 2026-10-09 (§13).

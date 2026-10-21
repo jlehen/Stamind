@@ -47,7 +47,8 @@ def row(exercise, count, low, high, load=None, light=False):
             "load_kg": load, "light": light}
 
 
-def answer(day, *exercises, keep=False, reason="", notes="2–3 min rests.", light=False):
+def answer(day, *exercises, keep=False, reason="", notes="2–3 min rests.", light=False,
+           summary=""):
     body = {"date": day, "keep": keep, "light": light, "notes": notes,
             "exercises": [
                 {"exercise": e["exercise"], "sets": e["sets"], "reps_low": e["reps_low"],
@@ -56,6 +57,8 @@ def answer(day, *exercises, keep=False, reason="", notes="2–3 min rests.", lig
             ]}
     if reason:
         body["reason"] = reason
+    if summary:
+        body["summary"] = summary
     return body
 
 
@@ -81,7 +84,7 @@ class _PlannerCase(unittest.TestCase):
         return reply
 
     def gym(self, day, *rows, title="Full-Body Strength", brief=BRIEF, duration=70,
-            short_name=None):
+            short_name=None, summary=None):
         """A planned strength session with the strength planner's exercises on it."""
         description = (
             prescription.render_description(brief, rows, "2–3 min rests.") if rows
@@ -92,6 +95,7 @@ class _PlannerCase(unittest.TestCase):
                 date=day, sport_type="strength_training", title=title,
                 description=description, duration_minutes=duration, rpe=7, tss=50,
                 prescribed_sets=list(rows) or None, short_name=short_name,
+                summary=summary,
             )
         saved = test_db.get_workout(day, "strength_training")
         self.gym_lineage = saved["id"]
@@ -137,6 +141,35 @@ class WhenItRunsTest(_PlannerCase):
         test_db.record_strength_check(session["id"], first.stamp)
         self.assertIsNone(self.strength_pass([]))
         self.assertEqual(len(self.asked), 1)
+
+    def test_a_session_it_writes_carries_its_short_line(self):
+        """DESIGN_short_messages.md §7: only the strength planner knows the exercises and the
+        kilograms, so it writes a gym day's short line."""
+        self.gym("2026-09-17")
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0),
+                   summary="One heavy lift, two reps short of failure."),
+        ]}]
+        result = self.strength_pass([])
+        self.assertEqual(result.added[0]["summary"],
+                         "One heavy lift, two reps short of failure.")
+        self.assertIn('"summary"', self.asked[0][0] + self.asked[0][1])
+
+    def test_a_rebriefed_session_whose_sets_stand_keeps_its_short_line(self):
+        """It is Monday. `workout adapt` rewrites Thursday's brief for a light week, and the
+        strength planner answers that Thursday's sets stand. The sets are copied under the
+        new brief, and the short line with them (DESIGN_short_messages.md §7)."""
+        self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0),
+                 summary="One heavy lift, two reps short of failure.")
+        test_db.bump_strength_history()
+        entry = {"date": "2026-09-17", "sport_type": "strength_training",
+                 "title": "Full-Body Strength",
+                 "description": "[Full-Body Strength]\nA lighter week: same sets, slower.",
+                 "duration_minutes": 70, "rpe": 6, "tss": 40, "summary": None}
+        self.replies = [{"sessions": [answer("2026-09-17", keep=True)]}]
+        self.strength_pass([entry])
+        self.assertEqual([r["load_kg"] for r in entry["prescribed_sets"]], [140.0])
+        self.assertEqual(entry["summary"], "One heavy lift, two reps short of failure.")
 
     def test_a_session_the_proposal_is_removing_is_left_alone(self):
         """The week planner moves Thursday's gym to Friday for the rain: it returns Thursday

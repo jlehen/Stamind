@@ -179,6 +179,17 @@ class TestTheAnswers(WindowTestCase):
         self.assertIn('"short_name"', self.prompt_system)
         self.assertEqual(test_db.get_workout(_days_out(2), "cycling")["short_name"], "Hills")
 
+    def test_the_short_line_the_week_planner_writes_reaches_the_row(self):
+        """DESIGN_short_messages.md §7: the prompt asks for it, and apply stores it."""
+        self.ride(_days_out(2))
+        self.generate(self.session(
+            _days_out(2), sport="cycling", title="Hill repeats",
+            summary="Six hill repeats of 90 s, hard but even.",
+        ))
+        self.assertIn('"summary"', self.prompt_system)
+        self.assertEqual(test_db.get_workout(_days_out(2), "cycling")["summary"],
+                         "Six hill repeats of 90 s, hard but even.")
+
     def test_replaces_moves_the_session_and_its_lineage(self):
         lineage = self.ride(_days_out(2))
         self.generate(self.session(

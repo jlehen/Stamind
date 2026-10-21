@@ -35,11 +35,12 @@ REVISION_COLUMNS = (
     "title", "description", "duration_minutes", "rpe", "tss",
     "void", "reason", "restored_from", "macrocycle_id", "created_at",
     "benchmark_type", "planned_zone_currency",
-) + _ZONE_COLUMNS + ("short_name",)
+) + _ZONE_COLUMNS + ("short_name", "summary")
 
 # What "the same prescription" means for the §9 no-op rule. `reason` is deliberately
 # out: if the prescription did not move, the session was held, and a rationale for
-# holding is not worth a revision. `short_name` is out too (DESIGN_calendar_miniapp.md §3.6).
+# holding is not worth a revision. `short_name` and `summary` are out too
+# (DESIGN_calendar_miniapp.md §3.6, DESIGN_short_messages.md §7).
 PRESCRIPTION_FIELDS = (
     "date", "sport_canonical", "sport_type", "title", "description",
     "duration_minutes", "rpe", "tss", "benchmark_type", "planned_zone_currency",
@@ -179,6 +180,7 @@ class WorkoutChange:
     def append(
         self, *, date: str, sport_type: str, title: str,
         description: Optional[str] = None, short_name: Optional[str] = None,
+        summary: Optional[str] = None,
         duration_minutes: Optional[int] = None, rpe: Optional[int] = None,
         tss: Optional[int] = None, reason: Optional[str] = None,
         benchmark_type: Optional[str] = None, clear_benchmark: bool = False,
@@ -192,10 +194,11 @@ class WorkoutChange:
 
         The new revision is the slot's live one merged with what is supplied here (§6
         step 2), so a partial re-save cannot read an omission as a deletion: `title`,
-        `description` and `short_name` are always taken as given, every other field carries
-        forward when omitted (DESIGN_calendar_miniapp.md §3.6). `clear_benchmark` is the
-        one way to blank `benchmark_type` in place, for an adaptation that replaces a test
-        with something that is no longer that test (DESIGN_benchmark_workouts.md §4.2).
+        `description`, `short_name` and `summary` are always taken as given, every other
+        field carries forward when omitted (DESIGN_calendar_miniapp.md §3.6).
+        `clear_benchmark` is the one way to blank `benchmark_type` in place, for an
+        adaptation that replaces a test with something that is no longer that test
+        (DESIGN_benchmark_workouts.md §4.2).
         `lineage_id` names the session explicitly, which is what a moved session's
         destination needs (§4).
 
@@ -222,6 +225,7 @@ class WorkoutChange:
             "title": title,
             "description": description,
             "short_name": short_name,
+            "summary": summary,
             "void": 0,
             "reason": reason,
             "restored_from": restored_from,

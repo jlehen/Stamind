@@ -377,6 +377,8 @@ def _keep(session: Session) -> None:
         session.live.get("description"), session.brief
     )
     session.entry["prescribed_sets"] = list(session.rows)
+    # The short line goes with the sets it describes (DESIGN_short_messages.md §7).
+    session.entry["summary"] = session.live.get("summary")
 
 
 def _fold_in(
@@ -385,8 +387,9 @@ def _fold_in(
 ) -> StrengthPass:
     result = StrengthPass(stamp=stamp, dropped=dropped)
     for session in to_write:
-        _write(session, answers[session.date].rows, answers[session.date].notes, result,
-               reason_key)
+        answer = answers[session.date]
+        _write(session, answer.rows, answer.notes, result, reason_key,
+               summary=answer.summary)
     for session in to_check:
         answer = answers.get(session.date)
         # New evidence, a new brief, a new duration or the athlete asking: without one of
@@ -402,13 +405,13 @@ def _fold_in(
             result.checked.append((session.date, session.sport_type))
             continue
         _write(session, answer.rows, answer.notes, result, reason_key,
-               reason=answer.reason)
+               reason=answer.reason, summary=answer.summary)
     return result
 
 
 def _write(
     session: Session, rows: List[Dict[str, Any]], notes: str, result: StrengthPass,
-    reason_key: str, reason: str = "",
+    reason_key: str, reason: str = "", summary: str = "",
 ) -> None:
     """Puts one written session into the proposal. A session the week planner never
     mentioned needs a row of its own, and its date's other sessions have to be held or
@@ -420,6 +423,7 @@ def _write(
     if session.entry is not None:
         session.entry["description"] = description
         session.entry["prescribed_sets"] = rows
+        session.entry["summary"] = summary or None
         session.entry.pop("keep", None)
         session.entry.pop("unmentioned", None)
         if reason:
@@ -431,6 +435,7 @@ def _write(
         "sport_type": session.sport_type,
         "title": session.title,
         "short_name": live.get("short_name"),
+        "summary": summary or None,
         "description": description,
         "duration_minutes": live.get("duration_minutes"),
         "rpe": live.get("rpe"),

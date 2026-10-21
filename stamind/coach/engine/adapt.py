@@ -381,6 +381,11 @@ evidence-backed observations are authored only by the weekly history analysis
                 '      "short_name": "Hills", (At most 5 characters naming the kind of session,\n'
                 '        e.g. "Easy", "Long", "Hills", "Tempo", "Z2", "VO2", "Gym". null on a\n'
                 '        rest day)\n'
+                '      "summary": "Ride easy at 155-175 W on a flat route. Ease off past 178 W.",\n'
+                '        (For the athlete: at most 2 short sentences, about 20 words, a hard\n'
+                '        limit. What to do, and the one or two numbers to hold. Plain words,\n'
+                '        no name coined in the description. null on a strength session, whose\n'
+                '        line the strength planner writes, and on a rest day)\n'
                 + change_reason_field +
                 '      "description": "Start with the title on its own line in brackets followed by a\n'
                 '        newline, e.g. \"[Tempo Run]\\n\", then an adapted description of intensity,\n'

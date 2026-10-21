@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""One-off migration: add the two columns the calendar and the "Goals & plan" page read.
+"""One-off migration: add the columns the calendar, the "Goals & plan" page and the chat read.
 
 `workouts.short_name` is what kind of session it is, in at most five characters
 (DESIGN_calendar_miniapp.md §3.6). `mesocycles.summary` is one line on what a mesocycle is
-for (§3.7). `_init_db` only creates tables and never adds a column to one that exists, so a
-database made before SCHEMA_VERSION 22 needs this script.
+for (§3.7). `workouts.summary` is a session's short line (DESIGN_short_messages.md §4).
+`_init_db` only creates tables and never adds a column to one that exists, so a database made
+before SCHEMA_VERSION 22, or before 29 for the last one, needs this script.
 
 It adds each column whenever it is missing, whatever version the database is stamped with,
 and does nothing when it is already there. It opens the file with plain `sqlite3`: opening
-it through `Database` would stamp version 22 first and leave the columns missing.
+it through `Database` would stamp the new version first and leave the columns missing.
 
 It operates on the instance named by `STAMIND_CONFIG`, or on the default config when that
 variable is unset (ARCHITECTURE.md §9). Run it once per athlete, from the repository root,
@@ -28,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from stamind.config import CONFIG_PATH, config
 
-COLUMNS = (("workouts", "short_name"), ("mesocycles", "summary"))
+COLUMNS = (("workouts", "short_name"), ("mesocycles", "summary"), ("workouts", "summary"))
 
 
 def add_columns(db_path: str) -> List[str]:
@@ -57,7 +58,7 @@ def main() -> int:
     if added:
         print(f"Added {', '.join(added)} to {db_path}.")
         return 0
-    print(f"{db_path} already has both columns. Nothing to do.")
+    print(f"{db_path} already has every column. Nothing to do.")
     return 0
 
 
