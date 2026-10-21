@@ -1,12 +1,14 @@
 // The pages' files in the bucket (DESIGN_miniapp_storage.md §5, §7): the page key, the names,
 // the download and the decryption, word for word as `stamind/page_files/recipe.py` does
-// them. Shared by the calendar and "Goals & plan". The key and what the files hold stay in
-// memory: this code writes nothing to the browser's storage (Telegram's script does, §5).
+// them. Shared by the calendar, "Goals & plan" and the details page. The key and what the
+// files hold stay in memory: this code writes nothing to the browser's storage (Telegram's
+// script does, §5).
 import { VERSION, base64urlBytes, inflate } from "./calendar_logic.js?v=dev";
 
 // Word for word the labels in `stamind/page_files/sync.py`; a Python test holds them together.
 export const INDEX = "calendar/index";
 export const PLAN = "plan";
+export const PROPOSAL = "proposal";
 
 // How long a download may take before the file counts as missing (§7.1). A first guess.
 const FETCH_MS = 10000;

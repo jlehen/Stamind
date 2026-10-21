@@ -24,7 +24,7 @@ from tests.chat_harness import (
     record_commands, routes_to, web_app_update,
 )
 from stamind import clock
-from stamind.chat import keyboards, messages, runner, scheduler
+from stamind.chat import keyboards, messages, runner, scheduler, telegram_api
 from stamind.config import config
 
 
@@ -378,6 +378,43 @@ class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
             [("✅ Change it", "q:4:a1")],
             [("😴 Feeling tired", keyboards.ui_callback_data(token, "0"))],
         ])
+
+    PAGE_URL = "https://x/details.html#p=4&k=secret&b=pages&f=1"
+
+    async def test_tell_me_more_is_a_row_of_its_own_and_never_journalled(self):
+        """DESIGN_short_messages.md §5: the button opens a page, is not the chat's live row,
+        and its address, which holds the page key, reaches no journal line."""
+        chat_bot = build_chat_bot(self)
+        logged = []
+        with mock.patch.object(chat_bot, "_log",
+                               side_effect=lambda *args, **kwargs: logged.append(args)):
+            await chat_bot._send_queue_item(runner.Session(42, _FakeProc(), "n0nce"), {
+                "id": 4, "text": "Shall I make these changes?",
+                "buttons": [{"label": "✅ Change it", "action": "a1"}],
+                "page": {"label": "🔎 Tell me more", "url": self.PAGE_URL},
+            })
+        [(_chat, _text, sent)] = chat_bot.bot.sent
+        self.assertEqual(sent["reply_markup"], [
+            [("✅ Change it", "q:4:a1")],
+            [("🔎 Tell me more", telegram_api.PAGE_CELL + self.PAGE_URL)],
+        ])
+        self.assertNotIn(42, chat_bot.ui_actions)
+        self.assertNotIn("secret", repr(logged))
+
+    async def test_tell_me_more_stays_after_the_answer(self):
+        chat_bot = build_chat_bot(self)
+        record_commands(self, chat_bot)
+        data = keyboards.queue_callback_data(4, "a1")
+        markup = SimpleNamespace(inline_keyboard=[
+            [SimpleNamespace(text="✅ Change it", callback_data=data)],
+            [SimpleNamespace(text="🔎 Tell me more", callback_data=None,
+                             web_app=SimpleNamespace(url=self.PAGE_URL))],
+        ])
+        query = _FakeQuery(data, text="Shall I make these changes?", markup=markup)
+        await chat_bot.on_callback(callback_update(query), None)
+        self.assertEqual(query.edited_text, "Shall I make these changes?\n\n→ ✅ Change it")
+        self.assertEqual(query.edited_markup,
+                         [[("🔎 Tell me more", telegram_api.PAGE_CELL + self.PAGE_URL)]])
 
     async def test_an_offer_tapped_under_a_proposal_leaves_its_two_answers(self):
         chat_bot = build_chat_bot(self)

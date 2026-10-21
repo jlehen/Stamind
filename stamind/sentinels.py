@@ -105,13 +105,18 @@ def emit_flush(out=None) -> None:
 
 def emit_queue_item(
     item_id: int, text: str, buttons: Sequence[dict], out=None, offer: Sequence[dict] = (),
+    page: Optional[dict] = None,
 ) -> None:
     """Sends one queued item. Its buttons are ``{"label", "action"}``
     (DESIGN_athlete_queue.md §6.2). `offer` is buttons shaped as `emit_buttons` takes
-    them, drawn under the item's own (DESIGN_waiting_proposal.md §5)."""
+    them, drawn under the item's own (DESIGN_waiting_proposal.md §5). `page` is
+    ``{"label", "url"}``, a button that opens a page and stays under the item for good; the
+    bot never journals its address, which holds the page key (DESIGN_short_messages.md §5)."""
     payload = {"id": item_id, "text": text, "buttons": list(buttons)}
     if offer:
         payload["offer"] = list(offer)
+    if page:
+        payload["page"] = dict(page)
     _write(QUEUE_SENTINEL, payload, out)
 
 

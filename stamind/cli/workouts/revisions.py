@@ -1,7 +1,7 @@
 """Previewing an in-place revision before it is applied.
 
 The expert table lives here; the companion prose form of the same proposal is
-`render.simple_revision_lines`, which reuses the wording-diff helpers below
+`render/proposal_lines.simple_revision_lines`, which reuses the wording-diff helpers below
 (DESIGN_render_persona.md §7).
 """
 import difflib

@@ -124,14 +124,22 @@ def all_update_types():
     return Update.ALL_TYPES
 
 
-def inline_keyboard(rows):
-    """An inline keyboard from rows of (label, callback_data)."""
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+# A cell that opens a page instead of calling the bot back: its data is this prefix and the
+# page's address (DESIGN_short_messages.md §5).
+PAGE_CELL = "page:"
 
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(label, callback_data=data) for label, data in row]
-         for row in rows]
-    )
+
+def inline_keyboard(rows):
+    """An inline keyboard from rows of (label, callback_data). A cell whose data starts with
+    `PAGE_CELL` opens the page at the address after it."""
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+
+    def cell(label, data):
+        if data.startswith(PAGE_CELL):
+            return InlineKeyboardButton(label, web_app=WebAppInfo(url=data[len(PAGE_CELL):]))
+        return InlineKeyboardButton(label, callback_data=data)
+
+    return InlineKeyboardMarkup([[cell(label, data) for label, data in row] for row in rows])
 
 
 def reply_keyboard(rows):

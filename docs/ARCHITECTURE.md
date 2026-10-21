@@ -149,6 +149,11 @@ classes themselves.
     inside the `morning-time` → `morning-deadline` window and idempotent on the
     `settings` row `push_morning_last` (DESIGN_bot_simple_frontend.md §4.2, §4.3); the
     proposal it saves is DESIGN_waiting_proposal.md §5.
+  - **A proposal**, where the pages are published, is one message: its short text above
+    "Shall I make these changes?", and "🔎 Tell me more" under the answers, a page button
+    (`telegram_api.PAGE_CELL`) that stays under its message and is never journalled
+    (`cli/render/proposal_lines.py`, `page_files/sync.py:page_button`,
+    DESIGN_short_messages.md §3, §5).
   - **The athlete queue** travels as `SM-QUEUE` (`cli/queue.py`); a tap runs `sm bot
     queue <id> <action>` (`cli/queue_commands.py`), which applies the action and sends
     the next item, and the buttons carry `q:<id>:<action>` so the bot stores nothing
@@ -203,7 +208,7 @@ One line per module; the rule each keeps is the part worth knowing before openin
 | `garmin/` | module functions | `client.py` (login, fetch), `sync.py` (`pull`, `ensure_data`, the `sync_state` watermark, the Calendar ride-along, §13), `derived.py` (where a handle meets the maths: `recompute_derived`, `backfill_tss`, `warmup_cutoff`). `__init__.py` still re-exports everything: debt, not precedent (AGENTS.md) |
 | `gcal/` | `CalendarSyncer` | Google Calendar, both ways: `event.py` (what an event says, no Google import), `history.py`, `client.py` (the only file that calls the API), `reconcile.py` (the pass after every change, DESIGN_workout_revisions.md §8); `__init__.py` maps them and re-exports nothing ([§15](#15-design-rationale--history)) |
 | `strength/` | — | Strength tracking (DESIGN_strength_tracking.md): the exercise table (`vocabulary.py`, DESIGN_exercise_table.md), Garmin's sets (`sets.py`), the strength planner (`planner.py` + `planner_prompt.py`, §9), the gym logger's payloads (`logger.py`, §16), planned against done (`comparison.py`, DESIGN_strength_planned_vs_done.md); `__init__.py` maps the rest. Rows in `db/strength.py` |
-| `page_files/` | — | The pages' encrypted files in a bucket (DESIGN_miniapp_storage.md): `recipe.py`, `bucket.py`, `sync.py` (`after_command`, `data publish`/`unpublish`); `__init__.py` maps them |
+| `page_files/` | — | The pages' encrypted files in a bucket (DESIGN_miniapp_storage.md): `recipe.py`, `bucket.py`, `sync.py` (`after_command`, `page_button`, `data publish`/`unpublish`); `__init__.py` maps them |
 | `chat/` | `ChatBot` | The Telegram front-end (above) |
 
 ### Change recipes (where to edit for a given task)
@@ -1997,11 +2002,11 @@ says where things live).
 and each view words them itself: `cli/render/calendar_page.py` (the page's snapshot and
 month files), `cli/render/plan_page.py` ("Goals & plan"), `cli/render/calendar_grid.py`
 (the terminal grid behind `cli/calendar.py`). The pages are `miniapp/calendar.html`,
-`plan.html` and their `*_logic.js` under node tests, with `storage.js` the bucket read
-both share. `page_files/sync.py` adds the bucket parameters to both buttons and uploads
+`plan.html` and `details.html` (a proposal in full, DESIGN_short_messages.md §6) and their
+`*_logic.js` under node tests, with `storage.js` the bucket read they share. `page_files/sync.py` adds the bucket parameters to both buttons and uploads
 the files that changed after every command (`after_command`, from `run_once`). On the
 bot's side, `ChatBot._page_buttons` builds both addresses on every send,
 `RepliesMixin._send_keyed` is the one send that attaches the keyboard, and
-`on_web_app_data` turns a `calendar_day` message into `workout list -d <date>` and a
+`on_web_app_data` turns a `calendar_day` message into `workout show -d <date>` and a
 `plan_why` one into `plan show --macrocycle <id>`; any other page message is a gym log
 ([§16](#16-gym-logger-telegram-mini-app)).

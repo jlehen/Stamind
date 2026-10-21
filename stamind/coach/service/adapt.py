@@ -18,7 +18,7 @@ from stamind.analytics.adherence import (
     analyze_adherence, format_discrepancies, performed_sessions,
 )
 from stamind.sports import canonical_sport
-from stamind import settings, signals
+from stamind import signals
 from stamind.text import cmd
 from stamind.clock import fmt_date, shift, today_str as _today_str
 from stamind.coach.formatting import format_baseline
@@ -325,7 +325,6 @@ class AdaptMixin:
             signal_earliest_date=start_date_str,
             tweak=tweak,
             tweak_dates=tweak_dates,
-            terse=settings.terse(),
             open_proposal=open_proposal,
             neighbour_workouts=neighbour_workouts,
         )

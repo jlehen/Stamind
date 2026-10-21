@@ -756,6 +756,9 @@ and load, so a session revised in words alone renders as
 is tagged `[text revised]` and the changed passages are printed under the table. A preview
 that says a session changed but not how is what makes an honest revision look like a bug.
 
+Amended 2026-10-21: where the pages are published, the chat's proposal quotes no passage;
+the details page shows the pairs (DESIGN_short_messages.md §6.2). A terminal still does.
+
 **The passages are shown as `Was:` / `Now:` pairs, not as a `-`/`+` diff.** The first
 version printed a unified diff: one line per sentence, signed. Observed 2026-08-31, over
 Telegram: the diff was wrapped at a fixed 88 columns whatever the client had asked for, and

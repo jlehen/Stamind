@@ -48,7 +48,7 @@ def row(exercise, count, low, high, load=None, light=False):
 
 
 def answer(day, *exercises, keep=False, reason="", notes="2–3 min rests.", light=False,
-           summary=""):
+           summary="", change=""):
     body = {"date": day, "keep": keep, "light": light, "notes": notes,
             "exercises": [
                 {"exercise": e["exercise"], "sets": e["sets"], "reps_low": e["reps_low"],
@@ -59,6 +59,8 @@ def answer(day, *exercises, keep=False, reason="", notes="2–3 min rests.", lig
         body["reason"] = reason
     if summary:
         body["summary"] = summary
+    if change:
+        body["change"] = change
     return body
 
 
@@ -170,6 +172,32 @@ class WhenItRunsTest(_PlannerCase):
         self.strength_pass([entry])
         self.assertEqual([r["load_kg"] for r in entry["prescribed_sets"]], [140.0])
         self.assertEqual(entry["summary"], "One heavy lift, two reps short of failure.")
+
+    def test_a_checked_session_written_again_carries_its_change_line(self):
+        """DESIGN_short_messages.md §7: the strength planner says what changes on a session it
+        was asked to check, beside its reason; a line the week planner wrote stands."""
+        self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
+        test_db.bump_strength_history()
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0), reason="Add 5.",
+                   change="belt squat 140 → 145 kg"),
+        ]}]
+        result = self.strength_pass([])
+        self.assertEqual(result.added[0]["change"], "belt squat 140 → 145 kg")
+
+        self.gym("2026-09-18", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
+        test_db.bump_strength_history()
+        entry = {"date": "2026-09-18", "sport_type": "strength_training",
+                 "title": "Full-Body Strength",
+                 "description": "[Full-Body Strength]\nA light week.", "duration_minutes": 70,
+                 "change": "a light week"}
+        self.replies = [{"sessions": [
+            answer("2026-09-18", row("SQUAT/BELT_SQUAT", 2, 4, 6, 125.0), reason="Light.",
+                   change="belt squat down to 125 kg"),
+            answer("2026-09-17", keep=True),
+        ]}]
+        self.strength_pass([entry])
+        self.assertEqual(entry["change"], "a light week")
 
     def test_a_session_the_proposal_is_removing_is_left_alone(self):
         """The week planner moves Thursday's gym to Friday for the rain: it returns Thursday

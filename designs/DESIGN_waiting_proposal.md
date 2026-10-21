@@ -50,7 +50,10 @@ ask the athlete (DESIGN_athlete_queue.md). The queue already gives what a propos
 that survives a bot restart, buttons that carry the item they belong to, a check that runs
 before a tap is applied, and `sm queue` to see and answer it from a terminal.
 
-The new kind is `proposal`. Its item holds:
+The new kind is `proposal`. Its item holds (amended 2026-10-21: also its short text and its
+page's content, and where the pages are published it is sent as one message, the short text
+above "Shall I make these changes?" and "🔎 Tell me more" under the answers; the text below
+stays what the terminal and the week planner read, DESIGN_short_messages.md §3, §5):
 
 - the text the athlete is shown: the coach's reason, then the preview the chat already prints
   under "Here's what I'd change:";

@@ -164,6 +164,8 @@ You MUST respond with a JSON object containing:
         PROGRESS. Every exercise of a light session is marked, not some of them.)
       "reason": "One sentence for the athlete, REQUIRED on a session under SESSIONS TO
         CHECK you are changing, omitted everywhere else.",
+      "change": "belt squat 145 → 150 kg", (REQUIRED with "reason", omitted where it is:
+        AT MOST 8 words saying what changes, with its number when it has one.)
       "notes": "The rests, the warm-up and any cue, in one short paragraph.",
       "summary": "Six exercises, heavy, two reps short of failure. Split squats at 36 kg.",
         (For the athlete: at most 2 short sentences, about 20 words, and that is a hard
@@ -405,6 +407,7 @@ class Answer:
     reason: str
     notes: str
     summary: str = ""   # the short line (DESIGN_short_messages.md §7)
+    change: str = ""    # what changes, in at most 8 words, on a checked session (§7)
 
 
 def clean_session(raw: Dict[str, Any], dropped: List[str]) -> Answer:
@@ -429,6 +432,7 @@ def clean_session(raw: Dict[str, Any], dropped: List[str]) -> Answer:
         reason=str(raw.get("reason") or "").strip(),
         notes=str(raw.get("notes") or "").strip(),
         summary=str(raw.get("summary") or "").strip(),
+        change=str(raw.get("change") or "").strip(),
     )
 
 

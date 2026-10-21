@@ -20,6 +20,7 @@ import datetime
 from typing import Any, List, Optional, Tuple
 
 from stamind.athlete_queue import QUEUE_LATER_CHOICES
+from stamind.chat.telegram_api import PAGE_CELL
 from stamind.clock import day_str, parse_date
 from stamind.sports import canonical_sport
 from stamind.types import Workout
@@ -242,12 +243,17 @@ def ui_menu_rows(menu: List[dict], token: str, parent: str) -> List[List[Tuple[s
 
 
 def queue_button_rows(req: dict) -> List[List[Tuple[str, str]]]:
-    """A queued item's buttons, laid out like the morning row they arrive under (§6.1)."""
+    """A queued item's buttons, laid out like the morning row they arrive under (§6.1), and
+    its page button on a row of its own under them (DESIGN_short_messages.md §5)."""
     cells = [
         (b.get("label", ""), queue_callback_data(req.get("id"), b.get("action", "")))
         for b in req.get("buttons") or [] if isinstance(b, dict)
     ]
-    return [cells[i:i + UI_BUTTONS_PER_ROW] for i in range(0, len(cells), UI_BUTTONS_PER_ROW)]
+    rows = [cells[i:i + UI_BUTTONS_PER_ROW] for i in range(0, len(cells), UI_BUTTONS_PER_ROW)]
+    page = req.get("page")
+    if isinstance(page, dict) and page.get("url"):
+        rows.append([(page.get("label", ""), PAGE_CELL + page["url"])])
+    return rows
 
 
 def queue_later_rows(item_id: str) -> List[List[Tuple[str, str]]]:
@@ -262,6 +268,13 @@ def answers_kept(rows: List[List[Tuple[str, str]]]) -> List[List[Tuple[str, str]
     its text when the offer drawn below them is tapped or has expired
     (DESIGN_waiting_proposal.md §5)."""
     kept = [[cell for cell in row if not cell[1].startswith("ui:")] for row in rows]
+    return [row for row in kept if row]
+
+
+def pages_kept(rows: List[List[Tuple[str, str]]]) -> List[List[Tuple[str, str]]]:
+    """A keyboard's page buttons: they stay under their message for good, whatever is tapped
+    beside them (DESIGN_short_messages.md §5)."""
+    kept = [[cell for cell in row if cell[1].startswith(PAGE_CELL)] for row in rows]
     return [row for row in kept if row]
 
 

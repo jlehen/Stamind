@@ -94,6 +94,7 @@ uploaded, and the buttons' addresses are the ones of today.
 | A month file | `calendar/2026-09` | The days of that month: each day's cell, its sheet, workout text included, and its gym log when it has one. Nothing else. On a day that is over, a session's text is its short line, or nothing when it has none (amended 2026-10-21, DESIGN_short_messages.md §4, D6). | After every command, for the months the window touches. Older months by `sm data publish` only (§9). |
 | The index file | `calendar/index` | Today's date, the stamp, the goals, the mesocycles, the last day of the schedule, and the first and last month that have a file. | After every command. |
 | The plan file | `plan` | What the "Goals & plan" button carries, plus each mesocycle's whole long text. | After every command. |
+| The proposal file | `proposal` | The newest proposal saved, whatever its answer, with its number: what the details page shows (added 2026-10-21, DESIGN_short_messages.md §6.2). | After every command, and before a "Tell me more" button is sent. |
 
 A file's name in the bucket never changes (D9). Writing a file again replaces its content
 under the same name, so a page always finds the newest content under the name it computes.
@@ -178,7 +179,9 @@ Stamind takes five steps.
 3. **It compares** each file with the record. What is compared is the content before
    encryption, without the stamp. A file whose last upload failed differs whatever its
    content, so a failed upload is tried again by the next command that builds the file.
-4. **It uploads** the files that differ, the month that holds today first. When any file
+4. **It uploads** the files that differ, the proposal's first, then the month that holds
+   today (amended 2026-10-21: the step also runs before a "Tell me more" button is sent,
+   DESIGN_short_messages.md §5). When any file
    of the calendar was uploaded, the index file is uploaded too, with the time of this
    command as its stamp. Each upload is one request, which carries the instruction "do not
    cache". Without it, Google would serve the old content for up to an hour.
@@ -278,6 +281,11 @@ file is the one `bot mesocycle` prints, the text behind the chat's "Tell me more
 not what `plan show` prints, which is the list of mesocycles the page already draws.
 
 The stamp follows the calendar's rule.
+
+### 7.3 Details (added 2026-10-21)
+
+The page a proposal's "🔎 Tell me more" opens, read-only, downloads the proposal file and
+shows it; DESIGN_short_messages.md §6 is its contract.
 
 ## 8. The button's address
 

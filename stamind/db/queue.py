@@ -65,6 +65,14 @@ class QueueMixin:
             ).fetchall()
             return [_item(row) for row in rows]
 
+    def newest_queue_item(self, kind: str) -> Optional[Dict[str, Any]]:
+        """The item of one kind queued last, waiting or closed."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM athlete_queue WHERE kind = ? ORDER BY id DESC LIMIT 1", (kind,)
+            ).fetchone()
+            return _item(row) if row else None
+
     def closed_queue_items(self) -> List[Dict[str, Any]]:
         """Every closed item, in the order they closed (§5.1)."""
         with self._get_connection() as conn:

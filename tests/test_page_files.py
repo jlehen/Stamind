@@ -175,6 +175,10 @@ class RecipeTest(unittest.TestCase):
         page = _read("miniapp", "storage.js")
         self.assertIn(f'INDEX = "{sync.INDEX}"', page)
         self.assertIn(f'PLAN = "{sync.PLAN}"', page)
+        self.assertIn(f'PROPOSAL = "{sync.PROPOSAL}"', page)
+        # The file is read from the queue kind of the same name.
+        from stamind.cli.workouts import proposal
+        self.assertEqual(sync.PROPOSAL, proposal.KIND)
         self.assertEqual(calendar_page.month_label("2026-09"), "calendar/2026-09")
         self.assertIn("`calendar/${monthKey(month)}`", _read("miniapp", "calendar_logic.js"))
 
@@ -523,6 +527,49 @@ class PublishTest(FilesTestCase):
         _activity("a0930", TODAY)
         sync.after_command()
         self.assertEqual(self.names(), [])
+
+
+def _proposal(cards=1, page=True):
+    """A proposal as the queue keeps it, with its page or, saved before step 2, without."""
+    payload = {"text": "long", "answers": [], "proposal": {}, "dates": [TODAY],
+               "written_upto": 0}
+    if page:
+        payload["page"] = {"summary": "Rough night.", "notice": "",
+                           "cards": [{"line": f"card {n}"} for n in range(cards)]}
+    item_id = test_db.queue_item("proposal", f"2026-09-30T06:0{cards}:00", payload,
+                                 datetime(2026, 9, 30, 6, cards).astimezone())
+    return test_db.get_queue_item(item_id)
+
+
+class ProposalFileTest(FilesTestCase):
+    """The proposal's file and its button (DESIGN_short_messages.md §5, §6.2)."""
+
+    def test_the_newest_proposal_is_the_file_and_one_saved_without_a_page_is_none(self):
+        self.assertNotIn(sync.PROPOSAL, sync.build(test_db, TODAY))
+        _proposal(page=False)
+        self.assertNotIn(sync.PROPOSAL, sync.build(test_db, TODAY))
+        _proposal(cards=1)
+        newest = _proposal(cards=2)
+        file = sync.build(test_db, TODAY)[sync.PROPOSAL]
+        self.assertEqual((file["id"], len(file["cards"])), (newest["id"], 2))
+        # Built from the database, so `sm data publish` builds it too.
+        self.assertIn(sync.PROPOSAL, sync.build(test_db, TODAY, every_month=True))
+
+    def test_the_button_uploads_the_proposal_first(self):
+        use_storage(self)
+        run_cli(["data", "publish"])
+        item = _proposal()
+        FakeBucket.uploads = []
+        button = sync.page_button(test_db, item)
+        where = sync.target()
+        self.assertEqual(FakeBucket.uploads[0], where.name(sync.PROPOSAL))
+        self.assertEqual(button["url"],
+                         f"https://jlehen.github.io/Stamind/miniapp/details.html"
+                         f"#p={item['id']}&k={KEY}&b={BUCKET}&f={FOLDER}")
+
+    def test_no_button_where_the_pages_are_not_published(self):
+        use_storage(self)
+        self.assertIsNone(sync.page_button(test_db, _proposal()))
 
 
 class ButtonTest(FilesTestCase):

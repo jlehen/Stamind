@@ -465,3 +465,31 @@ h1 {
   font-size: 14px;
   color: var(--hint);
 }
+
+/* ----- the details page (DESIGN_short_messages.md §6) ----- */
+
+.summary {
+  margin: 12px 0;
+}
+
+.card {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.card-line {
+  font-weight: 600;
+}
+
+.passage {
+  margin-top: 8px;
+}
+
+.card-text summary {
+  min-height: var(--tap);
+  line-height: var(--tap);
+  color: var(--accent);
+  font-size: 15px;
+}

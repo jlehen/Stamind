@@ -305,7 +305,8 @@ actually reads:
 
 | field | command | limit |
 | --- | --- | --- |
-| `reason` | `workout adapt` | at most 3 sentences (~60 words) |
+| `reason` | `workout adapt` | at most 2 short sentences (~30 words), for everyone (amended 2026-10-21, DESIGN_short_messages.md §7) |
+| `change` | `workout adapt`, the strength planner | at most 8 words (added 2026-10-21, DESIGN_short_messages.md §7) |
 | `change_reason` | `workout adapt` | one sentence, at most 20 words |
 | `reasoning` | `workout generate` | at most 4 sentences |
 | `summary` | `workout generate`, `workout adapt`, the strength planner | at most 2 short sentences, about 20 words (added 2026-10-21, DESIGN_short_messages.md §7) |

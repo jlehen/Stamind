@@ -226,7 +226,10 @@ Amended 2026-09-14 (DESIGN_athlete_queue.md §6.2): a fifth sentinel, `\x1eSM-QU
 {json}`, carries one item of the athlete queue. Unlike this row it is sent as a message of
 its own, and each of its buttons carries its whole meaning (`q:<item id>:<action>:<walk
 start>`), so it neither replaces the live row nor is replaced by it, and the bot stores
-nothing about it. One item brings this row with it (DESIGN_waiting_proposal.md §5).
+nothing about it. One item brings this row with it (DESIGN_waiting_proposal.md §5). A
+proposal may bring a page button too, "🔎 Tell me more", on a row of its own: it opens the
+details page, is never the live row, stays under its message after every tap, and its
+address is never journalled (amended 2026-10-21, DESIGN_short_messages.md §5).
 
 ## 5. Simple-mode interaction
 

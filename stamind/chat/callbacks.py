@@ -16,8 +16,8 @@ from stamind.athlete_queue import QUEUE_NOT_NOW
 from stamind.chat import telegram_api
 from stamind.chat.keyboards import (
     BUSY_TAP, UI_STALE_TAP, answers_kept, decode_callback, decode_queue_callback,
-    decode_ui_callback, queue_later_rows, resolve_ui_action, tapped_choice, tapped_label,
-    ui_menu_rows,
+    decode_ui_callback, pages_kept, queue_later_rows, resolve_ui_action, tapped_choice,
+    tapped_label, ui_menu_rows,
 )
 from stamind.chat.replies import format_prompt_message
 from stamind.chat.routing import parse_message_to_argv
@@ -26,10 +26,18 @@ from stamind.sentinels import prompt_answer
 
 
 def _keyboard_rows(message) -> list:
-    """The tapped message's inline keyboard, as rows of (label, callback data)."""
+    """The tapped message's inline keyboard, as rows of (label, callback data); a page button
+    reads as its page cell (DESIGN_short_messages.md §5)."""
     markup = getattr(message, "reply_markup", None)
-    return [[(b.text, b.callback_data) for b in row]
+    return [[(b.text, _cell_data(b)) for b in row]
             for row in (markup.inline_keyboard if markup else [])]
+
+
+def _cell_data(button) -> str:
+    web_app = getattr(button, "web_app", None)
+    if web_app is not None:
+        return telegram_api.PAGE_CELL + web_app.url
+    return button.callback_data
 
 
 def _keyboard_or_none(rows: list):
@@ -149,12 +157,18 @@ class CallbacksMixin:
         if held == COACH_ASKED:
             return
         message = query.message
-        label = tapped_label(_keyboard_rows(message), data)
-        try:  # the message keeps its text, gains the choice and loses its buttons (§6.1)
+        rows = _keyboard_rows(message)
+        label = tapped_label(rows, data)
+        # The message keeps its text, gains the choice and loses its buttons (§6.1), but for
+        # a page button, which stays (DESIGN_short_messages.md §5).
+        pages = _keyboard_or_none(pages_kept(rows))
+        try:
             if label and getattr(message, "text", None):
-                await query.edit_message_text(text=f"{message.text}\n\n→ {label}")
+                await query.edit_message_text(
+                    text=f"{message.text}\n\n→ {label}", reply_markup=pages
+                )
             else:
-                await query.edit_message_reply_markup(reply_markup=None)
+                await query.edit_message_reply_markup(reply_markup=pages)
         except Exception as exc:
             journal.debug("bot.event", f"queue choice not echoed: {exc}")
         if held:

@@ -3,6 +3,8 @@
 It is Thursday. A 90-minute ride is planned, and the week planner would cut it to 60 easy
 minutes. Each case saves that proposal, or lets a run save it, and checks one rule.
 """
+import contextlib
+import io
 import json
 import os
 import unittest
@@ -18,6 +20,8 @@ import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before
 
 from stamind import athlete_queue, runtime
 from stamind.cli import queue as queue_cli
+from stamind.cli.render import proposal_lines
+from stamind.cli.render.session_lines import sport_emoji
 from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.workouts.adapt import WEEK_CHANGED_LINE
@@ -188,6 +192,97 @@ class AnswerTest(_Case):
         self.assertEqual(self.ride()["duration_minutes"], 90)
         self.assertEqual(self.outcome(item), athlete_queue.ANSWERED)
         self.garmin.ensure_data.assert_not_called()
+
+
+class ShortProposalTest(_Case):
+    """The proposal in a published chat: its short text above the question, one message,
+    and "Tell me more" (DESIGN_short_messages.md §3, §5)."""
+
+    def three_changes(self):
+        """Thursday's ride eased with a change line, Friday's yoga removed, and on Saturday
+        a new long ride the planner wrote no change line for."""
+        save_workout(test_db, FRIDAY, "yoga", "Mobility yoga", duration_minutes=25)
+        workouts = [
+            {"date": THURSDAY, "sport_type": "cycling", "title": "Easy ride",
+             "description": "[Easy ride]\n60 easy minutes.", "duration_minutes": 60,
+             "change": "60 easy minutes", "modification_reason": "Rough night."},
+            {"date": SATURDAY, "sport_type": "cycling", "title": "Long ride",
+             "description": "[Long ride]\n2 h easy.", "duration_minutes": 120},
+        ]
+        pairs, _removals = pair_revisions(
+            workouts, test_db.get_workouts(start_date=THURSDAY, end_date=SATURDAY)
+        )
+        return RevisionProposal(
+            reason="Rough night, so the hard days move back.", workouts=workouts,
+            range_start=THURSDAY, range_end=SATURDAY, pairs=pairs,
+            removals=(test_db.get_workout(FRIDAY, "yoga"),), week_planner_changed=True,
+        )
+
+    def test_every_changed_session_has_a_line(self):
+        self.assertEqual(proposal_lines.simple_change_lines(self.three_changes()), [
+            f"{sport_emoji('cycling')} Today · 60 easy minutes",
+            f"{sport_emoji('yoga')} Fri 09 · removed",
+            f"{sport_emoji('cycling')} Sat 10 · Long ride — 120 min",
+        ])
+
+    def test_the_short_text_opens_with_the_reason_and_ends_with_the_list(self):
+        text = proposal_lines.short_text(self.three_changes(), saved_proposal.REPLACES_LINE)
+        self.assertTrue(text.startswith(saved_proposal.REPLACES_LINE + "\n\nRough night"))
+        self.assertTrue(text.endswith("Sat 10 · Long ride — 120 min"))
+        self.assertNotIn("[Easy ride]", text)
+
+    def test_the_page_shows_each_session_in_full(self):
+        page = proposal_lines.page_content(self.three_changes())
+        self.assertEqual(page["summary"], "Rough night, so the hard days move back.")
+        thursday, removed, saturday = page["cards"]
+        self.assertIn("Today: Easy ride — 60 min", thursday["line"])
+        self.assertEqual(thursday["why"], "Rough night.")
+        # A new title: no passage to read first, so the whole text is shown open (§6.2).
+        self.assertEqual((thursday["passages"], thursday["open"]), ([], True))
+        self.assertEqual(thursday["text"], "[Easy ride]\n60 easy minutes.")
+        self.assertIn("Mobility yoga — dropped", removed["line"])
+        self.assertIn("Long ride — 120 min (new)", saturday["line"])
+
+    def test_a_saved_proposal_keeps_its_short_text_and_its_page(self):
+        item = saved_proposal.save(self.three_changes(), newest_written())
+        self.assertIn("Fri 09 · removed", item["payload"]["short"])
+        self.assertEqual(len(item["payload"]["page"]["cards"]), 3)
+        self.assertIn("Here's what I'd change:", item["payload"]["text"])
+
+    def sent(self, published):
+        """`send_alone` in the chat, with the pages published or not."""
+        params = "&k=KEY&b=pages&f=123" if published else ""
+        upload = MagicMock()
+        out = io.StringIO()
+        with patch("stamind.page_files.sync.button_params", return_value=params), \
+                patch("stamind.page_files.sync.after_command", upload), \
+                contextlib.redirect_stdout(out):
+            item = saved_proposal.save(self.three_changes(), newest_written())
+            queue_cli.send_alone(item)
+        return item, out.getvalue(), upload
+
+    def test_published_it_is_one_message_with_tell_me_more(self):
+        item, out, upload = self.sent(published=True)
+        self.assertNotIn("Here's what I'd change:", out)
+        [sent] = queue_lines(out)
+        self.assertTrue(sent["text"].startswith("Rough night, so the hard days move back."))
+        self.assertTrue(sent["text"].endswith(saved_proposal.QUESTION_LINE))
+        self.assertIn("Today · 60 easy minutes", sent["text"])
+        self.assertEqual(sent["page"], {
+            "label": "🔎 Tell me more",
+            "url": f"{proposal_lines.PAGE_URL}#p={item['id']}&k=KEY&b=pages&f=123",
+        })
+        # The files went up before the button, and the address is in no printed line.
+        upload.assert_called_once()
+        self.assertEqual(out.count("k=KEY"), 1)
+
+    def test_unpublished_the_chat_reads_the_long_text_as_today(self):
+        _item, out, upload = self.sent(published=False)
+        self.assertIn("Here's what I'd change:", out)
+        [sent] = queue_lines(out)
+        self.assertEqual(sent["text"], saved_proposal.QUESTION_LINE)
+        self.assertNotIn("page", sent)
+        upload.assert_not_called()
 
 
 class OutOfDateTest(_Case):

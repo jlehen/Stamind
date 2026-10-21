@@ -69,7 +69,10 @@ class RenderImportDirectionTest(unittest.TestCase):
     # either, so a new file under `cli/bot/` has to be added here deliberately. The
     # render package's own files are exempt by directory, so cutting it into more files
     # never quietly widens the exemption.
-    ALLOWED = {"bot/views.py", "bot/capture.py", "bot/edit.py", "bot/goal.py"}
+    # A saved proposal's short text and page are read in the chat only, so the proposal kind
+    # builds them from the line builders too (DESIGN_short_messages.md §3, §6.2).
+    ALLOWED = {"bot/views.py", "bot/capture.py", "bot/edit.py", "bot/goal.py",
+               "workouts/proposal.py"}
 
     def test_no_command_module_imports_the_renderer(self):
         from pathlib import Path

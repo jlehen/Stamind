@@ -159,7 +159,6 @@ class WorkoutAdaptMixin:
         signal_earliest_date: Optional[str] = None,
         tweak: bool = False,
         tweak_dates: Sequence[str] = (),
-        terse: bool = False,
         open_proposal: Optional[str] = None,
         neighbour_workouts: Optional[List[Workout]] = None,
     ) -> Dict[str, Any]:
@@ -174,8 +173,7 @@ class WorkoutAdaptMixin:
         days it is about, `tweak_dates` when the caller already knows them, and the TASK
         asks for that and nothing else (DESIGN_workout_tweak.md §3.2). `removed_workouts`
         is then every cancelled session in the range, not only the athlete's (§3.1).
-        `terse` halves the summary (DESIGN_output_verbosity.md §9). `open_proposal` is the
-        proposal the athlete has not answered, which this answer replaces
+        `open_proposal` is the proposal the athlete has not answered, which this answer replaces
         (DESIGN_waiting_proposal.md §6.2). `neighbour_workouts` are the sessions planned in
         the week after the range, shown and never written (DESIGN_mesocycle_boundary.md §7).
         """
@@ -328,28 +326,15 @@ evidence-backed observations are authored only by the weekly history analysis
 (`data bootstrap` / `data reflect`).
 """
 
-        # Half the summary for an athlete who asked for short answers. Only the summary:
-        # "change_reason" is read again by later runs (DESIGN_output_verbosity.md §9).
-        if terse:
-            reason_field = (
-                '  "reason": "What you changed and why, or why nothing needs to change, in AT\n'
-                '    MOST 2 SHORT SENTENCES (~30 words in all): the athlete prefers short\n'
-                '    answers. When the note or the request drove a change, name that change\n'
-                '    first. Name the signal you acted on, and leave out every reading that did\n'
-                '    NOT change your mind. This is the batch-level summary, shared by every\n'
-                '    adapted workout below — do NOT repeat it per workout; keep per-workout\n'
-                '    notes in "change_reason"."'
-            )
-        else:
-            reason_field = (
-                '  "reason": "Overall rationale for the whole adaptation: the readiness/load\n'
-                '    picture and the strategy applied to the mesocycle, in AT MOST 3 SENTENCES\n'
-                '    (~60 words). Adapt runs daily, so this is the line the athlete reads most\n'
-                '    often — name the signal you acted on and what you did about it, and leave\n'
-                '    out the readings that did NOT change your mind. This is the batch-level\n'
-                '    summary, shared by every adapted workout below — do NOT repeat it per\n'
-                '    workout; keep per-workout notes in "change_reason"."'
-            )
+        # The summary the athlete answers from, above one line per session
+        # (DESIGN_short_messages.md §3, §7).
+        reason_field = (
+            '  "reason": "What drove the change, or why nothing needs to change, in AT MOST\n'
+            '    2 SHORT SENTENCES (~30 words in all). When the note or the request drove a\n'
+            '    change, name it first, then what changes overall. Name the signal you acted\n'
+            '    on, and leave out every reading that did NOT change your mind. Do NOT go\n'
+            '    through the sessions one by one: each has its own \"change\" line below."'
+        )
         # Each entry is one top-level member of the response object, without its trailing
         # comma — the ",\n".join below places the separators, so no code hand-writes a
         # comma and the has_message branch can't desync the punctuation.
@@ -386,6 +371,9 @@ evidence-backed observations are authored only by the weekly history analysis
                 '        limit. What to do, and the one or two numbers to hold. Plain words,\n'
                 '        no name coined in the description. null on a strength session, whose\n'
                 '        line the strength planner writes, and on a rest day)\n'
+                '      "change": "power band now 250-270 W", (For the athlete: AT MOST 8\n'
+                '        words saying what changes in this session, with its number when it\n'
+                '        has one. No reason: that is \"change_reason\".)\n'
                 + change_reason_field +
                 '      "description": "Start with the title on its own line in brackets followed by a\n'
                 '        newline, e.g. \"[Tempo Run]\\n\", then an adapted description of intensity,\n'

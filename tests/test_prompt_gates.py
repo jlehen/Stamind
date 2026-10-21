@@ -355,26 +355,25 @@ class TestTheTweakGate(unittest.TestCase):
 
 
 class TestTheTerseSwitch(unittest.TestCase):
-    """`terse` halves the summary the athlete reads once, and leaves "change_reason" alone,
-    because later runs read it again (DESIGN_output_verbosity.md §9)."""
+    """`terse` halves `workout generate`'s summary. Adapt and tweak ask everyone for two
+    short sentences, with a change line per session, and leave "change_reason" alone,
+    because later runs read it again (DESIGN_short_messages.md §7)."""
 
-    ADAPT_FULL = "AT MOST 3 SENTENCES"
-    ADAPT_TERSE = "MOST 2 SHORT SENTENCES"
+    ADAPT_REASON = "2 SHORT SENTENCES (~30 words in all)"
+    CHANGE_LINE = '"change": "power band now 250-270 W"'
     CHANGE_REASON_CAP = "a single sentence of at most 20 words"
 
-    def test_off_asks_for_the_full_summary(self):
-        system, _user = build_prompt()
-        self.assertIn(self.ADAPT_FULL, system)
-        self.assertNotIn(self.ADAPT_TERSE, system)
+    def test_off_asks_for_the_full_summary_of_generate(self):
         system, _user = build_generate_prompt()
         self.assertIn("MOST 4 SENTENCES", system)
 
-    def test_on_halves_the_summary_of_adapt_and_tweak(self):
+    def test_adapt_and_tweak_ask_two_sentences_and_a_change_line(self):
         for extra in ({}, {"tweak": True, "athlete_message": "swap Thursday and Friday"}):
             with self.subTest(extra=list(extra)):
-                system, _user = build_prompt(terse=True, **extra)
-                self.assertIn(self.ADAPT_TERSE, system)
-                self.assertNotIn(self.ADAPT_FULL, system)
+                system, _user = build_prompt(**extra)
+                self.assertIn(self.ADAPT_REASON, system)
+                self.assertNotIn("AT MOST 3 SENTENCES", system)
+                self.assertIn(self.CHANGE_LINE, system)
                 self.assertIn(self.CHANGE_REASON_CAP, system)
 
     def test_on_halves_the_summary_of_generate(self):

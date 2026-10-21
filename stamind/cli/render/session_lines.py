@@ -1,8 +1,8 @@
 """The companion voice on a day and what was trained in it
 (DESIGN_bot_simple_frontend.md §6).
 
-Pure functions over rows: one session as a line, a day, a week, a compare, a revision,
-and the words for a date — "today", "tomorrow", "Thu 28 Aug". `bot morning` and the
+Pure functions over rows: one session as a line, a day, a week, a compare, and the
+words for a date — "today", "tomorrow", "Thu 28 Aug". `bot morning` and the
 week view call them directly, never through a renderer (DESIGN_render_persona.md §3),
 which is why they are a module and not methods.
 
@@ -14,14 +14,10 @@ from stamind.benchmarks import format_delta, format_value, is_improvement, label
 from stamind.strength import comparison
 from stamind.analytics.adherence import DURATION, SETS, Gap, off_plan_gaps
 from stamind.strength.sets import activity_lines
-from stamind.coach.proposals import RevisionProposal
 from stamind.sports import canonical_sport
 from stamind.text import wrap_text
 from stamind.clock import days_between, fmt_date, today_str as _today_str
 from stamind.cli.common import simple_comparison_lines
-from stamind.cli.workouts.revisions import (
-    quotes_wording, rewritten_text_only, wording_group_lines, wording_groups,
-)
 
 
 REST_DAY_LINE = "Rest day — enjoy it 🎉"
@@ -61,22 +57,22 @@ def sport_emoji(sport_type: Optional[str]) -> str:
 # (DESIGN_bot_simple_frontend.md §6).
 SIMPLE_SESSION_RULE = "———"
 
-# The marks before a quoted change: the text that goes, and the text that comes. A terminal
-# says it with colour, and the chat has none (DESIGN_workout_revisions.md §9.1).
-SIMPLE_GONE_MARK = "🔴 "
-SIMPLE_NEW_MARK = "🟢 "
+
+def title_and_length(w: Dict[str, Any]) -> str:
+    """'Easy run — 40 min': a session's title and its length, when it has one."""
+    duration = w.get("duration_minutes")
+    duration_str = f" — {duration} min" if duration else ""
+    return f"{w.get('title') or w.get('sport_type', 'Session')}{duration_str}"
 
 
 def simple_session_line(w: Dict[str, Any], lead: Optional[str] = None) -> str:
     """One simple-mode line for a session: '🏃 Today: Easy run — 40 min'.
 
     `lead` is the day word ('Today', '2026-08-25 Tue'); omitted for a bare line."""
-    duration = w.get("duration_minutes")
-    duration_str = f" — {duration} min" if duration else ""
     prefix = f"{sport_emoji(w.get('sport_type'))} "
     if lead:
         prefix += f"{lead}: "
-    return f"{prefix}{w.get('title') or w.get('sport_type', 'Session')}{duration_str}"
+    return f"{prefix}{title_and_length(w)}"
 
 
 def simple_day_lines(
@@ -337,69 +333,3 @@ def simple_benchmark_question(
     if note:
         words += f" Note: “{note}”."
     return words + " Shall I write down this test result?"
-
-
-def _is_rest(w: Optional[dict]) -> bool:
-    return bool(w) and (w.get('sport_type') or '').lower() == 'rest'
-
-
-def _simple_was_clause(pw: dict, existing: Optional[dict], today: str) -> str:
-    """The parenthetical after a proposed session, saying what it replaces."""
-    if not existing:
-        return "new"
-    if existing['date'] != pw['date']:
-        # The same session, on a new day. Said before anything else the clause could
-        # say about it, because a session moved unchanged would otherwise read as
-        # "new" on one day and vanish from the other.
-        day = "today" if existing['date'] == today else simple_date_word(existing['date'])
-        return f"moved from {day}"
-    if rewritten_text_only(pw, existing):
-        return "same session, wording updated"
-    if _is_rest(existing):
-        return "was a rest day"
-    parts = []
-    if existing.get('title') != pw.get('title'):
-        parts.append(existing['title'])
-    if (existing.get('duration_minutes') or 0) != (pw.get('duration_minutes') or 0):
-        parts.append(f"{existing.get('duration_minutes') or 0} min")
-    return "was " + ", ".join(parts) if parts else "adjusted"
-
-
-def simple_revision_lines(proposal: RevisionProposal) -> List[str]:
-    """The revision as companion prose: one paragraph per touched day, no table and no
-    diff signs, so the phone can flow it (DESIGN_bot_simple_frontend.md §6). The
-    per-session reason is skipped when it merely repeats the batch reason printed above."""
-    today = _today_str()
-    entries = []
-    # The day that first quoted a given change, so a second gym day rewritten the same way
-    # points at it instead of quoting the same passages again.
-    first_quoted: Dict[str, str] = {}
-    for pair in sorted(proposal.pairs, key=lambda pair: pair.proposal['date']):
-        pw, existing = pair.proposal, pair.original
-        day = "Today" if pw['date'] == today else simple_date_word(pw['date'])
-        entry_lines = [
-            f"{simple_session_line(pw, lead=day)} "
-            f"({_simple_was_clause(pw, existing, today)})"
-        ]
-        why = (pw.get('modification_reason') or '').strip()
-        if why and why != (proposal.reason or '').strip():
-            entry_lines.append(why)
-        quoted = []
-        if quotes_wording(pw, existing):
-            quoted = [
-                "\n".join(wording_group_lines(b, gone=SIMPLE_GONE_MARK, new=SIMPLE_NEW_MARK))
-                for b in wording_groups(pw, existing)
-            ]
-        change = "\n\n".join(entry_lines[1:] + quoted)
-        if quoted and change in first_quoted:
-            same = f"Same change as {first_quoted[change]}."
-            entries.append((pw['date'], f"{entry_lines[0]}\n{same}"))
-            continue
-        first_quoted[change] = simple_day_word(pw['date'], today)
-        # A blank line between pairs, so each Was/Now pair reads as one passage.
-        entries.append((pw['date'], "\n\n".join(["\n".join(entry_lines)] + quoted)))
-    for ew in proposal.removals:
-        day = "Today" if ew['date'] == today else simple_date_word(ew['date'])
-        entries.append((ew['date'], f"🗑 {day}: {ew['title']} — dropped"))
-    entries.sort(key=lambda e: e[0])
-    return [text for _, text in entries]

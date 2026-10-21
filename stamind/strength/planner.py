@@ -405,13 +405,13 @@ def _fold_in(
             result.checked.append((session.date, session.sport_type))
             continue
         _write(session, answer.rows, answer.notes, result, reason_key,
-               reason=answer.reason, summary=answer.summary)
+               reason=answer.reason, summary=answer.summary, change=answer.change)
     return result
 
 
 def _write(
     session: Session, rows: List[Dict[str, Any]], notes: str, result: StrengthPass,
-    reason_key: str, reason: str = "", summary: str = "",
+    reason_key: str, reason: str = "", summary: str = "", change: str = "",
 ) -> None:
     """Puts one written session into the proposal. A session the week planner never
     mentioned needs a row of its own, and its date's other sessions have to be held or
@@ -428,6 +428,9 @@ def _write(
         session.entry.pop("unmentioned", None)
         if reason:
             session.entry[reason_key] = reason
+        # The week planner's line stands where it wrote one (DESIGN_short_messages.md §7).
+        if change and not session.entry.get("change"):
+            session.entry["change"] = change
         return
     live = session.live or {}
     result.added.append({
@@ -444,5 +447,6 @@ def _write(
         "macrocycle_id": live.get("macrocycle_id"),
         "prescribed_sets": rows,
         reason_key: reason or None,
+        "change": change or None,
     })
     result.held_dates.append(session.date)

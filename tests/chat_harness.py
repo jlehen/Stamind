@@ -127,6 +127,7 @@ class _FakeQuery:
         self.answered = False
         self.markups = []        # every reply_markup the bot swapped in (None = dropped)
         self.edited_text = None
+        self.edited_markup = None  # the keyboard left under an edited text
         self.message = SimpleNamespace(text=text, reply_markup=markup)
 
     async def answer(self):
@@ -135,8 +136,9 @@ class _FakeQuery:
     async def edit_message_reply_markup(self, reply_markup=None):
         self.markups.append(reply_markup)
 
-    async def edit_message_text(self, text=None):
+    async def edit_message_text(self, text=None, reply_markup=None):
         self.edited_text = text
+        self.edited_markup = reply_markup
 
 
 def build_chat_bot(testcase, allowed=(42,)) -> ChatBot:

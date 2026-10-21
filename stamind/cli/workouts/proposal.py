@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from stamind import clock, runtime
 from stamind.analytics.compare import adherence_verdicts
 from stamind.chat.routing import PLANNING_RUN
+from stamind.cli.render.proposal_lines import page_content, short_text
 from stamind.cli.workouts.heads_up import generate_dates, newest_written, revision_dates
 from stamind.clock import today_str
 from stamind.coach import picture
@@ -25,6 +26,7 @@ from stamind.coach.proposals import (
 )
 from stamind.db.queue import queue_stamp
 from stamind.output import step
+from stamind.page_files import sync as page_files
 from stamind.queue_kind import QUESTION, STALE, Kind, queue
 from stamind.text import strip_ansi
 
@@ -130,10 +132,18 @@ def _today_text(today: str) -> str:
         return ""
 
 
+def _asks(item: Dict[str, Any]) -> str:
+    """The question's message: the short text above it where the proposal has its page, else
+    the question alone, under the long text sent before it (DESIGN_short_messages.md §3)."""
+    if not page_files.has_page(runtime.db, item):
+        return QUESTION_LINE
+    return f"{item['payload']['short']}\n\n{QUESTION_LINE}"
+
+
 PROPOSAL_KIND = Kind(
     name=KIND, shape=QUESTION,
     wording=lambda item: item["payload"]["text"],
-    companion_wording=lambda item: QUESTION_LINE,
+    companion_wording=_asks,
     is_stale=out_of_date, apply=_apply,
     stands_alone=True, closed_line=OUT_OF_DATE_LINE,
 )
@@ -192,11 +202,16 @@ def save(proposal: RevisionProposal, written_upto: int, replaces: bool = False) 
     now = clock.now()
     for other in waiting():
         runtime.db.close_queue_item(other["id"], STALE, now)
+    opening = REPLACES_LINE if replaces else None
     text = _shown_text(proposal)
-    if replaces:
-        text = f"{REPLACES_LINE}\n\n{text}"
+    if opening:
+        text = f"{opening}\n\n{text}"
+    # The long text, the short one and the page's, so the page can be built again from the
+    # database (DESIGN_short_messages.md §3, §6.2).
     item_id = queue(KIND, queue_stamp(now), {
         "text": text,
+        "short": short_text(proposal, opening),
+        "page": page_content(proposal),
         "answers": list(ANSWERS),
         "proposal": revision_to_json(proposal),
         "dates": sorted(revision_dates(proposal)),

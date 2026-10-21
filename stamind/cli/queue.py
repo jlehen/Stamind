@@ -13,6 +13,7 @@ from stamind.athlete_queue import (
     ANSWERED, DROP, DROPPED, MESSAGE, QUEUE_LATER_BACK, QUEUE_NOT_NOW, STALE,
 )
 from stamind.db.queue import queue_stamp
+from stamind.page_files import sync as page_files
 from stamind.sentinels import emit_queue_item, is_json_frontend
 from stamind.text import bold, capitalized, cmd, cyan, gray, wrap_text
 from stamind.output import notice
@@ -174,15 +175,20 @@ def send_item(item: Dict[str, Any], left: int) -> None:
 def send_alone(item: Dict[str, Any], offer: Sequence[dict] = ()) -> None:
     """Sends a stand-alone item and records the send: its wording as ordinary text, then a
     message of its own that asks and carries the answers (DESIGN_waiting_proposal.md §3).
-    `offer` is the morning message's buttons, drawn under the answers (§5). On a terminal
-    the text is followed by the command that answers it."""
-    print(athlete_queue.wording(item))
+    A proposal with a page is one message instead, its short text above the question and
+    "Tell me more" under its answers (DESIGN_short_messages.md §3, §5). `offer` is the
+    morning message's buttons, drawn under the answers (§5). On a terminal the text is
+    followed by the command that answers it."""
     if not is_json_frontend():
+        print(athlete_queue.wording(item))
         notice(f"Saved as #{item['id']}. Answer it with "
                + cmd(f"queue answer {item['id']}") + ".")
         return
+    page = page_files.page_button(runtime.db, item)
+    if page is None:
+        print(athlete_queue.wording(item))
     text, buttons = queue_chat_message(item, 1)
-    emit_queue_item(item["id"], text, buttons, offer=offer)
+    emit_queue_item(item["id"], text, buttons, offer=offer, page=page)
     athlete_queue.sent(item)
 
 

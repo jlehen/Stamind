@@ -68,6 +68,9 @@ def structure_revision(
             'title': w['title'],
             'short_name': w.get('short_name'),
             'summary': w.get('summary'),
+            # Read once, in the proposal's message; never written to the session
+            # (DESIGN_short_messages.md §7).
+            'change': w.get('change'),
             'description': w['description'],
             # This revision's own note; the long batch rationale travels separately as
             # `reason` and lands on the change row (DESIGN_workout_revisions.md §3). Falls

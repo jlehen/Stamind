@@ -9,15 +9,18 @@ from urllib.parse import urlsplit
 from stamind import calendar_days, clock, journal, runtime
 from stamind.clock import month_end, month_start
 from stamind.config import config
-from stamind.cli.render import calendar_page, plan_page
+from stamind.cli.render import calendar_page, plan_page, proposal_lines
 from stamind.output import aside
 from stamind.page_files import bucket as _bucket
 from stamind.page_files import recipe
 from stamind.text import green
 
-# The labels of the two files that belong to no month (§4).
+# The labels of the files that belong to no month (§4).
 INDEX = "calendar/index"
 PLAN = "plan"
+# The newest proposal saved, whatever its answer (DESIGN_short_messages.md §6.2). The label is
+# the name of the queue kind it is read from too, `cli/workouts/proposal.py:KIND`.
+PROPOSAL = "proposal"
 # The label of the test file `sm data publish` writes. It is never a page's (§9.2).
 CHECK = "check"
 
@@ -83,13 +86,43 @@ def build(dbh, today: str, every_month: bool = False) -> Dict[str, Dict[str, Any
     at = clock.now()
     files[INDEX] = calendar_page.index_file(cal, at, window, first, window[1][:7])
     files[PLAN] = plan_page.plan_file(cal, at)
+    proposal = proposal_file(dbh, at)
+    if proposal is not None:
+        files[PROPOSAL] = proposal
     return files
 
 
+def proposal_file(dbh, at) -> Optional[Dict[str, Any]]:
+    """The newest proposal's page, with its number, or None when it was saved without one
+    (DESIGN_short_messages.md §6.2)."""
+    item = dbh.newest_queue_item(PROPOSAL)
+    if item is None or "page" not in item["payload"]:
+        return None
+    return {"v": calendar_page.VERSION, "at": at.strftime("%Y-%m-%dT%H:%M"), "id": item["id"],
+            **item["payload"]["page"]}
+
+
+def has_page(dbh, item: Dict[str, Any]) -> bool:
+    """Whether a saved item is read short in the chat, its page one tap away: it was saved
+    with its page, and the pages are published (DESIGN_short_messages.md §5, D9)."""
+    return "page" in item["payload"] and bool(button_params(dbh))
+
+
+def page_button(dbh, item: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """The "Tell me more" button under a saved proposal, or None when it has no page. The
+    step after a command runs first, the proposal's file first in it, so the file is up
+    before the button (DESIGN_short_messages.md §5)."""
+    if not has_page(dbh, item):
+        return None
+    after_command()
+    return {"label": proposal_lines.PAGE_LABEL,
+            "url": f"{proposal_lines.PAGE_URL}#p={item['id']}{button_params(dbh)}"}
+
+
 def rebuilt(label: str, today: str) -> bool:
-    """Whether the step after a command builds this file: the index file, the plan file, or
-    a month the window touches (§6 step 2)."""
-    if label in (INDEX, PLAN):
+    """Whether the step after a command builds this file: the index file, the plan file, the
+    proposal's, or a month the window touches (§6 step 2)."""
+    if label in (INDEX, PLAN, PROPOSAL):
         return True
     start, end = calendar_page.window(today)
     return calendar_page.month_label(start[:7]) <= label <= calendar_page.month_label(end[:7])
@@ -119,8 +152,11 @@ def _upload(dbh, where: Target, remote, label: str, content: Dict[str, Any],
 
 
 def _in_upload_order(labels, this_month: str) -> List[str]:
-    """The month holding today first, then the other months, the index file, the plan."""
+    """The proposal first, then the month holding today, the other months, the index file,
+    the plan (DESIGN_short_messages.md §5)."""
     def rank(label: str) -> Tuple[int, str]:
+        if label == PROPOSAL:
+            return -1, label
         if label == this_month:
             return 0, label
         if label == INDEX:

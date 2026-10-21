@@ -25,9 +25,10 @@ from stamind.cli.render.plan_lines import (
     simple_plan_setup_line, simple_plan_shaping_line, simple_plan_wrapped_line,
     simple_preference_words, simple_progress_lines, simple_runway_lines,
 )
+from stamind.cli.render.proposal_lines import simple_revision_lines
 from stamind.cli.render.session_lines import (
     SIMPLE_SESSION_RULE, simple_benchmark_question, simple_compare_lines, simple_day_lines,
-    simple_day_word, simple_revision_lines, simple_span_words, simple_week_lines,
+    simple_day_word, simple_span_words, simple_week_lines,
 )
 
 
