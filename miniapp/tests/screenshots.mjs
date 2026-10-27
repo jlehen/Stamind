@@ -54,10 +54,12 @@ async function main() {
     await kg.press("Enter");
     await shoot(page, "02-ticked.png");
 
-    // 3. The swap search, filtered to the card's own movement pattern (§1).
-    await first.getByText("Swap").click();
+    // 3. The name's box, then its Replace search, filtered to the movement's pattern (§1).
+    await first.locator(".chip").first().click();
+    await shoot(page, "03-chip.png");
+    await first.locator(".part-menu").getByText("Replace").click();
     await page.waitForSelector("#search-sheet:not([hidden])");
-    await shoot(page, "03-swap.png");
+    await shoot(page, "03-replace.png");
     await page.locator("#search-close").click();
 
     // 4. The session's own actions at the foot of the page.

@@ -79,12 +79,13 @@ let locked = false;
 const OPENED_LOCKED = "This is the log the bot holds for this session. Tap Edit to change it.";
 const OPENED_EDITING = "Send again replaces the log the bot holds. A change you do not send is "
   + "lost when the page closes.";
-// What the search sheet is for: "swap" or "insert" the card at `searchIndex`, or "add" one;
-// "replace" the movement `searchPart` of that card, or "chain" a pick after it.
+// What the search sheet is for: "swap" (the card's Replace) or "insert" the card at
+// `searchIndex`, or "add" one; "replace" the movement `searchPart` of that card, or "chain" a
+// pick after it.
 let searchMode = "add";
 let searchIndex = null;
 let searchPart = null;
-let swapPattern = null;
+let replacePattern = null;
 // The chip whose three buttons show, `{ card, part }`, or null. Not saved.
 let openChip = null;
 
@@ -326,7 +327,7 @@ function exerciseCard(exercise, xi) {
   tools.append(undoCard);
   tools.append(button("+ Set", "pill", () => apply(logic.addSet(state, xi), id)));
   tools.append(button("− Set", "pill", () => apply(logic.removeSet(state, xi), id)));
-  tools.append(button("⇆ Swap", "pill", () => openSearch("swap", xi)));
+  tools.append(button("⇆ Replace", "pill", () => openSearch("swap", xi)));
   tools.append(button("⤵ Insert", "pill", () => openSearch("insert", xi)));
   tools.append(button("❐ Dup", "pill", () => apply(logic.duplicateExercise(state, xi))));
   tools.append(button("✕ Del", "pill danger", () => apply(logic.removeExercise(state, xi))));
@@ -385,12 +386,12 @@ function movement(exercise, xi, chip, part, count) {
     }
     editChain(xi, logic.removePart(exercise.n, part));
   }));
-  menu.append(button("⤵ Insert after", "pill", () => openSearch("chain", xi, part)));
+  menu.append(button("⛓ Chain with", "pill", () => openSearch("chain", xi, part)));
   box.append(menu);
   return box;
 }
 
-// A chip's edit is a swap to the card's new key: the sets stay, the card's ↶ takes it back.
+// A chip's edit swaps in the card's new key: the sets stay, the card's ↶ takes it back.
 function editChain(xi, key) {
   apply(logic.swapExercise(state, xi, key), state.x[xi].id);
 }
@@ -492,19 +493,19 @@ function tick() {
 }
 
 // ---------------------------------------------------------------------------------------
-// The exercise search: a swap keeps the card's movement pattern as its filter, an added or
-// inserted exercise searches everything (§1). A chip's Replace keeps its movement's pattern,
-// its Insert after searches everything (DESIGN_strength_combos.md §6).
+// The exercise search: the card's Replace keeps the card's movement pattern as its filter, an
+// added or inserted exercise searches everything (§1). A chip's Replace keeps its movement's
+// pattern, its Chain with searches everything (DESIGN_strength_combos.md §6).
 // ---------------------------------------------------------------------------------------
 
 function openSearch(mode, xi = null, part = null) {
   searchMode = mode;
   searchIndex = xi;
   searchPart = part;
-  swapPattern = searchPattern(mode, xi, part);
+  replacePattern = searchPattern(mode, xi, part);
   ui.searchTitle.textContent = searchTitle(mode, xi, part);
-  ui.searchAllRow.hidden = !swapPattern;
-  ui.searchAll.checked = !swapPattern;
+  ui.searchAllRow.hidden = !replacePattern;
+  ui.searchAll.checked = !replacePattern;
   ui.searchInput.value = "";
   ui.searchSheet.hidden = false;
   renderResults();
@@ -521,10 +522,9 @@ function searchPattern(mode, xi, part) {
   return null;
 }
 
-// A chip's Insert after is titled "Insert in chain after …" (DESIGN_strength_combos.md §6).
 function searchTitle(mode, xi, part) {
   if (mode === "swap") {
-    return "Swap exercise";
+    return `Replace ${logic.wordsOf(catalog, state.x[xi].n)}`;
   }
   if (mode === "insert") {
     return `Insert after ${logic.wordsOf(catalog, state.x[xi].n)}`;
@@ -533,7 +533,7 @@ function searchTitle(mode, xi, part) {
     return `Replace ${logic.chipsOf(catalog, state.x[xi].n)[part]}`;
   }
   if (mode === "chain") {
-    return `Insert in chain after ${logic.chipsOf(catalog, state.x[xi].n)[part]}`;
+    return `Chain with ${logic.chipsOf(catalog, state.x[xi].n)[part]}`;
   }
   return "Add an exercise";
 }
@@ -543,7 +543,7 @@ function closeSearch() {
 }
 
 function renderResults() {
-  const pattern = ui.searchAll.checked ? null : swapPattern;
+  const pattern = ui.searchAll.checked ? null : replacePattern;
   ui.searchFilter.textContent = pattern ? `— only ${pattern.replace(/_/g, " ")}` : "";
   const hits = logic.searchExercises(catalog, ui.searchInput.value, pattern);
   if (!hits.length) {

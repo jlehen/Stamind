@@ -22,12 +22,12 @@ page saves its state on the phone, so a closed Telegram reopens where it left of
 
 Each card has an "Insert" button. It puts the new exercise right after that card, so a
 face pull added after the rows does not have to climb up from the bottom one tap at a time.
-The button that puts another exercise in a card's place is "⇆ Swap". Its search keeps the
+The button that puts another exercise in a card's place is "⇆ Replace". Its search keeps the
 card's movement pattern as a filter, and says so beside the "Search every exercise" box
 that lifts it ("— only single leg"); Insert and Add search everything. "❐ Dup" puts a copy
 of the card right after it: the same exercise, its sets with the reps and kilograms they
 show now, none ticked. Like an inserted card, the copy stands for no line of the session.
-The card's eight buttons (↶, + Set, − Set, Swap, Insert, Dup, Del, Pic) sit in two rows of
+The card's eight buttons (↶, + Set, − Set, Replace, Insert, Dup, Del, Pic) sit in two rows of
 four, so their labels stay short. Each number box says what it holds, "reps" or "kg", under
 the number.
 
@@ -97,7 +97,7 @@ once a set is ticked it copies only the ticked sets, the way the log does. A pho
 refuses the clipboard gets the same sheet the log uses, with the text to select by hand.
 
 A card's title is chips, one per movement. A tap on a chip boxes it with Replace, Remove and
-Insert after, and Insert after on a plain exercise starts a chain: several movements done back
+Chain with, and Chain with on a plain exercise starts a chain: several movements done back
 to back as one set, drawn and logged as one card (DESIGN_strength_combos.md §6).
 
 The next morning the pull finds Garmin's activity for that day. Instead of reading

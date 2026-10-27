@@ -55,8 +55,8 @@ each name a small rounded chip, with "3×5–8/side @ 8 kg" under it and three s
 five rounds, ticks the set, then six and six. She also has an idea: a swing straight into a halo.
 She taps "+ Add an exercise" and picks the kettlebell swing, as today. The new card's title is one
 chip, "[Hip raise] Kettlebell swing". She taps it, and a box opens around it holding three
-buttons: Replace, Remove, Insert after. She taps Insert after; the search opens as "Insert in
-chain after [Hip raise] Kettlebell swing", she picks the kettlebell halo, and the card now reads
+buttons: Replace, Remove, Chain with. She taps Chain with; the search opens as "Chain with
+[Hip raise] Kettlebell swing", she picks the kettlebell halo, and the card now reads
 "⛓ Kettlebell swing → Kettlebell halo", marked added, with the three sets it had, eight at 20 kg,
 its reps box now saying "/side". She sets 8 kg, does three sets of eight rounds a side, ticking
 each, and taps Finish.
@@ -243,28 +243,30 @@ movement whose bare name is shared keeps its brackets, "[Row] Face pull" (D23).
 `wordsOf` splits the key on `>` for the chips and for every other place the words are printed.
 `perSideOf` reads the per-side rule of §3, so the reps boxes say "/side" as for any one-sided
 exercise. `photosOf` shows the first movement's photos. `patternOf` is already null for any key
-the catalog lacks, a chain's included, so Swap on a chain card searches every exercise with no
-pattern filter and needs no change. Swap, Del and Dup act on the whole card, as today.
+the catalog lacks, a chain's included, so the card's Replace on a chain card searches every
+exercise with no pattern filter and needs no change. The card's Replace, Del and Dup act on the
+whole card, as today.
 
 **Building and changing a chain.** Nothing is added to the card's eight buttons and nothing to the
 footer (D21). A tap on a chip opens a rounded box around that movement holding three buttons,
-Replace, Remove and Insert after, so it is plain which movement they act on; a second tap on the
-chip closes the box. Replace and Insert after open the search sheet titled after the chip as it
-reads, "Replace [Squat] Goblet squat" or "Insert in chain after Goblet squat", the words "in
-chain" telling it from the sheet the card's own Insert opens, which adds a card. Replace puts the
-pick in that movement's place; its search keeps the replaced movement's pattern as its filter,
-with the box that lifts it, as Swap's does. Remove drops the movement. Insert after puts the pick
-after that movement; its search covers every exercise, as Insert's does. On a plain exercise,
-Insert after is how a chain starts. Each edit works out the card's new key and hands it
-to `swapExercise`, recorded on the card as Swap is: the sets stay, ticked or not, with their reps
-and kilograms; the written load leaves the card's line, as after a swap; and the card's ↶ takes
-the edit back. On a one-chip title, Replace does what Swap does and Remove does what Del does,
-in Del's colour, and only the header's Undo brings a removed card back. The page checks nothing
-about the gear (D7): she is holding it, and a chain she has done passes the strength planner's
-check from then on (D10). Every edit gives the card a new key, so an edited chain is a new chain
-for the record and the strength planner, as a swapped exercise is today. The chips, the box with
-its three buttons and the ⛓ mark are the only new markup, the three buttons being pills of the
-page's tap size; the search, the results and the pattern toggle are the ones Swap and Add use.
+Replace, Remove and Chain with, so it is plain which movement they act on; a second tap on the
+chip closes the box. Replace and Chain with open the search sheet titled after the chip as it
+reads, "Replace [Squat] Goblet squat" or "Chain with Goblet squat"; the sheet the card's own
+Insert opens, which adds a card, reads "Insert after …". Replace puts the pick in that
+movement's place; its search keeps the replaced movement's pattern as its filter, with the box
+that lifts it, as the card's Replace does. Remove drops the movement. Chain with puts the pick
+right after that movement; its search covers every exercise, as Insert's does. On a plain
+exercise, Chain with is how a chain starts. Each edit works out the card's new key and hands it
+to `swapExercise`, recorded on the card as the card's Replace is: the sets stay, ticked or not,
+with their reps and kilograms; the written load leaves the card's line, as after a swap; and the
+card's ↶ takes the edit back. On a one-chip title, the chip's Replace does what the card's
+Replace does, under the same sheet title (D26), and Remove does what Del does, in Del's colour,
+and only the header's Undo brings a removed card back. The page checks nothing about the gear
+(D7): she is holding it, and a chain she has done passes the strength planner's check from then
+on (D10). Every edit gives the card a new key, so an edited chain is a new chain for the record
+and the strength planner, as a swapped exercise is today. The chips, the box with its three
+buttons and the ⛓ mark are the only new markup, the three buttons being pills of the page's tap
+size; the search, the results and the pattern toggle are the ones the card's Replace and Add use.
 
 **The log.** `n` carries the joined key, and each set is rounds, kilograms and seconds as today.
 `parse_log` in `strength/logger.py` checks each part of a key with `vocabulary.get`, so a chain of
@@ -329,7 +331,8 @@ ruled on by the user there. The choices below have no row of their own; each is 
    search sheet is titled "Insert in chain after …", so it is not confused with the sheet the
    card's own Insert opens, which adds a card; Replace and Remove on a one-chip title are Swap
    and Del; photos are the first movement's (§6). The rest of §6 follows from reusing Swap and
-   Insert and is not a choice. Ruled: kept (2026-10-21).
+   Insert and is not a choice. Ruled: kept (2026-10-21). Amended 2026-10-27 (D26): Insert after
+   is "Chain with", its sheet "Chain with …", and the card's Swap is named Replace.
 5. The strength planner's list does not list chains; the history does (§4). Both pragmatic
    reviews say this follows from D3 and is not a choice. Ruled: kept (2026-10-21).
 6. The payload version stays 2 (§6). Both pragmatic reviews call this a fact, not a choice.
@@ -391,11 +394,12 @@ ruled on by the user there. The choices below have no row of their own; each is 
 | D18 | `strength log` and `strength name` | No change to either; `similar` is left as it is | The substring match on words already finds a chain (finding 10); on a chain line `strength name` offers the first movement's category, which nobody meets in a normal week, so the guard the author had written was cut by the pragmatic review; author's resolution. Kept by the user on 2026-10-21. Declined: no list on a chain's line, only the three fixed answers | Red Team, then ruling | 2026-10-18, 2026-10-21 |
 | D19 | Going live | Steps 1, 2a and 3 land as one branch, merged and pushed in the same sitting; no bot restart; the chips follow as a branch of their own | The prompt is live at the merge, the page at the push, and a page in between stores rounds as per side (finding 11); author's resolution, collapsed to one line by the pragmatic review | Red Team | 2026-10-18 |
 | D20 | No cap | A chain holds two or more movements; no cap in the check or on the page; the science says usually three or four | Nothing technical needs a number: the key is text, the page composes what she taps, and a session full of long chains is already listed under not handled. The author had written two to four. Declined: a generous cap of six | Interview | 2026-10-19 |
-| D21 | The page | Every title is chips, one per movement, a chain marked ⛓; a tap on a chip opens a box around that movement holding Replace, Remove and Insert after; no new card button, no footer button, no Done | Chosen from a mock-up of three shapes: the sheet with a second footer button (the design as reviewed), a ninth "Chain" button on each card (the pragmatic review's proposal), and the chips. The chain is edited where the chain is, and a chain starts from a plain exercise. The box and the name "Insert after" are the user's, after seeing both drawn; the thorough review's "Chain after" was declined, the sheet title "Insert in chain after …" keeping the two Inserts apart. Declined: the sheet; the pill | Interview | 2026-10-19 |
+| D21 | The page | Every title is chips, one per movement, a chain marked ⛓; a tap on a chip opens a box around that movement holding Replace, Remove and Insert after; no new card button, no footer button, no Done | Chosen from a mock-up of three shapes: the sheet with a second footer button (the design as reviewed), a ninth "Chain" button on each card (the pragmatic review's proposal), and the chips. The chain is edited where the chain is, and a chain starts from a plain exercise. The box and the name "Insert after" are the user's, after seeing both drawn; the thorough review's "Chain after" was declined, the sheet title "Insert in chain after …" keeping the two Inserts apart. Declined: the sheet; the pill. Renamed by D26 | Interview | 2026-10-19 |
 | D22 | Ticked sets | A card edited by its chips keeps its sets, ticked or not, as a swapped card does; the written load leaves its line | The user wants to be able to tweak what was done, even after the fact. Declined: a card with ticked sets is left alone and a copy is chained | Interview | 2026-10-19 |
 | D23 | Shared names | In a chain's words, a movement whose bare name belongs to more than one class keeps its category; the rest drop it | On the screen a bare "Face pull" cannot be told from the band one, though the stored key can. Declined: the category on every chip; the full name only when the chip is tapped; accepting it (D17) | Interview | 2026-10-19 |
 | D24 | Variety from chains | Noted in §4 for DESIGN_strength_rotation.md to pick up; this design still does not push the strength planner toward chains | Chains are the cheapest variety a one-implement athlete has; when exercises rotate is the rotation design's matter | Ruling on §8 choice 2 | 2026-10-20 |
 | D25 | Order | Order matters, as §8 choice 1 had it: `A>B` and `B>A` are two chains | The order is how a chain flows; one history for any order would sort what the page shows, or teach six readers to compare chains. The user first ruled the other way, then kept it after seeing both costs. Declined: sorted keys; one history with the order kept | Ruling on §8 choice 1 | 2026-10-20 |
+| D26 | The page | The card's Swap is named "⇆ Replace", its sheet "Replace …" as the chip's is; the chip's Insert after is "⛓ Chain with", its sheet "Chain with …"; Del is kept | The user's, from use: on a plain exercise the two Replaces are one edit with one filter, and the two Inserts read alike. The ⛓ ties the button to the mark it makes. Declined: removing the card's Replace, which on a chain swaps the whole chain in one tap | User | 2026-10-27 |
 
 ## Dependency Graph & Implementation Order
 

@@ -272,7 +272,7 @@ test("the search reads the words, category included, and gives back the row with
   // A key the catalog lacks shows as it is.
   assert.equal(logic.wordsOf(CATALOG, "SQUAT/MOON_SQUAT"), "SQUAT/MOON_SQUAT");
   assert.equal(logic.patternOf(CATALOG, "PULL_UP/PULL_UP"), "pull_vertical");
-  // An exercise with no pattern has none to filter a swap on.
+  // An exercise with no pattern has none to filter a Replace on.
   assert.equal(logic.patternOf(CATALOG, "CARDIO/SQUAT_JACKS"), "");
 });
 
@@ -647,7 +647,7 @@ test("a chain is per side when any movement is, and shows its first movement's p
   });
 
 test("a chip's three edits give the card its new key", () => {
-  // Insert after on a plain exercise starts a chain.
+  // Chain with on a plain exercise starts a chain.
   const swing = "HIP_RAISE/KETTLEBELL_SWING";
   const halo = "SHOULDER_STABILITY/KETTLEBELL_HALO";
   assert.equal(logic.chainAfter(swing, 0, halo), `${swing}>${halo}`);
