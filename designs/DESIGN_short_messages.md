@@ -521,6 +521,16 @@ The author ruled on these on 2026-10-09, after the choices of §14 were explaine
 
 He also accepted A22 and A24 as proposed.
 
+These four were chosen by Claude while building, on 2026-10-21, and put to the author after.
+He kept all four as built on 2026-10-27.
+
+| ID | Topic | Ruling |
+|---|---|---|
+| D11 | Where "Tell me more" sits under a proposal | Its row is under the two answers and above the morning offer. |
+| D12 | A session the proposal removes | Its line reads "🚴 Fri 09 · removed", with the session's own emoji. |
+| D13 | The page's words | The page is titled "In full". The fold that holds a session's whole text is "The whole session". |
+| D14 | A day the Calendar does not reach | Only the months the Calendar shows are uploaded, about four weeks back and six ahead. A later day's "Tell me more" opens a page that says the details could not be loaded. Not handled. |
+
 ## 14. Decided without asking the author
 
 The interview had seven minutes. These choices were made after it, by Claude, to make the
@@ -587,6 +597,10 @@ A choice the author overruled keeps its row, with the ruling beside it.
 | D8 | "Tell me more" on a morning with a proposal | The briefing has its "Tell me more" on such a morning too. | The author's ruling, which overrules A10: the athlete must be able to read the full text before accepting. | Interview | 2026-10-07 |
 | D9 | An instance with no bucket | Where the pages are not published, the chat stays as it is today: no short form and no "Tell me more". | The author's ruling, which overrules A8 and drops A20: "Without the bucket, we cannot abbreviate." Both reviewers had asked for it. | Interview | 2026-10-09 |
 | D10 | The letters of `workout show` | `-l` is `--long`, and the Calendar link moves from `-l` to `-L`. | The author's ruling, which changes A23. Nothing but the parser and one row of docs/ARCHITECTURE.md uses `-l` for the link. | Interview | 2026-10-09 |
+| D11 | "Tell me more" under a proposal | Its row is under the two answers and above the morning offer. | Chosen in the build; the author kept it. | Build | 2026-10-27 |
+| D12 | A removed session's line | "🚴 Fri 09 · removed", with the session's own emoji. | Chosen in the build; the author kept it. | Build | 2026-10-27 |
+| D13 | The page's words | Titled "In full", with the fold "The whole session". | Chosen in the build; the author kept it. | Build | 2026-10-27 |
+| D14 | A day the Calendar does not reach | Its page says the details could not be loaded. Not handled. | Chosen in the build; the author kept it. | Build | 2026-10-27 |
 
 ## Dependency Graph & Implementation Order
 
