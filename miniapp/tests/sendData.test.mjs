@@ -182,3 +182,28 @@ test("a gym log opens from the calendar locked, and Edit lets it be sent again",
     await page.waitForURL(/calendar\.html/);
   });
 });
+
+// The athlete leaves the app between two sets, and Telegram loads the page again when they come
+// back. The exercises' file is slow on the gym's signal: the clock is back before it (§1).
+test("a reopened page shows the running clock before the exercises arrive", async (t) => {
+  await onPhone(t, async (page, site) => {
+    await page.goto(`${site}/`, { waitUntil: "networkidle" });
+    await page.waitForSelector(".card");
+    await page.locator("#start-clock").click();
+
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    await page.route("**/exercises.json*", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.reload();
+    await page.waitForSelector("#rest:not([hidden])");
+    assert.equal(await page.locator("#start-clock").isVisible(), false);
+    assert.equal(await page.locator("#rest-label").textContent(), "since start");
+    assert.equal(await page.locator(".card").count(), 0);
+
+    release();
+    await page.waitForSelector(".card");
+  });
+});

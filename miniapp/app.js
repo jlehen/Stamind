@@ -848,7 +848,7 @@ async function start() {
   }
   wire();
   wireTelegram();
-  catalog = await loadCatalog();
+  const catalogLoad = loadCatalog();
   if (opened) {
     state = logic.stateFromLog(session, opened);
     showOpened();
@@ -858,8 +858,12 @@ async function start() {
     history = await restoreHistory();
     persist();
   }
-  render();
+  // The clock is back as soon as the phone answers, not after the download: a reopened page
+  // never shows it stopped (§1). The cards wait for the exercises' words.
+  tick();
   window.setInterval(tick, 1000);
+  catalog = await catalogLoad;
+  render();
 }
 
 start();

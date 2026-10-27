@@ -16,8 +16,9 @@
 <header class="head" id="head">
   <div class="head-top">
     <h1 id="title">Gym session</h1>
-    <!-- The clock waits for Start, so the exercises can be changed before the first set (§1). -->
-    <button class="start" id="start-clock" type="button">Start</button>
+    <!-- The clock waits for Start, so the exercises can be changed before the first set (§1).
+         Hidden until the saved state is read, so a reopened page never offers it by mistake. -->
+    <button class="start" id="start-clock" type="button" hidden>Start</button>
     <div class="rest" id="rest" hidden>
       <span class="rest-value" id="rest-value">00:00</span>
       <span class="rest-label" id="rest-label">since start</span>
