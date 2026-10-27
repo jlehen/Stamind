@@ -21,7 +21,7 @@ from stamind.cli.windows import (
     has_selector as _has_selector, resolve_window, split_targets,
 )
 from stamind.cli.workouts.session_line import (
-    line_markers, prescription_lines, print_marker_legend, workout_line,
+    line_markers, prescription_lines, print_marker_legend, session_table, workout_line,
 )
 
 
@@ -141,8 +141,9 @@ def print_workout_table(
     workouts: list, verdicts: dict, args: argparse.Namespace, *,
     start_date: Optional[str], end_date: Optional[str], ids: list, names_a_range: bool,
 ) -> None:
-    """The expert `workout list` body: the filter echo, one line per session (`-v` adds
-    its short form in gray, `-vv` the detail lines), and the end-of-schedule marker.
+    """The expert `workout list` body: the filter echo, the sessions as a table (`-v` adds
+    each one's short form in gray under its row; `-vv` turns each row back into a line with
+    the detail under it), and the end-of-schedule marker.
 
     The companion form of this is CompanionRenderer.workout_list
     (DESIGN_render_persona.md §5)."""
@@ -159,6 +160,47 @@ def print_workout_table(
             filter_parts.append(f"Type: {args.sport_type}")
         print(gray(f"Filters: {', '.join(filter_parts)}"))
 
+    verbosity = getattr(args, "verbose", 0) or 0
+    markers: set = set()
+    if verbosity >= 2:
+        markers = _print_details(workouts, verdicts, args)
+    elif workouts:
+        table, markers = session_table(
+            workouts, verdicts, under=[_under_row(w, args) for w in workouts]
+        )
+        print(table)
+    # Where the schedule stops, when the listed range runs past it (§4). A listing with
+    # nothing to show renders it alone: an empty range past the cliff is exactly where the
+    # gap needs naming rather than reading as a broken render.
+    end_marker = list_end_marker(end_date) if names_a_range else None
+    if end_marker:
+        print(end_marker)
+    print_marker_legend(markers)
+
+
+def _link_lines(w: dict, args: argparse.Namespace) -> list:
+    """`-L`: the session's Calendar event link, rebuilt from the stored event id, so it can
+    be opened without the sync commands having to print the URL every push."""
+    if not getattr(args, "link", False):
+        return []
+    url = event_url(w.get('google_event_id'), config.google_calendar_id)
+    if not url:
+        return [gray("  Calendar: (not synced)")]
+    return [gray(f"  Calendar: {url}")]
+
+
+def _under_row(w: dict, args: argparse.Namespace) -> list:
+    """What goes under a session's row: its link with `-L`, its short form with `-v`, the
+    same lines the `workout generate` preview draws."""
+    lines = _link_lines(w, args)
+    if getattr(args, "verbose", 0):
+        lines += prescription_lines(w)
+    return lines
+
+
+def _print_details(workouts: list, verdicts: dict, args: argparse.Namespace) -> set:
+    """`-vv`: each session as one line with its detail under it. Returns the markers
+    printed, for the legend."""
     # The long batch rationale is stamped on every workout of an adapt run; show each
     # distinct summary only once across the listing so it doesn't dominate the output.
     seen_summaries: set = set()
@@ -169,19 +211,8 @@ def print_workout_table(
         head = workout_line(w, verdict)
         markers |= line_markers(head)
         print(head)
-        # -L surfaces the Calendar event link (rebuilt from the stored event id) so it can
-        # be opened without the sync commands having to print the URL every push.
-        if getattr(args, "link", False):
-            url = event_url(w.get('google_event_id'), config.google_calendar_id)
-            print(gray(f"  Calendar: {url}") if url else gray("  Calendar: (not synced)"))
-        # Default listing is one line per workout; -v adds the short form under it, the
-        # same lines the `workout generate` preview draws; -vv the full detail.
-        verbosity = getattr(args, "verbose", 0) or 0
-        if verbosity == 1:
-            for line in prescription_lines(w):
-                print(f"      {gray(line)}")
-        if verbosity < 2:
-            continue
+        for line in _link_lines(w, args):
+            print(line)
         # Lifecycle timestamps: when the session first entered the plan and, if ever
         # eased, when the most recent `workout adapt` run touched it. Both NULL on
         # rows predating these columns, so the line is omitted when neither is known.
@@ -225,11 +256,5 @@ def print_workout_table(
             print(format_labeled_paragraph(label, note['text'], color_fn=cyan))
         _print_history(w, getattr(args, "history", None))
         print(gray("-" * 40))
-    # Where the schedule stops, when the listed range runs past it (§4). A listing with
-    # nothing to show renders it alone: an empty range past the cliff is exactly where the
-    # gap needs naming rather than reading as a broken render.
-    end_marker = list_end_marker(end_date) if names_a_range else None
-    if end_marker:
-        print(end_marker)
-    print_marker_legend(markers)
+    return markers
 

@@ -8,7 +8,9 @@ import os
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
+from tests.helpers import (
+    clear_all_tables, listing_row, run_cli, rebind_test_db, save_workout,
+)
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_listing.db")
@@ -19,20 +21,10 @@ test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
 
-def _line_for(stdout, title):
-    """The single `workout list` line for one session, found by its title."""
-    matches = [
-        line for line in stdout.splitlines()
-        if line.startswith("ID: ") and f"| {title}" in line
-    ]
-    assert len(matches) == 1, f"expected one line for {title!r}, got {matches}"
-    return matches[0]
-
-
 def _line_after(stdout, title):
-    """The line printed right under one session's `workout list` line."""
+    """The line printed right under one session's `workout list` row."""
     lines = stdout.splitlines()
-    return lines[lines.index(_line_for(stdout, title)) + 1]
+    return lines[lines.index(listing_row(stdout, title)) + 1]
 
 
 class TestCliWorkoutsListing(unittest.TestCase):
@@ -390,7 +382,7 @@ class TestCliWorkoutsListing(unittest.TestCase):
         self.assertIn("History: none, this is the session's first form.", stdout)
 
     def test_workout_list_shows_repeat_adapt_count(self):
-        """A session eased once reads [ADAPTED]; eased again reads [ADAPTED ×2].
+        """A session eased once reads ADAPTED; eased again reads ADAPTED ×2.
 
         The count is walked over the lineage and only counts revisions that actually cut
         the load, so the fixture walks the session down for real
@@ -407,9 +399,9 @@ class TestCliWorkoutsListing(unittest.TestCase):
         )
         exit_code, stdout, _ = self.run_cli(["workout", "list"])
         self.assertEqual(exit_code, 0)
-        self.assertIn("[ADAPTED]", stdout)
-        self.assertNotIn("[ADAPTED ×", stdout)
-        # The lifecycle line is verbose-only; the default listing is one line per workout.
+        self.assertIn("ADAPTED", listing_row(stdout, "Tempo"))
+        self.assertNotIn("ADAPTED ×", stdout)
+        # The lifecycle line is verbose-only; the default listing is one row per workout.
         self.assertNotIn("Planned:", stdout)
 
         # Lifecycle line under -vv: creation stamp always shown, last-adapted stamp when eased.
@@ -426,4 +418,4 @@ class TestCliWorkoutsListing(unittest.TestCase):
         )
         exit_code, stdout, _ = self.run_cli(["workout", "list"])
         self.assertEqual(exit_code, 0)
-        self.assertIn("[ADAPTED ×2]", stdout)
+        self.assertIn("ADAPTED ×2", listing_row(stdout, "Tempo"))

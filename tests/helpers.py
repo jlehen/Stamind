@@ -233,6 +233,17 @@ def run_cli(args: list, input_value: str = "n"):
     return exit_code, stdout_buf.getvalue(), stderr_buf.getvalue()
 
 
+def listing_row(stdout: str, title: str) -> str:
+    """The single table row a `workout list` or `workout generate` preview drew for one
+    session, found by its Session cell."""
+    matches = [
+        line for line in stdout.splitlines()
+        if title in (cell.strip() for cell in line.split("|"))
+    ]
+    assert len(matches) == 1, f"expected one row for {title!r}, got {matches}"
+    return matches[0]
+
+
 def save_workout(
     db, date, sport_type, title, description="",
     duration_minutes=None, rpe=None, tss=None,

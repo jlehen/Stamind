@@ -8,7 +8,9 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
+from tests.helpers import (
+    clear_all_tables, listing_row, run_cli, rebind_test_db, save_workout,
+)
 from stamind.clock import fmt_date
 from stamind.coach.proposals import RevisionProposal, GenerateProposal
 from tests import test_db_path
@@ -304,13 +306,12 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
         exit_code, stdout, _ = self.run_cli(["workout", "generate"])
         self.assertEqual(exit_code, 0)
         self.assertIn("WORKOUTS PROPOSED BY COACH", stdout)
-        # Rendered by the same `workout_line` the listing uses — the date, the sport, the
-        # title and the load, with no ID, since the session has no row yet.
-        self.assertIn(fmt_date(PROPOSED_DATE), stdout)
-        self.assertIn("RUNNING", stdout)
-        self.assertIn("Base Run", stdout)
-        self.assertIn("45min", stdout)
-        self.assertNotIn("ID:", stdout)
+        # Rendered by the same `session_table` the listing uses — the date, the sport, the
+        # title and the minutes, with no ID, since the session has no row yet.
+        row = [cell.strip() for cell in listing_row(stdout, "Base Run").split("|")]
+        self.assertEqual(row[:4], [fmt_date(PROPOSED_DATE), "RUNNING", "Base Run", "45"])
+        header = next(line for line in stdout.splitlines() if "Session" in line)
+        self.assertFalse(header.startswith("ID"))
         # Under it, the zones as the week planner wrote them, the line `workout list -v` draws.
         self.assertIn("Target: ~10min recovery, ~35min aerobic", stdout)
         self.assertIn("Workouts discarded", stdout)

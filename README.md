@@ -216,26 +216,29 @@ that from its size and asks whether to regenerate.
 ```
 $ ./sm workout list -d -7d..
 === WORKOUT SCHEDULE ===
-ID: 118 | 2027-05-10 Mon | STRENGTH_TRAINING | Strength: Lower Body [DONE] [SYNCED] | 60min | TSS 28 | RPE 6
-ID: 121 | 2027-05-11 Tue | YOGA | Mobility Session [DONE] [ADAPTED] [SYNCED] | 30min | TSS 4 | RPE 1
-ID: 124 | 2027-05-12 Wed | CYCLING | Easy Spin [DONE] [ADAPTED] [SYNCED] | 45min | TSS 28 | RPE 3
-ID: 125 | 2027-05-13 Thu | CYCLING | Hill Repeats 5x4 min [PARTIAL] [ADAPTED] [SYNCED] | 75min | TSS 84 | RPE 8
-ID: 127 | 2027-05-14 Fri | REST | Rest Day [REST OK] [SYNCED] | TSS 0 | RPE 0
-ID: 130 | 2027-05-15 Sat | CYCLING | Long Easy Ride [NOT YET] [SYNCED] | 150min | TSS 95 | RPE 4
-ID: 133 | 2027-05-16 Sun | REST | Rest Day [SYNCED] | TSS 0 | RPE 0
+ID  | Date           | Sport             | Session              | Result  | Min | TSS | RPE | Flags
+-------------------------------------------------------------------------------------------------------------
+118 | 2027-05-10 Mon | STRENGTH_TRAINING | Strength: Lower Body | DONE    | 60  | 28  | 6   | SYNCED
+121 | 2027-05-11 Tue | YOGA              | Mobility Session     | DONE    | 30  | 4   | 1   | ADAPTED, SYNCED
+124 | 2027-05-12 Wed | CYCLING           | Easy Spin            | DONE    | 45  | 28  | 3   | ADAPTED, SYNCED
+125 | 2027-05-13 Thu | CYCLING           | Hill Repeats 5x4 min | PARTIAL | 75  | 84  | 8   | ADAPTED, SYNCED
+127 | 2027-05-14 Fri | REST              | Rest Day             | REST OK | 0   | 0   | 0   | SYNCED
+130 | 2027-05-15 Sat | CYCLING           | Long Easy Ride       | NOT YET | 150 | 95  | 4   | SYNCED
+133 | 2027-05-16 Sun | REST              | Rest Day             |         | 0   | 0   | 0   | SYNCED
 ```
 
-Every session behind you carries a verdict: `[DONE]`, `[PARTIAL]`, `[MISSED]`,
-`[REST OK]` or `[REST BROKEN]`. Today's session reads `[NOT YET]` because the
-day is not over. The same verdict is stamped on the Calendar event.
+Every session behind you carries a verdict in the Result column: `DONE`,
+`PARTIAL`, `MISSED`, `REST OK` or `REST BROKEN`. Today's session reads
+`NOT YET` because the day is not over. The same verdict is stamped on the
+Calendar event's title, as `[Done]`.
 
-Thursday's hill repeats came in `[PARTIAL]` and you want to know why.
+Thursday's hill repeats came in `PARTIAL` and you want to know why.
 `./sm workout show 125` prints that one session in full: the workout
 description, when it was planned and last adapted, the activity it was graded
 against, and how far off it landed. It is `workout list -vv` under a name that
 says what it does, and it takes the same filters. With no argument it prints
 today's sessions in full. `workout list -v` sits in between: each session's
-line, and under it in gray what it asks of you. That is the exercises and
+row, and under it in gray what it asks of you. That is the exercises and
 kilograms on a gym day, and the time in each intensity zone on a ride or a run.
 
 **Sunday.** You check the bigger picture:

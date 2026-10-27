@@ -6,7 +6,9 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from tests.helpers import clear_all_tables, run_cli, rebind_test_db, save_workout
+from tests.helpers import (
+    clear_all_tables, listing_row, run_cli, rebind_test_db, save_workout,
+)
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_adherence.db")
@@ -18,16 +20,6 @@ test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
 PROPOSED_DATE = (datetime.now(timezone.utc).date() + timedelta(days=1)).strftime("%Y-%m-%d")
-
-
-def _line_for(stdout, title):
-    """The single `workout list` line for one session, found by its title."""
-    matches = [
-        line for line in stdout.splitlines()
-        if line.startswith("ID: ") and f"| {title}" in line
-    ]
-    assert len(matches) == 1, f"expected one line for {title!r}, got {matches}"
-    return matches[0]
 
 
 class TestCliWorkoutsListingGrades(unittest.TestCase):
@@ -111,14 +103,14 @@ class TestCliWorkoutsListingGrades(unittest.TestCase):
             "workout", "list", "-d", f"{day(-3)}..{day(1)}", "--no-pull",
         ])
         self.assertEqual(exit_code, 0)
-        self.assertIn("[MISSED]", _line_for(stdout, "Skipped Run"))
-        self.assertIn("[DONE]", _line_for(stdout, "Easy Run"))
-        self.assertIn("[PARTIAL]", _line_for(stdout, "Long Run"))
-        self.assertIn("[REST OK]", _line_for(stdout, "Rest"))
-        self.assertIn("[NOT YET]", _line_for(stdout, "Tempo Run"))
+        self.assertIn("MISSED", listing_row(stdout, "Skipped Run"))
+        self.assertIn("DONE", listing_row(stdout, "Easy Run"))
+        self.assertIn("PARTIAL", listing_row(stdout, "Long Run"))
+        self.assertIn("REST OK", listing_row(stdout, "Rest"))
+        self.assertIn("NOT YET", listing_row(stdout, "Tempo Run"))
         # A day still ahead carries no verdict at all — nothing has become of it yet.
-        ahead = _line_for(stdout, "Tomorrow Ride")
-        for marker in ("[DONE]", "[MISSED]", "[PARTIAL]", "[NOT YET]", "[REST OK]"):
+        ahead = listing_row(stdout, "Tomorrow Ride")
+        for marker in ("DONE", "MISSED", "PARTIAL", "NOT YET", "REST OK"):
             self.assertNotIn(marker, ahead)
 
     def test_workout_list_glosses_only_the_markers_on_screen(self):
@@ -158,14 +150,15 @@ class TestCliWorkoutsListingGrades(unittest.TestCase):
             "workout", "list", "-d", PROPOSED_DATE, "--no-pull",
         ])
         self.assertEqual(exit_code, 0)
-        self.assertIn("[STALE]", _line_for(stdout, "Drifted Run"))
+        self.assertIn("STALE", listing_row(stdout, "Drifted Run"))
         footer = " ".join(stdout.split())
         self.assertIn("STALE = its Google Calendar event is out of date", footer)
         self.assertIn("workout push", footer)
 
     def test_generate_preview_glosses_its_own_markers(self):
-        """The preview draws the same lines as the listing, so it carries the same
-        footer — and `[KEPT]`, the one marker only a preview prints, has to be in it."""
+        """The preview draws the same table as the listing, so it carries the same
+        footer — and `KEPT`, the one marker only a preview prints, has to be in it. The
+        sessions have no ID and no verdict yet, so the table has neither column."""
         import io
         from contextlib import redirect_stdout
         from stamind.cli.workouts.generate import print_generate_preview
@@ -189,8 +182,11 @@ class TestCliWorkoutsListingGrades(unittest.TestCase):
         with redirect_stdout(out):
             self.assertTrue(print_generate_preview(proposal))
         stdout = out.getvalue()
-        self.assertIn("[KEPT]", stdout)
+        self.assertIn("KEPT", listing_row(stdout, "Rest Day"))
         self.assertIn("KEPT = left as it stands", " ".join(stdout.split()))
+        header = next(line for line in stdout.splitlines() if "Session" in line)
+        self.assertNotIn("ID", header)
+        self.assertNotIn("Result", header)
 
     def test_every_marker_the_line_can_print_has_a_gloss(self):
         """A new adherence status or a new change kind must not reach the listing with
@@ -246,7 +242,7 @@ class TestCliWorkoutsListingGrades(unittest.TestCase):
         exit_code, stdout, _ = self.run_cli(["workout", "list", str(rest_id), "--no-pull"])
         self.assertEqual(exit_code, 0)
         self.assertNotIn("Endurance Ride", stdout)
-        self.assertIn("[REST OK]", _line_for(stdout, "Rest"))
+        self.assertIn("REST OK", listing_row(stdout, "Rest"))
 
     @patch("stamind.runtime.garmin")
     def test_workout_list_freshens_only_what_it_has_to_grade(self, mock_garmin):
@@ -288,4 +284,4 @@ class TestCliWorkoutsListingGrades(unittest.TestCase):
         ])
         self.assertEqual(exit_code, 0)
         self.assertNotIn("Called Off", stdout)
-        self.assertNotIn("[MISSED]", stdout)
+        self.assertNotIn("MISSED", stdout)

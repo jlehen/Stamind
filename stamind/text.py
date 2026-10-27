@@ -214,7 +214,8 @@ def flex_width(
 
 
 def render_table(
-    headers: list, rows: list, narrow: Optional[bool] = None, flex: Optional[int] = None
+    headers: list, rows: list, narrow: Optional[bool] = None, flex: Optional[int] = None,
+    under: Optional[list] = None,
 ) -> str:
     """Renders a table for the active client and returns it as text.
 
@@ -232,9 +233,13 @@ def render_table(
     past the client's width: its cells are cut to `flex_width` and end in an ellipsis.
     Without it a single long cell wraps the whole table (DESIGN_logging.md §7.2).
 
+    ``under`` holds, per row, the caller's own lines to print beneath that row or its
+    record, already formatted.
+
     Returns the rendered text with no trailing newline."""
     if narrow is None:
         narrow = is_narrow_client()
+    under = under or [[] for _ in rows]
 
     if flex is not None:
         room = flex_width(headers, rows, flex, narrow)
@@ -247,11 +252,11 @@ def render_table(
     if narrow:
         label_w = max((visible_len(h) for h in headers[1:]), default=0)
         cards = []
-        for row in rows:
+        for row, extra in zip(rows, under):
             lines = [str(row[0])]
             for header, cell in zip(headers[1:], row[1:]):
                 lines.append(f"  {pad_visible(header, label_w)}  {cell}")
-            cards.append("\n".join(lines))
+            cards.append("\n".join(lines + extra))
         return "\n\n".join(cards)
 
     widths = [_column_width(headers, rows, i) for i in range(len(headers))]
@@ -259,10 +264,11 @@ def render_table(
     out = [bold(" | ".join(pad_visible(h, widths[i]) for i, h in enumerate(headers)))]
     total = sum(widths) + 3 * (len(widths) - 1)
     out.append(gray("-" * total))
-    for row in rows:
+    for row, extra in zip(rows, under):
         out.append(
             " | ".join(pad_visible(str(c), widths[i]) for i, c in enumerate(row))
         )
+        out.extend(extra)
     return "\n".join(out)
 
 

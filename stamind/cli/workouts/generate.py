@@ -25,7 +25,7 @@ from stamind.cli.workouts.heads_up import (
     generate_dates, newest_written, print_send_notice, replacing_unsent,
 )
 from stamind.cli.workouts.session_line import (
-    line_markers, prescription_lines, print_marker_legend, workout_line,
+    prescription_lines, print_marker_legend, session_table,
 )
 from stamind.cli.workouts.strength_only import generate_strength_only, strength_span
 
@@ -307,17 +307,12 @@ def print_generate_preview(proposal) -> bool:
         return False
 
     print_standing_report(proposal)
-    # The same one-line rendering as `workout list`, so the plan the athlete is asked
-    # to accept reads exactly like the plan they will be living with.
-    markers: set = set()
-    for w in proposal.workouts:
-        head = workout_line(w)
-        markers |= line_markers(head)
-        print(head)
-        # What the one-line form leaves out: the kilograms of a gym day, the zones of any
-        # other session. The same lines `workout list -v` draws.
-        for line in prescription_lines(w):
-            print(f"      {gray(line)}")
+    # The same table as `workout list -v`, so the sessions the athlete is asked to accept
+    # read exactly like the ones they will be living with.
+    table, markers = session_table(
+        proposal.workouts, under=[prescription_lines(w) for w in proposal.workouts]
+    )
+    print(table)
     print_strength_notes(proposal)
     print_marker_legend(markers)
     print()
