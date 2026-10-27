@@ -8,6 +8,7 @@ are worked out from the key by `words`. The table ships with the code and nobody
 a name Garmin adds later is added to the file by hand.
 """
 import os
+import re
 from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
@@ -207,9 +208,24 @@ def shared_load(chain: Sequence[str]) -> bool:
 
 def searched(key: str) -> str:
     """What a typed name is matched against: the key's words, then the words of the names
-    people use for it (§3.2)."""
+    people use for it (§3.2), then all of it respelled when that differs (§7)."""
     known = get(key)
-    return " ".join((words(key),) + (known.also_words if known else ()))
+    text = " ".join((words(key),) + (known.also_words if known else ()))
+    other = respelled(text)
+    if other == text:
+        return text
+    return f"{text} {other}"
+
+
+# Garmin writes "one arm" and "single arm", "one leg" and "single leg", for the same thing (§7).
+_ONE_OR_SINGLE = re.compile(r"\b(one|single) (arm|leg)\b")
+_OTHER_SPELLING = {"one": "single", "single": "one"}
+
+
+def respelled(text: str) -> str:
+    """The text with "one arm" written "single arm" and "single arm" written "one arm", and the
+    same for legs, so a search finds either spelling under the other (§7)."""
+    return _ONE_OR_SINGLE.sub(lambda found: f"{_OTHER_SPELLING[found[1]]} {found[2]}", text)
 
 
 def _name_words(key: str) -> Set[str]:

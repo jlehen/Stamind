@@ -196,6 +196,11 @@ class ClassTest(unittest.TestCase):
         # A class with no such name, and a key the table lacks, are matched on their words.
         self.assertEqual(vocabulary.searched("SQUAT/BELT_SQUAT"), "squat: belt squat")
         self.assertEqual(vocabulary.searched("SQUAT/MOON_SQUAT"), "squat: moon squat")
+        # "one arm" and "single arm" find each other (§7), and "one hand" stays as it is.
+        self.assertIn("single arm cable lateral raise",
+                      vocabulary.searched("LATERAL_RAISE/ONE_ARM_CABLE_LATERAL_RAISE"))
+        self.assertEqual(vocabulary.respelled("single leg rdl, one arm one leg row, one hand"),
+                         "one leg rdl, single arm single leg row, one hand")
 
     def test_an_exercise_is_bodyweight_when_none_of_its_gear_is_a_load(self):
         """§3.6: a pull-up bar is not a load, a machine is."""

@@ -459,12 +459,16 @@ Not handled:
 commands, the chat, the session's description, the page. `strength log` and `strength exercises`
 match what is typed against the words the way they match the names today: the exact words, or
 else every exercise whose words contain it. "leg press" still finds "squat: leg press", and
-"pallof" finds "core: cable core press" through the name people use (§3.2). Lists
+"pallof" finds "core: cable core press" through the name people use (§3.2). Garmin writes
+"one arm" and "single arm", "one leg" and "single leg", for the same thing, so the search finds
+each spelling under the other: "single arm lateral raise" finds "lateral raise: one arm cable
+lateral raise". Lists
 sort by the words. The heading of `strength log NAME` gives the lift's pattern and its gear. The
 index of `strength exercises` gains a group for the lines with no pattern.
 
 The page's search lists one entry per class, under the words of its key, and searches those
-words and the names people use (§3.2). "Pull up" is one entry. Nothing is hidden: the yoga poses are in the list. The search
+words and the names people use (§3.2), "one arm" and "single arm" alike. "Pull up" is one
+entry. Nothing is hidden: the yoga poses are in the list. The search
 leaves the word "weighted" out of what is typed, so "weighted pull up" finds "pull up": a weighted
 twin is its class with a load.
 
@@ -508,7 +512,8 @@ strength planner's are. The buttons show the words. Its list goes from 32 kB to 
 **The page.** Both payloads keep their shape (DESIGN_gym_logger.md §3, §4) and go to version 2:
 `n` holds a key. `miniapp/exercises.json` gives the page, for each class, the key, the words,
 the pattern, the gear and whether it is bodyweight, with the photos id when there is one and a
-mark when it is done one side at a time (§3.8), and the names people use for it (§3.2). The
+mark when it is done one side at a time (§3.8), the names people use for it (§3.2), and its
+words respelled when they say "one arm" or "single arm", "one leg" or "single leg" (§7). The
 page searches the words and those names, prints the words as "[Squat] Belt squat" (§4), and
 sends the key. The state the
 page saves on the phone changes its version too, so a state saved under the old names is not

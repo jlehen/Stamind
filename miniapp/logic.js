@@ -608,7 +608,9 @@ export function searchExercises(catalog, query, pattern) {
     return [];
   }
   const first = tokens.length ? tokens[0] : "";
-  const holds = (row, token) => row.w.includes(token) || (row.a || "").includes(token);
+  // `t` is the words respelled, "single arm" for "one arm" (DESIGN_exercise_table.md §7).
+  const holds = (row, token) => row.w.includes(token) || (row.t || "").includes(token)
+    || (row.a || "").includes(token);
   const hits = scoped.filter((row) => tokens.every((token) => holds(row, token)))
     .map((row) => {
       const name = nameAfterCategory(row.w);

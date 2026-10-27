@@ -22,7 +22,8 @@ OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exercises.j
 def rows():
     """Every class as the page reads it: its key, its words, its pattern, its gear, whether
     it is bodyweight, the Free Exercise DB id of its photos when it has one, a mark when it is
-    done one side at a time, and the names people use for it when it has some."""
+    done one side at a time, the names people use for it when it has some, and its words
+    respelled when they say "one arm" or "single arm", "one leg" or "single leg"."""
     listed = []
     for exercise in vocabulary.all_exercises():
         row = {
@@ -35,6 +36,9 @@ def rows():
             row["o"] = True
         if exercise.also:
             row["a"] = ", ".join(exercise.also_words)
+        other = vocabulary.respelled(exercise.words)
+        if other != exercise.words:
+            row["t"] = other
         listed.append(row)
     return listed
 

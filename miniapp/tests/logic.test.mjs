@@ -290,6 +290,9 @@ test("the search ranks on the name after the category", async () => {
   const catalog = JSON.parse(
     await readFile(new URL("../exercises.json", import.meta.url), "utf8"));
   const curls = logic.searchExercises(catalog, "curl", null).map((r) => r.k);
+  // Garmin writes "one arm" and "single arm" for the same thing (DESIGN_exercise_table.md §7).
+  assert.deepEqual(logic.searchExercises(catalog, "single arm cable lateral", null)
+    .map((r) => r.k), ["LATERAL_RAISE/ONE_ARM_CABLE_LATERAL_RAISE"]);
   assert.equal(curls[0], "CURL/CURL");
   assert.ok(curls.indexOf("LEG_CURL/LEG_CURL") >= 0
             && curls.indexOf("LEG_CURL/LEG_CURL") < 10, curls.join(" "));
