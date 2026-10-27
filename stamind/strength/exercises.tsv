@@ -38,6 +38,8 @@
 +FLYE/PEC_DECK	accessory	CHEST|SHOULDERS	Machine
 # nearest Garmin exercise: FLYE/INCLINE_REVERSE_FLYE
 +FLYE/REVERSE_PEC_DECK	accessory	SHOULDERS|TRAPS	Machine
+# nearest Garmin exercise: FLYE/CABLE_CROSSOVER
++FLYE/ONE_ARM_CABLE_FLYE +FLYE/ONE_ARM_CROSSOVER	accessory	CHEST|SHOULDERS	Cable Machine, Cable Attachment	Single-Arm_Cable_Crossover	per side
 # nearest Garmin exercise: PULL_UP/EZ_BAR_PULLOVER
 +PULL_UP/DUMBBELL_PULLOVER	accessory	LATS,CHEST|TRICEPS	Bench, Dumbbells
 # nearest Garmin exercise: PULL_UP/EZ_BAR_PULLOVER

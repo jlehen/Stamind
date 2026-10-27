@@ -255,6 +255,12 @@ because it is that circuit's only pull and has to progress (DESIGN_strength_trac
 | `SHOULDER_STABILITY/KETTLEBELL_HALO` | `SANDBAG/AROUND_THE_WORLD` | accessory | Kettlebells |
 | `PULL_UP/KETTLEBELL_FLOOR_PULLOVER` | `PULL_UP/EZ_BAR_PULLOVER` | pull_vertical | Kettlebells |
 
+`FLYE/ONE_ARM_CABLE_FLYE` was added on 2026-10-27: the cable crossover done one arm at a time,
+the athlete's request. Garmin's only one-arm cable flye is the reverse one, for the rear
+shoulder. Its nearest Garmin exercise is `FLYE/CABLE_CROSSOVER`, and it is `per side`. "One arm
+crossover" is a later name on its line (§3.2). The six cable crossover sets of 12 and 22 October
+on the main instance were this exercise, and were moved to it by hand the same day.
+
 ### 3.4 Pattern
 
 The pattern says what job an exercise does in a session: `squat`, `hinge`, `single_leg`,
