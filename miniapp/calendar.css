@@ -254,6 +254,12 @@ h1 {
 .meso-4 { background: var(--meso-4); }
 .meso-5 { background: var(--meso-5); }
 
+/* A deload's days: the mesocycle's colour, dashed (DESIGN_deload_weeks.md §5.1). */
+.deload {
+  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 8px);
+  mask-image: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 8px);
+}
+
 .end-note {
   margin: 10px 0 0;
   font-size: 14px;

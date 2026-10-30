@@ -494,7 +494,7 @@ class TestFeedbackReplan(FeedbackTestCase):
         )
         mock_coach.data_bootstrap.assert_not_called()
         mock_coach.plan_apply.assert_called_once()
-        self.assertIn("If you applied the new plan", stdout)
+        self.assertIn("to schedule workouts based on this plan", stdout)
 
 
 class TestFeedbackFromGenerate(FeedbackTestCase):

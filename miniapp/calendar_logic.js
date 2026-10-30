@@ -218,6 +218,19 @@ export function mesoIndex(snapshot, iso) {
   return (snapshot.meso || []).findIndex((meso) => meso.s <= iso && iso <= meso.e);
 }
 
+export function isDeloadDay(snapshot, iso) {
+  // A day from the mesocycle's `d` to its last day (DESIGN_deload_weeks.md §5.1).
+  const meso = (snapshot.meso || [])[mesoIndex(snapshot, iso)];
+  return Boolean(meso && meso.d && meso.d <= iso);
+}
+
+export function deloadTouches(meso, month) {
+  // Whether the mesocycle's deload has a day in the month shown: it gets its own legend row.
+  const first = isoDay(new Date(month.year, month.month, 1, 12));
+  const last = isoDay(new Date(month.year, month.month + 1, 0, 12));
+  return Boolean(meso.d) && meso.d <= last && first <= meso.e;
+}
+
 export function goalsOn(snapshot, iso) {
   return (snapshot.goals || []).filter((goal) => goal.d === iso);
 }

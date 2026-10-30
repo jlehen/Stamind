@@ -118,12 +118,7 @@ to write — you are producing this mesocycle's REMAINDER, not the mesocycle.
 
 Read it as the progression's starting point, not as a fresh mesocycle. Carry the ramp on from
 where the last completed week left it instead of restarting at week-one volume, and keep
-the mesocycle's remaining weeks pointed at the focus it was given. If one elapsed week's
-planned load dips clearly below the weeks around it, that week WAS this mesocycle's deload —
-do not schedule a second one; if no such dip has happened yet and the mesocycle's design calls
-for one, it still belongs in the weeks you are writing. A dip that recurs on a fixed rhythm
-— every other week, where the athlete's guidelines alternate a heavier and a lighter week —
-is the microcycle, not the deload: the deload is the one-off dip below that rhythm.
+the mesocycle's remaining weeks pointed at the focus it was given.
 
 Where a week's actual load fell well short of what was planned, build from the volume the
 athlete actually produced rather than from the plan they did not complete — ramping from an
@@ -288,8 +283,10 @@ class WorkoutGenerateMixin:
             "Ensure the microcycles — one week, or longer where the athlete's guidelines\n"
             "alternate weeks — are designed specifically to match the focus, target volume, and\n"
             "intensity of the active mesocycle(s) the athlete is in during this period, and\n"
-            "incorporate any deload weeks or exceptions for the athlete's active constraints in accordance\n"
-            "with the science guidelines.\n"
+            "write each mesocycle's deload on the dates the plan gives it; a mesocycle the plan\n"
+            "gives no deload date has no deload, whatever its name or focus says. Incorporate\n"
+            "any exceptions for the athlete's active constraints in accordance with the science\n"
+            "guidelines.\n"
             "Cover EVERY date of the span: a training day carries its session, a rest\n"
             "day carries an explicit \"Rest Day\" entry. Never omit a date — an absent\n"
             "date and a planned rest day mean different things to the athlete's adherence\n"

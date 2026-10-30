@@ -177,6 +177,12 @@ def fmt_date(date_str: Optional[str]) -> str:
         return str(date_str)
 
 
+def fmt_day(date_str: str) -> str:
+    """Renders a YYYY-MM-DD date as 'Mon 2 Nov', the short form the calendar's lines use."""
+    day = parse_date(date_str)
+    return f"{day:%a} {day.day} {day:%b}"
+
+
 def fmt_span(start: Optional[str], end: Optional[str], sep: str = " to ") -> str:
     """Renders a date range with the weekday on both ends. A range that starts and
     ends on the same day collapses to that one date."""

@@ -1,6 +1,6 @@
 # Design: Deload weeks the plan dates
 
-**Status:** Proposed, five choices ruled 2026-10-30 (§7), not built · **Date:** 2026-10-19 ·
+**Status:** Built 2026-10-30, five choices ruled the same day (§7) · **Date:** 2026-10-19 ·
 **Branch:** worktree-deload-weeks-design
 
 A **deload** is a lighter recovery week: it cuts volume much more than intensity, so the
@@ -11,8 +11,8 @@ and `workout adapt` that writes the sessions, follows those words.
 
 This design makes `plan generate` give each mesocycle's deload a first day. The deload runs
 from that day to the mesocycle's last day. The date is stored with the mesocycle. Every model
-call that is shown the plan's mesocycles sees it, and the calendar draws the deload's days in
-a paler shade of the mesocycle's colour.
+call that is shown the plan's mesocycles sees it, and the calendar draws the deload's days
+with a dashed strip in the mesocycle's colour.
 
 ## 1. The problem
 
@@ -51,13 +51,13 @@ Two things went wrong, and this design fixes both:
 > the athlete's last lighter week, across mesocycle boundaries. When the count brings a
 > deload forward, the mesocycle is shortened so that it ends with the deload. Every model
 > call that is shown the plan's mesocycles sees the date, and the calendar draws the deload's
-> days with a paler strip.
+> days with a dashed strip.
 
 With the rule, the same Monday goes differently. The athlete runs `plan generate -f`. It reads
 the weekly loads of the mesocycle that ended yesterday: two and a half loading weeks and no
 deload. The counting rule says a deload is overdue. The new mesocycle starts today with
 nothing trained, so `plan generate` writes a shorter first mesocycle that ends with a deload,
-this week or next. The athlete opens the calendar and sees those seven days in a paler shade.
+this week or next. The athlete opens the calendar and sees those seven days with a dashed strip.
 
 ## 3. How `plan generate` places a deload
 
@@ -93,6 +93,9 @@ PRIOR TRAINING REVIEW and the deloads in PREVIOUS PERIODIZATION STRATEGY, and ca
 count across every mesocycle boundary. When the count brings a deload forward, shorten the
 mesocycle so that it ends with the deload.
 ```
+
+The sentence names only the sections the prompt holds: a first plan has neither section, and
+`--fresh` withholds the previous plan.
 
 `plan generate` already has the numbers. Its prompt section PRIOR TRAINING REVIEW shows each
 week's planned load beside the load produced, for the mesocycle that finished last and the
@@ -260,10 +263,10 @@ days, so the test lands at the deload's end, which `benchmarks.md` names as the 
 ### 5.1 The calendar page
 
 It is Wednesday 4 November. The athlete opens the calendar. Every cell from Monday 2 to
-Sunday 8 November has its strip in the mesocycle's colour, paler than the days around it.
-Under the grid, the legend shows the mesocycle's row, and under it a row with a paler swatch
-of the same colour: "Deload · 2 Nov – 8 Nov". The cells' background tint does not change:
-it still shows how each session went against its plan.
+Sunday 8 November has its strip in the mesocycle's colour, dashed where the days around it
+are solid. Under the grid, the legend shows the mesocycle's row, and under it a row with a
+striped swatch of the same colour: "Deload · 2 Nov – 8 Nov". The cells' background tint does
+not change: it still shows how each session went against its plan.
 
 - **The snapshot**, the packed data the calendar button carries to the page, gives a
   mesocycle with a deload one more key, `"d": "2026-11-02"`. `header`, in
@@ -274,7 +277,7 @@ it still shows how each session went against its plan.
 - **The page** (`miniapp/calendar_logic.js`) counts a day as a deload day when it falls from
   `d` to `e`, the mesocycle's last day, the way it already finds the day's mesocycle. `calendar.js`
   adds the class `deload` to that day's strip and to the legend's swatch, and `calendar.css`
-  draws it at 40% opacity.
+  cuts it into dashes with a mask, whichever of the six colours it has.
 - **The legend** gives a deload that touches the month its own row, under its mesocycle's.
 
 The page is published through the Pages deploy, which needs a push the author approves.
@@ -293,7 +296,7 @@ The page is published through the Pages deploy, which needs a push the author ap
 - **After a plan is applied**, `plan generate` names the command that rewrites the sessions
   already written. It is Monday 26 October, the schedule is written to Sunday 15 November,
   and a replan dates a deload from 26 October to 1 November. The calendar draws that week
-  pale at once, over the intervals the old plan wrote. A bare `workout generate` starts the
+  dashed at once, over the intervals the old plan wrote. A bare `workout generate` starts the
   day after the written schedule ends (`cli/workouts/generate.py::_resolve_span`), so it
   would never reach that week. When sessions are written past today
   (`cli/runway.py::schedule_coverage`), the closing line becomes: "Sessions are written up to
@@ -368,10 +371,15 @@ stand as written until the author says otherwise.
    the prompt and in code. *Changed by the second review:* a kept mesocycle may end earlier
    than its original end date to bring its deload forward. With one date column this is the
    only way a replan can bring the deload of the mesocycle under way forward.
-6. **A paler strip, at 40% opacity, not a new tint.** The tint already means "how did this
-   session go". A dashed strip would be easier for colour-blind readers, but the author asked
-   for a colour.
-7. **The legend gives each deload its own row.** The other way is one fixed key line, "pale
+6. **A dashed strip in the mesocycle's colour, not a new tint.** *Ruled by the author on
+   2026-10-30, after seeing it built.* The first version was a paler strip at 40% opacity,
+   because the author had asked for a colour. A paler strip looks like a tint: the first
+   strip's blue is the very colour of the "Less than planned" tint, and pale orange is nearly
+   "More than planned". The other way is a solid strip, darker in a light theme and brighter
+   in a dark one. In a dark theme it turns orange to yellow and grey to nearly white, and it
+   can vanish where Telegram's theme differs from the phone's. The dashes look the same in
+   both themes, and colour-blind readers can tell them apart too.
+7. **The legend gives each deload its own row.** The other way is one fixed key line, "dashed
    strip: deload week", which the reader has to match to the cells.
 8. **The calendar only, on the companion side.** The "Goals & plan" page, the chat's plan
    view, `sm status`, the web dashboard's plan page and the retrospective records show no
@@ -387,7 +395,7 @@ stand as written until the author says otherwise.
     and move the boundary fitness test to the deload's last day. That changes BENCHMARK
     PLACEMENT, the warning for a boundary week without a test, DESIGN_benchmark_workouts.md and
     DESIGN_mesocycle_progress.md §4.1.
-12. **A past deload keeps its paler strip only while the plan version that dated it is
+12. **A past deload keeps its dashed strip only while the plan version that dated it is
     active.** *Ruled by the author: left out of this design.* The other way below fixes every
     past strip, so it would be a small change of its own. Added by the second review. The
     calendar draws only active plan versions
@@ -417,7 +425,7 @@ Applied in the build commit, so no document describes behaviour the code does no
   deload forward (DESIGN_deload_weeks.md §3.3). Its start date, which everything in this
   section keys off, stays."
 - **DESIGN_calendar_miniapp.md.** §1's strip paragraph and §3.1's third item say a deload day's
-  strip is paler and the legend gives the deload its own row. §5's snapshot shape shows `d`,
+  strip is dashed and the legend gives the deload its own row. §5's snapshot shape shows `d`,
   with one bullet: "`d` is the first day of the mesocycle's deload, which runs to `e`, when
   the plan dates one." §7 gives the `── Deload` line.
 - **docs/DOMAIN_MODEL.md.** The mesocycle field table gains `deload_start`, and "five

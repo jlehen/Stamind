@@ -419,7 +419,8 @@ class TestMesocycleProgressTask(unittest.TestCase):
         task = _mesocycle_progress_task("Build 1 — ...")
         self.assertIn("MESOCYCLE PROGRESS SO FAR", task)
         self.assertIn("BENCHMARK PLACEMENT", task)
-        self.assertIn("deload", task)
+        # The plan dates the deload, so nothing guesses it from a dip (DESIGN_deload_weeks.md §4.2).
+        self.assertNotIn("deload", task)
         # Wraps at 100 like every other prompt literal (AGENTS.md).
         self.assertTrue(all(len(line) <= 100 for line in task.splitlines()))
 

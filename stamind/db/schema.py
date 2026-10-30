@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Bump when the DDL below changes, so an existing database picks the change up once.
 # Reusing a number a previous commit already stamped is silent (ARCHITECTURE.md §5).
-SCHEMA_VERSION = 29
+SCHEMA_VERSION = 30
 
 # The append-only rule, as the database enforces it (DESIGN_workout_revisions.md §14).
 # `wipe_workouts` drops both triggers to clear the table and puts them back from here, so
@@ -383,6 +383,9 @@ class SchemaMixin:
                     focus TEXT NOT NULL,
                     -- one line on what it is for, or NULL (DESIGN_calendar_miniapp.md §3.7)
                     summary TEXT,
+                    -- the first day of the deload, which runs to end_date; NULL when it has
+                    -- none (DESIGN_deload_weeks.md §4.1)
+                    deload_start TEXT,
                     FOREIGN KEY (macrocycle_id) REFERENCES macrocycles(id) ON DELETE CASCADE
                 )
             """)

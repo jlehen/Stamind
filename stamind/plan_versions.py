@@ -138,7 +138,7 @@ def _diff_mesocycle_pair(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, 
     """Compares two mesocycles taken to be the same phase across versions."""
     fields = [
         {"field": key, "from": old.get(key) or None, "to": new.get(key) or None}
-        for key in ('phase',)
+        for key in ('phase', 'deload_start')
         if (old.get(key) or None) != (new.get(key) or None)
     ]
     dates = None

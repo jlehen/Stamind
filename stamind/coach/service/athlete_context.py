@@ -21,7 +21,7 @@ from stamind.config import config
 from stamind.types import Objective, Constraint
 from stamind.text import cmd
 from stamind.output import notice
-from stamind.coach.formatting import _load_science_guidelines
+from stamind.coach.formatting import _load_science_guidelines, mesocycle_text
 
 
 @dataclass(frozen=True)
@@ -136,10 +136,7 @@ class AthleteContextMixin:
                 strategy = macrocycle['strategy']
                 mesocycles = self._db.get_mesocycles_for_macrocycle(macrocycle['id'])
                 for m in mesocycles:
-                    meso_text += (
-                        f"  - {m['name']} ({m['start_date']} to "
-                        f"{m['end_date']}): {m['focus']}\n"
-                    )
+                    meso_text += f"  - {mesocycle_text(m)}\n"
         if not strategy:
             strategy = NO_STRATEGY
             meso_text = NO_MESOCYCLES
@@ -179,10 +176,7 @@ class AthleteContextMixin:
                 meso_parts.append(f"  Toward {label}:")
             for m in self._db.get_mesocycles_for_macrocycle(macro_id):
                 mark = ">" if m['id'] in covered else "-"
-                meso_parts.append(
-                    f"  {mark} {m['name']} ({m['start_date']} to "
-                    f"{m['end_date']}): {m['focus']}"
-                )
+                meso_parts.append(f"  {mark} {mesocycle_text(m)}")
         # "this window", not "this generation window": callers that pass `mesocycles=`
         # reach this same assembler and generate nothing.
         meso_parts.append(

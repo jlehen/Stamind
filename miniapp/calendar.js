@@ -94,7 +94,8 @@ function renderCell(iso) {
   }
   cell.append(icons);
   cell.append(element("div", "label", content.label));
-  cell.append(element("div", stripClass(logic.mesoIndex(snapshot, iso))));
+  const deload = logic.isDeloadDay(snapshot, iso) ? " deload" : "";
+  cell.append(element("div", stripClass(logic.mesoIndex(snapshot, iso)) + deload));
   cell.addEventListener("click", () => openSheet(iso));
   return cell;
 }
@@ -126,6 +127,14 @@ function renderLegend(month) {
     row.append(element("span", "", `${meso.n} · ${logic.shortDay(meso.s)} – `
       + logic.shortDay(meso.e)));
     ui.legend.append(row);
+    if (!logic.deloadTouches(meso, month)) {
+      continue;
+    }
+    const deload = element("li");
+    deload.append(element("span", `swatch meso-${index % STRIPS} deload`));
+    deload.append(element("span", "", `Deload · ${logic.shortDay(meso.d)} – `
+      + logic.shortDay(meso.e)));
+    ui.legend.append(deload);
   }
 }
 

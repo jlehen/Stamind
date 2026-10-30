@@ -12,7 +12,7 @@ import sys
 from typing import Optional
 from stamind import runtime
 from stamind.text import bold, cmd, cyan, dim, format_labeled_paragraph, gray, green, red
-from stamind.output import aside, notice
+from stamind.output import notice
 from stamind.clock import fmt_date, fmt_span, today_str as _today_str
 from stamind.cli.selectors import IdRange, add_selector_args
 from stamind.cli.windows import goal_range_for_window, has_selector, resolve_window
@@ -211,8 +211,6 @@ def _run_replan_flow(title: str, constraint: dict) -> None:
         force=False, fresh=False,
     )
     _generate.run_plan_generate(ns)
-    aside("If you applied the new plan, run " + cmd("workout generate")
-          + " to schedule it.")
 
 
 def run_constraint_add(args: argparse.Namespace) -> None:

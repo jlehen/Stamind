@@ -210,6 +210,23 @@ test("a day outside the window is drawn as having no data until its month arrive
   assert.equal(logic.isOutside(button(), "2026-09-10"), false);
 });
 
+test("a deload day runs from d to the mesocycle's last day", () => {
+  const snapshot = { meso: [{ n: "Build", s: "2026-10-19", e: "2026-11-08", d: "2026-11-02" },
+                            { n: "Peak", s: "2026-11-09", e: "2026-11-30" }] };
+  assert.equal(logic.isDeloadDay(snapshot, "2026-11-01"), false);
+  assert.equal(logic.isDeloadDay(snapshot, "2026-11-02"), true);
+  assert.equal(logic.isDeloadDay(snapshot, "2026-11-08"), true);
+  assert.equal(logic.isDeloadDay(snapshot, "2026-11-09"), false);
+  assert.equal(logic.isDeloadDay(snapshot, "2026-12-01"), false);
+});
+
+test("the legend gives a deload in the month shown its own row", () => {
+  const meso = { n: "Build", s: "2026-10-19", e: "2026-11-08", d: "2026-11-02" };
+  assert.equal(logic.deloadTouches(meso, { year: 2026, month: 10 }), true);
+  assert.equal(logic.deloadTouches(meso, { year: 2026, month: 9 }), false);
+  assert.equal(logic.deloadTouches({ ...meso, d: undefined }, { year: 2026, month: 10 }), false);
+});
+
 test("the legend lists the mesocycles that touch the month shown", () => {
   const names = (month) => logic.legendFor(button(), month)
     .map(({ meso, index }) => `${index} ${meso.n}`);

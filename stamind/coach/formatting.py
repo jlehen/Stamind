@@ -11,6 +11,18 @@ from stamind.plan_inputs import science_documents
 from stamind.strength.prescription import brief_of
 
 
+def mesocycle_text(mesocycle: Dict[str, Any]) -> str:
+    """A mesocycle as every prompt that lists the plan writes it, with its deload when it has
+    one (DESIGN_deload_weeks.md §4.2)."""
+    line = (
+        f"{mesocycle['name']} ({mesocycle['start_date']} to {mesocycle['end_date']}): "
+        f"{mesocycle['focus']}"
+    )
+    if not mesocycle.get('deload_start'):
+        return line
+    return f"{line} Deload {mesocycle['deload_start']} to {mesocycle['end_date']}."
+
+
 def _for_the_week_planner(workout: Workout) -> str:
     """A session's description as the week planner is shown it.
 

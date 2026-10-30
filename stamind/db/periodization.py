@@ -5,6 +5,32 @@ from stamind.clock import today_date
 from stamind.db.objectives import ARCHIVED
 
 
+def _is_day(value: Any) -> bool:
+    """Whether `value` is a date written exactly as `YYYY-MM-DD`, so it compares as a string."""
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d") == value
+    except (TypeError, ValueError):
+        return False
+
+
+def _with_checked_deload(mesocycle: Dict[str, Any], notes: List[str]) -> Dict[str, Any]:
+    """A copy of the mesocycle, without a deload whose first day is not a date inside it, and
+    with a note naming the drop (DESIGN_deload_weeks.md §3.4)."""
+    first_day = mesocycle.get('deload_start')
+    if first_day is None:
+        return dict(mesocycle)
+    if not _is_day(first_day):
+        why = "it is not a date"
+    elif first_day < mesocycle['start_date']:
+        why = f"it starts before the mesocycle, which starts {mesocycle['start_date']}"
+    elif first_day > mesocycle['end_date']:
+        why = f"it starts after the mesocycle, which ends {mesocycle['end_date']}"
+    else:
+        return dict(mesocycle)
+    notes.append(f"dropped the deload of '{mesocycle['name']}' (from {first_day}): {why}")
+    return dict(mesocycle, deload_start=None)
+
+
 def repair_mesocycle_contiguity(
     mesocycles: List[Dict[str, Any]]
 ) -> Tuple[List[Dict[str, Any]], List[str]]:
@@ -13,7 +39,9 @@ def repair_mesocycle_contiguity(
     Contiguity is asked of the model; this repairs what came back so the stored plan
     always holds it (DOMAIN_MODEL.md §4). End dates are authoritative: a mesocycle whose
     start is not the day after its predecessor's end is re-dated to start there, and a
-    mesocycle ending inside its predecessor is dropped. Returns (mesocycles, notes), the notes
+    mesocycle ending inside its predecessor is dropped. A deload's first day that a moved
+    start overtook moves with it, and one that does not fit is dropped
+    (DESIGN_deload_weeks.md §3.4). Returns (mesocycles, notes), the notes
     naming each repair — empty when nothing needed one. Idempotent, so the write
     boundary re-applies it as a no-op after `plan_apply` has surfaced the notes."""
     ordered = sorted(mesocycles, key=lambda b: (b['start_date'], b['end_date']))
@@ -21,7 +49,7 @@ def repair_mesocycle_contiguity(
     notes: List[str] = []
     for mesocycle in ordered:
         if not repaired:
-            repaired.append(dict(mesocycle))
+            repaired.append(_with_checked_deload(mesocycle, notes))
             continue
         prev = repaired[-1]
         expected = (
@@ -38,12 +66,17 @@ def repair_mesocycle_contiguity(
                 how = f"overlapped '{prev['name']}'"
             else:
                 how = f"left a gap after '{prev['name']}'"
+            first_day = mesocycle.get('deload_start')
+            overtaken = _is_day(first_day) and mesocycle['start_date'] <= first_day < expected
             notes.append(
                 f"moved the start of '{mesocycle['name']}' from {mesocycle['start_date']} to "
                 f"{expected}: it {how}, which ends {prev['end_date']}"
+                + (", and its deload's first day with it" if overtaken else "")
             )
             mesocycle = dict(mesocycle, start_date=expected)
-        repaired.append(dict(mesocycle))
+            if overtaken:
+                mesocycle['deload_start'] = expected
+        repaired.append(_with_checked_deload(mesocycle, notes))
     return repaired, notes
 
 
@@ -306,10 +339,10 @@ class PeriodizationMixin:
             for meso in mesocycles:
                 cursor.execute("""
                     INSERT INTO mesocycles (
-                        macrocycle_id, name, start_date, end_date, focus, summary
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                        macrocycle_id, name, start_date, end_date, focus, summary, deload_start
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (macrocycle_id, meso['name'], meso['start_date'], meso['end_date'],
-                      meso['focus'], meso.get('summary')))
+                      meso['focus'], meso.get('summary'), meso.get('deload_start')))
 
             conn.commit()
             return int(macrocycle_id)

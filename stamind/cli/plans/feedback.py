@@ -96,8 +96,6 @@ def _feedback_replan(goal: dict) -> None:
         no_pull=False, force_pull=False, auto=False,
         goal_range=IdRange(start=goal['id'], end=goal['id']), force=False, fresh=False,
     ))
-    aside("If you applied the new plan, run " + cmd("workout generate")
-          + " to schedule it.")
 
 
 def run_plan_feedback(args: argparse.Namespace) -> None:

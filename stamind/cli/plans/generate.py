@@ -11,10 +11,12 @@ from stamind.text import (
     bold, cmd, cyan, default_wrap_width, format_labeled_paragraph, green, red, wrap_text,
 )
 from stamind.output import aside, notice, step, warn
-from stamind.clock import fmt_date
+from stamind.clock import fmt_date, fmt_day, today_str
 from stamind.cli import staleness
-from stamind.cli.common import add_feedback_note, ensure_recent_data
+from stamind.cli.common import add_feedback_note, deload_line, ensure_recent_data
+from stamind.cli.runway import schedule_coverage
 from stamind.cli.windows import goal_span_start, resolve_goal
+from stamind.db.periodization import repair_mesocycle_contiguity
 
 
 def _goals_in_range(rng) -> Optional[list]:
@@ -146,11 +148,14 @@ def print_new_strategy(
     print(format_labeled_paragraph(bold("Overall Strategy:"), strategy, width))
     print()
     print(bold("Mesocycles:"))
-    for m in mesocycles:
+    # Repaired as `plan_apply` will repair them, so a deload that does not fit reads as none
+    # here (DESIGN_deload_weeks.md §5.2). `plan_apply` prints the notes.
+    for m in repair_mesocycle_contiguity(mesocycles)[0]:
         mesocycle_head = wrap_text(
             f"- {m['name']} ({m['start_date']} to {m['end_date']})", width
         )
-        print(format_labeled_paragraph(bold(mesocycle_head), m['focus'], width))
+        deload = deload_line(m) if m.get('deload_start') else "Deload: none"
+        print(format_labeled_paragraph(f"{bold(mesocycle_head)}\n  {deload}", m['focus'], width))
     print(cyan(bold(f"{rule}\n")))
 
 
@@ -171,6 +176,18 @@ def print_plan_generate_preview(proposal: dict) -> None:
             "is being shown."
         ))
     print_new_strategy(proposal['strategy'], proposal['mesocycles'], width)
+
+
+def _after_the_plan_line() -> str:
+    """The command that brings the sessions in line with the plan just applied. With sessions
+    written past today, it rewrites those days and no more (DESIGN_deload_weeks.md §5.2)."""
+    last_written, _ = schedule_coverage()
+    if last_written is None or last_written <= today_str():
+        return f"Run {cmd('workout generate')} to schedule workouts based on this plan."
+    return wrap_text(
+        f"Sessions are written up to {fmt_day(last_written)} under the old plan. Run "
+        f"{cmd(f'workout generate -d today..{last_written}')} to rewrite them under this one."
+    )
 
 
 def run_plan_generate(args: argparse.Namespace) -> None:
@@ -310,7 +327,6 @@ def _generate_one_plan(
             notice("\nNo goal to attach this plan to — nothing was saved.")
             return
         print(green(f"\nGenerated {len(mesocycles)} mesocycles. Save complete."))
-        print(green(f"Run {cmd('workout generate')} to schedule workouts "
-                    "based on this plan."))
+        print(green(_after_the_plan_line()))
     else:
         notice("\nPlan discarded.")

@@ -19,6 +19,22 @@ from stamind.text import cyan, default_wrap_width, wrap_text
 from stamind.output import notice, step
 
 
+def _keep_started_deload(
+    mesocycles: List[Dict[str, Any]], under_way: Optional[Dict[str, Any]], today: str
+) -> List[Dict[str, Any]]:
+    """The model's mesocycles, with a started deload of the kept mesocycle under way back as it
+    is stored, its last day included (DESIGN_deload_weeks.md §3.3)."""
+    if not under_way or not under_way.get('deload_start') or under_way['deload_start'] > today:
+        return mesocycles
+    kept = []
+    for mesocycle in mesocycles:
+        if mesocycle.get('start_date') == under_way['start_date']:
+            mesocycle = dict(mesocycle, deload_start=under_way['deload_start'],
+                             end_date=under_way['end_date'])
+        kept.append(mesocycle)
+    return kept
+
+
 class PlanningMixin:
     def plan_rm(self, objective_id: int) -> None:
         """Deletes the periodization plan for a specific objective."""
@@ -265,7 +281,9 @@ class PlanningMixin:
             )
             strategy = macro_data.get("strategy", "Endurance preparation strategy.")
             summary = macro_data.get("summary") or ""
-            mesocycles = macro_data.get("mesocycles", [])
+            mesocycles = _keep_started_deload(
+                macro_data.get("mesocycles", []), current_mesocycle, today_str
+            )
 
             if auto_apply:
                 self.plan_apply(

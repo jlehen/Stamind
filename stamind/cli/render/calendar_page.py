@@ -186,6 +186,15 @@ def sheet(cal: Calendar, day: Day, texts: bool = False) -> List[Any]:
     return parts
 
 
+def _meso_entry(mesocycle: Dict[str, Any]) -> Dict[str, str]:
+    """One mesocycle of the payload; `d` is the first day of its deload, when it has one (§5)."""
+    entry = {"n": mesocycle["name"], "s": str(mesocycle["start_date"]),
+             "e": str(mesocycle["end_date"])}
+    if mesocycle.get("deload_start"):
+        entry["d"] = str(mesocycle["deload_start"])
+    return entry
+
+
 def header(cal: Calendar, at: datetime) -> Dict[str, Any]:
     """Everything the payload holds but its days (§5)."""
     goal = next_goal(cal.goals, cal.today)
@@ -198,8 +207,7 @@ def header(cal: Calendar, at: datetime) -> Dict[str, Any]:
         "goal": simple_goal_line(goal, cal.today) if goal else None,
         "goals": [{"t": simple_goal_line(g, cal.today), "d": str(g["target_date"])}
                   for g in cal.goals],
-        "meso": [{"n": m["name"], "s": str(m["start_date"]), "e": str(m["end_date"])}
-                 for m in cal.mesocycles],
+        "meso": [_meso_entry(m) for m in cal.mesocycles],
     }
     if cal.schedule_end and cal.schedule_end <= cal.end:
         payload["end"] = cal.schedule_end
