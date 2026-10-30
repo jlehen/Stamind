@@ -211,6 +211,8 @@ class Mesocycle(TypedDict):
     end_date: str
     focus: str
     summary: Optional[str]  # one line for the "Goals & plan" page (DESIGN_calendar_miniapp.md §3.7)
+    # The deload's first day; it runs to end_date (DESIGN_deload_weeks.md §4.1).
+    deload_start: Optional[str]
 
 class PlanFeedback(TypedDict):
     """One note in a plan's feedback log — a message the athlete addressed to the next

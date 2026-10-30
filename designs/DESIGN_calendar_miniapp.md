@@ -41,8 +41,8 @@ example "away at a wedding, no training". A dot means a signal was recorded that
 example two drinks the evening before, or a hot day.
 
 A thin coloured strip runs along the bottom of every cell. Its colour says which mesocycle
-the day belongs to. Under the grid, a legend gives each colour its mesocycle's name and
-dates.
+the day belongs to, and a deload day's strip is dashed (DESIGN_deload_weeks.md §5.1). Under the
+grid, a legend gives each colour its mesocycle's name and dates, and a deload its own row.
 
 She taps Tuesday. A sheet slides up with three parts, each made of lines the bot already
 writes in the chat:
@@ -81,7 +81,8 @@ A cell holds, from top to bottom:
 
 1. The day number, with the constraint diamond and the signal dot beside it.
 2. The sport icon of the session, and its label.
-3. The mesocycle strip.
+3. The mesocycle strip, dashed on a deload day, with a legend row of its own for the deload
+   (DESIGN_deload_weeks.md §5.1).
 
 The label is the session's short name (§3.6). A session without one shows its planned
 length: "90′" under 100 minutes, "1h40" or "2h" from 100 minutes on. A session with
@@ -308,7 +309,7 @@ view can show them (§3.4).
  "from": "2026-08-28", "to": "2026-11-06",
  "goal": "🏃 Sylvesterlauf — on 13 Dec (in 11 weeks)",
  "goals": [{"t": "🏃 Sylvesterlauf — on 13 Dec (in 11 weeks)", "d": "2026-12-13"}],
- "meso": [{"n": "Aerobic base", "s": "2026-10-01", "e": "2026-10-18"}],
+ "meso": [{"n": "Aerobic base", "s": "2026-10-01", "e": "2026-10-18", "d": "2026-10-12"}],
  "end": "2026-10-25", "fit": ["2026-09-11", "2026-10-16"],
  "days": {"2026-09-22": {
     "x": [{"i": "🏃", "l": "Easy", "g": "ok"}],
@@ -317,6 +318,8 @@ view can show them (§3.4).
               ["Done", ["✅ 🏃 Easy run — 50 min (you did 32 min)"]],
               ["Signals and constraints", ["alcohol: 2"]]]}}}
 ```
+
+- `d` is the first day of the mesocycle's deload, which runs to `e`, when the plan dates one.
 
 - `x` is the day's sessions: icon, label and glyph, `ok` (green), `less` (blue), `more`
   (orange), `miss` (red outline) or `ahead`. A session off its plan also carries `r`, the
@@ -456,7 +459,8 @@ the icon and the label (§3.1), then the grade in expert marks: ✓ done, ½ par
 A kept rest day has no mark. An activity nobody planned is its icon after a "+", and when
 the cell has no room for it the label goes first. Two sessions show two icons and no
 label, as on the page. When a mesocycle starts inside the month, a line under that week
-says "── <name> starts Thu 1 Oct". The header gives the month and the nearest goal ahead.
+says "── <name> starts Thu 1 Oct", and under the week a deload starts in, a line says "── Deload
+Mon 2 Nov to Sun 8 Nov". The header gives the month and the nearest goal ahead.
 
 A day's detail in the terminal is `workout list -d <date> -vv`, which already prints the
 description, what Garmin recorded, the grade and its reasons. `sm calendar` does not repeat

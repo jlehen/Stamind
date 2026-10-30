@@ -15,7 +15,7 @@ from stamind.text import (
     wrap_text, yellow,
 )
 from stamind.output import notice
-from stamind.clock import fmt_date, today_date, today_str as _today_str
+from stamind.clock import days_between, fmt_date, fmt_day, today_date, today_str as _today_str
 from stamind.strength import comparison, prescription, sets, vocabulary
 
 
@@ -289,6 +289,18 @@ def print_plan_goal(goal: dict, width: int) -> None:
     print_segments(
         pad, [magenta(goal['sport_type'].upper()), cyan(fmt_date(goal['target_date']))], width,
     )
+
+
+def deload_span(mesocycle: Dict[str, Any]) -> str:
+    """'Deload Mon 2 Nov to Sun 8 Nov', a mesocycle's deload in the terminal
+    (DESIGN_deload_weeks.md §5.2)."""
+    return f"Deload {fmt_day(mesocycle['deload_start'])} to {fmt_day(mesocycle['end_date'])}"
+
+
+def deload_line(mesocycle: Dict[str, Any]) -> str:
+    """`deload_span` with its length: a first day written too early shows as a long deload."""
+    days = days_between(mesocycle['deload_start'], mesocycle['end_date']) + 1
+    return f"{deload_span(mesocycle)} ({days} day{'s' if days != 1 else ''})"
 
 
 def print_mesocycle_head(span: Dict[str, Any], id_label: str, width: int) -> str:

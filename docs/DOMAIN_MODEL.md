@@ -467,7 +467,7 @@ A new strategy leaves the existing sessions exactly where they are until
 A phase of training with one job: *"Base Building, 2026-09-01 to 2026-10-05, Zone 2
 aerobic base, high volume."*
 
-That is genuinely all it is. The table has five meaningful columns:
+That is genuinely all it is. The table's meaningful columns:
 
 | Field | Notes |
 |---|---|
@@ -476,10 +476,11 @@ That is genuinely all it is. The table has five meaningful columns:
 | `start_date`, `end_date` | Inclusive `YYYY-MM-DD` bounds. |
 | `focus` | Prose: what this mesocycle is for. |
 | `summary` | One plain sentence saying the same thing, shorter. `plan show` prints it in place of `focus` unless `-v`, and the "Goals & plan" page shows it. NULL when the model leaves it out. |
+| `deload_start` | The first day of the deload that closes the mesocycle; the deload runs to `end_date`. NULL when it has none (`DESIGN_deload_weeks.md`). |
 
-There is **no** stored load target, no weekly hours, no intensity distribution, no deload
-flag. A mesocycle states what it is for, and the week planner derives the rest from that
-sentence plus the science guidelines.
+There is **no** stored load target, no weekly hours, no intensity distribution. A mesocycle
+states what it is for and, when it has one, the first day of its deload, and the week planner
+derives the rest from those plus the science guidelines.
 
 ### Lifecycle
 
@@ -513,12 +514,15 @@ today's date, not of anything stored. A bare `-m` on any selector-taking command
    its predecessor is dropped. `plan_apply`, the method that saves an accepted plan, runs
    the same repair first and prints a note per fix, so a repaired plan is never silently
    different from the one shown.
+5. A deload's first day lies inside its mesocycle, and the deload runs to the mesocycle's end;
+   `plan_apply` moves a first day the date repair overtook, drops any other that does not
+   fit, and prints a note.
 
 **Asked of the model, but not enforced anywhere:**
 
-5. The first mesocycle should start on the plan start date, and the last should end on or
+6. The first mesocycle should start on the plan start date, and the last should end on or
    around the goal date.
-6. Plans of *different* goals should not overlap. `plan generate` pins a new plan's
+7. Plans of *different* goals should not overlap. `plan generate` pins a new plan's
    start to the day after the latest preceding goal that has a plan — but this is
    best-effort: planning goals out of chronological order still produces two active
    plans over the same dates. That state is legitimate and transient — adding the
@@ -526,7 +530,7 @@ today's date, not of anything stored. A bare `-m` on any selector-taking command
    running `plan generate` on it re-pins its start — and the readers settle it by recency
    in the meantime (below).
 
-Point 5 lives in the planning prompt only; the readers absorb a plan that starts late or
+Point 6 lives in the planning prompt only; the readers absorb a plan that starts late or
 ends early by falling back (below).
 
 ### Reading mesocycles for a window: one reader
@@ -691,8 +695,8 @@ So the concept lives in exactly three places:
    mesocycle(s) the athlete is in during this period."* The model's `reasoning` field is
    asked to describe *"the shape of the microcycle and why"* — that is the microcycle
    design, returned as prose rather than as data. A two-week alternation is a microcycle
-   the prompt allows and the mesocycle-progress deload rule knows about
-   (`DESIGN_mesocycle_progress.md` §3.2); the app still aggregates by Monday week
+   the prompt allows and the counting rule in `stamind/science/periodization.md` knows
+   about (`DESIGN_deload_weeks.md` §3.1); the app still aggregates by Monday week
    (point 3), so the alternation shows there as a sawtooth, not as a unit.
 2. **The science guidelines**, as the defaults above.
 3. **`progression.weekly_aggregates`**, the one place the app makes weeks concrete. It

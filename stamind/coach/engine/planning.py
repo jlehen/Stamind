@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from stamind.types import Objective, Constraint
+from stamind.coach.formatting import mesocycle_text
 from stamind.text import cyan, wrap_text
 from stamind.output import step
 import stamind.coach.engine as _eng
@@ -19,15 +20,25 @@ def _previous_strategy_section(
     if not previous_plan:
         return None
     strategy, mesocycles = previous_plan
-    meso_text = "".join(
-        f"  - {m['name']} ({m['start_date']} to {m['end_date']}): {m['focus']}\n"
-        for m in mesocycles
-    )
+    meso_text = "".join(f"  - {mesocycle_text(m)}\n" for m in mesocycles)
     return (
         "## PREVIOUS PERIODIZATION STRATEGY (FOR CONTEXT)\n"
         f"- Overall Strategy: {strategy}\n"
         f"- Mesocycles:\n{meso_text or '  - None\n'}"
     )
+
+
+def _deload_evidence(prior_training_text: Optional[str], previous_plan: Optional[Tuple]) -> str:
+    """Where the deload count reads from, naming only the sections this prompt holds: a first
+    plan has neither, and `--fresh` withholds the previous plan (DESIGN_deload_weeks.md §3.2)."""
+    sources = []
+    if prior_training_text:
+        sources.append("the weekly load lines in PRIOR TRAINING REVIEW")
+    if previous_plan:
+        sources.append("the deloads in PREVIOUS PERIODIZATION STRATEGY")
+    if not sources:
+        return ""
+    return ", read from " + " and\n".join(sources)
 
 
 class PlanStrategyMixin:
@@ -64,6 +75,7 @@ class PlanStrategyMixin:
         # format, and the user message — so a horizon goal has to branch it here; prose
         # in the goal description cannot override it (ARCHITECTURE.md §15 "Goal dates").
         is_horizon = next_goal.get('date_type') == 'horizon'
+        deload_evidence = _deload_evidence(prior_training_text, previous_plan)
         custom_task = f"""
 ## TASK
 Determine the overall periodization strategy (macrocycle) from {plan_start} until the target
@@ -74,6 +86,11 @@ mesocycle based on the periodization style guidelines provided in the science fi
 mesocycles, it is acceptable to shorten/extend a mesocycle by a few days to align its transition or
 recovery boundaries with the athlete's active constraints (e.g. aligning a deload week or phase
 change with a long trip).
+Give each mesocycle at most one deload, as its last days: give the deload's first day as
+deload_start, and it runs to the mesocycle's end date. Place each deload by counting the
+loading weeks since the athlete's last lighter week{deload_evidence},
+and carry that count across every mesocycle boundary. When the count brings a deload forward,
+shorten the mesocycle so that it ends with the deload.
 Make sure there are no gaps between the end date of one mesocycle and the start date of the next.
 The last mesocycle must end on or around the goal date ({next_goal['target_date']}).
 """
@@ -86,6 +103,10 @@ The last mesocycle must end on or around the goal date ({next_goal['target_date'
                 datetime.strptime(today_str, "%Y-%m-%d").date()
                 - datetime.strptime(meso['start_date'], "%Y-%m-%d").date()
             ).days
+            if meso.get('deload_start'):
+                deload_line = f"Deload: from {meso['deload_start']}"
+            else:
+                deload_line = "Deload: none"
             custom_task += f"""
 ### THE MESOCYCLE ALREADY UNDER WAY
 The athlete is part-way through a mesocycle of the plan you are replacing:
@@ -93,17 +114,25 @@ The athlete is part-way through a mesocycle of the plan you are replacing:
   "{meso['name']}" ({meso['start_date']} to {meso['end_date']})
   Focus: {meso['focus']}
   Already trained: {trained_days} days of it, starting {meso['start_date']}.
+  {deload_line}
 
 Decide whether that mesocycle still fits the plan you are now designing.
 
 - If it DOES, keep it: emit it as your FIRST mesocycle with its ORIGINAL start date
-  ({meso['start_date']}), its original end date ({meso['end_date']}),
-  its name and its focus, all unchanged. Do NOT re-date it to {plan_start}: the athlete
-  finishes the mesocycle they are in, and the days already trained stay part of it. Your
-  second mesocycle then starts the day after it ends.
+  ({meso['start_date']}), its original end date ({meso['end_date']}) unless you end it
+  earlier to bring its deload forward, its name and its focus, all otherwise unchanged.
+  Do NOT re-date it to {plan_start}: the athlete finishes the mesocycle they are in, and the
+  days already trained stay part of it. Your second mesocycle then starts the day after it
+  ends.
 - If it does NOT, because the goals, the constraints or the athlete's profile have changed
   enough that continuing it would be wrong, discard it and start your first mesocycle on
   {plan_start}.
+
+Its deload follows one rule. A deload whose first day is on or before today stays as it is:
+the athlete is in it. If its deload has not started, or it has none, give this mesocycle its
+deload by the counting rule, starting today or later. To bring its deload forward, end this
+mesocycle on the deload's last day, earlier than its original end date. Its start date, name
+and focus stay unchanged, and your next mesocycle starts the day after.
 
 State which of the two you chose, and why, in the strategy text.
 """
@@ -176,7 +205,9 @@ You MUST respond with a JSON object containing:
         aerobic threshold, rest, peak load, etc.)",
       "summary": "What this mesocycle is for, in one plain sentence of at most 90
         characters, for the athlete (e.g., Rebuild the aerobic base and start sprint
-        intervals, ending with an FTP test.)"
+        intervals, ending with an FTP test.)",
+      "deload_start": "YYYY-MM-DD, the first day of the deload that closes this mesocycle
+        (it runs to end_date), or null when this mesocycle has none"
     }}
   ]
 }}
@@ -288,10 +319,7 @@ You MUST respond with a JSON object containing:
         science file, no history — the question is structural, and a model told to look
         for a reason to regenerate will find one, so the rubric demands the concrete
         change it would make and treats "cannot name one" as keep."""
-        mesocycle_lines = "\n".join(
-            f"- {m['name']} ({m['start_date']} to {m['end_date']}): {m['focus']}"
-            for m in mesocycles
-        )
+        mesocycle_lines = "\n".join(f"- {mesocycle_text(m)}" for m in mesocycles)
         system_prompt = """You are an endurance coach reviewing a periodization plan you built earlier.
 
 ## TASK

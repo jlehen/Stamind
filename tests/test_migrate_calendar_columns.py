@@ -1,7 +1,8 @@
 """The one-off migration that adds `workouts.short_name`, `mesocycles.summary`
-(DESIGN_calendar_miniapp.md §3.6, §3.7) and `workouts.summary` (DESIGN_short_messages.md §4).
+(DESIGN_calendar_miniapp.md §3.6, §3.7), `workouts.summary` (DESIGN_short_messages.md §4) and
+`mesocycles.deload_start` (DESIGN_deload_weeks.md §4.1).
 
-The fixture is a database made by the current code with the three columns dropped again and
+The fixture is a database made by the current code with the four columns dropped again and
 the stamp put back to 20: the oldest shape a live database can have.
 """
 import importlib.util
@@ -52,6 +53,7 @@ class AddColumnsTest(unittest.TestCase):
         conn.execute("ALTER TABLE workouts DROP COLUMN short_name")
         conn.execute("ALTER TABLE mesocycles DROP COLUMN summary")
         conn.execute("ALTER TABLE workouts DROP COLUMN summary")
+        conn.execute("ALTER TABLE mesocycles DROP COLUMN deload_start")
         conn.execute("DELETE FROM schema_version")
         conn.execute(
             "INSERT INTO schema_version (version, applied_at) VALUES (20, '2026-09-26')"
@@ -65,7 +67,8 @@ class AddColumnsTest(unittest.TestCase):
         self.assertNotIn("summary", _columns(self.path, "workouts"))
 
         self.assertEqual(migrate.add_columns(self.path),
-                         ["workouts.short_name", "mesocycles.summary", "workouts.summary"])
+                         ["workouts.short_name", "mesocycles.summary", "workouts.summary",
+                          "mesocycles.deload_start"])
         self.assertEqual(migrate.add_columns(self.path), [])
 
         self.assertEqual(_columns(self.path, "workouts").count("short_name"), 1)

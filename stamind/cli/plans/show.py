@@ -14,7 +14,7 @@ from stamind.output import notice
 from stamind.clock import fmt_date
 from stamind.cli import staleness
 from stamind.cli.common import (
-    print_feedback_notes, print_hanging, print_indented, print_mesocycle_head,
+    deload_line, print_feedback_notes, print_hanging, print_indented, print_mesocycle_head,
     print_mesocycle_rule, print_plan_goal, print_retrospective, print_segments,
 )
 from stamind.cli.windows import resolve_goal
@@ -297,6 +297,8 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
     print(bold("Mesocycle Timeline:"))
     for m in mesocycles:
         pad = print_mesocycle_head(m, f"[Mesocycle ID: {m['id']}]", width)
+        if m.get('deload_start'):
+            print(pad + deload_line(m))
         _print_mesocycle_workouts(m, workouts, pad, width, show_workouts)
         detail = m['focus'] if verbose else m.get('summary')
         if detail:

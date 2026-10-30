@@ -71,6 +71,13 @@ lighter recovery microcycle. The ratio of loading to recovery is a plan choice,
 and some mesocycles — typically short, low-volume ones — carry no scheduled deload
 at all.
 
+The run of loading weeks is counted across mesocycle boundaries, never restarted at a
+mesocycle's start. A mesocycle with no deload of its own hands its loading weeks to the next
+one, so that mesocycle's deload comes earlier. Count from the last week the athlete actually
+trained lighter, whichever mesocycle it fell in. A lighter week that recurs on a fixed
+rhythm, where the athlete's guidelines alternate a heavier and a lighter week, is the
+microcycle and does not end the run.
+
 * **Deload Protocol:** a deload **cuts volume substantially more than
   intensity**. That asymmetry is the mechanism: reduced volume clears systemic
   fatigue, while preserved intensity maintains neuromuscular and technical

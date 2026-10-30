@@ -1022,6 +1022,7 @@ A new `plan generate` **supersedes** the prior version (kept) rather than deleti
 | `end_date`      | TEXT                    | YYYY-MM-DD                              |
 | `focus`         | TEXT                    | E.g. "Zone 2 aerobic base, high volume" |
 | `summary`       | TEXT                    | One sentence on what the mesocycle is for, written by `plan generate` for the "Goals & plan" page; NULL when the model leaves it out (DESIGN_calendar_miniapp.md §3.7) |
+| `deload_start`  | TEXT                    | YYYY-MM-DD, the first day of the deload that closes the mesocycle; it runs to `end_date`. NULL when it has none. Only `plan generate` writes it; `repair_mesocycle_contiguity` moves or drops a first day that does not fit (DESIGN_deload_weeks.md) |
 
 ### plan_feedback
 The plan's feedback log — an append-only list of notes the athlete addressed to the

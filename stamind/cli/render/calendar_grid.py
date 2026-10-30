@@ -9,8 +9,9 @@ from typing import List
 
 from stamind import calendar_days
 from stamind.analytics.adherence import MISSED, PARTIAL, REST_VIOLATION
-from stamind.clock import day_str, fmt_date, parse_date
+from stamind.clock import day_str, fmt_date, fmt_day, parse_date
 from stamind.text import bold, cyan, gray
+from stamind.cli.common import deload_span
 from stamind.cli.render.calendar_page import icon, session_label
 
 # Each column's width, in terminal columns (§7).
@@ -70,7 +71,7 @@ def cell_lines(day: calendar_days.Day) -> List[str]:
 
 def month_lines(cal: calendar_days.Calendar, year: int, month: int) -> List[str]:
     """The month's grid: a header with the nearest goal, the weekday names, then two lines
-    per week and a line under a week in which a mesocycle starts (§7)."""
+    per week and a line under a week in which a mesocycle or a deload starts (§7)."""
     lines = [bold(cyan(f"=== {month_calendar.month_name[month]} {year} ==="))]
     goal = calendar_days.next_goal(cal.goals, cal.today)
     if goal:
@@ -87,6 +88,10 @@ def month_lines(cal: calendar_days.Calendar, year: int, month: int) -> List[str]
         for meso in cal.mesocycles:
             start = parse_date(str(meso["start_date"]))
             if start in week and start.month == month:
-                lines.append(gray(f"── {meso['name']} starts {start:%a} {start.day} "
-                                  f"{start:%b}"))
+                lines.append(gray(f"── {meso['name']} starts {fmt_day(str(meso['start_date']))}"))
+            if not meso.get("deload_start"):
+                continue
+            deload = parse_date(meso["deload_start"])
+            if deload in week and deload.month == month:
+                lines.append(gray(f"── {deload_span(meso)}"))
     return lines

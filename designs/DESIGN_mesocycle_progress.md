@@ -136,6 +136,11 @@ the same way it reads the dip. The alternation itself lives in the athlete's sci
 documents, anchored to the mesocycle start so that a `workout generate` opening mid-mesocycle can
 tell which week it is resuming into; the app stores no cycle phase.
 
+**Amendment, 2026-10-19.** The plan now dates each mesocycle's deload
+(DESIGN_deload_weeks.md). The week planner reads the date, so the dip rule above and its
+fixed-rhythm clause are gone from the prompt. The fixed-rhythm clause now sits in
+`periodization.md`'s counting rule, where `plan generate` reads it.
+
 ### 3.3 Per-sport gap annotation
 
 The week line's total is one blended figure across every sport (training_load.md's CTL/ATL/TSB
@@ -164,10 +169,10 @@ gets no second line — there is nothing the split would add.
 
 `coach/engine/generate.py::_mesocycle_progress_task` appends a `CONTINUING A MESOCYCLE ALREADY UNDER
 WAY` section, gated on the data being present so a clean mesocycle start produces the prompt it
-always did. It names the data section, states that those days are history, and asks for three
-things: carry the ramp on rather than restarting it; treat a clear dip in an elapsed week as
-the deload already taken; build from the load the athlete actually produced rather than from an
-unfulfilled plan.
+always did. It names the data section, states that those days are history, and asks for two
+things: carry the ramp on rather than restarting it; build from the load the athlete actually
+produced rather than from an unfulfilled plan. The plan dates the deload, so the prompt no
+longer reads one from a dip (DESIGN_deload_weeks.md §4.2).
 
 ### 4.1 Bounding BENCHMARK PLACEMENT
 
@@ -248,6 +253,10 @@ from the last completed week describes a week that does not exist.
   about rather than history it may only read.
 
 ## 7. Surviving a replan: keeping the mesocycle under way
+
+**Amendment, 2026-10-19.** A kept mesocycle may now end earlier than its original end date,
+when `plan generate` brings its deload forward (DESIGN_deload_weeks.md §3.3). Its start date,
+which everything in this section keys off, stays.
 
 Everything above keys off `meso['start_date']`. `_mesocycle_progress_context` returns None when
 `elapsed_end < meso['start_date']`, and `mesocycle_report.mesocycle_report` measures its window from the
