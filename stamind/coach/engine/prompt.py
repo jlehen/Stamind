@@ -225,7 +225,8 @@ sessions this command prints beside your words. Write accordingly:
   stacking several ideas into one clause.
 Any length limit stated on a field in RESPONSE FORMAT is a hard limit, not a target. This
 section governs rationale and summary prose only: a workout "description" is the
-prescription the athlete trains from, and stays as complete as the session requires.
+prescription the athlete trains from, and stays as complete as the session requires. It never
+asks the athlete a question: nothing they could answer reaches you from there.
 
 {custom_task}
 """

@@ -175,10 +175,12 @@ def lived_out(item: Dict[str, Any]) -> bool:
 
 
 def settle_if_stale(item: Dict[str, Any]) -> bool:
-    """Closes an item its kind no longer finds worth asking, and a confirmation that has
-    lived out its mornings. True when it did (§3)."""
+    """Closes an item its kind no longer finds worth asking, a confirmation that has lived
+    out its mornings, and an asked-once question left unanswered. True when it did (§3)."""
     kind = kind_of(item)
-    if not (kind.is_stale(item) or (kind.confirmation and lived_out(item))):
+    now = clock.now()
+    asked_and_left = kind.asked_once and bool(item["sent_at"]) and not is_out(item, now)
+    if not (kind.is_stale(item) or asked_and_left or (kind.confirmation and lived_out(item))):
         return False
     runtime.db.close_queue_item(item["id"], STALE, clock.now())
     return True

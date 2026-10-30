@@ -76,7 +76,7 @@ def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
 RETROSPECTIVE_KIND = Kind(
     name=KIND, shape=QUESTION,
     wording=_wording, companion_wording=_companion_wording,
-    is_stale=_is_stale, apply=_apply, drop_label="nothing to say",
+    is_stale=_is_stale, apply=_apply, drop_label="nothing to say", asked_once=True,
 )
 
 

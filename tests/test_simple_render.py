@@ -171,6 +171,20 @@ class DayLinesTest(unittest.TestCase):
         )
         self.assertNotIn(session_lines.SIMPLE_SESSION_RULE, "\n".join(lines))
 
+    def test_a_rest_day_drawn_short_shows_its_title_alone(self):
+        """A session with no short line falls back to its text, but a rest day never has
+        one (DESIGN_short_messages.md §4)."""
+        day = [{"sport_type": "rest", "title": "Rest Day", "date": "2026-08-25",
+                "description": "[Rest Day]\nFull day off after this morning's long run."}]
+        title_alone = session_lines.simple_day_lines(day, "2026-08-25", descriptions=False)
+        self.assertEqual(session_lines.simple_day_lines(day, "2026-08-25", short=True), title_alone)
+        self.assertIn("Full day off", "\n".join(session_lines.simple_day_lines(day, "2026-08-25")))
+
+    def test_a_session_with_no_short_line_still_falls_back_to_its_text(self):
+        day = [{"sport_type": "running", "title": "Easy run", "date": "2026-08-25",
+                "description": "Conversational pace."}]
+        lines = session_lines.simple_day_lines(day, "2026-08-25", short=True)
+        self.assertIn("Conversational pace.", "\n".join(lines))
 
     def _today(self, verdicts=None):
         return session_lines.simple_day_lines(

@@ -63,6 +63,9 @@ class Kind:
     # next `confirmation-days` mornings. The cut-short question takes the mark too
     # (DESIGN_chat_questions.md §2, §8 choice 18).
     confirmation: bool = False
+    # Asked once: left unanswered until the next morning, it closes without a word. "Not now"
+    # still brings it back (DESIGN_cycle_retrospective.md §4).
+    asked_once: bool = False
     # The answer whose tap starts a long run, by its position, and which long run, as
     # `chat/routing.py` names them. The bot runs that tap beside the chat
     # (DESIGN_long_runs_beside_chat.md §6).

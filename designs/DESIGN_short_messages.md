@@ -183,6 +183,10 @@ over.
 no button. That is every session written before this design lands, until a planner next
 writes it. There is no backfill (§13, D4).
 
+Amended 2026-10-30: a rest day has no short line by design (§7), so falling back would show its
+long text for good. In the short form it shows its title alone. The second athlete read a
+43-word "Rest Day" on 30 October, whose "this morning's long run" was a day out of date.
+
 **`workout show` of one day prints the long text** (§13, D7). `workout show` prints each
 session's detail, and today that always includes the full description. The new rule:
 

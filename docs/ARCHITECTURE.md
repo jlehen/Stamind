@@ -1592,8 +1592,8 @@ in the morning routine and inside `goal_archive`, through
 §5) fills a blank record once it is due, seven days after its end: it refreshes Garmin,
 computes the numbers and calls the retrospective writer (`coach/engine/retrospective.py`),
 one record per run. The question (`stamind/retrospective_question.py`, §4) is queued when
-the record is created, and an answer runs the writer at once. The record of a plan covers
-its mesocycle records (§6). `plan generate`'s prompt is the only reader (§7); `plan show
+the record is created and asked once, and an answer runs the writer at once. The record of a
+plan covers its mesocycle records (§6). `plan generate`'s prompt is the only reader (§7); `plan show
 -vv` and `plan retrospective` show the records (§8), and `plan retro redo` is §9.
 
 ---

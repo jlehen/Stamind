@@ -119,12 +119,13 @@ def simple_day_lines(
 
 def _session_text(w: Dict[str, Any], short: bool, fall_back: bool) -> str:
     """The description, or in the short form the short line, falling back to the description
-    for a session that has none unless `fall_back` is off."""
+    for a session that has none unless `fall_back` is off. A rest day never has a short line
+    and never falls back: its title says it all (DESIGN_short_messages.md §4)."""
     description = (w.get("description") or "").strip()
     if not short:
         return description
     summary = (w.get("summary") or "").strip()
-    if summary or not fall_back:
+    if summary or not fall_back or canonical_sport(w.get("sport_type")) == "rest":
         return summary
     return description
 

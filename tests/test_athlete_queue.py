@@ -829,6 +829,21 @@ class RetrospectiveQuestionTest(_QueueCase):
         self.assertEqual((record["athlete_words"], record["body"]), ("felt fresh", None))
         self.assertTrue(cycle_records.is_due(record, today_str()))
 
+    def test_it_is_asked_once_and_closes_the_next_morning(self):
+        item = self._question()
+        test_db.mark_queue_sent(item["id"], self.now)
+        self.assertEqual([i["id"] for i in athlete_queue.line()], [item["id"]])
+        self.now += timedelta(days=1)
+        self.assertEqual(athlete_queue.line(), [])
+        self.assertEqual(self.item(item["id"])["outcome"], athlete_queue.STALE)
+
+    def test_not_now_brings_it_back_the_next_morning(self):
+        item = self._question()
+        test_db.mark_queue_sent(item["id"], self.now)
+        test_db.set_queue_ready(item["id"], self.now + timedelta(hours=1))
+        self.now += timedelta(days=1)
+        self.assertEqual([i["id"] for i in athlete_queue.line()], [item["id"]])
+
     def test_nothing_to_say_leaves_the_record_to_wait_its_seven_days(self):
         item = self._question()
         athlete_queue.act(item, athlete_queue.DROP)

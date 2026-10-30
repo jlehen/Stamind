@@ -239,6 +239,14 @@ The question goes stale when its record is removed, and seven days after the end
 record. So a question left unanswered for seven days leaves the queue. The operator can still
 add the athlete's words afterwards (§9).
 
+Amended 2026-10-30: the question is asked once. It is Sunday 25 October and it goes out with
+the morning message. If the athlete has not tapped by Monday's morning time, it closes without a
+word, and the record waits its seven days as one with "nothing to say" does. "Not now" still
+brings it back. Before this it went out on six days in a row, and it was still open after the
+athlete had replied twice in words: a typed reply is not an answer (DESIGN_athlete_queue.md
+§6.3), so both went to `workout adapt`. Not handled: those typed words do not reach the record; the
+operator can add them with `plan retro redo ID --words`.
+
 ### One question at the end of a plan
 
 The last mesocycle of a plan and the plan itself end on the same day. Only the question about
