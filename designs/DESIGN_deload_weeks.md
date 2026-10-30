@@ -1,6 +1,7 @@
 # Design: Deload weeks the plan dates
 
-**Status:** Proposed · **Date:** 2026-10-19 · **Branch:** worktree-deload-weeks-design
+**Status:** Proposed, five choices ruled 2026-10-30 (§7), not built · **Date:** 2026-10-19 ·
+**Branch:** worktree-deload-weeks-design
 
 A **deload** is a lighter recovery week: it cuts volume much more than intensity, so the
 fatigue of the loading weeks before it clears (`stamind/science/periodization.md`). Today a
@@ -159,17 +160,25 @@ gives it one.
 ### 3.4 Checking what came back
 
 `plan_apply` already repairs the mesocycle dates the model returned
-(`db/periodization.py::repair_mesocycle_contiguity`) and prints a note for each repair. The
-same pass drops a deload whose first day is not a `YYYY-MM-DD` date inside its mesocycle,
-once the mesocycle's dates are repaired, and prints a note in the same form:
+(`db/periodization.py::repair_mesocycle_contiguity`) and prints a note for each repair.
+
+When the pass moves a mesocycle's start later, a deload whose first day the new start
+overtook moves to the new start, and the move's note says so. The race is on Sunday 25
+October. The model writes a Recovery mesocycle from that same Sunday, with its deload from
+25 October. The pass moves Recovery's start to Monday 26 October, and the deload's first day
+moves with it, so the week after the race stays a deload.
+
+The pass then drops a deload whose first day is not a `YYYY-MM-DD` date inside its mesocycle,
+and prints a note in the same form:
 
 ```
 Note: mesocycle dates repaired — dropped the deload of 'HIIT Block 1' (from 2026-11-10): it
 starts after the mesocycle, which ends 2026-11-08.
 ```
 
-A dropped deload is not moved. A deload the model put outside its mesocycle is a guess about
-the model's intent, and the note lets the athlete run `plan generate` again.
+A first day the model itself wrote outside its mesocycle is not moved. It is a guess about
+the model's intent, and a mistyped year must not turn a whole loading mesocycle into a
+deload. The note lets the athlete run `plan generate` again.
 
 ## 4. Where the date lives and who reads it
 
@@ -178,7 +187,7 @@ the model's intent, and the note lets the athlete run `plan generate` again.
 `mesocycles` gains one column, `deload_start`, TEXT `YYYY-MM-DD`. NULL means the mesocycle
 has no deload. Otherwise the deload runs from `deload_start` to the mesocycle's `end_date`.
 
-The schema is CREATE-only (ARCHITECTURE.md §5), so `SCHEMA_VERSION` goes to 29, and the
+The schema is CREATE-only (ARCHITECTURE.md §5), so `SCHEMA_VERSION` goes to 30, and the
 column reaches an existing database through the one-off `scripts/migrate_calendar_columns.py`.
 Its `COLUMNS` list already adds `mesocycles.summary`, and gains `mesocycles.deload_start`. It
 adds only the columns that are missing, ignores the version stamp and calls no model.
@@ -317,11 +326,15 @@ The page is published through the Pages deploy, which needs a push the author ap
 
 ## 7. Choices made without asking
 
+The author ruled on choices 2, 4, 5, 11 and 12 on 2026-10-30, and each says so. The others
+stand as written until the author says otherwise.
+
 1. **At most one deload per mesocycle.** This matches the usual definition: a mesocycle is a
    run of loading weeks closed by its recovery week. A long base phase with two deloads
    becomes two mesocycles. The other way is a list of deloads per mesocycle, which costs a
    little more in every place that reads the dates.
 2. **One date column, `deload_start`, and the deload runs to the mesocycle's last day.**
+   *Ruled by the author: one date.*
    *Changed by the review:* the first version stored a first and a last day, which could also
    hold a deload in the middle of a mesocycle. Choices 1 and 11 already ask for the deload at
    the end, and one column makes that the only shape the data can hold. It removes a column,
@@ -336,30 +349,25 @@ The page is published through the Pages deploy, which needs a push the author ap
    today started on a Thursday.
 3. **Only `plan generate` writes the date.** No code guesses a deload from the load or from a
    mesocycle's name, and old plans are not backfilled.
-4. **A deload whose first day falls outside its mesocycle is dropped with a note**, not moved
-   (§3.4). *An objection from the review* proposed clipping a deload that overran its
-   mesocycle, since the note prints only after the athlete has answered yes to "Apply?". With
-   one column a deload cannot overrun its mesocycle's end, so there is nothing left to clip.
-   *Objection from the second review:* the repair pass can still move a mesocycle's start
-   past its deload's first day. A Recovery mesocycle written from Sunday 25 October, the race
-   mesocycle's last day, has its start moved to Monday 26 October, and its deload from 25
-   October is dropped: the week after the race is told it has no deload. Moving the deload's
-   first day with the start keeps the week a deload, at the cost of one assignment in the
-   branch of the repair pass that moves a start. If taken, §3.4 reads: "When the same pass
-   moves a mesocycle's start later, a deload that began before the new start moves to it,
-   and the move's note says so. The pass then drops a deload whose first day is not a
-   `YYYY-MM-DD` date inside its mesocycle, and prints a note in the same form." *Narrowed by
-   a later review pass:* only a first day the repair pass overtook moves. A first day the model
-   wrote before its own mesocycle's start is still dropped, so a mistyped date cannot turn a
-   whole loading mesocycle into a deload. §10's first bullet and the DOMAIN_MODEL.md
-   invariant in §8 follow the same wording.
+4. **A deload whose first day the model wrote outside its mesocycle is dropped with a note,
+   and one the date repair overtook moves with the new start** (§3.4). *Ruled by the author:
+   the objection is taken.* The first version dropped both. The repair pass can move a
+   mesocycle's start past its deload's first day. A Recovery mesocycle written from Sunday 25
+   October, the race mesocycle's last day, has its start moved to Monday 26 October, and its
+   deload from 25 October would be dropped: the week after the race would be told it has no
+   deload. Moving the first day costs one assignment in the branch of the repair pass that
+   moves a start. Only a first day the repair pass overtook moves, so a mistyped date cannot
+   turn a whole loading mesocycle into a deload. An earlier objection proposed clipping a
+   deload that overran its mesocycle. With one column a deload cannot overrun its
+   mesocycle's end, so there is nothing to clip.
 5. **The deload of the mesocycle under way can be re-dated by a replan only before it
-   starts** (§3.3), even though its name, start date and focus are kept. *Narrowed by the
-   review:* the first version let a replan move a deload that had already started, which
-   could erase half a deload the athlete was in. A started deload stays, in the prompt and in
-   code. *Changed by the second review:* a kept mesocycle may end earlier than its original
-   end date to bring its deload forward. With one date column this is the only way a replan
-   can bring the deload of the mesocycle under way forward.
+   starts** (§3.3), even though its name, start date and focus are kept. *Ruled by the
+   author: both rules, the started deload stays and the mesocycle may end earlier.*
+   *Narrowed by the review:* the first version let a replan move a deload that had already
+   started, which could erase half a deload the athlete was in. A started deload stays, in
+   the prompt and in code. *Changed by the second review:* a kept mesocycle may end earlier
+   than its original end date to bring its deload forward. With one date column this is the
+   only way a replan can bring the deload of the mesocycle under way forward.
 6. **A paler strip, at 40% opacity, not a new tint.** The tint already means "how did this
    session go". A dashed strip would be easier for colour-blind readers, but the author asked
    for a colour.
@@ -374,13 +382,15 @@ The page is published through the Pages deploy, which needs a push the author ap
 10. **The heavier-and-lighter clause moves into the guideline** (§3.1), since the counting now
     happens in `plan generate` and the week planner's guess is deleted.
 11. **A deload closes its mesocycle** (§2): when the count brings a deload forward, the count
-    moves the boundary, not the deload. Added by the review, and held by the data since
-    choice 2 changed. The other way is to allow a deload anywhere and move the boundary
-    fitness test to the deload's last day. That changes BENCHMARK PLACEMENT, the warning for
-    a boundary week without a test, DESIGN_benchmark_workouts.md and
+    moves the boundary, not the deload. *Settled by the author's ruling on choice 2:* one date
+    can hold no other shape. Added by the review. The other way is to allow a deload anywhere
+    and move the boundary fitness test to the deload's last day. That changes BENCHMARK
+    PLACEMENT, the warning for a boundary week without a test, DESIGN_benchmark_workouts.md and
     DESIGN_mesocycle_progress.md §4.1.
 12. **A past deload keeps its paler strip only while the plan version that dated it is
-    active.** Added by the second review. The calendar draws only active plan versions
+    active.** *Ruled by the author: left out of this design.* The other way below fixes every
+    past strip, so it would be a small change of its own. Added by the second review. The
+    calendar draws only active plan versions
     (`db/mesocycles.py::_get_covering_mesocycles`), so every `plan generate`, step 7 on the
     build day included, takes the strip off the days before the new plan, as it does for
     every strip today. When the replan keeps the mesocycle under way, the strip goes up to the
@@ -413,7 +423,8 @@ Applied in the build commit, so no document describes behaviour the code does no
 - **docs/DOMAIN_MODEL.md.** The mesocycle field table gains `deload_start`, and "five
   meaningful columns" loses its number, which is already wrong. The list "Enforced by the
   code" gains: "A deload's first day lies inside its mesocycle, and the deload runs to the
-  mesocycle's end; `plan_apply` drops one that does not fit, and prints a note." The sentence
+  mesocycle's end; `plan_apply` moves a first day the date repair overtook, drops any other
+  that does not fit, and prints a note." The sentence
   "There is no stored load target, no weekly hours, no intensity distribution, no deload
   flag" loses "no deload flag", and the next one says a mesocycle states what it is for and,
   when it has one, the first day of its deload. The line that says the alternation is one
@@ -446,8 +457,9 @@ DESIGN_plan_change_continuity.md.
 
 ## 10. Tests
 
-- The repair pass drops a deload whose first day is outside its mesocycle or is not a
-  `YYYY-MM-DD` date, and names it in its note.
+- The repair pass moves a deload's first day when it moves the mesocycle's start past it, and
+  says so in its note. It drops a first day the model wrote outside its mesocycle, or one that
+  is not a `YYYY-MM-DD` date, and names it in its note.
 - `save_macrocycle` stores the date, and the mesocycle reads back with it.
 - `plan_generate` copies a started deload's first day and its mesocycle's end date back onto
   the kept mesocycle, and leaves a deload still ahead as the model returned it.
