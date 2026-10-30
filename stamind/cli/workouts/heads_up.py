@@ -40,6 +40,22 @@ def newest_written() -> int:
     return newest["id"] if newest else 0
 
 
+# What a terminal run says when a session was written while it asked: it writes nothing
+# (DESIGN_long_runs_beside_chat.md §3).
+WEEK_CHANGED_LINE = (
+    "Your week changed while I was thinking. Tell me again if you still want a change."
+)
+
+
+def week_changed(written_upto: int) -> bool:
+    """Whether a session was written since `written_upto`, saying so when it was. A terminal
+    run calls it under the week lock, just before it writes what it asked about (§3)."""
+    if newest_written() == written_upto:
+        return False
+    print(f"\n{WEEK_CHANGED_LINE}")
+    return True
+
+
 def _reaches(change_id: int, window: Window) -> bool:
     """Whether the run about to start writes any day the change wrote (§5).
 

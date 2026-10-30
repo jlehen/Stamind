@@ -151,23 +151,36 @@ def short_text(proposal: RevisionProposal, opening: Optional[str] = None) -> str
     return "\n\n".join(parts)
 
 
+def _before(existing: Optional[dict], text: str, passages: List[str]) -> str:
+    """The whole text of the session a card replaces, "" when the passages already show what
+    changed or it reads the same (§6.2)."""
+    if not existing or passages:
+        return ""
+    before = (existing.get('description') or '').strip()
+    return "" if before == text else before
+
+
 def page_content(proposal: RevisionProposal) -> Dict[str, Any]:
     """What the details page shows of the proposal (§6.2): the summary, then one card per
     changed session in date order. A card is the session's line and what it replaces, its
-    own reason, the changed passages when only its text changed, and its whole new text,
-    shown open when there is no passage to read first."""
+    own reason, the changed passages when only its text changed, its whole new text, shown
+    open when there is no passage to read first, and the whole text of what it replaces or
+    drops."""
     today = _today_str()
     cards = []
     for pair in proposal.pairs:
         pw, existing = pair.proposal, pair.original
+        text = (pw.get('description') or '').strip()
         passages = _quotes(pw, existing) if rewritten_text_only(pw, existing) else []
         cards.append((pw['date'], {
             "line": _heading(pw, existing, today), "why": _own_reason(pw, proposal),
-            "passages": passages, "text": (pw.get('description') or '').strip(),
+            "passages": passages, "text": text, "before": _before(existing, text, passages),
             "open": not passages,
         }))
     for ew in proposal.removals:
-        cards.append((ew['date'], {"line": _dropped(ew, today)}))
+        cards.append((ew['date'], {
+            "line": _dropped(ew, today), "text": (ew.get('description') or '').strip(),
+        }))
     return {
         "summary": (proposal.reason or '').strip(),
         "cards": [card for _, card in sorted(cards, key=lambda entry: entry[0])],

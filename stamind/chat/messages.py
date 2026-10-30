@@ -247,10 +247,10 @@ class MessagesMixin:
         "Finish".
 
         The calendar's day runs `workout show -d <day>`, which prints one day in full
-        (DESIGN_calendar_miniapp.md §6, DESIGN_short_messages.md §4); the why runs `plan show` (§3.7). The log is written
-        to a file and handed to `strength ingest`, whose summary streams back the way every
-        command's output does. The bot never reads the log itself: every write goes through
-        the CLI (DESIGN_gym_logger.md §6)."""
+        (DESIGN_calendar_miniapp.md §6, DESIGN_short_messages.md §4); the why runs `plan
+        show` (§3.7). The log is written to a file and handed to `strength ingest`, whose
+        summary streams back the way every command's output does. The bot never reads the log
+        itself: every write goes through the CLI (DESIGN_gym_logger.md §6)."""
         message = update.effective_message
         chat = update.effective_chat
         if message is None or chat is None or message.web_app_data is None:

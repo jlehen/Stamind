@@ -191,8 +191,7 @@ long text for good. In the short form it shows its title alone. The second athle
 session's detail, and today that always includes the full description. The new rule:
 
 - When every session shown falls on one day, it prints the full description, as today.
-- When the sessions span several days, it prints the short line in its place. `workout
-  show` with no argument details seven days, so it is short.
+- When the sessions span several days, it prints the short line in its place.
 - With `-H`, which adds each session's earlier forms, it prints the short line even for one
   day. The earlier forms print as today; their text is the one the Google Calendar event's
   history carries.
@@ -250,6 +249,11 @@ so it can sit under the briefing without bringing a second question. The athlete
 read today's session in full, as planned, before she answers the proposal under it. The
 proposal's own "Tell me more" shows what would change.
 
+When the proposal changes today, no briefing is drawn above it (amended 2026-10-20,
+DESIGN_waiting_proposal.md §5), so no day's "Tell me more" either. Today as planned is then
+on the proposal's page: today's card holds, folded, the session the proposal replaces or
+drops (§6.2, D15).
+
 ## 6. The page
 
 One new page, `details`, with two forms. It is read-only: it has no button that sends
@@ -290,6 +294,9 @@ shows the summary, then one card per changed session, in date order. A card hold
   and "Now" pairs (DESIGN_workout_revisions.md §9.1);
 - the whole new description, folded, and opened by a tap. For a session that is new or has
   a new title, it is shown open, because no "Was" and "Now" pair exists for it.
+- the whole text of the session it replaces, folded under "As planned before" (D15). A card
+  whose "Was" and "Now" pairs already show the change has none. The card of a session the
+  proposal drops holds that session's whole text, under "The whole session".
 
 The last point closes a gap of today. On 4 October the summary named a "breach rule". The
 rule was defined in Saturday's new description. Saturday had a new title, so the long
@@ -446,7 +453,8 @@ did not hold, and the prompt is where it is fixed.
 | `stamind/coach/engine/generate.py`, `adapt.py` | the fields of §7 in `## RESPONSE FORMAT` |
 | `stamind/coach/revisions.py` | `structure_revision` keeps `summary` and the change line. It drops, without a word, any field it does not name |
 | `stamind/strength/planner_prompt.py`, `planner.py` | `summary` and `change` in the strength planner's answer; `_keep` copies the live session's short line, which nothing else carries over (§7) |
-| `stamind/cli/render/session_lines.py` | the short form of `simple_day_lines` (§4); the short list of a proposal |
+| `stamind/cli/render/session_lines.py` | the short form of `simple_day_lines` (§4) |
+| `stamind/cli/render/proposal_lines.py` | the proposal's short list and short text, and the proposal file's content |
 | `stamind/cli/render/companion.py` | a requested day (§4); the proposal's short text |
 | `stamind/cli/workouts/proposal.py` | what the saved proposal keeps (§3); the item's message |
 | `stamind/cli/queue.py` | `send_alone` prints the long text in a terminal only; the row under today's sessions after "Change it" |
@@ -456,8 +464,6 @@ did not hold, and the prompt is where it is fixed.
 | `stamind/sentinels.py`, `stamind/chat/keyboards.py`, `replies.py`, `callbacks.py`, `telegram_api.py` | the page button (§5) |
 | `stamind/chat/messages.py` | "💬 Full day in chat" runs `workout show -d <day>` |
 | `stamind/page_files/sync.py` | the `proposal` file, first in the upload step; the one function that makes a "Tell me more" button (§5), beside `button_params` |
-| `stamind/cli/render/__init__.py`, `companion.py`, `stamind/runtime.py` | `make_renderer` moves (build step 2) |
-| `stamind/cli/render/` | a small module that builds the proposal file's content |
 | `miniapp/details.html`, `details.js` | the page of §6, over `storage.js` and `calendar_logic.js` |
 | `stamind/settings.py`, `stamind/cli/bot/capture.py`, `stamind/chat/routing.py`, `stamind/coach/service/adapt.py`, `stamind/coach/service/generate.py`, `stamind/coach/engine/`, `stamind/cli/workouts/revisions.py` | `terse` and `quotes_wording` go, with every reader of the setting |
 | `docs/ARCHITECTURE.md` | the bot section, the pages, the schema, and the `workout list` / `workout show` rows of the command reference (`-l` becomes `--long`, `--link` moves to `-L`, `-s` arrives) |
@@ -535,6 +541,12 @@ He kept all four as built on 2026-10-27.
 | D13 | The page's words | The page is titled "In full". The fold that holds a session's whole text is "The whole session". |
 | D14 | A day the Calendar does not reach | Only the months the Calendar shows are uploaded, about four weeks back and six ahead. A later day's "Tell me more" opens a page that says the details could not be loaded. Not handled. |
 
+The author ruled on this on 2026-10-30, after a code review of the build.
+
+| ID | Topic | Ruling |
+|---|---|---|
+| D15 | A morning whose proposal changes today | No briefing stands above that proposal, so D8 is kept on the proposal's page: each card holds, folded, the whole text of the session it replaces or drops. |
+
 ## 14. Decided without asking the author
 
 The interview had seven minutes. These choices were made after it, by Claude, to make the
@@ -575,11 +587,9 @@ A choice the author overruled keeps its row, with the ruling beside it.
 
 ## 15. Not verified
 
-- **That a button under a message can open a page in the bot's chat**, with the page's
-  address intact after the `#`. Telegram documents such buttons for a private chat with a
-  bot. It was not tried on a phone. Neither was how long an address such a button accepts;
-  ours is about 150 characters after the page's own. Both are step 0 of the build order,
-  the way DESIGN_calendar_miniapp.md §8 measured the keyboard's limit first.
+- ~~That a button under a message can open a page in the bot's chat~~, with the page's
+  address intact after the `#`. Verified on a phone on 2026-10-21 (step 0): a button with
+  an address of about 205 characters opened the Calendar.
 - **That the planners hold the new limits**, and that their short lines say what matters.
   One replay of the 4 October exchange with a plainer prompt still wrote 70 words against
   60.
@@ -605,6 +615,7 @@ A choice the author overruled keeps its row, with the ruling beside it.
 | D12 | A removed session's line | "🚴 Fri 09 · removed", with the session's own emoji. | Chosen in the build; the author kept it. | Build | 2026-10-27 |
 | D13 | The page's words | Titled "In full", with the fold "The whole session". | Chosen in the build; the author kept it. | Build | 2026-10-27 |
 | D14 | A day the Calendar does not reach | Its page says the details could not be loaded. Not handled. | Chosen in the build; the author kept it. | Build | 2026-10-27 |
+| D15 | Today as planned, under a proposal that changes it | Each card on the proposal's page holds, folded, the whole text of the session it replaces or drops. | The author's ruling after the code review. With no briefing above such a proposal, it keeps D8: she reads what she gives up before she answers. | Review | 2026-10-30 |
 
 ## Dependency Graph & Implementation Order
 
@@ -628,12 +639,7 @@ Each step from 1 on works on its own, and each can be landed alone.
 2. **The short proposal, with its page** (§3, §5, §6.2, §7): `change`; the two-sentence
    `reason`; the short text and the question as one message; the "Tell me more" page button;
    `details` with its proposal form; the `proposal` file; the upload before a button.
-   First, `make_renderer` moves out of `cli/render/__init__.py` into `companion.py`. Today
-   `page_files/sync.py` imports `cli/render`, whose `__init__.py` loads both renderers, and
-   `expert.py` loads `cli/queue.py` and `cli/workouts/listing.py`. So of the files that
-   print these rows, only `cli/bot/views.py` can import `page_files.sync` until that move;
-   `cli/render/companion.py` and `cli/queue.py` sit inside that circle, and so does
-   `cli/workouts/proposal.py`. Proposals come first because they are 54% of the words. The
+   Proposals come first because they are 54% of the words. The
    page shows the "Was" and "Now" pairs whatever `terse` says.
 3. **`terse` is removed** (§8), straight after step 2. From then on the setting would
    switch nothing the athlete can see.

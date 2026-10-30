@@ -11,8 +11,10 @@ from unittest.mock import patch
 from tests.helpers import (
     clear_all_tables, listing_row, run_cli, rebind_test_db, save_workout,
 )
+from stamind.cli.workouts.heads_up import WEEK_CHANGED_LINE
 from stamind.clock import fmt_date
 from stamind.coach.proposals import RevisionProposal, GenerateProposal
+from stamind.coach.revisions import pair_revisions
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_cli_workouts_generate.db")
@@ -284,6 +286,43 @@ class TestCliWorkoutsGenerate(unittest.TestCase):
             ["workout", "generate", "--strength-only", "--fresh", "-f"]
         )
         self.assertNotEqual(exit_code, 0)
+
+    @patch("stamind.cli.workouts.generate.ensure_recent_data")
+    @patch("stamind.runtime.prompt")
+    @patch("stamind.runtime.coach_service")
+    def test_a_session_written_while_the_terminal_asks_makes_yes_write_nothing(
+        self, mock_coach, mock_prompt, _ensure
+    ):
+        """A terminal lets go of the week while it asks. A tap in the chat moves a run
+        meanwhile, and "yes" then writes nothing (DESIGN_long_runs_beside_chat.md §3)."""
+        later = (datetime.now(timezone.utc).date() + timedelta(days=2)).strftime("%Y-%m-%d")
+        taps = []
+
+        def tap_meanwhile(*_args, **_kwargs):
+            taps.append(1)
+            save_workout(test_db, later, "running", "Moved run", duration_minutes=40 + len(taps))
+            return True
+
+        mock_prompt.confirm.side_effect = tap_meanwhile
+        mock_coach.workout_generate.return_value = _proposal()
+        _code, stdout, _ = self.run_cli(["workout", "generate"])
+        self.assertIn(WEEK_CHANGED_LINE, stdout)
+        mock_coach.workout_generate_apply.assert_not_called()
+
+        save_workout(test_db, PROPOSED_DATE, "strength_training", "Gym",
+                     description="[Gym]\nHeavy full-body.")
+        gym = {"date": PROPOSED_DATE, "sport_type": "strength_training", "title": "Gym",
+               "description": "[Gym]\nSquat 5x5.", "duration_minutes": 45}
+        pairs, removals = pair_revisions(
+            [gym], test_db.get_workouts(start_date=PROPOSED_DATE, end_date=PROPOSED_DATE)
+        )
+        mock_coach.workout_generate_strength.return_value = RevisionProposal(
+            reason="Fresh lifts.", workouts=[gym], range_start=PROPOSED_DATE,
+            range_end=PROPOSED_DATE, pairs=pairs, removals=removals,
+        )
+        _code, stdout, _ = self.run_cli(["workout", "generate", "-d", "today..", "--strength-only"])
+        self.assertIn(WEEK_CHANGED_LINE, stdout)
+        mock_coach.workout_revision_apply.assert_not_called()
 
     @patch("stamind.cli.workouts.generate.ensure_recent_data")
     @patch("stamind.runtime.prompt")

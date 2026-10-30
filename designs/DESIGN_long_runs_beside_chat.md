@@ -113,8 +113,13 @@ session was written meanwhile: "Your week changed while I was thinking. Tell me 
 still want a change." The kernel lets go of the lock of a process that ends, so a run that
 dies holds nothing.
 
-Not handled: a terminal `workout generate` writes what it previewed even when a session was
-written while it asked, as before.
+Every terminal run checks this the same way: `workout adapt`, `workout tweak`, `workout
+generate` and its `--strength-only` (amended 2026-10-30, `heads_up.week_changed`). Before,
+`workout generate --strength-only` wrote what it previewed. A tap that moved a gym session
+while it asked left that session on two days.
+
+Not handled: a tap that waits for the lock holds the chat's own place while it waits. A
+message, or "✅ Done lately", sent in that minute gets "A command is still running."
 
 ## 4. `workout generate` from its button
 

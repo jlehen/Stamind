@@ -29,7 +29,7 @@ from stamind.cli.queue import send_alone, send_own_questions
 from stamind.cli.runway import current_runway, plan_is_behind
 from stamind.cli.workouts import cut_short, proposal as saved_proposal
 from stamind.cli.workouts.heads_up import (
-    Window, newest_written, print_send_notice, replacing_unsent, revision_dates,
+    Window, newest_written, print_send_notice, replacing_unsent, revision_dates, week_changed,
 )
 
 
@@ -93,13 +93,6 @@ def run_workout_tweak(args: argparse.Namespace) -> None:
         _adapt(args, tweak=True)
 
 
-# What a terminal run says when a session was written while it asked: it writes nothing
-# (DESIGN_long_runs_beside_chat.md §3).
-WEEK_CHANGED_LINE = (
-    "Your week changed while I was thinking. Tell me again if you still want a change."
-)
-
-
 def _confirm_candidates(proposal, date_str: str, message: Optional[str]) -> None:
     """On a terminal, asks about each constraint and each daily signal the note produced
     (DESIGN_constraints.md §8, DESIGN_signal_extraction.md §2). The same call that wrote
@@ -159,8 +152,7 @@ def _settle(
     # A terminal let go of the week while it asked (`_adapt`), so a session may have been
     # written meanwhile (DESIGN_long_runs_beside_chat.md §3).
     with runtime.db.week_lock():
-        if newest_written() != written_upto:
-            print(f"\n{WEEK_CHANGED_LINE}")
+        if week_changed(written_upto):
             return
         step("\nApplying adaptations...")
         runtime.coach_service.workout_revision_apply(proposal)

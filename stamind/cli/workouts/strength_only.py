@@ -6,7 +6,9 @@ from typing import Optional, Tuple
 from stamind import runtime
 from stamind.cli.runway import schedule_coverage
 from stamind.cli.windows import resolve_window
-from stamind.cli.workouts.heads_up import print_send_notice, revision_dates
+from stamind.cli.workouts.heads_up import (
+    newest_written, print_send_notice, revision_dates, week_changed,
+)
 from stamind.sports import canonical_sport
 from stamind.text import cmd, green, red, wrap_text
 from stamind.output import notice, step
@@ -54,9 +56,10 @@ def generate_strength_only(
         return
 
     step("Asking the strength planner to write the strength sessions again...")
-    # One run at a time; a terminal asks next, so it lets go, and the write takes the lock
-    # again (DESIGN_long_runs_beside_chat.md §3).
+    # One run at a time; a terminal asks next, so it lets go, and writes nothing if a session
+    # was written meanwhile (DESIGN_long_runs_beside_chat.md §3).
     with runtime.db.week_lock():
+        written_upto = newest_written()
         proposal = runtime.coach_service.workout_generate_strength(start, end)
     runtime.render.adapt_reason(proposal.reason)
     if not proposal.workouts:
@@ -68,7 +71,10 @@ def generate_strength_only(
     if not (force or runtime.prompt.confirm("Apply these changes?")):
         notice(f"Workouts discarded{unchanged}")
         return
-    runtime.coach_service.workout_revision_apply(proposal)
+    with runtime.db.week_lock():
+        if week_changed(written_upto):
+            return
+        runtime.coach_service.workout_revision_apply(proposal)
     print(green(
         f"\nWrote {len(proposal.workouts)} strength session(s) again. Run "
         f"{cmd('workout rollback')} to undo it."

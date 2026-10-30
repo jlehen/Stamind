@@ -308,6 +308,23 @@ class CallbackHandlerTest(unittest.IsolatedAsyncioTestCase):
         # A row under the briefing holds nothing else, so the message loses its keyboard.
         self.assertEqual(query.markups, [None])
 
+    async def test_got_it_leaves_tell_me_more_under_its_message(self):
+        """A page button stays under its message whatever is tapped beside it
+        (DESIGN_short_messages.md §5)."""
+        chat_bot = build_chat_bot(self)
+        chat_bot.ui_actions[42] = ("tok", [{"label": "👍 Got it", "ack": "Nice"}])
+        data = keyboards.ui_callback_data("tok", "0")
+        url = "https://x/details.html#d=2026-10-20"
+        markup = SimpleNamespace(inline_keyboard=[
+            [SimpleNamespace(text="👍 Got it", callback_data=data)],
+            [SimpleNamespace(text="🔎 Tell me more", web_app=SimpleNamespace(url=url))],
+        ])
+        query = _FakeQuery(data, text="🚴 Today: Intervals", markup=markup)
+        await chat_bot.on_callback(callback_update(query), None)
+        self.assertEqual(query.markups,
+                         [[[("🔎 Tell me more", telegram_api.PAGE_CELL + url)]]])
+        self.assertEqual(chat_bot.bot.texts(), ["Nice"])
+
     async def test_a_tap_on_a_row_a_newer_one_replaced_says_the_offer_expired(self):
         """§12.3: the message behind a retired offer was already consumed, so silence
         would lose it twice."""

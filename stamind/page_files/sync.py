@@ -223,7 +223,7 @@ def _upload_changes(dbh, where: Target) -> int:
         if not _upload(dbh, where, remote, label, files[label], left):
             continue
         count += 1
-        if label not in (INDEX, PLAN):
+        if label not in (INDEX, PLAN, PROPOSAL):
             calendar_uploaded = True
     return count
 

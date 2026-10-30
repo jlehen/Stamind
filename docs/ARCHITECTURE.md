@@ -468,8 +468,8 @@ training data, so a wipe leaves them alone.
 - `db.week_lock()` is one look at the week at a time, across processes: a `flock` on
   `<database>.week-lock`, re-entrant in a process, held by `workout_change`, by every run of
   the week planner from reading the week to saving its answer (a terminal lets go before it
-  asks), and by a tap on a proposal; the scheduler counts it as busy (`week_busy`)
-  (DESIGN_long_runs_beside_chat.md §3).
+  asks, then writes nothing if `heads_up.week_changed`), and by a tap on a proposal; the
+  scheduler counts it as busy (`week_busy`) (DESIGN_long_runs_beside_chat.md §3).
 - `rollback_to_change(change_id, from_date)` is the **one** undo primitive, point in time:
   it reverts that change and every change after it, per slot rather than per lineage (its
   docstring says why), with `from_date` as the floor. `workout rollback`, `plan rollback`

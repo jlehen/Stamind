@@ -13,7 +13,8 @@ it through `Database` would stamp the new version first and leave the columns mi
 
 It operates on the instance named by `STAMIND_CONFIG`, or on the default config when that
 variable is unset (ARCHITECTURE.md §9). Run it once per athlete, from the repository root,
-before the bots restart on the new code:
+before main moves to the new code: the bot runs each command from the checkout, so the new
+code is live without a restart.
 
     venv/bin/python scripts/migrate_calendar_columns.py
     STAMIND_CONFIG=piupiu/config_piupiu.yaml venv/bin/python scripts/migrate_calendar_columns.py

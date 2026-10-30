@@ -25,9 +25,17 @@ function element(tag, className, text) {
   return node;
 }
 
+function fold(label, text, open) {
+  const box = element("details", "card-text");
+  box.open = Boolean(open);
+  box.append(element("summary", "", label));
+  box.append(element("p", "line", text));
+  return box;
+}
+
 function card(found) {
-  // A changed session: its line, its own reason, the passages that changed, and its whole
-  // text, folded unless no passage stands before it (§6.2).
+  // A changed session: its line, its own reason, the passages that changed, its whole text,
+  // folded unless no passage stands before it, and the session it replaces, folded (§6.2).
   const box = element("section", "card");
   box.append(element("p", "line card-line", found.line));
   if (found.why) {
@@ -37,11 +45,10 @@ function card(found) {
     box.append(element("p", "line passage", passage));
   }
   if (found.text) {
-    const fold = element("details", "card-text");
-    fold.open = Boolean(found.open);
-    fold.append(element("summary", "", "The whole session"));
-    fold.append(element("p", "line", found.text));
-    box.append(fold);
+    box.append(fold("The whole session", found.text, found.open));
+  }
+  if (found.before) {
+    box.append(fold("As planned before", found.before, false));
   }
   return box;
 }

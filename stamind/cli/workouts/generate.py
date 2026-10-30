@@ -22,7 +22,7 @@ from stamind.cli.runway import schedule_coverage
 from stamind.cli.windows import has_selector as _has_selector, resolve_window
 from stamind.cli.workouts import proposal as saved
 from stamind.cli.workouts.heads_up import (
-    generate_dates, newest_written, print_send_notice, replacing_unsent,
+    generate_dates, newest_written, print_send_notice, replacing_unsent, week_changed,
 )
 from stamind.cli.workouts.session_line import (
     prescription_lines, print_marker_legend, session_table,
@@ -396,9 +396,10 @@ def _generate(
         notice(f"Workout generation cancelled{unchanged}")
         return
 
-    # One run of the week planner at a time; a terminal asks next, so it lets go, and the
-    # write takes the lock again (DESIGN_long_runs_beside_chat.md §3).
+    # One run of the week planner at a time; a terminal asks next, so it lets go, and writes
+    # nothing if a session was written meanwhile (DESIGN_long_runs_beside_chat.md §3).
     with runtime.db.week_lock():
+        written_upto = newest_written()
         proposal = runtime.coach_service.workout_generate(
             start_date=span_start, end_date=span_end, prefer_macro_id=prefer_macro_id,
             fresh=fresh,
@@ -410,9 +411,12 @@ def _generate(
         notice(f"Workouts discarded{unchanged}")
         return
 
-    saved = runtime.coach_service.workout_generate_apply(
-        proposal, verbose=getattr(args, 'verbose', False)
-    )
+    with runtime.db.week_lock():
+        if week_changed(written_upto):
+            return
+        saved = runtime.coach_service.workout_generate_apply(
+            proposal, verbose=getattr(args, 'verbose', False)
+        )
     print(green(
         f"\nScheduled {len(saved)} workout(s) from {fmt_date(proposal.gen_start)} to "
         f"{fmt_date(proposal.gen_end)}."

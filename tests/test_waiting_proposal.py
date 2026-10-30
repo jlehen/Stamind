@@ -24,7 +24,7 @@ from stamind.cli.render import proposal_lines
 from stamind.cli.render.session_lines import sport_emoji
 from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
 from stamind.cli.workouts import proposal as saved_proposal
-from stamind.cli.workouts.adapt import WEEK_CHANGED_LINE
+from stamind.cli.workouts.heads_up import WEEK_CHANGED_LINE
 from stamind.cli.workouts.heads_up import newest_written
 from stamind.coach import picture
 from stamind.coach.proposals import RevisionProposal
@@ -201,7 +201,8 @@ class ShortProposalTest(_Case):
     def three_changes(self):
         """Thursday's ride eased with a change line, Friday's yoga removed, and on Saturday
         a new long ride the planner wrote no change line for."""
-        save_workout(test_db, FRIDAY, "yoga", "Mobility yoga", duration_minutes=25)
+        save_workout(test_db, FRIDAY, "yoga", "Mobility yoga", duration_minutes=25,
+                     description="[Mobility yoga]\n25 minutes for the hips.")
         workouts = [
             {"date": THURSDAY, "sport_type": "cycling", "title": "Easy ride",
              "description": "[Easy ride]\n60 easy minutes.", "duration_minutes": 60,
@@ -240,8 +241,12 @@ class ShortProposalTest(_Case):
         # A new title: no passage to read first, so the whole text is shown open (§6.2).
         self.assertEqual((thursday["passages"], thursday["open"]), ([], True))
         self.assertEqual(thursday["text"], "[Easy ride]\n60 easy minutes.")
+        # What she gives up is on the page too, before she answers (§6.2, D8).
+        self.assertEqual(thursday["before"], "[Intervals]\n90 minutes with intervals.")
         self.assertIn("Mobility yoga — dropped", removed["line"])
+        self.assertEqual(removed["text"], "[Mobility yoga]\n25 minutes for the hips.")
         self.assertIn("Long ride — 120 min (new)", saturday["line"])
+        self.assertEqual(saturday["before"], "")
 
     def test_a_saved_proposal_keeps_its_short_text_and_its_page(self):
         item = saved_proposal.save(self.three_changes(), newest_written())
@@ -342,6 +347,20 @@ class ShortDayTest(_Case):
         out = self.push(self.eased(day=SATURDAY))
         [row] = buttons_lines(out)
         self.assertEqual((row["buttons"], row["page"]), ([], self.page_of(THURSDAY)))
+
+    def test_where_the_pages_are_not_published_the_day_is_whole_and_has_no_button(self):
+        """D9: the briefing and "📅 Today" print the whole text, and no "Tell me more"."""
+        with patch("stamind.page_files.sync.button_params", return_value=""):
+            out = self.push(RevisionProposal(
+                reason="", workouts=[], range_start=THURSDAY, range_end=THURSDAY,
+            ))
+            _code, today, _err = run_cli(["workout", "list", "-d", "today", "--no-pull"])
+        self.assertIn("90 minutes with four intervals.", out)
+        [row] = buttons_lines(out)
+        self.assertEqual(row["buttons"][0]["label"], "👍 Got it")
+        self.assertNotIn("page", row)
+        self.assertIn("90 minutes with four intervals.", today)
+        self.assertEqual(buttons_lines(today), [])
 
     def test_today_is_short_and_workout_show_is_the_day_in_full(self):
         _code, out, _err = run_cli(["workout", "list", "-d", "today", "--no-pull"])
