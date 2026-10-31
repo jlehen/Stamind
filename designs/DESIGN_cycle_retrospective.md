@@ -247,7 +247,9 @@ athlete had replied twice in words: a typed reply is not an answer (DESIGN_athle
 §6.3), so both went to `workout adapt`. Not handled: those typed words do not reach the record; the
 operator can add them with `plan retro redo ID --words`. Designed the same day, not yet built:
 a typed reply names "tell me" and is stored as the answer, and the coach hears it too when it
-says how the athlete is (DESIGN_athlete_queue.md §14).
+says how the athlete is. The writer then runs with the words in hand and stores words and
+lines in one write, the words alone only when it fails, so the coach's run beside it does not
+find the record due and write it twice (DESIGN_athlete_queue.md §14).
 
 ### One question at the end of a plan
 

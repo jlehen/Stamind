@@ -521,6 +521,10 @@ earns it is expert detail, and the chat surface does not audit.
   `bot queue <id> <action>`, which is not in the intent table. A tap can only run one of
   the answers the item was queued with, on that item, after the item passes its check,
   and what an answer writes is reversible.
+- Amended 2026-10-30 (DESIGN_athlete_queue.md §14, designed, not built): the router may
+  name one of a live item's stored answers. `bot route` checks the pick against the list it
+  was shown, the bot holds it to a button's shape, and `bot queue` runs the item's check as
+  for a tap.
 
 ## 8. Touch points
 
@@ -1136,7 +1140,9 @@ The §7 posture after this pass, in full:
 - The model never authors argv. It picks intents from a fixed table, fills typed
   fields the CLI validates, and may nominate an object or allowlisted key *from
   context the CLI gave it* — and none of that executes without the athlete confirming
-  a preview the CLI rendered from real rows.
+  a preview the CLI rendered from real rows. Amended 2026-10-30 (DESIGN_athlete_queue.md
+  §14, designed, not built): a typed answer to a queued question runs as its tap would, with
+  no preview, on an answer the item was queued with and after the item's check.
 - Free text remains data, never instructions, at both calls; the blast radius of a
   hostile message is bounded by the argv tables and the allowlist, exactly as §7
   argued for the read-only router.
