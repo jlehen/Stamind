@@ -1226,12 +1226,12 @@ which decodes it as it decodes a button (§6.2).
    answer records it itself (DESIGN_chat_questions.md §6). `bot route` enforces this: a
    button answer always comes with the intent `answer`.
 
-   The coach's run begins with the retrospective write step, which writes any record that
-   holds her words and no lines yet (DESIGN_cycle_retrospective.md §5). So the retrospective's
-   answer no longer stores her words first: the writer runs with her words in hand, and the
-   words are stored as soon as the lines are, alone only when the writer fails, so the next
-   run tries again. Otherwise the run beside it would find the record due and write it a
-   second time.
+   `workout adapt`, the coach's run for `coach_message`, begins with the retrospective write
+   step, which writes any record that holds her words and no lines yet
+   (DESIGN_cycle_retrospective.md §5). So the retrospective's answer no longer stores her
+   words first: the writer runs with her words in hand, and the words are stored as soon as
+   the lines are, alone only when the writer fails, so the next run tries again. Otherwise
+   the run beside it would find the record due and write it a second time.
 
    When the tap's path refuses the answer because the chat is busy, the coach lane does not
    run either: she is told "One moment — still finishing the last thing. Tap again shortly."
@@ -1292,9 +1292,10 @@ Had she tapped "Tell me" at 07:05 first, the bot would have said "How did it go,
 words?" and ended, and her 07:09 message would have gone the same two ways.
 
 07:12, she types "ok". The router is shown the proposal alone, the retrospective having closed
-a few seconds after 07:09. It names "✅ Change it" with the intent `answer`. The proposal's
-message shows "→ ✅ Change it", and `bot queue 13 a1` writes the change and shows today's
-sessions (DESIGN_short_messages.md §4). Nothing goes to the coach.
+once its writer returned, a minute or less after 07:09. It names "✅ Change it" with the
+intent `answer`. The proposal's message shows "→ ✅ Change it", and `bot queue 13 a1` writes
+the change and shows today's sessions (DESIGN_short_messages.md §4). Nothing goes to the
+coach.
 
 Had she typed "ok but keep Friday's gym" at 07:12: no answer named. "→ passing that on to your
 coach", the week planner reads the open proposal and her message, and its proposal replaces
@@ -1306,8 +1307,8 @@ Tell me the number it gave you and I'll write it down." [Tell me the number] [No
 record] [🕐 Not now] is live. She types "Average last 20 minutes : 172". The router names "Tell
 me the number" and reads `record_test`; `bot route` sets the intent aside. `bot queue 9 a1
 --text "Average…"` runs the capture with the session pinned, the confirmation "172 bpm… Shall
-I write it down?" is asked in its place, and the question waits for the morning
-(DESIGN_chat_questions.md §6). One recording, one confirmation.
+I write down this test result?" is asked in its place, and the question waits for the
+morning (DESIGN_chat_questions.md §6). One recording, one confirmation.
 
 ### 14.5 The terminal
 
@@ -1374,7 +1375,8 @@ Choices made without the author, each with the other way:
 - An item shown in a terminal counts as sent (§13.4), so it is live for typing in the chat,
   where it was never shown. Only the operator's own terminal does that.
 - The router may misread. A misread "ok" applies a proposal she meant for something else, as
-  a mis-tap would; the reply shows what changed, and a message to the coach undoes it.
+  a mis-tap would; the proposal she answered says what changed, today's sessions follow when
+  today changed, and a message to the coach undoes it.
 
 ### 14.8 Touch points
 
@@ -1389,7 +1391,7 @@ Choices made without the author, each with the other way:
 | `stamind/cli/queue_commands.py` | `bot queue <id> <action> --text`; in the chat `_apply` prints the answer's question, records the send and ends when it has no text, and asks only on a terminal |
 | `stamind/cli/queue.py` | `settled_line` gives the settled line to an item answered or dropped, and the kind's own line otherwise (an item the tap's check has just closed is still unmarked in the row `_answer` read); `queue_buttons` and the later choices are what the router's list is built from |
 | `stamind/athlete_queue.py` | the live items: waiting, sent, still worth asking by a read-only check split out of `settle_if_stale`, newest send first |
-| `stamind/retrospective_question.py`, `stamind/coach/service/retrospective.py`, `stamind/db/retrospectives.py` | the writer runs with the words in hand; the words stored once the lines are, alone on failure |
+| `stamind/retrospective_question.py` | the writer runs with the words in hand; the words stored right after it returns, alone when it fails |
 | `tests/test_bot.py` | the intents the bot answers itself gain `answer`, so the test that every intent lands somewhere still holds |
 | `designs/DESIGN_athlete_queue.md` §6.3, §9, §13.6; `designs/DESIGN_bot_simple_frontend.md` §5.3, §7, §12.9; `designs/DESIGN_cycle_retrospective.md` §4 | notes dated 2026-10-30 |
 | `docs/ARCHITECTURE.md` | the route flow, the `bot queue` flag, the bot's memory of sent questions |
