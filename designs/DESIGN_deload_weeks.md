@@ -531,7 +531,7 @@ mesocycle, the deload, Today. The row cannot be tapped, like the Today line.
 a goal's part and before the sessions. An empty deload day opens too.
 
 **`sm status`** (`cli/status.py`) prints a line under the active mesocycle: "🔋 Deload Mon 2 Nov
-to Sun 8 Nov, starts in 2 days", then "…, day 3 of 7" from the Monday.
+to Sun 8 Nov, starts in 2 days" on Saturday 31 October, then "…, day 1 of 7" on the Monday.
 
 **`sm calendar`** (`cli/render/calendar_grid.py`) marks each deload day with 🔋 beside its number,
 after `◆` and `•`, and the line under the week becomes `── 🔋 Deload Mon 2 Nov to Sun 8 Nov` in
@@ -548,11 +548,10 @@ Three small functions in `cli/common.py`, beside `deload_span`, hold the logic a
   message, `deload_heads` and `sm calendar`'s marks test a day with it.
 - `deload_progress(mesocycle, today)`: "starts tomorrow", "starts in 2 days" or "day 3 of 7".
   `sm status` and the morning message read it.
-- `deload_heads(workouts)`: which listed session each deload's line goes before. It reads the
-  mesocycles with `get_governing_mesocycles` over the listed dates, and tests each row with
-  `in_deload`, which is false for the nearest mesocycle that reader falls back to when none
-  overlaps. On an empty list it returns nothing and reads nothing. Each renderer calls it when
-  `names_a_range` is true, as it does for the end-of-schedule marker.
+- `deload_heads(workouts)`: which listed session each deload's line goes before. For each
+  mesocycle `get_governing_mesocycles` gives over the listed dates, that is the first row
+  `in_deload` holds. Each renderer calls it when `names_a_range` is true, as it does for the
+  end-of-schedule marker.
 
 The 🔋 moves into `deload_span`, so the week view, the plan view, `sm workout list`, `sm status`
 and `sm calendar` print one string, and `plan show` and the `plan generate` preview get the 🔋 too.
@@ -571,9 +570,9 @@ filter lines and the table instead. `-vv` prints it between the sessions.
 The page data: `plan_page.py::snapshot` builds each row with `calendar_page.py::_meso_entry`,
 made public as `meso_entry`, so the plan's snapshot carries `d`. When the snapshot is over budget
 the summaries go and `d` stays. In `calendar_logic.js`, `deloadOn(snapshot, iso)`, the mesocycle
-or null, replaces `isDeloadDay`. The legend and the sheet share one function for "2 Nov – 8 Nov".
-`calendar.css` gets `.rail.deload`, the same dashes turned 90 degrees, since the rail runs down
-the page.
+or null, replaces `isDeloadDay`. The legend, the sheet and the page's row share one function for
+"2 Nov – 8 Nov". `calendar.css` gets `.rail.deload`, the same dashes turned 90 degrees, since the
+rail runs down the page.
 
 ### 11.3 Not handled
 
@@ -638,9 +637,8 @@ Tests:
   inside the deload.
 - `simple_mesocycle_lines` adds the line when the mesocycle has a date.
 - `plan_page.snapshot` carries `d`.
-- `sm status` prints the line; `sm calendar` marks a deload day and prints the line once per month,
-  and in both months when the deload starts on the Monday of a week that crosses one. The two
-  `── Deload` assertions in `tests/test_deload_weeks.py` take the 🔋.
+- `sm status` prints the line; `sm calendar` marks a deload day and prints the line in both months
+  when the deload starts on the Monday of a week that crosses one.
 - `miniapp/tests/calendar.test.mjs`: `sheetFor` gives a deload day a part, also an empty one;
   `planRows` orders mesocycle, deload, Today, also when the deload starts on its mesocycle's first
   day (§3.2), and dashes the rail of a row dated inside the deload.
