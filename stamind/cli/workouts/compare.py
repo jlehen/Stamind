@@ -8,7 +8,7 @@ import argparse
 from typing import Optional
 from stamind import runtime
 from stamind.analytics.adherence import (
-    MINOR, UNPLANNED, format_discrepancies, unplanned_kind,
+    MINOR, MISSED, PARTIAL, REST_VIOLATION, UNPLANNED, classify_adherence, unplanned_kind,
 )
 from stamind.analytics.compare import adherence_window, compare_days, format_actual
 from stamind.config import config
@@ -54,8 +54,7 @@ def run_workout_compare(args: argparse.Namespace) -> None:
 
     runtime.render.workout_compare(
         days, start_date=start_date, end_date=end_date, sport_filter=sport_filter,
-        discrepancies=window.discrepancies, informational=window.informational,
-        covered_ranges=window.covered_ranges,
+        informational=window.informational, covered_ranges=window.covered_ranges,
     )
     if not days:
         return
@@ -68,9 +67,10 @@ def run_workout_compare(args: argparse.Namespace) -> None:
 
 def print_workout_compare(
     days: list, *, start_date: str, end_date: str, sport_filter: Optional[str],
-    discrepancies: list, informational: list, covered_ranges: list,
+    informational: list, covered_ranges: list,
 ) -> None:
-    """The expert compare report: PLANNED/ACTUAL per day, then the discrepancy list."""
+    """The expert compare report: PLANNED/ACTUAL per day, what differed under each session,
+    then how many discrepancies the days shown hold."""
     print(bold(cyan("=== WORKOUT COMPARE ===")))
     filter_parts = [f"From: {fmt_date(start_date)}", f"Until: {fmt_date(end_date)}"]
     if sport_filter:
@@ -82,6 +82,7 @@ def print_workout_compare(
         print(gray("No planned workouts or completed activities found in this range."))
         return
 
+    discrepancies = 0
     for date_curr, day_results, unplanned in days:
         print(bold(cyan(fmt_date(date_curr))))
 
@@ -89,6 +90,11 @@ def print_workout_compare(
             w = r['planned']
             act = r['completed']
             is_rest = w['sport_type'] == 'rest'
+            verdict = classify_adherence(
+                w, act, config.minor_activity_load_threshold, pending=r.get('pending', False)
+            )
+            if verdict['status'] in (MISSED, PARTIAL, REST_VIOLATION):
+                discrepancies += 1
 
             if is_rest:
                 print(f"  PLANNED:    [{magenta('REST')}]")
@@ -119,6 +125,8 @@ def print_workout_compare(
                 print(f"  ACTUAL:     {gray('(not yet — still ahead today)')}")
             elif not is_rest:
                 print(f"  ACTUAL:     {red('(none — missed)')}")
+            for reason in verdict['reasons']:
+                notice(f"  Discrepancy: {reason}")
 
         for act in unplanned:
             act_str = format_actual(act, divergence=True)
@@ -128,6 +136,7 @@ def print_workout_compare(
             if kind == MINOR:
                 print(gray(f"  (minor):    {act_str}"))
             elif kind == UNPLANNED:
+                discrepancies += 1
                 print(f"  UNPLANNED:  {yellow(act_str)}")
             else:
                 print(gray(f"  (off-plan): {act_str}"))
@@ -137,12 +146,8 @@ def print_workout_compare(
 
     print()
     if discrepancies:
-        print(bold(yellow("=== DISCREPANCIES ===")))
-        for line in format_discrepancies(discrepancies):
-            notice(line)
-        print()
-        n = len(discrepancies)
-        print(bold(yellow(f"{n} discrepanc{'ies' if n != 1 else 'y'} found.")))
+        noun = "discrepancies" if discrepancies != 1 else "discrepancy"
+        print(bold(yellow(f"{discrepancies} {noun} found.")))
     else:
         print(bold(green("No discrepancies found. Great adherence!")))
 

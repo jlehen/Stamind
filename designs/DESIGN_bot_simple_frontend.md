@@ -434,7 +434,7 @@ view turned around: one dated line per planned session and per extra effort, and
 glyph at the front is the whole verdict — ✅ followed the plan, ❌ did not, ➕ an effort
 the plan did not ask for, ⏳ still ahead today. A trained session says what was done
 ("you did 43 min"); a kept rest day is a ✅; a rest day trained through is a ❌ that
-names the effort. The expert report's extra facts stay expert: the discrepancy list,
+names the effort. The expert report's extra facts stay expert: the discrepancy lines,
 the load-from-RPE note (it qualifies a load figure the companion line does not carry),
 the in-mesocycle versus off-plan distinction, and efforts under the minor-load bar, which
 the companion does not mention at all. The closing count follows the tone rule — what

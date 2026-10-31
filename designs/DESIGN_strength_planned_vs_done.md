@@ -229,7 +229,8 @@ skipped one:
 sets: 0 of 17 planned sets near their load (0%, below 80%); 17 lifted
 ```
 
-It is the "Discrepancy:" line under `workout list -vv`, and the reason `workout adapt` reads
+It is the "Discrepancy:" line under `workout list -vv` and `workout compare`, and the reason
+`workout adapt` reads
 among the week's evidence. The adapt prompt's TASK lists the discrepancies it weighs as
 "misses, workload/duration differences, rest violations"; it adds "sets short".
 
@@ -246,7 +247,8 @@ not how the session went.
 - **`workout show` and `workout list -vv`**: the table, under the "Actual:" line of a past
   strength session with planned lines. The "Discrepancy:" line follows it as today.
 - **`workout compare`**: the table replaces the set lines under the ACTUAL line of a planned
-  strength session. An activity with no planned session keeps its set lines.
+  strength session, and the "Discrepancy:" line follows it. An activity with no planned
+  session keeps its set lines.
 - **Expert mode in Telegram** shows the terminal output as monospace text, so it gets the
   same table.
 - **Companion "Done lately"** (`simple_compare_lines`): the companion lines of §2 replace the

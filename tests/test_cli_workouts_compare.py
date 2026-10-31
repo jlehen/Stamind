@@ -92,9 +92,8 @@ class TestCliWorkoutsCompare(unittest.TestCase):
         # The finished day reads as a miss; today's untrained session does not.
         self.assertIn("(none — missed)", stdout)
         self.assertIn("(not yet — still ahead today)", stdout)
-        self.assertIn("=== DISCREPANCIES ===", stdout)
-        self.assertIn("Complete Miss! Missed planned workout 'Skipped Run'", stdout)
-        self.assertNotIn("Tempo Run' (running)", stdout)
+        self.assertNotIn("=== DISCREPANCIES ===", stdout)
+        self.assertIn("1 discrepancy found.", stdout)
 
         # Date range with no data → empty message
         exit_code, stdout, stderr = self.run_cli([
@@ -102,6 +101,51 @@ class TestCliWorkoutsCompare(unittest.TestCase):
         ])
         self.assertEqual(exit_code, 0)
         self.assertIn("No planned workouts or completed activities found", stdout)
+
+    def test_discrepancy_sits_under_its_workout_and_the_count_follows_the_filter(self):
+        """A session done differently says how under its own lines, and the closing count
+        covers only the days shown, so a sport filter narrows it too."""
+        today = datetime.now(timezone.utc).date()
+        yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+        two_days_ago_str = (today - timedelta(days=2)).strftime("%Y-%m-%d")
+        save_workout(test_db,
+            date=two_days_ago_str, sport_type="running", title="Long Run",
+            description="40 mins", duration_minutes=40, rpe=5, tss=30,
+        )
+        test_db.save_completed_activity(
+            activity_id="act_cmp_long",
+            date=two_days_ago_str,
+            start_time=f"{two_days_ago_str} 08:00:00",
+            activity_name="Morning Run",
+            activity_type="running",
+            duration_sec=4800.0,
+            distance_km=15.0,
+            elevation_gain_m=50.0,
+            avg_hr=140,
+            max_hr=160,
+            rpe=5,
+            tss=60.0,
+        )
+        save_workout(test_db,
+            date=yesterday_str, sport_type="cycling", title="Skipped Ride",
+            description="60 mins", duration_minutes=60, rpe=4, tss=40,
+        )
+
+        exit_code, stdout, _ = self.run_cli(
+            ["workout", "compare", "-d", "3d", "--no-pull", "--no-mark"]
+        )
+        self.assertEqual(exit_code, 0)
+        reason = stdout.index("Discrepancy: duration mismatch")
+        self.assertLess(stdout.index("Long Run"), reason)
+        self.assertLess(reason, stdout.index("Skipped Ride"))
+        self.assertIn("2 discrepancies found.", stdout)
+
+        exit_code, stdout, _ = self.run_cli(
+            ["workout", "compare", "-d", "3d", "-t", "running", "--no-pull", "--no-mark"]
+        )
+        self.assertEqual(exit_code, 0)
+        self.assertNotIn("Skipped Ride", stdout)
+        self.assertIn("1 discrepancy found.", stdout)
 
     def test_workout_compare_in_companion_voice(self):
         """Simple mode reads the same pairing as glyph lines, and never the expert table
@@ -142,7 +186,7 @@ class TestCliWorkoutsCompare(unittest.TestCase):
         self.assertIn("✅ 🏃 Easy Run — 30 min (you did 30 min)", stdout)
         self.assertIn("1 of 2 sessions done", stdout)
         self.assertNotIn("WORKOUT COMPARE", stdout)
-        self.assertNotIn("DISCREPANCIES", stdout)
+        self.assertNotIn("iscrepanc", stdout)
         self.assertNotIn(yesterday_str, stdout)
 
     # Colour on: `informational` holds activity dicts, so a raw gray(dict) only blows

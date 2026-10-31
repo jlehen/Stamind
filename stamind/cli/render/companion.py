@@ -221,9 +221,9 @@ class CompanionRenderer(ExpertRenderer):
 
     def workout_compare(
         self, days: list, *, start_date: str, end_date: str, sport_filter: Optional[str],
-        discrepancies: list, informational: list, covered_ranges: list,
+        informational: list, covered_ranges: list,
     ) -> None:
-        # The discrepancy list, the load-from-RPE note and the in-mesocycle/off-plan
+        # The discrepancy lines, the load-from-RPE note and the in-mesocycle/off-plan
         # distinction are expert detail: the glyph on each line is the whole verdict here,
         # and an effort under the minor-load bar is not mentioned at all
         # (DESIGN_bot_simple_frontend.md §6). It asks the same question the expert view

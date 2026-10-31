@@ -202,12 +202,11 @@ class ExpertRenderer:
 
     def workout_compare(
         self, days: list, *, start_date: str, end_date: str, sport_filter: Optional[str],
-        discrepancies: list, informational: list, covered_ranges: list,
+        informational: list, covered_ranges: list,
     ) -> None:
         print_workout_compare(
             days, start_date=start_date, end_date=end_date, sport_filter=sport_filter,
-            discrepancies=discrepancies, informational=informational,
-            covered_ranges=covered_ranges,
+            informational=informational, covered_ranges=covered_ranges,
         )
 
     def calendar_marked(self, marked: int) -> None:
