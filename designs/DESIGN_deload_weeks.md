@@ -498,11 +498,13 @@ Take a mesocycle from 19 October to 8 November, with `deload_start` on Monday 2 
 "🔋 Deload, day 3 of 7." The other deload days say the same with their own number. These are
 statements, so they do not go through the athlete queue. They are text from the date, so they
 cost no model call and need no marker of what was already said. A morning that sends nothing,
-because the schedule has run out, stays silent.
+because the schedule has run out, stays silent. On a morning whose proposal changes today, the
+first message is the deload line alone, and the proposal follows as its own message.
 
 **The chat's week view** (`cli/render/session_lines.py::simple_week_lines`) and **`sm workout
 list`** (`cli/workouts/listing.py::print_workout_table`) put one line before the first listed
-session of each deload. On Saturday 31 October the athlete opens the week:
+session of each deload. The athlete reaches the week view by typing "my week", since the
+keyboard's button now opens the calendar. On Saturday 31 October the week reads:
 
     🗓 Coming up:
     Sat 31 · 🚴 Long ride
@@ -524,6 +526,8 @@ message has it too.
 dashed on a row of its own: dashing the mesocycle's row would dash all three weeks. Rows dated
 inside the deload, the Today line or a goal, get the dashed rail too. On Wednesday 4 November
 the page reads: the mesocycle, the deload, Today. The row cannot be tapped, like the Today line.
+It is pushed right after its mesocycle's row, so a deload that starts with its mesocycle (§3.2)
+stays under it, and a goal on that date comes after both, since goals are pushed last.
 
 **The calendar page's day sheet** (`miniapp/calendar_logic.js::sheetFor`). Tapping Wednesday
 4 November opens a part headed "Deload" with the legend's words, "2 Nov – 8 Nov". It opens after
@@ -544,16 +548,25 @@ Sunday 6 December then has its line in both months, so December's marks are expl
 
 Three small functions in `cli/common.py`, beside `deload_span`, hold the logic and the words:
 
-- `deload_covering(mesocycles, day)`: the mesocycle whose deload holds `day`, or None.
+- `in_deload(mesocycle, day)`: whether `day` falls from `deload_start` to `end_date`. The morning
+  message, `deload_heads` and `sm calendar`'s marks test a day with it.
 - `deload_progress(mesocycle, today)`: "starts tomorrow", "starts in 2 days" or "day 3 of 7".
   `sm status` and the morning message read it.
-- `deload_heads(workouts)`: which listed session each deload's line goes before. It reads
-  `get_governing_mesocycles` over the listed dates. `run_workout_list` calls it once, and hands
-  the answer to `runtime.render.workout_list`, so both renderers place the line by one rule.
+- `deload_heads(workouts, mesocycles)`: which listed session each deload's line goes before. It
+  reads no database. `run_workout_list` reads the mesocycles once, with
+  `get_governing_mesocycles` over the listed dates, and hands the answer to
+  `runtime.render.workout_list`, so both renderers place the line by one rule.
 
-The morning message finds the deload with `get_covering_mesocycle`, today's and tomorrow's. The
-terminal table is drawn as one block by `render_table`, so the line goes through its `under`
-argument, under the row before; `-vv` prints it between the sessions.
+The morning message finds the deload with `get_covering_mesocycle`, today's and tomorrow's. Its
+two sentences are built in `views.py` from `deload_progress` and `fmt_day`. The deload-day line is
+printed right after the silence check, before the Garmin refresh, so it is the first line
+whatever the refresh prints. The day-before line is printed after the runway lines, before the
+buttons. The plan view's line is built in `simple_mesocycle_lines`.
+
+The terminal table is drawn as one block by `render_table`, so the line goes through its `under`
+argument, under the row before. When the deload's first session is the first row listed, which is
+every plain `sm workout list` on a deload day, `print_workout_table` prints the line between the
+filter lines and the table instead. `-vv` prints it between the sessions.
 
 The page data: `plan_page.py::snapshot` builds each row with `calendar_page.py::_meso_entry`,
 made public as `meso_entry`, so the plan's snapshot carries `d`. When the snapshot is over budget
@@ -570,8 +583,15 @@ the rail runs down the page.
   the day sheet say it.
 - **`sm status` under a mesocycle with no deload** prints nothing, even when the next mesocycle
   has one. `sm calendar` and `plan show` show it.
-- **A `plan generate` that moves a deload after the heads-up.** The athlete was told "tomorrow",
-  and the next morning's message says what the new date says.
+- **A `plan generate` that moves a deload after the morning message.** The athlete was told
+  "tomorrow", or was told nothing because the new date is tomorrow. The next morning's message
+  says what the new date says.
+- **A deload with no listed session in it**, because `--sport` filtered them out, prints no line.
+- **The web dashboard's plan page and the retrospective records** still show no deload. Choice 8
+  named them, and nobody asked for them.
+- **Two plans overlapping on one day.** `sm status` reads the next goal's plan, the morning message
+  and the pages the newest plan covering the day, so they could name different deloads. `plan
+  generate -g ..N` writes plans one after the other (§6), so they do not overlap.
 
 ### 11.4 Choices made without asking
 
@@ -599,10 +619,12 @@ These stand until the author says otherwise:
 
 Build: the three functions and their tests; the terminal (`sm status`, `sm workout list`, `sm
 calendar`); the chat (morning, week view, plan view); the pages (snapshot, row, rail, sheet); then
-the documents: DESIGN_calendar_miniapp.md §3.7, §5 and §7, and ARCHITECTURE.md where a data flow
-or a command changes. The pages need a Pages deploy, which needs a push the author approves, and
-the chat lines need a bot restart. All of it shows nothing until the author runs §9's step 7
-`plan generate` on each instance. On 2026-10-31 no mesocycle on either instance has a date.
+the documents: DESIGN_calendar_miniapp.md §3.7, §5 and §7; DESIGN_bot_simple_frontend.md §4.1 and
+§11.2, one line each; and in ARCHITECTURE.md the morning push, the `status`, `calendar` and
+`workout list` rows, and the snapshot sentence that names `plan_page.py`. The pages need a Pages
+deploy, which needs a push the author approves, and the chat lines need a bot restart. All of it
+shows nothing until the author runs §9's step 7 `plan generate` on each instance. On 2026-10-31 no
+mesocycle on either instance has a date.
 
 Tests:
 
