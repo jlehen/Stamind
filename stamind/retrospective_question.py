@@ -1,8 +1,9 @@
 """The question a finished mesocycle or plan puts to the athlete: how did it go?
 (DESIGN_cycle_retrospective.md §4).
 
-The date check queues it, in `stamind/cycle_records.py`. The answer is stored with the
-record as typed, the retrospective writer runs at once, and its sentence is the reply.
+The date check queues it, in `stamind/cycle_records.py`. The retrospective writer runs at
+once with the answer in hand, the answer is stored as typed once it returns, and the
+writer's sentence is the reply.
 """
 from datetime import date
 from typing import Any, Dict, Optional
@@ -60,17 +61,20 @@ def _is_stale(item: Dict[str, Any]) -> bool:
 
 
 def _apply(item: Dict[str, Any], index: int, text: Optional[str]) -> str:
-    """Stores the athlete's words, then has the record written with them in hand. The
-    stored words make the record due, so the next run of the write step tries a failed
-    write again."""
+    """Has the record written with the athlete's words in hand, then stores them. Stored
+    words with no lines make a record due, so a coach's run started beside this answer
+    would write it a second time; a failed write leaves it that way on purpose, for the
+    next run to try again (DESIGN_athlete_queue.md §14.2)."""
     record_id = item["payload"]["record_id"]
-    runtime.db.set_retrospective_words(record_id, (text or "").strip())
-    record = runtime.db.get_retrospective(record_id)
+    words = (text or "").strip()
+    record = {**runtime.db.get_retrospective(record_id), "athlete_words": words}
+    line = THANKS_LINE
     try:
-        return runtime.coach_service.write_retrospective(record, WAIT_NOTICE) or THANKS_LINE
+        line = runtime.coach_service.write_retrospective(record, WAIT_NOTICE) or THANKS_LINE
     except Exception as e:
         step(f"The retrospective was not written, the next run tries again: {e}")
-        return THANKS_LINE
+    runtime.db.set_retrospective_words(record_id, words)
+    return line
 
 
 RETROSPECTIVE_KIND = Kind(

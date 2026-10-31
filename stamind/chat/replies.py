@@ -11,7 +11,7 @@ import functools
 import html
 import os
 import secrets
-from typing import List
+from typing import List, NamedTuple
 
 from stamind import journal
 from stamind.chat import telegram_api
@@ -29,6 +29,13 @@ MAX_MESSAGE_CHARS = 3800
 # What a question left unanswered for the prompt timeout is told. True whether or not a
 # proposal waits above it (DESIGN_waiting_proposal.md §6.1).
 PROMPT_TIMED_OUT = "No answer, so I stopped there."
+
+
+class SentQuestion(NamedTuple):
+    """A queued item's message, as the bot sent it (DESIGN_athlete_queue.md §14.3)."""
+    message_id: int
+    text: str
+    rows: list
 
 
 def format_prompt_message(req: dict) -> str:
@@ -156,8 +163,12 @@ class RepliesMixin:
             rows = rows + ui_button_rows(offer, token)
         keyboard = telegram_api.inline_keyboard(rows)
         session.sent = True
-        await self.bot.send_message(
-            chat_id=session.chat_id, text=req.get("text") or "", reply_markup=keyboard,
+        text = req.get("text") or ""
+        message = await self.bot.send_message(
+            chat_id=session.chat_id, text=text, reply_markup=keyboard,
+        )
+        self.sent_questions.setdefault(session.chat_id, {})[str(req.get("id"))] = SentQuestion(
+            message.message_id, text, rows,
         )
         self._log(session.chat_id, "<<", f"queue item #{req.get('id')}: {req.get('text')!r}")
         if offer:

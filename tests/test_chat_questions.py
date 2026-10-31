@@ -435,13 +435,14 @@ class TestResultTest(_Case):
                                benchmark_type="ftp_20min")
         test_result.ask_about(test_db.get_workout_by_id(session))
         [first] = test_db.waiting_queue_items()
-        self.prompt.ask_text.return_value = "236"
         self.later()
         with patch("stamind.openrouter.OpenRouterClient.complete", return_value={
             "kind": "ftp", "value": "236", "performed": True, "session_id": session,
             "note": None,
         }):
-            [confirmation] = sent(run_cli(["bot", "queue", str(first["id"]), "a1"])[1])
+            [confirmation] = sent(
+                run_cli(["bot", "queue", str(first["id"]), "a1", "--text", "236"])[1]
+            )
         self.assertIn("Shall I write down this test result?", confirmation["text"])
         self.assertEqual(self.line_ids(), [confirmation["id"]])
         self.tap(confirmation["id"], "a2")

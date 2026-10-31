@@ -101,14 +101,21 @@ def terminal_choices(item: Dict[str, Any]) -> List[Choice]:
     return choices
 
 
-def _apply(item: Dict[str, Any], action: str) -> None:
-    """Acts on a waiting item, asking for the text first when the answer is typed (§5.1,
-    §6.3). An empty text leaves the item as it was. An answer that starts a long run goes
-    on to it once the item is closed (DESIGN_long_runs_beside_chat.md §6)."""
+def _apply(item: Dict[str, Any], action: str, typed: Optional[str] = None) -> None:
+    """Acts on a waiting item. `typed` is what the athlete wrote, used only by an answer
+    that asks for words. Without it a terminal asks for them, and an empty text leaves the
+    item as it was (§5.1); the chat prints the question and ends, with the item out, and
+    the next message is routed as a typed answer (§14.2). An answer that starts a long run
+    goes on to it once the item is closed (DESIGN_long_runs_beside_chat.md §6)."""
     text = None
-    index = athlete_queue.answer_index(item, action)
-    ask = athlete_queue.answers(item)[index].get("ask") if index is not None else None
+    ask = athlete_queue.asks_for(item, action)
     if ask:
+        text = (typed or "").strip()
+    if ask and not text and is_json_frontend():
+        print(ask)
+        athlete_queue.sent(item)
+        return
+    if ask and not text:
         text = runtime.prompt.ask_text(ask).strip()
         if not text:
             return
@@ -217,19 +224,19 @@ def run_queue_tell(args: argparse.Namespace) -> None:
     ))
 
 
-def _answer(item_id: int, action: str) -> Optional[Dict[str, Any]]:
+def _answer(item_id: int, action: str, typed: Optional[str]) -> Optional[Dict[str, Any]]:
     """Acts on the item, or says it is settled. Returns the item as it was read."""
     item = runtime.db.get_queue_item(item_id)
     if item is None or item["closed_at"] or athlete_queue.settle_if_stale(item):
         print(settled_line(item))
     else:
-        _apply(item, action)
+        _apply(item, action, typed)
     return item
 
 
 def run_bot_queue(args: argparse.Namespace) -> None:
-    """A tap on a queued item's button, or `--next` from the bot's scheduler (§6.2,
-    §13.2). Spawned by the bot, never typed."""
+    """A tap on a queued item's button, a typed answer with `--text`, or `--next` from the
+    bot's scheduler (§6.2, §13.2, §14.2). Spawned by the bot, never typed."""
     if args.next:
         send_next()
         return
@@ -242,9 +249,9 @@ def run_bot_queue(args: argparse.Namespace) -> None:
         # after the wait: the run it waited for may have replaced it
         # (DESIGN_long_runs_beside_chat.md §3).
         with runtime.db.week_lock():
-            item = _answer(args.item_id, args.action)
+            item = _answer(args.item_id, args.action, args.text)
     else:
-        item = _answer(args.item_id, args.action)
+        item = _answer(args.item_id, args.action, args.text)
     if item is None:
         return
     # An answer that queued a question, or started a run that did, is followed by that

@@ -253,6 +253,14 @@ def queue_button_rows(req: dict) -> List[List[Tuple[str, str]]]:
     return rows + page_rows(req.get("page"))
 
 
+def typed_tap(answer: Any) -> Optional[Tuple[str, str]]:
+    """`bot route`'s pick read as a tap, held to a button's shape: the item and the action,
+    or None when there is no pick (DESIGN_athlete_queue.md §14.2)."""
+    if not isinstance(answer, dict):
+        return None
+    return decode_queue_callback(queue_callback_data(answer.get("item"), answer.get("action")))
+
+
 def page_rows(page: Any) -> List[List[Tuple[str, str]]]:
     """A page button on a row of its own, or no row (DESIGN_short_messages.md §5)."""
     if not isinstance(page, dict) or not page.get("url"):
@@ -262,7 +270,7 @@ def page_rows(page: Any) -> List[List[Tuple[str, str]]]:
 
 def queue_later_rows(item_id: str) -> List[List[Tuple[str, str]]]:
     """What "Not now" swaps in: the later choices that have a chat button, built from the
-    tap itself, so the bot still remembers nothing (DESIGN_athlete_queue.md §6.4)."""
+    tap itself (DESIGN_athlete_queue.md §6.4)."""
     return [[(button, queue_callback_data(item_id, code))
              for code, _words, button in QUEUE_LATER_CHOICES if button]]
 

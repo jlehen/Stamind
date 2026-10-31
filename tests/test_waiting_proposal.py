@@ -449,11 +449,21 @@ class OutOfDateTest(_Case):
         self.assertIn(saved_proposal.APPLIED_LINE, self.tap(item))
         self.garmin.ensure_data.assert_not_called()
 
-    def test_a_tap_on_a_closed_proposal_gets_the_same_line(self):
+    def test_a_tap_on_an_answered_proposal_says_it_is_settled(self):
+        """Monday 12:30 the athlete types "ok" and the week is written. A tap on the old
+        buttons at 12:31 must not say the week was left as it is
+        (DESIGN_athlete_queue.md §14.3)."""
         item = self.save()
-        self.tap(item, "a2")
+        self.tap(item, "a1")
+        out = self.tap(item, "a2")
+        self.assertIn(queue_cli.QUEUE_SETTLED_LINE, out)
+        self.assertNotIn(saved_proposal.OUT_OF_DATE_LINE, out)
+
+    def test_a_second_tap_on_a_proposal_that_went_out_of_date_keeps_its_line(self):
+        item = self.save()
+        save_workout(test_db, SATURDAY, "running", "Long run", duration_minutes=100)
+        self.refused(item)
         self.assertIn(saved_proposal.OUT_OF_DATE_LINE, self.tap(item))
-        self.assertEqual(self.ride()["duration_minutes"], 90)
 
 
 class StandAloneTest(_Case):

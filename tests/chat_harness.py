@@ -25,6 +25,7 @@ class _FakeBot:
     def __init__(self) -> None:
         self.sent = []           # (chat_id, text, kwargs)
         self.edits = []          # (chat_id, message_id, reply_markup)
+        self.text_edits = []     # (chat_id, message_id, text, reply_markup)
         self.photos = []         # (chat_id, caption)
         self.actions = []        # (chat_id, action)
         self.menus = []          # each set_my_commands payload
@@ -38,6 +39,10 @@ class _FakeBot:
     async def edit_message_reply_markup(self, chat_id=None, message_id=None,
                                         reply_markup=None):
         self.edits.append((chat_id, message_id, reply_markup))
+
+    async def edit_message_text(self, chat_id=None, message_id=None, text=None,
+                                reply_markup=None):
+        self.text_edits.append((chat_id, message_id, text, reply_markup))
 
     async def send_chat_action(self, chat_id=None, action=None):
         self.actions.append((chat_id, action))
@@ -210,10 +215,11 @@ def callback_update(query: _FakeQuery, chat_id: int = 42):
     )
 
 
-def routes_to(chat_bot: ChatBot, intent: str):
-    """Makes `sm bot route` answer `intent`, without running the CLI to ask it."""
+def routes_to(chat_bot: ChatBot, intent: str, answer=None):
+    """Makes `sm bot route` answer `intent`, and the question `answer` names, without running
+    the CLI to ask it."""
     async def route(_text):
-        return intent
+        return {"intent": intent, "answer": answer}
 
     return mock.patch.object(chat_bot, "_route_intent", route)
 

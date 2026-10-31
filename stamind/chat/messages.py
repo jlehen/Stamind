@@ -9,7 +9,8 @@ command line, and `parse_message_to_argv` turns it into argv. Without the slash 
 label runs its fixed argv, and anything else goes through the intent router: `_simple_route` asks
 `sm bot route` what the message means and maps the answer onto either the coach lane,
 which carries the athlete's own words, or the capture inbox, which asks before it stores
-(DESIGN_bot_simple_frontend.md §5, §12.3).
+(DESIGN_bot_simple_frontend.md §5, §12.3). A message that answers a queued question first
+runs what a tap on that button runs (DESIGN_athlete_queue.md §14.2).
 """
 import html
 import os
@@ -19,7 +20,7 @@ from typing import List, Optional
 
 from stamind import clock
 from stamind.chat import runner, telegram_api
-from stamind.chat.keyboards import SIMPLE_HELP, SIMPLE_WELCOME, keyboard_action
+from stamind.chat.keyboards import SIMPLE_HELP, SIMPLE_WELCOME, keyboard_action, typed_tap
 from stamind.chat.routing import (
     CAPTURE_PROMPT, CAPTURE_RESCUE_ECHO, ROUTER_CAPTURE_INTENTS, ROUTER_ECHO,
     ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, parse_message_to_argv,
@@ -55,8 +56,17 @@ class MessagesMixin:
 
         `armed_tap` — she just tapped "💬 Talk to me". It never changes a message the
         router could read, so the tap has nothing to explain (§5.2)."""
-        intent = await self._route_intent(text)
+        route = await self._route_intent(text)
+        intent = route["intent"]
         self._log(chat_id, "  ", f"routed: {intent}")
+        # A typed answer runs as its tap, and only a message that also tells the coach
+        # goes on (DESIGN_athlete_queue.md §14.2). Refused, the coach does not hear it
+        # either, so the athlete can send it again.
+        tap = typed_tap(route.get("answer"))
+        if tap is not None:
+            answered = await self._answer_typed(chat_id, *tap, text)
+            if not answered or intent not in ROUTER_MESSAGE_ARGV:
+                return None
         echo = ROUTER_ECHO.get(intent)
         # State and availability go to the coach in her own words; anything to be
         # remembered goes to the capture inbox, which asks before it stores and costs no

@@ -29,7 +29,7 @@ from stamind.chat.keyboards import (
     simple_keyboard_rows,
 )
 from stamind.chat.messages import MessagesMixin
-from stamind.chat.replies import RepliesMixin
+from stamind.chat.replies import RepliesMixin, SentQuestion
 from stamind.chat.runner import RunnerMixin, Session
 from stamind.chat.scheduler import SchedulerMixin
 from stamind.cli.render import calendar_page, plan_page
@@ -88,6 +88,9 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         # by the next push, §4.4).
         self.armed: Dict[int, float] = {}
         self.ui_actions: Dict[int, Tuple[str, List[dict]]] = {}
+        # The questions sent since this start, per chat and item, so a typed answer can
+        # edit the one it answers; it empties with a restart (DESIGN_athlete_queue.md §14.3).
+        self.sent_questions: Dict[int, Dict[str, SentQuestion]] = {}
         # Held until each ends: asyncio keeps only a weak reference to a running task.
         self.reflect_tasks: set = set()
         # The instant of the athlete's last own message or tap in the push chat. None

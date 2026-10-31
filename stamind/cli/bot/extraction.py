@@ -2,16 +2,18 @@
 
 One capture is one domain-focused model call. This module holds the role that call opens
 with, the rows the athlete could be talking about, the call itself, and what a capture says
-when it read nothing it could store (§12.3).
+when it read nothing it could store (§12.3). `use_fast_model` is here for the kinds too,
+which the router cannot serve: it reads the queue, and the queue imports the kinds.
 
 It is a module of its own rather than the top of `capture.py` because `capture.py`
 dispatches the five intents and so imports `edit.py`, which needs these same names; a
 shared module is what keeps that from being an import cycle (AGENTS.md, Code style).
 """
+import argparse
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from stamind import runtime
+from stamind import runtime, settings
 from stamind.cli.bot import hand_off
 from stamind.db.objectives import GOAL_UPCOMING, goal_state
 from stamind.prompt import athlete_watching
@@ -30,6 +32,18 @@ NOMINATE_SESSION_DAYS = 21
 CAPTURE_NO_FIND_LINE = (
     "I'm not sure what to do with that one 🤔 — but I don't want to lose it."
 )
+
+
+def use_fast_model(args: argparse.Namespace) -> None:
+    """Pins this process's OpenRouter client to the fast model (§5.4). Both the
+    classifier and the §12.2 extraction calls run on it: extraction is transcription,
+    not coaching judgement, so the cheap model is the right default and the escape
+    hatch is a setting. The per-invocation --llm-model override (applied by the
+    dispatcher before any handler runs) outranks the role."""
+    from stamind.openrouter import openrouter_client
+    fast_model = settings.fast_model()
+    if fast_model and not getattr(args, "llm_model", None):
+        openrouter_client.model = fast_model
 
 
 def dated_context(today: str) -> str:

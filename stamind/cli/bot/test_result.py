@@ -16,9 +16,9 @@ from typing import Any, Dict, List, Optional
 from stamind import runtime
 from stamind.benchmarks import ANCHOR_KINDS, LOGBOOK_KINDS, SPORT_ANCHORS, anchors_for_sport
 from stamind.cli.bot.extraction import (
-    CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find, valid_date,
+    CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find, use_fast_model,
+    valid_date,
 )
-from stamind.cli.bot.route import use_fast_model
 from stamind.clock import to_local, today_str as _today_str
 from stamind.prompt import athlete_watching
 from stamind.queue_kind import (

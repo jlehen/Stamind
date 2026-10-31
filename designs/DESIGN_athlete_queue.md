@@ -1,7 +1,7 @@
 # Design: The queue of things Stamind wants to tell or ask the athlete
 
 **Status:** Implemented · **Date:** 2026-09-14 (rev. 3) · rev. 4, 2026-10-10 (§13) · rev. 5,
-2026-10-30 (§14, designed, not built)
+2026-10-30 (§14, built 2026-10-31)
 
 Revision 5 makes a typed reply an answer to a question whose buttons are live, so that "ok"
 under a proposal applies it and words under the retrospective question reach its record. It is
@@ -495,7 +495,7 @@ queue` asks for the text through the existing text prompt, and her next message 
 answer. She has just tapped it, so she is about to type; the chat is busy only for that one
 answer. If she does not answer within the prompt timeout, the item stays waiting, unchanged.
 
-Amended 2026-10-30 (§14, designed, not built): typed text is an answer without the tap. The
+Amended 2026-10-30 (§14, built 2026-10-31): typed text is an answer without the tap. The
 router is shown the questions whose buttons are live and names the one a message answers; the
 bot then runs what the tap runs, her words attached. In the chat the tap on "Something else…"
 opens no text prompt any more: `bot queue` prints that answer's question and ends, the item
@@ -697,7 +697,7 @@ table, and a typed "leg press" is a message to the router like any other. The mo
 chooses which item is asked or what its buttons do. A feature may have the model write the
 text of an item inside fixed wording, and nothing more.
 
-Amended 2026-10-30 (§14, designed, not built): the router may name one of a live item's stored
+Amended 2026-10-30 (§14, built 2026-10-31): the router may name one of a live item's stored
 answers, and the bot runs it as a tap. `bot route` checks the pick against the list it was
 shown, the bot holds it to a button's shape, and `bot queue` runs the item's check as for a
 tap. The model still never chooses which item is asked or what its buttons do.
@@ -1335,7 +1335,8 @@ The author ruled on four questions on 2026-10-30, each put to him with the Thurs
    stores nothing: the bot replies with the chosen answer, and the question keeps its
    buttons, which say "Already settled" when tapped. **Ruled: remember and edit.**
 
-Choices made without the author, each with the other way:
+Choices made without the author, each with the other way. The author kept all four on
+2026-10-31:
 
 5. **A typed drop counts.** "nothing to say" typed closes the retrospective question as
    dropped, as the button does; "leave it unnamed" drops the naming question. The other way
@@ -1392,6 +1393,7 @@ Choices made without the author, each with the other way:
 | `stamind/cli/queue.py` | `settled_line` gives the settled line to an item answered or dropped, and the kind's own line otherwise (an item the tap's check has just closed is still unmarked in the row `_answer` read); `queue_buttons` and the later choices are what the router's list is built from |
 | `stamind/athlete_queue.py` | the live items: waiting, sent, still worth asking by a read-only check split out of `settle_if_stale`, newest send first |
 | `stamind/retrospective_question.py` | the writer runs with the words in hand; the words stored right after it returns, alone when it fails |
+| `stamind/cli/bot/extraction.py` | `use_fast_model` moves here from `route.py`: the router now reads the queue and the queue imports the kinds, which call it |
 | `tests/test_bot.py` | the intents the bot answers itself gain `answer`, so the test that every intent lands somewhere still holds |
 | `designs/DESIGN_athlete_queue.md` §6.3, §9, §13.6; `designs/DESIGN_bot_simple_frontend.md` §5.3, §7, §12.9; `designs/DESIGN_cycle_retrospective.md` §4 | notes dated 2026-10-30 |
 | `docs/ARCHITECTURE.md` | the route flow, the `bot queue` flag, the bot's memory of sent questions |

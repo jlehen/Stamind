@@ -8,16 +8,17 @@ each decoder rejects the other two — a stale tap must never turn into an actio
 something else (DESIGN_bot_stop_button.md §7, DESIGN_athlete_queue.md §6.2,
 DESIGN_bot_simple_frontend.md §4.4).
 """
+import functools
 import shlex
-from typing import Optional
+from typing import Callable, NamedTuple, Optional
 
 from stamind import athlete_queue, journal, runtime
 from stamind.athlete_queue import QUEUE_NOT_NOW
 from stamind.chat import telegram_api
 from stamind.chat.keyboards import (
     BUSY_TAP, UI_STALE_TAP, answers_kept, decode_callback, decode_queue_callback,
-    decode_ui_callback, pages_kept, queue_later_rows, resolve_ui_action, tapped_choice,
-    tapped_label, ui_menu_rows,
+    decode_ui_callback, pages_kept, queue_callback_data, queue_later_rows, resolve_ui_action,
+    tapped_choice, tapped_label, ui_menu_rows,
 )
 from stamind.chat.replies import format_prompt_message
 from stamind.chat.routing import parse_message_to_argv
@@ -54,6 +55,31 @@ def tap_long_run(item_id: str, action: str) -> Optional[str]:
     if item is None or item["closed_at"]:
         return None
     return athlete_queue.long_run_name(item, action)
+
+
+class AnsweredMessage(NamedTuple):
+    """The message a queued item's answer is left under: its text, its keyboard's rows, the
+    label of the chosen button, and the two calls that edit it."""
+    text: Optional[str]
+    rows: list
+    label: Optional[str]
+    edit_text: Callable
+    edit_markup: Callable
+
+
+async def _leave_choice(message: AnsweredMessage) -> None:
+    """The message keeps its text, gains the choice and loses its buttons (§6.1), but for a
+    page button, which stays (DESIGN_short_messages.md §5)."""
+    pages = _keyboard_or_none(pages_kept(message.rows))
+    try:
+        if message.label and message.text:
+            await message.edit_text(
+                text=f"{message.text}\n\n→ {message.label}", reply_markup=pages
+            )
+        else:
+            await message.edit_markup(reply_markup=pages)
+    except Exception as exc:
+        journal.debug("bot.event", f"queue choice not echoed: {exc}")
 
 
 class CallbacksMixin:
@@ -134,7 +160,8 @@ class CallbacksMixin:
         with the item's buttons (DESIGN_waiting_proposal.md §5).
 
         A tap on an answer that starts a long run runs beside the chat, and is kept while
-        another long run is alive (DESIGN_long_runs_beside_chat.md §6, §7)."""
+        another long run is alive (DESIGN_long_runs_beside_chat.md §6, §7). A typed answer
+        takes the same path, from `_answer_typed` (§14.2)."""
         decoded = decode_queue_callback(data)
         if decoded is None:
             return
@@ -146,35 +173,62 @@ class CallbacksMixin:
             except Exception as exc:
                 journal.debug("bot.event", f"later choices not swapped in: {exc}")
             return
+        rows = _keyboard_rows(query.message)
+        await self._run_queue_answer(chat_id, item_id, action, AnsweredMessage(
+            getattr(query.message, "text", None), rows, tapped_label(rows, data),
+            query.edit_message_text, query.edit_message_reply_markup,
+        ))
+
+    def _remembered_message(self, chat_id: int, item_id: str, action: str):
+        """The message a typed answer is left under, from what the bot remembers, or None.
+        The chosen button is among its rows, or among the two later choices "Not now" swaps
+        in (DESIGN_athlete_queue.md §14.3)."""
+        sent = self.sent_questions.get(chat_id, {}).get(item_id)
+        if sent is None:
+            return None
+        edited = {"chat_id": chat_id, "message_id": sent.message_id}
+        return AnsweredMessage(
+            sent.text, sent.rows,
+            tapped_label(
+                sent.rows + queue_later_rows(item_id), queue_callback_data(item_id, action)
+            ),
+            functools.partial(self.bot.edit_message_text, **edited),
+            functools.partial(self.bot.edit_message_reply_markup, **edited),
+        )
+
+    async def _answer_typed(self, chat_id: int, item_id: str, action: str, text: str) -> bool:
+        """A typed message that answers a queued item runs what a tap on that button runs,
+        with the athlete's words (DESIGN_athlete_queue.md §14.2). False when it was refused."""
+        message = self._remembered_message(chat_id, item_id, action)
+        return await self._run_queue_answer(chat_id, item_id, action, message, text)
+
+    async def _run_queue_answer(
+        self, chat_id: int, item_id: str, action: str, message: Optional[AnsweredMessage],
+        text: Optional[str] = None,
+    ) -> bool:
+        """Runs `bot queue` for one answer, tapped or typed, and leaves the choice under its
+        message when there is one. False when the answer was refused: the chat is busy, or
+        the long run alive asks. Refused before the buttons go, so it can be given again
+        (DESIGN_long_runs_beside_chat.md §7)."""
         if self.sessions.get(chat_id) is not None:
             await self.bot.send_message(chat_id=chat_id, text=BUSY_TAP)
-            return
+            return False
         run = tap_long_run(item_id, action)
         argv = ["bot", "queue", item_id, action]
+        if text:
+            # One word with its flag, so a message that opens with a dash stays the value.
+            argv.append(f"--text={text}")
         held = await self._keep_behind(chat_id, argv, quiet=True, run=run) if run else None
-        # Refused while the long run alive asks, before the buttons go, so it can be tapped
-        # again (§7).
         if held == COACH_ASKED:
-            return
-        message = query.message
-        rows = _keyboard_rows(message)
-        label = tapped_label(rows, data)
-        # The message keeps its text, gains the choice and loses its buttons (§6.1), but for
-        # a page button, which stays (DESIGN_short_messages.md §5).
-        pages = _keyboard_or_none(pages_kept(rows))
-        try:
-            if label and getattr(message, "text", None):
-                await query.edit_message_text(
-                    text=f"{message.text}\n\n→ {label}", reply_markup=pages
-                )
-            else:
-                await query.edit_message_reply_markup(reply_markup=pages)
-        except Exception as exc:
-            journal.debug("bot.event", f"queue choice not echoed: {exc}")
+            return False
+        self.sent_questions.get(chat_id, {}).pop(item_id, None)
+        if message is not None:
+            await _leave_choice(message)
         if held:
-            return
+            return True
         self._log(chat_id, "  ", f"run: {shlex.join(argv)}")
         await self._start_command(chat_id, argv, quiet=True, run=run)
+        return True
 
     async def on_callback(self, update, context) -> None:
         query = update.callback_query

@@ -141,6 +141,9 @@ def add_bot_parser(subparsers):
         help="The tapped button: a<n> for an answer, d, s, h, t or b",
     )
     b_queue.add_argument(
+        "--text", help="What the athlete typed, used by an answer that asks for words",
+    )
+    b_queue.add_argument(
         "--next", action="store_true",
         help="Send the first item of the line, unless an item is out",
     )
