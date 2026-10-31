@@ -1072,8 +1072,8 @@ on 2026-10-13.
 - A typed answer that never comes. The athlete taps "Tell me" and types nothing. The command
   ends after five minutes, the item stays out, and the line waits until the next morning.
   Before the line, the round stopped there too. Amended 2026-10-30 (§14, designed, not
-  built): no command waits any more; the tap prints the question and ends, and the item
-  stays out until she types or the next morning, the same outcome.
+  built): the text prompt is gone from the chat; the tap prints the question and ends, and
+  the item stays out until she types or the next morning, the same outcome.
 
 ### 13.7 Touch points
 
@@ -1171,13 +1171,14 @@ sees it.
 
 **A live question** is a waiting item that was sent, is not closed, and still passes its
 kind's check, the one the line runs on its way (`settle_if_stale`, §3, §13.2 rule 7): its
-buttons work. One that fails the check is closed on the way and not shown, as the line does
-it; a proposal that is out of date, or sets named in Connect since the question, cannot take a
-typed answer, as their buttons only say "out of date". A later choice, "⏰ In 1 hour" or
-"⏰ Ask me tomorrow", clears the send (§13.2), so a put-off item is not live until it comes
-back; "🕐 Not now" alone only swaps the buttons. The proposal, which stands alone
-(DESIGN_waiting_proposal.md §3), and the bare questions (DESIGN_waiting_proposal.md §6.3) are
-live like the rest. The list is newest first, by the time of the send.
+buttons work. One that fails the check is not shown. `bot route` only reads, so it closes
+nothing; the next send or tap closes the item, as today. A proposal that is out of date, or
+sets named in Connect since the question, cannot take a typed answer: their buttons only say
+"out of date". A later choice, "⏰ In 1 hour" or "⏰ Ask me tomorrow", clears the send
+(§13.2), so a put-off item is not live until it comes back; "🕐 Not now" alone only swaps the
+buttons. The proposal, which stands alone (DESIGN_waiting_proposal.md §3), and the bare
+questions (DESIGN_waiting_proposal.md §6.3) are live like the rest. The list is newest first,
+by the time of the send.
 
 Each entry is the question as the chat drew it, its lead line aside (`queue_chat_message`: for
 a proposal its short text and "Shall I make these changes?", never the long text), with its
@@ -1205,23 +1206,19 @@ says nothing else. The rules the router is given:
   the coach something: "Honestly it is a bit too much. No rest day enough." names "Tell me"
   and is `coach_message` too.
 
-`bot route` prints `{"intent": …, "answer": {"item": 12, "action": "a1", "label": "Tell me"}}`,
-or `"answer": null`. A pick outside the list it showed is no answer, and the intent `answer`
-with no answer prints `unclear`. The bot holds the item to digits and the action to letters
-and digits before it builds argv, the shape a button's data is held to
-(`decode_queue_callback`, §6.2).
+`bot route` prints `{"intent": …, "answer": {"item": 12, "action": "a1"}}`, or `"answer":
+null`. A pick outside the list it showed is no answer, and the intent `answer` with no answer
+prints `unclear`. The bot reads the pick as a tap, `q:12:a1`, and hands it to the tap's path,
+which decodes it as it decodes a button (§6.2).
 
 **What the bot does with it.**
 
 1. No answer named: as today.
 2. An answer named: the bot runs `bot queue <item> <action> --text "<her message>"` through
-   the tap's path (§6.2), long-run checks included (DESIGN_long_runs_beside_chat.md §6). That
-   path starts with the tap's busy check: the router runs outside the chat's place, so "ok"
-   typed twice in two seconds would otherwise start `bot queue` twice; the second gets "A
-   command is still running…". `bot queue` uses the text, stripped, for an answer that asks
-   for words and ignores it otherwise; an empty text leaves the item as it was, as the
-   prompt's did. The question's message is edited as after a tap: buttons gone, "→ ✅ Change
-   it" under its text (§14.3).
+   the tap's path (§6.2), its busy check and its long-run check included
+   (DESIGN_long_runs_beside_chat.md §6). `bot queue` uses the text, stripped, for an answer
+   that asks for words and ignores it otherwise. The question's message is edited as after a
+   tap: buttons gone, "→ ✅ Change it" under its text (§14.3).
 3. On an answer that asks for words, when the intent is `coach_message` or `tweak_session`,
    the message also goes to the coach, as it would with no question open: her words are in
    the record and the coach proposes. `bot queue` holds the chat's place and the coach's run
@@ -1244,8 +1241,10 @@ taps "Tell me" at 07:05; `bot queue` prints that answer's question, "How did it 
 words?", and ends; the item stays out. Her next message is a typed answer like any other: the
 router names "Tell me", and the coach hears the words when they say how she is. Before this,
 the prompt took her next message before the router saw it, so the same words gave the record
-alone after a tap and the record plus the coach without one. It also removes the one chat
-command that waited on the athlete (§6.3, §13.6). The terminal keeps its prompt (§14.5).
+alone after a tap and the record plus the coach without one. It removes the text prompt from
+the chat (§6.3, §13.6). The chooser that follows a typed exercise name, "Which exercise is
+…?", still asks on the spot (DESIGN_strength_tracking.md §7). The terminal keeps its prompt
+(§14.5).
 
 The sentence she learns: anything you can tap, you can type, and when I ask for your words,
 your coach hears them too.
@@ -1255,15 +1254,17 @@ your coach hears them too.
 After a tap, the question's message keeps its text, shows the choice under it and loses its
 buttons (§6.1). The bot can do that because the tap arrives with the message. A typed answer
 arrives on its own, and the bot stores nothing about the questions it sent (§6.2). Now it
-remembers, per chat, the message of each question it sent: the message id, the text and the
-rows of buttons, the last twenty. On a typed answer it edits that message exactly as a tap
-would, the page button kept (DESIGN_short_messages.md §5) and the morning offer drawn under a
-proposal gone with the answers (DESIGN_waiting_proposal.md §5). The line left under the
-question is the button's label, "→ ⏰ Ask me tomorrow" for a typed "later", as after a tap.
-That memory is cosmetic and empties with a bot restart: a question sent before the restart
-keeps its buttons, the bot sends "→ ✅ Change it" as a line of its own under her message
-instead, and a tap on the old buttons later says "Already settled" (§4). Every button still
-works after a restart, as §6.2 promises.
+remembers, per chat, the message of each question it sent since it started: the message id,
+the text and the rows of buttons, each dropped once its item is answered. On a typed answer
+it edits that message exactly as a tap would, the page button kept (DESIGN_short_messages.md
+§5) and the morning offer drawn under a proposal gone with the answers
+(DESIGN_waiting_proposal.md §5). The line left under the question is the button's label, "→
+⏰ Ask me tomorrow" for a typed "later", found as the tap's path finds it, in the remembered
+rows and the two later choices. That memory is cosmetic and empties with a bot restart: a
+question sent before the restart keeps its buttons, `bot queue`'s own reply says what
+happened ("Done — your week is updated.", the writer's sentence), and a tap on the old
+buttons later says "Already settled" (§4). Every button still works after a restart, as §6.2
+promises.
 
 For that line to be true, a kind's own closed line (§3) is for an item closed as stale only.
 Today the proposal's "That proposal is out of date, so I left your week as it is." is said
@@ -1359,8 +1360,6 @@ Choices made without the author, each with the other way:
 
 ### 14.7 Not handled
 
-- Two yes-or-no questions live and a bare "yes": it answers the newest, and the older keeps
-  its buttons.
 - A message that answers two questions at once. One answer per message; the second question
   keeps its buttons.
 - "Yes, and…" to a question other than a proposal answers nothing. 18:40, "Shall I pass it to
@@ -1371,8 +1370,6 @@ Choices made without the author, each with the other way:
   again.
 - A typed answer after a bot restart leaves the old buttons; a tap on them says "Already
   settled" (§14.3).
-- Between the landing and the bots' restart, the old bot reads the new `bot route`: a typed
-  answer gets the fallback line, nothing runs.
 - An item shown in a terminal counts as sent (§13.4), so it is live for typing in the chat,
   where it was never shown. Only the operator's own terminal does that.
 - The router may misread. A misread "ok" applies a proposal she meant for something else, as
@@ -1382,15 +1379,15 @@ Choices made without the author, each with the other way:
 
 | Where | What |
 |---|---|
-| `stamind/cli/bot/route.py` | the live questions beside the goals and constraints, each as the chat drew it, with its buttons and the two later choices in place of "Not now"; the rules of §14.2 in the prompt; the pick checked against the list shown; a button answer forces the intent `answer`; the output gains `answer`, with the item, the action code and the label |
+| `stamind/cli/bot/route.py` | the live questions beside the goals and constraints, each as the chat drew it, with its buttons and the two later choices in place of "Not now"; the rules of §14.2 in the prompt; the pick checked against the list shown; a button answer forces the intent `answer`; the output gains `answer`, with the item and the action code |
 | `stamind/chat/routing.py` | the `answer` intent in the table, with no echo of its own |
 | `stamind/chat/runner.py` | `_route_intent` returns the whole object, not the intent alone |
-| `stamind/chat/messages.py` | `_simple_route` answers first, through the tap's path, then runs the coach lane when the intent is one |
+| `stamind/chat/messages.py` | `_simple_route` answers first, as a tap through the tap's path, then runs the coach lane when the intent is one |
 | `stamind/chat/callbacks.py` | the tail of `_handle_queue_callback` (the busy check, the long-run check, the edit, the run) becomes one method a tap and a typed answer both call, given the message to edit or none |
-| `stamind/chat/replies.py` | `_send_queue_item` remembers the message it sent, per chat and item, the last twenty |
+| `stamind/chat/replies.py` | `_send_queue_item` remembers the message it sent, per chat and item |
 | `stamind/cli/queue_commands.py` | `bot queue <id> <action> --text`; in the chat `_apply` prints the answer's question and ends when it has no text, and asks only on a terminal |
 | `stamind/cli/queue.py` | `settled_line` gives a kind's own line to an item closed as stale only; `queue_buttons` and the later choices are what the router's list is built from |
-| `stamind/athlete_queue.py` | the live items: waiting, sent, still worth asking, newest send first |
+| `stamind/athlete_queue.py` | the live items: waiting, sent, still worth asking by a read-only check split out of `settle_if_stale`, newest send first |
 | `stamind/retrospective_question.py` | the writer runs with the words in hand; words and lines stored in one write, the words alone on failure |
 | `tests/test_bot.py` | the intents the bot answers itself gain `answer`, so the test that every intent lands somewhere still holds |
 | `designs/DESIGN_athlete_queue.md` §6.3, §9, §13.6; `designs/DESIGN_bot_simple_frontend.md` §5.3, §7, §12.9; `designs/DESIGN_cycle_retrospective.md` §4 | notes dated 2026-10-30 |
@@ -1400,13 +1397,12 @@ Both bots restart on the day it lands: the bot's own code changes (`messages.py`
 `callbacks.py`, `replies.py`, `routing.py`, `runner.py`). The commands take effect at the
 landing. About 100 lines plus tests.
 
-Tests, one per rule: the router is shown a live question and not a put-off or a stale one; a
-pick outside the list shown is no answer; a button answer comes with the intent `answer`, a
-words answer keeps `coach_message`; the bot runs `bot queue` with `--text` and then the coach
-lane for a words answer, and `bot queue` alone for a button answer; a second message while
-`bot queue` runs gets the busy line; `_apply` given a text asks nothing, and in the chat prints
-the question and ends without one; the sent question's message is edited, and the line is
-sent on its own when none is remembered; a tap on an answered item gets the settled line and
-a stale one its kind's line; the retrospective record is written once when the coach's run
-starts beside the answer; the drop and "tomorrow" typed, and "later" under a bare question
-answering nothing.
+Tests, one per rule: the router is shown a live question and not a put-off or a stale one,
+and closes nothing; a pick outside the list shown is no answer; a button answer comes with
+the intent `answer`, a words answer keeps `coach_message`; the bot runs `bot queue` with
+`--text` and then the coach lane for a words answer, and `bot queue` alone for a button
+answer; `_apply` given a text asks nothing, and in the chat prints the question and ends
+without one; the sent question's message is edited; a tap on an answered item gets the
+settled line and a stale one its kind's line; the retrospective record is written once when
+the coach's run starts beside the answer; the drop and "tomorrow" typed, and "later" under a
+bare question answering nothing.
