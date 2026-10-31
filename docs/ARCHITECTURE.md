@@ -464,7 +464,10 @@ training data, so a wipe leaves them alone.
   `coach/engine/sessions.py`, so adding a sport there reaches both). Matching
   canonicalizes both sides and compares exactly ([§15](#15-design-rationale--history));
   `completed_activities.activity_type` keeps Garmin's raw string and every read
-  canonicalizes.
+  canonicalizes. `hiit` is a timed conditioning circuit the athlete follows on their own,
+  Garmin's HIIT profile: never a strength session, so the strength planner and the gym
+  button skip it, and the week planner's brief rule tells it apart from an interval ride
+  (DESIGN_strength_tracking.md §12).
 - `db.week_lock()` is one look at the week at a time, across processes: a `flock` on
   `<database>.week-lock`, re-entrant in a process, held by `workout_change`, by every run of
   the week planner from reading the week to saving its answer (a terminal lets go before it

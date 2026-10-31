@@ -1828,6 +1828,20 @@ Decided:
 - The load is the weight moved in one rep; both athletes on this instance log the pair.
 - On an exercise done one side at a time the reps are per side and a set is both sides,
   whether a side finishes first or the two take turns; the line says so as `4×8/side` (§4).
+- A timed conditioning circuit the athlete follows on their own is not a strength session
+  (added 2026-10-31). It is Friday, and the plan's second resistance session of the week is a
+  kettlebell HIIT. The athlete picks a Daniel PT video on YouTube, a different one each time,
+  and follows it. Written as a strength session, the strength planner had to invent its rows
+  (goblet squat 2×10 @ 44, swings 3×20 @ 26, a farmers carry), the chat offered the gym
+  logger for it, and the watch's HIIT recording, Garmin's type `hiit`, matched nothing. So
+  `hiit` is a sport of its own in `sports.py`, with Garmin's `hiit` as its only alias. The
+  week planner picks it from a preference that says the session is a follow-along video, and
+  the brief rule (§9) tells it that an interval ride or run is not `hiit`. The session gets a
+  normal description, its length and what it is for; the strength planner never sees it, the
+  gym button skips it, and the activity is graded on its minutes and load like a ride. The
+  strength history never shows it, and the athlete's weekly-structure guideline, which counts
+  the kettlebell HIIT as the week's second resistance session, needs no change: that is a
+  scheduling rule the week planner reads, and the sport name does not touch it.
 
 Open:
 

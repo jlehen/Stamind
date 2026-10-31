@@ -42,6 +42,7 @@ SPORT_EMOJI = {
     "ski_touring": "🎿",
     "rowing": "🚣",
     "downhill_skiing": "⛷️",
+    "hiit": "🔥",
     "rest": "🛌",
 }
 DEFAULT_SPORT_EMOJI = "🎽"

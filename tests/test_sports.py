@@ -71,6 +71,20 @@ class TestDownhillSkiing(unittest.TestCase):
         self.assertNotIn("backcountry_skiing", sport_aliases("downhill_skiing"))
 
 
+class TestHiit(unittest.TestCase):
+    """A follow-along conditioning circuit is its own sport, so it is never a strength
+    session and never reaches the strength planner (DESIGN_strength_tracking.md §12)."""
+
+    def test_garmins_hiit_profile_is_its_own_sport(self):
+        self.assertEqual(canonical_sport("hiit"), "hiit")
+        self.assertIn("hiit", CANONICAL_SPORTS)
+
+    def test_hiit_is_not_a_strength_sport(self):
+        from stamind.sports import is_strength_sport
+        self.assertFalse(is_strength_sport("hiit"))
+        self.assertNotIn("hiit", sport_aliases("strength_training"))
+
+
 class TestPromptAndCliWiring(unittest.TestCase):
     def test_coach_prompt_enum_lists_every_canonical_sport_plus_rest(self):
         from stamind.coach.engine.sessions import SPORT_TYPE_ENUM

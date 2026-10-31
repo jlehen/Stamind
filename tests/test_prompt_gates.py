@@ -63,6 +63,8 @@ SPOKEN_DATA = "## RECENT SESSIONS THE ATHLETE SPOKE ABOUT"
 
 STRENGTH_BRIEF_INSTRUCTIONS = "### WRITING A STRENGTH DAY"
 STRENGTH_KEEP_THE_REQUEST = "A brief names an exercise in one case only"
+STRENGTH_HIIT_IS_NOT_A_BRIEF = 'is\nsport "hiit", not a strength session'
+
 STRENGTH_REQUEST_INSTRUCTIONS = "asks for something INSIDE a strength session"
 
 OPEN_PROPOSAL_INSTRUCTIONS = "### REPLACING THE WAITING PROPOSAL"
@@ -163,6 +165,9 @@ class TestStrengthBriefRegion(unittest.TestCase):
                 # A request written into a brief outlives any rewrite of it
                 # (DESIGN_workout_tweak.md §4).
                 self.assertIn(STRENGTH_KEEP_THE_REQUEST, prompt)
+                # A follow-along circuit is sport hiit and gets no brief
+                # (DESIGN_strength_tracking.md §12).
+                self.assertIn(STRENGTH_HIIT_IS_NOT_A_BRIEF, prompt)
 
     def test_the_rule_for_a_request_comes_with_the_message(self):
         """Only a run with a message has a request to write into a brief (§4)."""

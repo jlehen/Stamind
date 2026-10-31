@@ -5,7 +5,7 @@ const SPORT_ICONS = {
     running: "fa-person-running", cycling: "fa-bicycle", hiking: "fa-mountain-sun",
     strength_training: "fa-dumbbell", yoga: "fa-spa", ski_touring: "fa-person-skiing-nordic",
     rowing: "fa-ship", downhill_skiing: "fa-person-skiing", resort_skiing: "fa-person-skiing",
-    swimming: "fa-person-swimming", rest: "fa-bed",
+    swimming: "fa-person-swimming", hiit: "fa-fire", rest: "fa-bed",
 };
 
 // --- WORKOUTS (read-only listing) ---

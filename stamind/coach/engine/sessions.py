@@ -145,6 +145,11 @@ strength, second week of the build, non-failure. 70 min at the gym. Keep the leg
 Saturday's long ride."
 A brief names an exercise in one case only: it was requested, and the brief says "as
 requested". When you rewrite such a brief, keep what it says was requested.
+A timed conditioning circuit the athlete follows on their own, such as a kettlebell video, is
+sport "hiit", not a strength session: give it a normal description with its length and what it
+is for, never a brief. An interval ride or run keeps its own sport; "hiit" is not for those.
+Nor is a circuit of exercises with sets and reps: that is a strength session, whatever the
+athlete calls it.
 """
 
 _STRENGTH_REQUEST_TASK = """

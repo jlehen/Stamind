@@ -252,6 +252,17 @@ class WhenItRunsTest(_PlannerCase):
         )
         self.assertEqual(result.checked, [("2026-09-17", "strength_training")])
 
+    def test_a_hiit_session_never_reaches_the_strength_planner(self):
+        """A follow-along conditioning circuit is sport hiit, not a strength session: no
+        call is made for it and it stays as the week planner wrote it (§12)."""
+        friday = {"date": "2026-09-18", "sport_type": "hiit", "title": "Kettlebell HIIT",
+                  "description": "[Kettlebell HIIT]\n30 min, a Daniel PT video.",
+                  "duration_minutes": 30, "rpe": 8, "tss": 40}
+        result = self.strength_pass([friday])
+        self.assertEqual(self.asked, [])
+        self.assertIsNone(result)
+        self.assertNotIn("prescribed_sets", friday)
+
 
 class CheckingTest(_PlannerCase):
     def setUp(self):

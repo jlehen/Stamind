@@ -42,6 +42,10 @@ SPORT_MAPPING = {
         "resort_skiing_snowboarding", "resort_skiing_snowboarding_ws",
         "alpine_skiing", "snowboarding",
     ],
+    # A timed conditioning circuit the athlete follows on their own, a kettlebell video for
+    # one: Garmin's HIIT profile. Its own sport so it never reaches the strength planner
+    # (DESIGN_strength_tracking.md §12).
+    "hiit": ["hiit"],
 }
 
 # The planned/canonical sports, in declaration order. Single source of truth for the CLI's
