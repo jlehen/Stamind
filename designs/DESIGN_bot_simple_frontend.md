@@ -320,6 +320,11 @@ Routing through a CLI subcommand rather than in-process keeps every OpenRouter c
 client, retries, exchange logs under `logs/llm_exchanges/` — on the one existing path,
 and keeps the bot importable without LLM plumbing.
 
+Amended 2026-10-30 (designed, not built): the router is also shown the queued questions whose
+buttons are live, each with its answers, and returns beside the intent which one the message
+answers, if any. The intent table gains `answer`, a message that answers a question and says
+nothing else (DESIGN_athlete_queue.md §14).
+
 ### 5.4 The fast model
 
 A *role*, read by `sm bot route` and by the capture calls of §12.2: the `fast-model`

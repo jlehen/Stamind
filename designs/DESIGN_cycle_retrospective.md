@@ -245,7 +245,9 @@ word, and the record waits its seven days as one with "nothing to say" does. "No
 brings it back. Before this it went out on six days in a row, and it was still open after the
 athlete had replied twice in words: a typed reply is not an answer (DESIGN_athlete_queue.md
 §6.3), so both went to `workout adapt`. Not handled: those typed words do not reach the record; the
-operator can add them with `plan retro redo ID --words`.
+operator can add them with `plan retro redo ID --words`. Designed the same day, not yet built:
+a typed reply names "tell me" and is stored as the answer, and the coach hears it too when it
+says how the athlete is (DESIGN_athlete_queue.md §14).
 
 ### One question at the end of a plan
 
