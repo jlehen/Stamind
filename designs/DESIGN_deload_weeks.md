@@ -549,7 +549,9 @@ Three small functions in `cli/common.py`, beside `deload_span`, hold the logic a
 - `deload_progress(mesocycle, today)`: "starts tomorrow", "starts in 2 days" or "day 3 of 7".
   `sm status` and the morning message read it.
 - `deload_heads(workouts)`: which listed session each deload's line goes before. It reads the
-  mesocycles with `get_governing_mesocycles` over the listed dates. Each renderer calls it when
+  mesocycles with `get_governing_mesocycles` over the listed dates, and tests each row with
+  `in_deload`, which is false for the nearest mesocycle that reader falls back to when none
+  overlaps. On an empty list it returns nothing and reads nothing. Each renderer calls it when
   `names_a_range` is true, as it does for the end-of-schedule marker.
 
 The 🔋 moves into `deload_span`, so the week view, the plan view, `sm workout list`, `sm status`
@@ -636,7 +638,9 @@ Tests:
   inside the deload.
 - `simple_mesocycle_lines` adds the line when the mesocycle has a date.
 - `plan_page.snapshot` carries `d`.
-- `sm status` prints the line; `sm calendar` marks a deload day and prints the line in both months
-  when the deload starts on the Monday of a week that crosses one.
+- `sm status` prints the line; `sm calendar` marks a deload day and prints the line once per month,
+  and in both months when the deload starts on the Monday of a week that crosses one. The two
+  `── Deload` assertions in `tests/test_deload_weeks.py` take the 🔋.
 - `miniapp/tests/calendar.test.mjs`: `sheetFor` gives a deload day a part, also an empty one;
-  `planRows` orders mesocycle, deload, Today, and dashes the rail of a row dated inside the deload.
+  `planRows` orders mesocycle, deload, Today, also when the deload starts on its mesocycle's first
+  day (§3.2), and dashes the rail of a row dated inside the deload.
