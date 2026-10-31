@@ -593,7 +593,8 @@ with no explanation beside it, in the chat too.
 
 These stand until the author says otherwise:
 
-1. **The line sits before the deload's first session, in the chat and the terminal.** The author
+1. **The line sits before the deload's first session, in the chat and the terminal.** *Ruled by
+   the author on 2026-10-31: it stays, over the objection.* The author
    picked `sm workout list` with its line "above the first deload day's row". *Objection by the
    review:* the terminal table is one block, so this takes three placements: under the row
    before, above the table when the first row is inside the deload, and between sessions under
