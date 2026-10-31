@@ -193,8 +193,10 @@ def send_alone(item: Dict[str, Any], offer: Sequence[dict] = ()) -> None:
 
 
 def settled_line(item: Optional[Dict[str, Any]]) -> str:
-    """What a tap on a closed item is told: its kind's own line when it has one."""
-    if item is None:
+    """What a tap on a closed item is told. An item answered or dropped is settled; only
+    one its check closed gets its kind's own line. The check that has just closed it left
+    the row `item` was read from unmarked (§14.3)."""
+    if item is None or item["outcome"] in (ANSWERED, DROPPED):
         return QUEUE_SETTLED_LINE
     return athlete_queue.kind_of(item).closed_line or QUEUE_SETTLED_LINE
 

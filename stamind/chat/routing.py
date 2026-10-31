@@ -15,7 +15,8 @@ from typing import List, Optional, Sequence
 
 # The names the model may pick from, and what each one means to it (§5.3, widened by the
 # writes pass — §12.8 is the authoritative table). `sm bot route` builds its prompt from
-# this dict; the three tables under it say what each name runs.
+# this dict; the three tables under it say what each name runs. `answer` runs what `bot
+# route` names beside it (DESIGN_athlete_queue.md §14.2), so it is in none of them.
 ROUTER_INTENTS = {
     "show_today": "the athlete wants to see today's session or what to do today",
     "show_week": "the athlete wants to see the upcoming schedule / their week",
@@ -92,6 +93,7 @@ ROUTER_INTENTS = {
         "you message me at 7 instead?', 'stop the morning messages', 'don't message me "
         "after 8pm', 'stop asking me about that stuff')"
     ),
+    "answer": "the message answers one of the athlete's open questions and says nothing else",
     "help": "the athlete asks what they can say or how this works",
     "unclear": "anything else, or too ambiguous to route",
 }

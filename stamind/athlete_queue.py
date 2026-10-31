@@ -120,6 +120,13 @@ def answer_index(item: Dict[str, Any], action: str) -> Optional[int]:
     return index if 0 <= index < len(answers(item)) else None
 
 
+def asks_for(item: Dict[str, Any], action: str) -> Optional[str]:
+    """What the answer `action` names asks the athlete to type, or None when it asks
+    nothing (§6.3, §14.2)."""
+    index = answer_index(item, action)
+    return answers(item)[index].get("ask") if index is not None else None
+
+
 def long_run_name(item: Dict[str, Any], action: str) -> Optional[str]:
     """Which long run a tap on `action` starts beside the chat, or None when that answer
     starts none (DESIGN_long_runs_beside_chat.md §6)."""
@@ -174,16 +181,31 @@ def lived_out(item: Dict[str, Any]) -> bool:
     return clock.now() >= morning_of(queued) + timedelta(days=settings.confirmation_days() + 1)
 
 
-def settle_if_stale(item: Dict[str, Any]) -> bool:
-    """Closes an item its kind no longer finds worth asking, a confirmation that has lived
-    out its mornings, and an asked-once question left unanswered. True when it did (§3)."""
+def worth_asking(item: Dict[str, Any]) -> bool:
+    """False for an item its kind no longer finds worth asking, a confirmation that has
+    lived out its mornings, and an asked-once question left unanswered (§3). Reads only."""
     kind = kind_of(item)
     now = clock.now()
     asked_and_left = kind.asked_once and bool(item["sent_at"]) and not is_out(item, now)
-    if not (kind.is_stale(item) or asked_and_left or (kind.confirmation and lived_out(item))):
+    return not (kind.is_stale(item) or asked_and_left or (kind.confirmation and lived_out(item)))
+
+
+def settle_if_stale(item: Dict[str, Any]) -> bool:
+    """Closes an item that is no longer worth asking. True when it did (§3)."""
+    if worth_asking(item):
         return False
     runtime.db.close_queue_item(item["id"], STALE, clock.now())
     return True
+
+
+def live_items() -> List[Dict[str, Any]]:
+    """The questions a typed message can answer: sent, not closed and still worth asking,
+    so their buttons work. The newest send first (§14.2). Reads only."""
+    live = [
+        item for item in runtime.db.waiting_queue_items()
+        if item["sent_at"] and worth_asking(item)
+    ]
+    return sorted(live, key=lambda item: item["sent_at"], reverse=True)
 
 
 def _ready(now: datetime) -> List[Dict[str, Any]]:

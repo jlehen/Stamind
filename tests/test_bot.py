@@ -346,8 +346,8 @@ class RouterTablesTest(unittest.TestCase):
     # the echo, so a misroute between them changes what the athlete is told the coach
     # heard, never what is stored (§12.3).
     NOTE_INTENTS = {"add_constraint", "add_signal"}
-    # Intents the bot answers itself.
-    SPECIAL = {"help", "unclear"}
+    # Intents the bot answers itself; `answer` runs what `bot route` names beside it.
+    SPECIAL = {"help", "unclear", "answer"}
 
     def test_every_cli_intent_lands_somewhere_in_the_bot(self):
         for intent in routing.ROUTER_INTENTS:

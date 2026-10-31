@@ -470,20 +470,6 @@ class ChatTest(_QueueCase):
         self.assertEqual([b["label"] for b in sent["buttons"]][3:],
                          ["Leave it unnamed", "🕐 Not now"])
 
-    def test_a_typed_answer_asks_for_its_text(self):
-        item_id = self.ask("A")
-        runtime.prompt = _Prompt(typed="cable row")
-        _, out, _ = self.tap(item_id, "a3")
-        self.assertEqual(self.applied, [(item_id, 2, "cable row")])
-        self.assertIn("Named A: cable row.", out)
-
-    def test_an_empty_typed_answer_leaves_the_item_waiting(self):
-        item_id = self.ask("A")
-        runtime.prompt = _Prompt(typed="")
-        self.tap(item_id, "a3")
-        self.assertEqual(self.applied, [])
-        self.assertIsNone(self.item(item_id)["closed_at"])
-
 
 class MorningTest(_QueueCase):
     """`bot morning` ends by sending the first item of the line (§13.2 rule 4)."""

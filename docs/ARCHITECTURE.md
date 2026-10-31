@@ -123,7 +123,8 @@ classes themselves.
   - **A message is a CLI command line**, run through `stamind_cli.py` as a subprocess
     (`STAMIND_FRONTEND=json`, `STAMIND_RENDER=simple`). A leading `/` is the line as
     typed, a keyboard label runs fixed argv, and other text is classified by `sm bot
-    route` (`routing.ROUTER_INTENTS`; the fast model picks an intent, never argv). Prose
+    route` (`routing.ROUTER_INTENTS`; the fast model picks an intent, and the button of a
+    live question the message answers, never argv). Prose
     comes back as text; a prompt, a chart, a button row, a flush and a queued item come
     back as sentinel frames (`sentinels.py`, [§6](#6-singletons)). Every Telegram call but the
     poll goes through `telegram_api.retrying_request` (DESIGN_telegram_send_retry.md §2).
@@ -158,10 +159,18 @@ classes themselves.
     DESIGN_short_messages.md §3–§6).
   - **The athlete queue** travels as `SM-QUEUE` (`cli/queue.py`); a tap runs `sm bot
     queue <id> <action>` (`cli/queue_commands.py`), which applies the action and sends
-    the next item, and the buttons carry `q:<id>:<action>` so the bot stores nothing
-    (DESIGN_athlete_queue.md §6.2, §13). A tap whose answer queued a question is followed
-    by it, and an answer may put its own item off until the next morning
+    the next item, and the buttons carry `q:<id>:<action>`, so every button works after a
+    restart (DESIGN_athlete_queue.md §6.2, §13). A tap whose answer queued a question is
+    followed by it, and an answer may put its own item off until the next morning
     (`queue_kind.PutOff`, DESIGN_chat_questions.md §6).
+  - **A typed reply is an answer**: `sm bot route` is shown `athlete_queue.live_items()` and
+    returns `{"intent", "answer": {"item", "action"}}`. The bot reads the pick as a tap
+    (`keyboards.typed_tap`, `callbacks._run_queue_answer`) and runs `bot queue <id> <action>
+    --text=<message>`; an answer that asks for words with the intent `coach_message` or
+    `tweak_session` also goes to the coach. In the chat a tap on such an answer opens no
+    prompt: `bot queue` prints what it asks and ends. `ChatBot.sent_questions` remembers
+    each question's message since the start, so a typed answer can edit it
+    (DESIGN_athlete_queue.md §14).
   - **A change made out of the athlete's sight** is told by the hidden `bot changes`
     before any push or reply; the rule is `stamind/heads_up.py`
     (DESIGN_change_heads_up.md).
@@ -193,7 +202,7 @@ One line per module; the rule each keeps is the part worth knowing before openin
 | `workout_state.py` | — | Two of a session's three axes ([§5](#workout-state--three-orthogonal-axes-not-one-enum)): `modification_markers` and `calendar_status`; derived from a row, no database, so the web app can import it |
 | `learning_confidence.py` | — | What a learning's confidence means: the levels, `derive_confidence`, `step_down`, dormancy. Pure rules (DESIGN_evidence_based_confidence.md §3) |
 | `learning_doubts.py` | — | The `learning` queue kind and `settle_doubts`, which every reflect and bootstrap calls (DESIGN_learning_doubt_nudge.md) |
-| `athlete_queue.py` | — | The queue of questions and messages for the athlete: `KINDS`, the line, what is out, and the check the scheduler makes on a wake (DESIGN_athlete_queue.md). Rows in `db/queue.py`; shown and sent by `cli/queue.py`; the commands in `cli/queue_commands.py` |
+| `athlete_queue.py` | — | The queue of questions and messages for the athlete: `KINDS`, the line, what is out, the questions a typed message can answer, and the check the scheduler makes on a wake (DESIGN_athlete_queue.md). Rows in `db/queue.py`; shown and sent by `cli/queue.py`; the commands in `cli/queue_commands.py` |
 | `queue_kind.py` | — | What a feature brings to the queue: `Kind`, `queue(kind, subject, payload)`, `queue_replacing` (a confirmation that closes an older one about the same row), `NotApplied` and `PutOff` (what an answer raises to leave its item waiting, or to put it off until the morning). Apart from `athlete_queue.py` to break the cycle through `strength/sets.py` |
 | `heads_up.py` | — | Telling the athlete about a change made out of their sight: the wording, the send rule (`due`, `changes_due`, `sends_after_delay`), `changes_notify_upto` (DESIGN_change_heads_up.md). Pure but for `waiting()`/`changes_due()`, so `db/workout_change.py` imports it safely |
 | `freshness.py` | — | How fresh is fresh enough, for Garmin and the Calendar: `last_pull_age`, `fresh_notice`. Flat because `garmin/` and `gcal/` must not import each other; the decision stayed with each caller ([§15](#15-design-rationale--history)) |

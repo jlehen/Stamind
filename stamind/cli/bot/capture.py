@@ -18,9 +18,8 @@ from stamind import runtime, signals
 from stamind.cli.bot import hand_off
 from stamind.cli.bot.edit import edit_capture
 from stamind.cli.bot.extraction import (
-    CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find,
+    CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find, use_fast_model,
 )
-from stamind.cli.bot.route import use_fast_model
 from stamind.cli.bot.test_result import capture_test_result
 from stamind.cli.candidates import (
     confirm_new_constraints, confirm_new_signals, open_ended, queue_candidates,

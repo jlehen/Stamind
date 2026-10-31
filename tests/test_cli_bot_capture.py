@@ -702,12 +702,11 @@ class TestResultQuestionTest(_CaptureCase):
         [self.item] = test_db.waiting_queue_items()
 
     def _tap(self, answers=True, typed="250"):
-        prompt = self.prompt(answers)
-        prompt.ask_text = lambda message, **kw: typed
+        self.prompt(answers)
         extraction = {"kind": "ftp", "value": "250", "performed": False,
                       "session_id": None, "note": None}
         with patch("stamind.openrouter.OpenRouterClient.complete", return_value=extraction):
-            code, out, _ = run_cli(["bot", "queue", str(self.item["id"]), "a1"])
+            code, out, _ = run_cli(["bot", "queue", str(self.item["id"]), "a1", "--text", typed])
         return code, out
 
     def test_the_companion_asks_with_the_three_buttons(self):
@@ -741,11 +740,10 @@ class TestResultQuestionTest(_CaptureCase):
         self.assertIsNone(test_db.get_queue_item(self.item["id"])["closed_at"])
 
     def test_a_failed_call_while_answering_asks_nothing_new(self):
-        prompt = self.prompt(True)
-        prompt.ask_text = lambda message, **kw: "236"
+        self.prompt(True)
         with patch("stamind.openrouter.OpenRouterClient.complete",
                    side_effect=ValueError("no api key")):
-            _code, out, _ = run_cli(["bot", "queue", str(self.item["id"]), "a1"])
+            _code, out, _ = run_cli(["bot", "queue", str(self.item["id"]), "a1", "--text", "236"])
         self.assertIn("Nothing recorded.", out)
         self.assertEqual(
             [item["kind"] for item in test_db.waiting_queue_items()], [test_result.KIND]
@@ -754,10 +752,11 @@ class TestResultQuestionTest(_CaptureCase):
     def test_a_number_the_chat_cannot_use_asks_again(self):
         extraction = {"kind": "ftp", "value": "fine", "performed": False,
                       "session_id": None, "note": None}
-        prompt = self.prompt(True)
-        prompt.ask_text = lambda message, **kw: "it went fine"
+        self.prompt(True)
         with patch("stamind.openrouter.OpenRouterClient.complete", return_value=extraction):
-            _code, out, _ = run_cli(["bot", "queue", str(self.item["id"]), "a1"])
+            _code, out, _ = run_cli(
+                ["bot", "queue", str(self.item["id"]), "a1", "--text", "it went fine"]
+            )
         self.assertIn("Nothing recorded.", out)
         item = test_db.get_queue_item(self.item["id"])
         self.assertIsNone(item["closed_at"])

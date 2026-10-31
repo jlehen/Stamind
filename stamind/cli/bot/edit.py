@@ -22,9 +22,8 @@ from stamind import clock, runtime
 from stamind.cli.bot import hand_off
 from stamind.cli.bot.extraction import (
     CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find, nominate_rows,
-    upcoming_sessions, valid_date,
+    upcoming_sessions, use_fast_model, valid_date,
 )
-from stamind.cli.bot.route import use_fast_model
 from stamind.cli.render.plan_lines import (
     picker_label, simple_constraint_edit_lines, simple_goal_edit_lines, simple_goal_line,
 )

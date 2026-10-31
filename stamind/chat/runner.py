@@ -363,9 +363,11 @@ class RunnerMixin:
         session.task = asyncio.create_task(self._drive(session))
         return session
 
-    async def _route_intent(self, text: str) -> str:
+    async def _route_intent(self, text: str) -> dict:
         """Runs `sm bot route` silently — output captured here, never streamed to the
-        chat — and returns the intent, 'unclear' on any failure or timeout (§5.3)."""
+        chat — and returns its object, the intent and the question it answers, with the
+        intent 'unclear' on any failure or timeout (§5.3, DESIGN_athlete_queue.md §14.2)."""
+        unclear = {"intent": "unclear", "answer": None}
         proc = None
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -386,16 +388,17 @@ class RunnerMixin:
                 proc.kill()
             except ProcessLookupError:
                 pass
-            return "unclear"
+            return unclear
         except Exception:
-            return "unclear"
-        # The intent is the last JSON line; anything above it is stray CLI prose.
+            return unclear
+        # The object is the last JSON line; anything above it is stray CLI prose.
         for line in reversed(out.decode("utf-8", "replace").splitlines()):
             line = line.strip()
             if not line.startswith("{"):
                 continue
             try:
-                return str(json.loads(line).get("intent") or "unclear")
+                route = json.loads(line)
             except json.JSONDecodeError:
                 continue
-        return "unclear"
+            return {"intent": str(route.get("intent") or "unclear"), "answer": route.get("answer")}
+        return unclear
