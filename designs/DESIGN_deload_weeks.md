@@ -1,7 +1,7 @@
 # Design: Deload weeks the plan dates
 
-**Status:** Built 2026-10-30, five choices ruled the same day (§7) · **Date:** 2026-10-19 ·
-**Branch:** worktree-deload-weeks-design
+**Status:** Built 2026-10-30, five choices ruled the same day (§7); §11, the deload in words,
+is not built · **Date:** 2026-10-19 · **Branch:** worktree-deload-weeks-design
 
 A **deload** is a lighter recovery week: it cuts volume much more than intensity, so the
 fatigue of the loading weeks before it clears (`stamind/science/periodization.md`). Today a
@@ -381,7 +381,8 @@ stand as written until the author says otherwise.
    both themes, and colour-blind readers can tell them apart too.
 7. **The legend gives each deload its own row.** The other way is one fixed key line, "dashed
    strip: deload week", which the reader has to match to the cells.
-8. **The calendar only, on the companion side.** The "Goals & plan" page, the chat's plan
+8. *Overturned by the author on 2026-10-31: see §11.*
+   **The calendar only, on the companion side.** The "Goals & plan" page, the chat's plan
    view, `sm status`, the web dashboard's plan page and the retrospective records show no
    deload. Each could later take the same date. The web dashboard's plan diff shows a moved
    deload already, since it prints changed fields as they come.
@@ -480,3 +481,140 @@ DESIGN_plan_change_continuity.md.
 - `sm calendar` prints the `── Deload` line under the week the deload starts in.
 - `miniapp/tests/calendar.test.mjs`: a day from `d` to the mesocycle's last day is a deload
   day and a day before `d` is not, and the legend gives a deload in the month its own row.
+
+## 11. Amendment, 2026-10-31: the deload in words
+
+The author asked for the deload to be more visible, in the terminal and in Telegram. With §5
+alone an athlete sees it only by opening the calendar and noticing a dashed strip, or by running
+`plan show`. Every line below reads the date §4.1 stores, and a mesocycle without one prints
+nothing. This section overturns choice 8, and changes where §5.2 prints the `sm calendar` line.
+
+### 11.1 What the athlete sees
+
+Take a mesocycle from 19 October to 8 November, with `deload_start` on Monday 2 November.
+
+**The morning message** (`cli/bot/views.py::run_bot_morning`). On Sunday 1 November it ends with
+"🔋 Your deload starts tomorrow, until Sun 8 Nov." On Wednesday 4 November it opens with
+"🔋 Deload, day 3 of 7." The other deload days say the same with their own number. These are
+statements, so they do not go through the athlete queue. They are text from the date, so they
+cost no model call and need no marker of what was already said. A morning that sends nothing,
+because the schedule has run out, stays silent.
+
+**The chat's week view** (`cli/render/session_lines.py::simple_week_lines`) and **`sm workout
+list`** (`cli/workouts/listing.py::print_workout_table`) put one line before the first listed
+session of each deload. On Saturday 31 October the athlete opens the week:
+
+    🗓 Coming up:
+    Sat 31 · 🚴 Long ride
+    Sun 01 · 🧘 Yoga
+    🔋 Deload Mon 2 Nov to Sun 8 Nov
+    Mon 02 · 🏋️ Gym
+
+If the first row listed is already inside the deload, the line comes first. A listing of named
+workout IDs is not a range, so it prints no such line, as it prints no end-of-schedule marker.
+
+**The chat's plan view** (`cli/render/plan_lines.py::simple_mesocycle_lines`) gets one more line
+under the mesocycle's window: "🔋 Deload Nov 02 – Nov 08", in that view's date form
+(`simple_mesocycle_window`). `run_bot_mesocycle` prints the same lines, so a mesocycle's own
+message has it too.
+
+**The "Goals & plan" page** (`cli/render/plan_page.py`, `miniapp/plan_logic.js`,
+`miniapp/plan.js`) gets a row of its own in the timeline, in date order: "🔋 Deload · 2 Nov –
+8 Nov", right after its mesocycle's row. The rail is one stretch per row, so it can only be
+dashed on a row of its own: dashing the mesocycle's row would dash all three weeks. Rows dated
+inside the deload, the Today line or a goal, get the dashed rail too. On Wednesday 4 November
+the page reads: the mesocycle, the deload, Today. The row cannot be tapped, like the Today line.
+
+**The calendar page's day sheet** (`miniapp/calendar_logic.js::sheetFor`). Tapping Wednesday
+4 November opens a part headed "Deload" with the legend's words, "2 Nov – 8 Nov". It opens after
+a goal's part and before the sessions. `sheetFor` returns null on a day with nothing to say, and
+then the sheet does not open. A deload day now always has something to say, so an empty deload
+day opens too.
+
+**`sm status`** (`cli/status.py`) prints a line under the active mesocycle: "Deload Mon 2 Nov to
+Sun 8 Nov, starts in 2 days", then "…, day 3 of 7" from the Monday.
+
+**`sm calendar`** (`cli/render/calendar_grid.py`) marks each deload day with 🔋 beside its number,
+after `◆` and `•`, and the line under the week becomes `── 🔋 Deload Mon 2 Nov to Sun 8 Nov` in
+cyan, no longer grey. The line now goes under the first week of the month shown that holds a
+deload day, rather than the week the deload starts in. A deload from Monday 30 November to
+Sunday 6 December then has its line in both months, so December's marks are explained.
+
+### 11.2 The code
+
+Three small functions in `cli/common.py`, beside `deload_span`, hold the logic and the words:
+
+- `deload_covering(mesocycles, day)`: the mesocycle whose deload holds `day`, or None.
+- `deload_progress(mesocycle, today)`: "starts tomorrow", "starts in 2 days" or "day 3 of 7".
+  `sm status` and the morning message read it.
+- `deload_heads(workouts)`: which listed session each deload's line goes before. It reads
+  `get_governing_mesocycles` over the listed dates. `run_workout_list` calls it once, and hands
+  the answer to `runtime.render.workout_list`, so both renderers place the line by one rule.
+
+The morning message finds the deload with `get_covering_mesocycle`, today's and tomorrow's. The
+terminal table is drawn as one block by `render_table`, so the line goes through its `under`
+argument, under the row before; `-vv` prints it between the sessions.
+
+The page data: `plan_page.py::snapshot` builds each row with `calendar_page.py::_meso_entry`,
+made public as `meso_entry`, so the plan's snapshot carries `d`. When the snapshot is over budget
+the summaries go and `d` stays. `calendar_logic.js` gets `deloadOn(snapshot, iso)`, the mesocycle
+or null, and `isDeloadDay` becomes that as a boolean. The legend and the sheet share one function
+for "2 Nov – 8 Nov". `calendar.css` gets `.rail.deload`, the same dashes turned 90 degrees, since
+the rail runs down the page.
+
+### 11.3 Not handled
+
+- **A `workout generate` preview** shows no deload line. The plan's dates are already fixed, and
+  the sessions it lists land in the week view once accepted.
+- **A single day's view** (`workout show`, the chat's day) shows no line. The morning message and
+  the day sheet say it.
+- **`sm status` under a mesocycle with no deload** prints nothing, even when the next mesocycle
+  has one. `sm calendar` and `plan show` show it.
+- **A `plan generate` that moves a deload after the heads-up.** The athlete was told "tomorrow",
+  and the next morning's message says what the new date says.
+
+### 11.4 Choices made without asking
+
+The author ruled on these: the morning message speaks the day before and on every deload day;
+the four Telegram views and the three terminal commands above all show it; the word is "deload",
+with no explanation beside it, in the chat too.
+
+These stand until the author says otherwise:
+
+1. **The line sits before the deload's first session, not at the top of the list.** The first
+   version put it above the whole list in the chat. In place, the reader sees where the lighter
+   days start, and the same rule holds in the chat and the terminal. The other way is one line
+   above the list, which costs less in the terminal table.
+2. **The page gets a row, not a longer mesocycle row.** The other way keeps one row per mesocycle,
+   with the deload's dates as text on it and no dashed rail.
+3. **The plan view shows the deload of a finished mesocycle too.** The author chose "for every
+   mesocycle that has one". The other way hides it on a ✅ mesocycle, one condition more.
+4. **🔋 everywhere.** The progress view already says "recent rest is banking energy 🔋".
+5. **The day sheet shows the dates, not "day 3 of 7".** They are the legend's words, and the page
+   has no other use for a count.
+6. **Cyan in `sm calendar`.** It is already the colour of dates in `sm status`. Yellow reads as a
+   warning.
+
+### 11.5 Build and tests
+
+Build: the three functions and their tests; the terminal (`sm status`, `sm workout list`, `sm
+calendar`); the chat (morning, week view, plan view); the pages (snapshot, row, rail, sheet); then
+the documents: DESIGN_calendar_miniapp.md §3.7, §5 and §7, and ARCHITECTURE.md where a data flow
+or a command changes. The pages need a Pages deploy, which needs a push the author approves, and
+the chat lines need a bot restart. All of it shows nothing until the author runs §9's step 7
+`plan generate` on each instance. On 2026-10-31 no mesocycle on either instance has a date.
+
+Tests:
+
+- `deload_progress` for tomorrow, in two days, the first day and the last day.
+- `run_bot_morning` opens with the line on a deload day, ends with it the day before, says
+  nothing on other days and with no date, and stays silent when the schedule has run out.
+- `deload_heads`: a list that starts before the deload, one that starts inside it, a sport filter
+  that leaves no row in it, and two deloads.
+- `simple_mesocycle_lines` adds the line when the mesocycle has a date, and
+  `simple_mesocycle_buttons` still labels from the first line.
+- `plan_page.snapshot` carries `d`, also after the summaries are dropped.
+- `sm status` prints the line; `sm calendar` marks a deload day and prints the line in both months
+  of a deload that crosses one.
+- `miniapp/tests/calendar.test.mjs`: `sheetFor` gives a deload day a part, also an empty one;
+  `planRows` orders mesocycle, deload, Today, and dashes the rail of a row dated inside the deload.
