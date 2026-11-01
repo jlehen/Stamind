@@ -772,6 +772,15 @@ the label on every group. Simple mode (DESIGN_bot_simple_frontend.md §6) render
 preview as prose and reuses the same groups, unwrapped, since that client flows text
 itself.
 
+**The words that changed are marked inside a pair** (added 2026-11-01). A pair is still two
+whole lines. On the details page and in a terminal, the words that differ between them are
+highlighted, because finding one new word in two near-identical sentences was the hard part
+of reading a pair. On a Saturday ride, "so it is shorter" became "so it is deliberately
+shorter", and only "deliberately" is tinted. When fewer than half of the two lines' words
+match (`MOSTLY_SAME`), nothing is marked, because marks would break up a line that was
+rewritten anyway. A chat with no page keeps plain pairs, and so does the text the week planner
+reads.
+
 **A quoted passage is whole lines, with the blank lines that stood between them.** The
 diff first compared sentences, and that went wrong twice.
 

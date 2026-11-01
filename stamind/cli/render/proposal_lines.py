@@ -12,7 +12,7 @@ from stamind.cli.render.session_lines import (
     simple_date_word, simple_day_word, simple_session_line, sport_emoji, title_and_length,
 )
 from stamind.cli.workouts.revisions import (
-    rewritten_text_only, wording_group_lines, wording_groups,
+    CAME, GONE, rewritten_text_only, wording_group_lines, wording_group_sides, wording_groups,
 )
 from stamind.coach.proposals import RevisionProposal
 from stamind.text import wrap_text
@@ -171,13 +171,24 @@ def short_text(proposal: RevisionProposal, opening: Optional[str] = None) -> str
     return "\n\n".join(parts)
 
 
-def _before(existing: Optional[dict], text: str, passages: List[str]) -> str:
-    """The whole text of the session a card replaces, "" when the passages already show what
+def _before(existing: Optional[dict], text: str, changes: List[Any]) -> str:
+    """The whole text of the session a card replaces, "" when the changes already show what
     changed or it reads the same (§6.2)."""
-    if not existing or passages:
+    if not existing or changes:
         return ""
     before = (existing.get('description') or '').strip()
     return "" if before == text else before
+
+
+def _page_changes(pw: dict, existing: dict) -> List[List[Dict[str, Any]]]:
+    """The changed passages for the page, which draws and flows them itself: per passage, its
+    sides, each with its side, its label and its stretches of words (§6.2)."""
+    marks = {GONE: SIMPLE_GONE_MARK, CAME: SIMPLE_NEW_MARK}
+    return [
+        [{"side": side, "label": f"{marks[side]}{label}", "parts": parts}
+         for side, label, parts in wording_group_sides(group)]
+        for group in wording_groups(pw, existing)
+    ]
 
 
 def page_content(proposal: RevisionProposal) -> Dict[str, Any]:
@@ -191,11 +202,11 @@ def page_content(proposal: RevisionProposal) -> Dict[str, Any]:
     for pair in proposal.pairs:
         pw, existing = pair.proposal, pair.original
         text = (pw.get('description') or '').strip()
-        passages = _quotes(pw, existing) if rewritten_text_only(pw, existing) else []
+        changes = _page_changes(pw, existing) if rewritten_text_only(pw, existing) else []
         cards.append((pw['date'], {
             "line": _heading(pw, existing, today), "why": _own_reason(pw, proposal),
-            "passages": passages, "text": text, "before": _before(existing, text, passages),
-            "open": not passages,
+            "changes": changes, "text": text, "before": _before(existing, text, changes),
+            "open": not changes,
         }))
     for ew in proposal.removals:
         cards.append((ew['date'], {

@@ -65,6 +65,10 @@ def bold(text: str) -> str:
     return colorize(text, "\033[1m")
 
 
+def reverse(text: str) -> str:
+    return colorize(text, "\033[7m")
+
+
 def dim(text: str) -> str:
     return colorize(text, "\033[2m")
 

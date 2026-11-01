@@ -362,6 +362,35 @@ class TestCliWorkoutsAdapt(unittest.TestCase):
             "🟢 Now: EVERYTHING ELSE: 155–175 W.", stdout,
         )
 
+    def test_only_the_changed_words_of_a_rewritten_line_are_marked(self):
+        from stamind.cli.workouts.revisions import word_parts
+        old, new = word_parts("Squat: goblet squat 2×10 @ 44 kg", "Squat: goblet squat 4×8 @ 24 kg")
+        self.assertEqual([text for text, changed in old if changed], ["2×10", "44"])
+        self.assertEqual([text for text, changed in new if changed], ["4×8", "24"])
+        self.assertEqual("".join(text for text, _ in new), "Squat: goblet squat 4×8 @ 24 kg")
+
+    def test_a_line_mostly_rewritten_has_no_marked_words(self):
+        from stamind.cli.workouts.revisions import word_parts
+        self.assertEqual(
+            word_parts("Spin the hill home gently.", "No surges on the rollers."),
+            ([("Spin the hill home gently.", False)], [("No surges on the rollers.", False)]),
+        )
+
+    def test_a_terminal_highlights_changed_words_and_never_an_indent(self):
+        """The highlight is put on word by word once the text is wrapped, so a stretch that
+        runs over two lines does not light up the hanging indent between them."""
+        from stamind.cli.workouts.revisions import wording_group_lines
+        same = "one two three four five six seven eight nine ten"
+        group = ([f"{same} old1 old2 old3"], [f"{same} new1 new2 new3"])
+        with patch("stamind.text.is_color_enabled", return_value=True), \
+                patch.dict(os.environ, {"STAMIND_WRAP_WIDTH": "60"}):
+            _was, now = wording_group_lines(group)
+        self.assertIn("\033[7mnew1\033[0m", now)
+        self.assertIn("\033[7mnew3\033[0m", now)
+        self.assertNotIn("\033[7mone", now)
+        self.assertNotIn("\033[7m ", now)
+        self.assertIn("\n     ", now)
+
     def test_no_quoted_group_holds_a_blank_line(self):
         """Lines added with nothing standing for them are quoted together as long as they
         followed one another, and a blank line starts a new group. So a blank line in the

@@ -305,7 +305,9 @@ shows the summary, then one card per changed session, in date order. A card hold
   Low-Intensity Gravel Ride)";
 - the planner's one-sentence reason for this session (`change_reason`);
 - for a session whose title and load did not change, the passages that changed, as "Was"
-  and "Now" pairs (DESIGN_workout_revisions.md §9.1);
+  and "Now" pairs, with the changed words highlighted: tinted red and struck through on "Was",
+  tinted green on "Now" (DESIGN_workout_revisions.md §9.1). The page flows the text itself. A
+  proposal saved before this shows no pairs on its page, only its whole text;
 - the whole new description, folded, and opened by a tap. For a session that is new or has
   a new title, it is shown open, because no "Was" and "Now" pair exists for it.
 - the whole text of the session it replaces, folded under "🔴 As planned before" (D15). A card
@@ -566,6 +568,7 @@ The author asked for this on 2026-11-01, after reading short proposals on Telegr
 | ID | Topic | Ruling |
 |---|---|---|
 | D16 | What the chat says a session replaces | Each line of the list has a second line with the old session's title and length. This amends D2 (one short line per session) and D12. A2 stands: the chat still quotes no old or new text. |
+| D17 | The changed words of a "Was" and "Now" pair | Highlighted on the page and in a terminal. The author asked for it. Chosen for him when building: no highlight below half the words matching; red tint with a strikethrough and green tint on the page; reverse video in a terminal; a proposal saved before this shows no pairs on its page. |
 
 ## 14. Decided without asking the author
 
@@ -637,6 +640,7 @@ A choice the author overruled keeps its row, with the ruling beside it.
 | D14 | A day the Calendar does not reach | Its page says the details could not be loaded. Not handled. | Chosen in the build; the author kept it. | Build | 2026-10-27 |
 | D15 | Today as planned, under a proposal that changes it | Each card on the proposal's page holds, folded, the whole text of the session it replaces or drops. | The author's ruling after the code review. With no briefing above such a proposal, it keeps D8: she reads what she gives up before she answers. | Review | 2026-10-30 |
 | D16 | What the chat says a session replaces | A second line under each line of the list: the old session's title and length. | The author: "it's hard for me to say whether I'm ok with the replacement if I can't see what the proposal is replacing". Amends D2 and D12. The message stays about 150 words. | Request | 2026-11-01 |
+| D17 | Changed words in a pair | Highlighted on the page and in a terminal, with no highlight below half the words matching. | The author found the pairs hard to read when a long sentence changed by a word or two. | Request | 2026-11-01 |
 
 ## Dependency Graph & Implementation Order
 

@@ -262,7 +262,7 @@ class ShortProposalTest(_Case):
         self.assertIn("Today: Easy ride — 60 min", thursday["line"])
         self.assertEqual(thursday["why"], "Rough night.")
         # A new title: no passage to read first, so the whole text is shown open (§6.2).
-        self.assertEqual((thursday["passages"], thursday["open"]), ([], True))
+        self.assertEqual((thursday["changes"], thursday["open"]), ([], True))
         self.assertEqual(thursday["text"], "[Easy ride]\n60 easy minutes.")
         # What she gives up is on the page too, before she answers (§6.2, D8).
         self.assertEqual(thursday["before"], "[Intervals]\n90 minutes with intervals.")
@@ -270,6 +270,26 @@ class ShortProposalTest(_Case):
         self.assertEqual(removed["text"], "[Mobility yoga]\n25 minutes for the hips.")
         self.assertIn("Long ride — 120 min (new)", saturday["line"])
         self.assertEqual(saturday["before"], "")
+
+    def test_the_page_gets_a_rewritten_line_word_by_word(self):
+        title = {"sport_type": "cycling", "title": "Ride", "date": SATURDAY}
+        old = {**title, "description": "[Ride]\nRide 2 h, shorter than last week."}
+        new = {**title, "description": "[Ride]\nRide 2 h, deliberately shorter than last week."}
+        proposal = RevisionProposal(
+            reason="", workouts=[new], range_start=SATURDAY, range_end=SATURDAY,
+            pairs=(RevisionPair(new, old, False),),
+        )
+        card = proposal_lines.page_content(proposal)["cards"][0]
+        self.assertFalse(card["open"])
+        was, now = card["changes"][0]
+        self.assertEqual((was["side"], was["label"]), ("gone", "🔴 Was:"))
+        self.assertEqual("".join(text for text, _ in was["parts"]),
+                         "Ride 2 h, shorter than last week.")
+        self.assertEqual([text for text, changed in was["parts"] if changed], [])
+        self.assertEqual((now["side"], now["label"]), ("came", "🟢 Now:"))
+        self.assertEqual("".join(text for text, _ in now["parts"]),
+                         "Ride 2 h, deliberately shorter than last week.")
+        self.assertEqual([text for text, changed in now["parts"] if changed], ["deliberately"])
 
     def test_a_saved_proposal_keeps_its_short_text_and_its_page(self):
         item = saved_proposal.save(self.three_changes(), newest_written())

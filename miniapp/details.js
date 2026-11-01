@@ -33,6 +33,17 @@ function fold(label, text, open) {
   return box;
 }
 
+function changeSide(side) {
+  // One side of a changed passage, its changed words struck out or tinted (§6.2).
+  const line = element("p", "line");
+  line.append(element("span", "change-label", side.label), " ");
+  const tag = side.side === "gone" ? "del" : "ins";
+  for (const [text, changed] of side.parts) {
+    line.append(changed ? element(tag, "", text) : text);
+  }
+  return line;
+}
+
 function card(found) {
   // A changed session: its line, its own reason, the passages that changed, its whole text,
   // folded unless no passage stands before it, and the session it replaces, folded (§6.2).
@@ -41,8 +52,10 @@ function card(found) {
   if (found.why) {
     box.append(element("p", "line", found.why));
   }
-  for (const passage of found.passages || []) {
-    box.append(element("p", "line passage", passage));
+  for (const passage of found.changes || []) {
+    const quoted = element("div", "passage");
+    quoted.append(...passage.map(changeSide));
+    box.append(quoted);
   }
   if (found.text) {
     box.append(fold("The whole session", found.text, found.open));

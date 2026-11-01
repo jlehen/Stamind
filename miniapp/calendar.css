@@ -510,6 +510,27 @@ h1 {
   margin-top: 8px;
 }
 
+.change-label {
+  font-weight: 600;
+}
+
+/* The words a rewritten line changed. A tint with alpha reads on a light and a dark theme. */
+.passage del,
+.passage ins {
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.passage del {
+  background: rgba(229, 57, 53, 0.25);
+  text-decoration: line-through;
+}
+
+.passage ins {
+  background: rgba(67, 160, 71, 0.3);
+  text-decoration: none;
+}
+
 .card-text summary {
   min-height: var(--tap);
   line-height: var(--tap);

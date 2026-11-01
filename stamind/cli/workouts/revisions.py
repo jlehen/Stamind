@@ -5,10 +5,11 @@ The expert table lives here; the companion prose form of the same proposal is
 (DESIGN_render_persona.md §7).
 """
 import difflib
-from typing import Dict, List, Set, Tuple
+import re
+from typing import Callable, Dict, List, Set, Tuple
 
 from stamind.text import (
-    bold, cyan, format_labeled_text, gray, green, magenta, red, render_table, yellow,
+    bold, cyan, format_labeled_text, gray, green, magenta, red, render_table, reverse, yellow,
 )
 from stamind.cli.common import print_strength_notes
 from stamind.coach.proposals import RevisionProposal
@@ -21,6 +22,17 @@ WordingGroup = Tuple[List[str], List[str]]
 # How alike two lines must be for one to count as the other rewritten: a third of their
 # words, in the same order (DESIGN_workout_revisions.md §9.1).
 SAME_LINE = 1 / 3
+
+# A stretch of words in a quoted line, and whether it changed (§9.1).
+WordParts = List[Tuple[str, bool]]
+
+# How alike a rewritten line and its old form must be for their changed words to be marked.
+# Below this, most of the line changed, and marks would only break it up (§9.1).
+MOSTLY_SAME = 1 / 2
+
+# The two sides of a group: what goes and what comes.
+GONE = "gone"
+CAME = "came"
 
 
 def _stats(w: dict) -> str:
@@ -137,25 +149,71 @@ def wording_groups(proposal: dict, original: dict) -> List[WordingGroup]:
     return groups
 
 
+def _add_words(parts: WordParts, words: List[str], changed: bool) -> None:
+    """Add a stretch of words, with the space before it as a part of its own, so a highlight
+    never covers a space."""
+    if not words:
+        return
+    if parts:
+        parts.append((" ", False))
+    parts.append((" ".join(words), changed))
+
+
+def word_parts(old: str, new: str) -> Tuple[WordParts, WordParts]:
+    """A rewritten line and its old form as stretches of words, each marked changed or not.
+    Joined, the stretches give the line back. Two lines that share too little are one plain
+    stretch each (DESIGN_workout_revisions.md §9.1)."""
+    old_words, new_words = old.split(), new.split()
+    matcher = difflib.SequenceMatcher(None, old_words, new_words, autojunk=False)
+    if matcher.ratio() < MOSTLY_SAME:
+        return [(old, False)], [(new, False)]
+    gone: WordParts = []
+    came: WordParts = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        _add_words(gone, old_words[i1:i2], tag != 'equal')
+        _add_words(came, new_words[j1:j2], tag != 'equal')
+    return gone, came
+
+
+def wording_group_sides(group: WordingGroup) -> List[Tuple[str, str, WordParts]]:
+    """A group's sides as (GONE or CAME, label, stretches of words): 'Was:' and 'Now:' for a
+    rewritten line, 'Dropped:' or 'Added:' when one side is empty."""
+    dropped, added = group
+    if not added:
+        return [(GONE, "Dropped:", [("\n".join(dropped), False)])]
+    if not dropped:
+        return [(CAME, "Added:", [("\n".join(added), False)])]
+    old_parts, new_parts = word_parts(dropped[0], added[0])
+    return [(GONE, "Was:", old_parts), (CAME, "Now:", new_parts)]
+
+
+def _painter(parts: WordParts, color_fn: Callable[[str], str]) -> Callable[[str], str]:
+    """Colours text once it is wrapped, with the changed words also in reverse video. It goes
+    word by word, so that a highlight never reaches the indent of a wrapped line."""
+    changed = iter([flag for text, flag in parts for _ in text.split()])
+
+    def paint(wrapped: str) -> str:
+        return color_fn(re.sub(
+            r"\S+", lambda word: reverse(word[0]) if next(changed, False) else word[0], wrapped,
+        ))
+    return paint
+
+
 def wording_group_lines(
     group: WordingGroup, indent: str = "", gone: str = "", new: str = "",
 ) -> List[str]:
-    """One group as a labelled 'Was:' / 'Now:' pair (or 'Dropped:' / 'Added:' when one
-    side is empty), wrapped at the client's width with the text hanging under its label.
-    `gone` and `new` are marks put before the two labels, for a client that shows no
-    colour."""
-    dropped, added = group
+    """One group as labelled sides, wrapped at the client's width with the text hanging under
+    its label. `gone` and `new` are marks put before the two labels, for a client that shows
+    no colour."""
     lines: List[str] = []
-    if dropped:
-        label = "Was: " if added else "Dropped: "
-        lines.append(
-            format_labeled_text(indent + gone + label, "\n".join(dropped), color_fn=red)
-        )
-    if added:
-        label = "Now: " if dropped else "Added: "
-        lines.append(
-            format_labeled_text(indent + new + label, "\n".join(added), color_fn=green)
-        )
+    for side, label, parts in wording_group_sides(group):
+        mark, color_fn = gone, red
+        if side == CAME:
+            mark, color_fn = new, green
+        text = "".join(part for part, _ in parts)
+        lines.append(format_labeled_text(
+            f"{indent}{mark}{label} ", text, color_fn=_painter(parts, color_fn),
+        ))
     return lines
 
 
