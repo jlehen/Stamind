@@ -21,9 +21,6 @@ const ui = {
 // The calendar's strip colours, numbered along the same list of mesocycles (§4).
 const STRIPS = 6;
 
-// Whether the plan file arrived, which holds every long text.
-let fromFile = false;
-
 function element(tag, className, text) {
   const node = document.createElement(tag);
   if (className) {
@@ -36,18 +33,11 @@ function element(tag, className, text) {
 }
 
 function openSheet(row) {
-  const found = logic.rowSheet(row, fromFile);
+  const found = logic.rowSheet(row);
   ui.sheetTitle.textContent = found.title;
   ui.sheetBody.replaceChildren();
   for (const line of found.lines) {
     ui.sheetBody.append(element("p", "line", line));
-  }
-  // Only a page opened from the keyboard button can send; a browser has no bot (§6).
-  if (tg && found.why) {
-    const ask = element("button", "full-day", "💬 Why, in chat");
-    ask.type = "button";
-    ask.addEventListener("click", () => tg.sendData(logic.whyMessage(row)));
-    ui.sheetBody.append(ask);
   }
   ui.sheet.hidden = false;
 }
@@ -145,7 +135,6 @@ async function start() {
     return;
   }
   const at = calendar.later(snapshot.at, file.at);
-  fromFile = true;
   ui.stamp.textContent = calendar.stamp(at);
   renderPlan({ ...file, at });
 }

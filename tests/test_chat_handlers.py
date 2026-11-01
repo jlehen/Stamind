@@ -24,7 +24,7 @@ from tests.chat_harness import (
     record_commands, routes_to, web_app_update,
 )
 from stamind import clock
-from stamind.chat import keyboards, messages, runner, scheduler, telegram_api
+from stamind.chat import keyboards, messages, routing, runner, scheduler, telegram_api
 from stamind.config import config
 
 
@@ -73,6 +73,21 @@ class MessageHandlerTest(unittest.IsolatedAsyncioTestCase):
             await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
         self.assertEqual(started, [(42, ["progress", "--chart"], False, "bot")])
         self.assertTrue(chat_bot.bot.texts()[0].startswith("<i>→ "))
+
+    async def test_page_read_intents_point_to_the_keyboard_without_running_a_command(self):
+        for intent, expected in routing.ROUTER_PAGE_REPLIES.items():
+            with self.subTest(intent=intent):
+                chat_bot = build_chat_bot(self)
+                started = record_commands(self, chat_bot)
+                with mock.patch.object(chat_bot, "_keyboard", return_value="fresh-keyboard"), \
+                        routes_to(chat_bot, intent):
+                    update, _replied = message_update(text="show me")
+                    await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
+                self.assertEqual(started, [])
+                self.assertEqual(
+                    chat_bot.bot.sent,
+                    [(42, expected, {"reply_markup": "fresh-keyboard"})],
+                )
 
     async def test_the_talk_to_me_tap_arms_the_chat_for_one_message(self):
         """§5.2: the tap only keeps an unroutable message from bouncing, and it is spent
@@ -222,17 +237,6 @@ class GymLogHandlerTest(unittest.IsolatedAsyncioTestCase):
         update, _replied = web_app_update(data='{"calendar_day": "2026-09-26"}')
         await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
         self.assertEqual([s[1] for s in started], [["workout", "show", "-d", "2026-09-26"]])
-        self.assertFalse(os.path.exists(self.gym_logs()))
-
-    async def test_the_plan_page_asks_why_and_writes_no_log(self):
-        """The athlete taps a mesocycle on "Goals & plan", then "💬 Why, in chat": the bot
-        posts that mesocycle's plan, whichever goal it serves (DESIGN_calendar_miniapp.md
-        §3.7)."""
-        chat_bot = build_chat_bot(self)
-        started = record_commands(self, chat_bot)
-        update, _replied = web_app_update(data='{"plan_why": 10}')
-        await chat_bot.on_web_app_data(update, SimpleNamespace(bot=chat_bot.bot))
-        self.assertEqual([s[1] for s in started], [["plan", "show", "--macrocycle", "10"]])
         self.assertFalse(os.path.exists(self.gym_logs()))
 
 

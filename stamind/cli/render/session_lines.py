@@ -1,10 +1,10 @@
 """The companion voice on a day and what was trained in it
 (DESIGN_bot_simple_frontend.md §6).
 
-Pure functions over rows: one session as a line, a day, a week, a compare, and the
-words for a date — "today", "tomorrow", "Thu 28 Aug". `bot morning` and the
-week view call them directly, never through a renderer (DESIGN_render_persona.md §3),
-which is why they are a module and not methods.
+Pure functions over rows: one session as a line, a day, proposed weeks, a compare, and
+the words for a date — "today", "tomorrow", "Thu 28 Aug". `bot morning` calls them
+directly, never through a renderer (DESIGN_render_persona.md §3), which is why they are
+a module and not methods.
 
 `plan_lines.py` is the other half of the voice, and borrows the date words from here."""
 from datetime import datetime
@@ -131,48 +131,17 @@ def _session_text(w: Dict[str, Any], short: bool, fall_back: bool) -> str:
     return description
 
 
-def simple_week_lines(
-    workouts: List[Dict[str, Any]],
-    verdicts: Optional[Dict[int, Dict[str, Any]]] = None,
-    end_note: Optional[str] = None,
-    heads: Optional[Dict[int, str]] = None,
-) -> List[str]:
-    """Simple rendering of a multi-day window: one dated line per session, no
-    descriptions, ending on an encouraging count. An empty window is a break, not
-    a gap (§6 tone rule).
-
-    `verdicts` is `adherence_verdicts`' map; a session already trained gets a ✅
-    instead of its sport emoji, so the listing doubles as her calendar — done behind,
-    plan ahead (DESIGN_bot_simple_frontend.md §11).
-
-    `end_note` names the end of the schedule when the window crosses it, the companion
-    form of the expert listing's marker (DESIGN_runway_nudge.md §6). `heads` is
-    `deload_heads`' map, each deload's line by the row it goes before
-    (DESIGN_deload_weeks.md §11.1)."""
-    if not workouts:
-        # An empty window past the cliff is the schedule having run out, not a break the
-        # coach chose — so the note replaces the break line rather than following it (§4).
-        return [end_note] if end_note else ["Nothing on the schedule — enjoy the break 🎉"]
+def simple_week_lines(workouts: List[Dict[str, Any]]) -> List[str]:
+    """Proposed sessions for `CompanionRenderer.workout_generate_preview`: one dated line
+    per session, no descriptions, ending on a session count
+    (DESIGN_runway_nudge.md §6)."""
     lines = ["🗓 Coming up:"]
-    done = 0
-    for position, w in enumerate(workouts):
-        if position in (heads or {}):
-            lines.append(heads[position])
+    for w in workouts:
         day = datetime.strptime(w["date"], "%Y-%m-%d").strftime("%a %d")
-        status = ((verdicts or {}).get(w.get("id")) or {}).get("status")
-        if status in SIMPLE_DONE_STATUSES:
-            done += 1
-            lines.append(f"{day} · ✅ {simple_session_line(w)}")
-        else:
-            lines.append(f"{day} · {simple_session_line(w)}")
-    if end_note:
-        lines.append(end_note)
+        lines.append(f"{day} · {simple_session_line(w)}")
     count = len(workouts)
     session_word = "session" if count == 1 else "sessions"
-    if done:
-        lines.append(f"\n{done} of {count} {session_word} already done — keep it rolling 💪")
-    else:
-        lines.append(f"\n{count} {session_word} planned — you've got this 💪")
+    lines.append(f"\n{count} {session_word} planned — you've got this 💪")
     return lines
 
 

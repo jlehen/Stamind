@@ -15,10 +15,9 @@ from stamind.clock import fmt_span
 from stamind.cli.benchmarks import (
     benchmark_confirm_words, print_benchmark_recorded, print_benchmark_replan,
 )
-from stamind.cli.goals import print_goal_row, print_goal_table, report_archived_sessions
+from stamind.cli.goals import print_goal_row, report_archived_sessions
 from stamind.cli.learnings import print_learning_demoted, print_learning_kept
 from stamind.cli.plans.generate import print_plan_generate_preview
-from stamind.cli.plans.show import print_plan
 from stamind.cli.progress import print_progress_report
 from stamind.cli.queue import (
     print_closed_queue_list, print_queue_acted, print_queue_list, queue_hint_lines,
@@ -212,12 +211,6 @@ class ExpertRenderer:
     def calendar_marked(self, marked: int) -> None:
         print_calendar_marked(marked)
 
-    def goal_list(self, goals: list, called_off: list, show_all: bool, today: str) -> None:
-        print_goal_table(goals, called_off, show_all)
-
-    def plan(self, goal: dict, macrocycle: dict, args) -> None:
-        print_plan(goal, macrocycle, args)
-
     def progress(self, payload: dict, args, today: str, weeks_window: int) -> None:
         print_progress_report(payload, args, today, weeks_window)
 
@@ -317,14 +310,6 @@ class ExpertRenderer:
 
     def constraint_removed(self, constraint_id: int) -> None:
         print(green(f"Constraint [{constraint_id}] removed."))
-
-    def no_upcoming_goal(self) -> None:
-        """`plan show`'s empty state — the sentence `selectors.resolve_goal` would print."""
-        notice("No active goals found. Stamind needs at least one goal.")
-
-    def no_plan_yet(self, goal: dict) -> None:
-        notice(f"No active macrocycle strategy found for goal '{goal['title']}'.")
-        print(green(f"Run {cmd('plan generate')} to create one."))
 
     def runway_hint(self, state: Optional[Dict[str, Any]], today: str) -> None:
         """The end-of-schedule nudge: the fact, then the exact command

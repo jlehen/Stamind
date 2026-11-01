@@ -1,6 +1,4 @@
-"""`plan show` and `plan keep`: the plan as it stands, and dismissing a staleness notice.
-
-`print_plan` is what `ExpertRenderer.plan` delegates to (DESIGN_render_persona.md §7)."""
+"""`plan show` and `plan keep`: the plan as it stands, and dismissing a staleness notice."""
 import argparse
 from typing import List
 
@@ -15,7 +13,7 @@ from stamind.clock import fmt_date
 from stamind.cli import staleness
 from stamind.cli.common import (
     deload_line, print_feedback_notes, print_hanging, print_indented, print_mesocycle_head,
-    print_mesocycle_rule, print_plan_goal, print_retrospective, print_segments,
+    print_mesocycle_rule, print_no_plan_yet, print_plan_goal, print_retrospective, print_segments,
 )
 from stamind.cli.windows import resolve_goal
 from stamind.db.objectives import GOAL_UPCOMING, goal_state
@@ -193,14 +191,6 @@ def run_plan_show(args: argparse.Namespace) -> None:
         macrocycle = runtime.db.get_macrocycle(version_id)
         if macrocycle:
             args.goal_id = macrocycle['objective_id']
-    # The empty state `plan show` alone owns. `resolve_goal` below would say the same
-    # thing one line later, but it also serves `plan versions`, `plan diff`, `plan
-    # rollback` and `plan feedback`, where the companion sentence is the wrong one
-    # (DESIGN_render_persona.md §5).
-    if (args.goal_id is None and not getattr(args, 'all', False)
-            and not runtime.db.upcoming_objectives()):
-        runtime.render.no_upcoming_goal()
-        return
     if getattr(args, 'all', False):
         if args.goal_id is not None or getattr(args, 'macrocycle_id', None) is not None:
             notice("Error: --all cannot be combined with --goal or --macrocycle.", red)
@@ -213,7 +203,7 @@ def run_plan_show(args: argparse.Namespace) -> None:
             print(green(f"Run {cmd('plan generate')} to create one."))
             return
         for goal, macrocycle in planned:
-            runtime.render.plan(goal, macrocycle, args)
+            print_plan(goal, macrocycle, args)
         return
 
     next_goal = resolve_goal(args.goal_id)
@@ -232,10 +222,10 @@ def run_plan_show(args: argparse.Namespace) -> None:
     else:
         macrocycle = runtime.db.get_macrocycle_for_objective(next_goal['id'])
     if not macrocycle:
-        runtime.render.no_plan_yet(next_goal)
+        print_no_plan_yet(next_goal)
         return
 
-    runtime.render.plan(next_goal, macrocycle, args)
+    print_plan(next_goal, macrocycle, args)
 
 
 def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> None:
@@ -243,9 +233,7 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
     and the mesocycle timeline with each mesocycle's summary. `-v` puts the full strategy
     and focus in place of the summaries, and adds the feedback notes and snapshotted inputs.
     `-vv` adds the retrospective record of the plan under the strategy, and the record of
-    each mesocycle under its focus.
-
-    The companion form of this is CompanionRenderer.plan (DESIGN_render_persona.md §5)."""
+    each mesocycle under its focus."""
     mesocycles = runtime.db.get_mesocycles_for_macrocycle(macrocycle['id'])
     show_workouts = getattr(args, 'workouts', False)
     verbose = getattr(args, 'verbose', 0)
@@ -286,8 +274,7 @@ def print_plan(next_goal: dict, macrocycle: dict, args: argparse.Namespace) -> N
         _print_considered_inputs(macrocycle)
     # Right under the inputs it contradicts, and only for the version in force of a goal
     # still ahead: a superseded one is out of date by definition, a finished one has
-    # nothing left to replan (DESIGN_plan_staleness.md §9, §12). Expert only — the
-    # companion body is `simple_plan_lines`, and a replan is operator work.
+    # nothing left to replan (DESIGN_plan_staleness.md §9, §12).
     if not is_superseded and goal_state(next_goal) == GOAL_UPCOMING:
         change_reason = staleness.reason(macrocycle)
         if change_reason:
@@ -319,7 +306,7 @@ def run_plan_keep(args: argparse.Namespace) -> None:
 
     macrocycle = runtime.db.get_macrocycle_for_objective(goal['id'])
     if not macrocycle:
-        runtime.render.no_plan_yet(goal)
+        print_no_plan_yet(goal)
         return
 
     change_reason = staleness.reason(macrocycle)

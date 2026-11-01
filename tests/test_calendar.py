@@ -20,7 +20,6 @@ from stamind import calendar_days
 from stamind.analytics.adherence import DURATION, LOAD, Gap, off_plan_gaps
 from stamind.cli.render import calendar_grid
 from stamind.cli.render import calendar_page, plan_page
-from stamind.cli.render.plan_lines import SIMPLE_END_NOTE
 from stamind.cli.render.session_lines import simple_gap_words
 from stamind.db import Database
 
@@ -210,10 +209,6 @@ class SnapshotTest(CalendarTestCase):
         self.assertEqual(sheets["2026-09-24"], [["Planned", ["Rest day — enjoy it 🎉"]]])
         self.assertNotIn("2026-10-20", sheets)
 
-    def test_the_page_prints_the_end_note_word_for_word(self):
-        with open(os.path.join(REPO, "miniapp", "calendar_logic.js"), encoding="utf-8") as handle:
-            self.assertIn(SIMPLE_END_NOTE, handle.read())
-
     def test_the_page_asks_for_a_day_with_the_bots_key(self):
         with open(os.path.join(REPO, "miniapp", "calendar_logic.js"), encoding="utf-8") as handle:
             self.assertIn(f'DAY_REQUEST = "{calendar_page.DAY_REQUEST}"', handle.read())
@@ -300,9 +295,12 @@ class PlanPageTest(CalendarTestCase):
         return calendar_days.gather(test_db, start, end, TODAY)
 
     def test_mesocycles_and_goals_in_companion_words(self):
+        snap = plan_page.snapshot(self.cal(), AT)
+        self.assertTrue(all("p" not in m for m in snap["meso"]))
         payload = self.payload(plan_page.plan_url(self.cal(), AT))
         self.assertEqual([m["n"] for m in payload["meso"]], ["Build", "Aerobic base"])
         self.assertNotIn("m", payload["meso"][0])
+        self.assertNotIn("p", payload["meso"][0])
         self.assertTrue(payload["goals"][0]["t"].startswith("🏃 Autumn 10k — on "))
         self.assertNotIn("k", payload["goals"][0])
 
@@ -318,7 +316,7 @@ class PlanPageTest(CalendarTestCase):
         payload = self.payload(plan_page.plan_url(self.cal(), AT))
         spring = [m for m in payload["meso"] if m["n"] == "Spring"][0]
         self.assertEqual(spring["m"], "Sharpen for the half.")
-        self.assertEqual(spring["p"], test_db.get_macrocycle_for_objective(goal)["id"])
+        self.assertNotIn("p", spring)
         half = [g for g in payload["goals"] if "Spring half" in g["t"]][0]
         self.assertEqual((half["x"], half["k"]), ("Sub 1:50.", 1))
 
@@ -329,14 +327,6 @@ class PlanPageTest(CalendarTestCase):
             payload = self.payload(plan_page.plan_url(self.cal(), AT))
         self.assertTrue(all("x" not in g for g in payload["goals"]))
         self.assertIn("Long words", " ".join(g["t"] for g in payload["goals"]))
-
-    def test_the_why_the_page_sends(self):
-        self.assertEqual(plan_page.why_plan('{"plan_why": 10}'), 10)
-        for data in ('{"plan_why": 1, "x": 2}', '{"plan_why": true}', '{"plan_why": "10"}',
-                     '{"calendar_day": "2026-09-26"}', "no"):
-            self.assertIsNone(plan_page.why_plan(data), data)
-        with open(os.path.join(REPO, "miniapp", "plan_logic.js"), encoding="utf-8") as handle:
-            self.assertIn(f'WHY_REQUEST = "{plan_page.WHY_REQUEST}"', handle.read())
 
 
 class RequestedDayTest(unittest.TestCase):

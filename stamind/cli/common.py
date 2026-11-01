@@ -291,6 +291,12 @@ def print_plan_goal(goal: dict, width: int) -> None:
     )
 
 
+def print_no_plan_yet(goal: dict) -> None:
+    """Empty-state notice when a goal has no active macrocycle strategy yet."""
+    notice(f"No active macrocycle strategy found for goal '{goal['title']}'.")
+    print(green(f"Run {cmd('plan generate')} to create one."))
+
+
 def deload_span(mesocycle: Dict[str, Any]) -> str:
     """'🔋 Deload Mon 2 Nov to Sun 8 Nov', the one string the terminal and the chat print for
     a mesocycle's deload (DESIGN_deload_weeks.md §11.2)."""

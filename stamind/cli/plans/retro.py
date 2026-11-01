@@ -9,7 +9,8 @@ import sys
 
 from stamind import cycle_records, runtime
 from stamind.cli.common import (
-    print_mesocycle_head, print_mesocycle_rule, print_plan_goal, print_retrospective,
+    print_mesocycle_head, print_mesocycle_rule, print_no_plan_yet, print_plan_goal,
+    print_retrospective,
 )
 from stamind.cli.windows import resolve_goal
 from stamind.db.retrospectives import MESOCYCLE, PLAN
@@ -26,7 +27,7 @@ def run_plan_retrospective(args: argparse.Namespace) -> None:
         return
     macrocycle = runtime.db.get_macrocycle_for_objective(goal['id'])
     if not macrocycle:
-        runtime.render.no_plan_yet(goal)
+        print_no_plan_yet(goal)
         return
 
     width = default_wrap_width()

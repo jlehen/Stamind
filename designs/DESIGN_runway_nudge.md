@@ -287,6 +287,10 @@ without the note above it. Nothing else changes: same detector-chosen argv, same
 preview/confirm, and the single-day view keeps offering nothing (it renders the day, not
 the schedule).
 
+Amended 2026-11-01 (ARCHITECTURE.md §15): the companion week view is gone, so
+`simple_week_lines` now formats `workout generate` proposals only. The morning message and
+the Calendar page carry the end-of-schedule notice.
+
 The push repeats each morning inside the window until acted on — the §2 unconditional
 rule. But the plan-cliff-no-goal passed state has no action the athlete can take (the fix
 is operator work), so it must not repeat forever: past the §2 passed-state window

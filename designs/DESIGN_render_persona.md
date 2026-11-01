@@ -235,6 +235,10 @@ structure, different sentence), **shape** (same data, different rendering), or
   gets one wording per message" — moves from a docstring on a guard to a docstring on
   the override, which is where a reader looking for companion behaviour will look.
 
+Amended 2026-11-01 (ARCHITECTURE.md §15): `goal_list`, `plan`, `no_upcoming_goal`, and
+`no_plan_yet` left the renderer when `goal list` and `plan show` became single-voice expert
+commands again. `CompanionRenderer.workout_list` now renders single-day windows alone.
+
 The chart caption in `progress` is the one subtle case: the companion form passes its
 first summary line to `_emit_chart` as the caption. That stays inside the companion
 `progress` override, which is free to call `_emit_chart` itself; the expert override

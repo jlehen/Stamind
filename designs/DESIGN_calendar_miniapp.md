@@ -269,6 +269,10 @@ mesocycle of the December goal; a bare `plan show` would answer with the climb's
 `--macrocycle` alone shows that plan under its own goal. "my goals" or "my plan" typed in her own words
 still reach `goal list` and `plan show` through the router.
 
+Amended 2026-11-01 (ARCHITECTURE.md §15): `"💬 Why, in chat"` (`plan_why`) and the
+mesocycle's `"p"` key were removed with the chat plan view. Typed `"my goals"` and `"my
+plan"` messages now point to `"🎯 Goals & plan"`.
+
 ## 4. One list of days
 
 A new module, `stamind/calendar_days.py`, gathers the facts for a range of dates. It reads

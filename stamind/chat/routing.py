@@ -1,10 +1,10 @@
 """What one chat message means: the router's intent table, both halves of it.
 
 The model — through `sm bot route` — only ever picks a name out of `ROUTER_INTENTS`. The
-three tables under it say what that name runs: fixed argv for a view or a picker, an argv
-the athlete's words are appended to for the two coach lanes, or a `bot capture <intent>`
-for the intents that need values read out of the message
-(DESIGN_bot_simple_frontend.md §5.3, §12.8).
+four tables under it say what that name does: fixed argv for a view or a picker, a
+one-line reply naming a page button on the keyboard, an argv the athlete's words are
+appended to for the two coach lanes, or a `bot capture <intent>` for the intents that
+need values read out of the message (DESIGN_bot_simple_frontend.md §5.3, §12.8).
 
 They are one table in one file because they have to agree name for name, and a test
 checks that they do. Pure data and pure parsing: nothing here imports the telegram
@@ -15,7 +15,7 @@ from typing import List, Optional, Sequence
 
 # The names the model may pick from, and what each one means to it (§5.3, widened by the
 # writes pass — §12.8 is the authoritative table). `sm bot route` builds its prompt from
-# this dict; the three tables under it say what each name runs. `answer` runs what `bot
+# this dict; the four tables under it say what each name does. `answer` runs what `bot
 # route` names beside it (DESIGN_athlete_queue.md §14.2), so it is in none of them.
 ROUTER_INTENTS = {
     "show_today": "the athlete wants to see today's session or what to do today",
@@ -110,14 +110,20 @@ ROUTER_FALLBACK = (
 # pickers live here — fixed argv, no slots; help and unclear are answered by the bot.
 ROUTER_INTENT_ARGV = {
     "show_today": ["workout", "list", "-d", "today"],
-    "show_week": ["workout", "list"],
     "show_done": ["workout", "compare", "-d", "7d", "--no-mark"],
-    "show_goals": ["goal", "list"],
-    "show_plan": ["plan", "show"],
     "show_progress": ["progress", "--chart"],
     "show_constraints": ["bot", "constraints"],
     "remove_constraint": ["bot", "constraints"],
     "remove_goal": ["bot", "goals"],
+}
+
+
+# Read intents whose views live on the Mini App pages on the reply keyboard: the bot
+# sends this line under a fresh keyboard instead of spawning a CLI command.
+ROUTER_PAGE_REPLIES = {
+    "show_week": "Open 🗓 Calendar below to see your week.",
+    "show_plan": "Open 🎯 Goals & plan below to see your plan.",
+    "show_goals": "Open 🎯 Goals & plan below to see your goals.",
 }
 
 
@@ -178,10 +184,7 @@ ROUTER_CAPTURE_INTENTS = {
 # "passing that on to your coach" say which inbox took the message (§12.3).
 ROUTER_ECHO = {
     "show_today": "showing today",
-    "show_week": "showing your week",
     "show_done": "showing what you've done lately",
-    "show_goals": "showing your goals",
-    "show_plan": "showing your plan",
     "show_progress": "showing your progress",
     "coach_message": "passing that on to your coach",
     "tweak_session": "asking your coach to change that",

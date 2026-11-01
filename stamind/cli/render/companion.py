@@ -16,15 +16,14 @@ from stamind.sentinels import emit_buttons
 from stamind.strength.prescription import exercise_lines
 from stamind.text import green, wrap_text
 from stamind.output import notice
-from stamind.clock import shift, today_date as _today_date, today_str as _today_str
-from stamind.cli.common import deload_heads, print_strength_notes
+from stamind.clock import shift, today_str as _today_str
+from stamind.cli.common import print_strength_notes
 from stamind.cli.progress import emit_chart
 from stamind.cli.render.expert import ExpertRenderer
 from stamind.cli.render.plan_lines import (
-    SIMPLE_NO_PLAN_LINE, simple_end_buttons, simple_end_note, simple_goal_line,
-    simple_goal_lines, simple_mesocycle_buttons, simple_plan_lines,
-    simple_plan_setup_line, simple_plan_shaping_line, simple_plan_wrapped_line,
-    simple_preference_words, simple_progress_lines, simple_runway_lines,
+    simple_goal_line, simple_plan_setup_line, simple_plan_shaping_line,
+    simple_plan_wrapped_line, simple_preference_words, simple_progress_lines,
+    simple_runway_lines,
 )
 from stamind.cli.render.proposal_lines import simple_revision_lines
 from stamind.cli.render.session_lines import (
@@ -179,32 +178,25 @@ class CompanionRenderer(ExpertRenderer):
         self, workouts: list, verdicts: dict, args, *, start_date: Optional[str],
         end_date: Optional[str], ids: list, names_a_range: bool,
     ) -> None:
-        # A single-day window reads as the day, any other window as the week ahead
-        # (DESIGN_bot_simple_frontend.md §6).
-        if start_date and start_date == end_date:
-            # `workout show` of a day is the day in full, as "Full day in chat" asks
-            # (DESIGN_short_messages.md §4).
-            if (getattr(args, "verbose", 0) or 0) >= 2:
-                for line in simple_day_lines(workouts, start_date, verdicts):
-                    print(line)
-                return
-            _short_day(workouts, start_date, verdicts)
+        # Single-day windows stay in companion voice ("📅 Today" and `workout show -d <day>`);
+        # multi-day or workout-ID calls fall back to the expert table.
+        if not (start_date and start_date == end_date):
+            super().workout_list(
+                workouts, verdicts, args, start_date=start_date, end_date=end_date,
+                ids=ids, names_a_range=names_a_range,
+            )
             return
-        for line in simple_week_lines(
-            workouts, verdicts,
-            end_note=simple_end_note(end_date) if names_a_range else None,
-            heads=deload_heads(workouts) if names_a_range else None,
-        ):
-            print(line)
-        # The note states that the schedule stops; the button is what she does about it,
-        # offered where she is already looking (DESIGN_runway_nudge.md §6).
-        buttons = simple_end_buttons(end_date) if names_a_range else []
-        if buttons:
-            emit_buttons(buttons)
+        # `workout show` of a day is the day in full, as "Full day in chat" asks
+        # (DESIGN_short_messages.md §4).
+        if (getattr(args, "verbose", 0) or 0) >= 2:
+            for line in simple_day_lines(workouts, start_date, verdicts):
+                print(line)
+            return
+        _short_day(workouts, start_date, verdicts)
 
     def workout_generate_preview(self, proposal) -> bool:
-        # The sessions render the way her week view does — the runway button makes this
-        # preview reachable by tap, so it must not be a table (DESIGN_runway_nudge.md §6).
+        # Dated session lines, not a table: the runway button makes this preview reachable
+        # by tap in chat (DESIGN_runway_nudge.md §6).
         print(f"\n{wrap_text(proposal.reasoning)}\n")
         if not proposal.workouts:
             notice("The coach proposed no sessions — nothing to apply.")
@@ -245,22 +237,6 @@ class CompanionRenderer(ExpertRenderer):
     def calendar_marked(self, marked: int) -> None:
         # Bookkeeping on the operator's Calendar; chat is not the audit surface (§6).
         return
-
-    def goal_list(self, goals: list, called_off: list, show_all: bool, today: str) -> None:
-        for line in simple_goal_lines(goals, today):
-            print(line)
-
-    def plan(self, goal: dict, macrocycle: dict, args) -> None:
-        mesocycles = runtime.db.get_mesocycles_for_macrocycle(macrocycle['id'])
-        today = _today_date().strftime("%Y-%m-%d")
-        for line in simple_plan_lines(goal, macrocycle, mesocycles, today):
-            print(line)
-        # The road names the mesocycles; the button is how she reads one in full (§11.2).
-        # Only for the version in force — an older version's mesocycles are history.
-        if macrocycle.get("status") != "superseded":
-            buttons = simple_mesocycle_buttons(mesocycles, today)
-            if buttons:
-                emit_buttons(buttons)
 
     def progress(self, payload: dict, args, today: str, weeks_window: int) -> None:
         lines = simple_progress_lines(payload, today)
@@ -397,16 +373,9 @@ class CompanionRenderer(ExpertRenderer):
     def constraint_removed(self, constraint_id: int) -> None:
         print(green("Done — I've dropped that one and will stop working around it 👍"))
 
-    def no_upcoming_goal(self) -> None:
-        print(SIMPLE_NO_PLAN_LINE)
-
-    def no_plan_yet(self, goal: dict) -> None:
-        print(SIMPLE_NO_PLAN_LINE)
-
     def runway_hint(self, state: Optional[Dict[str, Any]], today: str) -> None:
-        """Draws nothing: the companion week view and the morning push word this fact
-        themselves, and one fact gets one wording per message
-        (DESIGN_runway_nudge.md §6)."""
+        """Draws nothing: the morning push words this fact itself, and one fact gets one
+        wording per message (DESIGN_runway_nudge.md §6)."""
 
     def adapt_plan_behind(self, state: Optional[Dict[str, Any]], today: str) -> None:
         # The morning push's plan-cliff wording, reached from adapt: the sentence

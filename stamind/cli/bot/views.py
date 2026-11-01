@@ -1,11 +1,11 @@
 """The `bot` views, and the two messages the bot sends unasked.
 
-`bot constraints`, `bot goals` and `bot mesocycle` render a companion list from stored
-rows and offer its picker; `bot morning` is the daily push and `bot changes` sends the
-changes to the athlete's week they have not been told about yet
-(DESIGN_bot_simple_frontend.md §4, §5.5, §11.2, §12.6; DESIGN_change_heads_up.md §4).
+`bot constraints` and `bot goals` render a companion list from stored rows and offer its
+picker; `bot morning` is the daily push and `bot changes` sends the changes to the
+athlete's week they have not been told about yet
+(DESIGN_bot_simple_frontend.md §4, §5.5, §12.6; DESIGN_change_heads_up.md §4).
 
-The three views run fixed argv and write nothing: the only mutation they reach is what a
+The two views run fixed argv and write nothing: the only mutation they reach is what a
 tapped picker leaf later runs as a command of its own (§12.1). The two unasked messages do
 write — `bot morning` stamps its per-day marker and, with `adapt-first` on, asks the week
 planner before it renders when something is new since the last run or a night is not
@@ -24,7 +24,7 @@ from stamind.cli.common import deload_progress, ensure_recent_data, in_deload
 # builders directly rather than through `runtime.render` (DESIGN_render_persona.md §3).
 from stamind.cli.render.plan_lines import (
     SIMPLE_PASSED_LINE, picker_label, simple_constraint_lines, simple_goal_lines,
-    simple_mesocycle_lines, simple_runway_lines,
+    simple_runway_lines,
 )
 from stamind.cli.render.session_lines import SIMPLE_DONE_STATUSES, simple_day_lines
 from stamind.cli.queue import send_alone, send_next
@@ -125,27 +125,6 @@ def run_bot_goals(args: argparse.Namespace) -> None:
     upcoming = [g for g in goals if goal_state(g, today) == GOAL_UPCOMING]
     if upcoming:
         emit_buttons(goal_rm_buttons(upcoming))
-
-
-def run_bot_mesocycle(args: argparse.Namespace) -> None:
-    """One training mesocycle in full: the stanza the plan view draws for it, then the
-    whole focus rather than its first sentence (§11.2). Read-only; reached from the
-    plan view's "Tell me more" leaves, so a stale tap after a replan has to land
-    softly rather than as an error."""
-    m = runtime.db.get_mesocycle(args.mesocycle_id)
-    if not m:
-        print("That mesocycle isn't on your plan any more — tap 🎯 Goals & plan for the "
-              "current road.")
-        return
-    macrocycle = runtime.db.get_macrocycle(m["macrocycle_id"])
-    if macrocycle and macrocycle.get("status") == "superseded":
-        print("(a mesocycle from an older version of the plan — a newer one has replaced it)")
-    for line in simple_mesocycle_lines(m, _today_str()):
-        print(line)
-    focus = (m.get("focus") or "").strip()
-    if focus:
-        print()
-        print(wrap_text(focus))
 
 
 def _warn_quietly(text: str) -> None:

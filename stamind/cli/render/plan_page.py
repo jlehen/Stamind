@@ -4,9 +4,8 @@ the content of the plan file in the bucket (DESIGN_miniapp_storage.md §4).
 
 `plan_url` is what the bot calls, with the same list of days the calendar is built from.
 """
-import json
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from stamind.calendar_days import Calendar
 from stamind.cli.render.calendar_page import VERSION, meso_entry, pack
@@ -20,16 +19,13 @@ PAGE_URL = "https://jlehen.github.io/Stamind/miniapp/plan.html"
 # with the calendar's 5 KB and the gym button (§8).
 BUDGET_BYTES = 2 * 1024
 
-# The key of the message the page's "💬 Why, in chat" sends back, with the plan's id (§3.7).
-WHY_REQUEST = "plan_why"
-
 
 def snapshot(cal: Calendar, at: datetime) -> Dict[str, Any]:
-    """The mesocycles with their plan's id and summary, and the goals with their
-    description; a completed goal is marked `k` (§3.7)."""
+    """The mesocycles with their summary, and the goals with their description; a completed
+    goal is marked `k` (§3.7)."""
     meso = []
     for m in cal.mesocycles:
-        row = {**meso_entry(m), "p": m["macrocycle_id"]}
+        row = meso_entry(m)
         if (m.get("summary") or "").strip():
             row["m"] = m["summary"].strip()
         meso.append(row)
@@ -47,8 +43,8 @@ def snapshot(cal: Calendar, at: datetime) -> Dict[str, Any]:
 
 def plan_url(cal: Calendar, at: datetime, storage: str = "") -> str:
     """The page's address with the snapshot after `#c=`. Past the budget the summaries and
-    descriptions go, and the page offers the chat for them (§3.7). `storage` is what the
-    files add to it, and comes out of the budget (DESIGN_miniapp_storage.md §8)."""
+    descriptions go (§3.7). `storage` is what the files add to it, and comes out of the
+    budget (DESIGN_miniapp_storage.md §8)."""
     payload = snapshot(cal, at)
     packed = pack(payload)
     if len(packed) > BUDGET_BYTES - len(storage):
@@ -61,25 +57,10 @@ def plan_url(cal: Calendar, at: datetime, storage: str = "") -> str:
 
 def plan_file(cal: Calendar, at: datetime) -> Dict[str, Any]:
     """The plan file: the button's data, where each mesocycle also carries as `f` its whole
-    long text, the one `bot mesocycle` prints (DESIGN_miniapp_storage.md §4, §7.2)."""
+    long text (DESIGN_miniapp_storage.md §4, §7.2)."""
     payload = snapshot(cal, at)
     for row, m in zip(payload["meso"], cal.mesocycles):
         focus = (m.get("focus") or "").strip()
         if focus:
             row["f"] = focus
     return payload
-
-
-def why_plan(data: str) -> Optional[int]:
-    """The plan whose reasoning the page's "💬 Why, in chat" asks for, or None when `data`
-    is some other page's message (§3.7)."""
-    try:
-        message = json.loads(data)
-    except ValueError:
-        return None
-    if not isinstance(message, dict) or set(message) != {WHY_REQUEST}:
-        return None
-    plan = message[WHY_REQUEST]
-    if isinstance(plan, bool) or not isinstance(plan, int):
-        return None
-    return plan

@@ -150,15 +150,12 @@ def run_goal_list(args=None) -> None:
     called_off = [g for g in goals if goal_state(g) == GOAL_ARCHIVED]
     if not show_all:
         goals = [g for g in goals if goal_state(g) != GOAL_ARCHIVED]
-    runtime.render.goal_list(goals, called_off, show_all, _today_str())
+    print_goal_table(goals, called_off, show_all)
 
 
 def print_goal_table(goals: list, called_off: list, show_all: bool) -> None:
     """The expert `goal list` body: every goal with its ID and state tag, and a count of
-    the called-off ones it is hiding.
-
-    The companion form of this is CompanionRenderer.goal_list
-    (DESIGN_render_persona.md §5)."""
+    the called-off ones it is hiding."""
     print(bold(cyan("=== GOALS ===")))
     for g in goals:
         print_goal_row(g)

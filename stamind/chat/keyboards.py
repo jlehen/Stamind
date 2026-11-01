@@ -127,7 +127,7 @@ SIMPLE_WELCOME = (
     "🎯 Goals & plan — what you're training for, and the road there\n"
     "📈 Progress — how your fitness is building\n"
     "💬 Talk to me — anything I should know (tired, busy, sore…)\n\n"
-    "Or just type what you want, in your own words — it's the same thing."
+    "Or just write to me in your own words."
 )
 
 # The two lanes, taught rather than discovered (§12.3). The surface has exactly two

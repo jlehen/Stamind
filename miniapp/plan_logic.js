@@ -4,14 +4,10 @@
 // (DESIGN_miniapp_storage.md §7.2). No DOM here, so `node --test` runs it.
 import { deloadDates, deloadOn, shortDay } from "./calendar_logic.js?v=dev";
 
-// Word for word the bot's `WHY_REQUEST` (cli/render/plan_page.py); a Python test holds the
-// two together.
-export const WHY_REQUEST = "plan_why";
-
 export function planRows(snapshot) {
   const rows = [];
   (snapshot.meso || []).forEach((meso, index) => {
-    rows.push({ kind: "meso", date: meso.s, index, name: meso.n, plan: meso.p,
+    rows.push({ kind: "meso", date: meso.s, index, name: meso.n,
                 span: `${shortDay(meso.s)} – ${shortDay(meso.e)}`, summary: meso.m || "",
                 long: meso.f || "", done: meso.e < snapshot.today });
     // Pushed right after its mesocycle, so the stable sort below keeps it there when the
@@ -50,20 +46,12 @@ export function planRows(snapshot) {
   return rows;
 }
 
-export function rowSheet(row, fromFile = false) {
-  // What a tapped row opens: a mesocycle's dates, summary and long text, with the way to
-  // its reasoning in the chat when the plan file did not arrive (storage §7.2); a goal's
-  // line and description (§3.7).
+export function rowSheet(row) {
+  // What a tapped row opens: a mesocycle's dates, summary and long text (storage §7.2); a
+  // goal's line and description (§3.7).
   if (row.kind === "meso") {
-    return { title: row.name, lines: [row.span, row.summary, row.long].filter(Boolean),
-             why: !fromFile };
+    return { title: row.name, lines: [row.span, row.summary, row.long].filter(Boolean) };
   }
   return { title: row.done ? "✅ Goal reached" : "🎯 Goal",
-           lines: [row.text, row.description].filter(Boolean), why: false };
-}
-
-export function whyMessage(row) {
-  // What `sendData` hands the bot: `plan show` of the tapped mesocycle's plan, which may be
-  // another goal's than the next one (§3.7).
-  return JSON.stringify({ [WHY_REQUEST]: row.plan });
+           lines: [row.text, row.description].filter(Boolean) };
 }

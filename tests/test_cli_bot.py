@@ -1,6 +1,6 @@
 """`bot` command family tests: the read half — morning-push idempotency, adapt_first, the
 messages the bot sends unasked, the companion lists and their pickers, and the free-text
-router (DESIGN_bot_simple_frontend.md §4.2, §5.3, §5.5, §11.2, §12.6). The write half,
+router (DESIGN_bot_simple_frontend.md §4.2, §5.3, §5.5, §12.6). The write half,
 `bot capture <intent>`, is in `test_cli_bot_capture.py`."""
 import json
 import os
@@ -980,50 +980,9 @@ class GoalsViewTest(unittest.TestCase):
         self.assertNotIn("[ARCHIVED]", out)
 
 
-class MesocycleViewTest(unittest.TestCase):
-    """`bot mesocycle` — §11.2: one mesocycle as its stanza plus the whole focus, and a stale
-    tap after a replan lands softly."""
-
-    def setUp(self):
-        rebind_test_db(test_db)
-        clear_all_tables(test_db)
-
-    def _mesocycle(self):
-        """A goal 45 days out, one mesocycle from last week to the goal; returns its id."""
-        from datetime import date, timedelta
-        today = date.fromisoformat(today_str())
-        out = lambda days: (today + timedelta(days=days)).isoformat()  # noqa: E731
-        goal_id = test_db.add_objective(
-            title="Zurich Marathon", target_date=out(45), sport_type="running",
-        )
-        test_db.save_macrocycle(
-            objective_id=goal_id, strategy="Build then sharpen.",
-            goals_hash="g", constraints_hash="c",
-            mesocycles=[{"name": "Base", "start_date": out(-7), "end_date": out(45),
-                         "focus": "Purpose: aerobic endurance, easy volume. "
-                                  "Long runs grow weekly."}],
-        )
-        macro = test_db.get_macrocycle_for_objective(goal_id)
-        return test_db.get_mesocycles_for_macrocycle(macro["id"])[0]["id"]
-
-    def test_renders_the_stanza_and_the_whole_focus(self):
-        mid = self._mesocycle()
-        code, out, _ = run_cli(["bot", "mesocycle", str(mid)])
-        self.assertEqual(code, 0)
-        self.assertIn("📍 Base", out)
-        self.assertIn("you're in week 2 of 8", out)
-        self.assertIn("Long runs grow weekly.", out)  # past the first sentence
-        self.assertNotIn("Mesocycle ID", out)
-
-    def test_an_unknown_mesocycle_lands_softly(self):
-        code, out, _ = run_cli(["bot", "mesocycle", "999"])
-        self.assertEqual(code, 0)
-        self.assertIn("isn't on your plan any more", out)
-
-
 class SimpleListRenderTest(unittest.TestCase):
-    """`workout list` under STAMIND_RENDER=simple: companion prose, expert form
-    untouched otherwise (§6)."""
+    """`workout list` under STAMIND_RENDER=simple: a single day renders as companion prose;
+    multi-day ranges keep the expert listing (§6)."""
 
     def setUp(self):
         rebind_test_db(test_db)  # an earlier module may have rebound the handles
@@ -1044,11 +1003,12 @@ class SimpleListRenderTest(unittest.TestCase):
         _, out, _ = run_cli(["workout", "list", "-d", "today"])
         self.assertIn("Rest day", out)
 
-    def test_week_view_lists_and_counts(self):
+    def test_multi_day_range_renders_expert_schedule(self):
         save_workout(test_db, today_str(), "running", "Easy run", duration_minutes=40)
         _, out, _ = run_cli(["workout", "list"])
-        self.assertIn("Coming up", out)
-        self.assertIn("1 session planned", out)
+        self.assertIn("WORKOUT SCHEDULE", out)
+        self.assertIn("Easy run", out)
+        self.assertNotIn("Coming up", out)
 
     def test_expert_form_is_untouched_without_the_env(self):
         os.environ.pop("STAMIND_RENDER", None)
@@ -1058,12 +1018,12 @@ class SimpleListRenderTest(unittest.TestCase):
 
 
 class CompanionSurfaceRoutingTest(unittest.TestCase):
-    """Every companion surface, driven through the real CLI (DESIGN_render_persona.md §5).
+    """Companion surfaces and expert-only commands driven through the real CLI
+    (DESIGN_render_persona.md §5).
 
     The line builders have their own unit tests; what these pin is the *routing* — that
-    the command reaches `runtime.render` and that the renderer built for this process is
-    the companion one. A wrong argument order or a stale singleton is invisible to a
-    builder test and changes every one of these."""
+    companion commands reach `runtime.render`, while `goal list` and `plan show` keep their
+    expert output even under `STAMIND_RENDER=simple`."""
 
     def setUp(self):
         rebind_test_db(test_db)
@@ -1088,40 +1048,25 @@ class CompanionSurfaceRoutingTest(unittest.TestCase):
         )
         return goal_id
 
-    def test_goal_list_reads_as_what_youre_training_for(self):
+    def test_bot_goals_renders_companion_prose_and_picker(self):
         self._goal_with_plan()
-        code, out, _ = run_cli(["goal", "list"])
+        code, out, _ = run_cli(["bot", "goals"])
         self.assertEqual(code, 0)
         self.assertIn("What you're training for", out)
         self.assertIn("Zurich Marathon", out)
-        # No IDs, no state tags, no expert header (§11).
-        self.assertNotIn("=== GOALS ===", out)
-        self.assertNotIn("[UPCOMING]", out)
-
-    def test_plan_show_reads_as_the_road_to_the_goal(self):
-        self._goal_with_plan()
-        code, out, _ = run_cli(["plan", "show"])
-        self.assertEqual(code, 0)
-        self.assertIn("The road to Zurich Marathon", out)
-        self.assertIn("you're in week", out)
-        self.assertNotIn("MACROCYCLE STRATEGY", out)
-        self.assertNotIn("Macrocycle ID", out)
-
-    def test_plan_show_offers_the_door_to_a_mesocycle(self):
-        """The road names the mesocycles; the button is how she reads one in full (§11.2)."""
-        self._goal_with_plan()
-        code, out, _ = run_cli(["plan", "show"])
-        self.assertEqual(code, 0)
         self.assertIn(BUTTONS_SENTINEL, out)
-        self.assertIn("bot mesocycle ", out)
+        self.assertNotIn("=== GOALS ===", out)
 
-    def test_plan_show_without_a_goal_invites_instead_of_naming_a_command(self):
-        """The athlete cannot run `plan generate`, so the empty state must not name it
-        (DESIGN_bot_simple_frontend.md §11)."""
-        code, out, _ = run_cli(["plan", "show"])
-        self.assertEqual(code, 0)
-        self.assertIn("once your goal is set up", out)
-        self.assertNotIn("plan generate", out)
+    def test_plan_show_and_goal_list_keep_expert_output_under_simple(self):
+        self._goal_with_plan()
+        goals_code, goals_out, _ = run_cli(["goal", "list"])
+        plan_code, plan_out, _ = run_cli(["plan", "show"])
+        self.assertEqual(goals_code, 0)
+        self.assertEqual(plan_code, 0)
+        self.assertIn("=== GOALS ===", goals_out)
+        self.assertNotIn("What you're training for", goals_out)
+        self.assertIn("MACROCYCLE STRATEGY", plan_out)
+        self.assertNotIn("The road to", plan_out)
 
     def test_progress_reads_as_a_summary_not_a_table(self):
         code, out, _ = run_cli(["progress", "--no-pull"])
@@ -1132,11 +1077,9 @@ class CompanionSurfaceRoutingTest(unittest.TestCase):
     def test_the_expert_voice_is_what_the_same_commands_speak_without_the_env(self):
         """The other half of the switch: nothing above may leak into the default voice."""
         os.environ.pop("STAMIND_RENDER", None)
-        self._goal_with_plan()
-        _, goals_out, _ = run_cli(["goal", "list"])
-        _, plan_out, _ = run_cli(["plan", "show"])
-        self.assertIn("=== GOALS ===", goals_out)
-        self.assertIn("MACROCYCLE STRATEGY", plan_out)
+        code, out, _ = run_cli(["progress", "--no-pull"])
+        self.assertEqual(code, 0)
+        self.assertIn("FORM today", out)
 
 
 if __name__ == "__main__":

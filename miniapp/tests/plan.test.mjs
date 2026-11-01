@@ -10,8 +10,8 @@ import * as logic from "../plan_logic.js";
 const SNAPSHOT = {
   v: 1, at: "2026-09-30T07:02", today: "2026-09-30",
   meso: [
-    { n: "Build", s: "2026-09-01", e: "2026-09-28", p: 6 },
-    { n: "Aerobic base", s: "2026-09-29", e: "2026-10-25", p: 10,
+    { n: "Build", s: "2026-09-01", e: "2026-09-28" },
+    { n: "Aerobic base", s: "2026-09-29", e: "2026-10-25",
       m: "Rebuild the aerobic base and start sprint intervals." },
   ],
   goals: [
@@ -42,16 +42,17 @@ test("the rail keeps a mesocycle's colour through a goal or today inside its dat
   assert.equal(rows[4].rail, undefined);
 });
 
-test("a mesocycle opens its dates, its summary and the way to the chat", () => {
+test("a mesocycle opens its dates and its summary", () => {
   const [build, , base] = logic.planRows(SNAPSHOT);
   assert.deepEqual(logic.rowSheet(base), {
     title: "Aerobic base",
     lines: ["29 Sep – 25 Oct", "Rebuild the aerobic base and start sprint intervals."],
-    why: true,
   });
-  // A plan written before summaries existed still offers the chat.
-  assert.deepEqual(logic.rowSheet(build).lines, ["1 Sep – 28 Sep"]);
-  assert.equal(logic.rowSheet(build).why, true);
+  assert.deepEqual(logic.rowSheet(build), {
+    title: "Build",
+    lines: ["1 Sep – 28 Sep"],
+  });
+  assert.equal("why" in logic.rowSheet(base), false);
 });
 
 test("a goal opens its line and its description", () => {
@@ -59,33 +60,25 @@ test("a goal opens its line and its description", () => {
   assert.deepEqual(logic.rowSheet(rows[4]), {
     title: "🎯 Goal",
     lines: ["🏃 Sylvesterlauf — on Sun Dec 13 (in 11 weeks)", "Run under 50 minutes."],
-    why: false,
   });
   assert.equal(logic.rowSheet(rows[1]).title, "✅ Goal reached");
 });
 
-test("the why names the tapped mesocycle's plan, not the next goal's", () => {
-  const [build, , base] = logic.planRows(SNAPSHOT);
-  assert.equal(logic.whyMessage(base), '{"plan_why":10}');
-  assert.equal(logic.whyMessage(build), '{"plan_why":6}');
-});
-
-test("from the plan file, a mesocycle shows its long text and no chat button", () => {
+test("from the plan file, a mesocycle shows its long text", () => {
   const file = { ...SNAPSHOT, meso: SNAPSHOT.meso.map((meso) => ({ ...meso, f: "Why it is." })) };
   const row = logic.planRows(file).find((r) => r.kind === "meso" && r.name === "Aerobic base");
-  assert.deepEqual(logic.rowSheet(row, true), {
-    title: "Aerobic base", why: false,
+  assert.deepEqual(logic.rowSheet(row), {
+    title: "Aerobic base",
     lines: ["29 Sep – 25 Oct", "Rebuild the aerobic base and start sprint intervals.",
             "Why it is."],
   });
-  assert.equal(logic.rowSheet(row).why, true);
 });
 
 // Wednesday 4 November, inside the deload of a mesocycle from 19 October to 8 November.
 const DELOAD_SNAPSHOT = {
   v: 1, at: "2026-11-04T07:02", today: "2026-11-04", goals: [],
-  meso: [{ n: "Build", s: "2026-10-19", e: "2026-11-08", d: "2026-11-02", p: 6 },
-         { n: "Peak", s: "2026-11-09", e: "2026-11-29", p: 6 }],
+  meso: [{ n: "Build", s: "2026-10-19", e: "2026-11-08", d: "2026-11-02" },
+         { n: "Peak", s: "2026-11-09", e: "2026-11-29" }],
 };
 
 test("a deload is a row of its own, in date order, right after its mesocycle", () => {
@@ -104,7 +97,7 @@ test("a row dated inside the deload has its rail dashed", () => {
 test("a deload on its mesocycle's first day still comes after the mesocycle", () => {
   const rows = logic.planRows({
     today: "2026-10-01", goals: [{ t: "🎯 Test", d: "2026-11-02" }],
-    meso: [{ n: "Recovery", s: "2026-11-02", e: "2026-11-08", d: "2026-11-02", p: 6 }],
+    meso: [{ n: "Recovery", s: "2026-11-02", e: "2026-11-08", d: "2026-11-02" }],
   });
   assert.deepEqual(rows.map((row) => row.kind), ["today", "meso", "deload", "goal"]);
 });

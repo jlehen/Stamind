@@ -8,7 +8,7 @@ from stamind.cli.bot.capture import CAPTURE_INTENTS, run_bot_capture
 from stamind.cli.bot.route import run_bot_route
 from stamind.cli.bot.views import (
     run_bot_changes, run_bot_constraints, run_bot_garmin_check, run_bot_goals,
-    run_bot_mesocycle, run_bot_morning,
+    run_bot_morning,
 )
 from stamind.cli.queue_commands import run_bot_queue
 
@@ -123,18 +123,6 @@ def add_bot_parser(subparsers):
         ),
     )
     b_goals.set_defaults(func=run_bot_goals)
-
-    # bot mesocycle
-    b_mesocycle = bot_subparsers.add_parser(
-        "mesocycle",
-        help="Render one training mesocycle in full, in companion prose",
-        description=(
-            "Render one mesocycle the way the simple plan view draws it, followed by "
-            "its whole focus. Read-only; the plan view's \"Tell me more\" leaves run it."
-        ),
-    )
-    b_mesocycle.add_argument("mesocycle_id", type=int, help="The mesocycle to show")
-    b_mesocycle.set_defaults(func=run_bot_mesocycle)
 
     # bot queue — the handler lives with the rest of the queue (DESIGN_athlete_queue.md §6.2)
     b_queue = bot_subparsers.add_parser(

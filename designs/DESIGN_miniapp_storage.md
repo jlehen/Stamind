@@ -280,6 +280,9 @@ from it. A tapped mesocycle shows its dates, its summary and its whole long text
 file is the one `bot mesocycle` prints, the text behind the chat's "Tell me more". It is
 not what `plan show` prints, which is the list of mesocycles the page already draws.
 
+Amended 2026-11-01 (ARCHITECTURE.md §15): `"💬 Why, in chat"` (`plan_why`), `bot mesocycle`,
+and the mesocycle's `"p"` key were removed with the chat plan view.
+
 The stamp follows the calendar's rule.
 
 ### 7.3 Details (added 2026-10-21)
@@ -516,6 +519,10 @@ The author answered each of these in the interview.
 by itself, and that Stamind deletes the old ones. With one file per month that no longer
 holds: the older months do not fit in a command's 3 seconds. So after a new token the
 operator runs `sm data publish` once (§9).
+
+Amended 2026-11-01 (ARCHITECTURE.md §15): D4 now covers `"💬 Full day in chat"` alone.
+`"💬 Why, in chat"` (`plan_why`) and the mesocycle's `"p"` key were removed with the chat
+plan view.
 
 **Decided without asking the author, open to objection.**
 

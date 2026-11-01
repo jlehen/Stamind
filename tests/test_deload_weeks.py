@@ -13,7 +13,7 @@ from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, run_cli, 
 
 from stamind import calendar_days, plan_versions, runtime
 from stamind.cli.common import deload_heads, deload_progress, in_deload
-from stamind.cli.render import calendar_grid, calendar_page, plan_lines, plan_page
+from stamind.cli.render import calendar_grid, calendar_page, plan_page
 from stamind.coach.formatting import mesocycle_text
 from stamind.coach.service import coach_service
 from stamind.config import config
@@ -401,37 +401,13 @@ class ListingTest(unittest.TestCase):
         gym = test_db.get_workouts(start_date="2026-11-02", end_date="2026-11-02")[0]
         self.assertNotIn("Deload", self._list(str(gym["id"])))
 
-    def test_the_chat_week_has_the_line_before_the_first_session_inside(self):
-        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
-            out = self._list("-d", "2026-10-31..2026-11-02")
-        self.assertIn(f"Sun 01 · 🧘 Yoga\n{DELOAD}\nMon 02 · 🏋️ Gym", out)
-
-    def test_the_chat_week_starting_inside_has_the_line_first(self):
-        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
-            out = self._list("-d", "2026-11-02..2026-11-03")
-        self.assertIn(f"🗓 Coming up:\n{DELOAD}\nMon 02", out)
-
     def test_the_chat_day_has_no_line(self):
         with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             self.assertNotIn("Deload", self._list("-d", "2026-11-02"))
 
 
 class PlanViewTest(unittest.TestCase):
-    """`simple_mesocycle_lines` and the "Goals & plan" page's snapshot (§11.1, §11.2)."""
-
-    def test_the_line_sits_under_the_window_whichever_state_the_mesocycle_is_in(self):
-        for today, head in (("2026-10-01", "⏳"), ("2026-11-04", "📍"), ("2026-11-30", "✅")):
-            with self.subTest(today=today):
-                lines = plan_lines.simple_mesocycle_lines(_build(), today)
-                self.assertTrue(lines[0].startswith(head))
-                self.assertTrue(lines[1].startswith("Oct 19 – Nov 08"))
-                self.assertEqual(lines[2:], [DELOAD])
-
-    def test_a_mesocycle_with_no_date_has_no_line(self):
-        lines = plan_lines.simple_mesocycle_lines(
-            _meso("Build", "2026-10-19", "2026-11-08"), "2026-11-04",
-        )
-        self.assertEqual(len(lines), 2)
+    """The "Goals & plan" page's snapshot and file (§11.1)."""
 
     def _calendar(self):
         rebind_test_db(test_db)
@@ -443,7 +419,6 @@ class PlanViewTest(unittest.TestCase):
     def test_the_snapshot_carries_d(self):
         meso = plan_page.snapshot(self._calendar(), datetime(2026, 10, 26, 7, 0))["meso"]
         self.assertEqual(meso[0]["d"], "2026-11-02")
-        self.assertEqual(meso[0]["p"], meso[1]["p"])
         self.assertNotIn("d", meso[1])
 
     def test_the_plan_file_carries_d(self):

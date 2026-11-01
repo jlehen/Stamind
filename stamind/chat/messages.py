@@ -23,9 +23,10 @@ from stamind.chat import runner, telegram_api
 from stamind.chat.keyboards import SIMPLE_HELP, SIMPLE_WELCOME, keyboard_action, typed_tap
 from stamind.chat.routing import (
     CAPTURE_PROMPT, CAPTURE_RESCUE_ECHO, ROUTER_CAPTURE_INTENTS, ROUTER_ECHO,
-    ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, parse_message_to_argv,
+    ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, ROUTER_PAGE_REPLIES,
+    parse_message_to_argv,
 )
-from stamind.cli.render import calendar_page, plan_page
+from stamind.cli.render import calendar_page
 from stamind.config import config
 from stamind.sentinels import prompt_answer
 
@@ -51,8 +52,8 @@ class MessagesMixin:
         self, chat_id: int, text: str, armed_tap: bool = False
     ) -> Optional[List[str]]:
         """Maps free text onto argv via the intent router (§5.3).
-        Replies itself (help text, gentle fallback) and returns None when nothing
-        should run; otherwise echoes the routed action and returns the argv.
+        Replies itself (page pointer, help text, gentle fallback) and returns None when
+        nothing should run; otherwise echoes the routed action and returns the argv.
 
         `armed_tap` — she just tapped "💬 Talk to me". It never changes a message the
         router could read, so the tap has nothing to explain (§5.2)."""
@@ -81,6 +82,9 @@ class MessagesMixin:
             argv = ["bot", "capture", ROUTER_CAPTURE_INTENTS[intent], text]
         elif intent in ROUTER_INTENT_ARGV:
             argv = list(ROUTER_INTENT_ARGV[intent])
+        elif intent in ROUTER_PAGE_REPLIES:
+            await self._send_keyed(chat_id, ROUTER_PAGE_REPLIES[intent])
+            return None
         elif intent == "help":
             await self._send_keyed(chat_id, SIMPLE_HELP)
             return None
@@ -252,15 +256,14 @@ class MessagesMixin:
         return path
 
     async def on_web_app_data(self, update, context) -> None:
-        """A message from one of the pages: the calendar asking for a day in full, the
-        "Goals & plan" page asking why, or the gym logger's log when the athlete taps
-        "Finish".
+        """A message from one of the pages: the calendar asking for a day in full, or the
+        gym logger's log when the athlete taps "Finish".
 
         The calendar's day runs `workout show -d <day>`, which prints one day in full
-        (DESIGN_calendar_miniapp.md §6, DESIGN_short_messages.md §4); the why runs `plan
-        show` (§3.7). The log is written to a file and handed to `strength ingest`, whose
-        summary streams back the way every command's output does. The bot never reads the log
-        itself: every write goes through the CLI (DESIGN_gym_logger.md §6)."""
+        (DESIGN_calendar_miniapp.md §6, DESIGN_short_messages.md §4). The log is written to
+        a file and handed to `strength ingest`, whose summary streams back the way every
+        command's output does. The bot never reads the log itself: every write goes through
+        the CLI (DESIGN_gym_logger.md §6)."""
         message = update.effective_message
         chat = update.effective_chat
         if message is None or chat is None or message.web_app_data is None:
@@ -282,11 +285,6 @@ class MessagesMixin:
         if day is not None:
             self._log(chat.id, "  ", f"calendar day: {day}")
             await self._start_command(chat.id, ["workout", "show", "-d", day])
-            return
-        plan = plan_page.why_plan(data)
-        if plan is not None:
-            self._log(chat.id, "  ", f"plan: why {plan}")
-            await self._start_command(chat.id, ["plan", "show", "--macrocycle", str(plan)])
             return
 
         await self._ingest_gym_log(chat.id, data)

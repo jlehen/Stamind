@@ -10,8 +10,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August",
                      "September", "October", "November", "December"];
 
-// Word for word the bot's `SIMPLE_END_NOTE` (cli/render/plan_lines.py); a Python test holds
-// the two together.
+// Shown under every month that holds a day past the end of the schedule (§5).
 export const END_NOTE = "That's the end of the current schedule.";
 
 // ---------------------------------------------------------------------------------------

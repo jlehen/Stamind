@@ -525,6 +525,11 @@ workout IDs is not a range, so it prints no such line, as it prints no end-of-sc
 under the mesocycle's window, the same words: "🔋 Deload Mon 2 Nov to Sun 8 Nov".
 `run_bot_mesocycle` prints the same lines, so a mesocycle's own message has it too.
 
+Amended 2026-11-01 (ARCHITECTURE.md §15): the chat's week view (`simple_week_lines`
+`heads`) and the chat's plan view (`simple_mesocycle_lines`, `run_bot_mesocycle`) were
+removed with those two views. The morning message, both pages, and the three terminal
+commands (`sm workout list`, `sm status`, `sm calendar`) still name the deload.
+
 **The "Goals & plan" page** (`cli/render/plan_page.py`, `miniapp/plan_logic.js`,
 `miniapp/plan.js`) gets a row of its own in the timeline, in date order: "🔋 Deload · 2 Nov –
 8 Nov", right after its mesocycle's row. The rail is one stretch per row, so it can only be
@@ -562,6 +567,10 @@ Three small functions in `cli/common.py`, beside `deload_span`, hold the logic a
 The 🔋 moves into `deload_span`, so the week view, the plan view, `sm workout list`, `sm status`
 and `sm calendar` print one string, and `plan show` and the `plan generate` preview get the 🔋 too.
 
+Amended 2026-11-01 (ARCHITECTURE.md §15): `print_workout_table` is now the only caller of
+`deload_heads`. `simple_week_lines` dropped `heads`, and `simple_mesocycle_lines` and
+`run_bot_mesocycle` were removed (§11.1).
+
 The morning message finds the deload with `get_covering_mesocycle`, today's and tomorrow's. Its
 two sentences are built in `views.py` from `deload_progress` and `fmt_day`. The deload-day line is
 printed right after the silence check, before the Garmin refresh, so it is the first line
@@ -583,7 +592,9 @@ rail runs down the page.
 ### 11.3 Not handled
 
 - **A `workout generate` preview** shows no deload line. The plan's dates are already fixed, and
-  the sessions it lists land in the week view once accepted.
+  the sessions it lists land in the week view once accepted. Amended 2026-11-01 (ARCHITECTURE.md
+  §15): they land on the Calendar page once accepted, and `simple_week_lines` formats `workout
+  generate` proposals alone.
 - **The chat's day** shows no line. The morning message and the day sheet say it.
 - **`sm status` under a mesocycle with no deload** prints nothing, even when the next mesocycle
   has one. `sm calendar` and `plan show` show it.

@@ -111,12 +111,12 @@ classes themselves.
   package, whose `__init__.py` maps its files: `app` (`ChatBot`, the shared state,
   `_serve`), `runner` (one CLI subprocess per place of a chat), `replies` (what goes back
   into the chat), `messages` and `callbacks` (a message, a tap), `routing` (the intent
-  table and what each intent runs), `keyboards` (every button drawn and every tap
-  decoded), `scheduler` (the push, the nightly reflect, the queue's wake), and beside it
-  `stamind/sentinels.py` (the `\x1e` line protocol between the CLI and the bot, both ends
-  in one file). No module in the package imports `python-telegram-bot`: `telegram_api`
-  names the library inside each function (`tests/test_layering.py` holds the rule), which
-  is what lets `sm bot route` read the intent table on a command line and
+  table and what each intent runs or replies with), `keyboards` (every button drawn and
+  every tap decoded), `scheduler` (the push, the nightly reflect, the queue's wake), and
+  beside it `stamind/sentinels.py` (the `\x1e` line protocol between the CLI and the bot,
+  both ends in one file). No module in the package imports `python-telegram-bot`:
+  `telegram_api` names the library inside each function (`tests/test_layering.py` holds the
+  rule), which is what lets `sm bot route` read the intent table on a command line and
   `tests/chat_harness.py` drive a real `ChatBot` against stand-ins.
 
   What the bot does, and where each rule is written:
@@ -124,10 +124,13 @@ classes themselves.
     (`STAMIND_FRONTEND=json`, `STAMIND_RENDER=simple`). A leading `/` is the line as
     typed, a keyboard label runs fixed argv, and other text is classified by `sm bot
     route` (`routing.ROUTER_INTENTS`; the fast model picks an intent, and the button of a
-    live question the message answers, never argv). Prose
+    live question the message answers, never argv; `ROUTER_PAGE_REPLIES` answers a week,
+    goals or plan read with a pointer to its page button instead of spawning a command,
+    [§15](#the-multi-day-schedule-goals-and-plan-live-on-their-pages-alone)). Prose
     comes back as text; a prompt, a chart, a button row, a flush and a queued item come
-    back as sentinel frames (`sentinels.py`, [§6](#6-singletons)). Every Telegram call but the
-    poll goes through `telegram_api.retrying_request` (DESIGN_telegram_send_retry.md §2).
+    back as sentinel frames (`sentinels.py`, [§6](#6-singletons)). Every Telegram call but
+    the poll goes through `telegram_api.retrying_request`
+    (DESIGN_telegram_send_retry.md §2).
   - **Two places per chat**: its own, one command at a time, and a long run beside it, one
     that asks the week planner (`runner.py`; DESIGN_long_runs_beside_chat.md §2, §7).
     Polling never pauses, so `/cancel` and `/restart` reach the bot while a command
@@ -1999,6 +2002,28 @@ Four layout decisions with no design doc and no other home in this document.
   (DESIGN_backward_evaluation.md §5.1), with no tie to `db/activities.py` but a shared
   wipe.
 
+### The multi-day schedule, goals, and plan live on their pages alone
+In the companion chat, `"🗓 Calendar"` and `"🎯 Goals & plan"` are the only read-only
+views of the multi-day schedule, the goals, and the plan. Keeping the older text views
+beside them (`workout list` over several days, `goal list`, `plan show`, and `bot
+mesocycle`) left unused paths that disagreed with the rest of the chat. Typing `"my
+goals"` ran `goal list` without the `"🗑 Call one off"` button that `bot goals` draws.
+Tapping `"💬 Why, in chat"` (`plan_why`) on `"Goals & plan"` ran `plan show`, which
+reprinted the mesocycle list instead of the tapped mesocycle's full focus.
+
+`show_week`, `show_goals`, and `show_plan` stay in `chat/routing.py::ROUTER_INTENTS` so
+`"what's my week?"` does not misroute to `show_today` or `unclear`. `messages._simple_route`
+answers them from `ROUTER_PAGE_REPLIES` with one line naming the keyboard button below
+and spawns no CLI subprocess. `_send_keyed` rebuilds the reply keyboard on that send, so
+the button underneath carries a fresh page snapshot. `"💬 Why, in chat"` and the
+mesocycle's `"p"` snapshot key went with the chat plan view: published bucket files
+already hold each mesocycle's full `focus`, and an offline phone cannot reach the bot via
+`sendData` anyway. Single-day `workout list -d today`, `workout show -d <date>`
+(`calendar_day`), `bot goals` (`remove_goal`), and `simple_week_lines` (for `workout
+generate --propose` previews) stay. `goal list` and `plan show` are single-voice expert
+commands again ([§6](#6-singletons),
+[§17](#17-calendar-telegram-mini-app-and-sm-calendar)).
+
 ---
 
 ## 16. Gym Logger (Telegram Mini App)
@@ -2037,10 +2062,10 @@ month files), `cli/render/plan_page.py` ("Goals & plan", whose mesocycles come f
 `calendar_page.py::meso_entry`, deload date included), `cli/render/calendar_grid.py`
 (the terminal grid behind `cli/calendar.py`). The pages are `miniapp/calendar.html`,
 `plan.html` and `details.html` (a proposal in full, DESIGN_short_messages.md §6) and their
-`*_logic.js` under node tests, with `storage.js` the bucket read they share. `page_files/sync.py` adds the bucket parameters to both buttons and uploads
-the files that changed after every command (`after_command`, from `run_once`). On the
-bot's side, `ChatBot._page_buttons` builds both addresses on every send,
-`RepliesMixin._send_keyed` is the one send that attaches the keyboard, and
-`on_web_app_data` turns a `calendar_day` message into `workout show -d <date>` and a
-`plan_why` one into `plan show --macrocycle <id>`; any other page message is a gym log
+`*_logic.js` under node tests, with `storage.js` the bucket read they share.
+`page_files/sync.py` adds the bucket parameters to both buttons and uploads the files
+that changed after every command (`after_command`, from `run_once`). On the bot's side,
+`ChatBot._page_buttons` builds both addresses on every send, `RepliesMixin._send_keyed`
+is the one send that attaches the keyboard, and `on_web_app_data` turns a `calendar_day`
+message into `workout show -d <date>`; any other page message is a gym log
 ([§16](#16-gym-logger-telegram-mini-app)).

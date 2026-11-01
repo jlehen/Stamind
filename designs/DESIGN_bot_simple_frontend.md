@@ -432,6 +432,12 @@ result, and `bot morning`. The §11 breadth
 pass added `goal list` and `plan show`; the look back (2026-09-03) added
 `workout compare`.
 
+Amended 2026-11-01 (ARCHITECTURE.md §15): the multi-day `workout list` week view, the
+read-only `goal list` view, the `plan show` view, and `bot mesocycle` are superseded by
+`"🗓 Calendar"` and `"🎯 Goals & plan"` and removed from `CompanionRenderer`. Single-day
+`workout list -d today`, `workout show -d <date>`, `bot goals` (`remove_goal`), and the
+`workout generate --propose` preview stay.
+
 **The look back is four glyphs.** `workout compare` in companion voice is the week
 view turned around: one dated line per planned session and per extra effort, and the
 glyph at the front is the whole verdict — ✅ followed the plan, ❌ did not, ➕ an effort
@@ -647,6 +653,12 @@ Each phase ships alone; her onboarding starts at phase 1.
    demands them.
 
 ## 11. Breadth: goals, the plan, and a calendar-shaped week (2026-08-30)
+
+Amended 2026-11-01 (ARCHITECTURE.md §15): the multi-day week view, the read-only goals
+view, the plan view (§11.1, §11.2), and `bot mesocycle` are superseded by `"🗓 Calendar"`
+and `"🎯 Goals & plan"`. Typed `show_week`, `show_goals`, and `show_plan` requests now
+answer from `ROUTER_PAGE_REPLIES` with a pointer to those buttons. `simple_goal_lines`
+stays for the `bot goals` (`remove_goal`) picker (§12.6).
 
 The first weeks of companion mode covered the daily loop — today, the week, progress,
 telling the coach. What it lacked was the *why*: an athlete without the Google Calendar

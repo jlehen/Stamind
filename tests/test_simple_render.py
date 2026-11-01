@@ -5,6 +5,9 @@
 itself: which voice `STAMIND_RENDER` picks, and that no command module imports the
 package back. The plan-side line builders are tests/test_simple_render_plan.py.
 """
+import argparse
+import contextlib
+import io
 import os
 import sys
 import unittest
@@ -217,11 +220,6 @@ class DayLinesTest(unittest.TestCase):
 
 
 class WeekLinesTest(unittest.TestCase):
-    def test_empty_window_is_a_break(self):
-        lines = session_lines.simple_week_lines([])
-        self.assertEqual(len(lines), 1)
-        self.assertIn("enjoy the break", lines[0])
-
     def test_sessions_are_dated_and_counted(self):
         lines = session_lines.simple_week_lines([
             {"sport_type": "running", "title": "Easy run",
@@ -239,27 +237,49 @@ class WeekLinesTest(unittest.TestCase):
         )
         self.assertIn("1 session planned", lines[-1])
 
-    def test_a_trained_session_gets_the_check_and_the_count(self):
-        lines = session_lines.simple_week_lines(
-            [{"id": 1, "sport_type": "running", "title": "Easy run",
-              "date": "2026-08-25"},
-             {"id": 2, "sport_type": "cycling", "title": "Endurance ride",
-              "date": "2026-08-27"}],
-            verdicts={1: {"status": "done"}},
-        )
-        self.assertIn("✅", lines[1])
-        self.assertNotIn("✅", lines[2])
-        self.assertIn("1 of 2 sessions already done", lines[-1])
 
-    def test_missed_and_pending_sessions_say_nothing(self):
-        # §6 tone rule: a gap is never remarked on in the listing.
-        lines = session_lines.simple_week_lines(
-            [{"id": 1, "sport_type": "running", "title": "Easy run",
-              "date": "2026-08-25"}],
-            verdicts={1: {"status": "missed"}},
-        )
-        self.assertNotIn("✅", lines[1])
-        self.assertIn("1 session planned", lines[-1])
+class CompanionWorkoutListTest(unittest.TestCase):
+    """`CompanionRenderer.workout_list`: single-day windows render companion prose;
+    multi-day and workout-ID calls delegate to `ExpertRenderer`."""
+
+    def setUp(self):
+        pin_clock(self, "2026-08-25")
+
+    def test_single_day_renders_companion_prose(self):
+        workouts = [{"sport_type": "running", "title": "Easy run",
+                     "duration_minutes": 40, "date": "2026-08-25",
+                     "description": "Conversational pace."}]
+        buf = io.StringIO()
+        with patch("stamind.cli.render.companion.runtime"), \
+                patch("stamind.cli.render.companion.page_files") as pf, \
+                patch.object(ExpertRenderer, "workout_list") as expert_list, \
+                contextlib.redirect_stdout(buf):
+            pf.pages_published.return_value = False
+            pf.day_button.return_value = None
+            CompanionRenderer().workout_list(
+                workouts, {}, argparse.Namespace(verbose=0),
+                start_date="2026-08-25", end_date="2026-08-25", ids=[], names_a_range=True,
+            )
+        expert_list.assert_not_called()
+        self.assertIn("🏃 Today: Easy run — 40 min", buf.getvalue())
+        self.assertIn("Conversational pace.", buf.getvalue())
+
+    def test_multi_day_and_id_calls_delegate_to_expert_renderer(self):
+        args = argparse.Namespace(verbose=0)
+        for start, end, ids, ranged in (
+            ("2026-08-25", "2026-08-31", [], True),
+            (None, None, [12], False),
+        ):
+            with self.subTest(start=start, end=end, ids=ids), \
+                    patch.object(ExpertRenderer, "workout_list") as expert_list:
+                CompanionRenderer().workout_list(
+                    [], {}, args, start_date=start, end_date=end,
+                    ids=ids, names_a_range=ranged,
+                )
+                expert_list.assert_called_once_with(
+                    [], {}, args, start_date=start, end_date=end,
+                    ids=ids, names_a_range=ranged,
+                )
 
 
 class CompareLinesTest(unittest.TestCase):

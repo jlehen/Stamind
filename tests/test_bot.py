@@ -150,6 +150,10 @@ class SimpleKeyboardTest(unittest.TestCase):
         self.assertIn(keyboards.PLAN_LABEL, keyboards.SIMPLE_WELCOME)
         self.assertNotIn("My week", keyboards.SIMPLE_WELCOME)
         self.assertNotIn("My plan", keyboards.SIMPLE_WELCOME)
+        self.assertTrue(
+            keyboards.SIMPLE_WELCOME.endswith("Or just write to me in your own words.")
+        )
+        self.assertNotIn("it's the same thing", keyboards.SIMPLE_WELCOME)
 
     def test_non_label_text_is_not_a_button(self):
         self.assertIsNone(keyboards.keyboard_action("show me my week"))
@@ -288,9 +292,8 @@ class GuardrailTest(unittest.TestCase):
     Nothing plan-shaping, expensive or irreversible is reachable without typing."""
 
     ALLOWED_PREFIXES = {
-        ("workout", "list"), ("workout", "compare"), ("goal", "list"), ("plan", "show"),
-        ("progress", "--chart"), ("bot", "constraints"), ("bot", "goals"),
-        ("bot", "capture"),
+        ("workout", "list"), ("workout", "compare"), ("progress", "--chart"),
+        ("bot", "constraints"), ("bot", "goals"), ("bot", "capture"),
     }
 
     def test_capture_intents_reach_only_the_capture_command(self):
@@ -353,15 +356,31 @@ class RouterTablesTest(unittest.TestCase):
         for intent in routing.ROUTER_INTENTS:
             self.assertTrue(
                 intent in routing.ROUTER_INTENT_ARGV
+                or intent in routing.ROUTER_PAGE_REPLIES
                 or intent in routing.ROUTER_CAPTURE_INTENTS
                 or intent in routing.ROUTER_MESSAGE_ARGV
                 or intent in self.SPECIAL, intent
             )
 
     def test_bot_tables_name_no_unknown_intent(self):
-        for intent in (list(routing.ROUTER_INTENT_ARGV) + list(routing.ROUTER_ECHO)
-                       + list(routing.ROUTER_CAPTURE_INTENTS) + list(routing.ROUTER_MESSAGE_ARGV)):
+        for intent in (list(routing.ROUTER_INTENT_ARGV) + list(routing.ROUTER_PAGE_REPLIES)
+                       + list(routing.ROUTER_ECHO) + list(routing.ROUTER_CAPTURE_INTENTS)
+                       + list(routing.ROUTER_MESSAGE_ARGV)):
             self.assertIn(intent, routing.ROUTER_INTENTS)
+
+    def test_page_reply_intents_point_to_keyboard_pages_and_run_nothing(self):
+        self.assertEqual(
+            set(routing.ROUTER_PAGE_REPLIES), {"show_week", "show_plan", "show_goals"}
+        )
+        for intent, reply in routing.ROUTER_PAGE_REPLIES.items():
+            self.assertIn(intent, routing.ROUTER_INTENTS, intent)
+            self.assertNotIn(intent, routing.ROUTER_INTENT_ARGV, intent)
+            self.assertNotIn(intent, routing.ROUTER_CAPTURE_INTENTS, intent)
+            self.assertNotIn(intent, routing.ROUTER_MESSAGE_ARGV, intent)
+            self.assertNotIn(intent, routing.ROUTER_ECHO, intent)
+            self.assertTrue(
+                keyboards.CALENDAR_LABEL in reply or keyboards.PLAN_LABEL in reply, intent
+            )
 
     def test_every_capture_intent_reaches_the_capture_command(self):
         from stamind.cli.bot.capture import CAPTURE_INTENTS
