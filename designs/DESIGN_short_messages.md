@@ -308,7 +308,7 @@ shows the summary, then one card per changed session, in date order. A card hold
   and "Now" pairs (DESIGN_workout_revisions.md §9.1);
 - the whole new description, folded, and opened by a tap. For a session that is new or has
   a new title, it is shown open, because no "Was" and "Now" pair exists for it.
-- the whole text of the session it replaces, folded under "As planned before" (D15). A card
+- the whole text of the session it replaces, folded under "🔴 As planned before" (D15). A card
   whose "Was" and "Now" pairs already show the change has none. The card of a session the
   proposal drops holds that session's whole text, under "The whole session".
 

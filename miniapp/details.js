@@ -48,7 +48,7 @@ function card(found) {
     box.append(fold("The whole session", found.text, found.open));
   }
   if (found.before) {
-    box.append(fold("As planned before", found.before, false));
+    box.append(fold("🔴 As planned before", found.before, false));
   }
   return box;
 }
