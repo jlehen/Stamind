@@ -202,6 +202,12 @@ Nothing is backfilled: a plan written before this design has no deload date. Rea
 of a mesocycle's name would be a guess. `plan generate -f` writes it; a plain `plan generate`
 reuses a plan whose inputs did not change (§9, step 7).
 
+One exception, 2026-11-01, by the author's choice: five mesocycles of the active plans whose
+focus gives the deload's dates, and whose deload closes the mesocycle, got their date by hand,
+three on the main instance and two on the companion's. Weekly load was the cross-check, not
+the source. A light week that does not close its mesocycle stays NULL: the companion's 15 to
+21 November, which a peak week follows.
+
 `plan rollback` copies no rows: it makes an older version active again, and the column
 travels with that version's mesocycles.
 
