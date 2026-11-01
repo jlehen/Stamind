@@ -590,6 +590,17 @@ rail runs down the page.
 - **A `plan generate` after the morning message.** The next morning says the new date.
 - **A deload that starts before the week holding the 1st**, Thursday 26 November to Wednesday
   2 December, has its marks in December's `sm calendar` and its line only in November's.
+- **Two plans that overlap.** Goal A's plan runs to 13 December with a deload from 2 to 8 November,
+  and goal B's newer plan starts on 1 December. On 4 November the morning message and `sm status`
+  say the deload, because they ask which plan covers today. The calendar page, the "Goals & plan"
+  page, `sm calendar` and a `sm workout list` reaching into December do not: a range that touches
+  both plans drops the older one whole (`get_governing_mesocycles`). That drop is older than this
+  section. Left as is by the author's ruling, 2026-11-01.
+- **A tap on a day whose month file has not arrived.** The deload runs from 30 November to
+  6 December and December's file is still on its way. Tapping Tuesday 1 December, which has a gym
+  session, opens a sheet with only the deload's dates, and nothing says the session is missing.
+  The cell is already drawn as having no data, and a goal's day does the same. Left as is by the
+  author's ruling, 2026-11-01.
 
 ### 11.4 Choices made without asking
 
