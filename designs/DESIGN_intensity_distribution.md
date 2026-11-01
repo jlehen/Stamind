@@ -1367,7 +1367,8 @@ rows under today exactly like the load table's ghost bars, and §9.6's one asymm
 > lit 9 rows across 3 tables. Two fixes, one idea — *ask whether the evidence is
 > big enough to carry the claim*:
 >
-> - **A duration floor** (`config.zone_min_activity_minutes`, default 20). Seven
+> - **A duration floor** (`config.min_activity_minutes`, 20 here, 15 since it also
+>   decides the RPE reminder, ARCHITECTURE.md §15). Seven
 >   of the ten `hr_sparse` activities in the window were under 15 minutes: a
 >   5-minute yoga worth 0.8 TSS, a 5-minute strength activity worth 0.3. None of
 >   them is evidence that a 344-TSS week is undercounted, and none is evidence

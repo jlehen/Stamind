@@ -92,7 +92,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         # edit the one it answers; it empties with a restart (DESIGN_athlete_queue.md §14.3).
         self.sent_questions: Dict[int, Dict[str, SentQuestion]] = {}
         # Held until each ends: asyncio keeps only a weak reference to a running task.
-        self.reflect_tasks: set = set()
+        self.outside_tasks: set = set()
         # The instant of the athlete's last own message or tap in the push chat. None
         # until the first one after a start (DESIGN_athlete_queue.md §13.2 rule 4).
         self.last_input_at: Optional[datetime.datetime] = None

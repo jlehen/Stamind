@@ -402,15 +402,22 @@ class Config:
         return float(self.get("garmin", {}).get("hr_zone_coverage_min", 0.5))
 
     @property
-    def zone_min_activity_minutes(self) -> float:
-        """Shortest activity that may raise an undercount marker in the progress tables
-        (DESIGN_intensity_distribution.md §11). Under `garmin:`. Default 20.
+    def garmin_poll_minutes(self) -> float:
+        """How often the bot looks for a new activity between the morning and the evening
+        time; 0 turns it off. Under `garmin:`, default 15."""
+        return float(self.get("garmin", {}).get("poll_minutes", 15))
+
+    @property
+    def min_activity_minutes(self) -> float:
+        """Shortest activity worth a claim about its missing effort data: it may raise an
+        undercount marker in the progress tables (DESIGN_intensity_distribution.md §11), and
+        get an RPE warning or reminder (ARCHITECTURE.md §15). Under `garmin:`. Default 15.
 
         A 5-minute mobility session with a cold strap is not evidence that a 340-TSS
         week is undercounted, and it is not evidence about recording quality either —
         it is too small to carry either claim. Sessions below this still contribute
         their load and their zone minutes; they simply get no vote on the markers."""
-        return float(self.get("garmin", {}).get("zone_min_activity_minutes", 20))
+        return float(self.get("garmin", {}).get("min_activity_minutes", 15))
 
     @property
     def hours_load_floor(self) -> float:

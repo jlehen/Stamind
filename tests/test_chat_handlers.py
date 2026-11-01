@@ -500,7 +500,7 @@ class SchedulerDriverTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(noted.tzinfo)
         seen = []
 
-        async def wake(_last_run, _busy, _run, _reflect, last_input):
+        async def wake(_last_run, _busy, _run, _reflect, last_input, _poll):
             seen.append(last_input)
             raise asyncio.CancelledError
 

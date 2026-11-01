@@ -29,6 +29,7 @@ from stamind.cli.workouts.proposal import (
 )
 from stamind.learning_doubts import LEARNING_KIND
 from stamind.retrospective_question import RETROSPECTIVE_KIND
+from stamind.rpe_reminder import RPE_REMINDER_KIND
 from stamind.strength.questions import SET_NAMES_KIND, SETS_FINAL_KIND
 
 # The action codes a chooser returns and a button carries (§6.2). An answer is `a<n>`, the
@@ -67,7 +68,7 @@ MESSAGE_KIND = Kind(
 
 # The strength kinds ask for a session's sets (DESIGN_strength_tracking.md §7), and the
 # learning kind whether a doubted learning still fits (DESIGN_learning_doubt_nudge.md §5),
-# the test-result kind what a test done yesterday gave (DESIGN_benchmark_from_chat.md §4),
+# the test-result kind what a finished test gave (DESIGN_benchmark_from_chat.md §4),
 # and the retrospective kind how a finished mesocycle went (DESIGN_cycle_retrospective.md §4).
 # The proposal kind holds what the week planner would change (DESIGN_waiting_proposal.md §3).
 # The constraint and signal kinds ask whether to store what a message stated (§6.3 there),
@@ -83,6 +84,7 @@ KINDS: Dict[str, Kind] = {
         MESSAGE_KIND, SETS_FINAL_KIND, SET_NAMES_KIND, LEARNING_KIND, TEST_RESULT_KIND,
         RETROSPECTIVE_KIND, PROPOSAL_KIND, NOTE_KIND, CONSTRAINT_KIND, SIGNAL_KIND,
         PASS_TO_COACH_KIND, SCHEDULE_KIND, REPLACE_SESSIONS_KIND, CUT_SHORT_KIND,
+        RPE_REMINDER_KIND,
         NEW_GOAL_KIND, EDIT_KIND, PICK_KIND, CHANGE_SETTING_KIND, TEST_RECORD_KIND,
         ADJUST_WEEK_KIND,
     )

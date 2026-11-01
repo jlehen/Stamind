@@ -69,13 +69,13 @@ def coverage_display_min(sport: str) -> float:
 
 def judgeable(act: Dict[str, Any]) -> bool:
     """Whether an activity is big enough to carry a claim about recording quality, or
-    about undercounted load (`config.zone_min_activity_minutes`, §11).
+    about undercounted load (`config.min_activity_minutes`, §11).
 
     A 5-minute mobility activity with a cold strap is not evidence that a 340-TSS week is
     undercounted, and it is not evidence about the strap either — it is below the noise
     floor of both questions. Its load and its zone minutes still count everywhere; only
     its vote on the markers is withheld."""
-    return float(act.get("duration_sec") or 0.0) / 60.0 >= config.zone_min_activity_minutes
+    return float(act.get("duration_sec") or 0.0) / 60.0 >= config.min_activity_minutes
 # Power is instantaneous and so the currency to read, but only once it can see the whole
 # window — the fraction it cannot see is the meterless easy commutes (§9.6). Shares a
 # number with the bar above and nothing else: that one grades a single week's row, this

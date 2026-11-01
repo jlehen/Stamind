@@ -22,6 +22,7 @@ from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 from stamind import athlete_queue, heads_up, journal, runtime, settings
 from stamind.chat import runner
 from stamind.clock import now as athlete_now, reset_cache as forget_timezone
+from stamind.config import config
 from stamind.text import strip_ansi
 
 
@@ -69,10 +70,26 @@ def reflect_due(now: "datetime.datetime") -> bool:
     return now.weekday() >= REFLECT_FROM_WEEKDAY and now.hour >= REFLECT_FROM_HOUR
 
 
+def garmin_poll_due(
+    now: "datetime.datetime", last_poll: Optional[str], every_minutes: float,
+    morning: str, evening: str,
+) -> bool:
+    """Whether to look for a new activity: between the morning and the evening time, and
+    `every_minutes` after the last look. Zero minutes turns it off. An activity seen later
+    is the morning push's (ARCHITECTURE.md §15)."""
+    if every_minutes <= 0 or not morning <= now.strftime("%H:%M") < evening:
+        return False
+    if last_poll is None:
+        return True
+    elapsed = now - datetime.datetime.fromisoformat(last_poll)
+    return elapsed >= datetime.timedelta(minutes=every_minutes)
+
+
 async def scheduler_wake(
     last_run: Dict[str, str], busy: Callable[[], bool],
     run: Callable[[List[str], bool], Awaitable[None]], reflect: Callable[[], None],
     last_input: Optional["datetime.datetime"] = None,
+    poll: Callable[[], None] = lambda: None,
 ) -> float:
     """One wake of the bot's scheduler. `last_run` holds the day the push and the nightly
     reflect last started, and the return is how long to sleep before the next wake: at most
@@ -83,7 +100,8 @@ async def scheduler_wake(
     push due on the same wake would otherwise find the chat busy. The `push` switch does
     not stop them (DESIGN_change_heads_up.md §4). `reflect` starts `data reflect --auto`
     outside the chat once a day, and nothing waits for it (DESIGN_learning_doubt_nudge.md
-    §3.1). The push fires inside the [morning_time, deadline] window once per bot-day, and
+    §3.1). `poll` starts `bot garmin-check` the same way when `garmin_poll_due` says so. The
+    push fires inside the [morning_time, deadline] window once per bot-day, and
     ends by sending from the athlete queue itself (DESIGN_bot_simple_frontend.md §4.3). On
     a wake with no push to run, the next item of the queue goes out when one is ready and
     none is out, whether or not the push is on. Past the evening time that needs
@@ -101,6 +119,10 @@ async def scheduler_wake(
     if reflect_due(now) and last_run.get("reflect") != today:
         last_run["reflect"] = today
         reflect()
+    if garmin_poll_due(now, last_run.get("poll"), config.garmin_poll_minutes,
+                       settings.morning_time(), settings.evening_time()):
+        last_run["poll"] = now.isoformat()
+        poll()
     delay = next_push_delay(now, settings.morning_time(), settings.morning_deadline())
     pushed = last_run.get("push") == today
     if delay > 0 or not settings.push_enabled() or pushed:
@@ -143,11 +165,10 @@ class SchedulerMixin:
             return
         await self._run_scheduled(["bot", "changes"], True)
 
-    async def _reflect_outside_chat(self) -> None:
-        """`data reflect --auto` as a process of its own, like the router: nothing is posted,
-        the chat is not busy, and its output goes to the journal
-        (DESIGN_learning_doubt_nudge.md §3.1)."""
-        argv = ["data", "reflect", "--auto"]
+    async def _run_outside_chat(self, argv: List[str], topic: str, always: bool) -> None:
+        """A command as a process of its own, like the router: nothing is posted, the chat
+        is not busy, and its output goes to the journal, where `always` is off only when it
+        failed (DESIGN_learning_doubt_nudge.md §3.1)."""
         self._log(self.push_chat_id, "**", shlex.join(argv))
         env = runner.cli_env(None, source="push")
         env.pop("STAMIND_FRONTEND")  # a terminal report for the journal, no chat sentinels
@@ -162,17 +183,25 @@ class SchedulerMixin:
             )
             out, _ = await proc.communicate()
         except Exception as exc:
-            journal.record("bot.reflect", f"did not run: {exc}", lvl="warn")
+            journal.record(topic, f"did not run: {exc}", lvl="warn")
+            return
+        if not always and proc.returncode == 0:
             return
         journal.record(
-            "bot.reflect", strip_ansi(out.decode(errors="replace")).strip(),
+            topic, strip_ansi(out.decode(errors="replace")).strip(),
             exit_code=proc.returncode,
         )
 
+    def _start_outside_chat(self, argv: List[str], topic: str, always: bool) -> None:
+        task = asyncio.create_task(self._run_outside_chat(argv, topic, always))
+        self.outside_tasks.add(task)
+        task.add_done_callback(self.outside_tasks.discard)
+
     def _start_reflect(self) -> None:
-        task = asyncio.create_task(self._reflect_outside_chat())
-        self.reflect_tasks.add(task)
-        task.add_done_callback(self.reflect_tasks.discard)
+        self._start_outside_chat(["data", "reflect", "--auto"], "bot.reflect", True)
+
+    def _start_garmin_check(self) -> None:
+        self._start_outside_chat(["bot", "garmin-check"], "bot.garmin_check", False)
 
     async def _push_loop(self) -> None:
         """One `scheduler_wake` after another (§4.3). Real idempotency lives in the
@@ -187,6 +216,7 @@ class SchedulerMixin:
                     last_run,
                     lambda: bool(self._runs(self.push_chat_id)) or runtime.db.week_busy(),
                     self._run_scheduled, self._start_reflect, self.last_input_at,
+                    self._start_garmin_check,
                 )
             except Exception as exc:
                 # One wake's failure never ends the loop: the push is the one thing that

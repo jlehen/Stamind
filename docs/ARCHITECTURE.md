@@ -151,6 +151,9 @@ classes themselves.
     `settings` row `push_morning_last` (DESIGN_bot_simple_frontend.md §4.2, §4.3); the
     proposal it saves is DESIGN_waiting_proposal.md §5. A deload day's message opens with a
     line and the day before's ends with one, text from the date (DESIGN_deload_weeks.md §11.1).
+  - **The Garmin check** is `sm bot garmin-check` (`cli/bot/views.py`), run by `scheduler.py`
+    beside the chat every `garmin.poll_minutes` between `morning-time` and `evening-time`
+    ([§15](#15-design-rationale--history)).
   - **Short messages**, where the pages are published: a proposal is one message, its short
     text above "Shall I make these changes?"; a day the chat draws (the morning message,
     "📅 Today", today after a proposal's answer) shows each session's short line. Under
@@ -208,6 +211,7 @@ One line per module; the rule each keeps is the part worth knowing before openin
 | `heads_up.py` | — | Telling the athlete about a change made out of their sight: the wording, the send rule (`due`, `changes_due`, `sends_after_delay`), `changes_notify_upto` (DESIGN_change_heads_up.md). Pure but for `waiting()`/`changes_due()`, so `db/workout_change.py` imports it safely |
 | `freshness.py` | — | How fresh is fresh enough, for Garmin and the Calendar: `last_pull_age`, `fresh_notice`. Flat because `garmin/` and `gcal/` must not import each other; the decision stayed with each caller ([§15](#15-design-rationale--history)) |
 | `cycle_records.py` | — | The date check: which retrospective records exist, when one is due, how one reads (DESIGN_cycle_retrospective.md §3). Rows in `db/retrospectives.py` |
+| `rpe_reminder.py` | — | The `rpe_reminder` queue kind: enter an RPE in Garmin ([§15](#15-design-rationale--history)) |
 | `retrospective_question.py` | — | The `retrospective` queue kind (DESIGN_cycle_retrospective.md §4) |
 | `calendar_days.py` | — | The one list of days the calendar page and `sm calendar` draw: `gather` → a `Calendar` of `Day`s, facts only, reads and never pulls (DESIGN_calendar_miniapp.md §4) |
 | `timeline_rows.py` | — | The one row fetch behind `sm progress` and `/api/timeline.png`; outside `analytics/` because it reads the database |
@@ -1361,7 +1365,8 @@ but the credentials is optional and falls back to the default shown:
 | `refresh_minutes`      | int | Throttle window shared by Garmin pulls **and** Calendar-signal syncs; reads inside it reuse the cache. Top-level, default 120; read as `config.data_refresh_minutes` |
 | `garmin.mutable_days` / `garmin.backfill_prompt_days` / `garmin.initial_backfill_days` / `garmin.throttle_seconds` | — | Auto-ensure tuning (defaults 3 / 30 / 90 / 0.2; see [§10 Data Pull](#data-pull-data-pull-and-auto-ensure)) |
 | `garmin.pmc_ctl_days` / `garmin.pmc_atl_days` | int | PMC time constants (42 / 7 — the supported configuration, [§12](#fitnessfatigueform-pmc-model)) |
-| `garmin.hr_zone_coverage_min` / `garmin.zone_min_activity_minutes` / `garmin.zone_coverage_display_min` / `garmin.zone_coverage_display_min_by_sport` | — | Load-model coverage gate (0.5), the too-short-to-judge cut-off (20 min) and the display coverage bars (0.8, per canonical sport) — [§12](#load-model-per-activity), DESIGN_intensity_distribution.md |
+| `garmin.hr_zone_coverage_min` / `garmin.zone_coverage_display_min` / `garmin.zone_coverage_display_min_by_sport` | — | Load-model coverage gate (0.5) and the display coverage bars (0.8, per canonical sport) — [§12](#load-model-per-activity), DESIGN_intensity_distribution.md |
+| `garmin.min_activity_minutes` / `garmin.poll_minutes` | float | Shortest activity that gets an RPE warning or reminder, starts the Garmin check's questions, or raises a `sm progress` under-count marker (15), and how often the bot looks for a new activity, 0 for never (15) — [§15](#15-design-rationale--history) |
 | `garmin.hours_load_floor` | float | Load per hour an activity or a planned session must exceed for its time to count in the week's hours (10, what an hour at RPE 1 gives) — DESIGN_progress_timeline.md §7.1 |
 | `google.service_account_file` | str | Path to service account JSON (default: `service_account.json`) |
 | `data_dir`             | str  | Directory every relative path key below resolves against, replacing the config file's directory as the base; itself config-file-relative. Absent → the config file's directory (the pre-`data_dir` rule) |
@@ -1810,6 +1815,17 @@ with no design doc of their own.
 sRPE); the former `TSS + RPE × hours` additive blend was removed because it
 double-counted internal and external load. RPE is user-entered only and never
 synthesised from power/HR. See [§12](#12-sports-science--coaching-mathematics).
+
+### Questions soon after a session
+
+The questions about a session used to wait for the next morning's pull. The bot now asks Garmin
+for today's activity list every `garmin.poll_minutes`, and pulls today's activities only when a
+new one lasts at least `garmin.min_activity_minutes`. That length also keeps a warm-up from raising
+"Was that the session, cut short?" while the session is still going, and decides which
+low-coverage activity gets the reminder or a warning. Below it, the load's tags still say
+`hr_sparse`, because they name where the number came from. The reminder asks for the RPE in
+Garmin, the one source of that column; the bot takes no RPE itself. Not handled: a warm-up
+longer than that length.
 
 ### Goal dates: event vs. training horizon
 Not every goal happens on its date — some dates only say how far the athlete wants to

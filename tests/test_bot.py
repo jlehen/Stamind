@@ -485,6 +485,8 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(scheduler, "forget_timezone"),
             mock.patch.object(scheduler.settings, "morning_time", return_value="08:00"),
             mock.patch.object(scheduler.settings, "morning_deadline", return_value="15:00"),
+            mock.patch.object(scheduler.settings, "evening_time", return_value="21:00"),
+            mock.patch.dict(scheduler.config.data, {"garmin": {"poll_minutes": 15}}),
             mock.patch.object(scheduler.settings, "push_enabled", return_value=True),
             mock.patch.object(scheduler.athlete_queue, "next_due", return_value=True),
             mock.patch.object(scheduler.heads_up, "changes_due", return_value=False),
@@ -506,6 +508,16 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
         return await scheduler.scheduler_wake(
             self.last_run, lambda: busy, self.run_command, self.reflect
         )
+
+    async def test_the_garmin_check_starts_once_until_its_time_comes_again(self):
+        """It starts beside the chat, so a busy chat does not hold it back."""
+        polls = []
+        for _ in range(2):
+            await scheduler.scheduler_wake(
+                self.last_run, lambda: True, self.run_command, self.reflect,
+                poll=lambda: polls.append(self.now),
+            )
+        self.assertEqual(polls, [self.now])
 
     async def test_a_due_push_runs_alone_and_the_next_wake_sends_from_the_queue(self):
         """The morning message ends by sending from the queue itself. Once it has run, a

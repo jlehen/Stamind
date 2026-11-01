@@ -78,7 +78,8 @@ def compute_load(
            (used when power is absent and HR is missing or too sparse to trust)
 
     When method 3 should apply but the user entered no RPE, we keep the weak
-    hrTSS (or 0) and return a warning string so callers can surface it.
+    hrTSS (or 0) and return a warning string so callers can surface it. An activity under
+    `config.min_activity_minutes` gets no warning: it is too short for its load to matter.
 
     Returns (load, method, warning). `method` identifies the source; `warning`
     is a human reason when we fell back to an unreliable estimate for lack of a
@@ -88,6 +89,7 @@ def compute_load(
     if power is not None:
         return power, "power", None
 
+    worth_asking = duration_sec >= config.min_activity_minutes * 60
     hr = _zone_tss(hr_zone_sec, "zone", HR_ZONE_TSS_PER_SEC)
     if hr is not None:
         # Trust hrTSS only when the HR zones cover enough of the activity; sparse
@@ -97,10 +99,14 @@ def compute_load(
             return hr, "hr", None
         if rpe:
             return rpe_tss(float(rpe), duration_sec), "rpe", None
+        if not worth_asking:
+            return hr, "hr_sparse", None
         return hr, "hr_sparse", "low HR-zone coverage and no RPE entered"
 
     if rpe:
         return rpe_tss(float(rpe), duration_sec), "rpe", None
+    if not worth_asking:
+        return 0.0, "none", None
     return 0.0, "none", "no power, HR, or RPE data"
 def _has_power_zones(act: Dict[str, Any]) -> bool:
     return any(act.get(f"power_zone{i}_sec") for i in range(1, 8))

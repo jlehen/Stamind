@@ -7,8 +7,8 @@ from here and names nothing else in this package.
 from stamind.cli.bot.capture import CAPTURE_INTENTS, run_bot_capture
 from stamind.cli.bot.route import run_bot_route
 from stamind.cli.bot.views import (
-    run_bot_changes, run_bot_constraints, run_bot_goals, run_bot_mesocycle,
-    run_bot_morning,
+    run_bot_changes, run_bot_constraints, run_bot_garmin_check, run_bot_goals,
+    run_bot_mesocycle, run_bot_morning,
 )
 from stamind.cli.queue_commands import run_bot_queue
 
@@ -56,6 +56,18 @@ def add_bot_parser(subparsers):
         ),
     )
     b_changes.set_defaults(func=run_bot_changes)
+
+    # bot garmin-check
+    b_garmin_check = bot_subparsers.add_parser(
+        "garmin-check",
+        help="Pull today's activities when Garmin lists a new one, and queue its questions",
+        description=(
+            "Ask Garmin for today's activity list. When it holds a new activity that lasts "
+            "at least garmin.min_activity_minutes, pull today's activities and queue the "
+            "questions about it. The bot's scheduler runs it every garmin.poll_minutes."
+        ),
+    )
+    b_garmin_check.set_defaults(func=run_bot_garmin_check)
 
     # bot route
     b_route = bot_subparsers.add_parser(

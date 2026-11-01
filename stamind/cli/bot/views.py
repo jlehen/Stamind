@@ -16,7 +16,7 @@ import argparse
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from stamind import heads_up, journal, runtime, settings
+from stamind import heads_up, journal, rpe_reminder, runtime, settings
 from stamind.analytics.compare import adherence_verdicts
 from stamind.cli.bot import test_result
 from stamind.cli.common import deload_progress, ensure_recent_data, in_deload
@@ -40,6 +40,7 @@ from stamind.sports import canonical_sport
 from stamind.strength.sets import read_new_activities
 from stamind.text import wrap_text, yellow
 from stamind.output import aside, step
+from stamind.config import config
 from stamind.clock import fmt_day, shift, today_str as _today_str
 
 # What the morning push offers (§4.1/§4.4): the CLI owns WHAT to offer, the bot only
@@ -247,22 +248,51 @@ def _refresh_garmin(date_str: str) -> None:
 
 
 def _ask_about_tests(today: str) -> None:
-    """Queues the test-result question for each planned test of the past seven days that
-    was done or partly done and has no result in the logbook
+    """Queues the test-result question for each planned test of the past seven days and
+    today that was done or partly done and has no result in the logbook
     (DESIGN_benchmark_from_chat.md §4). A failure must not sink the push."""
     start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
-    end = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     try:
-        tests = [w for w in runtime.db.get_workouts(start_date=start, end_date=end)
+        tests = [w for w in runtime.db.get_workouts(start_date=start, end_date=today)
                  if w.get("benchmark_type")]
         if not tests:
             return
-        verdicts = adherence_verdicts(runtime.db, start, end, today)
+        verdicts = adherence_verdicts(runtime.db, start, today, today)
         for w in tests:
             if (verdicts.get(w["id"]) or {}).get("status") in SIMPLE_DONE_STATUSES:
                 test_result.ask_about(w)
     except Exception as e:
         step(f"Could not check the past week's tests: {e}")
+
+
+def _queue_session_questions(today: str) -> None:
+    """What the athlete is asked once a session is in: the morning push and the Garmin check
+    both end on it."""
+    _ask_about_tests(today)
+    cut_short.queue_questions(today)
+    rpe_reminder.queue_reminders(today)
+
+
+def run_bot_garmin_check(args: argparse.Namespace) -> None:
+    """Pulls today's activities when Garmin lists one not stored yet that lasts at least
+    `garmin.min_activity_minutes`, and queues the questions about it. A shorter one, such as a
+    warm-up, waits for a later pull. Daily metrics and the "last pull" time stay out of it,
+    so a read command still refreshes them. The scheduler runs this beside the chat, and a
+    failure raises to the journal (ARCHITECTURE.md §15)."""
+    if not (config.garmin_email and config.garmin_password):
+        return
+    today = _today_str()
+    known = {a["activity_id"] for a in runtime.db.get_completed_activities(today, today)}
+    listed = runtime.garmin.connect().get_activities(today, today)
+    shortest = config.min_activity_minutes * 60
+    if not any(str(a.get("activityId")) not in known and (a.get("duration") or 0) >= shortest
+               for a in listed):
+        return
+    journal.record(
+        "bot.garmin_check",
+        runtime.garmin.pull(today, today, metrics=False, advance_watermark=False),
+    )
+    _queue_session_questions(today)
 
 
 def _trained_today(date_str: str) -> Dict[int, Dict[str, Any]]:
@@ -341,9 +371,9 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     if deload_day:
         print(deload_day)
     _refresh_garmin(today)
-    _ask_about_tests(today)
-    # It then stands first in the line, after the briefing (DESIGN_chat_questions.md §3).
-    cut_short.queue_questions(today)
+    # The cut-short question then stands first in the line, after the briefing
+    # (DESIGN_chat_questions.md §3).
+    _queue_session_questions(today)
 
     adapt_note, proposal_item = None, None
     if settings.adapt_first():
