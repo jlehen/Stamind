@@ -27,7 +27,7 @@ from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.workouts.heads_up import WEEK_CHANGED_LINE
 from stamind.cli.workouts.heads_up import newest_written
 from stamind.coach import picture
-from stamind.coach.proposals import RevisionProposal
+from stamind.coach.proposals import RevisionPair, RevisionProposal
 from stamind.coach.revisions import pair_revisions
 from stamind.config import config
 from stamind.sentinels import BUTTONS_SENTINEL, FLUSH_SENTINEL, QUEUE_SENTINEL
@@ -221,15 +221,38 @@ class ShortProposalTest(_Case):
 
     def test_every_changed_session_has_a_line(self):
         self.assertEqual(proposal_lines.simple_change_lines(self.three_changes()), [
-            f"{sport_emoji('cycling')} Today · 60 easy minutes",
-            f"{sport_emoji('yoga')} Fri 09 · removed",
-            f"{sport_emoji('cycling')} Sat 10 · Long ride — 120 min",
+            f"{sport_emoji('cycling')} Today · 60 easy minutes\n    was Intervals — 90 min",
+            f"{sport_emoji('yoga')} Fri 09 · removed\n    was Mobility yoga — 25 min",
+            f"{sport_emoji('cycling')} Sat 10 · Long ride — 120 min\n    nothing was planned",
         ])
+
+    def test_a_moved_session_says_the_day_it_stood_on(self):
+        moved = {"date": SATURDAY, "sport_type": "yoga", "title": "Mobility yoga",
+                 "change": "moved to Saturday"}
+        friday = {"date": FRIDAY, "sport_type": "yoga", "title": "Mobility yoga",
+                  "duration_minutes": 25}
+        proposal = RevisionProposal(
+            reason="", workouts=[moved], range_start=FRIDAY, range_end=SATURDAY,
+            pairs=(RevisionPair(moved, friday, False),),
+        )
+        self.assertEqual(proposal_lines.simple_change_lines(proposal), [
+            f"{sport_emoji('yoga')} Sat 10 · moved to Saturday\n"
+            "    was Mobility yoga — 25 min, Fri 09",
+        ])
+
+    def test_a_rest_day_is_named_and_not_titled(self):
+        ride = {"date": SATURDAY, "sport_type": "cycling", "title": "Long ride", "change": "added"}
+        rest = {"date": SATURDAY, "sport_type": "rest", "title": "Rest"}
+        proposal = RevisionProposal(
+            reason="", workouts=[ride], range_start=SATURDAY, range_end=SATURDAY,
+            pairs=(RevisionPair(ride, rest, True),),
+        )
+        self.assertIn("\n    was a rest day", proposal_lines.simple_change_lines(proposal)[0])
 
     def test_the_short_text_opens_with_the_reason_and_ends_with_the_list(self):
         text = proposal_lines.short_text(self.three_changes(), saved_proposal.REPLACES_LINE)
         self.assertTrue(text.startswith(saved_proposal.REPLACES_LINE + "\n\nRough night"))
-        self.assertTrue(text.endswith("Sat 10 · Long ride — 120 min"))
+        self.assertTrue(text.endswith("Sat 10 · Long ride — 120 min\n    nothing was planned"))
         self.assertNotIn("[Easy ride]", text)
 
     def test_the_page_shows_each_session_in_full(self):

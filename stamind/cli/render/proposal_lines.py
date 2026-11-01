@@ -24,6 +24,8 @@ SIMPLE_NEW_MARK = "🟢 "
 
 # The change line of a session the proposal removes, written by the code (§3).
 REMOVED_LINE = "removed"
+# The second line of an entry in the short list, set under the first (§3).
+REPLACED_INDENT = "    "
 
 # The details page, and the button under a proposal that opens it (§5, §6).
 PAGE_URL = "https://jlehen.github.io/Stamind/miniapp/details.html"
@@ -121,20 +123,38 @@ def _list_day(date_str: str, today: str) -> str:
     return datetime.strptime(date_str, "%Y-%m-%d").strftime("%a %d")
 
 
+def _replaced_line(existing: Optional[dict], date_str: str, today: str) -> str:
+    """What a line of the short list replaces, indented under it (§3): the old session's title
+    and length, with its day when it stood on another one."""
+    if not existing:
+        return f"{REPLACED_INDENT}nothing was planned"
+    if _is_rest(existing):
+        return f"{REPLACED_INDENT}was a rest day"
+    was = f"{REPLACED_INDENT}was {title_and_length(existing)}"
+    if existing['date'] == date_str:
+        return was
+    if existing['date'] == today:
+        return f"{was}, today"
+    return f"{was}, {_list_day(existing['date'], today)}"
+
+
 def simple_change_lines(proposal: RevisionProposal) -> List[str]:
-    """One line per session the proposal changes, in date order: its sport, its day and the
-    planner's change line, "removed" for a session it removes, and the title and length
-    where no change line came back. Every changed session has one (§3)."""
+    """One entry per session the proposal changes, in date order. Its first line is its sport,
+    its day and the planner's change line, "removed" for a session it removes, and the title
+    and length where no change line came back. Its second line says what it replaces. Every
+    changed session has one (§3)."""
     today = _today_str()
     lines = []
     for pair in proposal.pairs:
         pw = pair.proposal
         change = (pw.get('change') or '').strip() or title_and_length(pw)
         lines.append((pw['date'], f"{sport_emoji(pw.get('sport_type'))} "
-                                  f"{_list_day(pw['date'], today)} · {change}"))
+                                  f"{_list_day(pw['date'], today)} · {change}\n"
+                                  f"{_replaced_line(pair.original, pw['date'], today)}"))
     for ew in proposal.removals:
         lines.append((ew['date'], f"{sport_emoji(ew.get('sport_type'))} "
-                                  f"{_list_day(ew['date'], today)} · {REMOVED_LINE}"))
+                                  f"{_list_day(ew['date'], today)} · {REMOVED_LINE}\n"
+                                  f"{_replaced_line(ew, ew['date'], today)}"))
     return [line for _, line in sorted(lines, key=lambda entry: entry[0])]
 
 

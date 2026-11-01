@@ -73,12 +73,19 @@ Good that it felt strong. The ride had about 50 minutes at tempo or harder, so I
 the easy rides left outdoors a flat route and a power limit.
 
 🏋️ Fri 09 · split squats 40 → 36 kg
+    was Full-Body Strength (Heavy) — 65 min
 🚴 Sat 10 · flat route, stop at 178 W
+    was Long Low-Intensity Gravel Ride — 135 min
 🚴 Sun 11 · sprints on flat ground only
+    was Endurance Ride with Sprints — 90 min
 🏋️ Mon 12 · split squats 40 → 36 kg
+    was Full-Body Strength (Heavy) — 65 min
 🏋️ Fri 16 · swings 26 kg, dumbbell clean
+    was Full-Body Strength (Power) — 60 min
 🚴 Sat 17 · flat route, stop at 178 W
+    was Long Low-Intensity Gravel Ride — 150 min
 🚴 Sun 18 · outdoor limits added
+    was Endurance Ride — 90 min
 
 Shall I make these changes?
 
@@ -86,7 +93,7 @@ Shall I make these changes?
 [ 🔎 Tell me more ]
 ```
 
-That is about 95 words. The words inside are an example: the planners write them.
+That is about 150 words. The words inside are an example: the planners write them.
 
 **The summary** is the week planner's `reason`. It is at most two short sentences, about 30
 words. It says what drove the change, starting with the athlete's note when there is one,
@@ -99,10 +106,17 @@ with its number when it has one. "flat route, stop at 178 W". "moved to Sunday".
 planner that changed the session writes it (§7). The day is "Today" for today, and
 otherwise the weekday and the day of the month, as the week view writes it.
 
+**What it replaces** stands on a second line under it, written by the code (D16): "was", then
+the old session's title and length. A session moved from another day adds that day: "was Easy
+run — 40 min, Fri 09". A rest day reads "was a rest day". A session on a day with nothing
+planned reads "nothing was planned". The athlete cannot judge a replacement without seeing
+what goes, and the old text in full stays on the page (§6.2).
+
 Every changed session has a line, whatever the summary says. This is what the list is for:
 the athlete never approves a change that the message did not name.
 
-- A session the proposal removes gets the line "removed", written by the code.
+- A session the proposal removes gets the line "removed", written by the code, with what it
+  was under it.
 - A session whose planner gave no change line shows its title and its length in its place.
 - Two gym days changed the same way are two lines. Nothing is grouped.
 
@@ -427,7 +441,7 @@ The stored value is left in each database. Nothing reads it.
   line in the chat is newer than the page, until the next command uploads
   (DESIGN_miniapp_storage.md §16).
 - **A proposal's message over Telegram's 4,096 characters** is refused by Telegram, so the
-  proposal is saved and never shown. It takes more than 50 changed sessions.
+  proposal is saved and never shown. It takes more than 30 changed sessions.
 - **The plan view's own "Tell me more"** still answers in the chat. It is reached only by
   typing "my plan"; the keyboard opens the "Goals & plan" page.
 
@@ -537,7 +551,7 @@ He kept all four as built on 2026-10-27.
 | ID | Topic | Ruling |
 |---|---|---|
 | D11 | Where "Tell me more" sits under a proposal | Its row is under the two answers and above the morning offer. |
-| D12 | A session the proposal removes | Its line reads "🚴 Fri 09 · removed", with the session's own emoji. |
+| D12 | A session the proposal removes | Its line reads "🚴 Fri 09 · removed", with the session's own emoji. **Amended by D16:** the session's title and length stand under it. |
 | D13 | The page's words | The page is titled "In full". The fold that holds a session's whole text is "The whole session". |
 | D14 | A day the Calendar does not reach | Only the months the Calendar shows are uploaded, about four weeks back and six ahead. A later day's "Tell me more" opens a page that says the details could not be loaded. Not handled. |
 
@@ -546,6 +560,12 @@ The author ruled on this on 2026-10-30, after a code review of the build.
 | ID | Topic | Ruling |
 |---|---|---|
 | D15 | A morning whose proposal changes today | No briefing stands above that proposal, so D8 is kept on the proposal's page: each card holds, folded, the whole text of the session it replaces or drops. |
+
+The author asked for this on 2026-11-01, after reading short proposals on Telegram.
+
+| ID | Topic | Ruling |
+|---|---|---|
+| D16 | What the chat says a session replaces | Each line of the list has a second line with the old session's title and length. This amends D2 (one short line per session) and D12. A2 stands: the chat still quotes no old or new text. |
 
 ## 14. Decided without asking the author
 
@@ -568,7 +588,7 @@ A choice the author overruled keeps its row, with the ruling beside it.
 | A6 | One `proposal` file, replaced by each new proposal. An older proposal's button gets "replaced by a newer one". | One proposal is open at a time. One file never needs a deletion. | One file per proposal, kept or cleaned up. | Pragmatic: needed. What a tap writes does not hold the old sessions that the "Was" side needs, so the proposal has to keep its page's content. |
 | A7 | The proposal's page shows, per session, the reason, the changed passages, and the whole new description folded. | The passages point at what changed. The whole text was missing on 4 October for a session with a new title. | Old and new description side by side in full. The passages only. | Pragmatic: right-sized. |
 | A8 | With no bucket, "Tell me more" sends the long text in the chat (§5). | The short form must not depend on a Google bucket. This is also the long text of today, so nothing new is written. | No short form at all without a bucket. No details at all without a bucket. | **Overruled by the author, 2026-10-09 (D9):** "Without the bucket, we cannot abbreviate." Where the pages are not published, the chat stays as it is today (§5). Both reviewers had asked for this. The thorough reviewer had found two flaws in the chat button: "📅 Today" and a proposal asked for at 08:30 each made the buttons under the 08:00 briefing expire. |
-| A9 | The short text and "Shall I make these changes?" are one message, and it keeps its text after the answer. | The buttons sit under what they answer, and the chat keeps what was accepted. | Two messages, as today. | Thorough: the message is sent whole, so Telegram refuses one over 4,096 characters. That takes more than 50 changed sessions; listed in §10. Pragmatic: no more code than two messages. "Kept with today's …" is printed earlier in the run, so it stays a message of its own; §3 now says so. |
+| A9 | The short text and "Shall I make these changes?" are one message, and it keeps its text after the answer. | The buttons sit under what they answer, and the chat keeps what was accepted. | Two messages, as today. | Thorough: the message is sent whole, so Telegram refuses one over 4,096 characters. That takes more than 30 changed sessions since D16; listed in §10. Pragmatic: no more code than two messages. "Kept with today's …" is printed earlier in the run, so it stays a message of its own; §3 now says so. |
 | A10 | On a morning with a proposal, the briefing has no "Tell me more" (§5). | The author decided on 2026-10-05 that such a morning has one keyboard. | A lone "Tell me more" under the briefing. | Pragmatic: right-sized. **Overruled by the author, 2026-10-07 (D8):** the briefing has its "Tell me more" on such a morning too, as a page button, which asks nothing and is not the chat's live row (§5). |
 | A11 | A gym day's short line is written by the strength planner only. | One writer per field. Only the strength planner knows the exercises and kilograms. | The week planner writing a first short line from the brief, replaced later. | Thorough objected. A gym day whose brief the week planner changed, and whose kilograms the strength planner kept, was written again with no short line. Fixed: the short line is copied with the sets (§7). The choice itself stands. Pragmatic: the fix is needed, and it is one line. |
 | A12 | A page button stays under its message for good, after "Got it" and after a proposal's answer (§5). | The bot remembers nothing about it, so nothing makes it stale. The athlete can read the details at the trailhead. | Removing it with the other buttons of its row. | Thorough: buildable. Every function that reads or writes a row expects a button that calls the bot back, so each has to learn the page button. Pragmatic: about 15 lines in all. |
@@ -616,6 +636,7 @@ A choice the author overruled keeps its row, with the ruling beside it.
 | D13 | The page's words | Titled "In full", with the fold "The whole session". | Chosen in the build; the author kept it. | Build | 2026-10-27 |
 | D14 | A day the Calendar does not reach | Its page says the details could not be loaded. Not handled. | Chosen in the build; the author kept it. | Build | 2026-10-27 |
 | D15 | Today as planned, under a proposal that changes it | Each card on the proposal's page holds, folded, the whole text of the session it replaces or drops. | The author's ruling after the code review. With no briefing above such a proposal, it keeps D8: she reads what she gives up before she answers. | Review | 2026-10-30 |
+| D16 | What the chat says a session replaces | A second line under each line of the list: the old session's title and length. | The author: "it's hard for me to say whether I'm ok with the replacement if I can't see what the proposal is replacing". Amends D2 and D12. The message stays about 150 words. | Request | 2026-11-01 |
 
 ## Dependency Graph & Implementation Order
 
