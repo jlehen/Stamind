@@ -13,7 +13,9 @@ from stamind.text import (
 )
 from stamind.output import aside, notice
 from stamind.clock import fmt_date, today_date as _today_date, today_str as _today_str
-from stamind.cli.common import constraint_line, ensure_recent_data
+from stamind.cli.common import (
+    constraint_line, deload_progress, deload_span, ensure_recent_data,
+)
 from stamind.cli import staleness
 from stamind.cli.runway import current_runway
 from stamind.coach import honoring
@@ -158,6 +160,9 @@ def run_status(args) -> None:
                     f"({cyan(fmt_date(active_meso['start_date']))} to "
                     f"{cyan(fmt_date(active_meso['end_date']))})"
                 )
+                if active_meso.get('deload_start'):
+                    progress = deload_progress(active_meso, _today_str())
+                    print(f"{deload_span(active_meso)}, {progress}")
                 print(format_labeled_paragraph(f"{bold('Cycle Focus')}:", active_meso['focus']))
                 # What the mesocycle ACTUALLY measured, beside what it was for
                 # (DESIGN_intensity_distribution.md §9). Already wrapped to the target

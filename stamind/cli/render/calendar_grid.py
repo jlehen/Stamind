@@ -11,7 +11,7 @@ from stamind import calendar_days
 from stamind.analytics.adherence import MISSED, PARTIAL, REST_VIOLATION
 from stamind.clock import day_str, fmt_date, fmt_day, parse_date
 from stamind.text import bold, cyan, gray
-from stamind.cli.common import deload_span
+from stamind.cli.common import deload_span, in_deload
 from stamind.cli.render.calendar_page import icon, session_label
 
 # Each column's width, in terminal columns (§7).
@@ -20,7 +20,7 @@ WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 # The grade in expert marks; a grade with no mark prints nothing (§7).
 MARKS = {"done": "✓", PARTIAL: "½", MISSED: "✗", REST_VIOLATION: "✗"}
-CONSTRAINT, SIGNAL = "◆", "•"
+CONSTRAINT, SIGNAL, DELOAD = "◆", "•", "🔋"
 
 
 def columns(text: str) -> int:
@@ -51,13 +51,15 @@ def fit_cell(text: str, width: int = CELL) -> str:
     return out + " " * (width - columns(out))
 
 
-def cell_lines(day: calendar_days.Day) -> List[str]:
+def cell_lines(day: calendar_days.Day, deload: bool = False) -> List[str]:
     """A day's two lines: the number with its markers, then its sessions (§7)."""
     number = f" {parse_date(day.date).day:>2} "
     if day.constraints:
         number += CONSTRAINT
     if day.signals:
         number += SIGNAL
+    if deload:
+        number += DELOAD
     planned = [r["planned"] for r in day.results]
     icons = "".join(icon(w.get("sport_type")) for w in planned)
     marks = "".join(MARKS.get(r["status"], "") for r in day.results)
@@ -82,7 +84,9 @@ def month_lines(cal: calendar_days.Calendar, year: int, month: int) -> List[str]
         rows = ["", ""]
         for date in week:
             day = by_date.get(day_str(date)) if date.month == month else None
-            cells = cell_lines(day) if day else [" " * CELL, " " * CELL]
+            cells = [" " * CELL, " " * CELL]
+            if day:
+                cells = cell_lines(day, any(in_deload(m, day.date) for m in cal.mesocycles))
             rows = [rows[0] + cells[0], rows[1] + cells[1]]
         lines.extend(row.rstrip() for row in rows)
         for meso in cal.mesocycles:
@@ -91,7 +95,7 @@ def month_lines(cal: calendar_days.Calendar, year: int, month: int) -> List[str]
                 lines.append(gray(f"── {meso['name']} starts {fmt_day(str(meso['start_date']))}"))
             if not meso.get("deload_start"):
                 continue
-            deload = parse_date(meso["deload_start"])
-            if deload in week and deload.month == month:
-                lines.append(gray(f"── {deload_span(meso)}"))
+            # A week that crosses two months prints it in both (DESIGN_deload_weeks.md §11.1).
+            if parse_date(meso["deload_start"]) in week:
+                lines.append(cyan(f"── {deload_span(meso)}"))
     return lines

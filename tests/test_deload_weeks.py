@@ -1,19 +1,25 @@
 """Deload weeks the plan dates (DESIGN_deload_weeks.md): the repair pass, the stored date, a
 started deload kept through a replan, the prompts' line, and what the terminal and the
 calendar's snapshot say."""
+import os
+import random
+import re
 import unittest
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tests import test_db_path
 from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, run_cli, save_workout
 
-from stamind import calendar_days, plan_versions
-from stamind.cli.render import calendar_grid, calendar_page
+from stamind import calendar_days, plan_versions, runtime
+from stamind.cli.common import deload_heads, deload_progress, in_deload
+from stamind.cli.render import calendar_grid, calendar_page, plan_lines, plan_page
 from stamind.coach.formatting import mesocycle_text
 from stamind.coach.service import coach_service
+from stamind.config import config
 from stamind.db import Database
 from stamind.db.periodization import repair_mesocycle_contiguity
+from stamind.sentinels import BUTTONS_SENTINEL
 
 TEST_DB_PATH = test_db_path("test_deload_weeks.db")
 test_db = Database(db_path=TEST_DB_PATH)
@@ -36,6 +42,11 @@ def _save(goal_id, *mesocycles):
         objective_id=goal_id, strategy="s", goals_hash="g", constraints_hash="c",
         mesocycles=list(mesocycles),
     )
+
+
+def _marked_days(lines):
+    """The day numbers that `sm calendar` drew with a 🔋 beside them."""
+    return {int(day) for day in re.findall(r"(\d+) 🔋", "\n".join(lines))}
 
 
 class RepairTest(unittest.TestCase):
@@ -214,9 +225,9 @@ class CalendarTest(unittest.TestCase):
 
     def test_sm_calendar_prints_the_line_under_the_week_the_deload_starts_in(self):
         lines = calendar_grid.month_lines(self.cal, 2026, 11)
-        deload = [i for i, line in enumerate(lines) if "── Deload" in line]
+        deload = [i for i, line in enumerate(lines) if "── 🔋 Deload" in line]
         self.assertEqual(len(deload), 1)
-        self.assertIn("── Deload Mon 2 Nov to Sun 8 Nov", lines[deload[0]])
+        self.assertIn("── 🔋 Deload Mon 2 Nov to Sun 8 Nov", lines[deload[0]])
         # November's first week holds only Sunday 1, then two lines for the week of the 2nd.
         self.assertTrue(lines[deload[0] - 2].lstrip().startswith("2"))
         self.assertEqual(
@@ -224,10 +235,258 @@ class CalendarTest(unittest.TestCase):
             [],
         )
 
+    def test_sm_calendar_marks_each_deload_day_and_no_other(self):
+        self.assertEqual(_marked_days(calendar_grid.month_lines(self.cal, 2026, 11)),
+                         set(range(2, 9)))
+
+    def test_sm_calendar_prints_the_line_in_both_months_a_starting_week_crosses(self):
+        # Monday 30 November: that week is November's last and December's first.
+        clear_all_tables(test_db)
+        _save(_goal(), _meso("Build", "2026-11-09", "2026-12-06", deload="2026-11-30"),
+              _meso("Peak", "2026-12-07", "2026-12-13"))
+        cal = calendar_days.gather(test_db, "2026-11-01", "2026-12-31", "2026-10-26")
+        for month in (11, 12):
+            with self.subTest(month=month):
+                lines = calendar_grid.month_lines(cal, 2026, month)
+                self.assertEqual(
+                    len([line for line in lines if "── 🔋 Deload Mon 30 Nov" in line]), 1,
+                )
+        self.assertEqual(_marked_days(calendar_grid.month_lines(cal, 2026, 11)), {30})
+        self.assertEqual(_marked_days(calendar_grid.month_lines(cal, 2026, 12)), set(range(1, 7)))
+
     def test_the_snapshot_carries_d_only_for_a_mesocycle_with_a_deload(self):
         meso = calendar_page.header(self.cal, datetime(2026, 10, 26, 7, 0))["meso"]
         self.assertEqual(meso[0]["d"], "2026-11-02")
         self.assertNotIn("d", meso[1])
+
+
+DELOAD = "🔋 Deload Mon 2 Nov to Sun 8 Nov"
+
+
+def _build(deload="2026-11-02"):
+    """The mesocycle of DESIGN_deload_weeks.md §11.1, from 19 October to 8 November."""
+    return _meso("Build", "2026-10-19", "2026-11-08", deload=deload)
+
+
+class WordsTest(unittest.TestCase):
+    """`in_deload` and `deload_progress` (§11.2)."""
+
+    def test_a_deload_holds_its_first_and_last_day_and_no_other(self):
+        for day, inside in (("2026-11-01", False), ("2026-11-02", True), ("2026-11-08", True),
+                            ("2026-11-09", False)):
+            with self.subTest(day=day):
+                self.assertEqual(in_deload(_build(), day), inside)
+        self.assertFalse(in_deload(_meso("Build", "2026-10-19", "2026-11-08"), "2026-11-02"))
+
+    def test_the_progress_counts_down_then_up(self):
+        for today, words in (("2026-10-31", "starts in 2 days"), ("2026-11-01", "starts tomorrow"),
+                             ("2026-11-02", "day 1 of 7"), ("2026-11-08", "day 7 of 7")):
+            with self.subTest(today=today):
+                self.assertEqual(deload_progress(_build(), today), words)
+
+
+class MorningTest(unittest.TestCase):
+    """`bot morning` opens with the line on a deload day and ends with it the day before."""
+
+    def setUp(self):
+        rebind_test_db(test_db)
+        clear_all_tables(test_db)
+        garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
+        garmin.start()
+        self.addCleanup(garmin.stop)
+        # The operator's config.yaml must not switch adapt-first on for these tests.
+        telegram = {k: v for k, v in (config.data.get("telegram") or {}).items() if k != "push"}
+        pinned = patch.dict(config.data, {"telegram": telegram})
+        pinned.start()
+        self.addCleanup(pinned.stop)
+
+    def _morning(self, today, *mesocycles):
+        """The push on `today`. By default the plan runs on after the deload, into a mesocycle
+        with a deload of its own, as a real plan does."""
+        pin_clock(self, today)
+        _save(_goal(), *(mesocycles or (
+            _build(), _meso("Peak", "2026-11-09", "2026-11-29", deload="2026-11-23"),
+        )))
+        save_workout(test_db, today, "running", "Easy run", duration_minutes=40)
+        code, out, _ = run_cli(["bot", "morning"])
+        self.assertEqual(code, 0)
+        return out
+
+    def test_a_deload_day_opens_with_the_line(self):
+        out = self._morning("2026-11-04")
+        self.assertEqual(out.split("\n")[0], "🔋 Deload, day 3 of 7.")
+        self.assertIn("Today: Easy run", out)
+
+    def test_the_day_before_ends_with_the_line(self):
+        out = self._morning("2026-11-01")
+        words = out.split(BUTTONS_SENTINEL)[0].strip()
+        self.assertTrue(words.endswith("🔋 Your deload starts tomorrow, until Sun 8 Nov."), words)
+        self.assertNotIn("🔋 Deload", out)
+
+    def test_two_days_before_and_the_day_after_say_nothing(self):
+        for today in ("2026-10-31", "2026-11-09"):
+            with self.subTest(today=today):
+                clear_all_tables(test_db)
+                self.assertNotIn("🔋", self._morning(today))
+
+    def test_a_mesocycle_with_no_date_says_nothing(self):
+        out = self._morning("2026-11-04", _meso("Build", "2026-10-19", "2026-11-08"))
+        self.assertNotIn("🔋", out)
+
+    def test_a_schedule_that_has_run_out_stays_silent_on_a_deload_day(self):
+        pin_clock(self, "2026-11-04")
+        _save(_goal(), _meso("Build", "2026-09-01", "2026-11-08", deload="2026-11-02"))
+        save_workout(test_db, "2026-09-05", "running", "Old run")
+        # Past the window where the push still offers to extend the schedule.
+        with patch("stamind.cli.bot.views.current_runway", return_value=None):
+            code, out, _ = run_cli(["bot", "morning"])
+        self.assertEqual(code, 0)
+        self.assertEqual(out.strip(), "")
+
+
+class ListingTest(unittest.TestCase):
+    """The line before each deload's first listed session (§11.1, §11.2)."""
+
+    def setUp(self):
+        rebind_test_db(test_db)
+        clear_all_tables(test_db)
+        garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
+        garmin.start()
+        self.addCleanup(garmin.stop)
+        pin_clock(self, "2026-10-31")
+        _save(_goal(), _build(), _meso("Peak", "2026-11-09", "2026-11-29", deload="2026-11-23"))
+        for date, sport, title in (("2026-10-31", "cycling", "Long ride"),
+                                   ("2026-11-01", "yoga", "Yoga"),
+                                   ("2026-11-02", "strength_training", "Gym"),
+                                   ("2026-11-03", "running", "Easy run")):
+            save_workout(test_db, date, sport, title)
+
+    def _list(self, *args):
+        code, out, _ = run_cli(["workout", "list", *args])
+        self.assertEqual(code, 0)
+        return out
+
+    def test_the_heads_when_the_list_starts_before_a_deload(self):
+        rows = [{"date": d} for d in ("2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03")]
+        self.assertEqual(deload_heads(rows), {2: DELOAD})
+
+    def test_the_heads_when_the_list_starts_inside_a_deload(self):
+        self.assertEqual(deload_heads([{"date": "2026-11-03"}]), {0: DELOAD})
+
+    def test_the_heads_of_two_deloads_and_of_none(self):
+        rows = [{"date": d} for d in ("2026-11-05", "2026-11-12", "2026-11-24", "2026-11-25")]
+        self.assertEqual(deload_heads(rows), {
+            0: DELOAD, 2: "🔋 Deload Mon 23 Nov to Sun 29 Nov",
+        })
+        self.assertEqual(deload_heads([{"date": "2026-10-31"}]), {})
+        self.assertEqual(deload_heads([]), {})
+
+    def test_the_table_has_the_line_under_the_row_before(self):
+        out = self._list("-d", "2026-10-31..2026-11-03").split("\n")
+        at = out.index(DELOAD)
+        self.assertIn("Yoga", out[at - 1])
+        self.assertIn("Gym", out[at + 1])
+        self.assertEqual(out.count(DELOAD), 1)
+
+    def test_the_line_stands_above_the_table_when_the_first_row_is_inside(self):
+        out = self._list("-d", "2026-11-03").split("\n")
+        self.assertIn("Session", out[out.index(DELOAD) + 1])
+
+    def test_minus_vv_prints_it_between_the_sessions(self):
+        out = self._list("-d", "2026-11-01..2026-11-02", "-vv")
+        self.assertLess(out.index("Yoga"), out.index(DELOAD))
+        self.assertLess(out.index(DELOAD), out.index("Gym"))
+
+    def test_named_ids_are_no_range_and_print_no_line(self):
+        gym = test_db.get_workouts(start_date="2026-11-02", end_date="2026-11-02")[0]
+        self.assertNotIn("Deload", self._list(str(gym["id"])))
+
+    def test_the_chat_week_has_the_line_before_the_first_session_inside(self):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
+            out = self._list("-d", "2026-10-31..2026-11-02")
+        self.assertIn(f"Sun 01 · 🧘 Yoga\n{DELOAD}\nMon 02 · 🏋️ Gym", out)
+
+    def test_the_chat_week_starting_inside_has_the_line_first(self):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
+            out = self._list("-d", "2026-11-02..2026-11-03")
+        self.assertIn(f"🗓 Coming up:\n{DELOAD}\nMon 02", out)
+
+    def test_the_chat_day_has_no_line(self):
+        with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
+            self.assertNotIn("Deload", self._list("-d", "2026-11-02"))
+
+
+class PlanViewTest(unittest.TestCase):
+    """`simple_mesocycle_lines` and the "Goals & plan" page's snapshot (§11.1, §11.2)."""
+
+    def test_the_line_sits_under_the_window_whichever_state_the_mesocycle_is_in(self):
+        for today, head in (("2026-10-01", "⏳"), ("2026-11-04", "📍"), ("2026-11-30", "✅")):
+            with self.subTest(today=today):
+                lines = plan_lines.simple_mesocycle_lines(_build(), today)
+                self.assertTrue(lines[0].startswith(head))
+                self.assertTrue(lines[1].startswith("Oct 19 – Nov 08"))
+                self.assertEqual(lines[2:], [DELOAD])
+
+    def test_a_mesocycle_with_no_date_has_no_line(self):
+        lines = plan_lines.simple_mesocycle_lines(
+            _meso("Build", "2026-10-19", "2026-11-08"), "2026-11-04",
+        )
+        self.assertEqual(len(lines), 2)
+
+    def _calendar(self):
+        rebind_test_db(test_db)
+        clear_all_tables(test_db)
+        pin_clock(self, "2026-10-26")
+        _save(_goal(), _build(), _meso("Peak", "2026-11-09", "2026-12-13"))
+        return calendar_days.gather(test_db, "2026-10-19", "2026-11-30", "2026-10-26")
+
+    def test_the_snapshot_carries_d(self):
+        meso = plan_page.snapshot(self._calendar(), datetime(2026, 10, 26, 7, 0))["meso"]
+        self.assertEqual(meso[0]["d"], "2026-11-02")
+        self.assertEqual(meso[0]["p"], meso[1]["p"])
+        self.assertNotIn("d", meso[1])
+
+    def test_the_plan_file_carries_d(self):
+        meso = plan_page.plan_file(self._calendar(), datetime(2026, 10, 26, 7, 0))["meso"]
+        self.assertEqual(meso[0]["d"], "2026-11-02")
+
+    def test_over_budget_the_summaries_go_and_d_stays(self):
+        cal = self._calendar()
+        noise = random.Random(1)
+        long_text = "".join(noise.choice("abcdefghijklmnopqrstuvwxyz ") for _ in range(4000))
+        cal = cal._replace(mesocycles=[{**m, "summary": long_text} for m in cal.mesocycles])
+        url = plan_page.plan_url(cal, datetime(2026, 10, 26, 7, 0))
+        meso = calendar_page.unpack(url.split("#c=")[1])["meso"]
+        self.assertNotIn("m", meso[0])
+        self.assertEqual(meso[0]["d"], "2026-11-02")
+
+
+class StatusTest(unittest.TestCase):
+    """`sm status` prints the line under the active mesocycle (§11.1)."""
+
+    def setUp(self):
+        rebind_test_db(test_db)
+        clear_all_tables(test_db)
+        garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
+        garmin.start()
+        self.addCleanup(garmin.stop)
+
+    def _status(self, today, mesocycle):
+        pin_clock(self, today)
+        _save(_goal(), mesocycle)
+        code, out, _ = run_cli(["status", "--no-pull"])
+        self.assertEqual(code, 0)
+        return out
+
+    def test_ahead_it_counts_down(self):
+        self.assertIn(f"{DELOAD}, starts in 2 days", self._status("2026-10-31", _build()))
+
+    def test_inside_it_counts_the_day(self):
+        self.assertIn(f"{DELOAD}, day 1 of 7", self._status("2026-11-02", _build()))
+
+    def test_a_mesocycle_with_no_date_prints_nothing(self):
+        out = self._status("2026-10-31", _meso("Build", "2026-10-19", "2026-11-08"))
+        self.assertNotIn("Deload", out)
 
 
 if __name__ == "__main__":

@@ -557,6 +557,36 @@ class MorningPushTest(_Case):
         [item] = saved_proposal.waiting()
         self.assertEqual(item["payload"]["dates"], [THURSDAY])
 
+    def _deload_plan(self, deload_start):
+        """A plan whose first mesocycle ends on Sunday 11 October with a deload. The schedule
+        runs on, so the morning has no line about its end either."""
+        goal = test_db.add_objective(title="Winter 10k", target_date="2026-12-13",
+                                     sport_type="running")
+        test_db.save_macrocycle(
+            objective_id=goal, strategy="s", goals_hash="g", constraints_hash="c",
+            mesocycles=[{"name": "Build", "start_date": "2026-09-14", "end_date": "2026-10-11",
+                         "focus": "f", "deload_start": deload_start},
+                        {"name": "Peak", "start_date": "2026-10-12", "end_date": "2026-12-13",
+                         "focus": "f"}],
+        )
+        save_workout(test_db, "2026-11-20", "running", "Later run")
+
+    def test_on_a_deload_day_the_first_message_is_the_deload_line_alone(self):
+        """A proposal that changes today draws no briefing, so the line stands alone
+        (DESIGN_deload_weeks.md §11.1)."""
+        self._deload_plan("2026-10-05")
+        _coach, out = self.push(self.eased())
+        briefing, proposal = out.split(FLUSH_SENTINEL, 1)
+        self.assertEqual(briefing.strip(), "🔋 Deload, day 4 of 7.")
+        self.assertIn("Rough night.", proposal)
+
+    def test_the_day_before_a_deload_the_first_message_is_the_eve_line_alone(self):
+        self._deload_plan("2026-10-09")
+        _coach, out = self.push(self.eased())
+        briefing, proposal = out.split(FLUSH_SENTINEL, 1)
+        self.assertEqual(briefing.strip(), "🔋 Your deload starts tomorrow, until Sun 11 Oct.")
+        self.assertIn("Rough night.", proposal)
+
     def test_a_proposal_about_another_day_comes_under_the_briefing(self):
         save_workout(test_db, SATURDAY, "cycling", "Long ride", duration_minutes=180)
         _coach, out = self.push(self.eased(day=SATURDAY))

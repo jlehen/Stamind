@@ -135,6 +135,7 @@ def simple_week_lines(
     workouts: List[Dict[str, Any]],
     verdicts: Optional[Dict[int, Dict[str, Any]]] = None,
     end_note: Optional[str] = None,
+    heads: Optional[Dict[int, str]] = None,
 ) -> List[str]:
     """Simple rendering of a multi-day window: one dated line per session, no
     descriptions, ending on an encouraging count. An empty window is a break, not
@@ -145,14 +146,18 @@ def simple_week_lines(
     plan ahead (DESIGN_bot_simple_frontend.md §11).
 
     `end_note` names the end of the schedule when the window crosses it, the companion
-    form of the expert listing's marker (DESIGN_runway_nudge.md §6)."""
+    form of the expert listing's marker (DESIGN_runway_nudge.md §6). `heads` is
+    `deload_heads`' map, each deload's line by the row it goes before
+    (DESIGN_deload_weeks.md §11.1)."""
     if not workouts:
         # An empty window past the cliff is the schedule having run out, not a break the
         # coach chose — so the note replaces the break line rather than following it (§4).
         return [end_note] if end_note else ["Nothing on the schedule — enjoy the break 🎉"]
     lines = ["🗓 Coming up:"]
     done = 0
-    for w in workouts:
+    for position, w in enumerate(workouts):
+        if position in (heads or {}):
+            lines.append(heads[position])
         day = datetime.strptime(w["date"], "%Y-%m-%d").strftime("%a %d")
         status = ((verdicts or {}).get(w.get("id")) or {}).get("status")
         if status in SIMPLE_DONE_STATUSES:

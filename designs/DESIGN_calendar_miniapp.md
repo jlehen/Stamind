@@ -235,6 +235,8 @@ blue dot and a "Today, 30 Sep" line mark today. A mesocycle that has ended is gr
 goal or today that falls inside a mesocycle's dates keeps that mesocycle's colour on the rail
 behind it, so her race on Sunday does not look like a gap in the plan. The list runs from
 the first mesocycle in the calendar's window to the last goal. An archived goal is not on it.
+A deload is a row of its own after its mesocycle, "🔋 Deload · 2 Nov – 8 Nov", which cannot be
+tapped, and the rail is dashed beside every row dated inside it (DESIGN_deload_weeks.md §11.1).
 
 She taps "Aerobic base". A sheet shows its dates and one line on what it is for: "Rebuild
 the aerobic base and start sprint intervals, ending with an FTP test." Under it,
@@ -253,10 +255,11 @@ and dates, and still offers the chat.
 
 **The snapshot.** The same list of days the calendar is built from (§4) gives the page its
 payload, packed the same way into its own button's address (`cli/render/plan_page.py`):
-`meso` with `n`, `s`, `e`, the plan's id `p` and the summary `m`; `goals` with `t` (`simple_goal_line`), `d`,
+`meso` with `n`, `s`, `e`, the deload's first day `d` (§5), the plan's id `p` and the summary
+`m`; `goals` with `t` (`simple_goal_line`), `d`,
 the description `x`, and `k` for a completed goal; `at` and `today`. On the author's
 database it is about 1 KB. Its budget is 2 KB: past it the summaries and the descriptions
-go, the timeline stays, and the chat still answers.
+go, the timeline and the deloads stay, and the chat still answers.
 
 **The way back** is the calendar's (§6): `sendData` with `{"plan_why": 10}`, the tapped
 mesocycle's plan, which `on_web_app_data` turns into `plan show --macrocycle 10`. It names
@@ -320,6 +323,8 @@ view can show them (§3.4).
 ```
 
 - `d` is the first day of the mesocycle's deload, which runs to `e`, when the plan dates one.
+  The page builds the "Deload" part of that deload's day sheets from it, after a goal's part
+  and before the sessions, so `sheet` does not carry it (DESIGN_deload_weeks.md §11.1).
 
 - `x` is the day's sessions: icon, label and glyph, `ok` (green), `less` (blue), `more`
   (orange), `miss` (red outline) or `ahead`. A session off its plan also carries `r`, the
@@ -454,13 +459,15 @@ current; `--no-pull` skips that, as it does for `workout list`. A cell has two l
  🚴 Hills ✓  +🥾
 ```
 
-The first line is the day number, then ◆ for a constraint and • for a signal. The second is
+The first line is the day number, then ◆ for a constraint, • for a signal and 🔋 for a deload
+day. The second is
 the icon and the label (§3.1), then the grade in expert marks: ✓ done, ½ partial, ✗ missed.
 A kept rest day has no mark. An activity nobody planned is its icon after a "+", and when
 the cell has no room for it the label goes first. Two sessions show two icons and no
 label, as on the page. When a mesocycle starts inside the month, a line under that week
-says "── <name> starts Thu 1 Oct", and under the week a deload starts in, a line says "── Deload
-Mon 2 Nov to Sun 8 Nov". The header gives the month and the nearest goal ahead.
+says "── <name> starts Thu 1 Oct", and under the week a deload starts in, in both months when
+that week crosses two, a cyan line says "── 🔋 Deload Mon 2 Nov to Sun 8 Nov"
+(DESIGN_deload_weeks.md §11.1). The header gives the month and the nearest goal ahead.
 
 A day's detail in the terminal is `workout list -d <date> -vv`, which already prints the
 description, what Garmin recorded, the grade and its reasons. `sm calendar` does not repeat

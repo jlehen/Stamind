@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from stamind.calendar_days import Calendar
-from stamind.cli.render.calendar_page import VERSION, pack
+from stamind.cli.render.calendar_page import VERSION, meso_entry, pack
 from stamind.cli.render.plan_lines import simple_goal_line
 from stamind.db.objectives import GOAL_COMPLETED, goal_state
 
@@ -29,8 +29,7 @@ def snapshot(cal: Calendar, at: datetime) -> Dict[str, Any]:
     description; a completed goal is marked `k` (§3.7)."""
     meso = []
     for m in cal.mesocycles:
-        row = {"n": m["name"], "s": str(m["start_date"]), "e": str(m["end_date"]),
-               "p": m["macrocycle_id"]}
+        row = {**meso_entry(m), "p": m["macrocycle_id"]}
         if (m.get("summary") or "").strip():
             row["m"] = m["summary"].strip()
         meso.append(row)

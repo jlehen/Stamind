@@ -211,13 +211,30 @@ test("a day outside the window is drawn as having no data until its month arrive
 });
 
 test("a deload day runs from d to the mesocycle's last day", () => {
-  const snapshot = { meso: [{ n: "Build", s: "2026-10-19", e: "2026-11-08", d: "2026-11-02" },
-                            { n: "Peak", s: "2026-11-09", e: "2026-11-30" }] };
-  assert.equal(logic.isDeloadDay(snapshot, "2026-11-01"), false);
-  assert.equal(logic.isDeloadDay(snapshot, "2026-11-02"), true);
-  assert.equal(logic.isDeloadDay(snapshot, "2026-11-08"), true);
-  assert.equal(logic.isDeloadDay(snapshot, "2026-11-09"), false);
-  assert.equal(logic.isDeloadDay(snapshot, "2026-12-01"), false);
+  const build = { n: "Build", s: "2026-10-19", e: "2026-11-08", d: "2026-11-02" };
+  const snapshot = { meso: [build, { n: "Peak", s: "2026-11-09", e: "2026-11-30" }] };
+  assert.equal(logic.deloadOn(snapshot, "2026-11-01"), null);
+  assert.equal(logic.deloadOn(snapshot, "2026-11-02"), build);
+  assert.equal(logic.deloadOn(snapshot, "2026-11-08"), build);
+  assert.equal(logic.deloadOn(snapshot, "2026-11-09"), null);
+  assert.equal(logic.deloadOn(snapshot, "2026-12-01"), null);
+  assert.equal(logic.deloadDates(build), "2 Nov – 8 Nov");
+});
+
+test("a deload day's sheet opens with its part, after a goal's and before the sessions", () => {
+  const goal = { t: "🏃 Autumn 10k", d: "2026-11-05" };
+  const snapshot = {
+    today: "2026-11-04", from: "2026-10-01", to: "2026-11-30",
+    fit: ["2026-10-01", "2026-11-30"], goals: [goal],
+    meso: [{ n: "Build", s: "2026-10-19", e: "2026-11-08", d: "2026-11-02" }],
+    days: { "2026-11-05": { x: [], sheet: [["Planned", ["🏃 Today: Easy run"]]] } },
+  };
+  const deload = ["Deload", ["2 Nov – 8 Nov"]];
+  // An empty deload day opens too; a day before the deload still has nothing to say.
+  assert.deepEqual(logic.sheetFor(snapshot, "2026-11-04").parts, [deload]);
+  assert.equal(logic.sheetFor(snapshot, "2026-11-01"), null);
+  assert.deepEqual(logic.sheetFor(snapshot, "2026-11-05").parts,
+                   [["Goal", [goal.t]], deload, ["Planned", ["🏃 Today: Easy run"]]]);
 });
 
 test("the legend gives a deload in the month shown its own row", () => {

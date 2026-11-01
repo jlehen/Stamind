@@ -17,6 +17,7 @@ from stamind.analytics.runway import (
 )
 from stamind.text import capitalized, wrap_text
 from stamind.clock import days_between, parse_date, shift
+from stamind.cli.common import deload_span
 from stamind.cli.runway import crossing_the_end, current_runway, runway_buttons
 from stamind.cli.render.session_lines import (
     simple_date_word, simple_span_words, simple_when, sport_emoji,
@@ -258,18 +259,21 @@ def picker_label(text: str) -> str:
 def simple_mesocycle_lines(m: Dict[str, Any], today: str) -> List[str]:
     """One training mesocycle as a stanza head: the marker and name, then the window and
     the one thing the window cannot say — nothing behind her, how far into the mesocycle
-    she is, length ahead (§11.2). The plan view adds the focus headline under the
+    she is, length ahead (§11.2) — and its deload, when it has one
+    (DESIGN_deload_weeks.md §11.1). The plan view adds the focus headline under the
     active mesocycle; `bot mesocycle` adds the whole focus."""
     start, end = str(m["start_date"]), str(m["end_date"])
     total_days = max(1, days_between(start, end) + 1)
     window = simple_mesocycle_window(start, end)
+    deload = [deload_span(m)] if m.get("deload_start") else []
     if end < today:
-        return [f"✅ {m['name']}", window]
+        return [f"✅ {m['name']}", window, *deload]
     if start <= today:
         total_weeks = max(1, -(-total_days // 7))  # ceiling
         week_now = min(total_weeks, days_between(start, today) // 7 + 1)
-        return [f"📍 {m['name']}", f"{window} · you're in week {week_now} of {total_weeks}"]
-    return [f"⏳ {m['name']}", f"{window} · {simple_mesocycle_length(total_days)}"]
+        return [f"📍 {m['name']}", f"{window} · you're in week {week_now} of {total_weeks}",
+                *deload]
+    return [f"⏳ {m['name']}", f"{window} · {simple_mesocycle_length(total_days)}", *deload]
 
 
 def simple_plan_lines(

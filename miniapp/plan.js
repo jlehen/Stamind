@@ -58,7 +58,8 @@ function rail(row) {
     return "";
   }
   const done = row.rail.done ? " done" : "";
-  return element("span", `rail meso-${row.rail.index % STRIPS}${done}`);
+  const deload = row.rail.deload ? " deload" : "";
+  return element("span", `rail meso-${row.rail.index % STRIPS}${done}${deload}`);
 }
 
 function renderPlan(snapshot) {
@@ -68,6 +69,14 @@ function renderPlan(snapshot) {
       const today = element("li", "plan-today", `Today, ${calendar.shortDay(row.date)}`);
       today.prepend(rail(row));
       ui.plan.append(today);
+      continue;
+    }
+    // A deload is a row of its own that cannot be tapped, like today's
+    // (DESIGN_deload_weeks.md §11.1).
+    if (row.kind === "deload") {
+      const deload = element("li", row.done ? "plan-deload done" : "plan-deload", row.text);
+      deload.prepend(rail(row));
+      ui.plan.append(deload);
       continue;
     }
     // A mesocycle is a stretch of the timeline's rail in its strip colour; a goal is a

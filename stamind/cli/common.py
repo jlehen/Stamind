@@ -292,15 +292,47 @@ def print_plan_goal(goal: dict, width: int) -> None:
 
 
 def deload_span(mesocycle: Dict[str, Any]) -> str:
-    """'Deload Mon 2 Nov to Sun 8 Nov', a mesocycle's deload in the terminal
-    (DESIGN_deload_weeks.md §5.2)."""
-    return f"Deload {fmt_day(mesocycle['deload_start'])} to {fmt_day(mesocycle['end_date'])}"
+    """'🔋 Deload Mon 2 Nov to Sun 8 Nov', the one string the terminal and the chat print for
+    a mesocycle's deload (DESIGN_deload_weeks.md §11.2)."""
+    return f"🔋 Deload {fmt_day(mesocycle['deload_start'])} to {fmt_day(mesocycle['end_date'])}"
 
 
 def deload_line(mesocycle: Dict[str, Any]) -> str:
     """`deload_span` with its length: a first day written too early shows as a long deload."""
     days = days_between(mesocycle['deload_start'], mesocycle['end_date']) + 1
     return f"{deload_span(mesocycle)} ({days} day{'s' if days != 1 else ''})"
+
+
+def in_deload(mesocycle: Dict[str, Any], day: str) -> bool:
+    """Whether `day` falls from the mesocycle's `deload_start` to its `end_date`."""
+    start = mesocycle.get('deload_start')
+    return bool(start) and start <= day <= mesocycle['end_date']
+
+
+def deload_progress(mesocycle: Dict[str, Any], today: str) -> str:
+    """'starts tomorrow', 'starts in 2 days' or 'day 3 of 7'."""
+    start = mesocycle['deload_start']
+    ahead = days_between(today, start)
+    if ahead == 1:
+        return "starts tomorrow"
+    if ahead > 1:
+        return f"starts in {ahead} days"
+    return f"day {1 - ahead} of {days_between(start, mesocycle['end_date']) + 1}"
+
+
+def deload_heads(workouts: List[Dict[str, Any]]) -> Dict[int, str]:
+    """Each listed deload's line, by the position of the row it goes before: the first row
+    inside that deload (DESIGN_deload_weeks.md §11.2). `workouts` runs in date order."""
+    if not workouts:
+        return {}
+    mesocycles, _ = runtime.db.get_governing_mesocycles(workouts[0]['date'], workouts[-1]['date'])
+    heads = {}
+    for mesocycle in mesocycles:
+        inside = [i for i, w in enumerate(workouts) if in_deload(mesocycle, w['date'])]
+        if not inside:
+            continue
+        heads[inside[0]] = deload_span(mesocycle)
+    return heads
 
 
 def print_mesocycle_head(span: Dict[str, Any], id_label: str, width: int) -> str:

@@ -2,7 +2,7 @@
 // goals in date order around a "Today" line, and what a tapped row opens. The snapshot is
 // read like the calendar's, and the plan file from the bucket replaces it when it arrives
 // (DESIGN_miniapp_storage.md §7.2). No DOM here, so `node --test` runs it.
-import { shortDay } from "./calendar_logic.js?v=dev";
+import { deloadDates, deloadOn, shortDay } from "./calendar_logic.js?v=dev";
 
 // Word for word the bot's `WHY_REQUEST` (cli/render/plan_page.py); a Python test holds the
 // two together.
@@ -14,6 +14,12 @@ export function planRows(snapshot) {
     rows.push({ kind: "meso", date: meso.s, index, name: meso.n, plan: meso.p,
                 span: `${shortDay(meso.s)} – ${shortDay(meso.e)}`, summary: meso.m || "",
                 long: meso.f || "", done: meso.e < snapshot.today });
+    // Pushed right after its mesocycle, so the stable sort below keeps it there when the
+    // deload starts on the mesocycle's first day (DESIGN_deload_weeks.md §11.1).
+    if (meso.d) {
+      rows.push({ kind: "deload", date: meso.d, text: `🔋 Deload · ${deloadDates(meso)}`,
+                  done: meso.e < snapshot.today });
+    }
   });
   (snapshot.goals || []).forEach((goal) => {
     rows.push({ kind: "goal", date: goal.d, text: goal.t, description: goal.x || "",
@@ -27,7 +33,8 @@ export function planRows(snapshot) {
   }
   rows.splice(at, 0, { kind: "today", date: snapshot.today });
   // The rail beside each row: the mesocycle running on its date in that mesocycle's colour,
-  // faded once it has ended. A goal or today inside a mesocycle keeps its colour.
+  // faded once it has ended, and dashed when the row's date falls inside its deload. A goal
+  // or today inside a mesocycle keeps its colour.
   const mesos = snapshot.meso || [];
   for (const row of rows) {
     let index = row.index;
@@ -37,7 +44,8 @@ export function planRows(snapshot) {
     if (index === -1) {
       continue;
     }
-    row.rail = { index, done: mesos[index].e < snapshot.today };
+    row.rail = { index, done: mesos[index].e < snapshot.today,
+                 deload: Boolean(deloadOn(snapshot, row.date)) };
   }
   return rows;
 }

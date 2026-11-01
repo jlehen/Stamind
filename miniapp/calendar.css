@@ -342,6 +342,13 @@ h1 {
   opacity: 0.4;
 }
 
+/* A row dated inside a deload: the same dashes, turned to run down the page
+   (DESIGN_deload_weeks.md §11.2). */
+.rail.deload {
+  -webkit-mask-image: repeating-linear-gradient(180deg, #000 0 5px, transparent 5px 8px);
+  mask-image: repeating-linear-gradient(180deg, #000 0 5px, transparent 5px 8px);
+}
+
 .node {
   position: absolute;
   top: 50%;
@@ -371,6 +378,16 @@ h1 {
 .plan-when {
   color: var(--hint);
   font-size: 13px;
+}
+
+.plan li.plan-deload {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 13px;
+}
+
+.plan li.plan-deload.done {
+  color: var(--hint);
 }
 
 .plan li.plan-today {
