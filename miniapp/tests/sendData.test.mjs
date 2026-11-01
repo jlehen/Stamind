@@ -1,6 +1,6 @@
 // What only a browser can show. The Finish watchdog (DESIGN_gym_logger.md §4): Telegram closes
 // the app when it takes the log, so a page still open afterwards means the log never left. And
-// a past log opened from the calendar's day sheet (§8).
+// a past log opened from the calendar's day sheet (§8), and the plan page's deload row.
 // Run from the repository root: node --test miniapp/tests/*.test.mjs
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -180,6 +180,30 @@ test("a gym log opens from the calendar locked, and Edit lets it be sent again",
     assert.equal(await page.locator(".step").first().isVisible(), false);
     await page.locator("#back").click();
     await page.waitForURL(/calendar\.html/);
+  });
+});
+
+// Wednesday 4 November, inside a deload (DESIGN_deload_weeks.md §11.1).
+test("the plan page's deload row cannot be tapped, and its rail is dashed", async (t) => {
+  const snapshot = { v: 1, at: "2026-11-04T07:02", today: "2026-11-04", goals: [],
+                     meso: [{ n: "Build", s: "2026-10-19", e: "2026-11-08", d: "2026-11-02", p: 6 },
+                            { n: "Peak", s: "2026-11-09", e: "2026-11-29", p: 6 }] };
+  await onPhone(t, async (page, site) => {
+    await page.goto(`${site}/plan.html#c=${await packed(snapshot)}`, { waitUntil: "networkidle" });
+    const row = page.locator(".plan-deload");
+    assert.equal(await row.textContent(), "🔋 Deload · 2 Nov – 8 Nov");
+    assert.equal(await row.locator("button").count(), 0);
+    await row.click();
+    assert.equal(await page.locator("#row-sheet").isVisible(), false);
+
+    // The deload's row and today's are dashed; the two mesocycles' rows are not.
+    assert.equal(await page.locator(".rail").count(), 4);
+    const rail = page.locator(".plan-deload .rail");
+    assert.match(await rail.getAttribute("class"), /\bdeload\b/);
+    assert.equal(await page.locator(".rail.deload").count(), 2);
+    const mask = await rail.evaluate((node) => getComputedStyle(node).maskImage);
+    assert.match(mask, /repeating-linear-gradient/);
+    assert.doesNotMatch(mask, /90deg/);
   });
 });
 

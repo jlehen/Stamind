@@ -35,10 +35,10 @@ test("mesocycles and goals run in date order around today", () => {
 test("the rail keeps a mesocycle's colour through a goal or today inside its dates", () => {
   const rows = logic.planRows(SNAPSHOT);
   // Build: its own stretch, ended. Today falls in the base mesocycle, still running.
-  assert.deepEqual(rows[0].rail, { index: 0, done: true });
-  assert.deepEqual(rows[3].rail, { index: 1, done: false });
+  assert.deepEqual(rows[0].rail, { index: 0, done: true, deload: false });
+  assert.deepEqual(rows[3].rail, { index: 1, done: false, deload: false });
   // The 10k on 27 September fell in Build. The Sylvesterlauf is past every mesocycle.
-  assert.deepEqual(rows[1].rail, { index: 0, done: true });
+  assert.deepEqual(rows[1].rail, { index: 0, done: true, deload: false });
   assert.equal(rows[4].rail, undefined);
 });
 
@@ -79,4 +79,32 @@ test("from the plan file, a mesocycle shows its long text and no chat button", (
             "Why it is."],
   });
   assert.equal(logic.rowSheet(row).why, true);
+});
+
+// Wednesday 4 November, inside the deload of a mesocycle from 19 October to 8 November.
+const DELOAD_SNAPSHOT = {
+  v: 1, at: "2026-11-04T07:02", today: "2026-11-04", goals: [],
+  meso: [{ n: "Build", s: "2026-10-19", e: "2026-11-08", d: "2026-11-02", p: 6 },
+         { n: "Peak", s: "2026-11-09", e: "2026-11-29", p: 6 }],
+};
+
+test("a deload is a row of its own, in date order, right after its mesocycle", () => {
+  const rows = logic.planRows(DELOAD_SNAPSHOT);
+  assert.deepEqual(rows.map((row) => row.kind), ["meso", "deload", "today", "meso"]);
+  assert.equal(rows[1].text, "🔋 Deload · 2 Nov – 8 Nov");
+  assert.equal(rows[1].done, false);
+});
+
+test("a row dated inside the deload has its rail dashed", () => {
+  const rows = logic.planRows(DELOAD_SNAPSHOT);
+  assert.deepEqual(rows.map((row) => row.rail.deload), [false, true, true, false]);
+  assert.equal(rows[1].rail.index, 0);
+});
+
+test("a deload on its mesocycle's first day still comes after the mesocycle", () => {
+  const rows = logic.planRows({
+    today: "2026-10-01", goals: [{ t: "🎯 Test", d: "2026-11-02" }],
+    meso: [{ n: "Recovery", s: "2026-11-02", e: "2026-11-08", d: "2026-11-02", p: 6 }],
+  });
+  assert.deepEqual(rows.map((row) => row.kind), ["today", "meso", "deload", "goal"]);
 });

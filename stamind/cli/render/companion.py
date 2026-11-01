@@ -17,7 +17,7 @@ from stamind.strength.prescription import exercise_lines
 from stamind.text import green, wrap_text
 from stamind.output import notice
 from stamind.clock import shift, today_date as _today_date, today_str as _today_str
-from stamind.cli.common import print_strength_notes
+from stamind.cli.common import deload_heads, print_strength_notes
 from stamind.cli.progress import emit_chart
 from stamind.cli.render.expert import ExpertRenderer
 from stamind.cli.render.plan_lines import (
@@ -193,6 +193,7 @@ class CompanionRenderer(ExpertRenderer):
         for line in simple_week_lines(
             workouts, verdicts,
             end_note=simple_end_note(end_date) if names_a_range else None,
+            heads=deload_heads(workouts) if names_a_range else None,
         ):
             print(line)
         # The note states that the schedule stops; the button is what she does about it,

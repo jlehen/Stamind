@@ -218,10 +218,16 @@ export function mesoIndex(snapshot, iso) {
   return (snapshot.meso || []).findIndex((meso) => meso.s <= iso && iso <= meso.e);
 }
 
-export function isDeloadDay(snapshot, iso) {
-  // A day from the mesocycle's `d` to its last day (DESIGN_deload_weeks.md §5.1).
+export function deloadOn(snapshot, iso) {
+  // The mesocycle whose deload holds the day, from its `d` to its last day, or null
+  // (DESIGN_deload_weeks.md §5.1, §11.2).
   const meso = (snapshot.meso || [])[mesoIndex(snapshot, iso)];
-  return Boolean(meso && meso.d && meso.d <= iso);
+  return meso && meso.d && meso.d <= iso ? meso : null;
+}
+
+export function deloadDates(meso) {
+  // "2 Nov – 8 Nov", in the legend, the day sheet and the plan page's row.
+  return `${shortDay(meso.d)} – ${shortDay(meso.e)}`;
 }
 
 export function deloadTouches(meso, month) {
@@ -264,15 +270,25 @@ export function isOutside(snapshot, iso) {
 
 // The heading of the part a goal's day opens with (§3.5).
 export const GOAL = "Goal";
+// The heading of the part a deload day opens with (DESIGN_deload_weeks.md §11.1).
+export const DELOAD = "Deload";
 
 export function sheetFor(snapshot, iso) {
-  // The day's sheet, opening with the goals set on that day (§3.5).
+  // The day's sheet, opening with the goals set on that day (§3.5), then the deload.
   const found = daySheet(snapshot, iso);
+  const opening = [];
   const goals = goalsOn(snapshot, iso).map((goal) => goal.t);
-  if (!goals.length) {
+  if (goals.length) {
+    opening.push([GOAL, goals]);
+  }
+  const deload = deloadOn(snapshot, iso);
+  if (deload) {
+    opening.push([DELOAD, [deloadDates(deload)]]);
+  }
+  if (!opening.length) {
     return found;
   }
-  return { ...found, parts: [[GOAL, goals], ...((found && found.parts) || [])] };
+  return { ...found, parts: [...opening, ...((found && found.parts) || [])] };
 }
 
 function daySheet(snapshot, iso) {

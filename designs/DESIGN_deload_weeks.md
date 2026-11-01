@@ -1,7 +1,7 @@
 # Design: Deload weeks the plan dates
 
 **Status:** Built 2026-10-30, five choices ruled the same day (§7); §11, the deload in words,
-is not built · **Date:** 2026-10-19 · **Branch:** worktree-deload-weeks-design
+built 2026-10-31 · **Date:** 2026-10-19 · **Branch:** worktree-deload-weeks-design
 
 A **deload** is a lighter recovery week: it cuts volume much more than intensity, so the
 fatigue of the loading weeks before it clears (`stamind/science/periodization.md`). Today a

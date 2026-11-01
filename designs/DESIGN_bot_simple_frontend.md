@@ -91,6 +91,9 @@ the chat draws (this message, "📅 Today", today after a proposal's answer) sho
 session's short line in place of its description, and "🔎 Tell me more" opens the day in
 full on the details page.
 
+Amended 2026-10-31 (DESIGN_deload_weeks.md §11.1): a deload day's message opens with "🔋 Deload,
+day 3 of 7.", and the day before's ends with "🔋 Your deload starts tomorrow, until Sun 8 Nov."
+
 Rest days get one line ("Rest day — enjoy it 🎉", no buttons). So does a day whose
 sessions are all already trained — "✅ Already done for today — nice work 💪", the
 acknowledgement §6 gives the day view, promoted to the whole message. The catch-up
@@ -749,6 +752,9 @@ lets it wrap without losing its shape. The §11.1 vocabulary (✅ 📍 ⏳ 🏁,
 each), `simple_mesocycle_window`, `simple_mesocycle_length` and the §6 no-year rule are
 unchanged. The headline drops a one-word label the `plan generate` model likes to open
 with ("Purpose: …"): a field name, not a headline.
+
+Amended 2026-10-31 (DESIGN_deload_weeks.md §11.1): under the window, a mesocycle with a dated
+deload has one more line, "🔋 Deload Mon 2 Nov to Sun 8 Nov".
 
 **The door.** The names are written by `plan generate`, and they are coach vocabulary —
 "Race-Specific Sharpening" says nothing to the athlete about what October will ask of

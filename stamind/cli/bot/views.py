@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from stamind import heads_up, journal, runtime, settings
 from stamind.analytics.compare import adherence_verdicts
 from stamind.cli.bot import test_result
-from stamind.cli.common import ensure_recent_data
+from stamind.cli.common import deload_progress, ensure_recent_data, in_deload
 # The companion surfaces are companion-only by definition, so they call the line
 # builders directly rather than through `runtime.render` (DESIGN_render_persona.md §3).
 from stamind.cli.render.plan_lines import (
@@ -40,7 +40,7 @@ from stamind.sports import canonical_sport
 from stamind.strength.sets import read_new_activities
 from stamind.text import wrap_text, yellow
 from stamind.output import aside, step
-from stamind.clock import today_str as _today_str
+from stamind.clock import fmt_day, shift, today_str as _today_str
 
 # What the morning push offers (§4.1/§4.4): the CLI owns WHAT to offer, the bot only
 # renders. Each `send` is a canned utterance the bot feeds back through its normal
@@ -288,6 +288,25 @@ def run_bot_changes(args: argparse.Namespace) -> None:
         runtime.db.mark_changes_told([change["id"]])
 
 
+def _deload_day_line(today: str) -> Optional[str]:
+    """'🔋 Deload, day 3 of 7.' on a deload day (DESIGN_deload_weeks.md §11.1)."""
+    mesocycle = runtime.db.get_covering_mesocycle(today)
+    if not mesocycle or not in_deload(mesocycle, today):
+        return None
+    return f"🔋 Deload, {deload_progress(mesocycle, today)}."
+
+
+def _deload_eve_line(today: str) -> Optional[str]:
+    """'🔋 Your deload starts tomorrow, until Sun 8 Nov.' the day before one
+    (DESIGN_deload_weeks.md §11.1)."""
+    tomorrow = shift(today, 1)
+    mesocycle = runtime.db.get_covering_mesocycle(tomorrow)
+    if not mesocycle or mesocycle.get("deload_start") != tomorrow:
+        return None
+    until = fmt_day(mesocycle["end_date"])
+    return f"🔋 Your deload {deload_progress(mesocycle, today)}, until {until}."
+
+
 def run_bot_morning(args: argparse.Namespace) -> None:
     """Renders the §4.1 morning message for today and emits its button row, under the
     briefing or under the proposal's question (DESIGN_waiting_proposal.md §5).
@@ -316,6 +335,11 @@ def run_bot_morning(args: argparse.Namespace) -> None:
             and not runtime.db.get_workouts(start_date=today, end_date=today)):
         runtime.db.set_setting(settings.MORNING_MARKER, today)
         return
+    # Before the refresh, so it is the first line whatever the refresh prints
+    # (DESIGN_deload_weeks.md §11.2).
+    deload_day = _deload_day_line(today)
+    if deload_day:
+        print(deload_day)
     _refresh_garmin(today)
     _ask_about_tests(today)
     # It then stands first in the line, after the briefing (DESIGN_chat_questions.md §3).
@@ -353,6 +377,9 @@ def run_bot_morning(args: argparse.Namespace) -> None:
     if runway:
         for line in simple_runway_lines(runway, today):
             print(wrap_text(line))
+    deload_eve = _deload_eve_line(today)
+    if deload_eve:
+        print(deload_eve)
     # Two independent gates, each answering its own question, so relaxing one cannot
     # resurrect the other's buttons (§6). A rest session is graded apart from done, but
     # there is nothing on it to ease or move.

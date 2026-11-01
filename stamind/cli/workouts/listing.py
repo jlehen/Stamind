@@ -15,7 +15,7 @@ from stamind.gcal.event import event_url
 from stamind.text import bold, cyan, format_labeled_paragraph, gray, wrap_text, yellow
 from stamind.output import notice, warn
 from stamind.clock import fmt_date, fmt_timestamp, today_str as _today_str
-from stamind.cli.common import strength_table
+from stamind.cli.common import deload_heads, strength_table
 from stamind.cli.runway import list_end_marker
 from stamind.cli.windows import (
     has_selector as _has_selector, resolve_window, split_targets,
@@ -143,7 +143,8 @@ def print_workout_table(
 ) -> None:
     """The expert `workout list` body: the filter echo, the sessions as a table (`-v` adds
     each one's short form in gray under its row; `-vv` turns each row back into a line with
-    the detail under it), and the end-of-schedule marker.
+    the detail under it), each deload's line before its first session
+    (DESIGN_deload_weeks.md §11.2), and the end-of-schedule marker.
 
     The companion form of this is CompanionRenderer.workout_list
     (DESIGN_render_persona.md §5)."""
@@ -162,12 +163,19 @@ def print_workout_table(
 
     verbosity = getattr(args, "verbose", 0) or 0
     markers: set = set()
+    heads = deload_heads(workouts) if names_a_range else {}
     if verbosity >= 2:
-        markers = _print_details(workouts, verdicts, args)
+        markers = _print_details(workouts, verdicts, args, heads)
     elif workouts:
-        table, markers = session_table(
-            workouts, verdicts, under=[_under_row(w, args) for w in workouts]
-        )
+        # The table is one block: a deload's line goes under the row before its first session,
+        # or above the table when that session is the first row.
+        under = [_under_row(w, args) for w in workouts]
+        for position, line in heads.items():
+            if position == 0:
+                print(line)
+            else:
+                under[position - 1].append(line)
+        table, markers = session_table(workouts, verdicts, under=under)
         print(table)
     # Where the schedule stops, when the listed range runs past it (§4). A listing with
     # nothing to show renders it alone: an empty range past the cliff is exactly where the
@@ -198,15 +206,17 @@ def _under_row(w: dict, args: argparse.Namespace) -> list:
     return lines
 
 
-def _print_details(workouts: list, verdicts: dict, args: argparse.Namespace) -> set:
-    """`-vv`: each session as one line with its detail under it. Returns the markers
-    printed, for the legend."""
+def _print_details(workouts: list, verdicts: dict, args: argparse.Namespace, heads: dict) -> set:
+    """`-vv`: each session as one line with its detail under it, and `heads`, the deload lines
+    by position, between them. Returns the markers printed, for the legend."""
     # The long batch rationale is stamped on every workout of an adapt run; show each
     # distinct summary only once across the listing so it doesn't dominate the output.
     seen_summaries: set = set()
     markers: set = set()
     full_text = _full_text(workouts, args)
-    for w in workouts:
+    for position, w in enumerate(workouts):
+        if position in heads:
+            print(heads[position])
         verdict = verdicts.get(w.get('id'))
         head = workout_line(w, verdict)
         markers |= line_markers(head)
