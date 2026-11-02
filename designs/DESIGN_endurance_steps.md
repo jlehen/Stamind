@@ -137,7 +137,8 @@ week planner answers, before anything is saved or put in a waiting proposal. An 
 only keeps or drops a session already on the schedule (`keep`, `drop`) writes no session and
 is not checked. An entry fails one of three checks:
 
-1. **Shape.** Every step has a phase and a positive number of seconds, except at most one
+1. **Shape.** Every step has a phase and a positive number of seconds, and so does every
+   recovery, except at most one
    plain step (no `repeat`, not on a swim) whose seconds are `"remainder"`.
 2. **Fit.** Without a remainder, the steps add up to `duration_minutes`. With one, at least 5
    minutes are left for it.
@@ -176,9 +177,9 @@ is the seam that splits the description, as on a gym day. On a gym day the week 
 words sit above the seam; here they sit below it, so `coach/steps.py` splits the text
 itself and takes only `title_line` from `strength/prescription.py`. Stamind also adds up the
 seconds per zone and puts them in the entry's `planned_zone_currency` and `planned_zone_sec`,
-the fields the week planner wrote itself until now. From there the entry is a normal one: the waiting proposal,
-the chat's short line and Google Calendar read its description and its zone minutes as
-before.
+the fields the week planner wrote itself until now. From there the entry is a normal one:
+the waiting proposal, the chat's short line and Google Calendar read its description and its
+zone minutes as before.
 
 Wednesday's zone minutes, worked out from the steps: zone 1 = 15 + 3 × 2.5 + 10 = 32.5 min,
 zone 2 = 27.5 min, zone 5 = 15 min. Together 75 minutes.
@@ -190,7 +191,8 @@ some ("0:37:30").
 **What the week planner is shown.** When a later `workout adapt` lists Wednesday, the week
 planner reads its title, its prose, and its `steps` as JSON on one line: the shape
 it wrote and writes again (`coach/formatting.py:_for_the_week_planner`). It never sees the
-printed watts, the way it never sees a gym day's kilograms.
+printed watts, the way it never sees a gym day's kilograms. A session whose steps were
+printed and not stored (§4) is shown its prose only.
 
 **Storing.** One new column on `workouts`:
 
@@ -221,11 +223,18 @@ again with the thresholds now in use. No model call is made. Wednesday now says 
 Each new revision is a copy of the live one, the way `restore` writes a copy
 (`WorkoutChange.restore`, given the new description): `restored_from` points at the live
 revision, and only the description changes. So the session keeps its reason, its short line,
-its short name, and the kind it reads as: a session the athlete asked to move still shows
-"[Tweaked]" and its reason on Google Calendar, and the week planner still reads that
-sentence. The copies go under one change of a new kind, `reprint`, whose summary "Your FTP is
-now 245 W." is what `workout batches` lists. Like every change, it waits for the week lock,
-and closing it updates Google Calendar. A session whose text does not change gets no copy,
+its short name, and the kind it reads as: a session the athlete asked to move still reads
+`[TWEAKED]` in `workout list`, keeps its `Reason:` line on Google Calendar, and the week
+planner still reads that sentence. (Google Calendar titles only an adaptation,
+`gcal/event.py:_REVISION_LABELS`.) A change the athlete has not been told about yet still
+stands, because `change_has_live_revisions` follows `restored_from` to the copy
+(DESIGN_change_heads_up.md §6); a plain append would have dropped its line.
+
+The copies go under one change of a new kind, `reprint`, whose summary "Your FTP is now
+245 W." is what `workout batches` lists. Like every change, it waits for the week lock,
+and closing it updates Google Calendar. It prints every session before it opens the change,
+inside the week lock, which is how a reprint with nothing to write writes no change row. A
+session whose text does not change gets no copy,
 and when no text changes at all, no change is written, so recording an e1RM leaves no trace.
 
 A reprint that writes a revision is a newer change than any proposal waiting in the chat, so
@@ -318,6 +327,9 @@ Added by the review; each stands until the author says otherwise:
     holds the result question overnight, they answer it Saturday at 07:00, and Saturday's
     09:00 threshold ride would keep the old watts. From today, the test ridden this morning
     shows the new watts in its text and its event is pushed once more; nobody rides it again.
+    The day sheet and the details page show a past day as its short line, so the rewritten
+    text is met on Google Calendar and in `workout show -d` only. If the author minds that,
+    the cheapest shape with neither failure skips a test dated today: one condition.
 22. **Choice 8's columns line up in the terminal only.** *Changed by the second review pass;*
     the first drew the block in a fixed-width font on the two pages, but on a phone the
     lines are longer than the width and wrap anyway (§7). If the author wants the columns on
@@ -327,7 +339,10 @@ Added by the review; each stands until the author says otherwise:
     steps and no zone minutes, as ruled, but its description shows the steps as the week
     planner wrote them. The story against "prose only": the week planner keeps the steps out
     of the prose, so on Wednesday the athlete would read the morning check and the fuel and
-    no warm-up and no intervals, which is worse than today.
+    no warm-up and no intervals, which is worse than today. *The review's alternative:* store
+    those steps as written too, and withhold only the zone minutes. Then every printed block
+    has its steps behind it, the reprint covers it, and the week planner always reads the
+    JSON; it narrows choice 6 further, so it waits for the author.
 24. **The confirmation line after `benchmark record` stays as today.** The first pass added
     "4 sessions ahead now use it."; the day sheet showing 260–274 W is the proof, and the line
     would need a count and two renderers.
@@ -343,7 +358,9 @@ Added by the review; each stands until the author says otherwise:
   ask only.
 - **docs/ARCHITECTURE.md:** the `steps` column, the `reprint` change kind, the new module, the
   check and the second ask in the `workout generate` and `workout adapt` data flows, and the
-  reprint in `benchmark record`, `benchmark rm` and `benchmark wipe`.
+  reprint in `benchmark record`, `benchmark rm` and `benchmark wipe`, and the `restored_from`
+  row of the `workouts` table, which a `reprint` copy now carries too.
+- **DESIGN_workout_revisions.md §3:** the same `restored_from` row.
 
 ## 10. Build order
 
