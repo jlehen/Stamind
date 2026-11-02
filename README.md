@@ -560,6 +560,47 @@ Two instances can share one bucket, since each bot has its own folder in it.
 Do steps 5 to 7 once per instance, each with its own config. When the two use
 two service accounts, each gets the role of step 3.
 
+### Backups
+
+This is optional. `./sm data backup` uploads two files to a private bucket: a
+snapshot of the database, compressed, and the config file. The snapshot is safe
+to take while the bot is running. Each run replaces the two files, and the
+bucket keeps the older copies in its version history. The files go in a folder
+named after the instance's directory, so two instances can share the bucket.
+
+1. In the Cloud Console, create a second bucket, separate from the pages'
+   bucket. Its name is public, so put nothing personal in it. This time keep
+   **"Enforce public access prevention on this bucket"** ticked: the config
+   file holds your keys and the bot token.
+2. In the bucket's "Protection" tab, turn on **Object versioning**. In its
+   "Lifecycle" tab, add a rule: action "Delete object", condition "Number of
+   newer versions" = 30. A daily run then keeps the last 30 days. The rule never
+   deletes the newest copy, so the backups do not vanish if the runs stop.
+3. Give the service account the role **Storage Object User** on this bucket.
+4. Write the bucket's name in each instance's config, as
+   `google.backup_bucket`.
+5. Run `./sm data backup` once to check it. It exits with an error, and says
+   which file failed, when something is wrong.
+6. Add one line per instance to your crontab (`crontab -e`). For example, at
+   3 a.m. every night:
+
+   ```
+   0 3 * * * cd ~/Stamind && ./sm data backup >> logs/backup.log 2>&1
+   5 3 * * * cd ~/Stamind && STAMIND_CONFIG=piupiu/config_piupiu.yaml ./sm data backup >> piupiu/logs/backup.log 2>&1
+   ```
+
+To restore, stop the bot. Download the copy you want from the bucket's
+"Version history". Unzip it with `gunzip`, put it in place of `stamind.db`, and
+delete the `stamind.db-wal` and `stamind.db-shm` files beside it. Then start the
+bot and run `./sm data publish --force`, so the pages match the restored
+database. Then run `./sm workout prune-calendar` and `./sm workout push -f`, so
+Google Calendar drops the events written since the copy and shows the restored
+sessions.
+
+The service account's file, the Garmin session (`.garminconnect`) and the
+`science/` folder are not backed up. Google gives you a new key in the Console,
+and the next `./sm data pull` at a terminal signs in to Garmin again.
+
 ### One-time Garmin settings
 
 Garmin buckets every activity into heart-rate and power zones the moment it is

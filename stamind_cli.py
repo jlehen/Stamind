@@ -192,7 +192,9 @@ def run_once(argv, parser, named_subparsers, source=None) -> None:
         journal.drop_run()
         raise
     except SystemExit as exc:
-        journal.end_run("ok", exit_code=exc.code if isinstance(exc.code, int) else 0)
+        # Python's own rule: None exits 0, an int is kept, a message exits 1.
+        code = exc.code if isinstance(exc.code, int) else (1 if exc.code else 0)
+        journal.end_run("ok", exit_code=code)
         raise
     except (PromptCancelled, KeyboardInterrupt):
         journal.end_run("cancelled", exit_code=130)

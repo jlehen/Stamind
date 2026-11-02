@@ -7,6 +7,7 @@ from stamind.cli.selectors import add_selector_args
 from stamind.cli.data.analysis import (
     run_data_bootstrap, run_data_reflect, run_data_show_analysis,
 )
+from stamind.cli.data.backup import run_data_backup
 from stamind.cli.data.cache import run_data_backfill_tss, run_data_pull, run_data_wipe
 from stamind.cli.data.publish import run_data_publish, run_data_unpublish
 from stamind.cli.data.show import run_data_show_activities, run_data_show_metrics
@@ -270,5 +271,17 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             help="Go on when this bot's folder holds files this database never uploaded, "
                  "as after restoring a backup"
         )
+
+    d_backup = data_subparsers.add_parser(
+        "backup", advanced=True,
+        help="Upload a snapshot of the database and the config file to the backup bucket",
+        description=(
+            "Upload a consistent snapshot of this instance's database, compressed, and its "
+            "config file to google.backup_bucket, in a folder named after the instance's "
+            "directory. Each upload replaces the file of the same name; the bucket's "
+            "version history keeps the older ones. Meant for cron (README, \"Backups\")."
+        ),
+    )
+    d_backup.set_defaults(func=run_data_backup)
 
     return data_parser

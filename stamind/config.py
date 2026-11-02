@@ -89,6 +89,11 @@ class Config:
         return self.get("google", {}).get("storage_bucket") or None
 
     @property
+    def backup_bucket(self) -> Optional[str]:
+        """The private bucket `data backup` uploads to, or None (README, "Backups")."""
+        return self.get("google", {}).get("backup_bucket") or None
+
+    @property
     def llm_models(self) -> list[str]:
         """The OpenRouter models this install may use, in `settings list thinking-model`
         display order (DESIGN_model_selection.md §1). Entries are either a bare
