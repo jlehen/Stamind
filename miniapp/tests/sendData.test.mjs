@@ -236,3 +236,27 @@ test("a reopened page shows the running clock before the exercises arrive", asyn
     await page.waitForSelector(".card");
   });
 });
+
+test("a Finish tapped by mistake can be resumed, and the next Finish sends again", async (t) => {
+  await onPhone(t, async (page, site) => {
+    await page.goto(`${site}/`, { waitUntil: "networkidle" });
+    await page.waitForSelector(".card");
+    await page.locator(".card").first().locator(".set").nth(0).locator(".tick").click();
+    assert.equal(await page.locator("#resume-clock").isVisible(), false);
+    await page.evaluate(() => window.__finish());
+
+    // Telegram closed the page; the athlete opens it again from the same button.
+    await page.reload();
+    await page.waitForSelector(".card");
+    assert.equal(await page.locator("#rest-label").textContent(), "in total");
+    assert.equal(await page.locator("#reset-clock").isVisible(), false);
+    await page.locator("#resume-clock").click();
+
+    assert.equal(await page.locator("#rest-label").textContent(), "since last set");
+    assert.equal(await page.locator("#resume-clock").isVisible(), false);
+    assert.equal(await page.locator("#reset-clock").isVisible(), true);
+    assert.equal(await page.locator("#sent").isVisible(), false);
+    await page.evaluate(() => window.__finish());
+    assert.equal((await page.evaluate(() => window.__sent)).length, 1);
+  });
+});

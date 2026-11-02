@@ -63,8 +63,7 @@ The header also has "Reset timer", shown while the clock runs. It puts the Start
 back and keeps every ticked set ticked. Here is an example: the athlete taps Start at 17:50
 by mistake, ticks a set at 18:05, then taps "Reset timer" and taps Start again at 18:10.
 The 18:05 set came before the new start, so it counts as 0 seconds; a set ticked at 18:12
-counts as 2 minutes. A reset after Finish also clears the Finish, so the next
-Finish sends a log with the new start and end, and the bot replaces the one it had.
+counts as 2 minutes.
 "Start over", also in the header, goes back to the session as written and puts the Start
 button back; Undo brings back what it threw away.
 
@@ -83,9 +82,15 @@ pasted in the chat reaches the bot the same way as a sent one (§6).
 Finish stops the clock, and the page keeps the log. In the changing room the athlete
 notices a mistyped weight, opens the page again from the same button, fixes it and taps
 "Send again". The log goes out with the same start and end, and the bot replaces the
-evening's log instead of adding a second; its summary opens with "Updated the log of". A
-Finish tapped by mistake halfway through the session is not handled: the sets ticked after
-it are stamped at the finish time.
+evening's log instead of adding a second; its summary opens with "Updated the log of".
+
+After Finish, "Resume timer" takes the place of "Reset timer" in the header. Here is an
+example: at 18:30, halfway through, the athlete taps Finish by mistake and the page closes.
+They open it again from the same button. The clock reads 30:00 "in total" and stands still.
+They tap "Resume timer": the clock runs again from the 18:00 start, the rest timer counts
+from the last ticked set, and the button reads "Finish" again. At 19:10 they tap Finish, and
+the bot replaces the 18:30 log with the full one. A set ticked before the resume is stamped
+at 18:30, like any set ticked after Finish.
 
 The athlete also keeps their own training notes in a text file. Under "Add an exercise" is
 "Export to Markdown", which copies the session to the clipboard as a few lines of Markdown:
@@ -277,9 +282,9 @@ the state it saved on the phone during the session, and it saves nothing on the 
 change that is not sent is lost when the page closes.
 
 **The day and the clock times stay.** A log sent again from here carries the `d`, `st` and
-`en` it was opened with, so it replaces that day's log. "Reset timer" and "Start over" are
-not offered on an opened log: both restart the clock, and the next send would be dated
-today. A set ticked here is stamped at the session's end, like any set ticked after Finish.
+`en` it was opened with, so it replaces that day's log. "Reset timer", "Resume timer" and
+"Start over" are not offered on an opened log: each restarts the clock, and the next send
+would be dated today. A set ticked here is stamped at the session's end, like any set ticked after Finish.
 
 **The "Warm-up" tags** are the ones the page gives a session it opens for the first time
 (§1), since the log does not carry them.

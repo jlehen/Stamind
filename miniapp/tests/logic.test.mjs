@@ -452,6 +452,19 @@ test("a timer reset brings Start back, and the ticked sets are measured from the
   assert.equal(logic.startClock(state, START + 8 * 60 * 1000).x[0].sets[0].t, 0);
 });
 
+test("a resume after Finish runs the clock on from the same start", () => {
+  let state = tickSet(exampleState(), 0, 0, 30);
+  const started = state.startedAt;
+  state = logic.markFinished(state, END);
+  assert.equal(logic.clockAt(state, END + 60_000), END);
+  state = logic.resumeClock(state);
+  assert.equal(state.finishedAt, null);
+  assert.equal(state.startedAt, started);
+  assert.equal(state.x[0].sets[0].done, true);
+  assert.equal(logic.clockAt(state, END + 60_000), END + 60_000);
+  assert.equal(logic.resumeClock(state), state);
+});
+
 test("Undo takes back the last change anywhere, but never the Finish", () => {
   let state = exampleState();
   let history = [];

@@ -29,6 +29,7 @@ const ui = {
   startClock: document.getElementById("start-clock"),
   undo: document.getElementById("undo"),
   resetClock: document.getElementById("reset-clock"),
+  resumeClock: document.getElementById("resume-clock"),
   cards: document.getElementById("cards"),
   sessionNote: document.getElementById("session-note"),
   addExercise: document.getElementById("add-exercise"),
@@ -186,7 +187,8 @@ function applyQuiet(after, card = null) {
   tick();
 }
 
-// Finish is the one change Undo does not take back (§1), so it goes around the history.
+// Undo neither takes back a Finish nor brings it back (§1), so Finish and Resume go around the
+// history.
 function applyUnrecorded(after) {
   state = after;
   persist();
@@ -478,7 +480,8 @@ function tick() {
   ui.startClock.hidden = started;
   ui.rest.hidden = !started;
   // An opened log keeps its day and its clock times (§8).
-  ui.resetClock.hidden = !started || Boolean(opened);
+  ui.resetClock.hidden = !started || Boolean(opened) || Boolean(state.finishedAt);
+  ui.resumeClock.hidden = !started || Boolean(opened) || !state.finishedAt;
   if (!started) {
     return;
   }
@@ -756,6 +759,7 @@ function wire() {
   ui.exportMd.addEventListener("click", exportMarkdown);
   ui.startClock.addEventListener("click", () => apply(logic.startClock(state, Date.now())));
   ui.resetClock.addEventListener("click", () => apply(logic.resetClock(state)));
+  ui.resumeClock.addEventListener("click", () => applyUnrecorded(logic.resumeClock(state)));
   ui.undo.addEventListener("click", () => undo(logic.undoAll(history, state)));
   ui.finish.addEventListener("click", onFinish);
   ui.reset.addEventListener("click", startOver);

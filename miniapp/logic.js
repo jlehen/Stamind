@@ -439,6 +439,17 @@ export function resetClock(state) {
   return after;
 }
 
+// Resume after a Finish tapped by mistake: the clock runs on from the same start, as if Finish
+// had never been tapped, and the next Finish replaces the log already sent (§1).
+export function resumeClock(state) {
+  if (!state.finishedAt) {
+    return state;
+  }
+  const after = next(state);
+  after.finishedAt = null;
+  return after;
+}
+
 export function clockAt(state, now) {
   return state.finishedAt ?? now;
 }
