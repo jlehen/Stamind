@@ -265,10 +265,17 @@ function renderOpened() {
   ui.edit.textContent = locked ? "✏️ Edit" : "🔒 Lock";
   ui.openedNote.textContent = locked ? OPENED_LOCKED : OPENED_EDITING;
   ui.sent.hidden = true;
+  syncMainButton();
+}
+
+// Telegram's bottom button is not part of the page, so a sheet does not cover it: it hides
+// while a sheet is up, and on an opened log while it is locked (§1, §8).
+function syncMainButton() {
   if (!inTelegram) {
     return;
   }
-  if (locked) {
+  const sheetUp = !ui.searchSheet.hidden || !ui.outputSheet.hidden;
+  if (sheetUp || (opened && locked)) {
     tg.MainButton.hide();
   } else {
     tg.MainButton.show();
@@ -511,6 +518,7 @@ function openSearch(mode, xi = null, part = null) {
   ui.searchAll.checked = !replacePattern;
   ui.searchInput.value = "";
   ui.searchSheet.hidden = false;
+  syncMainButton();
   renderResults();
   ui.searchInput.focus();
 }
@@ -543,6 +551,7 @@ function searchTitle(mode, xi, part) {
 
 function closeSearch() {
   ui.searchSheet.hidden = true;
+  syncMainButton();
 }
 
 function renderResults() {
@@ -632,6 +641,7 @@ function showSheet(title, text, note, hint) {
   ui.outputText.value = text;
   ui.outputCopy.textContent = "Copy";
   ui.outputSheet.hidden = false;
+  syncMainButton();
 }
 
 // The Markdown goes straight to the clipboard; a phone that refuses it gets the sheet (§1).
@@ -771,10 +781,14 @@ function wire() {
   ui.searchInput.addEventListener("input", renderResults);
   ui.searchAll.addEventListener("change", renderResults);
   ui.searchClose.addEventListener("click", closeSearch);
-  ui.outputClose.addEventListener("click", () => { ui.outputSheet.hidden = true; });
+  ui.outputClose.addEventListener("click", () => {
+    ui.outputSheet.hidden = true;
+    syncMainButton();
+  });
   ui.outputCopy.addEventListener("click", copyOutput);
   ui.outputRetry.addEventListener("click", () => {
     ui.outputSheet.hidden = true;
+    syncMainButton();
     onFinish();
   });
 }

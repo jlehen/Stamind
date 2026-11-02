@@ -73,6 +73,10 @@ After the last set the athlete taps "Finish". The page sends one text message of
 every set named, and replies with a summary: what was done, and where it departed from
 what was written.
 
+Inside Telegram, Finish is Telegram's own button at the bottom of the screen, not a button
+of the page. So it hides while the exercise search or the log's sheet is open: a tap on it
+would send the session from behind the sheet.
+
 When Telegram takes the log it closes the page. A page still open two seconds after Finish
 shows the log with a "Retry" button and a "Copy" button, and says the log may not have
 reached the bot. A slow phone can still be closing, so the log may well have arrived; a

@@ -241,6 +241,13 @@ test("a Finish tapped by mistake can be resumed, and the next Finish sends again
   await onPhone(t, async (page, site) => {
     await page.goto(`${site}/`, { waitUntil: "networkidle" });
     await page.waitForSelector(".card");
+    // Telegram's bottom button is not covered by a sheet, so it hides while the search is up.
+    assert.equal(await page.evaluate(() => window.__mainButton), true);
+    await page.locator(".card").first().getByText("⇆ Replace").click();
+    assert.equal(await page.evaluate(() => window.__mainButton), false);
+    await page.locator("#search-close").click();
+    assert.equal(await page.evaluate(() => window.__mainButton), true);
+
     await page.locator(".card").first().locator(".set").nth(0).locator(".tick").click();
     assert.equal(await page.locator("#resume-clock").isVisible(), false);
     await page.evaluate(() => window.__finish());
