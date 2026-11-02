@@ -81,7 +81,8 @@ class Exercise:
     # One side does the rep, then the other: its reps are per side and a set is both sides
     # (DESIGN_strength_tracking.md §4).
     per_side: bool = False
-    # The names people use for it that Garmin lacks, among `names` (§3.2).
+    # The other names an athlete may type for it, among `names`: Garmin's doubles and the
+    # names people use that Garmin lacks (§3.2).
     also: Tuple[str, ...] = ()
 
     @property
@@ -95,12 +96,21 @@ class Exercise:
 
     @property
     def also_words(self) -> Tuple[str, ...]:
-        """The names people use as they are read, the category left out: 'pallof press'."""
+        """The other names as they are read, the category left out: 'pallof press'."""
         return tuple(_bare(name) for name in self.also)
 
 
 def _listed(text: str, separator: str) -> Tuple[str, ...]:
     return tuple(item for item in text.split(separator) if item)
+
+
+def _typed(name: str) -> bool:
+    """Whether a later name of a line is one an athlete may type: a name people use, or a
+    double. Not a weighted twin, the bare category or the category's general name (§3.2)."""
+    if name.startswith(ADDED_MARK):
+        return True
+    category, _, exercise = name.partition("/")
+    return bool(exercise) and exercise != category and "WEIGHTED" not in exercise
 
 
 @lru_cache(maxsize=None)
@@ -123,7 +133,7 @@ def _table() -> Tuple[Dict[str, Exercise], Dict[str, str]]:
                 secondary=_listed(secondary, ","), gear=_listed(gear, ", "),
                 photos=photos or None, added=listed.startswith(ADDED_MARK),
                 per_side=reps == PER_SIDE,
-                also=tuple(name[1:] for name in written[1:] if name.startswith(ADDED_MARK)),
+                also=tuple(name.lstrip(ADDED_MARK) for name in written[1:] if _typed(name)),
             )
             classes[exercise.key] = exercise
             for name in names:

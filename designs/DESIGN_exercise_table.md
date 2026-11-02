@@ -97,7 +97,9 @@ Four things, and only these, put two Garmin names on one line:
   way on 2026-10-09, after a read of the whole table and a strength-coach review: 29 judged
   sure, and 15 judged probable that the author approved one by one. The key of a merged line
   is the name that held the most stored sets, otherwise the one that says the implement,
-  otherwise the more usual one.
+  otherwise the more usual one. The other names of a double are searched and printed like a
+  name people use (below): "military press" finds the barbell shoulder press, with "also
+  military press" under it.
 - **A general name and its usual exercise.** Garmin has a general name in most categories:
   `DEADLIFT/DEADLIFT`, `ROW/ROW`. It is merged with one exercise only where every other form
   is always named, so that an athlete who logs a plain "deadlift" lifted a barbell. Eight
@@ -119,8 +121,8 @@ A third thing puts a name on a line, and it is not a Garmin name:
   shape and with the `+` of §3.3: `CORE/CABLE_CORE_PRESS +CORE/PALLOF_PRESS`. It is never
   stored, and it is never the exercise's words. A typed name is matched against it (§7), the
   page's search finds the class by it and prints "also pallof press" under the hit (§8), and a
-  model call that answers with it is given the class's key. One was written, the one an athlete
-  reported; others are added as they are met.
+  model call that answers with it is given the class's key. They are added when an athlete
+  types a usual name the search misses: "rear delt fly", "skull crusher", "tricep pushdown".
 
 So every name on a line has the same category, and the words of §4 always say the category Garmin
 gave. Today 37 lines hold names from more than one category, and each is split, one line per
@@ -467,7 +469,7 @@ sort by the words. The heading of `strength log NAME` gives the lift's pattern a
 index of `strength exercises` gains a group for the lines with no pattern.
 
 The page's search lists one entry per class, under the words of its key, and searches those
-words and the names people use (§3.2), "one arm" and "single arm" alike. "Pull up" is one
+words and the other names of §3.2, "one arm" and "single arm" alike. "Pull up" is one
 entry. Nothing is hidden: the yoga poses are in the list. The search
 leaves the word "weighted" out of what is typed, so "weighted pull up" finds "pull up": a weighted
 twin is its class with a load.
@@ -512,7 +514,7 @@ strength planner's are. The buttons show the words. Its list goes from 32 kB to 
 **The page.** Both payloads keep their shape (DESIGN_gym_logger.md §3, §4) and go to version 2:
 `n` holds a key. `miniapp/exercises.json` gives the page, for each class, the key, the words,
 the pattern, the gear and whether it is bodyweight, with the photos id when there is one and a
-mark when it is done one side at a time (§3.8), the names people use for it (§3.2), and its
+mark when it is done one side at a time (§3.8), its other names (§3.2), and its
 words respelled when they say "one arm" or "single arm", "one leg" or "single leg" (§7). The
 page searches the words and those names, prints the words as "[Squat] Belt squat" (§4), and
 sends the key. The state the

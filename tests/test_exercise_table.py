@@ -180,7 +180,18 @@ class ClassTest(unittest.TestCase):
         self.assertTrue(step_down.added)
         self.assertEqual(vocabulary.key_of("SQUAT/STEP_DOWN"), "SQUAT/STEP_DOWN")
         self.assertIsNone(vocabulary.get("+SQUAT/STEP_DOWN"))
-        self.assertEqual(sum(1 for one in vocabulary.all_exercises() if one.added), 41)
+        self.assertEqual(sum(1 for one in vocabulary.all_exercises() if one.added), 43)
+
+    def test_a_double_is_searched_but_not_a_twin_or_a_general_name(self):
+        """§3.2: "military press" finds the barbell shoulder press. The weighted twin and the
+        category's general name say nothing a person would type."""
+        press = vocabulary.get("SHOULDER_PRESS/BARBELL_SHOULDER_PRESS")
+        self.assertEqual(press.also_words,
+                         ("overhead barbell press", "strict press", "military press"))
+        self.assertIn("military press", vocabulary.searched(press.key))
+        self.assertEqual(vocabulary.get("PLANK/PLANK").also, ())
+        self.assertEqual(vocabulary.get("DEADLIFT/BARBELL_DEADLIFT").also, ())
+        self.assertEqual(vocabulary.get("CALF_RAISE/_3_WAY_CALF_RAISE").also, ())
 
     def test_a_name_people_use_finds_its_class_and_is_never_a_key(self):
         """§3.2: Garmin's cable core press is what people call the Pallof press."""
