@@ -277,17 +277,26 @@ def run_bot_garmin_check(args: argparse.Namespace) -> None:
     """Pulls today's activities when Garmin lists one not stored yet that lasts at least
     `garmin.min_activity_minutes`, and queues the questions about it. A shorter one, such as a
     warm-up, waits for a later pull. Daily metrics and the "last pull" time stay out of it,
-    so a read command still refreshes them. The scheduler runs this beside the chat, and a
-    failure raises to the journal (ARCHITECTURE.md §15)."""
+    so a read command still refreshes them. The scheduler runs this beside the chat. A check
+    that pulls nothing leaves no run in the journal; a failure prints its reason, exits 1,
+    and the scheduler decides whether to journal it (ARCHITECTURE.md §15)."""
     if not (config.garmin_email and config.garmin_password):
+        journal.drop_run()
         return
     today = _today_str()
     known = {a["activity_id"] for a in runtime.db.get_completed_activities(today, today)}
-    listed = runtime.garmin.connect().get_activities(today, today)
+    try:
+        listed = runtime.garmin.connect(announce=False).get_activities(today, today)
+    except Exception as exc:
+        journal.drop_run()
+        print(f"{type(exc).__name__}: {exc}")
+        raise SystemExit(1)
     shortest = config.min_activity_minutes * 60
     if not any(str(a.get("activityId")) not in known and (a.get("duration") or 0) >= shortest
                for a in listed):
+        journal.drop_run()
         return
+    journal.name_run("bot", "garmin-check")
     journal.record(
         "bot.garmin_check",
         runtime.garmin.pull(today, today, metrics=False, advance_watermark=False),

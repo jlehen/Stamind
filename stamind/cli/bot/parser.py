@@ -67,7 +67,7 @@ def add_bot_parser(subparsers):
             "questions about it. The bot's scheduler runs it every garmin.poll_minutes."
         ),
     )
-    b_garmin_check.set_defaults(func=run_bot_garmin_check)
+    b_garmin_check.set_defaults(func=run_bot_garmin_check, names_its_run=True)
 
     # bot route
     b_route = bot_subparsers.add_parser(

@@ -145,11 +145,13 @@ def _int_or_none(v: Any) -> Optional[int]:
         return int(round(float(v)))
     except (ValueError, TypeError):
         return None
-def connect() -> GarminClient:
+def connect(announce: bool = True) -> GarminClient:
     """A client logged into the configured Garmin Connect account. Raises GarminAuthRequired
-    when a non-interactive run would need MFA."""
+    when a non-interactive run would need MFA. `announce` says so in the output and the
+    journal."""
     client = GarminClient(config.garmin_email, config.garmin_password, config.garmin_token_dir)
-    step(f"Logging into Garmin Connect (tokens: {config.garmin_token_dir})...")
+    if announce:
+        step(f"Logging into Garmin Connect (tokens: {config.garmin_token_dir})...")
     client.login()
     return client
 def pull(

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from tests import test_db_path
 from tests.helpers import clear_all_tables, pin_clock, rebind_test_db, restore_db_handles, run_cli
+from tests.test_journal import JournalTestCase
 
 TEST_DB_PATH = test_db_path("test_garmin_check.db")
 
@@ -85,6 +86,7 @@ class PollDueTest(unittest.TestCase):
 
 class _Case(unittest.TestCase):
     def setUp(self):
+        super().setUp()
         restore_db_handles(self)
         if os.path.exists(TEST_DB_PATH):
             os.remove(TEST_DB_PATH)
@@ -134,6 +136,34 @@ class TheCheckTest(_Case):
         self.assertEqual((item["kind"], item["subject"]), ("rpe_reminder", "1"))
         self.assertIn("45-minute Yoga", item["payload"]["text"])
         self.assertIn("in Garmin", item["payload"]["text"])
+
+
+class TheJournalTest(_Case, JournalTestCase):
+    """A check runs dozens of times a day: only one that pulls leaves a run."""
+
+    def test_a_check_that_finds_nothing_leaves_no_trace(self):
+        _save(self.db, "1", 45)
+        for listed in (("1", 45), ("2", 10)):
+            self.client.get_activities.return_value = [
+                {"activityId": listed[0], "duration": listed[1] * 60.0}
+            ]
+            code, _, _ = run_cli(["bot", "garmin-check"])
+            self.assertEqual(code, 0)
+        self.assertEqual(self.records(), [])
+
+    def test_a_failure_leaves_no_run_and_prints_why(self):
+        self.client.get_activities.side_effect = RuntimeError("Garmin is down")
+        code, out, _ = run_cli(["bot", "garmin-check"])
+        self.assertEqual(code, 1)
+        self.assertIn("Garmin is down", out)
+        self.assertEqual(self.records(), [])
+
+    def test_a_check_that_pulls_is_a_run_like_any_other(self):
+        self.client.get_activities.return_value = [{"activityId": "1", "duration": 2700.0}]
+        run_cli(["bot", "garmin-check"])
+        events = [record["ev"] for record in self.records()]
+        self.assertEqual((events[0], events[-1]), ("run.start", "run.end"))
+        self.assertIn("bot.garmin_check", events)
 
 
 class TheReminderTest(_Case):

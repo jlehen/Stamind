@@ -17,7 +17,7 @@ import datetime
 import os
 import shlex
 import sys
-from typing import Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, Tuple
 
 from stamind import athlete_queue, heads_up, journal, runtime, settings
 from stamind.chat import runner
@@ -165,43 +165,57 @@ class SchedulerMixin:
             return
         await self._run_scheduled(["bot", "changes"], True)
 
-    async def _run_outside_chat(self, argv: List[str], topic: str, always: bool) -> None:
-        """A command as a process of its own, like the router: nothing is posted, the chat
-        is not busy, and its output goes to the journal, where `always` is off only when it
-        failed (DESIGN_learning_doubt_nudge.md §3.1)."""
-        self._log(self.push_chat_id, "**", shlex.join(argv))
+    async def _run_outside_chat(self, argv: List[str]) -> Tuple[int, str]:
+        """A command as a process of its own, like the router: nothing is posted and the chat
+        is not busy. Returns its exit code and its output, for the journal
+        (DESIGN_learning_doubt_nudge.md §3.1). Raises when it could not start."""
         env = runner.cli_env(None, source="push")
         env.pop("STAMIND_FRONTEND")  # a terminal report for the journal, no chat sentinels
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                sys.executable, "-u", runner.CLI_PATH, *argv,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                env=env,
-                cwd=os.path.dirname(runner.CLI_PATH),
-            )
-            out, _ = await proc.communicate()
-        except Exception as exc:
-            journal.record(topic, f"did not run: {exc}", lvl="warn")
-            return
-        if not always and proc.returncode == 0:
-            return
-        journal.record(
-            topic, strip_ansi(out.decode(errors="replace")).strip(),
-            exit_code=proc.returncode,
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-u", runner.CLI_PATH, *argv,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=env,
+            cwd=os.path.dirname(runner.CLI_PATH),
         )
+        out, _ = await proc.communicate()
+        return proc.returncode, strip_ansi(out.decode(errors="replace")).strip()
 
-    def _start_outside_chat(self, argv: List[str], topic: str, always: bool) -> None:
-        task = asyncio.create_task(self._run_outside_chat(argv, topic, always))
+    async def _reflect_outside_chat(self) -> None:
+        """`data reflect --auto`, with its output in the journal."""
+        argv = ["data", "reflect", "--auto"]
+        self._log(self.push_chat_id, "**", shlex.join(argv))
+        try:
+            code, out = await self._run_outside_chat(argv)
+        except Exception as exc:
+            journal.record("bot.reflect", f"did not run: {exc}", lvl="warn")
+            return
+        journal.record("bot.reflect", out, exit_code=code)
+
+    async def _garmin_check_outside_chat(self) -> None:
+        """`bot garmin-check`, journalled only at the first failure since the last success:
+        it runs dozens of times a day, and the run that pulls journals itself
+        (ARCHITECTURE.md §15)."""
+        try:
+            code, out = await self._run_outside_chat(["bot", "garmin-check"])
+        except Exception as exc:
+            code, out = 1, f"did not run: {exc}"
+        failed_before = self.garmin_check_failing
+        self.garmin_check_failing = code != 0
+        if code != 0 and not failed_before:
+            journal.record("bot.garmin_check", out, lvl="warn", exit_code=code)
+
+    def _start_outside_chat(self, work: Coroutine[Any, Any, None]) -> None:
+        task = asyncio.create_task(work)
         self.outside_tasks.add(task)
         task.add_done_callback(self.outside_tasks.discard)
 
     def _start_reflect(self) -> None:
-        self._start_outside_chat(["data", "reflect", "--auto"], "bot.reflect", True)
+        self._start_outside_chat(self._reflect_outside_chat())
 
     def _start_garmin_check(self) -> None:
-        self._start_outside_chat(["bot", "garmin-check"], "bot.garmin_check", False)
+        self._start_outside_chat(self._garmin_check_outside_chat())
 
     async def _push_loop(self) -> None:
         """One `scheduler_wake` after another (§4.3). Real idempotency lives in the

@@ -1825,7 +1825,8 @@ new one lasts at least `garmin.min_activity_minutes`. That length also keeps a w
 low-coverage activity gets the reminder or a warning. Below it, the load's tags still say
 `hr_sparse`, because they name where the number came from. The reminder asks for the RPE in
 Garmin, the one source of that column; the bot takes no RPE itself. Not handled: a warm-up
-longer than that length.
+longer than that length. A check runs dozens of times a day, so one that pulls nothing leaves
+no run in the journal, and only the first failure since the last success is journalled.
 
 ### Goal dates: event vs. training horizon
 Not every goal happens on its date — some dates only say how far the athlete wants to

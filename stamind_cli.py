@@ -258,8 +258,10 @@ def _dispatch(argv, parser, named_subparsers) -> None:
         raise UsageExit(1)
 
     # On the record too, so `journal` can tell a read-only view from a command that
-    # changed something whatever prefix was typed (DESIGN_logging.md §7.1).
-    journal.name_run(cmd, getattr(args, "subcommand", None))
+    # changed something whatever prefix was typed (DESIGN_logging.md §7.1). A command that may
+    # leave no run at all names it itself, once it knows.
+    if not getattr(args, "names_its_run", False):
+        journal.name_run(cmd, getattr(args, "subcommand", None))
 
     if cmd == "help":
         print(bold(parser.description))

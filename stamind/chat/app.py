@@ -93,6 +93,7 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         self.sent_questions: Dict[int, Dict[str, SentQuestion]] = {}
         # Held until each ends: asyncio keeps only a weak reference to a running task.
         self.outside_tasks: set = set()
+        self.garmin_check_failing = False
         # The instant of the athlete's last own message or tap in the push chat. None
         # until the first one after a start (DESIGN_athlete_queue.md §13.2 rule 4).
         self.last_input_at: Optional[datetime.datetime] = None

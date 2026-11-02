@@ -509,6 +509,19 @@ class SchedulerDriverTest(unittest.IsolatedAsyncioTestCase):
                 await chat_bot._push_loop()
         self.assertEqual(seen, [noted])
 
+    async def test_a_failing_garmin_check_is_journalled_once_until_it_recovers(self):
+        chat_bot = build_chat_bot(self)
+        codes = iter([0, 1, 1, 1, 0, 1])
+
+        async def run(argv):
+            return next(codes), "Garmin is down"
+
+        with mock.patch.object(chat_bot, "_run_outside_chat", run), \
+                mock.patch.object(scheduler.journal, "record") as record:
+            for _ in range(6):
+                await chat_bot._garmin_check_outside_chat()
+        self.assertEqual(record.call_count, 2)
+
     async def test_a_busy_chat_keeps_its_place_in_the_queue(self):
         chat_bot = build_chat_bot(self)
         started = record_commands(self, chat_bot)
