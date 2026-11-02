@@ -328,9 +328,8 @@ Added by the review; each stands until the author says otherwise:
 22. **Choice 8's columns line up in the terminal only.** *Changed by the second review pass;*
     the first drew the block in a fixed-width font on the two pages, but on a phone about 41
     characters fit across, and Wednesday's 63-character WORK line wraps to column 0 anyway
-    (§7). If the author wants the columns on
-    the phone, the block must first fit about 40 characters, for example with the target on
-    the line under the phase.
+    (§7). If the author wants the columns on the phone, the block must first fit about 40
+    characters, for example with the target on the line under the phase.
 23. **Steps that fail twice are stored as written and printed; their zone minutes are not
     stored** (narrows choice 6, which said "save the session without steps"). The story
     against "prose only": the week planner keeps the steps out of the prose, so on Wednesday
