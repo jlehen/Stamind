@@ -73,10 +73,9 @@ The targets read the way each sport speaks:
 - **No threshold on record for that target:** the zone and the effort only, "zone 2, easy,
   3/10". When a test result is recorded later, the next printing gets percentages (§6).
 
-The calendar page and the details page draw the step block in a fixed-width font, so the
-columns line up on a phone. In the terminal the block's lines stay under 80 columns, and
-`wrap_text` leaves a short line alone. Other sports, hiit and gym days included, keep their
-descriptions as today.
+The columns line up in the terminal, where the block's lines stay under 80 columns and
+`wrap_text` leaves a short line alone. Elsewhere they do not (§7). Other sports, hiit and gym
+days included, keep their descriptions as today.
 
 ## 3. What the week planner writes
 
@@ -136,14 +135,13 @@ instances today that is strength training and yoga, and an e-bike ride when one 
 Stamind checks every running, cycling and swimming entry that writes a session, as soon as the
 week planner answers, before anything is saved or put in a waiting proposal. An answer that
 only keeps or drops a session already on the schedule (`keep`, `drop`) writes no session and
-is not checked. An entry fails when:
+is not checked. An entry fails one of three checks:
 
-1. it has no steps, or a step lacks its phase or its seconds;
-2. it has two `"remainder"` steps, or a remainder on a repeat, a recovery or a swim;
-3. it has no remainder step and its steps do not add up to `duration_minutes`;
-4. it has a remainder step and less than 5 minutes are left for it, or nothing at all;
-5. a step lacks its zone when its sport has a zone type, or names a zone that type does not
-   have.
+1. **Shape.** Every step has a phase and a positive number of seconds, except at most one
+   plain step (no `repeat`, not on a swim) whose seconds are `"remainder"`.
+2. **Fit.** Without a remainder, the steps add up to `duration_minutes`. With one, at least 5
+   minutes are left for it.
+3. **Zone.** Every step has a zone of its sport's zone type, when the sport has one.
 
 When any entry fails, Stamind asks the week planner once more, the way the strength planner
 already gets two attempts (`strength/planner.py`, `MAX_ATTEMPTS`). It sends the same system
@@ -152,9 +150,11 @@ quoting the answer, and `## WHAT TO FIX`, one line per failed entry, for example
 2026-11-04 cycling: the steps without the remainder take 80 of the 75 minutes". The second
 answer replaces the first as a whole.
 
-If an entry of the second answer still fails, Stamind saves that entry with its prose and
-without steps, and the journal records which check it failed. Its zone minutes are then
-missing too.
+If an entry of the second answer still fails, Stamind stores no steps and no zone minutes
+for it, and the journal records the check it failed. It still prints the steps as written
+when each has its seconds, so the athlete reads the workout: a remainder that gets no time
+prints as nothing, and the TOTAL shows what the steps add up to. Only a step list that
+cannot be printed leaves the prose alone.
 
 A step that names a threshold the athlete has no value for does not fail. It prints as zone
 and effort (§2), the same printing a deleted threshold falls back to (§6).
@@ -169,16 +169,16 @@ is held through both calls, so a tap in the chat waits for the second answer.
 
 ## 5. Printing and storing
 
-**Printing.** Once an entry passes, Stamind fills in the remainder's seconds and prints the
-description in this order: the "[Title]" line, the step block, one blank line, the week
-planner's prose. The block holds no blank line, so the first blank line is the seam that
-splits the description, as on a gym day (`strength/prescription.py`): `brief_of` gives the
-title and the block, `body_of` gives the prose. Stamind also adds up the seconds per zone and
-puts them in the entry's `planned_zone_currency` and `planned_zone_sec`, the fields the week
-planner wrote itself until now. From there the entry is a normal one: the waiting proposal,
+**Printing.** Once an entry passes, Stamind works out the remainder's seconds from the
+duration and prints the description in this order: the "[Title]" line, the step block, one
+blank line, the week planner's prose. The block holds no blank line, so the first blank line
+is the seam that splits the description, as on a gym day. On a gym day the week planner's
+words sit above the seam; here they sit below it, so `coach/steps.py` splits the text
+itself and takes only `title_line` from `strength/prescription.py`. Stamind also adds up the
+seconds per zone and puts them in the entry's `planned_zone_currency` and `planned_zone_sec`,
+the fields the week planner wrote itself until now. From there the entry is a normal one: the waiting proposal,
 the chat's short line and Google Calendar read its description and its zone minutes as
-before. The calendar page's day sheet (`cli/render/calendar_page.py:sheet`) marks the block's
-lines, so the two pages can draw them in a fixed-width font.
+before.
 
 Wednesday's zone minutes, worked out from the steps: zone 1 = 15 + 3 × 2.5 + 10 = 32.5 min,
 zone 2 = 27.5 min, zone 5 = 15 min. Together 75 minutes.
@@ -188,7 +188,7 @@ are printed to the unit, paces to the second, and a clock time shows seconds onl
 some ("0:37:30").
 
 **What the week planner is shown.** When a later `workout adapt` lists Wednesday, the week
-planner reads its title, its prose (`body_of`), and its `steps` as JSON on one line: the shape
+planner reads its title, its prose, and its `steps` as JSON on one line: the shape
 it wrote and writes again (`coach/formatting.py:_for_the_week_planner`). It never sees the
 printed watts, the way it never sees a gym day's kilograms.
 
@@ -196,7 +196,7 @@ printed watts, the way it never sees a gym day's kilograms.
 
 | Column  | Type | Notes |
 |---------|------|-------|
-| `steps` | TEXT | The steps as JSON, the remainder resolved to its seconds. NULL on every sport but running, cycling and swimming, on a session written before this column, and on an entry whose steps failed twice (§4). |
+| `steps` | TEXT | The steps as JSON, as the week planner wrote them, `"remainder"` included: Stamind works it out from the row's `duration_minutes` each time it prints. NULL on every sport but running, cycling and swimming, on a session written before this column, and on an entry whose steps failed twice (§4). |
 
 `change.append(steps=...)` takes the steps as given, the way it takes the description, and
 never carries them forward from the live revision: the printed block in the description must
@@ -212,17 +212,21 @@ It is Saturday 7 November. The athlete does an FTP test at 10:00 and records 245
 `benchmark record` at 11:00. Wednesday 11 November was written last week and says "106–112%
 FTP (250–264 W)".
 
-Right after the result is saved, Stamind reprints every session from tomorrow on that has
-steps, tomorrow being read in the athlete's time zone. Today's sessions stand as the athlete
-read them this morning, the test included. For each session, Stamind reads its stored steps
-and its prose under the seam, and prints the block again with the thresholds now in use. No
-model call is made. Wednesday now says "106–112% FTP (260–274 W)". The reprint copies the live
-row the way `restore` does and changes only its description, so the title, the short name and
-the chat's short line stay. The new revisions go under one change of a new kind, `reprint`,
-with the reason "Your FTP is now 245 W." Like every change, it waits for the week lock, and
-closing it updates Google Calendar. A session whose targets do not use FTP prints the same
-text, so no revision is written for it. The record confirmation adds one line: "4 sessions
-ahead now use it."
+Right after the result is saved, Stamind reprints every session from today on that has
+steps, today included, so a threshold ride later the same day gets the new watts. For each
+session, Stamind reads its stored steps and its prose under the seam, and prints the block
+again with the thresholds now in use. No model call is made. Wednesday now says "106–112% FTP
+(260–274 W)".
+
+Each new revision is a copy of the live one, the way `restore` writes a copy
+(`WorkoutChange.restore`, given the new description): `restored_from` points at the live
+revision, and only the description changes. So the session keeps its reason, its short line,
+its short name, and the kind it reads as: a session the athlete asked to move still shows
+"[Tweaked]" and its reason on Google Calendar, and the week planner still reads that
+sentence. The copies go under one change of a new kind, `reprint`, whose summary "Your FTP is
+now 245 W." is what `workout batches` lists. Like every change, it waits for the week lock,
+and closing it updates Google Calendar. A session whose text does not change gets no copy,
+and when no text changes at all, no change is written, so recording an e1RM leaves no trace.
 
 A reprint that writes a revision is a newer change than any proposal waiting in the chat, so
 that proposal closes as out of date (DESIGN_waiting_proposal.md §4), and the athlete asks
@@ -231,25 +235,21 @@ again.
 `benchmark rm` and `benchmark wipe` reprint the same way, because deleting a result can change
 the threshold in use. If no value is left, the steps that used it print as zone and effort.
 
-Only the four thresholds a step can name reprint: `ftp`, `lthr`, `threshold_pace`, `css`.
-
 ## 7. Not handled
 
-- **A proposal saved after a reprint, or one the reprint did not touch,** is written with the
-  thresholds it was printed with and keeps them until the week planner writes that session
-  again.
+- **A proposal waiting when a test is recorded** closes as out of date when the reprint
+  writes anything (DESIGN_waiting_proposal.md §4). Otherwise it keeps the numbers it was
+  printed with until the week planner writes that session again.
 - **`workout rollback` to a change before a reprint** undoes the reprint with it, because the
   undo goes back to a point in time (DESIGN_workout_revisions.md §10). The old watts come back
   until the week planner writes those sessions again. Rollbacks are rare.
-- **Google Calendar** shows the step block in its own font, so the columns do not line up
-  there.
-- **Alternatives in the prose.** The steps hold the main path only (*ruled*). "Ride 60 min easy
-  instead" and "OUTDOORS / INDOORS" stay in the prose, with no steps of their own.
+- **Fonts.** The block lines up in the terminal only. Google Calendar, the chat and the two
+  pages draw it in their own proportional font, so the gaps between columns are uneven. A
+  fixed-width font would not help on a phone: about 41 characters fit across, and
+  Wednesday's WORK line is 63, so it would wrap to column 0 anyway (see choice 22).
 - **Sending the steps to the watch, to Zwift, or comparing each interval with Garmin's laps.**
   Not asked for. The installed `garminconnect` 0.3.5 has functions to upload a running,
   cycling or swimming workout and put it on a date, if that is wanted later.
-- **A recovery that is skipped after the last repetition.** The recovery follows every
-  repetition. Two and a half easy minutes before an easy steady block cost nothing.
 
 ## 8. Choices
 
@@ -285,16 +285,23 @@ Made without asking; each stands until the author says otherwise:
     pays off when code reads single steps, such as comparing each interval with a Garmin lap,
     and that is out of scope (choice 1).
 14. **A remainder under 5 minutes fails the check.** Less than that is not a block anyone
-    rides as one.
+    rides as one. *Objection by the review:* a 45-minute run of 10 min warm-up, 4 × (4 + 2)
+    min and 8 min cool-down leaves 3 minutes of steady; the floor sends the whole prompt to
+    the week planner again, a minute of "Writing your sessions" and twice the price, to
+    remove a 3-minute easy block the athlete would simply run. Without the floor, check 2
+    asks only that the remainder gets some time.
 15. **The second ask resends the whole prompt,** with the first answer and the fixes at the
     end, and replaces the whole answer. A smaller call that rewrites only the failed session
     would be cheaper, but it would be a second way to write a session, outside the week
     planner's view of the week.
 16. **The old zone-minutes field stays for sports without steps,** so strength and yoga
-    sessions keep their zone minutes.
-17. **Durations are written in seconds**, so a swim rest of 20 s is exact.
+    sessions keep their zone minutes. *The review calls this forced:* nobody would drop them.
+17. **Durations are written in seconds**, so a swim rest of 20 s is exact. *The review calls
+    this a repeat of §3's `seconds` bullet.*
 18. **A reprint is a change of its own kind, `reprint`,** so `workout batches` lists it apart
-    from the week planner's changes, and `workout rollback` can undo it.
+    from the week planner's changes, and `workout rollback` can undo it. *Changed by the
+    review:* each session keeps its own reason and the kind it reads as (§6); "Your FTP is
+    now 245 W." is the change's summary, not every session's reason.
 
 Added by the review; each stands until the author says otherwise:
 
@@ -305,10 +312,25 @@ Added by the review; each stands until the author says otherwise:
     they disagree with the block until the week planner writes the session again.
 20. **A swim has no remainder step** (narrows choice 5). Its metres would be unknown, and the
     TOTAL line gives metres.
-21. **The reprint starts tomorrow, not today.** A test ridden this morning keeps the text the
-    athlete rode it with, and is not pushed to Google Calendar again.
-22. **The two pages draw the step block in a fixed-width font,** which is what makes choice 8's
-    columns line up on a phone. It adds a mark on the day sheet's lines and one CSS rule.
+21. **The reprint starts today.** *Changed by the second review pass;* the first had it start
+    tomorrow, so that a test already ridden keeps its text and its Google Calendar event is
+    not pushed again. The story against it: the athlete tests on Friday at 19:00, the chat
+    holds the result question overnight, they answer it Saturday at 07:00, and Saturday's
+    09:00 threshold ride would keep the old watts. From today, the test ridden this morning
+    shows the new watts in its text and its event is pushed once more; nobody rides it again.
+22. **Choice 8's columns line up in the terminal only.** *Changed by the second review pass;*
+    the first drew the block in a fixed-width font on the two pages, but on a phone the
+    lines are longer than the width and wrap anyway (§7). If the author wants the columns on
+    the phone, the block must first fit about 40 characters, for example with the target on
+    the line under the phase.
+23. **Steps that fail twice are still printed** (narrows choice 6). The session stores no
+    steps and no zone minutes, as ruled, but its description shows the steps as the week
+    planner wrote them. The story against "prose only": the week planner keeps the steps out
+    of the prose, so on Wednesday the athlete would read the morning check and the fuel and
+    no warm-up and no intervals, which is worse than today.
+24. **The confirmation line after `benchmark record` stays as today.** The first pass added
+    "4 sessions ahead now use it."; the day sheet showing 260–274 W is the proof, and the line
+    would need a count and two renderers.
 
 ## 9. Amendments to other documents
 
@@ -326,33 +348,35 @@ Added by the review; each stands until the author says otherwise:
 ## 10. Build order
 
 1. **Steps module** `stamind/coach/steps.py`: the check (§4), resolving the remainder,
-   working out the zone minutes, printing (§2, §5), and the reprint (§6). The seam functions
-   of `strength/prescription.py` move where both modules can use them.
+   working out the zone minutes, printing (§2, §5), splitting a description at its seam, and
+   the reprint (§6).
 2. **Schema 31:** the `steps` column, `append(steps=...)`, `REVISION_COLUMNS`, the `reprint`
-   change kind. A one-off `ALTER TABLE` on each instance.
+   change kind with its label in `gcal/history.py:_KIND_LABELS`, and an optional
+   `description` on `WorkoutChange.restore`. A one-off `ALTER TABLE` on each instance.
 3. **Prompt:** WRITING AN ENDURANCE SESSION and the `steps` field in place of PRESCRIBING
    INTENSITY for the three sports, in both prompts; `_for_the_week_planner` shows the prose
-   and the steps JSON.
+   and the steps JSON. The `summary` example in both prompts (`coach/engine/generate.py`,
+   `coach/engine/adapt.py`), "Ride easy at 155-175 W on a flat route. Ease off past 178 W.",
+   becomes "Ride 66–74% FTP on a flat route." (choice 19).
 4. **The ask:** one function in `coach/engine/sessions.py` that calls the week planner through
    `_eng.openrouter_client`, checks, asks once more if needed, and prints. The three call sites
    (`workout generate`, `workout adapt`, `workout tweak`) call it in place of `complete`. Both
    save paths (`coach/service/generate.py`, `coach/service/revision_apply.py`) pass `steps`
    to `append`.
-5. **Reprint** after `benchmark record`, `benchmark rm` and `benchmark wipe`, and the
-   confirmation line.
-6. **Pages:** the day sheet marks the block's lines; the calendar page and the details page
-   draw them in a fixed-width font.
+5. **Reprint** after `benchmark record`, `benchmark rm` and `benchmark wipe`. Steps 1–4 can
+   ship alone; meanwhile, after a test, the sessions already written keep the old watts until
+   the week planner writes them again.
 
 ## 11. Tests
 
-- The check: each of the five failures in §4 fails, Wednesday's steps pass, its remainder
-  resolves to 1,650 seconds, and a `keep` or `drop` answer is not checked.
+- The check: each of the three checks in §4 fails on its case, Wednesday's steps pass, its
+  remainder resolves to 1,650 seconds, and a `keep` or `drop` answer is not checked.
 - The ask: a stubbed week planner that fails once and then passes is called twice and its
-  second answer is saved; one that fails twice is called twice and the entry is saved
-  without steps.
+  second answer is saved; one that fails twice is called twice and the entry is saved with
+  no steps stored and its steps printed.
 - Printing: Wednesday prints as in §2 with FTP 236 W; an LTHR target, a pace target, a swim
   and a step with no threshold on record each print their form; the zone minutes add up to
   the duration; `_for_the_week_planner` shows no watt.
-- Reprint: recording FTP 245 W rewrites Wednesday under one `reprint` change, keeps its short
-  line, leaves today's session and a heart-rate session unwritten; deleting the only FTP
-  prints zone and effort.
+- Reprint: recording FTP 245 W rewrites Wednesday under one `reprint` change as a copy that
+  keeps its reason and its short line, and leaves a heart-rate session unwritten; recording
+  an e1RM writes no change; deleting the only FTP prints zone and effort.
