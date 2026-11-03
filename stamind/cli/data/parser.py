@@ -278,8 +278,9 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         description=(
             "Upload a consistent snapshot of this instance's database, compressed, and its "
             "config file to google.backup_bucket, in a folder named after the athlete "
-            "(user_profile.name, else the instance's directory). Each upload replaces the file of the same name; the bucket's "
-            "version history keeps the older ones. Meant for cron (README, \"Backups\")."
+            "(user_profile.name, else the instance's directory). Each upload replaces the "
+            "file of the same name; the bucket's version history keeps the older ones. The "
+            "bot runs it every night (README, \"Backups\")."
         ),
     )
     d_backup.set_defaults(func=run_data_backup)

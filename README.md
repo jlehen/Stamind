@@ -562,10 +562,11 @@ two service accounts, each gets the role of step 3.
 
 ### Backups
 
-This is optional. `./sm data backup` uploads two files to a private bucket: a
-snapshot of the database, compressed, and the config file. The snapshot is safe
-to take while the bot is running. Each run replaces the two files, and the
-bucket keeps the older copies in its version history. The files go in a folder
+This is optional. Once a backup bucket is set, the bot uploads two files to it
+every night from 3 a.m. on the athlete's clock: a snapshot of the database,
+compressed, and the config file. The snapshot is safe to take while the bot is
+running. Each run replaces the two files, and the bucket keeps the older copies
+in its version history. `./sm data backup` does the same by hand. The files go in a folder
 named after the athlete (`user_profile.name`), so two instances can share the
 bucket.
 
@@ -574,21 +575,18 @@ bucket.
    **"Enforce public access prevention on this bucket"** ticked: the config
    file holds your keys and the bot token.
 2. In the bucket's "Protection" tab, turn on **Object versioning**. In its
-   "Lifecycle" tab, add a rule: action "Delete object", condition "Number of
-   newer versions" = 30. A daily run then keeps the last 30 days. The rule never
-   deletes the newest copy, so the backups do not vanish if the runs stop.
+   "Lifecycle" tab, add a rule: action "Delete object", condition "Days since
+   becoming noncurrent" = 30. Each replaced copy is then kept 30 days, however
+   many times a restarted bot backs up again. The rule never deletes the newest
+   copy, so the backups do not vanish if the runs stop.
 3. Give the service account the role **Storage Object User** on this bucket.
+   When two instances use two service accounts, each gets the role.
 4. Write the bucket's name in each instance's config, as
    `google.backup_bucket`.
 5. Run `./sm data backup` once to check it. It exits with an error, and says
    which file failed, when something is wrong.
-6. Add one line per instance to your crontab (`crontab -e`). For example, at
-   3 a.m. every night:
-
-   ```
-   0 3 * * * cd ~/Stamind && ./sm data backup >> logs/backup.log 2>&1
-   5 3 * * * cd ~/Stamind && STAMIND_CONFIG=piupiu/config_piupiu.yaml ./sm data backup >> piupiu/logs/backup.log 2>&1
-   ```
+6. Restart the bot. It reads `config.yaml` once, when it starts. Each night's
+   outcome is in `./sm journal show`, as `bot.backup`, a warning when it failed.
 
 To restore, stop the bot. Download the copy you want from the bucket's
 "Version history". Unzip it with `gunzip`, put it in place of `stamind.db`, and

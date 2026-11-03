@@ -1,5 +1,5 @@
 """`data backup`: uploads a snapshot of this instance's database and its config file to a
-private bucket, under the athlete's name (README, "Backups"). Cron runs it; the bucket's
+private bucket, under the athlete's name (README, "Backups"). The bot runs it nightly; the bucket's
 version history keeps the older copies, so nothing here deletes or names by date.
 """
 import argparse

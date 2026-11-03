@@ -112,7 +112,7 @@ classes themselves.
   `_serve`), `runner` (one CLI subprocess per place of a chat), `replies` (what goes back
   into the chat), `messages` and `callbacks` (a message, a tap), `routing` (the intent
   table and what each intent runs or replies with), `keyboards` (every button drawn and
-  every tap decoded), `scheduler` (the push, the nightly reflect, the queue's wake), and
+  every tap decoded), `scheduler` (the push, the nightly reflect and backup, the queue's wake), and
   beside it `stamind/sentinels.py` (the `\x1e` line protocol between the CLI and the bot,
   both ends in one file). No module in the package imports `python-telegram-bot`:
   `telegram_api` names the library inside each function (`tests/test_layering.py` holds the
@@ -184,6 +184,8 @@ classes themselves.
   - **The nightly reflect**: the first wake after 03:00, Wednesday to Sunday, starts
     `data reflect --auto` as a process outside the chat (DESIGN_learning_doubt_nudge.md
     §3.1).
+  - **The nightly backup**: the first wake after 03:00, every day, starts `data backup` the
+    same way when `google.backup_bucket` is set (README, "Backups").
 
 ### Package `stamind/`
 
@@ -1364,7 +1366,7 @@ but the credentials is optional and falls back to the default shown:
 | `llm.models`           | list | Models both model roles pick from, in display order; the first entry is the default until `settings set thinking-model` picks another. Absent/empty → `google/gemini-3.5-flash` alone (DESIGN_model_selection.md §1) |
 | `google.calendar_id`   | str  | Target calendar ID                                            |
 | `google.storage_bucket` | str | Optional. The Google Cloud Storage bucket the pages read their files from; unset, nothing is built or uploaded and the buttons are as before (DESIGN_miniapp_storage.md §3, §11) |
-| `google.backup_bucket` | str | Optional. The private bucket `sm data backup` uploads to; unset, the command refuses (README, "Backups") |
+| `google.backup_bucket` | str | Optional. The private bucket `sm data backup` uploads to, and the bot every night; unset, the command refuses and the bot skips it (README, "Backups") |
 | `garmin.email` / `garmin.password` | str | Garmin login; config.yaml only (kept out of the environment) |
 | `garmin.token_dir`     | str  | Garmin token store (default `.garminconnect` beside the config, or under `data_dir:`) |
 | `refresh_minutes`      | int | Throttle window shared by Garmin pulls **and** Calendar-signal syncs; reads inside it reuse the cache. Top-level, default 120; read as `config.data_refresh_minutes` |

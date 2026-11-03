@@ -62,6 +62,8 @@ ATHLETE_HERE = datetime.timedelta(minutes=10)
 # once late syncs and weekend edits have landed (DESIGN_learning_doubt_nudge.md §3.1).
 REFLECT_FROM_WEEKDAY = 2  # Wednesday
 REFLECT_FROM_HOUR = 3
+# The nightly `data backup` runs every day from the same hour (README, "Backups").
+BACKUP_FROM_HOUR = 3
 
 
 def reflect_due(now: "datetime.datetime") -> bool:
@@ -90,6 +92,7 @@ async def scheduler_wake(
     run: Callable[[List[str], bool], Awaitable[None]], reflect: Callable[[], None],
     last_input: Optional["datetime.datetime"] = None,
     poll: Callable[[], None] = lambda: None,
+    backup: Callable[[], None] = lambda: None,
 ) -> float:
     """One wake of the bot's scheduler. `last_run` holds the day the push and the nightly
     reflect last started, and the return is how long to sleep before the next wake: at most
@@ -100,7 +103,8 @@ async def scheduler_wake(
     push due on the same wake would otherwise find the chat busy. The `push` switch does
     not stop them (DESIGN_change_heads_up.md §4). `reflect` starts `data reflect --auto`
     outside the chat once a day, and nothing waits for it (DESIGN_learning_doubt_nudge.md
-    §3.1). `poll` starts `bot garmin-check` the same way when `garmin_poll_due` says so. The
+    §3.1). `poll` starts `bot garmin-check` the same way when `garmin_poll_due` says so,
+    and `backup` starts `data backup` once a day from 03:00 when a backup bucket is set. The
     push fires inside the [morning_time, deadline] window once per bot-day, and
     ends by sending from the athlete queue itself (DESIGN_bot_simple_frontend.md §4.3). On
     a wake with no push to run, the next item of the queue goes out when one is ready and
@@ -119,6 +123,10 @@ async def scheduler_wake(
     if reflect_due(now) and last_run.get("reflect") != today:
         last_run["reflect"] = today
         reflect()
+    if (config.backup_bucket and now.hour >= BACKUP_FROM_HOUR
+            and last_run.get("backup") != today):
+        last_run["backup"] = today
+        backup()
     if garmin_poll_due(now, last_run.get("poll"), config.garmin_poll_minutes,
                        settings.morning_time(), settings.evening_time()):
         last_run["poll"] = now.isoformat()
@@ -182,16 +190,16 @@ class SchedulerMixin:
         out, _ = await proc.communicate()
         return proc.returncode, strip_ansi(out.decode(errors="replace")).strip()
 
-    async def _reflect_outside_chat(self) -> None:
-        """`data reflect --auto`, with its output in the journal."""
-        argv = ["data", "reflect", "--auto"]
+    async def _journalled_outside_chat(self, argv: List[str], ev: str) -> None:
+        """A nightly command, `data reflect --auto` or `data backup`, with its output in the
+        journal, as a warning when it failed."""
         self._log(self.push_chat_id, "**", shlex.join(argv))
         try:
             code, out = await self._run_outside_chat(argv)
         except Exception as exc:
-            journal.record("bot.reflect", f"did not run: {exc}", lvl="warn")
+            journal.record(ev, f"did not run: {exc}", lvl="warn")
             return
-        journal.record("bot.reflect", out, exit_code=code)
+        journal.record(ev, out, lvl="warn" if code else "info", exit_code=code)
 
     async def _garmin_check_outside_chat(self) -> None:
         """`bot garmin-check`, journalled only at the first failure since the last success:
@@ -212,7 +220,11 @@ class SchedulerMixin:
         task.add_done_callback(self.outside_tasks.discard)
 
     def _start_reflect(self) -> None:
-        self._start_outside_chat(self._reflect_outside_chat())
+        self._start_outside_chat(
+            self._journalled_outside_chat(["data", "reflect", "--auto"], "bot.reflect"))
+
+    def _start_backup(self) -> None:
+        self._start_outside_chat(self._journalled_outside_chat(["data", "backup"], "bot.backup"))
 
     def _start_garmin_check(self) -> None:
         self._start_outside_chat(self._garmin_check_outside_chat())
@@ -230,7 +242,7 @@ class SchedulerMixin:
                     last_run,
                     lambda: bool(self._runs(self.push_chat_id)) or runtime.db.week_busy(),
                     self._run_scheduled, self._start_reflect, self.last_input_at,
-                    self._start_garmin_check,
+                    self._start_garmin_check, self._start_backup,
                 )
             except Exception as exc:
                 # One wake's failure never ends the loop: the push is the one thing that

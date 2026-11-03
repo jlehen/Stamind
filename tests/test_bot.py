@@ -505,7 +505,7 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(scheduler.settings, "morning_time", return_value="08:00"),
             mock.patch.object(scheduler.settings, "morning_deadline", return_value="15:00"),
             mock.patch.object(scheduler.settings, "evening_time", return_value="21:00"),
-            mock.patch.dict(scheduler.config.data, {"garmin": {"poll_minutes": 15}}),
+            mock.patch.dict(scheduler.config.data, {"garmin": {"poll_minutes": 15}, "google": {}}),
             mock.patch.object(scheduler.settings, "push_enabled", return_value=True),
             mock.patch.object(scheduler.athlete_queue, "next_due", return_value=True),
             mock.patch.object(scheduler.heads_up, "changes_due", return_value=False),
@@ -590,6 +590,21 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
             "Wed 03:00", "Thu 03:00", "Fri 03:00", "Sat 03:00", "Sun 03:00",
         ])
         self.assertNotIn("data", [argv[0] for argv, _ in self.ran])
+
+    async def test_backup_starts_once_a_night_when_a_bucket_is_set(self):
+        """Every day from 03:00; a bot whose config names no backup bucket never starts it."""
+        import datetime as dt
+        for bucket, expected in (("b", ["Mon 03:00", "Tue 03:00"]), (None, [])):
+            backups, self.last_run = [], {}
+            with mock.patch.dict(scheduler.config.data, {"google": {"backup_bucket": bucket}}):
+                for day in (14, 15):  # Monday 14 and Tuesday 15 September
+                    for hour, minute in ((2, 55), (3, 0), (3, 5), (8, 0)):
+                        self.now = dt.datetime(2026, 9, day, hour, minute).astimezone()
+                        await scheduler.scheduler_wake(
+                            self.last_run, lambda: True, self.run_command, self.reflect,
+                            backup=lambda: backups.append(self.now.strftime("%a %H:%M")),
+                        )
+            self.assertEqual(backups, expected)
 
     async def test_reflect_leaves_the_chat_to_the_push(self):
         """Started outside the chat, reflect neither waits for a busy chat nor holds up a
