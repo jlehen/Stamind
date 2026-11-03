@@ -81,7 +81,12 @@ days included, keep their descriptions as today.
 
 Each running, cycling and swimming entry in the week planner's answer gets a `steps` list.
 These are the canonical sports (`stamind/sports.py`), so a virtual ride or a trail run counts.
-The description it writes holds only the "[Title]" line and the prose: why the session is
+Stamind has no swimming sport today, so the week planner cannot write a swim at all, and a
+Garmin `lap_swimming` activity keeps its raw name. This design adds `swimming` to the sport
+vocabulary, with Garmin's `lap_swimming` and `open_water_swimming` as its aliases and 🏊 as
+its icon. Reads already map every alias to its sport, so the swim on record (21 April) needs
+no migration. A swim has no zone type, whatever its recordings: it is planned on pace. The
+description it writes holds only the "[Title]" line and the prose: why the session is
 there, the morning check, the advice. Wednesday's steps:
 
 ```json
@@ -127,8 +132,10 @@ The prompt section PRESCRIBING INTENSITY (`coach/engine/sessions.py:planned_zone
 becomes WRITING AN ENDURANCE SESSION: the fields above, the rule that the steps fill the
 duration, the rule that the description holds no step, the rule that the prose and the
 `summary` give no watts, beats or pace (§2), and the zone type per sport. Its old
-"planned_zone_sec" field stays only for the sports with a zone type and no steps: on the two
-instances today that is strength training and yoga, and an e-bike ride when one is planned.
+"planned_zone_currency" and "planned_zone_sec" fields leave the answer format of both prompts:
+the zone minutes come from the steps only. A session without steps gets no planned zone
+minutes. On a gym day, a yoga session, a hiit circuit, a hike or a ski tour, the prose
+carries the intent ("steady on the climbs, able to talk").
 
 ## 4. Checking the answer, and asking once more
 
@@ -298,8 +305,12 @@ Made without asking; each stands until the author says otherwise:
     end, and replaces the whole answer. A smaller call that rewrites only the failed session
     would be cheaper, but it would be a second way to write a session, outside the week
     planner's view of the week.
-16. **The old zone-minutes field stays for sports without steps,** so strength and yoga
-    sessions keep their zone minutes. *The review calls this forced:* nobody would drop them.
+16. *Ruled 2026-11-03:* **a session without steps gets no planned zone minutes.** The old
+    field leaves both prompts, so intensity has one way in. What goes: the "Target:" line on
+    a gym, yoga, hiit, hike or ski-tour session, and their rows on the planned side of the
+    Progress tab and the mesocycle report. On a gym day that line was noise, since heart rate
+    there shows the rests between sets. The real loss is a hiit circuit, where heart rate
+    does follow the effort; giving hiit steps would be a later design.
 17. **Durations are written in seconds**, so a swim rest of 20 s is exact. *The review calls
     this a repeat of §3's `seconds` bullet.*
 18. **A reprint is a change of its own kind, `reprint`,** so `workout batches` lists it apart
@@ -342,12 +353,14 @@ Added by the review; each stands until the author says otherwise:
 24. **The confirmation line after `benchmark record` stays as today.** The first pass added
     "4 sessions ahead now use it."; the day sheet showing 260–274 W is the proof, and the line
     would need a count and two renderers.
+25. *Ruled 2026-11-03:* **`swimming` becomes a sport** (§3), so choice 4 can be met. Today
+    the week planner cannot write a swim.
 
 ## 9. Amendments to other documents
 
-- **DESIGN_intensity_distribution.md §9.8:** for running, cycling and swimming, Stamind works
-  out the planned zone minutes from the steps; the week planner writes them only for the
-  other sports. §10's "Parsing planned interval structure out of `description`" stays
+- **DESIGN_intensity_distribution.md §9.8:** Stamind works out the planned zone minutes from
+  the steps; the week planner no longer writes them, and a session without steps has none.
+  §10's "Parsing planned interval structure out of `description`" stays
   rejected: the steps are structured data the week planner writes, not prose parsed back.
 - **DESIGN_prompt_structure.md §4:** `## YOUR LAST ANSWER` and `## WHAT TO FIX` at the end of
   the user content of `workout generate`, `workout adapt` and `workout tweak`, on the second
@@ -360,6 +373,8 @@ Added by the review; each stands until the author says otherwise:
 
 ## 10. Build order
 
+0. **Swimming:** a `swimming` row in `sports.py:SPORT_MAPPING` (`swimming`, `lap_swimming`,
+   `open_water_swimming`) and 🏊 in `cli/render/session_lines.py:SPORT_EMOJI`.
 1. **Steps module** `stamind/coach/steps.py`: the check (§4), resolving the remainder,
    working out the zone minutes, printing (§2, §5), splitting a description at its seam, and
    the reprint (§6).
@@ -367,7 +382,7 @@ Added by the review; each stands until the author says otherwise:
    change kind with its label in `gcal/history.py:_KIND_LABELS`, and an optional
    `description` on `WorkoutChange.restore`. A one-off `ALTER TABLE` on each instance.
 3. **Prompt:** WRITING AN ENDURANCE SESSION and the `steps` field in place of PRESCRIBING
-   INTENSITY for the three sports, in both prompts; `_for_the_week_planner` shows the prose
+   INTENSITY and its two fields, in both prompts; `_for_the_week_planner` shows the prose
    and the steps JSON. The `summary` example in both prompts (`coach/engine/generate.py`,
    `coach/engine/adapt.py`), "Ride easy at 155-175 W on a flat route. Ease off past 178 W.",
    becomes "Ride 66–74% FTP on a flat route." (choice 19).
