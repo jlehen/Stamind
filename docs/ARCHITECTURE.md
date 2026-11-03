@@ -112,8 +112,8 @@ classes themselves.
   `_serve`), `runner` (one CLI subprocess per place of a chat), `replies` (what goes back
   into the chat), `messages` and `callbacks` (a message, a tap), `routing` (the intent
   table and what each intent runs or replies with), `keyboards` (every button drawn and
-  every tap decoded), `scheduler` (the push, the nightly reflect and backup, the queue's wake), and
-  beside it `stamind/sentinels.py` (the `\x1e` line protocol between the CLI and the bot,
+  every tap decoded), `scheduler` (the push, the nightly reflect and backup, the queue's
+  wake), and beside it `stamind/sentinels.py` (the `\x1e` line protocol between the CLI and the bot,
   both ends in one file). No module in the package imports `python-telegram-bot`:
   `telegram_api` names the library inside each function (`tests/test_layering.py` holds the
   rule), which is what lets `sm bot route` read the intent table on a command line and

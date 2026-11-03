@@ -1,16 +1,17 @@
 """What the bot does without being asked, and when.
 
 The top half is the arithmetic: how long to sleep before the next wake, whether the
-nightly `data reflect` may start, and the wake itself — the changes to the athlete's week,
-then the morning push, or else the next item of the athlete queue
+nightly `data reflect` and `data backup` may start, and the wake itself — the changes to
+the athlete's week, then the morning push, or else the next item of the athlete queue
 (DESIGN_bot_simple_frontend.md §4.3, DESIGN_athlete_queue.md §13.2,
 DESIGN_learning_doubt_nudge.md §3.1). It takes the callbacks
 that run a command as arguments, so it decides everything and touches nothing.
 
 The bottom half is `SchedulerMixin`, which is what `ChatBot` passes in: the push chat, one
-wake after another, and the nightly reflect as a process of its own. `_tell_changes_first`
-is there too — not a wake, but the same rule arriving by the other door, when the athlete
-writes or taps before the scheduler got to it (DESIGN_change_heads_up.md §4).
+wake after another, and the nightly reflect and backup as processes of their own.
+`_tell_changes_first` is there too — not a wake, but the same rule arriving by the other
+door, when the athlete writes or taps before the scheduler got to it
+(DESIGN_change_heads_up.md §4).
 """
 import asyncio
 import datetime
@@ -94,10 +95,10 @@ async def scheduler_wake(
     poll: Callable[[], None] = lambda: None,
     backup: Callable[[], None] = lambda: None,
 ) -> float:
-    """One wake of the bot's scheduler. `last_run` holds the day the push and the nightly
-    reflect last started, and the return is how long to sleep before the next wake: at most
-    5 minutes, so a laptop suspend (which stalls the monotonic clock asyncio sleeps on) can't
-    oversleep the window.
+    """One wake of the bot's scheduler. `last_run` holds when the push, the nightly reflect
+    and backup, and the Garmin check last started, and the return is how long to sleep
+    before the next wake: at most 5 minutes, so a laptop suspend (which stalls the monotonic
+    clock asyncio sleeps on) can't oversleep the window.
 
     The changes to the athlete's week that are due go first, and `run` waits for them: a
     push due on the same wake would otherwise find the chat busy. The `push` switch does

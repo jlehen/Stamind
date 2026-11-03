@@ -566,9 +566,9 @@ This is optional. Once a backup bucket is set, the bot uploads two files to it
 every night from 3 a.m. on the athlete's clock: a snapshot of the database,
 compressed, and the config file. The snapshot is safe to take while the bot is
 running. Each run replaces the two files, and the bucket keeps the older copies
-in its version history. `./sm data backup` does the same by hand. The files go in a folder
-named after the athlete (`user_profile.name`), so two instances can share the
-bucket.
+in its version history. `./sm data backup` does the same by hand. The files go
+in a folder named after the athlete (`user_profile.name`), so two instances can
+share the bucket.
 
 1. In the Cloud Console, create a second bucket, separate from the pages'
    bucket. Its name is public, so put nothing personal in it. This time keep
@@ -585,8 +585,9 @@ bucket.
    `google.backup_bucket`.
 5. Run `./sm data backup` once to check it. It exits with an error, and says
    which file failed, when something is wrong.
-6. Restart the bot. It reads `config.yaml` once, when it starts. Each night's
-   outcome is in `./sm journal show`, as `bot.backup`, a warning when it failed.
+6. Restart the bot. It reads its config file once, when it starts. Each night's
+   backup is listed by `./sm journal --command "data backup"`, with its exit
+   code.
 
 To restore, stop the bot. Download the copy you want from the bucket's
 "Version history". Unzip it with `gunzip`, put it in place of `stamind.db`, and
