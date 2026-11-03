@@ -53,11 +53,11 @@ class DataBackupTests(unittest.TestCase):
     def test_uploads_the_database_and_the_config_file(self):
         remote = MagicMock()
         with patch.dict(config.data, {"google": {"backup_bucket": "b"}, "database": self.db,
-                                      "data_dir": self.dir.name}), \
+                                      "user_profile": {"name": "Sam"}}), \
                 patch.object(backup, "CONFIG_PATH", self.config_file), \
                 patch.object(backup._bucket, "Bucket", return_value=remote) as made:
             backup.run_data_backup(None)
-        made.assert_called_once_with("b", os.path.basename(self.dir.name))
+        made.assert_called_once_with("b", "Sam")
         uploads = {c.args[0]: c.args[1] for c in remote.upload.call_args_list}
         self.assertEqual(uploads["config_x.yaml"], b"google: {}\n")
         self.assertEqual(_rows(gzip.decompress(uploads["stamind.db.gz"])), [(42,)])
@@ -73,7 +73,7 @@ class DataBackupTests(unittest.TestCase):
         remote = MagicMock()
         remote.upload.side_effect = RuntimeError
         with patch.dict(config.data, {"google": {"backup_bucket": "b"}, "database": self.db,
-                                      "data_dir": self.dir.name}), \
+                                      "data_dir": self.dir.name, "user_profile": {}}), \
                 patch.object(backup, "CONFIG_PATH", self.config_file), \
                 patch.object(backup._bucket, "Bucket", return_value=remote):
             with self.assertRaises(SystemExit) as raised:

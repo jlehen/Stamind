@@ -566,7 +566,8 @@ This is optional. `./sm data backup` uploads two files to a private bucket: a
 snapshot of the database, compressed, and the config file. The snapshot is safe
 to take while the bot is running. Each run replaces the two files, and the
 bucket keeps the older copies in its version history. The files go in a folder
-named after the instance's directory, so two instances can share the bucket.
+named after the athlete (`user_profile.name`), so two instances can share the
+bucket.
 
 1. In the Cloud Console, create a second bucket, separate from the pages'
    bucket. Its name is public, so put nothing personal in it. This time keep

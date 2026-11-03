@@ -277,8 +277,8 @@ def add_data_parser(subparsers, pull_bypass_parser, llm_debug_parser):
         help="Upload a snapshot of the database and the config file to the backup bucket",
         description=(
             "Upload a consistent snapshot of this instance's database, compressed, and its "
-            "config file to google.backup_bucket, in a folder named after the instance's "
-            "directory. Each upload replaces the file of the same name; the bucket's "
+            "config file to google.backup_bucket, in a folder named after the athlete "
+            "(user_profile.name, else the instance's directory). Each upload replaces the file of the same name; the bucket's "
             "version history keeps the older ones. Meant for cron (README, \"Backups\")."
         ),
     )

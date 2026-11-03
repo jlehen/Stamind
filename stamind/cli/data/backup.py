@@ -1,5 +1,5 @@
 """`data backup`: uploads a snapshot of this instance's database and its config file to a
-private bucket, under the instance's folder (README, "Backups"). Cron runs it; the bucket's
+private bucket, under the athlete's name (README, "Backups"). Cron runs it; the bucket's
 version history keeps the older copies, so nothing here deletes or names by date.
 """
 import argparse
@@ -34,7 +34,8 @@ def run_data_backup(args: argparse.Namespace) -> None:
     if config.backup_bucket == config.storage_bucket:
         raise SystemExit("✗ google.backup_bucket names the pages' bucket, which anyone can "
                          "read. Create a private bucket for the backups (README, \"Backups\").")
-    folder = os.path.basename(os.path.normpath(config.data_dir))
+    folder = (config.user_profile.get("name")
+              or os.path.basename(os.path.normpath(config.data_dir)))
     remote = _bucket.Bucket(config.backup_bucket, folder)
     files = {
         os.path.basename(config.db_path) + ".gz": gzip.compress(snapshot(config.db_path)),
