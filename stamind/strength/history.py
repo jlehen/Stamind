@@ -8,7 +8,7 @@ next session's kilograms; the second is what the next session's content is writt
 """
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from stamind import runtime, settings
 from stamind.coach.formatting import athlete_note_lines
@@ -312,6 +312,27 @@ def _done(activity: _Activity, name: str, marked: Optional[_Prescription]) -> st
     if marked is None or name in marked.by_exercise:
         return text
     return text + NOT_PRESCRIBED
+
+
+def last_lifted() -> Dict[str, Tuple[str, float]]:
+    """Per exercise, the last day it was lifted and the heaviest load of that day: what a new
+    load is weighed against (§9, "Checking the output"). An exercise whose last day carried
+    no load is left out."""
+    since = settings.strength_sets_since()
+    if not since:
+        return {}
+    found: Dict[str, Tuple[str, float]] = {}
+    seen_on: Dict[str, str] = {}
+    for row in runtime.db.strength_set_rows(since):   # newest day first
+        exercise = row["exercise"]
+        if not exercise:
+            continue
+        day = seen_on.setdefault(exercise, row["date"])
+        if day != row["date"] or not row["load_kg"]:
+            continue
+        if exercise not in found or row["load_kg"] > found[exercise][1]:
+            found[exercise] = (day, row["load_kg"])
+    return found
 
 
 def build(today: str) -> str:

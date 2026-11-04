@@ -10,7 +10,7 @@ asked about, lives here because the prompt is written from it.
 import os
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from stamind import runtime
 from stamind.clock import fmt_date
@@ -443,3 +443,57 @@ def same_rows(written: Sequence[Dict[str, Any]], stored: Sequence[Dict[str, Any]
         return (row["exercise"], row["sets"], row["reps_low"], row["reps_high"],
                 row.get("load_kg"), bool(row.get("light")))
     return [key(r) for r in written] == [key(r) for r in stored]
+
+
+# A load is a jump when it is more than half again, and more than 2 kg, above the heaviest
+# the athlete lifted on the last day they did the exercise (§9, "Checking the output").
+JUMP_RATIO = 1.5
+JUMP_KG = 2.0
+
+REFUSED_HEADING = (
+    "## LOADS REFUSED\n"
+    "Your last answer was refused for the loads below: each is more than half again what the\n"
+    "athlete last lifted. A step starts from the load they lifted, not from the one that was\n"
+    "written (HOW TO PROGRESS). Answer again, every session in full."
+)
+
+
+@dataclass
+class Jump:
+    """A returned row whose load is a jump over what the athlete last lifted."""
+    day: str
+    row: Dict[str, Any]
+    lifted_on: str
+    lifted_kg: float
+
+    def refused(self) -> str:
+        return (f"- {self.day}: {self.row['exercise']} at {self.row['load_kg']:g} kg; "
+                f"lifted {self.lifted_kg:g} kg on {self.lifted_on}")
+
+    def hold(self) -> str:
+        """Puts the row back at the load lifted, and says so for the preview."""
+        line = (f"{self.day}: '{self.row['exercise']}' at {self.row['load_kg']:g} kg is more "
+                f"than half again the {self.lifted_kg:g} kg lifted on {self.lifted_on}, held "
+                f"at {self.lifted_kg:g} kg")
+        self.row["load_kg"] = self.lifted_kg
+        return line
+
+
+def jumps(answers: Dict[str, Answer], lifted: Dict[str, Tuple[str, float]]) -> List[Jump]:
+    """Every row of the answers whose load is a jump. A "keep" has no rows that count."""
+    found = []
+    for day, answer in answers.items():
+        if answer.keep:
+            continue
+        for row in answer.rows:
+            load = row.get("load_kg")
+            if load is None or row["exercise"] not in lifted:
+                continue
+            on, kg = lifted[row["exercise"]]
+            if load > kg * JUMP_RATIO and load - kg > JUMP_KG:
+                found.append(Jump(day, row, on, kg))
+    return found
+
+
+def refused_section(found: Sequence[Jump]) -> str:
+    return "\n\n" + "\n".join([REFUSED_HEADING] + [jump.refused() for jump in found])

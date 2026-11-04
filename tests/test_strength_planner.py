@@ -519,6 +519,77 @@ class FailureTest(_PlannerCase):
             self.strength_pass([])
 
 
+class LoadJumpTest(_PlannerCase):
+    """It is Wednesday. On Sunday the athlete pressed one 8 kg kettlebell for 3×12 where 16
+    was written. Saturday's press must start from her 8 kg (§9, "Checking the output")."""
+    PRESS = "SHOULDER_PRESS/DUMBBELL_SHOULDER_PRESS"
+
+    def setUp(self):
+        super().setUp()
+        self.gym("2026-09-19")
+        lifted = patch.object(planner.history, "last_lifted",
+                              return_value={self.PRESS: ("2026-09-13", 8.0)})
+        lifted.start()
+        self.addCleanup(lifted.stop)
+
+    def test_a_jump_is_refused_and_asked_again_with_the_reason(self):
+        self.replies = [
+            {"sessions": [answer("2026-09-19", row(self.PRESS, 3, 8, 12, 20.0))]},
+            {"sessions": [answer("2026-09-19", row(self.PRESS, 3, 8, 12, 10.0))]},
+        ]
+        result = self.strength_pass([])
+        self.assertEqual(len(self.asked), 2)
+        self.assertNotIn("## LOADS REFUSED", self.asked[0][1])
+        self.assertIn("## LOADS REFUSED\n", self.asked[1][1])
+        self.assertIn(f"- 2026-09-19: {self.PRESS} at 20 kg; lifted 8 kg on 2026-09-13",
+                      self.asked[1][1])
+        self.assertEqual([r["load_kg"] for r in result.added[0]["prescribed_sets"]], [10.0])
+        self.assertEqual(result.dropped, [])
+
+    def test_a_jump_standing_after_the_last_try_is_held_at_the_load_lifted(self):
+        jump = {"sessions": [answer("2026-09-19", row(self.PRESS, 3, 8, 12, 20.0))]}
+        self.replies = [jump, RuntimeError("timeout")]
+        result = self.strength_pass([])
+        self.assertEqual([r["load_kg"] for r in result.added[0]["prescribed_sets"]], [8.0])
+        self.assertIn("Shoulder press: dumbbell shoulder press 3×8–12 @ 8 kg",
+                      result.added[0]["description"])
+        self.assertEqual(result.dropped, [
+            f"2026-09-19: '{self.PRESS}' at 20 kg is more than half again the 8 kg lifted on "
+            "2026-09-13, held at 8 kg"
+        ])
+
+    def test_one_step_is_not_a_jump(self):
+        """8 to 12 is the next fixed kettlebell, 140 to 145 a plate on each side, 2 to 4 the
+        next pair of light dumbbells. An exercise with no load on record is not weighed."""
+        raise_ = "SHOULDER_PRESS/DUMBBELL_FRONT_RAISE"
+        with patch.object(planner.history, "last_lifted", return_value={
+            self.PRESS: ("2026-09-13", 8.0), "SQUAT/BELT_SQUAT": ("2026-09-13", 140.0),
+            raise_: ("2026-09-13", 2.0),
+        }):
+            self.replies = [{"sessions": [answer(
+                "2026-09-19", row(self.PRESS, 3, 8, 12, 12.0),
+                row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0), row(raise_, 3, 10, 15, 4.0),
+                row("PULL_UP/CHIN_UP", 3, 3, 5, 20.0),
+            )]}]
+            result = self.strength_pass([])
+        self.assertEqual(len(self.asked), 1)
+        self.assertEqual([r["load_kg"] for r in result.added[0]["prescribed_sets"]],
+                         [12.0, 145.0, 4.0, 20.0])
+
+    def test_going_back_to_the_load_she_chose_not_to_lift_is_a_jump(self):
+        """The pullover was written at 8 and she did it at 4: 8 again is refused."""
+        pullover = "PULL_UP/KETTLEBELL_FLOOR_PULLOVER"
+        with patch.object(planner.history, "last_lifted",
+                          return_value={pullover: ("2026-09-13", 4.0)}):
+            self.replies = [
+                {"sessions": [answer("2026-09-19", row(pullover, 3, 8, 12, 8.0))]},
+                {"sessions": [answer("2026-09-19", row(pullover, 3, 8, 12, 4.0))]},
+            ]
+            result = self.strength_pass([])
+        self.assertEqual(len(self.asked), 2)
+        self.assertEqual([r["load_kg"] for r in result.added[0]["prescribed_sets"]], [4.0])
+
+
 class InAdaptTest(_PlannerCase):
     """Where the pass sits inside `workout adapt` (§9)."""
 

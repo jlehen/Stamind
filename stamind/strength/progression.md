@@ -42,13 +42,19 @@ number of reps for one of these exercises.
   reserve allow.
 - **The load is yours.** It is the only number that moves between sessions.
 
+**A step starts from the load the athlete lifted, not from the one that was written.** The
+history shows both: `prescribed 3×8–12 @ 16: 3×12 @ 8`. When they differ, the athlete chose
+the load in the gym, lighter or heavier, and theirs is the new basis. In that example the
+next session starts from 8: one step up to the next bell after those three sets of 12, and
+never back to 16 because 16 was once written.
+
 **The load goes up by one step in the session after every working set reached the top of the
 range with the reserve intact.** A step is the smallest the equipment allows: 2.5 kg for the
 upper body, 5 kg for the lower body, or whatever the next plate on a stack or the next pair
 of kettlebells actually offers. Two sets at the top and one under it is not a step.
 
-**Otherwise the load holds.** A working set under the bottom of the range holds it. A second
-such day in a row takes one step off.
+**Otherwise the load holds** at what the athlete lifted. A working set under the bottom of the
+range holds it. A second such day in a row takes one step off.
 
 **A new load always comes with the same range**, so the two dials never move together.
 
@@ -95,8 +101,8 @@ much comes off:
 at that day's load, plus a step if that day's sets all reached the top of the range.
 
 Never count weeks yourself: you see one proposal and a few days per exercise, and the plan's
-mesocycles are where a light week is decided. A day the athlete simply lifted less on their
-own is not a light day — it is a day under its range, and the load holds.
+mesocycles are where a light week is decided. A day the athlete simply did fewer reps or sets
+on their own is not a light day — it is a day under its range, and the load holds.
 
 ## Accessories
 

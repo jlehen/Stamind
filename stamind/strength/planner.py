@@ -20,7 +20,8 @@ from stamind.openrouter import openrouter_client
 from stamind.sports import canonical_sport
 from stamind.strength import history, prescription
 from stamind.strength.planner_prompt import (
-    Answer, Session, clean_session, same_rows, system_prompt, user_content,
+    Answer, Session, clean_session, jumps, refused_section, same_rows, system_prompt,
+    user_content,
 )
 from stamind.text import cyan
 from stamind.output import step
@@ -290,7 +291,8 @@ def run(
     step(f"Querying OpenRouter to write {len(to_write)} strength session(s) and check "
          f"{len(to_check)}...", cyan)
 
-    asked = _ask(system, user, to_write, _wait_notice(to_write, to_check))
+    asked = _ask(system, user, to_write, _wait_notice(to_write, to_check),
+                 history.last_lifted())
     if asked is None:
         return _all_kept(to_check)
     answers, dropped = asked
@@ -323,15 +325,21 @@ def _strength_sessions(count: int) -> str:
 
 
 def _ask(
-    system: str, user: str, to_write: Sequence[Session], notice: str
+    system: str, user: str, to_write: Sequence[Session], notice: str,
+    lifted: Dict[str, Tuple[str, float]],
 ) -> Optional[Tuple[Dict[str, Answer], List[str]]]:
     """The call, tried once more when it fails or comes back unusable — a session to write
     left unanswered, or one whose every exercise failed a check, is a failed call (§9).
+
+    An answer with a load far above what the athlete last lifted is refused: the call is
+    asked again with the reason, and a jump still standing after the last try is held at
+    the load lifted, with a line for the preview (§9, "Checking the output").
 
     None when it failed twice with only sessions to check, which is a "keep" for all of
     them; it raises instead when a session was to be written.
     """
     last: Optional[Exception] = None
+    refused = None
     for _attempt in range(MAX_ATTEMPTS):
         dropped: List[str] = []
         try:
@@ -346,9 +354,18 @@ def _ask(
         }
         blank = Answer([], False, "", "")
         missing = [s.date for s in to_write if not answers.get(s.date, blank).rows]
-        if not missing:
+        if missing:
+            last = ValueError(f"no usable exercises came back for {', '.join(missing)}")
+            continue
+        found = jumps(answers, lifted)
+        if not found:
             return answers, dropped
-        last = ValueError(f"no usable exercises came back for {', '.join(missing)}")
+        refused = (answers, dropped, found)
+        user += refused_section(found)
+    if refused is not None:
+        answers, dropped, found = refused
+        dropped.extend(jump.hold() for jump in found)
+        return answers, dropped
     if to_write:
         raise StrengthPlannerFailed(str(last))
     return None

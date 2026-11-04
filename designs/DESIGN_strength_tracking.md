@@ -1344,6 +1344,23 @@ written. A session to write whose every entry fails counts as a failed call, and
 a session to check whose every entry fails is a "keep". When the strength planner's call
 fails it is tried once more. What a second failure costs depends on what was asked.
 
+**A load far above what the athlete lifted is refused.** The check weighs every load against
+the heaviest one the athlete lifted on the last day they did that exercise, never against
+the load that was written. A load is a jump when it is more than half again that weight
+and more than 2 kg above it. Half again lets a bell move to the next one (8 to 12 kg), and
+the 2 kg lets a 2 kg dumbbell move to a 4 kg one. Going back to a load the athlete chose not
+to lift (an 8 kg pullover she did at 4), reading one bell as a pair, or reading pounds as
+kilograms is twice the weight or more, so it is caught. Say that on Sunday
+October 18 the athlete pressed one 8 kg kettlebell for 3×12 where 16 was written, and on
+Wednesday the strength planner writes Saturday's press at 20 kg. The answer is refused,
+and the call is asked again with a LOADS REFUSED section naming the press, the 20 kg and
+the 8 kg. The second answer writes 10 kg and stands. If the second answer still holds a
+jump, or the second call fails, that row is held at 8 kg, and the preview says so:
+"2026-11-07: 'SHOULDER_PRESS/DUMBBELL_SHOULDER_PRESS' at 20 kg is more than half again the
+8 kg lifted on 2026-10-18, held at 8 kg". A load the athlete asks for in their preferences
+is weighed the same way. Not handled: a preference asking for a jump is held. The athlete
+lifts the heavier weight once, and the history follows.
+
 With a session to write in the proposal, the proposal fails, the week planner's changes with
 it, the way it does today when the week planner's call fails: nothing is written, the command
 says so in the terminal, and the morning push renders the schedule as stored, the error a

@@ -205,6 +205,19 @@ class EntriesTest(_HistoryCase):
         self.assertNotIn("SEATED_CABLE_ROW", text)
 
 
+class LastLiftedTest(_HistoryCase):
+    def test_the_heaviest_load_of_the_last_day_and_not_the_one_written(self):
+        """16 was written on Tuesday and she pressed 8, then 6: 8 is what a new load is
+        weighed against (§9, "Checking the output"). A bodyweight exercise has no entry."""
+        self.lifted("2026-09-14", lift("SHOULDER_PRESS", "DUMBBELL_SHOULDER_PRESS", 12, 16))
+        self.planned("2026-09-15", row("SHOULDER_PRESS/DUMBBELL_SHOULDER_PRESS", 2, 8, 12, 16.0))
+        self.lifted("2026-09-15", lift("SHOULDER_PRESS", "DUMBBELL_SHOULDER_PRESS", 12, 8),
+                    lift("SHOULDER_PRESS", "DUMBBELL_SHOULDER_PRESS", 12, 6),
+                    lift("PUSH_UP", "PUSH_UP", 12, None))
+        self.assertEqual(history.last_lifted(),
+                         {"SHOULDER_PRESS/DUMBBELL_SHOULDER_PRESS": ("2026-09-15", 8.0)})
+
+
 class SessionsAsDoneTest(_HistoryCase):
     """The recent strength days as whole sessions (§8): which exercises shared a session, in
     what order, which ones the athlete took turns on, and how much fits in the hour."""
