@@ -24,6 +24,12 @@ from stamind.queue_kind import QUESTION, Kind, queue
 # The answers of a queued question, as its item stores them (DESIGN_athlete_queue.md §3).
 YES = "yes"
 NO = "no"
+# A constraint question also asks whether she can train when her words do not say
+# (DESIGN_constraints.md §8, 2026-11-04). `trains` is the sentence a yes adds to the
+# description.
+CANNOT_TRAIN = {'label': "yes, no training", 'trains': "The athlete cannot train during it."}
+CAN_TRAIN = {'label': "yes, I can train", 'trains': "The athlete can train during it."}
+DONT_ADD = "no, don't add it"
 NOT_ABOUT_A_SESSION = "not about a session"
 
 
@@ -179,11 +185,16 @@ def confirm_new_signals(candidates: Sequence[Dict[str, Any]], date_str: str) -> 
 
 # --- the chat: queued, and answered with a tap (DESIGN_waiting_proposal.md §6.3) ---
 
+def _asks_training(payload: Dict[str, Any]) -> bool:
+    return any(answer['label'] == CAN_TRAIN['label'] for answer in payload['answers'])
+
+
 def _constraint_wording(item: Dict[str, Any]) -> str:
     payload = item['payload']
     start, end = _span(payload['candidate'], 'start_date', payload['date'])
     return runtime.render.constraint_candidate_question(
-        payload['candidate']['title'].strip(), start, end, today_str()
+        payload['candidate']['title'].strip(), start, end, today_str(),
+        ask_training=_asks_training(payload),
     )
 
 
@@ -198,10 +209,17 @@ def _apply_constraint(item: Dict[str, Any], index: int, text: Optional[str]) -> 
     where the item asks for one and the coach can reach the constraint's first day
     (DESIGN_chat_questions.md §4)."""
     payload = item['payload']
-    if payload['answers'][index]['label'] != YES:
+    answer = payload['answers'][index]
+    if answer['label'] in (NO, DONT_ADD):
         runtime.render.constraint_candidate_discarded()
         return
-    if _store_constraint(payload['candidate'], payload['date']) is None:
+    candidate = dict(payload['candidate'])
+    said = (candidate.get('description') or '').strip().rstrip('.')
+    if 'trains' in answer and said:
+        candidate['description'] = f"{said}. {answer['trains']}"
+    elif 'trains' in answer:
+        candidate['description'] = answer['trains']
+    if _store_constraint(candidate, payload['date']) is None:
         return
     start, _end = _span(payload['candidate'], 'start_date', payload['date'])
     if payload['offer'] and coach_reaches(start, today_str()):
@@ -317,6 +335,16 @@ def _signal_answers(metric: str, near: Optional[str]) -> List[Dict[str, Any]]:
     ]
 
 
+def _constraint_answers(candidate: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Yes and no, or two yeses when her words do not say whether she can train. Either
+    way a yes adds the sentence that says it."""
+    if candidate.get('can_train') is True:
+        return [{'label': YES, 'trains': CAN_TRAIN['trains']}, {'label': NO}]
+    if candidate.get('can_train') is False:
+        return [{'label': YES, 'trains': CANNOT_TRAIN['trains']}, {'label': NO}]
+    return [CANNOT_TRAIN, CAN_TRAIN, {'label': DONT_ADD}]
+
+
 def queue_candidates(
     constraints: Sequence[Dict[str, Any]], signal_rows: Sequence[Dict[str, Any]],
     date_str: str, text: str, offer: bool,
@@ -333,7 +361,7 @@ def queue_candidates(
     for place, candidate in enumerate(_dated(constraints)):
         ids.append(queue(CONSTRAINT_KIND.name, f"{run}:{place}", {
             'candidate': candidate, 'date': date_str, 'offer': offer,
-            'answers': [{'label': YES}, {'label': NO}],
+            'answers': _constraint_answers(candidate),
         }))
     for place, candidate in enumerate(signal_rows):
         metric, near, new = _categories(candidate)

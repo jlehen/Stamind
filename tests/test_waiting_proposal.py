@@ -895,7 +895,8 @@ class ChatRunTest(_Case):
         self.coach_run(self.nothing_to_change())
         self.assertEqual([item["id"] for item in saved_proposal.waiting()], [first["id"]])
 
-    CONSTRAINT = ({"title": "no run on Fridays", "start_date": FRIDAY, "end_date": FRIDAY},)
+    CONSTRAINT = ({"title": "no run on Fridays", "start_date": FRIDAY, "end_date": FRIDAY,
+                  "can_train": True},)
 
     def proposed_with_a_constraint(self, constraint=CONSTRAINT):
         """08:30, with a message out and unanswered since 08:00: the run finds a constraint

@@ -88,9 +88,12 @@ class ExpertRenderer:
     # -- confirming a note's candidates (cli/candidates.py) --
 
     def constraint_candidate_question(
-        self, title: str, start: str, end: str, today: str
+        self, title: str, start: str, end: str, today: str, ask_training: bool = False
     ) -> str:
-        return f"Add constraint: {title} ({_iso_span(start, end)})?"
+        question = f"Add constraint: {title} ({_iso_span(start, end)})?"
+        if ask_training:
+            question += " Can you train during it?"
+        return question
 
     def constraint_captured(
         self, constraint_id: int, title: str, start: str, end: str, today: str

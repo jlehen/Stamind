@@ -632,6 +632,19 @@ Amended 2026-10-08 (DESIGN_waiting_proposal.md §6.3): in the chat the run no lo
 about the constraint. It saves the question as a queued question and ends, and the athlete's
 tap on "Yes" creates the row. A terminal run keeps the order above.
 
+Amended 2026-11-04: each entry also carries `can_train`, true or false when the athlete's
+words say whether they can train during it, null when they do not. It is Sunday 25 October.
+She writes "I am in vacation from 15 novembre to 25 novembre". The words do not say whether
+she can run on holiday, so the chat's question asks it as well: "Shall I remember this
+constraint? “Vacation” — Sun Nov 15 to Wed Nov 25. Can you train during it?", with "Yes, no
+training", "Yes, I can train" and "No, don't add it". The question restates the constraint, so a tap a week
+later still knows what it answers. Either "Yes" stores the row with one sentence added to its
+description, "The athlete cannot train during it." or "The athlete can train during it.", and
+the week planner reads it there. Had she written "on vacation, no sport possible", the
+question would be the plain yes or no, and its "Yes" adds "The athlete cannot train during
+it." all the same. Not handled: how she trains when she can; she says so
+in a message. A terminal run keeps its yes or no.
+
 This makes §11's "echo what was created" fall out for free (the confirmation
 *is* the echo) and means a misfiled extraction is caught before any row exists,
 not after. `new_constraints` requires a new return channel from `workout_adapt`

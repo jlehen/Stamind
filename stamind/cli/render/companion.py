@@ -110,12 +110,15 @@ class CompanionRenderer(ExpertRenderer):
     # (DESIGN_bot_simple_frontend.md §12.3). Day words, no IDs, no ISO spans (§6).
 
     def constraint_candidate_question(
-        self, title: str, start: str, end: str, today: str
+        self, title: str, start: str, end: str, today: str, ask_training: bool = False
     ) -> str:
-        return (
+        question = (
             f"Shall I remember this constraint? “{title}” — "
             f"{simple_span_words(start, end, today)}"
         )
+        if ask_training:
+            question += ". Can you train during it?"
+        return question
 
     def constraint_captured(
         self, constraint_id: int, title: str, start: str, end: str, today: str

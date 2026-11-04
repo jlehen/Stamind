@@ -140,7 +140,7 @@ class _NoteCase(_CaptureCase):
     def _constraint(self, days=0):
         return {"new_constraints": [
             {"title": "no running", "start_date": self.future(days),
-             "end_date": self.future(days)},
+             "end_date": self.future(days), "can_train": True},
         ]}
 
 
@@ -262,6 +262,42 @@ class CaptureNoteFromChatTest(_NoteCase):
         # like any queued question and comes back the next morning.
         self.assertTrue(athlete_queue.anything_out())
         self.assertEqual([item["id"] for item in athlete_queue.line()], [question["id"]])
+
+    def test_words_that_do_not_say_whether_she_can_train_get_it_asked(self):
+        """DESIGN_constraints.md §8, 2026-11-04: the question restates the constraint and
+        asks, and the answer lands in the description the week planner reads."""
+        extraction = {"new_constraints": [{
+            "title": "Vacation", "start_date": today_str(), "end_date": today_str(),
+            "description": "In vacation", "can_train": None,
+        }]}
+        question, _prompt = self.asked(extraction)
+        self.assertEqual(
+            question["text"],
+            "Shall I remember this constraint? “Vacation” — today. Can you train during it?",
+        )
+        self.assertEqual(
+            [b["label"] for b in question["buttons"]],
+            ["Yes, no training", "Yes, I can train", "No, don't add it"],
+        )
+        self.tap(question, "a1")
+        [row] = test_db.get_constraints(today_str(), None)
+        self.assertEqual(row["description"], "In vacation. The athlete cannot train during it.")
+        self.assertEqual(row["rest"], 0)
+
+    def test_dont_add_it_stores_nothing(self):
+        question, _prompt = self.asked({"new_constraints": [{
+            "title": "Vacation", "start_date": today_str(), "end_date": today_str(),
+        }]})
+        out = self.tap(question, "a3")
+        self.assertIn("Okay — I won't note that one.", out)
+        self.assertEqual(test_db.get_constraints(today_str(), None), [])
+
+    def test_words_that_say_it_keep_yes_and_no_and_store_it(self):
+        question, _prompt = self.asked(self._constraint())
+        self.assertNotIn("Can you train", question["text"])
+        self.tap(question, "a1")
+        [row] = test_db.get_constraints(today_str(), None)
+        self.assertEqual(row["description"], "The athlete can train during it.")
 
     def test_yes_stores_it_and_asks_to_adjust_the_week(self):
         question, _prompt = self.asked(self._constraint())

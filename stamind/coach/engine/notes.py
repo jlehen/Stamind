@@ -168,6 +168,11 @@ preference belongs. Everything else is dated: never omit "start_date"/"end_date"
 extraction only — never invent a plan-shaping escalation. Extracted constraints are
 always advisory; the deterministic-rest and plan-shaping escalations are deliberate human
 actions and the app, not you, decides those.
+Say in "can_train" whether the note tells if the athlete can train at all during it: true
+when it says they can, even within a limit ("only 45 min", "only running"), false when it
+says they cannot ("no sport possible", "no training at all"), null when it does not say ("on
+vacation", "travelling"). Never guess: null is a correct answer, and the app asks the
+athlete.
 """
 
 
@@ -256,7 +261,8 @@ NEW_CONSTRAINTS_SCHEMA = (
     '      "start_date": "YYYY-MM-DD (required; default today)",\n'
     '      "end_date": "YYYY-MM-DD (required; == start for a single day)",\n'
     '      "open_ended": "true ONLY for a preference with no time bound (dates null)",\n'
-    '      "description": "optional richer context or null/omit"\n'
+    '      "description": "optional richer context or null/omit",\n'
+    '      "can_train": true | false | null (null when the note does not say)\n'
     "    }\n"
     "  ]"
 )
