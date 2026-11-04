@@ -66,8 +66,8 @@ and works out the minutes in each zone from them.
 - The steps hold the main path only. An alternative, such as indoors instead of outdoors or
   an easier session after a poor night, stays in the prose.
 - The steps fill "duration_minutes" exactly. At most one step may give "remainder" as its
-  seconds: Stamind gives it whatever the other steps leave of the duration, and at least 5
-  minutes must be left for it. A swim has no remainder: its steps add up to the duration.
+  seconds: Stamind gives it whatever the other steps leave of the duration. A swim has no
+  remainder: its steps add up to the duration, to within a minute.
 - Neither the prose nor "summary" gives watts, beats per minute or a pace. Name a target by
   its zone or as a share of the threshold ("66-74% FTP", "zone 2"). The steps carry the
   numbers, so a new threshold reaches every session ahead.

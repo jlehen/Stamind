@@ -17,8 +17,9 @@ from stamind.strength.prescription import body_of, title_line
 SPORTS = ("running", "cycling", "swimming")
 PHASES = ("warm-up", "work", "steady", "cool-down")
 REMAINDER = "remainder"
-# Choice 14 of §8: less than this is not a block anyone rides as one.
-MIN_REMAINDER_SECONDS = 300
+# A swim's step times are the week planner's estimates, so they may miss the duration by this
+# much (§8 choice 26).
+SWIM_SLACK_SECONDS = 60
 # How a target names its threshold on the page.
 ANCHOR_NAMES = {"ftp": "FTP", "lthr": "LTHR", "threshold_pace": "threshold", "css": "CSS"}
 
@@ -89,20 +90,21 @@ def _minutes(seconds: float) -> str:
     return f"{seconds / 60:g}"
 
 
-def _fit(steps: Sequence[Dict[str, Any]], duration_minutes: Any) -> Optional[str]:
-    """Check 2 of §4: the steps fill the session's minutes, the remainder at least
-    MIN_REMAINDER_SECONDS of them."""
+def _fit(steps: Sequence[Dict[str, Any]], duration_minutes: Any, swim: bool) -> Optional[str]:
+    """Check 2 of §4: the steps fill the session's minutes, a swim's to within
+    SWIM_SLACK_SECONDS, and a remainder gets some time."""
     budget = (duration_minutes or 0) * 60
     fixed = _fixed_seconds(steps)
     if not any(step.get("seconds") == REMAINDER for step in steps):
-        if round(fixed) == round(budget):
+        slack = SWIM_SLACK_SECONDS if swim else 0
+        if abs(round(fixed) - round(budget)) <= slack:
             return None
         return f"the steps take {_minutes(fixed)} of the {_minutes(budget)} minutes"
-    if budget - fixed >= MIN_REMAINDER_SECONDS:
+    if budget > fixed:
         return None
     return (
         f"the steps without the remainder take {_minutes(fixed)} of the {_minutes(budget)} "
-        f"minutes, which leaves under {MIN_REMAINDER_SECONDS // 60} for the remainder"
+        "minutes, which leaves no time for the remainder"
     )
 
 
@@ -129,7 +131,7 @@ def fault(entry: Dict[str, Any], zone_currencies: Dict[str, str]) -> Optional[st
     steps = entry.get("steps")
     problem = (
         _shape(steps, sport == "swimming")
-        or _fit(steps, entry.get("duration_minutes"))
+        or _fit(steps, entry.get("duration_minutes"), sport == "swimming")
         or _zones(steps, zone_currencies.get(sport))
     )
     if problem is None:

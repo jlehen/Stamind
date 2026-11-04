@@ -64,13 +64,23 @@ class TestTheCheck(unittest.TestCase):
 
     def test_a_fit_fault(self):
         self.assertEqual(
-            steps.fault(_ride(duration_minutes=50), POWER),
-            "Wed 2026-11-04 cycling: the steps without the remainder take 47.5 of the 50 "
-            "minutes, which leaves under 5 for the remainder",
+            steps.fault(_ride(duration_minutes=45), POWER),
+            "Wed 2026-11-04 cycling: the steps without the remainder take 47.5 of the 45 "
+            "minutes, which leaves no time for the remainder",
         )
+        # A remainder of 2.5 minutes passes: it needs only some time (choice 14).
+        self.assertIsNone(steps.fault(_ride(duration_minutes=50), POWER))
         fixed = [s for s in copy.deepcopy(WEDNESDAY) if s["seconds"] != "remainder"]
         self.assertIn("the steps take 47.5 of the 75 minutes",
                       steps.fault(_ride(steps=fixed), POWER))
+
+    def test_a_swim_may_miss_its_duration_by_a_minute(self):
+        swim = [{"phase": "steady", "seconds": 1750, "metres": 1500, "effort": "easy"}]
+        entry = {"date": "2026-11-05", "sport_type": "swimming", "duration_minutes": 30,
+                 "steps": swim}
+        self.assertIsNone(steps.fault(entry, {}))
+        swim[0]["seconds"] = 1730
+        self.assertIn("the steps take 28.8333 of the 30 minutes", steps.fault(entry, {}))
 
     def test_a_zone_fault(self):
         no_zone = copy.deepcopy(WEDNESDAY)
@@ -99,7 +109,7 @@ class TestTheAsk(unittest.TestCase):
 
     def test_a_fault_is_asked_once_more_and_the_second_answer_is_kept(self):
         complete, reply = self._ask(
-            {"workouts": [_ride(duration_minutes=50)]}, {"workouts": [_ride()]},
+            {"workouts": [_ride(duration_minutes=45)]}, {"workouts": [_ride()]},
         )
         self.assertEqual(complete.call_count, 2)
         again = complete.call_args_list[1].args[1]

@@ -109,7 +109,7 @@ there, the morning check, the advice. Wednesday's steps:
   left of the session's duration". The week planner keeps writing `duration_minutes`; it is
   the session's budget, decided top-down. The remainder is a plain step: no `repeat`, and
   never a recovery. A swim has no remainder, because its metres would be unknown; its steps
-  add up to the duration.
+  add up to the duration, to within a minute (choice 26).
 - **`repeat`** with a **`recovery`** is one interval set: work, then the recovery, N times. The
   recovery follows every repetition, the last one included. There is no deeper nesting.
 - **`zone`** is the zone in the sport's zone type (power or heart rate), the one Stamind already
@@ -147,8 +147,8 @@ is not checked. An entry fails one of three checks:
 1. **Shape.** Every step has a phase, and every step and every recovery a positive number of
    seconds, except at most one plain step (no `repeat`, not on a swim) whose seconds are
    `"remainder"`.
-2. **Fit.** Without a remainder, the steps add up to `duration_minutes`. With one, at least 5
-   minutes are left for it.
+2. **Fit.** Without a remainder, the steps add up to `duration_minutes`, a swim's to within
+   60 seconds. With one, some time is left for it.
 3. **Zone.** Every step has a zone of its sport's zone type, when the sport has one.
 
 When any entry fails, Stamind asks the week planner once more, the way the strength planner
@@ -295,12 +295,11 @@ Made without asking; each stands until the author says otherwise:
 13. **The steps are a JSON column, not a table** like a gym day's `prescribed_sets`. A table
     pays off when code reads single steps, such as comparing each interval with a Garmin lap,
     and that is out of scope (choice 1).
-14. **A remainder under 5 minutes fails the check.** Less than that is not a block anyone
-    rides as one. *Objection by the review:* a 45-minute run of 10 min warm-up, 4 × (4 + 2)
-    min and 8 min cool-down leaves 3 minutes of steady; the floor sends the whole prompt to
-    the week planner again, a minute of "Writing your sessions" and twice the price, to
-    remove a 3-minute easy block the athlete would simply run. Without the floor, check 2
-    asks only that the remainder gets some time.
+14. *Ruled 2026-11-04:* **a remainder needs only some time.** The first version failed a
+    remainder under 5 minutes. A 45-minute run of 10 min warm-up, 4 × (4 + 2) min and 8 min
+    cool-down leaves 3 minutes of steady; the floor sent the whole prompt to the week planner
+    again, a minute of "Writing your sessions" and twice the price, to remove a 3-minute easy
+    block the athlete would simply run.
 15. **The second ask resends the whole prompt,** with the first answer and the fixes at the
     end, and replaces the whole answer. A smaller call that rewrites only the failed session
     would be cheaper, but it would be a second way to write a session, outside the week
@@ -355,6 +354,11 @@ Added by the review; each stands until the author says otherwise:
     would need a count and two renderers.
 25. *Ruled 2026-11-03:* **`swimming` becomes a sport** (§3), so choice 4 can be met. Today
     the week planner cannot write a swim.
+26. *Ruled 2026-11-04, raised by the code review:* **a swim's steps may miss its duration by up
+    to 60 seconds.** Its step times are the week planner's estimates. A 30-minute swim written
+    at 110 s per 100 m comes to 29 min 10 s; without the slack, the whole prompt would go back
+    to the week planner for 50 seconds nobody would notice. The TOTAL line shows what the steps
+    add up to.
 
 ## 9. Amendments to other documents
 
