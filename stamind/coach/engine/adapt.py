@@ -14,9 +14,9 @@ from stamind.coach.engine.notes import (
     signal_extraction_task, tweak_task,
 )
 from stamind.coach.engine.sessions import (
-    LOCKED_HISTORY_TASK, SPORT_TYPE_ENUM, athlete_words_task, benchmark_task, move_task,
-    neighbour_sessions_section, neighbour_sessions_task,
-    planned_zone_fields, planned_zone_task, replaces_field, strength_brief_task,
+    LOCKED_HISTORY_TASK, SPORT_TYPE_ENUM, STEPS_FIELD, ask_week_planner, athlete_words_task,
+    benchmark_task, endurance_task, move_task, neighbour_sessions_section,
+    neighbour_sessions_task, replaces_field, strength_brief_task,
 )
 from stamind.coach.formatting import (
     format_completed_activities, format_daily_signals, format_metrics_history,
@@ -27,7 +27,6 @@ from stamind.output import step
 from stamind.prompt import athlete_watching
 from stamind.text import cyan
 from stamind.types import CompletedActivity, Constraint, Objective, Workout
-import stamind.coach.engine as _eng
 
 
 def _terminal_window_task(days_left: int, meso_end_date_str: str) -> str:
@@ -94,7 +93,7 @@ A measured picture that disagrees with the focus is an execution error, not a
 fatigue signal, and it is yours to fix — by changing HOW the remaining sessions
 are prescribed, not how much they contain. Hold duration and planned TSS; sharpen
 the intensity target and give it an explicit guard rail the athlete can act on
-mid-session (a HR ceiling, a pace cap, "walk the hills").
+mid-session (a ceiling as a zone or a share of the threshold, "walk the hills").
 - Drift upward means the athlete WANTS more, so do not only cap it: say where the
   appetite may legitimately go, in the batch-level reason, and spend it in the
   mesocycle's own currency — in a volume mesocycle, more easy minutes; in an intensity
@@ -283,12 +282,9 @@ the active mesocycle (from {target_date_str} to {range_end_str}).
         if has_intensity:
             custom_task += _DRIFT_TASK
 
-        # §9.2 gives adapt the intensity factor of a scheduled session, and §9.4's drift
-        # correction IS a rewrite of how a session is prescribed — so a session whose
-        # zones adapt leaves alone would keep describing the prescription it just
-        # replaced, and the future half of the zone table would grade the athlete against
-        # a target no longer on the page (§9.8).
-        custom_task += planned_zone_task(zone_currencies)
+        # A run, a ride or a swim is written as steps, here as in generate; its zone
+        # minutes come from them (DESIGN_endurance_steps.md §3).
+        custom_task += endurance_task(zone_currencies)
 
         # Inside the mesocycle's terminal window a cut cannot rebound before the mesocycle ends
         # (DESIGN_mesocycle_boundary.md §3). Outside it the prompt is unchanged. Adapt's range
@@ -366,22 +362,24 @@ evidence-backed observations are authored only by the weekly history analysis
                 '      "short_name": "Hills", (At most 5 characters naming the kind of session,\n'
                 '        e.g. "Easy", "Long", "Hills", "Tempo", "Z2", "VO2", "Gym". null on a\n'
                 '        rest day)\n'
-                '      "summary": "Ride easy at 155-175 W on a flat route. Ease off past 178 W.",\n'
+                '      "summary": "Ride 66-74% FTP on a flat route.",\n'
                 '        (For the athlete: at most 2 short sentences, about 20 words, a hard\n'
-                '        limit. What to do, and the one or two numbers to hold. Plain words,\n'
+                '        limit. What to do, and the one or two targets to hold, by zone or as a\n'
+                '        share of the threshold, never watts, beats or a pace. Plain words,\n'
                 '        no name coined in the description. null on a strength session, whose\n'
                 '        line the strength planner writes, and on a rest day)\n'
-                '      "change": "power band now 250-270 W", (For the athlete: AT MOST 8\n'
+                '      "change": "intervals now 106-112% FTP", (For the athlete: AT MOST 8\n'
                 '        words saying what changes in this session, with its number when it\n'
                 '        has one. No reason: that is \"change_reason\".)\n'
                 + change_reason_field +
                 '      "description": "Start with the title on its own line in brackets followed by a\n'
                 '        newline, e.g. \"[Tempo Run]\\n\", then an adapted description of intensity,\n'
-                '        duration, heart rate zones, and goals.",\n'
+                '        duration and goals. On a run, a ride or a swim, the prose only: see\n'
+                '        WRITING AN ENDURANCE SESSION.",\n'
                 '      "duration_minutes": 45,\n'
                 '      "rpe": 5,\n'
                 '      "tss": 30,\n'
-                + planned_zone_fields(zone_currencies)
+                + STEPS_FIELD
                 + replaces_field("PLANNED WORKOUTS") +
                 '      "benchmark_type": null (Preserve VERBATIM on the row that still IS\n'
                 "        the test — a moved/kept test must stay a test. null on EVERY\n"
@@ -546,16 +544,17 @@ session over largely as-is. {descriptions_note}
 ## ADHERENCE DISCREPANCIES & VIOLATIONS
 {discrepancy_text}
 {informational_section}"""
+        label, wait_notice = "workout_adapt", "Reviewing your coming sessions"
         if tweak:
             step("Querying OpenRouter to make the change asked for...", cyan)
-            return _eng.openrouter_client.complete(
-                system_prompt, user_content, label="workout_tweak",
-                wait_notice="Making the change you asked for",
-            )
-        step(f"Querying OpenRouter to evaluate adaptation for the remainder of the mesocycle "
-             f"({target_date_str} -> {range_end_str})...", cyan)
-        decision = _eng.openrouter_client.complete(
-            system_prompt, user_content, label="workout_adapt",
-            wait_notice="Reviewing your coming sessions",
+            label, wait_notice = "workout_tweak", "Making the change you asked for"
+        else:
+            step(f"Querying OpenRouter to evaluate adaptation for the remainder of the "
+                 f"mesocycle ({target_date_str} -> {range_end_str})...", cyan)
+        return ask_week_planner(
+            system_prompt, user_content, label=label, wait_notice=wait_notice,
+            entries=lambda reply: (
+                reply.get("adapted_workouts") or [] if reply.get("change_needed") else []
+            ),
+            zone_currencies=zone_currencies, profile=profile,
         )
-        return decision

@@ -36,6 +36,7 @@ _KIND_LABELS = {
     "rollback": "Rolled back",
     "stand-down": "Stood down",
     "reinstate": "Reinstated",
+    "reprint": "New threshold",
 }
 
 # A void needs its own word, which says who emptied the day: the plan, an adaptation, the

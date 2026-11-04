@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from tests.helpers import clear_all_tables, rebind_test_db, save_workout
+from tests.helpers import EASY_STEPS, clear_all_tables, rebind_test_db, save_workout
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_periodization_regeneration.db")
@@ -102,12 +102,14 @@ class TestRegenerationClearsTheOldSessions(unittest.TestCase):
             "workouts": [{
                 "date": _days_out(0), "sport_type": "running",
                 "title": "Base Run", "description": "30 mins",
+                "duration_minutes": 30, "steps": EASY_STEPS,
             }],
         }
         reason, workouts = _generate_workouts()
         self.assertEqual(reason, "Separate workout reasoning")
         self.assertEqual(_session_titles(workouts), ["Base Run"])
         mock_client.complete.assert_called_once()
+        self.assertEqual(test_db.get_workout(_days_out(0), "running")["steps"], EASY_STEPS)
 
     @patch("stamind.runtime.calendar_syncer")
     @patch("stamind.coach.engine.openrouter_client")

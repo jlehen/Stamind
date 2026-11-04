@@ -111,6 +111,9 @@ class Workout(TypedDict):
     # (DESIGN_strength_tracking.md §9). The description is rendered from them, so the two
     # cannot disagree.
     prescribed_sets: List[Dict[str, Any]]
+    # A run, ride or swim's steps as the week planner wrote them, "remainder" included; None
+    # on every other session (DESIGN_endurance_steps.md §5).
+    steps: Optional[List[Dict[str, Any]]]
     # What the athlete said about the session, oldest first: `sent_at` (UTC ISO) and
     # `text` (DESIGN_session_notes.md §2).
     athlete_notes: List[Dict[str, Any]]

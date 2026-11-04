@@ -224,7 +224,7 @@ One line per module; the rule each keeps is the part worth knowing before openin
 | `signals.py` | — | The daily-signal vocabulary and `write_signal_days` ([§13](#13-daily-signals-calendar-ingest)) |
 | `science/` | — | The shipped science guidelines the prompts quote ([§3](#3-coach-package-architecture)) |
 | `db/` | `db` | SQLite, `Database` composed from per-domain mixins. The only write path onto `workouts` is `workout_change.py`; a session as it stands is `workouts.py`, its lineage and change log `workout_history.py`; `schema.py` the DDL, `base.py` the connection |
-| `coach/` | `coach_service` | `service/` (`CoachService`: reads the database, orchestrates, prints), `engine/` (`CoachEngine`: the prompts and the model call), `formatting.py`, `honoring.py` (`honored_at`: who may stamp it, `needs_a_pass`, DESIGN_constraint_honoring.md), `proposals.py` and `revisions.py` (the frozen proposals and the pure helpers behind one), `picture.py` (what a `workout adapt` run saw, kept in the `settings` row `adapt_last_seen` so the morning push can tell what is new: `take`, `news`, `nights`, `remember`, DESIGN_quiet_morning.md §3, §4) ([§3](#3-coach-package-architecture)) |
+| `coach/` | `coach_service` | `service/` (`CoachService`: reads the database, orchestrates, prints), `engine/` (`CoachEngine`: the prompts and the model call), `formatting.py`, `honoring.py` (`honored_at`: who may stamp it, `needs_a_pass`, DESIGN_constraint_honoring.md), `proposals.py` and `revisions.py` (the frozen proposals and the pure helpers behind one), `picture.py` (what a `workout adapt` run saw, kept in the `settings` row `adapt_last_seen` so the morning push can tell what is new: `take`, `news`, `nights`, `remember`, DESIGN_quiet_morning.md §3, §4), `steps.py` (a run, a ride or a swim as steps: the check, the remainder, the zone minutes, the printed block, the `reprint`, DESIGN_endurance_steps.md) ([§3](#3-coach-package-architecture)) |
 | `analytics/` | module functions | Training maths over rows the caller fetched: opens no database, calls no model (`tests/test_layering.py`). `load.py` (the load model), `pmc.py` (CTL/ATL/TSB), `adherence.py` and `compare.py` (the verdict on a planned session), `intensity.py`, `zone_tables.py` and `mesocycle_report.py` (time in zone, DESIGN_intensity_distribution.md), `progression.py`, `timeline.py` and `chart.py` (the progress timeline, DESIGN_progress_timeline.md), `runway.py` (DESIGN_runway_nudge.md §2), `weekly_evidence.py`, `baselines.py`. `__init__.py` re-exports nothing |
 | `garmin/` | module functions | `client.py` (login, fetch), `sync.py` (`pull`, `ensure_data`, the `sync_state` watermark, the Calendar ride-along, §13), `derived.py` (where a handle meets the maths: `recompute_derived`, `backfill_tss`, `warmup_cutoff`). `__init__.py` still re-exports everything: debt, not precedent (AGENTS.md) |
 | `gcal/` | `CalendarSyncer` | Google Calendar, both ways: `event.py` (what an event says, no Google import), `history.py`, `client.py` (the only file that calls the API), `reconcile.py` (the pass after every change, DESIGN_workout_revisions.md §8); `__init__.py` maps them and re-exports nothing ([§15](#15-design-rationale--history)) |
@@ -255,7 +255,8 @@ flow for each lives in [§10](#10-key-data-flows).
 | Garmin pull / metrics / load model | `garmin/sync.py` (`pull`, `ensure_data`), `garmin/derived.py`, `analytics/load.py`, `analytics/pmc.py` ([§12](#12-sports-science--coaching-mathematics)) |
 | Progress timeline / PMC projection | `analytics/progression.py`, `analytics/timeline.py`, `stamind/timeline_rows.py`, `analytics/chart.py`, `cli/progress.py` + `cli/progress_load.py`, `/api/timeline.png`. DESIGN_progress_timeline.md |
 | Intensity distribution / time in zone | `analytics/intensity.py` (which sports qualify and in which currency; `judgeable`, `COVERAGE_MIN_BY_SPORT`, keys canonical), `analytics/zone_tables.py`, `analytics/mesocycle_report.py`, `coach/service/mesocycle_context.py` (`_intensity_mesocycle_context` for adapt, `_mesocycle_progress_context` for `workout generate`, `_planning_zone_currencies`), `coach/service/history_context.py`, `cli/status.py`, `cli/progress_zones.py`, `progression.weekly_aggregates`, `cli/data/show.py` (`--zones`), `/api/zones` + `static/progress.js`. DESIGN_intensity_distribution.md |
-| Planned time in zone (a session's intensity target) | `db/schema.py` (`planned_zone_currency`, `planned_zone1..7_sec`), `db/workout_change.py:WorkoutChange.append`, `intensity.parse_planned_zones`/`format_planned_zones`, `coach/engine/sessions.py` (`planned_zone_task`, `planned_zone_fields`), `gcal/event.py`, `coach/formatting.py`, `cli/workouts/session_line.py::prescription_lines`. DESIGN_intensity_distribution.md §9.8 |
+| Planned time in zone (a session's intensity target) | `db/schema.py` (`planned_zone_currency`, `planned_zone1..7_sec`), `db/workout_change.py:WorkoutChange.append`, `coach/steps.py:zone_seconds` (the only source: worked out from the steps), `intensity.parse_planned_zones`/`format_planned_zones`, `gcal/event.py`, `coach/formatting.py`, `cli/workouts/session_line.py::prescription_lines`. DESIGN_intensity_distribution.md §9.8, DESIGN_endurance_steps.md §5 |
+| A run, a ride or a swim as steps | `coach/steps.py` (`fault`, `finish`, `describe`, `reprint`), `coach/engine/sessions.py` (`endurance_task`, `STEPS_FIELD`, `ask_week_planner`), the `steps` column (`db/workout_change.py:append`), `coach/revisions.py` (the row shape), `coach/formatting.py:_for_the_week_planner`, `cli/benchmarks.py:reprint_sessions`. DESIGN_endurance_steps.md |
 | Calendar push / daily-signal ingest | `stamind/gcal/` ([§13](#13-daily-signals-calendar-ingest)) |
 | Workout state (modified/calendar/removed) | `stamind/workout_state.py`, `db/workouts.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
 | What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence`, `STATUS_LABELS`, `unplanned_kind`, `off_plan_gaps`), `analytics/compare.py` (`adherence_window`, `adherence_verdicts`, `compare_days`, `format_actual`), `gcal/reconcile.py:mark_adherence_range`, `gcal/event.py` (the title tag), `cli/workouts/session_line.py::adherence_marker`, `cli/workouts/listing.py::_list_verdicts`, `/api/workouts` + `static/workouts.js`, `calendar_days.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum), [§17](#17-calendar-telegram-mini-app-and-sm-calendar)) |
@@ -635,12 +636,13 @@ DESIGN_workout_revisions.md.
 | `tss`                   | INTEGER    | Expected Training Stress Score                   |
 | `void`                  | INTEGER    | 0/1 — 1 ⟺ this slot holds no session as of this revision. When it is the newest revision in the slot there is no session that day; when it is not, it is history like any other row. |
 | `reason`                | TEXT       | This revision's note: why it changed, or why it was cancelled. The change kind says which. |
-| `restored_from`         | INTEGER    | Only on a `rollback`/`reinstate` copy: the revision it duplicates. The adaptation tally follows it to skip spans that were undone. |
+| `restored_from`         | INTEGER    | Only on a `rollback`/`reinstate`/`reprint` copy: the revision it duplicates. The adaptation tally follows it to skip spans that were undone. |
 | `macrocycle_id`         | INTEGER    | Plan version this revision belongs to — the per-date tag every scoping read uses (goal stand-down, `plan show`). |
 | `created_at`            | TEXT       | UTC ISO — when the SESSION entered the plan, carried across its revisions. Distinct from the change's own timestamp. |
 | `benchmark_type`        | TEXT       | Benchmark identity: non-NULL ⟺ this session is a fitness test (`ftp_20min`, `run_5k_tt`, `e1rm`, …). Creation-time intent, carried forward by the append merge so a partial re-save preserves it; `change.append(clear_benchmark=True)` is the one way to blank it, used when an adaptation replaces a test with something that is no longer that test (`DESIGN_benchmark_workouts.md` §4.2). Rendered as `[BENCHMARK]` in `workout list`. |
 | `planned_zone_currency` | TEXT       | `hr` \| `power` (`DESIGN_intensity_distribution.md` §9.8) |
-| `planned_zone1..7_sec`  | INTEGER    | Planned time in zone.                            |
+| `planned_zone1..7_sec`  | INTEGER    | Planned time in zone, worked out from `steps`; taken as given like `steps`, so a session without steps has none. |
+| `steps`                 | TEXT       | A run, a ride or a swim's steps as JSON, as the week planner wrote them, `"remainder"` included; printed into `description`, so not a prescription field and taken as given. NULL on every other sport, on a session written before it, and on steps that failed twice and cannot be printed (DESIGN_endurance_steps.md §3–§5). |
 
 Indexes: `idx_workouts_slot (date, sport_canonical, id)` serves the live view;
 `idx_workouts_lineage (lineage_id, id)` serves every lineage derivation.
@@ -657,7 +659,7 @@ nothing, because an adapt that looked at the metrics and held is a real event.
 |-----------------|------------|---------------------------------------------------|
 | `id`            | INTEGER PK | The batch key. `workout rollback` undoes a change and everything after it. |
 | `created_at`    | TEXT       | UTC ISO, when the command ran.                    |
-| `kind`          | TEXT       | `generate` · `adapt` · `tweak` · `rollback` · `stand-down` · `reinstate`. Fixed at write time; one invocation has exactly one kind. |
+| `kind`          | TEXT       | `generate` · `adapt` · `tweak` · `rollback` · `stand-down` · `reinstate` · `reprint` (a new threshold printed into the sessions ahead, DESIGN_endurance_steps.md §6). Fixed at write time; one invocation has exactly one kind. |
 | `summary`       | TEXT       | The batch rationale. |
 | `macrocycle_id` | INTEGER    | The plan version in force when this ran: context for `workout batches`, distinct from the per-row tag. |
 | `note`          | TEXT       | The coach's one line to the athlete about this change. A `generate` writes it only when something they would notice changed (DESIGN_plan_change_continuity.md §6.3); an `adapt` that changed something stores its reason here too; a `rollback` writes its own line about what it undid. NULL on everything else (DESIGN_change_heads_up.md §6). |
@@ -696,7 +698,7 @@ markers on screen).
 | `adapt` | adapted |
 | `tweak` | tweaked (changed on request) |
 
-A `rollback`/`reinstate` copy reads as the prescription it restored; a void reads
+A `rollback`/`reinstate`/`reprint` copy reads as the prescription it restored; a void reads
 `[REMOVED]`. `modification_markers` in `stamind/workout_state.py` is the single renderer,
 and it draws the standing easings too (`[ADAPTED ×2]`). The adaptation tally
 (`adaptation_count` / `adapted_at`) is walked over the lineage, which is why `lineage_id`
@@ -1224,10 +1226,10 @@ tree). The exception is a group whose whole state is one read-only view (`settin
 | `constraint` | `list`       | `cons l` | List constraints from the current mesocycle onward (`-a`/`--all`, `-v`, selectors `-d`/`-m`/`-M`/`-g`; default anchor: active mesocycle start, else show all) |
 | `constraint` | `show`       | `cons s` | Show a constraint in detail (incl. plan-shaping status and whether a coach pass has honored it) |
 | `constraint` | `wipe`       | —        | Delete all constraints                                                  |
-| `benchmark`  | `record`     | `be rec` | Log a fitness-test result to the `benchmark_results` logbook: positional `SPORT` plus one anchor flag (`--ftp`, `--lthr`, `--threshold-pace`, `--css`, `--e1rm`, `--mas`), `-d/--date` (default today), `--note`, `--source` (`manual` default), `--session ID` (the planned test it satisfies, stored as `workout_id`). The confirm and the lines after it speak through `runtime.render`, since `bot capture test_result` reaches this command from chat (DESIGN_benchmark_from_chat.md §3). An implausible sport/anchor pair (`SPORT_ANCHORS`) warns and asks; `-y` skips that prompt ([§5](#benchmark_results)). `b` alone is ambiguous with `bot` |
+| `benchmark`  | `record`     | `be rec` | Log a fitness-test result to the `benchmark_results` logbook: positional `SPORT` plus one anchor flag (`--ftp`, `--lthr`, `--threshold-pace`, `--css`, `--e1rm`, `--mas`), `-d/--date` (default today), `--note`, `--source` (`manual` default), `--session ID` (the planned test it satisfies, stored as `workout_id`). The confirm and the lines after it speak through `runtime.render`, since `bot capture test_result` reaches this command from chat (DESIGN_benchmark_from_chat.md §3). An implausible sport/anchor pair (`SPORT_ANCHORS`) warns and asks; `-y` skips that prompt ([§5](#benchmark_results)). Then reprints the sessions ahead with steps (`steps.reprint`, DESIGN_endurance_steps.md §6). `b` alone is ambiguous with `bot` |
 | `benchmark`  | `list`       | `be l`   | The logbook newest first, each row with its delta against the previous row of the same kind |
-| `benchmark`  | `rm`         | `be rm`  | Delete one logbook row by ID                                            |
-| `benchmark`  | `wipe`       | —        | Delete the whole logbook (hidden; `-y`)                                 |
+| `benchmark`  | `rm`         | `be rm`  | Delete one logbook row by ID, then reprint as `record` does              |
+| `benchmark`  | `wipe`       | —        | Delete the whole logbook (hidden; `-y`), then reprint as `record` does   |
 | `signal`     | `add`        | `sig a`  | Author daily signal(s) (positional `METRIC [TEXT…]` or `-l/--label`, `--value N`, `-d RANGE` — no `-m`/`-M`, a signal spans days not mesocycles; one tagged all-day event per day) |
 | `signal`     | `rm`         | `sig r`  | Remove signal(s) by positional ID(s) or metric, and/or selectors `-d`/`-m`/`-M`/`-g` (deletes calendar event + local row) |
 | `signal`     | `list`       | `sig l`  | List signals (positional `METRIC` or `--metric`, selectors `-d`/`-m`/`-M`/`-g`; default window `metrics_lookback_days`) |
@@ -1471,6 +1473,9 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    commitment window (`--fresh` empties it; DESIGN_plan_change_continuity.md §4, §6.1).
 4. `CoachEngine._workout_generate_logic(num_days)` → LLM → `{reasoning, athlete_note?,
    workouts[]}`, read-only with respect to learnings ([§3](#3-coach-package-architecture)).
+   `sessions.ask_week_planner` checks each run, ride and swim's steps, asks once more with
+   `YOUR LAST ANSWER` and `WHAT TO FIX` when one fails, then prints the steps into the
+   description and works out the zone minutes (DESIGN_endurance_steps.md §4, §5).
    `_resolve_standing` maps the answers onto the standing sessions (`keep`, `drop`,
    `replaces`; DESIGN_plan_change_continuity.md §4.5), then the deterministic passes run
    (a `rest` constraint's row, §5.5 there; coverage, DESIGN_runway_nudge.md §2.1).
@@ -1508,7 +1513,8 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    which gates the `CORRECTING EXECUTION DRIFT` branch
    (DESIGN_intensity_distribution.md §9.3).
 4. `CoachEngine._workout_adapt_logic()` → LLM → `{change_needed, reason,
-   adapted_workouts[]}`, read-only with respect to learnings.
+   adapted_workouts[]}`, read-only with respect to learnings, through the same
+   `ask_week_planner` as generate.
 5. Any proposal dated outside the range (the mesocycle firewall's write side,
    `guards.py:_keep_inside` with a notice, the same drop `workout generate` runs on its
    span; DESIGN_mesocycle_boundary.md §1, §7) or targeting a completed session is dropped;

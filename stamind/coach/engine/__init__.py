@@ -9,7 +9,8 @@ about the athlete's words), `generate.py` (`workout generate`) and `adapt.py`
 
 Every file here that calls the model reaches it through `_eng.openrouter_client`, looked
 up when it is called, so that `patch("stamind.coach.engine.openrouter_client")` reaches
-all of them. `sessions.py` and `notes.py` are prompt text only and call nothing.
+all of them. `sessions.py` holds `ask_week_planner`, the call both week-planner prompts
+go through; `notes.py` is prompt text only.
 """
 from stamind.openrouter import openrouter_client
 

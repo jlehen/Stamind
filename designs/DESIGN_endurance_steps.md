@@ -1,6 +1,6 @@
 # Design: Steps for endurance sessions
 
-**Status:** Designed 2026-11-02, not built · **Branch:** worktree-endurance-steps-design
+**Status:** Designed 2026-11-02, built 2026-11-03 · **Branch:** worktree-endurance-steps-design
 
 A **step** is one phase of an endurance session: a warm-up, a work interval, a steady block, a
 cool-down. Today a run, a ride or a swim is written as prose, so nothing checks that its
@@ -37,12 +37,12 @@ The same Wednesday, written under this design. The athlete's FTP is 236 W, from 
 
 ```
 [Deload HIIT — 3 x 5 min]
-0:00     WARM-UP    15 min      easy, building to a sweat
-                                two 1-min lifts to about 93% FTP
-0:15     WORK       3 × 5 min   106–112% FTP (250–264 W), 8/10
-                                2.5 min easy after each
-0:37:30  STEADY     27.5 min    66–74% FTP (156–175 W), zone 2
-1:05     COOL-DOWN  10 min      easy
+0:00     WARM-UP    15 min     easy, building to a sweat
+                               two 1-min lifts to about 93% FTP
+0:15     WORK       3 × 5 min  106–112% FTP (250–264 W), 8/10
+                               2.5 min easy after each
+0:37:30  STEADY     27.5 min   66–74% FTP (156–175 W), zone 2
+1:05     COOL-DOWN  10 min     easy
                     ─────────
          TOTAL      75 min
 
@@ -182,11 +182,11 @@ duration and prints the description in this order: the "[Title]" line, the step 
 blank line, the week planner's prose. The block holds no blank line, so the first blank line
 is the seam that splits the description, as on a gym day. On a gym day the week planner's
 words sit above the seam; here they sit below it, so `coach/steps.py` splits the text
-itself and takes only `title_line` from `strength/prescription.py`. Stamind also adds up the
-seconds per zone and puts them in the entry's `planned_zone_currency` and `planned_zone_sec`,
-the fields the week planner wrote itself until now. From there the entry is a normal one:
-the waiting proposal, the chat's short line and Google Calendar read its description and its
-zone minutes as before.
+itself and takes `title_line` and `body_of` from `strength/prescription.py`. Stamind also adds
+up the seconds per zone and puts them in the entry's `planned_zone_currency` and
+`planned_zone_sec`, the fields the week planner wrote itself until now. From there the entry is
+a normal one: the waiting proposal, the chat's short line and Google Calendar read its
+description and its zone minutes as before.
 
 Wednesday's zone minutes, worked out from the steps: zone 1 = 15 + 3 × 2.5 + 10 = 32.5 min,
 zone 2 = 27.5 min, zone 5 = 15 min. Together 75 minutes.

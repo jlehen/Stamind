@@ -365,7 +365,7 @@ class TestTheSummaryLength(unittest.TestCase):
     runs read it again (DESIGN_short_messages.md §7, §8)."""
 
     ADAPT_REASON = "2 SHORT SENTENCES (~30 words in all)"
-    CHANGE_LINE = '"change": "power band now 250-270 W"'
+    CHANGE_LINE = '"change": "intervals now 106-112% FTP"'
     CHANGE_REASON_CAP = "a single sentence of at most 20 words"
 
     def test_generate_asks_two_sentences(self):
@@ -514,7 +514,7 @@ class TestStandingSessionsGate(unittest.TestCase):
         """Showing the target invites a revised one back on a KEEP. `_resolve_standing`
         discards it, so the only cost is tokens — say so rather than pay it."""
         system, _user = build_generate_prompt(standing_workouts=self.EASED)
-        self.assertIn('carries no "planned_zone_sec"', system)
+        self.assertIn('carries no "steps"', system)
 
     def test_a_standing_session_ships_its_description(self):
         """A revision should be minimal rather than re-invented, which needs the prose the

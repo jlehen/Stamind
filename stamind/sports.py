@@ -46,6 +46,8 @@ SPORT_MAPPING = {
     # one: Garmin's HIIT profile. Its own sport so it never reaches the strength planner
     # (DESIGN_strength_tracking.md §12).
     "hiit": ["hiit"],
+    # Planned on pace, never in a zone type (DESIGN_endurance_steps.md §3).
+    "swimming": ["swimming", "lap_swimming", "open_water_swimming"],
 }
 
 # The planned/canonical sports, in declaration order. Single source of truth for the CLI's

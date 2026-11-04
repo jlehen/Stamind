@@ -1,3 +1,4 @@
+import json
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import (
@@ -18,7 +19,7 @@ from stamind.sports import canonical_sport
 
 # One value per command invocation, fixed at write time (§3).
 CHANGE_KINDS = (
-    "generate", "adapt", "tweak", "rollback", "stand-down", "reinstate",
+    "generate", "adapt", "tweak", "rollback", "stand-down", "reinstate", "reprint",
 )
 
 # The voids the athlete decided, as against the ones the coach wrote. A goal stood down is
@@ -35,12 +36,13 @@ REVISION_COLUMNS = (
     "title", "description", "duration_minutes", "rpe", "tss",
     "void", "reason", "restored_from", "macrocycle_id", "created_at",
     "benchmark_type", "planned_zone_currency",
-) + _ZONE_COLUMNS + ("short_name", "summary")
+) + _ZONE_COLUMNS + ("short_name", "summary", "steps")
 
 # What "the same prescription" means for the §9 no-op rule. `reason` is deliberately
 # out: if the prescription did not move, the session was held, and a rationale for
 # holding is not worth a revision. `short_name` and `summary` are out too
-# (DESIGN_calendar_miniapp.md §3.6, DESIGN_short_messages.md §7).
+# (DESIGN_calendar_miniapp.md §3.6, DESIGN_short_messages.md §7), and so is `steps`: they are
+# printed into the description, which tells (DESIGN_endurance_steps.md §5).
 PRESCRIPTION_FIELDS = (
     "date", "sport_canonical", "sport_type", "title", "description",
     "duration_minutes", "rpe", "tss", "benchmark_type", "planned_zone_currency",
@@ -189,13 +191,15 @@ class WorkoutChange:
         macrocycle_id: Optional[int] = None, lineage_id: Optional[int] = None,
         restored_from: Optional[int] = None,
         prescribed_sets: Optional[Sequence[Dict[str, Any]]] = None,
+        steps: Optional[Sequence[Dict[str, Any]]] = None,
     ) -> Optional[int]:
         """Appends one revision of the session in `(date, sport_type)`.
 
         The new revision is the slot's live one merged with what is supplied here (§6
         step 2), so a partial re-save cannot read an omission as a deletion: `title`,
-        `description`, `short_name` and `summary` are always taken as given, every other
-        field carries forward when omitted (DESIGN_calendar_miniapp.md §3.6).
+        `description`, `short_name`, `summary`, `steps` and the zone minutes worked out from
+        them are always taken as given, every other field carries forward when omitted
+        (DESIGN_calendar_miniapp.md §3.6, DESIGN_endurance_steps.md §5).
         `clear_benchmark` is the one way to blank `benchmark_type` in place, for an
         adaptation that replaces a test with something that is no longer that test
         (DESIGN_benchmark_workouts.md §4.2).
@@ -229,16 +233,16 @@ class WorkoutChange:
             "void": 0,
             "reason": reason,
             "restored_from": restored_from,
+            "planned_zone_currency": planned_zone_currency,
+            "steps": json.dumps(list(steps), ensure_ascii=False) if steps else None,
         }
         for field, supplied in (
             ("duration_minutes", duration_minutes), ("rpe", rpe), ("tss", tss),
-            ("planned_zone_currency", planned_zone_currency),
         ):
             row[field] = supplied if supplied is not None else base.get(field)
         zones = list(planned_zone_sec or [])[:7]
         zones += [None] * (7 - len(zones))
-        for column, supplied in zip(_ZONE_COLUMNS, zones):
-            row[column] = supplied if supplied is not None else base.get(column)
+        row.update(zip(_ZONE_COLUMNS, zones))
         if clear_benchmark:
             row["benchmark_type"] = None
         else:
@@ -276,7 +280,8 @@ class WorkoutChange:
         return self._write(row, live["lineage_id"], live)
 
     def restore(
-        self, revision: Dict[str, Any], reason: Optional[str] = None
+        self, revision: Dict[str, Any], reason: Optional[str] = None,
+        description: Optional[str] = None,
     ) -> Optional[int]:
         """Appends a copy of an earlier revision, stamped `restored_from`.
 
@@ -285,12 +290,15 @@ class WorkoutChange:
         (§5). The stamp is what lets the adaptation tally skip the span this undid (§7).
 
         The copy carries the restored revision's prescribed sets, or the kilograms in its
-        text would have no rows behind them (DESIGN_strength_tracking.md §9).
+        text would have no rows behind them (DESIGN_strength_tracking.md §9). A
+        `description` replaces the copy's text: a `reprint` (DESIGN_endurance_steps.md §6).
         """
         row = {k: revision[k] for k in REVISION_COLUMNS}
         row["restored_from"] = revision["id"]
         if reason is not None:
             row["reason"] = reason
+        if description is not None:
+            row["description"] = description
         live = self.live_revision(revision["date"], revision["sport_canonical"])
         return self._write(
             row, revision["lineage_id"], live, self.prescribed_sets(revision["id"]),

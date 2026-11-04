@@ -1,3 +1,4 @@
+import json
 from typing import (
     Any,
     Dict,
@@ -36,7 +37,7 @@ def _describing_revision(
 ) -> Dict[str, Any]:
     """The revision whose change describes the *form* this one holds.
 
-    A rollback/reinstate copy re-establishes an earlier prescription, so it reads
+    A rollback/reinstate/reprint copy re-establishes an earlier prescription, so it reads
     as whatever that prescription was — the same `restored_from` jump the adaptation tally
     makes (§7). Every other revision describes itself. Both the change kind and the
     commitment window are read off it (DESIGN_plan_change_continuity.md §5.2)."""
@@ -200,7 +201,7 @@ class WorkoutsMixin:
             # A revision's note is either why it changed or why it was cancelled, and the
             # change kind says which (§3).
             "modification_reason": None if void else row["reason"],
-            "adaptation_summary": head.get("change_summary"),
+            "adaptation_summary": describing.get("change_summary"),
             "change_kind": describing.get("kind") if revisions else None,
             # The window this revision was written under, not the one standing now (§5.2).
             "commitment_end": describing.get("commitment_end"),
@@ -225,6 +226,7 @@ class WorkoutsMixin:
             # session. The description is rendered from these, so the week planner is shown
             # only the brief above them (DESIGN_strength_tracking.md §9).
             "prescribed_sets": list(prescribed or []),
+            "steps": json.loads(row["steps"]) if row["steps"] else None,
             # What the athlete said about the session (DESIGN_session_notes.md §4).
             "athlete_notes": list(notes or []),
         }
