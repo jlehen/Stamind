@@ -1261,6 +1261,22 @@ writes its own, so Thursday's intervals are held and stand. `workout generate --
 clean slate that kept Thursday's kilograms because the week planner wrote the same brief
 again would not be one.
 
+**An edit to the profile** is a fifth ground, amended 2026-11-04. The strength planner reads
+three keys of the profile: `preferences`, `equipment` and `weekly_schedule`, which holds each
+day's equipment. Each time it runs, and each time the morning push asks whether it has work,
+it takes a fingerprint of those three keys and compares it with the one in the `settings`
+row `strength_profile_seen`. A new fingerprint bumps `strength_history_changed_at` and is
+written to `strength_profile_edited_at`. So every session weighed before the edit is new
+evidence again, and the morning push runs `workout adapt` for it. Each such session also
+carries a line saying the preferences or equipment changed: write it again. Say that on
+Wednesday November 4 the athlete's preferences stop saying "two-arm overhead press" and say
+"one kettlebell held in both hands", and the next `workout generate` weighs Saturday's
+circuit again. Before this, the strength planner wrote the press at 10 kg, and the answer was
+thrown away, because Saturday had been weighed that morning and nothing was lifted since.
+The first fingerprint an instance ever takes is only stored, because no session was weighed
+against an edit before it. Not handled: an edit to the athlete's science documents, which
+is rare and needs `workout generate --strength-only`.
+
 Amended 2026-09-28: `workout generate --strength-only` leaves today out only when today's
 gym is already done. It is Monday September 28. The athlete ran at 07:00 and the gym is at
 18:00. Run at noon, the command writes tonight's gym: it can change no other session, so the

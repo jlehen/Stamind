@@ -19,6 +19,7 @@ from stamind.db import Database
 import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
 from stamind import runtime, settings
+from stamind.config import config
 from stamind.coach.service import coach_service
 from stamind.strength import planner, planner_prompt, prescription, sets, vocabulary
 
@@ -72,6 +73,9 @@ class _PlannerCase(unittest.TestCase):
         moving_clock.start()
         self.addCleanup(moving_clock.stop)
         settings.write(settings.STRENGTH_SETS_SINCE, "2026-08-01")
+        profile = patch.dict(config.data, {"user_profile": {"equipment": ["full gym"]}})
+        profile.start()
+        self.addCleanup(profile.stop)
         self.replies = []
         self.asked = []
         call = patch.object(planner, "_complete", side_effect=self._complete)
@@ -588,6 +592,45 @@ class LoadJumpTest(_PlannerCase):
             result = self.strength_pass([])
         self.assertEqual(len(self.asked), 2)
         self.assertEqual([r["load_kg"] for r in result.added[0]["prescribed_sets"]], [4.0])
+
+
+class ProfileEditTest(_PlannerCase):
+    """It is Tuesday. Thursday's gym was weighed this morning, and nothing was lifted since.
+    The athlete adds a pair of dumbbells to their equipment: Thursday is weighed again (§9,
+    "An edit to the profile")."""
+
+    def setUp(self):
+        super().setUp()
+        self.session = self.gym("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 140.0))
+        test_db.bump_strength_history()
+        test_db.record_strength_check(self.session["id"], test_db.strength_history_stamp())
+        # The first fingerprint ever is only stored: there is nothing to weigh.
+        self.assertFalse(self.has_work())
+
+    def has_work(self):
+        live = test_db.get_workouts(start_date=TODAY, end_date=MESO_END)
+        return planner.has_work(live, TODAY, MESO_END)
+
+    def edit(self):
+        config.data["user_profile"] = {"equipment": ["full gym", "a pair of dumbbells"]}
+
+    def test_an_edit_lets_a_weighed_session_be_written_again(self):
+        self.edit()
+        self.assertTrue(self.has_work())
+        self.replies = [{"sessions": [
+            answer("2026-09-17", row("SQUAT/BELT_SQUAT", 3, 4, 6, 145.0), reason="Step."),
+        ]}]
+        result = self.strength_pass([])
+        self.assertIn(planner_prompt.PROFILE_EDITED, self.asked[0][1])
+        self.assertEqual([r["load_kg"] for r in result.added[0]["prescribed_sets"]], [145.0])
+
+    def test_a_session_weighed_after_the_edit_is_left_alone(self):
+        self.edit()
+        self.assertTrue(self.has_work())
+        test_db.record_strength_check(self.session["id"], test_db.strength_history_stamp())
+        self.assertFalse(self.has_work())
+        self.assertIsNone(self.strength_pass([]))
+        self.assertEqual(self.asked, [])
 
 
 class InAdaptTest(_PlannerCase):

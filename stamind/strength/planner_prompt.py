@@ -1,11 +1,9 @@
 """What the strength planner tells the model, and what it accepts back
 (DESIGN_strength_tracking.md §9).
 
-`planner.py` is the other half: which sessions the call is about, the call itself, and what
-is done with the answers. This file holds the system prompt, the blocks the user message is
-built from, and the checks a returned exercise passes before it becomes a prescribed set —
-one that fails is left out with a line for the preview. `Session`, one session the call was
-asked about, lives here because the prompt is written from it.
+`planner.py` is the other half: which sessions the call is about, the call, and what is done
+with the answers. Here: the system prompt, the user message's blocks, `Session` (the prompt
+is written from it), and the checks a returned exercise passes.
 """
 import os
 from dataclasses import dataclass, field
@@ -26,6 +24,11 @@ SCIENCE_PATH = os.path.join(os.path.dirname(__file__), "progression.md")
 MOVED_ON = "Its brief or its duration changed since these sets were written: write it again."
 # The line for the fourth ground, the athlete asking: `workout generate --strength-only` (§9).
 ASKED_AGAIN = "The athlete asked for this session to be written again: write it again."
+# The fifth ground: an edit to what this call reads of the profile (§9).
+PROFILE_EDITED = (
+    "The athlete's preferences or equipment changed since these sets were written: write it "
+    "again."
+)
 # The profile's `preferences`, whole. The block is about every sport the athlete does (§9).
 PREFERENCES_HEADING = (
     "## ATHLETE'S PREFERENCES\n"
@@ -56,8 +59,8 @@ For each session under SESSIONS TO CHECK, the athlete has already been shown it.
 - The sets on record since it was written say a load should move.
 - The athlete has made a habit of doing something other than what it holds (CHOOSING THE
   EXERCISES).
-- It says to write it again, because its brief or its duration changed or because the athlete
-  asked for it. Then write it again, the way you write a session under SESSIONS TO WRITE.
+- It says to write it again, because its brief, its duration or the athlete's preferences or
+  equipment changed, or because the athlete asked for it. Then write it again, the way you write a session under SESSIONS TO WRITE.
 When you do change it, return the whole session again and say in one sentence why,
 written for the athlete to read: "Monday's sets all reached 6 at 140; add 5."
 
@@ -201,6 +204,7 @@ class Session:
     rows: List[Dict[str, Any]] = field(default_factory=list)
     to_write: bool = True
     asked_again: bool = False            # the athlete asked for it to be written again
+    profile_edited: bool = False         # the profile changed since it was last weighed
 
     @property
     def lineage_id(self) -> Optional[int]:
@@ -231,12 +235,7 @@ def _shipped_science() -> str:
 
 
 def _athlete_science() -> str:
-    """The athlete's own guidelines, whole, the way every coaching call gets them. The
-    science trim's tags are what will cut this to the strength ones (§10).
-
-    Same banner as the coach's own prompts, built by the same function — the wording of
-    the line under it is this call's, because a strength session is what it asks about.
-    """
+    """The athlete's own guidelines, whole, under the coach's own banner (§10)."""
     return science_section(
         runtime.config.science_dir,
         "ATHLETE-PROVIDED SPORTS SCIENCE GUIDELINES",
@@ -279,10 +278,8 @@ def _constraints_for(day: str, constraints: Sequence[Dict[str, Any]]) -> str:
 
 
 def _mesocycle_for(day: str, mesocycles: Dict[str, Any]) -> str:
-    """Which mesocycle the day falls in, its span, and which week of it the day is.
-
-    Read from the plan's own table rather than from the brief's prose, so a boundary the
-    week planner did not spell out is still exact (§9)."""
+    """Which mesocycle the day falls in, its span, and which week of it the day is, read
+    from the plan's own table (§9)."""
     meso = mesocycles.get(day)
     if not meso:
         return ""
@@ -311,6 +308,8 @@ def _session_block(
     lines = [f"- {fmt_date(session.date)} ({duration}) \"{session.title}\""]
     if session.rows and session.moved_on:
         lines.append(f"  {MOVED_ON}")
+    elif session.rows and session.profile_edited:
+        lines.append(f"  {PROFILE_EDITED}")
     elif session.asked_again:
         lines.append(f"  {ASKED_AGAIN}")
     mesocycle = _mesocycle_for(session.date, mesocycles)

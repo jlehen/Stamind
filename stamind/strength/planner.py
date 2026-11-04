@@ -11,11 +11,14 @@ This file is the pass: which sessions the call is about, the call itself, foldin
 answers into the proposal, and writing them. `planner_prompt.py` holds what the model is
 told and the checks on what it says back.
 """
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from stamind import runtime
+from stamind.config import config
 from stamind.openrouter import openrouter_client
 from stamind.sports import canonical_sport
 from stamind.strength import history, prescription
@@ -32,6 +35,12 @@ LABEL = "strength_planner"
 # A call that fails is tried once more; what a second failure costs depends on whether a
 # session was to be written (§9).
 MAX_ATTEMPTS = 2
+
+# What this call reads of the profile. An edit to it is new evidence (§9, "An edit to the
+# profile"); the two `settings` rows hold its fingerprint and when an edit was first seen.
+PROFILE_KEYS = ("preferences", "equipment", "weekly_schedule")
+PROFILE_SEEN_KEY = "strength_profile_seen"
+PROFILE_EDITED_KEY = "strength_profile_edited_at"
 
 NOT_RECHECKED = (
     "I could not recheck {days} kilograms this morning. They stand as written, and I will "
@@ -62,12 +71,8 @@ class StrengthPass:
 
 
 def proposal_fields(pass_: Optional["StrengthPass"]) -> Dict[str, Any]:
-    """What a proposal carries about the strength pass, as keyword arguments.
-
-    `workout generate`, `workout adapt` and the strength-only regenerate all end by
-    building a proposal, and all three wrote these four fields out by hand with the
-    same `if there was a pass` guard. `record_checks` below reads them back.
-    """
+    """What a proposal carries about the strength pass, as keyword arguments, for the
+    three commands that build one. `record_checks` below reads them back."""
     return {
         "strength_checks": tuple(pass_.checked) if pass_ else (),
         "strength_stamp": pass_.stamp if pass_ else "",
@@ -213,12 +218,35 @@ def _weighed_before(session: Session, stamp: str, checks: Dict[int, str]) -> boo
 
 def _evidence(to_check: Sequence[Session]) -> Tuple[str, Dict[int, str]]:
     """The strength history's stamp, and what each session to check was last weighed
-    against (§9)."""
+    against (§9). Marks the sessions weighed before the profile was last edited."""
+    edited_at = _profile_edited_at()
     stamp = runtime.db.strength_history_stamp()
     checks = runtime.db.strength_checks_for(
         [s.lineage_id for s in to_check if s.lineage_id is not None]
     )
+    for session in to_check:
+        weighed = checks.get(session.lineage_id, "") if session.lineage_id else ""
+        session.profile_edited = weighed < edited_at
     return stamp, checks
+
+
+def _profile_edited_at() -> str:
+    """When an edit to what this call reads of the profile was first seen, or "". A new
+    edit bumps the strength history; the first fingerprint is only stored (§9)."""
+    profile = config.user_profile
+    seen = json.dumps({key: profile.get(key) for key in PROFILE_KEYS}, sort_keys=True,
+                      default=str)
+    fingerprint = hashlib.sha256(seen.encode("utf-8")).hexdigest()
+    stored = runtime.db.get_setting(PROFILE_SEEN_KEY)
+    if stored == fingerprint:
+        return runtime.db.get_setting(PROFILE_EDITED_KEY) or ""
+    runtime.db.set_setting(PROFILE_SEEN_KEY, fingerprint)
+    if stored is None:
+        return ""
+    runtime.db.bump_strength_history()
+    edited_at = runtime.db.strength_history_stamp()
+    runtime.db.set_setting(PROFILE_EDITED_KEY, edited_at)
+    return edited_at
 
 
 def has_work(
@@ -331,9 +359,8 @@ def _ask(
     """The call, tried once more when it fails or comes back unusable — a session to write
     left unanswered, or one whose every exercise failed a check, is a failed call (§9).
 
-    An answer with a load far above what the athlete last lifted is refused: the call is
-    asked again with the reason, and a jump still standing after the last try is held at
-    the load lifted, with a line for the preview (§9, "Checking the output").
+    A load far above what the athlete last lifted is refused: asked again with the reason,
+    then held at the load lifted (§9, "Checking the output").
 
     None when it failed twice with only sessions to check, which is a "keep" for all of
     them; it raises instead when a session was to be written.

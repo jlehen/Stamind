@@ -911,7 +911,9 @@ took of its inputs, as JSON, which the push compares with a fresh one
 `workout notify` asked the bot to send (DESIGN_change_heads_up.md §4); and
 `strength_history_changed_at`, bumped by every write that changes what the strength
 history shows, the evidence a kept strength session's kilograms may move on
-(DESIGN_strength_tracking.md §5, §9).
+(DESIGN_strength_tracking.md §5, §9); `strength_profile_seen` and
+`strength_profile_edited_at`, the fingerprint of the profile keys the strength planner reads
+and when an edit to them was first seen, which also bumps the history stamp (§9).
 
 | Column       | Type    | Notes                                              |
 |--------------|---------|----------------------------------------------------|
