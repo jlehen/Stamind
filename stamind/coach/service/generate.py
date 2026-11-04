@@ -366,8 +366,7 @@ class WorkoutGenMixin:
                 # day that did not change (§7.1).
                 if w.get('keep'):
                     continue
-                # The intensity target the week planner stated while it still knew the intent
-                # (DESIGN_intensity_distribution.md §9.8) — validated, never rescaled.
+                # Worked out from the steps (DESIGN_endurance_steps.md §5).
                 zone_currency, zone_sec = intensity.parse_planned_zones(w)
                 slot = (w['date'], canonical_sport(w['sport_type']))
                 change.append(
@@ -394,6 +393,7 @@ class WorkoutGenMixin:
                     prescribed_sets=w.get('prescribed_sets'),
                     planned_zone_currency=zone_currency,
                     planned_zone_sec=zone_sec,
+                    steps=w.get('steps'),
                 )
 
         # The same warrant every other constraint this run built around gets (§8).

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Bump when the DDL below changes, so an existing database picks the change up once.
 # Reusing a number a previous commit already stamped is silent (ARCHITECTURE.md §5).
-SCHEMA_VERSION = 30
+SCHEMA_VERSION = 31
 
 # The append-only rule, as the database enforces it (DESIGN_workout_revisions.md §14).
 # `wipe_workouts` drops both triggers to clear the table and puts them back from here, so
@@ -119,7 +119,7 @@ class SchemaMixin:
                     tss INTEGER,
                     void INTEGER NOT NULL DEFAULT 0, -- 1 <=> this slot holds no session as of this revision
                     reason TEXT, -- per-revision note; why it changed, or why it was cancelled
-                    restored_from INTEGER, -- on a rollback/reinstate copy: the revision copied (§7)
+                    restored_from INTEGER, -- on a rollback/reinstate/reprint copy: the revision copied (§7)
                     macrocycle_id INTEGER, -- plan version this session belongs to
                     created_at TEXT, -- when the SESSION entered the plan, carried across revisions
                     benchmark_type TEXT, -- set <=> a fitness test (DESIGN_benchmark_workouts.md §3.1)
@@ -132,7 +132,8 @@ class SchemaMixin:
                     planned_zone6_sec INTEGER,
                     planned_zone7_sec INTEGER,
                     short_name TEXT, -- at most five characters (DESIGN_calendar_miniapp.md §3.6)
-                    summary TEXT -- the short line, about 20 words (DESIGN_short_messages.md §4)
+                    summary TEXT, -- the short line, about 20 words (DESIGN_short_messages.md §4)
+                    steps TEXT -- a run, ride or swim's steps as JSON (DESIGN_endurance_steps.md §5)
                 )
             """)
 

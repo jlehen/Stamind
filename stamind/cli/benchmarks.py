@@ -9,6 +9,7 @@ from stamind.clock import fmt_date, today_str as _today_str
 from stamind.cli.selectors import add_single_date_arg
 from stamind.sports import canonical_sport
 from stamind import benchmarks
+from stamind.coach import steps
 from stamind.benchmarks import (
     ANCHOR_KINDS, LOGBOOK_KINDS, anchors_for_sport, label_for_kind,
     unit_for_kind, format_value, format_delta, is_improvement,
@@ -123,6 +124,7 @@ def run_benchmark_record(args: argparse.Namespace) -> Optional[int]:
     runtime.render.benchmark_recorded(runtime.db.get_benchmark_result(rid), prev)
     if crosses:
         runtime.render.benchmark_replan()
+    reprint_sessions(kind)
     return rid
 
 
@@ -205,6 +207,7 @@ def run_benchmark_rm(args: argparse.Namespace) -> None:
         notice(f"Benchmark result with ID {args.id} not found.", red)
         sys.exit(1)
     runtime.db.delete_benchmark_result(args.id)
+    reprint_sessions(row["anchor_kind"])
     print(green(f"Removed benchmark result ID {args.id}."))
 
 
@@ -217,7 +220,19 @@ def run_benchmark_wipe(args: argparse.Namespace) -> None:
             print("Wipe cancelled.")
             return
     runtime.db.wipe_benchmarks()
+    reprint_sessions(None)
     print(green("All benchmark results wiped successfully."))
+
+
+def reprint_sessions(kind: Optional[str]) -> None:
+    """Prints the sessions ahead again with the thresholds now in use, after `kind` changed,
+    or after a wipe when None (DESIGN_endurance_steps.md §6)."""
+    latest = runtime.db.get_latest_benchmark(kind) if kind else None
+    summary = "A test result was removed."
+    if latest:
+        name = steps.ANCHOR_NAMES.get(kind, label_for_kind(kind))
+        summary = f"Your {name} is now {format_value(kind, float(latest['value']))}."
+    steps.reprint(runtime.db, runtime.coach_service.effective_thresholds(), summary)
 
 
 def add_benchmark_parser(subparsers):

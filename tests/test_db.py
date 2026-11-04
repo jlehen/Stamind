@@ -607,12 +607,14 @@ class TestPlannedZoneColumns(unittest.TestCase):
         self.assertIsNone(row["planned_zone6_sec"])
         self.assertIsNone(row["planned_zone7_sec"])
 
-    def test_a_later_save_that_omits_them_preserves_the_target(self):
+    def test_a_later_save_that_omits_them_drops_the_target(self):
+        """The zone minutes come from the steps given with a revision, so a revision without
+        them has none (DESIGN_endurance_steps.md §3, §5)."""
         self._save(planned_zone_currency="hr", planned_zone_sec=[300, 1800, 0, 0, 0])
         self._save(duration_minutes=45)
         row = test_db.get_workout("2026-06-10", "running")
-        self.assertEqual(row["planned_zone_currency"], "hr")
-        self.assertEqual(row["planned_zone2_sec"], 1800)
+        self.assertIsNone(row["planned_zone_currency"])
+        self.assertIsNone(row["planned_zone2_sec"])
 
     def test_an_adapt_that_emits_them_overwrites_the_target(self):
         """A drift correction rewrites HOW a session is prescribed, so leaving its zones

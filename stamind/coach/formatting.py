@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from stamind.types import Workout, CompletedActivity
@@ -8,7 +9,7 @@ from stamind.analytics.adherence import Performed
 from stamind.clock import fmt_timestamp
 from stamind.analytics import intensity
 from stamind.plan_inputs import science_documents
-from stamind.strength.prescription import brief_of
+from stamind.strength.prescription import body_of, brief_of, title_line
 
 
 def mesocycle_text(mesocycle: Dict[str, Any]) -> str:
@@ -28,9 +29,17 @@ def _for_the_week_planner(workout: Workout) -> str:
 
     A strength session whose kilograms the strength planner wrote is shown as its title and
     its brief and nothing below the seam, so the week planner never meets a kilogram and so
-    never copies one into a revision (DESIGN_strength_tracking.md §9).
+    never copies one into a revision (DESIGN_strength_tracking.md §9). A run, a ride or a
+    swim with steps is shown as its title, its prose and its steps as JSON, never the
+    printed watts (DESIGN_endurance_steps.md §5).
     """
     description = (workout.get('description') or '').strip()
+    if workout.get('steps'):
+        steps = json.dumps(workout['steps'], ensure_ascii=False)
+        prose = body_of(description)
+        return "\n".join(
+            part for part in (title_line(description), prose, f"Steps: {steps}") if part
+        )
     if not workout.get('prescribed_sets'):
         return description
     return brief_of(description)

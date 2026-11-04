@@ -96,6 +96,9 @@ def structure_revision(
             # the row (DESIGN_intensity_distribution.md §9.8).
             'planned_zone_currency': w.get('planned_zone_currency'),
             'planned_zone_sec': w.get('planned_zone_sec'),
+            # A run, a ride or a swim's steps, printed into its description
+            # (DESIGN_endurance_steps.md §5).
+            'steps': w.get('steps'),
         } for w in revised
     ]
 
@@ -107,7 +110,8 @@ def prescription_matches(proposed: Dict[str, Any], live: Dict[str, Any]) -> bool
     preview built from the week planner's answers would report a wording-only revision as a
     change to the day. The proposal step asks this instead, against the standing rows it
     already loaded (DESIGN_plan_change_continuity.md §4.5). It mirrors `append`'s merge:
-    a field the proposal omits carries forward and is therefore not a change.
+    a load field the proposal omits carries forward and is therefore not a change, while the
+    zone minutes are taken as given (DESIGN_endurance_steps.md §5).
 
     Prose is compared on its words, not its spacing: a model that re-lists a session it is
     holding wraps the same sentence differently often enough, and a proposal that only
@@ -136,12 +140,12 @@ def prescription_matches(proposed: Dict[str, Any], live: Dict[str, Any]) -> bool
     if benchmark != live.get('benchmark_type') and (benchmark or live.get('benchmark_type')):
         return False
     currency, seconds = intensity.parse_planned_zones(proposed)
-    if currency is not None and currency != live.get('planned_zone_currency'):
+    if currency != live.get('planned_zone_currency'):
         return False
     zones = list(seconds or [])[:7]
     zones += [None] * (7 - len(zones))
     for index, value in enumerate(zones, start=1):
-        if value is not None and value != live.get(f'planned_zone{index}_sec'):
+        if value != live.get(f'planned_zone{index}_sec'):
             return False
     return True
 

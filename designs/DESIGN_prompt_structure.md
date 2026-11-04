@@ -149,8 +149,8 @@ is. So the conditional sections are `###`:
 | command | `### sub-sections of TASK` |
 | --- | --- |
 | `plan generate` | `ATHLETE FEEDBACK ON THE PREVIOUS PLAN`, `CONTINUITY WITH THE PREVIOUS PLAN` |
-| `workout generate` | `BENCHMARK PLACEMENT`, `CONTINUING A MESOCYCLE ALREADY UNDER WAY`, `JUDGING THE MESOCYCLE'S COMPOSITION`, `PRESCRIBING INTENSITY` |
-| `workout adapt` | `STANDING RULES`, `WHAT YOU MAY NOT TOUCH`, `ATTRIBUTING A DEPRESSED MORNING`, `DO NOT COMPOUND A PRIOR ADAPTATION`, `PROTECTING A BENCHMARK`, `CORRECTING EXECUTION DRIFT`, `PRESCRIBING INTENSITY`, `THIS MESOCYCLE IS ENDING`, `ATHLETE'S NOTE FOR TODAY`, `EXTRACTING A DURABLE CONSTRAINT FROM THE NOTE`, `DURABLE OBSERVATIONS ARE READ-ONLY HERE` |
+| `workout generate` | `BENCHMARK PLACEMENT`, `CONTINUING A MESOCYCLE ALREADY UNDER WAY`, `JUDGING THE MESOCYCLE'S COMPOSITION`, `WRITING AN ENDURANCE SESSION` |
+| `workout adapt` | `STANDING RULES`, `WHAT YOU MAY NOT TOUCH`, `ATTRIBUTING A DEPRESSED MORNING`, `DO NOT COMPOUND A PRIOR ADAPTATION`, `PROTECTING A BENCHMARK`, `CORRECTING EXECUTION DRIFT`, `WRITING AN ENDURANCE SESSION`, `THIS MESOCYCLE IS ENDING`, `ATHLETE'S NOTE FOR TODAY`, `EXTRACTING A DURABLE CONSTRAINT FROM THE NOTE`, `DURABLE OBSERVATIONS ARE READ-ONLY HERE` |
 | `data analyze` | `READING THE PER-WEEK CONTEXT FIELDS`, `READING 'signal_days'` |
 
 Two sections gained a heading they never had, because a `###` scheme has no place for an
@@ -162,6 +162,12 @@ The response schema is **not** a sub-section. "You MUST respond with a JSON obje
 containing" is a peer of the task, not part of it, so it is `## RESPONSE FORMAT` in all four
 commands. Previously it was an unheaded paragraph trailing whichever section happened to
 come last — which differed per command and per gate.
+
+Amended 2026-11-03 (DESIGN_endurance_steps.md §3, §4): `PRESCRIBING INTENSITY` became
+`WRITING AN ENDURANCE SESSION` in both commands. When a run, a ride or a swim of the week
+planner's answer fails the steps check, the second ask of `workout generate`, `workout adapt`
+and `workout tweak` adds two sections at the end of the user content, `## YOUR LAST ANSWER`
+and `## WHAT TO FIX`.
 
 Amended 2026-10-01 (DESIGN_cycle_retrospective.md §5): the retrospective writer is a fifth
 call under the same scheme. Its system message is the role line, `## TASK` and

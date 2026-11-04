@@ -1197,6 +1197,13 @@ with §6.1's canonical rename, since that is the change touching this vocabulary
 
 ### 9.8 Planned zones — the future half of the table
 
+> **Amended 2026-11-03 (DESIGN_endurance_steps.md §5).** Stamind now works out the planned zone
+> minutes from a run, a ride or a swim's steps; the week planner no longer writes them, and a
+> session without steps has none. §10's "Parsing planned interval structure out of
+> `description`" stays rejected: the steps are structured data the week planner writes, not
+> prose parsed back. The prompt section below, PRESCRIBING INTENSITY, became WRITING AN
+> ENDURANCE SESSION.
+
 §9.6 stopped the zone tables at today because nothing in the schema gave a planned workout an
 intensity target. The week planner already decides one — it writes `6×3min @ VO2max` — and it is the
 only thing in the system that knows the intent. So it should emit the distribution as

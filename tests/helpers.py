@@ -5,6 +5,11 @@ from datetime import date, datetime, time
 from unittest.mock import MagicMock, patch
 
 
+# One easy step that fills any run or ride, so a stubbed week planner's session passes the
+# steps check (DESIGN_endurance_steps.md §4) and is not asked for again.
+EASY_STEPS = [{"phase": "steady", "seconds": "remainder", "zone": 2, "effort": "easy"}]
+
+
 def _m(minutes):
     """Minutes as seconds — zone fixtures are written in minutes, stored in seconds."""
     return minutes * 60.0

@@ -5,8 +5,9 @@
 (DESIGN_calendar_miniapp.md §3.6). `mesocycles.summary` is one line on what a mesocycle is
 for (§3.7). `workouts.summary` is a session's short line (DESIGN_short_messages.md §4).
 `mesocycles.deload_start` is the first day of a mesocycle's deload (DESIGN_deload_weeks.md
-§4.1). `_init_db` only creates tables and never adds a column to one that exists, so a database
-made before the SCHEMA_VERSION that brought a column (22, 29, 30) needs this script.
+§4.1). `workouts.steps` is a run, a ride or a swim's steps (DESIGN_endurance_steps.md §5).
+`_init_db` only creates tables and never adds a column to one that exists, so a database made
+before the SCHEMA_VERSION that brought a column (22, 29, 30, 31) needs this script.
 
 It adds each column whenever it is missing, whatever version the database is stamped with,
 and does nothing when it is already there. It opens the file with plain `sqlite3`: opening
@@ -32,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from stamind.config import CONFIG_PATH, config
 
 COLUMNS = (("workouts", "short_name"), ("mesocycles", "summary"), ("workouts", "summary"),
-           ("mesocycles", "deload_start"))
+           ("mesocycles", "deload_start"), ("workouts", "steps"))
 
 
 def add_columns(db_path: str) -> List[str]:

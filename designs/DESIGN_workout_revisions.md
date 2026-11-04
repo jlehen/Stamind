@@ -128,7 +128,7 @@ See §8.
 | `sport_canonical TEXT NOT NULL` | The slot key. `sport_type` keeps the spelling as written. |
 | `void INTEGER NOT NULL DEFAULT 0` | 1 means this slot holds no session as of this revision. |
 | `reason TEXT` | Per-revision note. Replaces `modification_reason` and `removed_reason`. |
-| `restored_from INTEGER` | Only on a `rollback`/`reinstate` copy: the id of the revision this row is a copy of. NULL everywhere else. The adaptation tally follows it to skip spans that were undone (§7). |
+| `restored_from INTEGER` | Only on a `rollback`/`reinstate`/`reprint` copy (the last, DESIGN_endurance_steps.md §6): the id of the revision this row is a copy of. NULL everywhere else. The adaptation tally follows it to skip spans that were undone (§7). |
 
 `reason` merges two columns that never legitimately coexisted on one *revision*: a row's
 note is either why it was changed or why it was cancelled, and the change kind says which.

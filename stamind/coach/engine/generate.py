@@ -8,9 +8,8 @@ calls share come from `sessions.py`.
 from typing import Any, Dict, List, Optional
 
 from stamind.coach.engine.sessions import (
-    SPORT_TYPE_ENUM, athlete_words_task, neighbour_sessions_section,
-    neighbour_sessions_task, planned_zone_fields, planned_zone_task, replaces_field,
-    strength_brief_task,
+    SPORT_TYPE_ENUM, STEPS_FIELD, ask_week_planner, athlete_words_task, endurance_task,
+    neighbour_sessions_section, neighbour_sessions_task, replaces_field, strength_brief_task,
 )
 from stamind.coach.formatting import (
     format_baseline, format_completed_activities, format_metrics_history,
@@ -19,7 +18,6 @@ from stamind.coach.formatting import (
 from stamind.output import step
 from stamind.text import cyan
 from stamind.types import CompletedActivity, Constraint, Objective, Workout
-import stamind.coach.engine as _eng
 
 
 def _standing_sessions_task(standing_workouts: Optional[List[Workout]]) -> str:
@@ -55,7 +53,7 @@ Answer for every session in that list with exactly one of these, and nothing in 
   session stays exactly as it stands, down to the interval structure and prose you were not
   shown, and the athlete sees no change on that day. Count its target toward the week's
   intensity distribution when you write the days around it, but do not restate it: a KEEP
-  carries no "planned_zone_sec" and anything else attached to one is discarded.
+  carries no "steps" and anything else attached to one is discarded.
 - REVISE it. Return it as an ordinary workout in the SAME date and sport, fully written
   out, with a "change_reason". Its history will show the athlete the form it had before.
 - MOVE it, or CHANGE ITS SPORT. Return the session in its new slot, fully written out,
@@ -313,7 +311,7 @@ class WorkoutGenerateMixin:
                 [*(spoken_workouts or []), *(standing_workouts or []),
                  *(neighbour_workouts or [])]
             )
-            + planned_zone_task(zone_currencies)
+            + endurance_task(zone_currencies)
             + "\n"
             "## RESPONSE FORMAT\n"
             "You MUST respond with a JSON object containing:\n"
@@ -335,18 +333,20 @@ class WorkoutGenerateMixin:
             '      "short_name": "Hills", (At most 5 characters naming the kind of session,\n'
             '        e.g. "Easy", "Long", "Hills", "Tempo", "Z2", "VO2", "Gym". null on a\n'
             '        rest day)\n'
-            '      "summary": "Ride easy at 155-175 W on a flat route. Ease off past 178 W.",\n'
+            '      "summary": "Ride 66-74% FTP on a flat route.",\n'
             '        (For the athlete: at most 2 short sentences, about 20 words, a hard\n'
-            '        limit. What to do, and the one or two numbers to hold. Plain words,\n'
+            '        limit. What to do, and the one or two targets to hold, by zone or as a\n'
+            '        share of the threshold, never watts, beats or a pace. Plain words,\n'
             '        no name coined in the description. null on a strength session, whose\n'
             '        line the strength planner writes, and on a rest day)\n'
             '      "description": "Start with the title on its own line in brackets followed by a\n'
             '        newline, e.g. \"[Tempo Run]\\n\", then a detailed description of intensity,\n'
-            '        duration, heart rate zones, and goals.",\n'
+            '        duration and goals. On a run, a ride or a swim, the prose only: see\n'
+            '        WRITING AN ENDURANCE SESSION.",\n'
             "      \"duration_minutes\": 60, (Estimated workout duration in minutes, integer. Use 0 for rest days)\n"
             "      \"rpe\": 6, (Expected Rate of Perceived Exertion, integer 1-10. Use 0 for rest days)\n"
             "      \"tss\": 45, (Expected Training Stress Score, integer. Use 0 for rest days)\n"
-            + planned_zone_fields(zone_currencies)
+            + STEPS_FIELD
             + _standing_answer_fields(standing_workouts) +
             '      "benchmark_type": null (Normally null. Set ONLY on a scheduled fitness\n'
             "        test — see BENCHMARK PLACEMENT — to the test kind, e.g. \"ftp_20min\" |\n"
@@ -453,8 +453,9 @@ class WorkoutGenerateMixin:
             user_content += "\n\n" + "\n\n".join(history_text_parts)
 
         step("Querying OpenRouter to generate training workouts (microcycles)...", cyan)
-        planner_reply = _eng.openrouter_client.complete(
+        return ask_week_planner(
             system_prompt, user_content, label="workout_generate",
             wait_notice="Writing your sessions",
+            entries=lambda reply: reply.get("workouts") or [],
+            zone_currencies=zone_currencies, profile=profile,
         )
-        return planner_reply

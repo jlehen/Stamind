@@ -1,19 +1,25 @@
 """How the week planner writes one session entry.
 
 The prompt sections about a single session rather than about the span: the sport enum
-both schemas list, the intensity target, its two schema members, the `replaces` field,
-the strength brief, what the athlete said about a session, the sessions just outside the days
+both schemas list, a run, a ride or a swim written as steps, the `replaces` field, the
+strength brief, what the athlete said about a session, the sessions just outside the days
 being written, what may not be rewritten, how a move is written, and what a benchmark entry
-must keep. The first seven of those are sent by `workout generate` and `workout adapt` both,
+must keep; and `ask_week_planner`, the call both send, which checks the steps (§4 of
+DESIGN_endurance_steps.md). The first seven sections are sent by `workout generate` and
+`workout adapt` both,
 and a second copy of one would slowly stop meaning the same thing in the two prompts
 (DESIGN_adapt_task_prompt.md §1). The last three only adapt sends today; they live here
 because they are about the entry, not about adapting.
 """
-from typing import Dict, List, Optional, Sequence
+import json
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
+from stamind.coach import steps
 from stamind.coach.formatting import format_neighbour_workouts
+from stamind.coach.steps import SPORTS as ENDURANCE_SPORTS
 from stamind.sports import CANONICAL_SPORTS
 from stamind.types import Workout
+import stamind.coach.engine as _eng
 
 
 def _sport_type_enum() -> str:
@@ -39,58 +45,101 @@ def _sport_type_enum() -> str:
 SPORT_TYPE_ENUM = _sport_type_enum()
 
 
-def planned_zone_task(zone_currencies: Optional[Dict[str, str]]) -> str:
-    """The PRESCRIBING INTENSITY section (DESIGN_intensity_distribution.md §9.8).
-
-    The week planner already decides an intensity target — it writes "6x3min @ VO2max" — and is
-    the only thing in the system that knows the intent. So it states the distribution as
-    structured data while it still knows it, instead of the app parsing it back out of
-    prose afterwards (§10). Which currency each sport is planned in is the APP's call,
-    not the model's: it comes from the same coverage rule the display uses, so the plan
-    is never written in a currency the table cannot render.
-    """
-    if not zone_currencies:
-        return ""
+def endurance_task(zone_currencies: Optional[Dict[str, str]]) -> str:
+    """The WRITING AN ENDURANCE SESSION section: a run, a ride or a swim as steps
+    (DESIGN_endurance_steps.md §3). The zone type per sport is Stamind's call, from the
+    athlete's recordings (`_planning_zone_currencies`)."""
     names = {"power": "power (7 zones)", "hr": "heart rate (5 zones)"}
-    lines = "\n".join(
-        f"  {sport}: {names.get(cur, cur)}"
-        for sport, cur in sorted(zone_currencies.items())
-    )
+    zone_lines = "\n".join(
+        f"  {sport}: {names.get(currency, currency)}"
+        for sport, currency in sorted((zone_currencies or {}).items())
+        if sport in ENDURANCE_SPORTS
+    ) or "  (none yet)"
     return f"""
-### PRESCRIBING INTENSITY (planned time in zone)
-State each session's intensity target as structured data, not only in the prose. The
-currency per sport is fixed by what the athlete's recordings actually cover — use
-exactly these and nothing else:
-{lines}
-A sport not listed above (and any rest day) leaves "planned_zone_currency" null and
-"planned_zone_sec" empty: swimming is anchored on pace and strength on load, and neither
-yields a zone model. Do NOT invent one for them.
+### WRITING AN ENDURANCE SESSION
+Every running, cycling and swimming session carries a "steps" list: its phases in order, each
+with an exact length. Stamind prints the steps at the top of the description, with the clock
+time each phase starts and the watts, beats or pace worked out from the athlete's thresholds,
+and works out the minutes in each zone from them.
+- The "description" holds the "[Title]" line and your prose only: why the session is there,
+  the morning check, the advice, the fuel. Never write a step into it.
+- The steps hold the main path only. An alternative, such as indoors instead of outdoors or
+  an easier session after a poor night, stays in the prose.
+- The steps fill "duration_minutes" exactly. At most one step may give "remainder" as its
+  seconds: Stamind gives it whatever the other steps leave of the duration, and at least 5
+  minutes must be left for it. A swim has no remainder: its steps add up to the duration.
+- Neither the prose nor "summary" gives watts, beats per minute or a pace. Name a target by
+  its zone or as a share of the threshold ("66-74% FTP", "zone 2"). The steps carry the
+  numbers, so a new threshold reaches every session ahead.
 
-Split the session's minutes across the zones the way you intend it to be executed —
-warm-up and recovery minutes into the low zones, work minutes into the target zone. A
-5x4min VO2max session is mostly Z2 by the clock and that is what to write. Do NOT derive
-these numbers from "tss": TSS is duration x intensity folded into one scalar and cannot
-be unfolded, and zones computed from it would make planned-vs-measured intensity a
-restatement of the adherence percentage that already exists.
+Each step has:
+- "phase": "warm-up" | "work" | "steady" | "cool-down".
+- "seconds": one exact number, or "remainder". A range such as "10-15 min" cannot be written.
+  The remainder is a plain step, with no "repeat" and no "recovery".
+- "repeat" and "recovery": an interval set, the work then the recovery, "repeat" times. The
+  recovery follows every repetition, the last one included. A recovery has "seconds", "zone"
+  and "effort". There is no deeper nesting.
+- "zone": the zone in the sport's zone type below, on every step and every recovery. A sport
+  not listed below has no zone type, and its steps carry no "zone". A swim never has one.
+{zone_lines}
+- "target" (optional): {{"anchor": ..., "low": ..., "high": ...}}, a range against one of the
+  athlete's thresholds in the profile. For "ftp" and "lthr" the range is a percentage of the
+  threshold. For "threshold_pace" (per km) and "css" (per 100 m) it is seconds slower than
+  the threshold, and a negative number is faster. Write the percentage or the seconds, never
+  a watt, a beat or a pace: Stamind works those out. An easy step can carry an effort alone.
+- "effort": a few words or an RPE, printed as written ("easy", "8/10").
+- "note" (optional): one short line printed under the step.
+- "metres": on a swim step only, with "seconds" your estimate of how long the metres take.
 
-The seconds do not have to sum to "duration_minutes" x 60 — they are a prescription, not
-an accounting identity. HR sessions fill zones 1-5 and leave 6 and 7 null.
+A 75-minute ride:
+"steps": [
+  {{"phase": "warm-up", "seconds": 900, "zone": 1, "effort": "easy, building to a sweat",
+   "note": "two 1-min lifts to about 93% FTP"}},
+  {{"phase": "work", "repeat": 3, "seconds": 300, "zone": 5,
+   "target": {{"anchor": "ftp", "low": 106, "high": 112}}, "effort": "8/10",
+   "recovery": {{"seconds": 150, "zone": 1, "effort": "easy"}}}},
+  {{"phase": "steady", "seconds": "remainder", "zone": 2,
+   "target": {{"anchor": "ftp", "low": 66, "high": 74}}}},
+  {{"phase": "cool-down", "seconds": 600, "zone": 1, "effort": "easy"}}
+]
 """
 
 
-def planned_zone_fields(zone_currencies: Optional[Dict[str, str]]) -> str:
-    """The two response-schema members carrying §9.8's target, declared the way every
-    other field is: a prose-annotated JSON example."""
-    if not zone_currencies:
-        return ""
-    return (
-        '      "planned_zone_currency": "hr" | "power" | null (the currency for THIS\n'
-        "        session's sport, from PRESCRIBING INTENSITY above; null for rest days\n"
-        "        and for any sport not listed there),\n"
-        '      "planned_zone_sec": [300, 1800, 600, 0, 0, null, null] (seconds intended\n'
-        "        in each zone, low to high. Five entries for heart rate, seven for\n"
-        "        power; use null or omit entirely when the currency is null),\n"
-    )
+STEPS_FIELD = (
+    '      "steps": [...] (Running, cycling and swimming only: see WRITING AN ENDURANCE\n'
+    "        SESSION. Leave it out on every other sport and on a rest day),\n"
+)
+
+
+def ask_week_planner(
+    system: str, user: str, *, label: str, wait_notice: str,
+    entries: Callable[[Dict[str, Any]], Sequence[Any]],
+    zone_currencies: Optional[Dict[str, str]], profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Asks the week planner, and once more when a run, a ride or a swim of its answer fails
+    the check; then prints the steps into each description (DESIGN_endurance_steps.md §4).
+
+    `entries` picks the session entries out of an answer. The second answer replaces the
+    first as a whole."""
+    currencies = zone_currencies or {}
+    reply = _eng.openrouter_client.complete(system, user, label=label, wait_notice=wait_notice)
+    faults = [
+        problem for problem in (
+            steps.fault(entry, currencies) for entry in entries(reply)
+            if steps.writes_steps(entry)
+        ) if problem
+    ]
+    if faults:
+        again = (
+            f"{user}\n\n## YOUR LAST ANSWER\n"
+            f"{json.dumps(reply, ensure_ascii=False, indent=2)}\n\n"
+            "## WHAT TO FIX\n" + "\n".join(faults)
+        )
+        reply = _eng.openrouter_client.complete(
+            system, again, label=label, wait_notice=wait_notice
+        )
+    steps.finish(entries(reply), currencies, profile)
+    return reply
 
 
 def replaces_field(listing: str) -> str:

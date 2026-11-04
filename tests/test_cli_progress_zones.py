@@ -234,7 +234,7 @@ class TestUnknownSportPreferences(unittest.TestCase):
         self.assertIn("cycling", warning)
 
     def test_a_genuinely_new_sport_warns_without_a_suggestion(self):
-        [warning] = unknown_sport_preferences(["swimming"])
+        [warning] = unknown_sport_preferences(["fencing"])
         self.assertIn("not a known sport", warning)
         self.assertNotIn("Did you mean", warning)
 

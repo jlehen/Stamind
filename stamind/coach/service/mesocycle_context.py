@@ -314,6 +314,9 @@ class MesocycleContextMixin:
             datetime.strptime(as_of, "%Y-%m-%d").date()
             - timedelta(days=7 * intensity.PLANNING_COVERAGE_WEEKS)
         ).strftime("%Y-%m-%d")
-        return intensity.currency_by_sport(
+        currencies = intensity.currency_by_sport(
             self._db.get_completed_activities(start_date=start, end_date=as_of)
         )
+        # A swim is planned on pace, whatever its recordings (DESIGN_endurance_steps.md §3).
+        currencies.pop("swimming", None)
+        return currencies

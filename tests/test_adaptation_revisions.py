@@ -20,6 +20,7 @@ import stamind.config
 test_db = Database(db_path=TEST_DB_PATH)
 rebind_test_db(test_db)
 
+from stamind.coach import steps
 from stamind.coach.service import CoachService, coach_service
 
 
@@ -151,10 +152,19 @@ class TestAdaptRevisions(unittest.TestCase):
         dropped. The athlete's day then kept the target the coach had just eased. The
         write path and the preview both count the target, and now so does this
         (DESIGN_intensity_distribution.md §9.8)."""
+        def easy(first_zone):
+            return [
+                {"phase": "warm-up", "seconds": 1800, "zone": first_zone, "effort": "easy"},
+                {"phase": "steady", "seconds": 1800, "zone": 2, "effort": "easy"},
+            ]
+
         with patch.dict(stamind.config.config.data, {
             "user_profile": {"lthr": 165, "max_hr": 185},
             "coach": {"metrics_lookback_days": 3, "minor_activity_load_threshold": 10.0},
-        }):
+        }), patch.object(
+            CoachService, "_planning_zone_currencies", return_value={"running": "hr"}
+        ):
+            # The new steps print the same words as the live ones: only the zones moved.
             mock_client.complete.return_value = {
                 "change_needed": True,
                 "reason": "HRV is down, so the aerobic work goes easier.",
@@ -163,12 +173,11 @@ class TestAdaptRevisions(unittest.TestCase):
                         "date": "2026-06-04",
                         "sport_type": "running",
                         "title": "Easy Run",
-                        "description": "60 mins easy",
+                        "description": "[Easy Run]",
                         "duration_minutes": 60,
                         "rpe": 4,
                         "tss": 40.0,
-                        "planned_zone_currency": "hr",
-                        "planned_zone_sec": [1800, 1800, 0, 0, 0],
+                        "steps": easy(1),
                     },
                 ],
             }
@@ -176,9 +185,10 @@ class TestAdaptRevisions(unittest.TestCase):
             test_db.save_metric_cache("2026-06-03", 50, 60, 80, 20, 10.0, 8.0, 1.1)
             test_db.save_baseline("2026-06-03", 50.0, 2.0, 60.0, 5.0, 80.0, 5.0)
             save_workout(test_db,
-                "2026-06-04", "running", "Easy Run", "60 mins easy",
+                "2026-06-04", "running", "Easy Run",
+                steps.describe("[Easy Run]", "", easy(2), "running", 60, {}),
                 duration_minutes=60, rpe=4, tss=40,
-                planned_zone_currency="hr", planned_zone_sec=[0, 2400, 0, 0, 0],
+                planned_zone_currency="hr", planned_zone_sec=[0, 3600, 0, 0, 0],
             )
 
             proposal = coach_service.workout_adapt("2026-06-03")
@@ -191,6 +201,7 @@ class TestAdaptRevisions(unittest.TestCase):
             # dropped by the proposal's row shape, so the day kept its old one.
             coach_service.workout_revision_apply(proposal)
             live = test_db.get_workout("2026-06-04", "running")
+            self.assertEqual(live["steps"], easy(1))
             self.assertEqual(live["planned_zone_currency"], "hr")
             self.assertEqual(
                 (live["planned_zone1_sec"], live["planned_zone2_sec"]), (1800, 1800)

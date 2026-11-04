@@ -299,11 +299,10 @@ class RevisionApplyMixin:
                     # The strength planner's exercises, written with the revision they
                     # belong to (DESIGN_strength_tracking.md §9).
                     prescribed_sets=w.get('prescribed_sets'),
-                    # A drift correction rewrites HOW a session is prescribed, so its zone
-                    # target moves with it; omitted, the carry-forward preserves what the
-                    # plan already held (DESIGN_intensity_distribution.md §9.8).
+                    # Worked out from the steps (DESIGN_endurance_steps.md §5).
                     planned_zone_currency=zone_currency,
                     planned_zone_sec=zone_sec,
+                    steps=w.get('steps'),
                 )
 
         # Stamped on the athlete's `y`, never on a proposal they declined (§8).

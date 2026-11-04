@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from tests.helpers import clear_all_tables, pin_clock, rebind_test_db
+from tests.helpers import EASY_STEPS, clear_all_tables, pin_clock, rebind_test_db
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_periodization_replan.db")
@@ -89,6 +89,7 @@ class TestReplan(unittest.TestCase):
             "workouts": [{
                 "date": "2026-06-01", "sport_type": "running",
                 "title": "Base Run", "description": "45 mins zone 2",
+                "duration_minutes": 45, "steps": EASY_STEPS,
             }],
         }
 
