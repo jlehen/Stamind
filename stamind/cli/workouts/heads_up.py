@@ -16,6 +16,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple
 from stamind import clock, heads_up, runtime, settings
 from stamind.cli.windows import has_selector, resolve_window
 from stamind.prompt import Choice, athlete_watching
+from stamind.sports import canonical_sport
 from stamind.text import bold, cmd, default_wrap_width, gray, green, red, wrap_text, yellow
 from stamind.output import notice
 from stamind.clock import fmt_timestamp, today_str
@@ -23,6 +24,8 @@ from stamind.clock import fmt_timestamp, today_str
 
 # The days a run may write: its first day, and its last one when the run knows it.
 Window = Tuple[str, Optional[str]]
+
+STRENGTH = canonical_sport("strength_training")
 
 
 def _when(change: Dict[str, Any]) -> str:
@@ -69,8 +72,11 @@ def _reaches(change_id: int, window: Window) -> bool:
     return span[1] >= first and (last is None or span[0] <= last)
 
 
-def _replace_unsent(window: Window) -> Optional[int]:
+def _replace_unsent(window: Window, strength_only: bool) -> Optional[int]:
     """Asks the §5 question and undoes the newest change on "replace".
+
+    A strength-only run builds on a change that wrote any other sport without asking: it
+    could not write those sessions back after an undo (§5).
 
     Returns the newest change that wrote a session right after the undo, the mark a later
     change must pass to count as written, or None when nothing was undone."""
@@ -81,6 +87,8 @@ def _replace_unsent(window: Window) -> Optional[int]:
         return None
     # Days that never meet make two real changes, each with a line of its own (§5).
     if not _reaches(newest["id"], window):
+        return None
+    if strength_only and runtime.db.change_sports(newest["id"]) != {STRENGTH}:
         return None
     choice = runtime.prompt.choose(
         f"The newest change ({newest['kind']}, {_when(newest)}) has not been sent to the "
@@ -103,7 +111,7 @@ def _replace_unsent(window: Window) -> Optional[int]:
 
 
 @contextmanager
-def replacing_unsent(skip: bool, window: Window) -> Iterator[bool]:
+def replacing_unsent(skip: bool, window: Window, strength_only: bool = False) -> Iterator[bool]:
     """Around a terminal `workout generate` or `workout adapt`: offers to undo the newest
     change when the athlete was never told about it, and yields whether it was undone (§5).
 
@@ -112,7 +120,7 @@ def replacing_unsent(skip: bool, window: Window) -> Iterator[bool]:
     asks nothing. The undo comes before the week planner is called, so a run that then
     writes nothing — cancelled, declined or failed — leaves it undone, and says so on the
     way out."""
-    written_upto = None if skip else _replace_unsent(window)
+    written_upto = None if skip else _replace_unsent(window, strength_only)
     try:
         yield written_upto is not None
     finally:

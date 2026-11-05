@@ -332,7 +332,7 @@ def run_workout_generate(args: argparse.Namespace) -> None:
     span = strength_span(args) if strength_only else _resolve_span(args)
     if span is None:
         return
-    with replacing_unsent(skip=force, window=span) as replaced:
+    with replacing_unsent(skip=force, window=span, strength_only=strength_only) as replaced:
         # Untrue once a Replace has undone the earlier attempt; the way out says so
         # instead (§5).
         unchanged = "." if replaced else " — your schedule is unchanged."

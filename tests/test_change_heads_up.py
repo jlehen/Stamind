@@ -164,11 +164,11 @@ class _DbCase(unittest.TestCase):
         started_from(self, "terminal")
 
     def change(self, kind="generate", note="Friday's test moves to Saturday.",
-               day=None, title="Ride"):
+               day=None, title="Ride", sport="cycling"):
         """One change that wrote one session, and its id."""
         with test_db.workout_change(kind=kind, note=note, summary=note) as change:
             change.append(
-                date=day or today_str(), sport_type="cycling", title=title,
+                date=day or today_str(), sport_type=sport, title=title,
                 description="60 min.", duration_minutes=60,
             )
             return change.id
@@ -240,7 +240,7 @@ class ReplaceQuestionTest(_DbCase):
         self.choose = prompt.start()
         self.addCleanup(prompt.stop)
 
-    def _run(self, skip=False, write=None, window=None):
+    def _run(self, skip=False, write=None, window=None, strength_only=False):
         """A terminal run inside the question; `write` is what it writes, if anything.
 
         `window` is the days the run may write, open-ended from today by default, which is
@@ -248,7 +248,7 @@ class ReplaceQuestionTest(_DbCase):
         from stamind.cli.workouts.heads_up import replacing_unsent
         out = StringIO()
         window = window or (today_str(), None)
-        with redirect_stdout(out), replacing_unsent(skip, window) as replaced:
+        with redirect_stdout(out), replacing_unsent(skip, window, strength_only) as replaced:
             if write:
                 write()
         return replaced, out.getvalue()
@@ -341,6 +341,21 @@ class ReplaceQuestionTest(_DbCase):
         self.change(kind="adapt", note="Today's lift is off.", day="2026-09-23")
         self._answer("build")
         self._run(window=("2026-09-23", "2026-10-21"))
+        self.choose.assert_called_once()
+
+    def test_a_strength_only_run_builds_on_a_change_to_other_sports(self):
+        """An undo would take back the ride too, and the strength planner never writes it
+        again."""
+        first = self.change(note="First attempt.")
+        self._answer("replace")
+        self._run(strength_only=True)
+        self.choose.assert_not_called()
+        self.assertTrue(test_db.change_has_live_revisions(first))
+
+    def test_a_strength_only_run_asks_after_a_strength_only_change(self):
+        self.change(note="Circuits written again.", sport="strength_training")
+        self._answer("build")
+        self._run(strength_only=True)
         self.choose.assert_called_once()
 
     def test_the_question_names_the_change_by_kind_and_time(self):

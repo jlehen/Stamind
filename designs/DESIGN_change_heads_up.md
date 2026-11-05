@@ -362,6 +362,17 @@ last day the unsent change wrote:
 - `workout tweak -d` names the days outright, so those are its span. Without `-d` the week
   planner reads the days off the message, and the tweak counts as open-ended like an adapt.
 
+Amended 2026-11-04: `workout generate --strength-only` rewrites strength sessions and
+nothing else. So it asks the question only when the unsent change wrote strength sessions
+and nothing else. Any other change, it builds on without asking. It is Wednesday, 11:41. A
+`workout generate` shortens Sunday's long run and clears the runs out of her holiday. At
+22:18 the operator rewrites her circuits with `--strength-only`. A Replace would undo the
+whole 11:41 change: the long run would go back to 65 minutes and the holiday runs would come
+back. The strength-only run would then write back only the circuits. So nothing is asked,
+and the circuits are written on top of the 11:41 week. If the 11:41 run had been a
+strength-only run too, the question would still be asked, and Replace would leave one
+change and one message.
+
 **Replace** rolls change 7 back, exactly as `workout rollback` would, and then runs the
 command. The week planner sees the week she knows, so the line it writes is right for her.
 The rollback itself says nothing, because she never heard of change 7 (§3). Three attempts in

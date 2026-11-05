@@ -196,6 +196,17 @@ class WorkoutHistoryMixin:
             return None
         return row["first"], row["last"]
 
+    def change_sports(self, change_id: int) -> Set[str]:
+        """The canonical sports of every session a change wrote, removed ones included: a
+        strength-only run offers to replace only a change that wrote strength alone
+        (DESIGN_change_heads_up.md §5)."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT sport_canonical FROM workouts WHERE change_id = ?",
+                (change_id,),
+            ).fetchall()
+        return {row["sport_canonical"] for row in rows}
+
     def wrote_between(self, after_change_id: int, start: str, end: str) -> bool:
         """Whether a change newer than `after_change_id` wrote a session dated `start` to
         `end`: what puts saved weeks out of date (DESIGN_long_runs_beside_chat.md §4)."""
