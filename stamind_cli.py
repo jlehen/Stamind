@@ -13,7 +13,7 @@ from stamind import clock, journal
 from stamind.page_files import sync as _page_files
 from stamind.prompt import PromptCancelled
 from stamind.text import bold, cyan, dim, red
-from stamind.output import aside, notice
+from stamind.output import aside, notice, route_library_logs
 
 from stamind.cli.argparse_ext import (
     UsageExit, WrapAwareArgumentParser,
@@ -361,6 +361,7 @@ def main(argv=None) -> None:
 
 
 if __name__ == "__main__":
+    route_library_logs()
     try:
         main()
     except PromptCancelled:

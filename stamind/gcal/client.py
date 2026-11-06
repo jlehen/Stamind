@@ -96,42 +96,33 @@ class CalendarSyncer:
                     )
                 return google_event_id
             except HttpError as e:
-                if e.resp.status in (404, 410):
-                    warn(
-                        f"Calendar event {google_event_id} was deleted on Google "
-                        f"Calendar. Re-creating a new one..."
-                    )
-                    # Fall through to insert new event
-                else:
-                    print(f"Error updating Google Calendar event: {e}")
-                    raise e
-            except Exception as e:
-                print(f"Error updating Google Calendar event: {e}")
-                raise e
+                if e.resp.status not in (404, 410):
+                    raise
+                warn(
+                    f"Calendar event {google_event_id} was deleted on Google "
+                    f"Calendar. Re-creating a new one..."
+                )
+                # Fall through to insert new event
 
         # Create a new event
-        try:
-            created_event = self.service.events().insert(
-                calendarId=self.calendar_id,
-                body=body
-            ).execute()
-            new_event_id = created_event.get('id')
-            if _event_log:
-                print(
-                    f"Created new calendar event for {fmt_date(workout['date'])} "
-                    f"({workout['sport_type']})."
-                )
+        created_event = self.service.events().insert(
+            calendarId=self.calendar_id,
+            body=body
+        ).execute()
+        new_event_id = created_event.get('id')
+        if _event_log:
+            print(
+                f"Created new calendar event for {fmt_date(workout['date'])} "
+                f"({workout['sport_type']})."
+            )
 
-            # Record the push: store the new event handle + the signature of what we
-            # just pushed, so the row derives as `synced` until edited again.
-            if workout.get('id') is not None:
-                runtime.db.mark_workout_pushed(
-                    workout['id'], new_event_id, calendar_signature(workout)
-                )
-            return str(new_event_id)
-        except Exception as e:
-            print(f"Error inserting event to Google Calendar: {e}")
-            raise e
+        # Record the push: store the new event handle + the signature of what we
+        # just pushed, so the row derives as `synced` until edited again.
+        if workout.get('id') is not None:
+            runtime.db.mark_workout_pushed(
+                workout['id'], new_event_id, calendar_signature(workout)
+            )
+        return str(new_event_id)
 
     def sync_multiple(self, workouts: List[Workout]) -> List[Optional[str]]:
         """Syncs a list of workouts sequentially, under one self-erasing progress bar.

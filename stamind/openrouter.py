@@ -203,7 +203,7 @@ class OpenRouterClient:
         """An error the API reported inside a 200 body, top-level or in the choice:
         printed, logged and journalled as a failed call; the caller raises it."""
         err_msg = err_obj.get("message") if isinstance(err_obj, dict) else str(err_obj)
-        print(f"OpenRouter API error: {err_msg}")
+        aside(f"OpenRouter API error: {err_msg}")
         path = self._log_exchange(
             label, system_content, user_content,
             response_data=resp_data, error_msg=f"OpenRouter Error: {err_msg}"
@@ -450,10 +450,10 @@ class OpenRouterClient:
             return parsed
 
         except requests.exceptions.HTTPError as he:
-            print(f"HTTP Error calling OpenRouter: {he}")
+            aside(f"HTTP Error calling OpenRouter: {he}")
             resp_text = response.text if response is not None else ""
             if resp_text:
-                print(f"Response Body: {resp_text}")
+                aside(f"Response Body: {resp_text}")
             err_msg = f"HTTP Error: {he}\nResponse: {resp_text}"
             path = self._log_exchange(
                 label, system_content, user_content, error_msg=err_msg
@@ -461,7 +461,7 @@ class OpenRouterClient:
             self._record_call(label, started, False, None, path, f"HTTP Error: {he}")
             raise he
         except Exception as e:
-            print(f"Error calling OpenRouter completions: {e}")
+            aside(f"Error calling OpenRouter completions: {e}")
             if not logged:
                 path = self._log_exchange(
                     label, system_content, user_content,

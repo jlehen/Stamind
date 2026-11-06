@@ -116,8 +116,8 @@ def _ingest_activities(client: GarminClient, start: str, end: str, throttle: flo
     # Connect). Without this they linger and surface as unplanned activities.
     pruned = runtime.db.prune_completed_activities(start, end, fetched_ids)
     if pruned:
-        print(f"  Removed {pruned} activit{'y' if pruned == 1 else 'ies'} "
-              "deleted in Garmin since the last sync.")
+        step(f"Removed {pruned} activit{'y' if pruned == 1 else 'ies'} "
+             "deleted in Garmin since the last sync.")
     return len(activities)
 def _ingest_metrics(client: GarminClient, start: str, end: str, throttle: float) -> int:
     """Ingests one row per day in the range, returning how many days that was."""

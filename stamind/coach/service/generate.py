@@ -24,8 +24,8 @@ from stamind.sports import canonical_sport
 from stamind.gcal.reconcile import verbose_events
 from stamind.analytics import intensity
 from stamind.strength import planner as strength_planner
-from stamind.text import cmd, green, keep_whole
-from stamind.output import notice
+from stamind.text import cmd, keep_whole
+from stamind.output import notice, step
 from stamind.clock import fmt_date, shift, today_str as _today_str
 
 
@@ -86,10 +86,8 @@ class WorkoutGenMixin:
             today_str, completed_activities
         ):
             gen_start_str = (today_date_obj + timedelta(days=1)).strftime("%Y-%m-%d")
-            print(green(
-                f"Today's workout is already completed — preserving it and regenerating "
-                f"from {gen_start_str}."
-            ))
+            step(f"Today's session is already done, so it stays and the sessions are "
+                 f"written from {gen_start_str}.")
         gen_start_obj = datetime.strptime(gen_start_str, "%Y-%m-%d").date()
 
         if end_date is not None:

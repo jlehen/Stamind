@@ -1,6 +1,7 @@
 """`stamind/output.py`: which tier a message belongs to, and who therefore sees it."""
 import ast
 import io
+import logging
 import os
 import unittest
 from unittest.mock import patch
@@ -240,6 +241,23 @@ class TestWarningTierWraps(unittest.TestCase):
             self._emit(self.output.warn, self.LONG)
         self.assertEqual(note.call_args.args[0], self.LONG)
 
+
+
+class TestLibraryLogs(unittest.TestCase):
+    def test_a_library_warning_goes_to_the_journal_and_not_to_the_chat(self):
+        # garminconnect's retry warning used to reach the chat through stderr.
+        log = logging.getLogger("garminconnect.test")
+        log.propagate = False
+        handler = output_module._LibraryLog()
+        log.addHandler(handler)
+        self.addCleanup(log.removeHandler, handler)
+        out, err = io.StringIO(), io.StringIO()
+        with patch.dict(os.environ, {"STAMIND_VERBOSE": "0"}), \
+                patch("sys.stdout", out), patch("sys.stderr", err), \
+                patch("stamind.journal.note") as note:
+            log.warning("retrying in %.1fs", 0.5)
+        self.assertEqual((out.getvalue(), err.getvalue()), ("", ""))
+        note.assert_called_once_with("garminconnect.test: retrying in 0.5s", lvl="warn")
 
 if __name__ == "__main__":
     unittest.main()

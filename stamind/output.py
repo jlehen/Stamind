@@ -8,6 +8,7 @@ athlete's own data reported back — always printed, never journalled. `Progress
 
 How the text is coloured and wrapped is `text.py`; this module only decides who sees it.
 """
+import logging
 import sys
 import threading
 import time
@@ -37,6 +38,22 @@ def step(text: str, color_fn=None) -> None:
     so nothing on screen moves; the difference is that it survives the screen."""
     aside(text, color_fn)
     journal.note(strip_ansi(text))
+
+
+class _LibraryLog(logging.Handler):
+    """A library's log record, such as garminconnect's "retrying in 0.5s": side information
+    in the journal, where Python's fallback handler would print it to stderr, and the bot
+    sends stderr to the chat. A failure that matters reaches the caller as an exception."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        text = f"{record.name}: {record.getMessage()}"
+        aside(text)
+        journal.note(text, lvl="warn" if record.levelno < logging.ERROR else "error")
+
+
+def route_library_logs() -> None:
+    """Sends every library's log records through `_LibraryLog`; called once per process."""
+    logging.getLogger().addHandler(_LibraryLog())
 
 
 def warn(text: str) -> None:
