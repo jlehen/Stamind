@@ -114,7 +114,6 @@ class Session:
         self.task: Optional["asyncio.Task"] = None
         self.sent = False                         # whether anything was sent to the chat
         self.quiet = quiet                        # scheduler-run: silence "(no output)"
-        self.last_message_id: Optional[int] = None  # anchor for a SM-BUTTONS row
 
 
 def cli_env(
@@ -282,14 +281,17 @@ class RunnerMixin:
                     await self._flush_output(session, buf)
                     buf = []
                     continue
+                if tag == BUTTONS_SENTINEL:
+                    # The row rides on the buffered prose's last message.
+                    await self._send_ui_buttons(session, payload, buf)
+                    buf = []
+                    continue
                 # Every other frame renders something of its own, so whatever prose is
                 # buffered is a message that ends here.
                 await self._flush_output(session, buf)
                 buf = []
                 if tag == PHOTO_SENTINEL:
                     await self._send_photo(session, payload)
-                elif tag == BUTTONS_SENTINEL:
-                    await self._send_ui_buttons(session, payload)
                 elif tag == QUEUE_SENTINEL:
                     await self._send_queue_item(session, payload)
                 elif tag == PROMPT_SENTINEL:

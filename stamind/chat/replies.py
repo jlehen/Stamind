@@ -99,28 +99,37 @@ class RepliesMixin:
                            chat=chat_id)
         return await send(text=text, **kwargs)
 
-    async def _flush_output(self, session: Session, buf: List[str]) -> bool:
-        """Sends the buffered output; True when something went out, so the caller knows
-        whether `session.last_message_id` is a fresh anchor to attach buttons to."""
+    async def _flush_output(self, session: Session, buf: List[str], buttons=None) -> bool:
+        """Sends the buffered output; True when something went out. `buttons`, an inline
+        keyboard, rides on the last message in place of the reply keyboard."""
         text = "\n".join(buf).strip()
         if not text:
             return False
         session.sent = True
         parse_mode = telegram_api.html_parse_mode()
-        for part in format_reply(text):
-            sent = await self._send_keyed(session.chat_id, part, parse_mode=parse_mode)
-            session.last_message_id = sent.message_id
+        parts = format_reply(text)
+        for part in parts[:-1]:
+            await self._send_keyed(session.chat_id, part, parse_mode=parse_mode)
+        if buttons is None:
+            await self._send_keyed(session.chat_id, parts[-1], parse_mode=parse_mode)
+        else:
+            await self.bot.send_message(
+                chat_id=session.chat_id, text=parts[-1], parse_mode=parse_mode,
+                reply_markup=buttons,
+            )
         self._log(session.chat_id, "<<", repr(text))
         return True
 
-    async def _send_ui_buttons(self, session: Session, req: dict) -> None:
-        """Attaches a SM-BUTTONS row to the output just flushed (§4.4). Non-blocking:
-        the CLI has already moved on; the payload is stored per chat and taps feed the
-        canned utterance back through the normal pipeline. Falls back to its own
-        message when there is nothing to anchor to."""
+    async def _send_ui_buttons(self, session: Session, req: dict, buf: List[str]) -> None:
+        """Sends the buffered output with a SM-BUTTONS row on its last message (§4.4).
+        Non-blocking: the CLI has already moved on; the payload is stored per chat and taps
+        feed the canned utterance back through the normal pipeline. The row goes out with
+        the text, not edited in after it: Telegram refuses inline buttons on a message
+        sent under the reply keyboard. With no text to carry it, it goes under a 👇."""
         buttons = [b for b in (req.get("buttons") or []) if isinstance(b, dict)]
         pages = page_rows(req.get("page"))
         if not buttons and not pages:
+            await self._flush_output(session, buf)
             return
         rows = []
         # A page button alone is no live row: the row it would replace keeps its buttons
@@ -131,22 +140,11 @@ class RepliesMixin:
             rows = ui_button_rows(buttons, token)
         keyboard = telegram_api.inline_keyboard(rows + pages)
         labels = f"buttons {[b.get('label') for b in buttons] + [r[0][0] for r in pages]}"
-        session.sent = True
-        if session.last_message_id is not None:
-            try:
-                await self.bot.edit_message_reply_markup(
-                    chat_id=session.chat_id, message_id=session.last_message_id,
-                    reply_markup=keyboard,
-                )
-                self._log(session.chat_id, "<<", labels)
-                return
-            except Exception as exc:
-                # Older client / edited race — degrade to a fresh message
-                # (DESIGN_logging.md §5.5).
-                journal.debug("bot.event", f"button attach failed: {exc}")
-        await self.bot.send_message(
-            chat_id=session.chat_id, text="👇", reply_markup=keyboard,
-        )
+        if not await self._flush_output(session, buf, keyboard):
+            session.sent = True
+            await self.bot.send_message(
+                chat_id=session.chat_id, text="👇", reply_markup=keyboard,
+            )
         self._log(session.chat_id, "<<", labels)
 
     async def _send_queue_item(self, session: Session, req: dict) -> None:

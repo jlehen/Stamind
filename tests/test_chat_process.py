@@ -311,7 +311,6 @@ class SendGuardTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(sent)
         self.assertEqual(self.chat_bot.bot.texts(), ["your week"])
         self.assertNotIn("reply_markup", self.chat_bot.bot.sent[0][2])
-        self.assertEqual(self.session.last_message_id, 101)
         self.assertEqual(self.errors(), ["sent without the keyboard: no db"])
 
     async def test_a_keyboard_telegram_refuses_is_dropped_and_the_text_sent_again(self):
@@ -380,11 +379,10 @@ class SendingTest(unittest.IsolatedAsyncioTestCase):
         self.chat_bot = build_chat_bot(self)
         self.session = runner.Session(42, _FakeProc(), "n0nce")
 
-    async def test_a_flush_sends_the_buffer_and_notes_the_anchor(self):
+    async def test_a_flush_sends_the_buffer(self):
         sent = await self.chat_bot._flush_output(self.session, ["one", "two"])
         self.assertTrue(sent)
         self.assertEqual(self.chat_bot.bot.texts(), ["one\ntwo"])
-        self.assertEqual(self.session.last_message_id, 101)
         self.assertTrue(self.session.sent)
 
     async def test_a_flush_logs_the_words_it_sent(self):
@@ -396,16 +394,32 @@ class SendingTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(await self.chat_bot._flush_output(self.session, ["", "  "]))
         self.assertEqual(self.chat_bot.bot.sent, [])
 
-    async def test_an_offer_is_remembered_per_chat_and_attached_to_the_last_message(self):
-        await self.chat_bot._flush_output(self.session, ["your week"])
+    def markup(self, i=-1):
+        return self.chat_bot.bot.sent[i][2].get("reply_markup")
+
+    async def test_an_offer_is_remembered_per_chat_and_sent_on_the_text(self):
+        """Not edited in after it: Telegram refuses inline buttons on a message sent under
+        the reply keyboard, and the bot then fell back to a "👇" message."""
         await self.chat_bot._send_ui_buttons(
-            self.session, {"buttons": [{"label": "Too tired", "send": "status"}]}
+            self.session, {"buttons": [{"label": "Too tired", "send": "status"}]},
+            ["your week"],
         )
         token, buttons = self.chat_bot.ui_actions[42]
         self.assertEqual(buttons[0]["label"], "Too tired")
-        self.assertEqual(self.chat_bot.bot.edits[-1][1], 101)
-        self.assertEqual(self.chat_bot.bot.edits[-1][2][0][0][1],
-                         keyboards.ui_callback_data(token, "0"))
+        self.assertEqual(self.chat_bot.bot.texts(), ["your week"])
+        self.assertEqual(self.chat_bot.bot.edits, [])
+        self.assertEqual(self.markup()[0][0][1], keyboards.ui_callback_data(token, "0"))
+
+    async def test_with_no_text_the_row_goes_under_a_pointing_hand(self):
+        await self.chat_bot._send_ui_buttons(
+            self.session, {"buttons": [{"label": "Too tired", "send": "status"}]}, [],
+        )
+        self.assertEqual(self.chat_bot.bot.texts(), ["👇"])
+        self.assertTrue(self.session.sent)
+
+    async def test_an_empty_row_still_sends_the_text(self):
+        await self.chat_bot._send_ui_buttons(self.session, {"buttons": []}, ["your day"])
+        self.assertEqual(self.chat_bot.bot.texts(), ["your day"])
 
     PAGE = {"label": "🔎 Tell me more",
             "url": "https://x/details.html#d=2026-10-20&k=secret&b=pages&f=1"}
@@ -415,18 +429,19 @@ class SendingTest(unittest.IsolatedAsyncioTestCase):
         "📅 Today", it leaves the morning's live row as it was; its address is never
         journalled."""
         page_row = [("🔎 Tell me more", telegram_api.PAGE_CELL + self.PAGE["url"])]
-        await self.chat_bot._flush_output(self.session, ["your day"])
         with mock.patch.object(self.chat_bot, "_log") as log:
             await self.chat_bot._send_ui_buttons(self.session, {
                 "buttons": [{"label": "👍 Got it", "ack": "Nice"}], "page": self.PAGE,
-            })
+            }, ["your day"])
             token, live = self.chat_bot.ui_actions[42]
             self.assertEqual([b["label"] for b in live], ["👍 Got it"])
-            self.assertEqual(self.chat_bot.bot.edits[-1][2][-1], page_row)
+            self.assertEqual(self.markup()[-1], page_row)
 
-            await self.chat_bot._send_ui_buttons(self.session, {"buttons": [], "page": self.PAGE})
+            await self.chat_bot._send_ui_buttons(
+                self.session, {"buttons": [], "page": self.PAGE}, ["your day"],
+            )
             self.assertEqual(self.chat_bot.ui_actions[42][0], token)
-            self.assertEqual(self.chat_bot.bot.edits[-1][2], [page_row])
+            self.assertEqual(self.markup(), [page_row])
         self.assertNotIn("secret", repr(log.call_args_list))
 
     async def test_the_chart_is_sent_and_its_temp_file_unlinked(self):
