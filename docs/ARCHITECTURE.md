@@ -1534,10 +1534,11 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    revision counts as an easing is decided at read time, against its predecessor
    (DESIGN_workout_revisions.md §7). Calendar follows from the reconcile.
 7. A run started from the athlete's chat does not ask and apply: `_adapt` saves the
-   proposal to the athlete queue (`cli/workouts/proposal.py:save`) and sends it
-   (`cli/queue.py:send_alone`); "Change it" writes it through `workout_revision_apply`
-   unless it is out of date. One proposal is open at a time: every run reads it
-   (`proposal.open_proposal`) and shows it to the week planner
+   proposal to the athlete queue (`cli/workouts/proposal.py:save`). The run's questions go
+   out first, one per tap, and `cli/queue.py:send_own_questions` sends the proposal after
+   the last one (`athlete_queue.held_back`); "Change it" writes it through
+   `workout_revision_apply` unless it is out of date. One proposal is open at a time: every
+   run reads the one sent (`proposal.open_proposal`) and shows it to the week planner
    (`proposal.shown_to_week_planner`), and saving one closes the others
    (DESIGN_waiting_proposal.md §2, §3, §6, §7).
 8. Apply, no-change and save each write the run's picture to the `settings` row

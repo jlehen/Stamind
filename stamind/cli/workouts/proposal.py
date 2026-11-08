@@ -157,12 +157,15 @@ def waiting() -> List[Dict[str, Any]]:
 
 
 def open_proposal() -> Optional[Dict[str, Any]]:
-    """The proposal that waits and is not out of date, or None. One that waits and is out
-    of date is closed on the way (§6.2)."""
+    """The proposal that was sent, waits and is not out of date, or None. One that waits and
+    is out of date is closed on the way (§6.2). One still held behind its run's questions
+    was never read, so the next proposal closes it without a word (§6.3)."""
     found = None
     for item in waiting():
         if out_of_date(item):
             runtime.db.close_queue_item(item["id"], STALE, clock.now())
+            continue
+        if not item["sent_at"]:
             continue
         found = item
     return found

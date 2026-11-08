@@ -239,6 +239,16 @@ def run_questions(queued_at: str) -> List[Dict[str, Any]]:
     ]
 
 
+def held_back(queued_at: str) -> Optional[Dict[str, Any]]:
+    """The stand-alone item the run which started at `queued_at` saved and has not sent, or
+    None. It goes out after that run's questions (DESIGN_waiting_proposal.md §6.3)."""
+    for item in runtime.db.waiting_queue_items():
+        if (item["queued_at"] == queued_at and kind_of(item).stands_alone
+                and not item["sent_at"] and not settle_if_stale(item)):
+            return item
+    return None
+
+
 def sent(item: Dict[str, Any]) -> None:
     """Records that an item was put in front of the athlete: it is out (§13.2 rule 3)."""
     runtime.db.mark_queue_sent(item["id"], clock.now())

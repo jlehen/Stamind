@@ -632,6 +632,11 @@ Amended 2026-10-08 (DESIGN_waiting_proposal.md §6.3): in the chat the run no lo
 about the constraint. It saves the question as a queued question and ends, and the athlete's
 tap on "Yes" creates the row. A terminal run keeps the order above.
 
+Amended 2026-11-06 (DESIGN_waiting_proposal.md §6.3): in the chat the question comes first
+again, and the proposal follows its answer. The proposal is written before the question is
+asked, so the answer does not change it. The author ruled that an unanswered question may hold
+the proposal back.
+
 Amended 2026-11-04: each entry also carries `can_train`, true or false when the athlete's
 words say whether they can train during it, null when they do not. It is Sunday 25 October.
 She writes "I am in vacation from 15 novembre to 25 novembre". The words do not say whether

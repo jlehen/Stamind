@@ -222,17 +222,21 @@ def send_next(after: Optional[Dict[str, Any]] = None) -> bool:
 
 def send_own_questions(queued_at: Optional[str] = None) -> bool:
     """Sends the first question a run queued and has not asked, whatever else is out: a
-    reply does not wait in the line. The run is this command's unless `queued_at` names
-    another. Nothing goes out while that run has an item out, and the next goes out when it
-    is answered (§13.2 rules 3 and 6, DESIGN_waiting_proposal.md §6.3). True when that run
-    has a question out."""
+    reply does not wait in the line. Once none is left, it sends the proposal the run saved
+    and held back. The run is this command's unless `queued_at` names another. Nothing goes
+    out while that run has an item out, and the next goes out when it is answered (§13.2
+    rules 3 and 6, DESIGN_waiting_proposal.md §6.3). True when that run has an item out."""
     stamp = queued_at or queue_stamp(clock.command_start())
     now = clock.now()
     if any(item["queued_at"] == stamp and athlete_queue.is_out(item, now)
            for item in runtime.db.waiting_queue_items()):
         return True
     items = athlete_queue.run_questions(stamp)
-    if not items:
+    if items:
+        send_item(items[0], len(items))
+        return True
+    held = athlete_queue.held_back(stamp)
+    if held is None:
         return False
-    send_item(items[0], len(items))
+    send_alone(held)
     return True

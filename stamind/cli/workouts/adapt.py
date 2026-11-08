@@ -25,7 +25,7 @@ from stamind.cli.candidates import (
     queue_note_question, tell_open_ended,
 )
 from stamind.cli.common import ensure_recent_data
-from stamind.cli.queue import send_alone, send_own_questions
+from stamind.cli.queue import send_own_questions
 from stamind.cli.runway import current_runway, plan_is_behind
 from stamind.cli.workouts import cut_short, proposal as saved_proposal
 from stamind.cli.workouts.heads_up import (
@@ -109,15 +109,16 @@ def _settle(
 ) -> None:
     """What becomes of the week planner's answer. A terminal run shows the preview, asks and
     applies. A run started from the athlete's chat never asks and never waits: it saves its
-    proposal and sends it, and `-y` writes without asking wherever it was typed
-    (DESIGN_waiting_proposal.md §2).
+    proposal, which goes out after the run's questions (§6.3), and `-y` writes without
+    asking wherever it was typed (DESIGN_waiting_proposal.md §2).
 
     `replaces` says a proposal was open when the run started, and `written_upto` is the
     newest change that wrote a session at that moment (§6.2)."""
     saves = in_chat and not args.auto
     if saves and proposal.week_planner_changed:
         # In place of the confirm: the reason and the preview, then the two answers (§3).
-        send_alone(saved_proposal.save(proposal, written_upto, replaces=replaces))
+        # `send_own_questions` sends it once the run's questions are answered (§6.3).
+        saved_proposal.save(proposal, written_upto, replaces=replaces)
         return
 
     runtime.render.adapt_reason(proposal.reason)
@@ -243,8 +244,8 @@ def _consult(
 
         # The questions about a constraint or a signal found in the note. A terminal asks them
         # before the preview (DESIGN_constraints.md §8). The chat queues them, the
-        # cut-short question after them: they go out at once, or behind the proposal when
-        # its answer comes (DESIGN_waiting_proposal.md §6.3, DESIGN_chat_questions.md §3).
+        # cut-short question after them, and they go out one by one before the proposal
+        # (DESIGN_waiting_proposal.md §6.3, DESIGN_chat_questions.md §3).
         if not in_chat:
             _confirm_candidates(proposal, date_str, message)
         _settle(args, tweak, proposal, in_chat, still_open is not None, written_upto)

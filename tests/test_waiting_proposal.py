@@ -91,7 +91,11 @@ class _Case(unittest.TestCase):
         )
 
     def save(self, **kwargs):
-        return saved_proposal.save(self.eased(**kwargs), newest_written())
+        """A proposal saved and sent, as the athlete has it."""
+        item = saved_proposal.save(self.eased(**kwargs), newest_written())
+        if item is not None:   # a second save in the same instant queues nothing
+            athlete_queue.sent(item)
+        return item
 
     def tap(self, item, action="a1"):
         """A tap on an item's button."""
@@ -900,25 +904,24 @@ class ChatRunTest(_Case):
 
     def proposed_with_a_constraint(self, constraint=CONSTRAINT):
         """08:30, with a message out and unanswered since 08:00: the run finds a constraint
-        in what the athlete wrote and proposes a change. The proposal goes out although
-        the message is out. Returns the one question the run sent."""
+        in what the athlete wrote and proposes a change. The question about the constraint
+        goes out although the message is out, and the proposal waits behind it. Returns
+        the one question the run sent."""
         athlete_queue.tell("Charge your watch tonight.")
         [self.message] = queue_lines(self.step())
         self.at(8, 30)
         _coach, prompt, out = self.coach_run(self.eased(new_constraints=constraint))
         prompt.confirm.assert_not_called()
-        [proposal] = queue_lines(out)
-        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
-        return proposal
-
-    def test_in_the_chat_the_constraint_question_waits_for_the_proposals_answer(self):
-        """One question at a time: the run sends its proposal and ends. The answer brings
-        the question about what the athlete wrote, and not the message left since the
-        morning, which is out (§6.3)."""
-        proposal = self.proposed_with_a_constraint()
-        out = self.tap(proposal, "a2")
         [question] = queue_lines(out)
-        self.assertLess(out.index(saved_proposal.KEPT_LINE), out.index(QUEUE_SENTINEL))
+        self.assertIn("this constraint?", question["text"])
+        self.assertNotIn("Rough night.", out)
+        return question
+
+    def test_in_the_chat_the_constraint_question_comes_before_the_proposal(self):
+        """One question at a time: the run sends the question about what the athlete wrote
+        and ends. Its answer brings the proposal, and the proposal's answer brings nothing:
+        the message left since the morning is out (§6.3)."""
+        question = self.proposed_with_a_constraint()
         self.assertEqual(
             question["text"],
             "Shall I remember this constraint? “no run on Fridays” — Fri Oct 09",
@@ -930,6 +933,13 @@ class ChatRunTest(_Case):
             [c["title"] for c in test_db.get_constraints(FRIDAY, FRIDAY)], ["no run on Fridays"]
         )
         self.assertIn("Noted — I'll work around that", out)
+        [proposal] = queue_lines(out)
+        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
+        self.assertLess(out.index("Noted"), out.index("Rough night."))
+        self.assertLess(out.index("Rough night."), out.index(QUEUE_SENTINEL))
+
+        out = self.tap(proposal, "a2")
+        self.assertIn(saved_proposal.KEPT_LINE, out)
         # The coach has just read the message: no offer, no next question, no closing line.
         self.assertNotIn(BUTTONS_SENTINEL, out)
         self.assertEqual(queue_lines(out), [])
@@ -939,31 +949,30 @@ class ChatRunTest(_Case):
         """The message of 08:00 is still out when the run's questions are answered, so it
         is not brought up again on Thursday. On Friday at 08:00 it is
         (DESIGN_athlete_queue.md §13.5 choice 1)."""
-        proposal = self.proposed_with_a_constraint()
-        [question] = queue_lines(self.tap(proposal, "a2"))
-        self.assertEqual(queue_lines(self.tap(question, "a1")), [])
+        question = self.proposed_with_a_constraint()
+        [proposal] = queue_lines(self.tap(question, "a1"))
+        self.assertEqual(queue_lines(self.tap(proposal, "a2")), [])
         self.at(20)
         self.assertEqual(queue_lines(self.step()), [])
         self.at(8, days=1)
         [again] = queue_lines(self.step())
         self.assertEqual(again["id"], self.message["id"])
 
-    def test_at_night_the_runs_proposal_and_its_question_do_not_wait_for_a_wake(self):
-        """23:30, past the evening time. The run sends its proposal itself, and the tap
-        brings the question about what the athlete wrote: no wake is involved
+    def test_at_night_the_runs_question_and_its_proposal_do_not_wait_for_a_wake(self):
+        """23:30, past the evening time. The run sends the question about what the athlete
+        wrote itself, and the tap brings the proposal: no wake is involved
         (DESIGN_athlete_queue.md §13.5, choice 15)."""
         self.at(23, 30)
         _coach, _prompt, out = self.coach_run(self.eased(new_constraints=self.CONSTRAINT))
-        [proposal] = queue_lines(out)
-        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
-        [question] = queue_lines(self.tap(proposal, "a2"))
+        [question] = queue_lines(out)
         self.assertIn("this constraint?", question["text"])
+        [proposal] = queue_lines(self.tap(question, "a2"))
+        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
 
     def test_a_date_the_model_left_out_counts_from_the_day_of_the_message(self):
-        proposal = self.proposed_with_a_constraint(
+        question = self.proposed_with_a_constraint(
             ({"title": "no run", "start_date": None, "end_date": SATURDAY},)
         )
-        [question] = queue_lines(self.tap(proposal, "a2"))
         self.at(9, days=1)
         self.tap(question, "a1")
         [constraint] = test_db.get_constraints(THURSDAY, SATURDAY)
@@ -977,29 +986,44 @@ class ChatRunTest(_Case):
         [question] = queue_lines(self.step())
         self.assertIn("this constraint?", question["text"])
 
-    def test_a_tap_on_the_proposal_the_next_day_does_not_repeat_a_question_that_is_out(self):
-        """Friday 08:00: the constraint question goes out first, and it is left. 09:00: the
-        tap on Thursday's proposal brings nothing."""
-        proposal = self.proposed_with_a_constraint()
+    def test_a_proposal_out_of_date_when_its_question_is_answered_is_never_sent(self):
+        """Thursday's proposal eases Thursday. The constraint question is left until Friday
+        09:00, so the tap brings no proposal, and the proposal is closed (§6.3)."""
+        self.proposed_with_a_constraint()
         self.at(8, days=1)
         [question] = queue_lines(self.step())
         self.assertIn("this constraint?", question["text"])
         self.at(9, days=1)
-        out = self.tap(proposal, "a2")
-        self.assertIn(saved_proposal.OUT_OF_DATE_LINE, out)
-        self.assertEqual(queue_lines(out), [])
+        out = self.tap(question, "a1")
+        self.assertNotIn(saved_proposal.QUESTION_LINE, out)
+        self.assertNotIn("Rough night.", out)
+        self.assertEqual(saved_proposal.waiting(), [])
+
+    def test_a_proposal_held_behind_its_question_is_not_shown_to_the_next_run(self):
+        """08:30 the constraint question goes out and the proposal waits behind it. 08:40 the
+        athlete writes again. That run is not told of a proposal the athlete never read,
+        and its own proposal does not say it replaces one (§6.3)."""
+        self.proposed_with_a_constraint()
+        [held] = saved_proposal.waiting()
+        self.at(8, 40)
+        _coach, _prompt, _out = self.coach_run(self.eased(minutes=45))
+        self.assertNotIn("open_proposal", self.coach.workout_adapt.call_args.kwargs)
+        self.assertEqual(self.outcome(held), athlete_queue.STALE)
+        [item] = saved_proposal.waiting()
+        self.assertFalse(item["payload"]["text"].startswith(saved_proposal.REPLACES_LINE))
 
     def test_after_the_runs_questions_an_item_not_sent_yet_follows(self):
         """A message queued at 08:25 has not gone out when the athlete writes at 08:30. It
-        follows the last question of the run (DESIGN_athlete_queue.md §13.5)."""
+        follows the run's proposal (DESIGN_athlete_queue.md §13.5)."""
         self.at(8, 25)
         athlete_queue.tell("Bring your pool card.")
         self.at(8, 30)
         _coach, _prompt, out = self.coach_run(self.eased(new_constraints=self.CONSTRAINT))
-        [proposal] = queue_lines(out)
-        [question] = queue_lines(self.tap(proposal, "a2"))
+        [question] = queue_lines(out)
         self.assertIn("this constraint?", question["text"])
-        [message] = queue_lines(self.tap(question, "a1"))
+        [proposal] = queue_lines(self.tap(question, "a1"))
+        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
+        [message] = queue_lines(self.tap(proposal, "a2"))
         self.assertIn("Bring your pool card.", message["text"])
 
     def test_the_line_waits_for_a_runs_proposal(self):
@@ -1054,7 +1078,7 @@ class ChatRunTest(_Case):
 
     def unclear_note(self, day=THURSDAY):
         """`day` has a ride and a gym session, and "had to cut it short" does not say
-        which. Returns the gym session and the question the proposal's answer brings."""
+        which. Returns the gym session and the question the run sends."""
         if day != THURSDAY:
             save_workout(test_db, day, "cycling", "Hill reps", duration_minutes=60)
         gym = save_workout(test_db, day, "strength_training", "Gym", duration_minutes=45)
@@ -1066,13 +1090,13 @@ class ChatRunTest(_Case):
         )
         prompt.choose.assert_not_called()
         self.assertNotIn("Kept with", out)
-        [proposal] = queue_lines(out)
-        [question] = queue_lines(self.tap(proposal, "a2"))
+        [question] = queue_lines(out)
         return gym, question
 
-    def test_in_the_chat_an_unclear_note_is_asked_about_once_the_proposal_is_answered(self):
+    def test_in_the_chat_an_unclear_note_is_asked_about_before_the_proposal(self):
         """The question quotes the words, offers each session of the day, and comes before
-        the constraint question (DESIGN_session_notes.md §3)."""
+        the constraint question, which comes before the proposal (DESIGN_session_notes.md
+        §3, DESIGN_waiting_proposal.md §6.3)."""
         gym, question = self.unclear_note()
         self.assertEqual(
             question["text"],
@@ -1091,6 +1115,8 @@ class ChatRunTest(_Case):
         self.assertEqual(self.ride()["athlete_notes"], [])
         [constraint] = queue_lines(out)
         self.assertIn("this constraint?", constraint["text"])
+        [proposal] = queue_lines(self.tap(constraint, "a2"))
+        self.assertEqual(proposal["text"], saved_proposal.QUESTION_LINE)
 
     def test_an_unclear_note_about_yesterday_offers_yesterdays_sessions(self):
         gym, question = self.unclear_note(day="2026-10-07")

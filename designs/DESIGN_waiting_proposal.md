@@ -478,6 +478,44 @@ looked at the week since it was asked: in the morning run, or for any message to
 Implemented designs amended with it: DESIGN_athlete_queue.md §2 and §8, DESIGN_constraints.md
 §8, DESIGN_signal_extraction.md §2 and §6, DESIGN_bot_simple_frontend.md §12.3.
 
+**Amended 2026-11-06, ruled by the author: the questions come first, the proposal last.**
+
+It is Friday 6 November. At 20:57 the athlete writes "I was a bit sick today, I didn't train".
+The week planner turns today's light gym session into rest and makes Saturday's 2-hour gravel
+ride an optional hour. In the same answer it reads a signal out of the words: illness, today.
+Before this amendment the proposal went out first, and "Shall I log this signal?" waited behind
+it. Now the run sends "Shall I log this signal?" and ends. The proposal is saved, not sent. The
+tap on "Yes" logs the signal, and the proposal follows at once: the reason, the preview, "Shall
+I make these changes?".
+
+The answer cannot change the proposal: the week planner wrote it before anything was asked.
+The order only says what the athlete reads first, and the author wants the coach to settle what
+it was told before it says what changes.
+
+- **Every question of the run goes first**, one at a time, in the order of §6.3: which session
+  the words are about, the constraint, the signal, then the cut-short question
+  (DESIGN_chat_questions.md §3). The proposal follows the last one. A run with no question
+  sends its proposal at once, as before.
+- **The cost, accepted.** A question left unanswered holds the proposal back. Friday's proposal
+  changes Friday, so if "Shall I log this signal?" is still unanswered at midnight, the
+  proposal is out of date (§4) and is closed without ever being sent. A proposal about later
+  days waits for the tap, however late.
+- **A proposal held back was never read.** A run that starts while one is held back is not
+  shown it (§6.2), and its own proposal does not open with "This replaces my earlier
+  proposal". Saving closes the held one, as it closes every waiting proposal (§3).
+- **Unchanged.** The morning's proposal still goes out first: the morning has no words of the
+  athlete to ask about, so its run queues no question but the cut-short one, which stays
+  behind it. A terminal still asks before the preview.
+
+Choice made without the author: the cut-short question and the session question go before the
+proposal too, so the rule is one sentence. The other way was to move only the constraint and
+signal questions.
+
+Where: `cli/workouts/adapt.py:_settle` saves without sending; `cli/queue.py:send_own_questions`
+sends the run's first question, or once none is left the proposal it held back
+(`athlete_queue.held_back`); `cli/workouts/proposal.py:open_proposal` skips a proposal never
+sent.
+
 Tests, one per rule: a chat run that makes a proposal sends the proposal and no other
 question; a tap on that proposal sends the run's question and not an older one that waits; a
 run with no proposal sends its question at once; the question has its two answers and no
