@@ -72,20 +72,20 @@ today's “Long Low-Intensity Gravel Ride (up to 3 h)”." Then the athlete read
 Good that it felt strong. The ride had about 50 minutes at tempo or harder, so I'd give
 the easy rides left outdoors a flat route and a power limit.
 
-🏋️ Fri 09 · split squats 40 → 36 kg
-    was Full-Body Strength (Heavy) — 65 min
-🚴 Sat 10 · flat route, stop at 178 W
-    was Long Low-Intensity Gravel Ride — 135 min
-🚴 Sun 11 · sprints on flat ground only
-    was Endurance Ride with Sprints — 90 min
-🏋️ Mon 12 · split squats 40 → 36 kg
-    was Full-Body Strength (Heavy) — 65 min
-🏋️ Fri 16 · swings 26 kg, dumbbell clean
-    was Full-Body Strength (Power) — 60 min
-🚴 Sat 17 · flat route, stop at 178 W
-    was Long Low-Intensity Gravel Ride — 150 min
-🚴 Sun 18 · outdoor limits added
-    was Endurance Ride — 90 min
+🏋️ Fri 09 · Full-Body Strength (Heavy), 65 min
+    split squats 40 → 36 kg
+🚴 Sat 10 · Long Low-Intensity Gravel Ride, 135 min
+    flat route, stop at 178 W
+🚴 Sun 11 · Endurance Ride with Sprints, 90 min
+    sprints on flat ground only
+🏋️ Mon 12 · Full-Body Strength (Heavy), 65 min
+    split squats 40 → 36 kg
+🏋️ Fri 16 · Full-Body Strength (Power), 60 min
+    swings 26 kg, dumbbell clean
+🚴 Sat 17 · Long Low-Intensity Gravel Ride, 150 min
+    flat route, stop at 178 W
+🚴 Sun 18 · Endurance Ride, 90 min
+    outdoor limits added
 
 Shall I make these changes?
 
@@ -98,27 +98,55 @@ That is about 150 words. The words inside are an example: the planners write the
 **The summary** is the week planner's `reason`. It is at most two short sentences, about 30
 words. It says what drove the change, starting with the athlete's note when there is one,
 then what changes overall. It does not go through the sessions one by one, because the list
-under it does.
+under it does. When the note asked for some changes and the coach also changed a session it
+did not ask about, one more sentence says what and why (D18).
 
-**The list** has one line per session the proposal changes, in date order. A line is the
-sport's emoji, the day, and the **change line**: at most eight words that say what changes,
-with its number when it has one. "flat route, stop at 178 W". "moved to Sunday". The
-planner that changed the session writes it (§7). The day is "Today" for today, and
-otherwise the weekday and the day of the month, as the week view writes it.
+**The list** has one entry per day, in date order, written by the code (D18). An entry opens
+with what the day holds after the change, one line per session: the sport's emoji, the day,
+the title and the length. The day is "Today" for today, and otherwise the weekday and the
+day of the month, as the week view writes it.
 
-**What it replaces** stands on a second line under it, written by the code (D16): "was", then
-the old session's title and length. A session moved from another day adds that day: "was Easy
-run — 40 min, Fri 09". A rest day reads "was a rest day". A session on a day with nothing
-planned reads "nothing was planned". The athlete cannot judge a replacement without seeing
-what goes, and the old text in full stays on the page (§6.2).
+**A session that stays on its day** is the same session, changed. Under it stands the
+**change line**: at most eight words that say what changes, with its number when it has one,
+"flat route, stop at 178 W". The planner that changed the session writes it (§7). When the
+session changed its title too, or no change line came back, the line says what it was
+instead: "was 🚴 Intervals, 90 min".
 
-Every changed session has a line, whatever the summary says. This is what the list is for:
-the athlete never approves a change that the message did not name.
+**A session the day held and holds no more** stands under the day (D16, D18): "was", its
+emoji, title and length, then "→" and where it went, the day it moved to or "dropped". A
+moved session is on two entries, once on its new day and once under its old one, so a swap
+reads as a swap. It is Monday 9 November. The athlete is tired, asks for rest today and
+never two sessions a day, and the coach also swaps the weekend rides:
 
-- A session the proposal removes gets the line "removed", written by the code, with what it
-  was under it.
-- A session whose planner gave no change line shows its title and its length in its place.
-- Two gym days changed the same way are two lines. Nothing is grouped.
+```
+🛌 Today · Rest Day
+    was 🚴 Easy Aerobic Ride, 60 min → Tue 10
+🚴 Tue 10 · Easy Aerobic Ride, 60 min
+    was 🏋️ Full-Body Strength (Heavy, Non-Failure), 90 min → Fri 13
+🚴 Wed 11 · HIIT — 3 x 6 min, 105 min (unchanged)
+🛌 Thu 12 · Rest Day (unchanged)
+🏋️ Fri 13 · Full-Body Strength (Heavy, Non-Failure), 90 min
+    was 🏋️ Full-Body Strength (Light, Non-Failure), 60 min → dropped
+🚴 Sat 14 · Long Low-Intensity Ride, 135 min
+    was 🚴 Sub-Threshold — 2 x 15 min, 100 min → Sun 15
+🚴 Sun 15 · Sub-Threshold — 2 x 15 min, 100 min
+    was 🚴 Long Low-Intensity Ride, 135 min → Sat 14
+```
+
+A rest day that goes reads "was a rest day". A day that had nothing planned reads "nothing
+was planned" under its session, and a day the change empties opens with "🛌 Fri 09 · nothing
+planned". The athlete cannot judge a replacement without seeing what goes, and the old text
+in full stays on the page (§6.2).
+
+**The days that do not change** between the first and the last changed day are listed too,
+one line per session ending "(unchanged)", when every changed day fits in one week, as
+Wednesday and Thursday above. Past a week they are left out, so a change today and one ten
+days out stay two entries. A session that does not change on a changed day is listed the
+same way.
+
+Every changed session is on an entry, whatever the summary says. This is what the list is
+for: the athlete never approves a change that the message did not name. Two gym days changed
+the same way are two entries. Nothing is grouped.
 
 **The lines that are there today stay.** "Kept with today's …" still answers a note
 (DESIGN_session_notes.md). The run prints it before the proposal is saved, so it is a
@@ -300,9 +328,9 @@ over. The page then shows that day as the Calendar does: short (§4).
 It is Sunday 4 October, 22:49. The athlete taps "Tell me more" under the proposal. The page
 shows the summary, then one card per changed session, in date order. A card holds:
 
-- the session's line and what it replaces, as the long text writes them today:
-  "🚴 Sat Oct 10: Long Low-Intensity Gravel Ride — Flat Route — 135 min (was Long
-  Low-Intensity Gravel Ride)";
+- the session's line, "🚴 Sat 10 · Long Low-Intensity Gravel Ride, 135 min". The first card
+  of a day opens with that day's entry from the chat's list instead, and a changed day with
+  no card of its own, one a session only left, gets a card holding its entry alone (D18);
 - the planner's one-sentence reason for this session (`change_reason`);
 - for a session whose title and load did not change, the passages that changed, as "Was"
   and "Now" pairs, with the changed words highlighted: tinted red and struck through on "Was",
@@ -364,7 +392,7 @@ All of this is in `## RESPONSE FORMAT`. No section is added to a prompt.
 | `summary` (new) | every session it writes, except a gym day and a rest day | At most 2 short sentences, about 20 words, for the athlete: what to do, and the one or two numbers to hold. Plain words. No name coined in the description. |
 | `change` (new) | every session it changes, in `workout adapt` and `workout tweak` | At most 8 words: what changes, with its number when it has one. No reason. |
 | `change_reason` | as today | Unchanged: one sentence of at most 20 words. It is read again by later runs. |
-| `reason` | the whole answer of `workout adapt` and `workout tweak` | At most 2 short sentences, about 30 words. What drove the change, the athlete's note first, then what changes overall. Not the sessions one by one. |
+| `reason` | the whole answer of `workout adapt` and `workout tweak` | At most 2 short sentences, about 30 words. What drove the change, the athlete's note first, then what changes overall. Not the sessions one by one. One more short sentence when it also changes a session the note did not ask about (D18). |
 
 **The strength planner:**
 
@@ -553,7 +581,7 @@ He kept all four as built on 2026-10-27.
 | ID | Topic | Ruling |
 |---|---|---|
 | D11 | Where "Tell me more" sits under a proposal | Its row is under the two answers and above the morning offer. |
-| D12 | A session the proposal removes | Its line reads "🚴 Fri 09 · removed", with the session's own emoji. **Amended by D16:** the session's title and length stand under it. |
+| D12 | A session the proposal removes | Its line reads "🚴 Fri 09 · removed", with the session's own emoji. **Amended by D16:** the session's title and length stand under it. **Amended by D18:** it stands under its day with "→ dropped". |
 | D13 | The page's words | The page is titled "In full". The fold that holds a session's whole text is "The whole session". |
 | D14 | A day the Calendar does not reach | Only the months the Calendar shows are uploaded, about four weeks back and six ahead. A later day's "Tell me more" opens a page that says the details could not be loaded. Not handled. |
 
@@ -569,6 +597,13 @@ The author asked for this on 2026-11-01, after reading short proposals on Telegr
 |---|---|---|
 | D16 | What the chat says a session replaces | Each line of the list has a second line with the old session's title and length. This amends D2 (one short line per session) and D12. A2 stands: the chat still quotes no old or new text. |
 | D17 | The changed words of a "Was" and "Now" pair | Highlighted on the page and in a terminal. The author asked for it. Chosen for him when building: no highlight below half the words matching; red tint with a strikethrough and green tint on the page; reverse video in a terminal; a proposal saved before this shows no pairs on its page. |
+
+The author asked for this on 2026-11-10, after the proposal of 9 November moved four sessions
+and the list named each by its move alone.
+
+| ID | Topic | Ruling |
+|---|---|---|
+| D18 | A proposal that moves sessions | One entry per day: what it holds now, and under it each session it held before and holds no more, with "→" and the day it moved to or "dropped". The days between that do not change are listed "(unchanged)" when the changed days fit in one week. The summary gets one more sentence for a change the note did not ask for. Amends D12 and D16. Chosen for him when building: "(unchanged)" in words, since the chat sends plain text and has no italics; the day after "→" as the week view writes it, "Tue 10"; a day the change empties opens "🛌 Fri 09 · nothing planned"; a session that keeps its title shows the change line, else "was" and what it was; on the page the first card of a day opens with its entry, and a day a session only left gets a card of its entry alone. |
 
 ## 14. Decided without asking the author
 
@@ -641,6 +676,7 @@ A choice the author overruled keeps its row, with the ruling beside it.
 | D15 | Today as planned, under a proposal that changes it | Each card on the proposal's page holds, folded, the whole text of the session it replaces or drops. | The author's ruling after the code review. With no briefing above such a proposal, it keeps D8: she reads what she gives up before she answers. | Review | 2026-10-30 |
 | D16 | What the chat says a session replaces | A second line under each line of the list: the old session's title and length. | The author: "it's hard for me to say whether I'm ok with the replacement if I can't see what the proposal is replacing". Amends D2 and D12. The message stays about 150 words. | Request | 2026-11-01 |
 | D17 | Changed words in a pair | Highlighted on the page and in a terminal, with no highlight below half the words matching. | The author found the pairs hard to read when a long sentence changed by a word or two. | Request | 2026-11-01 |
+| D18 | A proposal that moves sessions | One entry per day: now on top, and under it what left with "→" and where it went; unchanged days listed within a week; a summary sentence for a change not asked for. | The author, after the proposal of 9 November: a moved session was named by its move alone, "was" meant two things, and today read "nothing was planned" though a ride was. Amends D12 and D16. | Request | 2026-11-10 |
 
 ## Dependency Graph & Implementation Order
 

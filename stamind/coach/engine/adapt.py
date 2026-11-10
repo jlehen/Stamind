@@ -329,7 +329,11 @@ evidence-backed observations are authored only by the weekly history analysis
             '    2 SHORT SENTENCES (~30 words in all). When the note or the request drove a\n'
             '    change, name it first, then what changes overall. Name the signal you acted\n'
             '    on, and leave out every reading that did NOT change your mind. Do NOT go\n'
-            '    through the sessions one by one: each has its own \"change\" line below."'
+            '    through the sessions one by one: each has its own \"change\" line below.\n'
+            '    When the note or the request asked for some changes and you also change a\n'
+            '    session it did not ask about, add ONE more short sentence saying what and why,\n'
+            '    e.g. \"I also swapped the weekend rides, so the day after Friday\'s heavy lift\n'
+            '    is easy.\""'
         )
         # Each entry is one top-level member of the response object, without its trailing
         # comma — the ",\n".join below places the separators, so no code hand-writes a

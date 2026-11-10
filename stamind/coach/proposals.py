@@ -94,6 +94,9 @@ class RevisionProposal:
     # moving the kilograms alone: only the first waits for the athlete's answer
     # (DESIGN_waiting_proposal.md §7).
     week_planner_changed: bool = False
+    # The range's sessions as they stood when the week planner answered, which the short list
+    # compares day by day with what the proposal writes (DESIGN_short_messages.md §3, D18).
+    before: Tuple[Dict[str, Any], ...] = ()
 
 
 # What `workout_revision_apply` reads off a proposal, and so what a saved one keeps. What

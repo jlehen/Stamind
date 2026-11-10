@@ -450,5 +450,5 @@ class WorkoutGenMixin:
         return RevisionProposal(
             reason=reason, workouts=written, range_start=start, range_end=end_date,
             kind="generate", pairs=pairs, removals=removals, held=tuple(held),
-            **strength_planner.proposal_fields(strength),
+            before=tuple(span), **strength_planner.proposal_fields(strength),
         )

@@ -496,5 +496,6 @@ class AdaptMixin:
             covered_constraint_ids=covered,
             seen=seen,
             week_planner_changed=week_planner_changed,
+            before=tuple(window_workouts),
             **strength_planner.proposal_fields(strength),
         )

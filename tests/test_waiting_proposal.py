@@ -32,7 +32,8 @@ from stamind.coach.revisions import pair_revisions
 from stamind.config import config
 from stamind.sentinels import BUTTONS_SENTINEL, FLUSH_SENTINEL, QUEUE_SENTINEL
 from stamind.settings import ADAPT_LAST_SEEN
-from stamind.clock import today_str
+from stamind.clock import shift, today_str
+from stamind.cli.render.proposal_lines import UNCHANGED
 
 THURSDAY_8AM = datetime(2026, 10, 8, 8, 0).astimezone()
 THURSDAY, FRIDAY, SATURDAY = "2026-10-08", "2026-10-09", "2026-10-10"
@@ -214,34 +215,104 @@ class ShortProposalTest(_Case):
             {"date": SATURDAY, "sport_type": "cycling", "title": "Long ride",
              "description": "[Long ride]\n2 h easy.", "duration_minutes": 120},
         ]
-        pairs, _removals = pair_revisions(
-            workouts, test_db.get_workouts(start_date=THURSDAY, end_date=SATURDAY)
-        )
+        before = test_db.get_workouts(start_date=THURSDAY, end_date=SATURDAY)
+        pairs, _removals = pair_revisions(workouts, before)
         return RevisionProposal(
             reason="Rough night, so the hard days move back.", workouts=workouts,
             range_start=THURSDAY, range_end=SATURDAY, pairs=pairs,
             removals=(test_db.get_workout(FRIDAY, "yoga"),), week_planner_changed=True,
+            before=tuple(before),
         )
 
-    def test_every_changed_session_has_a_line(self):
+    def test_each_changed_day_has_an_entry(self):
         self.assertEqual(proposal_lines.simple_change_lines(self.three_changes()), [
-            f"{sport_emoji('cycling')} Today · 60 easy minutes\n    was Intervals — 90 min",
-            f"{sport_emoji('yoga')} Fri 09 · removed\n    was Mobility yoga — 25 min",
-            f"{sport_emoji('cycling')} Sat 10 · Long ride — 120 min\n    nothing was planned",
+            f"{sport_emoji('cycling')} Today · Easy ride, 60 min\n"
+            f"    was {sport_emoji('cycling')} Intervals, 90 min",
+            f"{sport_emoji('rest')} Fri 09 · nothing planned\n"
+            f"    was {sport_emoji('yoga')} Mobility yoga, 25 min → dropped",
+            f"{sport_emoji('cycling')} Sat 10 · Long ride, 120 min\n    nothing was planned",
         ])
 
-    def test_a_moved_session_says_the_day_it_stood_on(self):
-        moved = {"date": SATURDAY, "sport_type": "yoga", "title": "Mobility yoga",
-                 "change": "moved to Saturday"}
-        friday = {"date": FRIDAY, "sport_type": "yoga", "title": "Mobility yoga",
-                  "duration_minutes": 25}
+    def tired_monday(self):
+        """The week of 2026-11-09 moved to this Thursday. Tired, the athlete asked for rest
+        today: the easy ride goes to Friday, Friday's heavy gym to Monday in place of the
+        light one, and the coach swapped the weekend's tempo and long rides on its own."""
+        sat, sun, mon, tue, wed = (shift(THURSDAY, n) for n in range(2, 7))
+        before = [
+            {"date": THURSDAY, "sport_type": "cycling", "title": "Easy Aerobic Ride",
+             "duration_minutes": 60},
+            {"date": FRIDAY, "sport_type": "strength_training", "title": "Gym (Heavy)",
+             "duration_minutes": 90},
+            {"date": sat, "sport_type": "cycling", "title": "HIIT", "duration_minutes": 105},
+            {"date": sun, "sport_type": "rest", "title": "Rest Day", "duration_minutes": 0},
+            {"date": mon, "sport_type": "strength_training", "title": "Gym (Light)",
+             "duration_minutes": 60},
+            {"date": tue, "sport_type": "cycling", "title": "Tempo", "duration_minutes": 100},
+            {"date": wed, "sport_type": "cycling", "title": "Long Ride",
+             "duration_minutes": 135},
+        ]
+
+        def moved(source, day):
+            return {**source, "date": day, "change": "moved here",
+                    "replaces_slot": (source["date"], source["sport_type"])}
+
+        workouts = [
+            {"date": THURSDAY, "sport_type": "rest", "title": "Rest Day"},
+            moved(before[0], FRIDAY), moved(before[1], mon),
+            moved(before[6], tue), moved(before[5], wed),
+        ]
+        pairs, removals = pair_revisions(workouts, before)
+        return RevisionProposal(
+            reason="As asked, today is rest.", workouts=workouts, range_start=THURSDAY,
+            range_end=wed, pairs=pairs, removals=removals, before=tuple(before),
+        )
+
+    def test_a_week_of_moves_reads_day_by_day(self):
+        """Each day says what it holds now, and under it what it held before and where that
+        went; the days in between say they are unchanged (D18)."""
+        ride, gym, rest = (sport_emoji(s) for s in ("cycling", "strength_training", "rest"))
+        self.assertEqual("\n".join(proposal_lines.simple_change_lines(self.tired_monday())), (
+            f"{rest} Today · Rest Day\n"
+            f"    was {ride} Easy Aerobic Ride, 60 min → Fri 09\n"
+            f"{ride} Fri 09 · Easy Aerobic Ride, 60 min\n"
+            f"    was {gym} Gym (Heavy), 90 min → Mon 12\n"
+            f"{ride} Sat 10 · HIIT, 105 min (unchanged)\n"
+            f"{rest} Sun 11 · Rest Day (unchanged)\n"
+            f"{gym} Mon 12 · Gym (Heavy), 90 min\n"
+            f"    was {gym} Gym (Light), 60 min → dropped\n"
+            f"{ride} Tue 13 · Long Ride, 135 min\n"
+            f"    was {ride} Tempo, 100 min → Wed 14\n"
+            f"{ride} Wed 14 · Tempo, 100 min\n"
+            f"    was {ride} Long Ride, 135 min → Tue 13"
+        ))
+
+    def test_unchanged_days_are_left_out_past_a_week(self):
+        proposal = self.tired_monday()
+        late = {"date": shift(THURSDAY, 7), "sport_type": "cycling", "title": "Recovery spin",
+                "duration_minutes": 45}
+        pairs, removals = pair_revisions(
+            [*proposal.workouts, late], [*proposal.before, {**late, "duration_minutes": 30}])
+        later = RevisionProposal(
+            reason="", workouts=[*proposal.workouts, late], range_start=THURSDAY,
+            range_end=late["date"], pairs=pairs, removals=removals,
+            before=(*proposal.before, {**late, "duration_minutes": 30}),
+        )
+        text = "\n".join(proposal_lines.simple_change_lines(later))
+        self.assertNotIn(UNCHANGED, text)
+        self.assertIn("Thu 15 · Recovery spin, 45 min\n    was "
+                      f"{sport_emoji('cycling')} Recovery spin, 30 min", text)
+
+    def test_a_session_that_keeps_its_title_shows_the_change_line(self):
+        gym = {"date": SATURDAY, "sport_type": "strength_training", "title": "Gym",
+               "duration_minutes": 60}
+        lighter = {**gym, "change": "split squats 40 → 36 kg"}
         proposal = RevisionProposal(
-            reason="", workouts=[moved], range_start=FRIDAY, range_end=SATURDAY,
-            pairs=(RevisionPair(moved, friday, False),),
+            reason="", workouts=[lighter], range_start=SATURDAY, range_end=SATURDAY,
+            pairs=(RevisionPair(lighter, gym, False),), before=(gym,),
         )
         self.assertEqual(proposal_lines.simple_change_lines(proposal), [
-            f"{sport_emoji('yoga')} Sat 10 · moved to Saturday\n"
-            "    was Mobility yoga — 25 min, Fri 09",
+            f"{sport_emoji('strength_training')} Sat 10 · Gym, 60 min\n"
+            "    split squats 40 → 36 kg",
         ])
 
     def test_a_rest_day_is_named_and_not_titled(self):
@@ -249,31 +320,38 @@ class ShortProposalTest(_Case):
         rest = {"date": SATURDAY, "sport_type": "rest", "title": "Rest"}
         proposal = RevisionProposal(
             reason="", workouts=[ride], range_start=SATURDAY, range_end=SATURDAY,
-            pairs=(RevisionPair(ride, rest, True),),
+            pairs=(RevisionPair(ride, rest, True),), before=(rest,),
         )
         self.assertIn("\n    was a rest day", proposal_lines.simple_change_lines(proposal)[0])
 
     def test_the_short_text_opens_with_the_reason_and_ends_with_the_list(self):
         text = proposal_lines.short_text(self.three_changes(), saved_proposal.REPLACES_LINE)
         self.assertTrue(text.startswith(saved_proposal.REPLACES_LINE + "\n\nRough night"))
-        self.assertTrue(text.endswith("Sat 10 · Long ride — 120 min\n    nothing was planned"))
+        self.assertTrue(text.endswith("Sat 10 · Long ride, 120 min\n    nothing was planned"))
         self.assertNotIn("[Easy ride]", text)
 
     def test_the_page_shows_each_session_in_full(self):
         page = proposal_lines.page_content(self.three_changes())
         self.assertEqual(page["summary"], "Rough night, so the hard days move back.")
         thursday, removed, saturday = page["cards"]
-        self.assertIn("Today: Easy ride — 60 min", thursday["line"])
+        # Each card opens with its day's lines in the chat (D18).
+        lines = proposal_lines.simple_change_lines(self.three_changes())
+        self.assertEqual([thursday["line"], removed["line"], saturday["line"]], lines)
         self.assertEqual(thursday["why"], "Rough night.")
         # A new title: no passage to read first, so the whole text is shown open (§6.2).
         self.assertEqual((thursday["changes"], thursday["open"]), ([], True))
         self.assertEqual(thursday["text"], "[Easy ride]\n60 easy minutes.")
         # What she gives up is on the page too, before she answers (§6.2, D8).
         self.assertEqual(thursday["before"], "[Intervals]\n90 minutes with intervals.")
-        self.assertIn("Mobility yoga — dropped", removed["line"])
         self.assertEqual(removed["text"], "[Mobility yoga]\n25 minutes for the hips.")
-        self.assertIn("Long ride — 120 min (new)", saturday["line"])
         self.assertEqual(saturday["before"], "")
+
+    def test_the_page_has_a_card_for_each_changed_day(self):
+        """A day a session only left gets a card of its lines; a day that did not change
+        gets none."""
+        page = proposal_lines.page_content(self.tired_monday())
+        days = [card["line"].split(" · ")[0].split(" ", 1)[1] for card in page["cards"]]
+        self.assertEqual(days, ["Today", "Fri 09", "Mon 12", "Tue 13", "Wed 14"])
 
     def test_the_page_gets_a_rewritten_line_word_by_word(self):
         title = {"sport_type": "cycling", "title": "Ride", "date": SATURDAY}
@@ -297,7 +375,7 @@ class ShortProposalTest(_Case):
 
     def test_a_saved_proposal_keeps_its_short_text_and_its_page(self):
         item = saved_proposal.save(self.three_changes(), newest_written())
-        self.assertIn("Fri 09 · removed", item["payload"]["short"])
+        self.assertIn("Fri 09 · nothing planned", item["payload"]["short"])
         self.assertEqual(len(item["payload"]["page"]["cards"]), 3)
         self.assertIn("Here's what I'd change:", item["payload"]["text"])
 
@@ -319,7 +397,7 @@ class ShortProposalTest(_Case):
         [sent] = queue_lines(out)
         self.assertTrue(sent["text"].startswith("Rough night, so the hard days move back."))
         self.assertTrue(sent["text"].endswith(saved_proposal.QUESTION_LINE))
-        self.assertIn("Today · 60 easy minutes", sent["text"])
+        self.assertIn("Today · Easy ride, 60 min", sent["text"])
         self.assertEqual(sent["page"], {
             "label": "🔎 Tell me more",
             "url": f"{proposal_lines.PAGE_URL}#p={item['id']}&k=KEY&b=pages&f=123",

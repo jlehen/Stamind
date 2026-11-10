@@ -378,6 +378,7 @@ class TestTheSummaryLength(unittest.TestCase):
             with self.subTest(extra=list(extra)):
                 system, _user = build_prompt(**extra)
                 self.assertIn(self.ADAPT_REASON, system)
+                self.assertIn("add ONE more short sentence saying what and why", system)
                 self.assertNotIn("AT MOST 3 SENTENCES", system)
                 self.assertIn(self.CHANGE_LINE, system)
                 self.assertIn(self.CHANGE_REASON_CAP, system)
