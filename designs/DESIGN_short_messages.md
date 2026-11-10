@@ -65,8 +65,9 @@ description is still written, still stored, still on Google Calendar, and one ta
 
 ## 3. A proposal in the chat
 
-Back to Sunday 4 October, 22:48, with this design. The bot first says, as today: "Kept with
-today's “Long Low-Intensity Gravel Ride (up to 3 h)”." Then the athlete reads one message:
+Back to Sunday 4 October, 22:48, with this design. The bot first says, as today: "I kept your
+words as a note on today's “Long Low-Intensity Gravel Ride (up to 3 h)”." Then the athlete
+reads one message:
 
 ```
 Good that it felt strong. The ride had about 50 minutes at tempo or harder, so I'd give
@@ -148,9 +149,9 @@ Every changed session is on an entry, whatever the summary says. This is what th
 for: the athlete never approves a change that the message did not name. Two gym days changed
 the same way are two entries. Nothing is grouped.
 
-**The lines that are there today stay.** "Kept with today's …" still answers a note
-(DESIGN_session_notes.md). The run prints it before the proposal is saved, so it is a
-message of its own, above the proposal. "This replaces my earlier proposal." still opens a
+**The lines that are there today stay.** "I kept your words as a note on today's …" still
+answers a note (DESIGN_session_notes.md). The run prints it before the proposal is saved, so
+it is a message of its own, above the proposal. "This replaces my earlier proposal." still opens a
 proposal that replaces another. The strength planner's notice that it could not recheck a
 gym day's kilograms still closes the text (DESIGN_strength_tracking.md §9).
 

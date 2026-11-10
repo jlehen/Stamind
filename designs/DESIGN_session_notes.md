@@ -14,10 +14,11 @@ inside a two-hour ride. This design keeps the words with the session they are ab
 
 It is Wednesday 30 Sep. One session is planned: "Climb-Pace 2x15 min", with a 242 W ceiling. The
 athlete rides it and writes the message above. The chat echoes "→ passing that on to your coach",
-and `workout adapt` runs as it always has. Before the coach's answer, one line says "Kept with
-today's “Climb-Pace 2x15 min”". On Monday 5 Oct the week planner writes the week after the FTP
-re-test. Its prompt lists the sessions the athlete commented on in the last two weeks. Wednesday's
-session is there with its prescription and the athlete's words, next to that day's Garmin line.
+and `workout adapt` runs as it always has. Before the coach's answer, one line says "I kept your
+words as a note on today's “Climb-Pace 2x15 min”". On Monday 5 Oct the week planner writes the
+week after the FTP re-test. Its prompt lists the sessions the athlete commented on in the last
+two weeks. Wednesday's session is there with its prescription and the athlete's words, next to
+that day's Garmin line.
 On about 15 Oct, Wednesday falls out of every prompt's look back, and the words go with it.
 
 ## 2. What is kept
@@ -50,7 +51,8 @@ so: "yesterday's ride was tough", written the next morning. A note that names no
 today. The week planner gives one of three answers:
 
 - **A session**, named by its day and its sport. The note is kept with it, and the line in §1
-  says which: "Kept with yesterday's “Climb-Pace 2x15 min”."
+  says which: "I kept your words as a note on yesterday's “Climb-Pace 2x15 min”." Until
+  2026-11-10 it read "Kept with yesterday's …", which did not say what was kept.
 - **None.** The note is about another day, about how the athlete feels with no word about a
   session, or it is a question. It is not kept. `workout adapt` still reads it once.
 - **One of that day's sessions, and the note does not say which.** The week planner never
@@ -69,7 +71,8 @@ that run: at once, or when the coach's proposal is answered (DESIGN_waiting_prop
 >
 > `[Easy Ride]` `[Kettlebell HIIT]` `[Not about a session]`
 
-A tap on a session keeps the note with it: "Kept with today's “Kettlebell HIIT”." The last
+A tap on a session keeps the note with it: "I kept your words as a note on today's
+“Kettlebell HIIT”." The last
 answer keeps nothing. The question is closed without being asked once its day is out of every
 prompt's look back (§4), because nobody would read the note.
 
@@ -80,6 +83,13 @@ default.
 
 An answer the app cannot use keeps nothing: a sport with no session that day, one that two
 sessions of the day share, or a day other than those two.
+
+Amended 2026-11-10: a session the same answer moves to another day is not a candidate. It is
+Monday 9 November. The athlete writes "I feel tired so I won't train today. Can you reorganize
+my week?". The week planner names today's ride and moves it to Tuesday. A note follows its
+session through a move (§2), so the words "I won't train today" sat on Tuesday's ride, where a
+later run would read them beside a ride that was done. The words are about Monday, the day the
+session left, so the note is not kept, as for a remark about how the athlete feels (choice 1).
 
 The row is written after the coach's call returns, so a call that fails and a message sent again
 do not leave the same words twice.

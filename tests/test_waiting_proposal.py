@@ -1147,7 +1147,7 @@ class ChatRunTest(_Case):
             self.eased(note_date=THURSDAY, note_session="cycling"),
             ("workout", "adapt", "-m", "not on my normal bike"),
         )
-        self.assertIn("Kept with today's “Intervals”.", out)
+        self.assertIn("I kept your words as a note on today's “Intervals”.", out)
         self.assertEqual(
             [note["text"] for note in self.ride()["athlete_notes"]], ["not on my normal bike"]
         )
@@ -1167,7 +1167,7 @@ class ChatRunTest(_Case):
             ("workout", "adapt", "-m", "had to cut it short"),
         )
         prompt.choose.assert_not_called()
-        self.assertNotIn("Kept with", out)
+        self.assertNotIn("I kept your words", out)
         [question] = queue_lines(out)
         return gym, question
 
@@ -1185,7 +1185,7 @@ class ChatRunTest(_Case):
         self.assertEqual(labels[-1], "Not about a session")
 
         out = self.tap(question, f"a{labels.index('Gym') + 1}")
-        self.assertIn("Kept with today's “Gym”.", out)
+        self.assertIn("I kept your words as a note on today's “Gym”.", out)
         self.assertEqual(
             [note["text"] for note in test_db.get_lineage_head(gym)["athlete_notes"]],
             ["had to cut it short"],
@@ -1202,7 +1202,7 @@ class ChatRunTest(_Case):
         labels = [b["label"] for b in question["buttons"]]
         self.assertCountEqual(labels[:-1], ["Hill reps", "Gym"])
         out = self.tap(question, f"a{labels.index('Gym') + 1}")
-        self.assertIn("Kept with yesterday's “Gym”.", out)
+        self.assertIn("I kept your words as a note on yesterday's “Gym”.", out)
         self.assertEqual(
             [note["text"] for note in test_db.get_lineage_head(gym)["athlete_notes"]],
             ["had to cut it short"],

@@ -36,13 +36,18 @@ from stamind.cli.workouts.heads_up import (
 def _note_candidates(proposal, message: Optional[str]) -> List[Workout]:
     """The sessions that the athlete's note may be kept with, as the week planner read it:
     on the day it names, the one it names, every one when it cannot tell which, and none
-    when the note is about something else (DESIGN_session_notes.md §3)."""
+    when the note is about something else. A session the same answer moves to another day
+    is left out (DESIGN_session_notes.md §3)."""
     day, about = proposal.note_date, proposal.note_session
     if not day or not about or not (message or "").strip():
         return []
+    moved = {
+        canonical_sport(w['replaces_slot'][1]) for w in proposal.workouts
+        if w.get('replaces_slot') and w['replaces_slot'][0] == day and w['date'] != day
+    }
     sessions = [
         w for w in runtime.db.get_workouts(start_date=day, end_date=day)
-        if canonical_sport(w['sport_type']) != canonical_sport('rest')
+        if canonical_sport(w['sport_type']) not in moved | {canonical_sport('rest')}
     ]
     if about == NOTE_SESSION_UNCLEAR:
         return sessions

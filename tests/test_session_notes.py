@@ -122,6 +122,20 @@ class TestWorkoutAdaptKeepsTheNote(_Case):
         self.assertNotIn("Note kept", stdout)
         self.assertNotIn("Which session is this about?", stdout)
 
+    def test_a_session_the_answer_moves_to_another_day_gets_no_note(self, mock_coach, _g):
+        """"I feel tired so I won't train today", and the answer moves today's ride to
+        tomorrow. The words are about today, so tomorrow's ride does not carry them."""
+        ride = save_workout(test_db, TODAY, "cycling", "Easy Aerobic Ride")
+        moved = {"date": "2026-10-01", "sport_type": "cycling", "title": "Easy Aerobic Ride",
+                 "replaces_slot": (TODAY, "cycling")}
+        mock_coach.workout_adapt.return_value = RevisionProposal(
+            reason="Rest today.", workouts=[moved], range_start=TODAY,
+            range_end="2026-10-04", note_date=TODAY, note_session="cycling",
+        )
+        _, stdout, _ = run_cli(["workout", "adapt", "--auto", "-m", "Tired, no training today"])
+        self.assertEqual(self.notes(ride), [])
+        self.assertNotIn("Note kept", stdout)
+
     def test_a_sport_with_no_session_that_day_keeps_nothing(self, mock_coach, _g):
         ride = save_workout(test_db, TODAY, "cycling", "Climb-Pace 2x15")
         _, stdout, _ = self.adapt(mock_coach, about="running")
@@ -152,7 +166,7 @@ class TestWorkoutAdaptKeepsTheNote(_Case):
             _, stdout, _ = self.adapt(mock_coach, day=YESTERDAY)
         self.assertEqual(self.notes(ride), [WORDS])
         self.assertEqual(self.notes(today_ride), [])
-        self.assertIn("Kept with yesterday's “Climb-Pace 2x15”.", stdout)
+        self.assertIn("I kept your words as a note on yesterday's “Climb-Pace 2x15”.", stdout)
 
     def test_unclear_about_yesterday_asks_among_yesterdays_sessions(self, mock_coach, _g):
         save_workout(test_db, TODAY, "cycling", "Easy Spin")
@@ -201,7 +215,7 @@ class TestWorkoutAdaptKeepsTheNote(_Case):
         save_workout(test_db, TODAY, "cycling", "Climb-Pace 2x15")
         with patch.dict(os.environ, {"STAMIND_RENDER": "simple"}):
             _, stdout, _ = self.adapt(mock_coach)
-        self.assertIn("Kept with today's “Climb-Pace 2x15”.", stdout)
+        self.assertIn("I kept your words as a note on today's “Climb-Pace 2x15”.", stdout)
 
 
 class TestTheWordsAreShownUnderTheSession(unittest.TestCase):

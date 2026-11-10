@@ -93,7 +93,8 @@ class CompanionRenderer(ExpertRenderer):
         _short_day(workouts, today, verdicts)
 
     def session_note_kept(self, session: Dict[str, Any], day: str) -> None:
-        print(f"Kept with {_whose_day(day, _today_str())} “{session['title']}”.")
+        print(f"I kept your words as a note on {_whose_day(day, _today_str())} "
+              f"“{session['title']}”.")
 
     def session_note_question(self, text: str, day: str, today: str) -> str:
         return (
