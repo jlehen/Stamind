@@ -113,6 +113,13 @@ When two slots of one week end on the same lineage, the newer version counts. A 
 `workout adapt` or `workout tweak` created is not part of the written week, but an activity done
 on it still counts as load done.
 
+One exception: when `workout adapt` or `workout tweak` writes into a range that held no session
+at all, its change is stored as a `workout generate` (D5). It is Sunday evening. `plan generate`
+has started a new mesocycle, and its `workout generate` proposal waits in the chat. Before
+answering it, the athlete asks the coach for a change, and `workout adapt` writes the five weeks
+itself. Those sessions are the schedule as written, so they are stored as written by `workout
+generate`, and the slot walk reads them as written.
+
 Two stories show why the walk goes by slot and not by session. On Wednesday 4 November at
 08:00 the coach moves the intervals to Thursday, and at 08:30 the athlete runs `workout
 rollback`. Wednesday's ride slot holds the version `workout generate` wrote, the coach's void,
@@ -135,8 +142,9 @@ not a void, the rule `_speaking` already applies (`db/workouts.py`). On Friday 6
 light gym session's lineage holds a live void in the strength slot and a live rest day; the
 rest day is its now. The session is:
 
-- **dropped** when it has no now, or its now is of another sport (a rest day included):
-  "replaced by Rest Day — Unwell";
+- **dropped** when it has no now, or its now is of another sport (a rest day included). Its
+  line says "dropped" when it has no now, and names the now when it has one: "replaced by
+  Rest Day — Unwell";
 - **moved out** when its now falls in another week;
 - **cut** when its now plans less load than its written version (sports added up by load
   only).
@@ -290,6 +298,7 @@ a choice.
 | 13 | Two build steps, the record's numbers first (§8) | The original motivation lands without waiting on the wording rulings | One build | Made during the review (pragmatic) |
 | 14 | The terminal prints the prompts' lines, with no columns (§5) | One renderer | A column layout with SHORT on the right | Made during the review (pragmatic) |
 | 15 | Every quoted reason has the same lead-in, "changed <day>:" (§5) | The day in front tells which day "today" means in the quote | A special lead-in for a reason written about another day | Made during the review (pragmatic) |
+| 16 | D5 covers `workout tweak` as well as `workout adapt` (§3) | Both go through the same apply, so the one test is "the range held no session" | `workout adapt` only | |
 
 ## 7. Not handled
 
@@ -319,13 +328,17 @@ a choice.
   that week as written.
 - A week only part of which has written sessions (the first or last week of a plan, a gap
   between two plans) is graded on what was written, against the whole week's activities.
+- A session the coach moves from a Sunday to the Monday after, which a later `workout
+  generate` then writes again on that Monday, is written in both weeks, so a mesocycle's
+  record counts it twice in `sessions_planned`. Neither database holds such a case; the three
+  piupiu sessions that end on two slots each moved within one week.
 
 ## 8. Build order
 
 1. **The written week as "planned".** `get_slot_history`, the slot walk, `written_week`'s
-   written versions, `graded_workouts`, the swaps of §4 and the record's numbers. No screen
-   gains a line. The per-sport note keeps running, on the written figures. This is the original
-   motivation, and it can land alone.
+   written versions, `graded_workouts`, the swaps of §4, the record's numbers and the change
+   kind of D5. No screen gains a line. The per-sport note keeps running, on the written
+   figures. This is the original motivation, and it can land alone.
 2. **The grade**: the now and the dropped, moved-out and cut tests of §3, the reason, and the
    lines in `compare`, the chat and the prompts, with choices 7 and 8. The three share one
    renderer and the same rulings, so they land together.
@@ -359,15 +372,25 @@ a choice.
   `planned_load_elapsed_by_sport` and `actual_load_by_sport` fields of `weekly_aggregates`; also
   `tests/test_context_sport_gap.py` and those cases of `tests/test_progression.py`.
 - **`cli/workouts/compare.py`**: `run_workout_compare` grades the ended weeks that overlap the
-  window and hands them to the renderer; `print_workout_compare` prints them after the count.
+  window, reading their sessions and activities from Monday to Sunday and not only inside the
+  window, and hands them to the renderer; `print_workout_compare` prints them after the count.
+  Both renderers return early today when the window has no day to show (`if not days`); the
+  weeks are printed even then.
 - **`cli/render/expert.py` and `cli/render/companion.py`**: `workout_compare` takes the graded
   weeks.
 - **`cli/render/session_lines.py`**: the chat's week line, a function of its own printed after
   `simple_compare_lines`.
+- **`coach/service/revision_apply.py`**: `workout_revision_apply` opens its change as
+  `generate` when `existing_workouts`, the range's sessions read before the change opens, is
+  empty (D5). Two readers then see a `generate`. The quiet morning counts it as a newly written
+  schedule (`picture.py`, `written`), so the next morning's push runs `workout adapt` once. The
+  chat's hand-off question (`hand_off._coach_looked`) is still met by the proposal the chat
+  saved before the apply.
 - **docs/ARCHITECTURE.md**: the module line for `written_week.py`; the rule that an ended week
-  is planned from its written week, everywhere a week is compared; the `workout compare` row of
-  the command table; §15's "Nothing new grades anything" gains the week grade as the one other
-  grader.
+  is planned from its written week, everywhere a week is compared; the `workout_changes.kind`
+  line: an adapt or a tweak written into a range with no session is stored as `generate`; the
+  `workout compare` row of the command table; §15's "Nothing new grades anything" gains the
+  week grade as the one other grader.
 - **DESIGN_mesocycle_progress.md §3.3**: a line saying it is replaced by this design, if choice 7
   stands.
 
@@ -397,6 +420,8 @@ a choice.
   number written.
 - The week lines: an ended week's planned figure is the written week's; a test the coach
   dropped stays out of the test lines.
+- Apply: an adapt over a range with no session is stored as a `generate`, and the slot walk
+  reads its sessions as written; an adapt over a range holding one session stays an `adapt`.
 
 ## 11. After landing
 
@@ -404,6 +429,22 @@ Nothing to migrate: the written versions are read from the history already store
 lands before the HIIT Block 1 record (id 199) is written on 15 November, the record is right the
 first time. Otherwise run `plan retro redo 199` on the author's instance, so it is written again
 with these numbers.
+
+One row to fix on the companion instance (`piupiu/stamind.db`). On Sunday 25 October its new
+mesocycle had no sessions yet, and the `workout generate` proposal for it waited unanswered in
+the chat. The athlete added a holiday constraint and said yes to "Shall I adjust your week
+around this constraint?", so `workout adapt` wrote all 25 sessions of the five weeks, as change
+29. A `workout generate` on 4 November (change 39) was rolled back (change 40), which put change
+29's sessions back. Because change 29 is an adapt, the slot walk finds no written session in the
+week of 26 October and almost no written run after it. Change 29 is the case D5 now stores as
+a `workout generate`, so it is relabelled by hand, once:
+
+```
+UPDATE workout_changes SET kind = 'generate' WHERE id = 29;
+```
+
+The sessions it wrote then lose their `[ADAPTED]` marker, and their Calendar history reads
+"Planned" instead of "Adapted". Nothing else reads a change that old.
 
 ## Decisions Log
 
@@ -413,3 +454,4 @@ with these numbers.
 | D2 | When a change is flagged | Only when nothing of the same sport in the same week made up for it | The athlete's own rule: a trim balanced by a bigger session is expected | Athlete | 2026-11-10 |
 | D3 | How a drop is shown | Never as a miss; neutral lines, only under a short sport | A red drop would teach the athlete to stop telling the coach they are tired | Brainstorm | 2026-11-10 |
 | D4 | Hiit | Added up by load, not counted in sessions | The athlete's ruling on choice 1 | Athlete | 2026-11-10 |
+| D5 | A `workout adapt` that writes into a range with no session | Its change is stored as a `workout generate` | It did a `workout generate`'s work; stored as an adapt, its weeks have nothing written and go ungraded (piupiu, 25 October). Chosen over fixing such a change by hand each time, and over `workout adapt` refusing until the athlete answers the waiting proposal | Athlete | 2026-11-11 |
