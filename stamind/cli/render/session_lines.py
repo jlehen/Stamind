@@ -13,10 +13,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from stamind.benchmarks import format_delta, format_value, is_improvement, label_for_kind
 from stamind.strength import comparison
 from stamind.analytics.adherence import DURATION, SETS, Gap, off_plan_gaps
+from stamind.analytics.written_week import SESSIONS, SportGrade, changed_words, percent
 from stamind.strength.sets import activity_lines
 from stamind.sports import canonical_sport
 from stamind.text import wrap_text
-from stamind.clock import days_between, fmt_date, today_str as _today_str
+from stamind.clock import days_between, fmt_date, fmt_day, today_str as _today_str
 from stamind.cli.common import simple_comparison_lines
 
 
@@ -230,6 +231,45 @@ def simple_compare_lines(
         lines.append(f"\n{done} of {total} {session_word} done — keep it rolling 💪")
     else:
         lines.append(f"\n0 of {total} {session_word} done — the plan is ready when you are 💪")
+    return lines
+
+
+# The chat's noun for a sport added up by load, where the sport's name is not one already.
+SPORT_NOUNS = {"cycling": "riding"}
+
+
+def _grade_words(sport: SportGrade) -> str:
+    """'82% of its riding', '1 of its 2 gym sessions'."""
+    if sport.measure == SESSIONS:
+        noun = "gym session" if sport.written == 1 else "gym sessions"
+        return f"{sport.done:.0f} of its {sport.written:.0f} {noun}"
+    noun = SPORT_NOUNS.get(sport.sport, sport.sport.replace("_", " "))
+    return f"{percent(sport)}% of its {noun}"
+
+
+def simple_week_grade_lines(monday: str, grade: List[SportGrade]) -> List[str]:
+    """An ended week with a short sport, against its sessions as written: what was done
+    first, then each session no longer as written, with what happened and why. Nothing for
+    a week with nothing short (DESIGN_week_as_written.md §5)."""
+    short = [sport for sport in grade if sport.short]
+    if not short:
+        return []
+    words = [_grade_words(sport) for sport in short]
+    done = words[-1]
+    if len(words) > 1:
+        done = f"{', '.join(words[:-1])} and {done}"
+    lines = [wrap_text(
+        f"\nWeek of {fmt_day(monday)}, against the week as it was written: you did {done}."
+    )]
+    changes = sorted(
+        (changed for sport in short for changed in sport.changed),
+        key=lambda changed: changed.written["date"],
+    )
+    for changed in changes:
+        day = datetime.strptime(changed.written["date"], "%Y-%m-%d").strftime("%a %d")
+        lines.append(wrap_text(
+            f"{day} · {simple_session_line(changed.written)}: {changed_words(changed)}"
+        ))
     return lines
 
 

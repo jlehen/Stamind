@@ -6,6 +6,7 @@ from typing import (
     Optional,
     Sequence,
     Set,
+    Tuple,
 )
 
 from stamind.types import Workout
@@ -78,6 +79,35 @@ class WorkoutHistoryMixin:
         Calendar event renders as its history (DESIGN_calendar_lineage.md §4)."""
         with self._get_connection() as conn:
             return self._lineage_revisions(conn, [lineage_id]).get(lineage_id, [])
+
+    def get_slot_history(
+        self, start: Optional[str] = None, end: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], Dict[int, Dict[str, Any]]]:
+        """What the written week is walked from (DESIGN_week_as_written.md §3, §9).
+
+        Returns every version dated from `start` to `end`, every one without a window, oldest
+        first, with its change's `kind` and `change_created_at`; and, keyed by lineage, the
+        live version that is not a void of each of their lineages, the rule `_speaking`
+        applies. Two queries, whatever the size of the window."""
+        window = (start or "0000-00-00", end or "9999-99-99")
+        with self._get_connection() as conn:
+            versions = [
+                dict(row) for row in conn.execute(
+                    "SELECT w.*, c.kind AS kind, c.created_at AS change_created_at "
+                    "FROM workouts w JOIN workout_changes c ON c.id = w.change_id "
+                    "WHERE w.date >= ? AND w.date <= ? ORDER BY w.id ASC",
+                    window,
+                )
+            ]
+            now = {
+                row["lineage_id"]: dict(row) for row in conn.execute(
+                    "SELECT * FROM live_workouts WHERE void = 0 AND lineage_id IN ("
+                    "  SELECT lineage_id FROM workouts WHERE date >= ? AND date <= ?"
+                    ") ORDER BY id ASC",
+                    window,
+                )
+            }
+        return versions, now
 
     def get_change(self, change_id: int) -> Optional[Dict[str, Any]]:
         with self._get_connection() as conn:

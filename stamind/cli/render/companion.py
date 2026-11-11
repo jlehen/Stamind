@@ -28,7 +28,7 @@ from stamind.cli.render.plan_lines import (
 from stamind.cli.render.proposal_lines import simple_revision_lines
 from stamind.cli.render.session_lines import (
     SIMPLE_SESSION_RULE, simple_benchmark_question, simple_compare_lines, simple_day_lines,
-    simple_day_word, simple_span_words, simple_week_lines,
+    simple_day_word, simple_span_words, simple_week_grade_lines, simple_week_lines,
 )
 
 
@@ -218,7 +218,7 @@ class CompanionRenderer(ExpertRenderer):
 
     def workout_compare(
         self, days: list, *, start_date: str, end_date: str, sport_filter: Optional[str],
-        informational: list, covered_ranges: list,
+        informational: list, covered_ranges: list, weeks: list,
     ) -> None:
         # The discrepancy lines, the load-from-RPE note and the in-mesocycle/off-plan
         # distinction are expert detail: the glyph on each line is the whole verdict here,
@@ -237,6 +237,10 @@ class CompanionRenderer(ExpertRenderer):
                 kept.append((date_str, results, worth_a_line))
         for line in simple_compare_lines(kept, start_date, end_date, _today_str()):
             print(line)
+        # Only a week with a short sport earns a line (DESIGN_week_as_written.md §5).
+        for monday, grade in weeks:
+            for line in simple_week_grade_lines(monday, grade):
+                print(line)
 
     def calendar_marked(self, marked: int) -> None:
         # Bookkeeping on the operator's Calendar; chat is not the audit surface (§6).

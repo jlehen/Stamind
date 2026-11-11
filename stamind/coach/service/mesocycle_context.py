@@ -16,8 +16,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from stamind.types import Workout
 from stamind.analytics import intensity, progression, timeline
 from stamind.analytics.mesocycle_report import format_header, measured_window, mesocycle_report
+from stamind.analytics.written_week import graded_weeks, graded_workouts, week_grade_lines
 from stamind.benchmarks import format_value, label_for_kind
-from stamind.text import wrap_text
 from stamind.clock import days_between
 
 
@@ -67,11 +67,17 @@ class MesocycleContextMixin:
         if elapsed_end < meso['start_date']:
             return None, False
 
-        # Fetched once and handed to both renderers: they read the same rows, and the week
-        # lines and the test lines must never disagree about what the mesocycle contains.
-        workouts = self._db.get_workouts(start_date=meso['start_date'], end_date=elapsed_end)
-        weeks = self._mesocycle_week_lines(meso, as_of, elapsed_end, workouts)
-        benchmarks = self._mesocycle_benchmark_lines(meso, elapsed_end, workouts)
+        # An ended week is planned from its written week, but a test the coach dropped was
+        # not run, so the test lines read the schedule as it stands
+        # (DESIGN_week_as_written.md §4).
+        weeks = self._mesocycle_week_lines(
+            meso, as_of, elapsed_end,
+            graded_workouts(self._db, meso['start_date'], elapsed_end, as_of),
+        )
+        benchmarks = self._mesocycle_benchmark_lines(
+            meso, elapsed_end,
+            self._db.get_workouts(start_date=meso['start_date'], end_date=elapsed_end),
+        )
         # Everything is anchored on gen_start, not as_of: history ends the day before the
         # first day being written, so the header's "N completed weeks", the week lines and
         # the zone windows all count the same days. The two differ by one on the run that
@@ -80,7 +86,8 @@ class MesocycleContextMixin:
             meso, gen_start, self._db.get_completed_activities,
             current_week=True, previous=self._preceding_mesocycle(meso),
             benchmarks=self._db.get_benchmark_results(),
-            fetch_workouts=self._db.get_workouts, indent="",
+            fetch_workouts=lambda start, end: graded_workouts(self._db, start, end, as_of),
+            indent="",
         )
         # Gated on banked evidence, NOT on `report`: a started mesocycle with nothing recorded
         # still yields a report ("no completed activities in ..."), and pairing that with a
@@ -128,7 +135,8 @@ class MesocycleContextMixin:
         self, meso: Dict[str, Any], as_of: str, elapsed_end: str,
         workouts: List[Workout], indent: str = "    ",
     ) -> List[str]:
-        """One planned-vs-actual line per Monday-week of the mesocycle's elapsed part.
+        """One planned-vs-actual line per Monday-week of the mesocycle's elapsed part, and
+        under an ended week its grade per sport (DESIGN_week_as_written.md §5).
 
         Reuses `progression.weekly_aggregates`, the same planned-vs-actual weekly maths
         `sm progress` renders, so the week planner and the athlete never read different numbers
@@ -146,6 +154,7 @@ class MesocycleContextMixin:
             activities, workouts, as_of, timeline.meso_bands([meso], []),
             window_end=elapsed_end,
         )
+        grades = dict(graded_weeks(self._db, meso['start_date'], elapsed_end, as_of))
         out: List[str] = []
         for w in weeks:
             when, actual = w['week_commencing'], w['actual_load']
@@ -170,54 +179,8 @@ class MesocycleContextMixin:
                 if when < meso['start_date'] and not w['in_progress'] else ""
             )
             out.append(f"{head}: {asked}, actual {actual:.0f}{pct}{note}")
-            sport_note = self._week_sport_gap_note(w, denom, actual)
-            if sport_note:
-                # A week with several sports can run past the 100-char prompt-wide wrap
-                # convention (AGENTS.md) that the single blended line above never risks.
-                out.append(wrap_text(f"{indent}    {sport_note}"))
+            out.extend(week_grade_lines(grades.get(when, []), f"{indent}    "))
         return out
-
-    def _week_sport_gap_note(
-        self, week: Dict[str, Any], denom: Optional[float], actual: float,
-    ) -> Optional[str]:
-        """Per-sport breakdown for a week whose planned-vs-actual TOTAL hides which
-        sport actually drove it — a shortfall concentrated in one sport (e.g. missed
-        strength) reads as generalized under-training when only the blended total is
-        shown, even though the sport the athlete's goal depends on may be fully on
-        plan (DESIGN_mesocycle_progress.md §3.3: CTL/ATL/TSB is one blended stream across
-        all sports by design, DESIGN_pmc_fitness_fatigue.md's out-of-scope list; this
-        note is the cheap per-sport cross-check the blended total can't give alone).
-
-        The trigger is deliberately NOT "the blended total is far from 100%": a week
-        can blend a fully-on-plan sport with a fully-missed one and still land near
-        90% overall (100/205 cycling offsetting 0/32 strength) — exactly the case
-        this note exists for. Instead it fires when some sport's OWN adherence rate
-        is >=20 points off the blended rate, i.e. that sport is not telling the same
-        story as the total. 20 points matches no other threshold in this file —
-        chosen as clearly outside normal week-to-week noise between sports."""
-        if not denom or actual <= 0:
-            return None
-        planned_by_sport = progression.week_plan_denom_by_sport(week) or {}
-        actual_by_sport = week.get("actual_load_by_sport", {})
-        sports = sorted(set(planned_by_sport) | set(actual_by_sport))
-        if len(sports) < 2:
-            return None
-        overall_pct = actual / denom * 100
-        sport_pcts = [
-            actual_by_sport.get(sport, 0.0) / planned_by_sport[sport] * 100
-            for sport in sports if planned_by_sport.get(sport)
-        ]
-        if not sport_pcts or max(abs(p - overall_pct) for p in sport_pcts) < 20:
-            return None
-        parts = []
-        for sport in sports:
-            sport_planned = planned_by_sport.get(sport, 0.0)
-            sport_actual = actual_by_sport.get(sport, 0.0)
-            if not sport_planned and not sport_actual:
-                continue
-            sport_pct = f" ({sport_actual / sport_planned * 100:.0f}%)" if sport_planned else ""
-            parts.append(f"{sport}: {sport_actual:.0f}/{sport_planned:.0f}{sport_pct}")
-        return "of which " + ", ".join(parts) if parts else None
 
     def _mesocycle_benchmark_lines(
         self, meso: Dict[str, Any], elapsed_end: str, workouts: List[Workout],

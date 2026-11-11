@@ -26,7 +26,6 @@ from stamind.analytics.load import (
 )
 from stamind.analytics.runway import plan_dates, plan_end
 from stamind.clock import day_str, parse_date
-from stamind.sports import canonical_sport
 
 
 DayPoint = Dict[str, Any]  # {date, load, source: 'actual'|'planned',
@@ -188,24 +187,6 @@ def fitness_series(
     return out
 
 
-def _load_by_sport(
-    items: List[Dict[str, Any]], load_fn, sport_field: str
-) -> Dict[str, float]:
-    """Sums `load_fn(item)` per canonical sport (DESIGN_mesocycle_progress.md §3.3) — the
-    same bucketing `intensity.sport_durations` uses, so a week's per-sport load and its
-    per-sport duration never disagree about which sport an item belongs to.
-
-    `sport_field` differs by row type and is the caller's job to get right: a
-    completed activity's sport lives in `activity_type` (the raw `completed_activities`
-    column), a planned workout's in `sport_type` — the same split `analytics/intensity.py`'s
-    sport-keyed helpers already draw between the two row shapes."""
-    by_sport: Dict[str, float] = {}
-    for item in items:
-        sport = canonical_sport(item.get(sport_field) or "unknown")
-        by_sport[sport] = by_sport.get(sport, 0.0) + load_fn(item)
-    return by_sport
-
-
 def _done_seconds(activities: List[Dict[str, Any]]) -> float:
     """The time of the given activities that counts in a week's hours (§7.1)."""
     timed = [(activity_load(a), float(a.get("duration_sec") or 0.0)) for a in activities]
@@ -248,16 +229,12 @@ def weekly_aggregates(
     """Monday-commencing weekly planned-vs-actual load (§5/§6), one dict per week from
     the earliest activity/workout date through plan end (or today):
 
-        {week_commencing, planned_load, planned_load_by_sport, planned_load_elapsed?,
-         planned_load_elapsed_by_sport?, planned_seconds?, planned_seconds_elapsed?,
-         partial_plan?, in_progress, actual_load, actual_load_by_sport, actual_seconds,
+        {week_commencing, planned_load, planned_load_elapsed?, planned_seconds?,
+         planned_seconds_elapsed?, partial_plan?, in_progress, actual_load, actual_seconds,
          meso_label, meso_source, zone_rows, sport_seconds, judged_sport_seconds,
          load_sparse, planned_zone_rows}
 
-    The `_by_sport` dicts (canonical sport -> load) let a caller tell WHICH sport drove a
-    week's gap without re-deriving it — the raw material for DESIGN_mesocycle_progress.md
-    §3.3. Bucketed on `activity_type` for the actual dict and `sport_type` for the two
-    planned ones, the same split `analytics/intensity.py`'s sport-keyed helpers draw.
+    Which sport drove a week's gap is the week grade's (DESIGN_week_as_written.md §2).
 
     `planned_load` is None for a week the plan never covered, matching `adherence.py`:
     activity outside planned coverage is informational, not a deviation. `partial_plan`
@@ -290,7 +267,6 @@ def weekly_aggregates(
 
         week_acts = [a for d in week_dates for a in acts_by_date.get(d, [])]
         actual_load = sum(activity_load(a) for a in week_acts)
-        actual_load_by_sport = _load_by_sport(week_acts, activity_load, "activity_type")
         week_workouts = [w for d in week_dates for w in workouts_by_date.get(d, [])]
 
         meso_label, meso_source = _week_meso(week_dates, meso_spans)
@@ -298,7 +274,6 @@ def weekly_aggregates(
         week: Dict[str, Any] = {
             "week_commencing": week_mon,
             "actual_load": actual_load,
-            "actual_load_by_sport": actual_load_by_sport,
             # The hours done, of the activities hard enough to count (§7.1).
             "actual_seconds": _done_seconds(week_acts),
             "in_progress": in_progress,
@@ -334,9 +309,6 @@ def weekly_aggregates(
         }
         if week_workouts:
             week["planned_load"] = sum(planned_load(w) for w in week_workouts)
-            week["planned_load_by_sport"] = _load_by_sport(
-                week_workouts, planned_load, "sport_type"
-            )
             week["planned_seconds"] = _planned_seconds(week_workouts)
             # Elapsed = Mon..yesterday, plus today only once its load has synced
             # (today's §3 source is 'actual'). Including an unfinished today would
@@ -351,9 +323,6 @@ def weekly_aggregates(
                 elapsed_workouts = [w for w in week_workouts if w["date"] <= elapsed_end]
                 week["planned_load_elapsed"] = sum(
                     planned_load(w) for w in elapsed_workouts
-                )
-                week["planned_load_elapsed_by_sport"] = _load_by_sport(
-                    elapsed_workouts, planned_load, "sport_type"
                 )
                 week["planned_seconds_elapsed"] = _planned_seconds(elapsed_workouts)
             else:
@@ -398,13 +367,3 @@ def week_plan_seconds(week: Dict[str, Any]) -> Optional[float]:
     if week.get("in_progress"):
         return week.get("planned_seconds_elapsed", 0.0)
     return week["planned_seconds"]
-
-
-def week_plan_denom_by_sport(week: Dict[str, Any]) -> Optional[Dict[str, float]]:
-    """The per-sport counterpart of `week_plan_denom`: same elapsed-vs-full rule, but
-    keyed by canonical sport. None for a week no plan covered, matching the scalar."""
-    if week.get("planned_load") is None:
-        return None
-    if week.get("in_progress"):
-        return week.get("planned_load_elapsed_by_sport", {})
-    return week.get("planned_load_by_sport", {})

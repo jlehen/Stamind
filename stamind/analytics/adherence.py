@@ -129,7 +129,7 @@ def unplanned_kind(
     return UNPLANNED if date_covered(date_str, covered_ranges) else OFF_PLAN
 
 
-def _adherence_tolerance(exp_load: float) -> float:
+def adherence_tolerance(exp_load: float) -> float:
     """Dynamic +/- tolerance for the duration/workload comparison: looser for
     easy sessions (where small absolute swings are large in %), tighter for hard
     ones. Linearly interpolated between `easy_pct` at `low_load` and `hard_pct`
@@ -197,7 +197,7 @@ def off_plan_gaps(w: Dict[str, Any], matched_act: Dict[str, Any]) -> List[Gap]:
         if compared.share >= comparison.DONE_SHARE:
             return []
         return [Gap(SETS, compared.planned, compared.counted, 1 - comparison.DONE_SHARE)]
-    tolerance = _adherence_tolerance(planned_load(w))
+    tolerance = adherence_tolerance(planned_load(w))
     measures = (
         (DURATION, w.get("duration_minutes") or 0, matched_act["duration_sec"] / 60.0),
         (LOAD, _planned_load_like(w, matched_act) or 0, activity_load(matched_act)),
@@ -330,7 +330,7 @@ def _duration_shortfall(w: Dict[str, Any], matched_act: Dict[str, Any]) -> bool:
     if p_duration <= 0:
         return False
     act_duration_min = matched_act["duration_sec"] / 60.0
-    return (p_duration - act_duration_min) / p_duration > _adherence_tolerance(
+    return (p_duration - act_duration_min) / p_duration > adherence_tolerance(
         planned_load(w)
     )
 

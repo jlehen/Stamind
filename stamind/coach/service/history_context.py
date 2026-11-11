@@ -19,6 +19,7 @@ from stamind import cycle_records, garmin
 from stamind.analytics import zone_tables
 from stamind.analytics.mesocycle_report import mesocycle_report
 from stamind.analytics.pmc import PMC_TSB_LAG_NOTE, load_ratio, pmc_data_caveat, pmc_ramp
+from stamind.analytics.written_week import graded_workouts
 from stamind.db.objectives import ARCHIVED
 from stamind.db.retrospectives import MESOCYCLE, PLAN
 from stamind.plan_versions import plan_lineage
@@ -303,11 +304,13 @@ class HistoryContextMixin:
     ) -> Optional[str]:
         """One mesocycle in full detail: its intensity report, then each week's planned
         load beside the load produced. None when it has not started. The retrospective
-        writer reads the same text (DESIGN_cycle_retrospective.md §5)."""
+        writer reads the same text (DESIGN_cycle_retrospective.md §5). An ended week is
+        planned from its written week (DESIGN_week_as_written.md §4)."""
         text = mesocycle_report(
             meso, today_str, self._db.get_completed_activities,
             previous=previous, benchmarks=benchmarks,
-            fetch_workouts=self._db.get_workouts, width=width,
+            fetch_workouts=lambda start, end: graded_workouts(self._db, start, end, today_str),
+            width=width,
         )
         if not text:
             return None
@@ -316,7 +319,7 @@ class HistoryContextMixin:
         elapsed_end = min(today_str, meso['end_date'])
         weeks = self._mesocycle_week_lines(
             meso, today_str, elapsed_end,
-            self._db.get_workouts(start_date=meso['start_date'], end_date=elapsed_end),
+            graded_workouts(self._db, meso['start_date'], elapsed_end, today_str),
             indent="      ",
         )
         if weeks:

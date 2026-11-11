@@ -1,8 +1,10 @@
-"""`workout compare`: what was planned beside what Garmin recorded, day by day.
+"""`workout compare`: what was planned beside what Garmin recorded, day by day, then each
+week that has ended against its sessions as written.
 
 The pairing itself is `analytics/compare.py`, which this command, the dashboard's compare
-tab and the Calendar's verdict stamping all read; this file only asks it for a window and
-draws the answer.
+tab and the Calendar's verdict stamping all read; the week grade is
+`analytics/written_week.py` (DESIGN_week_as_written.md). This file only asks them for a
+window and draws the answer.
 """
 import argparse
 from typing import Optional
@@ -11,13 +13,16 @@ from stamind.analytics.adherence import (
     MINOR, MISSED, PARTIAL, REST_VIOLATION, UNPLANNED, classify_adherence, unplanned_kind,
 )
 from stamind.analytics.compare import adherence_window, compare_days, format_actual
+from stamind.analytics.written_week import graded_weeks, week_grade_lines
 from stamind.config import config
 from stamind.gcal.reconcile import mark_adherence_from_results
+from stamind.sports import canonical_sport
 from stamind.strength.sets import activity_lines
 from stamind.text import bold, cyan, gray, green, magenta, red, yellow
 from stamind.output import notice, warn
 from stamind.clock import (
-    fmt_date, parse_date, today_date as _today_date, today_str as _today_str,
+    fmt_date, fmt_day, parse_date, today_date as _today_date, today_str as _today_str,
+    week_start,
 )
 from stamind.cli.common import strength_table
 from stamind.cli.windows import resolve_window
@@ -38,8 +43,9 @@ def run_workout_compare(args: argparse.Namespace) -> None:
 
     if not getattr(args, 'no_pull', False):
         try:
+            # From the Monday: an ended week is graded whole (DESIGN_week_as_written.md §5).
             runtime.garmin.ensure_data(
-                start_date, end_date, force=getattr(args, 'force_pull', False)
+                week_start(start_date), end_date, force=getattr(args, 'force_pull', False)
             )
         except Exception as e:
             warn(f"could not ensure recent data: {e}")
@@ -51,10 +57,15 @@ def run_workout_compare(args: argparse.Namespace) -> None:
         parse_date(start_date), window.history_days, window.results, window.activities,
         sport_filter,
     )
+    weeks = graded_weeks(runtime.db, start_date, end_date, today_str)
+    if sport_filter:
+        sport = canonical_sport(sport_filter)
+        weeks = [(monday, [g for g in grade if g.sport == sport]) for monday, grade in weeks]
 
     runtime.render.workout_compare(
         days, start_date=start_date, end_date=end_date, sport_filter=sport_filter,
         informational=window.informational, covered_ranges=window.covered_ranges,
+        weeks=[(monday, grade) for monday, grade in weeks if grade],
     )
     if not days:
         return
@@ -67,10 +78,10 @@ def run_workout_compare(args: argparse.Namespace) -> None:
 
 def print_workout_compare(
     days: list, *, start_date: str, end_date: str, sport_filter: Optional[str],
-    informational: list, covered_ranges: list,
+    informational: list, covered_ranges: list, weeks: list,
 ) -> None:
     """The expert compare report: PLANNED/ACTUAL per day, what differed under each session,
-    then how many discrepancies the days shown hold."""
+    how many discrepancies the days shown hold, then each ended week as written."""
     print(bold(cyan("=== WORKOUT COMPARE ===")))
     filter_parts = [f"From: {fmt_date(start_date)}", f"Until: {fmt_date(end_date)}"]
     if sport_filter:
@@ -80,6 +91,7 @@ def print_workout_compare(
 
     if not days:
         print(gray("No planned workouts or completed activities found in this range."))
+        print_graded_weeks(weeks)
         return
 
     discrepancies = 0
@@ -149,7 +161,9 @@ def print_workout_compare(
         noun = "discrepancies" if discrepancies != 1 else "discrepancy"
         print(bold(yellow(f"{discrepancies} {noun} found.")))
     else:
-        print(bold(green("No discrepancies found. Great adherence!")))
+        # No "Great adherence!": the week below can be short (DESIGN_week_as_written.md §5).
+        print(bold(green("No discrepancies found.")))
+    print_graded_weeks(weeks)
 
     if informational:
         print()
@@ -158,6 +172,24 @@ def print_workout_compare(
             print(gray(
                 f"- {fmt_date(act['date'])}: {format_actual(act, divergence=True)}"
             ))
+
+
+def print_graded_weeks(weeks: list) -> None:
+    """Each ended week against its sessions as written, in the lines the prompts read; a
+    short sport's line is yellow, and nothing is red (DESIGN_week_as_written.md §5)."""
+    if not weeks:
+        return
+    print()
+    print(bold(cyan("=== WEEKS AS WRITTEN ===")))
+    for monday, grade in weeks:
+        print(bold(f"Week of {fmt_day(monday)}"))
+        for sport in grade:
+            first, *rest = week_grade_lines([sport], "    ")
+            if sport.short:
+                first = yellow(first)
+            print(first)
+            for line in rest:
+                print(line)
 
 
 def print_set_lines(act: dict) -> None:

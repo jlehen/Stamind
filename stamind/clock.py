@@ -232,6 +232,11 @@ def shift(date_str: str, days: int) -> str:
     return (parse_date(date_str) + timedelta(days=days)).isoformat()
 
 
+def week_start(date_str: str) -> str:
+    """The Monday of `date_str`'s week, as an ISO date."""
+    return shift(date_str, -parse_date(date_str).weekday())
+
+
 def month_start(date_str: str) -> str:
     """The first day of the month holding `date_str`."""
     return date_str[:8] + "01"
