@@ -131,6 +131,8 @@ def add_workout_parser(subparsers, pull_bypass_parser, llm_debug_parser):
             "missed sessions, rest-day violations, and unplanned high-load efforts. "
             "With no date filter, looks back 14 days; here a bare span like -d 7d looks "
             "backward (not forward) and the end date is always capped at today. "
+            "Then each week that has ended and overlaps the range is graded whole, per "
+            "sport, against its sessions as workout generate wrote them. "
             "Freshens Garmin data for the range first unless --no-pull is given. "
             "Each past event's Calendar entry is stamped with the adherence verdict "
             "(a [Done]/[Missed]/[Partial]/... title tag and an 'Adherence' description "

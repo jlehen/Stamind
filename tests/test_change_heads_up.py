@@ -12,7 +12,8 @@ from typing import Optional
 from unittest.mock import patch
 
 from tests.helpers import (
-    bind_test_db, clear_all_tables, pin_clock, rebind_test_db, run_cli, started_from,
+    bind_test_db, clear_all_tables, pin_clock, rebind_test_db, run_cli, save_workout,
+    started_from,
 )
 from tests import test_db_path
 
@@ -201,6 +202,9 @@ class WhoIsWatchingTest(_DbCase):
         ))
 
     def test_a_terminal_adapt_waits(self):
+        # A session stands in the range, so the change stays an adapt
+        # (DESIGN_week_as_written.md D5).
+        save_workout(test_db, today_str(), "running", "Easy run", tss=40)
         self._adapt()
         [change] = test_db.waiting_changes()
         self.assertEqual((change["kind"], change["note"]), ("adapt", "Friday becomes a rest day."))

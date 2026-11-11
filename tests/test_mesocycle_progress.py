@@ -137,19 +137,21 @@ class TestMesocycleProgressContext(unittest.TestCase):
             max(text.splitlines(), key=len),
         )
 
-    def test_missed_strength_week_gets_a_per_sport_split(self):
-        """A week where cycling was fully executed but strength was entirely skipped
-        reads as an unremarkable ~80% week blended, hiding that cycling itself was on
-        plan. The per-sport annotation is what makes that visible to the prompt."""
+    def test_an_ended_week_is_planned_as_written_and_graded_per_sport(self):
+        """The coach dropped the week's strength session. The week line still plans it, and
+        the grade under the week says strength is short and why, while cycling is on plan
+        (DESIGN_week_as_written.md §4, §5)."""
         self._planned("2026-07-06", 200.0, sport_type="cycling")
         self._done("2026-07-06", 200.0, "cyc-1")
         self._planned("2026-07-08", 50.0, sport_type="strength_training", title="Full body")
-        # No completed activity for the strength session: it was skipped.
+        with test_db.workout_change(kind="adapt") as change:
+            change.void(date="2026-07-08", sport_type="strength_training", reason="Tired.")
         text = self._context("2026-07-22", "2026-07-22")
         self.assertIn("week of 2026-07-06: planned 250, actual 200 (80%)", text)
-        self.assertIn(
-            "of which cycling: 200/200 (100%), strength_training: 0/50 (0%)", text
-        )
+        self.assertIn("        cycling: written 200, done 200 (100%)\n", text)
+        self.assertIn("        strength_training: written 1 session, done 0, short", text)
+        self.assertIn('          Wed 8 Jul Full body: dropped, changed ', text)
+        self.assertIn(': "Tired."', text)
         self.assertTrue(
             all(len(line) <= 100 for line in text.splitlines()),
             max(text.splitlines(), key=len),

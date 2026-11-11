@@ -6,12 +6,14 @@ is `coach/engine/retrospective.py`.
 
 It is one mixin of :class:`CoachService` — see coach/service/__init__.py.
 """
+from collections import Counter
 from typing import Any, Dict, List, Optional
 
 from stamind import cycle_records, runtime
 from stamind.analytics.adherence import PARTIAL
 from stamind.analytics.compare import adherence_verdicts
 from stamind.analytics.load import activity_load, planned_load
+from stamind.analytics.written_week import written_week
 from stamind.clock import today_str as _today_str
 from stamind.db.retrospectives import PLAN
 from stamind.output import step
@@ -134,21 +136,26 @@ class RetrospectiveMixin:
 
     def _retrospective_numbers(self, start: str, end: str, today: str) -> Dict[str, Any]:
         """The values a mesocycle record's first line shows, exact, as totals over its own
-        days (§5)."""
+        days (§5). Planned is the written week; done is the live sessions done or partial,
+        capped per sport at the number written (DESIGN_week_as_written.md §4)."""
         rest = canonical_sport('rest')
         planned = [
-            w for w in self._db.get_workouts(start_date=start, end_date=end)
-            if canonical_sport(w['sport_type']) != rest
+            session.written for session in written_week(self._db, start, end)
+            if canonical_sport(session.written['sport_type']) != rest
         ]
+        written_by_sport = Counter(canonical_sport(w['sport_type']) for w in planned)
         verdicts = adherence_verdicts(self._db, start, end, today)
-        done = [
-            w for w in planned
+        done_by_sport = Counter(
+            canonical_sport(w['sport_type'])
+            for w in self._db.get_workouts(start_date=start, end_date=end)
             if (verdicts.get(w['id']) or {}).get('status') in ("done", PARTIAL)
-        ]
+        )
         activities = self._db.get_completed_activities(start_date=start, end_date=end)
         fitness = {m['date']: m.get('ctl') for m in self._db.get_metrics_cache(start, end)}
         return {
-            'sessions_done': len(done),
+            'sessions_done': sum(
+                min(count, written_by_sport[sport]) for sport, count in done_by_sport.items()
+            ),
             'sessions_planned': len(planned),
             'duration_sec': sum(float(a.get('duration_sec') or 0.0) for a in activities),
             'load_planned': sum(planned_load(w) for w in planned),

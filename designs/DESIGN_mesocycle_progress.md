@@ -143,6 +143,10 @@ fixed-rhythm clause are gone from the prompt. The fixed-rhythm clause now sits i
 
 ### 3.3 Per-sport gap annotation
 
+**Replaced** by the week grade of DESIGN_week_as_written.md (choice 7 there): an ended week now
+carries one line per sport against its sessions as written, and the note below is gone. The week
+under way has no per-sport line (§7 there, not handled).
+
 The week line's total is one blended figure across every sport (training_load.md's CTL/ATL/TSB
 model is deliberately one systemic load stream, `DESIGN_pmc_fitness_fatigue.md`'s "out of
 scope" list). That blending can hide *which* sport produced a gap: a week where cycling landed

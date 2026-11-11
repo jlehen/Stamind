@@ -141,15 +141,17 @@ class TestTimelinePayload(unittest.TestCase):
         self.assertIn("no_history", {w["code"] for w in data["warnings"]})
 
     def test_plan_end_is_last_non_removed_workout(self):
+        # Ahead of today: a week that has ended reads its sessions as written, the removed
+        # one included (DESIGN_week_as_written.md §4).
+        last, removed = _goal_ahead(30), _goal_ahead(40)
         _save_activity(test_db, "a1", "2026-06-10", "running", 3600, 40.0)
-        save_workout(test_db, date="2026-07-10", sport_type="running", title="Run",
-                             description="d", duration_minutes=60, tss=50)
-        later = save_workout(test_db, date="2026-07-20", sport_type="running",
-                                     title="Run late", description="d",
-                                     duration_minutes=60, tss=50)
+        save_workout(test_db, date=last, sport_type="running", title="Run",
+                     description="d", duration_minutes=60, tss=50)
+        save_workout(test_db, date=removed, sport_type="running", title="Run late",
+                     description="d", duration_minutes=60, tss=50)
         with test_db.workout_change(kind="tweak") as change:
-            change.void(date="2026-07-20", sport_type="running", reason="cancelled")
-        self.assertEqual(self._payload()["plan_end"], "2026-07-10")
+            change.void(date=removed, sport_type="running", reason="cancelled")
+        self.assertEqual(self._payload()["plan_end"], last)
 
     def test_meso_bands_layers_inferred_and_plan(self):
         oid = test_db.add_objective(title="Race", target_date=_goal_ahead(),

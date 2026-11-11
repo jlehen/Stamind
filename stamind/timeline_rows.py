@@ -14,6 +14,7 @@ from stamind import garmin
 from stamind.config import config
 from stamind.db.objectives import ARCHIVED
 from stamind.analytics.timeline import assemble_timeline
+from stamind.analytics.written_week import graded_workouts
 from stamind.clock import today_str
 
 
@@ -24,7 +25,8 @@ def build_timeline_payload(dbh) -> Dict[str, Any]:
     the rest of their command used."""
     today = today_str()
     activities = dbh.get_completed_activities()
-    workouts = dbh.get_workouts()
+    # A week that has ended is planned from its written week (DESIGN_week_as_written.md §4).
+    workouts = graded_workouts(dbh, None, None, today)
     metrics_rows = dbh.get_metrics_cache()
 
     # Everything the athlete has not called off: a goal already raced still belongs on the

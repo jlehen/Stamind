@@ -1,6 +1,7 @@
 # Design: a week against its sessions as written
 
-**Status:** Proposed · **Date:** 2026-11-10 · **Branch:** `worktree-plan-delivery-design`
+**Status:** Built, both steps, on 2026-11-11, with every choice of §6 as written · **Date:**
+2026-11-10 · **Branch:** `worktree-plan-delivery-design`
 
 ## 1. The problem
 

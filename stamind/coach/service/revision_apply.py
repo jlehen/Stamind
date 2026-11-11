@@ -227,10 +227,15 @@ class RevisionApplyMixin:
             if canonical_sport(ew['sport_type']) not in proposed_sports:
                 displaced_by_date.setdefault(ew['date'], ew)
 
+        # A pass that writes into a range with no session wrote the schedule itself, so it is
+        # stored as a `workout generate` (DESIGN_week_as_written.md D5).
+        kind = proposal.kind
+        if not existing_workouts:
+            kind = "generate"
         # The reason is also the athlete's line about this change, in the one column both
         # revision commands use (DESIGN_change_heads_up.md §6).
         with self._db.workout_change(
-            kind=proposal.kind, summary=proposal.reason, note=proposal.reason,
+            kind=kind, summary=proposal.reason, note=proposal.reason,
         ) as change:
             for (day, sport), mover in moved_out.items():
                 source = by_slot.get((day, sport))
