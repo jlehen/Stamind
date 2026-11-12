@@ -104,6 +104,10 @@ export function spanDates(file, key) {
     return { from: shiftDay(thisMonday, -7 * (span.weeks - 1)), to: shiftDay(thisMonday, 13) };
   }
   const plan = governingPlan(file);
+  if (key === "plan" && plan && plan.from > last) {
+    // A plan written but with no session yet: its first day alone, never a span backwards.
+    return { from: plan.from, to: plan.from };
+  }
   if (key === "plan" && plan) {
     return { from: plan.from, to: last < plan.to ? last : plan.to };
   }

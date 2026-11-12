@@ -76,6 +76,15 @@ def record_name(record: Dict[str, Any]) -> str:
     return record['name']
 
 
+def records_newest_first(dbh) -> List[Dict[str, Any]]:
+    """Every record, newest first, a plan's above the mesocycles it closes: the order `sm
+    progress mesocycles` prints and the Progress page lists (DESIGN_progress_page.md §3.3)."""
+    return sorted(
+        dbh.get_retrospectives(),
+        key=lambda r: (r["end_date"], r["level"] == PLAN, r["start_date"]), reverse=True,
+    )
+
+
 def record_lines(record: Dict[str, Any]) -> List[str]:
     """What a written record holds: its numbers, its lines and the athlete's words (§2)."""
     lines = [numbers_line(record['numbers'])]

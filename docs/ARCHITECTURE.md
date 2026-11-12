@@ -95,13 +95,13 @@ classes themselves.
   `settings`, `strength` (with `strength_log` and `strength_ingest`), `queue` (what shows
   and sends a queued item) with `queue_commands` (the `queue` and `bot queue` commands,
   apart because the commands a tap runs import the queue), `progress` (with
-  `progress_load`, `progress_weeks` and `progress_zones`), and the packages `plans/`, `workouts/`, `data/`,
-  `journal/` and `bot/`, the hidden commands the Telegram bot spawns, whose `__init__.py`
-  maps its files (DESIGN_bot_simple_frontend.md §12). Shared by several families:
-  `common` (the renderers), `selectors` (the range grammar) with `windows` (the resolvers
-  that turn it into dates), `argparse_ext`, the `render/` package (the two voices and the
-  companion line builders, [§6](#6-singletons)), `candidates` (the questions that turn a
-  note's constraints and signals into rows, and the `session_note`, `constraint` and
+  `progress_load`, `progress_weeks` and `progress_zones`), and the packages `plans/`,
+  `workouts/`, `data/`, `journal/` and `bot/`, the hidden commands the Telegram bot spawns,
+  whose `__init__.py` maps its files (DESIGN_bot_simple_frontend.md §12). Shared by several
+  families: `common` (the renderers), `selectors` (the range grammar) with `windows` (the
+  resolvers that turn it into dates), `argparse_ext`, the `render/` package (the two voices
+  and the companion line builders, [§6](#6-singletons)), `candidates` (the questions that
+  turn a note's constraints and signals into rows, and the `session_note`, `constraint` and
   `signal` queue kinds), `staleness` (the changed-input wording) and `runway` (the
   end-of-schedule nudge every daily surface draws, DESIGN_runway_nudge.md §3).
 - **`stamind_web.py`** — Flask REST API behind the dashboard. **Read-only**: GET
@@ -145,13 +145,13 @@ classes themselves.
     worker killed by SIGHUP (DESIGN_bot_restart.md §4, §5).
   - **The companion** (DESIGN_bot_simple_frontend.md): the reply keyboard is
     `keyboards.SIMPLE_KEYBOARD`, "📈 Progress" a page button in place of its command where
-    the pages are published (DESIGN_progress_page.md §5); writes reach the chat through three shapes and no
-    fourth, view, picker and capture, which `cli/bot/__init__.py` names (§12 there). In
-    the chat a capture saves its read-back as a *confirmation* in the athlete queue and
-    ends, and a "Yes" that stored a constraint or found nothing is followed by its own
-    question, "Shall I adjust your week?" or "Shall I pass it to your coach?", whose "Yes"
-    starts `workout adapt` beside the chat (DESIGN_chat_questions.md §2, §4). The voice
-    is `runtime.render` ([§6](#6-singletons), DESIGN_render_persona.md).
+    the pages are published (DESIGN_progress_page.md §5); writes reach the chat through
+    three shapes and no fourth, view, picker and capture, which `cli/bot/__init__.py` names
+    (§12 there). In the chat a capture saves its read-back as a *confirmation* in the
+    athlete queue and ends, and a "Yes" that stored a constraint or found nothing is
+    followed by its own question, "Shall I adjust your week?" or "Shall I pass it to your
+    coach?", whose "Yes" starts `workout adapt` beside the chat (DESIGN_chat_questions.md
+    §2, §4). The voice is `runtime.render` ([§6](#6-singletons), DESIGN_render_persona.md).
   - **The morning push** is `sm bot morning` (`cli/bot/views.py`), run by `scheduler.py`
     inside the `morning-time` → `morning-deadline` window and idempotent on the
     `settings` row `push_morning_last` (DESIGN_bot_simple_frontend.md §4.2, §4.3); the
@@ -210,7 +210,7 @@ One line per module; the rule each keeps is the part worth knowing before openin
 | `openrouter.py` | `openrouter_client` | The OpenRouter client: `json_object` replies, the last of two objects wins; prints the wait notice and the flush before every call |
 | `sports.py` | — | The canonical sport vocabulary (`SPORT_MAPPING`, `canonical_sport`, `STRENGTH_SPORTS`); dependency-free so `db` and adherence share it |
 | `plan_inputs.py` | — | What shapes a plan and how it is fingerprinted and diffed (`plan_profile`, `plan_config_hash`, the goal and constraint cleaners). Flat and pure so the dashboard hashes the config without the coach; the judgment is `coach/service/staleness.py` (DESIGN_plan_staleness.md) |
-| `plan_versions.py` | — | A plan's versions and what changed between two: `plan_lineage` (by macrocycle id, never a date query, DESIGN_plan_rollback.md §6.1), `resolve_versions`, `diff_plans`, `input_snapshots`. Format-free; `plan diff` and `/api/plan/diff` both render it |
+| `plan_versions.py` | — | A plan's versions and what changed between two: `plan_lineage` (by macrocycle id, never a date query, DESIGN_plan_rollback.md §6.1) and `reported_mesocycles` (the governing plan's and the previous goal's, which intensity per mesocycle reports), `resolve_versions`, `diff_plans`, `input_snapshots`. Format-free; `plan diff` and `/api/plan/diff` both render it |
 | `workout_state.py` | — | Two of a session's three axes ([§5](#workout-state--three-orthogonal-axes-not-one-enum)): `modification_markers` and `calendar_status`; derived from a row, no database, so the web app can import it |
 | `learning_confidence.py` | — | What a learning's confidence means: the levels, `derive_confidence`, `step_down`, dormancy. Pure rules (DESIGN_evidence_based_confidence.md §3) |
 | `learning_doubts.py` | — | The `learning` queue kind and `settle_doubts`, which every reflect and bootstrap calls (DESIGN_learning_doubt_nudge.md) |
@@ -218,7 +218,7 @@ One line per module; the rule each keeps is the part worth knowing before openin
 | `queue_kind.py` | — | What a feature brings to the queue: `Kind`, `queue(kind, subject, payload)`, `queue_replacing` (a confirmation that closes an older one about the same row), `NotApplied` and `PutOff` (what an answer raises to leave its item waiting, or to put it off until the morning). Apart from `athlete_queue.py` to break the cycle through `strength/sets.py` |
 | `heads_up.py` | — | Telling the athlete about a change made out of their sight: the wording, the send rule (`due`, `changes_due`, `sends_after_delay`), `changes_notify_upto` (DESIGN_change_heads_up.md). Pure but for `waiting()`/`changes_due()`, so `db/workout_change.py` imports it safely |
 | `freshness.py` | — | How fresh is fresh enough, for Garmin and the Calendar: `last_pull_age`, `fresh_notice`. Flat because `garmin/` and `gcal/` must not import each other; the decision stayed with each caller ([§15](#15-design-rationale--history)) |
-| `cycle_records.py` | — | The date check: which retrospective records exist, when one is due, how one reads (DESIGN_cycle_retrospective.md §3). Rows in `db/retrospectives.py` |
+| `cycle_records.py` | — | The date check: which retrospective records exist, when one is due, how one reads (DESIGN_cycle_retrospective.md §3), and the order `progress mesocycles` and the Progress page list them (`records_newest_first`). Rows in `db/retrospectives.py` |
 | `rpe_reminder.py` | — | The `rpe_reminder` queue kind: enter an RPE in Garmin ([§15](#15-design-rationale--history)) |
 | `retrospective_question.py` | — | The `retrospective` queue kind (DESIGN_cycle_retrospective.md §4) |
 | `calendar_days.py` | — | The one list of days the calendar page and `sm calendar` draw: `gather` → a `Calendar` of `Day`s, facts only, reads and never pulls (DESIGN_calendar_miniapp.md §4) |
@@ -257,7 +257,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Backward analysis (bootstrap/reflect) | `coach/service/analysis.py:_run_workout_analysis`, `coach/engine/analysis.py:_data_analyze_logic` ([§10](#data-analysis-data-bootstrap--data-reflect)) |
 | Garmin pull / metrics / load model | `garmin/sync.py` (`pull`, `ensure_data`), `garmin/derived.py`, `analytics/load.py`, `analytics/pmc.py` ([§12](#12-sports-science--coaching-mathematics)) |
 | Progress timeline / PMC projection | `analytics/progression.py`, `analytics/timeline.py`, `stamind/timeline_rows.py`, `analytics/chart.py`, `cli/progress.py` + `cli/progress_load.py`, `/api/timeline.png`. DESIGN_progress_timeline.md; the four views of `sm progress`, DESIGN_progress_page.md §6 |
-| Intensity distribution / time in zone | `analytics/intensity.py` (which sports qualify and in which currency; `judgeable`, `COVERAGE_MIN_BY_SPORT`, keys canonical; `zone_weeks`, the weeks `/api/zones` and the Progress page share), `analytics/zone_tables.py`, `analytics/mesocycle_report.py`, `coach/service/mesocycle_context.py` (`_intensity_mesocycle_context` for adapt, `_mesocycle_progress_context` for `workout generate`, `_planning_zone_currencies`), `coach/service/history_context.py`, `cli/status.py`, `cli/progress_zones.py` (`reported_mesocycles`), `cli/render/progress_page.py` (the rates per mesocycle), `progression.weekly_aggregates`, `cli/data/show.py` (`--zones`), `/api/zones` + `static/progress.js`. DESIGN_intensity_distribution.md |
+| Intensity distribution / time in zone | `analytics/intensity.py` (which sports qualify and in which currency; `judgeable`, `COVERAGE_MIN_BY_SPORT`, keys canonical; `zone_weeks`, the weeks `/api/zones` and the Progress page share), `analytics/zone_tables.py`, `analytics/mesocycle_report.py`, `coach/service/mesocycle_context.py` (`_intensity_mesocycle_context` for adapt, `_mesocycle_progress_context` for `workout generate`, `_planning_zone_currencies`), `coach/service/history_context.py`, `cli/status.py`, `cli/progress_zones.py`, `plan_versions.py:reported_mesocycles`, `cli/render/progress_page.py` (the rates per mesocycle), `progression.weekly_aggregates`, `cli/data/show.py` (`--zones`), `/api/zones` + `static/progress.js`. DESIGN_intensity_distribution.md |
 | Planned time in zone (a session's intensity target) | `db/schema.py` (`planned_zone_currency`, `planned_zone1..7_sec`), `db/workout_change.py:WorkoutChange.append`, `coach/steps.py:zone_seconds` (the only source: worked out from the steps), `intensity.parse_planned_zones`/`format_planned_zones`, `gcal/event.py`, `coach/formatting.py`, `cli/workouts/session_line.py::prescription_lines`. DESIGN_intensity_distribution.md §9.8, DESIGN_endurance_steps.md §5 |
 | A run, a ride or a swim as steps | `coach/steps.py` (`fault`, `finish`, `describe`, `reprint`), `coach/engine/sessions.py` (`endurance_task`, `STEPS_FIELD`, `ask_week_planner`), the `steps` column (`db/workout_change.py:append`), `coach/revisions.py` (the row shape), `coach/formatting.py:_for_the_week_planner`, `cli/benchmarks.py:reprint_sessions`. DESIGN_endurance_steps.md |
 | Calendar push / daily-signal ingest | `stamind/gcal/` ([§13](#13-daily-signals-calendar-ingest)) |
@@ -1219,7 +1219,8 @@ the default window each command declares with `add_selector_args`.
 **A bare command group** prints that level's help and exits 1 (`build_parser` reads
 `named_subparsers`, so a new group is covered; `tests/test_dispatch.py` walks the same
 tree). The exception is a group whose whole state is one read-only view (`settings`,
-`queue`), or of read-only views (`progress`, bare = `progress fitness`), acts bare instead (DESIGN_cli_noargs.md §a3).
+`queue`), or of read-only views (`progress`, bare = `progress fitness`), which acts bare
+instead (DESIGN_cli_noargs.md §a3).
 
 | Command      | Subcommand   | Short form | Description                                                            |
 |--------------|--------------|----------|--------------------------------------------------------------------------|

@@ -133,8 +133,10 @@ function drawChart(model, width) {
     svg.append(shape("text", { x: lastMonth + 2, y: HEIGHT - 2, class: "axis" }, month));
   }
 
-  svg.append(shape("line", { x1: x(model.today) + day / 2, x2: x(model.today) + day / 2,
-                             y1: MARKS, y2: stripTop, class: "today" }));
+  if (model.from <= model.today && model.today <= model.to) {
+    svg.append(shape("line", { x1: x(model.today) + day / 2, x2: x(model.today) + day / 2,
+                               y1: MARKS, y2: stripTop, class: "today" }));
+  }
   for (const goal of model.goals) {
     const middle = x(goal.date) + day / 2;
     svg.append(shape("line", { x1: middle, x2: middle, y1: MARKS, y2: stripTop,
@@ -275,8 +277,11 @@ function drawZoneWeeks(chart, width) {
       svg.append(shape("text", { x: left + room / 2, y: top - 2, class: "hours" }, item.mark));
     }
   }
-  svg.append(shape("line", { x1: x(state.file.today), x2: x(state.file.today), y1: MARKS,
-                             y2: bottom, class: "today" }));
+  const today = state.file.today;
+  if (chart.from <= today && today <= chart.to) {
+    svg.append(shape("line", { x1: x(today), x2: x(today), y1: MARKS, y2: bottom,
+                               class: "today" }));
+  }
   return svg;
 }
 

@@ -47,10 +47,12 @@ the bot: the file holds the whole history (§4).
 ```
 
 "This plan" is the plan that governs today (`get_governing_macrocycle`), from its first
-mesocycle's start to its last one's end; with no plan, the span is not offered. The page takes
-today from the file, never from the phone, and shows the file's stamp under the tabs, as the
-other pages do: on Monday at 07:00, before any command has run, it draws Sunday evening's file as
-it is, and the first command of the day replaces it. When the file cannot be read, the page says
+mesocycle's start to its last one's end, or to the last day with a session written when that
+comes first; with no plan, the span is not offered. The span picks what every tab lists: the
+weeks and the records it overlaps. The page takes today from the file, never from the phone,
+and shows the file's stamp under the tabs, as the other pages do: on Monday at 07:00, before
+any command has run, it draws Sunday evening's file as it is, and the first command of the day
+replaces it. When the file cannot be read, the page says
 "Your progress could not be loaded. Close this page and tap again in a moment.", as the details
 page does (`miniapp/details_logic.js`).
 
@@ -187,8 +189,9 @@ athlete asked for. Its content changes when a Garmin pull brings an activity or 
 metrics, which moves fitness and form; when the schedule changes, which moves the planned bars
 and the projection ahead; and when a record is written. On a Tuesday with a morning pull, a
 morning `workout adapt` that changes Thursday, and a ride that reaches Garmin at 18:00, it goes
-up three times, about 29 KB each (measured, below). On a day with nothing new, the commands that run rebuild it,
-find it unchanged, and upload nothing. `sm data publish` uploads it with the rest.
+up three times, about 29 KB each (measured, below). On a day with nothing new, the commands
+that run rebuild it, find it unchanged, and upload nothing. `sm data publish` uploads it with
+the rest.
 
 Building it costs every command, and a typed message pays it twice: `sm bot route`, which reads
 what the message means, is a command of its own. On 12 November, on the athlete's database, the

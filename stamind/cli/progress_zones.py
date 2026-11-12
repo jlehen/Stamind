@@ -15,7 +15,7 @@ from stamind.analytics import intensity, timeline, zone_tables
 from stamind.analytics.mesocycle_report import mesocycle_report
 from stamind.config import config
 from stamind.output import warn
-from stamind.plan_versions import delta_baseline, plan_lineage
+from stamind.plan_versions import delta_baseline, reported_mesocycles
 # Which sports get a table, and in which currency: aggregation, not layout, so it lives
 # in `intensity` where the web dashboard reads it from too (ARCHITECTURE.md §8).
 from stamind.analytics.intensity import (
@@ -307,22 +307,6 @@ def unknown_sport_preferences(preferences: Sequence[str]) -> List[str]:
             f"literally against activity types.{hint}"
         )
     return out
-
-
-def reported_mesocycles(dbh) -> List[Dict[str, Any]]:
-    """The mesocycles intensity is reported per mesocycle for, here and on the Progress
-    page: the governing plan's, and the previous goal's so §4.1's delta has a left-hand
-    side.
-
-    The preceding plan is the previous *goal's* — the one that governed the window's
-    earlier dates — never an earlier version of this goal's own, which was superseded
-    before it was ever trained (DESIGN_plan_rollback.md §6.1).
-    """
-    governing = dbh.get_governing_macrocycle()
-    preceding = (
-        dbh.get_preceding_macrocycle(governing["objective_id"]) if governing else None
-    )
-    return plan_lineage(dbh, [preceding, governing])
 
 
 def _orphan_week_note(

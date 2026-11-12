@@ -57,6 +57,26 @@ class BareIsFitnessTest(_Case):
         self.assertIs(args.func, run_progress)
         self.assertEqual((args.weeks, args.chart, args.explain), (12, True, True))
 
+    def test_a_flag_before_the_view_word_is_kept(self):
+        # The view's own default used to overwrite the group's value.
+        parser, _ = stamind_cli.build_parser()
+        for view in ("fitness", "weeks", "intensity"):
+            with self.subTest(view=view):
+                args = parser.parse_args(["progress", "-w", "12", view])
+                self.assertEqual(args.weeks, 12)
+        self.assertEqual(parser.parse_args(["progress", "weeks"]).weeks, 8)
+        self.assertEqual(parser.parse_args(["progress", "weeks", "-w", "3"]).weeks, 3)
+
+    def test_a_chart_path_that_names_a_view_is_refused(self):
+        # `--chart` takes an optional path, so the view's word would have become a file.
+        for argv in (["--chart", "weeks"], ["chart", "weeks"]):
+            with self.subTest(argv=argv):
+                code, out, err = run_cli(["progress", *argv, "--no-pull"])
+                self.assertEqual(code, 1)
+                self.assertIn("Put --chart after the view", out + err)
+                self.assertIn("progress weeks --chart", out + err)
+                self.assertFalse(os.path.exists("weeks"))
+
     def test_the_old_spellings_are_gone(self):
         parser, _ = stamind_cli.build_parser()
         with patch("sys.stderr"):

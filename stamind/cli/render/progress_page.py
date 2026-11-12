@@ -19,10 +19,11 @@ from stamind.analytics.written_week import (
     SESSIONS, SportGrade, changed_line, graded_weeks, percent, sport_line,
 )
 from stamind.config import config
-from stamind.cycle_records import ENDED_LABELS, record_lines, record_name
+from stamind.plan_versions import reported_mesocycles
+from stamind.cycle_records import (
+    ENDED_LABELS, record_lines, record_name, records_newest_first,
+)
 from stamind.sports import canonical_sport
-from stamind.cli.progress_weeks import records_newest_first
-from stamind.cli.progress_zones import reported_mesocycles
 from stamind.cli.render.calendar_page import VERSION
 from stamind.cli.render.session_lines import sport_emoji
 

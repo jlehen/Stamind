@@ -84,6 +84,16 @@ test("4 weeks and 3 months end with next week; the plan and everything at the la
   assert.equal(logic.spanDates(later, "plan").to, "2026-12-20");
 });
 
+test("a plan that starts after the last day written spans its first day, not backwards", () => {
+  // Thursday: `plan generate` wrote a plan from next Monday; no session is written yet.
+  const file = { ...FILE, days: FILE.days.filter((day) => day.date <= "2026-11-12"),
+                 mesocycles: [{ label: "Next", source: "plan", start_date: "2026-11-16",
+                                end_date: "2026-12-13" }] };
+  assert.deepEqual(logic.spanDates(file, "plan"), { from: "2026-11-16", to: "2026-11-16" });
+  const model = logic.chart(file, "plan");
+  assert.ok(model.from <= model.to);
+});
+
 test("today is the file's, never the phone's", () => {
   // The file was built on Sunday evening; the phone reads Monday.
   const sunday = { ...FILE, today: "2026-11-15" };

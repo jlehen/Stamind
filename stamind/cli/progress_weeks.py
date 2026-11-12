@@ -2,16 +2,15 @@
 sessions as written, and the mesocycles' records (DESIGN_progress_page.md §6).
 
 The week grade is `analytics/written_week.py` (DESIGN_week_as_written.md); a record prints
-through `cli/common.py:print_retrospective`, as `plan retrospective` prints one goal's. The
-Progress page's file reads the records in the order `records_newest_first` gives."""
+through `cli/common.py:print_retrospective`, as `plan retrospective` prints one goal's, in the
+order `cycle_records.records_newest_first` gives the Progress page's file too."""
 import argparse
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from stamind import runtime
 from stamind.analytics.written_week import graded_weeks, week_grade_lines, week_line
 from stamind.clock import fmt_day, shift, today_str as _today_str, week_start
-from stamind.cycle_records import record_name
-from stamind.db.retrospectives import PLAN
+from stamind.cycle_records import record_name, records_newest_first
 from stamind.text import bold, default_wrap_width, gray, yellow
 from stamind.cli.common import ensure_recent_data, print_retrospective
 from stamind.cli.progress_load import short_date
@@ -62,14 +61,6 @@ def print_week(monday: str, today: str) -> None:
         print(first)
         for line in rest:
             print(line)
-
-
-def records_newest_first(dbh) -> List[Dict[str, Any]]:
-    """Every record, a plan's above the mesocycles it closes (DESIGN_progress_page.md §3.3)."""
-    return sorted(
-        dbh.get_retrospectives(),
-        key=lambda r: (r["end_date"], r["level"] == PLAN, r["start_date"]), reverse=True,
-    )
 
 
 def mesocycle_under_way(dbh, today: str) -> Optional[Dict[str, Any]]:

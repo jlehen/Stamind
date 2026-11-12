@@ -8,6 +8,7 @@ and `render_progress`, which assembles the Fitness view from `cli/progress_load.
 are fed the `assemble_timeline` payload (§6.0), so the formatting is unit-testable without a
 database."""
 import argparse
+import sys
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
@@ -189,6 +190,11 @@ def run_progress(args: argparse.Namespace) -> None:
     Garmin data first (the seam would otherwise read yesterday's un-synced ride as a
     0-load day)."""
     from stamind import timeline_rows
+    # `--chart` takes an optional path, so `sm progress --chart weeks` would write a file
+    # named after the view rather than show it.
+    if args.chart in VIEWS:
+        notice("Put --chart after the view: " + cmd(f"progress {args.chart} --chart"), red)
+        sys.exit(1)
     ensure_recent_data(
         no_pull=args.no_pull, force_pull=getattr(args, "force_pull", False)
     )
@@ -236,27 +242,34 @@ def _weeks_arg(raw: str):
     return n
 
 
-def _add_weeks_flag(parser: argparse.ArgumentParser) -> argparse.Action:
-    """The weeks either side of today, which every view but Mesocycles reads
-    (DESIGN_progress_page.md §6)."""
+# The four views, one per tab of the Progress page (DESIGN_progress_page.md §6).
+VIEWS = ("fitness", "weeks", "mesocycles", "intensity")
+
+WEEKS_HELP = ("Weeks to show either side of today, this week counted (default: 8, must be "
+              ">= 1, or 'all' for every week).")
+
+# Every copy of the flags below defaults to SUPPRESS, and the group alone sets the defaults,
+# so a flag typed before the view's word is not overwritten by the view's default.
+
+
+def _add_weeks_flag(parser: argparse.ArgumentParser, text: str = WEEKS_HELP) -> argparse.Action:
+    """The weeks either side of today, which every view but Mesocycles reads (§6)."""
     return parser.add_argument(
-        "-w", "--weeks", type=_weeks_arg, default=8, metavar="N",
-        help="Weeks to show either side of today, this week counted (default: 8, must be "
-             ">= 1, or 'all' for every week). The projection lines above the load table "
-             "always run to plan end regardless."
+        "-w", "--weeks", type=_weeks_arg, default=argparse.SUPPRESS, metavar="N", help=text,
     )
 
 
 def _add_fitness_flags(parser: argparse.ArgumentParser) -> argparse.Action:
     """The Fitness view's flags, which a bare `sm progress` takes too (§6). Returns the
     weeks flag's action."""
-    weeks = _add_weeks_flag(parser)
+    weeks = _add_weeks_flag(parser, WEEKS_HELP + " The projection lines above the load "
+                                                 "table always run to plan end regardless.")
     parser.add_argument(
-        "--explain", action="store_true",
+        "--explain", action="store_true", default=argparse.SUPPRESS,
         help="Append the PMC footnotes (e.g. why TSB lags same-day CTL - ATL)."
     )
     parser.add_argument(
-        "--chart", nargs="?", const=True, default=False, metavar="PATH",
+        "--chart", nargs="?", const=True, default=argparse.SUPPRESS, metavar="PATH",
         help="Also render the two-panel chart (PMC + weekly load) to a PNG "
              "(default: ./progress.png; requires matplotlib). Additive — the "
              "text output above still prints."
@@ -279,7 +292,7 @@ def add_progress_parser(subparsers, pull_bypass_parser):
     # (DESIGN_progress_page.md §6).
     _add_fitness_flags(progress_parser).dashless = False
     # A bare `sm progress` is the Fitness view (DESIGN_cli_noargs.md §a3).
-    progress_parser.set_defaults(func=run_progress)
+    progress_parser.set_defaults(func=run_progress, weeks=8, explain=False, chart=False)
     views = progress_parser.add_subparsers(dest="subcommand", help="Progress views")
 
     fitness = views.add_parser(
