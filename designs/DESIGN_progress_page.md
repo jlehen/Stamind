@@ -1,6 +1,6 @@
 # Design: the Progress page
 
-**Status:** Proposed · **Date:** 2026-11-12 · **Branch:** `worktree-progress-page-design`
+**Status:** Built · **Date:** 2026-11-12 · **Branch:** `worktree-progress-page-design`
 
 ## 1. The problem
 
@@ -187,15 +187,17 @@ athlete asked for. Its content changes when a Garmin pull brings an activity or 
 metrics, which moves fitness and form; when the schedule changes, which moves the planned bars
 and the projection ahead; and when a record is written. On a Tuesday with a morning pull, a
 morning `workout adapt` that changes Thursday, and a ride that reaches Garmin at 18:00, it goes
-up three times, about 10 KB each. On a day with nothing new, the commands that run rebuild it,
+up three times, about 29 KB each (measured, below). On a day with nothing new, the commands that run rebuild it,
 find it unchanged, and upload nothing. `sm data publish` uploads it with the rest.
 
 Building it costs every command, and a typed message pays it twice: `sm bot route`, which reads
 what the message means, is a command of its own. On 12 November, on the athlete's database, the
 timeline took 84 ms and grading every week 640 ms. The 640 ms is `graded_weeks` scanning every
 session and every activity again for each week, parsing each date each time; sorting them into
-weeks once should bring it near the 84 ms. The file's build is measured again before landing
-(§12).
+weeks once should bring it near the 84 ms. Measured again once built, on a copy of the
+athlete's database of 12 November: grading every week takes 60 ms, and the whole file, Intensity
+included, 160 ms (§12). The file is 197 KB of JSON, 29 KB once compressed: the days 13 KB, the
+zones 12 KB, the weeks 4 KB.
 
 ### 4.3 No outside script
 
@@ -402,7 +404,9 @@ The page goes live when main is pushed (`.github/workflows/pages.yml`). On each 
 command (`sm status`) runs before its bot is restarted, so the file is up before the new keyboard
 is: `/start`, `/help` and the reply to `/restart` send the keyboard with no command behind them.
 Both bots are restarted, since the keyboard is built in the bot. No `sm data publish` is needed.
-The build of the file is timed once on each instance, and its cost written here.
+The build of the file is timed once on each instance, and its cost written here. On a copy of the
+author's database of 12 November, before landing: 160 ms for the whole file (the timeline 82 ms,
+grading every week 60 ms), 29 KB compressed. The companion's instance is not timed yet.
 
 ## Decisions Log
 

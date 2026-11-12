@@ -179,6 +179,63 @@ test("a record opens whole, the athlete's answer under it; one not written yet s
   assert.equal(cards[2].sheet, undefined);
 });
 
+// Cycling in power zones: one week measured, one trained but not recorded, the week under
+// way, and next week as prescribed; two mesocycles' average weeks.
+const ZONES = [{
+  sport: "cycling", currency: "power", tag: "[pwr]",
+  zone_labels: ["recovery", "endurance", "tempo", "threshold", "VO2max", "anaerobic",
+                "neuromuscular"],
+  weeks: [
+    { week_commencing: "2026-10-26", future: false, seconds: [600, 7200, 1200, 0, 0, 0, 0],
+      undercounted: false },
+    { week_commencing: "2026-11-02", future: false, seconds: null, undercounted: true },
+    { week_commencing: "2026-11-09", future: false, seconds: [300, 1800, 0, 0, 0, 0, 0],
+      undercounted: false },
+    { week_commencing: "2026-11-16", future: true, seconds: [0, 9000, 0, 600, 0, 0, 0],
+      undercounted: false },
+  ],
+  mesocycles: [
+    { name: "Sharpening", start: "2026-10-05", end: "2026-11-03", focus: "Race pace.",
+      weeks: 4, seconds: [600, 6000, 900, 300, 0, 0, 0] },
+    { name: "Build", start: "2026-11-04", end: "2026-11-29", focus: "Long bouts.", weeks: 1,
+      seconds: [300, 1800, 0, 0, 0, 0, 0] },
+  ],
+}];
+
+test("intensity by week: the span's weeks, measured, prescribed ahead, and the marks", () => {
+  const [chart] = logic.intensity({ ...FILE, zones: ZONES }, "4w", "week");
+  assert.equal(chart.head, "cycling [pwr]");
+  assert.equal(chart.labels.length, 7);
+  assert.deepEqual(chart.items.map((item) => [item.monday, item.mark, item.ahead]), [
+    ["2026-10-26", "", false], ["2026-11-02", "!", false], ["2026-11-09", "", false],
+    ["2026-11-16", "+", true],
+  ]);
+  assert.equal(chart.most, 9600);
+  assert.deepEqual(chart.marks, ["!", "+"]);
+});
+
+test("the toggle: by mesocycle, an average week per mesocycle the span overlaps", () => {
+  const file = { ...FILE, zones: ZONES };
+  const [chart] = logic.intensity(file, "all", "meso");
+  assert.deepEqual(chart.items.map((item) => [item.name, item.per]), [
+    ["Sharpening", "a week, over 4 weeks"], ["Build", "a week, over 1 week"],
+  ]);
+  assert.equal(chart.items[0].focus, "Race pace.");
+  // The plan's span starts on 4 November: the mesocycle before it is left out, and a
+  // sport's zones stay the same.
+  const [planned] = logic.intensity(file, "plan", "meso");
+  assert.deepEqual(planned.items.map((item) => item.name), ["Build"]);
+  assert.equal(planned.head, chart.head);
+});
+
+test("a file with no zones has no chart, the tab's empty state", () => {
+  assert.deepEqual(logic.intensity(FILE, "3m", "week"), []);
+  assert.deepEqual(logic.intensity({ ...FILE, zones: [] }, "3m", "meso"), []);
+  assert.deepEqual(logic.TABS.map((tab) => tab.label),
+                   ["Fitness", "Weeks", "Mesocycles", "Intensity"]);
+  assert.equal(logic.FIRST_GRAIN, "week");
+});
+
 test("hours read as the chat says them", () => {
   assert.equal(logic.hours(5040), "1h24");
   assert.equal(logic.hours(2700), "0h45");

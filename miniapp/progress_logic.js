@@ -17,7 +17,23 @@ export const TABS = [
   { key: "fitness", label: "Fitness" },
   { key: "weeks", label: "Weeks" },
   { key: "mesocycles", label: "Mesocycles" },
+  { key: "intensity", label: "Intensity" },
 ];
+
+// Intensity's two grains, one at a time (D9).
+export const GRAINS = [
+  { key: "week", label: "By week" },
+  { key: "meso", label: "By mesocycle" },
+];
+export const FIRST_GRAIN = "week";
+
+// What Intensity says with no zone data, or a mark on a week needs (§3.4).
+export const NO_ZONES = "No time in zone on record yet.";
+export const MARKS = {
+  "+": "Paler bars: what the plan prescribes",
+  "!": "! trained, but the time was not recorded in these zones",
+  "~": "~ planned in the other zones",
+};
 
 // The spans under the tabs (choice 1). `weeks` counts this week, as `sm progress -w` does.
 export const SPANS = [
@@ -244,4 +260,54 @@ export function recordCards(file, key) {
     cards.push(card);
   }
   return cards;
+}
+
+// ---------------------------------------------------------------------------------------
+// Intensity (§3.4): one chart per sport, by week or by mesocycle.
+// ---------------------------------------------------------------------------------------
+
+export function total(seconds) {
+  return (seconds || []).reduce((sum, value) => sum + value, 0);
+}
+
+function weekMark(week) {
+  // The terminal's marks: trained but not recorded, planned in the other zones, prescribed.
+  if (week.undercounted) {
+    return "!";
+  }
+  if (week.currency_mismatch) {
+    return "~";
+  }
+  if (week.future && week.seconds) {
+    return "+";
+  }
+  return "";
+}
+
+function perWeek(meso) {
+  if (!meso.weeks) {
+    return "under a week, its minutes so far";
+  }
+  return `a week, over ${meso.weeks} week${meso.weeks === 1 ? "" : "s"}`;
+}
+
+export function intensity(file, key, grain) {
+  // The span picks the weeks, or the mesocycles it overlaps; a sport's zones never change.
+  const span = spanDates(file, key);
+  return (file.zones || []).map((zone) => {
+    let items;
+    if (grain === "meso") {
+      items = zone.mesocycles.filter((meso) => overlaps(meso.start, meso.end, span))
+        .map((meso) => ({ name: meso.name, dates: dates(meso.start, meso.end),
+                          focus: meso.focus, seconds: meso.seconds, per: perWeek(meso) }));
+    } else {
+      items = zone.weeks.filter((week) => overlaps(week.week_commencing,
+                                                   shiftDay(week.week_commencing, 6), span))
+        .map((week) => ({ monday: week.week_commencing, seconds: week.seconds,
+                          ahead: week.future, mark: weekMark(week) }));
+    }
+    return { head: `${zone.sport} ${zone.tag}`, labels: zone.zone_labels, from: span.from,
+             to: span.to, items, most: Math.max(1, ...items.map((item) => total(item.seconds))),
+             marks: [...new Set(items.map((item) => item.mark).filter(Boolean))] };
+  });
 }

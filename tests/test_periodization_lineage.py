@@ -26,7 +26,7 @@ rebind_test_db(test_db)
 
 class TestPlanLineage(unittest.TestCase):
     """The retrospective mesocycle walk takes the previous *goal's* plan and never an earlier
-    *version* of this goal's own (DESIGN_plan_rollback.md §6.1). `_mesocycles_in_window` used
+    *version* of this goal's own (DESIGN_plan_rollback.md §6.1). `reported_mesocycles` used
     to call the version accessor, so `sm progress --mesocycles` reported every mesocycle twice
     after any regeneration — the two plans cover the same dates."""
 
@@ -67,7 +67,7 @@ class TestPlanLineage(unittest.TestCase):
     def test_regenerating_does_not_duplicate_the_mesocycles(self):
         """The regression: v1 and v2 span the same dates, so walking both reports every
         calendar period twice and counts each activity into two mesocycles."""
-        from stamind.cli.progress_zones import _mesocycles_in_window
+        from stamind.cli.progress_zones import reported_mesocycles
 
         obj = self._goal("Autumn Marathon", "2026-09-20")
         self._plan(obj, "v1", [("V1 Base", "2026-06-01", "2026-06-28"),
@@ -75,21 +75,21 @@ class TestPlanLineage(unittest.TestCase):
         v2 = self._plan(obj, "v2", [("V2 Base", "2026-06-01", "2026-06-28"),
                                     ("V2 Build", "2026-06-29", "2026-07-26")])
 
-        mesocycles = _mesocycles_in_window(test_db, "2026-06-01", self.TODAY)
+        mesocycles = reported_mesocycles(test_db)
         self.assertEqual([b["name"] for b in mesocycles], ["V2 Base", "V2 Build"])
         self.assertEqual({b["macrocycle_id"] for b in mesocycles}, {v2})
 
     def test_the_previous_goals_plan_is_walked(self):
         """The other half: a window reaching back past the current plan's first mesocycle
         lands in the previous goal's plan, which nothing else supplies."""
-        from stamind.cli.progress_zones import _mesocycles_in_window
+        from stamind.cli.progress_zones import reported_mesocycles
 
         spring = self._goal("Spring 10k", "2026-05-31")
         self._plan(spring, "spring", [("Spring Base", "2026-04-06", "2026-05-31")])
         autumn = self._goal("Autumn Marathon", "2026-09-20")
         self._plan(autumn, "autumn", [("Autumn Base", "2026-06-01", "2026-06-28")])
 
-        mesocycles = _mesocycles_in_window(test_db, "2026-04-06", self.TODAY)
+        mesocycles = reported_mesocycles(test_db)
         self.assertEqual([b["name"] for b in mesocycles], ["Spring Base", "Autumn Base"])
 
     def test_preceding_macrocycle_skips_superseded_versions(self):

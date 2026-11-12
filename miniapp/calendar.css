@@ -689,3 +689,48 @@ h1 {
   color: var(--hint);
   font-size: 14px;
 }
+
+/* Intensity (§3.4): the zones from easy to hard, cool to hot, the same in both currencies. */
+.zone-1 { --zone: #9aa7b4; }
+.zone-2 { --zone: #2f7bd6; }
+.zone-3 { --zone: #16a085; }
+.zone-4 { --zone: #e0b21e; }
+.zone-5 { --zone: #e07a1e; }
+.zone-6 { --zone: #c0392b; }
+.zone-7 { --zone: #8e44ad; }
+
+.chart .zone { fill: var(--zone); }
+.chart .zone.ahead { opacity: 0.4; }
+.legend .zone, .zone-bar .zone { background: var(--zone); }
+
+.zones {
+  margin-top: 8px;
+}
+
+.zone-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
+}
+
+.meso-zones {
+  display: block;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  text-align: left;
+}
+
+.meso-zones .line {
+  display: block;
+}
+
+.zone-bar {
+  display: flex;
+  height: 14px;
+  margin: 4px 0;
+  border-radius: 3px;
+  overflow: hidden;
+}

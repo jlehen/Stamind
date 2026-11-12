@@ -309,9 +309,10 @@ def unknown_sport_preferences(preferences: Sequence[str]) -> List[str]:
     return out
 
 
-def _mesocycles_in_window(dbh, start: str, end: str) -> List[Dict[str, Any]]:
-    """Every mesocycle overlapping `start..end`, plus the mesocycle preceding the first of
-    them so §4.1's delta has a left-hand side.
+def reported_mesocycles(dbh) -> List[Dict[str, Any]]:
+    """The mesocycles intensity is reported per mesocycle for, here and on the Progress
+    page: the governing plan's, and the previous goal's so §4.1's delta has a left-hand
+    side.
 
     The preceding plan is the previous *goal's* — the one that governed the window's
     earlier dates — never an earlier version of this goal's own, which was superseded
@@ -389,7 +390,7 @@ def render_mesocycle_section(
             if canonical_sport(a.get("activity_type") or "unknown") == sport
         ]
 
-    mesocycles = _mesocycles_in_window(dbh, window_start, today)
+    mesocycles = reported_mesocycles(dbh)
     benchmarks = dbh.get_benchmark_results()
     lines: List[str] = [bold(f"ZONES BY MESOCYCLE — {sport}")]
     reported: List[Dict[str, Any]] = []

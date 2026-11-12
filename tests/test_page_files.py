@@ -614,6 +614,30 @@ def _records():
                               "finished", "Keep moving.")
 
 
+def _ride(day, seconds, **zones):
+    test_db.save_completed_activity(
+        activity_id=f"ride-{day}", date=day, start_time=f"{day} 08:00:00",
+        activity_name="Ride", activity_type="cycling", duration_sec=float(seconds),
+        distance_km=30.0, elevation_gain_m=100.0, avg_hr=130, max_hr=160, rpe=4, tss=50.0,
+        **zones,
+    )
+
+
+def _zone_history():
+    """Five rides in June in heart rate only, a run in June, then three rides with power:
+    two in Summer's first weeks, one in Build's."""
+    for day in ("2026-06-01", "2026-06-03", "2026-06-05", "2026-06-08", "2026-06-10"):
+        _ride(day, 3600, zone1_sec=600, zone2_sec=3000)
+    test_db.save_completed_activity(
+        activity_id="run-0612", date="2026-06-12", start_time="2026-06-12 08:00:00",
+        activity_name="Run", activity_type="running", duration_sec=2400.0, distance_km=6.0,
+        elevation_gain_m=10.0, avg_hr=140, max_hr=160, rpe=4, tss=30.0, zone2_sec=2400,
+    )
+    for day in ("2026-08-05", "2026-08-12"):
+        _ride(day, 3600, power_zone2_sec=3000, power_zone3_sec=600)
+    _ride("2026-09-08", 3600, power_zone2_sec=2400, power_zone4_sec=1200)
+
+
 class ProgressFileTest(FilesTestCase):
     """The Progress page's file (DESIGN_progress_page.md §4.1)."""
 
@@ -623,7 +647,9 @@ class ProgressFileTest(FilesTestCase):
     def test_the_keys_of_the_file(self):
         file = self.progress()
         self.assertEqual(set(file), {"v", "at", "today", "days", "weeks", "records", "goals",
-                                     "mesocycles"})
+                                     "mesocycles", "zones"})
+        # No sport of the profile has zone data: the Intensity tab's empty state.
+        self.assertEqual(file["zones"], [])
         self.assertEqual((file["v"], file["today"]), (1, TODAY))
         self.assertEqual(file["days"][0]["date"], "2026-05-10")
         self.assertEqual(file["days"][-1]["date"], "2026-10-02")
@@ -684,6 +710,35 @@ class ProgressFileTest(FilesTestCase):
         _records()
         sync.after_command()
         self.assertEqual(FakeBucket.uploads, [recipe.file_name(key, sync.PROGRESS)])
+
+    def test_intensity_zones_come_from_the_last_8_weeks_and_a_sport_from_before_them_stays(self):
+        # Rides in June in heart rate only, then rides with a power meter from August: over
+        # the whole history heart rate covers more, over the last 8 weeks power does
+        # (choice 16). A run in June only still has its chart.
+        _zone_history()
+        profile = {**config.user_profile, "sport_preferences": ["cycling", "running", "yoga"]}
+        with patch.dict(config.data, {"user_profile": profile}):
+            zones = self.progress()["zones"]
+        self.assertEqual([(z["sport"], z["currency"]) for z in zones],
+                         [("cycling", "power"), ("running", "hr")])
+        ride = next(w for w in zones[0]["weeks"] if w["week_commencing"] == "2026-08-10")
+        self.assertEqual(ride["seconds"], [0, 3000, 600, 0, 0, 0, 0])
+        june = next(w for w in zones[0]["weeks"] if w["week_commencing"] == "2026-06-01")
+        self.assertEqual((june["seconds"], june["undercounted"]), (None, True))
+
+    def test_each_mesocycles_average_week_in_zone(self):
+        # Summer's rate window is its first four whole weeks, Build's its first three; Taper
+        # has run two days and holds no ride.
+        _zone_history()
+        profile = {**config.user_profile, "sport_preferences": ["cycling"]}
+        with patch.dict(config.data, {"user_profile": profile}):
+            [cycling] = self.progress()["zones"]
+        rates = {m["name"]: (m["weeks"], m["seconds"]) for m in cycling["mesocycles"]}
+        self.assertEqual(rates["Summer"], (4, [0, 1500, 300, 0, 0, 0, 0]))
+        self.assertEqual(rates["Build"], (3, [0, 800, 0, 400, 0, 0, 0]))
+        self.assertEqual(rates["Taper"], (0, None))
+        self.assertEqual(cycling["mesocycles"][1]["focus"], "Build the engine.\n\nMost of it "
+                                                            "easy, one quality day a week.")
 
     def test_the_button_fits_the_256_bytes_taken_from_the_calendar(self):
         # DESIGN_progress_page.md §5: the keyboard's worst case does not grow.

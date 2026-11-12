@@ -21,7 +21,8 @@ const ui = {
   sheetClose: document.getElementById("sheet-close"),
 };
 
-const state = { file: null, tab: logic.FIRST_TAB, span: logic.FIRST_SPAN };
+const state = { file: null, tab: logic.FIRST_TAB, span: logic.FIRST_SPAN,
+                grain: logic.FIRST_GRAIN };
 
 // The calendar's strip colours, numbered along the file's list of mesocycles.
 const STRIPS = 6;
@@ -243,10 +244,107 @@ function showMesocycles() {
 }
 
 // ---------------------------------------------------------------------------------------
+// Intensity (§3.4).
+// ---------------------------------------------------------------------------------------
+
+const ZONE_ROWS = 110;
+
+function zoneStack(seconds, scale) {
+  // A bar's zones, bottom up, as [zone index, height].
+  return (seconds || []).map((value, index) => [index, value * scale]);
+}
+
+function drawZoneWeeks(chart, width) {
+  const height = MARKS + ZONE_ROWS + MONTHS;
+  const svg = shape("svg", { viewBox: `0 0 ${width} ${height}`, class: "chart",
+                             role: "img", "aria-label": `${chart.head}, week by week` });
+  const x = (iso) => logic.xAt(chart, iso, width);
+  const bottom = MARKS + ZONE_ROWS;
+  svg.append(shape("text", { x: 2, y: MARKS + 8, class: "axis" }, logic.hours(chart.most)));
+  for (const item of chart.items) {
+    const left = x(item.monday);
+    const room = x(logic.shiftDay(item.monday, 7)) - left;
+    let top = bottom;
+    for (const [zone, size] of zoneStack(item.seconds, ZONE_ROWS / chart.most)) {
+      top -= size;
+      svg.append(shape("rect", { x: left + room * 0.15, y: top, width: room * 0.7,
+                                 height: size, class: `zone zone-${zone + 1}`
+                                 + (item.ahead ? " ahead" : "") }));
+    }
+    if (item.mark === "!" || item.mark === "~") {
+      svg.append(shape("text", { x: left + room / 2, y: top - 2, class: "hours" }, item.mark));
+    }
+  }
+  svg.append(shape("line", { x1: x(state.file.today), x2: x(state.file.today), y1: MARKS,
+                             y2: bottom, class: "today" }));
+  return svg;
+}
+
+function zoneBar(seconds, most) {
+  // One mesocycle's average week across the row, its zones left to right.
+  const bar = element("span", "zone-bar");
+  (seconds || []).forEach((value, index) => {
+    const part = element("span", `zone zone-${index + 1}`);
+    part.style.width = `${value / most * 100}%`;
+    bar.append(part);
+  });
+  return bar;
+}
+
+function showZoneMesocycles(chart, box) {
+  for (const item of chart.items) {
+    // A tap shows what the mesocycle set out to do (§3.4).
+    const row = element("button", "meso-zones");
+    row.type = "button";
+    row.append(element("span", "line card-line", `${item.name}, ${item.dates}`));
+    if (item.seconds) {
+      row.append(zoneBar(item.seconds, chart.most),
+                 element("span", "line record-status",
+                         `${logic.hours(logic.total(item.seconds))} ${item.per}`));
+    } else {
+      row.append(element("span", "line record-status", "no time in these zones"));
+    }
+    row.addEventListener("click", () => openSheet({ title: item.name,
+                                                     lines: [item.dates, item.focus] }));
+    box.append(row);
+  }
+}
+
+function showIntensity() {
+  const grains = element("div", "choices");
+  choices(grains, logic.GRAINS, state.grain, (grain) => { state.grain = grain; draw(); });
+  ui.view.append(grains);
+  const charts = logic.intensity(state.file, state.span, state.grain);
+  if (!charts.length) {
+    ui.view.append(element("p", "problem", logic.NO_ZONES));
+    return;
+  }
+  for (const chart of charts) {
+    const box = element("section", "zones");
+    box.append(element("h3", "part", chart.head));
+    if (state.grain === "meso") {
+      showZoneMesocycles(chart, box);
+    } else {
+      box.append(drawZoneWeeks(chart, Math.max(280, ui.view.clientWidth)));
+    }
+    const keys = element("ul", "legend zone-keys");
+    chart.labels.forEach((label, index) => {
+      keys.append(key(`zone zone-${index + 1}`, `Z${index + 1} ${label}`));
+    });
+    for (const mark of chart.marks) {
+      keys.append(element("li", "", logic.MARKS[mark]));
+    }
+    box.append(keys);
+    ui.view.append(box);
+  }
+}
+
+// ---------------------------------------------------------------------------------------
 // The page.
 // ---------------------------------------------------------------------------------------
 
-const VIEWS = { fitness: showFitness, weeks: showWeeks, mesocycles: showMesocycles };
+const VIEWS = { fitness: showFitness, weeks: showWeeks, mesocycles: showMesocycles,
+                intensity: showIntensity };
 
 function draw() {
   choices(ui.tabs, logic.TABS, state.tab, (tab) => { state.tab = tab; draw(); });
