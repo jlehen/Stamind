@@ -204,9 +204,11 @@ def _build_keyword_spec(parser: argparse.ArgumentParser) -> dict:
     """Map every dashless option spelling -> its action for one parser level.
 
     ``--from``/``--from-date`` both register (``from``, ``from-date``); ``-y`` registers
-    ``y``. Positionals, the sub-parsers action, and ``-h/--help`` are excluded. Two
-    distinct actions claiming one keyword in the same command is an authoring bug, so we
-    warn rather than silently shadow.
+    ``y``. Positionals, the sub-parsers action, and ``-h/--help`` are excluded, and so is
+    an action marked ``dashless = False``, whose spelling a command at its level took
+    (`sm progress weeks`, DESIGN_progress_page.md §6). Two distinct actions claiming one
+    keyword in the same command is an authoring bug, so we warn rather than silently
+    shadow.
     """
     spec: dict = {}
     for action in parser._actions:
@@ -214,6 +216,8 @@ def _build_keyword_spec(parser: argparse.ArgumentParser) -> dict:
             continue
         if not action.option_strings:
             continue  # positional — bound by position, not by keyword
+        if getattr(action, "dashless", True) is False:
+            continue
         for opt in action.option_strings:
             kw = opt.lstrip("-")
             if kw in spec and spec[kw] is not action:

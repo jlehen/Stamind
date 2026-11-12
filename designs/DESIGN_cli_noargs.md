@@ -21,7 +21,7 @@ fourth case with its own rule (§a3):
 | Read-only | Just act | `status`, `workout list`, `plan show` (defaults to the next active goal) |
 | Mutating, preview-then-confirm | Act on a sensible default, show the preview, gate the write behind a confirm | `workout adapt` (defaults to today), `plan generate` (defaults to the nearest goal) |
 | Mutating, immediate / no natural default | Print the command's help, then the line naming what's missing (in chat, that line plus a `-h` pointer instead of the help) | `workout tweak`, `goal add`, `constraint add` |
-| Command group, no sub-command | Print the group's own help and exit 1 — the same output in chat, since no argument is missing (§a3) | `goal`, `workout`, `plan`; `settings` is the one exception |
+| Command group, no sub-command | Print the group's own help and exit 1 — the same output in chat, since no argument is missing (§a3) | `goal`, `workout`, `plan`; `settings`, `queue` and `progress` are the exceptions |
 
 Read-only is about the *bare* run, not the command name: `constraint show` and
 `learnings show` take a mandatory `id` and so land in the third bucket, while
@@ -118,8 +118,14 @@ read-only view that is its whole state, and the other sub-commands are addressed
 *through* that view — `settings set` takes a name from `settings list`, so printing
 help instead would answer the question with a second command to run. One other group
 qualifies (amended 2026-09-14, DESIGN_athlete_queue.md §5.1): a bare `queue` runs
-`queue list`, and `queue answer <id>` takes its id from that list. `goal`, `workout` and
-the rest each hold several views, and picking one for them would be arbitrary.
+`queue list`, and `queue answer <id>` takes its id from that list.
+
+`progress` is the third (amended 2026-11-12, DESIGN_progress_page.md §6). Its four
+sub-commands are four read-only views, one per tab of the Progress page, and the page
+opens on Fitness. So a bare `progress` runs `progress fitness` and takes its flags: the
+operator's `sm progress -w 12` and the chat's `progress --chart` keep working. `goal`,
+`workout` and the rest each hold several views and commands that write, and picking one
+for them would be arbitrary.
 
 ## §b — Preview-then-confirm commands name the defaulted target
 

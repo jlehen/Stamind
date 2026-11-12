@@ -205,6 +205,11 @@ column.
 
 ## 5. What the athlete sees
 
+Since DESIGN_progress_page.md, the weeks are shown by `sm progress weeks` and by the Progress
+page's Weeks tab, and no longer under `workout compare` or "✅ Done lately" (its §5, §6). The
+terminal's lines below are the ones `sm progress weeks DATE` prints, and the chat's week line
+is gone. The prompts are unchanged.
+
 ### `workout compare`
 
 The day lines are unchanged. When no day has a discrepancy, the closing green line loses "Great

@@ -38,6 +38,7 @@ COMMAND_ORDER = {
          "journal", "shell", "help"],
     "settings": ["list", "set", "reset"],
     "queue": ["list", "answer", "tell"],
+    "progress": ["fitness", "weeks", "mesocycles", "intensity"],
     "strength": ["name", "reset", "discard"],
     "journal": ["show", "prune"],
     "goal": ["list", "add", "edit", "rm"],

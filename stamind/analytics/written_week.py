@@ -309,6 +309,24 @@ def sport_line(grade: SportGrade) -> str:
     return line
 
 
+def week_line(grade: List[SportGrade]) -> str:
+    """One ended week on one line, as `sm progress weeks` lists it:
+    'cycling 82%, short · strength_training 1 of 2, short' (DESIGN_progress_page.md §6)."""
+    parts = []
+    for sport in grade:
+        share = percent(sport)
+        if sport.measure == SESSIONS:
+            part = f"{sport.sport} {sport.done:.0f} of {sport.written:.0f}"
+        elif share is None:
+            part = f"{sport.sport} done {sport.done:.0f}"
+        else:
+            part = f"{sport.sport} {share}%"
+        if sport.short:
+            part += ", short"
+        parts.append(part)
+    return " · ".join(parts)
+
+
 def week_grade_lines(grade: List[SportGrade], indent: str) -> List[str]:
     """The lines the terminal and the prompts share: one per sport, and under a short sport
     each session no longer as written, its reason printed whole (§5)."""
