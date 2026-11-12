@@ -66,13 +66,30 @@ class MessageHandlerTest(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_free_text_rides_the_router_and_says_where_it_went(self):
+        # Where the pages are not published, a progress question runs its command
+        # (DESIGN_progress_page.md §5).
         chat_bot = build_chat_bot(self)
         started = record_commands(self, chat_bot)
-        with routes_to(chat_bot, "show_progress"):
+        with mock.patch.object(messages.page_files, "pages_published", return_value=False), \
+                routes_to(chat_bot, "show_progress"):
             update, _replied = message_update(text="how's it going")
             await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
         self.assertEqual(started, [(42, ["progress", "--chart"], False, "bot")])
         self.assertTrue(chat_bot.bot.texts()[0].startswith("<i>→ "))
+
+    async def test_where_the_pages_are_published_progress_points_to_its_page(self):
+        chat_bot = build_chat_bot(self)
+        started = record_commands(self, chat_bot)
+        with mock.patch.object(messages.page_files, "pages_published", return_value=True), \
+                mock.patch.object(chat_bot, "_keyboard", return_value="fresh-keyboard"), \
+                routes_to(chat_bot, "show_progress"):
+            update, _replied = message_update(text="how's my progress?")
+            await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
+        self.assertEqual(started, [])
+        self.assertEqual(chat_bot.bot.sent, [(
+            42, "Open 📈 Progress below to see how your weeks went.",
+            {"reply_markup": "fresh-keyboard"},
+        )])
 
     async def test_page_read_intents_point_to_the_keyboard_without_running_a_command(self):
         for intent, expected in routing.ROUTER_PAGE_REPLIES.items():

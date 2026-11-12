@@ -18,16 +18,17 @@ import shlex
 import time
 from typing import List, Optional
 
-from stamind import clock
+from stamind import clock, runtime
 from stamind.chat import runner, telegram_api
 from stamind.chat.keyboards import SIMPLE_HELP, SIMPLE_WELCOME, keyboard_action, typed_tap
 from stamind.chat.routing import (
     CAPTURE_PROMPT, CAPTURE_RESCUE_ECHO, ROUTER_CAPTURE_INTENTS, ROUTER_ECHO,
-    ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV, ROUTER_PAGE_REPLIES,
-    parse_message_to_argv,
+    PUBLISHED_PAGE_REPLIES, ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV,
+    ROUTER_PAGE_REPLIES, parse_message_to_argv,
 )
 from stamind.cli.render import calendar_page
 from stamind.config import config
+from stamind.page_files import sync as page_files
 from stamind.sentinels import prompt_answer
 
 # Told to anything arriving while a command is still going, whichever door it came in by:
@@ -80,6 +81,9 @@ class MessagesMixin:
                 return None
         elif intent in ROUTER_CAPTURE_INTENTS:
             argv = ["bot", "capture", ROUTER_CAPTURE_INTENTS[intent], text]
+        elif intent in PUBLISHED_PAGE_REPLIES and page_files.pages_published(runtime.db):
+            await self._send_keyed(chat_id, PUBLISHED_PAGE_REPLIES[intent])
+            return None
         elif intent in ROUTER_INTENT_ARGV:
             argv = list(ROUTER_INTENT_ARGV[intent])
         elif intent in ROUTER_PAGE_REPLIES:

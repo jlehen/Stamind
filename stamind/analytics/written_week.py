@@ -260,15 +260,17 @@ def graded_weeks(
     if last < first:
         return []
     sunday = shift(last, 6)
-    sessions = written_week(dbh, first, sunday)
-    activities = dbh.get_completed_activities(start_date=first, end_date=sunday)
+    # Sorted into weeks once, not scanned again for each week (DESIGN_progress_page.md §4.2).
+    sessions: Dict[str, List[WrittenSession]] = {}
+    for session in written_week(dbh, first, sunday):
+        sessions.setdefault(week_start(session.written["date"]), []).append(session)
+    activities: Dict[str, List[Dict[str, Any]]] = {}
+    for activity in dbh.get_completed_activities(start_date=first, end_date=sunday):
+        activities.setdefault(week_start(activity["date"]), []).append(activity)
     weeks = []
     monday = first
     while monday <= last:
-        grade = week_grade(
-            [s for s in sessions if week_start(s.written["date"]) == monday],
-            [a for a in activities if week_start(a["date"]) == monday],
-        )
+        grade = week_grade(sessions.get(monday, []), activities.get(monday, []))
         if grade:
             weeks.append((monday, grade))
         monday = shift(monday, 7)
@@ -327,6 +329,13 @@ def week_line(grade: List[SportGrade]) -> str:
     return " · ".join(parts)
 
 
+def changed_line(changed: Changed) -> str:
+    """'Thu 5 Nov Light gym: replaced by Rest Day, changed …', unwrapped: the Progress page's
+    file holds it as is (DESIGN_progress_page.md §4.1)."""
+    written = changed.written
+    return f"{fmt_day(written['date'])} {written['title']}: {changed_words(changed)}"
+
+
 def week_grade_lines(grade: List[SportGrade], indent: str) -> List[str]:
     """The lines the terminal and the prompts share: one per sport, and under a short sport
     each session no longer as written, its reason printed whole (§5)."""
@@ -334,9 +343,5 @@ def week_grade_lines(grade: List[SportGrade], indent: str) -> List[str]:
     for sport in grade:
         lines.append(f"{indent}{sport_line(sport)}")
         for changed in sport.changed:
-            written = changed.written
-            lines.append(wrap_text(
-                f"{indent}  {fmt_day(written['date'])} {written['title']}: "
-                f"{changed_words(changed)}"
-            ))
+            lines.append(wrap_text(f"{indent}  {changed_line(changed)}"))
     return lines

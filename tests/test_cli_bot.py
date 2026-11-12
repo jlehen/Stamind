@@ -1068,11 +1068,13 @@ class CompanionSurfaceRoutingTest(unittest.TestCase):
         self.assertIn("MACROCYCLE STRATEGY", plan_out)
         self.assertNotIn("The road to", plan_out)
 
-    def test_progress_reads_as_a_summary_not_a_table(self):
+    def test_progress_in_the_chat_prints_what_the_terminal_prints(self):
+        # The Progress page holds the weeks; the chat's three sentences went
+        # (DESIGN_progress_page.md §5).
         code, out, _ = run_cli(["progress", "--no-pull"])
         self.assertEqual(code, 0)
-        self.assertIn("The chart shows your fitness", out)
-        self.assertNotIn("FORM today", out)
+        self.assertIn("FORM today", out)
+        self.assertNotIn("The chart shows your fitness", out)
 
     def test_the_expert_voice_is_what_the_same_commands_speak_without_the_env(self):
         """The other half of the switch: nothing above may leak into the default voice."""

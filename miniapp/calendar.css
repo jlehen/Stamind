@@ -537,3 +537,155 @@ h1 {
   color: var(--accent);
   font-size: 15px;
 }
+
+/* ----- the Progress page (DESIGN_progress_page.md §3) ----- */
+
+:root {
+  --fitness: #2f7bd6;
+  --form: #e08a1e;
+  /* A short sport is amber, never red: a drop is not a miss (§3.2). */
+  --short: #c27c0e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fitness: #5aa2ee;
+    --form: #f2a24a;
+    --short: #f0b44a;
+  }
+}
+
+/* The tabs, and the spans under them. */
+.choices {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.choice {
+  flex: 1;
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--card);
+  font-size: 14px;
+}
+
+.spans .choice {
+  min-height: 30px;
+  font-size: 13px;
+}
+
+.choice[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--tg-theme-button-text-color, #ffffff);
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 12px;
+}
+
+.chart .fitness, .chart .form {
+  fill: none;
+  stroke-width: 2;
+}
+
+.chart .fitness { stroke: var(--fitness); }
+.chart .form { stroke: var(--form); }
+.chart .ahead { stroke-dasharray: 4 3; }
+.chart .planned { fill: var(--hint); opacity: 0.35; }
+.chart .done { fill: var(--fitness); opacity: 0.75; }
+.chart .zero { stroke: var(--line); }
+.chart .today { stroke: var(--hint); stroke-dasharray: 2 3; }
+.chart .goal-line { stroke: var(--text); stroke-dasharray: 1 3; }
+
+.chart .axis, .chart .hours {
+  fill: var(--hint);
+  font-size: 9px;
+}
+
+.chart .hours, .chart .goal-flag {
+  text-anchor: middle;
+}
+
+.chart .goal-flag {
+  font-size: 11px;
+}
+
+.key-fitness { background: var(--fitness); }
+.key-form { background: var(--form); }
+.key-planned { background: var(--hint); opacity: 0.35; }
+.key-done { background: var(--fitness); opacity: 0.75; }
+
+.chart-note {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.weeks {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.week-now {
+  padding: 8px 0;
+  font-weight: 600;
+}
+
+.week-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: var(--tap);
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  text-align: left;
+  font-size: 15px;
+}
+
+.week-label {
+  min-width: 52px;
+  font-weight: 600;
+}
+
+.week-open {
+  margin-left: auto;
+  color: var(--hint);
+}
+
+.week-row.opened .week-open {
+  transform: rotate(90deg);
+}
+
+.week-lines {
+  padding: 0 0 8px;
+}
+
+.week-lines .under {
+  padding-left: 16px;
+  font-size: 14px;
+}
+
+.short {
+  color: var(--short);
+}
+
+.record {
+  display: block;
+  width: 100%;
+  border: 0;
+  text-align: left;
+}
+
+.record-status {
+  color: var(--hint);
+  font-size: 14px;
+}

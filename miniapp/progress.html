@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Progress</title>
+<!-- The calendar's look, served beside it (DESIGN_progress_page.md §3). The deploy turns
+     "?v=dev" into the commit, so a phone never mixes two versions' files. -->
+<link rel="stylesheet" href="./calendar.css?v=dev">
+<link rel="icon" href="data:,">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<header class="head">
+  <div class="head-top">
+    <h1 id="title">Progress</h1>
+  </div>
+  <div class="choices" id="tabs" role="tablist"></div>
+  <div class="choices spans" id="spans"></div>
+  <div class="head-sub">
+    <span class="stamp" id="stamp"></span>
+  </div>
+</header>
+
+<main id="view"><p class="problem">Loading…</p></main>
+
+<p class="problem" id="problem" hidden></p>
+
+<!-- A record opened in full: its lines and the athlete's answer (§3.3). -->
+<div class="sheet" id="record-sheet" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head">
+      <h2 id="sheet-title"></h2>
+      <button class="close" id="sheet-close" type="button">✕</button>
+    </div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<script type="module" src="./progress.js?v=dev"></script>
+</body>
+</html>

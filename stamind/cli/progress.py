@@ -202,11 +202,9 @@ def run_progress(args: argparse.Namespace) -> None:
 def print_progress_report(
     payload: Dict[str, Any], args: argparse.Namespace, today: str, weeks_window: int,
 ) -> None:
-    """The expert Fitness view: the fitness line, the goals, the load table, and the chart
-    captioned with the table's first line.
-
-    The companion form of this is CompanionRenderer.progress
-    (DESIGN_render_persona.md §5)."""
+    """The Fitness view: the fitness line, the goals, the load table, and the chart
+    captioned with the table's first line. The chat prints it too (DESIGN_progress_page.md
+    §5)."""
     lines = render_progress(payload, weeks_window, getattr(args, "explain", False))
     for line in lines:
         # Table rows are already fixed-width; prose (banners, footnotes) wraps.

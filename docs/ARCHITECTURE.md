@@ -127,6 +127,7 @@ classes themselves.
     route` (`routing.ROUTER_INTENTS`; the fast model picks an intent, and the button of a
     live question the message answers, never argv; `ROUTER_PAGE_REPLIES` answers a week,
     goals or plan read with a pointer to its page button instead of spawning a command,
+    and `PUBLISHED_PAGE_REPLIES` a progress read where the pages are published,
     [§15](#the-multi-day-schedule-goals-and-plan-live-on-their-pages-alone)). Prose
     comes back as text; a prompt, a chart, a button row, a flush and a queued item come
     back as sentinel frames (`sentinels.py`, [§6](#6-singletons)). Every Telegram call but
@@ -143,7 +144,8 @@ classes themselves.
     (`RESTART_EXIT_CODE`, a contract between `sm-bot` and `chat/runner.py`) or 129, a
     worker killed by SIGHUP (DESIGN_bot_restart.md §4, §5).
   - **The companion** (DESIGN_bot_simple_frontend.md): the reply keyboard is
-    `keyboards.SIMPLE_KEYBOARD`; writes reach the chat through three shapes and no
+    `keyboards.SIMPLE_KEYBOARD`, "📈 Progress" a page button in place of its command where
+    the pages are published (DESIGN_progress_page.md §5); writes reach the chat through three shapes and no
     fourth, view, picker and capture, which `cli/bot/__init__.py` names (§12 there). In
     the chat a capture saves its read-back as a *confirmation* in the athlete queue and
     ends, and a "Yes" that stored a constraint or found nothing is followed by its own
@@ -260,7 +262,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A run, a ride or a swim as steps | `coach/steps.py` (`fault`, `finish`, `describe`, `reprint`), `coach/engine/sessions.py` (`endurance_task`, `STEPS_FIELD`, `ask_week_planner`), the `steps` column (`db/workout_change.py:append`), `coach/revisions.py` (the row shape), `coach/formatting.py:_for_the_week_planner`, `cli/benchmarks.py:reprint_sessions`. DESIGN_endurance_steps.md |
 | Calendar push / daily-signal ingest | `stamind/gcal/` ([§13](#13-daily-signals-calendar-ingest)) |
 | Workout state (modified/calendar/removed) | `stamind/workout_state.py`, `db/workouts.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
-| What "planned" means for a week that has ended, and its grade per sport | `analytics/written_week.py` (`written_week`, `graded_workouts`, `week_grade`, `graded_weeks`, `week_grade_lines`, `week_line`), `db/workout_history.py:get_slot_history`, the readers (`timeline_rows.py`, `coach/service/mesocycle_context.py`, `coach/service/history_context.py:_mesocycle_review`, `coach/service/retrospective.py:_retrospective_numbers`), `cli/progress_weeks.py` (`sm progress weeks`). DESIGN_week_as_written.md, DESIGN_progress_page.md §6 |
+| What "planned" means for a week that has ended, and its grade per sport | `analytics/written_week.py` (`written_week`, `graded_workouts`, `week_grade`, `graded_weeks`, `week_grade_lines`, `changed_line`, `week_line`), `db/workout_history.py:get_slot_history`, the readers (`timeline_rows.py`, `coach/service/mesocycle_context.py`, `coach/service/history_context.py:_mesocycle_review`, `coach/service/retrospective.py:_retrospective_numbers`), `cli/progress_weeks.py` (`sm progress weeks`). DESIGN_week_as_written.md, DESIGN_progress_page.md §6 |
 | What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence`, `STATUS_LABELS`, `unplanned_kind`, `off_plan_gaps`), `analytics/compare.py` (`adherence_window`, `adherence_verdicts`, `compare_days`, `format_actual`), `gcal/reconcile.py:mark_adherence_range`, `gcal/event.py` (the title tag), `cli/workouts/session_line.py::adherence_marker`, `cli/workouts/listing.py::_list_verdicts`, `/api/workouts` + `static/workouts.js`, `calendar_days.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum), [§17](#17-calendar-telegram-mini-app-and-sm-calendar)) |
 | Which timezone dates are read in | `stamind/clock.py`, the push window in `chat/scheduler.py`. DESIGN_user_timezone.md |
 | A preference the athlete can change at runtime | a registry entry in `stamind/settings.py` (not a command), `cli/settings.py`, and the reader that consumes it. DESIGN_settings.md |
@@ -270,6 +272,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` kind, `save`, `open_proposal`, `shown_to_week_planner`, `out_of_date`), `coach/proposals.py` (`week_planner_changed`, `revision_to_json`/`revision_from_json`), `coach/engine/notes.py:open_proposal_task`, `cli/queue.py:send_alone`, `cli/workouts/adapt.py:_settle`, `cli/bot/views.py:_morning_adaptation`. DESIGN_waiting_proposal.md |
 | Whether the morning push asks the week planner | `coach/picture.py` (`take`, `news`, `nights`, `remember`), `cli/bot/views.py:_asks`, `strength/planner.py:has_work`, `db/workout_history.py:newest_change_with_sessions(exclude_kind)`, `RevisionProposal.seen`, the `adapt_last_seen` row of `settings`. DESIGN_quiet_morning.md |
 | A strength activity's sets | `strength/sets.py`, `strength/vocabulary.py` + `exercises.tsv` (then rebuild `miniapp/exercises.json` with `miniapp/build_exercises.py`), `strength/questions.py`, `db/strength.py`, `cli/strength.py`, `cli/strength_log.py`, the `strength-sets-since` setting. DESIGN_strength_tracking.md, DESIGN_exercise_table.md |
+| The Progress page (the chat's "📈 Progress") | `cli/render/progress_page.py` (the file, the address), `page_files/sync.py` (`PROGRESS`), `miniapp/progress.html` + `progress.js` + `progress_logic.js`, `chat/keyboards.py` (`PROGRESS_LABEL`), `chat/app.py:_page_buttons`, `chat/routing.py:PUBLISHED_PAGE_REPLIES`; the terminal's views are `cli/progress*.py`. DESIGN_progress_page.md |
 | A gym session logged on the phone | `miniapp/`, `strength/logger.py`, `cli/strength_ingest.py`, `strength/sets.py::take_over_logs`, `db/strength.py` (`gym_logs`, `upsert_logged_activity`, `save_gym_log`, `gym_log_for_day`, `garmin_activity_with_log`, `move_gym_log`). DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
 | A past strength session against its planned lines | `strength/comparison.py`, `db/strength.py::attach_lifted`, `analytics/adherence.py` (`_discrepancy_reasons`, `_pairing_order`, `is_ambiguous_match`), `cli/common.py` (`strength_table`, `simple_comparison_lines`), `strength/sets.py::done_text`. DESIGN_strength_planned_vs_done.md |
 | What a strength session prescribes | `strength/planner.py`, `strength/planner_prompt.py`, `strength/progression.md`, `strength/history.py`, `strength/prescription.py`, `prescribed_sets` + `strength_checks` in `db/schema.py`, `db/workout_change.py::WorkoutChange`, the pass's place in `coach/service/generate.py` and `coach/service/adapt.py`. DESIGN_strength_tracking.md §9 |
@@ -840,7 +843,7 @@ Untouched by every `wipe`.
 | Column        | Type    | Notes                                                        |
 |---------------|---------|---------------------------------------------------------------|
 | `address`     | TEXT PK | The file's full address, bucket, folder and name. The name is computed from the bot token, so another token or bucket finds no row of its own |
-| `label`       | TEXT    | What the file holds: `calendar/2026-09`, `calendar/index` or `plan` |
+| `label`       | TEXT    | What the file holds: `calendar/2026-09`, `calendar/index`, `plan`, `proposal` or `progress` |
 | `fingerprint` | TEXT    | SHA-256 of the content last uploaded, before encryption and without the stamp; NULL until one upload succeeded |
 | `uploaded_at` | TEXT    | When that upload succeeded (UTC ISO)                          |
 | `error`       | TEXT    | The last attempt's HTTP status or error type when it failed, else NULL; `sm status` shows it |
@@ -2031,7 +2034,9 @@ Four layout decisions with no design doc and no other home in this document.
 
 ### The multi-day schedule, goals, and plan live on their pages alone
 In the companion chat, `"🗓 Calendar"` and `"🎯 Goals & plan"` are the only read-only
-views of the multi-day schedule, the goals, and the plan. Keeping the older text views
+views of the multi-day schedule, the goals, and the plan, and where the pages are
+published `"📈 Progress"` is the one view of the weeks and the mesocycles
+(DESIGN_progress_page.md §5). Keeping the older text views
 beside them (`workout list` over several days, `goal list`, `plan show`, and `bot
 mesocycle`) left unused paths that disagreed with the rest of the chat. Typing `"my
 goals"` ran `goal list` without the `"🗑 Call one off"` button that `bot goals` draws.
@@ -2041,7 +2046,9 @@ reprinted the mesocycle list instead of the tapped mesocycle's full focus.
 `show_week`, `show_goals`, and `show_plan` stay in `chat/routing.py::ROUTER_INTENTS` so
 `"what's my week?"` does not misroute to `show_today` or `unclear`. `messages._simple_route`
 answers them from `ROUTER_PAGE_REPLIES` with one line naming the keyboard button below
-and spawns no CLI subprocess. `_send_keyed` rebuilds the reply keyboard on that send, so
+and spawns no CLI subprocess; `show_progress` gets its line from `PUBLISHED_PAGE_REPLIES`
+where the pages are published, and runs `progress --chart` where they are not.
+`_send_keyed` rebuilds the reply keyboard on that send, so
 the button underneath carries a fresh page snapshot. `"💬 Why, in chat"` and the
 mesocycle's `"p"` snapshot key went with the chat plan view: published bucket files
 already hold each mesocycle's full `focus`, and an offline phone cannot reach the bot via
@@ -2087,12 +2094,14 @@ says where things live).
 and each view words them itself: `cli/render/calendar_page.py` (the page's snapshot and
 month files), `cli/render/plan_page.py` ("Goals & plan", whose mesocycles come from
 `calendar_page.py::meso_entry`, deload date included), `cli/render/calendar_grid.py`
-(the terminal grid behind `cli/calendar.py`). The pages are `miniapp/calendar.html`,
-`plan.html` and `details.html` (a proposal in full, DESIGN_short_messages.md §6) and their
-`*_logic.js` under node tests, with `storage.js` the bucket read they share.
-`page_files/sync.py` adds the bucket parameters to both buttons and uploads the files
-that changed after every command (`after_command`, from `run_once`). On the bot's side,
-`ChatBot._page_buttons` builds both addresses on every send, `RepliesMixin._send_keyed`
+(the terminal grid behind `cli/calendar.py`), and `cli/render/progress_page.py` (the
+Progress page's file, DESIGN_progress_page.md §4). The pages are `miniapp/calendar.html`,
+`plan.html`, `details.html` (a proposal in full, DESIGN_short_messages.md §6) and
+`progress.html`, and their `*_logic.js` under node tests, with `storage.js` the bucket read
+they share. `page_files/sync.py` adds the bucket parameters to the buttons and uploads the
+files that changed after every command (`after_command`, from `run_once`). On the bot's
+side, `ChatBot._page_buttons` builds the addresses on every send, the Progress page's only
+where the pages are published, `RepliesMixin._send_keyed`
 is the one send that attaches the keyboard, and `on_web_app_data` turns a `calendar_day`
 message into `workout show -d <date>`; any other page message is a gym log
 ([§16](#16-gym-logger-telegram-mini-app)).

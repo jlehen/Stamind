@@ -7,7 +7,6 @@ to the expert form. Each override is the *when* — which line builder in
 from typing import Any, Dict, List, Optional, Tuple
 
 from stamind import runtime, signals
-from stamind.analytics import timeline
 from stamind.analytics.adherence import MINOR, unplanned_kind
 from stamind.coach.proposals import RevisionProposal
 from stamind.config import config
@@ -18,12 +17,10 @@ from stamind.text import green, wrap_text
 from stamind.output import notice
 from stamind.clock import shift, today_str as _today_str
 from stamind.cli.common import print_strength_notes
-from stamind.cli.progress import emit_chart
 from stamind.cli.render.expert import ExpertRenderer
 from stamind.cli.render.plan_lines import (
     simple_goal_line, simple_plan_setup_line, simple_plan_shaping_line,
-    simple_plan_wrapped_line, simple_preference_words, simple_progress_lines,
-    simple_runway_lines,
+    simple_plan_wrapped_line, simple_preference_words, simple_runway_lines,
 )
 from stamind.cli.render.proposal_lines import simple_revision_lines
 from stamind.cli.render.session_lines import (
@@ -241,23 +238,6 @@ class CompanionRenderer(ExpertRenderer):
     def calendar_marked(self, marked: int) -> None:
         # Bookkeeping on the operator's Calendar; chat is not the audit surface (§6).
         return
-
-    def progress(self, payload: dict, args, today: str, weeks_window: int) -> None:
-        lines = simple_progress_lines(payload, today)
-        for line in lines:
-            print(wrap_text(line))
-        chart_arg = getattr(args, "chart", False)
-        if not chart_arg:
-            return
-        # The chart captions itself with the trend line, where the expert form captions
-        # it with the table's first row (DESIGN_bot_simple_frontend.md §6).
-        emit_chart(
-            chart_arg,
-            timeline.clip_payload_for_weeks(
-                payload, weeks_window, today, cap_future=True
-            ),
-            lines[0],
-        )
 
     def revision_preview(self, proposal: RevisionProposal, heading: str) -> None:
         print(f"\n{heading}")

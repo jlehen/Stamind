@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 from stamind import calendar_days, clock, journal, runtime
 from stamind.clock import month_end, month_start
 from stamind.config import config
-from stamind.cli.render import calendar_page, plan_page, proposal_lines
+from stamind.cli.render import calendar_page, plan_page, progress_page, proposal_lines
 from stamind.output import aside
 from stamind.page_files import bucket as _bucket
 from stamind.page_files import recipe
@@ -21,6 +21,10 @@ PLAN = "plan"
 # The newest proposal saved, whatever its answer (DESIGN_short_messages.md §6.2). The label is
 # the name of the queue kind it is read from too, `cli/workouts/proposal.py:KIND`.
 PROPOSAL = "proposal"
+# The Progress page's file (DESIGN_progress_page.md §4).
+PROGRESS = "progress"
+# The files that belong to no month.
+NOT_MONTHS = (INDEX, PLAN, PROPOSAL, PROGRESS)
 # The label of the test file `sm data publish` writes. It is never a page's (§9.2).
 CHECK = "check"
 
@@ -74,7 +78,8 @@ def button_params(dbh) -> str:
 
 def build(dbh, today: str, every_month: bool = False) -> Dict[str, Dict[str, Any]]:
     """Each file's content by label: the months the window touches, or every month from the
-    first when `every_month`, then the index file and the plan file (§4, §6 step 2)."""
+    first when `every_month`, then the index file, the plan file, the proposal's and the
+    progress file (§4, §6 step 2)."""
     window = calendar_page.window(today)
     cal = calendar_days.gather(dbh, month_start(window[0]), month_end(window[1]), today)
     first = min(dbh.first_training_day() or window[0], window[0])[:7]
@@ -89,6 +94,7 @@ def build(dbh, today: str, every_month: bool = False) -> Dict[str, Dict[str, Any
     proposal = proposal_file(dbh, at)
     if proposal is not None:
         files[PROPOSAL] = proposal
+    files[PROGRESS] = progress_page.progress_file(dbh, today, at)
     return files
 
 
@@ -138,9 +144,9 @@ def day_button(dbh, workouts: List[Dict[str, Any]], day: str) -> Optional[Dict[s
 
 
 def rebuilt(label: str, today: str) -> bool:
-    """Whether the step after a command builds this file: the index file, the plan file, the
-    proposal's, or a month the window touches (§6 step 2)."""
-    if label in (INDEX, PLAN, PROPOSAL):
+    """Whether the step after a command builds this file: one that belongs to no month, or a
+    month the window touches (§6 step 2)."""
+    if label in NOT_MONTHS:
         return True
     start, end = calendar_page.window(today)
     return calendar_page.month_label(start[:7]) <= label <= calendar_page.month_label(end[:7])
@@ -171,7 +177,8 @@ def _upload(dbh, where: Target, remote, label: str, content: Dict[str, Any],
 
 def _in_upload_order(labels, this_month: str) -> List[str]:
     """The proposal first, then the month holding today, the other months, the index file,
-    the plan (DESIGN_short_messages.md §5)."""
+    the plan, and the progress file last (DESIGN_short_messages.md §5,
+    DESIGN_progress_page.md §10)."""
     def rank(label: str) -> Tuple[int, str]:
         if label == PROPOSAL:
             return -1, label
@@ -181,6 +188,8 @@ def _in_upload_order(labels, this_month: str) -> List[str]:
             return 2, label
         if label == PLAN:
             return 3, label
+        if label == PROGRESS:
+            return 4, label
         return 1, label
     return sorted(labels, key=rank)
 
@@ -223,7 +232,7 @@ def _upload_changes(dbh, where: Target) -> int:
         if not _upload(dbh, where, remote, label, files[label], left):
             continue
         count += 1
-        if label not in (INDEX, PLAN, PROPOSAL):
+        if label not in NOT_MONTHS:
             calendar_uploaded = True
     return count
 

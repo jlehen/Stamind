@@ -126,6 +126,12 @@ ROUTER_PAGE_REPLIES = {
     "show_goals": "Open 🎯 Goals & plan below to see your goals.",
 }
 
+# The Progress page is on the keyboard only where the pages are published; elsewhere its
+# intent runs `ROUTER_INTENT_ARGV`'s command (DESIGN_progress_page.md §5).
+PUBLISHED_PAGE_REPLIES = {
+    "show_progress": "Open 📈 Progress below to see how your weeks went.",
+}
+
 
 # The two intents that carry the athlete's words to the coach, and the argv the text is
 # appended to: how the athlete is goes to `workout adapt`, a change they decided goes to

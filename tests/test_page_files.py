@@ -18,7 +18,7 @@ from tests.helpers import (
 from stamind import calendar_days
 from stamind.cli import status
 from stamind.cli.data import publish
-from stamind.cli.render import calendar_page
+from stamind.cli.render import calendar_page, progress_page
 from stamind.config import config
 from stamind.db import Database
 from stamind.page_files import bucket, recipe, sync
@@ -176,6 +176,7 @@ class RecipeTest(unittest.TestCase):
         self.assertIn(f'INDEX = "{sync.INDEX}"', page)
         self.assertIn(f'PLAN = "{sync.PLAN}"', page)
         self.assertIn(f'PROPOSAL = "{sync.PROPOSAL}"', page)
+        self.assertIn(f'PROGRESS = "{sync.PROGRESS}"', page)
         # The file is read from the queue kind of the same name.
         from stamind.cli.workouts import proposal
         self.assertEqual(sync.PROPOSAL, proposal.KIND)
@@ -199,11 +200,12 @@ class BuildTest(FilesTestCase):
     def test_after_a_command_the_months_the_window_touches(self):
         # The window runs from 2 September to 11 November.
         self.assertEqual(set(sync.build(test_db, TODAY)), {
-            "calendar/2026-09", "calendar/2026-10", "calendar/2026-11", sync.INDEX, sync.PLAN})
+            "calendar/2026-09", "calendar/2026-10", "calendar/2026-11", sync.INDEX, sync.PLAN,
+            sync.PROGRESS})
 
     def test_publish_builds_every_month_from_the_first_empty_ones_included(self):
         files = sync.build(test_db, TODAY, every_month=True)
-        months = sorted(label for label in files if label not in (sync.INDEX, sync.PLAN))
+        months = sorted(label for label in files if label not in sync.NOT_MONTHS)
         self.assertEqual(months[0], "calendar/2026-05")
         self.assertEqual(months[-1], "calendar/2026-11")
         self.assertEqual(len(months), 7)
@@ -354,7 +356,7 @@ class AfterCommandTest(FilesTestCase):
 
     def publish(self):
         code, out, _err = run_cli(["data", "publish"])
-        self.assertIn("Updated 9 files", out)
+        self.assertIn("Updated 10 files", out)
         FakeBucket.uploads.clear()
 
     def test_a_database_never_published_uploads_nothing(self):
@@ -374,17 +376,18 @@ class AfterCommandTest(FilesTestCase):
         sync.after_command()
         self.assertEqual(FakeBucket.uploads, [])
 
-    def test_a_new_activity_uploads_its_month_then_the_index(self):
+    def test_a_new_activity_uploads_its_month_then_the_index_and_the_progress_last(self):
         use_storage(self)
         self.publish()
         _activity("a0930", TODAY)
         run_cli(["calendar", "--no-pull"])
         key = recipe.page_key(TOKEN)
         self.assertEqual(FakeBucket.uploads, [recipe.file_name(key, "calendar/2026-09"),
-                                              recipe.file_name(key, sync.INDEX)])
+                                              recipe.file_name(key, sync.INDEX),
+                                              recipe.file_name(key, sync.PROGRESS)])
 
     def test_a_terminal_reads_one_line_about_the_upload_and_the_chat_none(self):
-        line = "Pages' files updated: 2 file(s) uploaded to the bucket."
+        line = "Pages' files updated: 3 file(s) uploaded to the bucket."
         use_storage(self)
         os.environ.pop("STAMIND_VERBOSE", None)
         self.publish()
@@ -396,7 +399,7 @@ class AfterCommandTest(FilesTestCase):
         started_from(self, "chat")
         _activity("a0929", "2026-09-29")
         self.assertNotIn("Pages' files updated", run_cli(["calendar", "--no-pull"])[1])
-        self.assertEqual(len(FakeBucket.uploads), 4)
+        self.assertEqual(len(FakeBucket.uploads), 6)
 
     def test_a_line_that_only_printed_help_uploads_nothing(self):
         use_storage(self)
@@ -413,7 +416,7 @@ class AfterCommandTest(FilesTestCase):
             sync.after_command()
         self.assertEqual(FakeBucket.uploads, [])
         sync.after_command()
-        self.assertEqual(len(FakeBucket.uploads), 2)
+        self.assertEqual(len(FakeBucket.uploads), 3)
 
     def test_a_failed_upload_goes_to_the_journal_and_status_and_the_command_goes_on(self):
         use_storage(self)
@@ -472,9 +475,9 @@ class PublishTest(FilesTestCase):
         use_storage(self)
         _code, out, _err = run_cli(["data", "publish"])
         # The test file of check 3 is gone with the fill, and is not counted.
-        self.assertEqual(out.strip(), f"✓ Updated 9 files, removed 0 in GCS bucket {BUCKET}.")
+        self.assertEqual(out.strip(), f"✓ Updated 10 files, removed 0 in GCS bucket {BUCKET}.")
         self.assertEqual(self.names(), self.expected())
-        self.assertEqual(len(test_db.get_page_files()), 9)
+        self.assertEqual(len(test_db.get_page_files()), 10)
         self.assertNotIn(KEY, out)
 
     def test_a_failed_check_names_the_step_and_nothing_is_uploaded(self):
@@ -570,6 +573,126 @@ class ProposalFileTest(FilesTestCase):
     def test_no_button_where_the_pages_are_not_published(self):
         use_storage(self)
         self.assertIsNone(sync.page_button(test_db, _proposal()))
+
+
+# A reason longer than any terminal line, so a wrapped copy would differ by width.
+REASON = ("Your resting heart rate is raised after Friday's illness, so the long ride becomes "
+          "an easy spin of forty minutes and the rest of the week stays as it is.")
+
+
+def _short_ride_week():
+    """The week of 21 September: a 120-minute ride written, cut to 40 by an adapt, and a
+    40-minute ride done."""
+    with test_db.workout_change(kind="generate") as change:
+        change.append(date="2026-09-22", sport_type="cycling", title="Long ride",
+                      description="Long ride", duration_minutes=120, tss=100)
+    lineage = test_db.get_workout("2026-09-22", "cycling")["id"]
+    with test_db.workout_change(kind="adapt") as change:
+        change.append(date="2026-09-22", sport_type="cycling", title="Long ride",
+                      description="Easy spin", duration_minutes=40, tss=30,
+                      lineage_id=lineage, reason=REASON)
+    test_db.save_completed_activity(
+        activity_id="r0922", date="2026-09-22", start_time="2026-09-22 08:00:00",
+        activity_name="Ride", activity_type="cycling", duration_sec=2400.0, distance_km=15.0,
+        elevation_gain_m=0.0, avg_hr=120, max_hr=140, rpe=3, tss=30.0,
+    )
+
+
+def _records():
+    """Build, finished and written with the athlete's answer; Summer, not written yet."""
+    goal = test_db.get_objectives()[0]["id"]
+    build = test_db.add_retrospective(goal, "mesocycle", "Build", "2026-09-02",
+                                      "2026-09-27", "finished", "Build the engine.")
+    test_db.write_retrospective(
+        build, {"sessions_done": 5, "sessions_planned": 9, "load_done": 237.0,
+                "load_planned": 275.0, "duration_sec": 21060.0, "fitness_start": 16.2,
+                "fitness_end": 18.4, "benchmarks": []},
+        "The athlete completed 5 of 9 sessions.\nThe long rides grew.",
+        "You kept your rides going.")
+    test_db.set_retrospective_words(build, "felt   fresh")
+    test_db.add_retrospective(goal, "mesocycle", "Summer", "2026-08-01", "2026-09-01",
+                              "finished", "Keep moving.")
+
+
+class ProgressFileTest(FilesTestCase):
+    """The Progress page's file (DESIGN_progress_page.md §4.1)."""
+
+    def progress(self):
+        return sync.build(test_db, TODAY)[sync.PROGRESS]
+
+    def test_the_keys_of_the_file(self):
+        file = self.progress()
+        self.assertEqual(set(file), {"v", "at", "today", "days", "weeks", "records", "goals",
+                                     "mesocycles"})
+        self.assertEqual((file["v"], file["today"]), (1, TODAY))
+        self.assertEqual(file["days"][0]["date"], "2026-05-10")
+        self.assertEqual(file["days"][-1]["date"], "2026-10-02")
+        self.assertEqual(file["goals"], [{"title": "Autumn 10k", "date": "2026-10-18"}])
+        self.assertEqual([m["label"] for m in file["mesocycles"]], ["Summer", "Build", "Taper"])
+        this_week = next(w for w in file["weeks"] if w["monday"] == "2026-09-28")
+        self.assertTrue(this_week["under_way"])
+        self.assertNotIn("grade", this_week)
+
+    def test_an_ended_week_carries_its_grade_in_the_terminals_words(self):
+        _short_ride_week()
+        week = next(w for w in self.progress()["weeks"] if w["monday"] == "2026-09-21")
+        self.assertEqual(week["planned"], 100.0)
+        self.assertFalse(week["under_way"] or week["ahead"])
+        [ride] = week["grade"]
+        self.assertEqual((ride["icon"], ride["percent"], ride["short"]), ("🚴", 30, True))
+        self.assertEqual(ride["line"], "cycling: written 100, done 30 (30%), short")
+        [changed] = ride["changed"]
+        self.assertTrue(changed.startswith("Tue 22 Sep Long ride: cut from 120 to 40 min, "))
+        self.assertIn(REASON, changed)
+
+    def test_the_file_is_the_same_built_at_80_and_at_900_columns(self):
+        _short_ride_week()
+        _records()
+        built = []
+        for width in ("80", "900"):
+            with patch.dict(os.environ, {"STAMIND_WRAP_WIDTH": width}):
+                built.append(sync.fingerprint(self.progress()))
+        self.assertEqual(built[0], built[1])
+
+    def test_a_record_with_the_athletes_answer_and_one_not_written_yet(self):
+        _records()
+        build, summer = self.progress()["records"]
+        self.assertEqual(build["name"], "Build")
+        self.assertEqual(build["first"], "Sessions 5 of 9 · load 237 of 275 TSS · 5h51 · "
+                                         "fitness 16 -> 18 · no test")
+        self.assertEqual(build["lines"], ["The athlete completed 5 of 9 sessions.",
+                                          "The long rides grew."])
+        self.assertEqual(build["said"], "You kept your rides going.")
+        self.assertEqual(build["answer"], 'Athlete: "felt fresh"')
+        self.assertEqual(summer, {"name": "Summer", "start": "2026-08-01",
+                                  "end": "2026-09-01", "ended": "finished"})
+
+    def test_a_record_without_an_answer_has_none(self):
+        _records()
+        build = self.progress()["records"][0]
+        test_db.set_retrospective_words(test_db.get_retrospectives()[-1]["id"], None)
+        self.assertNotIn("answer", self.progress()["records"][0])
+        self.assertIn("answer", build)
+
+    def test_built_after_a_command_and_uploaded_only_when_it_changed(self):
+        use_storage(self)
+        run_cli(["data", "publish"])
+        FakeBucket.uploads.clear()
+        key = recipe.page_key(TOKEN)
+        sync.after_command()
+        self.assertEqual(FakeBucket.uploads, [])
+        _records()
+        sync.after_command()
+        self.assertEqual(FakeBucket.uploads, [recipe.file_name(key, sync.PROGRESS)])
+
+    def test_the_button_fits_the_256_bytes_taken_from_the_calendar(self):
+        # DESIGN_progress_page.md §5: the keyboard's worst case does not grow.
+        use_storage(self)
+        run_cli(["data", "publish"])
+        url = progress_page.progress_url(sync.button_params(test_db))
+        self.assertEqual(url, f"{progress_page.PAGE_URL}#k={KEY}&b={BUCKET}&f={FOLDER}")
+        self.assertLessEqual(len(url.encode()) + len("📈 Progress".encode()), 256)
+        self.assertEqual(calendar_page.BUDGET_BYTES, 5 * 1024 - 256)
 
 
 class ButtonTest(FilesTestCase):

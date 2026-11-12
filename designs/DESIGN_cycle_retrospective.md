@@ -436,6 +436,11 @@ seven days after the end of the mesocycle (§4).
 
 The athlete sees the sentence once, as this reply. No view of the plan shows it (§15).
 
+Amended 2026-11-12: the Progress page's Mesocycles tab shows every record, the sentence on
+its card, and a tap opens the record's lines as the retrospective writer wrote them for
+`plan generate`, with the athlete's answer under them (DESIGN_progress_page.md §3.3, choice
+15). The four rules above bind the sentence, not those lines.
+
 The sentence follows four rules. It uses plain words. It holds no numbers. It holds nothing
 private, because it can appear on a lock screen. It never opens with a miss
 (DESIGN_bot_simple_frontend.md).
@@ -660,7 +665,8 @@ tests call it directly.
   of the calendar mini app. A finished mesocycle's sheet on that page says what the mesocycle
   was for, not how it went. The plan file that the page reads from a bucket
   (DESIGN_miniapp_storage.md §4) could carry the sentence. To look at again once real
-  records exist.
+  records exist. Done since 2026-11-12, on a page of its own: the Progress page's
+  Mesocycles tab shows each record and its sentence (DESIGN_progress_page.md §3.3).
 
 ## Decisions Log
 
