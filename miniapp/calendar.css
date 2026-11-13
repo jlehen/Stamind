@@ -543,6 +543,7 @@ h1 {
 :root {
   --fitness: #2f7bd6;
   --form: #e08a1e;
+  --fatigue: #c0392b;
   /* A short sport is amber, never red: a drop is not a miss (§3.2). */
   --short: #c27c0e;
 }
@@ -551,6 +552,7 @@ h1 {
   :root {
     --fitness: #5aa2ee;
     --form: #f2a24a;
+    --fatigue: #e8766a;
     --short: #f0b44a;
   }
 }
@@ -588,13 +590,14 @@ h1 {
   margin-top: 12px;
 }
 
-.chart .fitness, .chart .form {
+.chart .fitness, .chart .form, .chart .fatigue {
   fill: none;
   stroke-width: 2;
 }
 
 .chart .fitness { stroke: var(--fitness); }
 .chart .form { stroke: var(--form); }
+.chart .fatigue { stroke: var(--fatigue); }
 .chart .ahead { stroke-dasharray: 4 3; }
 .chart .planned { fill: var(--hint); opacity: 0.35; }
 .chart .done { fill: var(--fitness); opacity: 0.75; }
@@ -617,6 +620,7 @@ h1 {
 
 .key-fitness { background: var(--fitness); }
 .key-form { background: var(--form); }
+.key-fatigue { background: var(--fatigue); }
 .key-planned { background: var(--hint); opacity: 0.35; }
 .key-done { background: var(--fitness); opacity: 0.75; }
 
