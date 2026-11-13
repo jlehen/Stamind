@@ -67,6 +67,18 @@ class BareIsFitnessTest(_Case):
         self.assertEqual(parser.parse_args(["progress", "weeks"]).weeks, 8)
         self.assertEqual(parser.parse_args(["progress", "weeks", "-w", "3"]).weeks, 3)
 
+    def test_a_pull_flag_before_the_view_word_is_kept(self):
+        # `progress --no-pull weeks` used to pull from Garmin all the same.
+        parser, _ = stamind_cli.build_parser()
+        for view in ("fitness", "weeks", "intensity"):
+            with self.subTest(view=view):
+                args = parser.parse_args(["progress", "--no-pull", view])
+                self.assertEqual((args.no_pull, args.force_pull), (True, False))
+                args = parser.parse_args(["progress", "--force-pull", view])
+                self.assertEqual((args.no_pull, args.force_pull), (False, True))
+                args = parser.parse_args(["progress", view])
+                self.assertEqual((args.no_pull, args.force_pull), (False, False))
+
     def test_a_chart_path_that_names_a_view_is_refused(self):
         # `--chart` takes an optional path, so the view's word would have become a file.
         for argv in (["--chart", "weeks"], ["chart", "weeks"]):

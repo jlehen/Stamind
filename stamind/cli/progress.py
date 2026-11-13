@@ -18,6 +18,7 @@ from stamind.analytics.pmc import PMC_TSB_LAG_NOTE
 from stamind.text import cmd, dim, keep_whole, red, visible_len, wrap_text
 from stamind.output import notice
 from stamind.clock import parse_date, today_str as _today_str
+from stamind.cli.argparse_ext import pull_flags
 from stamind.cli.common import ensure_recent_data
 from stamind.cli.progress_load import (
     LOAD_TABLE_WIDTH, format_form_line, format_no_plan_banner,
@@ -248,8 +249,9 @@ VIEWS = ("fitness", "weeks", "mesocycles", "intensity")
 WEEKS_HELP = ("Weeks to show either side of today, this week counted (default: 8, must be "
               ">= 1, or 'all' for every week).")
 
-# Every copy of the flags below defaults to SUPPRESS, and the group alone sets the defaults,
-# so a flag typed before the view's word is not overwritten by the view's default.
+# Every view's copy of the flags below, and of the pull flags, defaults to SUPPRESS, and the
+# group alone sets the defaults, so a flag typed before the view's word is not overwritten by
+# the view's default.
 
 
 def _add_weeks_flag(parser: argparse.ArgumentParser, text: str = WEEKS_HELP) -> argparse.Action:
@@ -294,10 +296,11 @@ def add_progress_parser(subparsers, pull_bypass_parser):
     # A bare `sm progress` is the Fitness view (DESIGN_cli_noargs.md §a3).
     progress_parser.set_defaults(func=run_progress, weeks=8, explain=False, chart=False)
     views = progress_parser.add_subparsers(dest="subcommand", help="Progress views")
+    view_pull = pull_flags(argparse.SUPPRESS)
 
     fitness = views.add_parser(
         "fitness",
-        parents=[pull_bypass_parser],
+        parents=[view_pull],
         help="Fitness and form, the goals, and the weekly load; a bare 'progress'",
         description=(
             "Show a single continuous timeline of training load: past days measured "
@@ -316,7 +319,7 @@ def add_progress_parser(subparsers, pull_bypass_parser):
 
     weeks = views.add_parser(
         "weeks",
-        parents=[pull_bypass_parser],
+        parents=[view_pull],
         help="Each week that has ended against its sessions as written",
         description=(
             "One line per week that has ended in the window, graded whole, per sport, "
@@ -347,7 +350,7 @@ def add_progress_parser(subparsers, pull_bypass_parser):
 
     intensity = views.add_parser(
         "intensity",
-        parents=[pull_bypass_parser],
+        parents=[view_pull],
         help="Weekly time in zone, one table per sport",
         description=(
             "Weekly time-in-zone tables, one per sport: weeks behind today show what you "

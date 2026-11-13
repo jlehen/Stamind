@@ -18,7 +18,7 @@ from stamind.output import aside, notice, route_library_logs
 from stamind.cli.argparse_ext import (
     UsageExit, WrapAwareArgumentParser,
     _print_command_tree, translate_dashless_argv, _HelpAllAction,
-    sort_command_tree,
+    pull_flags, sort_command_tree,
 )
 
 # Help lists commands by usefulness, not argparse registration order
@@ -121,19 +121,7 @@ def build_parser():
     )
 
     # Common parser for commands that support bypassing or forcing the auto-pull.
-    # --no-pull and --force-pull are opposite ends of the same throttle, so they're
-    # mutually exclusive.
-    pull_bypass_parser = argparse.ArgumentParser(add_help=False)
-    _pull_group = pull_bypass_parser.add_mutually_exclusive_group()
-    _pull_group.add_argument(
-        "--no-pull", action="store_true", dest="no_pull",
-        help="Skip the Garmin/Calendar pull check, reading purely from the SQLite cache"
-    )
-    _pull_group.add_argument(
-        "--force-pull", action="store_true", dest="force_pull",
-        help="Force a Garmin/Calendar refresh even within the refresh-minutes window, "
-             "bypassing the cache-reuse throttle"
-    )
+    pull_bypass_parser = pull_flags()
 
     # Common parser for debugging LLM prompts
     llm_debug_parser = argparse.ArgumentParser(add_help=False)

@@ -7,7 +7,7 @@ import argparse
 import re
 import sys
 import textwrap
-from typing import Optional
+from typing import Any, Optional
 
 from stamind.text import (
     bold, cmd, default_wrap_width, dim, format_labeled_paragraph, red, wrap_text, yellow,
@@ -194,6 +194,28 @@ _NEGATIVE_SELECTOR_RE = re.compile(r"-\d+(\.\d+)?[dw](\.\.|$)")
 
 def _needs_equals(value: Optional[str]) -> bool:
     return bool(value) and value.startswith("-") and bool(_NEGATIVE_SELECTOR_RE.match(value))
+
+
+def pull_flags(default: Any = False) -> argparse.ArgumentParser:
+    """The parent parser of every command that reads Garmin: `--no-pull` and `--force-pull`,
+    the two ends of one throttle, so mutually exclusive.
+
+    `default=argparse.SUPPRESS` is for the sub-commands of a group that takes the flags too: a
+    sub-command's defaults overwrite what the group already parsed, so `progress --no-pull
+    weeks` would pull (DESIGN_progress_page.md §6). One parser per default, because argparse
+    shares a parent's actions with every child."""
+    parser = argparse.ArgumentParser(add_help=False)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--no-pull", action="store_true", dest="no_pull", default=default,
+        help="Skip the Garmin/Calendar pull check, reading purely from the SQLite cache"
+    )
+    group.add_argument(
+        "--force-pull", action="store_true", dest="force_pull", default=default,
+        help="Force a Garmin/Calendar refresh even within the refresh-minutes window, "
+             "bypassing the cache-reuse throttle"
+    )
+    return parser
 
 
 def _canonical_option(action: argparse.Action) -> str:
