@@ -161,7 +161,7 @@ function showFitness() {
     return;
   }
   const row = element("div", "choices");
-  const toggle = element("button", "choice", logic.FATIGUE_BUTTON);
+  const toggle = element("button", "choice", "Fatigue (ATL)");
   toggle.type = "button";
   toggle.setAttribute("aria-pressed", String(state.fatigue));
   toggle.addEventListener("click", () => { state.fatigue = !state.fatigue; draw(); });
@@ -170,7 +170,7 @@ function showFitness() {
   const keys = element("ul", "legend");
   keys.append(key("key-fitness", "Fitness (CTL)"), key("key-form", "Form (TSB)"));
   if (state.fatigue) {
-    keys.append(key("key-fatigue", logic.FATIGUE_KEY));
+    keys.append(key("key-fatigue", "Fatigue (ATL), about fitness − form"));
   }
   keys.append(key("key-planned", "Planned load of the week"),
               key("key-done", "Load done, its hours over it"));

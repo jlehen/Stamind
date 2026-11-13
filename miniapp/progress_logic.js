@@ -9,11 +9,9 @@ export const COULD_NOT_LOAD =
   "Your progress could not be loaded. Close this page and tap again in a moment.";
 export const NO_BUTTON = "Open this page from the bot's 📈 Progress button.";
 
-// The line under the chart (§3.1), and the button that shows fatigue over it (choice 3).
+// The line under the chart (§3.1).
 export const CHART_NOTE = "Fitness: what your last six weeks of training built. Fatigue: what "
   + "your last week or so cost. Form: fitness minus fatigue; above zero you are fresh.";
-export const FATIGUE_BUTTON = "Fatigue (ATL)";
-export const FATIGUE_KEY = "Fatigue (ATL), about fitness − form";
 
 export const TABS = [
   { key: "fitness", label: "Fitness" },
