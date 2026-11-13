@@ -326,6 +326,15 @@ h1 {
 .key-less { background: rgb(var(--less-rgb) / var(--gap-alpha)); }
 .key-more { background: rgb(var(--more-rgb) / var(--gap-alpha)); }
 .key-miss { border: 2px solid var(--miss-line); }
+/* The key's two rows: the fill's three colours, and a card with a corner. */
+.key-fill {
+  background: linear-gradient(90deg, var(--ok) 0 33%,
+                              rgb(var(--less-rgb) / var(--gap-alpha)) 33% 67%,
+                              rgb(var(--more-rgb) / var(--gap-alpha)) 67%);
+}
+.key-corner {
+  background: linear-gradient(225deg, rgb(var(--ok-rgb)) 0 30%, var(--card) 30%);
+}
 
 /* The page is a timeline: a grey rail down the left, each mesocycle a stretch of it in its
    strip colour, each goal a marker on it, and today a dot (§3.7). */

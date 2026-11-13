@@ -153,8 +153,9 @@ style of the line the grid already prints under a week a mesocycle starts in (ch
   sheet's changed lines, in the month files only.
 - **`miniapp/calendar_logic.js`**, **`calendar.js`**, **`calendar.css`**: the corner, the eighth
   column, `withMonth` merging a file's weeks into those it holds (one spread), and
-  the key under the grid: "Colour: against what was written. Corner: the coach changed this
-  day; its colour is against what the coach asked."
+  the key, two rows at the top of the legend: "Colour: comparing against what was initially
+  planned for this microcycle (week)" and "Corner: changed, comparing against what the coach
+  last requested" (D10).
 - **`stamind/cli/render/calendar_grid.py`**: the marks of §4 and the week's line under it;
   **`stamind/cli/calendar.py`**: the help text names the new marks.
 - **Docs**: DESIGN_calendar_miniapp.md §3.2 points here; `docs/ARCHITECTURE.md` (§17, the
@@ -181,7 +182,7 @@ a choice.
 | 6 | The terminal's marks: – for a dropped session, `*` for a changed day (§4) | The terminal has no corner; ✗ is a miss, and a drop is never one | A coloured mark | |
 | 7 | A gym session graded by its sets has one grade, against what the coach asked (§2) | The gym logger pairs the sets done with the live session's lines, and the strength planner may rewrite a session's exercises after it was written, moved or not | Its sets against the written version's | Revised during the review: the first reason, that the strength planner rewrites a moved session's sets, was wrong (`strength/planner.py:171-177`) (thorough) |
 | 8 | The corner is drawn at twice the cell's depth, a green one in full green (built) | At the cell's own depth a corner on a fill of its colour, Thursday 5's green on green, barely shows | The cell's exact depth | |
-| 9 | The key is one line above the legend, whose words ("As planned", "Less than planned"…) stay (built) | The legend still names the colours; the line says what each colour is held against | Rewording the legend | |
+| 9 | The key's rows sit at the top of the legend, whose words ("As planned", "Less than planned"…) stay (built) | The legend still names the colours; the key says what each colour is held against | Rewording the legend | The key's own words changed by the author (D10) |
 | 10 | A sport whose written load is nil shows the load done, "🚴 40", in the eighth column (built) | It has no share to give; `week_line` says "done 40" there too | Leaving the sport out | |
 | 11 | `gather` reads the written weeks to the Sunday of its last day's week too (built) | A session moved from the days after the range into it keeps its written version, as one moved into the first days does | Stopping at the last day | |
 | 12 | A missed session keeps its red outline even when it replaced a written session of another sport, which still counts as dropped: the second athlete's Sunday 8 November, a long run turned into a circuit she did not do, is outlined red, and `sm calendar` prints ✗–* (§2) | §2's "a missed session keeps the red outline" and "a miss wins"; the rule that the replacement gives no fill was written for a session that went | No fill, so the day reads blue, a drop and nothing more | Found by the code review (Fable) on both athletes' data |
@@ -232,3 +233,4 @@ restarted, since the bot builds the button's address.
 | D7 | Which views follow | The page and `sm calendar`; Google Calendar's tags stay against the coach's ask | His pick | Athlete | 2026-11-13 |
 | D8 | Where a corner goes | On every day the coach changed, even when it has the fill's colour | Choice 1, mock-up A over B | Athlete | 2026-11-13 |
 | D9 | The week's numbers in the terminal | A gray line under each ended week, `week_line`'s words | Both reviewers: the numbers after the row wrap on an 80-column terminal | Athlete | 2026-11-13 |
+| D10 | The key's words | Two rows with a swatch each: "Colour: comparing against what was initially planned for this microcycle (week)", "Corner: changed, comparing against what the coach last requested" | "Colour: against what was written. Corner: …" was not clear enough | Athlete | 2026-11-13 |
