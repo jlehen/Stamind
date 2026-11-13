@@ -1,7 +1,8 @@
 """`sm calendar`'s month grid, in expert marks (DESIGN_calendar_miniapp.md §7).
 
 The terminal's words for the list of days the calendar page is also built on
-(`stamind/calendar_days.py`); the cell's icon and label follow the page's rules (§3.1).
+(`stamind/calendar_days.py`); the cell's icon and label follow the page's rules (§3.1), its
+marks the page's colour and corner (DESIGN_calendar_as_written.md §4).
 """
 import calendar as month_calendar
 import unicodedata
@@ -9,17 +10,20 @@ from typing import List
 
 from stamind import calendar_days
 from stamind.analytics.adherence import MISSED, PARTIAL, REST_VIOLATION
+from stamind.analytics.written_week import week_line
 from stamind.clock import day_str, fmt_date, fmt_day, parse_date
 from stamind.text import bold, cyan, gray
 from stamind.cli.common import deload_span, in_deload
-from stamind.cli.render.calendar_page import icon, session_label
+from stamind.cli.render.calendar_page import corner, dropped_count, icon, session_label
 
 # Each column's width, in terminal columns (§7).
 CELL = 11
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-# The grade in expert marks; a grade with no mark prints nothing (§7).
+# The grade against what was written, in expert marks; a grade with no mark prints nothing
+# (§7). A written session dropped is never a miss (DESIGN_calendar_as_written.md §4).
 MARKS = {"done": "✓", PARTIAL: "½", MISSED: "✗", REST_VIOLATION: "✗"}
+DROPPED, CHANGED = "–", "*"
 CONSTRAINT, SIGNAL, DELOAD = "◆", "•", "🔋"
 
 
@@ -51,8 +55,10 @@ def fit_cell(text: str, width: int = CELL) -> str:
     return out + " " * (width - columns(out))
 
 
-def cell_lines(day: calendar_days.Day, deload: bool = False) -> List[str]:
-    """A day's two lines: the number with its markers, then its sessions (§7)."""
+def cell_lines(day: calendar_days.Day, today: str, deload: bool = False) -> List[str]:
+    """A day's two lines: the number with its markers, then its sessions (§7): a mark per
+    standing session, a – per written session dropped, and * on a day the coach changed
+    (DESIGN_calendar_as_written.md §4)."""
     number = f" {parse_date(day.date).day:>2} "
     if day.constraints:
         number += CONSTRAINT
@@ -62,7 +68,10 @@ def cell_lines(day: calendar_days.Day, deload: bool = False) -> List[str]:
         number += DELOAD
     planned = [r["planned"] for r in day.results]
     icons = "".join(icon(w.get("sport_type")) for w in planned)
-    marks = "".join(MARKS.get(r["status"], "") for r in day.results)
+    marks = "".join(MARKS.get(r["fill"]["status"], "") for r in day.results if r["fill"])
+    marks += DROPPED * dropped_count(day, today)
+    if corner(day, today):
+        marks += CHANGED
     extra = [f"+{icon(act.get('activity_type'))}" for act in day.worth_showing()]
     body = " " + " ".join(p for p in [icons, session_label(planned), marks, *extra] if p)
     if columns(body) > CELL:
@@ -73,22 +82,28 @@ def cell_lines(day: calendar_days.Day, deload: bool = False) -> List[str]:
 
 def month_lines(cal: calendar_days.Calendar, year: int, month: int) -> List[str]:
     """The month's grid: a header with the nearest goal, the weekday names, then two lines
-    per week and a line under a week in which a mesocycle or a deload starts (§7)."""
+    per week, a line under an ended week with its numbers (DESIGN_calendar_as_written.md §4)
+    and a line under a week in which a mesocycle or a deload starts (§7)."""
     lines = [bold(cyan(f"=== {month_calendar.month_name[month]} {year} ==="))]
     goal = calendar_days.next_goal(cal.goals, cal.today)
     if goal:
         lines.append(gray(f"Next goal: {goal['title']} ({fmt_date(str(goal['target_date']))})"))
     lines.append("".join(fit_cell(f" {name}") for name in WEEKDAYS).rstrip())
     by_date = {day.date: day for day in cal.days}
+    weeks = dict(cal.weeks)
     for week in month_calendar.Calendar(firstweekday=0).monthdatescalendar(year, month):
         rows = ["", ""]
         for date in week:
             day = by_date.get(day_str(date)) if date.month == month else None
             cells = [" " * CELL, " " * CELL]
             if day:
-                cells = cell_lines(day, any(in_deload(m, day.date) for m in cal.mesocycles))
+                deload = any(in_deload(m, day.date) for m in cal.mesocycles)
+                cells = cell_lines(day, cal.today, deload)
             rows = [rows[0] + cells[0], rows[1] + cells[1]]
         lines.extend(row.rstrip() for row in rows)
+        grade = weeks.get(day_str(week[0]))
+        if grade:
+            lines.append(gray(f"── {week_line(grade)}"))
         for meso in cal.mesocycles:
             start = parse_date(str(meso["start_date"]))
             if start in week and start.month == month:

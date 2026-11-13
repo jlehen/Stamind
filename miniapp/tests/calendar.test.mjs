@@ -37,27 +37,70 @@ test("no c= means no snapshot, and another version is refused", async () => {
 });
 
 test("the tint: green done, red missed, red wins, none ahead", () => {
-  assert.deepEqual(logic.tint({ x: [{ i: "🏃", g: "ok" }] }), { kind: "ok", strength: 1 });
-  assert.equal(logic.tint({ x: [{ i: "🏃", g: "miss" }] }).kind, "miss");
-  assert.equal(logic.tint({ x: [{ i: "🏃", g: "less", r: 0.6 },
+  assert.deepEqual(logic.fill({ x: [{ i: "🏃", g: "ok" }] }), { kind: "ok", strength: 1 });
+  assert.equal(logic.fill({ x: [{ i: "🏃", g: "miss" }] }).kind, "miss");
+  assert.equal(logic.fill({ x: [{ i: "🏃", g: "less", r: 0.6 },
                                 { i: "🏋️", g: "miss" }] }).kind, "miss");
-  assert.equal(logic.tint({ x: [{ i: "🚴", g: "ahead" }] }), null);
-  assert.equal(logic.tint(undefined), null);
+  assert.equal(logic.fill({ x: [{ i: "🚴", g: "ahead" }] }), null);
+  assert.equal(logic.fill(undefined), null);
 });
 
 test("a session off its plan is blue for less, orange for more, deeper the further", () => {
   // Tuesday: a 50-minute run cut to 32 minutes. Thursday: a 60-minute ride ridden at double.
-  assert.deepEqual(logic.tint({ x: [{ i: "🏃", g: "less", r: 0.64 }] }),
+  assert.deepEqual(logic.fill({ x: [{ i: "🏃", g: "less", r: 0.64 }] }),
                    { kind: "less", strength: Math.abs(Math.log2(0.64)) });
-  assert.deepEqual(logic.tint({ x: [{ i: "🚴", g: "more", r: 2.4 }] }),
+  assert.deepEqual(logic.fill({ x: [{ i: "🚴", g: "more", r: 2.4 }] }),
                    { kind: "more", strength: 1 });
   // Just past the tolerance still shows; a rest day trained through carries no ratio.
-  assert.equal(logic.tint({ x: [{ i: "🚴", g: "more", r: 1.1 }] }).strength, 0.3);
-  assert.deepEqual(logic.tint({ x: [{ i: "🛌", g: "more" }] }), { kind: "more", strength: 1 });
+  assert.equal(logic.fill({ x: [{ i: "🚴", g: "more", r: 1.1 }] }).strength, 0.3);
+  assert.deepEqual(logic.fill({ x: [{ i: "🛌", g: "more" }] }), { kind: "more", strength: 1 });
   // Two sessions: the one furthest from its plan sets the colour, over a green one.
-  assert.deepEqual(logic.tint({ x: [{ i: "🏋️", g: "ok" }, { i: "🏃", g: "less", r: 0.8 },
+  assert.deepEqual(logic.fill({ x: [{ i: "🏋️", g: "ok" }, { i: "🏃", g: "less", r: 0.8 },
                                     { i: "🚴", g: "more", r: 1.5 }] }),
                    { kind: "more", strength: Math.log2(1.5) });
+});
+
+// DESIGN_calendar_as_written.md §2, the author's two weeks of November 2026.
+test("the fill is against what was written, the corner against what the coach asked", () => {
+  // Sunday 8: the 120-minute ride, cut to 40 by the coach, ridden for 72. Blue at full
+  // depth against the 80 of load written; an orange corner, 72 minutes for the 40 asked.
+  const sunday = { x: [{ i: "🚴", g: "less", r: 0.44 }], k: [{ g: "more", r: 1.3 }] };
+  assert.deepEqual(logic.fill(sunday), { kind: "less", strength: 1 });
+  assert.deepEqual(logic.corner(sunday), { kind: "more", strength: Math.log2(1.3) });
+  // Monday 9: the heavy gym session moved away, a rest day added and kept. No fill, a
+  // green corner.
+  const monday = { x: [{ i: "🛌" }], k: [{ g: "ok" }] };
+  assert.equal(logic.fill(monday), null);
+  assert.deepEqual(logic.corner(monday), { kind: "ok", strength: 1 });
+  // Friday 6: the light gym session dropped, a rest day in its place. Full blue.
+  const friday = { x: [{ i: "🛌" }], d: [{ g: "less" }], k: [{ g: "ok" }] };
+  assert.deepEqual(logic.fill(friday), { kind: "less", strength: 1 });
+  // Two sessions, one written session dropped: the order of §3.2 runs over both lists, so
+  // a missed session still wins and the dropped one beats a green one.
+  assert.equal(logic.fill({ x: [{ i: "🏃", g: "miss" }], d: [{ g: "less" }] }).kind, "miss");
+  assert.equal(logic.fill({ x: [{ i: "🏃", g: "ok" }], d: [{ g: "less" }] }).kind, "less");
+  // Tuesday 10, moved and moved back: no corner. Thursday 12, a written rest kept: none.
+  assert.equal(logic.corner({ x: [{ i: "🚴", g: "more", r: 1.4 }] }), null);
+  // A missed session on a changed day: a red corner, the colour of the outline.
+  assert.equal(logic.corner({ x: [{ i: "🚴", g: "miss" }], k: [{ g: "miss" }] }).kind,
+               "miss");
+});
+
+test("the eighth column holds an ended week's numbers, a short sport in amber", () => {
+  const snapshot = { weeks: { "2026-11-02": [["🚴", "82%", 1], ["🏋️", "2/2", 0]] } };
+  // The week of 2 November, in November's grid: its Monday is the first cell.
+  const november = logic.monthWeeks({ year: 2026, month: 10 });
+  assert.equal(logic.weekMonday(november[0]), "2026-10-26");
+  assert.equal(logic.weekMonday(november[1]), "2026-11-02");
+  assert.deepEqual(logic.weekNumbers(snapshot, november[1]),
+                   [{ icon: "🚴", words: "82%", short: true },
+                    { icon: "🏋️", words: "2/2", short: false }]);
+  // The week under way, or a page from before the numbers: nothing.
+  assert.deepEqual(logic.weekNumbers(snapshot, november[2]), []);
+  assert.deepEqual(logic.weekNumbers({}, november[1]), []);
+  // October's grid ends on the week of 26 October, whose Sunday is 1 November.
+  const october = logic.monthWeeks({ year: 2026, month: 9 });
+  assert.equal(logic.weekMonday(october[october.length - 1]), "2026-10-26");
 });
 
 test("two sessions show two icons and no label", () => {
@@ -172,6 +215,19 @@ test("a month file replaces that month's days, and its days need no chat", () =>
   // October still comes from the button.
   assert.equal(logic.asksForFullDay(data, "2026-10-02"), true);
   assert.equal(logic.monthNote(data, september), "");
+});
+
+test("a month file's weeks join the button's, which keeps the weeks only it holds", () => {
+  const before = { ...button(), weeks: { "2026-09-21": [["🏃", "64%", 1]],
+                                         "2026-09-28": [["🏃", "90%", 0]] } };
+  const file = { ...SEPTEMBER_FILE, weeks: { "2026-09-21": [["🏃", "70%", 1]],
+                                              "2026-08-31": [["🏃", "100%", 0]] } };
+  const data = logic.withMonth(before, "2026-09", file);
+  assert.deepEqual(data.weeks, { "2026-09-21": [["🏃", "70%", 1]],
+                                 "2026-09-28": [["🏃", "90%", 0]],
+                                 "2026-08-31": [["🏃", "100%", 0]] });
+  // A button from before the numbers, and a file from before them, merge to nothing.
+  assert.deepEqual(logic.withMonth(button(), "2026-09", SEPTEMBER_FILE).weeks, {});
 });
 
 test("a month is loading, loaded or could not be loaded", () => {

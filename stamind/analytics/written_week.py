@@ -200,12 +200,39 @@ def _changes(version: Dict[str, Any], previous: Dict[str, Any]) -> bool:
     )
 
 
+def departed(session: WrittenSession) -> bool:
+    """Whether the coach changed a written session: dropped it, or changed its day, its sport
+    or its load. A reworded session, or one moved and moved back, is as written
+    (DESIGN_calendar_as_written.md §2)."""
+    return session.now is None or _changes(session.now, session.written)
+
+
+def calendar_change(session: WrittenSession) -> Optional[Changed]:
+    """What became of a written session, for the calendar's day sheet: the grade's words,
+    else "moved to …" for a move inside its week, which `_what` leaves out
+    (DESIGN_calendar_as_written.md §3). None when its day still holds it, lengthened or not."""
+    sport = canonical_sport(session.written["sport_type"])
+    what = _what(session, SESSIONS if sport in STRENGTH_SPORTS else LOAD)
+    now = session.now
+    if what is None and now is not None and now["date"] != session.written["date"]:
+        what = f"moved to {fmt_day(now['date'])}"
+    if what is None:
+        return None
+    return _with_reason(session, what)
+
+
 def _changed(session: WrittenSession, measure: str) -> Optional[Changed]:
     """A session no longer as written, with the newest version dated in its week that
     changed it; a version that only reworded it is skipped (§5)."""
     what = _what(session, measure)
     if what is None:
         return None
+    return _with_reason(session, what)
+
+
+def _with_reason(session: WrittenSession, what: str) -> Changed:
+    """`what`, with the day and the reason of the newest version dated in the session's week
+    that changed it (§5)."""
     found: Optional[Dict[str, Any]] = None
     previous = session.written
     for version in session.later:
