@@ -9,9 +9,11 @@ export const COULD_NOT_LOAD =
   "Your progress could not be loaded. Close this page and tap again in a moment.";
 export const NO_BUTTON = "Open this page from the bot's 📈 Progress button.";
 
-// The line under the chart (§3.1). Fatigue is named though not drawn (choice 3).
+// The line under the chart (§3.1), and the button that shows fatigue over it (choice 3).
 export const CHART_NOTE = "Fitness: what your last six weeks of training built. Fatigue: what "
   + "your last week or so cost. Form: fitness minus fatigue; above zero you are fresh.";
+export const FATIGUE_BUTTON = "Fatigue (ATL)";
+export const FATIGUE_KEY = "Fatigue (ATL), about fitness − form";
 
 export const TABS = [
   { key: "fitness", label: "Fitness" },
@@ -144,14 +146,16 @@ function lineSegments(days, field, today) {
   return segments;
 }
 
-export function chart(file, key) {
+export function chart(file, key, fatigue = false) {
+  // `fatigue` adds the ATL line, which the athlete shows with a button (choice 3).
   const span = spanDates(file, key);
   const days = (file.days || []).filter((day) => day.date >= span.from && day.date <= span.to);
   const weeks = (file.weeks || []).filter((week) => overlaps(week.monday,
                                                              shiftDay(week.monday, 6), span));
+  const fields = fatigue ? ["ctl", "tsb", "atl"] : ["ctl", "tsb"];
   const values = [0];
   for (const day of days) {
-    for (const field of ["ctl", "tsb"]) {
+    for (const field of fields) {
       if (day[field] !== null && day[field] !== undefined) {
         values.push(day[field]);
       }
@@ -175,6 +179,7 @@ export function chart(file, key) {
     from: span.from, to: span.to, today: file.today,
     fitness: lineSegments(days, "ctl", file.today),
     form: lineSegments(days, "tsb", file.today),
+    fatigue: fatigue ? lineSegments(days, "atl", file.today) : [],
     low: Math.min(...values), high: Math.max(...values),
     bars, most: Math.max(1, ...bars.map((bar) => Math.max(bar.planned || 0, bar.done || 0))),
     bands,

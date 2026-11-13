@@ -64,8 +64,9 @@ One chart, drawn by the page in its own code (§4.3), as wide as the phone:
 
 - **Fitness (CTL) and Form (TSB)**, named so (D7). A line under the chart says what they are:
   "Fitness: what your last six weeks of training built. Fatigue: what your last week or so
-  cost. Form: fitness minus fatigue; above zero you are fresh." Fatigue (ATL) is left out
-  (choice 3).
+  cost. Form: fitness minus fatigue; above zero you are fresh." A button over the chart,
+  "Fatigue (ATL)", shows or hides the fatigue line; it is hidden when the page opens, and
+  its key reads "Fatigue (ATL), about fitness − form" (choice 3, D11).
 - **One pair of bars per week** under it: planned and done, with the hours done over each. For a
   week that has ended, planned is its written week (DESIGN_week_as_written.md §4), as `sm
   progress` already reads it; for the week under way, the planned figure `sm progress` compares
@@ -286,7 +287,7 @@ a choice.
 |---|---|---|---|---|
 | 1 | The page opens on Fitness and 3 months; the spans are 4 weeks, 3 months, this plan, everything (§3) | 3 months holds a mesocycle and its neighbours; the default of `sm progress` is 8 weeks either side | Opening on Weeks; other spans | Kept by the author (D6) |
 | 2 | Under 4 weeks and 3 months the chart ends with next week; under this plan and everything, at the last day written (§3.1) | Today half the chart is the future; the projection at the goal still shows under the plan | The future always to the last day written | Kept by the author (D10) |
-| 3 | The chart shows fitness and form, not fatigue (§3.1) | Fatigue is the noisy line, and form already carries it | All three lines | Open: the author asked what fatigue is |
+| 3 | The chart shows fitness and form; a button shows fatigue too, hidden when the page opens (§3.1) | Fatigue is the noisy line, and form already carries it | All three lines always | Ruled by the author: a button, with the key "about fitness − form" (D11) |
 | 4 | Fitness and form are named so, with the code's name in brackets: "Fitness (CTL)", "Form (TSB)" (§3.1) | CTL, ATL and TSB alone mean nothing to the athlete | The code's names alone | Kept, with the brackets added by the author (D7) |
 | 5 | Weeks lists newest first, the week under way first with its hours and no grade (§3.2) | The week the athlete asks about is the last one | Oldest first, as the terminal table | Kept by the author, to try (D6) |
 | 6 | A week's sessions open on a tap, in place (§3.2) | Every week of the athlete's last five has a short sport; listing them all is long | Every short week open | Kept by the author (D6) |
@@ -409,7 +410,8 @@ is: `/start`, `/help` and the reply to `/restart` send the keyboard with no comm
 Both bots are restarted, since the keyboard is built in the bot. No `sm data publish` is needed.
 The build of the file is timed once on each instance, and its cost written here. On a copy of the
 author's database of 12 November, before landing: 160 ms for the whole file (the timeline 82 ms,
-grading every week 60 ms), 29 KB compressed. The companion's instance is not timed yet.
+grading every week 60 ms), 29 KB compressed. On copies of 13 November: the author's 182 ms
+and 28 KB, the companion's 86 ms and 13 KB.
 
 ## Decisions Log
 
@@ -425,3 +427,4 @@ grading every week 60 ms), 29 KB compressed. The companion's instance is not tim
 | D8 | One wording | The page shows the words the terminal prints | Choice 9; no benefit seen in a second wording | Athlete | 2026-11-12 |
 | D9 | Intensity's grains | By week and by mesocycle, one at a time, a toggle between them | Choice 8 changed: both, not by week only | Athlete | 2026-11-12 |
 | D10 | Choices 2, 10 and 13 | Kept: the chart's future by span, the file uploaded when it changed, `sm progress` with a view word that is not required | | Athlete | 2026-11-12 |
+| D11 | Fatigue on the chart | A button shows or hides the fatigue (ATL) line, hidden at first; its key says it is about fitness minus form | Choice 3 settled | Athlete | 2026-11-13 |

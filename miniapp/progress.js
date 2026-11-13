@@ -22,7 +22,7 @@ const ui = {
 };
 
 const state = { file: null, tab: logic.FIRST_TAB, span: logic.FIRST_SPAN,
-                grain: logic.FIRST_GRAIN };
+                grain: logic.FIRST_GRAIN, fatigue: false };
 
 // The calendar's strip colours, numbered along the file's list of mesocycles.
 const STRIPS = 6;
@@ -108,7 +108,8 @@ function drawChart(model, width) {
     }
   }
 
-  for (const series of [["fitness", model.fitness], ["form", model.form]]) {
+  for (const series of [["fitness", model.fitness], ["form", model.form],
+                        ["fatigue", model.fatigue]]) {
     for (const segment of series[1]) {
       const points = segment.points.map(([date, value]) => `${x(date) + day / 2},${y(value)}`);
       svg.append(shape("polyline", { points: points.join(" "),
@@ -154,15 +155,24 @@ function key(className, text) {
 }
 
 function showFitness() {
-  const model = logic.chart(state.file, state.span);
+  const model = logic.chart(state.file, state.span, state.fatigue);
   if (!model.fitness.length && !model.bars.length) {
     ui.view.append(element("p", "problem", "No training on record in this span."));
     return;
   }
-  ui.view.append(drawChart(model, Math.max(280, ui.view.clientWidth)));
+  const row = element("div", "choices");
+  const toggle = element("button", "choice", logic.FATIGUE_BUTTON);
+  toggle.type = "button";
+  toggle.setAttribute("aria-pressed", String(state.fatigue));
+  toggle.addEventListener("click", () => { state.fatigue = !state.fatigue; draw(); });
+  row.append(toggle);
+  ui.view.append(row, drawChart(model, Math.max(280, ui.view.clientWidth)));
   const keys = element("ul", "legend");
-  keys.append(key("key-fitness", "Fitness (CTL)"), key("key-form", "Form (TSB)"),
-              key("key-planned", "Planned load of the week"),
+  keys.append(key("key-fitness", "Fitness (CTL)"), key("key-form", "Form (TSB)"));
+  if (state.fatigue) {
+    keys.append(key("key-fatigue", logic.FATIGUE_KEY));
+  }
+  keys.append(key("key-planned", "Planned load of the week"),
               key("key-done", "Load done, its hours over it"));
   ui.view.append(keys, element("p", "line chart-note", logic.CHART_NOTE));
   const named = element("ul", "legend");

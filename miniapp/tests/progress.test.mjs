@@ -111,9 +111,16 @@ test("the chart draws fitness and form, the projection dashed, and no fatigue", 
   // The projection starts where the past ends, so the line has no gap.
   assert.equal(model.fitness[1].points[0][0], "2026-11-12");
   assert.equal(model.form.length, 2);
-  assert.equal("fatigue" in model, false);
+  assert.deepEqual(model.fatigue, []);
   assert.equal(model.low, -5);
   assert.equal(model.high, 20);
+});
+
+test("the fatigue button adds the ATL line, and its values to the chart's range", () => {
+  const model = logic.chart(FILE, "all", true);
+  assert.deepEqual(model.fatigue.map((segment) => segment.dashed), [false, true]);
+  assert.equal(model.fatigue[0].points[0][1], 25);
+  assert.equal(model.high, 25);
 });
 
 test("the bars: planned beside done, the hours done over each, none ahead", () => {
