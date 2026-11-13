@@ -97,6 +97,10 @@ companion's chat messages use.
 
 ### 3.2 The tint
 
+The cell's colour now compares each session with what `workout generate` wrote, and a
+corner on a day the coach changed carries the tint below against what the coach asked
+(DESIGN_calendar_as_written.md §2). The rules below are how either colour is drawn.
+
 The tint is a picture of `workout compare`: how far each session went from its plan, and
 which way. It follows the grade `classify_adherence` gives the session:
 

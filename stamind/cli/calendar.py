@@ -39,9 +39,11 @@ def add_calendar_parser(subparsers, pull_bypass_parser):
         help="Show one month as a grid of sessions, grades, constraints and signals",
         description=(
             "Show the month holding DATE (today by default) as a grid, Monday first: each "
-            "day's sessions and their grade (✓ done, ½ partial, ✗ missed), an activity "
-            "nothing planned after a '+', ◆ for a constraint and • for a signal. A day's "
-            "detail is 'workout list -d DATE -vv'."
+            "day's sessions and their grade against what 'workout generate' wrote (✓ done, "
+            "½ partial, ✗ missed, – a written session dropped), * on a day the coach "
+            "changed, an activity nothing planned after a '+', ◆ for a constraint and • for "
+            "a signal. Under each ended week, its numbers as 'progress weeks' gives them. A "
+            "day's detail is 'workout list -d DATE -vv'."
         ),
     )
     parser.add_argument(

@@ -1,6 +1,6 @@
 # Design: the calendar against what was written
 
-**Status:** Proposed · **Date:** 2026-11-13 · **Branch:** `worktree-calendar-as-written`
+**Status:** Built · **Date:** 2026-11-13 · **Branch:** `worktree-calendar-as-written-build`
 
 ## 1. The problem
 
@@ -137,7 +137,8 @@ style of the line the grid already prints under a week a mesocycle starts in (ch
   (`graded_weeks`).
   Measured on the author's copy: `gather` 35 ms over the bot's window, `written_week` 21 ms and
   `graded_weeks` 14 ms more, so each message the bot sends pays about 35 ms more
-  (`chat/app.py:_page_buttons`). Accepted.
+  (`chat/app.py:_page_buttons`). Accepted. Built, it costs 43 ms more (80 ms against 37 ms,
+  warm): `graded_weeks` reads the written weeks a second time.
 - **`stamind/analytics/written_week.py`**: one small public function giving a changed
   session's words, "moved to …" with its reason when `_what` has none; `_what` keeps saying
   nothing of a move inside the week, which the week grade relies on.
@@ -161,7 +162,9 @@ style of the line the grid already prints under a week a mesocycle starts in (ch
 
 The packed address grows by the corners and the numbers. Today it uses 4,525 of its 4,864 bytes
 (DESIGN_miniapp_storage.md §8), so it holds fewer day sheets; where the pages are published the
-files carry them anyway. Measured before landing.
+files carry them anyway. Measured when built, on Friday 13 November: the corners, the dropped
+grades and the numbers add 172 packed bytes on the author's copy, and the address still holds
+every day's sheet, 4,652 of its 4,864 bytes; the second athlete's uses 2,787.
 
 ## 7. Choices made without asking
 
@@ -177,6 +180,11 @@ a choice.
 | 5 | A written session replaced by another of its sport on its day gives no colour; the week's numbers and the sheet show it (§2) | The athlete's own reading: "the heavy strength is still present in the week, the light one went" | Blue for the light session on Friday 13 | |
 | 6 | The terminal's marks: – for a dropped session, `*` for a changed day (§4) | The terminal has no corner; ✗ is a miss, and a drop is never one | A coloured mark | |
 | 7 | A gym session graded by its sets has one grade, against what the coach asked (§2) | The gym logger pairs the sets done with the live session's lines, and the strength planner may rewrite a session's exercises after it was written, moved or not | Its sets against the written version's | Revised during the review: the first reason, that the strength planner rewrites a moved session's sets, was wrong (`strength/planner.py:171-177`) (thorough) |
+| 8 | The corner is drawn at twice the cell's depth, a green one in full green (built) | At the cell's own depth a corner on a fill of its colour, Thursday 5's green on green, barely shows | The cell's exact depth | |
+| 9 | The key is one line above the legend, whose words ("As planned", "Less than planned"…) stay (built) | The legend still names the colours; the line says what each colour is held against | Rewording the legend | |
+| 10 | A sport whose written load is nil shows the load done, "🚴 40", in the eighth column (built) | It has no share to give; `week_line` says "done 40" there too | Leaving the sport out | |
+| 11 | `gather` reads the written weeks to the Sunday of its last day's week too (built) | A session moved from the days after the range into it keeps its written version, as one moved into the first days does | Stopping at the last day | |
+| 12 | A missed session keeps its red outline even when it replaced a written session of another sport, which still counts as dropped: the second athlete's Sunday 8 November, a long run turned into a circuit she did not do, is outlined red, and `sm calendar` prints ✗–* (§2) | §2's "a missed session keeps the red outline" and "a miss wins"; the rule that the replacement gives no fill was written for a session that went | No fill, so the day reads blue, a drop and nothing more | Found by the code review (Fable) on both athletes' data |
 
 ## 8. Not handled
 
@@ -188,6 +196,9 @@ a choice.
   video of Friday 30 October, written as strength and re-recorded as hiit.
 - A chain of swaps that hands a lineage to another session can grade a day against the wrong
   written version; the week's numbers are not affected.
+- A session moved into the next week, then kept there when `workout generate` wrote that week,
+  still puts a corner on its day: its first week's written version reads as moved. It did not
+  happen once in either athlete's history.
 
 ## 9. Tests
 

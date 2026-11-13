@@ -3,8 +3,10 @@ button's address (DESIGN_calendar_miniapp.md §3, §5), and the content of the c
 files in the bucket (DESIGN_miniapp_storage.md §4).
 
 `calendar_url` is what the bot calls. Every line of a day's sheet comes from a companion
-line builder the chat already uses; nothing here writes new wording (§5). The marks the
-grid draws — icon, label, glyph — are facts, and the page draws them itself.
+line builder the chat already uses, or from the week grade's words (§5). The marks the
+grid draws — icon, label, glyph, corner, a week's numbers — are facts, and the page draws
+them itself. A cell's colour is against what `workout generate` wrote, its corner against
+what the coach asked (DESIGN_calendar_as_written.md §2).
 """
 import base64
 import json
@@ -16,8 +18,9 @@ from stamind import signals
 from stamind.analytics.adherence import (
     DURATION, LOAD, MISSED, PARTIAL, REST_VIOLATION, SETS, off_plan_gaps,
 )
+from stamind.analytics.written_week import SESSIONS, SportGrade, changed_words, percent
 from stamind.calendar_days import Calendar, Day, next_goal
-from stamind.clock import day_str, parse_date, shift
+from stamind.clock import day_str, month_end, parse_date, shift
 from stamind.sports import canonical_sport
 from stamind.strength import logger
 from stamind.cli.render.plan_lines import simple_goal_line
@@ -108,24 +111,85 @@ def icon(sport_type: Optional[str]) -> str:
     return sport_emoji(canonical_sport(sport_type))
 
 
+def _grade(result: Dict[str, Any], day: str, today: str) -> Dict[str, Any]:
+    """A grade as the page's tint reads it: the glyph, and the ratio when off the plan."""
+    grade = {"g": glyph(result, day, today)}
+    if result["status"] == PARTIAL:
+        grade["r"] = round(gap_ratio(result), 2)
+    return grade
+
+
+def corner(day: Day, today: str) -> List[Dict[str, Any]]:
+    """The grades against what the coach asked, which colour the corner of a day the coach
+    changed; none on another day, nor before the day has a grade
+    (DESIGN_calendar_as_written.md §2)."""
+    if not day.changed:
+        return []
+    grades = [_grade(r, day.date, today) for r in day.results]
+    if all(grade["g"] == AHEAD for grade in grades):
+        return []
+    return grades
+
+
+def dropped_count(day: Day, today: str) -> int:
+    """The written sessions the day shows as dropped: none until the day is over (§2)."""
+    return len(day.dropped) if day.date < today else 0
+
+
 def _marks(day: Day, today: str) -> Dict[str, Any]:
-    """The cell: sessions, faded icons, and whether a constraint or a signal covers it."""
+    """The cell: sessions with their fill's grade, faded icons, whether a constraint or a
+    signal covers it, then a full blue grade per dropped session (`d`) and the coach's
+    grades on a changed day (`k`) (DESIGN_calendar_as_written.md §6)."""
     planned = [r["planned"] for r in day.results]
     label = session_label(planned)
     sessions = []
     for r in day.results:
-        mark = {"i": icon(r["planned"].get("sport_type")), "g": glyph(r, day.date, today)}
-        if r["status"] == PARTIAL:
-            mark["r"] = round(gap_ratio(r), 2)
+        mark = {"i": icon(r["planned"].get("sport_type"))}
+        if r["fill"] is not None:
+            mark.update(_grade(r["fill"], day.date, today))
         if label:
             mark["l"] = label
         sessions.append(mark)
-    return {
+    marks: Dict[str, Any] = {
         "x": sessions,
         "u": [icon(act.get("activity_type")) for act in day.worth_showing()],
         "c": int(bool(day.constraints)),
         "s": int(bool(day.signals)),
     }
+    dropped = dropped_count(day, today)
+    if dropped:
+        # No ratio: the page draws a gap without one at full depth.
+        marks["d"] = [{"g": LESS}] * dropped
+    coach = corner(day, today)
+    if coach:
+        marks["k"] = coach
+    return marks
+
+
+def _has_marks(marks: Dict[str, Any]) -> bool:
+    return any(marks.get(key) for key in ("x", "u", "c", "s", "d"))
+
+
+def week_marks(grade: List[SportGrade]) -> List[List[Any]]:
+    """An ended week's numbers as the eighth column shows them, one `[icon, words, short]`
+    per sport: `["🚴", "82%", 1]`, `["🏋️", "1/2", 1]` (DESIGN_calendar_as_written.md §6)."""
+    marks = []
+    for sport in grade:
+        share = percent(sport)
+        if sport.measure == SESSIONS:
+            words = f"{sport.done:.0f}/{sport.written:.0f}"
+        elif share is None:
+            words = f"{sport.done:.0f}"
+        else:
+            words = f"{share}%"
+        marks.append([icon(sport.sport), words, int(sport.short)])
+    return marks
+
+
+def _weeks(cal: Calendar, first: str, last: str) -> Dict[str, List[List[Any]]]:
+    """The numbers of each ended week of `cal` that touches `first` to `last`, by Monday."""
+    return {monday: week_marks(grade) for monday, grade in cal.weeks
+            if monday <= last and first <= shift(monday, 6)}
 
 
 def _done_lines(day: Day, today: str) -> List[str]:
@@ -171,13 +235,18 @@ def sheet(cal: Calendar, day: Day, texts: bool = False) -> List[Any]:
     """The day's sheet as [heading, lines] pairs; empty when there is nothing to say.
     `texts` adds each workout's text as stored, for the month files
     (DESIGN_miniapp_storage.md §4): its short line on a day that is over
-    (DESIGN_short_messages.md §4, D6)."""
+    (DESIGN_short_messages.md §4, D6); and what became of each session written for the day
+    that the coach changed, its reason whole (DESIGN_calendar_as_written.md §3)."""
     parts: List[Any] = []
     planned = [r["planned"] for r in day.results]
+    lines: List[str] = []
     if planned or _in_schedule(cal, day.date):
-        parts.append([PLANNED, simple_day_lines(planned, day.date, descriptions=texts,
-                                                wrap=False, short=day.date < cal.today,
-                                                fall_back=False)])
+        lines = simple_day_lines(planned, day.date, descriptions=texts, wrap=False,
+                                 short=day.date < cal.today, fall_back=False)
+    if texts:
+        lines = lines + [f"{c.written['title']}: {changed_words(c)}" for c in day.changes]
+    if lines:
+        parts.append([PLANNED, lines])
     done = _done_lines(day, cal.today)
     if done:
         parts.append([DONE, done])
@@ -217,12 +286,13 @@ def header(cal: Calendar, at: datetime) -> Dict[str, Any]:
 
 
 def snapshot(cal: Calendar, at: datetime) -> Tuple[Dict[str, Any], Dict[str, list]]:
-    """The payload without its sheets, and the sheets by date (§5)."""
-    payload = {**header(cal, at), "days": {}}
+    """The payload without its sheets, and the sheets by date (§5); its `weeks` are the
+    numbers of the window's ended weeks (DESIGN_calendar_as_written.md §6)."""
+    payload = {**header(cal, at), "weeks": _weeks(cal, cal.start, cal.end), "days": {}}
     sheets: Dict[str, list] = {}
     for day in cal.days:
         marks = _marks(day, cal.today)
-        if marks["x"] or marks["u"] or marks["c"] or marks["s"]:
+        if _has_marks(marks):
             payload["days"][day.date] = marks
         parts = sheet(cal, day)
         if parts:
@@ -285,7 +355,7 @@ def _drop_sheet(payload: Dict[str, Any], day: str) -> None:
     if marks is None:
         return
     marks.pop("sheet", None)
-    if not (marks["x"] or marks["u"] or marks["c"] or marks["s"]):
+    if not _has_marks(marks):
         del payload["days"][day]
 
 
@@ -316,16 +386,20 @@ def gym_log(day: Day) -> Optional[Dict[str, Any]]:
 
 def month_files(cal: Calendar) -> Dict[str, Dict[str, Any]]:
     """Each month `cal` spans as its file's content, by label: every day with its marks, its
-    whole sheet, workout text included, and its gym log. A month with nothing on it still
+    whole sheet, workout text included, and its gym log, and the numbers of every ended week
+    touching the month (DESIGN_calendar_as_written.md §6). A month with nothing on it still
     has a file (DESIGN_miniapp_storage.md §4): `cal.days` holds every date of the range."""
-    files = {month_label(m): {"v": VERSION, "days": {}}
-             for m in dict.fromkeys(day.date[:7] for day in cal.days)}
+    files = {}
+    for month in dict.fromkeys(day.date[:7] for day in cal.days):
+        first = f"{month}-01"
+        files[month_label(month)] = {"v": VERSION, "weeks": _weeks(cal, first, month_end(first)),
+                                     "days": {}}
     for day in cal.days:
         entry = _marks(day, cal.today)
         parts = sheet(cal, day, texts=True)
         if parts:
             entry["sheet"] = parts
-        elif not (entry["x"] or entry["u"] or entry["c"] or entry["s"]):
+        elif not _has_marks(entry):
             continue
         logged = gym_log(day)
         if logged:

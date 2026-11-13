@@ -165,10 +165,22 @@ export function gapStrength(session) {
   return Math.min(1, Math.max(PALEST, Math.abs(Math.log2(session.r))));
 }
 
-export function tint(day) {
+export function fill(day) {
+  // The cell's colour, against what `workout generate` wrote: its sessions' grades, then a
+  // full blue one per written session dropped (DESIGN_calendar_as_written.md §2).
+  return tint([...((day && day.x) || []), ...((day && day.d) || [])]);
+}
+
+export function corner(day) {
+  // The corner of a day the coach changed, against what the coach asked; null on another
+  // day, and before the day has a grade (DESIGN_calendar_as_written.md §2).
+  return tint(day && day.k);
+}
+
+export function tint(grades) {
   // A missed session wins; then the session furthest from its plan; then green; none
-  // while everything is ahead (§3.2).
-  const sessions = (day && day.x) || [];
+  // while everything is ahead (§3.2). A session the fill does not grade has no `g`.
+  const sessions = grades || [];
   if (sessions.some((session) => session.g === "miss")) {
     return { kind: "miss", strength: 1 };
   }
@@ -201,6 +213,21 @@ export function cellContent(day) {
     constraint: Boolean(day && day.c),
     signal: Boolean(day && day.s),
   };
+}
+
+export function weekMonday(week) {
+  // The Monday of a row of `monthWeeks`, whose first days may belong to another month.
+  const index = week.findIndex((iso) => iso);
+  const date = parseDay(week[index]);
+  date.setDate(date.getDate() - index);
+  return isoDay(date);
+}
+
+export function weekNumbers(snapshot, week) {
+  // The eighth column: each graded sport of an ended week, "🚴 82%", a short one in amber
+  // (DESIGN_calendar_as_written.md §2). Nothing for the week under way.
+  const sports = (snapshot.weeks || {})[weekMonday(week)] || [];
+  return sports.map(([icon, words, short]) => ({ icon, words, short: Boolean(short) }));
 }
 
 export function legendFor(snapshot, month) {
@@ -370,14 +397,15 @@ export function withMonthState(data, key, state) {
 }
 
 export function withMonth(data, key, file) {
-  // A month file's days replace that month's days.
+  // A month file's days replace that month's days; its weeks join those the page holds.
   const days = {};
   for (const [iso, day] of Object.entries(data.days)) {
     if (iso.slice(0, 7) !== key) {
       days[iso] = day;
     }
   }
-  return withMonthState({ ...data, days: { ...days, ...file.days } }, key, LOADED);
+  const weeks = { ...data.weeks, ...file.weeks };
+  return withMonthState({ ...data, weeks, days: { ...days, ...file.days } }, key, LOADED);
 }
 
 export function monthNote(data, month) {

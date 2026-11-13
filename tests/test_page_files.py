@@ -209,7 +209,7 @@ class BuildTest(FilesTestCase):
         self.assertEqual(months[0], "calendar/2026-05")
         self.assertEqual(months[-1], "calendar/2026-11")
         self.assertEqual(len(months), 7)
-        self.assertEqual(files["calendar/2026-06"], {"v": 1, "days": {}})
+        self.assertEqual(files["calendar/2026-06"], {"v": 1, "weeks": {}, "days": {}})
         self.assertIn("2026-05-10", files["calendar/2026-05"]["days"])
 
     def test_a_month_file_holds_the_workout_text_as_stored(self):

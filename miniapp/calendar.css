@@ -18,6 +18,7 @@
   /* The tint (§3.2): green as planned, blue less, orange more, deeper with the gap, and a
      red outline for a missed session. `--strength` comes from the page, 0.3 to 1. */
   --ok: rgba(31, 157, 85, 0.22);
+  --ok-rgb: 31 157 85;
   --less-rgb: 47 123 214;
   --more-rgb: 230 126 34;
   --gap-alpha: 0.5;
@@ -43,6 +44,7 @@
     --fallback-line: #33414f;
     --fallback-button: #4a9be8;
     --ok: rgba(62, 194, 122, 0.28);
+    --ok-rgb: 62 194 122;
     --less-rgb: 90 160 240;
     --more-rgb: 245 150 60;
     --gap-alpha: 0.55;
@@ -144,9 +146,11 @@ h1 {
 
 /* ----- the month grid (§3.1) ----- */
 
+/* Seven days, then the week's numbers in a narrow eighth column
+   (DESIGN_calendar_as_written.md §2). */
 .weekdays, .grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(0, 0.95fr);
   gap: 2px;
 }
 
@@ -162,6 +166,7 @@ h1 {
 }
 
 .cell {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 64px;
@@ -199,6 +204,34 @@ h1 {
 
 .cell.outside, .cell.after-end {
   opacity: 0.5;
+}
+
+/* The corner of a day the coach changed: the tint's colour against what the coach asked,
+   at twice the cell's depth so it shows on a fill of its own colour
+   (DESIGN_calendar_as_written.md §2). */
+.corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+.corner.ok { background: rgb(var(--ok-rgb)); }
+.corner.less { background: rgb(var(--less-rgb) / var(--strength, 1)); }
+.corner.more { background: rgb(var(--more-rgb) / var(--strength, 1)); }
+.corner.miss { background: var(--miss-line); }
+
+.week-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  font-size: 9px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .cell-top {

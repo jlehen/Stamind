@@ -62,10 +62,16 @@ function renderCell(iso) {
   const content = logic.cellContent(day);
   const cell = element("button", "cell");
   cell.type = "button";
-  const tint = logic.tint(day);
+  const tint = logic.fill(day);
   if (tint) {
     cell.classList.add(tint.kind);
     cell.style.setProperty("--strength", String(tint.strength));
+  }
+  const corner = logic.corner(day);
+  if (corner) {
+    const mark = element("span", `corner ${corner.kind}`);
+    mark.style.setProperty("--strength", String(corner.strength));
+    cell.append(mark);
   }
   if (iso === snapshot.today) {
     cell.classList.add("today");
@@ -100,6 +106,18 @@ function renderCell(iso) {
   return cell;
 }
 
+function renderWeek(week) {
+  // The eighth column: an ended week's numbers, a short sport in amber
+  // (DESIGN_calendar_as_written.md §2).
+  const cell = element("div", "week-cell");
+  for (const sport of logic.weekNumbers(snapshot, week)) {
+    const line = element("div", sport.short ? "short" : "");
+    line.append(element("span", "", sport.icon), element("span", "", sport.words));
+    cell.append(line);
+  }
+  return cell;
+}
+
 function renderMonth() {
   const month = months[shown];
   ui.title.textContent = logic.monthTitle(month);
@@ -110,6 +128,7 @@ function renderMonth() {
     for (const iso of week) {
       ui.grid.append(renderCell(iso));
     }
+    ui.grid.append(renderWeek(week));
   }
   ui.endNote.hidden = !logic.endNoteShown(snapshot, month);
   ui.endNote.textContent = logic.END_NOTE;

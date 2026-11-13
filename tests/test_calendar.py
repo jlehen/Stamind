@@ -414,8 +414,12 @@ class CalendarCommandTest(CalendarTestCase):
         self.assertIn("🏃 50′ ✓", body)
         self.assertIn("🏃🏋️ ✓✗", body)
         self.assertIn("🚴 90′", body)
-        # The week before: Sunday's run gives its label up to the hike nothing planned.
-        previous = lines[lines.index(numbers) - 1]
+        # The week before has ended: its numbers on a line under it, as `progress weeks`
+        # gives them (DESIGN_calendar_as_written.md §4). The week under way has none.
+        self.assertEqual(lines[lines.index(numbers) - 1], "── running 64%, short")
+        self.assertNotIn("──", lines[lines.index(numbers) + 2])
+        # Sunday's run gives its label up to the hike nothing planned.
+        previous = lines[lines.index(numbers) - 2]
         self.assertTrue(previous.endswith("🏃 ✓ +🥾"), previous)
 
     def test_it_pulls_the_month_up_to_today(self):
