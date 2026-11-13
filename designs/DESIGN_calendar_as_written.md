@@ -112,9 +112,9 @@ the reason whole, up to 400 characters, and would push the far days' sheets out 
 `sm calendar` draws the same days, from the same list (D7). Its marks follow the fill: ✓ within
 tolerance, ½ off it, ✗ missed, and – for a written session dropped. A changed day carries `*`.
 On a day with two sessions: one mark per standing session in order, then one – per dropped
-written session, then one `*` for the day. Both follow the page's timing (§2). A week's numbers
-follow its row, past the seven cells, since the grid already fills 77 of 80 columns (choice
-2).
+written session, then one `*` for the day. Both follow the page's timing (§2). Under an ended
+week, a gray line gives its numbers as `sm progress weeks` lists them (`week_line`), in the
+style of the line the grid already prints under a week a mesocycle starts in (choice 2, D9).
 
 ## 5. What does not change
 
@@ -154,7 +154,7 @@ follow its row, past the seven cells, since the grid already fills 77 of 80 colu
   column, `withMonth` merging a file's weeks into those it holds (one spread), and
   the key under the grid: "Colour: against what was written. Corner: the coach changed this
   day; its colour is against what the coach asked."
-- **`stamind/cli/render/calendar_grid.py`**: the marks of §4 and the numbers after each row;
+- **`stamind/cli/render/calendar_grid.py`**: the marks of §4 and the week's line under it;
   **`stamind/cli/calendar.py`**: the help text names the new marks.
 - **Docs**: DESIGN_calendar_miniapp.md §3.2 points here; `docs/ARCHITECTURE.md` (§17, the
   `calendar` row).
@@ -171,7 +171,7 @@ a choice.
 | # | Choice | Why | Chosen over | Review |
 |---|---|---|---|---|
 | 1 | A corner on every day the coach changed, coloured as today's tint, even when it has the colour of the fill (Thursday 5, the ride moved from Wednesday and done: green fill, green corner) (§2) | The author kept the green corner "because it clearly indicates there was a deviation from `workout generate`"; a corner only where the colours differ would hide a move done as written | A corner only where the coach's ask gives another colour than the fill (mock-up 6) | Kept by the author over B, after both mock-ups (D8) |
-| 2 | `sm calendar` prints a week's numbers after its row, past 80 columns (§4) | The seven cells take 77 columns | An eighth column of 2 characters; numbers on a line under the row | Objection (thorough): lines of about 93 columns wrap on an 80-column terminal and break the grid; a line under the week, in the style of the deload line (`calendar_grid.py:92-100`), cannot wrap. Objection (pragmatic): that line can reuse `week_line` (`written_week.py:314`), the line `sm progress weeks` prints, so the terminal needs no new formatter. Not applied: the author rules |
+| 2 | `sm calendar` prints an ended week's numbers on a line under it, `week_line`'s words (§4) | The grid fills 77 of 80 columns, and a line under a week already exists for a mesocycle's start | Numbers after the row, past 80 columns | Changed by the author to the reviewers' proposal (D9) |
 | 3 | A dropped written session is blue at full depth (§2) | Nothing of it was done that day; the deepest blue is "half the plan or less" | A pale blue | |
 | 4 | A rest day the coach added gives no fill, and a training session the coach added is graded against the coach's ask (§2) | There is no written version to compare with | Grading an added rest day green | |
 | 5 | A written session replaced by another of its sport on its day gives no colour; the week's numbers and the sheet show it (§2) | The athlete's own reading: "the heavy strength is still present in the week, the light one went" | Blue for the light session on Friday 13 | |
@@ -197,7 +197,7 @@ a choice.
   two-session day with one written session dropped.
 - The sheet's line for a moved session, and none for a session that moved in.
 - The week numbers equal `graded_weeks`' for the same weeks; none for the week under way.
-- `sm calendar`: the marks of §4, the numbers after the row.
+- `sm calendar`: the marks of §4, the week's line under an ended week.
 - The page's logic under node: the fill's order on a two-session day, the corner, a dropped
   entry, the eighth column; a month file's weeks added to the address's, a week only the address
   holds kept.
@@ -220,3 +220,4 @@ restarted, since the bot builds the button's address.
 | D6 | The week's grade | Numbers in an eighth column (mock-up 3) | His pick over a line under the row | Athlete | 2026-11-13 |
 | D7 | Which views follow | The page and `sm calendar`; Google Calendar's tags stay against the coach's ask | His pick | Athlete | 2026-11-13 |
 | D8 | Where a corner goes | On every day the coach changed, even when it has the fill's colour | Choice 1, mock-up A over B | Athlete | 2026-11-13 |
+| D9 | The week's numbers in the terminal | A gray line under each ended week, `week_line`'s words | Both reviewers: the numbers after the row wrap on an 80-column terminal | Athlete | 2026-11-13 |
