@@ -677,6 +677,9 @@ too, from the lineage's first revision.
 
 ### 9.6 `sm progress -z [sport ...]` — per sport, weekly grain
 
+Amended 2026-11-12: the views are now `sm progress intensity [SPORT…]`; see
+DESIGN_progress_page.md §6.
+
 `sm progress` (`DESIGN_progress_timeline.md`) is the fullest rendering anywhere of the
 picture §1 calls a lie: a CTL sparkline, a weekly TSS column, an adherence percentage and a
 forward projection, every one of them computed from load alone. An athlete whose easy days

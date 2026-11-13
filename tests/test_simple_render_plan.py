@@ -1,4 +1,4 @@
-"""The companion voice on goals, constraints and the fitness summary
+"""The companion voice on goals and constraints
 (DESIGN_bot_simple_frontend.md §6, §11).
 
 `stamind/cli/render/plan_lines.py`. The day-side line builders, and the rules about
@@ -56,93 +56,6 @@ class GoalLinesTest(unittest.TestCase):
         lines = plan_lines.simple_goal_lines([], "2026-08-25")
         self.assertEqual(len(lines), 1)
         self.assertIn("No goal on the horizon", lines[0])
-
-
-class ProgressLinesTest(unittest.TestCase):
-    """The §6 tone rule: every CTL branch reads as good news, and the trend line is
-    always first (it doubles as the chart caption)."""
-
-    TODAY = "2026-08-25"
-
-    def _payload(self, start_ctl, end_ctl):
-        return {"days": [
-            {"date": "2026-07-25", "ctl": start_ctl},
-            {"date": self.TODAY, "ctl": end_ctl},
-        ]}
-
-    def test_no_history_is_a_beginning(self):
-        lines = plan_lines.simple_progress_lines({"days": []}, self.TODAY)
-        self.assertIn("getting started", lines[0])
-        self.assertEqual(len(lines), 2)
-
-    def test_rising_ctl_is_climbing(self):
-        lines = plan_lines.simple_progress_lines(self._payload(40.0, 50.0), self.TODAY)
-        self.assertIn("climbing", lines[0])
-        self.assertIn("25%", lines[0])
-
-    def test_flat_ctl_is_steady(self):
-        lines = plan_lines.simple_progress_lines(self._payload(50.0, 50.5), self.TODAY)
-        self.assertIn("steady", lines[0])
-
-    def test_falling_ctl_is_freshening_not_decay(self):
-        lines = plan_lines.simple_progress_lines(self._payload(50.0, 40.0), self.TODAY)
-        self.assertIn("freshening", lines[0])
-        for word in ("down", "lost", "behind", "miss"):
-            self.assertNotIn(word, lines[0].lower())
-
-    def test_future_days_are_ignored(self):
-        payload = {"days": [
-            {"date": "2026-07-25", "ctl": 40.0},
-            {"date": self.TODAY, "ctl": 50.0},
-            {"date": "2026-09-25", "ctl": 90.0},
-        ]}
-        lines = plan_lines.simple_progress_lines(payload, self.TODAY)
-        self.assertIn("25%", lines[0])
-
-    # TODAY is a Tuesday: this week began Monday 24 August, last week Monday 17 August.
-    def _with_weeks(self, last_week=None, this_week=None):
-        payload = self._payload(50.0, 50.5)
-        payload["weeks"] = [
-            {"week_commencing": "2026-08-10", "actual_seconds": 99999.0},
-            {"week_commencing": "2026-08-17", "actual_seconds": last_week},
-            {"week_commencing": "2026-08-24", "actual_seconds": this_week},
-        ]
-        return plan_lines.simple_progress_lines(payload, self.TODAY)
-
-    def test_hours_of_last_week_and_this_week_sit_between_trend_and_legend(self):
-        lines = self._with_weeks(last_week=39960.0, this_week=9600.0)
-        self.assertEqual(len(lines), 3)
-        self.assertIn("steady", lines[0])
-        self.assertEqual(
-            lines[1], "⏱ You trained 11h06 last week, and 2h40 so far this week."
-        )
-        self.assertIn("chart", lines[2])
-
-    def test_nothing_done_yet_this_week_says_last_week_only(self):
-        lines = self._with_weeks(last_week=39960.0, this_week=0.0)
-        self.assertEqual(lines[1], "⏱ You trained 11h06 last week.")
-
-    def test_week_after_a_week_off_says_this_week_only_and_minutes_under_an_hour(self):
-        lines = self._with_weeks(last_week=0.0, this_week=2700.0)
-        self.assertEqual(lines[1], "⏱ You've trained 45 min so far this week.")
-
-    def test_two_weeks_without_a_minute_of_activity_say_nothing_about_hours(self):
-        # The 20 seconds are a watch started and stopped by mistake.
-        lines = self._with_weeks(last_week=20.0, this_week=None)
-        self.assertEqual(len(lines), 2)
-
-    def test_the_week_runs_monday_to_sunday(self):
-        weeks = [
-            {"week_commencing": "2026-08-17", "actual_seconds": 39960.0},
-            {"week_commencing": "2026-08-24", "actual_seconds": 9600.0},
-        ]
-        expected = "⏱ You trained 11h06 last week, and 2h40 so far this week."
-        for day in ("2026-08-24", "2026-08-30"):  # the Monday and the Sunday
-            self.assertEqual(plan_lines.simple_week_hours_line(weeks, day), expected)
-        self.assertEqual(
-            plan_lines.simple_week_hours_line(weeks, "2026-08-31"),  # the next Monday
-            "⏱ You trained 2h40 last week.",
-        )
 
 
 class ConstraintLinesTest(unittest.TestCase):

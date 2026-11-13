@@ -1,18 +1,21 @@
-"""The intensity half of `sm progress`: time in zone, by week and by mesocycle
-(DESIGN_intensity_distribution.md §9.6).
+"""`sm progress intensity`: time in zone, by week and by mesocycle
+(DESIGN_progress_page.md §6, DESIGN_intensity_distribution.md §9.6).
 
-It lives here rather than in `analytics/zone_tables.py` because it aligns row for row
-with the load table in `cli/progress_load.py` and shares that table's week column and
-band walk, within its own `TABLE_WIDTH`. `analytics/zone_tables.py` keeps the
-prompt-width table the coach reads, and `analytics/intensity.py` the aggregation under
-both."""
+It lives here rather than in `analytics/zone_tables.py` because it shares the load table's
+week column and band walk (`cli/progress_load.py`), within its own `TABLE_WIDTH`.
+`analytics/zone_tables.py` keeps the prompt-width table the coach reads, and
+`analytics/intensity.py` the aggregation under both."""
+import argparse
 import textwrap
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from stamind import runtime
 from stamind.analytics import intensity, timeline, zone_tables
 from stamind.analytics.mesocycle_report import mesocycle_report
-from stamind.plan_versions import delta_baseline, plan_lineage
+from stamind.config import config
+from stamind.output import warn
+from stamind.plan_versions import delta_baseline, reported_mesocycles
 # Which sports get a table, and in which currency: aggregation, not layout, so it lives
 # in `intensity` where the web dashboard reads it from too (ARCHITECTURE.md §8).
 from stamind.analytics.intensity import (
@@ -20,7 +23,8 @@ from stamind.analytics.intensity import (
 )
 from stamind.sports import SPORT_MAPPING, canonical_sport
 from stamind.text import asides_enabled, bold, gray, pad_visible, yellow
-from stamind.clock import parse_date
+from stamind.clock import parse_date, today_str as _today_str
+from stamind.cli.common import ensure_recent_data
 from stamind.cli.progress_load import (
     NO_BAND, WEEK_COL_WIDTH, band_header, short_date,
 )
@@ -273,7 +277,7 @@ def zone_section(
     if low:
         footer.extend(_legend(
             f"{', '.join(low)} omitted (under {ZONE_SPORT_MIN_SHARE * 100:.0f}% of "
-            f"volume) — name them to see: sm progress {low[0]}"
+            f"volume) — name them to see: sm progress intensity {low[0]}"
         ))
     if hidden_weeks:
         footer.append(f"+{hidden_weeks} more weeks (--weeks all)")
@@ -303,21 +307,6 @@ def unknown_sport_preferences(preferences: Sequence[str]) -> List[str]:
             f"literally against activity types.{hint}"
         )
     return out
-
-
-def _mesocycles_in_window(dbh, start: str, end: str) -> List[Dict[str, Any]]:
-    """Every mesocycle overlapping `start..end`, plus the mesocycle preceding the first of
-    them so §4.1's delta has a left-hand side.
-
-    The preceding plan is the previous *goal's* — the one that governed the window's
-    earlier dates — never an earlier version of this goal's own, which was superseded
-    before it was ever trained (DESIGN_plan_rollback.md §6.1).
-    """
-    governing = dbh.get_governing_macrocycle()
-    preceding = (
-        dbh.get_preceding_macrocycle(governing["objective_id"]) if governing else None
-    )
-    return plan_lineage(dbh, [preceding, governing])
 
 
 def _orphan_week_note(
@@ -385,7 +374,7 @@ def render_mesocycle_section(
             if canonical_sport(a.get("activity_type") or "unknown") == sport
         ]
 
-    mesocycles = _mesocycles_in_window(dbh, window_start, today)
+    mesocycles = reported_mesocycles(dbh)
     benchmarks = dbh.get_benchmark_results()
     lines: List[str] = [bold(f"ZONES BY MESOCYCLE — {sport}")]
     reported: List[Dict[str, Any]] = []
@@ -419,3 +408,37 @@ def render_mesocycle_section(
         lines.append("")
         lines.extend(gray(o) for o in orphan)
     return lines
+
+
+def run_progress_intensity(args: argparse.Namespace) -> None:
+    """The Intensity view: one weekly zone table per sport, measured behind today and
+    prescribed ahead of it, or with `--mesocycles` one sport per mesocycle (§9.6, §9.8)."""
+    from stamind import timeline_rows
+    ensure_recent_data(no_pull=args.no_pull, force_pull=getattr(args, "force_pull", False))
+    today = _today_str()
+    payload = timeline_rows.build_timeline_payload(runtime.db)
+    sports = list(args.sports or [])
+    preferences: List[str] = []
+    if not sports:
+        preferences = list(config.user_profile.get("sport_preferences") or [])
+        for warning in unknown_sport_preferences(preferences):
+            warn(warning)
+    if args.mesocycles:
+        lines = render_mesocycle_section(
+            runtime.db, payload, args.weeks, today, sports, preferences
+        )
+    else:
+        forced = None
+        if args.power:
+            forced = "power"
+        if args.hr:
+            forced = "hr"
+        past, future, hidden = timeline.select_weeks(payload["weeks"], args.weeks, today)
+        lines = zone_section(
+            past + future, preferences, explicit=sports, forced_currency=forced,
+            hidden_weeks=hidden, today=today, stats_weeks=past,
+        )
+    # Printed as built: the tables lay one zone cell per column at phone width, and a
+    # screen-width re-wrap would shred them (§9.6).
+    for line in lines:
+        print(line)

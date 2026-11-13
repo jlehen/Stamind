@@ -176,6 +176,7 @@ class RecipeTest(unittest.TestCase):
         self.assertIn(f'INDEX = "{sync.INDEX}"', page)
         self.assertIn(f'PLAN = "{sync.PLAN}"', page)
         self.assertIn(f'PROPOSAL = "{sync.PROPOSAL}"', page)
+        self.assertIn(f'PROGRESS = "{sync.PROGRESS}"', page)
         # The file is read from the queue kind of the same name.
         from stamind.cli.workouts import proposal
         self.assertEqual(sync.PROPOSAL, proposal.KIND)
@@ -199,11 +200,12 @@ class BuildTest(FilesTestCase):
     def test_after_a_command_the_months_the_window_touches(self):
         # The window runs from 2 September to 11 November.
         self.assertEqual(set(sync.build(test_db, TODAY)), {
-            "calendar/2026-09", "calendar/2026-10", "calendar/2026-11", sync.INDEX, sync.PLAN})
+            "calendar/2026-09", "calendar/2026-10", "calendar/2026-11", sync.INDEX, sync.PLAN,
+            sync.PROGRESS})
 
     def test_publish_builds_every_month_from_the_first_empty_ones_included(self):
         files = sync.build(test_db, TODAY, every_month=True)
-        months = sorted(label for label in files if label not in (sync.INDEX, sync.PLAN))
+        months = sorted(label for label in files if label not in sync.NOT_MONTHS)
         self.assertEqual(months[0], "calendar/2026-05")
         self.assertEqual(months[-1], "calendar/2026-11")
         self.assertEqual(len(months), 7)
@@ -354,7 +356,7 @@ class AfterCommandTest(FilesTestCase):
 
     def publish(self):
         code, out, _err = run_cli(["data", "publish"])
-        self.assertIn("Updated 9 files", out)
+        self.assertIn("Updated 10 files", out)
         FakeBucket.uploads.clear()
 
     def test_a_database_never_published_uploads_nothing(self):
@@ -374,17 +376,18 @@ class AfterCommandTest(FilesTestCase):
         sync.after_command()
         self.assertEqual(FakeBucket.uploads, [])
 
-    def test_a_new_activity_uploads_its_month_then_the_index(self):
+    def test_a_new_activity_uploads_its_month_then_the_index_and_the_progress_last(self):
         use_storage(self)
         self.publish()
         _activity("a0930", TODAY)
         run_cli(["calendar", "--no-pull"])
         key = recipe.page_key(TOKEN)
         self.assertEqual(FakeBucket.uploads, [recipe.file_name(key, "calendar/2026-09"),
-                                              recipe.file_name(key, sync.INDEX)])
+                                              recipe.file_name(key, sync.INDEX),
+                                              recipe.file_name(key, sync.PROGRESS)])
 
     def test_a_terminal_reads_one_line_about_the_upload_and_the_chat_none(self):
-        line = "Pages' files updated: 2 file(s) uploaded to the bucket."
+        line = "Pages' files updated: 3 file(s) uploaded to the bucket."
         use_storage(self)
         os.environ.pop("STAMIND_VERBOSE", None)
         self.publish()
@@ -396,7 +399,7 @@ class AfterCommandTest(FilesTestCase):
         started_from(self, "chat")
         _activity("a0929", "2026-09-29")
         self.assertNotIn("Pages' files updated", run_cli(["calendar", "--no-pull"])[1])
-        self.assertEqual(len(FakeBucket.uploads), 4)
+        self.assertEqual(len(FakeBucket.uploads), 6)
 
     def test_a_line_that_only_printed_help_uploads_nothing(self):
         use_storage(self)
@@ -413,7 +416,7 @@ class AfterCommandTest(FilesTestCase):
             sync.after_command()
         self.assertEqual(FakeBucket.uploads, [])
         sync.after_command()
-        self.assertEqual(len(FakeBucket.uploads), 2)
+        self.assertEqual(len(FakeBucket.uploads), 3)
 
     def test_a_failed_upload_goes_to_the_journal_and_status_and_the_command_goes_on(self):
         use_storage(self)
@@ -472,9 +475,9 @@ class PublishTest(FilesTestCase):
         use_storage(self)
         _code, out, _err = run_cli(["data", "publish"])
         # The test file of check 3 is gone with the fill, and is not counted.
-        self.assertEqual(out.strip(), f"✓ Updated 9 files, removed 0 in GCS bucket {BUCKET}.")
+        self.assertEqual(out.strip(), f"✓ Updated 10 files, removed 0 in GCS bucket {BUCKET}.")
         self.assertEqual(self.names(), self.expected())
-        self.assertEqual(len(test_db.get_page_files()), 9)
+        self.assertEqual(len(test_db.get_page_files()), 10)
         self.assertNotIn(KEY, out)
 
     def test_a_failed_check_names_the_step_and_nothing_is_uploaded(self):

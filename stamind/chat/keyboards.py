@@ -25,6 +25,10 @@ from stamind.clock import day_str, parse_date
 from stamind.sports import canonical_sport
 from stamind.types import Workout
 
+# The Progress label: a page button where the pages are published, else this command
+# (DESIGN_progress_page.md §5).
+PROGRESS_LABEL = "📈 Progress"
+
 # Reply-keyboard label → fixed argv; None arms free-text capture (§5.1/§5.2).
 # Buttons never reach beyond this table; the keyboard renders it two per row, in order,
 # with the calendar cell in the second place and the "Goals & plan" cell in the fourth.
@@ -32,7 +36,7 @@ SIMPLE_KEYBOARD = [
     ("📅 Today", ["workout", "list", "-d", "today"]),
     # A look back is a read: --no-mark keeps the Calendar stamping out of a tap (§5.1).
     ("✅ Done lately", ["workout", "compare", "-d", "7d", "--no-mark"]),
-    ("📈 Progress", ["progress", "--chart"]),
+    (PROGRESS_LABEL, ["progress", "--chart"]),
     ("💬 Talk to me", None),
 ]
 
@@ -52,15 +56,19 @@ PLAN_SLOT = 3
 
 
 def simple_keyboard_rows(
-    gym: Any = None, calendar: Any = None, plan: Any = None,
+    gym: Any = None, calendar: Any = None, plan: Any = None, progress: Any = None,
 ) -> List[List[Any]]:
     """The §5.1 reply keyboard's labels, laid out the way the bot attaches them.
 
     `gym` is the gym button `gym_button` found — a label, or the (label, url) pair that
     opens the Mini App. It takes the first row on its own (DESIGN_gym_logger.md §6).
     `calendar` is the calendar's (label, url) cell, placed after "📅 Today", and `plan` the
-    "Goals & plan" page's, after "✅ Done lately" (DESIGN_calendar_miniapp.md §6, §3.7)."""
+    "Goals & plan" page's, after "✅ Done lately" (DESIGN_calendar_miniapp.md §6, §3.7).
+    `progress` is the Progress page's (label, url) cell, in place of its command
+    (DESIGN_progress_page.md §5)."""
     cells: List[Any] = [label for label, _ in SIMPLE_KEYBOARD]
+    if progress is not None:
+        cells[cells.index(PROGRESS_LABEL)] = progress
     if calendar is not None:
         cells.insert(CALENDAR_SLOT, calendar)
     if plan is not None:
@@ -125,7 +133,7 @@ SIMPLE_WELCOME = (
     "🗓 Calendar — your weeks at a glance\n"
     "✅ Done lately — how the last days went\n"
     "🎯 Goals & plan — what you're training for, and the road there\n"
-    "📈 Progress — how your fitness is building\n"
+    "📈 Progress — how your weeks and mesocycles went\n"
     "💬 Talk to me — anything I should know (tired, busy, sore…)\n\n"
     "Or just write to me in your own words."
 )

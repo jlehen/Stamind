@@ -189,8 +189,8 @@ class _WindowCache:
     `mesocycle_report` asks its fetcher for up to four windows per mesocycle — elapsed, the
     rate window, the current week, the previous mesocycle — and all but the last are
     sub-ranges of the mesocycle itself. Against the database that was four queries per
-    mesocycle, which `progress --mesocycles` multiplied by the number of mesocycles. Dates are
-    ISO strings, so slicing by comparison is chronological.
+    mesocycle, which `progress intensity --mesocycles` multiplied by the number of mesocycles.
+    Dates are ISO strings, so slicing by comparison is chronological.
     """
 
     def __init__(self, fetch: "FetchActivities", span_start: str, span_end: str):

@@ -37,8 +37,9 @@ DAYS_AHEAD = 42
 
 # How many packed bytes the address may carry. Telegram refuses a whole reply keyboard past
 # about 9.9 KB (measured 2026-09-26), and the "Goals & plan" page, the gym button and the
-# labels share it (§8).
-BUDGET_BYTES = 5 * 1024
+# labels share it (§8). The 256 bytes are the Progress button's address
+# (DESIGN_progress_page.md §5).
+BUDGET_BYTES = 5 * 1024 - 256
 
 # The key of the message the sheet's "💬 Full day in chat" sends back (§6).
 DAY_REQUEST = "calendar_day"

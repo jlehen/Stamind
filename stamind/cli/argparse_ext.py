@@ -7,7 +7,7 @@ import argparse
 import re
 import sys
 import textwrap
-from typing import Optional
+from typing import Any, Optional
 
 from stamind.text import (
     bold, cmd, default_wrap_width, dim, format_labeled_paragraph, red, wrap_text, yellow,
@@ -196,6 +196,28 @@ def _needs_equals(value: Optional[str]) -> bool:
     return bool(value) and value.startswith("-") and bool(_NEGATIVE_SELECTOR_RE.match(value))
 
 
+def pull_flags(default: Any = False) -> argparse.ArgumentParser:
+    """The parent parser of every command that reads Garmin: `--no-pull` and `--force-pull`,
+    the two ends of one throttle, so mutually exclusive.
+
+    `default=argparse.SUPPRESS` is for the sub-commands of a group that takes the flags too: a
+    sub-command's defaults overwrite what the group already parsed, so `progress --no-pull
+    weeks` would pull (DESIGN_progress_page.md §6). One parser per default, because argparse
+    shares a parent's actions with every child."""
+    parser = argparse.ArgumentParser(add_help=False)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--no-pull", action="store_true", dest="no_pull", default=default,
+        help="Skip the Garmin/Calendar pull check, reading purely from the SQLite cache"
+    )
+    group.add_argument(
+        "--force-pull", action="store_true", dest="force_pull", default=default,
+        help="Force a Garmin/Calendar refresh even within the refresh-minutes window, "
+             "bypassing the cache-reuse throttle"
+    )
+    return parser
+
+
 def _canonical_option(action: argparse.Action) -> str:
     """The most explicit spelling of an option (argparse accepts any registered one)."""
     return max(action.option_strings, key=len)
@@ -204,9 +226,11 @@ def _build_keyword_spec(parser: argparse.ArgumentParser) -> dict:
     """Map every dashless option spelling -> its action for one parser level.
 
     ``--from``/``--from-date`` both register (``from``, ``from-date``); ``-y`` registers
-    ``y``. Positionals, the sub-parsers action, and ``-h/--help`` are excluded. Two
-    distinct actions claiming one keyword in the same command is an authoring bug, so we
-    warn rather than silently shadow.
+    ``y``. Positionals, the sub-parsers action, and ``-h/--help`` are excluded, and so is
+    an action marked ``dashless = False``, whose spelling a command at its level took
+    (`sm progress weeks`, DESIGN_progress_page.md §6). Two distinct actions claiming one
+    keyword in the same command is an authoring bug, so we warn rather than silently
+    shadow.
     """
     spec: dict = {}
     for action in parser._actions:
@@ -214,6 +238,8 @@ def _build_keyword_spec(parser: argparse.ArgumentParser) -> dict:
             continue
         if not action.option_strings:
             continue  # positional — bound by position, not by keyword
+        if getattr(action, "dashless", True) is False:
+            continue
         for opt in action.option_strings:
             kw = opt.lstrip("-")
             if kw in spec and spec[kw] is not action:

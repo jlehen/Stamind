@@ -47,7 +47,8 @@ the *presentation*-side view of past **and future**)
 > for the chart, and `--mesocycles`. All three now call `timeline.select_weeks`.
 > (6) **The zone tables move behind `-z`/`--zones`** (naming a sport implies it).
 > They tripled a numbers-first command from ~27 lines to 96 at phone width and
-> answer a different question from the load table.
+> answer a different question from the load table. Amended 2026-11-12: they are now
+> `sm progress intensity [SPORT…]`, and `-z` is gone (DESIGN_progress_page.md §6).
 > (7) Leftovers: `zero_load_workout_count` is dated from today, so a past row
 > nobody can fix no longer keeps the banner permanently lit; the FORM line prints
 > CTL/ATL at one decimal to match the TSB beside it and `sm status`; the config

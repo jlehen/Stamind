@@ -95,13 +95,13 @@ classes themselves.
   `settings`, `strength` (with `strength_log` and `strength_ingest`), `queue` (what shows
   and sends a queued item) with `queue_commands` (the `queue` and `bot queue` commands,
   apart because the commands a tap runs import the queue), `progress` (with
-  `progress_load` and `progress_zones`), and the packages `plans/`, `workouts/`, `data/`,
-  `journal/` and `bot/`, the hidden commands the Telegram bot spawns, whose `__init__.py`
-  maps its files (DESIGN_bot_simple_frontend.md §12). Shared by several families:
-  `common` (the renderers), `selectors` (the range grammar) with `windows` (the resolvers
-  that turn it into dates), `argparse_ext`, the `render/` package (the two voices and the
-  companion line builders, [§6](#6-singletons)), `candidates` (the questions that turn a
-  note's constraints and signals into rows, and the `session_note`, `constraint` and
+  `progress_load`, `progress_weeks` and `progress_zones`), and the packages `plans/`,
+  `workouts/`, `data/`, `journal/` and `bot/`, the hidden commands the Telegram bot spawns,
+  whose `__init__.py` maps its files (DESIGN_bot_simple_frontend.md §12). Shared by several
+  families: `common` (the renderers), `selectors` (the range grammar) with `windows` (the
+  resolvers that turn it into dates), `argparse_ext`, the `render/` package (the two voices
+  and the companion line builders, [§6](#6-singletons)), `candidates` (the questions that
+  turn a note's constraints and signals into rows, and the `session_note`, `constraint` and
   `signal` queue kinds), `staleness` (the changed-input wording) and `runway` (the
   end-of-schedule nudge every daily surface draws, DESIGN_runway_nudge.md §3).
 - **`stamind_web.py`** — Flask REST API behind the dashboard. **Read-only**: GET
@@ -127,6 +127,7 @@ classes themselves.
     route` (`routing.ROUTER_INTENTS`; the fast model picks an intent, and the button of a
     live question the message answers, never argv; `ROUTER_PAGE_REPLIES` answers a week,
     goals or plan read with a pointer to its page button instead of spawning a command,
+    and `PUBLISHED_PAGE_REPLIES` a progress read where the pages are published,
     [§15](#the-multi-day-schedule-goals-and-plan-live-on-their-pages-alone)). Prose
     comes back as text; a prompt, a chart, a button row, a flush and a queued item come
     back as sentinel frames (`sentinels.py`, [§6](#6-singletons)). Every Telegram call but
@@ -143,13 +144,14 @@ classes themselves.
     (`RESTART_EXIT_CODE`, a contract between `sm-bot` and `chat/runner.py`) or 129, a
     worker killed by SIGHUP (DESIGN_bot_restart.md §4, §5).
   - **The companion** (DESIGN_bot_simple_frontend.md): the reply keyboard is
-    `keyboards.SIMPLE_KEYBOARD`; writes reach the chat through three shapes and no
-    fourth, view, picker and capture, which `cli/bot/__init__.py` names (§12 there). In
-    the chat a capture saves its read-back as a *confirmation* in the athlete queue and
-    ends, and a "Yes" that stored a constraint or found nothing is followed by its own
-    question, "Shall I adjust your week?" or "Shall I pass it to your coach?", whose "Yes"
-    starts `workout adapt` beside the chat (DESIGN_chat_questions.md §2, §4). The voice
-    is `runtime.render` ([§6](#6-singletons), DESIGN_render_persona.md).
+    `keyboards.SIMPLE_KEYBOARD`, "📈 Progress" a page button in place of its command where
+    the pages are published (DESIGN_progress_page.md §5); writes reach the chat through
+    three shapes and no fourth, view, picker and capture, which `cli/bot/__init__.py` names
+    (§12 there). In the chat a capture saves its read-back as a *confirmation* in the
+    athlete queue and ends, and a "Yes" that stored a constraint or found nothing is
+    followed by its own question, "Shall I adjust your week?" or "Shall I pass it to your
+    coach?", whose "Yes" starts `workout adapt` beside the chat (DESIGN_chat_questions.md
+    §2, §4). The voice is `runtime.render` ([§6](#6-singletons), DESIGN_render_persona.md).
   - **The morning push** is `sm bot morning` (`cli/bot/views.py`), run by `scheduler.py`
     inside the `morning-time` → `morning-deadline` window and idempotent on the
     `settings` row `push_morning_last` (DESIGN_bot_simple_frontend.md §4.2, §4.3); the
@@ -208,7 +210,7 @@ One line per module; the rule each keeps is the part worth knowing before openin
 | `openrouter.py` | `openrouter_client` | The OpenRouter client: `json_object` replies, the last of two objects wins; prints the wait notice and the flush before every call |
 | `sports.py` | — | The canonical sport vocabulary (`SPORT_MAPPING`, `canonical_sport`, `STRENGTH_SPORTS`); dependency-free so `db` and adherence share it |
 | `plan_inputs.py` | — | What shapes a plan and how it is fingerprinted and diffed (`plan_profile`, `plan_config_hash`, the goal and constraint cleaners). Flat and pure so the dashboard hashes the config without the coach; the judgment is `coach/service/staleness.py` (DESIGN_plan_staleness.md) |
-| `plan_versions.py` | — | A plan's versions and what changed between two: `plan_lineage` (by macrocycle id, never a date query, DESIGN_plan_rollback.md §6.1), `resolve_versions`, `diff_plans`, `input_snapshots`. Format-free; `plan diff` and `/api/plan/diff` both render it |
+| `plan_versions.py` | — | A plan's versions and what changed between two: `plan_lineage` (by macrocycle id, never a date query, DESIGN_plan_rollback.md §6.1) and `reported_mesocycles` (the governing plan's and the previous goal's, which intensity per mesocycle reports), `resolve_versions`, `diff_plans`, `input_snapshots`. Format-free; `plan diff` and `/api/plan/diff` both render it |
 | `workout_state.py` | — | Two of a session's three axes ([§5](#workout-state--three-orthogonal-axes-not-one-enum)): `modification_markers` and `calendar_status`; derived from a row, no database, so the web app can import it |
 | `learning_confidence.py` | — | What a learning's confidence means: the levels, `derive_confidence`, `step_down`, dormancy. Pure rules (DESIGN_evidence_based_confidence.md §3) |
 | `learning_doubts.py` | — | The `learning` queue kind and `settle_doubts`, which every reflect and bootstrap calls (DESIGN_learning_doubt_nudge.md) |
@@ -216,7 +218,7 @@ One line per module; the rule each keeps is the part worth knowing before openin
 | `queue_kind.py` | — | What a feature brings to the queue: `Kind`, `queue(kind, subject, payload)`, `queue_replacing` (a confirmation that closes an older one about the same row), `NotApplied` and `PutOff` (what an answer raises to leave its item waiting, or to put it off until the morning). Apart from `athlete_queue.py` to break the cycle through `strength/sets.py` |
 | `heads_up.py` | — | Telling the athlete about a change made out of their sight: the wording, the send rule (`due`, `changes_due`, `sends_after_delay`), `changes_notify_upto` (DESIGN_change_heads_up.md). Pure but for `waiting()`/`changes_due()`, so `db/workout_change.py` imports it safely |
 | `freshness.py` | — | How fresh is fresh enough, for Garmin and the Calendar: `last_pull_age`, `fresh_notice`. Flat because `garmin/` and `gcal/` must not import each other; the decision stayed with each caller ([§15](#15-design-rationale--history)) |
-| `cycle_records.py` | — | The date check: which retrospective records exist, when one is due, how one reads (DESIGN_cycle_retrospective.md §3). Rows in `db/retrospectives.py` |
+| `cycle_records.py` | — | The date check: which retrospective records exist, when one is due, how one reads (DESIGN_cycle_retrospective.md §3), and the order `progress mesocycles` and the Progress page list them (`records_newest_first`). Rows in `db/retrospectives.py` |
 | `rpe_reminder.py` | — | The `rpe_reminder` queue kind: enter an RPE in Garmin ([§15](#15-design-rationale--history)) |
 | `retrospective_question.py` | — | The `retrospective` queue kind (DESIGN_cycle_retrospective.md §4) |
 | `calendar_days.py` | — | The one list of days the calendar page and `sm calendar` draw: `gather` → a `Calendar` of `Day`s, facts only, reads and never pulls (DESIGN_calendar_miniapp.md §4) |
@@ -254,13 +256,13 @@ flow for each lives in [§10](#10-key-data-flows).
 | Coach learnings / confidence | `db/learnings.py`, `coach/service/athlete_context.py` (`_apply_learning_updates`, `_review_learning_proposals`), `learning_doubts.py`; the model is DESIGN_evidence_based_confidence.md |
 | Backward analysis (bootstrap/reflect) | `coach/service/analysis.py:_run_workout_analysis`, `coach/engine/analysis.py:_data_analyze_logic` ([§10](#data-analysis-data-bootstrap--data-reflect)) |
 | Garmin pull / metrics / load model | `garmin/sync.py` (`pull`, `ensure_data`), `garmin/derived.py`, `analytics/load.py`, `analytics/pmc.py` ([§12](#12-sports-science--coaching-mathematics)) |
-| Progress timeline / PMC projection | `analytics/progression.py`, `analytics/timeline.py`, `stamind/timeline_rows.py`, `analytics/chart.py`, `cli/progress.py` + `cli/progress_load.py`, `/api/timeline.png`. DESIGN_progress_timeline.md |
-| Intensity distribution / time in zone | `analytics/intensity.py` (which sports qualify and in which currency; `judgeable`, `COVERAGE_MIN_BY_SPORT`, keys canonical), `analytics/zone_tables.py`, `analytics/mesocycle_report.py`, `coach/service/mesocycle_context.py` (`_intensity_mesocycle_context` for adapt, `_mesocycle_progress_context` for `workout generate`, `_planning_zone_currencies`), `coach/service/history_context.py`, `cli/status.py`, `cli/progress_zones.py`, `progression.weekly_aggregates`, `cli/data/show.py` (`--zones`), `/api/zones` + `static/progress.js`. DESIGN_intensity_distribution.md |
+| Progress timeline / PMC projection | `analytics/progression.py`, `analytics/timeline.py`, `stamind/timeline_rows.py`, `analytics/chart.py`, `cli/progress.py` + `cli/progress_load.py`, `/api/timeline.png`. DESIGN_progress_timeline.md; the four views of `sm progress`, DESIGN_progress_page.md §6 |
+| Intensity distribution / time in zone | `analytics/intensity.py` (which sports qualify and in which currency; `judgeable`, `COVERAGE_MIN_BY_SPORT`, keys canonical; `zone_weeks`, the weeks `/api/zones` and the Progress page share), `analytics/zone_tables.py`, `analytics/mesocycle_report.py`, `coach/service/mesocycle_context.py` (`_intensity_mesocycle_context` for adapt, `_mesocycle_progress_context` for `workout generate`, `_planning_zone_currencies`), `coach/service/history_context.py`, `cli/status.py`, `cli/progress_zones.py`, `plan_versions.py:reported_mesocycles`, `cli/render/progress_page.py` (the rates per mesocycle), `progression.weekly_aggregates`, `cli/data/show.py` (`--zones`), `/api/zones` + `static/progress.js`. DESIGN_intensity_distribution.md |
 | Planned time in zone (a session's intensity target) | `db/schema.py` (`planned_zone_currency`, `planned_zone1..7_sec`), `db/workout_change.py:WorkoutChange.append`, `coach/steps.py:zone_seconds` (the only source: worked out from the steps), `intensity.parse_planned_zones`/`format_planned_zones`, `gcal/event.py`, `coach/formatting.py`, `cli/workouts/session_line.py::prescription_lines`. DESIGN_intensity_distribution.md §9.8, DESIGN_endurance_steps.md §5 |
 | A run, a ride or a swim as steps | `coach/steps.py` (`fault`, `finish`, `describe`, `reprint`), `coach/engine/sessions.py` (`endurance_task`, `STEPS_FIELD`, `ask_week_planner`), the `steps` column (`db/workout_change.py:append`), `coach/revisions.py` (the row shape), `coach/formatting.py:_for_the_week_planner`, `cli/benchmarks.py:reprint_sessions`. DESIGN_endurance_steps.md |
 | Calendar push / daily-signal ingest | `stamind/gcal/` ([§13](#13-daily-signals-calendar-ingest)) |
 | Workout state (modified/calendar/removed) | `stamind/workout_state.py`, `db/workouts.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)) |
-| What "planned" means for a week that has ended, and its grade per sport | `analytics/written_week.py` (`written_week`, `graded_workouts`, `week_grade`, `graded_weeks`, `week_grade_lines`), `db/workout_history.py:get_slot_history`, the readers (`timeline_rows.py`, `coach/service/mesocycle_context.py`, `coach/service/history_context.py:_mesocycle_review`, `coach/service/retrospective.py:_retrospective_numbers`), `cli/workouts/compare.py` (`print_graded_weeks`), `cli/render/session_lines.py:simple_week_grade_lines`. DESIGN_week_as_written.md |
+| What "planned" means for a week that has ended, and its grade per sport | `analytics/written_week.py` (`written_week`, `graded_workouts`, `week_grade`, `graded_weeks`, `week_grade_lines`, `changed_line`, `week_line`), `db/workout_history.py:get_slot_history`, the readers (`timeline_rows.py`, `coach/service/mesocycle_context.py`, `coach/service/history_context.py:_mesocycle_review`, `coach/service/retrospective.py:_retrospective_numbers`), `cli/progress_weeks.py` (`sm progress weeks`). DESIGN_week_as_written.md, DESIGN_progress_page.md §6 |
 | What became of a planned session (the adherence verdict) | `analytics/adherence.py` (`classify_adherence`, `STATUS_LABELS`, `unplanned_kind`, `off_plan_gaps`), `analytics/compare.py` (`adherence_window`, `adherence_verdicts`, `compare_days`, `format_actual`), `gcal/reconcile.py:mark_adherence_range`, `gcal/event.py` (the title tag), `cli/workouts/session_line.py::adherence_marker`, `cli/workouts/listing.py::_list_verdicts`, `/api/workouts` + `static/workouts.js`, `calendar_days.py` ([§5](#workout-state--three-orthogonal-axes-not-one-enum), [§17](#17-calendar-telegram-mini-app-and-sm-calendar)) |
 | Which timezone dates are read in | `stamind/clock.py`, the push window in `chat/scheduler.py`. DESIGN_user_timezone.md |
 | A preference the athlete can change at runtime | a registry entry in `stamind/settings.py` (not a command), `cli/settings.py`, and the reader that consumes it. DESIGN_settings.md |
@@ -270,6 +272,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` kind, `save`, `open_proposal`, `shown_to_week_planner`, `out_of_date`), `coach/proposals.py` (`week_planner_changed`, `revision_to_json`/`revision_from_json`), `coach/engine/notes.py:open_proposal_task`, `cli/queue.py:send_alone`, `cli/workouts/adapt.py:_settle`, `cli/bot/views.py:_morning_adaptation`. DESIGN_waiting_proposal.md |
 | Whether the morning push asks the week planner | `coach/picture.py` (`take`, `news`, `nights`, `remember`), `cli/bot/views.py:_asks`, `strength/planner.py:has_work`, `db/workout_history.py:newest_change_with_sessions(exclude_kind)`, `RevisionProposal.seen`, the `adapt_last_seen` row of `settings`. DESIGN_quiet_morning.md |
 | A strength activity's sets | `strength/sets.py`, `strength/vocabulary.py` + `exercises.tsv` (then rebuild `miniapp/exercises.json` with `miniapp/build_exercises.py`), `strength/questions.py`, `db/strength.py`, `cli/strength.py`, `cli/strength_log.py`, the `strength-sets-since` setting. DESIGN_strength_tracking.md, DESIGN_exercise_table.md |
+| The Progress page (the chat's "📈 Progress") | `cli/render/progress_page.py` (the file, the address), `page_files/sync.py` (`PROGRESS`), `miniapp/progress.html` + `progress.js` + `progress_logic.js`, `chat/keyboards.py` (`PROGRESS_LABEL`), `chat/app.py:_page_buttons`, `chat/routing.py:PUBLISHED_PAGE_REPLIES`; the terminal's views are `cli/progress*.py`. DESIGN_progress_page.md |
 | A gym session logged on the phone | `miniapp/`, `strength/logger.py`, `cli/strength_ingest.py`, `strength/sets.py::take_over_logs`, `db/strength.py` (`gym_logs`, `upsert_logged_activity`, `save_gym_log`, `gym_log_for_day`, `garmin_activity_with_log`, `move_gym_log`). DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
 | A past strength session against its planned lines | `strength/comparison.py`, `db/strength.py::attach_lifted`, `analytics/adherence.py` (`_discrepancy_reasons`, `_pairing_order`, `is_ambiguous_match`), `cli/common.py` (`strength_table`, `simple_comparison_lines`), `strength/sets.py::done_text`. DESIGN_strength_planned_vs_done.md |
 | What a strength session prescribes | `strength/planner.py`, `strength/planner_prompt.py`, `strength/progression.md`, `strength/history.py`, `strength/prescription.py`, `prescribed_sets` + `strength_checks` in `db/schema.py`, `db/workout_change.py::WorkoutChange`, the pass's place in `coach/service/generate.py` and `coach/service/adapt.py`. DESIGN_strength_tracking.md §9 |
@@ -840,7 +843,7 @@ Untouched by every `wipe`.
 | Column        | Type    | Notes                                                        |
 |---------------|---------|---------------------------------------------------------------|
 | `address`     | TEXT PK | The file's full address, bucket, folder and name. The name is computed from the bot token, so another token or bucket finds no row of its own |
-| `label`       | TEXT    | What the file holds: `calendar/2026-09`, `calendar/index` or `plan` |
+| `label`       | TEXT    | What the file holds: `calendar/2026-09`, `calendar/index`, `plan`, `proposal` or `progress` |
 | `fingerprint` | TEXT    | SHA-256 of the content last uploaded, before encryption and without the stamp; NULL until one upload succeeded |
 | `uploaded_at` | TEXT    | When that upload succeeded (UTC ISO)                          |
 | `error`       | TEXT    | The last attempt's HTTP status or error type when it failed, else NULL; `sm status` shows it |
@@ -1216,7 +1219,8 @@ the default window each command declares with `add_selector_args`.
 **A bare command group** prints that level's help and exits 1 (`build_parser` reads
 `named_subparsers`, so a new group is covered; `tests/test_dispatch.py` walks the same
 tree). The exception is a group whose whole state is one read-only view (`settings`,
-`queue`), which acts bare instead (DESIGN_cli_noargs.md §a3).
+`queue`), or of read-only views (`progress`, bare = `progress fitness`), which acts bare
+instead (DESIGN_cli_noargs.md §a3).
 
 | Command      | Subcommand   | Short form | Description                                                            |
 |--------------|--------------|----------|--------------------------------------------------------------------------|
@@ -1262,10 +1266,13 @@ tree). The exception is a group whose whole state is one read-only view (`settin
 | `plan`       | `rm`         | `pl rm`  | Delete plan for a goal ID, with the goal's retrospective records, which the inventory it prints before asking counts. The old `pl d` alias is gone — `d` now prefixes `diff` |
 | `plan`       | `feedback`   | `pl f`   | Append a note about the plan to its append-only log — bare text is plan-level, `-m [ATOM]` files it to one mesocycle of any upcoming goal's plan by name-infix / date / mesocycle ID (bare `-m` = the current mesocycle), and that mesocycle picks the plan. Bare run lists what is pending, `--rm ID [-y]` deletes one, `--replan` runs `plan generate` straight away (the same as `plan generate --feedback` for a plan-level note), `-g/--goal ID` targets another goal's plan (and confines `-m` to it). No LLM at capture; the next `plan generate` reads the whole log and must address every note (DESIGN_plan_feedback.md) |
 | `plan`       | `wipe`       | —        | Delete all plans, and every retrospective record with them               |
-| `progress`   | `[SPORT ...]` | `pr`    | Show the progress timeline: measured load to date, plan-projected forward (CTL/ATL/TSB), weekly planned-vs-actual bars with the hours planned and done each week (`-w/--weeks N`, `--chart [PATH]` for a PNG, `--explain` for the TSB-lag note; DESIGN_progress_timeline.md). `-z`/`--zones` (implied by naming a sport) adds one weekly time-in-zone table per sport — measured behind today, prescribed ahead of it (`--mesocycles` for mesocycle grain, `--power`/`--hr` to force the currency; DESIGN_intensity_distribution.md §9.6/§9.8). The sport argument scopes the **zone tables only**: CTL/ATL/TSB, the projection and the load table stay whole-athlete |
+| `progress`   | `fitness`    | `pr`     | The Fitness view, and a bare `progress` with the same flags (DESIGN_cli_noargs.md §a3): the progress timeline, measured load to date, plan-projected forward (CTL/ATL/TSB), weekly planned-vs-actual bars with the hours planned and done (`-w/--weeks N|all`, `--chart [PATH]` for a PNG, `--explain` for the TSB-lag note; DESIGN_progress_timeline.md). A view's flags go after its word (DESIGN_progress_page.md §6) |
+| `progress`   | `weeks`      | `pr w`   | One line per week that has ended in the `-w` window, graded per sport against its sessions as written (`written_week.week_line`); the week under way is never graded. `weeks DATE`: that week in full, a short sport's changed sessions under it with the day and the reason (DESIGN_week_as_written.md §5) |
+| `progress`   | `mesocycles` | `pr m`   | The mesocycle under way, then every retrospective record newest first, a plan's above the mesocycles it closes, each through `print_retrospective` (DESIGN_progress_page.md §3.3) |
+| `progress`   | `intensity`  | `pr i`   | One weekly time-in-zone table per sport, measured behind today, prescribed ahead of it (`[SPORT ...]` names them, `-w`, `--mesocycles` for mesocycle grain, `--power`/`--hr` to force the currency; DESIGN_intensity_distribution.md §9.6/§9.8) |
 | `workout`    | `list`       | `w l`    | Show planned workouts, a 7-day window from today by default, as a table with one row per session (`cli/workouts/session_line.py::session_table`, a column no row fills is left out). Positional `TARGET…` (workout IDs and/or date selectors) plus `-d`/`-m`/`-M`/`-g`, `-t/--type TYPE` and `-L/--link` (DESIGN_cli_selectors.md). A session dated today or earlier carries its adherence verdict in the Result column (`DONE`, `PARTIAL`, `MISSED`, `REST OK`, `REST BROKEN`, or `NOT YET` for one still ahead today), and the listing freshens Garmin over that past span unless `--no-pull` ([§5](#workout-state--three-orthogonal-axes-not-one-enum)). `-v` adds each session's short form under its row (`prescription_lines`); `-vv` turns each row back into one line (`workout_line`, markers in brackets) with the full detail under it. A listing that runs past the last scheduled session ends on a marker saying so (DESIGN_runway_nudge.md §4). A range puts each deload's line before its first listed session (`cli/common.py::deload_heads`, DESIGN_deload_weeks.md §11.2). |
 | `workout`    | `show`       | `w sh`   | `workout list -vv` under a name that says what it does: the same handler with the detail flag pinned on, the same positional targets and the same selectors. `wo sh 12` details one session. The one difference is the default window: a bare `wo sh` details today's sessions, where a bare `wo li` lists seven days. `-H/--history [N]` prints the session's earlier forms under it, newest first, capped at N (`gcal/history.py::depth_section`). The detail prints each description for one day and the session's short line in its place over several days or with `-H`; `-l/--long` and `-s/--short` choose, and a session with no short line prints its description (`listing.py::_full_text`, DESIGN_short_messages.md §4). |
-| `workout`    | `compare`    | `w c`    | Compare planned vs completed (`analyze_adherence()`): prints PLANNED/ACTUAL per day, flags misses (red), rest violations (red), unplanned high-load (yellow), a `Discrepancy:` line under a session done differently, then the count for the days shown, then under `=== WEEKS AS WRITTEN ===` each week that has ended and overlaps the window, graded whole per sport against its sessions as written, a short sport in yellow with its dropped, moved-out and cut sessions under it; `-t` grades one sport, and the chat adds a week line only when a sport is short (DESIGN_week_as_written.md §5). Today's untrained sessions read `(not yet — still ahead today)` and are not misses (`pending_from`, [§10](#10-key-data-flows)). Same selectors as `workout list`; default 14-day lookback; a bare span (`-d 7d`) looks *back*; end capped at today. |
+| `workout`    | `compare`    | `w c`    | Compare planned vs completed (`analyze_adherence()`): prints PLANNED/ACTUAL per day, flags misses (red), rest violations (red), unplanned high-load (yellow), a `Discrepancy:` line under a session done differently, then the count for the days shown, "Great adherence!" when there is none. The days only: the weeks are `progress weeks` (DESIGN_progress_page.md §6). Today's untrained sessions read `(not yet — still ahead today)` and are not misses (`pending_from`, [§10](#10-key-data-flows)). Same selectors as `workout list`; default 14-day lookback; a bare span (`-d 7d`) looks *back*; end capped at today. |
 | `workout`    | `generate`   | `w g`    | Write the sessions for a span from the plan's mesocycles (the dates pick the plan, not a goal — DESIGN_cli_selectors.md §8). No selector → from the day after the schedule stops, for `config.workout_generation_span_days`; a span never opens before today; refused when the plan is covered to its last day. Span flags, mutually exclusive: `-g/--goal [ID]`, `-d`, `-m`, `-M` (which also settles which plan where two cover the days). Previews the sessions as `workout list` draws them and asks; on a `y` it writes one `generate` change and pushes to Calendar ([§10](#workout-generation-workout-generate)). `-f`/`-y` skip the prompts. `--fresh` empties the commitment window (DESIGN_plan_change_continuity.md §4.4). `--strength-only` (not with `--fresh`) calls the strength planner alone (`cli/workouts/strength_only.py`, DESIGN_strength_tracking.md §9). `--propose`, what the chat's "📅 Plan my next weeks" sends, asks nothing and writes nothing: it saves the weeks as a queued proposal, or the question "Shall I plan these weeks?" when sessions stand in the span (`cli/workouts/proposal.py`, DESIGN_long_runs_beside_chat.md §4). From a terminal it first offers to replace the newest change the athlete was never told about (`cli/workouts/heads_up.py`, shared with `workout adapt`; DESIGN_change_heads_up.md §5, §8), and with `--strength-only` only when that change wrote strength alone. |
 | `workout`    | `rollback`   | `w r`    | Undo a workout change **and every change after it**, putting the sessions back the way they were the moment before it ran (`--batch N` per `workout batches`, default #1 the newest; `-y`). Any change qualifies, an adapt or a tweak included. The only undo. Leaves the active plan version alone — unlike `plan rollback` (DESIGN_workout_revisions.md §10). |
 | `workout`    | `batches`    | `w b`    | List the commands that wrote workouts over `-d RANGE` (default: the last 7 days), newest first, each with the `#N` that `workout rollback --batch` takes, its kind, revision count, date span, plan version and stored description; `(held)` for a pass that appended nothing, `not sent yet` for a change the athlete has not been told about (DESIGN_change_heads_up.md §8). Every entry is undoable, the newest included (DESIGN_workout_revisions.md §10) |
@@ -1335,7 +1342,7 @@ them.
 | GET    | `/api/plan`                     | Active plan for a goal (`plan show`): `?goal_id=` (default next active) → `{goal, macrocycle, mesocycles}` |
 | GET    | `/api/plan/versions`            | Plan versions for a goal (`?goal_id=`; active + superseded) |
 | GET    | `/api/plan/diff`                | Compare two plan versions (`?goal_id=&from_version=&to_version=`; defaults to previous vs active) → `{goal, diff}`, the same `plan_versions.diff_plans` structure the CLI renders. `{error, code}` + 400/404 when the pair cannot be formed |
-| GET    | `/api/zones`                    | Per-sport, per-zone time in zone (`progress -z`; its sports and currencies come from `intensity.window_sport_stats`/`select_zone_sports`/`zone_currency`, the CLI tables' own functions). `?weeks=N\|all` (default 8), `?sport=` (repeatable, overrides the volume filter), `?currency=hr\|power` → `{window, sports[{sport, currency, zone_labels, coverage, weeks[]}], omitted}`. Weeks past today carry the *prescribed* zones (`future: true`); a future week planned in the other currency reports `currency_mismatch` rather than converting (DESIGN_intensity_distribution.md §9.8) |
+| GET    | `/api/zones`                    | Per-sport, per-zone time in zone (`progress intensity`; its sports and currencies come from `intensity.window_sport_stats`/`select_zone_sports`/`zone_currency`, the CLI tables' own functions, and its weeks from `intensity.zone_weeks`, which the Progress page's file calls too). `?weeks=N\|all` (default 8), `?sport=` (repeatable, overrides the volume filter), `?currency=hr\|power` → `{window, sports[{sport, currency, zone_labels, coverage, weeks[]}], omitted}`. Weeks past today carry the *prescribed* zones (`future: true`); a future week planned in the other currency reports `currency_mismatch` rather than converting (DESIGN_intensity_distribution.md §9.8) |
 | GET    | `/api/benchmarks`               | Benchmark logbook newest first + current thresholds (`benchmark list`). `?sport=&kind=`; each row carries `formatted`, a direction-aware `delta` vs the previous row of its kind, and `improvement` |
 | GET    | `/api/learnings`                | List coach learnings (`?sport=&confidence=&dormant=`) + `summary` |
 | GET    | `/api/learnings/<id>/evidence`  | Per-week evidence basis (supporting/contra)  |
@@ -2028,7 +2035,9 @@ Four layout decisions with no design doc and no other home in this document.
 
 ### The multi-day schedule, goals, and plan live on their pages alone
 In the companion chat, `"🗓 Calendar"` and `"🎯 Goals & plan"` are the only read-only
-views of the multi-day schedule, the goals, and the plan. Keeping the older text views
+views of the multi-day schedule, the goals, and the plan, and where the pages are
+published `"📈 Progress"` is the one view of the weeks and the mesocycles
+(DESIGN_progress_page.md §5). Keeping the older text views
 beside them (`workout list` over several days, `goal list`, `plan show`, and `bot
 mesocycle`) left unused paths that disagreed with the rest of the chat. Typing `"my
 goals"` ran `goal list` without the `"🗑 Call one off"` button that `bot goals` draws.
@@ -2038,7 +2047,9 @@ reprinted the mesocycle list instead of the tapped mesocycle's full focus.
 `show_week`, `show_goals`, and `show_plan` stay in `chat/routing.py::ROUTER_INTENTS` so
 `"what's my week?"` does not misroute to `show_today` or `unclear`. `messages._simple_route`
 answers them from `ROUTER_PAGE_REPLIES` with one line naming the keyboard button below
-and spawns no CLI subprocess. `_send_keyed` rebuilds the reply keyboard on that send, so
+and spawns no CLI subprocess; `show_progress` gets its line from `PUBLISHED_PAGE_REPLIES`
+where the pages are published, and runs `progress --chart` where they are not.
+`_send_keyed` rebuilds the reply keyboard on that send, so
 the button underneath carries a fresh page snapshot. `"💬 Why, in chat"` and the
 mesocycle's `"p"` snapshot key went with the chat plan view: published bucket files
 already hold each mesocycle's full `focus`, and an offline phone cannot reach the bot via
@@ -2084,12 +2095,14 @@ says where things live).
 and each view words them itself: `cli/render/calendar_page.py` (the page's snapshot and
 month files), `cli/render/plan_page.py` ("Goals & plan", whose mesocycles come from
 `calendar_page.py::meso_entry`, deload date included), `cli/render/calendar_grid.py`
-(the terminal grid behind `cli/calendar.py`). The pages are `miniapp/calendar.html`,
-`plan.html` and `details.html` (a proposal in full, DESIGN_short_messages.md §6) and their
-`*_logic.js` under node tests, with `storage.js` the bucket read they share.
-`page_files/sync.py` adds the bucket parameters to both buttons and uploads the files
-that changed after every command (`after_command`, from `run_once`). On the bot's side,
-`ChatBot._page_buttons` builds both addresses on every send, `RepliesMixin._send_keyed`
+(the terminal grid behind `cli/calendar.py`), and `cli/render/progress_page.py` (the
+Progress page's file, DESIGN_progress_page.md §4). The pages are `miniapp/calendar.html`,
+`plan.html`, `details.html` (a proposal in full, DESIGN_short_messages.md §6) and
+`progress.html`, and their `*_logic.js` under node tests, with `storage.js` the bucket read
+they share. `page_files/sync.py` adds the bucket parameters to the buttons and uploads the
+files that changed after every command (`after_command`, from `run_once`). On the bot's
+side, `ChatBot._page_buttons` builds the addresses on every send, the Progress page's only
+where the pages are published, `RepliesMixin._send_keyed`
 is the one send that attaches the keyboard, and `on_web_app_data` turns a `calendar_day`
 message into `workout show -d <date>`; any other page message is a gym log
 ([§16](#16-gym-logger-telegram-mini-app)).

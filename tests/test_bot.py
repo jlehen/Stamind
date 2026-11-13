@@ -247,6 +247,19 @@ class GymButtonTest(unittest.TestCase):
         self.assertIsNone(keyboards.keyboard_action(keyboards.CALENDAR_LABEL))
         self.assertIsNone(keyboards.keyboard_action(keyboards.PLAN_LABEL))
 
+    def test_where_the_pages_are_published_progress_is_a_page_cell_in_its_place(self):
+        """DESIGN_progress_page.md §5: the page in place of the command; without it, the
+        command button, which an old keyboard's tap still runs."""
+        progress = (keyboards.PROGRESS_LABEL, "https://x/progress.html#k=a&b=b&f=f")
+        rows = keyboards.simple_keyboard_rows(progress=progress)
+        self.assertEqual(rows[1], [progress, "💬 Talk to me"])
+        self.assertEqual(keyboards.simple_keyboard_rows()[1], ["📈 Progress", "💬 Talk to me"])
+        self.assertEqual(
+            keyboards.keyboard_action(keyboards.PROGRESS_LABEL), ("run", ["progress", "--chart"])
+        )
+        self.assertIn("📈 Progress — how your weeks and mesocycles went",
+                      keyboards.SIMPLE_WELCOME)
+
     def test_the_gym_label_is_not_a_command(self):
         """Tapping it opens the page and sends no text, so nothing here should ever see
         it; if Telegram ever did deliver it as text, it must not run anything."""

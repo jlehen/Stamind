@@ -450,3 +450,49 @@ def week_zone_state(
         undercounted=undercounted,
         currency_mismatch=mismatch,
     )
+
+
+def zone_weeks(
+    weeks: List[Dict[str, Any]], sports: Sequence[str], today: str,
+    forced: Optional[str] = None, choose_from: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Each sport's time in zone, week by week over `weeks`, as `/api/zones` serves it and the
+    Progress page draws it, so the two cannot disagree (DESIGN_progress_page.md §3.4, §10).
+    Measured behind today, prescribed ahead of it (§9.8).
+
+    A sport's currency is chosen over `choose_from`, else over `weeks`; a sport with no zone
+    data in `choose_from` takes the choice of `weeks` (DESIGN_progress_page.md choice 16).
+    A sport with no currency at all is left out."""
+    stats = window_sport_stats(weeks)
+    chosen = stats if choose_from is None else window_sport_stats(choose_from)
+    out = []
+    for sport in sports:
+        currency = zone_currency(chosen, sport, forced) or zone_currency(stats, sport, forced)
+        if not currency:
+            continue
+        spec = CURRENCY_BY_KEY[currency]
+        agg = stats.get(sport) or {"seconds": 0.0, "coverage": {}}
+        rows = []
+        for week in weeks:
+            future = week["week_commencing"] > today
+            state = week_zone_state(week, sport, currency, is_future=future)
+            row: Dict[str, Any] = {
+                "week_commencing": week["week_commencing"],
+                "meso_label": week.get("meso_label"),
+                "in_progress": bool(week.get("in_progress")),
+                "future": future,
+                "seconds": list(state.seconds) if state.seconds is not None else None,
+                "trained": state.trained,
+                "undercounted": state.undercounted,
+            }
+            if future and state.seconds is None:
+                # Planned in the other currency: offered as a fact, never converted (§9.8).
+                row["currency_mismatch"] = state.currency_mismatch
+            rows.append(row)
+        out.append({
+            "sport": sport, "currency": currency, "tag": spec.tag,
+            "zone_labels": list(spec.labels),
+            "coverage": (agg.get("coverage") or {}).get(currency, 0.0),
+            "sport_seconds": agg["seconds"], "weeks": rows,
+        })
+    return out

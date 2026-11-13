@@ -369,18 +369,14 @@ def get_timeline_png() -> Any:
 @app.route("/api/zones", methods=["GET"])
 def get_zones() -> Any:
     """Per-sport, per-zone time in zone over the displayed window — the structured form
-    of the `sm progress -z` tables (DESIGN_intensity_distribution.md §9.6/§9.8).
+    of the `sm progress intensity` tables (DESIGN_intensity_distribution.md §9.6/§9.8).
 
     Which sports qualify, and the currency each is drawn in, come from
     `intensity.window_sport_stats`/`select_zone_sports`/`zone_currency` — the same three
     functions the CLI tables call, so a sport the terminal omits is omitted here for the
-    same reason and named in `omitted` rather than silently dropped.
-
-    Weeks at or before today carry what was MEASURED; weeks beyond it carry what the plan
-    PRESCRIBES (`future: true`), the data behind the CLI's ghost rows. A future week whose
-    plan was written in the other currency reports `currency_mismatch` instead of
-    converting — collapsing 7 power zones onto 5 HR ones would be banding by the back
-    door (§5).
+    same reason and named in `omitted` rather than silently dropped. The weeks are
+    `intensity.zone_weeks`, which the Progress page's file reads too: measured behind
+    today, prescribed ahead of it (`future: true`).
 
     Query: ?weeks=N|all (default 8), ?sport= (repeatable; overrides the volume filter),
     ?currency=hr|power (the CLI's --hr/--power)."""
@@ -406,43 +402,8 @@ def get_zones() -> Any:
         explicit, list(config.user_profile.get("sport_preferences") or []), stats
     )
     window_seconds = sum(agg["seconds"] for agg in stats.values())
-
-    sports_out: List[Dict[str, Any]] = []
-    for sport in selected:
-        currency = intensity.zone_currency(stats, sport, forced)
-        if not currency:
-            continue
-        spec = intensity.CURRENCY_BY_KEY[currency]
-        agg = stats.get(sport) or {"seconds": 0.0, "coverage": {}}
-
-        weeks_out = []
-        for week in weeks:
-            is_future = week["week_commencing"] > today
-            # One derivation of the three-state rule, shared with the CLI table.
-            state = intensity.week_zone_state(week, sport, currency, is_future=is_future)
-            entry: Dict[str, Any] = {
-                "week_commencing": week["week_commencing"],
-                "meso_label": week.get("meso_label"),
-                "in_progress": bool(week.get("in_progress")),
-                "future": is_future,
-                "seconds": list(state.seconds) if state.seconds is not None else None,
-                "trained": state.trained,
-                "undercounted": state.undercounted,
-            }
-            if is_future and state.seconds is None:
-                # Planned in the other currency: offered as a fact, never converted (§9.8).
-                entry["currency_mismatch"] = state.currency_mismatch
-            weeks_out.append(entry)
-
-        sports_out.append({
-            "sport": sport,
-            "currency": currency,
-            "tag": spec.tag,
-            "zone_labels": list(spec.labels),
-            "coverage": (agg.get("coverage") or {}).get(currency, 0.0),
-            "sport_seconds": agg["seconds"],
-            "weeks": weeks_out,
-        })
+    # The Progress page's file calls the same function (DESIGN_progress_page.md §10).
+    sports_out = intensity.zone_weeks(weeks, selected, today, forced)
 
     return jsonify({
         "window": {

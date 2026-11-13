@@ -30,8 +30,9 @@ from tests.helpers import bind_test_db, save_workout
 from stamind import clock, settings
 from stamind.chat import keyboards, replies, runner, scheduler, telegram_api
 from stamind.chat.app import ChatBot
-from stamind.cli.render import calendar_page, plan_page
+from stamind.cli.render import calendar_page, plan_page, progress_page
 from stamind.config import config
+from stamind.page_files import sync as page_files
 from stamind.strength import logger
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -195,7 +196,7 @@ class GymKeyboardTest(unittest.TestCase):
         self.db = bind_test_db(test_db_path("test_chat_process.db"))
         # The page cells have their own case below; here they are fixed cells.
         patcher = mock.patch.object(ChatBot, "_page_buttons",
-                                    return_value=(self.CALENDAR, self.PLAN))
+                                    return_value=(self.CALENDAR, self.PLAN, None))
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -255,6 +256,14 @@ class CalendarKeyboardTest(unittest.TestCase):
         self.assertEqual(plan[0], keyboards.PLAN_LABEL)
         self.assertTrue(plan[1].startswith(plan_page.PAGE_URL + "#c="), plan[1])
         self.assertEqual(rows, keyboards.simple_keyboard_rows(calendar=(label, url), plan=plan))
+
+    def test_where_the_pages_are_published_progress_opens_its_page(self):
+        """No snapshot, only the way to the file, in place of the command
+        (DESIGN_progress_page.md §5). Unpublished, the case above keeps the command."""
+        with mock.patch.object(page_files, "button_params", return_value="&k=key&b=pages&f=1"):
+            _kind, rows = build_chat_bot(self)._keyboard()
+        self.assertEqual(rows[2][0], (keyboards.PROGRESS_LABEL,
+                                      progress_page.PAGE_URL + "#k=key&b=pages&f=1"))
 
 
 class BackAfterRestartTest(unittest.IsolatedAsyncioTestCase):

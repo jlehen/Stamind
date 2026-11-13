@@ -330,6 +330,22 @@ def plan_lineage(
     return [mesocycle for lineage in lineages for mesocycle in lineage]
 
 
+def reported_mesocycles(dbh) -> List[Dict[str, Any]]:
+    """The mesocycles time in zone is reported per mesocycle for, by `sm progress intensity
+    --mesocycles` and the Progress page: the governing plan's, and the previous goal's so
+    DESIGN_intensity_distribution.md §4.1's delta has a left-hand side.
+
+    The preceding plan is the previous *goal's* — the one that governed the earlier dates —
+    never an earlier version of this goal's own, which was superseded before it was ever
+    trained (DESIGN_plan_rollback.md §6.1).
+    """
+    governing = dbh.get_governing_macrocycle()
+    preceding = (
+        dbh.get_preceding_macrocycle(governing["objective_id"]) if governing else None
+    )
+    return plan_lineage(dbh, [preceding, governing])
+
+
 def delta_baseline(
     mesocycles: Sequence[Dict[str, Any]], i: int
 ) -> Optional[Dict[str, Any]]:
@@ -338,8 +354,9 @@ def delta_baseline(
 
     A delta across a plan boundary compares last season's taper with this season's base,
     which is not the intensity-creep signal the delta carries — so the boundary mesocycle
-    simply reports no change. `sm progress --mesocycles` only: the strategy prompt wants the
-    cross-season comparison and indexes the list itself (DESIGN_plan_rollback.md §6.1).
+    simply reports no change. `sm progress intensity --mesocycles` only: the strategy prompt
+    wants the cross-season comparison and indexes the list itself (DESIGN_plan_rollback.md
+    §6.1).
     """
     if not i:
         return None

@@ -1,6 +1,7 @@
 """A week against its sessions as `workout generate` wrote them (DESIGN_week_as_written.md):
 the slot walk (§3), the grade (§2), the reason shown (§5), the switch to the live sessions at
-this week's Monday (§4), the record's numbers (§4), D5 in apply, and `workout compare` (§5).
+this week's Monday (§4), the record's numbers (§4), D5 in apply, `sm progress weeks` and a
+`workout compare` with no weeks (DESIGN_progress_page.md §6).
 
 The week is Monday 2 November to Sunday 8 November 2026, graded on Tuesday 10 November.
 """
@@ -329,8 +330,8 @@ class ApplyTest(_Case):
         self.assertEqual(self._apply(), "adapt")
 
 
-class CompareTest(_Case):
-    """§5: the weeks as written under `workout compare`, in both voices."""
+class _ShortGymWeek(_Case):
+    """The week of 2 November: the ride done, Thursday's gym replaced by a rest day."""
 
     def setUp(self):
         super().setUp()
@@ -342,33 +343,61 @@ class CompareTest(_Case):
                voids=[(3, "strength_training")], reason="Sick.")
         _act(1, tss=100.0)
 
-    def _compare(self, *extra, render="expert"):
-        with patch.dict(os.environ, {"STAMIND_RENDER": render}):
-            return run_cli(["workout", "compare", "-d", f"{MON}..{_day(6)}", "--no-pull",
-                            "--no-mark", *extra])[1]
 
-    def test_a_short_sport_lists_its_changed_sessions_and_the_other_none(self):
-        out = self._compare()
-        self.assertIn("=== WEEKS AS WRITTEN ===", out)
+class ProgressWeeksTest(_ShortGymWeek):
+    """`sm progress weeks`: the ended weeks, one line each, or one in full
+    (DESIGN_progress_page.md §6)."""
+
+    def _weeks(self, *extra):
+        code, out, _ = run_cli(["progress", "weeks", *extra, "--no-pull"])
+        self.assertEqual(code, 0)
+        return out
+
+    def test_one_line_per_ended_week_of_the_window_and_none_for_the_week_under_way(self):
+        # Two weeks, this one counted: the week of 2 November, and the week under way.
+        _write("generate", _session(8, tss=80))
+        out = self._weeks("-w", "2")
+        self.assertIn("WEEKS AS WRITTEN", out)
+        self.assertIn("w/c 11-02  cycling 100% · strength_training 0 of 1, short\n", out)
+        self.assertNotIn("w/c 11-09", out)
+
+    def test_a_week_outside_the_window_is_not_listed(self):
+        self.assertNotIn("w/c 11-02", self._weeks("-w", "1"))
+
+    def test_a_day_of_the_week_prints_it_in_full(self):
+        out = self._weeks(_day(4))
+        self.assertIn("Week of Mon 2 Nov", out)
         self.assertIn("cycling: written 100, done 100 (100%)\n", out)
         self.assertIn("strength_training: written 1 session, done 0, short", out)
         self.assertIn('Thu 5 Nov Light gym: replaced by Rest Day, changed ', out)
-        self.assertNotIn("Great adherence", out)
-
-    def test_sport_grades_only_that_sport(self):
-        out = self._compare("-t", "cycling")
-        self.assertIn("cycling: written 100", out)
-        self.assertNotIn("strength_training: written", out)
-
-    def test_the_chat_says_what_was_done_then_the_session(self):
-        out = " ".join(self._compare(render="simple").split())
-        self.assertIn("against the week as it was written: you did 0 of its 1 gym session.", out)
-        self.assertIn("Thu 05 · 🏋️ Light gym — 60 min: replaced by Rest Day, changed ", out)
         self.assertIn(': "Sick."', out)
 
-    def test_the_chat_adds_nothing_for_a_week_with_nothing_short(self):
-        _act(3, sport="strength_training", tss=15.0)
-        self.assertNotIn("as it was written", self._compare(render="simple"))
+    def test_the_week_under_way_is_never_graded(self):
+        out = self._weeks(TODAY)
+        self.assertIn("has not ended", out)
+        self.assertNotIn("written", out)
+
+
+class CompareTest(_ShortGymWeek):
+    """`workout compare` and "✅ Done lately" are the days again (DESIGN_progress_page.md
+    §5, §6)."""
+
+    def _compare(self, render="expert"):
+        with patch.dict(os.environ, {"STAMIND_RENDER": render}):
+            return run_cli(["workout", "compare", "-d", f"{MON}..{_day(6)}", "--no-pull",
+                            "--no-mark"])[1]
+
+    def test_no_week_section_and_great_adherence_when_no_day_has_a_discrepancy(self):
+        out = self._compare()
+        self.assertNotIn("WEEKS AS WRITTEN", out)
+        self.assertNotIn("written 1 session", out)
+        self.assertIn("No discrepancies found. Great adherence!", out)
+
+    def test_the_chat_adds_no_week_line_under_the_days(self):
+        out = self._compare(render="simple")
+        self.assertIn("Looking back", out)
+        self.assertNotIn("as it was written", out)
+        self.assertNotIn("Sick.", out)
 
 
 if __name__ == "__main__":

@@ -25,14 +25,14 @@ from stamind import calendar_days, clock, journal, runtime, settings
 from stamind.chat import runner, telegram_api
 from stamind.chat.callbacks import CallbacksMixin
 from stamind.chat.keyboards import (
-    CALENDAR_LABEL, GYM_SPORT, PLAN_LABEL, SIMPLE_MENU_COMMANDS, gym_button, gym_window_end,
-    simple_keyboard_rows,
+    CALENDAR_LABEL, GYM_SPORT, PLAN_LABEL, PROGRESS_LABEL, SIMPLE_MENU_COMMANDS, gym_button,
+    gym_window_end, simple_keyboard_rows,
 )
 from stamind.chat.messages import MessagesMixin
 from stamind.chat.replies import RepliesMixin, SentQuestion
 from stamind.chat.runner import RunnerMixin, Session
 from stamind.chat.scheduler import SchedulerMixin
-from stamind.cli.render import calendar_page, plan_page
+from stamind.cli.render import calendar_page, plan_page, progress_page
 from stamind.config import config
 from stamind.output import warn
 from stamind.page_files import sync as page_files
@@ -127,26 +127,31 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         label, workout = found
         return label, logger.session_url(workout)
 
-    def _page_buttons(self) -> Tuple[Tuple[str, str], Tuple[str, str]]:
+    def _page_buttons(self) -> Tuple[Tuple[str, str], Tuple[str, str],
+                                     Optional[Tuple[str, str]]]:
         """The calendar's and the "Goals & plan" page's (label, address) cells, both
         carrying this moment's snapshot of one list of days (DESIGN_calendar_miniapp.md §5,
         §3.7), and the way to the pages' files once they are published
-        (DESIGN_miniapp_storage.md §8)."""
+        (DESIGN_miniapp_storage.md §8). Then the Progress page's cell, which carries no
+        snapshot, only where they are published, else None (DESIGN_progress_page.md §5)."""
         today = clock.today_str()
         start, end = calendar_page.window(today)
         cal = calendar_days.gather(runtime.db, start, end, today)
         now = clock.now()
         storage = page_files.button_params(runtime.db)
+        progress = None
+        if storage:
+            progress = (PROGRESS_LABEL, progress_page.progress_url(storage))
         return ((CALENDAR_LABEL, calendar_page.calendar_url(cal, now, storage)),
-                (PLAN_LABEL, plan_page.plan_url(cal, now, storage)))
+                (PLAN_LABEL, plan_page.plan_url(cal, now, storage)), progress)
 
     def _keyboard(self):
         """The §5.1 reply keyboard, rebuilt on every send so the gym button follows the week
         and the pages carry a fresh snapshot (DESIGN_gym_logger.md §6,
         DESIGN_calendar_miniapp.md §5)."""
-        calendar, plan = self._page_buttons()
+        calendar, plan, progress = self._page_buttons()
         return telegram_api.reply_keyboard(
-            simple_keyboard_rows(self._gym_button(), calendar, plan)
+            simple_keyboard_rows(self._gym_button(), calendar, plan, progress)
         )
 
     def _log(

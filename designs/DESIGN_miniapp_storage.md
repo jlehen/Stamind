@@ -95,6 +95,7 @@ uploaded, and the buttons' addresses are the ones of today.
 | The index file | `calendar/index` | Today's date, the stamp, the goals, the mesocycles, the last day of the schedule, and the first and last month that have a file. | After every command. |
 | The plan file | `plan` | What the "Goals & plan" button carries, plus each mesocycle's whole long text. | After every command. |
 | The proposal file | `proposal` | The newest proposal saved, whatever its answer, with its number: what the details page shows (added 2026-10-21, DESIGN_short_messages.md §6.2). | After every command, and before a "Tell me more" button is sent. |
+| The progress file | `progress` | The days, the weeks with each ended week's grade, the records, the chart's goals and bands, and each sport's time in zone by week and by mesocycle: what the Progress page shows. No snapshot in its button (added 2026-11-12, DESIGN_progress_page.md §4). | After every command, uploaded last. |
 
 A file's name in the bucket never changes (D9). Writing a file again replaces its content
 under the same name, so a page always finds the newest content under the name it computes.
