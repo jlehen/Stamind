@@ -20,6 +20,7 @@ const ui = {
   endNote: document.getElementById("end-note"),
   monthNote: document.getElementById("month-note"),
   legend: document.getElementById("legend"),
+  legendHead: document.getElementById("legend-head"),
   problem: document.getElementById("problem"),
   sheet: document.getElementById("day-sheet"),
   sheetTitle: document.getElementById("sheet-title"),
@@ -154,6 +155,7 @@ function renderLegend(month) {
     deload.append(element("span", "", `Deload · ${logic.deloadDates(meso)}`));
     ui.legend.append(deload);
   }
+  ui.legendHead.hidden = !ui.legend.children.length;
 }
 
 function renderHead() {

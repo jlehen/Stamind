@@ -308,6 +308,17 @@ h1 {
   font-size: 13px;
 }
 
+/* What the list under it is: the background colours, the underline colours. */
+.legend-head {
+  margin: 16px 0 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.legend-head + .legend {
+  margin-top: 2px;
+}
+
 .legend li, .plan-row {
   display: flex;
   align-items: center;

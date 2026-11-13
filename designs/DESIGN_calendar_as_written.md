@@ -234,3 +234,4 @@ restarted, since the bot builds the button's address.
 | D8 | Where a corner goes | On every day the coach changed, even when it has the fill's colour | Choice 1, mock-up A over B | Athlete | 2026-11-13 |
 | D9 | The week's numbers in the terminal | A gray line under each ended week, `week_line`'s words | Both reviewers: the numbers after the row wrap on an 80-column terminal | Athlete | 2026-11-13 |
 | D10 | The key's words | Two rows with a swatch each: "Colour: comparing against what was initially planned for this microcycle (week)", "Corner: changed, comparing against what the coach last requested" | "Colour: against what was written. Corner: …" was not clear enough | Athlete | 2026-11-13 |
+| D11 | The legend's lists | A heading over each: "Background colour: how the day went", "Underline colour: the day's mesocycle" | "Introduce what they each are" | Athlete | 2026-11-13 |
