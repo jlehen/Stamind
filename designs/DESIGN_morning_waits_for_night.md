@@ -143,8 +143,8 @@ Typing "what's on today?" runs the same command as the button, so it does the sa
   busy for the minute the message takes, as for any command. With it off, the message comes in
   seconds and has no such line.
 - **A tap while the bot's own try runs.** The scheduler starts `bot morning` beside the chat,
-  as a long run (DESIGN_long_runs_beside_chat.md §2), and the marker is written only at its
-  end. While that run is alive, "📅 Today" and a typed "what's on today?" show the view as they
+  as a long run (DESIGN_long_runs_beside_chat.md §2), and the marker is written only once the
+  try has found the night. While that run is alive, "📅 Today" and a typed "what's on today?" show the view as they
   do now, and the message follows on its own. Otherwise a tap at 06:15:20, during the try
   started at 06:15:00, would send a second morning message.
 - **`earliest-morning`** is a setting (DESIGN_settings.md), seeded from
