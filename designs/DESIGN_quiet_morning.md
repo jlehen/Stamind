@@ -114,9 +114,9 @@ note is never news to the next run.
 ## 4. The night
 
 A night is graded by the three verdicts `analytics/baselines.py` already gives to colour `status`
-and `data show-metrics`: HRV is suppressed below the 28-day mean minus one standard deviation,
-resting HR is elevated above the mean plus one standard deviation with a floor of 3 bpm, and
-sleep is poor below a score of 60. No new threshold and no new setting.
+and `data show-metrics`: HRV is suppressed below the rolling mean (`garmin.baseline_days`) minus
+one standard deviation, resting HR is elevated above the mean plus one standard deviation with a
+floor of 3 bpm, and sleep is poor below a score of 60. No new threshold and no new setting.
 
 The push grades the days after `night`, up to today, that have a sleep score, on all three
 verdicts. With no `night` yet, because no day up to `date` had a sleep score, it grades every

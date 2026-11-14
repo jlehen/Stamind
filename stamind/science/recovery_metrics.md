@@ -12,17 +12,17 @@ readiness to train and absorb stress.
    - HRV measures the variation in time between consecutive heartbeats. Higher HRV typically
      indicates a dominant parasympathetic nervous system (rest, digest, recovery). Lower HRV
      indicates sympathetic dominance (stress, fatigue).
-   - Baseline: A 28-day rolling average and standard deviation (SD) define the athlete's "normal
+   - Baseline: A rolling average and standard deviation (SD) define the athlete's "normal
      range" or "baseline band".
    - Under-recovery: An overnight HRV average that drops more than 1.0 standard deviation below the
-     rolling 28-day baseline signifies fatigue. If it drops more than 1.5 SD, it indicates high
+     rolling baseline signifies fatigue. If it drops more than 1.5 SD, it indicates high
      fatigue or potential illness.
    - Adaptation: Reduce training intensity/volume or schedule a rest day when HRV is significantly
      suppressed.
 
 2. Resting Heart Rate (RHR):
    - RHR is the heart rate measured when completely at rest (typically waking rate).
-   - Baseline: 28-day rolling average and standard deviation.
+   - Baseline: rolling average and standard deviation.
    - Under-recovery: An RHR that is elevated by 3 or more beats per minute (bpm) above the baseline
      average (or > 1.0 SD) is a strong marker of systemic stress, poor recovery, dehydration, or
      onset of illness.
@@ -31,7 +31,7 @@ readiness to train and absorb stress.
 3. Sleep Score:
    - Sleep quality directly affects hormonal release, glycogen replenishment, and muscle tissue
      repair.
-   - Baseline: 28-day rolling average of sleep score (0-100 scale).
+   - Baseline: rolling average of sleep score (0-100 scale).
    - Interpretation:
      - 80 - 100 (Excellent/Good): High readiness. Ready for high-intensity or high-volume workouts.
      - 60 - 79 (Fair): Moderately ready. Proceed with planned workouts but monitor feel.

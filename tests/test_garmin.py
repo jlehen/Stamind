@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, rebind_test_db
 from stamind import runtime
+from stamind.config import config
 from stamind.db import Database
 import stamind.garmin as garmin
 from tests import test_db_path
@@ -104,6 +105,9 @@ class TestRecomputeDerived(unittest.TestCase):
     def setUp(self):
         _bind_test_db(self)
         clear_all_tables(test_db)
+        pinned = patch.dict(config.data, {"garmin": {"baseline_days": 40}})
+        pinned.start()
+        self.addCleanup(pinned.stop)
 
     def test_recompute_fills_workload_and_baseline(self):
         # 30 days of metric rows + one activity in the acute window.
@@ -121,10 +125,55 @@ class TestRecomputeDerived(unittest.TestCase):
         # Activity yesterday still carries into today's ATL/CTL EWMAs.
         self.assertGreater(today_row["atl"], 0.0)
         self.assertIsNotNone(today_row["ctl"])
-        # 28+ days of stable metrics -> a baseline exists for today.
+        # 30 days of stable metrics, past the 7 readings a baseline needs.
         baseline = test_db.get_baseline(_d(0))
         self.assertIsNotNone(baseline)
         self.assertAlmostEqual(baseline["rhr_baseline_mean"], 50.0)
+
+    def test_baseline_averages_over_configured_window(self):
+        # 20 mornings at 50 bpm, then 10 at 60: a 10-day window sees only the 60s.
+        for i in range(30, -1, -1):
+            test_db.save_metric_cache(
+                date=_d(-i), rhr=60 if i <= 10 else 50, hrv=70, sleep_score=80, stress=20,
+            )
+        with patch.dict(config.data, {"garmin": {"baseline_days": 10}}):
+            garmin.recompute_derived()
+        self.assertAlmostEqual(test_db.get_baseline(_d(0))["rhr_baseline_mean"], 60.0)
+
+    def test_metric_under_seven_readings_has_no_baseline_not_zero(self):
+        # HRV on none, then on 6, of the mornings before today: RHR gets a baseline, HRV
+        # stays NULL rather than 0 or a mean of six.
+        for hrv_days in (0, 6):
+            with self.subTest(hrv_days=hrv_days):
+                clear_all_tables(test_db)
+                for i in range(30, -1, -1):
+                    test_db.save_metric_cache(
+                        date=_d(-i), rhr=50, hrv=70 if 0 < i <= hrv_days else None,
+                        sleep_score=80, stress=20,
+                    )
+                garmin.recompute_derived()
+                baseline = test_db.get_baseline(_d(0))
+                self.assertAlmostEqual(baseline["rhr_baseline_mean"], 50.0)
+                self.assertIsNone(baseline["hrv_baseline_mean"])
+                self.assertIsNone(baseline["hrv_baseline_std"])
+
+    def test_day_that_no_longer_earns_a_baseline_loses_its_row(self):
+        # 10 mornings, then a 20-day gap: a 40-day window gives today a baseline, a
+        # 7-day one does not, and today must not keep the 40-day row.
+        for i in range(30, 20, -1):
+            test_db.save_metric_cache(date=_d(-i), rhr=50, hrv=70, sleep_score=80, stress=20)
+        test_db.save_metric_cache(date=_d(0), rhr=50, hrv=70, sleep_score=80, stress=20)
+        garmin.recompute_derived()
+        self.assertEqual(test_db.get_baseline(_d(0))["date"], _d(0))
+        with patch.dict(config.data, {"garmin": {"baseline_days": 7}}):
+            garmin.recompute_derived()
+        # get_baseline falls back to the closest earlier row, which is not today's.
+        self.assertNotEqual(test_db.get_baseline(_d(0))["date"], _d(0))
+
+    def test_window_under_seven_days_is_refused(self):
+        with patch.dict(config.data, {"garmin": {"baseline_days": 6}}):
+            with self.assertRaises(ValueError):
+                garmin.recompute_derived()
 
 
 class TestBackfillTss(unittest.TestCase):

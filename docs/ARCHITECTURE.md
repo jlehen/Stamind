@@ -530,7 +530,8 @@ signatures are read off the mixin in `stamind/db/`. Only what the convention doe
   athlete's words with a session (DESIGN_session_notes.md).
 - **Completed Activities** (`activities.py`): `save_completed_activity` upserts on
   `activity_id` naming its columns, so it never touches the strength columns;
-  `get_baseline(date)` returns the closest prior baseline.
+  `get_baseline(date)` returns the closest prior baseline; `clear_baselines` empties the
+  table for the recompute sweep.
 - **Strength sets** (`strength.py`): `name_exercise_sets` is the only writer of
   `named_by = athlete`; `strength_set_rows` is the one query the strength history is built
   from; every write that changes what the history shows calls `bump_strength_history`
@@ -880,8 +881,10 @@ calendar day; the ATL:CTL ratio is derived at read time, never stored
 ([§12](#12-sports-science--coaching-mathematics), DESIGN_load_ratio.md).
 
 ### athlete_baselines
-28-day rolling baseline computed during `garmin.recompute_derived()` (a full
-sweep run after every pull).
+Rolling mean and standard deviation over the `garmin.baseline_days` days before each day,
+rewritten from scratch by `garmin.recompute_derived()` (a full sweep run after every pull). A
+metric with fewer than 7 readings in the window is NULL, and a day with none of the three has
+no row.
 
 | Column                      | Type    |
 |-----------------------------|---------|
@@ -1390,6 +1393,7 @@ but the credentials is optional and falls back to the default shown:
 | `refresh_minutes`      | int | Throttle window shared by Garmin pulls **and** Calendar-signal syncs; reads inside it reuse the cache. Top-level, default 120; read as `config.data_refresh_minutes` |
 | `garmin.mutable_days` / `garmin.backfill_prompt_days` / `garmin.initial_backfill_days` / `garmin.throttle_seconds` | — | Auto-ensure tuning (defaults 3 / 30 / 90 / 0.2; see [§10 Data Pull](#data-pull-data-pull-and-auto-ensure)) |
 | `garmin.pmc_ctl_days` / `garmin.pmc_atl_days` | int | PMC time constants (42 / 7 — the supported configuration, [§12](#fitnessfatigueform-pmc-model)) |
+| `garmin.baseline_days` | int | Days before each morning the RHR, HRV and sleep baselines average over (40, at least 7, [§15](#baseline-window)) |
 | `garmin.hr_zone_coverage_min` / `garmin.zone_coverage_display_min` / `garmin.zone_coverage_display_min_by_sport` | — | Load-model coverage gate (0.5) and the display coverage bars (0.8, per canonical sport) — [§12](#load-model-per-activity), DESIGN_intensity_distribution.md |
 | `garmin.min_activity_minutes` / `garmin.poll_minutes` | float | Shortest activity that gets an RPE warning or reminder, starts the Garmin check's questions, raises a `sm progress` under-count marker, or counts as a gym session done in the week grade (15), and how often the bot looks for a new activity, 0 for never (15) — [§15](#15-design-rationale--history) |
 | `garmin.hours_load_floor` | float | Load per hour an activity or a planned session must exceed for its time to count in the week's hours (10, what an hour at RPE 1 gives) — DESIGN_progress_timeline.md §7.1 |
@@ -1591,7 +1595,8 @@ DESIGN_garmin_direct_pull.md).
    reads the sets of every strength activity never read
    (`strength.sets.read_new_activities`, DESIGN_strength_tracking.md §6).
 2. `garmin.recompute_derived()` runs a full sweep over every cached day: the PMC EWMAs and
-   the 28-day baseline. The ATL:CTL ratio is derived at read time (§12).
+   the rolling baselines (`garmin.baseline_days`). The ATL:CTL ratio is derived at read
+   time (§12).
 3. The `sync_state` watermark advances (`through_date` forward only, `last_pull_utc`).
 
 **Auto-ensure.** Read-side commands call `garmin.ensure_data(start, end)` at entry
@@ -1846,6 +1851,17 @@ with no design doc of their own.
 sRPE); the former `TSS + RPE × hours` additive blend was removed because it
 double-counted internal and external load. RPE is user-entered only and never
 synthesised from power/HR. See [§12](#12-sports-science--coaching-mathematics).
+
+### Baseline window
+
+The resting HR, HRV and sleep baselines are plain means over `garmin.baseline_days`
+(default 40). With the former 28 days, a fortnight of illness was half the window: by its
+second week a sick morning read as normal, and the skew lasted two weeks past recovery. A
+longer window keeps that illness flagged but follows a real change, like a summer of higher
+resting HR, more slowly. HRV4Training draws its normal range from 60 days. Not handled: a
+longer illness. A sick morning stops being flagged once the illness fills about half the
+window, and sooner for an athlete whose readings vary a lot from day to day. Days with an
+`illness` signal are not left out.
 
 ### Questions soon after a session
 

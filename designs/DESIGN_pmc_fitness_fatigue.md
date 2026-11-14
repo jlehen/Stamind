@@ -387,7 +387,8 @@ defaults. Two corrections to the text above:
   window it pads for.
 - The `acwr_chronic_days` term went with ACWR (DESIGN_load_ratio.md). The `28` floor
   stays and now carries that job alone, since it was always the real backstop for the
-  hardcoded baseline lookback.
+  hardcoded baseline lookback. That lookback is now `garmin.baseline_days` (default 40),
+  and the floor reads it: `max(baseline_days, ceil(1.5 * pmc_ctl_days))`.
 
 **Config-change staleness (accepted, documented).** The rewriting sweep only runs
 on the next path that calls `recompute_derived()` (next `pull()` / `backfill_tss()`

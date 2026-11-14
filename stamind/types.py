@@ -170,12 +170,13 @@ class AthleteMetric(TypedDict):
 class AthleteBaseline(TypedDict):
     """Represents rolling baseline stats calculated for an athlete."""
     date: str
-    rhr_baseline_mean: float
-    rhr_baseline_std: float
-    hrv_baseline_mean: float
-    hrv_baseline_std: float
-    sleep_baseline_mean: float
-    sleep_baseline_std: float
+    # A metric with too few readings in the window is None (garmin/derived.py).
+    rhr_baseline_mean: Optional[float]
+    rhr_baseline_std: Optional[float]
+    hrv_baseline_mean: Optional[float]
+    hrv_baseline_std: Optional[float]
+    sleep_baseline_mean: Optional[float]
+    sleep_baseline_std: Optional[float]
 
 class Macrocycle(TypedDict):
     """Represents a high-level periodized training macrocycle.

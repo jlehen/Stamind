@@ -276,11 +276,18 @@ class ActivitiesMixin:
             return row["sleep_score"] if row else None
 
     # --- Athlete Baselines ---
+    def clear_baselines(self) -> None:
+        """Deletes every baseline row; `garmin.recompute_derived()` then rewrites them."""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM athlete_baselines")
+
     def save_baseline(
-        self, date: str, rhr_mean: float, rhr_std: float, hrv_mean: float,
-        hrv_std: float, sleep_mean: float, sleep_std: float
+        self, date: str, rhr_mean: Optional[float], rhr_std: Optional[float],
+        hrv_mean: Optional[float], hrv_std: Optional[float],
+        sleep_mean: Optional[float], sleep_std: Optional[float],
     ) -> None:
-        """Saves calculated athlete baseline values."""
+        """Saves calculated athlete baseline values; None for a metric with too few
+        readings in the window."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""

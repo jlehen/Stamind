@@ -29,12 +29,12 @@ def derivation_pad_days() -> int:
     """Raw history needed *before* a displayed window so the baselines and the CTL EWMA
     are warm for the earliest displayed day. Read live from config.
 
-    `max(28, ceil(1.5*pmc_ctl_days))` (= 63 at defaults): the 28 floor pins the pad to
-    the hardcoded 28-day baseline lookback in recompute_derived(); the 1.5*τ_ctl term
+    `max(baseline_days, ceil(1.5*pmc_ctl_days))` (= 63 at defaults): the first term pins
+    the pad to the baseline window in recompute_derived(); the 1.5*τ_ctl term
     warms CTL to ~78% at the left edge (the §3.3(b) accuracy caveat carries the
     residual). See DESIGN_pmc_fitness_fatigue.md §3.4."""
     return max(
-        28,
+        config.baseline_days,
         math.ceil(1.5 * config.pmc_ctl_days),
     )
 def load_ratio(atl: Optional[float], ctl: Optional[float]) -> Optional[float]:

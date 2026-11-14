@@ -303,19 +303,14 @@ def run_status(args) -> None:
         
         # Baselines
         if baseline:
-            print(bold("Baselines (28-day):"))
-            print(
-                f"- RHR Mean   : {baseline['rhr_baseline_mean']:.1f} "
-                f"(std: {baseline['rhr_baseline_std']:.2f})"
-            )
-            print(
-                f"- HRV Mean   : {baseline['hrv_baseline_mean']:.1f} "
-                f"(std: {baseline['hrv_baseline_std']:.2f})"
-            )
-            print(
-                f"- Sleep Mean : {baseline['sleep_baseline_mean']:.1f} "
-                f"(std: {baseline['sleep_baseline_std']:.2f})"
-            )
+            print(bold(f"Baselines ({config.baseline_days}-day):"))
+            for label, key in (("RHR", "rhr"), ("HRV", "hrv"), ("Sleep", "sleep")):
+                mean = baseline[f"{key}_baseline_mean"]
+                if mean is None:
+                    print(f"- {label + ' Mean':<11}: none yet, too few readings")
+                    continue
+                std = baseline[f"{key}_baseline_std"]
+                print(f"- {label + ' Mean':<11}: {mean:.1f} (std: {std:.2f})")
     else:
         notice("\nRecent Garmin Metrics: No cached metrics. Run "
                + cmd("data pull") + " first.")

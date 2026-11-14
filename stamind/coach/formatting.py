@@ -377,17 +377,18 @@ def format_removed_workouts(removed_workouts: List[Workout]) -> str:
 
 
 def format_baseline(baseline: Optional[Dict[str, Any]]) -> str:
-    """Formats 28-day baseline reference to readable text for LLM prompts."""
+    """Formats the rolling baseline to readable text for LLM prompts."""
     if not baseline:
         return "No baseline data available."
-    return (
-        f"Resting HR: Mean = {baseline['rhr_baseline_mean']:.1f}, "
-        f"StdDev = {baseline['rhr_baseline_std']:.2f}\n"
-        f"HRV: Mean = {baseline['hrv_baseline_mean']:.1f}, "
-        f"StdDev = {baseline['hrv_baseline_std']:.2f}\n"
-        f"Sleep Score: Mean = {baseline['sleep_baseline_mean']:.1f}, "
-        f"StdDev = {baseline['sleep_baseline_std']:.2f}"
-    )
+    lines = []
+    for label, key in (("Resting HR", "rhr"), ("HRV", "hrv"), ("Sleep Score", "sleep")):
+        mean = baseline[f"{key}_baseline_mean"]
+        if mean is None:
+            lines.append(f"{label}: no baseline (too few readings)")
+            continue
+        std = baseline[f"{key}_baseline_std"]
+        lines.append(f"{label}: Mean = {mean:.1f}, StdDev = {std:.2f}")
+    return "\n".join(lines)
 
 
 def preferences_text(profile: Optional[Dict[str, Any]]) -> str:

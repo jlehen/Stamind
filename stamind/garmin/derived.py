@@ -3,11 +3,12 @@
 The maths itself is `analytics/pmc.py` and `analytics/load.py`, which touch no database.
 This module is where a database handle meets them. See DESIGN_pmc_fitness_fatigue.md.
 """
-import math
+import statistics
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from stamind import runtime
+from stamind.analytics.baselines import MIN_BASELINE_READINGS
 from stamind.analytics.load import _hr_zone_coverage, activity_load, compute_load, measured_tss
 from stamind.analytics.pmc import compute_pmc, pmc_warmup_cutoff_for
 from stamind.clock import parse_date
@@ -44,19 +45,18 @@ def warmup_cutoff(dbh=None, history_start: Optional[str] = None) -> Optional[str
     return pmc_warmup_cutoff_for(history_start, config.pmc_ctl_days)
 
 
-def _mean_std(values: List[float]) -> Tuple[float, float]:
-    if not values:
-        return 0.0, 0.0
-    n = len(values)
-    mean = sum(values) / n
-    if n < 2:
-        return mean, 0.0
-    variance = sum((x - mean) ** 2 for x in values) / (n - 1)
-    return mean, math.sqrt(variance)
+def _mean_std(values: List[float]) -> Tuple[Optional[float], Optional[float]]:
+    """Mean and sample standard deviation, or (None, None) under MIN_BASELINE_READINGS."""
+    if len(values) < MIN_BASELINE_READINGS:
+        return None, None
+    return statistics.fmean(values), statistics.stdev(values)
+
+
 def recompute_derived(dbh=None) -> None:
-    """Recomputes the PMC (CTL/ATL/TSB) and 28-day baselines for ALL cached days. A full
+    """Recomputes the PMC (CTL/ATL/TSB) and the baselines for ALL cached days. A full
     sweep is trivially cheap on a local DB and avoids windowed-recompute bugs (an
-    activity affects 28 days of derived values).
+    activity moves every later day's CTL/ATL, and a morning's readings move the next
+    `garmin.baseline_days` baselines).
 
     `dbh` defaults to the module db; the post-wipe recompute (`db/wipes.py`) passes the
     handle the wipe ran against, so it sweeps that same database even when the
@@ -94,7 +94,11 @@ def recompute_derived(dbh=None) -> None:
 
 
 def _write_derived(dbh, metrics, by_date, pmc) -> None:
-    """Upserts the PMC triple and the 28-day baselines for every cached day."""
+    """Upserts the PMC triple and rewrites, for every cached day, the baselines over the
+    `garmin.baseline_days` days before it (ARCHITECTURE.md §15, "Baseline window"). The
+    baselines are cleared first, so a day that no longer earns one keeps no old row."""
+    window = range(1, config.baseline_days + 1)
+    dbh.clear_baselines()
     for m in metrics:
         date_str = m["date"]
         date_obj = parse_date(date_str)
@@ -109,7 +113,7 @@ def _write_derived(dbh, metrics, by_date, pmc) -> None:
         )
 
         rhr_vals, hrv_vals, sleep_vals = [], [], []
-        for d in range(1, 29):
+        for d in window:
             prev = by_date.get((date_obj - timedelta(days=d)).isoformat())
             if not prev:
                 continue
@@ -120,15 +124,18 @@ def _write_derived(dbh, metrics, by_date, pmc) -> None:
             if prev.get("sleep_score") is not None:
                 sleep_vals.append(prev["sleep_score"])
 
-        if len(rhr_vals) >= 7 or len(hrv_vals) >= 7 or len(sleep_vals) >= 7:
-            rhr_mean, rhr_std = _mean_std(rhr_vals)
-            hrv_mean, hrv_std = _mean_std(hrv_vals)
-            sleep_mean, sleep_std = _mean_std(sleep_vals)
-            dbh.save_baseline(
-                date=date_str, rhr_mean=rhr_mean, rhr_std=rhr_std,
-                hrv_mean=hrv_mean, hrv_std=hrv_std,
-                sleep_mean=sleep_mean, sleep_std=sleep_std,
-            )
+        rhr_mean, rhr_std = _mean_std(rhr_vals)
+        hrv_mean, hrv_std = _mean_std(hrv_vals)
+        sleep_mean, sleep_std = _mean_std(sleep_vals)
+        if rhr_mean is None and hrv_mean is None and sleep_mean is None:
+            continue
+        dbh.save_baseline(
+            date=date_str, rhr_mean=rhr_mean, rhr_std=rhr_std,
+            hrv_mean=hrv_mean, hrv_std=hrv_std,
+            sleep_mean=sleep_mean, sleep_std=sleep_std,
+        )
+
+
 def backfill_tss(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,

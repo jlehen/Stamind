@@ -314,6 +314,12 @@ garmin:
   # lands on the next data pull, wipe or backfill.
   pmc_ctl_days: 42
   pmc_atl_days: 7
+  # How many days before each morning its resting HR, HRV and sleep baselines average over.
+  # Longer keeps a fortnight of illness from becoming the new normal; shorter follows a real
+  # change sooner. Each metric needs 7 readings in the window, or it has no baseline that
+  # day, so the value must be at least 7. Like the two keys above, an edit lands on the next
+  # data pull, wipe or backfill.
+  baseline_days: 40
 
 # Strength tracking (DESIGN_strength_tracking.md).
 strength:

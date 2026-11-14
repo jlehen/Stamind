@@ -2,6 +2,8 @@ import os
 import yaml
 from typing import Any, Dict, Optional
 
+from stamind.analytics.baselines import MIN_BASELINE_READINGS
+
 # Which config file this process runs against; STAMIND_CONFIG is how a second athlete
 # runs from the same checkout (ARCHITECTURE.md §9). Relative paths in the file resolve
 # against its directory, or against `data_dir:` when set — either way an instance's state
@@ -454,9 +456,8 @@ class Config:
     # experimental; calibration caveat in config_template_full.yaml and
     # DESIGN_pmc_fitness_fatigue.md §3.4. ---
     def _load_window_days(self, key: str, default: int) -> int:
-        """A `garmin:` load time-constant, validated positive — both are EWMA divisors,
-        so a non-positive value would crash recompute or store nonsense. Fail loud at
-        read time."""
+        """A `garmin:` window in days, validated positive: a non-positive value would crash
+        recompute or store nonsense. Fail loud at read time."""
         v = int(self.get("garmin", {}).get(key, default))
         if v <= 0:
             raise ValueError(
@@ -475,6 +476,19 @@ class Config:
         """ATL (fatigue) EWMA time constant τ, in days — the classic 7-day Coggan
         constant (garmin.py). Under `garmin:`. Default 7."""
         return self._load_window_days("pmc_atl_days", 7)
+
+    @property
+    def baseline_days(self) -> int:
+        """Days before each morning that its resting HR, HRV and sleep baselines average
+        over (garmin/derived.py, ARCHITECTURE.md §15). Under `garmin:`. Default 40, and at
+        least MIN_BASELINE_READINGS, or no day could ever earn a baseline."""
+        v = self._load_window_days("baseline_days", 40)
+        if v < MIN_BASELINE_READINGS:
+            raise ValueError(
+                f"config garmin.baseline_days must be at least {MIN_BASELINE_READINGS} days "
+                f"(a metric needs {MIN_BASELINE_READINGS} readings in the window), got {v}"
+            )
+        return v
 
     @property
     def calendar_signal_tag(self) -> str:

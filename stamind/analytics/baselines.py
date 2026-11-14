@@ -18,6 +18,9 @@ RHR_MIN_ELEVATED_MARGIN_BPM = 3.0
 # Absolute, not baseline-relative: a bad night is a bad night.
 POOR_SLEEP_SCORE = 60
 
+# A metric needs this many readings in the window, or it has no baseline that day.
+MIN_BASELINE_READINGS = 7
+
 # Used when a baseline exists but its spread is missing or zero.
 _DEFAULT_STD = 1.0
 

@@ -2,6 +2,7 @@
 prompt. Exact strings are the contract here: the string IS what the model reads."""
 import unittest
 
+from stamind.coach.formatting import format_baseline
 from stamind.coach.formatting import format_completed_activities
 from stamind.coach.formatting import format_metrics_history
 from stamind.analytics.pmc import PMC_TSB_LAG_NOTE
@@ -45,6 +46,17 @@ if __name__ == "__main__":
 # ==============================================================================
 # format_metrics_history — None omission + warm-up suppression (§5.1)
 # ==============================================================================
+
+class TestFormatBaseline(unittest.TestCase):
+    def test_metric_without_baseline_says_so(self):
+        text = format_baseline({
+            "rhr_baseline_mean": 48.5, "rhr_baseline_std": 2.25,
+            "hrv_baseline_mean": None, "hrv_baseline_std": None,
+            "sleep_baseline_mean": 80.0, "sleep_baseline_std": 5.0,
+        })
+        self.assertIn("Resting HR: Mean = 48.5, StdDev = 2.25", text)
+        self.assertIn("HRV: no baseline (too few readings)", text)
+
 
 class TestFormatMetricsHistory(unittest.TestCase):
     def test_full_row_shows_pmc_and_footnote(self):

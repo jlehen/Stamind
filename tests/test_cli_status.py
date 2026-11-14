@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from tests.helpers import clear_all_tables, run_cli, rebind_test_db
 from stamind.clock import fmt_date
+from stamind.config import config
 from tests import test_db_path
 
 TEST_DB_PATH = test_db_path("test_stamind_cli_status.db")
@@ -74,7 +75,7 @@ class TestCliStatus(unittest.TestCase):
         self.assertIn("London Marathon", stdout)
         self.assertIn("Resting HR : 48 bpm", stdout)
         self.assertIn("Overnight HRV: 82 ms", stdout)
-        self.assertIn("Baselines (28-day)", stdout)
+        self.assertIn("- RHR Mean   : 50.0 (std: 1.50)", stdout)
         # Status shows only a one-line learnings summary; the full text lives under 'learnings'.
         self.assertIn("Coach Learnings:", stdout)
         self.assertIn("1 active", stdout)
@@ -120,6 +121,23 @@ class TestCliStatus(unittest.TestCase):
             f"- [UPCOMING] ID: {g_id} | London Marathon (running) on {GOAL_DATE}",
             stdout_vv,
         )
+
+    @patch("stamind.cli.status.ensure_recent_data")
+    def test_status_metric_without_baseline(self, _ens):
+        test_db.save_metric_cache(
+            date="2026-05-31", rhr=48, hrv=None, sleep_score=90, stress=15,
+        )
+        test_db.save_baseline(
+            date="2026-05-31", rhr_mean=50.0, rhr_std=1.5, hrv_mean=None, hrv_std=None,
+            sleep_mean=82.0, sleep_std=3.0,
+        )
+        # Not the default 40, so the heading must read the setting.
+        with patch.dict(config.data, {"garmin": {"baseline_days": 21}}):
+            exit_code, stdout, _ = self.run_cli(["status"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Baselines (21-day)", stdout)
+        self.assertIn("- RHR Mean   : 50.0 (std: 1.50)", stdout)
+        self.assertIn("- HRV Mean   : none yet, too few readings", stdout)
 
     @patch("stamind.cli.status.ensure_recent_data")
     def test_status_pmc_never_zero_fills_and_explains_warmup(self, _ens):
