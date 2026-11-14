@@ -520,6 +520,8 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(scheduler.settings, "morning_time", return_value="08:00"),
             mock.patch.object(scheduler.settings, "morning_deadline", return_value="15:00"),
             mock.patch.object(scheduler.settings, "evening_time", return_value="21:00"),
+            mock.patch.object(scheduler.settings, "adapt_first", return_value=True),
+            mock.patch.object(scheduler.settings, "earliest_morning", return_value=None),
             mock.patch.dict(scheduler.config.data, {"garmin": {"poll_minutes": 15}, "google": {}}),
             mock.patch.object(scheduler.settings, "push_enabled", return_value=True),
             mock.patch.object(scheduler.athlete_queue, "next_due", return_value=True),
@@ -599,6 +601,24 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
                 await self.wake()
         tries = [argv for argv, _ in self.ran if argv == ["bot", "morning"]]
         self.assertEqual(len(tries), 2)
+
+    async def test_with_earliest_morning_the_bot_looks_from_then_and_holds_the_queue(self):
+        """Tuesday of DESIGN_morning_waits_for_night.md §3 with `earliest-morning` at 05:00:
+        the queue waits from 05:00, and the 05:45 look sends the message."""
+        import datetime as dt
+        self.night_in = False
+        with mock.patch.object(scheduler.settings, "earliest_morning", return_value="05:00"):
+            for minute in (0, 15, 30, 40):
+                self.now = dt.datetime(2026, 9, 16, 5, minute).astimezone()
+                await self.wake()
+            self.assertEqual(self.ran, [(["bot", "morning"], False)] * 3)
+            self.night_in = True
+            self.now = dt.datetime(2026, 9, 16, 5, 45).astimezone()
+            await self.wake()
+            await self.wake()
+        self.assertEqual(self.ran[3:], [
+            (["bot", "morning"], False), (["bot", "queue", "--next"], True),
+        ])
 
     def test_a_try_is_due_every_poll_minutes_and_at_the_mark(self):
         import datetime as dt

@@ -1,6 +1,6 @@
 # Design: The morning message waits for the night
 
-**Status:** Designed, reviewed and ruled, not built · **Date:** 2026-11-14
+**Status:** Built, in the three steps of §8 · **Date:** 2026-11-14
 
 The morning message is what the bot sends each morning: today's sessions, their buttons, and
 the first question of the athlete queue (`sm bot morning`, DESIGN_bot_simple_frontend.md §4).
@@ -198,6 +198,22 @@ written, except 7 (one line) and 11 (folded into 4).
     every one to five minutes, so the try at the mark needs a wake inside the window.
 14. When today's message went out before `morning-time`, the queue's day turns at that moment.
     This amends DESIGN_athlete_queue.md §13.2 rule 5 (§5).
+
+Made while building it, 2026-11-14, not ruled yet:
+
+15. A tap that sends the message without the night, past the two-hour mark or with no Garmin
+    login configured, says "Preparing your morning message…" alone. "Your night is in." would
+    be false there.
+16. The retry also holds with `adapt-first` off. A try that ends without sending, such as one
+    that crashed, is tried again every `garmin.poll_minutes` until the window closes. Before,
+    the bot tried once per day it ran.
+17. `bot morning` runs the retrospectives step after the wait, so a try that waits writes no
+    record. On a day the schedule has run out it still runs it.
+18. The marker, the two-hour mark and the window live in a new module,
+    `stamind/morning_message.py`, because four files read them.
+19. `settings.py` (499 lines) and `cli/bot/views.py` (497 lines) were trimmed rather than
+    split. The next setting, or the next few lines in the views, forces the split: the morning
+    message would be its own file, `cli/bot/morning.py`.
 
 ## 8. Build order
 

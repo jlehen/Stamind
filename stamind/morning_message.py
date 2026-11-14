@@ -56,7 +56,13 @@ def night_deadline() -> str:
 
 
 def window() -> Tuple[str, str]:
-    """Local HH:MM between which the scheduler tries the message: from morning-time, to the
-    later of morning-deadline and ten minutes past the two-hour mark (§5)."""
+    """Local HH:MM between which the scheduler tries the message: from earliest-morning when
+    it is on, before morning-time, and the message waits for the night, else from
+    morning-time; to the later of morning-deadline and ten minutes past the two-hour mark
+    (§5)."""
+    opens = settings.morning_time()
+    earliest = settings.earliest_morning()
+    if settings.adapt_first() and earliest is not None and earliest < opens:
+        opens = earliest
     closes = max(settings.morning_deadline(), _later(night_deadline(), LAST_TRY_MINUTES))
-    return settings.morning_time(), closes
+    return opens, closes
