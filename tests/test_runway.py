@@ -537,6 +537,17 @@ class MorningPushRunwayTest(unittest.TestCase):
         self.assertTrue(morning_message.sent_on(today_str()))
         self.assertEqual(test_db.get_retrospectives()[0]["body"], "For: x")
 
+    def test_on_a_silent_morning_today_shows_the_day_and_sends_no_message(self):
+        """"📅 Today" is the view on a day the morning message sends nothing
+        (DESIGN_morning_waits_for_night.md §5)."""
+        self._plan([(-60, -20)], goal_offset=-20)
+        self._sessions(-20)
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "json", "STAMIND_RENDER": "simple"}):
+            code, out, _ = run_cli(["bot", "today"])
+        self.assertEqual(code, 0)
+        self.assertNotEqual(out.strip(), "")
+        self.assertFalse(morning_message.sent_on(today_str()))
+
     def test_a_silent_morning_spends_no_adaptation(self):
         """The silence is decided before `adapt-first` runs, so a dead plan does not burn
         an LLM call every morning for a message nobody sends."""

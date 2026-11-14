@@ -107,7 +107,12 @@ Typing "what's on today?" runs the same command as the button, so it does the sa
 - **The marker holds the moment the message went out**, not only its day:
   `2026-11-17T05:50:06+01:00`, on the athlete's clock, where it held `2026-11-17`. Its readers
   compare the first ten characters with today, so a value written before this change still
-  reads right.
+  reads right. It is written as the message starts, so a message that breaks half-way is not
+  tried again, and a second message the same day (`--force`) keeps the first moment.
+- **The changes to the week go first.** Before its first line, the message sends the changes
+  the athlete was not told about yet, each as a message of its own, as a tap does
+  (DESIGN_change_heads_up.md §4). The scheduler sends them from `morning-time` only, so a
+  message that goes out earlier would otherwise come before them.
 - **The queue's day turns at an early morning message.** Today, at `morning-time` nothing
   counts as out any more, "out" meaning sent and not yet tapped (DESIGN_athlete_queue.md §13.2,
   rule 5). The day now turns at today's morning message or at `morning-time`, whichever comes
@@ -115,8 +120,8 @@ Typing "what's on today?" runs the same command as the button, so it does the sa
   holds yesterday's moment until today's message goes out. It is Tuesday. Monday evening's
   unanswered question comes back with the 05:50 message. The question that message asks is
   still out at 08:00: it is not sent again, and an asked-once question is not closed two hours
-  after it was asked. The marker is written before the message sends from the queue, as it is
-  today.
+  after it was asked. A confirmation on its last morning closes at the same turn. The marker
+  is written before the message sends from the queue, as it is today.
 - **The scheduler** opens the morning message's window at `earliest-morning` when it is on,
   else at `morning-time` as today, and closes it at the later of `morning-deadline` and ten
   minutes after the two-hour mark, so the try at the mark has a wake to start on. It counts the
@@ -159,6 +164,12 @@ Typing "what's on today?" runs the same command as the button, so it does the sa
   and the night is read the next morning.
 - A tap at 00:30, before bed: the date has turned, so he sees the new day's sessions and the
   first line of §4.
+- "Ask me tomorrow", and an answer that puts its question off, still mean `morning-time`. It
+  is Monday, and he taps "Ask me tomorrow". Tuesday's message goes out at 05:45 without that
+  question, which comes on its own after 08:00.
+- A tap and the bot's own try that start within the same instant both send the message. The
+  chat checks for the try after its last wait on Telegram, which leaves the time it takes to
+  start a process.
 
 ## 7. Choices made without asking
 
@@ -204,9 +215,10 @@ Made while building it, 2026-11-14, not ruled yet:
 15. A tap that sends the message without the night, past the two-hour mark or with no Garmin
     login configured, says "Preparing your morning message…" alone. "Your night is in." would
     be false there.
-16. The retry also holds with `adapt-first` off. A try that ends without sending, such as one
-    that crashed, is tried again every `garmin.poll_minutes` until the window closes. Before,
-    the bot tried once per day it ran.
+16. The retry also holds with `adapt-first` off, but only a try that sent nothing is tried
+    again. A message is marked sent as it starts, so one that crashes half-way is not tried
+    again, even after a restart. Ruled 2026-11-14 on the code review: the athlete would
+    otherwise get the half message and the error every 15 minutes until the window closes.
 17. `bot morning` runs the retrospectives step after the wait, so a try that waits writes no
     record. On a day the schedule has run out it still runs it.
 18. The marker, the two-hour mark and the window live in a new module,

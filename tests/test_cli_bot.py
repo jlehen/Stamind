@@ -20,7 +20,7 @@ TEST_DB_PATH = test_db_path("test_stamind_cli_bot.db")
 from stamind.db import Database
 import stamind_cli
 
-from stamind import clock, runtime
+from stamind import clock, journal, runtime
 from stamind.cli.bot.views import (
     NIGHT_IN_LINE, PREPARING_LINE, PUSH_ALL_DONE_LINE, WAITING_LINE,
 )
@@ -152,11 +152,19 @@ class ChangesCommandTest(unittest.TestCase):
         self.assertIn("The first attempt.", out)
         self.assertNotIn("The second attempt.", out)
 
-    def test_the_morning_message_no_longer_carries_the_line(self):
+    def test_a_waiting_change_goes_just_before_the_morning_message_on_its_own(self):
+        """The morning message does not carry the line: `bot morning` sends it first, as a
+        message of its own, so a message sent before the morning time cannot overtake it
+        (DESIGN_change_heads_up.md §4, §7; DESIGN_morning_waits_for_night.md §5)."""
         self._change(note="Four sessions a week now.")
-        _code, out, _ = run_cli(["bot", "morning"])
-        self.assertNotIn(CHANGE_LEAD, out)
-        self.assertEqual(len(test_db.waiting_changes()), 1)
+        with patch.dict(config.data, {"telegram": {"push": {"adapt_first": False}}}), \
+                patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
+            _code, out, _ = run_cli(["bot", "morning"])
+        told, message = out.split(FLUSH_SENTINEL, 1)
+        self.assertIn(f"{CHANGE_LEAD} Four sessions a week now.", told)
+        self.assertNotIn(CHANGE_LEAD, message)
+        self.assertIn("Ride", message)
+        self.assertEqual(test_db.waiting_changes(), [])
 
 
 # The words of the morning message's first button: the chat's button rows travel as JSON,
@@ -281,6 +289,26 @@ class MorningWaitTest(unittest.TestCase):
         runtime.garmin.connect.side_effect = RuntimeError("Garmin down")
         self.assertEqual(self._morning_at(8).strip(), "")
         self.assertFalse(morning_message.sent_on(self.today))
+
+    def test_a_try_that_waits_leaves_no_run_and_a_failed_look_a_named_one(self):
+        """The failed look's warning is journalled, so its run is kept under its name."""
+        def ends():
+            return [r for r in journal.iter_records() if r["ev"] == "run.end"]
+
+        before = len(ends())
+        self._morning_at(8)
+        self.assertEqual(len(ends()), before)
+        runtime.garmin.connect.side_effect = RuntimeError("Garmin down")
+        self._morning_at(8, 15)
+        self.assertEqual([r["d"]["cmd"] for r in ends()[before:]], ["bot morning"])
+
+    def test_a_message_that_breaks_half_way_is_not_tried_again(self):
+        """It counts as sent from the moment it starts (§7 choice 16)."""
+        self.look.return_value = 74
+        with patch("stamind.cli.bot.views._refresh_garmin", side_effect=RuntimeError("bug")):
+            out = self._morning_at(8)
+        self.assertNotIn("Easy run", out)
+        self.assertTrue(morning_message.sent_on(self.today))
 
     def test_no_wait_without_garmin_with_adapt_first_off_or_with_force(self):
         for pinned, flags in (

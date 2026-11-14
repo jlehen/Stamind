@@ -38,7 +38,10 @@ def sent_at() -> Optional[datetime]:
 
 
 def mark_sent() -> None:
-    """Records the moment today's morning message went out."""
+    """Records the moment today's morning message went out. A second one the same day, a
+    `--force`, keeps the first moment: the queue's day turned there (§5)."""
+    if sent_on(clock.today_str()):
+        return
     runtime.db.set_setting(MARKER, clock.now().isoformat())
 
 

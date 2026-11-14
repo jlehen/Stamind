@@ -193,10 +193,11 @@ def anything_out() -> bool:
 
 def lived_out(item: Dict[str, Any]) -> bool:
     """Whether a confirmation was asked on its day and after the morning message on the
-    next `confirmation-days` mornings: at the morning after those, it closes
-    (DESIGN_chat_questions.md §2)."""
+    next `confirmation-days` mornings: once the queue's day turns on the morning after
+    those, it closes (DESIGN_chat_questions.md §2, DESIGN_morning_waits_for_night.md §5)."""
     queued = clock.to_local(datetime.fromisoformat(item["queued_at"]))
-    return clock.now() >= morning_of(queued) + timedelta(days=settings.confirmation_days() + 1)
+    closes_on = queued.date() + timedelta(days=settings.confirmation_days() + 1)
+    return day_turned_at(clock.now()).date() >= closes_on
 
 
 def worth_asking(item: Dict[str, Any]) -> bool:

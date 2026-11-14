@@ -343,7 +343,7 @@ def run_bot_today(args: argparse.Namespace) -> None:
         _today_view(today)
         return
     if settings.adapt_first():
-        night_in = _night_in(today)
+        night_in = _night_in(today, "today")
         if not night_in and _may_wait():
             _today_view(today)
             print(wrap_text(WAITING_LINE.format(time=morning_message.night_deadline())))
@@ -375,9 +375,10 @@ def _may_wait() -> bool:
     return _garmin_set_up() and clock.now().strftime("%H:%M") < morning_message.night_deadline()
 
 
-def _night_in(today: str) -> bool:
+def _night_in(today: str, command: str) -> bool:
     """Whether Garmin has today's sleep score: stored already, or found by one call after
-    the login. A look that fails counts as no night (DESIGN_morning_waits_for_night.md §5)."""
+    the login. A look that fails counts as no night (DESIGN_morning_waits_for_night.md §5),
+    and its warning keeps the run of `bot <command>` in the journal, named."""
     if runtime.db.get_sleep_score(today) is not None:
         return True
     if not _garmin_set_up():
@@ -385,6 +386,7 @@ def _night_in(today: str) -> bool:
     try:
         return runtime.garmin.connect(announce=False).get_sleep_score(today) is not None
     except Exception as e:
+        journal.name_run("bot", command)
         _warn_quietly(f"Waiting for the night: Garmin could not be asked: {e}")
         return False
 
@@ -409,7 +411,8 @@ def run_bot_morning(args: argparse.Namespace) -> None:
         runtime.coach_service.retrospectives_step()
         morning_message.mark_sent()
         return
-    if not args.force and settings.adapt_first() and _may_wait() and not _night_in(today):
+    if (not args.force and settings.adapt_first() and _may_wait()
+            and not _night_in(today, "morning")):
         journal.drop_run()
         return
     journal.name_run("bot", "morning")
@@ -417,10 +420,18 @@ def run_bot_morning(args: argparse.Namespace) -> None:
 
 
 def _morning_message(today: str, runway: Optional[Dict[str, Any]]) -> None:
-    """The morning message itself, once `run_bot_morning` has decided it goes out. A day
-    with no session gets the one-line rest message, a planned rest day its own line, and a
-    day already trained the congratulation, all without buttons — none has a session left
-    to change."""
+    """The morning message itself, once `run_bot_morning` or `run_bot_today` has decided it
+    goes out. A day with no session gets the one-line rest message, a planned rest day its
+    own line, and a day already trained the congratulation, all without buttons — none has
+    a session left to change."""
+    # Marked as it starts, so a try that breaks half-way is not tried again
+    # (DESIGN_morning_waits_for_night.md §5, §7 choice 16).
+    morning_message.mark_sent()
+    # The changes to the week not told yet go first, each as a message of its own, as before
+    # a tap (DESIGN_change_heads_up.md §4).
+    if heads_up.waiting():
+        run_bot_changes(argparse.Namespace())
+        emit_flush()
     # A plan that has run out gets its records too, on the silent branch above
     # (DESIGN_cycle_retrospective.md §3, §5).
     runtime.coach_service.retrospectives_step()
@@ -485,7 +496,6 @@ def _morning_message(today: str, runway: Optional[Dict[str, Any]]) -> None:
         # A page button asks nothing and is no live row, so the briefing keeps it on a
         # morning with a proposal (DESIGN_short_messages.md §5, D8).
         emit_buttons([], page=page)
-    morning_message.mark_sent()
     # The last act is the queue's step: the first item of the line, unless an item is
     # out (DESIGN_athlete_queue.md §13.2). What the week planner would change goes first,
     # as a message of its own. It is then out, so the line starts when the athlete answers

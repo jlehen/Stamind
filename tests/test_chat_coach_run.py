@@ -97,7 +97,9 @@ class CoachRunTest(unittest.IsolatedAsyncioTestCase):
         started = record_commands(self, chat_bot)
         self.thinking(chat_bot, long=MORNING_RUN)
         await self.say(chat_bot, "📅 Today")
-        self.assertEqual(started, [(42, ["workout", "list", "-d", "today"], False, "bot")])
+        with routes_to(chat_bot, "show_today"):
+            await self.say(chat_bot, "what's on today?")
+        self.assertEqual(started, [(42, ["workout", "list", "-d", "today"], False, "bot")] * 2)
 
     async def test_the_next_message_to_the_coach_is_kept_while_it_thinks(self):
         """07:06 "move Saturday's ride to Sunday": no echo, one line, and it is kept

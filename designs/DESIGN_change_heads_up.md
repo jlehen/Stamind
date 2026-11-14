@@ -211,6 +211,9 @@ none is out, between her morning time and 21:00, the hours of this section. So a
 put off is now held overnight too, which §12 had left out, and a `queue tell` message goes out
 the same day.
 
+Amended 2026-11-14 (DESIGN_morning_waits_for_night.md §5): the morning message may now go out
+before the morning time, so it sends the waiting changes itself, just before its first line.
+
 **A change waits for her morning time.** Her morning time (the `morning-time` setting, 08:00
 for her) is when she learns what a day holds: the morning message's own adaptation already
 changes today's session at that moment, and she reads the result then. A change to her week

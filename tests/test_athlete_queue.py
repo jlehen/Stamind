@@ -310,6 +310,17 @@ class OutTest(_QueueCase):
             self.at(hour, 0, days)
             self.assertEqual(athlete_queue.anything_out(), out, (hour, days))
 
+    def test_a_second_message_the_same_day_keeps_the_turn_of_the_first(self):
+        """`bot morning --force` at 09:00, after a 05:50 message: the question the 05:50
+        message asked is still out (DESIGN_morning_waits_for_night.md §5)."""
+        a = self.ask("A")
+        self.at(5, 50, 1)
+        morning_message.mark_sent()
+        athlete_queue.sent(self.item(a))
+        self.at(9, 0, 1)
+        morning_message.mark_sent()
+        self.assertTrue(athlete_queue.anything_out())
+
     def test_a_marker_holding_the_day_alone_turns_the_day_at_the_morning_time(self):
         """The form the marker had before it held the moment."""
         thursday = (WEDNESDAY_8AM + timedelta(days=1)).date().isoformat()

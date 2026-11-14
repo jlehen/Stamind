@@ -228,14 +228,15 @@ class MessagesMixin:
                 )
                 if argv is None:
                     return
+            await context.bot.send_chat_action(chat_id=chat.id, action="typing")
             # While the bot's own try at the morning message runs, "📅 Today" is the
-            # sessions alone, so it cannot send a second message
+            # sessions alone, so it cannot send a second message. Checked after the last
+            # wait on Telegram, so a try cannot start in between
             # (DESIGN_morning_waits_for_night.md §5).
             alive = self.long_runs.get(chat.id)
             if argv == TODAY_ARGV and alive is not None and alive.long == MORNING_RUN:
                 argv = list(TODAY_VIEW_ARGV)
             self._log(chat.id, "  ", f"run: {shlex.join(argv)}")
-            await context.bot.send_chat_action(chat_id=chat.id, action="typing")
             await self._start_command(chat.id, argv)
             return
 
