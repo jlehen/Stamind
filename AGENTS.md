@@ -75,7 +75,6 @@
 
 # Git policy
 - Never push anything to the remote without asking before.
-- Never commit without being explicitly asked by the user.
 - Never open a pull request.
 - Land a worktree branch by rebasing onto main and fast-forwarding. Only a branch with
   enough commits to be worth a node in the graph earns `--no-ff`.
