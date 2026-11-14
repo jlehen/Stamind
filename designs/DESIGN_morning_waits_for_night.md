@@ -1,6 +1,6 @@
 # Design: The morning message waits for the night
 
-**Status:** Designed, not built · **Date:** 2026-11-14
+**Status:** Designed, reviewed and ruled, not built · **Date:** 2026-11-14
 
 The morning message is what the bot sends each morning: today's sessions, their buttons, and
 the first question of the athlete queue (`sm bot morning`, DESIGN_bot_simple_frontend.md §4).
@@ -25,26 +25,27 @@ So the message comes at one fixed time, and whether the night is in by then is l
 
 ## 2. The rule
 
-> The morning message waits for the night. Until it has gone out, "📅 Today" sends it as soon
-> as the night is in. The bot also looks on its own: from `earliest-morning` when that setting
-> is on, else from `morning-time`. Two hours after `morning-time`, the message goes out without
-> the night.
+> Until the morning message has gone out, "📅 Today" sends it. With `adapt-first` on, the
+> message waits for the night: a tap sends it once the night is in, and the bot also looks on
+> its own, from `earliest-morning` when that setting is on, else from `morning-time`. Two hours
+> after `morning-time`, it goes out without the night.
 
-The rule does not depend on `adapt-first` (the athlete's ruling, 2026-11-14: that setting keeps
-its one meaning). With it off, the message does not read the night, but it waits for it all the
-same, so one rule holds for every athlete. With the push off there is no morning message, and
-"📅 Today" stays the view it is now.
+The wait follows `adapt-first` (the author's ruling, 2026-11-14). With it on, the message asks
+the week planner, which reads the night, so the night is worth waiting for. With it off, the
+message does not read the night: it goes out at `morning-time` as today, a tap before that
+sends it at once, and `earliest-morning` changes nothing. With the push off there is no
+morning message, and "📅 Today" stays the view it is now.
 
 `earliest-morning` is off by default, because watches differ in what closes the night (§6). On
 a watch that closes it when the athlete dismisses its morning report, the night being in means
 the athlete is up, and the setting is safe. On a watch that closes it on its own, the message
-could wake an athlete who still sleeps. The athlete's ruling, 2026-11-14: his is set to 05:00;
+could wake an athlete who still sleeps. The author's ruling, 2026-11-14: his is set to 05:00;
 piupiu's stays off until her watch is known.
 
 ## 3. A week
 
-`morning-time` is 08:00 and `earliest-morning` is off, so the bot looks on its own from 08:00,
-and the message goes out at 10:00 at the latest.
+`morning-time` is 08:00, `adapt-first` is on and `earliest-morning` is off, so the bot looks on
+its own from 08:00, and the message goes out at 10:00 at the latest.
 
 - **Tuesday 17 November, the night is in.** He wakes at 05:40 and taps "📅 Today" at 05:50. The
   bot asks Garmin and finds the sleep score. He gets the whole morning message: the sessions,
@@ -68,38 +69,32 @@ The same week with `earliest-morning` at 05:00. The bot looks at 05:00, 05:15, 0
 
 - **Tuesday.** He dismisses the watch's morning report at 05:40, and the phone syncs at 05:42.
   The 05:45 look finds the night, and the message comes without a tap.
-- **Wednesday.** After his 06:10 tap, the line says the bot will send the message once Garmin
-  has the night. The watch syncs at 06:12, and the 06:15 look sends it. He does not tap again.
+- **Wednesday.** He taps at 06:10 and reads the line. The watch syncs at 06:12, and the 06:15
+  look sends the message, whether he taps again or not.
 
 ## 4. "📅 Today" while the message waits
 
 While the morning message has not gone out and the night is not in, "📅 Today" shows today's
-sessions as it does now, with one line under them. Before the bot looks on its own, the line
-asks for another tap:
+sessions as it does now, with one line under them:
 
-> Garmin does not have your night yet. Your morning message waits for it, until 10:00 at the
-> latest. Once your watch has synced, tap 📅 Today again.
+> Garmin does not have your night yet. Once your watch has synced, tap 📅 Today again.
+> Otherwise your morning message comes by 10:00 at the latest.
 
-Once the bot looks on its own, from `earliest-morning` or `morning-time` (§2), it says the bot
-will send it:
-
-> Garmin does not have your night yet. I'll send your morning message as soon as it does, by
-> 10:00 at the latest.
-
-The time is `morning-time` plus two hours. Once the message has gone out, "📅 Today" is the
+The line is true before the bot looks on its own and after. The time is `morning-time` plus two
+hours. Once the message has gone out, "📅 Today" is the
 view it is now.
 
 Typing "what's on today?" runs the same command as the button, so it does the same.
 
 ## 5. Inside the bot
 
-- **The wait sits in `bot morning`**, after its once-a-day test and the silence of a schedule
-  that has run out (DESIGN_runway_nudge.md §6), before its first line. Before the two-hour
-  mark, with no sleep score stored for today, it asks Garmin for today's sleep alone: one data
-  call after the login. If Garmin has no score, `bot morning` ends and leaves the "sent today"
-  marker (`push_morning_last`) alone. If it has one, the forced pull the message already makes
-  before it asks the week planner (DESIGN_bot_simple_frontend.md §4.2), now made whether or not
-  it asks, stores the night. A pull that fails after the look found a score sends the message
+- **The wait sits in `bot morning`**, with `adapt-first` on, after its once-a-day test and the
+  silence of a schedule that has run out (DESIGN_runway_nudge.md §6), before its first line.
+  Before the two-hour mark, with no sleep score stored for today, it asks Garmin for today's
+  sleep alone: one data call after the login. If Garmin has no score, `bot morning` ends and
+  leaves the "sent today" marker (`push_morning_last`) alone. If it has one, the forced pull the
+  message already makes before it asks the week planner (DESIGN_bot_simple_frontend.md §4.2)
+  stores the night. A pull that fails after the look found a score sends the message
   without the night, as a failed pull does today. Otherwise the message runs as today, and the
   quiet-morning gate grades a night it can see.
 - **A try that ends without sending says nothing in the chat.** A look that fails counts as no
@@ -138,9 +133,10 @@ Typing "what's on today?" runs the same command as the button, so it does the sa
   today`, in the chat's own place like any view. It is the morning message while that has not
   gone out, else the view. With the push off it is always the view, and so it is on a day the
   morning message sends nothing because the schedule has run out (DESIGN_runway_nudge.md §6).
-  When it is about to send the morning message, it first says one line and sends it at once:
-  "Your night is in. Preparing your morning message…". The chat is then busy for the minute the
-  message takes, as for any command.
+  With `adapt-first` on, when it is about to send the morning message, it first says one line
+  and sends it at once: "Your night is in. Preparing your morning message…". The chat is then
+  busy for the minute the message takes, as for any command. With it off, the message comes in
+  seconds and has no such line.
 - **A tap while the bot's own try runs.** The scheduler starts `bot morning` beside the chat,
   as a long run (DESIGN_long_runs_beside_chat.md §2), and the marker is written only at its
   end. While that run is alive, "📅 Today" and a typed "what's on today?" show the view as they
@@ -148,18 +144,16 @@ Typing "what's on today?" runs the same command as the button, so it does the sa
   started at 06:15:00, would send a second morning message.
 - **`earliest-morning`** is a setting (DESIGN_settings.md), seeded from
   `telegram.push.earliest_morning`: an hour, or `off`, the default. An hour at or after
-  `morning-time` changes nothing, because the bot then looks from `morning-time`.
+  `morning-time` changes nothing, because the bot then looks from `morning-time`. With
+  `adapt-first` off it changes nothing either, since the message does not wait then.
 - **`bot morning --force`**, typed in a terminal, skips the wait as it skips the marker.
 
 ## 6. Not handled
 
 - With `earliest-morning` off, a night that lands after a tap waits for the next tap or for
   `morning-time`.
-- An athlete who never sleeps with the watch gets the message two hours after `morning-time`
-  every day. Neither instance's athlete is in that case.
-- An athlete whose phone syncs the watch late gets the message late on those days, up to the
-  two-hour mark, also with `adapt-first` off, when the message does not read the night. Piupiu
-  may be such an athlete.
+- An athlete with `adapt-first` on who never sleeps with the watch gets the message two hours
+  after `morning-time` every day. Neither instance's athlete is in that case.
 - Stamind does not know what closes the night on a given watch (§2).
 - Sleeping past the two-hour mark: the message goes out without the night, as at 08:00 today,
   and the night is read the next morning.
@@ -168,7 +162,8 @@ Typing "what's on today?" runs the same command as the button, so it does the sa
 
 ## 7. Choices made without asking
 
-Each is listed so it can be overruled.
+Each was listed so it could be overruled. The author ruled on 2026-11-14: each stands as
+written, except 7 (one line) and 11 (folded into 4).
 
 1. The message goes out without the night two hours after `morning-time`. This is a constant,
    not a setting, and it moves with the athlete's own morning time.
@@ -176,34 +171,27 @@ Each is listed so it can be overruled.
    two-hour mark covers that day, and the line says when the message comes.
 3. The bot looks every `garmin.poll_minutes`, the Garmin check's existing knob, not a new one,
    before `morning-time` as after it.
-4. Queued questions wait for the morning message, even when it goes out at 10:00.
+4. Queued questions wait for the morning message, even when it goes out at 10:00. The wait
+   starts when the window opens, not at midnight: before it, a tap can still bring a queued
+   question ahead of the message, as today (§5).
 5. The night is in when Garmin has today's sleep score, the same test the quiet-morning gate
    uses (DESIGN_quiet_morning.md §4). Resting HR or HRV alone does not count.
 6. A tap on "📅 Today" sends the morning message whenever it has not gone out, even in the
-   afternoon of a day the bot was down all morning. Objection (thorough review, pass 1): once
-   the window has closed, "📅 Today" should be the view, because `morning-deadline` exists to
-   stop a late briefing. Not applied: the author rules. The pragmatic review (pass 1) sides
-   with the choice: "the morning message until it has gone out" is one sentence, and a window
-   check in `bot today` would be a second path.
-7. The two lines' wording, and which one shows: picked by whether the bot looks on its own
-   yet, not by the setting (§4). Objection (pragmatic review, pass 1): one line true in both
-   states, "Garmin does not have your night yet. Once your watch has synced, tap 📅 Today
-   again. Otherwise your morning message comes by 10:00 at the latest." It saves a string, a
-   branch and a test, and `bot today` would no longer need to know when the bot starts
-   looking. The thorough review (pass 2) agrees with the objection. Not applied: the author
-   rules.
+   afternoon of a day the bot was down all morning. The thorough review objected: once the
+   window has closed, "📅 Today" should be the view. The pragmatic review sided with the
+   choice, which keeps the rule one sentence. Ruled: kept.
+7. One line under "📅 Today" while the night is not in, true before and after the bot looks on
+   its own (§4). Ruled: the line both reviews proposed, in place of two wordings picked by
+   the time of day.
 8. `earliest-morning` is set from the terminal only, not from the chat: whether it is safe
    depends on the watch, which the operator checks.
 9. An `earliest-morning` at or after `morning-time` is accepted and changes nothing, rather
    than refused: the check would compare two settings, and no athlete gains from it.
 10. A tap while the bot's own try runs shows the view, and the message follows on its own. The
     tap does not wait for the try (§5).
-11. The queue is held from the window's opening, not from midnight. Before it, a tap can still
-    bring a queued question ahead of the message, as today (§5). Objection (pragmatic review,
-    pass 1): this is today's behaviour, not a choice, and could be folded into choice 4. The
-    thorough review (pass 2) agrees. Not applied: the author rules.
+11. Folded into choice 4: both reviews found it described today's behaviour.
 12. The line said before a tapped morning message: "Your night is in. Preparing your morning
-    message…" (§5).
+    message…" (§5). With `adapt-first` off the message comes in seconds and has no line.
 13. The window stays open until the later of `morning-deadline` and ten minutes after the
     two-hour mark, so an early deadline cannot leave a broken-watch day without its message
     (§5). The ten minutes were added in the thorough review (pass 2): the scheduler wakes
@@ -215,11 +203,12 @@ Each is listed so it can be overruled.
 
 Each step ships alone, one commit each.
 
-1. **The wait.** The look, the wait in `bot morning`, the scheduler's retry, sent meaning the
-   marker, and the window's end. This fixes the Sunday of §1. It needs no change to the queue,
-   `messages.py` or the keyboard, because the message never goes out before `morning-time`.
+1. **The wait**, with `adapt-first` on. The look, the wait in `bot morning`, the scheduler's
+   retry, sent meaning the marker, and the window's end. This fixes the Sunday of §1. It needs
+   no change to the queue, `messages.py` or the keyboard, because the message never goes out
+   before `morning-time`.
 2. **The tap.** `bot today`, the marker as a moment, the queue's turn, the check in
-   `messages.py`, and the lines. This fixes the Saturday of §1.
+   `messages.py`, and the line. This fixes the Saturday of §1.
 3. **`earliest-morning`.** It needs step 2's turn of the queue's day.
 
 ## 9. Touch points
@@ -239,4 +228,5 @@ Each step ships alone, one commit each.
 | `docs/ARCHITECTURE.md` | The morning push line, `telegram.push.*`, the keyboard, `bot today` |
 | DESIGN_bot_simple_frontend.md §4.3 | One line pointing here |
 | DESIGN_quiet_morning.md §8, DESIGN_athlete_queue.md §13.2 | One line each, pointing here |
-| Tests | §3's week both ways; the retry; an empty look; a tap during a try; the 08:00 turn |
+| Tests | §3's week both ways; `adapt-first` off; the retry; an empty look; a tap during a try |
+| Tests | The 08:00 turn of the queue's day after an early message |
