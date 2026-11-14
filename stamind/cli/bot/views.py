@@ -44,10 +44,8 @@ from stamind.output import aside, step
 from stamind.config import config
 from stamind.clock import fmt_day, shift, today_str as _today_str
 
-# What the morning push offers (§4.1/§4.4): the CLI owns WHAT to offer, the bot only
-# renders. Each `send` is a canned utterance the bot feeds back through its normal
-# command pipeline when the button is tapped; `ack` runs nothing; `menu` nests a
-# choose-row at the bot level.
+# What the morning push offers (§4.1, §4.4): a tap feeds `send` back through the bot's
+# pipeline, `ack` runs nothing, and `menu` nests a row.
 GOT_IT_BUTTON = {"label": "👍 Got it", "ack": "Nice — have a good one! 💪"}
 # The buttons about today's session. Under a proposal they follow its two answers, which
 # stand where "Got it" would (DESIGN_waiting_proposal.md §5).
@@ -68,9 +66,7 @@ SESSION_BUTTONS = [
 ]
 
 
-# What the push says on a day already trained: the catch-up window runs to mid-afternoon
-# (§4.3), so it routinely fires on a session that is already in the bag, and reading its
-# prescription back with a "can't today" row attached is a ping about nothing (§4.1).
+# What the push says on a day already trained, in place of the briefing (§4.1).
 PUSH_ALL_DONE_LINE = "✅ Already done for today — nice work 💪"
 
 # --- Pickers (§12.1: the model picks that something should change, the tap picks which) ---
@@ -93,9 +89,8 @@ def constraint_rm_buttons(constraints: list) -> list:
 
 
 def goal_rm_buttons(goals: list) -> list:
-    """The picker under the simple goals view (§12.6). `goal rm` archives — sessions
-    stood down, history kept, reinstatable by the operator — so the one goal mutation a
-    tap fires is the reversible one; `--purge` is unreachable from chat."""
+    """The picker under the simple goals view (§12.6). `goal rm` archives, the reversible
+    action; `--purge` is unreachable from chat."""
     return [
         {"label": "👍 All good", "ack": "Great — we keep building toward these 💪"},
         {"label": "🗑 Call one off", "menu": _picker_leaves(goals, "goal rm")},
@@ -103,9 +98,8 @@ def goal_rm_buttons(goals: list) -> list:
 
 
 def run_bot_constraints(args: argparse.Namespace) -> None:
-    """Renders the athlete's current-and-upcoming constraints in companion prose and
-    offers the remove picker (§5.5). Read-only itself; the only mutation reachable is
-    what a tapped leaf later runs."""
+    """The current and upcoming constraints in companion prose, with the remove picker
+    (§5.5). Read-only: a tapped leaf runs its own command."""
     today = _today_str()
     constraints = runtime.db.get_constraints(today, None)
     for line in simple_constraint_lines(constraints, today):
@@ -115,9 +109,8 @@ def run_bot_constraints(args: argparse.Namespace) -> None:
 
 
 def run_bot_goals(args: argparse.Namespace) -> None:
-    """Renders the goals still ahead in companion prose and offers the call-off picker
-    (§12.6). An empty active list renders the §11 invitation, never a bare picker: the
-    list she reads IS the answer — already done, or already called off."""
+    """The goals still ahead in companion prose, with the call-off picker (§12.6). With
+    none ahead, the §11 invitation and no picker."""
     today = _today_str()
     goals = [g for g in runtime.db.get_objectives()
              if goal_state(g, today) != GOAL_ARCHIVED]
@@ -166,16 +159,11 @@ def _asks(date_str: str) -> bool:
 def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
     """Asks the week planner about today when something is new or a night is not normal
     (DESIGN_quiet_morning.md §2), and returns (the line for the briefing, the saved
-    proposal's item). A quiet morning returns neither, like a run that changed nothing.
-
-    A session that would change is saved as a proposal and nothing is written. Kilograms
-    that moved alone are written at once, with their sentence as the line
-    (DESIGN_waiting_proposal.md §5, §7). A failure must not sink the push: the schedule
-    then renders as stored, and the error surfaces only as a terminal aside — never in the
-    athlete's chat.
-
-    The strength planner's notice is the line when nothing changed, which is what covers
-    the morning of the gym day itself (DESIGN_strength_tracking.md §9)."""
+    proposal's item); a quiet morning returns neither. A session that would change is saved
+    as a proposal, and kilograms that moved alone are written at once
+    (DESIGN_waiting_proposal.md §5, §7). With nothing changed, the strength planner's notice
+    is the line (DESIGN_strength_tracking.md §9). A failure renders the stored schedule and
+    stays out of the athlete's chat."""
     try:
         # A pull that found no sleep score yet leaves a row for today that the refresh
         # throttle would keep; the night is what this morning is about, so fetch again,
@@ -217,9 +205,9 @@ def _ask_week_planner(date_str: str) -> Tuple[Optional[str], Optional[Dict[str, 
 
 
 def _refresh_garmin(date_str: str) -> None:
-    """The recent-data refresh a read command runs, then the strength sets: the push is the
-    morning message reads them, so their questions are in the line it sends from at its
-    end (DESIGN_strength_tracking.md §11). A failure briefs what is stored."""
+    """The recent-data refresh a read command runs, then the strength sets, so their
+    questions are in the line (DESIGN_strength_tracking.md §11). A failure briefs what is
+    stored."""
     try:
         runtime.garmin.ensure_data(date_str, date_str)
         read_new_activities()
@@ -255,11 +243,9 @@ def _queue_session_questions(today: str) -> None:
 
 def run_bot_garmin_check(args: argparse.Namespace) -> None:
     """Pulls today's activities when Garmin lists one not stored yet that lasts at least
-    `garmin.min_activity_minutes`, and queues the questions about it. A shorter one, such as a
-    warm-up, waits for a later pull. Daily metrics and the "last pull" time stay out of it,
-    so a read command still refreshes them. The scheduler runs this beside the chat. A check
-    that pulls nothing leaves no run in the journal; a failure prints its reason, exits 1,
-    and the scheduler decides whether to journal it (ARCHITECTURE.md §15)."""
+    `garmin.min_activity_minutes`, and queues the questions about it; daily metrics stay out
+    of it. A check that pulls nothing leaves no run in the journal; a failure prints its
+    reason, exits 1, and the scheduler decides whether to journal it (ARCHITECTURE.md §15)."""
     if not (config.garmin_email and config.garmin_password):
         journal.drop_run()
         return
@@ -285,9 +271,8 @@ def run_bot_garmin_check(args: argparse.Namespace) -> None:
 
 
 def _trained_today(date_str: str) -> Dict[int, Dict[str, Any]]:
-    """Today's adherence verdicts over freshly pulled activity data — what the push needs
-    to tell a session still ahead from one already behind (§4.1). Like the adaptation, a
-    failure must not sink the push: an ungraded day renders as the schedule it was."""
+    """Today's adherence verdicts over freshly pulled activity data, which tell a session
+    still ahead from one done (§4.1). A failure renders the day ungraded."""
     try:
         runtime.garmin.ensure_data(date_str, date_str)
         return adherence_verdicts(runtime.db, date_str, date_str, _today_str())
@@ -324,6 +309,52 @@ def _deload_eve_line(today: str) -> Optional[str]:
         return None
     until = fmt_day(mesocycle["end_date"])
     return f"🔋 Your deload {deload_progress(mesocycle, today)}, until {until}."
+
+
+# What "📅 Today" says under today's sessions while the morning message waits for the night,
+# and what it says before it sends the message itself (DESIGN_morning_waits_for_night.md §4,
+# §5). The time is the two-hour mark.
+WAITING_LINE = (
+    "Garmin does not have your night yet. Once your watch has synced, tap 📅 Today again. "
+    "Otherwise your morning message comes by {time} at the latest."
+)
+PREPARING_LINE = "Preparing your morning message…"
+NIGHT_IN_LINE = "Your night is in. " + PREPARING_LINE
+
+
+def _today_view(today: str) -> None:
+    """Today's sessions, as "📅 Today" draws them once the morning message has gone out."""
+    workouts = runtime.db.get_workouts(start_date=today, end_date=today)
+    verdicts = _trained_today(today) if workouts else {}
+    runtime.render.workout_list(
+        workouts, verdicts, argparse.Namespace(sport_type=None), start_date=today,
+        end_date=today, ids=[], names_a_range=True,
+    )
+
+
+def run_bot_today(args: argparse.Namespace) -> None:
+    """"📅 Today" and "what's on today?": today's morning message while it has not gone out,
+    else today's sessions. With the push off, or on a day the message sends nothing, always
+    the sessions. With `adapt-first` on the message waits for the night, and the sessions
+    then carry one line saying so (DESIGN_morning_waits_for_night.md §4, §5)."""
+    today = _today_str()
+    runway = current_runway(today)
+    if not settings.push_enabled() or morning_message.sent_on(today) or _silent(today, runway):
+        _today_view(today)
+        return
+    if settings.adapt_first():
+        night_in = _night_in(today)
+        if not night_in and _may_wait():
+            _today_view(today)
+            print(wrap_text(WAITING_LINE.format(time=morning_message.night_deadline())))
+            return
+        # Past the two-hour mark, or without Garmin, the message goes out without the night.
+        line = PREPARING_LINE
+        if night_in:
+            line = NIGHT_IN_LINE
+        print(line)
+        emit_flush()
+    _morning_message(today, runway)
 
 
 def _silent(today: str, runway: Optional[Dict[str, Any]]) -> bool:

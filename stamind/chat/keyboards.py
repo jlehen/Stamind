@@ -20,6 +20,7 @@ import datetime
 from typing import Any, List, Optional, Tuple
 
 from stamind.athlete_queue import QUEUE_LATER_CHOICES
+from stamind.chat.routing import TODAY_ARGV
 from stamind.chat.telegram_api import PAGE_CELL
 from stamind.clock import day_str, parse_date
 from stamind.sports import canonical_sport
@@ -33,7 +34,7 @@ PROGRESS_LABEL = "📈 Progress"
 # Buttons never reach beyond this table; the keyboard renders it two per row, in order,
 # with the calendar cell in the second place and the "Goals & plan" cell in the fourth.
 SIMPLE_KEYBOARD = [
-    ("📅 Today", ["workout", "list", "-d", "today"]),
+    ("📅 Today", TODAY_ARGV),
     # A look back is a read: --no-mark keeps the Calendar stamping out of a tap (§5.1).
     ("✅ Done lately", ["workout", "compare", "-d", "7d", "--no-mark"]),
     (PROGRESS_LABEL, ["progress", "--chart"]),

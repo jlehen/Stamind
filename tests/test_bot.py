@@ -129,7 +129,7 @@ class SimpleKeyboardTest(unittest.TestCase):
     def test_labels_map_to_fixed_argv(self):
         self.assertEqual(
             keyboards.keyboard_action("📅 Today"),
-            ("run", ["workout", "list", "-d", "today"]),
+            ("run", ["bot", "today"]),
         )
         self.assertIsNone(keyboards.keyboard_action("🗓 My week"))
         self.assertIsNone(keyboards.keyboard_action("🎯 Goals"))
@@ -162,7 +162,7 @@ class SimpleKeyboardTest(unittest.TestCase):
     def test_surrounding_whitespace_is_tolerated(self):
         self.assertEqual(
             keyboards.keyboard_action("  📅 Today  "),
-            ("run", ["workout", "list", "-d", "today"]),
+            ("run", ["bot", "today"]),
         )
 
     def test_returned_argv_is_a_copy(self):
@@ -170,7 +170,7 @@ class SimpleKeyboardTest(unittest.TestCase):
         argv.append("--verbose")
         self.assertEqual(
             keyboards.keyboard_action("📅 Today"),
-            ("run", ["workout", "list", "-d", "today"]),
+            ("run", ["bot", "today"]),
         )
 
 
@@ -302,11 +302,13 @@ class GuardrailTest(unittest.TestCase):
     """§7/§12.9: buttons and router intents reach read-only views, `adapt -m`, the two
     companion pickers (whose leaves offer single-ID `constraint rm` / `goal rm` — pinned
     in tests/test_cli_bot.py) and the capture command, which asks before it writes.
-    Nothing plan-shaping, expensive or irreversible is reachable without typing."""
+    Nothing plan-shaping, expensive or irreversible is reachable without typing. `bot
+    today` may send the morning message, which goes out once a day whoever starts it
+    (DESIGN_morning_waits_for_night.md §5)."""
 
     ALLOWED_PREFIXES = {
         ("workout", "list"), ("workout", "compare"), ("progress", "--chart"),
-        ("bot", "constraints"), ("bot", "goals"), ("bot", "capture"),
+        ("bot", "constraints"), ("bot", "goals"), ("bot", "capture"), ("bot", "today"),
     }
 
     def test_capture_intents_reach_only_the_capture_command(self):

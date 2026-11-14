@@ -53,7 +53,7 @@ class MessageHandlerTest(unittest.IsolatedAsyncioTestCase):
         update, _replied = message_update(text="📅 Today")
         await chat_bot.on_message(update, SimpleNamespace(bot=chat_bot.bot))
         self.assertEqual(
-            started, [(42, ["workout", "list", "-d", "today"], False, "bot")]
+            started, [(42, ["bot", "today"], False, "bot")]
         )
 
     async def test_a_message_with_a_leading_slash_is_a_command_line(self):

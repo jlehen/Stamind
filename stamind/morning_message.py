@@ -5,13 +5,15 @@ the window in which the bot's scheduler tries it.
 The message itself is `sm bot morning` (`cli/bot/views.py`), and the scheduler that tries
 it is `chat/scheduler.py`.
 """
-from typing import Tuple
+from datetime import datetime
+from typing import Optional, Tuple
 
 from stamind import clock, runtime, settings
 
-# Not a setting: the day `bot morning` last sent, kept in the `settings` table so the bot
-# process stays stateless across restarts (DESIGN_bot_simple_frontend.md §4.2). Its first
-# ten characters are the day.
+# Not a setting: the moment `bot morning` last sent, on the athlete's clock, kept in the
+# `settings` table so the bot process stays stateless across restarts
+# (DESIGN_bot_simple_frontend.md §4.2). Its first ten characters are the day, so a value
+# written before it held the moment, the day alone, still reads right (§5).
 MARKER = "push_morning_last"
 
 # The message waits for the night at most this long after morning-time (§2, §7 choice 1).
@@ -26,9 +28,18 @@ def sent_on(day: str) -> bool:
     return (runtime.db.get_setting(MARKER) or "")[:10] == day
 
 
+def sent_at() -> Optional[datetime]:
+    """The moment the last morning message went out, or None when the marker holds no
+    moment."""
+    raw = runtime.db.get_setting(MARKER) or ""
+    if len(raw) <= len("YYYY-MM-DD"):
+        return None
+    return datetime.fromisoformat(raw)
+
+
 def mark_sent() -> None:
-    """Records that today's morning message went out."""
-    runtime.db.set_setting(MARKER, clock.today_str())
+    """Records the moment today's morning message went out."""
+    runtime.db.set_setting(MARKER, clock.now().isoformat())
 
 
 def _later(hhmm: str, minutes: int) -> str:

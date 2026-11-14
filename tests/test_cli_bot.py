@@ -21,7 +21,9 @@ from stamind.db import Database
 import stamind_cli
 
 from stamind import clock, runtime
-from stamind.cli.bot.views import PUSH_ALL_DONE_LINE
+from stamind.cli.bot.views import (
+    NIGHT_IN_LINE, PREPARING_LINE, PUSH_ALL_DONE_LINE, WAITING_LINE,
+)
 from stamind import morning_message
 from stamind.settings import ADAPT_LAST_SEEN
 from stamind.cli.workouts import proposal as saved_proposal
@@ -157,9 +159,15 @@ class ChangesCommandTest(unittest.TestCase):
         self.assertEqual(len(test_db.waiting_changes()), 1)
 
 
+# The words of the morning message's first button: the chat's button rows travel as JSON,
+# which escapes the emoji.
+GOT_IT = "Got it"
+
+
 class MorningWaitTest(unittest.TestCase):
     """With `adapt-first` on, `bot morning` waits for Garmin to have the night, until two
-    hours after morning-time (DESIGN_morning_waits_for_night.md §3, §5)."""
+    hours after morning-time, and "📅 Today" sends the message once it has
+    (DESIGN_morning_waits_for_night.md §3, §4, §5)."""
 
     def setUp(self):
         rebind_test_db(test_db)
@@ -185,12 +193,67 @@ class MorningWaitTest(unittest.TestCase):
         self.today = today_str()
         save_workout(test_db, self.today, "running", "Easy run", duration_minutes=40)
 
-    def _morning_at(self, hour, minute=0, *flags):
-        """What `bot morning` sends into the chat when run at that local time today."""
+    def _in_chat_at(self, argv, hour, minute=0):
+        """What `argv` sends into the chat when run at that local time today."""
         moment = datetime.combine(date.fromisoformat(self.today), time(hour, minute))
         with patch("stamind.clock.now", return_value=moment.astimezone()), \
-                patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
-            return run_cli(["bot", "morning", *flags])[1]
+                patch.dict(os.environ, {"STAMIND_FRONTEND": "json", "STAMIND_RENDER": "simple"}):
+            return run_cli(argv)[1]
+
+    def _morning_at(self, hour, minute=0, *flags):
+        return self._in_chat_at(["bot", "morning", *flags], hour, minute)
+
+    def _today_at(self, hour, minute=0):
+        """A tap on "📅 Today" at that local time today."""
+        return self._in_chat_at(["bot", "today"], hour, minute)
+
+    def test_a_tap_once_the_night_is_in_sends_the_morning_message_once(self):
+        """Tuesday of §3: 05:50, and the watch has synced."""
+        self.look.return_value = 74
+        out = self._today_at(5, 50)
+        self.assertIn(NIGHT_IN_LINE, out)
+        self.assertIn(GOT_IT, out)
+        self.assertTrue(morning_message.sent_on(self.today))
+        again = self._today_at(6)
+        self.assertIn("Easy run", again)
+        self.assertNotIn(PREPARING_LINE, again)
+        self.assertNotIn(GOT_IT, again)
+        self.assertEqual(self._morning_at(8).strip(), "")
+
+    def test_a_tap_before_the_night_shows_the_sessions_and_says_when_the_message_comes(self):
+        """Wednesday of §3: 06:10, and the watch has not synced."""
+        out = self._today_at(6, 10)
+        self.assertIn("Easy run", out)
+        self.assertIn(WAITING_LINE.format(time="10:00"), " ".join(out.split()))
+        self.assertNotIn(GOT_IT, out)
+        self.assertFalse(morning_message.sent_on(self.today))
+
+    def test_past_the_mark_a_tap_sends_the_message_without_claiming_the_night(self):
+        """The bot was down all morning (§7 choice 6)."""
+        out = self._today_at(14)
+        self.assertIn(PREPARING_LINE, out)
+        self.assertNotIn(NIGHT_IN_LINE, out)
+        self.assertIn(GOT_IT, out)
+
+    def test_with_adapt_first_off_a_tap_sends_the_message_at_once_and_says_nothing_first(self):
+        with patch.dict(config.data, {"telegram": {"push": {"adapt_first": False}}}):
+            out = self._today_at(6, 10)
+        self.assertNotIn(PREPARING_LINE, out)
+        self.assertIn(GOT_IT, out)
+        self.look.assert_not_called()
+
+    def test_with_the_push_off_a_tap_is_the_sessions_alone(self):
+        with patch.dict(config.data, {"telegram": {"push": {"enabled": False}}}):
+            out = self._today_at(6, 10)
+        self.assertIn("Easy run", out)
+        self.assertNotIn(GOT_IT, out)
+        self.assertFalse(morning_message.sent_on(self.today))
+
+    def test_in_a_terminal_bot_today_lists_the_sessions(self):
+        morning_message.mark_sent()
+        code, out, _ = run_cli(["bot", "today"])
+        self.assertEqual(code, 0)
+        self.assertIn("Easy run", out)
 
     def test_the_message_waits_while_garmin_has_no_night(self):
         self.assertEqual(self._morning_at(8).strip(), "")

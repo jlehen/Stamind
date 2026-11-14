@@ -15,7 +15,7 @@ TEST_DB_PATH = test_db_path("test_athlete_queue.db")
 from stamind.db import Database
 import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
-from stamind import athlete_queue, clock, runtime
+from stamind import athlete_queue, clock, morning_message, runtime
 from stamind.cli import queue as queue_cli
 from stamind.coach.proposals import RevisionProposal
 from stamind.sentinels import BUTTONS_SENTINEL, QUEUE_SENTINEL
@@ -293,6 +293,33 @@ class OutTest(_QueueCase):
         for hour, minute, days, out in ((23, 0, 0, True), (7, 59, 1, True), (8, 0, 1, False)):
             self.at(hour, minute, days)
             self.assertEqual(athlete_queue.anything_out(), out, (hour, minute, days))
+
+    def test_the_day_turns_at_a_morning_message_sent_before_the_morning_time(self):
+        """Wednesday evening's question comes back with Thursday's 05:50 message, and the
+        question that message asks is still out at 08:00 (DESIGN_morning_waits_for_night.md
+        §5). On Friday, with no message yet, the day turns at 08:00 as before."""
+        a, b = self.ask("A"), self.ask("B")
+        self.at(20)
+        athlete_queue.sent(self.item(a))
+        self.at(5, 50, days=1)
+        self.assertTrue(athlete_queue.anything_out())
+        morning_message.mark_sent()
+        self.assertFalse(athlete_queue.anything_out())
+        athlete_queue.sent(self.item(b))
+        for hour, days, out in ((8, 1, True), (9, 1, True), (7, 2, True), (8, 2, False)):
+            self.at(hour, 0, days)
+            self.assertEqual(athlete_queue.anything_out(), out, (hour, days))
+
+    def test_a_marker_holding_the_day_alone_turns_the_day_at_the_morning_time(self):
+        """The form the marker had before it held the moment."""
+        thursday = (WEDNESDAY_8AM + timedelta(days=1)).date().isoformat()
+        test_db.set_setting(morning_message.MARKER, thursday)
+        a = self.ask("A")
+        self.at(20)
+        athlete_queue.sent(self.item(a))
+        for hour, minute, out in ((7, 59, True), (8, 0, False)):
+            self.at(hour, minute, 1)
+            self.assertEqual(athlete_queue.anything_out(), out, (hour, minute))
 
     def test_a_wake_sends_between_the_morning_time_and_the_evening_only(self):
         """A question the nightly reflect queues at 03:00 waits for 08:00, and nothing
