@@ -65,17 +65,7 @@ class GarminClient:
             step(f"[{date_str}] daily stats unavailable: {e}")
 
         try:
-            sleep_data = self.api.get_sleep_data(date_str)
-            if isinstance(sleep_data, dict):
-                daily_sleep = sleep_data.get("dailySleepDTO")
-                if isinstance(daily_sleep, dict):
-                    scores = daily_sleep.get("sleepScores")
-                    if isinstance(scores, dict):
-                        metrics["sleep_score"] = scores.get("overall", {}).get("value")
-                    if metrics["sleep_score"] is None:
-                        q = daily_sleep.get("sleepQualityScore")
-                        if isinstance(q, dict):
-                            metrics["sleep_score"] = q.get("score")
+            metrics["sleep_score"] = self.get_sleep_score(date_str)
         except Exception as e:
             step(f"[{date_str}] sleep data unavailable: {e}")
 
@@ -93,6 +83,24 @@ class GarminClient:
             journal.debug("garmin.pull", f"[{date_str}] HRV unavailable: {e}")
 
         return metrics
+
+    def get_sleep_score(self, date_str: str) -> Optional[Any]:
+        """The sleep score of the night before `date_str`, None while Garmin has none, in
+        one call. Raises on API failure (DESIGN_morning_waits_for_night.md §5)."""
+        sleep_data = self.api.get_sleep_data(date_str)
+        if not isinstance(sleep_data, dict):
+            return None
+        daily_sleep = sleep_data.get("dailySleepDTO")
+        if not isinstance(daily_sleep, dict):
+            return None
+        score = None
+        scores = daily_sleep.get("sleepScores")
+        if isinstance(scores, dict):
+            score = scores.get("overall", {}).get("value")
+        quality = daily_sleep.get("sleepQualityScore")
+        if score is None and isinstance(quality, dict):
+            score = quality.get("score")
+        return score
 
     def get_activities(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Fetches the activity summary list within a date range (inclusive).

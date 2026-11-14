@@ -6,9 +6,9 @@ from here and names nothing else in this package.
 """
 from stamind.cli.bot.capture import CAPTURE_INTENTS, run_bot_capture
 from stamind.cli.bot.route import run_bot_route
+from stamind.cli.bot.morning import run_bot_morning, run_bot_today
 from stamind.cli.bot.views import (
     run_bot_changes, run_bot_constraints, run_bot_garmin_check, run_bot_goals,
-    run_bot_morning,
 )
 from stamind.cli.queue_commands import run_bot_queue
 
@@ -31,18 +31,34 @@ def add_bot_parser(subparsers):
             "rest-day line — and emit the follow-up button row. Records "
             "push_morning_last in the settings table and exits silently when already "
             "sent today, so the bot's scheduler can fire it repeatedly without "
-            "double-sending. With telegram.push.adapt_first, asks the week planner first "
+            "double-sending. With telegram.push.adapt_first, waits for Garmin to have "
+            "the night's sleep score, until two hours after morning-time "
+            "(DESIGN_morning_waits_for_night.md), then asks the week planner first "
             "when something is new since the last workout adapt run or a night since "
             "then is not normal (DESIGN_quiet_morning.md). A session it would change is "
             "sent after the briefing as a proposal the athlete answers with a tap; "
             "nothing is written before that."
         ),
     )
-    b_morning.set_defaults(func=run_bot_morning)
+    # A try that waits for the night leaves no run in the journal.
+    b_morning.set_defaults(func=run_bot_morning, names_its_run=True)
     b_morning.add_argument(
         "-f", "--force", action="store_true",
-        help="Send even when already recorded as sent today",
+        help="Send even when already recorded as sent today, and without waiting for the night",
     )
+
+    # bot today
+    b_today = bot_subparsers.add_parser(
+        "today",
+        help="What the chat's 📅 Today runs: the morning message, else today's sessions",
+        description=(
+            "Send today's morning message while it has not gone out, else show today's "
+            "sessions. With telegram.push.adapt_first, the message waits for Garmin to have "
+            "the night's sleep score, and the sessions then carry one line saying so "
+            "(DESIGN_morning_waits_for_night.md §4, §5)."
+        ),
+    )
+    b_today.set_defaults(func=run_bot_today)
 
     # bot changes
     b_changes = bot_subparsers.add_parser(

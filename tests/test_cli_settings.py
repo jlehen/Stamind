@@ -332,8 +332,37 @@ class TestMorningPushKnobs(SettingsTestCase):
                 now, settings.morning_time(), settings.morning_deadline()),
             3600.0)
 
+    def test_earliest_morning_is_off_until_set_and_reads_a_bare_off_in_config(self):
+        """YAML reads an unquoted `off` as false."""
+        from stamind.config import config
+        from stamind.cli.bot.setting import ROUTABLE_SETTINGS
+        self.assertIsNone(settings.earliest_morning())
+        for raw, expected in ((False, None), ("off", None), ("5:00", "05:00")):
+            with self.subTest(raw=raw), \
+                    patch.dict(config.data, {"telegram": {"push": {"earliest_morning": raw}}}):
+                self.assertEqual(settings.earliest_morning(), expected)
+        self.run_cli(["settings", "set", "earliest-morning", "05:00"])
+        self.assertEqual(settings.earliest_morning(), "05:00")
+        self.run_cli(["settings", "set", "earliest-morning", "off"])
+        self.assertIsNone(settings.earliest_morning())
+        # Set from the terminal only (DESIGN_morning_waits_for_night.md §7 choice 8).
+        self.assertNotIn(settings.EARLIEST_MORNING, ROUTABLE_SETTINGS)
+
+    def test_the_window_opens_at_earliest_morning_only_while_the_message_waits(self):
+        """With adapt-first off the message does not wait, and a time at or after
+        morning-time changes nothing (DESIGN_morning_waits_for_night.md §5)."""
+        from stamind import morning_message
+        self.run_cli(["settings", "set", "earliest-morning", "05:00"])
+        self.assertEqual(morning_message.window(), ("08:00", "15:00"))
+        self.run_cli(["settings", "set", "adapt-first", "on"])
+        self.assertEqual(morning_message.window(), ("05:00", "15:00"))
+        self.run_cli(["settings", "set", "earliest-morning", "09:00"])
+        self.assertEqual(morning_message.window(), ("08:00", "15:00"))
+        self.run_cli(["settings", "set", "morning-deadline", "09:00"])
+        self.assertEqual(morning_message.window(), ("08:00", "10:10"))
+
     def test_the_morning_command_adapts_only_when_the_switch_is_on(self):
-        with patch("stamind.cli.bot.views._morning_adaptation",
+        with patch("stamind.cli.bot.morning._morning_adaptation",
                    return_value=("adapted", None)) as note:
             self.run_cli(["bot", "morning", "--force"])
             self.assertFalse(note.called)
@@ -381,6 +410,7 @@ class TestRegistryShape(SettingsTestCase):
             settings.MORNING_TIME: "06:45",
             settings.MORNING_DEADLINE: "11:15",
             settings.EVENING_TIME: "20:30",
+            settings.EARLIEST_MORNING: "05:00",
             settings.ADAPT_FIRST: "on",
             settings.COMMITMENT_DAYS: "10",
             settings.CHANGE_DELAY: "5",

@@ -29,7 +29,7 @@ from stamind import runtime  # noqa: E402
 from stamind.cli import runway as runway_cli  # noqa: E402
 from stamind.cli.render import plan_lines as render_plan  # noqa: E402
 from stamind.cli.workouts import generate as generate_cli  # noqa: E402
-from stamind.settings import MORNING_MARKER  # noqa: E402
+from stamind import morning_message  # noqa: E402
 from stamind.config import config  # noqa: E402
 from stamind.cli.render.plan_lines import SIMPLE_PASSED_LINE  # noqa: E402
 from stamind.cli.render.session_lines import SPORT_EMOJI  # noqa: E402
@@ -534,8 +534,19 @@ class MorningPushRunwayTest(unittest.TestCase):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")
-        self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+        self.assertTrue(morning_message.sent_on(today_str()))
         self.assertEqual(test_db.get_retrospectives()[0]["body"], "For: x")
+
+    def test_on_a_silent_morning_today_shows_the_day_and_sends_no_message(self):
+        """"📅 Today" is the view on a day the morning message sends nothing
+        (DESIGN_morning_waits_for_night.md §5)."""
+        self._plan([(-60, -20)], goal_offset=-20)
+        self._sessions(-20)
+        with patch.dict(os.environ, {"STAMIND_FRONTEND": "json", "STAMIND_RENDER": "simple"}):
+            code, out, _ = run_cli(["bot", "today"])
+        self.assertEqual(code, 0)
+        self.assertNotEqual(out.strip(), "")
+        self.assertFalse(morning_message.sent_on(today_str()))
 
     def test_a_silent_morning_spends_no_adaptation(self):
         """The silence is decided before `adapt-first` runs, so a dead plan does not burn
@@ -546,7 +557,7 @@ class MorningPushRunwayTest(unittest.TestCase):
         coach = MagicMock()
         with patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}), \
                 patch.object(runtime, "coach_service", coach, create=True), \
-                patch("stamind.cli.bot.views.ensure_recent_data"):
+                patch("stamind.cli.bot.morning.ensure_recent_data"):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")

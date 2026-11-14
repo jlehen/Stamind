@@ -20,7 +20,7 @@ import shlex
 import sys
 from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, Tuple
 
-from stamind import athlete_queue, heads_up, journal, runtime, settings
+from stamind import athlete_queue, heads_up, journal, morning_message, runtime, settings
 from stamind.chat import runner
 from stamind.clock import now as athlete_now, reset_cache as forget_timezone
 from stamind.config import config
@@ -73,6 +73,25 @@ def reflect_due(now: "datetime.datetime") -> bool:
     return now.weekday() >= REFLECT_FROM_WEEKDAY and now.hour >= REFLECT_FROM_HOUR
 
 
+def morning_try_due(
+    now: "datetime.datetime", last_try: Optional[str], every_minutes: float, mark: str,
+) -> bool:
+    """Whether a wake inside the morning message's window, before it went out, tries it: the
+    first wake of the day, `every_minutes` after the last try started, and once more at the
+    two-hour mark `mark`. Zero minutes leaves the first and the one at the mark
+    (DESIGN_morning_waits_for_night.md §5)."""
+    if last_try is None:
+        return True
+    last = datetime.datetime.fromisoformat(last_try)
+    if last.date() != now.date():
+        return True
+    if last.strftime("%H:%M") < mark <= now.strftime("%H:%M"):
+        return True
+    if every_minutes <= 0:
+        return False
+    return now - last >= datetime.timedelta(minutes=every_minutes)
+
+
 def garmin_poll_due(
     now: "datetime.datetime", last_poll: Optional[str], every_minutes: float,
     morning: str, evening: str,
@@ -106,11 +125,12 @@ async def scheduler_wake(
     outside the chat once a day, and nothing waits for it (DESIGN_learning_doubt_nudge.md
     §3.1). `poll` starts `bot garmin-check` the same way when `garmin_poll_due` says so,
     and `backup` starts `data backup` once a day from 03:00 when a backup bucket is set. The
-    push fires inside the [morning_time, deadline] window once per bot-day, and
-    ends by sending from the athlete queue itself (DESIGN_bot_simple_frontend.md §4.3). On
-    a wake with no push to run, the next item of the queue goes out when one is ready and
-    none is out, whether or not the push is on. Past the evening time that needs
-    `last_input`, the athlete's last message or tap, to be recent
+    push is tried inside its window until the marker says it went out, which it may not
+    while it waits for the night; it ends by sending from the athlete queue itself
+    (DESIGN_morning_waits_for_night.md §5, DESIGN_bot_simple_frontend.md §4.3). Until then
+    the queue waits for it. On a wake outside that, the next item of the queue goes out
+    when one is ready and none is out, whether or not the push is on. Past the evening time
+    that needs `last_input`, the athlete's last message or tap, to be recent
     (DESIGN_athlete_queue.md §13.2 rule 4)."""
     # The athlete's wall clock, not the machine's: morning-time/morning-deadline are the
     # hours they wake up in (DESIGN_user_timezone.md §2). Every knob here is re-read each
@@ -132,18 +152,20 @@ async def scheduler_wake(
                        settings.morning_time(), settings.evening_time()):
         last_run["poll"] = now.isoformat()
         poll()
-    delay = next_push_delay(now, settings.morning_time(), settings.morning_deadline())
-    pushed = last_run.get("push") == today
-    if delay > 0 or not settings.push_enabled() or pushed:
+    delay = next_push_delay(now, *morning_message.window())
+    if delay > 0 or not settings.push_enabled() or morning_message.sent_on(today):
         here = last_input is not None and now - last_input <= ATHLETE_HERE
         if not busy() and athlete_queue.next_due(here):
             await run(["bot", "queue", "--next"], True)
         return min(max(delay, 60), 300)
+    mark = morning_message.night_deadline()
+    if not morning_try_due(now, last_run.get("push"), config.garmin_poll_minutes, mark):
+        return 60
     if busy():
         # §4.3: never collide with an in-flight command — retry shortly.
         return 180
     await run(["bot", "morning"], False)
-    last_run["push"] = today
+    last_run["push"] = now.isoformat()
     return 0
 
 

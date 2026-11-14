@@ -18,7 +18,7 @@ TEST_DB_PATH = test_db_path("test_stamind_long_runs.db")
 from stamind.db import Database
 import stamind_cli  # noqa: F401  (registers the parsers)
 
-from stamind import athlete_queue, runtime
+from stamind import athlete_queue, morning_message, runtime
 from stamind.chat.callbacks import tap_long_run
 from stamind.chat.routing import COACH_RUN, PLANNING_RUN
 from stamind.cli.bot import hand_off
@@ -169,6 +169,17 @@ class ConfirmationTest(_Case):
         self.at(days=3, hour=23)
         self.assertEqual(self.line_ids(), [item["id"]])
         self.at(days=4)
+        self.assertEqual(self.line_ids(), [])
+        self.assertEqual(test_db.get_queue_item(item["id"])["outcome"], athlete_queue.STALE)
+
+    def test_on_its_last_morning_an_early_morning_message_closes_it(self):
+        """Monday's message goes out at 05:45, before the morning time. The queue's day turns
+        then, so the question is not sent on a fourth morning
+        (DESIGN_morning_waits_for_night.md §5)."""
+        item = self.ask()
+        self.at(days=4, hour=5, minute=45)
+        self.assertEqual(self.line_ids(), [item["id"]])
+        morning_message.mark_sent()
         self.assertEqual(self.line_ids(), [])
         self.assertEqual(test_db.get_queue_item(item["id"])["outcome"], athlete_queue.STALE)
 

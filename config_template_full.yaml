@@ -214,8 +214,15 @@ telegram:
     # Ask the week planner before writing the push, so it accounts for overnight signals, on
     # the mornings when something is new or the night is not normal. A session it would
     # change follows the push as a proposal the athlete accepts or declines with a tap.
-    # Costs at most one LLM call a morning.
+    # Costs at most one LLM call a morning. With it on, the push waits for the night's sleep
+    # score in Garmin, until two hours after morning_time (DESIGN_morning_waits_for_night.md).
     adapt_first: false
+    # With adapt_first on, the bot looks for the night from this earlier local time, every
+    # garmin.poll_minutes, and sends the push as soon as it is in. Off by default: watches
+    # differ in what closes the night. One that closes it when the athlete dismisses its
+    # morning report is safe; one that closes it on its own could wake them. A time at or
+    # after morning_time changes nothing. Seeds `settings set earliest-morning`.
+    earliest_morning: "off"
   # A change you make to the athlete's week from the terminal reaches them at their next
   # morning time (DESIGN_change_heads_up.md §4). A change to one of today's sessions cannot
   # wait that long — by the next morning the day it is about is over — so it goes out the

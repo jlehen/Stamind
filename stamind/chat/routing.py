@@ -105,11 +105,19 @@ ROUTER_FALLBACK = (
 )
 
 
+# "📅 Today", by its button or by "what's on today?": the morning message while it has not
+# gone out, else today's sessions. While the bot's own try at the message runs beside the
+# chat, the sessions alone, and the message follows on its own
+# (DESIGN_morning_waits_for_night.md §5).
+TODAY_ARGV = ["bot", "today"]
+TODAY_VIEW_ARGV = ["workout", "list", "-d", "today"]
+
+
 # What each of those names runs (§5.3). The model picks a name above and never argv, so
 # a hostile or confused message cannot reach a flag this table does not expose. Views and
 # pickers live here — fixed argv, no slots; help and unclear are answered by the bot.
 ROUTER_INTENT_ARGV = {
-    "show_today": ["workout", "list", "-d", "today"],
+    "show_today": TODAY_ARGV,
     "show_done": ["workout", "compare", "-d", "7d", "--no-mark"],
     "show_progress": ["progress", "--chart"],
     "show_constraints": ["bot", "constraints"],

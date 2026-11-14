@@ -449,7 +449,7 @@ class ShortDayTest(_Case):
         coach.workout_adapt.return_value = proposal
         with patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}), \
                 patch.object(runtime, "coach_service", coach, create=True), \
-                patch("stamind.cli.bot.views.ensure_recent_data"):
+                patch("stamind.cli.bot.morning.ensure_recent_data"):
             code, out, _err = run_cli(["bot", "morning", "--force"])
         self.assertEqual(code, 0)
         return out
@@ -660,7 +660,7 @@ class MorningPushTest(_Case):
         coach.workout_adapt.return_value = proposal
         with patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}), \
                 patch.object(runtime, "coach_service", coach, create=True), \
-                patch("stamind.cli.bot.views.ensure_recent_data"):
+                patch("stamind.cli.bot.morning.ensure_recent_data"):
             code, out, _err = run_cli(["bot", "morning", "--force"])
         self.assertEqual(code, 0)
         return coach, out
@@ -750,7 +750,7 @@ class MorningPushTest(_Case):
 
     def test_the_button_that_extends_the_schedule_joins_them(self):
         extend = {"label": "📅 Plan more weeks", "send": "workout generate"}
-        with patch("stamind.cli.bot.views.runway_buttons", return_value=[extend]):
+        with patch("stamind.cli.bot.morning.runway_buttons", return_value=[extend]):
             _coach, out = self.push(self.eased())
         self.assertNotIn(BUTTONS_SENTINEL, out)
         [sent] = queue_lines(out)

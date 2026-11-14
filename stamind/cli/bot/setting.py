@@ -7,7 +7,7 @@ A terminal asks on the spot. In the chat the question is saved, and `bot capture
 import argparse
 from typing import Any, Dict, Optional
 
-from stamind import clock, runtime, settings
+from stamind import clock, morning_message, runtime, settings
 from stamind.cli.bot.extraction import (
     CAPTURE_ROLE, NEVER_FILL_RULE, capture_call, dated_context, no_find,
 )
@@ -93,8 +93,7 @@ def _push_lands_today() -> bool:
     """Whether a morning-push change takes effect today. The scheduler re-reads every
     tick (§4.3), so a change made before today's push lands today — and the preview only
     claims tomorrow when today's is already past (§12.7)."""
-    today = _today_str()
-    if runtime.db.get_setting(settings.MORNING_MARKER) == today:
+    if morning_message.sent_on(_today_str()):
         return False
     deadline = settings.morning_deadline()
     return clock.now().strftime("%H:%M") <= deadline

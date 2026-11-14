@@ -7,7 +7,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from unittest.mock import MagicMock, patch
 
 from tests.helpers import (
@@ -20,9 +20,12 @@ TEST_DB_PATH = test_db_path("test_stamind_cli_bot.db")
 from stamind.db import Database
 import stamind_cli
 
-from stamind import clock, runtime
-from stamind.cli.bot.views import PUSH_ALL_DONE_LINE
-from stamind.settings import ADAPT_LAST_SEEN, MORNING_MARKER
+from stamind import clock, journal, runtime
+from stamind.cli.bot.morning import (
+    NIGHT_IN_LINE, PREPARING_LINE, PUSH_ALL_DONE_LINE, WAITING_LINE,
+)
+from stamind import morning_message
+from stamind.settings import ADAPT_LAST_SEEN
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
 from stamind.coach import picture
@@ -149,11 +152,174 @@ class ChangesCommandTest(unittest.TestCase):
         self.assertIn("The first attempt.", out)
         self.assertNotIn("The second attempt.", out)
 
-    def test_the_morning_message_no_longer_carries_the_line(self):
+    def test_a_waiting_change_goes_just_before_the_morning_message_on_its_own(self):
+        """The morning message does not carry the line: `bot morning` sends it first, as a
+        message of its own, so a message sent before the morning time cannot overtake it
+        (DESIGN_change_heads_up.md §4, §7; DESIGN_morning_waits_for_night.md §5)."""
         self._change(note="Four sessions a week now.")
-        _code, out, _ = run_cli(["bot", "morning"])
-        self.assertNotIn(CHANGE_LEAD, out)
-        self.assertEqual(len(test_db.waiting_changes()), 1)
+        with patch.dict(config.data, {"telegram": {"push": {"adapt_first": False}}}), \
+                patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
+            _code, out, _ = run_cli(["bot", "morning"])
+        told, message = out.split(FLUSH_SENTINEL, 1)
+        self.assertIn(f"{CHANGE_LEAD} Four sessions a week now.", told)
+        self.assertNotIn(CHANGE_LEAD, message)
+        self.assertIn("Ride", message)
+        self.assertEqual(test_db.waiting_changes(), [])
+
+
+# The words of the morning message's first button: the chat's button rows travel as JSON,
+# which escapes the emoji.
+GOT_IT = "Got it"
+
+
+class MorningWaitTest(unittest.TestCase):
+    """With `adapt-first` on, `bot morning` waits for Garmin to have the night, until two
+    hours after morning-time, and "📅 Today" sends the message once it has
+    (DESIGN_morning_waits_for_night.md §3, §4, §5)."""
+
+    def setUp(self):
+        rebind_test_db(test_db)
+        clear_all_tables(test_db)
+        garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
+        garmin.start()
+        self.addCleanup(garmin.stop)
+        # The one call a try makes after the login: no night yet.
+        self.look = runtime.garmin.connect.return_value.get_sleep_score
+        self.look.return_value = None
+        coach = MagicMock()
+        coach.workout_adapt.return_value = MagicMock(workouts=[], reason="", strength_notice=None)
+        for patcher in (
+            patch.dict(config.data, {
+                "telegram": {"push": {"adapt_first": True, "morning_time": "08:00"}},
+                "garmin": {"email": "athlete@example.com", "password": "secret"},
+            }),
+            patch.object(runtime, "coach_service", coach, create=True),
+            patch("stamind.cli.bot.morning.ensure_recent_data"),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.today = today_str()
+        save_workout(test_db, self.today, "running", "Easy run", duration_minutes=40)
+
+    def _in_chat_at(self, argv, hour, minute=0):
+        """What `argv` sends into the chat when run at that local time today."""
+        moment = datetime.combine(date.fromisoformat(self.today), time(hour, minute))
+        with patch("stamind.clock.now", return_value=moment.astimezone()), \
+                patch.dict(os.environ, {"STAMIND_FRONTEND": "json", "STAMIND_RENDER": "simple"}):
+            return run_cli(argv)[1]
+
+    def _morning_at(self, hour, minute=0, *flags):
+        return self._in_chat_at(["bot", "morning", *flags], hour, minute)
+
+    def _today_at(self, hour, minute=0):
+        """A tap on "📅 Today" at that local time today."""
+        return self._in_chat_at(["bot", "today"], hour, minute)
+
+    def test_a_tap_once_the_night_is_in_sends_the_morning_message_once(self):
+        """Tuesday of §3: 05:50, and the watch has synced."""
+        self.look.return_value = 74
+        out = self._today_at(5, 50)
+        self.assertIn(NIGHT_IN_LINE, out)
+        self.assertIn(GOT_IT, out)
+        self.assertTrue(morning_message.sent_on(self.today))
+        again = self._today_at(6)
+        self.assertIn("Easy run", again)
+        self.assertNotIn(PREPARING_LINE, again)
+        self.assertNotIn(GOT_IT, again)
+        self.assertEqual(self._morning_at(8).strip(), "")
+
+    def test_a_tap_before_the_night_shows_the_sessions_and_says_when_the_message_comes(self):
+        """Wednesday of §3: 06:10, and the watch has not synced."""
+        out = self._today_at(6, 10)
+        self.assertIn("Easy run", out)
+        self.assertIn(WAITING_LINE.format(time="10:00"), " ".join(out.split()))
+        self.assertNotIn(GOT_IT, out)
+        self.assertFalse(morning_message.sent_on(self.today))
+
+    def test_past_the_mark_a_tap_sends_the_message_without_claiming_the_night(self):
+        """The bot was down all morning (§7 choice 6)."""
+        out = self._today_at(14)
+        self.assertIn(PREPARING_LINE, out)
+        self.assertNotIn(NIGHT_IN_LINE, out)
+        self.assertIn(GOT_IT, out)
+
+    def test_with_adapt_first_off_a_tap_sends_the_message_at_once_and_says_nothing_first(self):
+        with patch.dict(config.data, {"telegram": {"push": {"adapt_first": False}}}):
+            out = self._today_at(6, 10)
+        self.assertNotIn(PREPARING_LINE, out)
+        self.assertIn(GOT_IT, out)
+        self.look.assert_not_called()
+
+    def test_with_the_push_off_a_tap_is_the_sessions_alone(self):
+        with patch.dict(config.data, {"telegram": {"push": {"enabled": False}}}):
+            out = self._today_at(6, 10)
+        self.assertIn("Easy run", out)
+        self.assertNotIn(GOT_IT, out)
+        self.assertFalse(morning_message.sent_on(self.today))
+
+    def test_in_a_terminal_bot_today_lists_the_sessions(self):
+        morning_message.mark_sent()
+        code, out, _ = run_cli(["bot", "today"])
+        self.assertEqual(code, 0)
+        self.assertIn("Easy run", out)
+
+    def test_the_message_waits_while_garmin_has_no_night(self):
+        self.assertEqual(self._morning_at(8).strip(), "")
+        self.assertFalse(morning_message.sent_on(self.today))
+        self.look.assert_called_once_with(self.today)
+        runtime.coach_service.workout_adapt.assert_not_called()
+
+    def test_the_try_after_the_watch_synced_sends_it(self):
+        self._morning_at(8)
+        self.look.return_value = 74
+        self.assertIn("Easy run", self._morning_at(8, 15))
+        self.assertTrue(morning_message.sent_on(self.today))
+
+    def test_a_night_already_stored_needs_no_look(self):
+        test_db.save_metric_cache(self.today, 50, 60, 80, 20, None, None, None)
+        self.assertIn("Easy run", self._morning_at(8))
+        self.look.assert_not_called()
+
+    def test_at_the_two_hour_mark_it_goes_without_the_night(self):
+        """Friday of §3: the watch is broken, and the 10:00 try sends."""
+        self.assertIn("Easy run", self._morning_at(10))
+        self.look.assert_not_called()
+
+    def test_a_look_that_fails_counts_as_no_night_and_stays_out_of_the_chat(self):
+        runtime.garmin.connect.side_effect = RuntimeError("Garmin down")
+        self.assertEqual(self._morning_at(8).strip(), "")
+        self.assertFalse(morning_message.sent_on(self.today))
+
+    def test_a_try_that_waits_leaves_no_run_and_a_failed_look_a_named_one(self):
+        """The failed look's warning is journalled, so its run is kept under its name."""
+        def ends():
+            return [r for r in journal.iter_records() if r["ev"] == "run.end"]
+
+        before = len(ends())
+        self._morning_at(8)
+        self.assertEqual(len(ends()), before)
+        runtime.garmin.connect.side_effect = RuntimeError("Garmin down")
+        self._morning_at(8, 15)
+        self.assertEqual([r["d"]["cmd"] for r in ends()[before:]], ["bot morning"])
+
+    def test_a_message_that_breaks_half_way_is_not_tried_again(self):
+        """It counts as sent from the moment it starts (§7 choice 16)."""
+        self.look.return_value = 74
+        with patch("stamind.cli.bot.morning._refresh_garmin", side_effect=RuntimeError("bug")):
+            out = self._morning_at(8)
+        self.assertNotIn("Easy run", out)
+        self.assertTrue(morning_message.sent_on(self.today))
+
+    def test_no_wait_without_garmin_with_adapt_first_off_or_with_force(self):
+        for pinned, flags in (
+            ({"garmin": {}}, ()),
+            ({"telegram": {"push": {"adapt_first": False}}}, ()),
+            ({}, ("--force",)),
+        ):
+            with patch.dict(config.data, pinned):
+                self.assertIn("Easy run", self._morning_at(8, 0, *flags))
+            test_db.clear_setting(morning_message.MARKER)
+        self.look.assert_not_called()
 
 
 class MorningPushTest(unittest.TestCase):
@@ -187,7 +353,7 @@ class MorningPushTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Rest day", out)
         self.assertNotIn(BUTTONS_SENTINEL, out)
-        self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+        self.assertTrue(morning_message.sent_on(today_str()))
 
     def test_a_planned_rest_day_gets_no_buttons(self):
         """The week planner writes rest as a session row, graded rest_ok rather than done; "Can't
@@ -221,7 +387,7 @@ class MorningPushTest(unittest.TestCase):
         self.assertNotIn("Easy run", out)
         self.assertNotIn("Conversational pace", out)
         self.assertNotIn(BUTTONS_SENTINEL, out)
-        self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+        self.assertTrue(morning_message.sent_on(today_str()))
 
     def test_the_session_still_ahead_is_briefed_and_keeps_the_buttons(self):
         save_workout(test_db, today_str(), "running", "Easy run", duration_minutes=40)
@@ -285,7 +451,7 @@ class MorningPushTest(unittest.TestCase):
         return (
             patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}),
             patch.object(runtime, "coach_service", coach, create=True),
-            patch("stamind.cli.bot.views.ensure_recent_data"),
+            patch("stamind.cli.bot.morning.ensure_recent_data"),
         )
 
     def test_adapt_first_writes_moved_kilograms_and_surfaces_the_reason(self):
@@ -349,7 +515,7 @@ class MorningPushTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Easy run", out)
         self.assertNotIn("LLM down", out)
-        self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+        self.assertTrue(morning_message.sent_on(today_str()))
 
     def _adapt_first_run(self, coach):
         coach.workout_adapt.return_value = MagicMock(
@@ -417,7 +583,7 @@ class QuietMorningTest(unittest.TestCase):
             workouts=[], reason="All green.", strength_notice=None,
         )
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("stamind.cli.bot.views.ensure_recent_data", side_effect=pull), \
+                patch("stamind.cli.bot.morning.ensure_recent_data", side_effect=pull), \
                 patch("stamind.journal.record") as journal, \
                 patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
             code, out, _ = run_cli(["bot", "morning", "--force"])

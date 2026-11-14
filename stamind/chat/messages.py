@@ -22,9 +22,9 @@ from stamind import clock, runtime
 from stamind.chat import runner, telegram_api
 from stamind.chat.keyboards import SIMPLE_HELP, SIMPLE_WELCOME, keyboard_action, typed_tap
 from stamind.chat.routing import (
-    CAPTURE_PROMPT, CAPTURE_RESCUE_ECHO, ROUTER_CAPTURE_INTENTS, ROUTER_ECHO,
+    CAPTURE_PROMPT, CAPTURE_RESCUE_ECHO, MORNING_RUN, ROUTER_CAPTURE_INTENTS, ROUTER_ECHO,
     PUBLISHED_PAGE_REPLIES, ROUTER_FALLBACK, ROUTER_INTENT_ARGV, ROUTER_MESSAGE_ARGV,
-    ROUTER_PAGE_REPLIES, parse_message_to_argv,
+    ROUTER_PAGE_REPLIES, TODAY_ARGV, TODAY_VIEW_ARGV, parse_message_to_argv,
 )
 from stamind.cli.render import calendar_page
 from stamind.config import config
@@ -228,8 +228,15 @@ class MessagesMixin:
                 )
                 if argv is None:
                     return
-            self._log(chat.id, "  ", f"run: {shlex.join(argv)}")
             await context.bot.send_chat_action(chat_id=chat.id, action="typing")
+            # While the bot's own try at the morning message runs, "📅 Today" is the
+            # sessions alone, so it cannot send a second message. Checked after the last
+            # wait on Telegram, so a try cannot start in between
+            # (DESIGN_morning_waits_for_night.md §5).
+            alive = self.long_runs.get(chat.id)
+            if argv == TODAY_ARGV and alive is not None and alive.long == MORNING_RUN:
+                argv = list(TODAY_VIEW_ARGV)
+            self._log(chat.id, "  ", f"run: {shlex.join(argv)}")
             await self._start_command(chat.id, argv)
             return
 

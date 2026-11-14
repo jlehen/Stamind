@@ -150,8 +150,14 @@ coach:
 #    # Ask the week planner first, so the push accounts for overnight signals, on the
 #    # mornings when something is new or the night is not normal. A session it would
 #    # change follows as a proposal the athlete answers with a tap. Costs at most one LLM
-#    # call a morning.
+#    # call a morning. With it on, the push waits for the night's sleep score in Garmin,
+#    # until two hours after morning_time.
 #    adapt_first: false
+#    # With adapt_first on, the bot looks for the night from this earlier time, and sends
+#    # the push as soon as it is in. Leave it off unless the athlete's watch closes the
+#    # night only once they are up, such as when they dismiss its morning report.
+#    # `settings set earliest-morning` overrides it live.
+#    earliest_morning: "off"
 #  # When you change the athlete's week from the terminal, they are told at their next
 #  # morning time. A change to one of today's sessions cannot wait that long, so it goes
 #  # out the same day, once you have left their week alone for this many minutes. Another

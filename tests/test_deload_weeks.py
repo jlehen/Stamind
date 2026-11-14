@@ -338,7 +338,7 @@ class MorningTest(unittest.TestCase):
         _save(_goal(), _meso("Build", "2026-09-01", "2026-11-08", deload="2026-11-02"))
         save_workout(test_db, "2026-09-05", "running", "Old run")
         # Past the window where the push still offers to extend the schedule.
-        with patch("stamind.cli.bot.views.current_runway", return_value=None):
+        with patch("stamind.cli.bot.morning.current_runway", return_value=None):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")

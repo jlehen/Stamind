@@ -1,12 +1,7 @@
-"""The athlete's preferences: which knobs change at runtime, and how the config file and
-the database combine to answer each one.
-
-See DESIGN_settings.md. `config.yaml` carries the install default, the `settings` table
-carries the athlete's override, and `resolve()` is the one place the two are combined.
-Each knob's storage key stays owned by the module that reads it
-(`clock.TIMEZONE_SETTING`, `llm_models.LLM_MODEL_SETTING`); this module owns the
-athlete-facing name, the validator and the resolution order. The database handle is
-read as `runtime.db` at call time, so importing this module never opens it.
+"""The athlete's preferences: one `Setting` per runtime knob, and `resolve()`, the one place
+the stored row, `config.yaml` and the default combine (DESIGN_settings.md). A knob's storage
+key stays with the module that reads it (`clock.TIMEZONE_SETTING`). `runtime.db` is read at
+call time, so importing this module opens nothing.
 """
 
 import re
@@ -26,6 +21,7 @@ PUSH = "push"
 MORNING_TIME = "morning-time"
 MORNING_DEADLINE = "morning-deadline"
 EVENING_TIME = "evening-time"
+EARLIEST_MORNING = "earliest-morning"
 ADAPT_FIRST = "adapt-first"
 COMMITMENT_DAYS = "commitment-days"
 CHANGE_DELAY = "change-delay"
@@ -34,11 +30,7 @@ STRENGTH_SETS_SINCE = "strength-sets-since"
 LEARNING_QUESTIONS = "learning-questions"
 STRENGTH_LOGGER = "strength-logger"
 
-# Not a setting: the day `bot morning` last sent, kept in the settings table so the bot
-# process stays stateless across restarts. The morning push reads it, and so does the
-# question that changes `morning-time` (DESIGN_bot_simple_frontend.md §4.2, §12.7).
-MORNING_MARKER = "push_morning_last"
-# Not a setting either: the picture the last `workout adapt` run took of its inputs, as
+# Not a setting: the picture the last `workout adapt` run took of its inputs, as
 # JSON, which the morning push compares with a fresh one (DESIGN_quiet_morning.md §3).
 ADAPT_LAST_SEEN = "adapt_last_seen"
 
@@ -53,6 +45,14 @@ def parse_hhmm(token: Any) -> str:
     if hour > 23 or minute > 59:
         raise ValueError(f"'{raw}' is not a time — hours run 00-23 and minutes 00-59.")
     return f"{hour:02d}:{minute:02d}"
+
+
+def parse_hhmm_or_off(token: Any) -> str:
+    """A local time as 'HH:MM', or 'off'. A bare `off` in config.yaml arrives as False."""
+    raw = str(token if token is not None else "").strip().lower()
+    if raw in ("off", "false"):
+        return "off"
+    return parse_hhmm(raw)
 
 
 def _parse_count(token: Any, unit: str, example: str) -> str:
@@ -103,15 +103,16 @@ def _as_int(stored: Optional[str]) -> Optional[int]:
     return None if stored is None else int(stored)
 
 
+def _unless_off(stored: Optional[str]) -> Optional[str]:
+    return None if stored == "off" else stored
+
+
 @dataclass(frozen=True)
 class Setting:
-    """One preference: what it is called, where it is stored, and how a value is read.
-
-    `parse` maps a typed token to the stored form and raises ValueError with a
-    ready-to-print message; `fallback` is the built-in default, None when "unset" is
-    itself a meaningful state (§3). `on_change` drops whatever cache the new value
-    invalidates. A knob config.yaml can seed names its key in `config_path`; one whose
-    default is not a plain key (the model menu's first entry) supplies `config_default`.
+    """One preference: its name, its storage key, and how a value is read (§3). `parse`
+    raises ValueError with a printable message; `fallback` is None when "unset" means
+    something; `config_default` stands in for `config_path` when the default is not a plain
+    key (the model menu's first entry); `on_change` drops the cache the value invalidates.
     """
     name: str
     key: str
@@ -128,10 +129,8 @@ class Setting:
     on_change: Optional[Callable[[], None]] = None
 
     def from_config(self) -> Optional[str]:
-        """What config.yaml says, in stored form, or None when it says nothing.
-
-        The file's value goes through the same parser a typed one does, so an unquoted
-        `07:30` — a sexagesimal integer to PyYAML — is caught rather than obeyed (§3)."""
+        """What config.yaml says, through the same parser as a typed value, or None when it
+        says nothing (§3)."""
         if self.config_default:
             return self.config_default()
         if not self.config_path:
@@ -143,16 +142,14 @@ class Setting:
 
     @property
     def config_label(self) -> Optional[str]:
-        """The config.yaml key behind this setting, named for the detail view. None when
-        the file has no say in it."""
+        """The config.yaml key behind this setting, for the detail view; None when none."""
         if self.config_hint:
             return self.config_hint
         return ".".join(self.config_path) if self.config_path else None
 
 
 def _reset_model_cache() -> None:
-    """Drops the model the OpenRouter client resolved on first use — one process serves
-    many commands in `sm shell` and in the bot (DESIGN_model_selection.md §3.1)."""
+    """Drops the model the OpenRouter client resolved (DESIGN_model_selection.md §3.1)."""
     from stamind.openrouter import openrouter_client
     openrouter_client.reset_model()
 
@@ -261,6 +258,19 @@ SETTINGS: List[Setting] = [
         fallback="21:00",
     ),
     Setting(
+        name=EARLIEST_MORNING,
+        key="push_earliest_morning",
+        group="Morning push",
+        # Off by default: whether it is safe depends on what closes the night on the
+        # athlete's watch (DESIGN_morning_waits_for_night.md §2).
+        summary="Local time from which the bot looks for the night, before morning-time",
+        value_hint="HH:MM|off",
+        parse=parse_hhmm_or_off,
+        config_path=("telegram", "push", "earliest_morning"),
+        fallback="off",
+        coerce=_unless_off,
+    ),
+    Setting(
         name=ADAPT_FIRST,
         key="push_adapt_first",
         group="Morning push",
@@ -326,10 +336,8 @@ SETTINGS: List[Setting] = [
 
 @dataclass(frozen=True)
 class Resolved:
-    """What a setting currently answers, and why: `source` is 'db' (the athlete set it),
-    'config' (config.yaml) or 'default' (built in). `config_error` carries the complaint
-    when config.yaml holds a value this setting cannot read — the listing shows it
-    instead of every command that asks failing (§3)."""
+    """What a setting currently answers, and why: `source` is 'db', 'config' or 'default'.
+    `config_error` is config.yaml's unreadable value, which the listing shows (§3)."""
     value: Optional[str]
     source: str
     set_at: Optional[str] = None
@@ -342,9 +350,8 @@ def names() -> List[str]:
 
 
 def get(name: str) -> Setting:
-    """The setting `name` addresses — exactly, or by an unambiguous prefix, the way every
-    command level resolves (DESIGN_cli_noargs.md §d). Raises ValueError with a printable
-    message when it names nothing, or several things."""
+    """The setting `name` addresses, exactly or by an unambiguous prefix (DESIGN_cli_noargs.md
+    §d). Raises ValueError with a printable message when it names none, or several."""
     token = (name or "").strip().lower()
     if not token:
         raise ValueError(f"Name a setting — {cmd('settings')} lists them.")
@@ -400,8 +407,7 @@ def write(name: str, token: Any) -> str:
 
 
 def clear(name: str) -> bool:
-    """Forgets the stored value so config.yaml (or the built-in default) rules again.
-    True when a row was actually removed."""
+    """Forgets the stored value, so config.yaml or the default rules again. True if it went."""
     setting = get(name)
     cleared = runtime.db.clear_setting(setting.key)
     if setting.on_change:
@@ -409,9 +415,8 @@ def clear(name: str) -> bool:
     return cleared
 
 
-# --- Named readers, one per knob with no home module of its own ---
-# `thinking-model` and `timezone` are read through llm_models/clock, which own the rest of
-# their behaviour; the morning-push knobs and the fast model have no such module.
+# --- Named readers, one per knob with no home module of its own (not `thinking-model` and
+# `timezone`, which llm_models and clock read) ---
 
 def commitment_days() -> int:
     """How many days from today the week planner must account for session by session
@@ -420,12 +425,8 @@ def commitment_days() -> int:
 
 
 def commitment_end(today_str: str) -> Optional[str]:
-    """The last day of the commitment window, or None when it is empty (§4.1).
-
-    `N` days starting today, so `1` covers today alone and `0` covers nothing. The
-    window's length and where it ends are one rule, and `workout generate` was
-    deriving the end from the length itself.
-    """
+    """The last day of the commitment window, `N` days starting today, or None when it is
+    empty (§4.1)."""
     days = commitment_days() or 0
     if days <= 0:
         return None
@@ -435,9 +436,8 @@ def commitment_end(today_str: str) -> Optional[str]:
 
 
 def change_delay_minutes() -> int:
-    """How long a change to one of today's sessions waits before the bot tells the athlete,
-    so the operator's trial and error stays off their phone (DESIGN_change_heads_up.md §4).
-    Operator-only: not in ROUTABLE_SETTINGS."""
+    """How long a change to one of today's sessions waits before the bot tells the athlete
+    (DESIGN_change_heads_up.md §4). Operator-only: not in ROUTABLE_SETTINGS."""
     return value(CHANGE_DELAY)
 
 
@@ -463,9 +463,14 @@ def morning_deadline() -> str:
 
 
 def evening_time() -> str:
-    """Local HH:MM from which the bot sends no queued item and no change to the week on its
-    own, until the morning time (DESIGN_athlete_queue.md §13.2 rule 4)."""
+    """Local HH:MM from which the bot sends nothing on its own (DESIGN_athlete_queue.md §13.2)."""
     return value(EVENING_TIME)
+
+
+def earliest_morning() -> Optional[str]:
+    """Local HH:MM from which the bot looks for the night, or None when off
+    (DESIGN_morning_waits_for_night.md §5). Operator-only: not in ROUTABLE_SETTINGS."""
+    return value(EARLIEST_MORNING)
 
 
 def adapt_first() -> bool:

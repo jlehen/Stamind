@@ -1,76 +1,28 @@
-"""The `bot` views, and the two messages the bot sends unasked.
+"""The `bot` views, the Garmin check, and the changes to the athlete's week.
 
 `bot constraints` and `bot goals` render a companion list from stored rows and offer its
-picker; `bot morning` is the daily push and `bot changes` sends the changes to the
-athlete's week they have not been told about yet
-(DESIGN_bot_simple_frontend.md §4, §5.5, §12.6; DESIGN_change_heads_up.md §4).
-
-The two views run fixed argv and write nothing: the only mutation they reach is what a
-tapped picker leaf later runs as a command of its own (§12.1). The two unasked messages do
-write — `bot morning` stamps its per-day marker and, with `adapt-first` on, asks the week
-planner before it renders when something is new since the last run or a night is not
-normal (DESIGN_quiet_morning.md §2), and saves what it would change as a proposal
-(DESIGN_waiting_proposal.md §5); `bot changes` marks each line told as it prints it.
+picker (DESIGN_bot_simple_frontend.md §5.5, §12.6). They run fixed argv and write nothing:
+the only mutation they reach is what a tapped picker leaf later runs as a command of its own
+(§12.1). `bot garmin-check` pulls a new activity and queues its questions (ARCHITECTURE.md
+§15), and `bot changes` sends the changes to the athlete's week they have not been told about
+yet, marking each told as it prints it (DESIGN_change_heads_up.md §4). The morning message is
+`morning.py`.
 """
 import argparse
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Sequence
 
-from stamind import heads_up, journal, rpe_reminder, runtime, settings
-from stamind.analytics.compare import adherence_verdicts
-from stamind.cli.bot import test_result
-from stamind.cli.common import deload_progress, ensure_recent_data, in_deload
+from stamind import heads_up, journal, runtime
+from stamind.cli.bot.session_questions import queue_session_questions
 # The companion surfaces are companion-only by definition, so they call the line
 # builders directly rather than through `runtime.render` (DESIGN_render_persona.md §3).
 from stamind.cli.render.plan_lines import (
-    SIMPLE_PASSED_LINE, picker_label, simple_constraint_lines, simple_goal_lines,
-    simple_runway_lines,
+    picker_label, simple_constraint_lines, simple_goal_lines,
 )
-from stamind.cli.render.session_lines import SIMPLE_DONE_STATUSES, simple_day_lines
-from stamind.cli.queue import send_alone, send_next
-from stamind.cli.runway import current_runway, runway_buttons, schedule_exhausted
-from stamind.cli.workouts import cut_short, proposal as saved_proposal
-from stamind.cli.workouts.heads_up import newest_written
-from stamind.coach import picture
 from stamind.db.objectives import GOAL_ARCHIVED, GOAL_UPCOMING, goal_state
-from stamind.openrouter import openrouter_client
-from stamind.page_files import sync as page_files
 from stamind.sentinels import emit_buttons, emit_flush
-from stamind.sports import canonical_sport
-from stamind.strength.sets import read_new_activities
-from stamind.text import wrap_text, yellow
-from stamind.output import aside, step
+from stamind.text import wrap_text
 from stamind.config import config
-from stamind.clock import fmt_day, shift, today_str as _today_str
-
-# What the morning push offers (§4.1/§4.4): the CLI owns WHAT to offer, the bot only
-# renders. Each `send` is a canned utterance the bot feeds back through its normal
-# command pipeline when the button is tapped; `ack` runs nothing; `menu` nests a
-# choose-row at the bot level.
-GOT_IT_BUTTON = {"label": "👍 Got it", "ack": "Nice — have a good one! 💪"}
-# The buttons about today's session. Under a proposal they follow its two answers, which
-# stand where "Got it" would (DESIGN_waiting_proposal.md §5).
-SESSION_BUTTONS = [
-    {"label": "😴 Should I rest?",
-     "send": 'workout adapt -m "feeling tired today"'},
-    {"label": "🕐 Can't today", "menu": [
-        {"label": "📆 Move it",
-         "send": 'workout adapt -m "no time to train today - please move today\'s '
-                 'session to another day if that makes sense"'},
-        {"label": "✂️ Shorten it",
-         "send": 'workout adapt -m "short on time today - please shorten today\'s '
-                 'session"'},
-        {"label": "⏭️ Skip it",
-         "send": 'workout adapt -m "can\'t train today - please skip today\'s '
-                 'session"'},
-    ]},
-]
-
-
-# What the push says on a day already trained: the catch-up window runs to mid-afternoon
-# (§4.3), so it routinely fires on a session that is already in the bag, and reading its
-# prescription back with a "can't today" row attached is a ping about nothing (§4.1).
-PUSH_ALL_DONE_LINE = "✅ Already done for today — nice work 💪"
+from stamind.clock import today_str as _today_str
 
 # --- Pickers (§12.1: the model picks that something should change, the tap picks which) ---
 
@@ -92,9 +44,8 @@ def constraint_rm_buttons(constraints: list) -> list:
 
 
 def goal_rm_buttons(goals: list) -> list:
-    """The picker under the simple goals view (§12.6). `goal rm` archives — sessions
-    stood down, history kept, reinstatable by the operator — so the one goal mutation a
-    tap fires is the reversible one; `--purge` is unreachable from chat."""
+    """The picker under the simple goals view (§12.6). `goal rm` archives, the reversible
+    action; `--purge` is unreachable from chat."""
     return [
         {"label": "👍 All good", "ack": "Great — we keep building toward these 💪"},
         {"label": "🗑 Call one off", "menu": _picker_leaves(goals, "goal rm")},
@@ -102,9 +53,8 @@ def goal_rm_buttons(goals: list) -> list:
 
 
 def run_bot_constraints(args: argparse.Namespace) -> None:
-    """Renders the athlete's current-and-upcoming constraints in companion prose and
-    offers the remove picker (§5.5). Read-only itself; the only mutation reachable is
-    what a tapped leaf later runs."""
+    """The current and upcoming constraints in companion prose, with the remove picker
+    (§5.5). Read-only: a tapped leaf runs its own command."""
     today = _today_str()
     constraints = runtime.db.get_constraints(today, None)
     for line in simple_constraint_lines(constraints, today):
@@ -114,9 +64,8 @@ def run_bot_constraints(args: argparse.Namespace) -> None:
 
 
 def run_bot_goals(args: argparse.Namespace) -> None:
-    """Renders the goals still ahead in companion prose and offers the call-off picker
-    (§12.6). An empty active list renders the §11 invitation, never a bare picker: the
-    list she reads IS the answer — already done, or already called off."""
+    """The goals still ahead in companion prose, with the call-off picker (§12.6). With
+    none ahead, the §11 invitation and no picker."""
     today = _today_str()
     goals = [g for g in runtime.db.get_objectives()
              if goal_state(g, today) != GOAL_ARCHIVED]
@@ -127,138 +76,11 @@ def run_bot_goals(args: argparse.Namespace) -> None:
         emit_buttons(goal_rm_buttons(upcoming))
 
 
-def _warn_quietly(text: str) -> None:
-    """A warning the terminal sees and the journal keeps at warn level, kept out of the
-    athlete's chat, where `warn` would print it (DESIGN_quiet_morning.md §6)."""
-    aside(text, yellow)
-    journal.note(text, lvl="warn")
-
-
-def _asks(date_str: str) -> bool:
-    """Whether this morning asks the week planner: something is new since the last run, a
-    night since the last one in hand is not normal, or the strength planner has work
-    (DESIGN_quiet_morning.md §2, §3, §4). The journal gets one line either way (§5). Its
-    own `try`, apart from the run's: a gate that breaks asks, and says so at warn level
-    (§6)."""
-    try:
-        before = picture.last(runtime.db)
-        if before is None:
-            _warn_quietly("Asking the week planner: no picture of the last run")
-            return True
-        reasons = picture.news(runtime.db, before, picture.take(runtime.db, date_str))
-        graded = picture.nights(runtime.db, before["night"], date_str)
-        reasons += [why for why in graded.values() if why]
-        since = picture.taken(before)
-    except Exception as e:
-        _warn_quietly(f"Asking the week planner: the gate failed: {e}")
-        return True
-    if reasons:
-        step("Asking the week planner: " + "; ".join(reasons))
-        return True
-    if graded:
-        step(f"Quiet morning: the night is normal and nothing is new since {since}")
-    else:
-        step(f"Quiet morning: nothing is new since {since} and no night since has a reading")
-    return False
-
-
-def _morning_adaptation(date_str: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
-    """Asks the week planner about today when something is new or a night is not normal
-    (DESIGN_quiet_morning.md §2), and returns (the line for the briefing, the saved
-    proposal's item). A quiet morning returns neither, like a run that changed nothing.
-
-    A session that would change is saved as a proposal and nothing is written. Kilograms
-    that moved alone are written at once, with their sentence as the line
-    (DESIGN_waiting_proposal.md §5, §7). A failure must not sink the push: the schedule
-    then renders as stored, and the error surfaces only as a terminal aside — never in the
-    athlete's chat.
-
-    The strength planner's notice is the line when nothing changed, which is what covers
-    the morning of the gym day itself (DESIGN_strength_tracking.md §9)."""
-    try:
-        # A pull that found no sleep score yet leaves a row for today that the refresh
-        # throttle would keep; the night is what this morning is about, so fetch again,
-        # and grade it only after (§4.2, DESIGN_quiet_morning.md §4).
-        ensure_recent_data(date_str, force_pull=runtime.db.get_sleep_score(date_str) is None)
-        # From the gate to the save nothing writes the week, and a tap waits its turn
-        # (DESIGN_long_runs_beside_chat.md §3). Nobody asked for this run, so the chat is
-        # not told when it waits.
-        with runtime.db.week_lock(waiting=None):
-            return _ask_week_planner(date_str)
-    except Exception as e:
-        step(f"Morning adaptation failed, rendering the stored schedule: {e}")
-        return None, None
-
-
-def _ask_week_planner(date_str: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
-    """`_morning_adaptation`'s look at the week, under the week lock."""
-    if not _asks(date_str):
-        return None, None
-    written_upto = newest_written()
-    # The proposal that still waits is shown to the week planner, and a new one replaces it
-    # (DESIGN_waiting_proposal.md §6.2).
-    still_open = saved_proposal.open_proposal()
-    # Nobody asked for this run, so the chat is not told it is waiting
-    # (DESIGN_output_verbosity.md §8.4).
-    with openrouter_client.unannounced():
-        proposal = runtime.coach_service.workout_adapt(
-            date_str, **saved_proposal.shown_to_week_planner(still_open)
-        )
-    if not proposal.workouts:
-        runtime.coach_service.workout_revision_record_no_change(proposal)
-        return proposal.strength_notice, None
-    if proposal.week_planner_changed:
-        item = saved_proposal.save(proposal, written_upto, replaces=still_open is not None)
-        return None, item
-    runtime.coach_service.workout_revision_apply(proposal)
-    note = " ".join(part for part in (proposal.reason, proposal.strength_notice) if part)
-    return note, None
-
-
-def _refresh_garmin(date_str: str) -> None:
-    """The recent-data refresh a read command runs, then the strength sets: the push is the
-    morning message reads them, so their questions are in the line it sends from at its
-    end (DESIGN_strength_tracking.md §11). A failure briefs what is stored."""
-    try:
-        runtime.garmin.ensure_data(date_str, date_str)
-        read_new_activities()
-    except Exception as e:
-        step(f"Could not refresh Garmin data, briefing what is stored: {e}")
-
-
-def _ask_about_tests(today: str) -> None:
-    """Queues the test-result question for each planned test of the past seven days and
-    today that was done or partly done and has no result in the logbook
-    (DESIGN_benchmark_from_chat.md §4). A failure must not sink the push."""
-    start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
-    try:
-        tests = [w for w in runtime.db.get_workouts(start_date=start, end_date=today)
-                 if w.get("benchmark_type")]
-        if not tests:
-            return
-        verdicts = adherence_verdicts(runtime.db, start, today, today)
-        for w in tests:
-            if (verdicts.get(w["id"]) or {}).get("status") in SIMPLE_DONE_STATUSES:
-                test_result.ask_about(w)
-    except Exception as e:
-        step(f"Could not check the past week's tests: {e}")
-
-
-def _queue_session_questions(today: str) -> None:
-    """What the athlete is asked once a session is in: the morning push and the Garmin check
-    both end on it."""
-    _ask_about_tests(today)
-    cut_short.queue_questions(today)
-    rpe_reminder.queue_reminders(today)
-
-
 def run_bot_garmin_check(args: argparse.Namespace) -> None:
     """Pulls today's activities when Garmin lists one not stored yet that lasts at least
-    `garmin.min_activity_minutes`, and queues the questions about it. A shorter one, such as a
-    warm-up, waits for a later pull. Daily metrics and the "last pull" time stay out of it,
-    so a read command still refreshes them. The scheduler runs this beside the chat. A check
-    that pulls nothing leaves no run in the journal; a failure prints its reason, exits 1,
-    and the scheduler decides whether to journal it (ARCHITECTURE.md §15)."""
+    `garmin.min_activity_minutes`, and queues the questions about it; daily metrics stay out
+    of it. A check that pulls nothing leaves no run in the journal; a failure prints its
+    reason, exits 1, and the scheduler decides whether to journal it (ARCHITECTURE.md §15)."""
     if not (config.garmin_email and config.garmin_password):
         journal.drop_run()
         return
@@ -280,19 +102,7 @@ def run_bot_garmin_check(args: argparse.Namespace) -> None:
         "bot.garmin_check",
         runtime.garmin.pull(today, today, metrics=False, advance_watermark=False),
     )
-    _queue_session_questions(today)
-
-
-def _trained_today(date_str: str) -> Dict[int, Dict[str, Any]]:
-    """Today's adherence verdicts over freshly pulled activity data — what the push needs
-    to tell a session still ahead from one already behind (§4.1). Like the adaptation, a
-    failure must not sink the push: an ungraded day renders as the schedule it was."""
-    try:
-        runtime.garmin.ensure_data(date_str, date_str)
-        return adherence_verdicts(runtime.db, date_str, date_str, _today_str())
-    except Exception as e:
-        step(f"Could not check what was trained today, briefing the schedule: {e}")
-        return {}
+    queue_session_questions(today)
 
 
 def run_bot_changes(args: argparse.Namespace) -> None:
@@ -304,123 +114,3 @@ def run_bot_changes(args: argparse.Namespace) -> None:
             emit_flush()
         print(wrap_text(heads_up.message(change)))
         runtime.db.mark_changes_told([change["id"]])
-
-
-def _deload_day_line(today: str) -> Optional[str]:
-    """'🔋 Deload, day 3 of 7.' on a deload day (DESIGN_deload_weeks.md §11.1)."""
-    mesocycle = runtime.db.get_covering_mesocycle(today)
-    if not mesocycle or not in_deload(mesocycle, today):
-        return None
-    return f"🔋 Deload, {deload_progress(mesocycle, today)}."
-
-
-def _deload_eve_line(today: str) -> Optional[str]:
-    """'🔋 Your deload starts tomorrow, until Sun 8 Nov.' the day before one
-    (DESIGN_deload_weeks.md §11.1)."""
-    tomorrow = shift(today, 1)
-    mesocycle = runtime.db.get_covering_mesocycle(tomorrow)
-    if not mesocycle or mesocycle.get("deload_start") != tomorrow:
-        return None
-    until = fmt_day(mesocycle["end_date"])
-    return f"🔋 Your deload {deload_progress(mesocycle, today)}, until {until}."
-
-
-def run_bot_morning(args: argparse.Namespace) -> None:
-    """Renders the §4.1 morning message for today and emits its button row, under the
-    briefing or under the proposal's question (DESIGN_waiting_proposal.md §5).
-
-    Idempotent per day via the settings marker; the bot's scheduler may fire it
-    repeatedly (catch-up after sleep, restarts) without double-sending. A day with no
-    session gets the one-line rest message, a planned rest day its own line, and a day
-    already trained the congratulation, all without buttons — none has a session left to
-    change.
-
-    Once the schedule has run out the push says so and offers to extend it, and once even
-    that has nothing left to say it sends nothing at all (DESIGN_runway_nudge.md §6)."""
-    today = _today_str()
-    if not args.force and runtime.db.get_setting(settings.MORNING_MARKER) == today:
-        return
-    # Before the silence below, so a plan that has run out still gets its records
-    # (DESIGN_cycle_retrospective.md §3, §5).
-    runtime.coach_service.retrospectives_step()
-    runway = current_runway(today)
-
-    # An exhausted schedule past the passed-state window has nothing honest left to say on
-    # an empty day: not the rest-day line, which would describe a hole as a coaching
-    # decision, and not a stale celebration. Silence, until a schedule exists again (§6).
-    # Decided before the adaptation, so a dead plan does not spend an LLM call each morning.
-    if (runway is None and schedule_exhausted(today)
-            and not runtime.db.get_workouts(start_date=today, end_date=today)):
-        runtime.db.set_setting(settings.MORNING_MARKER, today)
-        return
-    # Before the refresh, so it is the first line whatever the refresh prints
-    # (DESIGN_deload_weeks.md §11.2).
-    deload_day = _deload_day_line(today)
-    if deload_day:
-        print(deload_day)
-    _refresh_garmin(today)
-    # The cut-short question then stands first in the line, after the briefing
-    # (DESIGN_chat_questions.md §3).
-    _queue_session_questions(today)
-
-    adapt_note, proposal_item = None, None
-    if settings.adapt_first():
-        adapt_note, proposal_item = _morning_adaptation(today)
-    # After the adaptation, so the verdicts grade the sessions this push is about to show.
-    workouts = runtime.db.get_workouts(start_date=today, end_date=today)
-    verdicts = _trained_today(today) if workouts else {}
-    ahead = [
-        w for w in workouts
-        if (verdicts.get(w.get("id")) or {}).get("status") not in SIMPLE_DONE_STATUSES
-    ]
-
-    # A proposal that changes today says what today would become, and either answer draws
-    # today as it then stands, so today as stored is not drawn above it
-    # (DESIGN_waiting_proposal.md §5).
-    changes_today = proposal_item is not None and today in proposal_item["payload"]["dates"]
-    page = None
-    if workouts and not ahead:
-        print(PUSH_ALL_DONE_LINE)
-    elif not workouts and runway is not None and runway["days_left"] < 0:
-        print(SIMPLE_PASSED_LINE)
-    elif not changes_today:
-        # Each session's short line where the pages are published, its whole text one tap
-        # away (DESIGN_short_messages.md §4).
-        short = page_files.pages_published(runtime.db)
-        for line in simple_day_lines(workouts, today, verdicts, short=short):
-            print(line)
-        page = page_files.day_button(runtime.db, workouts, today)
-    if adapt_note:
-        print(wrap_text(adapt_note))
-    if runway:
-        for line in simple_runway_lines(runway, today):
-            print(wrap_text(line))
-    deload_eve = _deload_eve_line(today)
-    if deload_eve:
-        print(deload_eve)
-    # Two independent gates, each answering its own question, so relaxing one cannot
-    # resurrect the other's buttons (§6). A rest session is graded apart from done, but
-    # there is nothing on it to ease or move.
-    to_change = [w for w in ahead if canonical_sport(w["sport_type"]) != "rest"]
-    buttons = (SESSION_BUTTONS if to_change else []) + runway_buttons(runway)
-    # With no proposal the row sits under the briefing and opens with "Got it". With one,
-    # the briefing has no row: the buttons go under the proposal's question
-    # (DESIGN_waiting_proposal.md §5).
-    if proposal_item is None and to_change:
-        buttons = [GOT_IT_BUTTON] + buttons
-    if proposal_item is None and buttons:
-        emit_buttons(buttons, page=page)
-    elif page:
-        # A page button asks nothing and is no live row, so the briefing keeps it on a
-        # morning with a proposal (DESIGN_short_messages.md §5, D8).
-        emit_buttons([], page=page)
-    runtime.db.set_setting(settings.MORNING_MARKER, today)
-    # The last act is the queue's step: the first item of the line, unless an item is
-    # out (DESIGN_athlete_queue.md §13.2). What the week planner would change goes first,
-    # as a message of its own. It is then out, so the line starts when the athlete answers
-    # it (DESIGN_waiting_proposal.md §5).
-    if proposal_item is not None:
-        emit_flush()
-        send_alone(proposal_item, buttons)
-    send_next()
-

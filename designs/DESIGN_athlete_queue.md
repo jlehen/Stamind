@@ -859,7 +859,9 @@ to the coach at 00:40, it would have come back by 00:45.
 
 **5. An item left unanswered comes back each morning.** At the athlete's morning time nothing
 counts as out any more. The step that follows the morning message then sends the first item of
-the line again, as each morning's round does today (§10).
+the line again, as each morning's round does today (§10). Amended 2026-11-14: the day turns at
+the morning message when it goes out before the morning time (DESIGN_morning_waits_for_night.md
+§5).
 
 **6. A reply comes first.** A reply is what a run sends on its own account: the proposal it
 makes, and the questions about what the athlete wrote (DESIGN_waiting_proposal.md §3, §6.3).

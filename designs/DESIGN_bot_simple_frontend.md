@@ -216,6 +216,9 @@ to Sunday, the first wake after 03:00 on the athlete's clock also starts `sm dat
 nothing is posted, the chat is not busy, the scheduler does not wait for it, and its output
 goes to the journal. The expert persona has no nightly reflect.
 
+Amended 2026-11-14 (DESIGN_morning_waits_for_night.md): the scheduler tries the message
+until it has gone out, and with `adapt-first` on it waits for the night.
+
 ### 4.4 Bot-level buttons: a third sentinel
 
 The CLI↔bot channel already carries `\x1eSM-PROMPT` (blocking question) and

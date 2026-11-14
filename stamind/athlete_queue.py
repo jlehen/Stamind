@@ -10,7 +10,7 @@ passed, the earliest first, and one item is out at a time (§13.2).
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from stamind import clock, heads_up, runtime, settings
+from stamind import clock, heads_up, morning_message, runtime, settings
 from stamind.db.queue import queue_stamp
 # Re-exported: what a feature needs lives in queue_kind, so a feature can queue items
 # without importing the list of kinds that imports it.
@@ -160,13 +160,29 @@ def morning_of(now: datetime) -> datetime:
     return heads_up.at_time(now, settings.morning_time())
 
 
+def _turn(morning: datetime, sent: Optional[datetime]) -> datetime:
+    """When the queue's day turns on `morning`'s day: at that day's morning message when it
+    went out before the morning time, else at the morning time."""
+    if sent is not None and sent.date() == morning.date():
+        return min(morning, sent)
+    return morning
+
+
+def day_turned_at(now: datetime) -> datetime:
+    """When the queue's day last turned: today's morning message or morning time, whichever
+    came first, else yesterday's (DESIGN_morning_waits_for_night.md §5). Until today's
+    message goes out, the marker still holds yesterday's."""
+    sent = morning_message.sent_at()
+    turn = _turn(morning_of(now), sent)
+    if now < turn:
+        turn = _turn(morning_of(now) - timedelta(days=1), sent)
+    return turn
+
+
 def is_out(item: Dict[str, Any], now: datetime) -> bool:
-    """Whether a waiting item was sent and not tapped since. At the athlete's morning time
+    """Whether a waiting item was sent and not tapped since. When the queue's day turns,
     nothing counts as out any more (§13.2, rules 3 and 5)."""
-    morning = morning_of(now)
-    if now < morning:
-        morning -= timedelta(days=1)
-    return bool(item["sent_at"]) and item["sent_at"] >= queue_stamp(morning)
+    return bool(item["sent_at"]) and item["sent_at"] >= queue_stamp(day_turned_at(now))
 
 
 def anything_out() -> bool:
@@ -177,10 +193,11 @@ def anything_out() -> bool:
 
 def lived_out(item: Dict[str, Any]) -> bool:
     """Whether a confirmation was asked on its day and after the morning message on the
-    next `confirmation-days` mornings: at the morning after those, it closes
-    (DESIGN_chat_questions.md §2)."""
+    next `confirmation-days` mornings: once the queue's day turns on the morning after
+    those, it closes (DESIGN_chat_questions.md §2, DESIGN_morning_waits_for_night.md §5)."""
     queued = clock.to_local(datetime.fromisoformat(item["queued_at"]))
-    return clock.now() >= morning_of(queued) + timedelta(days=settings.confirmation_days() + 1)
+    closes_on = queued.date() + timedelta(days=settings.confirmation_days() + 1)
+    return day_turned_at(clock.now()).date() >= closes_on
 
 
 def worth_asking(item: Dict[str, Any]) -> bool:

@@ -129,7 +129,7 @@ class SimpleKeyboardTest(unittest.TestCase):
     def test_labels_map_to_fixed_argv(self):
         self.assertEqual(
             keyboards.keyboard_action("📅 Today"),
-            ("run", ["workout", "list", "-d", "today"]),
+            ("run", ["bot", "today"]),
         )
         self.assertIsNone(keyboards.keyboard_action("🗓 My week"))
         self.assertIsNone(keyboards.keyboard_action("🎯 Goals"))
@@ -162,7 +162,7 @@ class SimpleKeyboardTest(unittest.TestCase):
     def test_surrounding_whitespace_is_tolerated(self):
         self.assertEqual(
             keyboards.keyboard_action("  📅 Today  "),
-            ("run", ["workout", "list", "-d", "today"]),
+            ("run", ["bot", "today"]),
         )
 
     def test_returned_argv_is_a_copy(self):
@@ -170,7 +170,7 @@ class SimpleKeyboardTest(unittest.TestCase):
         argv.append("--verbose")
         self.assertEqual(
             keyboards.keyboard_action("📅 Today"),
-            ("run", ["workout", "list", "-d", "today"]),
+            ("run", ["bot", "today"]),
         )
 
 
@@ -302,11 +302,13 @@ class GuardrailTest(unittest.TestCase):
     """§7/§12.9: buttons and router intents reach read-only views, `adapt -m`, the two
     companion pickers (whose leaves offer single-ID `constraint rm` / `goal rm` — pinned
     in tests/test_cli_bot.py) and the capture command, which asks before it writes.
-    Nothing plan-shaping, expensive or irreversible is reachable without typing."""
+    Nothing plan-shaping, expensive or irreversible is reachable without typing. `bot
+    today` may send the morning message, which goes out once a day whoever starts it
+    (DESIGN_morning_waits_for_night.md §5)."""
 
     ALLOWED_PREFIXES = {
         ("workout", "list"), ("workout", "compare"), ("progress", "--chart"),
-        ("bot", "constraints"), ("bot", "goals"), ("bot", "capture"),
+        ("bot", "constraints"), ("bot", "goals"), ("bot", "capture"), ("bot", "today"),
     }
 
     def test_capture_intents_reach_only_the_capture_command(self):
@@ -335,7 +337,7 @@ class GuardrailTest(unittest.TestCase):
             self.assertIn(tuple(argv[:2]), self.ALLOWED_PREFIXES, intent)
 
     def test_morning_button_utterances_reach_only_adapt_m(self):
-        from stamind.cli.bot.views import SESSION_BUTTONS
+        from stamind.cli.bot.morning import SESSION_BUTTONS
 
         def leaves(buttons):
             for b in buttons:
@@ -452,7 +454,7 @@ class UiCallbackTest(unittest.TestCase):
         self.assertIsNone(keyboards.resolve_ui_action(buttons, "x"))
 
     def test_morning_buttons_fit_telegrams_64_byte_callback_cap(self):
-        from stamind.cli.bot.views import GOT_IT_BUTTON, SESSION_BUTTONS
+        from stamind.cli.bot.morning import GOT_IT_BUTTON, SESSION_BUTTONS
         buttons = [GOT_IT_BUTTON] + SESSION_BUTTONS
         token = "aabbcc"  # secrets.token_hex(3) width
         rows = keyboards.ui_button_rows(buttons, token)
@@ -518,10 +520,16 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(scheduler.settings, "morning_time", return_value="08:00"),
             mock.patch.object(scheduler.settings, "morning_deadline", return_value="15:00"),
             mock.patch.object(scheduler.settings, "evening_time", return_value="21:00"),
+            mock.patch.object(scheduler.settings, "adapt_first", return_value=True),
+            mock.patch.object(scheduler.settings, "earliest_morning", return_value=None),
             mock.patch.dict(scheduler.config.data, {"garmin": {"poll_minutes": 15}, "google": {}}),
             mock.patch.object(scheduler.settings, "push_enabled", return_value=True),
             mock.patch.object(scheduler.athlete_queue, "next_due", return_value=True),
             mock.patch.object(scheduler.heads_up, "changes_due", return_value=False),
+            # The marker `bot morning` writes once the message has gone out.
+            mock.patch.object(
+                scheduler.morning_message, "sent_on", side_effect=lambda day: day in self.sent
+            ),
         ]
         for patcher in patches:
             patcher.start()
@@ -529,9 +537,14 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
         self.ran = []
         self.reflects = []
         self.last_run = {}
+        self.sent = set()
+        # Whether the next `bot morning` sends, or waits for the night.
+        self.night_in = True
 
     async def run_command(self, argv, wait):
         self.ran.append((argv, wait))
+        if argv == ["bot", "morning"] and self.night_in:
+            self.sent.add(self.now.date().isoformat())
 
     def reflect(self):
         self.reflects.append(self.now.strftime("%a %H:%M"))
@@ -556,9 +569,72 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
         wake sends the next item, as it does on a morning the message stayed silent."""
         await self.wake()
         self.assertEqual(self.ran, [(["bot", "morning"], False)])
-        self.assertEqual(self.last_run["push"], "2026-09-16")
+        self.assertEqual(self.last_run["push"], self.now.isoformat())
         await self.wake()
         self.assertEqual(self.ran[1:], [(["bot", "queue", "--next"], True)])
+
+    async def test_a_message_waiting_for_the_night_is_tried_again_and_holds_the_queue(self):
+        """Thursday of DESIGN_morning_waits_for_night.md §3: the 08:00 try finds no night,
+        the wakes in between send nothing from the queue, and the 08:15 try sends."""
+        import datetime as dt
+        self.night_in = False
+        for minute in (0, 5, 10):
+            self.now = dt.datetime(2026, 9, 16, 8, minute).astimezone()
+            await self.wake()
+        self.assertEqual(self.ran, [(["bot", "morning"], False)])
+        self.night_in = True
+        self.now = dt.datetime(2026, 9, 16, 8, 15).astimezone()
+        await self.wake()
+        self.assertEqual(self.ran[1:], [(["bot", "morning"], False)])
+        await self.wake()
+        self.assertEqual(self.ran[2:], [(["bot", "queue", "--next"], True)])
+
+    async def test_the_window_stays_open_for_the_try_at_the_two_hour_mark(self):
+        """A morning-deadline at 09:00 would close the window before 10:00. It stays open to
+        10:10, and the 10:00 try starts even with the Garmin check's knob at zero."""
+        import datetime as dt
+        self.night_in = False
+        with mock.patch.object(scheduler.settings, "morning_deadline", return_value="09:00"), \
+                mock.patch.dict(scheduler.config.data, {"garmin": {"poll_minutes": 0}}):
+            for hour, minute in ((8, 0), (9, 30), (9, 55), (10, 0), (10, 5)):
+                self.now = dt.datetime(2026, 9, 16, hour, minute).astimezone()
+                await self.wake()
+        tries = [argv for argv, _ in self.ran if argv == ["bot", "morning"]]
+        self.assertEqual(len(tries), 2)
+
+    async def test_with_earliest_morning_the_bot_looks_from_then_and_holds_the_queue(self):
+        """Tuesday of DESIGN_morning_waits_for_night.md §3 with `earliest-morning` at 05:00:
+        the queue waits from 05:00, and the 05:45 look sends the message."""
+        import datetime as dt
+        self.night_in = False
+        with mock.patch.object(scheduler.settings, "earliest_morning", return_value="05:00"):
+            for minute in (0, 15, 30, 40):
+                self.now = dt.datetime(2026, 9, 16, 5, minute).astimezone()
+                await self.wake()
+            self.assertEqual(self.ran, [(["bot", "morning"], False)] * 3)
+            self.night_in = True
+            self.now = dt.datetime(2026, 9, 16, 5, 45).astimezone()
+            await self.wake()
+            await self.wake()
+        self.assertEqual(self.ran[3:], [
+            (["bot", "morning"], False), (["bot", "queue", "--next"], True),
+        ])
+
+    def test_a_try_is_due_every_poll_minutes_and_at_the_mark(self):
+        import datetime as dt
+
+        def at(hour, minute):
+            return dt.datetime(2026, 9, 16, hour, minute).astimezone()
+
+        last = at(8, 0).isoformat()
+        due = scheduler.morning_try_due
+        self.assertTrue(due(at(8, 0), None, 15, "10:00"))
+        self.assertFalse(due(at(8, 10), last, 15, "10:00"))
+        self.assertTrue(due(at(8, 15), last, 15, "10:00"))
+        self.assertFalse(due(at(9, 0), last, 0, "10:00"))
+        self.assertTrue(due(at(10, 0), at(9, 50).isoformat(), 15, "10:00"))
+        self.assertTrue(due(at(8, 0), dt.datetime(2026, 9, 15, 8, 0).astimezone().isoformat(),
+                            0, "10:00"))
 
     async def test_the_queue_goes_out_with_the_push_switched_off(self):
         with mock.patch.object(scheduler.settings, "push_enabled", return_value=False):

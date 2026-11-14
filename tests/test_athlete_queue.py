@@ -15,7 +15,7 @@ TEST_DB_PATH = test_db_path("test_athlete_queue.db")
 from stamind.db import Database
 import stamind_cli  # noqa: F401 — the CLI binds its handles at import, before the rebind
 
-from stamind import athlete_queue, clock, runtime
+from stamind import athlete_queue, clock, morning_message, runtime
 from stamind.cli import queue as queue_cli
 from stamind.coach.proposals import RevisionProposal
 from stamind.sentinels import BUTTONS_SENTINEL, QUEUE_SENTINEL
@@ -294,6 +294,44 @@ class OutTest(_QueueCase):
             self.at(hour, minute, days)
             self.assertEqual(athlete_queue.anything_out(), out, (hour, minute, days))
 
+    def test_the_day_turns_at_a_morning_message_sent_before_the_morning_time(self):
+        """Wednesday evening's question comes back with Thursday's 05:50 message, and the
+        question that message asks is still out at 08:00 (DESIGN_morning_waits_for_night.md
+        §5). On Friday, with no message yet, the day turns at 08:00 as before."""
+        a, b = self.ask("A"), self.ask("B")
+        self.at(20)
+        athlete_queue.sent(self.item(a))
+        self.at(5, 50, days=1)
+        self.assertTrue(athlete_queue.anything_out())
+        morning_message.mark_sent()
+        self.assertFalse(athlete_queue.anything_out())
+        athlete_queue.sent(self.item(b))
+        for hour, days, out in ((8, 1, True), (9, 1, True), (7, 2, True), (8, 2, False)):
+            self.at(hour, 0, days)
+            self.assertEqual(athlete_queue.anything_out(), out, (hour, days))
+
+    def test_a_second_message_the_same_day_keeps_the_turn_of_the_first(self):
+        """`bot morning --force` at 09:00, after a 05:50 message: the question the 05:50
+        message asked is still out (DESIGN_morning_waits_for_night.md §5)."""
+        a = self.ask("A")
+        self.at(5, 50, 1)
+        morning_message.mark_sent()
+        athlete_queue.sent(self.item(a))
+        self.at(9, 0, 1)
+        morning_message.mark_sent()
+        self.assertTrue(athlete_queue.anything_out())
+
+    def test_a_marker_holding_the_day_alone_turns_the_day_at_the_morning_time(self):
+        """The form the marker had before it held the moment."""
+        thursday = (WEDNESDAY_8AM + timedelta(days=1)).date().isoformat()
+        test_db.set_setting(morning_message.MARKER, thursday)
+        a = self.ask("A")
+        self.at(20)
+        athlete_queue.sent(self.item(a))
+        for hour, minute, out in ((7, 59, True), (8, 0, False)):
+            self.at(hour, minute, 1)
+            self.assertEqual(athlete_queue.anything_out(), out, (hour, minute))
+
     def test_a_wake_sends_between_the_morning_time_and_the_evening_only(self):
         """A question the nightly reflect queues at 03:00 waits for 08:00, and nothing
         goes out on its own from 21:00 on."""
@@ -524,7 +562,7 @@ class MorningTest(_QueueCase):
                                      anchor_kind="css", value=105.0, unit="sec/100m")
         verdicts = {done: {"status": "done"}, missed: {"status": "missed"},
                     recorded: {"status": "done"}}
-        with patch("stamind.cli.bot.views.adherence_verdicts", return_value=verdicts):
+        with patch("stamind.cli.bot.session_questions.adherence_verdicts", return_value=verdicts):
             _, out, _ = run_cli(["bot", "morning"])
             run_cli(["bot", "morning", "--force"])
         [item] = test_db.waiting_queue_items()

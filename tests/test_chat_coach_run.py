@@ -40,6 +40,9 @@ class LongRunTableTest(unittest.TestCase):
             ("workout", "generate", "-m", "..7", "--propose"): PLANNING_RUN,
             ("workout", "generate"): None,
             ("workout", "list", "-d", "today"): None,
+            # A tap that sends the morning message keeps the chat busy
+            # (DESIGN_morning_waits_for_night.md §5).
+            ("bot", "today"): None,
             ("bot", "queue", "7", "a1"): None,
         }
         for argv, run in cases.items():
@@ -85,7 +88,18 @@ class CoachRunTest(unittest.IsolatedAsyncioTestCase):
         started = record_commands(self, chat_bot)
         self.thinking(chat_bot)
         await self.say(chat_bot, "📅 Today")
-        self.assertEqual(started, [(42, ["workout", "list", "-d", "today"], False, "bot")])
+        self.assertEqual(started, [(42, ["bot", "today"], False, "bot")])
+
+    async def test_today_during_the_bots_own_morning_try_shows_the_sessions_alone(self):
+        """Its 06:15 try is alive at 06:15:20: the tap cannot send a second morning message,
+        and the try's message follows on its own (DESIGN_morning_waits_for_night.md §5)."""
+        chat_bot = build_chat_bot(self)
+        started = record_commands(self, chat_bot)
+        self.thinking(chat_bot, long=MORNING_RUN)
+        await self.say(chat_bot, "📅 Today")
+        with routes_to(chat_bot, "show_today"):
+            await self.say(chat_bot, "what's on today?")
+        self.assertEqual(started, [(42, ["workout", "list", "-d", "today"], False, "bot")] * 2)
 
     async def test_the_next_message_to_the_coach_is_kept_while_it_thinks(self):
         """07:06 "move Saturday's ride to Sunday": no echo, one line, and it is kept
