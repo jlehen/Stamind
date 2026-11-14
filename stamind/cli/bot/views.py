@@ -7,16 +7,17 @@ athlete's week they have not been told about yet
 
 The two views run fixed argv and write nothing: the only mutation they reach is what a
 tapped picker leaf later runs as a command of its own (§12.1). The two unasked messages do
-write — `bot morning` stamps its per-day marker and, with `adapt-first` on, asks the week
-planner before it renders when something is new since the last run or a night is not
-normal (DESIGN_quiet_morning.md §2), and saves what it would change as a proposal
-(DESIGN_waiting_proposal.md §5); `bot changes` marks each line told as it prints it.
+write — `bot morning` stamps its per-day marker and, with `adapt-first` on, waits for the
+night (DESIGN_morning_waits_for_night.md §5), asks the week planner before it renders when
+something is new since the last run or a night is not normal (DESIGN_quiet_morning.md §2),
+and saves what it would change as a proposal (DESIGN_waiting_proposal.md §5); `bot
+changes` marks each line told as it prints it.
 """
 import argparse
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from stamind import heads_up, journal, rpe_reminder, runtime, settings
+from stamind import clock, heads_up, journal, morning_message, rpe_reminder, runtime, settings
 from stamind.analytics.compare import adherence_verdicts
 from stamind.cli.bot import test_result
 from stamind.cli.common import deload_progress, ensure_recent_data, in_deload
@@ -325,34 +326,73 @@ def _deload_eve_line(today: str) -> Optional[str]:
     return f"🔋 Your deload {deload_progress(mesocycle, today)}, until {until}."
 
 
+def _silent(today: str, runway: Optional[Dict[str, Any]]) -> bool:
+    """Whether the morning message sends nothing: the schedule ran out past the
+    passed-state window and today is empty. Not the rest-day line, which would describe a
+    hole as a coaching decision, and not a stale celebration (DESIGN_runway_nudge.md §6)."""
+    return (runway is None and schedule_exhausted(today)
+            and not runtime.db.get_workouts(start_date=today, end_date=today))
+
+
+def _garmin_set_up() -> bool:
+    return bool(config.garmin_email and config.garmin_password)
+
+
+def _may_wait() -> bool:
+    """Whether the morning message may still wait for the night: Garmin is set up and the
+    two-hour mark has not passed (DESIGN_morning_waits_for_night.md §5)."""
+    return _garmin_set_up() and clock.now().strftime("%H:%M") < morning_message.night_deadline()
+
+
+def _night_in(today: str) -> bool:
+    """Whether Garmin has today's sleep score: stored already, or found by one call after
+    the login. A look that fails counts as no night (DESIGN_morning_waits_for_night.md §5)."""
+    if runtime.db.get_sleep_score(today) is not None:
+        return True
+    if not _garmin_set_up():
+        return False
+    try:
+        return runtime.garmin.connect(announce=False).get_sleep_score(today) is not None
+    except Exception as e:
+        _warn_quietly(f"Waiting for the night: Garmin could not be asked: {e}")
+        return False
+
+
 def run_bot_morning(args: argparse.Namespace) -> None:
     """Renders the §4.1 morning message for today and emits its button row, under the
     briefing or under the proposal's question (DESIGN_waiting_proposal.md §5).
 
-    Idempotent per day via the settings marker; the bot's scheduler may fire it
-    repeatedly (catch-up after sleep, restarts) without double-sending. A day with no
-    session gets the one-line rest message, a planned rest day its own line, and a day
-    already trained the congratulation, all without buttons — none has a session left to
-    change.
-
-    Once the schedule has run out the push says so and offers to extend it, and once even
-    that has nothing left to say it sends nothing at all (DESIGN_runway_nudge.md §6)."""
+    Idempotent per day via the settings marker; the bot's scheduler tries it until the
+    marker says today (DESIGN_morning_waits_for_night.md §5). A try that waits for the night
+    leaves no run in the journal. Once the schedule has run out the push says so and offers
+    to extend it, and once even that has nothing left to say it sends nothing at all
+    (DESIGN_runway_nudge.md §6)."""
     today = _today_str()
-    if not args.force and runtime.db.get_setting(settings.MORNING_MARKER) == today:
+    if not args.force and morning_message.sent_on(today):
+        journal.drop_run()
         return
-    # Before the silence below, so a plan that has run out still gets its records
+    runway = current_runway(today)
+    # Decided before the adaptation, so a dead plan does not spend an LLM call each morning.
+    if _silent(today, runway):
+        journal.name_run("bot", "morning")
+        runtime.coach_service.retrospectives_step()
+        morning_message.mark_sent()
+        return
+    if not args.force and settings.adapt_first() and _may_wait() and not _night_in(today):
+        journal.drop_run()
+        return
+    journal.name_run("bot", "morning")
+    _morning_message(today, runway)
+
+
+def _morning_message(today: str, runway: Optional[Dict[str, Any]]) -> None:
+    """The morning message itself, once `run_bot_morning` has decided it goes out. A day
+    with no session gets the one-line rest message, a planned rest day its own line, and a
+    day already trained the congratulation, all without buttons — none has a session left
+    to change."""
+    # A plan that has run out gets its records too, on the silent branch above
     # (DESIGN_cycle_retrospective.md §3, §5).
     runtime.coach_service.retrospectives_step()
-    runway = current_runway(today)
-
-    # An exhausted schedule past the passed-state window has nothing honest left to say on
-    # an empty day: not the rest-day line, which would describe a hole as a coaching
-    # decision, and not a stale celebration. Silence, until a schedule exists again (§6).
-    # Decided before the adaptation, so a dead plan does not spend an LLM call each morning.
-    if (runway is None and schedule_exhausted(today)
-            and not runtime.db.get_workouts(start_date=today, end_date=today)):
-        runtime.db.set_setting(settings.MORNING_MARKER, today)
-        return
     # Before the refresh, so it is the first line whatever the refresh prints
     # (DESIGN_deload_weeks.md §11.2).
     deload_day = _deload_day_line(today)
@@ -414,7 +454,7 @@ def run_bot_morning(args: argparse.Namespace) -> None:
         # A page button asks nothing and is no live row, so the briefing keeps it on a
         # morning with a proposal (DESIGN_short_messages.md §5, D8).
         emit_buttons([], page=page)
-    runtime.db.set_setting(settings.MORNING_MARKER, today)
+    morning_message.mark_sent()
     # The last act is the queue's step: the first item of the line, unless an item is
     # out (DESIGN_athlete_queue.md §13.2). What the week planner would change goes first,
     # as a message of its own. It is then out, so the line starts when the athlete answers

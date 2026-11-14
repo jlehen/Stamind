@@ -206,6 +206,7 @@ The picture is JSON in one settings row; its lists are compared as sets.
   bad night, a missed session, a message, a mismatch, a new mesocycle.
 - A night that arrives after the quiet decision on the same morning is graded the next morning,
   not that day. Today's push runs blind in that case and then never looks again either.
+  Amended 2026-11-14: the push now waits for the night (DESIGN_morning_waits_for_night.md).
 - A constraint that ends makes one morning run, because it leaves the hash. A removed daily
   signal or a removed logbook row does not count as new.
 - An answer to "Was that the session, cut short?" waits for the next morning that runs. It is

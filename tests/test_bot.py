@@ -522,6 +522,10 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(scheduler.settings, "push_enabled", return_value=True),
             mock.patch.object(scheduler.athlete_queue, "next_due", return_value=True),
             mock.patch.object(scheduler.heads_up, "changes_due", return_value=False),
+            # The marker `bot morning` writes once the message has gone out.
+            mock.patch.object(
+                scheduler.morning_message, "sent_on", side_effect=lambda day: day in self.sent
+            ),
         ]
         for patcher in patches:
             patcher.start()
@@ -529,9 +533,14 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
         self.ran = []
         self.reflects = []
         self.last_run = {}
+        self.sent = set()
+        # Whether the next `bot morning` sends, or waits for the night.
+        self.night_in = True
 
     async def run_command(self, argv, wait):
         self.ran.append((argv, wait))
+        if argv == ["bot", "morning"] and self.night_in:
+            self.sent.add(self.now.date().isoformat())
 
     def reflect(self):
         self.reflects.append(self.now.strftime("%a %H:%M"))
@@ -556,9 +565,54 @@ class SchedulerWakeTest(unittest.IsolatedAsyncioTestCase):
         wake sends the next item, as it does on a morning the message stayed silent."""
         await self.wake()
         self.assertEqual(self.ran, [(["bot", "morning"], False)])
-        self.assertEqual(self.last_run["push"], "2026-09-16")
+        self.assertEqual(self.last_run["push"], self.now.isoformat())
         await self.wake()
         self.assertEqual(self.ran[1:], [(["bot", "queue", "--next"], True)])
+
+    async def test_a_message_waiting_for_the_night_is_tried_again_and_holds_the_queue(self):
+        """Thursday of DESIGN_morning_waits_for_night.md §3: the 08:00 try finds no night,
+        the wakes in between send nothing from the queue, and the 08:15 try sends."""
+        import datetime as dt
+        self.night_in = False
+        for minute in (0, 5, 10):
+            self.now = dt.datetime(2026, 9, 16, 8, minute).astimezone()
+            await self.wake()
+        self.assertEqual(self.ran, [(["bot", "morning"], False)])
+        self.night_in = True
+        self.now = dt.datetime(2026, 9, 16, 8, 15).astimezone()
+        await self.wake()
+        self.assertEqual(self.ran[1:], [(["bot", "morning"], False)])
+        await self.wake()
+        self.assertEqual(self.ran[2:], [(["bot", "queue", "--next"], True)])
+
+    async def test_the_window_stays_open_for_the_try_at_the_two_hour_mark(self):
+        """A morning-deadline at 09:00 would close the window before 10:00. It stays open to
+        10:10, and the 10:00 try starts even with the Garmin check's knob at zero."""
+        import datetime as dt
+        self.night_in = False
+        with mock.patch.object(scheduler.settings, "morning_deadline", return_value="09:00"), \
+                mock.patch.dict(scheduler.config.data, {"garmin": {"poll_minutes": 0}}):
+            for hour, minute in ((8, 0), (9, 30), (9, 55), (10, 0), (10, 5)):
+                self.now = dt.datetime(2026, 9, 16, hour, minute).astimezone()
+                await self.wake()
+        tries = [argv for argv, _ in self.ran if argv == ["bot", "morning"]]
+        self.assertEqual(len(tries), 2)
+
+    def test_a_try_is_due_every_poll_minutes_and_at_the_mark(self):
+        import datetime as dt
+
+        def at(hour, minute):
+            return dt.datetime(2026, 9, 16, hour, minute).astimezone()
+
+        last = at(8, 0).isoformat()
+        due = scheduler.morning_try_due
+        self.assertTrue(due(at(8, 0), None, 15, "10:00"))
+        self.assertFalse(due(at(8, 10), last, 15, "10:00"))
+        self.assertTrue(due(at(8, 15), last, 15, "10:00"))
+        self.assertFalse(due(at(9, 0), last, 0, "10:00"))
+        self.assertTrue(due(at(10, 0), at(9, 50).isoformat(), 15, "10:00"))
+        self.assertTrue(due(at(8, 0), dt.datetime(2026, 9, 15, 8, 0).astimezone().isoformat(),
+                            0, "10:00"))
 
     async def test_the_queue_goes_out_with_the_push_switched_off(self):
         with mock.patch.object(scheduler.settings, "push_enabled", return_value=False):

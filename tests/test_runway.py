@@ -29,7 +29,7 @@ from stamind import runtime  # noqa: E402
 from stamind.cli import runway as runway_cli  # noqa: E402
 from stamind.cli.render import plan_lines as render_plan  # noqa: E402
 from stamind.cli.workouts import generate as generate_cli  # noqa: E402
-from stamind.settings import MORNING_MARKER  # noqa: E402
+from stamind import morning_message  # noqa: E402
 from stamind.config import config  # noqa: E402
 from stamind.cli.render.plan_lines import SIMPLE_PASSED_LINE  # noqa: E402
 from stamind.cli.render.session_lines import SPORT_EMOJI  # noqa: E402
@@ -534,7 +534,7 @@ class MorningPushRunwayTest(unittest.TestCase):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")
-        self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+        self.assertTrue(morning_message.sent_on(today_str()))
         self.assertEqual(test_db.get_retrospectives()[0]["body"], "For: x")
 
     def test_a_silent_morning_spends_no_adaptation(self):

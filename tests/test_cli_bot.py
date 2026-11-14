@@ -7,7 +7,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from unittest.mock import MagicMock, patch
 
 from tests.helpers import (
@@ -22,7 +22,8 @@ import stamind_cli
 
 from stamind import clock, runtime
 from stamind.cli.bot.views import PUSH_ALL_DONE_LINE
-from stamind.settings import ADAPT_LAST_SEEN, MORNING_MARKER
+from stamind import morning_message
+from stamind.settings import ADAPT_LAST_SEEN
 from stamind.cli.workouts import proposal as saved_proposal
 from stamind.cli.render.session_lines import SIMPLE_DONE_LINE
 from stamind.coach import picture
@@ -156,6 +157,80 @@ class ChangesCommandTest(unittest.TestCase):
         self.assertEqual(len(test_db.waiting_changes()), 1)
 
 
+class MorningWaitTest(unittest.TestCase):
+    """With `adapt-first` on, `bot morning` waits for Garmin to have the night, until two
+    hours after morning-time (DESIGN_morning_waits_for_night.md §3, §5)."""
+
+    def setUp(self):
+        rebind_test_db(test_db)
+        clear_all_tables(test_db)
+        garmin = patch.object(runtime, "garmin", MagicMock(), create=True)
+        garmin.start()
+        self.addCleanup(garmin.stop)
+        # The one call a try makes after the login: no night yet.
+        self.look = runtime.garmin.connect.return_value.get_sleep_score
+        self.look.return_value = None
+        coach = MagicMock()
+        coach.workout_adapt.return_value = MagicMock(workouts=[], reason="", strength_notice=None)
+        for patcher in (
+            patch.dict(config.data, {
+                "telegram": {"push": {"adapt_first": True, "morning_time": "08:00"}},
+                "garmin": {"email": "athlete@example.com", "password": "secret"},
+            }),
+            patch.object(runtime, "coach_service", coach, create=True),
+            patch("stamind.cli.bot.views.ensure_recent_data"),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.today = today_str()
+        save_workout(test_db, self.today, "running", "Easy run", duration_minutes=40)
+
+    def _morning_at(self, hour, minute=0, *flags):
+        """What `bot morning` sends into the chat when run at that local time today."""
+        moment = datetime.combine(date.fromisoformat(self.today), time(hour, minute))
+        with patch("stamind.clock.now", return_value=moment.astimezone()), \
+                patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
+            return run_cli(["bot", "morning", *flags])[1]
+
+    def test_the_message_waits_while_garmin_has_no_night(self):
+        self.assertEqual(self._morning_at(8).strip(), "")
+        self.assertFalse(morning_message.sent_on(self.today))
+        self.look.assert_called_once_with(self.today)
+        runtime.coach_service.workout_adapt.assert_not_called()
+
+    def test_the_try_after_the_watch_synced_sends_it(self):
+        self._morning_at(8)
+        self.look.return_value = 74
+        self.assertIn("Easy run", self._morning_at(8, 15))
+        self.assertTrue(morning_message.sent_on(self.today))
+
+    def test_a_night_already_stored_needs_no_look(self):
+        test_db.save_metric_cache(self.today, 50, 60, 80, 20, None, None, None)
+        self.assertIn("Easy run", self._morning_at(8))
+        self.look.assert_not_called()
+
+    def test_at_the_two_hour_mark_it_goes_without_the_night(self):
+        """Friday of §3: the watch is broken, and the 10:00 try sends."""
+        self.assertIn("Easy run", self._morning_at(10))
+        self.look.assert_not_called()
+
+    def test_a_look_that_fails_counts_as_no_night_and_stays_out_of_the_chat(self):
+        runtime.garmin.connect.side_effect = RuntimeError("Garmin down")
+        self.assertEqual(self._morning_at(8).strip(), "")
+        self.assertFalse(morning_message.sent_on(self.today))
+
+    def test_no_wait_without_garmin_with_adapt_first_off_or_with_force(self):
+        for pinned, flags in (
+            ({"garmin": {}}, ()),
+            ({"telegram": {"push": {"adapt_first": False}}}, ()),
+            ({}, ("--force",)),
+        ):
+            with patch.dict(config.data, pinned):
+                self.assertIn("Easy run", self._morning_at(8, 0, *flags))
+            test_db.clear_setting(morning_message.MARKER)
+        self.look.assert_not_called()
+
+
 class MorningPushTest(unittest.TestCase):
     """`bot morning` — §4.1 rendering and the §4.2 settings-marker idempotency."""
 
@@ -187,7 +262,7 @@ class MorningPushTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Rest day", out)
         self.assertNotIn(BUTTONS_SENTINEL, out)
-        self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+        self.assertTrue(morning_message.sent_on(today_str()))
 
     def test_a_planned_rest_day_gets_no_buttons(self):
         """The week planner writes rest as a session row, graded rest_ok rather than done; "Can't
@@ -221,7 +296,7 @@ class MorningPushTest(unittest.TestCase):
         self.assertNotIn("Easy run", out)
         self.assertNotIn("Conversational pace", out)
         self.assertNotIn(BUTTONS_SENTINEL, out)
-        self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+        self.assertTrue(morning_message.sent_on(today_str()))
 
     def test_the_session_still_ahead_is_briefed_and_keeps_the_buttons(self):
         save_workout(test_db, today_str(), "running", "Easy run", duration_minutes=40)
@@ -349,7 +424,7 @@ class MorningPushTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Easy run", out)
         self.assertNotIn("LLM down", out)
-        self.assertEqual(test_db.get_setting(MORNING_MARKER), today_str())
+        self.assertTrue(morning_message.sent_on(today_str()))
 
     def _adapt_first_run(self, coach):
         coach.workout_adapt.return_value = MagicMock(
