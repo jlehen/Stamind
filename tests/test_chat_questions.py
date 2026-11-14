@@ -187,7 +187,7 @@ class CutShortTest(_Case):
         self.addCleanup(garmin.stop)
         telegram = {k: v for k, v in (config.data.get("telegram") or {}).items() if k != "push"}
         with patch.dict(config.data, {"telegram": telegram}), \
-                patch("stamind.cli.bot.views.read_new_activities"):
+                patch("stamind.cli.bot.morning.read_new_activities"):
             code, out, _ = run_cli(["bot", "morning", "--force"])
         self.assertEqual(code, 0)
         [question] = sent(out)

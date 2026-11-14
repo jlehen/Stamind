@@ -362,7 +362,7 @@ class TestMorningPushKnobs(SettingsTestCase):
         self.assertEqual(morning_message.window(), ("08:00", "10:10"))
 
     def test_the_morning_command_adapts_only_when_the_switch_is_on(self):
-        with patch("stamind.cli.bot.views._morning_adaptation",
+        with patch("stamind.cli.bot.morning._morning_adaptation",
                    return_value=("adapted", None)) as note:
             self.run_cli(["bot", "morning", "--force"])
             self.assertFalse(note.called)

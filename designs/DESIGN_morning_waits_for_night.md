@@ -223,9 +223,10 @@ Made while building it, 2026-11-14, not ruled yet:
     record. On a day the schedule has run out it still runs it.
 18. The marker, the two-hour mark and the window live in a new module,
     `stamind/morning_message.py`, because four files read them.
-19. `settings.py` (499 lines) and `cli/bot/views.py` (497 lines) were trimmed rather than
-    split. The next setting, or the next few lines in the views, forces the split: the morning
-    message would be its own file, `cli/bot/morning.py`.
+19. `settings.py` (499 lines) was trimmed rather than split; the next setting forces the
+    split. `cli/bot/views.py` was split on the code review, ruled 2026-11-14: the morning
+    message and `bot today` are `cli/bot/morning.py`, and what both it and the Garmin check
+    ask once a session is in is `cli/bot/session_questions.py`.
 
 ## 8. Build order
 
@@ -243,7 +244,7 @@ Each step ships alone, one commit each.
 
 | Where | What |
 |---|---|
-| `stamind/cli/bot/views.py` | The wait in `run_bot_morning`, the marker's moment, `run_bot_today` |
+| `stamind/cli/bot/morning.py` | The wait in `run_bot_morning`, the marker's moment, `run_bot_today` (split from `views.py`) |
 | `stamind/cli/bot/parser.py` | The hidden `bot today` |
 | `stamind/cli/bot/setting.py` | `_push_lands_today` reads the marker's day |
 | `stamind/chat/keyboards.py`, `routing.py` | "📅 Today" and `show_today` run `bot today` |

@@ -7,7 +7,9 @@ Hidden maintenance commands the Telegram bot spawns, never typed by the athlete
 to the expert vocabulary — which is why nothing here reaches `plan generate`, a wipe, a
 model role or `restart`.
 
-`views` holds the views and the two messages the bot sends unasked, `route` the intent
+`views` holds the views, the Garmin check and `bot changes`, `morning` the morning message
+and `bot today` (DESIGN_morning_waits_for_night.md), `session_questions` what both the
+morning message and the Garmin check ask once a session is in, `route` the intent
 classifier, `extraction` what every capture's model call shares, `capture` the note inbox
 and the dispatch between the intents, `goal` the new goal (the `new_goal` kind), `setting`
 the setting change (the `change_setting` kind), `edit` the two intents that change a row

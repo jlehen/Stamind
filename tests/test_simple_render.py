@@ -74,8 +74,8 @@ class RenderImportDirectionTest(unittest.TestCase):
     # never quietly widens the exemption.
     # A saved proposal's short text and page are read in the chat only, so the proposal kind
     # builds them from the line builders too (DESIGN_short_messages.md §3, §6.2).
-    ALLOWED = {"bot/views.py", "bot/capture.py", "bot/edit.py", "bot/goal.py",
-               "workouts/proposal.py"}
+    ALLOWED = {"bot/views.py", "bot/morning.py", "bot/session_questions.py", "bot/capture.py",
+               "bot/edit.py", "bot/goal.py", "workouts/proposal.py"}
 
     def test_no_command_module_imports_the_renderer(self):
         from pathlib import Path

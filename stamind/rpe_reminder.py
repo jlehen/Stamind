@@ -1,6 +1,6 @@
 """The reminder to enter an RPE in Garmin, for a session whose heart rate data cannot measure
-its load (`analytics.load.compute_load`, ARCHITECTURE.md §15). Apart from `cli/bot/views.py`
-to break the cycle through `athlete_queue.py`."""
+its load (`analytics.load.compute_load`, ARCHITECTURE.md §15). Apart from
+`cli/bot/session_questions.py` to break the cycle through `athlete_queue.py`."""
 from typing import Any, Dict
 
 from stamind import runtime

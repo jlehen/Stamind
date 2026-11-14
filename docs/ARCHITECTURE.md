@@ -152,7 +152,7 @@ classes themselves.
     followed by its own question, "Shall I adjust your week?" or "Shall I pass it to your
     coach?", whose "Yes" starts `workout adapt` beside the chat (DESIGN_chat_questions.md
     §2, §4). The voice is `runtime.render` ([§6](#6-singletons), DESIGN_render_persona.md).
-  - **The morning push** is `sm bot morning` (`cli/bot/views.py`), tried by `scheduler.py`
+  - **The morning push** is `sm bot morning` (`cli/bot/morning.py`), tried by `scheduler.py`
     inside its window every `garmin.poll_minutes` until the `settings` row
     `push_morning_last` says it went out, the queue waiting meanwhile; with `adapt-first`
     on it waits for today's sleep score until two hours after `morning-time`
@@ -256,7 +256,7 @@ flow for each lives in [§10](#10-key-data-flows).
 | Workout generation span | `coach/service/generate.py:workout_generate`, `cli/workouts/generate.py:_resolve_span`, `cli/workouts/strength_only.py:_span`, `cli/workouts/parser.py`, `config.workout_generation_span_days` |
 | Commitment window | `settings.commitment_days`/`commitment_end`, `coach/service/standing.py`, `coach/formatting.py:format_standing_workouts`, `gcal/reconcile.py:leaves_trace`, `workout_changes.commitment_end` |
 | A plan-shaping input changed since the plan was built | `plan_inputs.py` (what shapes a plan and its hash), `coach/service/staleness.py` (the judgment, `plan_fingerprints()`, the `plan keep` stamp), `cli/staleness.py` (every wording the athlete reads), and the surfaces: `cli/plans/show.py`, `cli/plans/generate.py`, `cli/workouts/generate.py`, `cli/status.py`, `stamind_web.py` (a banner off `plan_config_hash()`). DESIGN_plan_staleness.md §9 |
-| The schedule is running out | `analytics/runway.py` (the detector and its four kinds), `cli/runway.py` (every wording, the push button), and the surfaces: `cli/workouts/adapt.py`, `cli/workouts/listing.py`, `cli/status.py`, `cli/bot/views.py::run_bot_morning`; `config.runway_warning_days`. DESIGN_runway_nudge.md |
+| The schedule is running out | `analytics/runway.py` (the detector and its four kinds), `cli/runway.py` (every wording, the push button), and the surfaces: `cli/workouts/adapt.py`, `cli/workouts/listing.py`, `cli/status.py`, `cli/bot/morning.py::run_bot_morning`; `config.runway_warning_days`. DESIGN_runway_nudge.md |
 | Generation covering every date of its span | `coach/engine/generate.py` (the TASK sentence), `coach/service/guards.py:_fill_coverage_gaps`. DESIGN_runway_nudge.md §2.1 |
 | Whether the schedule reflects a constraint | `coach/honoring.py` (`honored_at`, `needs_a_pass`), `coach/proposals.py:covered_constraint_ids`, the two stamps in `coach/service/generate.py` and `coach/service/revision_apply.py`, `cli/constraints.py:point_at_honor`, `cli/status.py`, `cli/common.py:constraint_line`/`report_unhonored`, `db/constraints.py` (`mark_honored`, `clear_honored`, `clear_honored_after`). DESIGN_constraint_honoring.md (§5: no command, no SQL copy of the predicate) |
 | Coach learnings / confidence | `db/learnings.py`, `coach/service/athlete_context.py` (`_apply_learning_updates`, `_review_learning_proposals`), `learning_doubts.py`; the model is DESIGN_evidence_based_confidence.md |
@@ -274,10 +274,10 @@ flow for each lives in [§10](#10-key-data-flows).
 | A preference the athlete can change at runtime | a registry entry in `stamind/settings.py` (not a command), `cli/settings.py`, and the reader that consumes it. DESIGN_settings.md |
 | Cycle retrospectives | `stamind/cycle_records.py`, `db/retrospectives.py`, `coach/service/retrospective.py`, `coach/engine/retrospective.py`, `stamind/retrospective_question.py`, `coach/service/history_context.py` (what `plan generate` reads), `cli/plans/show.py` (`-vv`), `cli/plans/retro.py`, `cli/common.py` (`print_mesocycle_head`, `print_retrospective`). DESIGN_cycle_retrospective.md |
 | A question or message no command waits on | a `Kind` (`stamind/queue_kind.py`) in `KINDS` of `stamind/athlete_queue.py`, and `queue_kind.queue(kind, subject, payload)` from the feature; nothing in the bot. DESIGN_athlete_queue.md §8; `strength/questions.py` is the worked example |
-| A long run beside the chat | `chat/routing.py:long_run`, `chat/runner.py` (`_keep_behind`, `_start_kept`, `KEPT_LINES`), `chat/callbacks.py:tap_long_run`, `queue_kind.Kind.long_run`/`confirmation`, `athlete_queue.long_run_name`/`lived_out`, `cli/queue_commands.py:GOES_ON`, `cli/bot/hand_off.py` (`pass_to_coach`, `adjust_week`), `cli/workouts/proposal.py` (`schedule`, `replace_sessions`), `cli/workouts/generate.py:propose_weeks`, `coach/proposals.py` (`generate_to_json`/`generate_from_json`), `cli/bot/views.py:_morning_adaptation`. DESIGN_long_runs_beside_chat.md |
-| A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` kind, `save`, `open_proposal`, `shown_to_week_planner`, `out_of_date`), `coach/proposals.py` (`week_planner_changed`, `revision_to_json`/`revision_from_json`), `coach/engine/notes.py:open_proposal_task`, `cli/queue.py:send_alone`, `cli/workouts/adapt.py:_settle`, `cli/bot/views.py:_morning_adaptation`. DESIGN_waiting_proposal.md |
-| When the morning message goes out | `stamind/morning_message.py`, `cli/bot/views.py` (`run_bot_morning`, `run_bot_today`, `_may_wait`, `_night_in`), `garmin/client.py:get_sleep_score`, `chat/scheduler.py` (`scheduler_wake`, `morning_try_due`), `chat/routing.py:TODAY_ARGV` + `chat/messages.py` (a tap during the bot's try), `athlete_queue.py:day_turned_at`. DESIGN_morning_waits_for_night.md |
-| Whether the morning push asks the week planner | `coach/picture.py` (`take`, `news`, `nights`, `remember`), `cli/bot/views.py:_asks`, `strength/planner.py:has_work`, `db/workout_history.py:newest_change_with_sessions(exclude_kind)`, `RevisionProposal.seen`, the `adapt_last_seen` row of `settings`. DESIGN_quiet_morning.md |
+| A long run beside the chat | `chat/routing.py:long_run`, `chat/runner.py` (`_keep_behind`, `_start_kept`, `KEPT_LINES`), `chat/callbacks.py:tap_long_run`, `queue_kind.Kind.long_run`/`confirmation`, `athlete_queue.long_run_name`/`lived_out`, `cli/queue_commands.py:GOES_ON`, `cli/bot/hand_off.py` (`pass_to_coach`, `adjust_week`), `cli/workouts/proposal.py` (`schedule`, `replace_sessions`), `cli/workouts/generate.py:propose_weeks`, `coach/proposals.py` (`generate_to_json`/`generate_from_json`), `cli/bot/morning.py:_morning_adaptation`. DESIGN_long_runs_beside_chat.md |
+| A proposal that waits for the athlete's answer | `cli/workouts/proposal.py` (the `proposal` kind, `save`, `open_proposal`, `shown_to_week_planner`, `out_of_date`), `coach/proposals.py` (`week_planner_changed`, `revision_to_json`/`revision_from_json`), `coach/engine/notes.py:open_proposal_task`, `cli/queue.py:send_alone`, `cli/workouts/adapt.py:_settle`, `cli/bot/morning.py:_morning_adaptation`. DESIGN_waiting_proposal.md |
+| When the morning message goes out | `stamind/morning_message.py`, `cli/bot/morning.py` (`run_bot_morning`, `run_bot_today`, `_may_wait`, `_night_in`), `garmin/client.py:get_sleep_score`, `chat/scheduler.py` (`scheduler_wake`, `morning_try_due`), `chat/routing.py:TODAY_ARGV` + `chat/messages.py` (a tap during the bot's try), `athlete_queue.py:day_turned_at`. DESIGN_morning_waits_for_night.md |
+| Whether the morning push asks the week planner | `coach/picture.py` (`take`, `news`, `nights`, `remember`), `cli/bot/morning.py:_asks`, `strength/planner.py:has_work`, `db/workout_history.py:newest_change_with_sessions(exclude_kind)`, `RevisionProposal.seen`, the `adapt_last_seen` row of `settings`. DESIGN_quiet_morning.md |
 | A strength activity's sets | `strength/sets.py`, `strength/vocabulary.py` + `exercises.tsv` (then rebuild `miniapp/exercises.json` with `miniapp/build_exercises.py`), `strength/questions.py`, `db/strength.py`, `cli/strength.py`, `cli/strength_log.py`, the `strength-sets-since` setting. DESIGN_strength_tracking.md, DESIGN_exercise_table.md |
 | The Progress page (the chat's "📈 Progress") | `cli/render/progress_page.py` (the file, the address), `page_files/sync.py` (`PROGRESS`), `miniapp/progress.html` + `progress.js` + `progress_logic.js`, `chat/keyboards.py` (`PROGRESS_LABEL`), `chat/app.py:_page_buttons`, `chat/routing.py:PUBLISHED_PAGE_REPLIES`; the terminal's views are `cli/progress*.py`. DESIGN_progress_page.md |
 | A gym session logged on the phone | `miniapp/`, `strength/logger.py`, `cli/strength_ingest.py`, `strength/sets.py::take_over_logs`, `db/strength.py` (`gym_logs`, `upsert_logged_activity`, `save_gym_log`, `gym_log_for_day`, `garmin_activity_with_log`, `move_gym_log`). DESIGN_gym_logger.md ([§16](#16-gym-logger-telegram-mini-app)) |
@@ -1570,7 +1570,7 @@ replan; the rest of the mesocycle does (`DESIGN_plan_staleness.md` §3–§4).
    (DESIGN_waiting_proposal.md §2, §3, §6, §7).
 8. Apply, no-change and save each write the run's picture to the `settings` row
    `adapt_last_seen` when the run was evaluated on today (`picture.remember`). With
-   `adapt-first` on, the morning push (`cli/bot/views.py:_asks`) runs `workout adapt` only
+   `adapt-first` on, the morning push (`cli/bot/morning.py:_asks`) runs `workout adapt` only
    when a fresh picture differs from it (`picture.news`, the table in
    DESIGN_quiet_morning.md §3), or a night since the last one in hand is not normal
    (`picture.nights`, after the forced pull, §4). Otherwise the morning is quiet, with one
@@ -1830,7 +1830,7 @@ moved to another file is one red test naming the target and the test file, inste
 patch that stubs nothing while the test keeps passing. It reads a target a loop builds as
 well as a literal one, because three of the four sites that name an `ensure_recent_data`
 (`cli/status`, `cli/workouts/adapt`, `cli/workouts/generate`) build it that way and the
-fourth, `cli/bot/views.py`, writes it out in full. A target passed `create=True` is
+fourth, `cli/bot/morning.py`, writes it out in full. A target passed `create=True` is
 skipped; `patch.object` and `patch.dict` need no guard, since a name that has moved
 raises `AttributeError` where it is used.
 

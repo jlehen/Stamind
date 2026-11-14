@@ -2,7 +2,7 @@
 says it went out today, the two-hour mark after which it stops waiting for the night, and
 the window in which the bot's scheduler tries it.
 
-The message itself is `sm bot morning` (`cli/bot/views.py`), and the scheduler that tries
+The message itself is `sm bot morning` (`cli/bot/morning.py`), and the scheduler that tries
 it is `chat/scheduler.py`.
 """
 from datetime import datetime

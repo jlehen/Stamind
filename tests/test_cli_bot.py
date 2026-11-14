@@ -21,7 +21,7 @@ from stamind.db import Database
 import stamind_cli
 
 from stamind import clock, journal, runtime
-from stamind.cli.bot.views import (
+from stamind.cli.bot.morning import (
     NIGHT_IN_LINE, PREPARING_LINE, PUSH_ALL_DONE_LINE, WAITING_LINE,
 )
 from stamind import morning_message
@@ -194,7 +194,7 @@ class MorningWaitTest(unittest.TestCase):
                 "garmin": {"email": "athlete@example.com", "password": "secret"},
             }),
             patch.object(runtime, "coach_service", coach, create=True),
-            patch("stamind.cli.bot.views.ensure_recent_data"),
+            patch("stamind.cli.bot.morning.ensure_recent_data"),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -305,7 +305,7 @@ class MorningWaitTest(unittest.TestCase):
     def test_a_message_that_breaks_half_way_is_not_tried_again(self):
         """It counts as sent from the moment it starts (§7 choice 16)."""
         self.look.return_value = 74
-        with patch("stamind.cli.bot.views._refresh_garmin", side_effect=RuntimeError("bug")):
+        with patch("stamind.cli.bot.morning._refresh_garmin", side_effect=RuntimeError("bug")):
             out = self._morning_at(8)
         self.assertNotIn("Easy run", out)
         self.assertTrue(morning_message.sent_on(self.today))
@@ -451,7 +451,7 @@ class MorningPushTest(unittest.TestCase):
         return (
             patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}),
             patch.object(runtime, "coach_service", coach, create=True),
-            patch("stamind.cli.bot.views.ensure_recent_data"),
+            patch("stamind.cli.bot.morning.ensure_recent_data"),
         )
 
     def test_adapt_first_writes_moved_kilograms_and_surfaces_the_reason(self):
@@ -583,7 +583,7 @@ class QuietMorningTest(unittest.TestCase):
             workouts=[], reason="All green.", strength_notice=None,
         )
         with patch.object(runtime, "coach_service", coach, create=True), \
-                patch("stamind.cli.bot.views.ensure_recent_data", side_effect=pull), \
+                patch("stamind.cli.bot.morning.ensure_recent_data", side_effect=pull), \
                 patch("stamind.journal.record") as journal, \
                 patch.dict(os.environ, {"STAMIND_FRONTEND": "json"}):
             code, out, _ = run_cli(["bot", "morning", "--force"])

@@ -562,7 +562,7 @@ class MorningTest(_QueueCase):
                                      anchor_kind="css", value=105.0, unit="sec/100m")
         verdicts = {done: {"status": "done"}, missed: {"status": "missed"},
                     recorded: {"status": "done"}}
-        with patch("stamind.cli.bot.views.adherence_verdicts", return_value=verdicts):
+        with patch("stamind.cli.bot.session_questions.adherence_verdicts", return_value=verdicts):
             _, out, _ = run_cli(["bot", "morning"])
             run_cli(["bot", "morning", "--force"])
         [item] = test_db.waiting_queue_items()

@@ -557,7 +557,7 @@ class MorningPushRunwayTest(unittest.TestCase):
         coach = MagicMock()
         with patch.dict(config.data, {"telegram": {"push": {"adapt_first": True}}}), \
                 patch.object(runtime, "coach_service", coach, create=True), \
-                patch("stamind.cli.bot.views.ensure_recent_data"):
+                patch("stamind.cli.bot.morning.ensure_recent_data"):
             code, out, _ = run_cli(["bot", "morning"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "")

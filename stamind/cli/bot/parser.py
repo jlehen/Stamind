@@ -6,9 +6,9 @@ from here and names nothing else in this package.
 """
 from stamind.cli.bot.capture import CAPTURE_INTENTS, run_bot_capture
 from stamind.cli.bot.route import run_bot_route
+from stamind.cli.bot.morning import run_bot_morning, run_bot_today
 from stamind.cli.bot.views import (
     run_bot_changes, run_bot_constraints, run_bot_garmin_check, run_bot_goals,
-    run_bot_morning, run_bot_today,
 )
 from stamind.cli.queue_commands import run_bot_queue
 
