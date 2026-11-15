@@ -1,6 +1,9 @@
 # Design: `workout tweak`, and the end of the four hand-edit commands
 
-**Status:** Implemented (rev. 4), not reviewed · **Date:** 2026-09-30 (rev. 4)
+**Status:** Implemented (rev. 5), not reviewed · **Date:** 2026-11-15 (rev. 5)
+
+Revision 5 lets a tweak make up a session missed on a day before today (§3.2). "Swap
+Monday's intervals with today's rest day" was refused.
 
 Revision 4 lets a tweak reach past the end of the current mesocycle, up to a week ahead
 (§3.2, §8). On the last day of a mesocycle, a tweak could only change that day.
@@ -146,6 +149,20 @@ and Stamind does not take its word for it:
 - The strength planner runs over those days only.
 - A tweak marks no constraint as honoured. That mark means "a coach pass had authority over
   every remaining day of this constraint", and a tweak has authority over a few days.
+
+**A session missed before today.** A day before today never changes. It is Wednesday 18
+November. The athlete was sick on Monday and missed the intervals, and Wednesday is a rest
+day. They ask "swap Monday's intervals with today's rest day". The TASK says a session missed
+on a past day may be written again on one of the request's days, as a new session and not a
+move, and that the past day stays out of `tweak_dates`. Wednesday gets the intervals. Monday
+keeps its session, shown as missed, and the week grade still adds the ride up over the week
+(DESIGN_week_as_written.md §2). Without that sentence the week planner refused, because every
+day it names must fall between today and the reach. A live call to the week planner on 15
+November 2026 showed both answers.
+
+A true move out of the past day is not offered. `workout rollback` never writes a day before
+today, so undoing the move on Wednesday would leave the intervals on neither day. Monday would
+also read "Rest OK" for a sick day.
 
 **Why a tweak reaches past the end of the mesocycle.** `workout adapt` stops at the end of
 the mesocycle for a reason about load (DESIGN_mesocycle_boundary.md §2). It cuts sessions
@@ -357,6 +374,10 @@ the past.
 
 - **A tweak past its reach (§3.2).** On the last day of a mesocycle, a day eight or more
   days away is refused. The athlete adds a constraint, or asks again once the day is closer.
+- **A make-up written as a move (§3.2).** If the week planner marks Wednesday's intervals as
+  coming from Monday (`"replaces"`), the tweak drops them as a move whose other end is
+  outside its days, and writes nothing. If it names Monday among `tweak_dates`, the run is
+  refused with advice meant for a day further out. Three live calls did neither.
 - **A session with exact numbers the athlete typed.** The coach writes the session. The
   athlete who wants "exactly 52 minutes" says so in the message.
 - **An edit with no model call.** Every change to a session now costs one week planner call,

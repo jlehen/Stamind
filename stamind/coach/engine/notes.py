@@ -32,9 +32,9 @@ def tweak_task(
             'Read them off the request ("Friday", "tomorrow", "swap Thursday and Friday").\n'
             "  The Evaluation Date is today, and every day must fall between "
             f"{target_date_str} and\n  {range_end_str}. If you cannot tell which days "
-            "are meant, or one falls outside that\n"
-            '  range, return "change_needed": false and "tweak_dates": [], and say why in\n'
-            '  "reason".'
+            "are meant, or one falls after\n"
+            f'  {range_end_str}, return "change_needed": false and "tweak_dates": [], and '
+            'say why in\n  "reason".'
         )
     if watching:
         opening = "The athlete asks for a change to the schedule."
@@ -59,7 +59,9 @@ that.
 - FIND THE DAYS the request is about, and return them as "tweak_dates".
   {days_line}
 - CHANGE ONLY THOSE DAYS. Every session on every other date stays exactly as planned. A
-  session may move between those days, never to or from another date.
+  session may move between those days, never to or from another date. A day before today
+  never changes. A session missed on one may be written again on one of those days, as a
+  new session, not a move; leave the past day out of "tweak_dates".
 - DO WHAT IS ASKED. The request may be for a session made shorter, longer, easier or
   harder; another sport in its place; other exercises in a strength session; a session
   added; a session dropped, which you write as a rest day; a session moved to another day,
