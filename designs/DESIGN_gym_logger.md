@@ -20,6 +20,12 @@ fourth set, swaps the belt squat for a leg press, removes the curls, moves the r
 appends an exercise the session did not ask for, and types a note. After every tap the
 page saves its state on the phone, so a closed Telegram reopens where it left off.
 
+The state is saved under the session's date, not its revision. It is Monday. The athlete
+logs from a button built before the coach made the lift light, and sends the log. The bot's
+summary brings a button that carries the light revision. Tapped, it opens the log just sent,
+not the light session: a saved state the athlete has started (clock running or a set ticked)
+wins over a newer revision of its day. One nobody has started gives way to it, with no undo.
+
 Each card has an "Insert" button. It puts the new exercise right after that card, so a
 face pull added after the rows does not have to climb up from the bottom one tap at a time.
 The button that puts another exercise in a card's place is "⇆ Replace". Its search keeps the

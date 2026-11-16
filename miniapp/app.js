@@ -744,22 +744,23 @@ async function loadCatalog() {
   }
 }
 
+// The state saved for this day when it wins over the URL, so a reopened app carries on (§1);
+// null when the page starts from the session.
 async function restore(session) {
-  const saved = await store.get(logic.storageKey(session.r));
+  const saved = await store.get(storeKey);
   if (!saved) {
-    return logic.newState(session);
+    return null;
   }
   try {
     const parsed = JSON.parse(saved);
-    // A saved state for this revision wins over the URL, so a reopened app carries on (§1).
-    if (parsed && parsed.v === logic.STATE_VERSION && parsed.r === session.r
-        && Array.isArray(parsed.x)) {
+    if (parsed && parsed.v === logic.STATE_VERSION && Array.isArray(parsed.x)
+        && logic.keepsSaved(parsed, session)) {
       return parsed;
     }
   } catch (problem) {
     console.warn("the saved session could not be read", problem);
   }
-  return logic.newState(session);
+  return null;
 }
 
 function wire() {
@@ -871,9 +872,11 @@ async function start() {
     state = logic.stateFromLog(session, opened);
     showOpened();
   } else {
-    storeKey = logic.storageKey(session.r);
-    state = await restore(session);
-    history = await restoreHistory();
+    storeKey = logic.storageKey(session.d);
+    const saved = await restore(session);
+    state = saved || logic.newState(session);
+    // A fresh state takes no undo history: what is saved undid another revision's cards.
+    history = saved ? await restoreHistory() : [];
     persist();
   }
   // The clock is back as soon as the phone answers, not after the download: a reopened page

@@ -205,8 +205,17 @@ function clockMs(iso, clock, days = 0) {
   return new Date(year, month - 1, day + days, hours, minutes).getTime();
 }
 
-export function storageKey(revision) {
-  return `stamind-gym-v${STATE_VERSION}-r${revision}`;
+// Keyed by the session's date, not its revision: the button can carry a newer revision of the
+// day than the one being logged (§1).
+export function storageKey(day) {
+  return `stamind-gym-v${STATE_VERSION}-d${day}`;
+}
+
+// A state saved for the day wins once the athlete has started logging it, even when the
+// button now carries another revision; an untouched one gives way to the coach's new session.
+export function keepsSaved(saved, session) {
+  return saved.r === session.r || saved.startedAt !== null
+    || saved.x.some((card) => card.sets.some((set) => set.done));
 }
 
 // "3×8–10/side @ 30 kg" when the exercise is done one side at a time (`perSideOf`).

@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import * as logic from "../logic.js";
 import { freePort, servePage } from "./serve.mjs";
 
 // A Telegram client that answers every call and then does nothing with the log.
@@ -265,5 +266,23 @@ test("a Finish tapped by mistake can be resumed, and the next Finish sends again
     assert.equal(await page.locator("#sent").isVisible(), false);
     await page.evaluate(() => window.__finish());
     assert.equal((await page.evaluate(() => window.__sent)).length, 1);
+  });
+});
+
+// It is Monday. The coach rewrote the session after the athlete's button was built, so the
+// button the bot sends with the log's summary carries the newer revision (§1).
+test("a page reopened on a newer revision of the day shows the log already sent", async (t) => {
+  await onPhone(t, async (page, site) => {
+    await page.goto(`${site}/`, { waitUntil: "networkidle" });
+    await page.waitForSelector(".card");
+    await page.locator(".card").first().locator(".set").nth(0).locator(".tick").click();
+    await page.evaluate(() => window.__finish());
+
+    const rewritten = { ...logic.demoSession(), r: 1 };
+    await page.goto(`${site}/index.html#s=${logic.encodeSession(rewritten)}`);
+    // A new hash alone keeps the page; Telegram loads it afresh.
+    await page.reload();
+    await page.waitForSelector(".card");
+    assert.equal(await page.locator("#sent").isVisible(), true);
   });
 });

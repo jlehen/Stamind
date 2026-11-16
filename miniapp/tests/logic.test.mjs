@@ -367,11 +367,22 @@ test("the header shows the session's own date in words", () => {
   assert.equal(logic.shown("pull up"), "Pull up");
 });
 
-test("the saved state is keyed by its version and the session's revision id", () => {
+test("the saved state is keyed by its version and the session's date", () => {
   // A state saved under the old names has another version, so it is never read.
-  assert.equal(logic.storageKey(727), "stamind-gym-v3-r727");
+  assert.equal(logic.storageKey("2026-11-16"), "stamind-gym-v3-d2026-11-16");
   assert.equal(logic.newState(logic.demoSession()).v, logic.STATE_VERSION);
-  assert.notEqual(logic.storageKey(727), logic.storageKey(728));
+});
+
+test("a day's saved state wins over a newer revision once the athlete has started it", () => {
+  // It is Monday. The athlete logs revision 1019, the coach has since written 1022, and the
+  // button rebuilt after the send carries 1022.
+  const old = { ...logic.demoSession(), r: 1019 };
+  const rewritten = { ...logic.demoSession(), r: 1022 };
+  const untouched = logic.newState(old);
+  assert.equal(logic.keepsSaved(untouched, old), true);
+  assert.equal(logic.keepsSaved(untouched, rewritten), false);
+  assert.equal(logic.keepsSaved(logic.toggleDone(untouched, 0, 0, 30), rewritten), true);
+  assert.equal(logic.keepsSaved(logic.startClock(untouched, Date.now()), rewritten), true);
 });
 
 test("an exercise linked to Free Exercise DB has its two photos, any other has none", () => {
