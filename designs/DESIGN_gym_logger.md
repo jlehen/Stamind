@@ -242,6 +242,15 @@ activities. The summary opens with "Updated the log of", as for any second send.
   days, the first row is the gym button, labelled with the day ("🏋️ Log today's gym",
   "🏋️ Log Thursday's gym"), a `KeyboardButton(text, web_app=WebAppInfo(url))`. Otherwise
   the keyboard is what it is today.
+- A message with inline buttons cannot carry the keyboard, so the gym button can go out of
+  date. It is Monday. At 07:11 the athlete accepts a lighter lift, and the reply has a
+  "🔎 Tell me more" button. Without more, 🏋️ would still open the heavy session at 10:20.
+  So the bot keeps, per chat, the address of the gym button it last sent. After any run
+  that sent something, it compares that with the button it would build now. When they
+  differ, it sends one line under a fresh keyboard: "🏋️ The gym button now opens today's
+  session: Full-Body Strength (Light, Non-Failure)." or "🏋️ The gym button is gone: no gym
+  session in the next seven days." The same line comes the morning after a gym day, when
+  that morning's messages all have buttons: 🏋️ would still open the day just done.
 - A `MessageHandler(filters.StatusUpdate.WEB_APP_DATA, ...)` receives the log. It checks
   the chat is allowed, writes the data to `logs/gym_logs/<date>-<hhmmss>.json`, and
   runs `strength ingest <file>` through `_start_command`, so the summary reaches the chat
@@ -256,8 +265,10 @@ activities. The summary opens with "Updated the log of", as for any second send.
 - Grading a session set by set: DESIGN_strength_planned_vs_done.md.
 - What the strength planner is shown of a log.
 - A rest timer that alerts: the page cannot notify while the phone is locked.
-- Refreshing the button after a `workout adapt` run from the terminal; the log carries the
-  revision id, so a stale button costs nothing but a mismatch in the summary.
+- Refreshing the button after a `workout adapt` run from the terminal: nothing reaches the
+  chat, so the button stays as it was until the bot's next message.
+- After a bot restart, the bot takes the chat to hold the button of that moment. The first
+  run after it that changes the gym session, with a reply under inline buttons, sends no line.
 
 ## 8. A past log, opened from the calendar
 

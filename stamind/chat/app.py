@@ -26,7 +26,7 @@ from stamind.chat import runner, telegram_api
 from stamind.chat.callbacks import CallbacksMixin
 from stamind.chat.keyboards import (
     CALENDAR_LABEL, GYM_SPORT, PLAN_LABEL, PROGRESS_LABEL, SIMPLE_MENU_COMMANDS, gym_button,
-    gym_window_end, simple_keyboard_rows,
+    gym_moved_line, gym_window_end, simple_keyboard_rows,
 )
 from stamind.chat.messages import MessagesMixin
 from stamind.chat.replies import RepliesMixin, SentQuestion
@@ -37,6 +37,7 @@ from stamind.config import config
 from stamind.output import warn
 from stamind.page_files import sync as page_files
 from stamind.strength import logger
+from stamind.types import Workout
 
 # What the chat that sent /restart hears once the new worker is up (DESIGN_bot_restart.md
 # §5.2).
@@ -91,6 +92,9 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         # The questions sent since this start, per chat and item, so a typed answer can
         # edit the one it answers; it empties with a restart (DESIGN_athlete_queue.md §14.3).
         self.sent_questions: Dict[int, Dict[str, SentQuestion]] = {}
+        # The address of the gym button each chat's keyboard last carried, None for no
+        # button; it empties with a restart (DESIGN_gym_logger.md §6).
+        self.gym_shown: Dict[int, Optional[str]] = {}
         # Held until each ends: asyncio keeps only a weak reference to a running task.
         self.outside_tasks: set = set()
         self.garmin_check_failing = False
@@ -112,20 +116,43 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         no one, which is what an unconfigured instance gets."""
         return chat_id in self.allowed_ids
 
-    def _gym_button(self) -> Optional[Tuple[str, str]]:
-        """The gym button's label and the address it opens, or None when the `strength-logger`
-        setting is off or no gym session is coming (DESIGN_gym_logger.md §6)."""
+    def _gym_session(self) -> Optional[Tuple[str, Workout]]:
+        """The gym button's label and the session it opens, or None when the
+        `strength-logger` setting is off or no gym session is coming (DESIGN_gym_logger.md §6)."""
         if not settings.strength_logger():
             return None
         today = clock.today_str()
         workouts = runtime.db.get_workouts(
             today, gym_window_end(today), sport_type=GYM_SPORT
         )
-        found = gym_button(workouts, today)
+        return gym_button(workouts, today)
+
+    def _gym_button(self) -> Optional[Tuple[str, str]]:
+        """The gym button's label and the address it opens, or None (§6)."""
+        found = self._gym_session()
         if found is None:
             return None
         label, workout = found
         return label, logger.session_url(workout)
+
+    async def _refresh_gym_button(self, chat_id: int) -> None:
+        """Sends one line under a fresh keyboard when the gym button the chat holds no longer
+        opens the session it should: a reply with inline buttons brings no keyboard
+        (DESIGN_gym_logger.md §6). A chat with no keyboard since the start is taken to hold
+        the right one. A failure is journalled: the run's own reply is already out."""
+        try:
+            found = self._gym_session()
+            workout = None
+            address = None
+            if found is not None:
+                workout = found[1]
+                address = logger.session_url(workout)
+            if address == self.gym_shown.setdefault(chat_id, address):
+                return
+            await self._send_keyed(chat_id, gym_moved_line(workout, clock.today_str()))
+        except Exception as exc:
+            journal.record("bot.event", f"gym button not refreshed: {exc}", lvl="warn",
+                           chat=chat_id)
 
     def _page_buttons(self) -> Tuple[Tuple[str, str], Tuple[str, str],
                                      Optional[Tuple[str, str]]]:
@@ -145,14 +172,20 @@ class ChatBot(RunnerMixin, RepliesMixin, MessagesMixin, CallbacksMixin, Schedule
         return ((CALENDAR_LABEL, calendar_page.calendar_url(cal, now, storage)),
                 (PLAN_LABEL, plan_page.plan_url(cal, now, storage)), progress)
 
-    def _keyboard(self):
+    def _keyboard(self, chat_id: int):
         """The §5.1 reply keyboard, rebuilt on every send so the gym button follows the week
         and the pages carry a fresh snapshot (DESIGN_gym_logger.md §6,
-        DESIGN_calendar_miniapp.md §5)."""
+        DESIGN_calendar_miniapp.md §5). Records the gym button's address as the chat's: a
+        keyboard Telegram refuses would be refused again under any later line."""
+        gym = self._gym_button()
         calendar, plan, progress = self._page_buttons()
-        return telegram_api.reply_keyboard(
-            simple_keyboard_rows(self._gym_button(), calendar, plan, progress)
+        keyboard = telegram_api.reply_keyboard(
+            simple_keyboard_rows(gym, calendar, plan, progress)
         )
+        self.gym_shown[chat_id] = None
+        if gym is not None:
+            self.gym_shown[chat_id] = gym[1]
+        return keyboard
 
     def _log(
         self, chat_id: Optional[int], direction: str, msg: str, lvl: str = "info"

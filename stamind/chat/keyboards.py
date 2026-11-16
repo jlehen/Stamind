@@ -88,20 +88,34 @@ def simple_keyboard_rows(
 GYM_SPORT = "strength_training"
 GYM_WINDOW_DAYS = 7
 
-GYM_TODAY_LABEL = "🏋️ Log today's gym"
-
 
 def gym_window_end(today: str) -> str:
     """The last day the gym button looks at, given today (both YYYY-MM-DD)."""
     return day_str(parse_date(today) + datetime.timedelta(days=GYM_WINDOW_DAYS - 1))
 
 
-def gym_label(day: str, today: str) -> str:
-    """What the button says for a session on `day`: "today's" on the day itself, and the
-    weekday's name otherwise (§6)."""
+GYM_GONE_LINE = "🏋️ The gym button is gone: no gym session in the next seven days."
+
+
+def gym_day(day: str, today: str) -> str:
+    """"today" on the day itself, and the weekday's name otherwise (§6)."""
     if day == today:
-        return GYM_TODAY_LABEL
-    return f"🏋️ Log {parse_date(day).strftime('%A')}'s gym"
+        return "today"
+    return parse_date(day).strftime("%A")
+
+
+def gym_label(day: str, today: str) -> str:
+    """What the button says for a session on `day` (§6)."""
+    return f"🏋️ Log {gym_day(day, today)}'s gym"
+
+
+def gym_moved_line(workout: Optional[Workout], today: str) -> str:
+    """The line that brings a fresh keyboard when the gym button the chat holds no longer
+    opens the session it should; `workout` is the session it opens now, if any (§6)."""
+    if workout is None:
+        return GYM_GONE_LINE
+    day = gym_day(str(workout.get("date") or ""), today)
+    return f"🏋️ The gym button now opens {day}'s session: {workout.get('title')}."
 
 
 def gym_button(workouts: List[Workout], today: str) -> Optional[Tuple[str, Workout]]:

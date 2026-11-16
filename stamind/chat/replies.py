@@ -85,7 +85,7 @@ class RepliesMixin:
         if send is None:
             send = functools.partial(self.bot.send_message, chat_id=chat_id)
         try:
-            keyboard = self._keyboard()
+            keyboard = self._keyboard(chat_id)
         except Exception as exc:
             journal.record("bot.event", f"sent without the keyboard: {exc}", lvl="error",
                            chat=chat_id)

@@ -2101,7 +2101,9 @@ its planned lines is DESIGN_strength_planned_vs_done.md.
 `strength ingest`; `strength/sets.py::read_new_activities` runs the takeover
 (`db/strength.py::move_gym_log`) before any set is read from Garmin. The rows are
 `gym_logs` ([§5](#gym_logs)). On the bot's side: `keyboards.gym_button`,
-`app.ChatBot._keyboard` (built on every send) and `messages.on_web_app_data`; a typed
+`app.ChatBot._keyboard` (built on every send), `app.ChatBot._refresh_gym_button` (after a
+run, one line under a fresh keyboard when the chat's gym button is out of date) and
+`messages.on_web_app_data`; a typed
 message starting with `{` is a pasted log on the same path. The bot parses nothing:
 every write goes through the CLI. The comparison is `strength/comparison.py`, drawn by
 `cli/common.py::strength_table` and `simple_comparison_lines` ([§6](#6-singletons) says

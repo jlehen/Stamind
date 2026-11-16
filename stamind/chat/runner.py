@@ -307,6 +307,9 @@ class RunnerMixin:
             # legitimately end silent; only interactive commands owe a reply.
             if not session.sent and not session.quiet:
                 await self.bot.send_message(chat_id=session.chat_id, text="(no output)")
+            # Only after a reply, so the line never arrives on its own (DESIGN_gym_logger.md §6).
+            if session.sent:
+                await self._refresh_gym_button(session.chat_id)
         except Exception as e:  # pragma: no cover - defensive
             await self._report_drive_failure(session, e)
         finally:

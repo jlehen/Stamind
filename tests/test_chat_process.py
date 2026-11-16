@@ -10,6 +10,7 @@ four use are in `tests/chat_harness.py`.
 import ast
 import asyncio
 import glob
+import io
 import inspect
 import os
 import pathlib
@@ -25,7 +26,7 @@ from telegram.error import BadRequest, TimedOut
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests import test_db_path
-from tests.chat_harness import _FakeProc, build_chat_bot
+from tests.chat_harness import _FakeProc, _ScriptedProc, build_chat_bot
 from tests.helpers import bind_test_db, save_workout
 from stamind import clock, settings
 from stamind.chat import keyboards, replies, runner, scheduler, telegram_api
@@ -33,6 +34,7 @@ from stamind.chat.app import ChatBot
 from stamind.cli.render import calendar_page, plan_page, progress_page
 from stamind.config import config
 from stamind.page_files import sync as page_files
+from stamind.sentinels import emit_buttons
 from stamind.strength import logger
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -213,14 +215,14 @@ class GymKeyboardTest(unittest.TestCase):
 
     def test_a_gym_day_puts_the_button_above_the_usual_labels(self):
         self.a_gym_day(clock.today_str())
-        _kind, rows = build_chat_bot(self)._keyboard()
+        _kind, rows = build_chat_bot(self)._keyboard(42)
         label, url = rows[0][0]
         self.assertEqual(label, "🏋️ Log today's gym")
         self.assertTrue(url.startswith(logger.PAGE_URL + "#s="), url)
         self.assertEqual(rows[1:], self.plain_rows())
 
     def test_a_week_with_no_gym_day_keeps_the_plain_keyboard(self):
-        _kind, rows = build_chat_bot(self)._keyboard()
+        _kind, rows = build_chat_bot(self)._keyboard(42)
         self.assertEqual(rows, self.plain_rows())
 
     def test_with_the_setting_off_there_is_no_button_and_no_database_read(self):
@@ -228,9 +230,74 @@ class GymKeyboardTest(unittest.TestCase):
         settings.write(settings.STRENGTH_LOGGER, "off")
         chat_bot = build_chat_bot(self)
         with mock.patch.object(self.db, "get_workouts") as never:
-            _kind, rows = chat_bot._keyboard()
+            _kind, rows = chat_bot._keyboard(42)
         self.assertEqual(rows, self.plain_rows())
         never.assert_not_called()
+
+
+class GymButtonRefreshTest(unittest.IsolatedAsyncioTestCase):
+    """It is Monday. The keyboard went out with the heavy lift under 🏋️. The athlete accepts
+    a light one, and the reply that says so has an inline button, so it brings no keyboard.
+    The bot sends one more line under a fresh keyboard (DESIGN_gym_logger.md §6)."""
+
+    LIGHT = dict(GymKeyboardTest.BELT_SQUAT, load_kg=120.0)
+
+    def setUp(self):
+        self.db = bind_test_db(test_db_path("test_chat_process.db"))
+        patcher = mock.patch.object(
+            ChatBot, "_page_buttons",
+            return_value=(GymKeyboardTest.CALENDAR, GymKeyboardTest.PLAN, None))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.today = clock.today_str()
+        save_workout(self.db, date=self.today, sport_type="strength_training",
+                     title="Heavy lift", prescribed_sets=[GymKeyboardTest.BELT_SQUAT])
+        self.chat_bot = build_chat_bot(self)
+
+    def lighten(self):
+        save_workout(self.db, date=self.today, sport_type="strength_training",
+                     title="Light lift", modification_reason="resting heart rate up",
+                     prescribed_sets=[self.LIGHT])
+
+    async def reply(self, *lines):
+        await self.chat_bot._drive(runner.Session(42, _ScriptedProc(lines), "t4p"))
+
+    def with_a_button(self):
+        out = io.StringIO()
+        emit_buttons([{"label": "🔎 Tell me more", "send": "more"}], out=out)
+        return out.getvalue()
+
+    async def test_a_reply_with_inline_buttons_is_followed_by_the_new_button(self):
+        await self.chat_bot._send_keyed(42, "Good morning.")
+        self.lighten()
+        await self.reply("Done — your week is updated.\n", self.with_a_button())
+        self.assertEqual(self.chat_bot.bot.texts()[1:], [
+            "Done — your week is updated.",
+            "🏋️ The gym button now opens today's session: Light lift.",
+        ])
+        _kind, rows = self.chat_bot.bot.sent[-1][2]["reply_markup"]
+        self.assertEqual(rows[0][0], self.chat_bot._gym_button())
+        await self.reply("Anything else?\n", self.with_a_button())
+        self.assertEqual(len(self.chat_bot.bot.sent), 4)
+
+    async def test_a_reply_under_the_keyboard_needs_no_line(self):
+        await self.chat_bot._send_keyed(42, "Good morning.")
+        self.lighten()
+        await self.reply("Done — your week is updated.\n")
+        self.assertEqual(len(self.chat_bot.bot.sent), 2)
+
+    async def test_after_a_start_the_chat_is_taken_to_hold_the_button_of_that_moment(self):
+        await self.reply("Good morning.\n", self.with_a_button())
+        self.lighten()
+        await self.reply("Done — your week is updated.\n", self.with_a_button())
+        self.assertEqual(self.chat_bot.bot.texts()[-1],
+                         "🏋️ The gym button now opens today's session: Light lift.")
+
+    def test_the_line_names_the_day_or_says_the_button_is_gone(self):
+        lift = {"date": "2026-11-19", "title": "Light lift"}
+        self.assertEqual(keyboards.gym_moved_line(lift, "2026-11-16"),
+                         "🏋️ The gym button now opens Thursday's session: Light lift.")
+        self.assertEqual(keyboards.gym_moved_line(None, "2026-11-16"), keyboards.GYM_GONE_LINE)
 
 
 class CalendarKeyboardTest(unittest.TestCase):
@@ -244,7 +311,7 @@ class CalendarKeyboardTest(unittest.TestCase):
     def test_the_calendar_cell_opens_the_page_with_today_packed_in(self):
         save_workout(self.db, date=clock.today_str(), sport_type="running", title="Easy run",
                      duration_minutes=40)
-        _kind, rows = build_chat_bot(self)._keyboard()
+        _kind, rows = build_chat_bot(self)._keyboard(42)
         label, url = rows[0][1]
         self.assertEqual(label, keyboards.CALENDAR_LABEL)
         head, packed = url.split("#c=")
@@ -261,7 +328,7 @@ class CalendarKeyboardTest(unittest.TestCase):
         """No snapshot, only the way to the file, in place of the command
         (DESIGN_progress_page.md §5). Unpublished, the case above keeps the command."""
         with mock.patch.object(page_files, "button_params", return_value="&k=key&b=pages&f=1"):
-            _kind, rows = build_chat_bot(self)._keyboard()
+            _kind, rows = build_chat_bot(self)._keyboard(42)
         self.assertEqual(rows[2][0], (keyboards.PROGRESS_LABEL,
                                       progress_page.PAGE_URL + "#k=key&b=pages&f=1"))
 
