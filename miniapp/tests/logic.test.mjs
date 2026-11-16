@@ -310,6 +310,9 @@ test("the search finds a class by the name people use for it", async () => {
   assert.deepEqual(logic.searchExercises(catalog, "Pallof press", null).map((r) => r.k),
                    ["CORE/CABLE_CORE_PRESS"]);
   assert.equal(logic.searchExercises(catalog, "copenhagen", null)[0].k, "PLANK/COPENHAGEN_PLANK");
+  // The name people use ranks like the name, ahead of "banded exercises: back extension".
+  assert.equal(logic.searchExercises(catalog, "back extension", null)[0].k,
+               "HYPEREXTENSION/HYPEREXTENSION");
 });
 
 test("the page draws a session only when it is version 2", () => {

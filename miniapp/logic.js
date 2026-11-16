@@ -620,6 +620,7 @@ function nameRank(name, first) {
 // The word "weighted" is left out of what is typed: a weighted twin is its class with a load.
 // The hits are ranked on the name after the category, because every entry starts with its
 // category and "curl" would otherwise fill the list with the curl category and hide "leg curl".
+// A name people use ranks like the name (§3.2): "back extension" puts "hyperextension" first.
 export function searchExercises(catalog, query, pattern) {
   const tokens = String(query || "").toLowerCase().split(/\s+/)
     .filter((token) => token && token !== "weighted");
@@ -634,7 +635,9 @@ export function searchExercises(catalog, query, pattern) {
   const hits = scoped.filter((row) => tokens.every((token) => holds(row, token)))
     .map((row) => {
       const name = nameAfterCategory(row.w);
-      return { row, name, rank: nameRank(name, first) };
+      const also = row.a ? row.a.split(", ") : [];
+      const rank = Math.min(...[name, ...also].map((each) => nameRank(each, first)));
+      return { row, name, rank };
     });
   hits.sort((a, b) => {
     if (a.rank !== b.rank) {
