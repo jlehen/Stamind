@@ -44,8 +44,10 @@ def rows():
 
 
 def text() -> str:
-    """The file's exact contents, so the test can compare without rewriting it."""
-    return json.dumps(rows(), ensure_ascii=False, separators=(",", ":")) + "\n"
+    """The file's exact contents, so the test can compare without rewriting it. One exercise
+    per line, so a diff shows the rows that changed."""
+    lines = (json.dumps(row, ensure_ascii=False, separators=(",", ":")) for row in rows())
+    return "[\n" + ",\n".join(lines) + "\n]\n"
 
 
 def main():
