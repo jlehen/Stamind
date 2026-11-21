@@ -324,8 +324,8 @@ h1 {
   background: var(--line);
 }
 
-/* On a 360px phone the set's mark leaves the numbers too little room for "137.5". */
-@media (max-width: 374px) {
+/* Under 390px the set's mark leaves the numbers too little room for "137.5". */
+@media (max-width: 389px) {
   .step {
     width: 32px;
   }
@@ -737,4 +737,29 @@ h1 {
   background: var(--card);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
+}
+
+/* ----- a 320px phone: the same page, its buttons and gaps drawn smaller ----- */
+
+@media (max-width: 349px) {
+  .act, .pill {
+    font-size: 12px;
+  }
+
+  .pill.undo {
+    font-size: 22px;
+  }
+
+  .set {
+    grid-template-columns: 26px 1fr 1fr var(--tap);
+    gap: 4px;
+  }
+
+  .step {
+    width: 24px;
+  }
+
+  .split-word {
+    font-size: 10px;
+  }
 }
