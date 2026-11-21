@@ -142,10 +142,10 @@ h1 {
 /* The header's actions take the Start blue, and Start over the danger red, tinted rather than
    filled so Start stays the one solid button. A Telegram theme's card colour can be white. */
 .act {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 36px;
-  padding: 0 6px;
+  padding: 0 2px;
   border: 1px solid var(--start);
   border-radius: 10px;
   background: transparent;
@@ -502,7 +502,7 @@ h1 {
 /* ----- a past log opened from the calendar, until Edit unlocks it (§8) ----- */
 
 .locked .step, .locked .moves, .locked .tools, .locked .note:placeholder-shown,
-.locked #add-exercise, .locked #finish, .locked #undo {
+.locked #add-exercise, .locked #finish, .locked #undo, .locked #order {
   display: none;
 }
 
@@ -596,6 +596,71 @@ h1 {
   display: block;
   font-size: 12px;
   color: var(--hint);
+}
+
+/* The Order sheet's lines: short, so a long session shows whole or nearly (§1). */
+#order-sheet .sheet-box {
+  max-height: 96vh;
+}
+
+#order-sheet .sheet-note {
+  margin: 0 0 4px;
+}
+
+.order-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+}
+
+.order-row.picked {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.order-row.swapped {
+  background: color-mix(in srgb, var(--done) 22%, transparent);
+}
+
+.order-kind {
+  flex: none;
+  width: 62px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--hint);
+}
+
+.order-kind.warmup {
+  color: #d98a1c;
+  font-weight: 600;
+}
+
+.order-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-load {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--hint);
+}
+
+.order-row.picked .order-kind, .order-row.picked .order-load {
+  color: inherit;
 }
 
 .empty, .sheet-note {

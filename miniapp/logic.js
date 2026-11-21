@@ -395,6 +395,17 @@ export function moveExercise(state, xi, delta) {
   return after;
 }
 
+// The Order sheet's one move: the cards at `a` and `b` trade places (§1).
+export function swapExercises(state, a, b) {
+  const last = state.x.length - 1;
+  if (a === b || a < 0 || b < 0 || a > last || b > last) {
+    return state;
+  }
+  const after = next(state);
+  [after.x[a], after.x[b]] = [after.x[b], after.x[a]];
+  return after;
+}
+
 export function setExerciseNote(state, xi, text) {
   const after = next(state);
   after.x[xi].note = text;

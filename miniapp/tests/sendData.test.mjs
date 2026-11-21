@@ -93,6 +93,38 @@ test("a log Telegram does not take comes back as a sheet to copy", async (t) => 
   });
 });
 
+test("the Order sheet makes two tapped exercises trade places", async (t) => {
+  await onPhone(t, async (page, site) => {
+    await page.goto(`${site}/`, { waitUntil: "networkidle" });
+    await page.waitForSelector(".card");
+    const names = () => page.locator(".card .chip").allTextContents();
+    const before = await names();
+
+    // The sheet covers the page, so Telegram's bottom button hides under it.
+    await page.locator("#order").click();
+    assert.equal(await page.evaluate(() => window.__mainButton), false);
+    const rows = page.locator("#order-rows .order-row");
+    assert.equal(await rows.count(), before.length);
+
+    // A tap on the picked line lets it go; two different lines trade places.
+    await rows.nth(0).click();
+    await rows.nth(0).click();
+    assert.deepEqual(await names(), before);
+    await rows.nth(0).click();
+    await rows.nth(3).click();
+    const after = await names();
+    assert.equal(after[0], before[3]);
+    assert.equal(after[3], before[0]);
+    assert.equal(await page.locator("#order-rows .swapped").count(), 2);
+
+    // One swap is one Undo step.
+    await page.locator("#order-close").click();
+    assert.equal(await page.evaluate(() => window.__mainButton), true);
+    await page.locator("#undo").click();
+    assert.deepEqual(await names(), before);
+  });
+});
+
 // Thursday 24 September as its month's file brings it: the sheet, and the gym log beside its
 // session. The curls were added, the leg press stood for the squat, the pull-ups were not done.
 const LOGGED_DAY = {

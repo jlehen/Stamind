@@ -58,6 +58,17 @@ the header's Undo brings it back.
 Undo never takes back a Finish: once a log is sent, the fix is an edit and "Send again".
 The undo history is saved on the phone with the rest, so a reopened page can still undo.
 
+A card's ↑ and ↓ move it one place. A card is a third of a screen tall, so a longer move
+goes through the header's "Order" button. It opens a sheet with one short line per card: its
+tag, its name and its first set's load, with a ✓ once every set is ticked. A tap picks a line,
+and a tap on another line makes the two cards trade places; a second tap on the picked line
+lets it go. Each trade is one Undo step. Here is an example. It is Monday, and the session
+pairs the hip thrust with the shoulder press and the lunge with the row. The shoulder press
+bench is taken. The athlete opens Order, taps the shoulder press warm-up and the row warm-up,
+then the two main cards: four taps, and the hip thrust now goes with the row and the lunge
+with the shoulder press. Not handled: moving a group past a group of another size in one
+go, which stays a card at a time.
+
 The clock does not run when the page opens. At 17:50, in the changing room, the athlete
 sees the leg press is out of order and swaps it before walking in. The header shows a
 "Start" button where the timer will be. At 18:00 they tap it, and the timer appears and

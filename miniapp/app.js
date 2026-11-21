@@ -28,6 +28,10 @@ const ui = {
   rest: document.getElementById("rest"),
   startClock: document.getElementById("start-clock"),
   undo: document.getElementById("undo"),
+  order: document.getElementById("order"),
+  orderSheet: document.getElementById("order-sheet"),
+  orderRows: document.getElementById("order-rows"),
+  orderClose: document.getElementById("order-close"),
   resetClock: document.getElementById("reset-clock"),
   resumeClock: document.getElementById("resume-clock"),
   cards: document.getElementById("cards"),
@@ -89,6 +93,10 @@ let searchPart = null;
 let replacePattern = null;
 // The chip whose three buttons show, `{ card, part }`, or null. Not saved.
 let openChip = null;
+// In the Order sheet: the id of the card waiting for its partner, or null, and the ids of the
+// two cards that last traded places. Not saved.
+let orderPicked = null;
+let orderSwapped = [];
 
 // ---------------------------------------------------------------------------------------
 // Saving. Telegram's own device storage when the app has it, the browser's otherwise (§1).
@@ -249,6 +257,7 @@ function render() {
   }
   setFinishLabel(finished ? "Send again" : "Finish");
   ui.undo.disabled = !history.length;
+  renderOrder();
   renderOpened();
   tick();
 }
@@ -274,7 +283,7 @@ function syncMainButton() {
   if (!inTelegram) {
     return;
   }
-  const sheetUp = !ui.searchSheet.hidden || !ui.outputSheet.hidden;
+  const sheetUp = !ui.searchSheet.hidden || !ui.outputSheet.hidden || !ui.orderSheet.hidden;
   if (sheetUp || (opened && locked)) {
     tg.MainButton.hide();
   } else {
@@ -500,6 +509,60 @@ function tick() {
   const last = logic.lastSetSeconds(state);
   ui.restLabel.textContent = done ? "since last set" : "since start";
   ui.restValue.textContent = logic.formatMMSS(secondsNow() - last);
+}
+
+// ---------------------------------------------------------------------------------------
+// The Order sheet: one line per card, so the whole session is in reach without scrolling. A
+// tap picks a line, a tap on another makes the two trade places, one Undo step each (§1).
+// ---------------------------------------------------------------------------------------
+
+function showOrder(shown) {
+  orderPicked = null;
+  orderSwapped = [];
+  ui.orderSheet.hidden = !shown;
+  syncMainButton();
+  renderOrder();
+}
+
+function renderOrder() {
+  if (ui.orderSheet.hidden) {
+    return;
+  }
+  ui.orderRows.replaceChildren(...state.x.map(orderRow));
+}
+
+function orderRow(exercise, xi) {
+  const row = button("", "order-row", () => onOrderTap(xi));
+  if (exercise.id === orderPicked) {
+    row.classList.add("picked");
+  }
+  if (orderSwapped.includes(exercise.id)) {
+    row.classList.add("swapped");
+  }
+  row.setAttribute("aria-pressed", String(exercise.id === orderPicked));
+  row.append(el("span", exercise.warmup ? "order-kind warmup" : "order-kind",
+                exercise.warmup ? "Warm-up" : "Main"));
+  row.append(el("span", "order-name", logic.wordsOf(catalog, exercise.n)));
+  const kg = exercise.sets[0].kg;
+  const load = kg === null ? logic.formatKg(kg) : `${logic.formatKg(kg)} kg`;
+  const ticked = exercise.sets.every((set) => set.done);
+  row.append(el("span", "order-load", ticked ? `✓ ${load}` : load));
+  return row;
+}
+
+function onOrderTap(xi) {
+  const id = state.x[xi].id;
+  const from = state.x.findIndex((exercise) => exercise.id === orderPicked);
+  if (from < 0 || from === xi) {
+    // The first tap picks the line, and a second tap on it lets it go.
+    orderPicked = from === xi ? null : id;
+    orderSwapped = [];
+    renderOrder();
+    return;
+  }
+  orderSwapped = [orderPicked, id];
+  orderPicked = null;
+  apply(logic.swapExercises(state, from, xi));
 }
 
 // ---------------------------------------------------------------------------------------
@@ -779,6 +842,8 @@ function wire() {
     locked = !locked;
     render();
   });
+  ui.order.addEventListener("click", () => showOrder(true));
+  ui.orderClose.addEventListener("click", () => showOrder(false));
   ui.searchInput.addEventListener("input", renderResults);
   ui.searchAll.addEventListener("change", renderResults);
   ui.searchClose.addEventListener("click", closeSearch);

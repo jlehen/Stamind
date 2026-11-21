@@ -202,6 +202,18 @@ test("moving an exercise reorders the cards and leaves the positions alone", () 
   assert.deepEqual(logic.moveExercise(state, 1, 1), state);
 });
 
+test("swapping two exercises makes them trade places and leaves the positions alone", () => {
+  let state = exampleState();
+  state = logic.addExercise(state, "ROW/SEATED_CABLE_ROW", false);
+  state = logic.swapExercises(state, 0, 2);
+  assert.deepEqual(state.x.map((x) => x.n),
+                   ["ROW/SEATED_CABLE_ROW", "PULL_UP/PULL_UP", "SQUAT/BELT_SQUAT"]);
+  assert.deepEqual(state.x.map((x) => x.p), [null, 2, 1]);
+  // A card with itself, or a place that is not there, changes nothing.
+  assert.deepEqual(logic.swapExercises(state, 1, 1), state);
+  assert.deepEqual(logic.swapExercises(state, 0, 3), state);
+});
+
 test("removing an exercise drops it, removing a set stops at the last one", () => {
   let state = exampleState();
   state = logic.removeExercise(state, 0);
