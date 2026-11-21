@@ -29,7 +29,7 @@ wins over a newer revision of its day. One nobody has started gives way to it, w
 Each card has an "Insert" button. It puts the new exercise right after that card, so a
 face pull added after the rows does not have to climb up from the bottom one tap at a time.
 The buttons that act on the whole exercise sit with its name, in a block of bare icons on the
-right: ↑ and ↓ on top, ⇆ (Replace) and ✕ (Delete) under them, and 📷 in a column of its own
+right: ↑ and ↓ on top, ⇆ (Replace) and a red ✕ (Delete) under them, and 📷 in a column of its own
 on the left of ↑ when the exercise has photos. ⇆ puts another exercise in the card's place.
 Its search keeps the card's movement pattern as a filter, and says so beside the "Search
 every exercise" box that lifts it ("— only single leg"); Insert and Add search everything.

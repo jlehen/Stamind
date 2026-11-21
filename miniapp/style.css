@@ -313,6 +313,10 @@ h1 {
   font-size: 16px;
 }
 
+.move.del {
+  color: var(--danger);
+}
+
 /* A ✕ tapped once, waiting for the second tap (§1). The light theme's red in both themes: the
    dark theme's is a text colour, too pale under a white ✕. */
 .move.del.armed {
