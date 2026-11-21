@@ -558,22 +558,6 @@ test("Replace on a card of two lines renames every row and drops both written lo
                    [{ n: "SQUAT/LEG_PRESS", p: 1, sets: [[5, 120, 30]] }]);
 });
 
-test("Dup adds the card's exercise right after it, its sets as they stand, none ticked", () => {
-  let state = exampleState();
-  state = logic.setKg(state, 0, 0, 100);
-  state = tickSet(state, 0, 0, 30);
-  state = logic.toggleWarmup(state, 0, 0);
-  state = logic.duplicateExercise(state, 0);
-  assert.deepEqual(state.x.map((x) => x.n),
-                   ["SQUAT/BELT_SQUAT", "SQUAT/BELT_SQUAT", "PULL_UP/PULL_UP"]);
-  const copy = state.x[1];
-  assert.equal(copy.id, 3);
-  assert.deepEqual(copy.lines, []);
-  assert.deepEqual(copy.sets.map((set) => [set.reps, set.kg, set.done, set.p, set.w]),
-                   [[6, 100, false, null, true], [6, 140, false, null, false],
-                    [6, 140, false, null, false]]);
-});
-
 test("a timer reset brings Start back, and the ticked sets are measured from the new start", () => {
   // Start at 17:50 by mistake, a set ticked at 18:05, then the timer reset.
   const early = new Date(2026, 8, 24, 17, 50, 0).getTime();

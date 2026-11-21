@@ -30,11 +30,9 @@ Each card has an "Insert" button. It puts the new exercise right after that card
 face pull added after the rows does not have to climb up from the bottom one tap at a time.
 The button that puts another exercise in a card's place is "⇆ Replace". Its search keeps the
 card's movement pattern as a filter, and says so beside the "Search every exercise" box
-that lifts it ("— only single leg"); Insert and Add search everything. "❐ Dup" puts a copy
-of the card right after it: the same exercise, its sets with the reps and kilograms they
-show now, none ticked. Like an inserted card, the copy stands for no line of the session.
-The card's eight cells (↶, Set, W Set, Replace, Insert, Dup, Del, Pic) sit in two rows of
-four, so their labels stay short. "Set" and "W Set" are split pills: a tap on the left half,
+that lifts it ("— only single leg"); Insert and Add search everything.
+The card's seven cells (↶, Set, W Set, Replace, Insert, Del, Pic) sit in two rows, four to a
+row, so their labels stay short. "Set" and "W Set" are split pills: a tap on the left half,
 "−", takes a row away, and a tap on the right half, "+", adds one. Each number box says what
 it holds, "reps" or "kg", under the number.
 

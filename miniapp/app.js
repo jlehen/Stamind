@@ -344,7 +344,6 @@ function exerciseCard(exercise, xi) {
   tools.append(...setButtons(xi, id));
   tools.append(button("⇆ Replace", "pill", () => openSearch("swap", xi)));
   tools.append(button("⤵ Insert", "pill", () => openSearch("insert", xi)));
-  tools.append(button("❐ Dup", "pill", () => apply(logic.duplicateExercise(state, xi))));
   tools.append(button("✕ Del", "pill danger", () => apply(logic.removeExercise(state, xi))));
   if (photos.length) {
     const label = photosOpen.has(exercise.n) ? "📷 Hide" : "📷 Pic";

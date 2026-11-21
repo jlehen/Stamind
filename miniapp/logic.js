@@ -408,14 +408,6 @@ export function addExercise(state, name, bodyweight, at = state.x.length) {
   return insertAdded(next(state), at, name, sets);
 }
 
-// Dup: the card's exercise added right after it, with its sets as they stand and their warm-up
-// marks, none ticked. Like an inserted card, it stands for no written line (§1).
-export function duplicateExercise(state, xi) {
-  const source = state.x[xi];
-  const sets = source.sets.map((set) => ({ ...set, done: false, t: null, p: null }));
-  return insertAdded(next(state), xi + 1, source.n, sets);
-}
-
 function insertAdded(after, at, name, sets) {
   const id = after.nextId;
   after.nextId += 1;

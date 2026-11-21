@@ -244,7 +244,7 @@ movement whose bare name is shared keeps its brackets, "[Row] Face pull" (D23).
 `perSideOf` reads the per-side rule of §3, so the reps boxes say "/side" as for any one-sided
 exercise. `photosOf` shows the first movement's photos. `patternOf` is already null for any key
 the catalog lacks, a chain's included, so the card's Replace on a chain card searches every
-exercise with no pattern filter and needs no change. The card's Replace, Del and Dup act on the
+exercise with no pattern filter and needs no change. The card's Replace and Del act on the
 whole card, as today.
 
 **Building and changing a chain.** Nothing is added to the card's buttons and nothing to the
@@ -303,7 +303,7 @@ Each is a case a plausible athlete rarely meets, left out on purpose with the be
   the strength planner writes as "clean → press → clean" passes too. A chain the model composes
   badly is a chain the athlete reads before lifting and swaps.
 - Chaining a card with ticked sets makes those sets rounds of the chain, as a swap renames them.
-  To keep them as they were, Dup the card and chain the copy.
+  To keep them as they were, Insert the same exercise after the card and chain that one.
 - A chain holding one two-handed movement and one per-side movement is per side as a whole (§3):
   "kettlebell swing → kettlebell halo" at 8 rounds a side is 16 swings a set. The notes say how
   the sides are done, and the athlete who means 8 swings logs 4 a side.
